@@ -138,10 +138,13 @@ bb3(%5 : $Builtin.NativeObject):
   br bb4(%5 : $Builtin.NativeObject)
 
 bb4(%6 : $Builtin.NativeObject):
-  cond_br undef, bb4(%6 : $Builtin.NativeObject), bb5
+  cond_br undef, bb6(%6 : $Builtin.NativeObject), bb5
 
 bb5:
   return undef : $()
+
+bb6(%7 : $Builtin.NativeObject):
+  br bb4(%7 : $Builtin.NativeObject)
 }
 
 // All of the SSA values in the given function can be resolved to %0.

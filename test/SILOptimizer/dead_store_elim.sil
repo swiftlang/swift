@@ -364,7 +364,7 @@ bb0(%0 : $*Builtin.Int32):
   %1 = integer_literal $Builtin.Int32, 0
   %2 = integer_literal $Builtin.Int32, 1
   store %1 to %0 : $*Builtin.Int32
-  cond_br undef, bb1, bb2
+  cond_br undef, bb1, bb3
 
 bb1:
   store %2 to %0 : $*Builtin.Int32
@@ -373,6 +373,9 @@ bb1:
 bb2:
   %9999 = tuple()
   return %9999 : $()
+
+bb3:
+  br bb2
 }
 
 // We cannot remove the local store as the debug_value w/ address value
@@ -887,7 +890,7 @@ bb2:
   %18 = struct_element_addr %2 : $*S1, #S1.a
   store %17 to %18 : $*Int
   %9 = struct_extract %0 : $Bool, #Bool.value
-  cond_br %9, bb1, bb3
+  cond_br %9, bb4, bb3
 
 bb3:
   %21 = integer_literal $Builtin.Int64, 2
@@ -897,6 +900,9 @@ bb3:
   %25 = tuple ()
   dealloc_stack %2 : $*S1
   return %25 : $()
+
+bb4:
+  br bb1
 }
 
 // Remove dead stores in loop blocks, as the store in exit block kills them.
@@ -930,7 +936,7 @@ bb2:
   %18 = struct_element_addr %2 : $*S1, #S1.a
   store %17 to %18 : $*Int
   %9 = struct_extract %0 : $Bool, #Bool.value
-  cond_br %9, bb1, bb3
+  cond_br %9, bb4, bb3
 
 bb3:
   %21 = integer_literal $Builtin.Int64, 2
@@ -940,6 +946,9 @@ bb3:
   %25 = tuple ()
   dealloc_stack %2 : $*S1
   return %25 : $()
+
+bb4:
+  br bb1
 }
 
 // Remove dead store in the tuple data structure.
@@ -1354,7 +1363,7 @@ bb0(%0 : $Bool, %1 : $Int):
 
 bb1:
   %12 = struct_extract %0 : $Bool, #Bool.value
-  cond_br %12, bb1, bb2
+  cond_br %12, bb3, bb2
 
 bb2:
   %14 = integer_literal $Builtin.Int64, 2
@@ -1364,6 +1373,9 @@ bb2:
   %18 = tuple ()
   dealloc_stack %2 : $*S1
   return %18 : $()
+
+bb3:
+  br bb1
 }
 
 // Make sure the load in bb1 prevents the store in bb0 to be eliminated. we have a bug
@@ -1493,13 +1505,16 @@ bb1(%2 : $foo):
   %6 = ref_element_addr %2 : $foo, #foo.a
   store %5 to %6 : $*Int
   %9 = alloc_ref $foo
-  cond_br undef, bb1(%9: $foo), bb2
+  cond_br undef, bb3, bb2
 
 bb2:
   %7 = ref_element_addr %2 : $foo, #foo.a
   store %5 to %7 : $*Int
   %14 = tuple ()
   return %14 : $()
+
+bb3:
+  br bb1(%9 : $foo)
 }
 
 // CHECK-LABEL: test_is_unique

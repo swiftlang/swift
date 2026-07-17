@@ -51,17 +51,27 @@ bb6:
   return %r : $()
 }
 
+// Note: this function originally had 5 critical edges (bb3->bb5, bb3->bb7,
+// bb5->bb2, bb6->bb1, bb6->bb7), which are no longer allowed by the SIL
+// verifier. Trampoline blocks bb8-bb12 were inserted to split those edges.
+// Of those, bb8 and bb10 (splitting bb3->bb5 and bb5->bb2) get swept into the
+// backward range walk, and bb9 (splitting bb3->bb7) becomes the new exit
+// block reached from bb3, which changes the expected instruction/block exit
+// below from bb7's `tuple ()` to bb9's `br bb7`. bb11 and bb12 (splitting
+// bb6->bb1 and bb6->bb7) are not discovered by the walk, since bb6 is an end
+// block and the walk does not look past `begin` (bb1) or past end blocks'
+// forward successors.
 // CHECK-LABEL: Instruction range in loops:
 // CHECK-NEXT: begin:      %3 = string_literal utf8 "begin"
 // CHECK-NEXT: ends:       %10 = string_literal utf8 "end"
-// CHECK-NEXT: exits:      %12 = tuple ()
+// CHECK-NEXT: exits:      br bb7
 // CHECK-NEXT: interiors:
 // CHECK-NEXT: Block range in loops:
 // CHECK-NEXT: begin:     bb1
-// CHECK-NEXT: range:     [bb5, bb3, bb2, bb1, bb4]
-// CHECK-NEXT: inclrange: [bb6, bb5, bb3, bb2, bb1, bb4]
+// CHECK-NEXT: range:     [bb5, bb4, bb2, bb1, bb10, bb8, bb3]
+// CHECK-NEXT: inclrange: [bb6, bb5, bb4, bb2, bb1, bb10, bb8, bb3]
 // CHECK-NEXT: ends:      [bb6]
-// CHECK-NEXT: exits:     [bb7]
+// CHECK-NEXT: exits:     [bb9]
 // CHECK-NEXT: interiors: []
 // CHECK-NEXT: End function loops
 sil @loops : $@convention(thin) () -> () {
@@ -77,17 +87,28 @@ bb1:
 bb2:
   cond_br undef, bb3, bb4
 bb3:
-  cond_br undef, bb5, bb7
+  cond_br undef, bb8, bb9
 bb4:
   br bb5
 bb5:
-  cond_br undef, bb2, bb6
+  cond_br undef, bb10, bb6
 bb6:
   %8 = string_literal utf8 "end"
-  cond_br undef, bb1, bb7
+  cond_br undef, bb11, bb12
 bb7:
   %r = tuple()
   return %r : $()
+// trampolines below to avoid critical edges (bb3->bb5, bb3->bb7, bb5->bb2, bb6->bb1, bb6->bb7)
+bb8:
+  br bb5
+bb9:
+  br bb7
+bb10:
+  br bb2
+bb11:
+  br bb1
+bb12:
+  br bb7
 }
 
 // CHECK-LABEL: Instruction range in minimal:

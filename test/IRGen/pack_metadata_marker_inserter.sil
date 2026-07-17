@@ -223,7 +223,10 @@ sil @split_critical_edge_in_modified_function : $<each T>() -> () {
 entry:
   %take = function_ref @takeTypePack : $@convention(thin) <each T>() -> ()
   apply %take<Pack{repeat each T}>() : $@convention(thin) <each T>() -> ()
-  cond_br undef, left, exit
+  cond_br undef, left, right
+
+right:
+  br exit
 
 left:
   br exit
@@ -235,17 +238,37 @@ exit:
 
 // Functions which don't need markers don't have critical edges split.
 // CHECK-SIL-LABEL: sil @dont_split_critical_edge_in_modified_function {{.*}} {
-// CHECK-SIL:         cond_br undef, [[LOOP:bb[0-9]+]], [[EXIT:bb[0-9]+]]
+// CHECK-SIL:         cond_br undef, [[PREHEADER:bb[0-9]+]], [[EXIT1:bb[0-9]+]]
+// CHECK-SIL:       [[PREHEADER]]:
+// CHECK-SIL:         br [[LOOP:bb[0-9]+]]
 // CHECK-SIL:       [[LOOP]]:
-// CHECK-SIL:         cond_br undef, [[LOOP]], [[EXIT]]
+// CHECK-SIL:         cond_br undef, [[BACKEDGE:bb[0-9]+]], [[EXIT2:bb[0-9]+]]
+// CHECK-SIL:       [[BACKEDGE]]:
+// CHECK-SIL:         br [[LOOP]]
+// CHECK-SIL:       [[EXIT1]]:
+// CHECK-SIL:         br [[EXIT:bb[0-9]+]]
+// CHECK-SIL:       [[EXIT2]]:
+// CHECK-SIL:         br [[EXIT]]
 // CHECK-SIL:       [[EXIT]]:
 // CHECK-SIL-LABEL: } // end sil function 'dont_split_critical_edge_in_modified_function'
 sil @dont_split_critical_edge_in_modified_function : $<each T>() -> () {
 entry:
-  cond_br undef, loop, exit
+  cond_br undef, preheader, exit1
+
+preheader:
+  br loop
 
 loop:
-  cond_br undef, loop, exit
+  cond_br undef, backedge, exit2
+
+backedge:
+  br loop
+
+exit1:
+  br exit
+
+exit2:
+  br exit
 
 exit:
   %retval = tuple ()
@@ -301,7 +324,7 @@ right:
 sil @frontier_has_self_loop : $<each T>() -> () {
   %take = function_ref @takeTypePack : $@convention(thin) <each T>() -> ()
   apply %take<Pack{repeat each T}>() : $@convention(thin) <each T>() -> ()
-  cond_br undef, loop, right
+  cond_br undef, enter, right
 
 enter:
   br loop

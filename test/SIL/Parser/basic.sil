@@ -1618,8 +1618,8 @@ sil @value_names : $@convention(thin) (Builtin.Int1) -> () {
 entry(%param : $Builtin.Int1):
 // CHECK-NEXT: %1 = tuple ()
   %v_o_i_d = tuple ()
-// CHECK-NEXT: cond_br %0, bb1, bb2
-  cond_br %param, then, else
+// CHECK-NEXT: cond_br %0, bb1, bb3
+  cond_br %param, then, elseTrampoline
 
 // CHECK: bb1:
 then:
@@ -1634,6 +1634,11 @@ else:
   %3void = tuple ()
 // CHECK-NEXT: return %5 : $()
   return %3void : $()
+
+// CHECK: bb3:
+elseTrampoline:
+// CHECK-NEXT: br bb2
+  br else
 }
 // CHECK: } // end sil function 'value_names'
 

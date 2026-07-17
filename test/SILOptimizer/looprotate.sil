@@ -245,11 +245,11 @@ bb0:
 
 bb1(%1 : $Builtin.Int32, %2 : $Builtin.Int32):    // Preds: bb0 bb2
   %3 = integer_literal $Builtin.Int1, 0           // user: %4
-  cond_br %3, bb2(%1 : $Builtin.Int32, %2 : $Builtin.Int32), bb10 // id: %4
+  cond_br %3, bb11, bb10 // id: %4
 
 bb2(%5 : $Builtin.Int32, %6 : $Builtin.Int32):    // Preds: bb1 bb8
   %7 = integer_literal $Builtin.Int1, -1          // user: %8
-  cond_br %7, bb3, bb1(%5 : $Builtin.Int32, %6 : $Builtin.Int32) // id: %8
+  cond_br %7, bb3, bb12 // id: %8
 
 bb3:                                              // Preds: bb2
   %9 = integer_literal $Builtin.Int32, 0          // user: %11
@@ -288,6 +288,12 @@ bb9:                                              // Preds: bb4
 bb10:                                             // Preds: bb1
   %34 = tuple ()                                  // user: %35
   return %34 : $()                                // id: %35
+
+bb11:
+  br bb2(%1 : $Builtin.Int32, %2 : $Builtin.Int32)
+
+bb12:
+  br bb1(%5 : $Builtin.Int32, %6 : $Builtin.Int32)
 }
 
 // CHECK-LABEL: dont_looprotate_objc
@@ -390,17 +396,21 @@ bb5:
 // CHECK: bb0({{.*}}):
 // CHECK:   br bb1
 // CHECK: bb1:
-// CHECK:   cond_br {{.*}}, bb1, bb2
+// CHECK:   cond_br {{.*}}, bb3, bb2
 // CHECK: bb2:
 // CHECK:   return
+// CHECK: bb3:
+// CHECK:   br bb1
 sil @dont_rotate_single_basic_block_loop : $@convention(thin) (Builtin.Int1) -> () {
 bb0(%0 : $Builtin.Int1):
   br bb1
 bb1:
-  cond_br %0, bb1, bb2
+  cond_br %0, bb3, bb2
 bb2:
  %1 = tuple ()
  return %1 : $()
+bb3:
+  br bb1
 }
 
 // CHECK-LABEL: sil @dont_rotate_single_basic_block_loop_split_backedge

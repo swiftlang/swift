@@ -56,7 +56,7 @@ struct S3 {
 // CHECK: bb2({{.*}} : $Builtin.NativeObject, {{.*}} : $S1, {{.*}} : $Builtin.NativeObject, {{.*}} : $Builtin.NativeObject):
 sil @do_not_split_struct_with_only_trivial_fields : $@convention(thin) (Builtin.NativeObject, S1, Builtin.NativeObject, @in S1, Builtin.NativeObject) -> Builtin.Int32 {
 bb0(%0 : $Builtin.NativeObject, %1 : $S1, %2 : $Builtin.NativeObject, %3 : $*S1, %4 : $Builtin.NativeObject):
-  cond_br undef, bb1, bb2(%0 : $Builtin.NativeObject, %1 : $S1, %2 : $Builtin.NativeObject, %4 : $Builtin.NativeObject)
+  cond_br undef, bb1, bb3
 
 bb1:
   br bb2(%0 : $Builtin.NativeObject, %1 : $S1, %2 : $Builtin.NativeObject, %4 : $Builtin.NativeObject)
@@ -64,13 +64,18 @@ bb1:
 bb2(%5 : $Builtin.NativeObject, %6 : $S1, %7 : $Builtin.NativeObject, %9 : $Builtin.NativeObject):
   %10 = struct_extract %6 : $S1, #S1.y
   return %10 : $Builtin.Int32
+
+// Trampoline block to avoid a critical edge from the cond_br in bb0 to bb2
+// (bb2 has two predecessors: bb1 and this trampoline).
+bb3:
+  br bb2(%0 : $Builtin.NativeObject, %1 : $S1, %2 : $Builtin.NativeObject, %4 : $Builtin.NativeObject)
 }
 
 // CHECK-LABEL: sil @do_not_split_struct_with_only_one_non_trivial_field : $@convention(thin) (Builtin.NativeObject, S1_B, Builtin.NativeObject, @in S1_B, Builtin.NativeObject) -> Builtin.NativeObject {
 // CHECK: bb2({{.*}} : $Builtin.NativeObject, {{.*}} : $S1_B, {{.*}} : $Builtin.NativeObject, {{.*}} : $Builtin.NativeObject):
 sil @do_not_split_struct_with_only_one_non_trivial_field : $@convention(thin) (Builtin.NativeObject, S1_B, Builtin.NativeObject, @in S1_B, Builtin.NativeObject) -> Builtin.NativeObject {
 bb0(%0 : $Builtin.NativeObject, %1 : $S1_B, %2 : $Builtin.NativeObject, %3 : $*S1_B, %4 : $Builtin.NativeObject):
-  cond_br undef, bb1, bb2(%0 : $Builtin.NativeObject, %1 : $S1_B, %2 : $Builtin.NativeObject, %4 : $Builtin.NativeObject)
+  cond_br undef, bb1, bb3
 
 bb1:
   br bb2(%0 : $Builtin.NativeObject, %1 : $S1_B, %2 : $Builtin.NativeObject, %4 : $Builtin.NativeObject)
@@ -78,13 +83,18 @@ bb1:
 bb2(%5 : $Builtin.NativeObject, %6 : $S1_B, %7 : $Builtin.NativeObject, %9 : $Builtin.NativeObject):
   %10 = struct_extract %6 : $S1_B, #S1_B.y
   return %10 : $Builtin.NativeObject
+
+// Trampoline block to avoid a critical edge from the cond_br in bb0 to bb2
+// (bb2 has two predecessors: bb1 and this trampoline).
+bb3:
+  br bb2(%0 : $Builtin.NativeObject, %1 : $S1_B, %2 : $Builtin.NativeObject, %4 : $Builtin.NativeObject)
 }
 
 // CHECK-LABEL: sil @split_struct_with_multiple_non_trivial_fields : $@convention(thin) (Builtin.NativeObject, S1_C, Builtin.NativeObject, @in S1_C, Builtin.NativeObject) -> (Builtin.NativeObject, Builtin.NativeObject) {
 // CHECK: bb2({{.*}} : $Builtin.NativeObject, {{.*}} : $Builtin.NativeObject, {{.*}} : $Builtin.NativeObject, {{.*}} : $Builtin.NativeObject, {{.*}} : $Builtin.NativeObject):
 sil @split_struct_with_multiple_non_trivial_fields : $@convention(thin) (Builtin.NativeObject, S1_C, Builtin.NativeObject, @in S1_C, Builtin.NativeObject) -> (Builtin.NativeObject, Builtin.NativeObject) {
 bb0(%0 : $Builtin.NativeObject, %1 : $S1_C, %2 : $Builtin.NativeObject, %3 : $*S1_C, %4 : $Builtin.NativeObject):
-  cond_br undef, bb1, bb2(%0 : $Builtin.NativeObject, %1 : $S1_C, %2 : $Builtin.NativeObject, %4 : $Builtin.NativeObject)
+  cond_br undef, bb1, bb3
 
 bb1:
   br bb2(%0 : $Builtin.NativeObject, %1 : $S1_C, %2 : $Builtin.NativeObject, %4 : $Builtin.NativeObject)
@@ -94,6 +104,11 @@ bb2(%5 : $Builtin.NativeObject, %6 : $S1_C, %7 : $Builtin.NativeObject, %9 : $Bu
   %11 = struct_extract %6 : $S1_C, #S1_C.z
   %12 = tuple(%10 : $Builtin.NativeObject, %11 : $Builtin.NativeObject)
   return %12 : $(Builtin.NativeObject, Builtin.NativeObject)
+
+// Trampoline block to avoid a critical edge from the cond_br in bb0 to bb2
+// (bb2 has two predecessors: bb1 and this trampoline).
+bb3:
+  br bb2(%0 : $Builtin.NativeObject, %1 : $S1_C, %2 : $Builtin.NativeObject, %4 : $Builtin.NativeObject)
 }
 
 // Make sure our rules apply nicely at multiple levels. We split S2 into an S1_B and a native object
@@ -101,7 +116,7 @@ bb2(%5 : $Builtin.NativeObject, %6 : $S1_C, %7 : $Builtin.NativeObject, %9 : $Bu
 // CHECK: bb2({{.*}} : $Builtin.NativeObject, {{.*}} : $Builtin.NativeObject, {{.*}} : $Builtin.NativeObject, {{.*}} : $S1_B, {{.*}} : $Builtin.NativeObject):
 sil @two_level_struct_with_differing_levels_of_splitting : $@convention(thin) (Builtin.NativeObject, S2, Builtin.NativeObject, @in S2, Builtin.NativeObject) -> (Builtin.Int1, Builtin.NativeObject) {
 bb0(%0 : $Builtin.NativeObject, %1 : $S2, %2 : $Builtin.NativeObject, %3 : $*S2, %4 : $Builtin.NativeObject):
-  cond_br undef, bb1, bb2(%0 : $Builtin.NativeObject, %1 : $S2, %2 : $Builtin.NativeObject, %4 : $Builtin.NativeObject)
+  cond_br undef, bb1, bb3
 
 bb1:
   br bb2(%0 : $Builtin.NativeObject, %1 : $S2, %2 : $Builtin.NativeObject, %4 : $Builtin.NativeObject)
@@ -113,19 +128,29 @@ bb2(%5 : $Builtin.NativeObject, %6 : $S2, %7 : $Builtin.NativeObject, %9 : $Buil
   %13 = struct_extract %12 : $S1_B, #S1_B.x
   %14 = tuple(%13 : $Builtin.Int1, %11 : $Builtin.NativeObject)
   return %14 : $(Builtin.Int1, Builtin.NativeObject)
+
+// Trampoline block to avoid a critical edge from the cond_br in bb0 to bb2
+// (bb2 has two predecessors: bb1 and this trampoline).
+bb3:
+  br bb2(%0 : $Builtin.NativeObject, %1 : $S2, %2 : $Builtin.NativeObject, %4 : $Builtin.NativeObject)
 }
 
 // CHECK-LABEL: sil @large_struct_split : $@convention(thin) (Builtin.NativeObject, S3, Builtin.NativeObject, @in S3, Builtin.NativeObject) -> S3 {
 // CHECK: bb2({{.*}} : $Builtin.NativeObject, {{.*}} : $Builtin.NativeObject, {{.*}} : $Builtin.NativeObject, {{.*}} : $Builtin.NativeObject, {{.*}} : $FakeOptional<S2>, {{.*}} : $S1_B, {{.*}} : $FakeOptional<(Builtin.Int32, Builtin.Int64)>, {{.*}} : $Builtin.NativeObject, {{.*}} : $Builtin.NativeObject, {{.*}} : $S1_B, {{.*}} : $FakeOptional<(Builtin.Int32, Builtin.Int64)>, {{.*}} : $Builtin.NativeObject, {{.*}} : $Builtin.NativeObject, {{.*}} : $S1_B, {{.*}} : $FakeOptional<(Builtin.Int32, Builtin.Int64)>, {{.*}} : $Builtin.NativeObject, {{.*}} : $Builtin.NativeObject):
 sil @large_struct_split : $@convention(thin) (Builtin.NativeObject, S3, Builtin.NativeObject, @in S3, Builtin.NativeObject) -> S3 {
 bb0(%0 : $Builtin.NativeObject, %1 : $S3, %2 : $Builtin.NativeObject, %3 : $*S3, %4 : $Builtin.NativeObject):
-  cond_br undef, bb1, bb2(%0 : $Builtin.NativeObject, %1 : $S3, %2 : $Builtin.NativeObject,  %4 : $Builtin.NativeObject)
+  cond_br undef, bb1, bb3
 
 bb1:
   br bb2(%0 : $Builtin.NativeObject, %1 : $S3, %2 : $Builtin.NativeObject,  %4 : $Builtin.NativeObject)
 
 bb2(%5 : $Builtin.NativeObject, %6 : $S3, %7 : $Builtin.NativeObject, %9 : $Builtin.NativeObject):
   return %6 : $S3
+
+// Trampoline block to avoid a critical edge from the cond_br in bb0 to bb2
+// (bb2 has two predecessors: bb1 and this trampoline).
+bb3:
+  br bb2(%0 : $Builtin.NativeObject, %1 : $S3, %2 : $Builtin.NativeObject,  %4 : $Builtin.NativeObject)
 }
 
 

@@ -31,10 +31,10 @@ sil_global @_swiftEmptyArrayStorage : $_SwiftEmptyArrayStorage
 // CHECK:         load
 // CHECK-NOT:     load
 // CHECK-NOT:     store
-// CHECK:       bb5:
+// CHECK:       bb9:
 // CHECK-NEXT:    store
 // CHECK-NOT:     store
-// CHECK:       bb7:
+// CHECK:       bb11:
 // CHECK-NEXT:    store
 // CHECK-NOT:     store
 // CHECK:       } // end sil function 'multi_end_licm'
@@ -95,13 +95,13 @@ bb4(%27 : $Builtin.Int64):
 bb10:
   store %43 to %global : $*Int
   end_access %global : $*Int
-  cond_br %47, bb6, bb5
+  cond_br %47, bb13, bb14
 
 bb11:
   %otherInt = struct $Int (%27 : $Builtin.Int64)
   store %otherInt to %global : $*Int
   end_access %global : $*Int
-  cond_br %47, bb6, bb5
+  cond_br %47, bb15, bb16
 
 bb5:
   br bb4(%29 : $Builtin.Int64)
@@ -112,18 +112,28 @@ bb6:
 bb12:
   %25 = tuple ()
   return %25 : $()
+
+bb13:
+  br bb6
+
+bb14:
+  br bb5
+
+bb15:
+  br bb6
+
+bb16:
+  br bb5
 } // end sil function 'multi_end_licm'
 
 // CHECK-LABEL: sil hidden @multi_end_licm_loop_exit : $@convention(thin) () -> () {
 // CHECK:       bb2:
 // CHECK:         begin_access [modify] [dynamic] [no_nested_conflict]
 // CHECK:         br bb3
-// CHECK:       bb5:
-// CHECK:         end_access
 // CHECK:       bb6:
-// CHECK:       bb7:
 // CHECK:         end_access
-// CHECK:       bb8:
+// CHECK:       bb10:
+// CHECK:         end_access
 // CHECK:       } // end sil function 'multi_end_licm_loop_exit'
 sil hidden @multi_end_licm_loop_exit : $@convention(thin) () -> () {
 bb0:
@@ -182,13 +192,13 @@ bb4(%27 : $Builtin.Int64):
 bbend1:
   store %43 to %global : $*Int
   end_access %global : $*Int
-  cond_br %47, bb6, bb5
-  
+  cond_br %47, bbtramp1, bbtramp2
+
 bbend2:
   %otherInt = struct $Int (%27 : $Builtin.Int64)
   store %otherInt to %global : $*Int
   end_access %global : $*Int
-  cond_br %47, bbOut, bb5
+  cond_br %47, bbOut, bbtramp3
 
 bbOut:
   br bb6
@@ -198,8 +208,17 @@ bb5:
 
 bb6:
   br bbRet
-  
+
 bbRet:
   %25 = tuple ()
   return %25 : $()
+
+bbtramp1:
+  br bb6
+
+bbtramp2:
+  br bb5
+
+bbtramp3:
+  br bb5
 } // end sil function 'multi_end_licm_loop_exit'

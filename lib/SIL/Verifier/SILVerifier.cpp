@@ -96,10 +96,6 @@ static llvm::cl::opt<bool> VerifyDebugValueExpr("verify-debug-value-expr",
 static llvm::cl::opt<bool> SkipConvertEscapeToNoescapeAttributes(
     "verify-skip-convert-escape-to-noescape-attributes", llvm::cl::init(false));
 
-// Allow unit tests to gradually migrate toward -allow-critical-edges=false.
-static llvm::cl::opt<bool> AllowCriticalEdges("allow-critical-edges",
-                                              llvm::cl::init(true));
-
 static llvm::cl::opt<bool> VerifyReducibleLoops(
     "verify-reducible-loops", llvm::cl::init(false),
     llvm::cl::desc("Verify that SIL does not contain irreducible loops"));
@@ -7227,31 +7223,17 @@ public:
   }
 
   void verifyBranches(const SILFunction *F) {
-    // Verify no critical edge.
-    auto requireNonCriticalSucc = [this](const TermInst *termInst,
-                                         const Twine &message) {
-      // A critical edge has more than one outgoing edges from the source
-      // block.
-      auto succBlocks = termInst->getSuccessorBlocks();
-      if (succBlocks.size() <= 1)
-        return;
-
-      for (const SILBasicBlock *destBB : succBlocks) {
-        // And its destination block has more than one predecessor.
-        _require(destBB->getSinglePredecessorBlock(), message);
-      }
-    };
-
     for (auto &bb : *F) {
       const TermInst *termInst = bb.getTerminator();
       VerifierErrorEmitterGuard guard(this, termInst);
 
-      if (isSILOwnershipEnabled() && F->hasOwnership()) {
-        requireNonCriticalSucc(termInst, "critical edges not allowed in OSSA");
-      }
-      // In Lowered SIL, they are allowed on conditional branches only.
-      if (!AllowCriticalEdges && !isa<CondBranchInst>(termInst)) {
-        requireNonCriticalSucc(termInst, "only cond_br critical edges allowed");
+      // A critical edge has more than one outgoing edges from the source
+      // block.
+      if (!isa<BranchInst>(termInst)) {
+        for (const SILBasicBlock *destBB : termInst->getSuccessorBlocks()) {
+          // And its destination block has more than one predecessor.
+          _require(destBB->getSinglePredecessorBlock(), "critical edges not allowed");
+        }
       }
     }
   }

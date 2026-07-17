@@ -467,13 +467,13 @@ bb0(%0 : $Array<Int>):
   %t1 = apply %f1(%0) : $@convention(method) (@owned Array<Int>) -> Int32
   %c1 = struct_extract %t1 : $Int32, #Int32._value
   %t2 = builtin "cmp_eq_Int32"(%z0 : $Builtin.Int32, %c1 : $Builtin.Int32) : $Builtin.Int1
-  cond_br %t2, bb5, bb1
+  cond_br %t2, bb6, bb1
 
 bb1:
   br bb2(%z0 : $Builtin.Int32)
 
 bb2(%i0 : $Builtin.Int32):
-  cond_br undef, bb3, bb4
+  cond_br undef, bb3, bb7
 
 bb3:
   %f2 = function_ref @checkbounds2 : $@convention(method) (Int32, Bool, @owned Array<Int>) -> _DependenceToken
@@ -498,11 +498,23 @@ bb4:
   %af4 = builtin "cmp_eq_Int32"(%t7 : $Builtin.Int32, %z0 : $Builtin.Int32) : $Builtin.Int1
   cond_fail %af4 : $Builtin.Int1
   %8 = builtin "cmp_eq_Int32"(%t7 : $Builtin.Int32, %c1 : $Builtin.Int32) : $Builtin.Int1
-  cond_br %8, bb5, bb2(%t7 : $Builtin.Int32)
+  cond_br %8, bb8, bb9(%t7 : $Builtin.Int32)
 
 bb5:
   %r1 = tuple ()
   return %r1 : $()
+
+bb6:
+  br bb5
+
+bb7:
+  br bb4
+
+bb8:
+  br bb5
+
+bb9(%i1 : $Builtin.Int32):
+  br bb2(%i1 : $Builtin.Int32)
 }
 
 
@@ -571,8 +583,8 @@ bb3:
 // HOIST:    bb0{{.*}}:
 // HOIST:      [[CB:%[0-9]+]] = function_ref @checkbounds
 // HOIST:      apply [[CB]]
-// HOIST:      br bb1
-// HOIST:    bb3{{.*}}:
+// HOIST:      cond_br {{.*}}, bb2, bb3
+// HOIST:    bb2{{.*}}:
 // HOIST-NOT:  apply
 // HOIST:    return
 
@@ -600,11 +612,14 @@ bb1(%4 : $Builtin.Int32):
   %22 = tuple_extract %20 : $(Builtin.Int32, Builtin.Int1), 1
   cond_fail %22 : $Builtin.Int1
   %8 = builtin "cmp_eq_Int32"(%4 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int1
-  cond_br %8, bb2, bb1(%21 : $Builtin.Int32)
+  cond_br %8, bb2, bb3(%21 : $Builtin.Int32)
 
 bb2:
   %23 = struct $Int32 (%4 : $Builtin.Int32)
   return %23 : $Int32
+
+bb3(%24 : $Builtin.Int32):
+  br bb1(%24 : $Builtin.Int32)
 }
 
 // HOIST-LABEL: sil @hoist_rangechecked :
@@ -799,13 +814,13 @@ bb0(%0 : $Array<Int>):
   %t1 = apply %f1(%0) : $@convention(method) (@owned Array<Int>) -> Int32
   %c1 = struct_extract %t1 : $Int32, #Int32._value
   %t2 = builtin "cmp_eq_Int32"(%z0 : $Builtin.Int32, %c1 : $Builtin.Int32) : $Builtin.Int1
-  cond_br %t2, bb5, bb1
+  cond_br %t2, bb6, bb1
 
 bb1:
   br bb2(%z0 : $Builtin.Int32)
 
 bb2(%i0 : $Builtin.Int32):
-  cond_br undef, bb3, bb4
+  cond_br undef, bb3, bb7
 
 bb3:
   %f2 = function_ref @checkbounds2 : $@convention(method) (Int32, Bool, @owned Array<Int>) -> _DependenceToken
@@ -824,11 +839,23 @@ bb4:
   %t6 = builtin "sadd_with_overflow_Int32"(%i0 : $Builtin.Int32, %i2 : $Builtin.Int32, %t5 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
   %t7 = tuple_extract %t6 : $(Builtin.Int32, Builtin.Int1), 0
   %8 = builtin "cmp_eq_Int32"(%t7 : $Builtin.Int32, %c1 : $Builtin.Int32) : $Builtin.Int1
-  cond_br %8, bb5, bb2(%t7 : $Builtin.Int32)
+  cond_br %8, bb8, bb9(%t7 : $Builtin.Int32)
 
 bb5:
   %r1 = tuple ()
   return %r1 : $()
+
+bb6:
+  br bb5
+
+bb7:
+  br bb4
+
+bb8:
+  br bb5
+
+bb9(%i3 : $Builtin.Int32):
+  br bb2(%i3 : $Builtin.Int32)
 }
 
 // HOIST-LABEL: sil @dont_eliminate_zero_to_count_for_slices
@@ -1158,16 +1185,16 @@ bb3:
 }
 
 // HOIST-LABEL: sil @hoist_but_dont_remove_bc_after_loop
-// HOIST: {{^bb2}}
+// HOIST: {{^bb1}}
 // HOIST:   [[CB:%.*]] = function_ref @checkbounds
 // HOIST:   apply [[CB]]
 // HOIST:   apply [[CB]]
+// HOIST: {{^bb2}}
+// HOIST:   cond_br {{.*}}, bb3, bb6
 // HOIST: {{^bb3}}
-// HOIST:   cond_br {{.*}}, bb5, bb4
-// HOIST: {{^bb4}}
-// HOIST:   br bb3
-// HOIST: {{^bb5}}
 // HOIST:   apply [[CB]]
+// HOIST: {{^bb6}}
+// HOIST:   br bb2
 
 sil @hoist_but_dont_remove_bc_after_loop : $@convention(thin) (Int32, @inout ArrayInt) -> Int32 {
 bb0(%0 : $Int32, %1 : $*ArrayInt):
@@ -1176,7 +1203,7 @@ bb0(%0 : $Int32, %1 : $*ArrayInt):
   %4 = struct_extract %0 : $Int32, #Int32._value
   %5 = integer_literal $Builtin.Int32, 0
   %6 = builtin "cmp_eq_Int32"(%5 : $Builtin.Int32, %4 : $Builtin.Int32) : $Builtin.Int1
-  cond_br %6, bb4(%5 : $Builtin.Int32), bb1
+  cond_br %6, bb5(%5 : $Builtin.Int32), bb1
 
 bb1:
   br bb2(%5 : $Builtin.Int32)
@@ -1196,7 +1223,7 @@ bb2(%10 : $Builtin.Int32):
   %22 = tuple_extract %20 : $(Builtin.Int32, Builtin.Int1), 1
   cond_fail %22 : $Builtin.Int1
   %24 = builtin "cmp_eq_Int32"(%21 : $Builtin.Int32, %4 : $Builtin.Int32) : $Builtin.Int1
-  cond_br %24, bb3(%21 : $Builtin.Int32), bb2(%21 : $Builtin.Int32)
+  cond_br %24, bb3(%21 : $Builtin.Int32), bb6(%21 : $Builtin.Int32)
 
 bb3(%28 : $Builtin.Int32):
   %t1 = function_ref @take_array : $@convention(thin) (@inout ArrayInt) -> ()
@@ -1208,6 +1235,12 @@ bb3(%28 : $Builtin.Int32):
 bb4(%31 : $Builtin.Int32):
   %32 = struct $Int32 (%31 : $Builtin.Int32)
   return %32 : $Int32
+
+bb5(%33 : $Builtin.Int32):
+  br bb4(%33 : $Builtin.Int32)
+
+bb6(%34 : $Builtin.Int32):
+  br bb2(%34 : $Builtin.Int32)
 }
 
 // SIL pattern for :
@@ -1454,21 +1487,23 @@ sil [_semantics "array.check_subscript"] @checkbounds3 : $@convention(method) (I
 
 // CHECK-LABEL: sil @rangeCheck
 // CHECK: bb0
-// CHECK:   cond_br {{.*}}, bb1, bb2
+// CHECK:   cond_br {{.*}}, bb4, bb1
 // CHECK: bb1
+// CHECK: [[TRUE:%.*]] = integer_literal $Builtin.Int1, -1
 // CHECK:   br bb3
 // CHECK: bb2
-// CHECK: [[TRUE:%.*]] = integer_literal $Builtin.Int1, -1
-// CHECK:   br bb4
-// CHECK: bb3
 // CHECK:   return
-// CHECK: bb4([[IV:%.*]] : $Builtin.Int64):
+// CHECK: bb3([[IV:%.*]] : $Builtin.Int64):
 // CHECK:   builtin "xor_Int1"([[TRUE]]
 // CHECK:   builtin "xor_Int1"([[TRUE]]
 // CHECK:   cond_fail
-// CHECK:   cond_br {{.*}}, bb6, bb5
+// CHECK:   cond_br {{.*}}, bb5, bb6
+// CHECK: bb4:
+// CHECK:   br bb2
 // CHECK: bb5:
-// CHECK:   br bb4
+// CHECK:   br bb2
+// CHECK: bb6:
+// CHECK:   br bb3
 // CHECK: }
 sil @rangeCheck : $@convention(thin) (Builtin.Int64) -> () {
 bb0(%0 : $Builtin.Int64):
@@ -1478,7 +1513,7 @@ bb0(%0 : $Builtin.Int64):
   %7 = builtin "xor_Int1"(%5 : $Builtin.Int1, %6 : $Builtin.Int1) : $Builtin.Int1
   cond_fail %7 : $Builtin.Int1
   %9 = builtin "cmp_eq_Int64"(%3 : $Builtin.Int64, %0 : $Builtin.Int64) : $Builtin.Int1
-  cond_br %9, bb2, bb1
+  cond_br %9, bb5, bb1
 
 bb1:
   %11 = integer_literal $Builtin.Int64, 1
@@ -1500,28 +1535,39 @@ bb3(%15 : $Builtin.Int64):
   %24 = tuple_extract %22 : $(Builtin.Int64, Builtin.Int1), 1
   cond_fail %24 : $Builtin.Int1
   %28 = builtin "cmp_eq_Int64"(%23 : $Builtin.Int64, %0 : $Builtin.Int64) : $Builtin.Int1
-  cond_br %28, bb2, bb3(%23 : $Builtin.Int64)
+  cond_br %28, bb6, bb7(%23 : $Builtin.Int64)
+
+bb5:
+  br bb2
+
+bb6:
+  br bb2
+
+bb7(%29 : $Builtin.Int64):
+  br bb3(%29 : $Builtin.Int64)
 }
 
 // CHECK-LABEL: sil @rangeCheck2
 // CHECK: bb0
-// CHECK:   cond_br {{.*}}, bb1, bb2
+// CHECK:   cond_br {{.*}}, bb4, bb1
 // CHECK: bb1
-// CHECK:   br bb3
-// CHECK: bb2
 // CHECK: [[TRUE:%.*]] = integer_literal $Builtin.Int1, -1
 // CHECK: [[FALSE:%.*]] = integer_literal $Builtin.Int1, 0
-// CHECK:   br bb4
-// CHECK: bb3
+// CHECK:   br bb3
+// CHECK: bb2
 // CHECK:   return
-// CHECK: bb4([[IV:%.*]] : $Builtin.Int64):
+// CHECK: bb3([[IV:%.*]] : $Builtin.Int64):
 // CHECK:   builtin "xor_Int1"([[TRUE]]
 // CHECK:   builtin "xor_Int1"([[TRUE]]
 // CHECK:   builtin "or_Int1"([[FALSE]]
 // CHECK:   cond_fail
-// CHECK:   cond_br {{.*}}, bb6, bb5
+// CHECK:   cond_br {{.*}}, bb5, bb6
+// CHECK: bb4:
+// CHECK:   br bb2
 // CHECK: bb5:
-// CHECK:   br bb4
+// CHECK:   br bb2
+// CHECK: bb6:
+// CHECK:   br bb3
 // CHECK: }
 sil @rangeCheck2 : $@convention(thin) (Builtin.Int64) -> () {
 bb0(%0 : $Builtin.Int64):
@@ -1531,7 +1577,7 @@ bb0(%0 : $Builtin.Int64):
   %7 = builtin "xor_Int1"(%5 : $Builtin.Int1, %6 : $Builtin.Int1) : $Builtin.Int1
   cond_fail %7 : $Builtin.Int1
   %9 = builtin "cmp_eq_Int64"(%3 : $Builtin.Int64, %0 : $Builtin.Int64) : $Builtin.Int1
-  cond_br %9, bb2, bb1
+  cond_br %9, bb5, bb1
 
 bb1:
   %11 = integer_literal $Builtin.Int64, 1
@@ -1554,7 +1600,16 @@ bb3(%15 : $Builtin.Int64):
   %24 = tuple_extract %22 : $(Builtin.Int64, Builtin.Int1), 1
   cond_fail %24 : $Builtin.Int1
   %28 = builtin "cmp_eq_Int64"(%23 : $Builtin.Int64, %0 : $Builtin.Int64) : $Builtin.Int1
-  cond_br %28, bb2, bb3(%23 : $Builtin.Int64)
+  cond_br %28, bb6, bb7(%23 : $Builtin.Int64)
+
+bb5:
+  br bb2
+
+bb6:
+  br bb2
+
+bb7(%29 : $Builtin.Int64):
+  br bb3(%29 : $Builtin.Int64)
 }
 
 sil @unknown : $@convention(thin) () -> Builtin.Int1
@@ -1562,7 +1617,7 @@ sil @unknown : $@convention(thin) () -> Builtin.Int1
 // RANGECHECK-LABEL: sil @rangeCheck_early_exit
 // RANGECHECK: bb0
 // RANGECHECK:   cond_fail
-// RANGECHECK:   cond_br {{.*}}, bb2, bb1
+// RANGECHECK:   cond_br {{.*}}, bb5, bb1
 // RANGECHECK: bb1:
 // RANGECHECK-NOT:  cond_fail
 // RANGECHECK:   br bb3
@@ -1570,11 +1625,19 @@ sil @unknown : $@convention(thin) () -> Builtin.Int1
 // RANGECHECK:  return
 // RANGECHECK: bb3({{.*}}):
 // RANGECHECK:  apply
-// RANGECHECK:  cond_br {{.*}}, bb4, bb2
+// RANGECHECK:  cond_br {{.*}}, bb4, bb6
 // RANGECHECK: bb4:
 // RANGECHECK:   cond_fail
 // RANGECHECK:   cond_fail
-// RANGECHECK:   cond_br {{.*}}, bb2, bb3
+// RANGECHECK:   cond_br {{.*}}, bb7, bb8
+// RANGECHECK: bb5:
+// RANGECHECK:   br bb2
+// RANGECHECK: bb6:
+// RANGECHECK:   br bb2
+// RANGECHECK: bb7:
+// RANGECHECK:   br bb2
+// RANGECHECK: bb8({{.*}}):
+// RANGECHECK:   br bb3
 // RANGECHECK: }
 sil @rangeCheck_early_exit : $@convention(thin) (Builtin.Int64) -> () {
 bb0(%0 : $Builtin.Int64):
@@ -1584,7 +1647,7 @@ bb0(%0 : $Builtin.Int64):
   %7 = builtin "xor_Int1"(%5 : $Builtin.Int1, %6 : $Builtin.Int1) : $Builtin.Int1
   cond_fail %7 : $Builtin.Int1
   %9 = builtin "cmp_eq_Int64"(%3 : $Builtin.Int64, %0 : $Builtin.Int64) : $Builtin.Int1
-  cond_br %9, bb2, bb1
+  cond_br %9, bb5, bb1
 
 bb1:
   %11 = integer_literal $Builtin.Int64, 1
@@ -1597,7 +1660,7 @@ bb2:
 bb3(%15 : $Builtin.Int64):
   %1 = function_ref @unknown : $@convention(thin) () -> Builtin.Int1
   %2 = apply %1() : $@convention(thin) () -> Builtin.Int1
-  cond_br %2, bb4, bb2
+  cond_br %2, bb4, bb6
 
 bb4:
   %16 = builtin "cmp_sle_Int64"(%3 : $Builtin.Int64, %15 : $Builtin.Int64) : $Builtin.Int1
@@ -1611,7 +1674,19 @@ bb4:
   %24 = tuple_extract %22 : $(Builtin.Int64, Builtin.Int1), 1
   cond_fail %24 : $Builtin.Int1
   %28 = builtin "cmp_eq_Int64"(%23 : $Builtin.Int64, %0 : $Builtin.Int64) : $Builtin.Int1
-  cond_br %28, bb2, bb3(%23 : $Builtin.Int64)
+  cond_br %28, bb7, bb8(%23 : $Builtin.Int64)
+
+bb5:
+  br bb2
+
+bb6:
+  br bb2
+
+bb7:
+  br bb2
+
+bb8(%29 : $Builtin.Int64):
+  br bb3(%29 : $Builtin.Int64)
 }
 
 // Don't assert when we have an isNativeTypeChecked parameter that is not a
@@ -1634,7 +1709,7 @@ bb3(%10 : $Bool):
   %11 = struct_extract %0 : $Int32, #Int32._value
   %12 = integer_literal $Builtin.Int32, 0
   %13 = builtin "cmp_eq_Int32"(%12 : $Builtin.Int32, %11 : $Builtin.Int32) : $Builtin.Int1
-  cond_br %13, bb6(%12 : $Builtin.Int32), bb4
+  cond_br %13, bb7(%12 : $Builtin.Int32), bb4
 
 bb4:
   br bb5(%12 : $Builtin.Int32)
@@ -1654,11 +1729,20 @@ bb5(%16 : $Builtin.Int32):
   %28 = tuple_extract %26 : $(Builtin.Int32, Builtin.Int1), 1
   cond_fail %28 : $Builtin.Int1
   %30 = builtin "cmp_eq_Int32"(%27 : $Builtin.Int32, %11 : $Builtin.Int32) : $Builtin.Int1
-  cond_br %30, bb6(%27 : $Builtin.Int32), bb5(%27 : $Builtin.Int32)
+  cond_br %30, bb8(%27 : $Builtin.Int32), bb9(%27 : $Builtin.Int32)
 
 bb6(%32 : $Builtin.Int32):
   %33 = struct $Int32 (%32 : $Builtin.Int32)
   return %33 : $Int32
+
+bb7(%34 : $Builtin.Int32):
+  br bb6(%34 : $Builtin.Int32)
+
+bb8(%35 : $Builtin.Int32):
+  br bb6(%35 : $Builtin.Int32)
+
+bb9(%36 : $Builtin.Int32):
+  br bb5(%36 : $Builtin.Int32)
 }
 
 struct Wrapper {

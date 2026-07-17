@@ -74,7 +74,10 @@ bb2(%54 : $Builtin.Word):
   fix_lifetime %59: $Builtin.NativeObject
   store %1 to %99 : $*Int
   %101 = builtin "cmp_eq_Word"(%58 : $Builtin.Word, %60 : $Builtin.Word) : $Builtin.Int1
-  cond_br %101, bb1, bb2(%58 : $Builtin.Word)
+  cond_br %101, bb1, bb3
+
+bb3:
+  br bb2(%58 : $Builtin.Word)
 }
 
 // CHECK-LABEL: @must_move_condfail
@@ -122,7 +125,10 @@ bb2(%48 : $Builtin.Word):
   %99 = index_addr [projection] %97 : $*Int, %48 : $Builtin.Word
   store %1 to %99 : $*Int
   %101 = builtin "cmp_eq_Word"(%58 : $Builtin.Word, %60 : $Builtin.Word) : $Builtin.Int1
-  cond_br %101, bb1, bb2(%58 : $Builtin.Word)
+  cond_br %101, bb1, bb3
+
+bb3:
+  br bb2(%58 : $Builtin.Word)
 }
 
 
@@ -143,14 +149,29 @@ bb0(%0 : $*Builtin.Int1, %1 : $Int):
 bb1:
   %5 = load %0 : $*Builtin.Int1
   %6 = integer_literal $Builtin.Word, 101
-  cond_br %5, bb2, bb3
+  cond_br %5, bb8, bb9
+
+bb8:
+  br bb2
+
+bb9:
+  br bb3
 
 bb2:
-  cond_br %5, bb4, bb1
+  cond_br %5, bb4, bb5
+
+bb5:
+  br bb1
 
 // Inner loop.
 bb3:
-  cond_br %5, bb2, bb3
+  cond_br %5, bb6, bb7
+
+bb6:
+  br bb2
+
+bb7:
+  br bb3
 
 bb4:
   %10 = tuple ()
@@ -175,15 +196,30 @@ bb0(%0 : $*Builtin.Int1, %1 : $Int):
 bb1:
   %5 = load %0 : $*Builtin.Int1
   %6 = integer_literal $Builtin.Word, 101
-  cond_br %5, bb2, bb3
+  cond_br %5, bb8, bb9
+
+bb8:
+  br bb2
+
+bb9:
+  br bb3
 
 bb2:
-  cond_br %5, bb4, bb1
+  cond_br %5, bb4, bb5
+
+bb5:
+  br bb1
 
 // Inner loop.
 bb3:
   store %2 to %0 : $*Builtin.Int1
-  cond_br %5, bb2, bb3
+  cond_br %5, bb6, bb7
+
+bb6:
+  br bb2
+
+bb7:
+  br bb3
 
 bb4:
   %10 = tuple ()
@@ -209,7 +245,10 @@ bb1:
   %f2 = function_ref @user : $@convention(thin) (Int) -> ()
   %c1 = apply %f1(%0) : $@convention(method) (@guaranteed Array<Int>) -> Int
   %c2 = apply %f2(%c1) : $@convention(thin) (Int) -> ()
-  cond_br undef, bb1, bb2
+  cond_br undef, bb3, bb2
+
+bb3:
+  br bb1
 
 bb2:
   %r1 = tuple ()
@@ -235,7 +274,10 @@ bb1:
   store %0 to %313 : $*Int32
   %f = function_ref @use_addr : $@convention(thin) (@inout Int32) -> ()
   %a = apply %f(%313) : $@convention(thin) (@inout Int32) -> ()
-  cond_br undef, bb1, bb2
+  cond_br undef, bb3, bb2
+
+bb3:
+  br bb1
 
 bb2:
   dealloc_stack %313 : $*Int32
@@ -272,7 +314,10 @@ bb1(%existential : $P):
   %4 = witness_method $@opened("C4960DBA-02C5-11E6-BE1B-B8E856428C60", P) Self, #P.foo, %2 : $@opened("C4960DBA-02C5-11E6-BE1B-B8E856428C60", P) Self : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> Int32
   %5 = apply %4<@opened("C4960DBA-02C5-11E6-BE1B-B8E856428C60", P) Self>(%2) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> Int32
   %6 = load %0 : $*Builtin.Int1
-  cond_br %6, bb3, bb1(%existential : $P)
+  cond_br %6, bb3, bb5
+
+bb5:
+  br bb1(%existential : $P)
 
 bb3:
   br bb4
@@ -298,7 +343,10 @@ bb0(%0 : $*P):
 bb1:
   copy_addr %0 to [init] %1 : $*P
   %2 = existential_metatype $@thick P.Type, %1 : $*P
-  cond_br undef, bb1, bb2
+  cond_br undef, bb3, bb2
+
+bb3:
+  br bb1
 
 bb2:
   dealloc_stack %1 : $*P
@@ -347,7 +395,10 @@ bb2:
   %4 = load %0 : $*Builtin.Int32
   %6 = apply %unknown_value_fn() : $@convention(thin) () -> Builtin.Int32
   %33 = builtin "cmp_eq_Int32"(%4 : $Builtin.Int32, %6 : $Builtin.Int32) : $Builtin.Int1
-  cond_br %33, bb2, bb3
+  cond_br %33, bb4, bb3
+
+bb4:
+  br bb2
 
 bb3:
   %9999 = tuple()
@@ -376,7 +427,10 @@ bb1:
   cond_br undef, bb2, bb3
 
 bb2:
-  cond_br undef, bb4, bb1
+  cond_br undef, bb4, bb5
+
+bb5:
+  br bb1
 
 bb3:
   %x = ref_element_addr %0 : $RefElemClass, #RefElemClass.x
@@ -403,7 +457,10 @@ bb1:
   %b = end_cow_mutation %m : $RefElemClass
   %f = function_ref @potential_escape : $@convention(thin) (@guaranteed RefElemClass) -> ()
   %a = apply %f(%b) : $@convention(thin) (@guaranteed RefElemClass) -> ()
-  cond_br undef, bb1, bb2
+  cond_br undef, bb3, bb2
+
+bb3:
+  br bb1
 
 bb2:
   return %b : $RefElemClass
@@ -646,13 +703,13 @@ bb3:
 // CHECK:   [[V3:%[0-9]+]] = struct $Int32
 // CHECK: bb2:
 // CHECK-NOT:   store
-// CHECK:   cond_br undef, bb1([[V3]] : $Int32), bb3
+// CHECK:   cond_br undef, bb7, bb3
 // CHECK: bb3:
 // CHECK:   store [[V3]] to %0
 // CHECK:   br bb6
 // CHECK: bb4:
 // CHECK-NOT:   store
-// CHECK:   cond_br undef, bb1([[V3]] : $Int32), bb5
+// CHECK:   cond_br undef, bb8, bb5
 // CHECK: bb5:
 // CHECK:   store [[V3]] to %0
 // CHECK:   br bb6
@@ -669,7 +726,7 @@ bb0(%0 : $*Int32, %1 : $Int32):
   br bb1(%5 : $Int32)                             // id: %6
 
 // %7                                             // user: %8
-bb1(%7 : $Int32):                                 // Preds: bb0 bb2 bb4
+bb1(%7 : $Int32):                                 // Preds: bb0 bb7 bb8
   %8 = struct_extract %7 : $Int32, #Int32._value  // user: %9
   %9 = builtin "sadd_with_overflow_Int64"(%8 : $Builtin.Int32, %3 : $Builtin.Int32, %4 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1) // user: %10
   %10 = tuple_extract %9 : $(Builtin.Int32, Builtin.Int1), 0 // user: %11
@@ -677,14 +734,14 @@ bb1(%7 : $Int32):                                 // Preds: bb0 bb2 bb4
   cond_br undef, bb2, bb4                         // id: %12
 
 bb2:                                              // Preds: bb1
-  cond_br undef, bb1(%11 : $Int32), bb3           // id: %13
+  cond_br undef, bb7, bb3                         // id: %13
 
 bb3:                                              // Preds: bb2
   store %11 to %0 : $*Int32                       // id: %14
   br bb6                                          // id: %15
 
 bb4:                                              // Preds: bb1
-  cond_br undef, bb1(%11 : $Int32), bb5           // id: %16
+  cond_br undef, bb8, bb5                         // id: %16
 
 bb5:                                              // Preds: bb4
   store %11 to %0 : $*Int32                       // id: %17
@@ -693,6 +750,12 @@ bb5:                                              // Preds: bb4
 bb6:                                              // Preds: bb3 bb5
   %19 = tuple ()                                  // user: %20
   return %19 : $()                                // id: %20
+
+bb7:                                              // Preds: bb2
+  br bb1(%11 : $Int32)                            // id: %21
+
+bb8:                                              // Preds: bb4
+  br bb1(%11 : $Int32)                            // id: %22
 } // end sil function 'hoist_loads_and_stores'
 
 // ==================================================================
@@ -1589,11 +1652,14 @@ bb1:
   %2 = address_to_pointer %1 : $*Builtin.Word to $Builtin.RawPointer
   %3 = function_ref @g_init : $@convention(c) () -> ()
   %4 = builtin "once"(%2 : $Builtin.RawPointer, %3 : $@convention(c) () -> ()) : $()
-  cond_br undef, bb1, bb2
+  cond_br undef, bb3, bb2
 
 bb2:
   %r1 = tuple ()
   return %r1 : $()
+
+bb3:
+  br bb1
 }
 
 struct Outer {
@@ -1655,11 +1721,14 @@ bb1:
   %4 = address_to_pointer %3 : $*Builtin.Word to $Builtin.RawPointer
   %5 = function_ref @g_init : $@convention(c) () -> ()
   %6 = builtin "once"(%4 : $Builtin.RawPointer, %5 : $@convention(c) () -> ()) : $()
-  cond_br undef, bb1, bb2
+  cond_br undef, bb3, bb2
 
 bb2:
   %r1 = tuple ()
   return %r1 : $()
+
+bb3:
+  br bb1
 }
 
 // CHECK-LABEL: sil [ossa] @hoist_load_copy :
