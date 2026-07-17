@@ -1066,10 +1066,9 @@ visitResumeThrowingContinuationThrowing(BuiltinInst *bi, StringRef attr) {
   return OperandOwnership::TrivialUse;
 }
 
-/// TaskPushDeadline takes (clockType: Builtin.RawPointer,
+/// TaskPushDeadline takes (clockType: Any.Type,
 /// box: __owned Builtin.NativeObject). The `box` operand at index 1 is
-/// consumed by the runtime; `clockType` at index 0 is a trivial raw
-/// pointer.
+/// consumed by the runtime; `clockType` at index 0 is a trivial metatype.
 OperandOwnership
 OperandOwnershipBuiltinClassifier::visitTaskPushDeadline(BuiltinInst *bi,
                                                         StringRef attr) {

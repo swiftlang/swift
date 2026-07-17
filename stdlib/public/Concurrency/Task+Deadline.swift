@@ -134,8 +134,7 @@ public nonisolated(nonsending) func withDeadline<Return, Failure, C>(
   let box = _ClockBox<C>(clock: clock, deadline: expiration)
   let opaque = unsafe Unmanaged.passRetained(box).toOpaque()
   let native = unsafe Builtin.reinterpretCast(opaque) as Builtin.NativeObject
-  let clockTypeRaw = unsafe Builtin.reinterpretCast(C.self) as Builtin.RawPointer
-  let deadlineRecord = unsafe Builtin.taskPushDeadline(clockType: clockTypeRaw, box: native)
+  let deadlineRecord = unsafe Builtin.taskPushDeadline(clockType: C.self, box: native)
   defer { unsafe Builtin.taskPopDeadline(record: deadlineRecord) }
 
   return try await __withTaskCancellationScope { scope throws(Failure) in
@@ -149,8 +148,8 @@ public nonisolated(nonsending) func withDeadline<Return, Failure, C>(
     // TODO: Replace this by picking the "Clock's executor"
     // TODO: Instead of creating a full task here, we want to enqueue a job
     //       at a deadline that cancels the scope; disarming should attempt
-    //       to cancel the job.
-    //       I.e. this wants to be: clockExecutor.enqueue(Job({ scope.cancel(reason: .deadlineExceeded) })
+    //       to cancel the job. I.e. this wants to be:
+    //          let registration = clockExecutor.enqueue(Job({ scope.cancel(reason: .deadlineExceeded) })
     let timer = Task.detached {
       do {
         try await clock.sleep(until: expiration, tolerance: tolerance)
@@ -368,16 +367,16 @@ extension Task where Success == Never, Failure == Never {
 
 @available(StdlibDeploymentTarget 6.5, *)
 extension Task where Success == Never, Failure == Never {
-  /// Find the tightest deadline given the specified clock.
+  /// Find the nearest deadline given the specified clock.
   ///
   /// The returned instant is the earliest deadline whose clock identity
   /// (`clock.id`) matches the argument's - nested `withDeadline` scopes
-  /// on the same clock are coalesced to the tightest one.
+  /// on the same clock are coalesced to the nearest one.
   ///
   /// Deadlines installed for a *different* clock are ignored (there is no
   /// meaningful cross-clock conversion, so no attempt is made to unify
   /// them). Composing multiple `withDeadline` scopes on different clocks
-  /// still works correctly - the tightest deadline for each clock governs
+  /// still works correctly - the nearest deadline for each clock governs
   /// independently - but this accessor can only report on one clock at a
   /// time.
   ///
@@ -391,8 +390,7 @@ extension Task where Success == Never, Failure == Never {
 // ==== -----------------------------------------------------------------------
 // MARK: Internals
 
-/// A non-generic base class carrying identity/compare methods that dispatch
-/// via Swift's dynamic-dispatch table into the concrete `_ClockBox<C>`.
+/// Type-eraser for `_ClockBox<C>`.
 @available(StdlibDeploymentTarget 6.5, *)
 internal class _AnyClockBox {
   init() {}
@@ -410,9 +408,8 @@ internal class _AnyClockBox {
   }
 }
 
-/// A heap-allocated Swift class that stores both the clock instance and the
-/// deadline instant. Retained by the `TaskDeadlineStatusRecord` on push and
-/// released on pop.
+/// Stores both the clock instance and the deadline instant.
+/// Lifetime is owned by `TaskDeadlineStatusRecord`, which releses it on deadline pop.
 @available(StdlibDeploymentTarget 6.5, *)
 internal final class _ClockBox<C: Clock & Identifiable>: _AnyClockBox {
   let clock: C

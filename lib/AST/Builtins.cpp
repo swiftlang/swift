@@ -2429,19 +2429,21 @@ static ValueDecl *getTaskRemovePriorityEscalationHandler(ASTContext &ctx,
 }
 
 static ValueDecl *getTaskPushDeadline(ASTContext &ctx, Identifier id) {
-  // (clockType: Builtin.RawPointer, box: __owned Builtin.NativeObject)
+  // (clockType: Any.Type, box: __owned Builtin.NativeObject)
   //   -> UnsafeRawPointer
   //
-  // `clockType` is a raw metatype pointer (Swift side obtains it by
-  // reinterpreting `C.self` via unsafeBitCast). Kept as a trivial raw
-  // pointer at the SIL level to avoid a generic-arg dance for a value
-  // that only ever needs to be compared by pointer-equality.
+  // `clockType` is a thin metatype - at the SIL/IR level a single
+  // pointer, identical to how we treat a `Builtin.RawPointer`. Using
+  // `Any.Type` here lets the caller write `C.self` directly instead of
+  // `Builtin.reinterpretCast(C.self) as Builtin.RawPointer`. The runtime
+  // only pointer-eq-checks `ClockType` on the record, so any metatype
+  // shape works.
   //
   // `box` is a retained (+1) `_ClockBox<C>` reference; the runtime takes
   // ownership and releases it on pop.
   return getBuiltinFunction(
       ctx, id, _thin,
-      _parameters(_label("clockType", _rawPointer),
+      _parameters(_label("clockType", _existentialMetatype(_unconstrainedAny)),
                   _label("box", _owned(_nativeObject))),
       _unsafeRawPointer);
 }
