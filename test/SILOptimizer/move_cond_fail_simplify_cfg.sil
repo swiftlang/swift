@@ -38,17 +38,17 @@ bb1(%7 : $Builtin.Int64, %8 : $Builtin.Int64, %9 : $Builtin.Int1):
   cond_fail %15 : $Builtin.Int1
   %17 = builtin "cmp_eq_Int64"(%14 : $Builtin.Int64, %3 : $Builtin.Int64) : $Builtin.Int1
   %18 = builtin "cmp_eq_Int64"(%11 : $Builtin.Int64, %3 : $Builtin.Int64) : $Builtin.Int1
-  cond_br %18, bb5, bb6(%14 : $Builtin.Int64, %11 : $Builtin.Int64, %17 : $Builtin.Int1)
+  cond_br %18, bb5, bb6
 
 // Trampoline block avoiding the critical edge from bb1's cond_br back to
 // bb1 (bb1's former self-loop). Since this trampoline is now a predecessor
 // of bb1 with a single successor, the hoisted cond_fail (using the
 // corresponding incoming value for %9, which is %17) is inserted here too.
-// CHECK: bb2({{.*}}):
+// CHECK: bb2:
 // CHECK-NEXT: cond_fail
 // CHECK-NEXT: br bb1
-bb6(%20 : $Builtin.Int64, %21 : $Builtin.Int64, %22 : $Builtin.Int1):
-  br bb1(%20 : $Builtin.Int64, %21 : $Builtin.Int64, %22 : $Builtin.Int1)
+bb6:
+  br bb1(%14 : $Builtin.Int64, %11 : $Builtin.Int64, %17 : $Builtin.Int1)
 
 // Make sure that this predecessor -- which directly branches to bb1 and
 // supplies a constant for %9 -- also gets the hoisted cond_fail.

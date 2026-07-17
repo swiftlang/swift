@@ -320,10 +320,10 @@ bb2:
   br bb3(%1 : $FakeOptional<Builtin.NativeObject>)
 
 bb3(%2 : $FakeOptional<Builtin.NativeObject>):
-  cond_br undef, bb4(%2 : $FakeOptional<Builtin.NativeObject>), bb5
+  cond_br undef, bb4, bb5
 
-bb4(%3 : $FakeOptional<Builtin.NativeObject>):
-  br bb3(%3 : $FakeOptional<Builtin.NativeObject>)
+bb4:
+  br bb3(%2 : $FakeOptional<Builtin.NativeObject>)
 
 bb5:
   retain_value %0 : $FakeOptional<Builtin.NativeObject>
@@ -437,10 +437,10 @@ bb1(%1 : $FakeOptional<Cls>):
   retain_value %2 : $Cls
   release_value %1 : $FakeOptional<Cls>
   %3 = enum $FakeOptional<Cls>, #FakeOptional.some!enumelt, %2 : $Cls
-  cond_br undef, bb2(%3 : $FakeOptional<Cls>), bb3
+  cond_br undef, bb2, bb3
 
-bb2(%4 : $FakeOptional<Cls>):
-  br bb1(%4 : $FakeOptional<Cls>)
+bb2:
+  br bb1(%3 : $FakeOptional<Cls>)
 
 bb3:
   %5 = tuple()
@@ -466,10 +466,10 @@ bb2:
   br bb3
 
 bb3:
-  cond_br undef, bb4(%3 : $FakeOptional<Cls>), bb5
+  cond_br undef, bb4, bb5
 
-bb4(%4 : $FakeOptional<Cls>):
-  br bb1(%4 : $FakeOptional<Cls>)
+bb4:
+  br bb1(%3 : $FakeOptional<Cls>)
 
 bb5:
   %5 = tuple()
@@ -495,10 +495,10 @@ bb2:
   br bb3
 
 bb3:
-  cond_br undef, bb4(%3 : $FakeOptional<Cls>), bb5
+  cond_br undef, bb4, bb5
 
-bb4(%4 : $FakeOptional<Cls>):
-  br bb1(%4 : $FakeOptional<Cls>)
+bb4:
+  br bb1(%3 : $FakeOptional<Cls>)
 
 bb5:
   %5 = tuple()
@@ -524,10 +524,10 @@ bb2:
 bb3:
   release_value %1 : $FakeOptional<Cls>
   %3 = enum $FakeOptional<Cls>, #FakeOptional.some!enumelt, %2 : $Cls
-  cond_br undef, bb4(%3 : $FakeOptional<Cls>), bb5
+  cond_br undef, bb4, bb5
 
-bb4(%4 : $FakeOptional<Cls>):
-  br bb1(%4 : $FakeOptional<Cls>)
+bb4:
+  br bb1(%3 : $FakeOptional<Cls>)
 
 bb5:
   %5 = tuple()
@@ -553,10 +553,10 @@ bb3:
   retain_value %2 : $Cls
   release_value %1 : $FakeOptional<Cls>
   %3 = enum $FakeOptional<Cls>, #FakeOptional.some!enumelt, %2 : $Cls
-  cond_br undef, bb4(%3 : $FakeOptional<Cls>), bb5
+  cond_br undef, bb4, bb5
 
-bb4(%4 : $FakeOptional<Cls>):
-  br bb1(%4 : $FakeOptional<Cls>)
+bb4:
+  br bb1(%3 : $FakeOptional<Cls>)
 
 bb5:
   %5 = tuple()
@@ -582,10 +582,10 @@ bb2:
 bb3:
   release_value %1 : $FakeOptional<Cls>
   %3 = enum $FakeOptional<Cls>, #FakeOptional.some!enumelt, %2 : $Cls
-  cond_br undef, bb4(%3 : $FakeOptional<Cls>), bb5
+  cond_br undef, bb4, bb5
 
-bb4(%4 : $FakeOptional<Cls>):
-  br bb1(%4 : $FakeOptional<Cls>)
+bb4:
+  br bb1(%3 : $FakeOptional<Cls>)
 
 bb5:
   %5 = tuple()

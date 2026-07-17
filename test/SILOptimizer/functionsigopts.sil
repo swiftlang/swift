@@ -1376,10 +1376,10 @@ bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
   apply %9999(%1) : $@convention(thin) (Builtin.NativeObject) -> ()
   %2 = function_ref @create_object : $@convention(thin) () -> Builtin.NativeObject
   %3 = apply %2() : $@convention(thin) () -> Builtin.NativeObject
-  cond_br undef, bb1(%3 : $Builtin.NativeObject), bb3(%3 : $Builtin.NativeObject)
+  cond_br undef, bb1, bb3
 
-bb1(%4 : $Builtin.NativeObject):
-  br bb2(%4 : $Builtin.NativeObject)
+bb1:
+  br bb2(%3 : $Builtin.NativeObject)
 
 bb2(%5 : $Builtin.NativeObject):
   strong_release %5 : $Builtin.NativeObject
@@ -1388,8 +1388,8 @@ bb2(%5 : $Builtin.NativeObject):
   %6 = tuple()
   return %6 : $()
 
-bb3(%7 : $Builtin.NativeObject):
-  br bb2(%7 : $Builtin.NativeObject)
+bb3:
+  br bb2(%3 : $Builtin.NativeObject)
 }
 
 // CHECK-LABEL: sil [serialized] @owned_to_guaranteed_simple_singlebb_multiple_arg_caller : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> () {

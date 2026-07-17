@@ -428,10 +428,10 @@ bb0(%0 : $XX):
 bb1(%a1 : $XX):
   strong_release %a1 : $XX
   %o1 = alloc_ref $XX
-  cond_br undef, bb2(%o1 : $XX), bb3
+  cond_br undef, bb2, bb3
 
-bb2(%a2 : $XX):
-  br bb1(%a2 : $XX)
+bb2:
+  br bb1(%o1 : $XX)
 
 bb3:
   %t = tuple ()
@@ -452,10 +452,10 @@ bb1(%a0 : $XX):
 bb2(%a1 : $XX):
   strong_release %a1 : $XX
   %o1 = alloc_ref $XX
-  cond_br undef, bb3(%o1 : $XX), bb4
+  cond_br undef, bb3, bb4
 
-bb3(%a2 : $XX):
-  br bb1(%a2 : $XX)
+bb3:
+  br bb1(%o1 : $XX)
 
 bb4:
   %t = tuple ()
@@ -838,7 +838,7 @@ bb3:
 sil @promote_and_fix_stack_nesting5 : $@convention(thin) (Builtin.Word) -> Int32 {
 bb0(%0 : $Builtin.Word):
   %s1 = alloc_stack $Int32
-  cond_br undef, bb1, bb3(%0 : $Builtin.Word)
+  cond_br undef, bb1, bb3
 
 bb1:
   br bb2(%0 : $Builtin.Word)
@@ -853,8 +853,8 @@ bb2(%i : $Builtin.Word):
   strong_release %n1 : $XX
   return %l2 : $Int32
 
-bb3(%0a : $Builtin.Word):
-  br bb2(%0a : $Builtin.Word)
+bb3:
+  br bb2(%0 : $Builtin.Word)
 }
 
 // CHECK-LABEL: sil @promote_array

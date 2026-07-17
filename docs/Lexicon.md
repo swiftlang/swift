@@ -141,7 +141,9 @@ This has two unrelated meanings:
 ## critical edge
 
 An edge in a control flow graph where the destination has multiple predecessors
-and the source has multiple successors.
+and the source has multiple successors. SIL does not permit critical edges: they
+must be split (by inserting a block along the edge) throughout SIL, in both raw
+and canonical SIL and regardless of whether a function is in Ownership SSA.
 
 ## currency type
 

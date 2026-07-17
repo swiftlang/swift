@@ -1446,21 +1446,21 @@ bb2(%4 : $X):
 //CHECK-LABEL: @cond_branch0
 sil @cond_branch0: $@convention(thin) (@owned X) -> Int {
 bb0(%0 : $X):
-  cond_br undef, bb4, bb1(%0 : $X)
+  cond_br undef, bb4, bb1
 
 bb4:
   br bb2(%0 : $X)
 
-bb1(%1 : $X):
+bb1:
   //CHECK: strong_release %0
-  strong_release %1 : $X
-  br bb2(%1 : $X)
+  strong_release %0 : $X
+  br bb2(%0 : $X)
 
 bb2(%4 : $X):
   br bb3(%4 : $X)
 
 bb3(%6 : $X):
-  //CHECK: strong_release %6
+  //CHECK: strong_release %5
   strong_release %6 : $X
   br bb3(%6 : $X)
 }

@@ -259,13 +259,13 @@ bb3:
   br bb4(%p1 : $MyArray<MyStruct>)
 
 bb4(%p2 : $MyArray<MyStruct>):
-  cond_br undef, bb1a(%p2 : $MyArray<MyStruct>), bb5(%p2 : $MyArray<MyStruct>)
+  cond_br undef, bb1a, bb5
 
-bb1a(%p2a : $MyArray<MyStruct>):
-  br bb1(%p2a : $MyArray<MyStruct>)
+bb1a:
+  br bb1(%p2 : $MyArray<MyStruct>)
 
-bb5(%p3 : $MyArray<MyStruct>):
-  return %p3 : $MyArray<MyStruct>
+bb5:
+  return %p2 : $MyArray<MyStruct>
 }
 
 // CHECK-LABEL: sil @cow_should_ignore_mark_dependence_addrproj_use : $@convention(thin) (@inout MyArray<MyStruct>, @inout Builtin.Int1) -> () {

@@ -1507,20 +1507,14 @@ public:
     assert(arg->isPhi() && "precondition");
     for (SILBasicBlock *predBB : arg->getParent()->getPredecessorBlocks()) {
       auto *TI = predBB->getTerminator();
+      require(isa<BranchInst>(TI), "All phi inputs must be branch operands.");
       if (F.hasOwnership()) {
-        require(isa<BranchInst>(TI), "All phi inputs must be branch operands.");
-
         // Address-only values are potentially unmovable when borrowed. See also
         // checkOwnershipForwardingInst. A phi implies a move of its arguments
         // because they can't necessarily all reuse the same storage.
         require((!arg->getType().isAddressOnly(F)
                  || arg->getOwnershipKind() != OwnershipKind::Guaranteed),
                 "Guaranteed address-only phi not allowed--implies a copy");
-      } else {
-        // FIXME: when critical edges are removed and cond_br arguments are
-        // disallowed, only allow BranchInst.
-        require(isa<BranchInst>(TI) || isa<CondBranchInst>(TI),
-                "All phi argument inputs must be from branches.");
       }
     }
     if (arg->isPhi()) {
@@ -6046,34 +6040,15 @@ public:
                         1, cbi->getCondition()->getType().getASTContext()),
                     "condition of conditional branch must have Int1 type");
 
-    require(cbi->getTrueArgs().size() == cbi->getTrueBB()->args_size(),
-            "true branch has wrong number of arguments for dest bb");
     require(cbi->getTrueBB() != cbi->getFalseBB(), "identical destinations");
-    require(std::equal(cbi->getTrueArgs().begin(), cbi->getTrueArgs().end(),
-                       cbi->getTrueBB()->args_begin(),
-                       [&](SILValue branchArg, SILArgument *bbArg) {
-                         return verifyBranchArgs(branchArg, bbArg);
-                       }),
-            "true branch argument types do not match arguments for dest bb");
 
-    require(cbi->getFalseArgs().size() == cbi->getFalseBB()->args_size(),
-            "false branch has wrong number of arguments for dest bb");
-    require(std::equal(cbi->getFalseArgs().begin(), cbi->getFalseArgs().end(),
-                       cbi->getFalseBB()->args_begin(),
-                       [&](SILValue branchArg, SILArgument *bbArg) {
-                         return verifyBranchArgs(branchArg, bbArg);
-                       }),
-            "false branch argument types do not match arguments for dest bb");
-    // When we are in ossa, cond_br can not have any arguments that are
-    // non-trivial.
-    if (!F.hasOwnership())
-      return;
-
-    require(llvm::all_of(cbi->getOperandValues(),
-                         [&](SILValue v) -> bool {
-                           return v->getType().isTrivial(*cbi->getFunction());
-                         }),
-            "cond_br must not have a non-trivial value in ossa.");
+    // A cond_br never passes branch arguments: because SIL does not contain
+    // critical edges, both destinations have a single predecessor and therefore
+    // must not take any block arguments.
+    require(cbi->getTrueBB()->args_empty(),
+            "true branch destination must not take arguments");
+    require(cbi->getFalseBB()->args_empty(),
+            "false branch destination must not take arguments");
   }
 
   void checkDynamicMethodBranchInst(DynamicMethodBranchInst *DMBI) {

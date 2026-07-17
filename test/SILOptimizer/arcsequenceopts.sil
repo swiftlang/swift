@@ -1962,9 +1962,9 @@ bb0(%0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>):
   %1 = function_ref @user : $@convention(thin) (<τ_0_0> { var τ_0_0 } <Builtin.Int32>) -> ()
   apply %1(%0) : $@convention(thin) (<τ_0_0> { var τ_0_0 } <Builtin.Int32>) -> ()
   %2 = integer_literal $Builtin.Int1, 0
-  cond_br %2, bb1(%0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>), bb2
+  cond_br %2, bb1, bb2
 
-bb1(%3 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>):
+bb1:
   br bb3
 
 bb2:
@@ -1985,9 +1985,9 @@ bb0(%0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>):
   %1 = function_ref @user : $@convention(thin) (<τ_0_0> { var τ_0_0 } <Builtin.Int32>) -> ()
   apply %1(%0) : $@convention(thin) (<τ_0_0> { var τ_0_0 } <Builtin.Int32>) -> ()
   %2 = integer_literal $Builtin.Int1, 0
-  cond_br %2, bb2(%0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>), bb1
+  cond_br %2, bb2, bb1
 
-bb2(%3 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>):
+bb2:
   br bb3
 
 bb1:

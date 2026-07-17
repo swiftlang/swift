@@ -203,11 +203,11 @@ bb2:
 sil @testCondBranchBBArgs : $@convention(thin) (Int, Int) -> Int {
 bb0(%0 : $Int, %1 : $Int):
   %2 = integer_literal $Builtin.Int1, 0
-  cond_br %2, bb1(%0 : $Int), bb2(%1 : $Int)
-bb1(%3 : $Int):
-  br bb3(%3 : $Int)
-bb2(%4 : $Int):
-  br bb3(%4 : $Int)
+  cond_br %2, bb1, bb2
+bb1:
+  br bb3(%0 : $Int)
+bb2:
+  br bb3(%1 : $Int)
 bb3(%5 : $Int):
   return %5 : $Int
 }
@@ -223,11 +223,11 @@ bb3(%5 : $Int):
 sil @removePredecessorWithBBArgs : $@convention(thin) (Int, Int) -> Int {
 bb0(%0 : $Int, %1 : $Int):
  %2 = integer_literal $Builtin.Int1, 0
- cond_br %2, bb2(%0 : $Int), bb3(%1 : $Int)
-bb2(%4 : $Int):
- br bb4(%4 : $Int)
-bb3(%5 : $Int):
-  br bb4(%5 : $Int)
+ cond_br %2, bb2, bb3
+bb2:
+ br bb4(%0 : $Int)
+bb3:
+  br bb4(%1 : $Int)
 bb4(%6 : $Int):
   return %6 : $Int
 }

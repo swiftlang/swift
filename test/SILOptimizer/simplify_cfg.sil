@@ -346,13 +346,13 @@ bb2:
 // CHECK:  return
 sil @elim_trampoline : $@convention(thin) (Builtin.Int1, Int64, Int64) -> Int64 {
 bb0(%0 : $Builtin.Int1, %1 : $Int64, %2 : $Int64):
-  cond_br %0, bb1(%1 : $Int64), bb2(%2 : $Int64)
+  cond_br %0, bb1, bb2
 
-bb1(%3 : $Int64):
-  br bb3(%3 : $Int64)
+bb1:
+  br bb3(%1 : $Int64)
 
-bb2(%4 : $Int64):
-  br bb3(%4 : $Int64)
+bb2:
+  br bb3(%2 : $Int64)
 
 bb3(%5 : $Int64):
   return %5 : $Int64
@@ -363,13 +363,13 @@ bb3(%5 : $Int64):
 // CHECK: return
 sil @elim_trampoline2 : $@convention(thin) (Builtin.Int1, Int64) -> Int64 {
 bb0(%0 : $Builtin.Int1, %1 : $Int64):
-  cond_br %0, bb1(%1 : $Int64), bb2(%1 : $Int64)
+  cond_br %0, bb1, bb2
 
-bb1(%2 : $Int64):
-  br bb3(%2 : $Int64)
+bb1:
+  br bb3(%1 : $Int64)
 
-bb2(%3 : $Int64):
-  br bb3(%3 : $Int64)
+bb2:
+  br bb3(%1 : $Int64)
 
 bb3(%4 : $Int64):
   return %4 : $Int64
@@ -380,14 +380,14 @@ bb3(%4 : $Int64):
 // CHECK: return
 sil @elim_trampoline_debug : $@convention(thin) (Builtin.Int1, Int64) -> Int64 {
 bb0(%0 : $Builtin.Int1, %1 : $Int64):
-  cond_br %0, bb1(%1 : $Int64), bb2(%1 : $Int64)
+  cond_br %0, bb1, bb2
 
-bb1(%2 : $Int64):
+bb1:
   debug_value %0 : $Builtin.Int1
-  br bb3(%2 : $Int64)
+  br bb3(%1 : $Int64)
 
-bb2(%3 : $Int64):
-  br bb3(%3 : $Int64)
+bb2:
+  br bb3(%1 : $Int64)
 
 bb3(%4 : $Int64):
   return %4 : $Int64
@@ -403,13 +403,13 @@ bb3(%4 : $Int64):
 // CHECK:  return
 sil @elim_trampoline3 : $@convention(thin) (Builtin.Int1, Int64, Int64) -> Int64 {
 bb0(%0 : $Builtin.Int1, %1 : $Int64, %2 : $Int64):
-  cond_br %0, bb1(%1 : $Int64), bb2(%2 : $Int64)
+  cond_br %0, bb1, bb2
 
-bb1(%3 : $Int64):
-  br bb3(%3 : $Int64)
+bb1:
+  br bb3(%1 : $Int64)
 
-bb2(%4 : $Int64):
-  br bb3(%4 : $Int64)
+bb2:
+  br bb3(%2 : $Int64)
 
 bb3(%5 : $Int64):
   br bb4(%5 : $Int64)
@@ -470,7 +470,7 @@ bb0(%0 : $Int32):
   %1 = integer_literal $Builtin.Int32, 0
   %2 = struct_extract %0 : $Int32, #Int32._value
   %3 = builtin "cmp_eq_Int32"(%1 : $Builtin.Int32, %2 : $Builtin.Int32) : $Builtin.Int1
-  cond_br %3, bb6, bb7(%1 : $Builtin.Int32)
+  cond_br %3, bb6, bb7
 
 bb1:
   %5 = tuple ()
@@ -487,28 +487,28 @@ bb3:
 
 bb4(%13 : $Builtin.Int32):
   %14 = builtin "cmp_eq_Int32"(%13 : $Builtin.Int32, %2 : $Builtin.Int32) : $Builtin.Int1
-  cond_br %14, bb8, bb9(%13 : $Builtin.Int32)
+  cond_br %14, bb8, bb9
 
 bb5(%16 : $Builtin.Int32):
   %17 = builtin "sadd_with_overflow_Int32"(%16 : $Builtin.Int32, %8 : $Builtin.Int32, %9 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
   %18 = tuple_extract %17 : $(Builtin.Int32, Builtin.Int1), 0
   %19 = builtin "cmp_eq_Int32"(%18 : $Builtin.Int32, %10 : $Builtin.Int32) : $Builtin.Int1
-  cond_br %19, bb3, bb10(%18 : $Builtin.Int32)
+  cond_br %19, bb3, bb10
 
 bb6:
   br bb1
 
-bb7(%20 : $Builtin.Int32):
-  br bb2(%20 : $Builtin.Int32)
+bb7:
+  br bb2(%1 : $Builtin.Int32)
 
 bb8:
   br bb1
 
-bb9(%21 : $Builtin.Int32):
-  br bb2(%21 : $Builtin.Int32)
+bb9:
+  br bb2(%13 : $Builtin.Int32)
 
-bb10(%22 : $Builtin.Int32):
-  br bb5(%22 : $Builtin.Int32)
+bb10:
+  br bb5(%18 : $Builtin.Int32)
 }
 
 // CHECK-LABEL: @elim_trampoline_loop
@@ -516,10 +516,10 @@ bb10(%22 : $Builtin.Int32):
 // CHECK: return
 sil @elim_trampoline_loop : $@convention(thin) (Builtin.Int1, Int64, Int64) -> Int64 {
 bb0(%0 : $Builtin.Int1, %1 : $Int64, %2 : $Int64):
-  cond_br %0, bb1(%1 : $Int64), bb5(%2 : $Int64)
+  cond_br %0, bb1, bb5
 
-bb1(%3 : $Int64):
-  br bb3(%3 : $Int64)
+bb1:
+  br bb3(%1 : $Int64)
 
 bb2(%4 : $Int64):
   br bb2(%4 : $Int64)
@@ -530,8 +530,8 @@ bb3(%5 : $Int64):
 bb4(%6 : $Int64):
   return %6 : $Int64
 
-bb5(%7 : $Int64):
-  br bb2(%7 : $Int64)
+bb5:
+  br bb2(%2 : $Int64)
 }
 
 // CHECK-LABEL: @elim_common_arg
@@ -559,22 +559,22 @@ bb3(%a1 : $Int64):
 // CHECK-NEXT: return %1
 sil @elim_diamonds : $@convention(thin) (Builtin.Int1, Int64, Int64) -> Int64 {
 bb0(%0 : $Builtin.Int1, %1 : $Int64, %2 : $Int64):
-  cond_br %0, bb1(%1 : $Int64), bb2(%1 : $Int64)
+  cond_br %0, bb1, bb2
 
-bb1(%3 : $Int64):
-  br bb3(%3 : $Int64)
+bb1:
+  br bb3(%1 : $Int64)
 
-bb2(%4 : $Int64):
-  br bb3(%4 : $Int64)
+bb2:
+  br bb3(%1 : $Int64)
 
 bb3(%5 : $Int64):
-  cond_br %0, bb4(%5 : $Int64), bb5(%5 : $Int64)
+  cond_br %0, bb4, bb5
 
-bb4(%6 : $Int64):
-  br bb6(%6 : $Int64)
+bb4:
+  br bb6(%5 : $Int64)
 
-bb5(%7 : $Int64):
-  br bb6(%7 : $Int64)
+bb5:
+  br bb6(%5 : $Int64)
 
 bb6(%8 : $Int64):
   return %8 : $Int64
@@ -1327,7 +1327,7 @@ bb0(%0 : $Int32):
   %8 = tuple_extract %6 : $(Builtin.Int32, Builtin.Int1), 1
   cond_fail %8 : $Builtin.Int1
   %11 = builtin "cmp_eq_Int32"(%2 : $Builtin.Int32, %7 : $Builtin.Int32) : $Builtin.Int1
-  cond_br %11, bb9(%1 : $Builtin.Int32), bb2
+  cond_br %11, bb9, bb2
 
 bb2:
   %14 = integer_literal $Builtin.Int32, 2
@@ -1368,8 +1368,8 @@ bb8(%40 : $Builtin.Int32):
   %41 = struct $Int32 (%40 : $Builtin.Int32)
   return %41 : $Int32
 
-bb9(%42 : $Builtin.Int32):
-  br bb8(%42 : $Builtin.Int32)
+bb9:
+  br bb8(%1 : $Builtin.Int32)
 }
 
 // CHECK-LABEL: sil @jumpthread_switch_enum2
@@ -1460,7 +1460,7 @@ bb0:
 
 bb1:
   %4 = enum $Optional<Int32>, #Optional.none!enumelt
-  cond_br undef, bb8(%4 : $Optional<Int32>), bb9(%4 : $Optional<Int32>, %c0 : $Builtin.Int32)
+  cond_br undef, bb8, bb9
 
 bb2:
   %6 = integer_literal $Builtin.Int32, 0
@@ -1490,11 +1490,11 @@ bb6:
 bb7(%r : $Builtin.Int32, %carg2 : $Builtin.Int32):
   return %r : $Builtin.Int32
 
-bb8(%20 : $Optional<Int32>):
-  br bb3(%20 : $Optional<Int32>)
+bb8:
+  br bb3(%4 : $Optional<Int32>)
 
-bb9(%21 : $Optional<Int32>, %22 : $Builtin.Int32):
-  br bb4(%21 : $Optional<Int32>, %22 : $Builtin.Int32)
+bb9:
+  br bb4(%4 : $Optional<Int32>, %c0 : $Builtin.Int32)
 }
 
 // CHECK-LABEL: sil @jumpthread_switch_enum5
@@ -1562,7 +1562,7 @@ bb0(%0 : $Int32):
   %8 = tuple_extract %6 : $(Builtin.Int32, Builtin.Int1), 1
   cond_fail %8 : $Builtin.Int1
   %11 = builtin "cmp_eq_Int32"(%2 : $Builtin.Int32, %7 : $Builtin.Int32) : $Builtin.Int1
-  cond_br %11, bb9(%1 : $Builtin.Int32), bb2
+  cond_br %11, bb9, bb2
 
 bb2:
   %14 = integer_literal $Builtin.Int32, 2
@@ -1605,8 +1605,8 @@ bb8(%40 : $Builtin.Int32):
   %41 = struct $Int32 (%40 : $Builtin.Int32)
   return %41 : $Int32
 
-bb9(%42 : $Builtin.Int32):
-  br bb8(%42 : $Builtin.Int32)
+bb9:
+  br bb8(%1 : $Builtin.Int32)
 }
 
 enum OneCase {
@@ -2064,7 +2064,7 @@ bb1:
 
 bb2:
   apply %f1() : $@convention(thin) () -> () // prevent other CFG optimizations
-  cond_br %2, bb5(%1 : $Builtin.Int1), bb6
+  cond_br %2, bb5, bb6
 
 bb3(%a3 : $Builtin.Int1):
   apply %f1() : $@convention(thin) () -> () // prevent other CFG optimizations
@@ -2075,8 +2075,8 @@ bb4:
   %r = tuple ()
   return %r : $()
 
-bb5(%a5 : $Builtin.Int1):
-  br bb3(%a5 : $Builtin.Int1)
+bb5:
+  br bb3(%1 : $Builtin.Int1)
 
 bb6:
   br bb4
