@@ -16216,6 +16216,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::IgnoreNonMetatypeDynamicType:
   case FixKind::IgnoreIsolatedConformance:
   case FixKind::IgnoreClassRequirementForDynamicMemberLookup:
+  case FixKind::ExecutionSemanticsMismatch:
     llvm_unreachable("handled elsewhere");
   }
 
