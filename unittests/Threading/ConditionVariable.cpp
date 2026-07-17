@@ -16,7 +16,6 @@
 #include <chrono>
 #include <vector>
 
-#include "ThreadingHelpers.h"
 #include "LockingHelpers.h"
 
 using namespace swift;

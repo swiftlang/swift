@@ -16,7 +16,6 @@
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckDistributed.h"
 #include "TypeChecker.h"
-#include "swift/Strings.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Initializer.h"
@@ -25,11 +24,8 @@
 #include "swift/AST/DistributedDecl.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/TypeCheckRequests.h"
-#include "swift/AST/TypeVisitor.h"
 #include "swift/AST/ImportCache.h"
 #include "swift/AST/ExistentialLayout.h"
-#include "swift/Basic/Assertions.h"
-#include "swift/Basic/Defer.h"
 #include "swift/AST/ASTPrinter.h"
 
 using namespace swift;

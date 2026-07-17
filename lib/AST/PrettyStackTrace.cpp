@@ -29,7 +29,6 @@
 #include "swift/Basic/SourceManager.h"
 #include "clang/AST/Type.h"
 #include "llvm/Support/raw_ostream.h"
-#include "llvm/Support/MemoryBuffer.h"
 
 using namespace swift;
 

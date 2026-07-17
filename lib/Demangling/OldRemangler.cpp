@@ -21,7 +21,6 @@
 #include "swift/AST/Ownership.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/ManglingUtils.h"
-#include "swift/Demangling/Punycode.h"
 #include "swift/Strings.h"
 #include <cstdio>
 #include <cstdlib>

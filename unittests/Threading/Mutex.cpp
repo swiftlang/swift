@@ -12,10 +12,6 @@
 
 #include "swift/Threading/Mutex.h"
 #include "gtest/gtest.h"
-#include <atomic>
-#include <chrono>
-#include <map>
-#include <random>
 
 #include "LockingHelpers.h"
 

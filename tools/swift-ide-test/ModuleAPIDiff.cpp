@@ -19,7 +19,6 @@
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/Sema/IDETypeChecking.h"
-#include "llvm/ADT/ArrayRef.h"
 #include "llvm/Support/YAMLTraits.h"
 #include <memory>
 #include <optional>

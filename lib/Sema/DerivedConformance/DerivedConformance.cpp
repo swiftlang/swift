@@ -28,7 +28,6 @@
 #include "swift/Basic/QuotedString.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "llvm/ADT/STLExtras.h"
-#include "llvm/Support/Casting.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
 

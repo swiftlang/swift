@@ -22,14 +22,12 @@
 
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/GlobalDecl.h"
-#include "clang/Basic/CharInfo.h"
 #include "clang/CodeGen/CGFunctionInfo.h"
 #include "clang/CodeGen/CodeGenABITypes.h"
 
 #include "swift/AST/Decl.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/IRGen/Linking.h"
@@ -54,7 +52,6 @@
 #include "IRGenModule.h"
 #include "MetadataRequest.h"
 #include "NativeConventionSchema.h"
-#include "ScalarTypeInfo.h"
 #include "StructLayout.h"
 
 #include "GenObjC.h"

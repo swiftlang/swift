@@ -12,7 +12,6 @@
 
 #include "swift/SIL/LoopInfo.h"
 #include "swift/SIL/Dominance.h"
-#include "llvm/Support/GenericLoopInfoImpl.h"
 #include "llvm/Support/Debug.h"
 
 using namespace swift;

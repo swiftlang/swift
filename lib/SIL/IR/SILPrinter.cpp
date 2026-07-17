@@ -60,7 +60,6 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/FormattedStream.h"
-#include <set>
 
 using namespace swift;
 using ID = SILPrintContext::ID;

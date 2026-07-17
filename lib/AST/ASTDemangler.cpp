@@ -40,7 +40,6 @@
 #include "swift/Basic/Defer.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/ManglingMacros.h"
-#include "clang/Tooling/Refactor/USRFinder.h"
 #include "llvm/ADT/StringSwitch.h"
 
 using namespace swift;

@@ -20,7 +20,6 @@
 #include "ManagedValue.h"
 #include "SILGenFunction.h"
 #include "SILGenFunctionBuilder.h"
-#include "Scope.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/GenericEnvironment.h"

@@ -12,7 +12,6 @@
 
 #include "swift/Option/Options.h"
 
-#include "llvm/ADT/STLExtras.h"
 #include "llvm/Option/OptTable.h"
 #include "llvm/Option/Option.h"
 

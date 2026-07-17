@@ -21,13 +21,10 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/ADT/SmallString.h"
-#include "llvm/Support/raw_ostream.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/ABI/MetadataValues.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/IRGen/ValueWitness.h"
-#include "swift/SIL/TypeLowering.h"
 
 #include "Callee.h"
 #include "ComputedWitnessIndex.h"

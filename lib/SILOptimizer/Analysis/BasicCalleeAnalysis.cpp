@@ -12,19 +12,13 @@
 
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 
-#include "swift/AST/Decl.h"
-#include "swift/AST/ProtocolConformance.h"
-#include "swift/Basic/Statistic.h"
-#include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/SILBridging.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/Test.h"
 #include "swift/SILOptimizer/OptimizerBridging.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
-#include "llvm/Support/Compiler.h"
 
-#include <algorithm>
 
 #define DEBUG_TYPE "BasicCalleeAnalysis"
 

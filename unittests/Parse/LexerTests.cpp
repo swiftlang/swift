@@ -5,7 +5,6 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Subsystems.h"
-#include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Process.h"
 #include "gtest/gtest.h"
 

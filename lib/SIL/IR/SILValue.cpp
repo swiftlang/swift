@@ -10,14 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILArgument.h"
-#include "swift/SIL/SILBuiltinVisitor.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
-#include "swift/SIL/SILVisitor.h"
 #include "swift/SIL/Test.h"
 #include "llvm/ADT/StringSwitch.h"
 

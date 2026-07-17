@@ -16,7 +16,6 @@
 #include "llvm/ADT/Statistic.h"
 
 #include "swift/AST/Expr.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
@@ -24,7 +23,6 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Utils/DistributedActor.h"
 #include "llvm/ADT/StringExtras.h"
-#include "llvm/Support/Debug.h"
 #include "llvm/Support/SaveAndRestore.h"
 
 using namespace swift;

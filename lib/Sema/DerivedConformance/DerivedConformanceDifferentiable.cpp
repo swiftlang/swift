@@ -31,8 +31,6 @@
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Assertions.h"
-#include "llvm/ADT/SmallPtrSet.h"
 
 using namespace swift;
 

@@ -12,10 +12,8 @@
 
 #define DEBUG_TYPE "sil-looprotate"
 
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/SILArgument.h"
-#include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"

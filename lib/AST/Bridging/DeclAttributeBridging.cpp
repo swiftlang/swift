@@ -17,7 +17,6 @@
 #include "swift/AST/AutoDiff.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Identifier.h"
-#include "swift/Basic/Assertions.h"
 
 using namespace swift;
 

@@ -22,7 +22,6 @@
 #include <chrono>
 #include <condition_variable>
 #include <mutex>
-#include <thread>
 
 using namespace SourceKit;
 using namespace llvm;

@@ -20,7 +20,6 @@
 #include "swift/SIL/ApplySite.h"
 #include "swift/SILOptimizer/Differentiation/Common.h"
 #include "swift/AST/TypeCheckRequests.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/SILOptimizer/Differentiation/ADContext.h"
 
 namespace swift {

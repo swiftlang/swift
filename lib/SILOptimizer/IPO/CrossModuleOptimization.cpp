@@ -17,9 +17,7 @@
 #define DEBUG_TYPE "cross-module-serialization-setup"
 #include "swift/AST/Module.h"
 #include "swift/AST/ImportCache.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/IRGen/TBDGen.h"
-#include "swift/SIL/ApplySite.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILModule.h"
@@ -30,7 +28,6 @@
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
 #include "llvm/Support/CommandLine.h"
-#include "llvm/Support/Debug.h"
 
 using namespace swift;
 

@@ -13,7 +13,6 @@
 #define DEBUG_TYPE "sil-differentiability-witness"
 
 #include "swift/AST/ASTMangler.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILDifferentiabilityWitness.h"
 #include "swift/SIL/SILModule.h"
 
