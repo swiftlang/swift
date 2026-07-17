@@ -156,12 +156,17 @@ SwiftJIT::CreateLLJIT(CompilerInstance &CI) {
   std::tie(TargetOpt, CPU, Features, Triple) =
       getIRTargetOptions(IRGenOpts, Ctx);
   // Use the relocation model that Clang resolved for this target, consistent
-  // with the AOT code path in IRGen::createTargetMachine.
-  auto *clangImporter =
-      static_cast<ClangImporter *>(Ctx.getClangModuleLoader());
+  // with the AOT code path in IRGen::createTargetMachine. If there is no Clang
+  // importer, fall back to Swift's default: PIC everywhere except Windows,
+  // which is implicitly position-independent.
+  llvm::Reloc::Model relocModel = llvm::Triple(Triple).isOSWindows()
+                                      ? llvm::Reloc::Static
+                                      : llvm::Reloc::PIC_;
+  if (auto *clangImporter =
+          static_cast<ClangImporter *>(Ctx.getClangModuleLoader()))
+    relocModel = clangImporter->getCodeGenOpts().RelocationModel;
   auto JTMB = llvm::orc::JITTargetMachineBuilder(llvm::Triple(Triple))
-                  .setRelocationModel(
-                      clangImporter->getCodeGenOpts().RelocationModel)
+                  .setRelocationModel(relocModel)
                   .setOptions(std::move(TargetOpt))
                   .setCPU(std::move(CPU))
                   .addFeatures(Features)

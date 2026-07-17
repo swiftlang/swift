@@ -1195,9 +1195,13 @@ swift::createTargetMachine(const IRGenOptions &Opts, ASTContext &Ctx,
   // Use the relocation model that Clang resolved for this target. This keeps
   // Swift's code generation consistent with any C/C++ code Clang emits into the
   // module, and lets `-Xcc` PIC flags (e.g. -fno-pic) affect Swift's model too.
-  auto *clangImporter =
-      static_cast<ClangImporter *>(Ctx.getClangModuleLoader());
-  Reloc::Model relocModel = clangImporter->getCodeGenOpts().RelocationModel;
+  // If there is no Clang importer, fall back to Swift's default: PIC
+  // everywhere except Windows, which is implicitly position-independent.
+  Reloc::Model relocModel =
+      EffectiveTriple.isOSWindows() ? Reloc::Static : Reloc::PIC_;
+  if (auto *clangImporter =
+          static_cast<ClangImporter *>(Ctx.getClangModuleLoader()))
+    relocModel = clangImporter->getCodeGenOpts().RelocationModel;
 
   // Create a target machine.
   llvm::TargetMachine *TargetMachine = Target->createTargetMachine(
