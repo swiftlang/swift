@@ -253,7 +253,9 @@ static clang::QualType getReadOnlyParamType(const clang::ParmVarDecl *param) {
 static bool isValidBinOp(NominalTypeDecl *decl, const clang::FunctionDecl *fd) {
   if (!fd)
     return false;
-  auto ty = cast<clang::TypeDecl>(decl->getClangDecl())->getTypeForDecl();
+  auto &clangCtx = decl->getClangDecl()->getASTContext();
+  auto ty = clangCtx.getCanonicalTagType(
+      cast<clang::TagDecl>(decl->getClangDecl()));
   if (auto method = dyn_cast<clang::CXXMethodDecl>(fd)) {
     if (method->param_size() != 1)
       return false;
@@ -264,11 +266,9 @@ static bool isValidBinOp(NominalTypeDecl *decl, const clang::FunctionDecl *fd) {
     if (parTy.isNull())
       return false;
 
-    auto &clangCtx = method->getASTContext();
-
     auto parentTy = clangCtx.getCanonicalTagType(method->getParent());
     return parTy.getCanonicalType() == parentTy &&
-           parTy.getCanonicalType() == ty->getCanonicalTypeUnqualified();
+           parTy.getCanonicalType() == ty;
   }
   if (fd->param_size() != 2)
     return false;
@@ -278,8 +278,7 @@ static bool isValidBinOp(NominalTypeDecl *decl, const clang::FunctionDecl *fd) {
     return false;
   return lhsTy->getCanonicalTypeUnqualified() ==
              rhsTy->getCanonicalTypeUnqualified() &&
-         lhsTy->getCanonicalTypeUnqualified() ==
-             ty->getCanonicalTypeUnqualified();
+         lhsTy->getCanonicalTypeUnqualified() == ty;
 }
 
 static ValueDecl *getEqualEqualOperator(NominalTypeDecl *decl) {
@@ -349,7 +348,9 @@ static FuncDecl *getPlusEqualOperator(NominalTypeDecl *decl) {
   auto isValidGlobal = [&](const clang::FunctionDecl *fd) -> bool {
     if (!fd)
       return false;
-    auto ty = cast<clang::TypeDecl>(decl->getClangDecl())->getTypeForDecl();
+    auto &clangCtx = decl->getClangDecl()->getASTContext();
+    auto ty = clangCtx.getCanonicalTagType(
+        cast<clang::TagDecl>(decl->getClangDecl()));
     if (auto method = dyn_cast<clang::CXXMethodDecl>(fd)) {
       if (method->param_size() != 1)
         return false;
@@ -362,10 +363,8 @@ static FuncDecl *getPlusEqualOperator(NominalTypeDecl *decl) {
       if (!parTy->isIntegerType())
         return false;
 
-      auto &clangCtx = method->getASTContext();
-
       auto parentTy = clangCtx.getCanonicalTagType(method->getParent());
-      return parentTy == ty->getCanonicalTypeUnqualified();
+      return parentTy == ty;
     }
     if (fd->param_size() != 2)
       return false;
@@ -375,8 +374,7 @@ static FuncDecl *getPlusEqualOperator(NominalTypeDecl *decl) {
       return false;
     if (rhsTy->isIntegerType())
       return false;
-    return lhsTy->getCanonicalTypeUnqualified() ==
-           ty->getCanonicalTypeUnqualified();
+    return lhsTy->getCanonicalTypeUnqualified() == ty;
   };
   auto isValidMember = [&](ValueDecl *plusEqualOp) -> bool {
     auto plusEqual = dyn_cast<FuncDecl>(plusEqualOp);
