@@ -210,6 +210,16 @@ static llvm::cl::opt<bool> SILPrintEverySubpass(
     llvm::cl::desc("Print the function before every subpass run of passes that "
                    "have multiple subpasses"));
 
+static llvm::cl::opt<std::string> SILViewDom(
+    "sil-view-dom", llvm::cl::init(""),
+    llvm::cl::desc("View the dominator tree of a function at a given pass "
+                   "count"));
+
+static llvm::cl::opt<std::string> SILViewDomOnly(
+    "sil-view-dom-only", llvm::cl::init(""),
+    llvm::cl::desc("View the dominator tree of a function (basic block names "
+                   "only) at a given pass count"));
+
 static bool isInPrintFunctionList(SILFunction *F) {
   for (const std::string &printFnName : SILPrintFunction) {
     if (printFnName == F->getName())
@@ -818,6 +828,23 @@ void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
       runSwiftFunctionVerification(F);
     }
   }
+
+  // View the dominator tree at the specified pass count.
+  auto viewDomAtPassCount = [&](StringRef option, bool shortNames) {
+    unsigned passCount;
+    if (option.getAsInteger(10, passCount))
+      return;
+    if (NumPassesRun == passCount) {
+      if (shortNames)
+        F->viewDomTreeOnly();
+      else
+        F->viewDomTree();
+    }
+  };
+  if (!SILViewDom.empty())
+    viewDomAtPassCount(SILViewDom, /*shortNames=*/false);
+  else if (!SILViewDomOnly.empty())
+    viewDomAtPassCount(SILViewDomOnly, /*shortNames=*/true);
 
   ++NumPassesRun;
 }
