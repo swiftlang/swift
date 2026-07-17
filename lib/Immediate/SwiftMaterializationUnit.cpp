@@ -85,7 +85,7 @@ SwiftJIT::Create(CompilerInstance &CI) {
     return MemAccess.takeError();
 
   auto EPCIU = llvm::orc::EPCIndirectionUtils::Create(
-      ES.getExecutorProcessControl(), **MemAccess);
+      ES.getExecutorProcessControl(), (*J)->getMemoryManager(), **MemAccess);
 
   if (!EPCIU)
     return EPCIU.takeError();
