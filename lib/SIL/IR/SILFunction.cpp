@@ -954,6 +954,7 @@ struct DOTGraphTraits<SILFunction *> : public DefaultDOTGraphTraits {
     return "";
   }
 };
+
 } // namespace llvm
 #endif
 
@@ -983,6 +984,23 @@ void SILFunction::viewCFGOnly() const {
   viewCFGHelper(this, /*skipBBContents=*/true);
 }
 
+static void viewDomTreeHelper(const SILFunction *f, bool shortNames) {
+#ifndef NDEBUG
+  auto *nonConstF = const_cast<SILFunction *>(f);
+  DominanceInfo domInfo(nonConstF);
+
+  llvm::ViewGraph(&domInfo, "domtree_" + f->getName().str(),
+                  /*ShortNames=*/shortNames);
+#endif
+}
+
+void SILFunction::viewDomTree() const {
+  viewDomTreeHelper(this, /*shortNames=*/false);
+}
+
+void SILFunction::viewDomTreeOnly() const {
+  viewDomTreeHelper(this, /*shortNames=*/true);
+}
 
 bool SILFunction::hasDynamicSelfMetadata() const {
   auto paramTypes =

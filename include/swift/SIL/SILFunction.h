@@ -1836,6 +1836,11 @@ public:
   /// Like ViewCFG, but the graph does not show the contents of basic blocks.
   void viewCFGOnly() const;
 
+  /// View the dominator tree of this function.
+  void viewDomTree() const;
+  /// Like viewDomTree, but the graph does not show the contents of basic
+  /// blocks.
+  void viewDomTreeOnly() const;
 };
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
