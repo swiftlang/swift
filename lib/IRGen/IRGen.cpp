@@ -1192,9 +1192,16 @@ swift::createTargetMachine(const IRGenOptions &Opts, ASTContext &Ctx,
   if (EffectiveTriple.isArch64Bit() && EffectiveTriple.isWindowsCygwinEnvironment())
     cmodel = CodeModel::Large;
 
+  // Use the relocation model that Clang resolved for this target. This keeps
+  // Swift's code generation consistent with any C/C++ code Clang emits into the
+  // module, and lets `-Xcc` PIC flags (e.g. -fno-pic) affect Swift's model too.
+  auto *clangImporter =
+      static_cast<ClangImporter *>(Ctx.getClangModuleLoader());
+  Reloc::Model relocModel = clangImporter->getCodeGenOpts().RelocationModel;
+
   // Create a target machine.
   llvm::TargetMachine *TargetMachine = Target->createTargetMachine(
-      EffectiveTriple, CPU, targetFeatures, TargetOpts, Reloc::PIC_,
+      EffectiveTriple, CPU, targetFeatures, TargetOpts, relocModel,
       cmodel, OptLevel);
   if (!TargetMachine) {
     Ctx.Diags.diagnose(SourceLoc(), diag::no_llvm_target,
