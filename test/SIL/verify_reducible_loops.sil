@@ -1,0 +1,32 @@
+// RUN: %empty-directory(%t)
+// RUN: not --crash %target-sil-opt -verify-reducible-loops %s 2> %t/err.txt
+// RUN: %FileCheck %s < %t/err.txt
+
+// REQUIRES: asserts
+
+// This test contains an irreducible loop and should fail verification
+// when -sil-verify-reducible-loops is enabled.
+
+sil_stage canonical
+
+import Builtin
+
+// CHECK: Irreducible loop detected in function irreducible_loop
+
+sil @irreducible_loop : $@convention(thin) (Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1):
+  cond_br %0, bb1, bb2
+
+// bb1 and bb2 form an irreducible loop: both are entry points
+// from outside and both branch to each other.
+bb1:
+  cond_br %0, bb2, bb3
+
+bb2:
+  cond_br %0, bb1, bb3
+
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
