@@ -2,7 +2,7 @@
 // RUN: split-file %s %t
 // RUN: %target-swift-frontend  -I %t/Inputs -emit-sil %t/test.swift -enable-experimental-feature LifetimeDependence -cxx-interoperability-mode=default -diagnostic-style llvm 2>&1 | %FileCheck %s
 // RUN: %target-swift-frontend  -I %t/Inputs -emit-sil %t/test.swift -cxx-interoperability-mode=default -diagnostic-style llvm 2>&1 | %FileCheck %s
-// RUN: %target-swift-frontend  -I %t/Inputs -emit-sil -verify %t/escaping_scopes.swift -verify-additional-file %t/Inputs/nonescapable.h -enable-experimental-feature Lifetimes -cxx-interoperability-mode=default -diagnostic-style llvm
+// RUN: %target-swift-frontend  -I %t/Inputs -emit-sil -verify %t/escaping_scopes.swift -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}nonescapable.h -enable-experimental-feature Lifetimes -cxx-interoperability-mode=default -diagnostic-style llvm
 
 // REQUIRES: swift_feature_LifetimeDependence
 // REQUIRES: swift_feature_Lifetimes
@@ -234,9 +234,7 @@ struct OwnerBox {
 
 class SharedTrivialOwner {
 public:
-    Owner field;
-    // The trivial 'Owner' field's borrow (see frtTrivialField) roots here.
-    // expected-note @-2 {{it depends on the lifetime of variable 'field'}}
+    Owner field; // #owner
 } SWIFT_SHARED_REFERENCE(retainSharedTrivialOwner, releaseSharedTrivialOwner);
 inline void retainSharedTrivialOwner(SharedTrivialOwner *) {}
 inline void releaseSharedTrivialOwner(SharedTrivialOwner *) {}
@@ -389,14 +387,15 @@ final class SwiftBoxOwner { var field = NonTrivialOwner() }
 final class SwiftBoxNested { var field = OwnerBox() }
 
 // Foreign reference type base, trivial field. The field 'Owner' is trivial, so
-// (as with viaMethod) the borrow is value-based; the escape is still diagnosed
-// but without an "it depends on" note.
+// the borrow is value-based; the "it depends on" note points at the field's
+// declaration in the imported header (see the '#owner' marker).
 @available(SwiftStdlib 5.8, *)
 @_lifetime(borrow x)
 func frtTrivialField(x: SharedTrivialOwner) -> View {
   return x.field.handOutView()
   // expected-error @-1 {{lifetime-dependent value escapes its scope}}
-  // expected-note @-2 {{this use causes the lifetime-dependent value to escape}}
+  // expected-note@#owner {{it depends on the lifetime of variable 'field'}}
+  // expected-note @-3 {{this use causes the lifetime-dependent value to escape}}
 }
 
 // Foreign reference type base, non-trivial field.
