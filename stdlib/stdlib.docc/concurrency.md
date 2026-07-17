@@ -27,6 +27,7 @@ Perform asynchronous and parallel operations.
 
 ### Continuations
 
+- ``Swift/Continuation``
 - ``Swift/CheckedContinuation``
 - ``Swift/withCheckedContinuation(isolation:function:_:)``
 - ``Swift/withCheckedThrowingContinuation(isolation:function:_:)``
