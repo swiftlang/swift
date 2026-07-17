@@ -1,6 +1,7 @@
 #ifndef SWIFT_CXXMETHODBRIDGING_H
 #define SWIFT_CXXMETHODBRIDGING_H
 
+#include "clang/AST/Attr.h"
 #include "clang/AST/DeclCXX.h"
 #include "llvm/ADT/StringRef.h"
 #include <string>
@@ -24,7 +25,7 @@ struct CXXMethodBridging {
         nameKind != NameKind::lower && nameKind != NameKind::snake)
       return Kind::unknown;
 
-    if (getClangName().starts_with_insensitive("set")) {
+    if (hasSetterPrefix()) {
       // Setters only have one parameter.
       if (method->getNumParams() != 1)
         return Kind::unknown;
@@ -41,18 +42,22 @@ struct CXXMethodBridging {
     if (method->getReturnType()->isVoidType())
       return Kind::unknown;
 
-    if (getClangName().starts_with_insensitive("get")) {
-      // Getters cannot take arguments.
-      if (method->getNumParams() != 0)
-        return Kind::unknown;
+    // Getters cannot take arguments.
+    if (method->getNumParams() != 0)
+      return Kind::unknown;
 
-      // rdar://89453106 (We need to handle imported properties that return a
-      // reference)
-      if (method->getReturnType()->isReferenceType())
-        return Kind::unknown;
+    // rdar://89453106 (We need to handle imported properties that return a
+    // reference)
+    if (method->getReturnType()->isReferenceType())
+      return Kind::unknown;
 
+    // A getter is named with a "get" prefix, or -- when the method is
+    // explicitly annotated with 'import_computed_property'
+    // (the SWIFT_COMPUTED_PROPERTY macro) -- with any name. In the latter case
+    // the whole name becomes the (camelCased) property name. See
+    // rdar://89453010.
+    if (hasGetterPrefix() || isExplicitComputedProperty())
       return Kind::getter;
-    }
 
     // rdar://89453187 (Add subscripts clarification to CXXMethod Bridging to
     // clean up importDecl)
@@ -84,11 +89,36 @@ struct CXXMethodBridging {
     return method->getName();
   }
 
+  bool hasGetterPrefix() { return getClangName().starts_with_insensitive("get"); }
+  bool hasSetterPrefix() { return getClangName().starts_with_insensitive("set"); }
+
+  // True when the method carries the 'import_computed_property' Swift attribute
+  // (i.e. the SWIFT_COMPUTED_PROPERTY macro), which opts it in to being
+  // imported as a computed property even without a get/set name prefix.
+  bool isExplicitComputedProperty() {
+    for (const auto *attr : method->specific_attrs<clang::SwiftAttrAttr>())
+      if (attr->getAttribute() == "import_computed_property")
+        return true;
+    return false;
+  }
+
+  // The clang name with a leading "get"/"set" accessor prefix removed, if it
+  // has one; otherwise the whole name (e.g. an annotated prefix-less getter).
+  // Returns a StringRef into the persistent Clang name, so it stays valid for
+  // uses that outlive this object, such as a GetterSetterMap key.
+  llvm::StringRef nameWithoutAccessorPrefix() {
+    if (hasGetterPrefix() || hasSetterPrefix())
+      return getClangName().drop_front(3);
+    return getClangName();
+  }
+
   std::string importNameAsCamelCaseName() {
     std::string output;
     auto kind = classify();
+    // The property name is derived from the accessor name without its get/set
+    // prefix (see nameWithoutAccessorPrefix); non-accessors keep their name.
     if (kind == Kind::getter || kind == Kind::setter) {
-      output = getClangName().drop_front(3).str();
+      output = nameWithoutAccessorPrefix().str();
     } else {
       output = getClangName().str();
     }

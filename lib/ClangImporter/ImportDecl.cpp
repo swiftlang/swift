@@ -2968,8 +2968,8 @@ namespace {
           // name and make both APIs unusable.
           CXXMethodBridging cxxMethodBridging(
               cast<clang::CXXMethodDecl>(getter->getClangDecl()));
-          if (allMemberNames.contains(
-                  cxxMethodBridging.importNameAsCamelCaseName()))
+          auto importedName = cxxMethodBridging.importNameAsCamelCaseName();
+          if (allMemberNames.contains(importedName))
             continue;
 
           auto p =
@@ -2977,6 +2977,26 @@ namespace {
           // Add computed properties directly because they won't be found from
           // the clang decl during lazy member lookup.
           result->addMember(p);
+
+          // Deprecate the underlying accessor methods that were explicitly
+          // opted in via SWIFT_COMPUTED_PROPERTY, steering callers to the
+          // synthesized property (rdar://89452854). We only do this for the
+          // explicit attribute, not the global
+          // -cxx-interop-getters-setters-as-properties flag, to avoid flooding
+          // existing code with deprecation warnings.
+          auto deprecateTransformedAccessor = [&](FuncDecl *accessor) {
+            if (!accessor || !accessor->getClangDecl() ||
+                !hasComputedPropertyAttr(accessor->getClangDecl()))
+              return;
+            std::string message =
+                ("use the '" + importedName + "' property");
+            accessor->addAttribute(AvailableAttr::createUniversallyDeprecated(
+                Impl.SwiftContext,
+                Impl.SwiftContext.AllocateCopy(StringRef(message)),
+                /*Rename=*/""));
+          };
+          deprecateTransformedAccessor(getter);
+          deprecateTransformedAccessor(setter);
         }
       }
 
@@ -4786,11 +4806,11 @@ namespace {
           auto parent = funcDecl->getParent()->getSelfNominalTypeDecl();
           CXXMethodBridging bridgingInfo(decl);
           if (bridgingInfo.classify() == CXXMethodBridging::Kind::getter) {
-            auto name = bridgingInfo.getClangName().drop_front(3);
+            auto name = bridgingInfo.nameWithoutAccessorPrefix();
             Impl.GetterSetterMap[parent][name].first = funcDecl;
           } else if (bridgingInfo.classify() ==
                      CXXMethodBridging::Kind::setter) {
-            auto name = bridgingInfo.getClangName().drop_front(3);
+            auto name = bridgingInfo.nameWithoutAccessorPrefix();
             Impl.GetterSetterMap[parent][name].second = funcDecl;
           }
         }
