@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-build-swift %s -import-objc-header %S/Inputs/has-dispatch-private.h -parse-as-library -o %t/async_task_priority
+// RUN: %target-build-swift %s -parse-as-library -o %t/async_task_priority
 // RUN: %target-codesign %t/async_task_priority
 // RUN: %target-run %t/async_task_priority
 
@@ -340,10 +340,8 @@ actor Test {
           await task2.value // Escalate task2 which should be queued behind task1 on the actor
         }
 
-        // This test will only work properly if Dispatch supports lowering the base priority of a thread rdar://88155873
-        // If we don't have swift_concurrency_private.h then the runtime doesn't have
-        // full priority escalation, so don't try to test it.
-        if #available(macOS 9998, iOS 9998, tvOS 9998, watchOS 9998, *), HasSwiftConcurrencyPrivateHeader() != 0 {
+        // This test will only work properly if Dispatch supports lowering the base priority of a thread
+        if #available(macOS 9998, iOS 9998, tvOS 9998, watchOS 9998, *) {
           tests.test("Task escalation doesn't impact qos_class_self") {
             let task = Task(priority: .utility) {
               let initialQos = DispatchQoS(
@@ -377,46 +375,6 @@ actor Test {
             }
 
             await task.value
-          }
-        }
-
-        // Requires escalatePriority
-        // If we don't have swift_concurrency_private.h then the runtime doesn't have
-        // full priority escalation, so don't try to test it.
-        if #available(SwiftStdlib 6.2, *), HasSwiftConcurrencyPrivateHeader() != 0 {
-          // Test that Task stealers are able to escalate a Task which is enqueued but not yet running rdar://160967177
-          tests.test("Tasks can be escalated even if they are enqueued but not yet running") {
-            // If there are ncpu tasks of a given priority,
-            // new tasks of that priority that are enqueued
-            // will not run but tasks of a higher priority will
-            var cpuMib: [Int32] = [CTL_HW, HW_NCPU]
-            var cpuCount: Int32 = 0
-            var cpuCountSize = MemoryLayout<Int32>.size
-            sysctl(&cpuMib, 2, &cpuCount, &cpuCountSize, nil, 0)
-
-            let semaphore = DispatchSemaphore(value: 0)
-            for _ in 1 ... cpuCount {
-              Task.detached(priority: .utility) {
-                // DispatchSemaphore.wait() is correctly attributed as
-                // not available in async functions so we have to wrap
-                // the call in a synchronous closure to bypass the error
-                {semaphore.wait()}()
-              }
-            }
-
-            var finished = DispatchSemaphore(value: 0)
-            let nextTask = Task.detached(priority: .utility) {
-              finished.signal()
-            }
-            // This additional Task shouldn't be able to run
-            assert({ finished.wait(timeout: DispatchTime.now() + DispatchTimeInterval.milliseconds(100))}() == .timedOut)
-            nextTask.escalatePriority(to: .userInitiated)
-            // Now that the Task has been escalated, it should be successfully run
-            assert({ finished.wait(timeout: DispatchTime.now() + DispatchTimeInterval.milliseconds(100))}() == .success)
-            // Signal the remaining Tasks so that they can complete and unblock the queue
-            for _ in 1 ... cpuCount {
-              semaphore.signal()
-            }
           }
         }
       }
