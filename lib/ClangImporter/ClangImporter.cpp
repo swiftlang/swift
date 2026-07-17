@@ -1951,6 +1951,13 @@ bool ClangImporter::Implementation::importHeader(
   clang::Parser::DeclGroupPtrTy parsed;
   clang::Sema::ModuleImportState importState =
       clang::Sema::ModuleImportState::NotACXX20Module;
+  // When incremental processing is enabled (as it is for the long-lived
+  // bridging-header importer), the parser retains the EOF token of a
+  // previously-parsed buffer rather than terminating. Skip that stale EOF so
+  // that ParseTopLevelDecl starts lexing the buffer we just entered instead of
+  // immediately seeing EOF and parsing nothing.
+  if (Parser->getCurToken().is(clang::tok::eof))
+    Parser->ConsumeAnyToken();
   while (!Parser->ParseTopLevelDecl(parsed, importState)) {
     if (parsed)
       handleParsed(parsed.get());
