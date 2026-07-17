@@ -1353,6 +1353,50 @@ bool SILParser::parseSILDottedPathWithoutPound(ValueDecl *&Decl,
   return false;
 }
 
+static bool satisfies(ValueDecl *decl,
+                      SILParser::ValueDeclPredicate predicate) {
+  if (!decl)
+    return true;
+
+  switch (predicate) {
+  case SILParser::ValueDeclPredicate::None:
+    return true;
+
+  case SILParser::ValueDeclPredicate::Storage:
+    return isa<AbstractStorageDecl>(decl);
+
+  case SILParser::ValueDeclPredicate::Var:
+    return isa<VarDecl>(decl);
+
+  case SILParser::ValueDeclPredicate::StoredVar: {
+    if (auto prop = dyn_cast<VarDecl>(decl)) {
+      return prop->hasStorage();
+    }
+    return false;
+  }
+
+  }
+  llvm_unreachable("unknown ValueDeclPredicate");
+}
+
+bool SILParser::applyValueDeclPredicate(ValueDeclPredicate predicate,
+                                        ValueDecl *&Decl,
+                                        SmallVectorImpl<ValueDecl *> &values) {
+  if (satisfies(Decl, predicate))
+    return false;
+
+  for (auto value : values) {
+    if (satisfies(value, predicate)) {
+      Decl = value;
+      return false;
+    }
+  }
+
+  P.diagnose(P.PreviousLoc, diag::sil_no_named_decl_matching_predicate,
+             Decl->getName(), unsigned(predicate));
+  return true;
+}
+
 static std::optional<AccessorKind> getAccessorKind(StringRef ident) {
   return llvm::StringSwitch<std::optional<AccessorKind>>(ident)
       .Case("getter", AccessorKind::Get)
@@ -2516,7 +2560,7 @@ SILParser::parseKeyPathPatternComponent(KeyPathPatternComponent &component,
   if (componentKind.str() == "stored_property") {
     ValueDecl *prop;
     CanType ty;
-    if (parseSILDottedPath(prop)
+    if (parseSILDottedPath(prop, ValueDeclPredicate::StoredVar)
         || P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":")
         || P.parseToken(tok::sil_dollar,
                         diag::expected_tok_in_sil_instr, "$")
@@ -2565,7 +2609,7 @@ SILParser::parseKeyPathPatternComponent(KeyPathPatternComponent &component,
           if (P.peekToken().is(tok::pound)) {
             ValueDecl *propertyValueDecl;
             P.consumeToken(tok::pound);
-            if (parseSILDottedPath(propertyValueDecl))
+            if (parseSILDottedPath(propertyValueDecl, ValueDeclPredicate::Var))
               return true;
             idProperty = cast<VarDecl>(propertyValueDecl);
           } else if (parseSILDeclRef(idDecl, /*fnType*/ true))
@@ -2593,7 +2637,7 @@ SILParser::parseKeyPathPatternComponent(KeyPathPatternComponent &component,
         ValueDecl *parsedExternalDecl;
         SmallVector<ParsedSubstitution, 4> parsedSubs;
 
-        if (parseSILDottedPath(parsedExternalDecl)
+        if (parseSILDottedPath(parsedExternalDecl, ValueDeclPredicate::Storage)
             || parseSubstitutions(parsedSubs, patternSig, patternParams))
           return true;
 
@@ -4871,7 +4915,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
 
     if (parseAssignOrInitMode(Mode, *this) ||
         parseAssignOrInitAssignments(assignments, *this) ||
-        parseSILDottedPath(Prop) ||
+        parseSILDottedPath(Prop, ValueDeclPredicate::Var) ||
         P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
         parseVerbatim("self") || parseTypedValueRef(Self, B) ||
         P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
@@ -6017,7 +6061,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       SourceLoc NameLoc = P.Tok.getLoc();
       if (parseTypedValueRef(Val, B) ||
           P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
-          parseSILDottedPath(FieldV))
+          parseSILDottedPath(FieldV, ValueDeclPredicate::StoredVar))
         return true;
 
       ValueOwnershipKind forwardingOwnership = Val->getOwnershipKind();
@@ -6054,7 +6098,8 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       if (parseSILOptional(IsImmutable, *this, "immutable") ||
           parseTypedValueRef(Val, B) ||
           P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
-          parseSILDottedPath(FieldV) || parseSILDebugLocation(InstLoc, B))
+          parseSILDottedPath(FieldV, ValueDeclPredicate::StoredVar) ||
+          parseSILDebugLocation(InstLoc, B))
         return true;
       if (!FieldV || !isa<VarDecl>(FieldV)) {
         P.diagnose(NameLoc, diag::sil_ref_inst_wrong_field);
@@ -7929,7 +7974,7 @@ bool SILParserState::parseSILProperty(Parser &P) {
   
   ValueDecl *VD;
   
-  if (SP.parseSILDottedPath(VD))
+  if (SP.parseSILDottedPath(VD, SILParser::ValueDeclPredicate::Storage))
     return true;
   
   GenericParamList *patternParams;
