@@ -105,6 +105,12 @@ public:
                                 std::string Name)
       : OriginalSize(Size), Cur(Cur), Size(Size), Name(Name) {
     if (Size != 0) {
+      if (Size < Self::getMinimumRecordSize()) {
+        // The section is too small to contain even a record header. Treat the
+        // section as empty.
+        this->Size = 0;
+        return;
+      }
       auto NextRecord = this->operator*();
       if (!NextRecord) {
         // NULL record pointer, don't attempt to proceed. Setting size to 0 will
@@ -140,6 +146,12 @@ public:
     Size -= CurSize;
 
     if (Size > 0) {
+      if (Size < Self::getMinimumRecordSize()) {
+        // The trailing bytes are too small to contain even a record header, so
+        // end iteration here.
+        Size = 0;
+        return asImpl();
+      }
       auto NextRecord = this->operator*();
       auto NextSize = Self::getCurrentRecordSize(NextRecord);
       if (NextSize > Size) {
@@ -179,6 +191,13 @@ public:
   }
 
   bool operator!=(const Self &other) const { return !(*this == other); }
+
+  // The minimum number of bytes that must remain in the section for the record
+  // header to be safely read by getCurrentRecordSize() and operator*(). The
+  // default is the full descriptor size; iterators whose descriptor ends in a
+  // flexible array member (so its sizeof is smaller than its readable header)
+  // override this.
+  static uint64_t getMinimumRecordSize() { return sizeof(Descriptor); }
 };
 
 class FieldDescriptorIterator
@@ -247,6 +266,13 @@ public:
   static uint64_t
   getCurrentRecordSize(RemoteRef<MultiPayloadEnumDescriptor> MPER) {
     return MPER->getSizeInBytes();
+  }
+
+  static uint64_t getMinimumRecordSize() {
+    // MultiPayloadEnumDescriptor ends in a flexible `contents` array, so its
+    // sizeof only covers TypeName. getSizeInBytes() reads contents[0], so we
+    // need room for TypeName plus that first content word.
+    return sizeof(MultiPayloadEnumDescriptor) + sizeof(uint32_t);
   }
 };
 using MultiPayloadEnumSection =
@@ -2119,9 +2145,17 @@ private:
             Demangle::Context Ctx;
             auto demangledRoot =
                 Ctx.demangleSymbolAsNode(symbol->getSymbol().str());
-            assert(demangledRoot->getKind() == Node::Kind::Global);
-            std::string nodeName =
-                nodeToString(demangledRoot->getChild(0)->getChild(0));
+            if (!demangledRoot ||
+                demangledRoot->getKind() != Node::Kind::Global) {
+              Error = "Failed to demangle indirect parent context symbol.";
+              return;
+            }
+            auto globalChild = demangledRoot->getChild(0);
+            if (!globalChild || globalChild->getNumChildren() < 1) {
+              Error = "Failed to demangle indirect parent context symbol.";
+              return;
+            }
+            std::string nodeName = nodeToString(globalChild->getChild(0));
             chain.push_back(
                 ContextNameInfo{nodeName, adjustedParentTargetAddress, false});
           } else {
@@ -2292,6 +2326,7 @@ private:
     std::string Error;
     PointerReader OpaquePointerReader;
     ByteReader OpaqueByteReader;
+    StringReader OpaqueStringReader;
     DynamicSymbolResolver OpaqueDynamicSymbolResolver;
     QualifiedContextNameReader<ObjCInteropKind, PointerSize> NameReader;
 
@@ -2300,7 +2335,7 @@ private:
         PointerReader pointerReader,
         DynamicSymbolResolver dynamicSymbolResolver)
         : Error(""), OpaquePointerReader(pointerReader),
-          OpaqueByteReader(byteReader),
+          OpaqueByteReader(byteReader), OpaqueStringReader(stringReader),
           OpaqueDynamicSymbolResolver(dynamicSymbolResolver),
           NameReader(byteReader, stringReader, pointerReader,
                      dynamicSymbolResolver) {}
@@ -2318,7 +2353,29 @@ private:
       // return class name
       if (conformanceDescriptor.getTypeKind() ==
           TypeReferenceKind::DirectObjCClassName) {
-        auto className = conformanceDescriptor.getDirectObjCClassName();
+        // The class name is a RelativeDirectPointer stored in the descriptor's
+        // TypeRef field. We only hold a local copy of the descriptor, so we
+        // must not resolve that relative pointer in place (getDirectObjCClassName
+        // would resolve the stored offset against our local buffer and read out
+        // of bounds). Instead re-derive the field's remote address and issue a
+        // bounded read, the same way the type-descriptor kinds below do.
+        auto nameFieldAddress = conformanceDescriptorAddress.applyRelativeOffset(
+            (int32_t)conformanceDescriptor.getTypeRefDescriptorOffset());
+        auto nameOffsetBytes =
+            OpaqueByteReader(nameFieldAddress, sizeof(int32_t));
+        if (!nameOffsetBytes.get()) {
+          Error = "Failed to read direct ObjC class name field in conformance "
+                  "descriptor.";
+          return std::nullopt;
+        }
+        auto nameOffset = (const int32_t *)nameOffsetBytes.get();
+        auto nameAddress = nameFieldAddress.applyRelativeOffset(*nameOffset);
+        std::string className;
+        if (!OpaqueStringReader(nameAddress, className)) {
+          Error = "Failed to read direct ObjC class name in conformance "
+                  "descriptor.";
+          return std::nullopt;
+        }
         typeName = MANGLING_MODULE_OBJC.str() + std::string(".") + className;
         return std::make_pair(mangledTypeName, typeName);
       }
@@ -2356,11 +2413,19 @@ private:
           Demangle::Context Ctx;
           auto demangledRoot =
               Ctx.demangleSymbolAsNode(symbol->getSymbol().str());
-          assert(demangledRoot->getKind() == Node::Kind::Global);
+          // The symbol name comes from the inspected image and may not
+          // demangle to the expected shape. Guard every dereference rather
+          // than relying on the asserts, which are compiled out in release
+          // builds.
+          if (!demangledRoot || demangledRoot->getKind() != Node::Kind::Global)
+            return std::nullopt;
           auto nomTypeDescriptorRoot = demangledRoot->getChild(0);
-          assert(nomTypeDescriptorRoot->getKind() ==
-                 Node::Kind::NominalTypeDescriptor);
+          if (!nomTypeDescriptorRoot || nomTypeDescriptorRoot->getKind() !=
+                                            Node::Kind::NominalTypeDescriptor)
+            return std::nullopt;
           auto typeRoot = nomTypeDescriptorRoot->getChild(0);
+          if (!typeRoot)
+            return std::nullopt;
           typeName = nodeToString(typeRoot);
 
           auto typeMangling =
