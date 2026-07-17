@@ -1218,6 +1218,26 @@ bool ArrayLiteralToDictionaryConversionFailure::diagnoseAsError() {
   return true;
 }
 
+bool AttributedFuncToTypeConversionFailure::diagnoseAsNote() {
+  if (!getToType()->is<FunctionType>())
+    return false;
+
+  auto argApplyInfo = getFunctionArgApplyInfo(getLocator());
+  if (!argApplyInfo)
+    return false;
+
+  auto overload = getCalleeOverloadChoiceIfAvailable(getLocator());
+  if (!(overload && overload->choice.isDecl()))
+    return false;
+
+  SmallString<4> scratch;
+  emitDiagnosticAt(overload->choice.getDecl(),
+                   diag::candidate_expects_escaping_argument, attributeKind,
+                   argApplyInfo->getParamPosition(),
+                   argApplyInfo->getArgDescription(scratch));
+  return true;
+}
+
 bool AttributedFuncToTypeConversionFailure::diagnoseAsError() {
   if (diagnoseParameterUse())
     return true;
