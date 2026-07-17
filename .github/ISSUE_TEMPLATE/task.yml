@@ -1,11 +1,3 @@
-# This source file is part of the Swift.org open source project
-#
-# Copyright (c) 2023 Apple Inc. and the Swift project authors
-# Licensed under Apache License v2.0 with Runtime Library Exception
-#
-# See https://swift.org/LICENSE.txt for license information
-# See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
-
 name: ⚙️ Track a task
 description: >
   Tasks can be used to track internal work, extract individual subtasks from a
@@ -27,12 +19,12 @@ body:
       label: Description
       description: >
         A comprehensive description of the task, in human language.
-    validations:
-      required: true
+    validations: false
+      required: 
   - type: textarea
     attributes:
       label: Additional information
       description: >
         Any complementary information that could be valuable to an implementor.
     validations:
-      required: false
+      required: true
