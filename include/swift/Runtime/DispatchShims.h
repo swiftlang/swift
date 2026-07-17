@@ -15,15 +15,6 @@
 
 #include "Concurrency.h"
 
-// The values in this struct should be considered opaque
-struct swift_dispatch_priority_token_s {
-  uint32_t priority;
-
-#if __cplusplus
-  bool isSet() const noexcept { return priority != 0; }
-#endif
-};
-
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
 #include <dispatch/swift_concurrency_private.h>
 
@@ -66,17 +57,13 @@ swift_dispatch_thread_override_self(qos_class_t override_qos) {
   return 0;
 }
 
-static inline struct swift_dispatch_priority_token_s
-swift_dispatch_thread_override_self_with_base(qos_class_t override_qos,
-                                              qos_class_t base_qos) {
-  struct swift_dispatch_priority_token_s token = {};
+static inline uint32_t
+swift_dispatch_thread_override_self_with_base(qos_class_t override_qos, qos_class_t base_qos) {
 
 #if DISPATCH_SWIFT_CONCURRENCY_PRIVATE_INTERFACE_VERSION >= 1
   if (__builtin_available(macOS 9998, iOS 9998, tvOS 9998, watchOS 9998, *)) {
-    token.priority =
-        dispatch_thread_override_self_with_base(override_qos, base_qos);
-    return token;
-  }
+    return dispatch_thread_override_self_with_base(override_qos, base_qos);
+  } else
 #endif
   if (__builtin_available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)) {
     // If we don't have the ability to set our base qos correctly, at least set the override
@@ -84,15 +71,15 @@ swift_dispatch_thread_override_self_with_base(qos_class_t override_qos,
     (void) dispatch_thread_override_self(override_qos);
   }
 
-  return token;
+  return 0;
 }
 
-static inline void swift_dispatch_thread_reset_override_self(
-    struct swift_dispatch_priority_token_s opaque) {
+static inline void
+swift_dispatch_thread_reset_override_self(uint32_t opaque) {
 
 #if DISPATCH_SWIFT_CONCURRENCY_PRIVATE_INTERFACE_VERSION >= 1
   if (__builtin_available(macOS 9998, iOS 9998, tvOS 9998, watchOS 9998, *)) {
-    dispatch_thread_reset_override_self(opaque.priority);
+    dispatch_thread_reset_override_self(opaque);
   }
 #endif
 }
