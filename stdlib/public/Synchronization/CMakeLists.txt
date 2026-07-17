@@ -171,8 +171,15 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
   add_custom_target(embedded-synchronization)
   add_dependencies(embedded-libraries embedded-synchronization)
 
+  # The EmbeddedPlatform bridging header annotates C declarations with Clang
+  # bounds-safety attributes (__counted_by / __sized_by), which the importer
+  # expands via the `_SwiftifyImport` macro from the SwiftMacros compiler
+  # plugin. Point at the freshly-built plugin directory (`SWIFT_HOST_PLUGINS_DIR`,
+  # computed in stdlib/public/CMakeLists.txt) so we don't fall back to a stale
+  # plugin from the host toolchain.
   set(_embedded_synchronization_swift_flags
     ${SWIFT_SYNCHRNOIZATION_SWIFT_FLAGS}
+    "-plugin-path" "${SWIFT_HOST_PLUGINS_DIR}"
     -internal-import-bridging-header ${CMAKE_CURRENT_SOURCE_DIR}/../EmbeddedPlatform/swift/EmbeddedPlatform.h
     -enable-experimental-feature LiteralExpressions)
 

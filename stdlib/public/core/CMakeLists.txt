@@ -380,16 +380,9 @@ list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "BorrowAnd
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "BorrowInout")
 list(APPEND swift_stdlib_compile_flags "-strict-memory-safety")
 
-if("${SWIFT_NATIVE_SWIFT_TOOLS_PATH}" STREQUAL "")
-  set(swift_bin_dir "${CMAKE_BINARY_DIR}/bin")
-  set(swift_lib_dir "${CMAKE_BINARY_DIR}/lib")
-else()
-  set(swift_bin_dir "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}")
-  set(swift_lib_dir "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib")
-endif()
-
-# For `@DebugDescription`.
-list(APPEND swift_stdlib_compile_flags "-plugin-path" "${swift_lib_dir}/swift/host/plugins")
+# For `@DebugDescription`. `SWIFT_HOST_PLUGINS_DIR` is computed once in
+# stdlib/public/CMakeLists.txt.
+list(APPEND swift_stdlib_compile_flags "-plugin-path" "${SWIFT_HOST_PLUGINS_DIR}")
 
 set(swift_core_incorporate_object_libraries)
 list(APPEND swift_core_incorporate_object_libraries swiftRuntimeCore)
