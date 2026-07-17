@@ -1602,67 +1602,22 @@ std::unique_ptr<ClangImporter> ClangImporter::create(
                          clang::SourceLocation());
   clangDiags.setFatalsAsError(ctx.Diags.getShowDiagnosticsAfterFatalError());
 
-  // Use Clang to configure/save options for Swift IRGen/CodeGen
+  // Configure the Clang CodeGen/Target options used by Swift IRGen and by the
+  // Clang invocation. Under '-clang-target', for SIL-generating actions, IRGen
+  // needs options for the Swift triple, so build a mock invocation for it.
+  // The AST-affecting policy is applied to the "real" underlying invocation
+  // regardless (see configureOptionsForCodeGen).
+  std::unique_ptr<clang::CompilerInvocation> swiftTargetClangInvocation;
   if (ctx.LangOpts.ClangTarget.has_value() && needCodeGenTargetOpts) {
-    // If '-clang-target' is set, create a mock invocation with the Swift triple
-    // to configure CodeGen and Target options for Swift compilation.
-    auto swiftTargetClangInvocation = importer->createClangInvocation(
+    swiftTargetClangInvocation = importer->createClangInvocation(
         ctx, instance.getVirtualFileSystemPtr(), /*forCodeGen=*/true);
     if (!swiftTargetClangInvocation)
       return nullptr;
-
-    importer->Impl.configureOptionsForCodeGen(clangDiags,
-                                              swiftTargetClangInvocation.get());
-  } else {
-    // Set using the existing invocation.
-    importer->Impl.configureOptionsForCodeGen(clangDiags);
   }
+  importer->Impl.configureOptionsForCodeGen(clangDiags, IRGenOpts,
+                                            swiftTargetClangInvocation.get());
 
   if (IRGenOpts) {
-    // We need to set the AST-affecting CodeGenOpts here early so that
-    // the clang module cache hash will be consistent throughout. Also
-    // prefer to set the AST-benign ones here unless they are computed
-    // after this point or may var per inputs.
-    auto &CGO = importer->getCodeGenOpts();
-    // Reflect the Swift optimization mode in the Clang optimization level, but
-    // only raise it: preserving a nonzero level from the cc1 '-O' arguments
-    // keeps '__OPTIMIZE__' defined when Swift itself is not optimizing.
-    if (IRGenOpts->shouldOptimize())
-      CGO.OptimizationLevel = 3;
-    CGO.DebugTypeExtRefs = !IRGenOpts->DisableClangModuleSkeletonCUs;
-    switch (IRGenOpts->DebugInfoLevel) {
-    case IRGenDebugInfoLevel::None:
-      CGO.setDebugInfo(llvm::codegenoptions::DebugInfoKind::NoDebugInfo);
-      break;
-    case IRGenDebugInfoLevel::LineTables:
-      CGO.setDebugInfo(llvm::codegenoptions::DebugInfoKind::DebugLineTablesOnly);
-      break;
-    case IRGenDebugInfoLevel::ASTTypes:
-    case IRGenDebugInfoLevel::DwarfTypes:
-      CGO.setDebugInfo(llvm::codegenoptions::DebugInfoKind::FullDebugInfo);
-      break;
-    }
-    switch (IRGenOpts->DebugInfoFormat) {
-    case IRGenDebugInfoFormat::None:
-      break;
-    case IRGenDebugInfoFormat::DWARF:
-      CGO.DebugCompilationDir = IRGenOpts->DebugCompilationDir;
-      CGO.DwarfVersion = IRGenOpts->DWARFVersion;
-      break;
-    case IRGenDebugInfoFormat::CodeView:
-      CGO.EmitCodeView = true;
-      CGO.DebugCompilationDir = IRGenOpts->DebugCompilationDir;
-      break;
-    }
-    if (!IRGenOpts->TrapFuncName.empty()) {
-      CGO.TrapFuncName = IRGenOpts->TrapFuncName;
-    }
-    // We don't need to perform coverage mapping for any Clang decls we've
-    // synthesized, as they have no user-written code. This is also needed to
-    // avoid a Clang crash when attempting to emit coverage for decls without
-    // source locations (rdar://100172217).
-    CGO.CoverageMapping = false;
-
     // Non-PIC code generation is only supported in Embedded Swift, which does
     // not depend on the position-independent Swift runtime. The relocation
     // model is decided by Clang (and can be influenced via -Xcc, e.g.
@@ -1675,19 +1630,13 @@ std::unique_ptr<ClangImporter> ClangImporter::create(
     // position-independent and legitimately resolves to a non-PIC relocation
     // model on some architectures (e.g. 32-bit x86/ARM), so it must not be
     // diagnosed.
+    auto &CGO = importer->getCodeGenOpts();
     if (!ctx.LangOpts.Target.isOSWindows() &&
         CGO.RelocationModel != llvm::Reloc::PIC_ &&
         !ctx.LangOpts.hasFeature(Feature::Embedded)) {
       ctx.Diags.diagnose(SourceLoc(), diag::non_pic_without_embedded);
       return nullptr;
     }
-
-    // With '-clang-target', getCodeGenOpts() is a separate instance used for
-    // Swift IRGen; the Clang invocation is what the bridging-header PCH is
-    // serialized against, so keep its optimization level in lock-step.
-    auto &invocationCGO = importer->Impl.Invocation->getCodeGenOpts();
-    if (&invocationCGO != &CGO && IRGenOpts->shouldOptimize())
-      invocationCGO.OptimizationLevel = 3;
   }
 
   // Set up PCH content CASID.
@@ -5099,8 +5048,54 @@ void ClangImporter::Implementation::getItaniumMangledName(
   return getMangledName(mangler.get(), clangDecl, os);
 }
 
+/// The AST-affecting Clang CodeGen options derived from the Swift compilation.
+/// Applied identically wherever these must agree for PCH/module interop.
+///
+/// - Important: This must remain idempotent, so only assign, never accumulate.
+static void applyASTAffectingCodeGenOptions(clang::CodeGenOptions &CGO,
+                                            const IRGenOptions &IRGenOpts) {
+  // Reflect the Swift optimization mode in the Clang optimization level, but
+  // only raise it: preserving a nonzero level from the cc1 '-Xcc -O' arguments
+  // keeps '__OPTIMIZE__' defined when Swift itself is not optimizing.
+  if (IRGenOpts.shouldOptimize())
+    CGO.OptimizationLevel = 3;
+  CGO.DebugTypeExtRefs = !IRGenOpts.DisableClangModuleSkeletonCUs;
+  switch (IRGenOpts.DebugInfoLevel) {
+  case IRGenDebugInfoLevel::None:
+    CGO.setDebugInfo(llvm::codegenoptions::DebugInfoKind::NoDebugInfo);
+    break;
+  case IRGenDebugInfoLevel::LineTables:
+    CGO.setDebugInfo(llvm::codegenoptions::DebugInfoKind::DebugLineTablesOnly);
+    break;
+  case IRGenDebugInfoLevel::ASTTypes:
+  case IRGenDebugInfoLevel::DwarfTypes:
+    CGO.setDebugInfo(llvm::codegenoptions::DebugInfoKind::FullDebugInfo);
+    break;
+  }
+  switch (IRGenOpts.DebugInfoFormat) {
+  case IRGenDebugInfoFormat::None:
+    break;
+  case IRGenDebugInfoFormat::DWARF:
+    CGO.DebugCompilationDir = IRGenOpts.DebugCompilationDir;
+    CGO.DwarfVersion = IRGenOpts.DWARFVersion;
+    break;
+  case IRGenDebugInfoFormat::CodeView:
+    CGO.EmitCodeView = true;
+    CGO.DebugCompilationDir = IRGenOpts.DebugCompilationDir;
+    break;
+  }
+  if (!IRGenOpts.TrapFuncName.empty())
+    CGO.TrapFuncName = IRGenOpts.TrapFuncName;
+  // We don't need to perform coverage mapping for any Clang decls we've
+  // synthesized, as they have no user-written code. This is also needed to
+  // avoid a Clang crash when attempting to emit coverage for decls without
+  // source locations (rdar://100172217).
+  CGO.CoverageMapping = false;
+}
+
 void ClangImporter::Implementation::configureOptionsForCodeGen(
-    clang::DiagnosticsEngine &Diags, clang::CompilerInvocation *CI) {
+    clang::DiagnosticsEngine &Diags, const IRGenOptions *IRGenOpts,
+    clang::CompilerInvocation *CI) {
   clang::TargetInfo *targetInfo = nullptr;
   if (CI) {
     TargetOpts.reset(new clang::TargetOptions(std::move(CI->getTargetOpts())));
@@ -5119,6 +5114,17 @@ void ClangImporter::Implementation::configureOptionsForCodeGen(
   }
 
   CodeGenTargetInfo.reset(targetInfo);
+
+  if (!IRGenOpts)
+    return;
+
+  // The underlying ClangImporter invocation is what the bridging-header PCH and
+  // Clang modules are emitted/validated against, so it must carry a matching
+  // configuration in every path. The IRGen-facing copy above (created for
+  // '-clang-target') also needs it for Swift codegen.
+  applyASTAffectingCodeGenOptions(Invocation->getCodeGenOpts(), *IRGenOpts);
+  if (CodeGenOpts)
+    applyASTAffectingCodeGenOptions(*CodeGenOpts, *IRGenOpts);
 }
 
 clang::CodeGenOptions &

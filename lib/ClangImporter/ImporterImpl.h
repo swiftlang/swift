@@ -676,8 +676,11 @@ private:
 
   /// Sets the target & code generation options for use by IRGen/CodeGen
   /// clients of `ClangImporter`. If `CI` is null, the data is drawn from the
-  /// importer's invocation.
+  /// importer's invocation. When `IRGenOpts` is non-null, also applies the
+  /// AST-affecting CodeGen configuration (optimization level, debug info, ...)
+  /// to the Clang invocation and, if distinct, the IRGen-facing copy.
   void configureOptionsForCodeGen(clang::DiagnosticsEngine &Diags,
+                                  const IRGenOptions *IRGenOpts,
                                   clang::CompilerInvocation *CI = nullptr);
 
   clang::TargetInfo &getCodeGenTargetInfo() const { return *CodeGenTargetInfo; }
