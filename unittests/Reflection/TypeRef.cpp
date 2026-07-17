@@ -628,3 +628,84 @@ TEST(TypeRefTest, DeriveSubstitutions) {
   EXPECT_EQ(SubstOne, ResultOne);
   EXPECT_EQ(SubstTwo, ResultTwo);
 }
+
+// Verify that the MultiPayloadEnumDescriptor spare-bit-mask accessors defend
+// against malformed __swift5_mpenum records supplied by an inspected process,
+// rather than trusting the record's declared mask size.
+// rdar://181865069, rdar://181864074
+TEST(TypeRefTest, MultiPayloadEnumSpareBitMaskBounds) {
+  // Records are laid out as: int32 TypeName; uint32 contents[SizeInWords].
+  //   contents[0] = (SizeInWords << 16) | flags
+  //   contents[1] = (maskByteOffset << 16) | maskByteCount
+  //   contents[2...] = mask bytes
+  auto makeRecord = [](std::vector<uint32_t> &storage, uint32_t sizeInWords,
+                       uint32_t flags,
+                       uint32_t maskByteCount) -> const MultiPayloadEnumDescriptor * {
+    storage.assign(1 + sizeInWords, 0);
+    storage[0] = 0; // TypeName relative pointer (unused here).
+    storage[1] = (sizeInWords << 16) | (flags & 0xffff);
+    if (sizeInWords >= 2)
+      storage[2] = maskByteCount & 0xffff;
+    return reinterpret_cast<const MultiPayloadEnumDescriptor *>(storage.data());
+  };
+
+  // A record claiming a 0xFFFF-byte mask but declaring only two content words
+  // (leaving zero bytes of room for the mask) must clamp the count to 0.
+  {
+    std::vector<uint32_t> storage;
+    auto *desc = makeRecord(storage, /*sizeInWords=*/2, /*flags=*/1,
+                            /*maskByteCount=*/0xFFFF);
+    EXPECT_TRUE(desc->usesPayloadSpareBits());
+    EXPECT_EQ(desc->getPayloadSpareBitMaskByteCount(), 0u);
+    EXPECT_NE(desc->getPayloadSpareBits(), nullptr);
+  }
+
+  // With extra content words the count is clamped to the room the record
+  // actually describes ((SizeInWords - 2) * 4 bytes).
+  {
+    std::vector<uint32_t> storage;
+    auto *desc = makeRecord(storage, /*sizeInWords=*/4, /*flags=*/1,
+                            /*maskByteCount=*/0xFFFF);
+    EXPECT_EQ(desc->getPayloadSpareBitMaskByteCount(), 8u);
+  }
+
+  // A well-formed count is returned unchanged.
+  {
+    std::vector<uint32_t> storage;
+    auto *desc = makeRecord(storage, /*sizeInWords=*/3, /*flags=*/1,
+                            /*maskByteCount=*/4);
+    EXPECT_EQ(desc->getPayloadSpareBitMaskByteCount(), 4u);
+    EXPECT_NE(desc->getPayloadSpareBits(), nullptr);
+  }
+
+  // A record that claims to use spare bits but declares too few words to even
+  // hold the mask-count word must not read contents[1] or hand back a pointer.
+  {
+    std::vector<uint32_t> storage;
+    auto *desc = makeRecord(storage, /*sizeInWords=*/1, /*flags=*/1,
+                            /*maskByteCount=*/0);
+    EXPECT_EQ(desc->getPayloadSpareBitMaskByteCount(), 0u);
+    EXPECT_EQ(desc->getPayloadSpareBitMaskByteOffset(), 0u);
+    EXPECT_EQ(desc->getPayloadSpareBits(), nullptr);
+  }
+}
+
+// A reflection section whose size is smaller than a single record header must
+// terminate iteration immediately rather than reading the header past the end
+// of the section buffer. rdar://181867993
+TEST(TypeRefTest, ReflectionSectionUndersizedRecord) {
+  // Back the section with a generous buffer so the test itself never reads out
+  // of bounds, but tell the section it is only 4 bytes long -- fewer than
+  // sizeof(FieldDescriptor).
+  alignas(16) char buffer[64] = {0};
+  remote::RemoteAddress addr(reinterpret_cast<uintptr_t>(buffer),
+                             remote::RemoteAddress::DefaultAddressSpace);
+  RemoteRef<void> ref(addr, buffer);
+
+  FieldSection section(ref, /*Size=*/4);
+  EXPECT_TRUE(section.begin() == section.end());
+  for (auto record : section) {
+    (void)record;
+    ADD_FAILURE() << "undersized field section should yield no records";
+  }
+}
