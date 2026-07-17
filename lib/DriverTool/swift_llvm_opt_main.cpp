@@ -207,7 +207,7 @@ int swift_llvm_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
 
   // Override function attributes based on CPUStr, FeaturesStr, and command line
   // flags.
-  llvm::codegen::setFunctionAttributes(CPUStr, FeaturesStr, *M);
+  llvm::codegen::setFunctionAttributes(*M, CPUStr, FeaturesStr);
 
   if (options.Optimized) {
     IRGenOptions Opts;
