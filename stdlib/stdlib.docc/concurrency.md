@@ -19,14 +19,6 @@ Perform asynchronous and parallel operations.
 - ``Swift/withThrowingDiscardingTaskGroup(returning:isolation:body:)``
 - ``Swift/UnsafeCurrentTask``
 
-### Deadlines
-
-- ``Swift/withDeadline(_:tolerance:clock:operation:)``
-- ``Swift/withDeadline(in:tolerance:clock:operation:)``
-- ``Swift/withDeadline(in:tolerance:operation:)``
-- ``Swift/CancellationError``
-- ``Swift/CancellationError/Reason``
-
 ### Asynchronous Sequences
 
 - ``Swift/AsyncSequence``
@@ -61,6 +53,32 @@ Perform asynchronous and parallel operations.
 
 - ``Swift/TaskLocal``
 - ``Swift/TaskLocal()``
+
+### Task Deadlines
+
+- ``Swift/withDeadline(_:tolerance:clock:operation:)``
+- ``Swift/withDeadline(in:tolerance:clock:operation:)``
+- ``Swift/withDeadline(in:tolerance:operation:)``
+
+### Task Cancellation
+
+- ``Swift/Task/isCancelled``
+- ``Swift/Task/cancel()``
+- ``Swift/Task/cancel(reason:)``
+- ``Swift/Task/cancellationReason``
+- ``Swift/Task/checkCancellation()``
+- ``Swift/UnsafeCurrentTask/isCancelled``
+- ``Swift/UnsafeCurrentTask/cancel()``
+- ``Swift/UnsafeCurrentTask/cancel(reason:)``
+- ``Swift/UnsafeCurrentTask/cancellationReason``
+- ``Swift/CancellationError``
+- ``Swift/CancellationError/Reason``
+- ``Swift/withTaskCancellationHandler(operation:onCancel:)``
+- ``Swift/withTaskCancellationHandler(operation:onCancel:isolation:)``
+- ``Swift/withTaskCancellationShield(operation:)-(()->Value)``
+- ``Swift/withTaskCancellationShield(operation:)-(()async->Value)``
+- ``Swift/Task/hasActiveCancellationShield``
+- ``Swift/UnsafeCurrentTask/hasActiveCancellationShield``
 
 ### Executors
 
