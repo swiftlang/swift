@@ -945,7 +945,8 @@ public:
   /// Keep track of initializer declarations that correspond to
   /// imported methods.
   llvm::DenseMap<
-      std::tuple<const clang::ObjCMethodDecl *, const DeclContext *, Version>,
+      std::tuple<const clang::ObjCMethodDecl *, const DeclContext *, Version,
+                 CArrayProjection>,
       ConstructorDecl *> Constructors;
 
   /// Keep track of all initializers that have been imported into a
