@@ -1622,8 +1622,9 @@ ParserResult<TypeRepr> Parser::parseTypeOrValue(Diag<> MessageID,
   }
 
   // A parenthesized expression that contains type-only syntax such as an opaque
-  // 'some' type must be parsed as a type, not a value expression: opaque types
-  // have to appear as TypeReprs in the enclosing declaration.
+  // 'some' type, or a top-level comma (making it a tuple type), must be parsed
+  // as a type, not a value expression: such types have to appear as TypeReprs
+  // in the enclosing declaration, and a tuple is never a generic value argument.
   if (shouldParseValueExpr && Tok.is(tok::l_paren) &&
       parenGenericArgumentContainsTypeOnlySyntax())
     shouldParseValueExpr = false;
@@ -1656,6 +1657,10 @@ bool Parser::parenGenericArgumentContainsTypeOnlySyntax() {
       if (canParseType())
         return true;
     }
+    // A top-level comma makes this a tuple type; tuples are never valid generic
+    // value arguments, so parse it as a type.
+    if (depth == 1 && Tok.is(tok::comma))
+      return true;
     if (Tok.isAny(tok::l_paren, tok::l_square, tok::l_brace))
       ++depth;
     else if (Tok.isAny(tok::r_paren, tok::r_square, tok::r_brace))
