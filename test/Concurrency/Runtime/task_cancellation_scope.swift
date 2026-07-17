@@ -28,7 +28,7 @@ import Dispatch
     await test_scope_with_cancellation_shield_inside()
     await test_scope_with_cancellation_shield_outside()
     await test_scope_outer_cancel_cascades_to_inner()
-    await test_scope_structured_children_not_auto_cancelled()
+    await test_scope_structured_children_are_cascaded()
     print("done")
   }
 }
@@ -351,29 +351,39 @@ func test_scope_outer_cancel_cascades_to_inner() async {
 }
 
 @available(StdlibDeploymentTarget 6.5, *)
-func test_scope_structured_children_not_auto_cancelled() async {
-  print("--- test_scope_structured_children_not_auto_cancelled")
-  // CHECK: --- test_scope_structured_children_not_auto_cancelled
+func test_scope_structured_children_are_cascaded() async {
+  print("--- test_scope_structured_children_are_cascaded")
+  // CHECK: --- test_scope_structured_children_are_cascaded
 
-  // Documented behavior: scope.cancel() does NOT propagate cancellation
-  // into structured children (TaskGroup / async let); those observe the
-  // scope only through the same local Task.isCancelled check as any other
-  // code and they inherit the parent task's own cancellation state, which
-  // is untouched by scope.cancel().
+  // scope.cancel() cascades into structured children: children already
+  // spawned when cancel runs get cancelled via the record-chain walk;
+  // children spawned AFTER cancel are cancelled at birth because their
+  // parent has a cancelled scope on its chain.
   await __withTaskCancellationScope { scope in
     await withTaskGroup(of: Bool.self) { group in
+      // Child spawned BEFORE cancel: still executing when the cascade
+      // fires; observes as cancelled.
+      group.addTask {
+        // Yield so the parent's cancel walk happens first.
+        for _ in 0..<10 { await Task.yield() }
+        return Task.isCancelled
+      }
+
       scope.cancel()
 
+      // Child spawned AFTER cancel: birth-time propagation via
+      // swift_task_create_common sees the cancelled scope on the parent
+      // chain and marks the child cancelled from the start.
       group.addTask {
-        // Child was spawned AFTER scope.cancel(); the child task itself
-        // has never had its own cancellation flag set, so it must observe
-        // as not-cancelled.
         Task.isCancelled
       }
 
-      let childCancelled = await group.next() ?? true
-      print("child isCancelled=\(childCancelled)")
-      // CHECK: child isCancelled=false
+      let a = await group.next() ?? false
+      let b = await group.next() ?? false
+      print("child (before cancel) isCancelled=\(a)")
+      // CHECK: child (before cancel) isCancelled=true
+      print("child (after cancel) isCancelled=\(b)")
+      // CHECK: child (after cancel) isCancelled=true
     }
   }
 }

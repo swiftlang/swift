@@ -46,21 +46,43 @@ import Swift
 /// - If the operation completes successfully before deadline: Returns the operation result.
 /// - If the operation throws an error before deadline: Throws the operation error.
 /// - If deadline expires and operation completes successfully: Returns the operation result.
-/// - If deadline expires and operation throws an error: Throws the operation error.
+/// - If deadline expires and operation throws an error: Throws the operation error,
+///     potentially a ``CancellationError`` caused by cancellation caused by the expired deadline.
 ///
-/// ## Cancellation model
+/// When the deadline expires `Task.isCancelled` returns true for the duration of `operation`.
+/// This cancellation does not affect the "outer" task in which the deadline operation was started:
 ///
-/// When the deadline expires, `withDeadline` cancels a private cancellation scope
-/// wrapping `operation`, not the enclosing task. This means:
+/// ```
+/// try await withDeadline(in: .seconds(2)) {
+///   while !Task.isCancelled {
+///     try? await Task.sleep(for: .seconds(1))
+///   }
+///   assert(Task.isCancelled == true)
+/// }
+/// assert(Task.isCancelled == false) // the outer task is unaffected
+/// ```
 ///
-/// - `Task.isCancelled` observed inside `operation` returns `true` after the
-///   deadline fires.
-/// - `withTaskCancellationHandler` handlers registered inside `operation`
-///   fire (so `Task.sleep`, etc. wake up promptly).
+/// This means:
+///
+/// - `Task.isCancelled` observed inside `operation` returns `true` after the deadline is exceeded.
+/// - Child tasks, created using `async let`, or task groups, inside `operation`
+///     are cancelled automatically when the deadline is exceeded.
+/// - `withTaskCancellationHandler` handlers created within `operation` are triggered es expected.
 /// - The enclosing task's `Task.isCancelled` is unaffected.
-/// - Structured children spawned inside `operation` are not auto-cancelled
-///   by the deadline; they observe the scope only through the same
-///   local-check mechanism.
+///
+/// When a deadline expires, semantically the scope of the task which is running the `operation`
+/// becomes cancelled. This is observable using `Task.isCancelled` and similar APIs, and has
+/// the usual effect on child tasks an task cancellation handlers.
+///
+/// Even though this a deadline's expiry cancels the operation scope, the `withDeadline` block still
+/// will await for the operation to complete. This is consistent with Swift's approach to cooperative
+/// cancellation and structured concurrency. It does mean however that operation code must be checking
+/// for cancellation if it wants to react and return "early".
+///
+/// The `withDeadline` function may return after the deadline has expired, as there is no guarantee on
+/// interrupting the operation's execution. Similarily, even if the deadline is set in the past, the
+/// operation will still always execute - and it is up to the operation (or any of its parts, or child tasks)
+/// to check e.g. `Task.isCancelled` if it should proceed with its computation or not.
 ///
 /// ## Coordinating multiple operations
 ///
@@ -82,21 +104,6 @@ import Swift
 ///
 /// This ensures both operations share the same absolute deadline, avoiding duration drift that can occur
 /// when timeouts are passed through multiple call layers.
-///
-/// ### Cancellation behavior
-/// When a deadline expires, semantically the scope of the task which is running the `operation`
-/// becomes cancelled. This is observable using `Task.isCancelled` and similar APIs, and has
-/// the usual effect on child tasks an task cancellation handlers.
-///
-/// Even though this a deadline's expiry cancels the operation scope, the `withDeadline` block still
-/// will await for the operation to complete. This is consistent with Swift's approach to cooperative
-/// cancellation and structured concurrency. It does mean however that operation code must be checking
-/// for cancellation if it wants to react and return "early".
-///
-/// The `withDeadline` function may return after the deadline has expired, as there is no guarantee on
-/// interrupting the operation's execution. Similarily, even if the deadline is set in the past, the
-/// operation will still always execute - and it is up to the operation (or any of its parts, or child tasks)
-/// to check e.g. `Task.isCancelled` if it should proceed with its computation or not.
 ///
 /// - Parameters:
 ///   - expiration: The instant by which the operation must complete.
@@ -131,11 +138,6 @@ public nonisolated(nonsending) func withDeadline<Return, Failure, C>(
   let deadlineRecord = unsafe Builtin.taskPushDeadline(clockType: clockTypeRaw, box: native)
   defer { unsafe Builtin.taskPopDeadline(record: deadlineRecord) }
 
-  // Arm a detached timer task on the given clock that will cancel the
-  // scope wrapping `operation` once the deadline elapses. The scope is
-  // local to `operation`, so `Task.isCancelled` observed by `operation`
-  // (or by any `withTaskCancellationHandler` handler it installs) becomes
-  // true, but the enclosing task's own cancellation state is unaffected.
   return try await __withTaskCancellationScope { scope throws(Failure) in
     // The scope handle is `~Escapable`, but its underlying record pointer
     // is a plain `UnsafeRawPointer` we can hand to the sending timer
@@ -155,7 +157,12 @@ public nonisolated(nonsending) func withDeadline<Return, Failure, C>(
         // Timer was cancelled (disarmed) before the deadline elapsed.
         return
       }
-      unsafe _taskCancelTaskCancellationScope(record: scopeRecord)
+      // Deadline elapsed; cancel the scope with the `deadlineExpired` reason
+      // so `Task.checkCancellation()` etc. throw a `CancellationError` whose
+      // `reason` reports the deadline expiration instead of `.unspecified`.
+      unsafe _taskCancelTaskCancellationScopeWithReason(
+        record: scopeRecord,
+        reason: UInt(CancellationError.Reason.deadlineExpired.rawValue))
     }
     defer { timer.cancel() }
     return try await operation()
@@ -178,6 +185,51 @@ public nonisolated(nonsending) func withDeadline<Return, Failure, C>(
 ///     try await fetchDataFromServer()
 /// }
 /// ```
+///
+/// ## Behavior
+///
+/// The function exhibits the following behavior based on deadline and operation completion:
+///
+/// - If the operation completes successfully before deadline: Returns the operation result.
+/// - If the operation throws an error before deadline: Throws the operation error.
+/// - If deadline expires and operation completes successfully: Returns the operation result.
+/// - If deadline expires and operation throws an error: Throws the operation error,
+///     potentially a ``CancellationError`` caused by cancellation caused by the expired deadline.
+///
+/// When the deadline expires `Task.isCancelled` returns true for the duration of `operation`.
+/// This cancellation does not affect the "outer" task in which the deadline operation was started:
+///
+/// ```
+/// try await withDeadline(in: .seconds(2)) {
+///   while !Task.isCancelled {
+///     try? await Task.sleep(for: .seconds(1))
+///   }
+///   assert(Task.isCancelled == true)
+/// }
+/// assert(Task.isCancelled == false) // the outer task is unaffected
+/// ```
+///
+/// This means:
+///
+/// - `Task.isCancelled` observed inside `operation` returns `true` after the deadline is exceeded.
+/// - Child tasks, created using `async let`, or task groups, inside `operation`
+///     are cancelled automatically when the deadline is exceeded.
+/// - `withTaskCancellationHandler` handlers created within `operation` are triggered es expected.
+/// - The enclosing task's `Task.isCancelled` is unaffected.
+///
+/// When a deadline expires, semantically the scope of the task which is running the `operation`
+/// becomes cancelled. This is observable using `Task.isCancelled` and similar APIs, and has
+/// the usual effect on child tasks an task cancellation handlers.
+///
+/// Even though this a deadline's expiry cancels the operation scope, the `withDeadline` block still
+/// will await for the operation to complete. This is consistent with Swift's approach to cooperative
+/// cancellation and structured concurrency. It does mean however that operation code must be checking
+/// for cancellation if it wants to react and return "early".
+///
+/// The `withDeadline` function may return after the deadline has expired, as there is no guarantee on
+/// interrupting the operation's execution. Similarily, even if the deadline is set in the past, the
+/// operation will still always execute - and it is up to the operation (or any of its parts, or child tasks)
+/// to check e.g. `Task.isCancelled` if it should proceed with its computation or not.
 ///
 /// - Parameters:
 ///   - timeout: The duration, relative to `clock.now`, by which the
@@ -216,6 +268,51 @@ public nonisolated(nonsending) func withDeadline<Return, Failure, C>(
 /// alone cannot infer `C` from `timeout` when the `clock:` argument is
 /// defaulted.
 ///
+/// ## Behavior
+///
+/// The function exhibits the following behavior based on deadline and operation completion:
+///
+/// - If the operation completes successfully before deadline: Returns the operation result.
+/// - If the operation throws an error before deadline: Throws the operation error.
+/// - If deadline expires and operation completes successfully: Returns the operation result.
+/// - If deadline expires and operation throws an error: Throws the operation error,
+///     potentially a ``CancellationError`` caused by cancellation caused by the expired deadline.
+///
+/// When the deadline expires `Task.isCancelled` returns true for the duration of `operation`.
+/// This cancellation does not affect the "outer" task in which the deadline operation was started:
+///
+/// ```
+/// try await withDeadline(in: .seconds(2)) {
+///   while !Task.isCancelled {
+///     try? await Task.sleep(for: .seconds(1))
+///   }
+///   assert(Task.isCancelled == true)
+/// }
+/// assert(Task.isCancelled == false) // the outer task is unaffected
+/// ```
+///
+/// This means:
+///
+/// - `Task.isCancelled` observed inside `operation` returns `true` after the deadline is exceeded.
+/// - Child tasks, created using `async let`, or task groups, inside `operation`
+///     are cancelled automatically when the deadline is exceeded.
+/// - `withTaskCancellationHandler` handlers created within `operation` are triggered es expected.
+/// - The enclosing task's `Task.isCancelled` is unaffected.
+///
+/// When a deadline expires, semantically the scope of the task which is running the `operation`
+/// becomes cancelled. This is observable using `Task.isCancelled` and similar APIs, and has
+/// the usual effect on child tasks an task cancellation handlers.
+///
+/// Even though this a deadline's expiry cancels the operation scope, the `withDeadline` block still
+/// will await for the operation to complete. This is consistent with Swift's approach to cooperative
+/// cancellation and structured concurrency. It does mean however that operation code must be checking
+/// for cancellation if it wants to react and return "early".
+///
+/// The `withDeadline` function may return after the deadline has expired, as there is no guarantee on
+/// interrupting the operation's execution. Similarily, even if the deadline is set in the past, the
+/// operation will still always execute - and it is up to the operation (or any of its parts, or child tasks)
+/// to check e.g. `Task.isCancelled` if it should proceed with its computation or not.
+///
 /// - Parameters:
 ///   - timeout: The duration, relative to `ContinuousClock().now`, by which
 ///     the operation must complete.
@@ -240,40 +337,6 @@ func withDeadline<Return, Failure>(
     clock: clock,
     operation: operation
   )
-}
-
-// ==== -----------------------------------------------------------------------
-// MARK: Timer arming
-
-/// Create a timer and return a function to cancel the underlying task/job.
-@available(StdlibDeploymentTarget 6.5, *)
-private func _armDeadlineTimer<C: Clock & Identifiable>(
-  scope: borrowing TaskCancellationScope,
-  expiration: C.Instant,
-  tolerance: C.Instant.Duration?,
-  clock: C
-) -> (@Sendable () -> Void) {
-  // The scope handle itself is `~Escapable`, but its underlying record
-  // pointer is a plain `UnsafeRawPointer` we can hand to the sending
-  // closure. The scope's lifetime is the operation of `__withTaskCancellationScope`
-  // above us, and the returned disarm closure is called from `defer` inside
-  // that operation - so the record pointer is guaranteed live for the duration
-  // of the timer task.
-  let scopeRecord = unsafe scope._record
-
-  // TODO: Replace this by picking the "Clock's executor"
-  // TODO: Instead of creating a full task here, we want to enqueue a job at a deadline,
-  //       that cancels the scope; and the returned func from here must attempt to cancel the job.
-  let timer = Task.detached {
-    do {
-      try await clock.sleep(until: expiration, tolerance: tolerance)
-    } catch {
-      // Timer was cancelled (disarmed) before the deadline elapsed.
-      return
-    }
-    unsafe _taskCancelTaskCancellationScope(record: scopeRecord)
-  }
-  return { timer.cancel() }
 }
 
 // ==== -----------------------------------------------------------------------

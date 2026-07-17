@@ -703,6 +703,15 @@ void swift_task_popCancellationScope(TaskCancellationScopeRecord *record);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_cancelCancellationScope(TaskCancellationScopeRecord *record);
 
+/// Cancel the given scope, tagging it with the given `size_t` reason value
+/// (matching `swift_task_cancelWithReason`'s reason encoding). Otherwise
+/// identical to `swift_task_cancelCancellationScope`.
+///
+/// Runtime availability: Swift 6.5
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_task_cancelCancellationScopeWithReason(
+    TaskCancellationScopeRecord *record, size_t reason);
+
 /// Return whether the given cancellation scope has been cancelled by
 /// reading its atomic flag directly. This bypasses whole-task cancellation
 /// state and any active cancellation shield on the enclosing task.

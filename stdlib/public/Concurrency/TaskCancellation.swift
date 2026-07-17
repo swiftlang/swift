@@ -281,13 +281,22 @@ extension Task where Success == Never, Failure == Never {
 extension Task where Success == Never, Failure == Never {
   /// Throws an error if the task was canceled.
   ///
-  /// The error is always an instance of `CancellationError`.
+  /// The error is always an instance of `CancellationError`. Its `reason`
+  /// reports why the task was cancelled: for example, `.deadlineExpired`
+  /// when the current call site is inside a `withDeadline` block whose
+  /// deadline has elapsed; `.unspecified` otherwise.
   ///
   /// - SeeAlso: `isCancelled()`
+  /// - SeeAlso: ``CancellationError/Reason``
   @_unavailableInEmbedded
   public static func checkCancellation() throws {
     if Task<Never, Never>.isCancelled {
-      throw _Concurrency.CancellationError()
+      if #available(StdlibDeploymentTarget 6.5, *) {
+        throw _Concurrency.CancellationError(
+          reason: Task.cancellationReason ?? .unspecified)
+      } else {
+        throw _Concurrency.CancellationError()
+      }
     }
   }
 }

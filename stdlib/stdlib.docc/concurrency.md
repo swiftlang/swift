@@ -19,6 +19,14 @@ Perform asynchronous and parallel operations.
 - ``Swift/withThrowingDiscardingTaskGroup(returning:isolation:body:)``
 - ``Swift/UnsafeCurrentTask``
 
+### Deadlines
+
+- ``Swift/withDeadline(_:tolerance:clock:operation:)``
+- ``Swift/withDeadline(in:tolerance:clock:operation:)``
+- ``Swift/withDeadline(in:tolerance:operation:)``
+- ``Swift/CancellationError``
+- ``Swift/CancellationError/Reason``
+
 ### Asynchronous Sequences
 
 - ``Swift/AsyncSequence``

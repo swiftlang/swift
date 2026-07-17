@@ -1174,9 +1174,20 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
     // `.deadlineExpired` from a `withDeadline` scope).
     auto parentStatus =
         parent->_private()._status().load(std::memory_order_relaxed);
+    // Also consider a cancelled cancellation scope on the parent's chain:
+    // structured children spawned inside a cancelled `__withTaskCancellationScope`
+    // (including `withDeadline` after its deadline elapsed) must observe as
+    // cancelled from birth, with the scope's reason.
+    TaskCancellationScopeRecord *cancelledScope = nullptr;
+    if (parentStatus.hasTaskCancellationScope())
+      cancelledScope = _swift_task_getCancellationScope(parent);
     if ((group && group->isCancelled()) ||
-        parentStatus.isCancelledIgnoringShield()) {
-      swift_task_cancelWithReason(task, swift_task_getCancellationReason(parent));
+        parentStatus.isCancelledIgnoringShield() ||
+        cancelledScope) {
+      size_t reason = parentStatus.isCancelledIgnoringShield()
+                          ? swift_task_getCancellationReason(parent)
+                          : (cancelledScope ? cancelledScope->getReason() : 0);
+      swift_task_cancelWithReason(task, reason);
     }
 
     // Inherit the `HasDeadline` flag from the parent. Structured
@@ -1823,9 +1834,17 @@ bool swift::swift_task_isCancelledWithFlags(AsyncTask *task,
 
 size_t swift::swift_task_getCancellationReason(AsyncTask *task) {
   auto status = task->_private()._status().load(std::memory_order_relaxed);
-  if (!status.isCancelledIgnoringShield())
-    return 0;
-  return status.getCancellationReason();
+  // Whole-task cancel wins: the reason bit was set at cancel time and
+  // dominates any per-scope reason on the chain.
+  if (status.isCancelledIgnoringShield())
+    return status.getCancellationReason();
+  // Otherwise the innermost cancelled scope (if any) supplies the reason,
+  // e.g. `.deadlineExpired` from a `withDeadline` timer firing.
+  if (status.hasTaskCancellationScope()) {
+    if (auto *scope = _swift_task_getCancellationScope(task))
+      return scope->getReason();
+  }
+  return 0;
 }
 
 SWIFT_CC(swift)

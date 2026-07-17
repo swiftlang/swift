@@ -1019,6 +1019,13 @@ void AsyncTask::cancellationShieldPop() {
 SWIFT_CC(swift)
 static void
 swift_task_cancelCancellationScopeImpl(TaskCancellationScopeRecord *record) {
+  swift_task_cancelCancellationScopeWithReason(record, /*unspecified=*/0);
+}
+
+SWIFT_CC(swift)
+static void
+swift_task_cancelCancellationScopeWithReasonImpl(
+    TaskCancellationScopeRecord *record, size_t reason) {
   // Cancelling a scope is a local operation on the scope's own atomic flag.
   // Unlike `swift_task_cancel`, it does NOT set the task's own IsCancelled
   // flag. To make code that reacts to cancellation via
@@ -1035,7 +1042,7 @@ swift_task_cancelCancellationScopeImpl(TaskCancellationScopeRecord *record) {
   if (!record)
     return;
 
-  record->cancel();
+  record->cancel(reason);
 
   auto task = record->getOwningTask();
   if (!task)
@@ -1072,9 +1079,28 @@ swift_task_cancelCancellationScopeImpl(TaskCancellationScopeRecord *record) {
       }
       case TaskStatusRecordKind::TaskCancellationScope: {
         // An inner scope, nested inside the scope being cancelled. Mark
-        // it cancelled too (idempotent). Its own inner notification
-        // handlers were already fired above as we walked past them.
-        cast<TaskCancellationScopeRecord>(cur)->cancel();
+        // it cancelled too (idempotent), carrying the same reason as the
+        // outer cancel. Its own inner notification handlers were already
+        // fired above as we walked past them.
+        cast<TaskCancellationScopeRecord>(cur)->cancel(reason);
+        break;
+      }
+      case TaskStatusRecordKind::ChildTask: {
+        // Structured child tasks (async let) spawned inside the scope get
+        // cancelled with the scope's reason. This matches "as-if child
+        // task" semantics for the scope itself: cancelling the scope
+        // behaves like cancelling a child task, so its own children
+        // cascade.
+        auto childRecord = cast<ChildTaskStatusRecord>(cur);
+        for (AsyncTask *child : childRecord->children())
+          swift_task_cancelWithReason(child, reason);
+        break;
+      }
+      case TaskStatusRecordKind::TaskGroup: {
+        // TaskGroup children spawned inside the scope also cascade. This
+        // matches the whole-task-cancel path via _swift_taskGroup_cancel.
+        auto groupRecord = cast<TaskGroupTaskStatusRecord>(cur);
+        _swift_taskGroup_cancel(groupRecord->getGroup(), reason);
         break;
       }
       default:

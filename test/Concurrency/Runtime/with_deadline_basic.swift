@@ -31,6 +31,7 @@
     await test_nested_deadline_outer_tighter_inner_short_sleep()
     await test_two_clock_composition()
     await test_withDeadline_in_shorthand()
+    await test_deadline_checkCancellation_error_carries_deadlineExpired_reason()
     print("done")
   }
 }
@@ -620,6 +621,46 @@ func test_withDeadline_in_shorthand() async {
     let promptly = elapsed < .seconds(5)
     print("threw promptly:\(promptly)")
     // CHECK: threw promptly:true
+  } catch {
+    print("threw wrong error: \(error)")
+  }
+}
+
+// The user-requested test: a `withDeadline` block whose deadline expires
+// while `operation` is running. The operation completes its own work
+// successfully (no unrelated throw), but along the way it calls
+// `Task.checkCancellation()`. That throw MUST surface a `CancellationError`
+// whose `reason` is `.deadlineExpired` (not `.unspecified`).
+@available(StdlibDeploymentTarget 6.5, *)
+func test_deadline_checkCancellation_error_carries_deadlineExpired_reason() async {
+  print("--- \(#function)")
+  // CHECK-LABEL: --- test_deadline_checkCancellation_error_carries_deadlineExpired_reason()
+
+  let clock = ContinuousClock()
+  let deadline = clock.now.advanced(by: .milliseconds(50))
+
+  do {
+    _ = try await withDeadline(deadline, clock: clock) {
+      // Sleep for way past the deadline. The deadline timer fires long
+      // before this returns, cancels the scope, and the sleep wakes up
+      // early via its withTaskCancellationHandler-installed record.
+      // Swallow sleep's own thrown CancellationError with `try?` so the
+      // subsequent explicit `checkCancellation()` is the one that
+      // observably throws.
+      try? await Task.sleep(for: .seconds(30))
+      // The scope is cancelled with reason=.deadlineExpired; this
+      // throw must carry that reason.
+      try Task.checkCancellation()
+      // Unreachable.
+      return 0
+    }
+    print("did not throw (unexpected)")
+  } catch let error as CancellationError {
+    // Concrete reason plumbed all the way from the timer through the
+    // scope record's Reason field into Task.checkCancellation's thrown
+    // CancellationError.
+    print("caught reason: \(error.reason)")
+    // CHECK: caught reason: deadlineExpired
   } catch {
     print("threw wrong error: \(error)")
   }

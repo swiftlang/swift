@@ -59,11 +59,13 @@ public struct TaskCancellationScope: ~Copyable, ~Escapable {
   /// It does NOT set the enclosing task's own cancellation flag, and it
   /// does NOT invoke handlers installed outside the scope's dynamic extent.
   ///
-  /// Cancellation cascades to inner scopes. If this scope has any nested
-  /// `__withTaskCancellationScope` inside its dynamic extent, cancelling
-  /// this outer scope also marks each inner scope cancelled - matching
-  /// the "as-if child task" semantics: cancelling a parent cancels its
-  /// children.
+  /// Cancellation cascades. Cancelling this scope also cascades to:
+  /// - any nested inner `__withTaskCancellationScope` records, which are
+  ///   marked cancelled with the same reason;
+  /// - any structured child tasks (`async let`, `TaskGroup`) spawned
+  ///   inside the scope, which are cancelled with the same reason.
+  /// This matches the "as-if child task" semantics: cancelling a parent
+  /// cancels its children.
   ///
   /// Each `CancellationNotificationStatusRecord` handler fires at most
   /// once across scope-cancel and whole-task-cancel combined, so a
@@ -104,10 +106,14 @@ public struct TaskCancellationScope: ~Copyable, ~Escapable {
 /// and wakes up any `withTaskCancellationHandler`-based operations
 /// (including `Task.sleep`) installed inside the scope.
 ///
-/// The scope's effects are strictly local to `operation`. The enclosing task's
-/// own cancellation state is unchanged, and cancellation does not propagate
-/// into structured children (`TaskGroup` / `async let`) spawned inside the
-/// scope.
+/// The scope's effects on `Task.isCancelled` are strictly local to `operation`;
+/// the enclosing task's own cancellation state is unchanged. Structured
+/// children (`TaskGroup` / `async let`) spawned inside `operation` ARE
+/// cascaded when the scope is cancelled: `scope.cancel()` walks the record
+/// chain from the innermost record down to the scope record and cancels any
+/// `ChildTask` / `TaskGroup` records in that range, so nested children see
+/// `Task.isCancelled == true` just as they would inside a cancelled child
+/// task.
 ///
 /// This is a low-level primitive intended for building higher-level control
 /// abstractions such as `withDeadline`. It is gated on `@_spi(Concurrency)`
@@ -152,6 +158,13 @@ internal func _taskPopTaskCancellationScope(record: UnsafeRawPointer /*TaskCance
 @usableFromInline
 @_silgen_name("swift_task_cancelCancellationScope")
 internal func _taskCancelTaskCancellationScope(record: UnsafeRawPointer /*TaskCancellationScopeRecord*/)
+
+@available(StdlibDeploymentTarget 6.5, *)
+@usableFromInline
+@_silgen_name("swift_task_cancelCancellationScopeWithReason")
+internal func _taskCancelTaskCancellationScopeWithReason(
+  record: UnsafeRawPointer /*TaskCancellationScopeRecord*/,
+  reason: UInt)
 
 @available(StdlibDeploymentTarget 6.5, *)
 @usableFromInline

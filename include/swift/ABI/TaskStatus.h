@@ -504,6 +504,12 @@ class TaskCancellationScopeRecord : public TaskStatusRecord {
 
   std::atomic<bool> Cancelled{false};
 
+  /// Cancellation reason, meaningful only while `Cancelled` is true.
+  /// Matches the `size_t reason` ABI used by `swift_task_cancelWithReason`
+  /// (0 = unspecified, 1 = deadlineExpired, etc.). Written once at
+  /// cancellation time; readers observe the store paired with `Cancelled`.
+  std::atomic<size_t> Reason{0};
+
 public:
   explicit TaskCancellationScopeRecord(AsyncTask *owningTask)
       : TaskStatusRecord(TaskStatusRecordKind::TaskCancellationScope),
@@ -511,7 +517,15 @@ public:
 
   AsyncTask *getOwningTask() const { return OwningTask; }
   bool isCancelled() const { return Cancelled.load(std::memory_order_relaxed); }
-  void cancel() { Cancelled.store(true, std::memory_order_relaxed); }
+  size_t getReason() const { return Reason.load(std::memory_order_relaxed); }
+  void cancel(size_t reason = 0) {
+    // Store the reason FIRST so any reader that sees `Cancelled=true` also
+    // sees a consistent reason. Both are relaxed because the surrounding
+    // status-record lock provides the ordering between cancel-writes and
+    // isCancelled-reads on the isCancelled path.
+    Reason.store(reason, std::memory_order_relaxed);
+    Cancelled.store(true, std::memory_order_relaxed);
+  }
 
   static bool classof(const TaskStatusRecord *record) {
     return record->getKind() == TaskStatusRecordKind::TaskCancellationScope;
