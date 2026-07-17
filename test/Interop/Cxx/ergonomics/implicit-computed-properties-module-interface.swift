@@ -105,6 +105,7 @@
 // CHECK-NEXT:    var val: Int32
 // CHECK-NEXT:    func Get_X() -> Int32
 // CHECK-NEXT:    mutating func Set_X(_ v: Int32)
+// CHECK-NEXT:    var x: Int32
 // CHECK-NEXT: }
 
 // CHECK:      struct IntGetterSetterSnakeCase {

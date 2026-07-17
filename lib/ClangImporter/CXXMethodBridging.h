@@ -19,9 +19,6 @@ struct CXXMethodBridging {
     if (nameIsBlacklist())
       return Kind::unknown;
 
-    // This should be handled as snake case. See: rdar://89453010
-    // case. In the future we could
-    //  import these too, though.
     auto nameKind = classifyNameKind();
     if (nameKind != NameKind::title && nameKind != NameKind::camel &&
         nameKind != NameKind::lower && nameKind != NameKind::snake)
@@ -69,8 +66,11 @@ struct CXXMethodBridging {
     if (getClangName().empty())
       return NameKind::unknown;
 
+    // Any name containing an underscore is treated as snake_case, even when it
+    // also has uppercase letters (e.g. an acronym segment like
+    // `get_http_URL`). See rdar://89453010.
     if (getClangName().contains('_'))
-      return hasUpper ? NameKind::unknown : NameKind::snake;
+      return NameKind::snake;
     if (!hasUpper)
       return NameKind::lower;
 
@@ -84,7 +84,6 @@ struct CXXMethodBridging {
     return method->getName();
   }
 
-  // This should be handled as snake case. See: rdar://89453010
   std::string importNameAsCamelCaseName() {
     std::string output;
     auto kind = classify();
@@ -119,6 +118,11 @@ struct CXXMethodBridging {
           }
         }
       }
+      // A property name is always lowercased first. When the name started with
+      // a leading underscore (e.g. `Get_X` -> `_X` -> `X`), the real first
+      // letter wasn't lowercased above, so do it now.
+      if (!output.empty())
+        output.front() = std::tolower(output.front());
       return output;
     }
 
