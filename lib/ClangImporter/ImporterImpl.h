@@ -855,7 +855,8 @@ public:
   /// Keep track of initializer declarations that correspond to
   /// imported methods.
   llvm::DenseMap<
-      std::tuple<const clang::ObjCMethodDecl *, const DeclContext *, Version>,
+      std::tuple<const clang::ObjCMethodDecl *, const DeclContext *, Version,
+                 CArrayProjection>,
       ConstructorDecl *> Constructors;
 
   /// Keep track of all initializers that have been imported into a
@@ -2375,5 +2376,29 @@ RetainReleaseOperationKind checkRetainReleaseOperationValidity(
     CustomRefCountingOperationKind operationKind);
 } // end namespace importer
 } // end namespace swift
+
+namespace llvm {
+
+template<>
+struct DenseMapInfo<swift::CArrayProjection> {
+  using CArrayProjection = swift::CArrayProjection;
+
+  using UnsignedDMI = DenseMapInfo<uint8_t>;
+
+  static inline CArrayProjection getEmptyKey() {
+    return CArrayProjection(UnsignedDMI::getEmptyKey());
+  }
+  static inline CArrayProjection getTombstoneKey() {
+    return CArrayProjection(UnsignedDMI::getTombstoneKey());
+  }
+  static inline unsigned getHashValue(CArrayProjection options) {
+    return UnsignedDMI::getHashValue(uint8_t(options));
+  }
+  static bool isEqual(CArrayProjection a, CArrayProjection b) {
+    return UnsignedDMI::isEqual(uint8_t(a), uint8_t(b));
+  }
+};
+
+}
 
 #endif
