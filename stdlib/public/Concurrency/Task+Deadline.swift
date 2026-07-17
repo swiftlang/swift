@@ -150,6 +150,7 @@ public nonisolated(nonsending) func withDeadline<Return, Failure, C>(
     // TODO: Instead of creating a full task here, we want to enqueue a job
     //       at a deadline that cancels the scope; disarming should attempt
     //       to cancel the job.
+    //       I.e. this wants to be: clockExecutor.enqueue(Job({ scope.cancel(reason: .deadlineExceeded) })
     let timer = Task.detached {
       do {
         try await clock.sleep(until: expiration, tolerance: tolerance)
@@ -340,6 +341,54 @@ func withDeadline<Return, Failure>(
 }
 
 // ==== -----------------------------------------------------------------------
+// MARK: Task.hasActiveDeadline
+
+@available(StdlibDeploymentTarget 6.5, *)
+extension Task where Success == Never, Failure == Never {
+  /// Whether any deadline is set on the current task.
+  ///
+  /// Returns `true` when the current task is executing inside at least one
+  /// `withDeadline` scope (for any clock), and `false` otherwise. This is
+  /// cheap - it only reads the task's status flags and does not walk the
+  /// record chain.
+  ///
+  /// External systems that only need to know "does an outer deadline
+  /// govern our behavior" can use this without knowing which specific
+  /// clock is in play. To read the actual deadline value use
+  /// ``activeDeadline(for:)``.
+  ///
+  /// - SeeAlso: ``activeDeadline(for:)``
+  public static var hasActiveDeadline: Bool {
+    _swift_task_hasActiveDeadline()
+  }
+}
+
+// ==== -----------------------------------------------------------------------
+// MARK: activeDeadline(for:)
+
+@available(StdlibDeploymentTarget 6.5, *)
+extension Task where Success == Never, Failure == Never {
+  /// Find the tightest deadline given the specified clock.
+  ///
+  /// The returned instant is the earliest deadline whose clock identity
+  /// (`clock.id`) matches the argument's - nested `withDeadline` scopes
+  /// on the same clock are coalesced to the tightest one.
+  ///
+  /// Deadlines installed for a *different* clock are ignored (there is no
+  /// meaningful cross-clock conversion, so no attempt is made to unify
+  /// them). Composing multiple `withDeadline` scopes on different clocks
+  /// still works correctly - the tightest deadline for each clock governs
+  /// independently - but this accessor can only report on one clock at a
+  /// time.
+  ///
+  /// - SeeAlso: ``hasActiveDeadline``
+  public static func activeDeadline<C: Clock & Identifiable>(for clock: C) -> C.Instant? {
+    // No need to short-circut here with hasDeadline as the `find...` already does so.
+    _findNearestDeadline(clock: clock)
+  }
+}
+
+// ==== -----------------------------------------------------------------------
 // MARK: Clock box
 
 /// A non-generic base class carrying identity/compare methods that dispatch
@@ -405,7 +454,7 @@ internal func _task_deadline_boxesSameClock(
 }
 
 // ==== -----------------------------------------------------------------------
-// MARK: Nearest-deadline SPI
+// MARK: Internal SPI
 
 /// Query the innermost active deadline installed on the current task for
 /// the given clock, or nil if none.
@@ -449,53 +498,6 @@ public func _findNearestDeadline<C: Clock & Identifiable>(clock: C) -> C.Instant
   return typed.deadline
 }
 
-// ==== -----------------------------------------------------------------------
-// MARK: Task.hasActiveDeadline / activeDeadline(for:)
-
-@available(StdlibDeploymentTarget 6.5, *)
-extension Task where Success == Never, Failure == Never {
-  /// Whether any deadline is set on the current task.
-  ///
-  /// Returns `true` when the current task is executing inside at least one
-  /// `withDeadline` scope (for any clock), and `false` otherwise. This is
-  /// cheap - it only reads the task's status flags and does not walk the
-  /// record chain.
-  ///
-  /// External systems that only need to know "does an outer deadline
-  /// govern our behavior" can use this without knowing which specific
-  /// clock is in play. To read the actual deadline value use
-  /// ``activeDeadline(for:)``.
-  ///
-  /// - SeeAlso: ``activeDeadline(for:)``
-  public static var hasActiveDeadline: Bool {
-    _swift_task_hasActiveDeadline()
-  }
-}
-
-// ==== -----------------------------------------------------------------------
-// MARK: Task.hasActiveDeadline / activeDeadline(for:)
-
-@available(StdlibDeploymentTarget 6.5, *)
-extension Task where Success == Never, Failure == Never {
-  /// Find the tightest deadline given the specified clock.
-  ///
-  /// The returned instant is the earliest deadline whose clock identity
-  /// (`clock.id`) matches the argument's - nested `withDeadline` scopes
-  /// on the same clock are coalesced to the tightest one.
-  ///
-  /// Deadlines installed for a *different* clock are ignored (there is no
-  /// meaningful cross-clock conversion, so no attempt is made to unify
-  /// them). Composing multiple `withDeadline` scopes on different clocks
-  /// still works correctly - the tightest deadline for each clock governs
-  /// independently - but this accessor can only report on one clock at a
-  /// time.
-  ///
-  /// - SeeAlso: ``hasActiveDeadline``
-  public static func activeDeadline<C: Clock & Identifiable>(for clock: C) -> C.Instant? {
-    // No need to short-circut here with hasDeadline as the `find...` already does so.
-    _findNearestDeadline(clock: clock)
-  }
-}
 
 @available(StdlibDeploymentTarget 6.5, *)
 @_silgen_name("_swift_task_hasActiveDeadline")
