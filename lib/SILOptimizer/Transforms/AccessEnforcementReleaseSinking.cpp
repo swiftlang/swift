@@ -230,7 +230,6 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::TaskCancellationScopeCancel:
     case BuiltinValueKind::TaskPushDeadline:
     case BuiltinValueKind::TaskPopDeadline:
-    case BuiltinValueKind::TaskFindNearestDeadlineForClock:
       return true;
     }
   }

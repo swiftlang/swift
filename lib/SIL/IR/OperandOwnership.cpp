@@ -1066,24 +1066,14 @@ visitResumeThrowingContinuationThrowing(BuiltinInst *bi, StringRef attr) {
   return OperandOwnership::TrivialUse;
 }
 
-/// TaskPushDeadline takes (clockType: Any.Type,
-/// box: __owned Builtin.NativeObject). The `box` operand at index 1 is
-/// consumed by the runtime; `clockType` at index 0 is a trivial metatype.
+/// TaskPushDeadline takes four trivial operands:
+///   (clockPtr: Builtin.RawPointer, instantPtr: Builtin.RawPointer,
+///    clockType: Any.Type, instantType: Any.Type).
+/// All trivial; the runtime copies through the pointers via value
+/// witnesses without taking ownership of either.
 OperandOwnership
 OperandOwnershipBuiltinClassifier::visitTaskPushDeadline(BuiltinInst *bi,
                                                         StringRef attr) {
-  if (&op == &bi->getOperandRef(1))
-    return OperandOwnership::DestroyingConsume;
-  return OperandOwnership::TrivialUse;
-}
-
-/// TaskFindNearestDeadlineForClock takes four raw pointers (queryClock,
-/// clockType, clockWT, identifiableWT). All trivial - the caller retains
-/// ownership of the underlying box and the runtime only borrows through
-/// the pointers.
-OperandOwnership
-OperandOwnershipBuiltinClassifier::visitTaskFindNearestDeadlineForClock(
-    BuiltinInst *bi, StringRef attr) {
   return OperandOwnership::TrivialUse;
 }
 
@@ -1138,9 +1128,9 @@ BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskCancellationScopeCancel)
 
 // Trivial use since our operand is just an UnsafeRawPointer.
 BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskPopDeadline)
-// TaskPushDeadline and TaskFindNearestDeadlineForClock are handled by
-// custom visitors above so their `customIDBox` operand can be classified
-// as a consumed / borrowed reference respectively.
+// TaskPushDeadline is handled by the custom visitor above so its
+// trivial operand tuple can be classified without relying on the
+// generic BUILTIN_OPERAND_OWNERSHIP macro.
 
 #undef BUILTIN_OPERAND_OWNERSHIP
 

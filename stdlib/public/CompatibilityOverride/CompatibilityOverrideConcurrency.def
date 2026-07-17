@@ -438,12 +438,21 @@ OVERRIDE_TASK_STATUS(task_popTaskExecutorPreference, void,
 
 // swift_task_pushDeadline takes multiple arguments so it goes through the
 // standard *Impl indirection. See TaskStatus.cpp for the implementation.
+// clock/instant are borrowed +0 pointers into caller-owned storage; the
+// runtime vw-copies both into task-allocated tail storage. No heap
+// object is used.
 OVERRIDE_TASK_STATUS(task_pushDeadline,
                      TaskDeadlineStatusRecord *,
                      SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
                      swift::,
-                     (const Metadata *clockType, HeapObject *box),
-                     (clockType, box))
+                     (OpaqueValue *clock,
+                      OpaqueValue *instant,
+                      const Metadata *clockType,
+                      const Metadata *instantType,
+                      const WitnessTable *clockWT,
+                      const WitnessTable *identifiableWT),
+                     (clock, instant, clockType, instantType,
+                      clockWT, identifiableWT))
 
 OVERRIDE_TASK_STATUS(task_popDeadline, void,
                      SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
@@ -451,7 +460,7 @@ OVERRIDE_TASK_STATUS(task_popDeadline, void,
                      (record))
 
 OVERRIDE_TASK_STATUS(task_findNearestDeadlineForClock,
-                     HeapObject *,
+                     OpaqueValue *,
                      SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
                      swift::,
                      (OpaqueValue *queryClock,

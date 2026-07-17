@@ -128,21 +128,26 @@ public nonisolated(nonsending) func withDeadline<Return, Failure, C>(
     return try await operation()
   }
 
-  // Allocate a `_ClockBox<C>` on the Swift heap that carries both the
-  // clock and the deadline instant. The runtime consumes the +1 on push
-  // and releases it on pop.
-  let box = _ClockBox<C>(clock: clock, deadline: expiration)
-  let opaque = unsafe Unmanaged.passRetained(box).toOpaque()
-  let native = unsafe Builtin.reinterpretCast(opaque) as Builtin.NativeObject
-  let deadlineRecord = unsafe Builtin.taskPushDeadline(clockType: C.self, box: native)
+  // Push a deadline record on the current task.
+  // We need to borrow the clock and expiration, because we don't know the exact types.
+  // The record will initializeWithCopy them into the record's tail allocated storage,
+  // and destroy them when the record is popped.
+  //
+  // FIXME: The shape of this builtin is a workaround,
+  //        since stack nesting SIL checking couldn't handle a generic builtin
+  //        that would take clock and expiration directly; Something to improve for sure.
+  let deadlineRecord = unsafe Builtin.taskPushDeadline(
+    clockPtr: Builtin.addressOfBorrow(clock),
+    instantPtr: Builtin.addressOfBorrow(expiration),
+    clockType: C.self,
+    instantType: C.Instant.self)
+  defer { withExtendedLifetime(clock) {} }
+  defer { withExtendedLifetime(expiration) {} }
   defer { unsafe Builtin.taskPopDeadline(record: deadlineRecord) }
 
   return try await __withTaskCancellationScope { scope throws(Failure) in
-    // The scope handle is `~Escapable`, but its underlying record pointer
-    // is a plain `UnsafeRawPointer` we can hand to the sending timer
-    // closure. The scope's lifetime is this operation, and the timer is
-    // disarmed by `defer` before the operation returns, so the record
-    // pointer is guaranteed live for the duration of the timer task.
+    // Scope handle is ~Escapable; but we're playing lose here until we get
+    // the new Job() enqueue at time...
     let scopeRecord = unsafe scope._record
 
     // TODO: Replace this by picking the "Clock's executor"
@@ -390,64 +395,41 @@ extension Task where Success == Never, Failure == Never {
 // ==== -----------------------------------------------------------------------
 // MARK: Internals
 
-/// Type-eraser for `_ClockBox<C>`.
-@available(StdlibDeploymentTarget 6.5, *)
-internal class _AnyClockBox {
-  init() {}
-
-  /// Whether `other` refers to the same logical clock as `self`.
-  ///
-  /// The caller (runtime) has already checked that both records have the
-  /// same `ClockType` metadata pointer, so both boxes are known to be
-  /// `_ClockBox<C>` for the same `C`. Concrete `_ClockBox<C>` overrides
-  /// this method with a properly-typed comparison of `clock.id`.
-  func hasSameClock(as other: _AnyClockBox) -> Bool {
-    // Base implementation reached only if someone instantiates a bare
-    // `_AnyClockBox` (should never happen).
-    return self === other
-  }
-}
-
-/// Stores both the clock instance and the deadline instant.
-/// Lifetime is owned by `TaskDeadlineStatusRecord`, which releses it on deadline pop.
-@available(StdlibDeploymentTarget 6.5, *)
-internal final class _ClockBox<C: Clock & Identifiable>: _AnyClockBox {
-  let clock: C
-  let deadline: C.Instant
-
-  init(clock: C, deadline: C.Instant) {
-    self.clock = clock
-    self.deadline = deadline
-    super.init()
-  }
-
-  override func hasSameClock(as other: _AnyClockBox) -> Bool {
-    // The runtime guaranteed both records share ClockType metadata, so
-    // the downcast succeeds. Use unchecked downcast for the common path.
-    guard let typed = other as? _ClockBox<C> else { return false }
-    return clock.id == typed.clock.id
-  }
-}
-
-/// Swift-side helper called by the runtime for each candidate
-/// record while walking the chain looking for a deadline for the query
-/// clock. Both arguments are `_AnyClockBox` instances; the dispatch to
-/// `hasSameClock(as:)` picks the right `_ClockBox<C>.hasSameClock` via
-/// Swift's virtual dispatch, without any metadata plumbing on the C++
-/// side.
+/// Swift-side helper called by the runtime for each deadline record whose
+/// `ClockType` metadata pointer-equals the caller's `C`. Reads the record's
+/// inline-stored clock as a `C` value and compares identities via `Identifiable`.
+///
+/// **Precondition (upheld by the runtime):** the outer walker in
+/// `swift_task_findNearestDeadlineForClockImpl` calls this bridge only after
+/// pointer-equality checking `record->ClockType == C-metadata`. The trailing
+/// storage at `recordClockStorage` was initialized on push via
+/// `clockType->vw_initializeWithCopy(..., incomingClock: C)`, so the bytes
+/// there are a valid `C`. No dynamic downcast is needed - there is no class
+/// instance to downcast; the bytes ARE the value. This matches how
+/// `TaskLocal` loads back a stored task-local: identity of the key/type
+/// gates the load, no runtime type check is performed.
 ///
 /// C++-side ABI signature (see TaskStatus.cpp):
 ///
 ///     extern "C" SWIFT_CC(swift)
-///     bool _task_deadline_boxesSameClock(HeapObject *a, HeapObject *b);
+///     bool _task_deadline_recordHasSameClock(
+///         OpaqueValue *recordClockStorage,
+///         OpaqueValue *queryClock,
+///         const Metadata *clockType,
+///         const WitnessTable *clockWT,
+///         const WitnessTable *identifiableWT);
 @available(StdlibDeploymentTarget 6.5, *)
-@_silgen_name("_task_deadline_boxesSameClock")
-internal func _task_deadline_boxesSameClock(
-  _ a: AnyObject, _ b: AnyObject
+@_silgen_name("_task_deadline_recordHasSameClock")
+internal func _task_deadline_recordHasSameClock<C: Clock & Identifiable>(
+  recordClockStorage: UnsafeMutableRawPointer,
+  queryClock: C
 ) -> Bool {
-  guard let boxA = a as? _AnyClockBox, let boxB = b as? _AnyClockBox
-  else { return false }
-  return boxA.hasSameClock(as: boxB)
+  // TODO: This should be simplified to be between two Identifiable things. No need to make it clock specific.
+  //       AND it should be well typed on both sides, some I, some I, should be fine;
+  // TODO: I guess that's why we need to store Metadata and WT in the record, to implement this callout well typed
+  let stored = unsafe recordClockStorage
+    .assumingMemoryBound(to: C.self).pointee
+  return stored.id == queryClock.id
 }
 
 /// Query the innermost active deadline installed on the current task for
@@ -459,38 +441,46 @@ internal func _task_deadline_boxesSameClock(
 @_spi(Concurrency)
 @available(StdlibDeploymentTarget 6.5, *)
 public func _findNearestDeadline<C: Clock & Identifiable>(clock: C) -> C.Instant? {
-  // Build a query box with the clock instance and a placeholder deadline;
-  // only the identity fields (clock.id via the virtual `hasSameClock`
-  // override) are consulted by the bridge, the deadline is unused.
-  let queryBox = _ClockBox<C>(clock: clock, deadline: clock.now)
-  let queryRaw = unsafe Unmanaged.passUnretained(queryBox).toOpaque()._rawValue
-  let clockTypeRaw = unsafe Builtin.reinterpretCast(C.self) as Builtin.RawPointer
-
-  let matchedRaw: Builtin.RawPointer = unsafe Builtin.taskFindNearestDeadlineForClock(
-    queryClock: queryRaw,
-    clockType: clockTypeRaw,
-    // clockWT + identifiableWT are unused by this path; runtime dispatches
-    // via the AnyObject-based bridge which does virtual dispatch on the
-    // box's Swift class.
-    clockWT: unsafe Builtin.inttoptr_Word(0._builtinWordValue),
-    identifiableWT: unsafe Builtin.inttoptr_Word(0._builtinWordValue))
-  _fixLifetime(queryBox)
-
-  // Null pointer means "no matching record".
-  let matchedInt = Int(bitPattern: UnsafeRawPointer(matchedRaw))
-  if matchedInt == 0 {
+  // Direct-call into the runtime via `@_silgen_name`. Swift's standard
+  // generic ABI passes:
+  //   - `queryClock`  as `@in_guaranteed C`  (indirect, +0)
+  //   - `C`'s type metadata
+  //   - `C: Clock` witness table
+  //   - `C: Identifiable` witness table
+  // which is exactly what `swift_task_findNearestDeadlineForClock`'s
+  // C++ signature expects. The WTs reach the Swift bridge
+  // `_task_deadline_recordHasSameClock` so it can compare `.id`s.
+  //
+  // Result: a borrowed +0 pointer into the matched record's tail storage
+  // aligned at `C.Instant`, or null.
+  guard let matched =
+      unsafe _swift_task_findNearestDeadlineForClock(queryClock: clock) else {
     return nil
   }
 
-  // Runtime handed us +1. Wrap via Unmanaged so ARC releases it once we
-  // read the deadline off it. `matchedRaw` points at a `_ClockBox<C>`
-  // (ClockType matched pointer-equal and hasSameClock returned true).
-  let matchedBox: AnyObject =
-    unsafe Unmanaged<AnyObject>.fromOpaque(UnsafeRawPointer(matchedRaw))
-      .takeRetainedValue()
-  let typed = unsafe unsafeDowncast(matchedBox, to: _ClockBox<C>.self)
-  return typed.deadline
+  // Copy the instant out of the record's storage; the record continues
+  // to own it (a subsequent pop will run vw_destroy on it).
+  return unsafe UnsafeRawPointer(matched)
+    .assumingMemoryBound(to: C.Instant.self).pointee
 }
+
+/// Runtime shim declared purely for Swift's generic ABI: the compiler
+/// synthesizes the (value, metadata, Clock WT, Identifiable WT) argument
+/// tuple and calls straight into the C++ runtime symbol.
+///
+/// C++-side signature (see Runtime/Concurrency.h and TaskStatus.cpp):
+///
+///     OpaqueValue *
+///     swift_task_findNearestDeadlineForClock(
+///         OpaqueValue *queryClock,
+///         const Metadata *clockType,
+///         const WitnessTable *clockWT,
+///         const WitnessTable *identifiableWT);
+@available(StdlibDeploymentTarget 6.5, *)
+@_silgen_name("swift_task_findNearestDeadlineForClock")
+internal func _swift_task_findNearestDeadlineForClock<C: Clock & Identifiable>(
+  queryClock: C
+) -> UnsafeMutableRawPointer?
 
 
 @available(StdlibDeploymentTarget 6.5, *)

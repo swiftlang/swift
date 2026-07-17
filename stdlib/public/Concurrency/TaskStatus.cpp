@@ -667,40 +667,63 @@ static void swift_task_popTaskExecutorPreferenceImpl(
 /**************************************************************************/
 
 /// Bridged Swift-side helper. Called by the runtime for each candidate
-/// record while walking the chain looking for a deadline for the query
-/// clock. Both boxes are `_AnyClockBox` instances (Swift classes); the
-/// bridge dispatches via virtual method `hasSameClock(as:)` on the boxes'
-/// concrete `_ClockBox<C>` type.
+/// record whose `ClockType` metadata already pointer-equals the query
+/// clock's type. Reads the record's inline-stored clock through the
+/// runtime-supplied `C` (matched via metadata identity) and compares
+/// identities.
 ///
-/// The Swift definition lives in `Task+Deadline.swift`:
+/// Swift-side definition (in `Task+Deadline.swift`):
 ///
-///     internal func _task_deadline_boxesSameClock(_ a: AnyObject,
-///                                                 _ b: AnyObject) -> Bool
+///     internal func _task_deadline_recordHasSameClock<C: Clock & Identifiable>(
+///       recordClockStorage: UnsafeMutableRawPointer, queryClock: C) -> Bool
 ///
-/// Because both arguments are class-typed at the ABI level, no metadata
-/// or witness-table plumbing is needed on the C++ side.
+/// The runtime passes `(recordClockStorage, queryClock, C metadata,
+/// Clock witness, Identifiable witness)` following Swift's generic
+/// calling convention. `recordClockStorage` is a pointer into the
+/// record's task-allocated tail; it holds a valid `C` because push
+/// installed it via `clockType->vw_initializeWithCopy`.
 extern "C" SWIFT_CC(swift)
-bool _task_deadline_boxesSameClock(HeapObject *a, HeapObject *b);
+bool _task_deadline_recordHasSameClock(
+    OpaqueValue *recordClockStorage,
+    OpaqueValue *queryClock,
+    const Metadata *clockType,
+    const WitnessTable *clockWT,
+    const WitnessTable *identifiableWT);
 
 SWIFT_CC(swift)
 static TaskDeadlineStatusRecord *
-swift_task_pushDeadlineImpl(const Metadata *clockType, HeapObject *box) {
+swift_task_pushDeadlineImpl(OpaqueValue *clock,
+                            OpaqueValue *instant,
+                            const Metadata *clockType,
+                            const Metadata *instantType,
+                            const WitnessTable *clockWT,
+                            const WitnessTable *identifiableWT) {
+  (void)clockWT;
+  (void)identifiableWT;
   auto task = swift_task_getCurrent();
   assert(task && "Currently, withDeadline must be used from an async context; We may relax this in the future");
 
-  void *allocation =
-      _swift_task_alloc_specific(task, sizeof(class TaskDeadlineStatusRecord));
+  // Task-allocate one contiguous chunk holding the record header + the
+  // trailing clock and instant payloads. Both incoming values are
+  // borrowed (+0); COPY them in via value witnesses so the caller keeps
+  // ownership of the originals. Pop mirrors this with vw_destroy and
+  // swift_task_dealloc.
+  size_t size = TaskDeadlineStatusRecord::recordSize(clockType, instantType);
+  void *allocation = _swift_task_alloc_specific(task, size);
 
   // `IsOutermostDeadline` is decided under the status-record lock inside
   // `addStatusRecord`'s update closure and stored on the record: the
   // outermost record is the one whose push flipped `HasDeadline` from
   // false to true. The bookkeeping lets `swift_task_popDeadline` clear
   // `HasDeadline` in O(1) without walking the chain.
-  auto record = ::new (allocation)
-      TaskDeadlineStatusRecord(clockType, box, /*isOutermostDeadline=*/false);
+  auto record = ::new (allocation) TaskDeadlineStatusRecord(
+      clockType, instantType, /*isOutermostDeadline=*/false);
+  clockType->vw_initializeWithCopy(record->getClockStorage(), clock);
+  instantType->vw_initializeWithCopy(record->getInstantStorage(), instant);
+
   SWIFT_TASK_DEBUG_LOG("[Deadline] Create deadline record:%p for task:%p "
-                       "(clockType:%p, box:%p)",
-                       allocation, task, clockType, box);
+                       "(clockType:%p, instantType:%p, size:%zu)",
+                       allocation, task, clockType, instantType, size);
 
   addStatusRecord(task, record,
                   [&](ActiveTaskStatus oldStatus, ActiveTaskStatus &newStatus) {
@@ -744,96 +767,79 @@ static void swift_task_popDeadlineImpl(TaskDeadlineStatusRecord *record) {
         }
       });
 
-  // Release the box we took ownership of on push. The Swift `_ClockBox<C>`
-  // destructor runs ARC releases on `clock` and `deadline` transitively.
-  if (auto *box = record->getBox())
-    swift_release(box);
-
+  // Destroy the inline payload values before releasing the storage.
+  record->getInstantType()->vw_destroy(record->getInstantStorage());
+  record->getClockType()->vw_destroy(record->getClockStorage());
   swift_task_dealloc(record);
 }
 
 /// Search a single task's status record chain for a deadline record
-/// whose clock matches `(clockType, queryBox)`. Returns the matching
-/// record's box, or nullptr if none.
+/// whose clock matches the given query. Returns a borrowed pointer into
+/// the matching record's instant storage, or nullptr if none.
 ///
 /// Takes the task's status-record lock.
-static HeapObject *
-findDeadlineOnSingleTask(AsyncTask *task, HeapObject *queryBox,
-                         const Metadata *clockType) {
-  HeapObject *found = nullptr;
+static OpaqueValue *
+findDeadlineOnSingleTask(AsyncTask *task,
+                         OpaqueValue *queryClock,
+                         const Metadata *clockType,
+                         const WitnessTable *clockWT,
+                         const WitnessTable *identifiableWT) {
+  OpaqueValue *foundInstant = nullptr;
   withStatusRecordLock(task, [&](ActiveTaskStatus status) {
-    for (auto record : status.records()) {
-      if (record->getKind() != TaskStatusRecordKind::Deadline)
+    for (auto _record : status.records()) {
+      if (_record->getKind() != TaskStatusRecordKind::Deadline)
         continue;
-      auto d = cast<TaskDeadlineStatusRecord>(record);
+      auto record = cast<TaskDeadlineStatusRecord>(_record);
       // Fast-check: clock types must be pointer-equal.
-      if (d->getClockType() != clockType)
+      if (record->getClockType() != clockType)
         continue;
 
       // Same-clock identity check via Swift callout.
-      // The first record that matches is the one we want, since it'll be the tightest deadline.
-      if (!_task_deadline_boxesSameClock(d->getBox(), queryBox))
-        continue;
-      found = d->getBox();
-      return;
+      if (_task_deadline_recordHasSameClock(record->getClockStorage(), queryClock,
+          clockType, clockWT, identifiableWT)) {
+        foundInstant = record->getInstantStorage();
+        return;
+      }
     }
   });
-  return found;
+  return foundInstant; // Return opaque, caller will know to treat this as C.Instant
 }
 
 SWIFT_CC(swift)
-static HeapObject *
+static OpaqueValue *
 swift_task_findNearestDeadlineForClockImpl(
     OpaqueValue *queryClock,
     const Metadata *clockType,
     const WitnessTable *clockWT,
     const WitnessTable *identifiableWT) {
-  // `queryClock` is actually a `HeapObject *` (a `_AnyClockBox` subclass)
-  // passed as a raw pointer at the builtin ABI layer. The Swift caller
-  // in `_findNearestDeadline` constructs a `_ClockBox<C>` query box and
-  // hands us its address. `clockType` is the metatype of the caller's
-  // `C`, used for the fast-path pointer-equal filter. The trailing
-  // witness-table args are unused by this path but are kept in the
-  // signature to match the builtin ABI.
-  (void)clockWT;
-  (void)identifiableWT;
-
-  auto queryBox = reinterpret_cast<HeapObject *>(queryClock);
   auto task = swift_task_getCurrent();
   if (!task)
     return nullptr;
 
-  // Walk this task and its parents. Structured children
-  // inherit `HasDeadline` from their parent at create time (see
-  // `AsyncTask::inheritDeadlineFlagFrom`), so we can bail out of the
-  // whole search when we hit a task that reports no deadline anywhere
-  // in the ancestor chain.
-  HeapObject *found = nullptr;
-
-  auto *cur = task;
+  auto cur = task;
   while (cur) {
     auto status = cur->_private()._status().load(std::memory_order_relaxed);
+    // We can stop our search early if the cur task definitely has no deadline,
+    // since this means its parent tasks also don't have any deadline set.
+    // See: AsyncTask::inheritDeadlineFlagFrom.
     if (!status.hasDeadline())
       break;
 
-    found = findDeadlineOnSingleTask(cur, queryBox, clockType);
-    if (found)
-      break;
+    if (auto found = findDeadlineOnSingleTask(cur,
+      queryClock, clockType, clockWT, identifiableWT)) {
+      // Return borrowed (+0). The Swift caller in `_findNearestDeadline`
+      // copies the instant out immediately; the record continues to own the
+      // storage until pop.
+      return found;
+    }
 
-    // No local match; try structured parent.
+    // Check the parent task next
     if (!cur->hasChildFragment())
-      break;
+      return nullptr;
     cur = cur->childFragment()->getParent();
   }
 
-  // Return an owned reference (+1). The caller will consume it (typically
-  // via Unmanaged in Swift). This lets the SIL builtin result be marked
-  // Owned (no "borrowed builtin result" concept exists), and keeps the box
-  // alive across possible unlocks in between the walk and the caller's
-  // downcast.
-  if (found)
-    swift_retain(found);
-  return found;
+  return nullptr;
 }
 
 /// Fast-path check for `Task.hasActiveDeadline`.

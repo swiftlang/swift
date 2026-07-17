@@ -142,25 +142,19 @@ void emitBuiltinTaskCancellationShieldPop(IRGenFunction &IGF);
 
 /// Emit IR for the taskPushDeadline builtin.
 ///
+/// Values first, metadata trailing (matches Swift's generic ABI shape).
+/// The runtime `vw_initializeWithCopy`s both values into task-allocated
+/// tail storage on the deadline record.
+///
 /// \returns the record pointer to hand back to emitBuiltinTaskPopDeadline.
 llvm::Value *emitBuiltinTaskPushDeadline(IRGenFunction &IGF,
+                                         llvm::Value *clockPtr,
+                                         llvm::Value *instantPtr,
                                          llvm::Value *clockType,
-                                         llvm::Value *box);
+                                         llvm::Value *instantType);
 
 /// Emit IR for the taskPopDeadline builtin.
 void emitBuiltinTaskPopDeadline(IRGenFunction &IGF, llvm::Value *record);
-
-/// Emit IR for the taskFindNearestDeadlineForClock builtin.
-///
-/// The builtin is generic-over-C at the SIL level; IRGen supplies the
-/// four ABI-lowered args: the query clock's OpaqueValue address, plus
-/// the type metadata and witness tables for `C: Clock & Identifiable`.
-///
-/// \returns the matching `_ClockBox<C>` viewed as HeapObject *, borrowed
-/// (+0); nullptr if no deadline for the clock is installed.
-llvm::Value *emitBuiltinTaskFindNearestDeadlineForClock(
-    IRGenFunction &IGF, llvm::Value *queryClock, llvm::Value *clockType,
-    llvm::Value *clockWT, llvm::Value *identifiableWT);
 
 /// Emit IR for the taskCancellationScopePush builtin.
 ///

@@ -469,10 +469,9 @@ class TaskDeadlineStatusRecord : public TaskStatusRecord {
   /// are for different clocks and no Swift bridge call is needed.
   const Metadata *ClockType;
 
-  /// Retained (+1) pointer to a Swift `_ClockBox<C>` (subclass of
-  /// `_AnyClockBox`) that stores both the clock instance and the deadline
-  /// instant. Runtime releases this in `swift_task_popDeadline`.
-  HeapObject *Box;
+  /// Metatype of `C.Instant`. Needed to compute the instant's offset in
+  /// the trailing storage and to run its destroy value witness on pop.
+  const Metadata *InstantType;
 
   /// True iff this record was the FIRST deadline installed on the owning
   /// task (i.e. the task had `HasDeadline == false` at push time and this
@@ -483,17 +482,53 @@ class TaskDeadlineStatusRecord : public TaskStatusRecord {
   /// push sets it.
   bool IsOutermostDeadline;
 
+  // Trailing task-allocated storage (uninitialized in this class body):
+  //   [pad to ClockType.vw_alignment()]
+  //   C bytes                            <- getClockStorage()
+  //   [pad to InstantType.vw_alignment()]
+  //   C.Instant bytes                    <- getInstantStorage()
+
 public:
-  TaskDeadlineStatusRecord(const Metadata *clockType, HeapObject *box,
+  TaskDeadlineStatusRecord(const Metadata *clockType,
+                           const Metadata *instantType,
                            bool isOutermostDeadline)
       : TaskStatusRecord(TaskStatusRecordKind::Deadline),
-        ClockType(clockType), Box(box),
+        ClockType(clockType), InstantType(instantType),
         IsOutermostDeadline(isOutermostDeadline) {}
 
   const Metadata *getClockType() const { return ClockType; }
-  HeapObject *getBox() const { return Box; }
+  const Metadata *getInstantType() const { return InstantType; }
   bool isOutermostDeadline() const { return IsOutermostDeadline; }
   void setOutermostDeadline(bool value) { IsOutermostDeadline = value; }
+
+  /// Offset from the base of the record where the clock value lives.
+  static size_t clockOffset(const Metadata *clockType) {
+    size_t align = clockType->vw_alignment();
+    return (sizeof(TaskDeadlineStatusRecord) + align - 1) & ~(align - 1);
+  }
+
+  /// Offset from the base of the record where the deadline instant lives.
+  static size_t instantOffset(const Metadata *clockType,
+                              const Metadata *instantType) {
+    size_t off = clockOffset(clockType) + clockType->vw_size();
+    size_t align = instantType->vw_alignment();
+    return (off + align - 1) & ~(align - 1);
+  }
+
+  /// Total allocation size for a record with the given generic types.
+  static size_t recordSize(const Metadata *clockType,
+                           const Metadata *instantType) {
+    return instantOffset(clockType, instantType) + instantType->vw_size();
+  }
+
+  OpaqueValue *getClockStorage() {
+    return reinterpret_cast<OpaqueValue *>(
+        reinterpret_cast<char *>(this) + clockOffset(ClockType));
+  }
+  OpaqueValue *getInstantStorage() {
+    return reinterpret_cast<OpaqueValue *>(
+        reinterpret_cast<char *>(this) + instantOffset(ClockType, InstantType));
+  }
 
   static bool classof(const TaskStatusRecord *record) {
     return record->getKind() == TaskStatusRecordKind::Deadline;

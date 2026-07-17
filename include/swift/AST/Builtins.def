@@ -1274,22 +1274,6 @@ BUILTIN_MISC_OPERATION(TaskPushDeadline, "taskPushDeadline", "", Special)
 /// Signature: (record: UnsafeRawPointer) -> ()
 BUILTIN_MISC_OPERATION(TaskPopDeadline, "taskPopDeadline", "", Special)
 
-/// Equivalent to calling swift_task_findNearestDeadlineForClock.
-///
-/// Returns the `_ClockBox<C>` from the nearest (innermost) deadline
-/// record installed on the current task whose clock matches
-/// `queryClock`, or nil if none. The returned reference is borrowed
-/// (+0); the record still owns the +1.
-///
-/// The clock is passed by value under the generic constraint `C: Clock &
-/// Identifiable`. Two clocks are considered the same iff their type
-/// metatypes are pointer-equal AND their `id` values compare equal via
-/// `Hashable`.
-///
-/// Signature: <C: Clock & Identifiable>(queryClock: C) -> Builtin.NativeObject?
-BUILTIN_MISC_OPERATION(TaskFindNearestDeadlineForClock,
-                       "taskFindNearestDeadlineForClock", "", Special)
-
 /// Equivalent to calling swift_task_pushCancellationScope.
 ///
 /// Pushes a cancellation scope record onto the current task, returning the

@@ -384,11 +384,25 @@ void irgen::emitBuiltinTaskCancellationShieldPop(IRGenFunction &IGF) {
 }
 
 llvm::Value *irgen::emitBuiltinTaskPushDeadline(IRGenFunction &IGF,
+                                               llvm::Value *clockPtr,
+                                               llvm::Value *instantPtr,
                                                llvm::Value *clockType,
-                                               llvm::Value *box) {
+                                               llvm::Value *instantType) {
+  // Runtime signature:
+  //   swift_task_pushDeadline(OpaqueValue *clock, OpaqueValue *instant,
+  //                           const Metadata *clockType,
+  //                           const Metadata *instantType,
+  //                           const WitnessTable *clockWT,
+  //                           const WitnessTable *identifiableWT)
+  //
+  // clockWT and identifiableWT are reserved for future runtime use;
+  // pass null for now (Swift-side identity comparison is dispatched via
+  // the `_task_deadline_recordHasSameClock` bridge which threads its
+  // own generic-arg witnesses).
+  auto *null = llvm::ConstantPointerNull::get(IGF.IGM.Int8PtrTy);
   auto *call = IGF.Builder.CreateCall(
       IGF.IGM.getTaskPushDeadlineFunctionPointer(),
-      {clockType, box});
+      {clockPtr, instantPtr, clockType, instantType, null, null});
   call->setDoesNotThrow();
   call->setCallingConv(IGF.IGM.SwiftCC);
   return call;
@@ -400,17 +414,6 @@ void irgen::emitBuiltinTaskPopDeadline(IRGenFunction &IGF,
       IGF.IGM.getTaskPopDeadlineFunctionPointer(), {record});
   call->setDoesNotThrow();
   call->setCallingConv(IGF.IGM.SwiftCC);
-}
-
-llvm::Value *irgen::emitBuiltinTaskFindNearestDeadlineForClock(
-    IRGenFunction &IGF, llvm::Value *queryClock, llvm::Value *clockType,
-    llvm::Value *clockWT, llvm::Value *identifiableWT) {
-  auto *call = IGF.Builder.CreateCall(
-      IGF.IGM.getTaskFindNearestDeadlineForClockFunctionPointer(),
-      {queryClock, clockType, clockWT, identifiableWT});
-  call->setDoesNotThrow();
-  call->setCallingConv(IGF.IGM.SwiftCC);
-  return call;
 }
 
 llvm::Value *irgen::emitBuiltinTaskCancellationScopePush(IRGenFunction &IGF) {

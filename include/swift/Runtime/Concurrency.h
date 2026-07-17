@@ -620,11 +620,14 @@ void swift_task_popTaskExecutorPreference(TaskExecutorPreferenceStatusRecord* re
 
 /// Push a deadline status record onto the current task.
 ///
-/// The record stores a metatype pointer for the caller's generic Clock
-/// type C plus a retained (+1) pointer to a Swift `_ClockBox<C>` that
-/// carries both the clock instance and the deadline instant. Ownership
-/// of the box transfers into the record on push and is released in
-/// `swift_task_popDeadline`.
+/// The clock instance and deadline instant are borrowed pointers into
+/// caller-owned storage. The runtime `vw_initializeWithCopy`s both into
+/// the record's task-allocated trailing storage; the caller retains
+/// ownership of the originals. Both are destroyed on pop via
+/// `vw_destroy`. No heap allocation is performed for the payload.
+///
+/// Values first, metadata + witness tables trailing (matches Swift's
+/// generic calling convention).
 ///
 /// All subsumption logic (nesting a tighter deadline inside an outer one)
 /// is handled on the Swift side by `withDeadline` before it invokes push;
@@ -633,14 +636,21 @@ void swift_task_popTaskExecutorPreference(TaskExecutorPreferenceStatusRecord* re
 /// Runtime availability: Swift 6.5
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 TaskDeadlineStatusRecord *
-swift_task_pushDeadline(const Metadata *clockType, HeapObject *box);
+swift_task_pushDeadline(OpaqueValue *clock,
+                        OpaqueValue *instant,
+                        const Metadata *clockType,
+                        const Metadata *instantType,
+                        const WitnessTable *clockWT,      // reserved
+                        const WitnessTable *identifiableWT); // reserved
 
 /// Remove a single deadline record from the current task.
 ///
 /// Must be passed the record intended to be removed (as returned by
 /// `swift_task_pushDeadline`). Passing nullptr is a no-op (defensive
 /// against pushes that returned nullptr because there was no current
-/// task). The record's held `_ClockBox<C>` reference is released.
+/// task). The trailing clock and instant values are destroyed via
+/// their value witnesses and the record's task-allocated storage is
+/// released.
 ///
 /// Runtime availability: Swift 6.5
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
@@ -649,19 +659,19 @@ void swift_task_popDeadline(TaskDeadlineStatusRecord *record);
 /// Find the nearest active deadline installed for the given clock on the
 /// current task, if any.
 ///
-/// The clock is passed by value in Swift's generic calling convention:
-/// an OpaqueValue pointer to the C.Clock bytes plus the type metadata and
-/// witness tables for `C: Clock & Identifiable`. The runtime filters
-/// candidate records by pointer-equality on `ClockType` (cheap) and, for
-/// each surviving candidate, dispatches into the bridged Swift function
-/// `_task_deadline_hasSameClock` to compare the clock identities.
+/// The query clock is a borrowed pointer into caller-owned storage. The
+/// runtime filters candidate records by pointer-equality on `ClockType`
+/// (cheap) and, for each surviving candidate, dispatches into the
+/// bridged Swift function `_task_deadline_recordHasSameClock` to compare
+/// the clock identities.
 ///
-/// Returns the matching record's `_ClockBox<C>` viewed as `HeapObject *`
-/// (borrowed; the record still owns the +1). Nullptr if no match.
+/// Returns a borrowed +0 pointer into the matching record's tail storage
+/// aligned at the stored `C.Instant`, or nullptr if none. The caller
+/// must copy the instant out before the record is popped.
 ///
 /// Runtime availability: Swift 6.5
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-HeapObject *
+OpaqueValue *
 swift_task_findNearestDeadlineForClock(
     OpaqueValue *queryClock,
     const Metadata *clockType,

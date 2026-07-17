@@ -2429,50 +2429,36 @@ static ValueDecl *getTaskRemovePriorityEscalationHandler(ASTContext &ctx,
 }
 
 static ValueDecl *getTaskPushDeadline(ASTContext &ctx, Identifier id) {
-  // (clockType: Any.Type, box: __owned Builtin.NativeObject)
-  //   -> UnsafeRawPointer
+  // Non-generic:
+  //   (clockPtr: Builtin.RawPointer,
+  //    instantPtr: Builtin.RawPointer,
+  //    clockType: Any.Type,
+  //    instantType: Any.Type) -> UnsafeRawPointer
   //
-  // `clockType` is a thin metatype - at the SIL/IR level a single
-  // pointer, identical to how we treat a `Builtin.RawPointer`. Using
-  // `Any.Type` here lets the caller write `C.self` directly instead of
-  // `Builtin.reinterpretCast(C.self) as Builtin.RawPointer`. The runtime
-  // only pointer-eq-checks `ClockType` on the record, so any metatype
-  // shape works.
+  // Values first, metadata trailing (matches Swift's generic ABI).
   //
-  // `box` is a retained (+1) `_ClockBox<C>` reference; the runtime takes
-  // ownership and releases it on pop.
+  // Non-generic keeps the SIL builtin's operands trivial. Passing the
+  // clock and instant by raw pointer into caller-owned storage
+  // (typically via `withUnsafePointer(to:)`) avoids the SILGen having
+  // to materialize alloc_stacks for `_typeparam` operands, which
+  // interfere with the stack-nesting invariant paired with
+  // `taskPopDeadline`.
+  //
+  // The runtime `vw_initializeWithCopy`s both values into the record's
+  // task-allocated tail storage. Caller retains ownership of the
+  // originals; they're destroyed when their lexical scope ends.
   return getBuiltinFunction(
       ctx, id, _thin,
-      _parameters(_label("clockType", _existentialMetatype(_unconstrainedAny)),
-                  _label("box", _owned(_nativeObject))),
+      _parameters(_label("clockPtr", _rawPointer),
+                  _label("instantPtr", _rawPointer),
+                  _label("clockType", _existentialMetatype(_unconstrainedAny)),
+                  _label("instantType", _existentialMetatype(_unconstrainedAny))),
       _unsafeRawPointer);
 }
 
 static ValueDecl *getTaskPopDeadline(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(
       ctx, id, _thin, _parameters(_label("record", _unsafeRawPointer)), _void);
-}
-
-static ValueDecl *getTaskFindNearestDeadlineForClock(ASTContext &ctx,
-                                                    Identifier id) {
-  // (queryClock: Builtin.RawPointer,
-  //  clockType: Builtin.RawPointer,
-  //  clockWT: Builtin.RawPointer,
-  //  identifiableWT: Builtin.RawPointer) -> Builtin.RawPointer
-  //
-  // At the SIL/builtin level all four arguments and the result are
-  // trivial raw pointers. The runtime returns a nullable `HeapObject *`;
-  // callers wrap it via `Unmanaged` on the Swift side once they've
-  // null-checked. Keeping the result trivial avoids IRGen complexity
-  // around optional-of-builtin-nativeobject and matches the pattern used
-  // by `TaskCancellationScopePush`.
-  return getBuiltinFunction(
-      ctx, id, _thin,
-      _parameters(_label("queryClock", _rawPointer),
-                  _label("clockType", _rawPointer),
-                  _label("clockWT", _rawPointer),
-                  _label("identifiableWT", _rawPointer)),
-      _rawPointer);
 }
 
 static ValueDecl *getTaskCancellationScopePush(ASTContext &ctx, Identifier id) {
@@ -3660,9 +3646,6 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::TaskPopDeadline:
     return getTaskPopDeadline(Context, Id);
-
-  case BuiltinValueKind::TaskFindNearestDeadlineForClock:
-    return getTaskFindNearestDeadlineForClock(Context, Id);
 
   case BuiltinValueKind::TaskCancellationScopePush:
     return getTaskCancellationScopePush(Context, Id);

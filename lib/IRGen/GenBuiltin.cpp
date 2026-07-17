@@ -1600,23 +1600,17 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     return;
   }
   case BuiltinValueKind::TaskPushDeadline: {
+    auto *clockPtr = args.claimNext();
+    auto *instantPtr = args.claimNext();
     auto *clockType = args.claimNext();
-    auto *box = args.claimNext();
-    out.add(emitBuiltinTaskPushDeadline(IGF, clockType, box));
+    auto *instantType = args.claimNext();
+    out.add(emitBuiltinTaskPushDeadline(IGF, clockPtr, instantPtr,
+                                        clockType, instantType));
     return;
   }
   case BuiltinValueKind::TaskPopDeadline: {
     auto *record = args.claimNext();
     emitBuiltinTaskPopDeadline(IGF, record);
-    return;
-  }
-  case BuiltinValueKind::TaskFindNearestDeadlineForClock: {
-    auto *queryClock = args.claimNext();
-    auto *clockType = args.claimNext();
-    auto *clockWT = args.claimNext();
-    auto *identifiableWT = args.claimNext();
-    out.add(emitBuiltinTaskFindNearestDeadlineForClock(
-        IGF, queryClock, clockType, clockWT, identifiableWT));
     return;
   }
   case BuiltinValueKind::RemoveTaskLocalValue:

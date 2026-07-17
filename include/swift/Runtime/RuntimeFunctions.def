@@ -2754,12 +2754,16 @@ FUNCTION(TaskRemovePriorityEscalationHandler,
          UNKNOWN_MEMEFFECTS)
 
 // TaskDeadlineStatusRecord*
-// swift_task_pushDeadline(const Metadata *clockType, HeapObject *box);
+// swift_task_pushDeadline(OpaqueValue *clock, OpaqueValue *instant,
+//                         const Metadata *clockType,
+//                         const Metadata *instantType,
+//                         const WitnessTable *clockWT,
+//                         const WitnessTable *identifiableWT);
 FUNCTION(TaskPushDeadline,
         _Concurrency, swift_task_pushDeadline, SwiftCC,
         ConcurrencyAvailability,
         RETURNS(Int8PtrTy),
-        ARGS(Int8PtrTy, Int8PtrTy),
+        ARGS(Int8PtrTy, Int8PtrTy, Int8PtrTy, Int8PtrTy, Int8PtrTy, Int8PtrTy),
         ATTRS(NoUnwind),
         EFFECT(RuntimeEffect::Concurrency),
         UNKNOWN_MEMEFFECTS)
@@ -2774,19 +2778,10 @@ FUNCTION(TaskPopDeadline,
          EFFECT(RuntimeEffect::Concurrency),
          UNKNOWN_MEMEFFECTS)
 
-// HeapObject *
-// swift_task_findNearestDeadlineForClock(OpaqueValue *queryClock,
-//                                        const Metadata *clockType,
-//                                        const WitnessTable *clockWT,
-//                                        const WitnessTable *identifiableWT);
-FUNCTION(TaskFindNearestDeadlineForClock,
-         _Concurrency, swift_task_findNearestDeadlineForClock, SwiftCC,
-         ConcurrencyAvailability,
-         RETURNS(Int8PtrTy),
-         ARGS(Int8PtrTy, Int8PtrTy, Int8PtrTy, Int8PtrTy),
-         ATTRS(NoUnwind),
-         EFFECT(RuntimeEffect::Concurrency),
-         UNKNOWN_MEMEFFECTS)
+// swift_task_findNearestDeadlineForClock is generic-over-C at the Swift
+// call site (see stdlib/public/Concurrency/Task+Deadline.swift). It is
+// invoked directly by name via `@_silgen_name` and does not need a
+// FUNCTION() entry here - IRGen never has to synthesize a call.
 
 // TaskCancellationScopeRecord* swift_task_pushCancellationScope();
 FUNCTION(TaskPushCancellationScope,
