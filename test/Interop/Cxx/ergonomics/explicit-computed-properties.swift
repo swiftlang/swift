@@ -17,6 +17,14 @@ struct Record {
   int getX() SWIFT_COMPUTED_PROPERTY { return 42; }
 };
 
+// A getter-shaped method without SWIFT_COMPUTED_PROPERTY is only turned into a
+// computed property when -cxx-interop-getters-setters-as-properties is passed.
+// Neither RUN line here passes that flag, so this method must stay a plain
+// method with no synthesized property and no deprecation.
+struct NoAttribute {
+  int getY() { return 42; }
+};
+
 //--- test.swift
 
 // CHECK: struct Record {
@@ -24,3 +32,9 @@ struct Record {
 // CHECK:   mutating func getX() -> Int32
 // CHECK:   var x: Int32 { mutating get }
 // CHECK: }
+
+// CHECK:      struct NoAttribute {
+// CHECK-NOT:     var
+// CHECK-NEXT:    init()
+// CHECK-NEXT:    mutating func getY() -> Int32
+// CHECK-NEXT: }
