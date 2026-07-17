@@ -10,8 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-// The deadline APIs depend on Clock.now, Task.detached, clock.sleep, and
-// AnyHashable - all unavailable in Embedded Swift.
 #if !$Embedded
 
 import Swift
@@ -103,14 +101,13 @@ import Swift
 /// - Parameters:
 ///   - expiration: The instant by which the operation must complete.
 ///   - tolerance: The tolerance used for the sleep.
-///   - clock: The clock to use for measuring time.
+///   - clock: The clock to use for measuring time. Defaults to ``ContinuousClock``.
 ///   - operation: The asynchronous operation to complete before the deadline.
 ///
 /// - Returns: The result of the operation if it completes successfully before or after the deadline expires.
 /// - Throws: The error thrown by the operation.
 @available(StdlibDeploymentTarget 6.5, *)
-public nonisolated(nonsending)
-func withDeadline<Return, Failure, C>(
+public nonisolated(nonsending) func withDeadline<Return, Failure, C>(
   _ expiration: C.Instant,
   tolerance: C.Instant.Duration? = nil,
   clock: C = ContinuousClock(),
@@ -131,9 +128,7 @@ func withDeadline<Return, Failure, C>(
   let opaque = unsafe Unmanaged.passRetained(box).toOpaque()
   let native = unsafe Builtin.reinterpretCast(opaque) as Builtin.NativeObject
   let clockTypeRaw = unsafe Builtin.reinterpretCast(C.self) as Builtin.RawPointer
-  let deadlineRecord = unsafe Builtin.taskPushDeadline(
-    clockType: clockTypeRaw,
-    box: native)
+  let deadlineRecord = unsafe Builtin.taskPushDeadline(clockType: clockTypeRaw, box: native)
   defer { unsafe Builtin.taskPopDeadline(record: deadlineRecord) }
 
   // Arm a detached timer task on the given clock that will cancel the
@@ -142,19 +137,33 @@ func withDeadline<Return, Failure, C>(
   // (or by any `withTaskCancellationHandler` handler it installs) becomes
   // true, but the enclosing task's own cancellation state is unaffected.
   return try await __withTaskCancellationScope { scope throws(Failure) in
-    let disarm = _armDeadlineTimer(
-      scope: scope,
-      expiration: expiration,
-      tolerance: tolerance,
-      clock: clock
-    )
-    defer { disarm() }
+    // The scope handle is `~Escapable`, but its underlying record pointer
+    // is a plain `UnsafeRawPointer` we can hand to the sending timer
+    // closure. The scope's lifetime is this operation, and the timer is
+    // disarmed by `defer` before the operation returns, so the record
+    // pointer is guaranteed live for the duration of the timer task.
+    let scopeRecord = unsafe scope._record
+
+    // TODO: Replace this by picking the "Clock's executor"
+    // TODO: Instead of creating a full task here, we want to enqueue a job
+    //       at a deadline that cancels the scope; disarming should attempt
+    //       to cancel the job.
+    let timer = Task.detached {
+      do {
+        try await clock.sleep(until: expiration, tolerance: tolerance)
+      } catch {
+        // Timer was cancelled (disarmed) before the deadline elapsed.
+        return
+      }
+      unsafe _taskCancelTaskCancellationScope(record: scopeRecord)
+    }
+    defer { timer.cancel() }
     return try await operation()
   }
 }
 
 // ==== -----------------------------------------------------------------------
-// MARK: withDeadline(in:) shorthand
+// MARK: withDeadline(in:)
 
 /// Executes an operation with the expectation it completes within the given
 /// relative timeout, measured against `clock.now` at the point of call.
@@ -174,14 +183,13 @@ func withDeadline<Return, Failure, C>(
 ///   - timeout: The duration, relative to `clock.now`, by which the
 ///     operation must complete.
 ///   - tolerance: The tolerance used for the sleep.
-///   - clock: The clock to use for measuring time.
+///   - clock: The clock to use for measuring time. Defaults to ``ContinuousClock``.
 ///   - operation: The asynchronous operation to complete before the deadline.
 ///
 /// - Returns: The result of the operation if it completes successfully before or after the deadline expires.
 /// - Throws: The error thrown by the operation.
 @available(StdlibDeploymentTarget 6.5, *)
-public nonisolated(nonsending)
-func withDeadline<Return, Failure, C>(
+public nonisolated(nonsending) func withDeadline<Return, Failure, C>(
   in timeout: C.Instant.Duration,
   tolerance: C.Instant.Duration? = nil,
   clock: C = ContinuousClock(),
@@ -344,9 +352,7 @@ internal func _task_deadline_boxesSameClock(
 /// query the active deadline; not part of the general public API.
 @_spi(Concurrency)
 @available(StdlibDeploymentTarget 6.5, *)
-public func _findNearestDeadline<C: Clock & Identifiable>(
-  clock: C
-) -> C.Instant? {
+public func _findNearestDeadline<C: Clock & Identifiable>(clock: C) -> C.Instant? {
   // Build a query box with the clock instance and a placeholder deadline;
   // only the identity fields (clock.id via the virtual `hasSameClock`
   // override) are consulted by the bridge, the deadline is unused.
@@ -401,7 +407,13 @@ extension Task where Success == Never, Failure == Never {
   public static var hasActiveDeadline: Bool {
     _swift_task_hasActiveDeadline()
   }
+}
 
+// ==== -----------------------------------------------------------------------
+// MARK: Task.hasActiveDeadline / activeDeadline(for:)
+
+@available(StdlibDeploymentTarget 6.5, *)
+extension Task where Success == Never, Failure == Never {
   /// Find the tightest deadline given the specified clock.
   ///
   /// The returned instant is the earliest deadline whose clock identity
