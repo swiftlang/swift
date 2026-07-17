@@ -54,8 +54,7 @@ struct CXXMethodBridging {
     // A getter is named with a "get" prefix, or -- when the method is
     // explicitly annotated with 'import_computed_property'
     // (the SWIFT_COMPUTED_PROPERTY macro) -- with any name. In the latter case
-    // the whole name becomes the (camelCased) property name. See
-    // rdar://89453010.
+    // the whole name becomes the (camelCased) property name.
     if (hasGetterPrefix() || isExplicitComputedProperty())
       return Kind::getter;
 
@@ -73,7 +72,7 @@ struct CXXMethodBridging {
 
     // Any name containing an underscore is treated as snake_case, even when it
     // also has uppercase letters (e.g. an acronym segment like
-    // `get_http_URL`). See rdar://89453010.
+    // `get_http_URL`).
     if (getClangName().contains('_'))
       return NameKind::snake;
     if (!hasUpper)

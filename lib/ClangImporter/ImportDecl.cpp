@@ -2980,8 +2980,8 @@ namespace {
 
           // Deprecate the underlying accessor methods that were explicitly
           // opted in via SWIFT_COMPUTED_PROPERTY, steering callers to the
-          // synthesized property (rdar://89452854). We only do this for the
-          // explicit attribute, not the global
+          // synthesized property. We only do this for the explicit
+          // attribute, not the global
           // -cxx-interop-getters-setters-as-properties flag, to avoid flooding
           // existing code with deprecation warnings.
           auto deprecateTransformedAccessor = [&](FuncDecl *accessor) {

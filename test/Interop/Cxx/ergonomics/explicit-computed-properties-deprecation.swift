@@ -14,7 +14,7 @@ module Test {
   __attribute__((swift_attr("import_computed_property")))
 
 // When an annotated getter/setter is turned into a computed property, the
-// original methods are deprecated, pointing at the property (rdar://89452854).
+// original methods are deprecated, pointing at the property.
 struct GetterSetter {
   int get_x() const SWIFT_COMPUTED_PROPERTY { return 42; }
   void set_x(int v) SWIFT_COMPUTED_PROPERTY {}

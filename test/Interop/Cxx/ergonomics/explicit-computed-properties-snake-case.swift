@@ -25,8 +25,8 @@ struct SnakeCaseMultiWord {
   void set_foo_bar(int p) SWIFT_COMPUTED_PROPERTY {}
 };
 
-// snake_case with an uppercase acronym segment (rdar://89453010): should still
-// be imported as a computed property named `httpURL`.
+// snake_case with an uppercase acronym segment: should still be imported as
+// a computed property named `httpURL`.
 struct SnakeCaseAcronym {
   int get_http_URL() const SWIFT_COMPUTED_PROPERTY { return 42; }
   void set_http_URL(int p) SWIFT_COMPUTED_PROPERTY {}
