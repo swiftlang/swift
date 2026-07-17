@@ -178,6 +178,27 @@ void BindingSet::computeLValueState() {
   }
 }
 
+namespace {
+
+struct MergedBinding {
+  SmallVector<Type, 3> types;
+  bool allTransitive = true;
+  PointerUnion<Constraint *, ConstraintLocator *> bindingSource;
+  TypeVariableType *originator;
+
+  void add(const PotentialBinding &binding) {
+    if (!binding.isTransitive())
+      allTransitive = false;
+
+    bindingSource = binding.BindingSource;
+    originator = binding.Originator;
+
+    types.push_back(binding.BindingType);
+  }
+};
+
+}
+
 void BindingSet::computeJoinsAndMeets() {
   // We don't allow a join of type 'Any' or 'Any?', unless we're looking at
   // an array element, dictionary value, or dictionary key. We detect this
@@ -189,97 +210,136 @@ void BindingSet::computeJoinsAndMeets() {
                               !type->getOptionalObjectType()->isAny());
   };
 
-  SmallVector<Type, 3> typesToJoin;
   bool allowUpperBound = false;
-  bool allTransitive = true;
-  PointerUnion<Constraint *, ConstraintLocator *> bindingSource;
-  TypeVariableType *originator;
+  MergedBinding supertypes;
+  MergedBinding subtypes;
 
   for (const auto &binding : Bindings) {
-    if (binding.isViableForJoin()) {
+    if (binding.Kind == AllowedBindingKind::Supertypes &&
+        binding.isViableForJoinOrMeet()) {
       if (!isAcceptableJoin(binding.BindingType))
         allowUpperBound = true;
 
-      if (!binding.isTransitive())
-        allTransitive = false;
-
-      bindingSource = binding.BindingSource;
-      originator = binding.Originator;
-
-      typesToJoin.push_back(binding.BindingType);
+      supertypes.add(binding);
+    } else if (binding.Kind == AllowedBindingKind::Subtypes &&
+               binding.isViableForJoinOrMeet()) {
+      subtypes.add(binding);
     }
   }
 
-  if (typesToJoin.size() <= 1)
+  SmallVector<PotentialBinding, 4> newBindings;
+  bool foundCommonSupertype = false;
+  bool foundCommonSubtype = false;
+  bool uninhabited = false;
+
+  if (supertypes.types.size() > 1) {
+    // Put the existentials first, to work around the fact that our join
+    // operation is not actually associative.
+    //
+    // FIXME: Perhaps subtypeJoin() should just take a list of types.
+    std::stable_partition(supertypes.types.begin(), supertypes.types.end(),
+                          [](Type ty) -> bool {
+                            return ty->lookThroughAllOptionalTypes()->isAnyExistentialType();
+                          });
+
+    if (!supertypes.allTransitive)
+      supertypes.originator = nullptr;
+
+    Type commonSupertype;
+    for (auto ty : supertypes.types) {
+      if (!commonSupertype) {
+        commonSupertype = ty;
+        continue;
+      }
+
+      // FIXME: Remove isAcceptableJoin() and check existentialUpperBound
+      // instead.
+      bool existentialUpperBound = false;
+      commonSupertype = subtypeJoin(commonSupertype, ty, &existentialUpperBound);
+    }
+
+    // If the result was 'Any' or 'Any?' but none of the inputs were, don't
+    // accept the join unless we have a default of 'Any'.
+    if (!allowUpperBound && !isAcceptableJoin(commonSupertype)) {
+      auto found = llvm::find_if(Defaults, [](Constraint *constraint) {
+            return (constraint->getKind() == ConstraintKind::Defaultable &&
+                    (constraint->getSecondType()->isAny() ||
+                     constraint->getSecondType()->isAnyHashable()));
+          });
+
+      if (found == Defaults.end())
+        return;
+
+      // Use the default type instead of the common supertype binding.
+      commonSupertype = (*found)->getSecondType();
+      supertypes.bindingSource = *found;
+    }
+
+    PotentialBinding supertypeBinding(commonSupertype,
+                                      AllowedBindingKind::Supertypes,
+                                      supertypes.bindingSource,
+                                      supertypes.originator);
+    newBindings.push_back(supertypeBinding);
+    foundCommonSupertype = true;
+  }
+
+  if (subtypes.types.size() > 1) {
+    Type commonSubtype;
+    for (auto ty : subtypes.types) {
+      if (!commonSubtype) {
+        commonSubtype = ty;
+        continue;
+      }
+
+      commonSubtype = subtypeMeet(commonSubtype, ty, &uninhabited);
+    }
+
+    auto newKind = uninhabited ? AllowedBindingKind::Exact
+                               : AllowedBindingKind::Subtypes;
+    PotentialBinding subtypeBinding(commonSubtype, newKind,
+                                    subtypes.bindingSource,
+                                    subtypes.originator);
+
+    newBindings.push_back(subtypeBinding);
+    foundCommonSubtype = true;
+  }
+
+  // Check if there's nothing to do.
+  if (!foundCommonSupertype && !foundCommonSubtype)
     return;
 
-  if (!allTransitive)
-    originator = nullptr;
-
-  // Put the existentials first, to work around the fact that our join
-  // operation is not actually associative.
+  // If the joined binding is in conflict with an existing subtype binding,
+  // we have a situation where we picked a more general supertype than what
+  // was expected. Bail out.
   //
-  // FIXME: Perhaps subtypeJoin() should just take a list of types.
-  std::stable_partition(typesToJoin.begin(), typesToJoin.end(),
-                        [](Type ty) -> bool {
-                          return ty->lookThroughAllOptionalTypes()->isAnyExistentialType();
-                        });
+  // FIXME: Eventually, we should drop the supertype bindings.
+  if (!uninhabited &&
+      foundCommonSubtype &&
+      foundCommonSupertype &&
+      subsumeBinding(newBindings[1], newBindings[0])
+          == SubsumeBindingResult::Conflict) {
+    return;
+  }
 
-  Type commonSupertype;
-  for (auto ty : typesToJoin) {
-    if (!commonSupertype) {
-      commonSupertype = ty;
-      continue;
+  if (uninhabited)
+    markConflicting();
+
+  // Remove bindings that participated in the join and meet.
+  for (const auto &binding : Bindings) {
+    if (foundCommonSupertype) {
+      // Filter out supertype bindings that participated in the join.
+      if (binding.Kind == AllowedBindingKind::Supertypes &&
+          binding.isViableForJoinOrMeet()) {
+        continue;
+      }
     }
 
-    // FIXME: Remove isAcceptableJoin() and check existentialUpperBound
-    // instead.
-    bool existentialUpperBound = false;
-    commonSupertype = subtypeJoin(commonSupertype, ty, &existentialUpperBound);
-  }
-
-  // If the result was 'Any' or 'Any?' but none of the inputs were, don't
-  // accept the join unless we have a default of 'Any'.
-  if (!allowUpperBound && !isAcceptableJoin(commonSupertype)) {
-    auto found = llvm::find_if(Defaults, [](Constraint *constraint) {
-          return (constraint->getKind() == ConstraintKind::Defaultable &&
-                  (constraint->getSecondType()->isAny() ||
-                   constraint->getSecondType()->isAnyHashable()));
-        });
-
-    if (found == Defaults.end())
-      return;
-
-    // Use the default type instead of the common supertype binding.
-    commonSupertype = (*found)->getSecondType();
-    bindingSource = *found;
-  }
-
-  PotentialBinding supertypeBinding(commonSupertype,
-                                    AllowedBindingKind::Supertypes,
-                                    bindingSource, originator);
-
-  LLVM_DEBUG(llvm::dbgs() << "Computed join of supertype bindings: ";
-             dump(llvm::dbgs(), 0);
-             llvm::dbgs() << "\n");
-
-  // Record the new binding and remove bindings that participated in the join.
-  SmallVector<PotentialBinding, 4> newBindings;
-  newBindings.push_back(supertypeBinding);
-
-  for (const auto &binding : Bindings) {
-    // Filter out supertype bindings that participated in the join.
-    if (binding.isViableForJoin())
-      continue;
-
-    // If the joined binding is in conflict with an existing subtype binding,
-    // we have a situation where we picked a more general supertype than what
-    // was expected. Bail out.
-    //
-    // FIXME: Eventually, we should drop the supertype bindings.
-    if (binding.Kind == AllowedBindingKind::Subtypes &&
-        subsumeBinding(binding, supertypeBinding) == SubsumeBindingResult::Conflict) {
-      return;
+    if (foundCommonSubtype) {
+      // Filter out supertype bindings that participated in the join.
+      if (binding.Kind == AllowedBindingKind::Subtypes &&
+          binding.isViableForJoinOrMeet()) {
+        continue;
+      }
     }
 
     // Keep all other bindings.
@@ -324,9 +384,8 @@ static bool isGenericParameter(TypeVariableType *TypeVar) {
   return locator && locator->isLastElement<LocatorPathElt::GenericParameter>();
 }
 
-bool PotentialBinding::isViableForJoin() const {
-  return Kind == AllowedBindingKind::Supertypes &&
-         !BindingType->hasLValueType() &&
+bool PotentialBinding::isViableForJoinOrMeet() const {
+  return !BindingType->hasLValueType() &&
          !BindingType->hasTypeVariable() &&
          !BindingType->hasPlaceholder() &&
          !BindingType->hasUnboundGenericType() &&
@@ -1984,7 +2043,7 @@ void BindingSet::possiblyDropDefaults() {
   for (const auto &binding : Bindings) {
     if (binding.Kind == AllowedBindingKind::Supertypes) {
       anySupertypeBindings = true;
-      if (!binding.isViableForJoin())
+      if (!binding.isViableForJoinOrMeet())
         anyNonJoinableSupertypeBindings = true;
     }
   }
