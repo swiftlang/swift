@@ -52,6 +52,7 @@ import CharacterLiteralsSmall
 import CharacterProperties
 import CharacterRecognizer
 import Chars
+import ChildTaskCreation
 import ClassArrayGetter
 import CodableTest
 import Combos
@@ -267,6 +268,7 @@ register(CharacterLiteralsSmall.benchmarks)
 register(CharacterProperties.benchmarks)
 register(CharacterRecognizer.benchmarks)
 register(Chars.benchmarks)
+register(ChildTaskCreation.benchmarks)
 register(CodableTest.benchmarks)
 register(Combos.benchmarks)
 register(ContiguousArrayTests.benchmarks)

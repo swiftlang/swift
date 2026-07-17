@@ -59,6 +59,12 @@ public struct TaskCancellationScope: ~Copyable, ~Escapable {
   /// It does NOT set the enclosing task's own cancellation flag, and it
   /// does NOT invoke handlers installed outside the scope's dynamic extent.
   ///
+  /// Cancellation cascades to inner scopes. If this scope has any nested
+  /// `__withTaskCancellationScope` inside its dynamic extent, cancelling
+  /// this outer scope also marks each inner scope cancelled - matching
+  /// the "as-if child task" semantics: cancelling a parent cancels its
+  /// children.
+  ///
   /// Each `CancellationNotificationStatusRecord` handler fires at most
   /// once across scope-cancel and whole-task-cancel combined, so a
   /// subsequent whole-task cancellation will not double-fire handlers that
@@ -71,6 +77,18 @@ public struct TaskCancellationScope: ~Copyable, ~Escapable {
 #else
     unsafe _taskCancelTaskCancellationScope(record: _record)
 #endif
+  }
+
+  /// Whether this scope has been cancelled.
+  ///
+  /// Reads the scope record's own atomic cancellation flag directly, so
+  /// this ignores whether the enclosing task has a whole-task cancellation
+  /// or any surrounding cancellation shield. Useful in tests that need to
+  /// observe scope cascade behavior (an outer scope's `cancel()` marks
+  /// nested inner scopes cancelled) without going through
+  /// `Task.isCancelled`.
+  public var isCancelled: Bool {
+    unsafe _taskCancellationScopeIsCancelled(record: _record)
   }
 }
 
@@ -134,3 +152,8 @@ internal func _taskPopTaskCancellationScope(record: UnsafeRawPointer /*TaskCance
 @usableFromInline
 @_silgen_name("swift_task_cancelCancellationScope")
 internal func _taskCancelTaskCancellationScope(record: UnsafeRawPointer /*TaskCancellationScopeRecord*/)
+
+@available(StdlibDeploymentTarget 6.5, *)
+@usableFromInline
+@_silgen_name("swift_task_cancellationScopeIsCancelled")
+internal func _taskCancellationScopeIsCancelled(record: UnsafeRawPointer /*TaskCancellationScopeRecord*/) -> Bool

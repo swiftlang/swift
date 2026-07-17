@@ -2818,6 +2818,16 @@ FUNCTION(TaskCancelCancellationScope,
          EFFECT(RuntimeEffect::Concurrency),
          UNKNOWN_MEMEFFECTS)
 
+// bool swift_task_cancellationScopeIsCancelled(TaskCancellationScopeRecord *record);
+FUNCTION(TaskCancellationScopeIsCancelled,
+         _Concurrency, swift_task_cancellationScopeIsCancelled, SwiftCC,
+         ConcurrencyAvailability,
+         RETURNS(Int1Ty),
+         ARGS(Int8PtrTy),
+         ATTRS(NoUnwind),
+         EFFECT(RuntimeEffect::Concurrency),
+         UNKNOWN_MEMEFFECTS)
+
 // void swift_task_localValuePush(const HeapObject *key,
 //                                /* +1 */ OpaqueValue *value,
 //                                const Metadata *valueType);

@@ -703,6 +703,14 @@ void swift_task_popCancellationScope(TaskCancellationScopeRecord *record);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_cancelCancellationScope(TaskCancellationScopeRecord *record);
 
+/// Return whether the given cancellation scope has been cancelled by
+/// reading its atomic flag directly. This bypasses whole-task cancellation
+/// state and any active cancellation shield on the enclosing task.
+///
+/// Runtime availability: Swift 6.5
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+bool swift_task_cancellationScopeIsCancelled(TaskCancellationScopeRecord *record);
+
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 size_t swift_task_getJobFlags(AsyncTask* task);
 

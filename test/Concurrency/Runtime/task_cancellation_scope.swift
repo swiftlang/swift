@@ -27,6 +27,7 @@ import Dispatch
     await test_scope_handler_outside_does_not_fire_on_scope_cancel()
     await test_scope_with_cancellation_shield_inside()
     await test_scope_with_cancellation_shield_outside()
+    await test_scope_outer_cancel_cascades_to_inner()
     await test_scope_structured_children_not_auto_cancelled()
     print("done")
   }
@@ -320,6 +321,33 @@ func test_scope_with_cancellation_shield_outside() async {
       }
     }
   }.value
+}
+
+@available(StdlibDeploymentTarget 6.5, *)
+func test_scope_outer_cancel_cascades_to_inner() async {
+  print("--- test_scope_outer_cancel_cascades_to_inner")
+  // CHECK: --- test_scope_outer_cancel_cascades_to_inner
+
+  // Cancelling an outer scope must also cancel any nested inner scopes,
+  // matching "as-if child task" semantics: cancelling a parent cancels
+  // its children. Uses the SPI `scope.isCancelled` to read each scope's
+  // own flag directly, independent of Task.isCancelled.
+  await __withTaskCancellationScope { outer in
+    await __withTaskCancellationScope { inner in
+      print("before: outer=\(outer.isCancelled) inner=\(inner.isCancelled)")
+      // CHECK: before: outer=false inner=false
+
+      outer.cancel()
+
+      print("after outer.cancel: outer=\(outer.isCancelled) inner=\(inner.isCancelled)")
+      // CHECK: after outer.cancel: outer=true inner=true
+
+      // Task.isCancelled also observes the cascade: the walker hits the
+      // innermost scope (now cancelled) first and returns true.
+      print("Task.isCancelled=\(Task.isCancelled)")
+      // CHECK: Task.isCancelled=true
+    }
+  }
 }
 
 @available(StdlibDeploymentTarget 6.5, *)

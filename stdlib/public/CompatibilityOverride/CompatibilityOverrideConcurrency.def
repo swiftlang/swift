@@ -475,6 +475,11 @@ OVERRIDE_TASK_STATUS(task_cancelCancellationScope, void,
                      swift::, (TaskCancellationScopeRecord *record),
                      (record))
 
+OVERRIDE_TASK_STATUS(task_cancellationScopeIsCancelled, bool,
+                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
+                     swift::, (TaskCancellationScopeRecord *record),
+                     (record))
+
 OVERRIDE_TASK(task_startOnMainActor, void,
               SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
               swift::, (AsyncTask *task), (task))
