@@ -2166,8 +2166,14 @@ static void salvagePackElementSetDebugInfo(PackElementSetInst *PESI) {
 // TODO: whenever a debug_value is inserted at a new location, check that no
 // other debug_value instructions exist between the old and new location for
 // the same variable.
+//
+// TODO: Kill all debug uses when the salvage fails.
 void swift::salvageDebugInfo(SILInstruction *I) {
   if (!I)
+    return;
+
+  // Instructions with type dependent operands cannot be salvaged.
+  if (I->getNumTypeDependentOperands() != 0)
     return;
 
   if (auto *SI = dyn_cast<StoreInst>(I)) {
@@ -2310,6 +2316,10 @@ void swift::salvageDebugInfo(SILInstruction *I) {
     salvageDestructureInst(I);
 
   if (isa<AddressToPointerInst>(I) || isa<PointerToAddressInst>(I))
+    salvageUnaryInst(cast<SingleValueInstruction>(I));
+
+  if (isa<UpcastInst>(I) || isa<UncheckedRefCastInst>(I) ||
+      isa<ConvertEscapeToNoEscapeInst>(I))
     salvageUnaryInst(cast<SingleValueInstruction>(I));
 
   if (isa<StructElementAddrInst>(I) || isa<TupleElementAddrInst>(I) ||
