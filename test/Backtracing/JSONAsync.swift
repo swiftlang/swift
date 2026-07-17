@@ -2,7 +2,7 @@
 // RUN: %target-build-swift %s -parse-as-library -Onone -g -o %t/JSONAsync
 // RUN: %target-codesign %t/JSONAsync
 
-// RUN: env SWIFT_BACKTRACE=enable=yes,demangle=no,cache=no,format=json,output-to=%t/crash.json %target-run %t/JSONAsync 2>&1 || true
+// RUN: env %env-SWIFT_BACKTRACE=enable=yes,demangle=no,cache=no,format=json,output-to=%t/crash.json %target-run %t/JSONAsync %t/JSONAsync.dSYM 2>&1 || true
 // RUN: %validate-json %t/crash.json | %FileCheck %s
 
 // UNSUPPORTED: use_os_stdlib
