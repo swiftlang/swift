@@ -1254,6 +1254,24 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED) const {
     if (elt->isInvalid())
       continue;
 
+    // A raw value that is a literal of a kind that can never serve as a raw
+    // value -- a regex literal, a magic identifier such as #file, or an object
+    // literal -- can't be used. Diagnose it before type checking (to avoid a
+    // spurious conversion error) and drop it, so the case receives an automatic
+    // value below and the enum can still conform, as it did before
+    // LiteralExpressions. Integer literal *expressions* are not single literals
+    // and are validated after folding; 'nil' flows through to the
+    // type-compatibility check.
+    if (auto *litExpr =
+            dyn_cast_or_null<LiteralExpr>(uncheckedRawValueOf(elt))) {
+      if (!isValidEnumRawValueLiteral(litExpr) &&
+          !isa<NilLiteralExpr>(litExpr)) {
+        ED->getASTContext().Diags.diagnose(
+            litExpr->getLoc(), diag::nonliteral_enum_case_raw_value);
+        elt->setRawValueExpr(nullptr);
+      }
+    }
+
     if (uncheckedRawValueOf(elt)) {
       if (!uncheckedRawValueOf(elt)->isImplicit())
         lastExplicitValueElt = elt;
@@ -1314,6 +1332,21 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED) const {
             value->getLoc(), foldIntegerRawValue
                                  ? diag::nonliteral_int_expr_enum_case_raw_value
                                  : diag::nonliteral_enum_case_raw_value);
+      // The auto-value path above has already run, so recover here by assigning
+      // an automatic value directly, keeping the enum conforming.
+      if (!valueKind)
+        valueKind = computeAutomaticEnumValueKind(ED);
+      Expr *automatic =
+          valueKind ? getAutomaticRawValueExpr(*valueKind, elt, prevValue)
+                    : nullptr;
+      if (automatic &&
+          TypeChecker::typeCheckExpression(
+              automatic, ED, /*contextualInfo=*/{rawTy, CTP_EnumCaseRawValue})) {
+        elt->setRawValueExpr(automatic);
+        prevValue = dyn_cast<LiteralExpr>(automatic);
+      } else {
+        elt->setInvalid();
+      }
       continue;
     }
 
@@ -1341,10 +1374,13 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED) const {
     // Only Integer/Float/String/Bool literals can serve as raw values. Reject
     // any other literal -- magic identifiers such as #file/#line, regex
     // literals, object literals -- here, since RawValueKey below only handles
-    // those four kinds.
+    // those four kinds. Such literals are caught before type checking above, so
+    // this is a defensive backstop; mark the case invalid rather than feed an
+    // unexpected literal kind to RawValueKey.
     if (!isValidEnumRawValueLiteral(prevValue)) {
       Diags.diagnose(diagLoc, diag::nonliteral_enum_case_raw_value);
       prevValue = nullptr;
+      elt->setInvalid();
       continue;
     }
 
