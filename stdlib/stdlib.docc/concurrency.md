@@ -32,7 +32,7 @@ Perform asynchronous and parallel operations.
 
 ### Task Cancellation
 
-- ``Swift/Task/isCancelled``
+- ``Swift/Task/isCancelled-type.property``
 - ``Swift/Task/cancel()``
 - ``Swift/Task/cancel(reason:)``
 - ``Swift/Task/cancellationReason``
@@ -41,8 +41,8 @@ Perform asynchronous and parallel operations.
 - ``Swift/CancellationError/Reason``
 - ``Swift/withTaskCancellationHandler(operation:onCancel:)``
 - ``Swift/withTaskCancellationHandler(operation:onCancel:isolation:)``
-- ``Swift/withTaskCancellationShield(operation:)-(()->Value)``
-- ``Swift/withTaskCancellationShield(operation:)-(()async->Value)``
+- ``Swift/withTaskCancellationShield(operation:)-8zlgh``
+- ``Swift/withTaskCancellationShield(operation:)-2lzl8``
 - ``Swift/Task/hasActiveCancellationShield``
 
 ### Asynchronous Sequences
