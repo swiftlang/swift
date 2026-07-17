@@ -19,8 +19,6 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SILOptimizer/Analysis/SimplifyInstruction.h"
-#include "swift/SILOptimizer/Utils/InstOptUtils.h"
-#include "llvm/Support/Debug.h"
 using namespace swift;
 using namespace swift::PatternMatch;
 

@@ -24,7 +24,6 @@
 #ifndef LLVM_C_DATATYPES_H
 #define LLVM_C_DATATYPES_H
 
-#include <inttypes.h>
 #include <stdint.h>
 
 #ifndef _MSC_VER
@@ -40,7 +39,6 @@
 #endif
 
 /* Note that <inttypes.h> includes <stdint.h>, if this is a C99 system. */
-#include <sys/types.h>
 
 #ifdef _AIX
 // GCC is strict about defining large constants: they must have LL modifier.

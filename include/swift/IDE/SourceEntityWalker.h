@@ -15,9 +15,7 @@
 
 #include "swift/AST/ASTWalker.h"
 #include "swift/Basic/Defer.h"
-#include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceLoc.h"
-#include "llvm/ADT/PointerUnion.h"
 #include "llvm/Support/SaveAndRestore.h"
 
 namespace clang {

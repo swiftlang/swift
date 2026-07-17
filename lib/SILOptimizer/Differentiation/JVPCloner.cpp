@@ -23,10 +23,8 @@
 #include "swift/SILOptimizer/Differentiation/AdjointValue.h"
 #include "swift/SILOptimizer/Differentiation/DifferentiationInvoker.h"
 #include "swift/SILOptimizer/Differentiation/LinearMapInfo.h"
-#include "swift/SILOptimizer/Differentiation/PullbackCloner.h"
 #include "swift/SILOptimizer/Differentiation/Thunk.h"
 
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/LoopInfo.h"
 #include "swift/SIL/TypeSubstCloner.h"
 #include "swift/SILOptimizer/Analysis/LoopAnalysis.h"

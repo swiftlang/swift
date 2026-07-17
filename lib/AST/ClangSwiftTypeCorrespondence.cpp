@@ -15,7 +15,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ClangSwiftTypeCorrespondence.h"
-#include "swift/Basic/Assertions.h"
 #include "clang/AST/Type.h"
 
 bool swift::canImportAsOptional(const clang::Type *type) {

@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/Assertions.h"
 #include "swift/IDE/SelectedOverloadInfo.h"
 
 using namespace swift::ide;

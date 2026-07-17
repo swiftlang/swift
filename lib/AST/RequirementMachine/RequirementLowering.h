@@ -14,11 +14,9 @@
 #define SWIFT_REQUIREMENTLOWERING_H
 
 #include "swift/AST/Type.h"
-#include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/DenseSet.h"
-#include "llvm/ADT/SmallVector.h"
-#include <vector>
 #include "Diagnostics.h"
+#include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/SmallVector.h"
 
 namespace llvm {
   class raw_ostream;

@@ -10,15 +10,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "clang/AST/DeclObjC.h"
 #include "clang/Basic/Module.h"
-#include "llvm/ADT/StringSwitch.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/SymbolGraphGen/SymbolGraphGen.h"
 
 #include "SymbolGraphASTWalker.h"

@@ -17,7 +17,6 @@
 #ifndef JUMPDEST_H
 #define JUMPDEST_H
 
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILLocation.h"
 #include "llvm/Support/Compiler.h"
 #include "Cleanup.h"

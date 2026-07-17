@@ -20,7 +20,6 @@
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/PrettyStackTrace.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Version.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Frontend/FrontendOptions.h"

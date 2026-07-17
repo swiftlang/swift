@@ -17,18 +17,16 @@
 #ifndef SWIFT_PATTERN_H
 #define SWIFT_PATTERN_H
 
-#include "swift/Basic/AnyValue.h"
 #include "swift/Basic/SourceLoc.h"
-#include "swift/Basic/type_traits.h"
 #include "swift/AST/ASTAllocated.h"
 #include "swift/AST/Decl.h"
+#include "swift/Basic/AnyValue.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/InlineBitfield.h"
-#include "swift/Basic/OptionSet.h"
 #include "llvm/Support/TrailingObjects.h"
 
 namespace swift {

@@ -24,7 +24,6 @@
 #include "FormalEvaluation.h"
 #include "SILGenFunction.h"
 #include "Scope.h"
-#include "swift/Basic/Assertions.h"
 
 namespace swift {
 namespace Lowering {

@@ -52,7 +52,6 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
-#include <functional>
 #include <iterator>
 using namespace swift;
 

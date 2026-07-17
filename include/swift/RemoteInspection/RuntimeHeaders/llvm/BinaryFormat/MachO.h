@@ -14,7 +14,6 @@
 #define LLVM_BINARYFORMAT_MACHO_H
 
 #include "llvm/Support/Compiler.h"
-#include "llvm/Support/DataTypes.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/SwapByteOrder.h"
 

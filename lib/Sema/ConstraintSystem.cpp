@@ -36,7 +36,6 @@
 #include "swift/AST/TypeTransform.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
-#include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Sema/CSDisjunction.h"
 #include "swift/Sema/CSFix.h"

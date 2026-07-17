@@ -13,9 +13,9 @@
 #ifndef SWIFT_IDE_CODECOMPLETIONRESULTPRINTER_H
 #define SWIFT_IDE_CODECOMPLETIONRESULTPRINTER_H
 
-#include "llvm/ADT/StringRef.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/Allocator.h"
+#include "llvm/ADT/StringRef.h"
 
 namespace swift {
 

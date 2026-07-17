@@ -15,18 +15,14 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Localization/LocalizationFormat.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Range.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
-#include "llvm/Bitstream/BitstreamReader.h"
-#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include <cstdint>
 #include <map>
-#include <optional>
 #include <string>
 #include <system_error>
 #include <type_traits>

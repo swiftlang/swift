@@ -22,8 +22,8 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Parse/LexerState.h"
 #include "swift/Parse/Token.h"
-#include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/SaveAndRestore.h"
+#include "llvm/ADT/SmallVector.h"
 
 namespace swift {
 

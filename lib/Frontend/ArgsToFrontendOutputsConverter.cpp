@@ -11,17 +11,11 @@
 
 #include "ArgsToFrontendOutputsConverter.h"
 
-#include "ArgsToFrontendInputsConverter.h"
 #include "ArgsToFrontendOptionsConverter.h"
 #include "swift/AST/DiagnosticsFrontend.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/OutputFileMap.h"
-#include "swift/Basic/Platform.h"
-#include "swift/Frontend/Frontend.h"
 #include "swift/Option/Options.h"
 #include "swift/Option/SanitizerOptions.h"
-#include "swift/Strings.h"
-#include "llvm/ADT/STLExtras.h"
 #include "llvm/TargetParser/Triple.h"
 #include "llvm/Option/Arg.h"
 #include "llvm/Option/ArgList.h"

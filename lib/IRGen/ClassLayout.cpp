@@ -14,7 +14,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/AST/ASTContext.h"
 #include "swift/SIL/SILType.h"
 #include "llvm/ADT/SmallVector.h"
 

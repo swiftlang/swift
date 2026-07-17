@@ -23,13 +23,11 @@
 #include "swift/IDE/IDEBridging.h"
 #include "swift/IDE/SourceEntityWalker.h"
 #include "swift/Parse/Token.h"
-#include "llvm/ADT/PointerIntPair.h"
-#include "llvm/ADT/StringRef.h"
 #include "llvm/Support/VirtualFileSystem.h"
-#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
+#include "llvm/ADT/StringRef.h"
 
 namespace llvm {
   template<typename Fn> class function_ref;

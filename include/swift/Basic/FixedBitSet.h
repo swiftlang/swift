@@ -21,9 +21,7 @@
 #define LLVM_ADT_FIXEDBITSET_H
 
 #include <assert.h>
-#include <inttypes.h>
 #include <initializer_list>
-#include "llvm/Support/MathExtras.h"
 
 namespace swift {
 

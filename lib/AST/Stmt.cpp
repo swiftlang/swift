@@ -24,7 +24,6 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Statistic.h"
-#include "llvm/ADT/PointerUnion.h"
 
 using namespace swift;
 

@@ -12,7 +12,6 @@
 
 #include "swift/IDE/ArgumentCompletion.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/IDE/CodeCompletion.h"
 #include "swift/IDE/CompletionLookup.h"
 #include "swift/IDE/SelectedOverloadInfo.h"

@@ -18,7 +18,6 @@
 #ifndef SWIFT_DRIVERTOOL_H
 #define SWIFT_DRIVERTOOL_H
 
-#include "swift/Basic/LLVM.h"
 
 namespace swift {
   int mainEntry(int argc_, const char **argv_);

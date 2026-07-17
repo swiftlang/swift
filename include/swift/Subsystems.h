@@ -19,17 +19,14 @@
 
 #include "swift/AST/TBDGenRequests.h"
 #include "swift/Basic/LLVM.h"
-#include "swift/Basic/OptionSet.h"
 #include "swift/Basic/PrimarySpecificPaths.h"
-#include "swift/Basic/Version.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/SIL/SILDeclRef.h"
-#include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/StringRef.h"
-#include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Mutex.h"
 
 #include <memory>
+#include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/StringRef.h"
 
 namespace llvm {
   class raw_pwrite_stream;

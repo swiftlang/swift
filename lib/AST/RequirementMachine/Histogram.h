@@ -10,17 +10,16 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "llvm/ADT/ArrayRef.h"
 
 #ifndef SWIFT_HISTOGRAM_H
 #define SWIFT_HISTOGRAM_H
 
 #include "swift/Basic/Assertions.h"
-#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
 #include <vector>
+#include "llvm/ADT/ArrayRef.h"
 
 namespace swift {
 

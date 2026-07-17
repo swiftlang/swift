@@ -20,10 +20,7 @@
 #include "swift/SILOptimizer/Differentiation/Common.h"
 
 #include "swift/AST/AnyFunctionRef.h"
-#include "swift/AST/Requirement.h"
 #include "swift/AST/SubstitutionMap.h"
-#include "swift/AST/TypeCheckRequests.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/DifferentiationMangler.h"
 

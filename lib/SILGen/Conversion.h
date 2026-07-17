@@ -19,7 +19,6 @@
 
 #include "Initialization.h"
 #include "SGFContext.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/ExternalUnion.h"
 #include "swift/SIL/AbstractionPattern.h"
 #include <optional>

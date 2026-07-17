@@ -15,9 +15,9 @@
 
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SupplementaryOutputPaths.h"
-#include "llvm/ADT/StringRef.h"
 
 #include <string>
+#include "llvm/ADT/StringRef.h"
 
 namespace swift {
 

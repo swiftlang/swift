@@ -13,7 +13,6 @@
 #ifndef LLVM_SUPPORT_MEMORY_H
 #define LLVM_SUPPORT_MEMORY_H
 
-#include "llvm/Support/DataTypes.h"
 #include <system_error>
 
 namespace llvm {

@@ -12,7 +12,6 @@
 
 #include "SemaFixture.h"
 #include "swift/AST/Expr.h"
-#include "llvm/Support/Casting.h"
 
 using namespace swift;
 using namespace swift::unittest;

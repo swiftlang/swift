@@ -18,8 +18,6 @@
 #define SWIFT_SILGEN_SCOPE_H
 
 #include "SILGenFunction.h"
-#include "swift/Basic/Assertions.h"
-#include "swift/SIL/SILDebugScope.h"
 #include "Cleanup.h"
 
 namespace swift {

@@ -13,8 +13,6 @@
 #ifndef SWIFT_IDE_CURSORINFO_H
 #define SWIFT_IDE_CURSORINFO_H
 
-#include "swift/AST/Type.h"
-#include "swift/Basic/LLVM.h"
 #include "swift/IDE/Utils.h"
 
 namespace swift {

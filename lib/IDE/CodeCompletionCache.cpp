@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/IDE/CodeCompletionCache.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Cache.h"
 #include "swift/Basic/StringExtras.h"
 #include "llvm/ADT/APInt.h"

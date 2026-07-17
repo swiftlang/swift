@@ -22,7 +22,6 @@
 #ifndef SWIFT_LOWERING_ARGUMENTSOURCE_H
 #define SWIFT_LOWERING_ARGUMENTSOURCE_H
 
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/ExternalUnion.h"
 #include "RValue.h"
 #include "LValue.h"

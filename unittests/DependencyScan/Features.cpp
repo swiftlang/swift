@@ -15,7 +15,6 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Option/Options.h"
 #include "llvm/ADT/StringRef.h"
-#include <vector>
 #include <unordered_set>
 #include "gtest/gtest.h"
 

@@ -13,7 +13,6 @@
 #ifndef SWIFT_IRGEN_METADATA_SOURCE_H
 #define SWIFT_IRGEN_METADATA_SOURCE_H
 
-#include "swift/AST/Types.h"
 
 namespace swift {
 namespace irgen {

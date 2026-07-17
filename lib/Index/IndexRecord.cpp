@@ -18,12 +18,10 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleLoader.h"
-#include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/PathRemapper.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/IDE/ModuleInterfacePrinting.h"
@@ -38,7 +36,6 @@
 #include "llvm/Support/BLAKE3.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/HashBuilder.h"
-#include "llvm/Support/Path.h"
 
 using namespace swift;
 using namespace swift::index;

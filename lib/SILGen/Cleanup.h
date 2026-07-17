@@ -19,7 +19,6 @@
 
 #define SWIFT_INCLUDED_IN_SILGEN_SOURCES
 
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/DiverseStack.h"
 #include "swift/SIL/SILLocation.h"

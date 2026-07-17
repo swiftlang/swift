@@ -26,11 +26,11 @@
 
 #include "swift/Basic/LLVM.h"
 #include "clang/Basic/PathRemapper.h"
-#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Twine.h"
 
 #include <string>
 #include <utility>
+#include "llvm/ADT/SmallVector.h"
 
 namespace swift {
 

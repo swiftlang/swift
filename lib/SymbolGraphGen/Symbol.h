@@ -17,7 +17,6 @@
 #include "swift/AST/Attr.h"
 #include "swift/AST/Type.h"
 #include "swift/Basic/LLVM.h"
-#include "swift/Markup/Markup.h"
 #include "swift/SymbolGraphGen/PathComponent.h"
 #include "swift/SymbolGraphGen/FragmentInfo.h"
 

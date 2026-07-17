@@ -21,7 +21,6 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "access-marker-elim"
-#include "swift/Basic/Range.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"

@@ -14,7 +14,6 @@
 #define SWIFT_OPENED_EXISTENTIALS_H
 
 #include "swift/AST/Type.h"
-#include "swift/Basic/OptionalEnum.h"
 #include <optional>
 
 namespace swift {

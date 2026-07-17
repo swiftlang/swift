@@ -13,16 +13,12 @@
 #ifndef SWIFT_SIL_LINEARLIFETIMECHECKER_H
 #define SWIFT_SIL_LINEARLIFETIMECHECKER_H
 
-#include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILBasicBlock.h"
-#include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/BasicBlockUtils.h"
-#include "swift/SIL/BasicBlockBits.h"
-#include "llvm/ADT/SmallPtrSet.h"
 
 namespace swift {
 

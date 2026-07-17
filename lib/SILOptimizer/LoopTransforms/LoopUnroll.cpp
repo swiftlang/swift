@@ -12,9 +12,7 @@
 
 #define DEBUG_TYPE "sil-loopunroll"
 
-#include "llvm/ADT/DepthFirstIterator.h"
 
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/PatternMatch.h"
 #include "swift/SIL/SILCloner.h"

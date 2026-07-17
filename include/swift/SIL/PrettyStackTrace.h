@@ -21,7 +21,6 @@
 #include "swift/SIL/SILLocation.h"
 #include "swift/SIL/SILNode.h"
 #include "swift/SIL/SILDeclRef.h"
-#include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/PrettyStackTrace.h"
 

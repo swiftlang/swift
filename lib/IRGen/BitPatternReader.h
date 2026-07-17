@@ -12,10 +12,9 @@
 
 #pragma once
 
-#include "swift/Basic/ClusteredBitVector.h"
 
 #include "llvm/ADT/APInt.h"
-#include <optional>
+#include "swift/Basic/ClusteredBitVector.h"
 
 namespace swift {
 namespace irgen {

@@ -35,7 +35,6 @@
 
 #include "swift/Basic/BlotSetVector.h"
 #include "swift/SIL/SILInstruction.h"
-#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SILOptimizer/Utils/DebugOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"

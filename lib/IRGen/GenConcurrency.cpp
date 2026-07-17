@@ -17,7 +17,6 @@
 
 #include "GenConcurrency.h"
 
-#include "BitPatternBuilder.h"
 #include "CallEmission.h"
 #include "ExtraInhabitants.h"
 #include "GenCall.h"
@@ -32,7 +31,6 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/ABI/MetadataValues.h"
-#include "swift/Basic/Assertions.h"
 #include "llvm/IR/Module.h"
 
 using namespace swift;

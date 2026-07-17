@@ -13,7 +13,6 @@
 #include "SourceKit/Support/Tracing.h"
 
 #include "llvm/Support/Mutex.h"
-#include "llvm/Support/YAMLTraits.h"
 
 using namespace SourceKit;
 using namespace llvm;

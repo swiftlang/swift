@@ -16,7 +16,6 @@
 ///
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILDebugInfoExpression.h"
 #include <unordered_map>
 

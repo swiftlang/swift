@@ -18,7 +18,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "SemanticARCOptVisitor.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/SIL/DebugUtils.h"
 

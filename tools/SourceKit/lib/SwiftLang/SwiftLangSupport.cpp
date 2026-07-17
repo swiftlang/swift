@@ -23,7 +23,6 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/SILOptions.h"
 #include "swift/AST/USRGeneration.h"
-#include "swift/Config.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/IDE/CodeCompletionCache.h"
 #include "swift/IDE/SyntaxModel.h"
@@ -31,10 +30,8 @@
 #include "swift/IDETool/IDEInspectionInstance.h"
 #include "swift/IDETool/SyntacticMacroExpansion.h"
 
-#include "clang/Lex/HeaderSearch.h"
 #include "clang/Lex/Preprocessor.h"
 #include "llvm/ADT/APInt.h"
-#include "llvm/ADT/Hashing.h"
 #include "llvm/Support/ConvertUTF.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/Path.h"

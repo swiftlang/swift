@@ -15,7 +15,6 @@
 
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/STLExtras.h"
-#include "llvm/Support/raw_ostream.h"
 
 namespace swift {
 

@@ -18,7 +18,6 @@
 #include "swift/Basic/SupplementaryOutputPaths.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/Support/MemoryBuffer.h"
-#include "llvm/Support/Path.h"
 #include <string>
 
 namespace swift {

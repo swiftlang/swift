@@ -12,7 +12,6 @@
 
 #include "swift/LLVMPasses/Passes.h"
 #include "LLVMARCOpts.h"
-#include "llvm/IR/Module.h"
 
 using namespace llvm;
 using swift::SwiftRCIdentity;

@@ -17,7 +17,6 @@
 
 #include "TypeChecker.h"
 #include "TypeCheckObjC.h"
-#include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Initializer.h"
@@ -28,9 +27,6 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeWalker.h"
-#include "swift/Basic/Assertions.h"
-#include "swift/Basic/Defer.h"
-#include "llvm/ADT/SmallPtrSet.h"
 using namespace swift;
 
 namespace {

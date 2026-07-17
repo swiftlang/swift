@@ -14,10 +14,9 @@
 #define SWIFT_DRIVER_FRONTENDUTIL_H
 
 #include "swift/Basic/LLVM.h"
-#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/StringSaver.h"
+#include "llvm/ADT/STLExtras.h"
 
-#include <memory>
 
 namespace swift {
 

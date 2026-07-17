@@ -17,7 +17,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/Assertions.h"
 #include "swift/SwiftDemangle/MangleHack.h"
 #include "swift/Runtime/Portability.h"
 #include "swift/Strings.h"

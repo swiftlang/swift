@@ -29,7 +29,6 @@
 #include "Outlining.h"
 #include "swift/AST/ReferenceCounting.h"
 #include "swift/SIL/SILInstruction.h"
-#include "llvm/ADT/MapVector.h"
 
 namespace llvm {
   class Constant;
