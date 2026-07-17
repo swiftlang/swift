@@ -246,6 +246,11 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
       opts.SerializeOptionsForDebugging.value_or(
           !module->isExternallyConsumed());
 
+  serializationOpts.PrefixMapSourceInfo = opts.PrefixMapSourceInfo;
+  if (opts.PrefixMapSourceInfo) {
+    serializationOpts.SourceInfoPrefixMap = getIRGenOptions().FilePrefixMap;
+  }
+
   serializationOpts.PathObfuscator = opts.serializedPathObfuscator;
   if (serializationOpts.SerializeOptionsForDebugging &&
       opts.DebugPrefixSerializedDebuggingOptions) {
