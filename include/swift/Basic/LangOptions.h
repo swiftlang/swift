@@ -1122,6 +1122,13 @@ namespace swift {
     /// import, but it can affect Clang's IR generation of static functions.
     std::string Optimization;
 
+    /// Whether Clang should generate position-independent code (PIC) for any
+    /// code it emits (e.g. inline functions). Mirrors
+    /// IRGenOptions::UsePositionIndependentCode so C interop honors
+    /// -disable-position-independent-code. Ignored on Windows, which is
+    /// implicitly position-independent.
+    bool UsePositionIndependentCode = true;
+
     /// Disable validating the persistent PCH.
     bool PCHDisableValidation = false;
 
@@ -1222,7 +1229,8 @@ namespace swift {
                           ImportForwardDeclarations,
                           DisableSwiftBridgeAttr,
                           DisableOverlayModules,
-                          EnableClangSPI);
+                          EnableClangSPI,
+                          UsePositionIndependentCode);
     }
 
     /// Return a hash code of any components from these options that should

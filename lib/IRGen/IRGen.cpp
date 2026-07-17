@@ -1192,9 +1192,14 @@ swift::createTargetMachine(const IRGenOptions &Opts, ASTContext &Ctx,
   if (EffectiveTriple.isArch64Bit() && EffectiveTriple.isWindowsCygwinEnvironment())
     cmodel = CodeModel::Large;
 
+  // Swift defaults to position-independent code, but Embedded Swift targets
+  // may opt into the static relocation model.
+  Reloc::Model relocModel =
+      Opts.UsePositionIndependentCode ? Reloc::PIC_ : Reloc::Static;
+
   // Create a target machine.
   llvm::TargetMachine *TargetMachine = Target->createTargetMachine(
-      EffectiveTriple, CPU, targetFeatures, TargetOpts, Reloc::PIC_,
+      EffectiveTriple, CPU, targetFeatures, TargetOpts, relocModel,
       cmodel, OptLevel);
   if (!TargetMachine) {
     Ctx.Diags.diagnose(SourceLoc(), diag::no_llvm_target,

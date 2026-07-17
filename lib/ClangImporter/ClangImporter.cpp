@@ -588,10 +588,15 @@ void importer::getNormalInvocationArguments(
     invocationArgStrs.insert(invocationArgStrs.end(), {"-D__swift_embedded__"});
   }
 
-  // Enable Position Independence.  `-fPIC` is not supported on Windows, which
-  // is implicitly position independent.
-  if (!triple.isOSWindows())
+  // Reflect the resolved relocation model to Clang so that any code it emits
+  // (e.g. inline functions) matches Swift's own code generation. Whether PIC
+  // is used by default is decided when parsing the options (see
+  // getDefaultUsePositionIndependentCode); Windows defaults to non-PIC and
+  // rejects `-fPIC`, but accepts `-fno-PIC`.
+  if (importerOpts.UsePositionIndependentCode)
     invocationArgStrs.insert(invocationArgStrs.end(), {"-fPIC"});
+  else
+    invocationArgStrs.insert(invocationArgStrs.end(), {"-fno-PIC"});
 
   // Enable modules.
   invocationArgStrs.insert(invocationArgStrs.end(), {

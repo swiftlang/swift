@@ -1540,6 +1540,14 @@ def disable_colocate_type_descriptors :
   Flag<["-"], "disable-colocate-type-descriptors">,
   HelpText<"Disable colocate type descriptors">;
 
+def enable_position_independent_code :
+  Flag<["-"], "enable-position-independent-code">,
+  HelpText<"Emit position-independent code (PIC)">;
+def disable_position_independent_code :
+  Flag<["-"], "disable-position-independent-code">,
+  HelpText<"Do not emit position-independent code; use the static relocation "
+           "model instead (primarily for Embedded Swift)">;
+
 def enable_relative_protocol_witness_tables :
   Flag<["-"], "enable-relative-protocol-witness-tables">,
   HelpText<"Enable relative protocol witness tables">;

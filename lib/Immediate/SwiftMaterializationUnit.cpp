@@ -154,7 +154,9 @@ SwiftJIT::CreateLLJIT(CompilerInstance &CI) {
   std::tie(TargetOpt, CPU, Features, Triple) =
       getIRTargetOptions(IRGenOpts, Ctx);
   auto JTMB = llvm::orc::JITTargetMachineBuilder(llvm::Triple(Triple))
-                  .setRelocationModel(llvm::Reloc::PIC_)
+                  .setRelocationModel(IRGenOpts.UsePositionIndependentCode
+                                          ? llvm::Reloc::PIC_
+                                          : llvm::Reloc::Static)
                   .setOptions(std::move(TargetOpt))
                   .setCPU(std::move(CPU))
                   .addFeatures(Features)

@@ -591,6 +591,11 @@ public:
   /// Whether to enable IR level instrumentation.
   bool EnableIRProfileGen = false;
 
+  /// Whether to generate position-independent code (PIC). When false, the
+  /// static relocation model is used instead. This is primarily intended for
+  /// Embedded Swift targets that link against a statically located image.
+  bool UsePositionIndependentCode = true;
+
   /// Controls whether DWARF discriminators are added to the IR.
   unsigned DebugInfoForProfiling : 1;
 
@@ -716,6 +721,7 @@ public:
        << 'd' << DisableLLVMOptzns
        << 'D' << DisableSwiftSpecificLLVMOptzns
        << 'p' << GenerateProfile
+       << 'P' << UsePositionIndependentCode
        << 's' << Sanitizers.toRaw();
   }
 
