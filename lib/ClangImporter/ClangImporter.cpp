@@ -1657,7 +1657,15 @@ std::unique_ptr<ClangImporter> ClangImporter::create(
     // model is decided by Clang (and can be influenced via -Xcc, e.g.
     // -fno-pic), so validate the resolved model here rather than at the flag
     // level.
-    if (CGO.RelocationModel != llvm::Reloc::PIC_ &&
+    //
+    // This only applies where Swift requests PIC as the baseline, i.e.
+    // non-Windows targets (see the `-fPIC` injection in
+    // getNormalInvocationArguments). Windows is implicitly
+    // position-independent and legitimately resolves to a non-PIC relocation
+    // model on some architectures (e.g. 32-bit x86/ARM), so it must not be
+    // diagnosed.
+    if (!ctx.LangOpts.Target.isOSWindows() &&
+        CGO.RelocationModel != llvm::Reloc::PIC_ &&
         !ctx.LangOpts.hasFeature(Feature::Embedded)) {
       ctx.Diags.diagnose(SourceLoc(), diag::non_pic_without_embedded);
       return nullptr;
