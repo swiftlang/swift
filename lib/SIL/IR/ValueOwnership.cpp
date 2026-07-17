@@ -764,6 +764,10 @@ ValueOwnershipKind ValueBase::getOwnershipKind() const {
     if (!f)
       return OwnershipKind::None;
 
+    // Debug reconstruction blocks don't participate in the ownership system.
+    if (block->isDebugReconstructionBlock())
+      return OwnershipKind::None;
+
     // Now that we know that we do have a block/function, check if we have
     // ownership.
     if (!f->hasOwnership())

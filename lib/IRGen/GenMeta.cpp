@@ -1473,6 +1473,17 @@ namespace {
       if (!nominal)
         return result;
 
+      // GenericContextDescriptorFlags must be zero for descriptors that might
+      // be seen by a pre-5.8 runtime, so omit this on pre-5.8 targets unless
+      // we're building the runtime itself.
+      auto deploymentAvailability =
+          AvailabilityRange::forDeploymentTarget(IGM.Context);
+      if (!IGM.Context.LangOpts.DisableAvailabilityChecking &&
+          !deploymentAvailability.isContainedIn(
+              IGM.Context.getSwift58Availability()) &&
+          !IGM.getSwiftModule()->isStdlibModule())
+        return result;
+
       auto checkProtocol = [&](InvertibleProtocolKind kind) {
         switch (nominal->canConformTo(kind)) {
         case TypeDecl::CanBeInvertible::Never:
