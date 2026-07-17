@@ -334,10 +334,7 @@ extension CancellationError: CustomStringConvertible {
 extension CancellationError {
   /// Describes why a task was cancelled.
   ///
-  /// This enum is non-frozen ("nonexhaustive"). Additional cases may be
-  /// added in future stdlib versions, so switch statements over
-  /// `CancellationError.Reason` should always include an `@unknown default:`
-  /// arm.
+  /// This enum is non-frozen, and additional cases may be added in future versions.
   ///
   /// - SeeAlso: `Task.cancellationReason`
   /// - SeeAlso: `Task.cancel(reason:)`

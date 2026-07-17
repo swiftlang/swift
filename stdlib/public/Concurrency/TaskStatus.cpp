@@ -686,28 +686,30 @@ SWIFT_CC(swift)
 static TaskDeadlineStatusRecord *
 swift_task_pushDeadlineImpl(const Metadata *clockType, HeapObject *box) {
   auto task = swift_task_getCurrent();
-  if (!task) {
-    // No current task means no scope for the deadline to be attached to.
-    // Release the +1 we were handed on the box.
-    if (box)
-      swift_release(box);
-    return nullptr;
-  }
+  assert(task && "Currently, withDeadline must be used from an async context; We may relax this in the future");
 
   void *allocation =
       _swift_task_alloc_specific(task, sizeof(class TaskDeadlineStatusRecord));
-  auto record = ::new (allocation) TaskDeadlineStatusRecord(clockType, box);
+
+  // `IsOutermostDeadline` is decided under the status-record lock inside
+  // `addStatusRecord`'s update closure and stored on the record: the
+  // outermost record is the one whose push flipped `HasDeadline` from
+  // false to true. The bookkeeping lets `swift_task_popDeadline` clear
+  // `HasDeadline` in O(1) without walking the chain.
+  auto record = ::new (allocation)
+      TaskDeadlineStatusRecord(clockType, box, /*isOutermostDeadline=*/false);
   SWIFT_TASK_DEBUG_LOG("[Deadline] Create deadline record:%p for task:%p "
                        "(clockType:%p, box:%p)",
                        allocation, task, clockType, box);
 
   addStatusRecord(task, record,
                   [&](ActiveTaskStatus oldStatus, ActiveTaskStatus &newStatus) {
-                    // Set the "has deadline" flag so
-                    // swift_task_findNearestDeadlineForClock can bail out
-                    // without walking the record chain when there are no
-                    // deadlines installed.
-                    newStatus = newStatus.withDeadline();
+                    if (!oldStatus.hasDeadline()) {
+                      // We are the outermost deadline on this task; remember
+                      // it so the matching pop can flip the flag back off.
+                      record->setOutermostDeadline(true);
+                      newStatus = newStatus.withDeadline();
+                    }
                     return true; // always add the record
                   });
 
@@ -716,8 +718,6 @@ swift_task_pushDeadlineImpl(const Metadata *clockType, HeapObject *box) {
 
 SWIFT_CC(swift)
 static void swift_task_popDeadlineImpl(TaskDeadlineStatusRecord *record) {
-  // Pushes that occurred with no current task returned nullptr; pop must
-  // accept that.
   if (!record)
     return;
 
@@ -727,26 +727,18 @@ static void swift_task_popDeadlineImpl(TaskDeadlineStatusRecord *record) {
   if (!task)
     return;
 
-  // Track how many deadline records are still installed after removing the
-  // target one. When this drops to zero we clear the HasDeadline flag so
-  // the fast path in `swift_task_findNearestDeadlineForClock` stays cheap.
-  int remainingDeadlines = 0;
+  // If we're removing the "outermost" deadline, we must clear the HasDeadline,
+  // as we know for sure there's no more deadline records present.
+  bool clearFlag = record->isOutermostDeadline();
   removeStatusRecordWhere(
       task,
       /*condition=*/[&](ActiveTaskStatus status, TaskStatusRecord *cur) {
-        assert(status.hasDeadline() && "does not have record!");
-        if (cur->getKind() != TaskStatusRecordKind::Deadline)
-          return false;
-
-        if (cur == record)
-          return true; // remove this record
-
-        remainingDeadlines += 1;
-        return false;
+        assert(status.hasDeadline() && "does not have deadline record!");
+        return cur == record;
       },
       /*updateStatus=*/[&](ActiveTaskStatus oldStatus,
                             ActiveTaskStatus &newStatus) {
-        if (remainingDeadlines == 0) {
+        if (clearFlag) {
           assert(oldStatus.hasDeadline());
           newStatus = newStatus.withoutDeadline();
         }
@@ -762,8 +754,9 @@ static void swift_task_popDeadlineImpl(TaskDeadlineStatusRecord *record) {
 
 /// Search a single task's status record chain for a deadline record
 /// whose clock matches `(clockType, queryBox)`. Returns the matching
-/// record's box (borrowed - runtime still owns the +1 on it), or
-/// nullptr if none. Takes the task's status-record lock while walking.
+/// record's box, or nullptr if none.
+///
+/// Takes the task's status-record lock while walking.
 static HeapObject *
 findDeadlineOnSingleTask(AsyncTask *task, HeapObject *queryBox,
                          const Metadata *clockType) {
@@ -773,12 +766,12 @@ findDeadlineOnSingleTask(AsyncTask *task, HeapObject *queryBox,
       if (record->getKind() != TaskStatusRecordKind::Deadline)
         continue;
       auto d = cast<TaskDeadlineStatusRecord>(record);
-      // Fast filter: types must be pointer-equal (necessary condition).
+      // Fast-check: clock types must be pointer-equal.
       if (d->getClockType() != clockType)
         continue;
-      // Same-clock check via Swift bridge. If the identities match, this
-      // is the record we want; the first one encountered walking outward
-      // from the head is the innermost (== tightest by push invariant).
+
+      // Same-clock identity check via Swift callout.
+      // The first record that matches is the one we want, since it'll be the tightest deadline.
       if (!_task_deadline_boxesSameClock(d->getBox(), queryBox))
         continue;
       found = d->getBox();

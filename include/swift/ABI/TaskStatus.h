@@ -474,13 +474,26 @@ class TaskDeadlineStatusRecord : public TaskStatusRecord {
   /// instant. Runtime releases this in `swift_task_popDeadline`.
   HeapObject *Box;
 
+  /// True iff this record was the FIRST deadline installed on the owning
+  /// task (i.e. the task had `HasDeadline == false` at push time and this
+  /// push flipped it to true). Enables `swift_task_popDeadline` to clear
+  /// `HasDeadline` without walking the record chain to count remaining
+  /// deadlines - the invariant is that only the outermost record's pop
+  /// clears the flag, matching the invariant that only the outermost
+  /// push sets it.
+  bool IsOutermostDeadline;
+
 public:
-  TaskDeadlineStatusRecord(const Metadata *clockType, HeapObject *box)
+  TaskDeadlineStatusRecord(const Metadata *clockType, HeapObject *box,
+                           bool isOutermostDeadline)
       : TaskStatusRecord(TaskStatusRecordKind::Deadline),
-        ClockType(clockType), Box(box) {}
+        ClockType(clockType), Box(box),
+        IsOutermostDeadline(isOutermostDeadline) {}
 
   const Metadata *getClockType() const { return ClockType; }
   HeapObject *getBox() const { return Box; }
+  bool isOutermostDeadline() const { return IsOutermostDeadline; }
+  void setOutermostDeadline(bool value) { IsOutermostDeadline = value; }
 
   static bool classof(const TaskStatusRecord *record) {
     return record->getKind() == TaskStatusRecordKind::Deadline;
