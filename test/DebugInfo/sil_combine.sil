@@ -208,6 +208,35 @@ bb0(%0 : $Int64, %1 : $Int64):
   return %e : $Int64
 }
 
+class Klass {}
+
+struct KlassStruct {
+  @_hasStorage var k: Klass { get set }
+  @_hasStorage var x: Int64 { get set }
+  init(k: Klass, x: Int64)
+}
+
+// When SimplifyStruct removes an owned struct with begin_borrow/struct_extract
+// uses via erase(instructionIncludingAllUsers:), debug uses must be salvaged.
+//
+// CHECK-LABEL: sil [ossa] @salvage_struct_erase_including_all_users
+// CHECK-NOT:     struct $KlassStruct
+// CHECK:         debug_value %0 : $Klass, let, name "s", type $KlassStruct, expr op_fragment:#KlassStruct.k
+// CHECK:         debug_value %1 : $Int64, let, name "s", type $KlassStruct, expr op_fragment:#KlassStruct.x
+// CHECK:         destroy_value %0 : $Klass
+// CHECK:         return %1 : $Int64
+// CHECK:       } // end sil function 'salvage_struct_erase_including_all_users'
+sil [ossa] @salvage_struct_erase_including_all_users : $@convention(thin) (@owned Klass, Int64) -> Int64 {
+bb0(%0 : @owned $Klass, %1 : $Int64):
+  %s = struct $KlassStruct (%0 : $Klass, %1 : $Int64)
+  debug_value %s : $KlassStruct, let, name "s"
+  %b = begin_borrow %s : $KlassStruct
+  %e = struct_extract %b : $KlassStruct, #KlassStruct.x
+  end_borrow %b : $KlassStruct
+  destroy_value %s : $KlassStruct
+  return %e : $Int64
+}
+
 // This test verifies that splitAggregateLoad in CanonicalizeInstruction.cpp
 // salvages debug info attached to the loaded aggregate in optimized builds.
 //
