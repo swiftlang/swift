@@ -218,13 +218,6 @@ extension MutatingContext {
     }
   }
 
-  // This function doesn't do what its name implies, it's equivalent to erase(instruction:).
-  public func erase(instructionIncludingDebugUses inst: Instruction) {
-    precondition(inst.results.allSatisfy { $0.uses.ignoreDebugUses.isEmpty })
-    // Erase calls salvageDebugInfo which will rewrite all debug uses.
-    erase(instruction: inst)
-  }
-
   public func erase(block: BasicBlock) {
     _bridged.eraseBlock(block.bridged)
   }
