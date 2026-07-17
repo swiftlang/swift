@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-// Micro-benchmarks for `Task.isCancelled` under various shield/scope
+// Measure `Task.isCancelled` under various shield/scope
 // nesting shapes. Each variant sets up a specific record-chain state,
 // then runs a hot inner loop of `Task.isCancelled` reads.
 //
@@ -21,7 +21,6 @@
 
 @_spi(Concurrency) import _Concurrency
 import TestsUtils
-import Dispatch
 
 public var benchmarks: [BenchmarkInfo] {
   // These benchmarks exercise APIs currently only present on the
@@ -44,19 +43,6 @@ public var benchmarks: [BenchmarkInfo] {
   ]
 }
 
-// Drive an async body from a synchronous benchmark entry point.
-@available(macOS 9999, *)
-@inline(never)
-private func drive(_ body: @escaping @Sendable () async -> Void) {
-  let g = DispatchGroup()
-  g.enter()
-  Task {
-    await body()
-    g.leave()
-  }
-  g.wait()
-}
-
 @inline(never)
 private func hotLoop(_ n: Int) -> Int {
   var trueCount = 0
@@ -68,19 +54,48 @@ private func hotLoop(_ n: Int) -> Int {
 
 @available(macOS 9999, *)
 @inline(never)
-public func run_FastPath(n: Int) {
-  drive {
-    // No scope, no shield: pure bit check.
+public func run_FastPath(n: Int) async {
+  // No scope, no shield: pure bit check.
+  blackHole(hotLoop(n * 1000))
+}
+
+@available(macOS 9999, *)
+@inline(never)
+public func run_ShieldOnly(n: Int) async {
+  await withTaskCancellationShield {
+    // Shield bit set, no scope: bit check + shield mask, no walk.
     blackHole(hotLoop(n * 1000))
   }
 }
 
 @available(macOS 9999, *)
 @inline(never)
-public func run_ShieldOnly(n: Int) {
-  drive {
+public func run_InScopeUncancelled(n: Int) async {
+  await __withTaskCancellationScope { _ in
+    // Scope on chain but not cancelled: walker runs, returns nullptr.
+    blackHole(hotLoop(n * 1000))
+  }
+}
+
+@available(macOS 9999, *)
+@inline(never)
+public func run_InScopeCancelled(n: Int) async {
+  await __withTaskCancellationScope { scope in
+    scope.cancel()
+    // Scope cancelled: walker returns the scope record.
+    blackHole(hotLoop(n * 1000))
+  }
+}
+
+@available(macOS 9999, *)
+@inline(never)
+public func run_InScopeInnerShield(n: Int) async {
+  await __withTaskCancellationScope { scope in
+    scope.cancel()
     await withTaskCancellationShield {
-      // Shield bit set, no scope: bit check + shield mask, no walk.
+      // Innermost record above the cancelled scope is a shield: walker
+      // sees SHIELD first and short-circuits. Also exercises the shield
+      // push/pop for a nested-inside-scope shield.
       blackHole(hotLoop(n * 1000))
     }
   }
@@ -88,54 +103,13 @@ public func run_ShieldOnly(n: Int) {
 
 @available(macOS 9999, *)
 @inline(never)
-public func run_InScopeUncancelled(n: Int) {
-  drive {
-    await __withTaskCancellationScope { _ in
-      // Scope on chain but not cancelled: walker runs, returns nullptr.
-      blackHole(hotLoop(n * 1000))
-    }
-  }
-}
-
-@available(macOS 9999, *)
-@inline(never)
-public func run_InScopeCancelled(n: Int) {
-  drive {
+public func run_InScopeOuterShield(n: Int) async {
+  await withTaskCancellationShield {
     await __withTaskCancellationScope { scope in
       scope.cancel()
-      // Scope cancelled: walker returns the scope record.
+      // Shield is OUTSIDE the scope on the chain: walker sees SCOPE
+      // (cancelled) first, returns true. Positional walk still runs.
       blackHole(hotLoop(n * 1000))
-    }
-  }
-}
-
-@available(macOS 9999, *)
-@inline(never)
-public func run_InScopeInnerShield(n: Int) {
-  drive {
-    await __withTaskCancellationScope { scope in
-      scope.cancel()
-      await withTaskCancellationShield {
-        // Innermost record above the cancelled scope is a shield: walker
-        // sees SHIELD first and short-circuits. Also exercises the shield
-        // push/pop for a nested-inside-scope shield.
-        blackHole(hotLoop(n * 1000))
-      }
-    }
-  }
-}
-
-@available(macOS 9999, *)
-@inline(never)
-public func run_InScopeOuterShield(n: Int) {
-  drive {
-    await withTaskCancellationShield {
-      await __withTaskCancellationScope { scope in
-        scope.cancel()
-        // Shield is OUTSIDE the scope on the chain: walker sees SCOPE
-        // (cancelled) first, returns true. Positional walk still runs.
-        blackHole(hotLoop(n * 1000))
-      }
     }
   }
 }

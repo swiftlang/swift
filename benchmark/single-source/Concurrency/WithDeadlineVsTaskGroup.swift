@@ -22,7 +22,6 @@
 
 @_spi(Concurrency) import _Concurrency
 import TestsUtils
-import Dispatch
 
 public var benchmarks: [BenchmarkInfo] {
   guard #available(macOS 9999, *) else { return [] }
@@ -34,18 +33,6 @@ public var benchmarks: [BenchmarkInfo] {
     BenchmarkInfo(name: "NaiveTaskGroupDeadline.FarFuture.WorkChild",
                   runFunction: run_NaiveTaskGroupDeadline_WorkChild, tags: [.concurrency]),
   ]
-}
-
-@available(macOS 9999, *)
-@inline(never)
-private func drive(_ body: @escaping @Sendable () async -> Void) {
-  let g = DispatchGroup()
-  g.enter()
-  Task {
-    await body()
-    g.leave()
-  }
-  g.wait()
 }
 
 // Deterministic, non-trivial "work" the operation performs. Same body used
@@ -60,55 +47,49 @@ private func doWork() -> Int {
 
 @available(macOS 9999, *)
 @inline(never)
-public func run_WithDeadline_NoOp(n: Int) {
-  drive {
-    let clock = ContinuousClock()
-    for _ in 0..<n {
-      let deadline = clock.now.advanced(by: .seconds(3600))
-      _ = try? await withDeadline(deadline, clock: clock) {
-        return 0
-      }
+public func run_WithDeadline_NoOp(n: Int) async {
+  let clock = ContinuousClock()
+  for _ in 0..<n {
+    let deadline = clock.now.advanced(by: .seconds(3600))
+    _ = try? await withDeadline(deadline, clock: clock) {
+      return 0
     }
   }
 }
 
 @available(macOS 9999, *)
 @inline(never)
-public func run_WithDeadline_WorkChild(n: Int) {
-  drive {
-    let clock = ContinuousClock()
-    for _ in 0..<n {
-      let deadline = clock.now.advanced(by: .seconds(3600))
-      let result = try? await withDeadline(deadline, clock: clock) {
-        doWork()
-      }
-      blackHole(result ?? 0)
+public func run_WithDeadline_WorkChild(n: Int) async {
+  let clock = ContinuousClock()
+  for _ in 0..<n {
+    let deadline = clock.now.advanced(by: .seconds(3600))
+    let result = try? await withDeadline(deadline, clock: clock) {
+      doWork()
     }
+    blackHole(result ?? 0)
   }
 }
 
 @available(macOS 9999, *)
 @inline(never)
-public func run_NaiveTaskGroupDeadline_WorkChild(n: Int) {
-  drive {
-    let clock = ContinuousClock()
-    for _ in 0..<n {
-      let deadline = clock.now.advanced(by: .seconds(3600))
-      // The shape a user would reach for without withDeadline: two child
-      // tasks in a group, whichever finishes first wins, then cancel the
-      // rest. Two child-task allocations, two enqueues, one cancelAll,
-      // plus the group teardown per iteration.
-      let result = await withTaskGroup(of: Int?.self) { group in
-        group.addTask { doWork() }
-        group.addTask {
-          try? await ContinuousClock().sleep(until: deadline, tolerance: nil)
-          return nil
-        }
-        let first = await group.next() ?? nil
-        group.cancelAll()
-        return first
+public func run_NaiveTaskGroupDeadline_WorkChild(n: Int) async {
+  let clock = ContinuousClock()
+  for _ in 0..<n {
+    let deadline = clock.now.advanced(by: .seconds(3600))
+    // The shape a user would reach for without withDeadline: two child
+    // tasks in a group, whichever finishes first wins, then cancel the
+    // rest. Two child-task allocations, two enqueues, one cancelAll,
+    // plus the group teardown per iteration.
+    let result = await withTaskGroup(of: Int?.self) { group in
+      group.addTask { doWork() }
+      group.addTask {
+        try? await ContinuousClock().sleep(until: deadline, tolerance: nil)
+        return nil
       }
-      blackHole(result ?? 0)
+      let first = await group.next() ?? nil
+      group.cancelAll()
+      return first
     }
+    blackHole(result ?? 0)
   }
 }
