@@ -2093,7 +2093,7 @@ void importer::addMacrosToLookupTable(SwiftLookupTable &table,
     };
 
     ArrayRef<clang::ModuleMacro *> moduleMacros =
-        macro.second.getActiveModuleMacros(pp, macro.first);
+        macro.second.getModuleInfo(pp, macro.first).ActiveModuleMacros;
     if (moduleMacros.empty()) {
       // Handle the bridging header case.
       clang::MacroDirective *MD = pp.getLocalMacroDirective(macro.first);
