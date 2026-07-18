@@ -6402,7 +6402,7 @@ EnumImplStrategy::get(TypeConverter &TC, SILType type, EnumDecl *theEnum) {
   unsigned numElements = 0;
   TypeInfoKind tik = Loadable;
   IsFixedSize_t alwaysFixedSize = IsFixedSize;
-  auto triviallyDestroyable = theEnum->getValueTypeDestructor()
+  auto triviallyDestroyable = theEnum->hasValueTypeDestructor()
     ? IsNotTriviallyDestroyable : IsTriviallyDestroyable;
   auto copyable = !theEnum->canBeCopyable()
     ? IsNotCopyable : IsCopyable;
@@ -7095,7 +7095,7 @@ TypeInfo *SinglePayloadEnumImplStrategy::completeFixedLayout(
   auto alignment = payloadTI.getFixedAlignment();
   applyLayoutAttributes(TC.IGM, theEnum, /*fixed*/true, alignment);
 
-  auto deinit = theEnum->getValueTypeDestructor()
+  auto deinit = theEnum->hasValueTypeDestructor()
     ? IsNotTriviallyDestroyable : IsTriviallyDestroyable;
   auto copyable = !theEnum->canBeCopyable()
     ? IsNotCopyable : IsCopyable;
@@ -7134,7 +7134,7 @@ TypeInfo *SinglePayloadEnumImplStrategy::completeDynamicLayout(
   
   auto enumAccessible = IsABIAccessible_t(TC.IGM.isTypeABIAccessible(Type));
 
-  auto deinit = theEnum->getValueTypeDestructor()
+  auto deinit = theEnum->hasValueTypeDestructor()
     ? IsNotTriviallyDestroyable : IsTriviallyDestroyable;
   auto copyable = !theEnum->canBeCopyable()
     ? IsNotCopyable : IsCopyable;
@@ -7174,7 +7174,7 @@ MultiPayloadEnumImplStrategy::completeFixedLayout(TypeConverter &TC,
   Alignment worstAlignment(1);
   auto isCopyable = !theEnum->canBeCopyable()
     ? IsNotCopyable : IsCopyable;
-  auto isTriviallyDestroyable = theEnum->getValueTypeDestructor()
+  auto isTriviallyDestroyable = theEnum->hasValueTypeDestructor()
     ? IsNotTriviallyDestroyable : IsTriviallyDestroyable;
   IsBitwiseTakable_t isBT = IsBitwiseTakableAndBorrowable;
   PayloadSize = 0;
@@ -7342,7 +7342,7 @@ TypeInfo *MultiPayloadEnumImplStrategy::completeDynamicLayout(
   // during initializeMetadata. We can at least glean the best available
   // static information from the payloads.
   Alignment alignment(1);
-  auto td = theEnum->getValueTypeDestructor()
+  auto td = theEnum->hasValueTypeDestructor()
     ? IsNotTriviallyDestroyable : IsTriviallyDestroyable;
   auto bt = IsBitwiseTakableAndBorrowable;
   for (auto &element : ElementsWithPayload) {
