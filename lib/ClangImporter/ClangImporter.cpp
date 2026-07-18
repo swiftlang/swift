@@ -588,8 +588,12 @@ void importer::getNormalInvocationArguments(
     invocationArgStrs.insert(invocationArgStrs.end(), {"-D__swift_embedded__"});
   }
 
-  // Enable Position Independence.  `-fPIC` is not supported on Windows, which
-  // is implicitly position independent.
+  // Swift generates position-independent code by default, so establish `-fPIC`
+  // as the baseline for any code Clang emits (e.g. inline functions). `-fPIC`
+  // is not supported on Windows, which is implicitly position-independent. This
+  // is only a default: because the last PIC-related flag wins, a subsequent
+  // `-Xcc -fno-pic` (etc.) overrides it, and the resulting relocation model is
+  // read back from Clang for Swift's own code generation.
   if (!triple.isOSWindows())
     invocationArgStrs.insert(invocationArgStrs.end(), {"-fPIC"});
 
@@ -1648,6 +1652,24 @@ std::unique_ptr<ClangImporter> ClangImporter::create(
     // source locations (rdar://100172217).
     CGO.CoverageMapping = false;
 
+    // Non-PIC code generation is only supported in Embedded Swift, which does
+    // not depend on the position-independent Swift runtime. The relocation
+    // model is decided by Clang (and can be influenced via -Xcc, e.g.
+    // -fno-pic), so validate the resolved model here rather than at the flag
+    // level.
+    //
+    // This only applies where Swift requests PIC as the baseline, i.e.
+    // non-Windows targets (see the `-fPIC` injection in
+    // getNormalInvocationArguments). Windows is implicitly
+    // position-independent and legitimately resolves to a non-PIC relocation
+    // model on some architectures (e.g. 32-bit x86/ARM), so it must not be
+    // diagnosed.
+    if (!ctx.LangOpts.Target.isOSWindows() &&
+        CGO.RelocationModel != llvm::Reloc::PIC_ &&
+        !ctx.LangOpts.hasFeature(Feature::Embedded)) {
+      ctx.Diags.diagnose(SourceLoc(), diag::non_pic_without_embedded);
+      return nullptr;
+    }
   }
 
   // Set up PCH content CASID.
