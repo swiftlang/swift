@@ -1775,10 +1775,6 @@ bool BridgedInstruction::RefCountingInst_getIsAtomic() const {
   return getAs<swift::RefCountingInst>()->getAtomicity() == swift::RefCountingInst::Atomicity::Atomic;
 }
 
-SwiftInt BridgedInstruction::CondBranchInst_getNumTrueArgs() const {
-  return getAs<swift::CondBranchInst>()->getNumTrueArgs();
-}
-
 void BridgedInstruction::AllocRefInstBase_setIsStackAllocatable() const {
   getAs<swift::AllocRefInstBase>()->setStackAllocatable();
 }

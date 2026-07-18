@@ -5720,22 +5720,20 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       UnresolvedValueName Cond;
       Identifier BBName, BBName2;
       SourceLoc NameLoc, NameLoc2;
-      SmallVector<SILValue, 6> Args, Args2;
       if (parseValueName(Cond) ||
           P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
           parseSILIdentifier(BBName, NameLoc, diag::expected_sil_block_name) ||
-          parseSILBBArgsAtBranch(Args, B) ||
           P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
           parseSILIdentifier(BBName2, NameLoc2,
                              diag::expected_sil_block_name) ||
-          parseSILBBArgsAtBranch(Args2, B) || parseSILDebugLocation(InstLoc, B))
+          parseSILDebugLocation(InstLoc, B))
         return true;
 
       auto I1Ty = SILType::getBuiltinIntegerType(1, SILMod.getASTContext());
       SILValue CondVal = getLocalValue(Cond, I1Ty, InstLoc, B);
       ResultVal = B.createCondBranch(
-          InstLoc, CondVal, getBBForReference(BBName, NameLoc), Args,
-          getBBForReference(BBName2, NameLoc2), Args2);
+          InstLoc, CondVal, getBBForReference(BBName, NameLoc),
+          getBBForReference(BBName2, NameLoc2));
       break;
     }
     case SILInstructionKind::UnreachableInst:

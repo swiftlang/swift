@@ -117,7 +117,10 @@ bb3(%arg : $C):
 
 bb4:
   %val = load %adr : $*Builtin.Int32
-  cond_br undef, bb4, bb5
+  cond_br undef, bb4trampoline, bb5
+
+bb4trampoline:
+  br bb4
 
 bb5:
   return %val : $Builtin.Int32
@@ -198,7 +201,10 @@ bb1(%i4 : $Builtin.Int64):
   %f3 = function_ref @get_condition : $@convention(thin)  (Builtin.Int64) -> Builtin.Int1
   %c1 = apply %f3(%i3) : $@convention(thin)  (Builtin.Int64) -> Builtin.Int1
   %i5 = integer_literal $Builtin.Int64, 27
-  cond_br %c1, bb1(%i5 : $Builtin.Int64), bb5
+  cond_br %c1, bb1trampoline, bb5
+
+bb1trampoline:
+  br bb1(%i5 : $Builtin.Int64)
 
 bb2:
   %f1 = function_ref @get_int1 : $@convention(thin)  () -> Builtin.Int64

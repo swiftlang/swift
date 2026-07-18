@@ -34,8 +34,11 @@ bb0(%0 : $Cls):
 bb1:
   strong_release %0 : $Cls
   strong_retain %0 : $Cls
-  cond_br undef, bb1, bb2
-  
+  cond_br undef, bb1t, bb2
+
+bb1t:
+  br bb1
+
 bb2:
   strong_release %0 : $Cls
   strong_release %0 : $Cls
@@ -46,7 +49,7 @@ bb2:
 // CHECK-LABEL: sil hidden @$matched_rr_loop :
 // CHECK: bb0(%0 : $Cls):
 // CHECK-NOT:   strong_retain %0 : $Cls
-// CHECK: bb2:
+// CHECK: bb3:
 // CHECK-NEXT:   strong_release %0 : $Cls
 // CHECK-NEXT:   [[RET:%.*]] = tuple ()
 // CHECK-NEXT:   return [[RET]]
@@ -59,8 +62,11 @@ bb0(%0 : $Cls):
 bb1:
   strong_retain %0 : $Cls
   strong_release %0 : $Cls
-  cond_br undef, bb1, bb2
-  
+  cond_br undef, bb1t, bb2
+
+bb1t:
+  br bb1
+
 bb2:
   strong_release %0 : $Cls
   strong_release %0 : $Cls
@@ -83,7 +89,10 @@ bb0(%0 : $S, %1 : $ChildCls):
 bb1:
   strong_release %1 : $ChildCls
   strong_retain %1 : $ChildCls
-  cond_br undef, bb1, bb2
+  cond_br undef, bb1t, bb2
+
+bb1t:
+  br bb1
 
 bb2:
   release_value %0 : $S
@@ -95,7 +104,7 @@ bb2:
 // CHECK-LABEL: sil hidden @$matched_rr_aliasing_loop :
 // CHECK: bb0(%0 : $S, %1 : $ChildCls):
 // CHECK-NOT:   retain_value %0 : $S
-// CHECK: bb2:
+// CHECK: bb3:
 // CHECK-NEXT:   release_value %0 : $S
 // CHECK-NEXT:   [[RET:%.*]] = tuple ()
 // CHECK-NEXT:   return [[RET]]
@@ -108,7 +117,10 @@ bb0(%0 : $S, %1 : $ChildCls):
 bb1:
   strong_retain %1 : $ChildCls
   strong_release %1 : $ChildCls
-  cond_br undef, bb1, bb2
+  cond_br undef, bb1t, bb2
+
+bb1t:
+  br bb1
 
 bb2:
   release_value %0 : $S
@@ -134,7 +146,10 @@ bb1:
   %2 = load %1 : $*ChildCls
   strong_release %2 : $ChildCls
   strong_retain %2 : $ChildCls
-  cond_br undef, bb1, bb2
+  cond_br undef, bb1t, bb2
+
+bb1t:
+  br bb1
 
 bb2:
   release_value %0 : $Cls
@@ -146,7 +161,7 @@ bb2:
 // CHECK-LABEL: sil hidden @$matched_rr_subobject_loop :
 // CHECK: bb0(%0 : $Cls):
 // CHECK-NOT:   retain_value %0 : $Cls
-// CHECK: bb2:
+// CHECK: bb3:
 // CHECK-NEXT:   release_value %0 : $Cls
 // CHECK-NEXT:   [[RET:%.*]] = tuple ()
 // CHECK-NEXT:   return [[RET]]
@@ -161,7 +176,10 @@ bb1:
   %2 = load %1 : $*ChildCls
   strong_retain %2 : $ChildCls
   strong_release %2 : $ChildCls
-  cond_br undef, bb1, bb2
+  cond_br undef, bb1t, bb2
+
+bb1t:
+  br bb1
 
 bb2:
   release_value %0 : $Cls
@@ -189,7 +207,10 @@ bb1:
   %1 = struct_extract %0 : $S, #S.child1
   strong_release %1 : $ChildCls
   strong_retain %1 : $ChildCls
-  cond_br undef, bb1, bb2
+  cond_br undef, bb1t, bb2
+
+bb1t:
+  br bb1
 
 bb2:
   release_value %0 : $S
@@ -202,24 +223,33 @@ bb2:
 // CHECK-LABEL: sil hidden @$unmatched_rr_loop_early_exit :
 // CHECK: bb1
 // CHECK:   strong_release %0 : $Cls
-// CHECK:   cond_br undef, bb2, bb3
+// CHECK:   cond_br undef, bb2, bb4
 // CHECK: bb2:
 // CHECK:   strong_retain %0 : $Cls
-// CHECK:   cond_br undef, bb1, bb3
+// CHECK:   cond_br undef, bb3, bb5
 // CHECK-LABEL: } // end sil function '$unmatched_rr_loop_early_exit'
 sil hidden @$unmatched_rr_loop_early_exit : $@convention(thin) (@owned Cls) -> () {
 bb0(%0 : $Cls):
   strong_retain %0 : $Cls
   br bb1
-  
+
 bb1:
   strong_release %0 : $Cls
-  cond_br undef, bb2, bb3
+  cond_br undef, bb2, bb3t1
 
 bb2:
   strong_retain %0 : $Cls
-  cond_br undef, bb1, bb3
-  
+  cond_br undef, bb1t, bb3t2
+
+bb1t:
+  br bb1
+
+bb3t1:
+  br bb3
+
+bb3t2:
+  br bb3
+
 bb3:
   strong_release %0 : $Cls
   strong_release %0 : $Cls
@@ -233,24 +263,33 @@ bb3:
 // CHECK-LABEL: sil hidden @$matched_rr_loop_early_exit :
 // CHECK: bb1
 // CHECK:   strong_retain %0 : $Cls
-// CHECK:   cond_br undef, bb2, bb3
+// CHECK:   cond_br undef, bb2, bb4
 // CHECK: bb2:
 // CHECK:   strong_release %0 : $Cls
-// CHECK:   cond_br undef, bb1, bb3
+// CHECK:   cond_br undef, bb3, bb5
 // CHECK-LABEL: } // end sil function '$matched_rr_loop_early_exit'
 sil hidden @$matched_rr_loop_early_exit : $@convention(thin) (@owned Cls) -> () {
 bb0(%0 : $Cls):
   strong_retain %0 : $Cls
   br bb1
-  
+
 bb1:
   strong_retain %0 : $Cls
-  cond_br undef, bb2, bb3
+  cond_br undef, bb2, bb3t1
 
 bb2:
   strong_release %0 : $Cls
-  cond_br undef, bb1, bb3
-  
+  cond_br undef, bb1t, bb3t2
+
+bb1t:
+  br bb1
+
+bb3t1:
+  br bb3
+
+bb3t2:
+  br bb3
+
 bb3:
   strong_release %0 : $Cls
   strong_release %0 : $Cls
@@ -261,24 +300,27 @@ bb3:
 // CHECK-LABEL: sil hidden @$unmatched_rr_loop_early_exit_allowsleaks :
 // CHECK: bb1
 // CHECK:   strong_release %0 : $Cls
-// CHECK:   cond_br undef, bb2, bb3
+// CHECK:   cond_br undef, bb2, bb4
 // CHECK: bb2:
 // CHECK:   strong_retain %0 : $Cls
-// CHECK:   cond_br undef, bb1, bb4
+// CHECK:   cond_br undef, bb3, bb5
 // CHECK-LABEL: } // end sil function '$unmatched_rr_loop_early_exit_allowsleaks'
 sil hidden @$unmatched_rr_loop_early_exit_allowsleaks : $@convention(thin) (@owned Cls) -> () {
 bb0(%0 : $Cls):
   strong_retain %0 : $Cls
   br bb1
-  
+
 bb1:
   strong_release %0 : $Cls
   cond_br undef, bb2, bb3
 
 bb2:
   strong_retain %0 : $Cls
-  cond_br undef, bb1, bb4
-  
+  cond_br undef, bb1t, bb4
+
+bb1t:
+  br bb1
+
 bb3:
   unreachable
 
@@ -294,24 +336,27 @@ bb4:
 // CHECK-LABEL: sil hidden @$matched_rr_loop_early_exit_allowsleaks :
 // CHECK: bb1
 // CHECK-NOT:   strong_release %0 : $Cls
-// CHECK:   cond_br undef, bb2, bb3
+// CHECK:   cond_br undef, bb2, bb4
 // CHECK: bb2:
 // CHECK-NOT:   strong_retain %0 : $Cls
-// CHECK:   cond_br undef, bb1, bb4
+// CHECK:   cond_br undef, bb3, bb5
 // CHECK-LABEL: } // end sil function '$matched_rr_loop_early_exit_allowsleaks'
 sil hidden @$matched_rr_loop_early_exit_allowsleaks : $@convention(thin) (@owned Cls) -> () {
 bb0(%0 : $Cls):
   strong_retain %0 : $Cls
   br bb1
-  
+
 bb1:
   strong_retain %0 : $Cls
   cond_br undef, bb2, bb3
 
 bb2:
   strong_release %0 : $Cls
-  cond_br undef, bb1, bb4
-  
+  cond_br undef, bb1t, bb4
+
+bb1t:
+  br bb1
+
 bb3:
   unreachable
 

@@ -7,7 +7,7 @@ import Swift
 import SwiftShims
 
 // CHECK-LABEL: sil @test_jump_threading
-// CHECK: bb5(%{{[0-9]+}} : $Builtin.Int64):
+// CHECK: bb4({{.*}} : $Builtin.Int64):
 // CHECK-NEXT: br bb1
 sil @test_jump_threading : $@convention(thin)  (Builtin.Int1) -> () {
 bb0(%0 : $Builtin.Int1):
@@ -19,7 +19,7 @@ bb1(%i4 : $Builtin.Int64):
   %f3 = function_ref @get_condition : $@convention(thin)  (Builtin.Int64) -> Builtin.Int1
   %c1 = apply %f3(%i3) : $@convention(thin)  (Builtin.Int64) -> Builtin.Int1
   %i5 = integer_literal $Builtin.Int64, 27
-  cond_br %c1, bb1(%i5 : $Builtin.Int64), bb5
+  cond_br %c1, bb6, bb5
 
 bb2:
   %f1 = function_ref @get_int1 : $@convention(thin)  () -> Builtin.Int64
@@ -39,6 +39,11 @@ bb4(%i3 : $Builtin.Int64):
 bb5:
   %r1 = tuple ()
   return %r1 : $()
+
+// Trampoline block to avoid a critical edge from the cond_br in bb1 to bb1 itself
+// (bb1 has two predecessors: bb4 and this trampoline).
+bb6:
+  br bb1(%i5 : $Builtin.Int64)
 
 }
 

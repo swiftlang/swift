@@ -295,11 +295,13 @@ bb0(%0 : $*T, %1 : $*T):
   br bb1
 bb1:
   %a1 = apply %pa(%0) : $@callee_guaranteed (@in T) -> ()
-  cond_br undef, bb1, bb2
+  cond_br undef, bb3, bb2
 bb2:
   strong_release %pa : $@callee_guaranteed (@in T) -> ()
   %r = tuple ()
   return %r : $()
+bb3:
+  br bb1
 }
 
 // Now check that we handle the in_guaranteed case.

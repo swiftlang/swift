@@ -203,11 +203,9 @@ bool SimplifyCFG::threadEdge(const ThreadInfo &ti) {
 
     ThreadedSuccessorBlock =
         clonedSrc->getSuccessors()[ti.ThreadedSuccessorIdx].getBB();
-    auto Args = ti.ThreadedSuccessorIdx == 0 ? CondTerm->getTrueArgs()
-                                             : CondTerm->getFalseArgs();
-
+    // A cond_br passes no branch arguments (SIL has no critical edges).
     SILBuilderWithScope(CondTerm).createBranch(CondTerm->getLoc(),
-                                               ThreadedSuccessorBlock, Args);
+                                               ThreadedSuccessorBlock);
 
     CondTerm->eraseFromParent();
   } else {
@@ -540,13 +538,11 @@ bool SimplifyCFG::simplifyThreadedTerminators() {
         LLVM_DEBUG(llvm::dbgs() << "simplify threaded " << *CondBr);
         SILBasicBlock *TrueSide = CondBr->getTrueBB();
         SILBasicBlock *FalseSide = CondBr->getFalseBB();
-        auto TrueArgs = CondBr->getTrueArgs();
-        auto FalseArgs = CondBr->getFalseArgs();
         bool isFalse = !IL->getValue();
-        auto LiveArgs = isFalse ? FalseArgs : TrueArgs;
         auto *LiveBlock = isFalse ? FalseSide : TrueSide;
+        // A cond_br passes no branch arguments (SIL has no critical edges).
         SILBuilderWithScope(CondBr)
-            .createBranch(CondBr->getLoc(), LiveBlock, LiveArgs);
+            .createBranch(CondBr->getLoc(), LiveBlock);
         CondBr->eraseFromParent();
         if (IL->use_empty())
           IL->eraseFromParent();
@@ -1474,8 +1470,9 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
   auto *ThisBB = BI->getParent();
   SILBasicBlock *TrueSide = BI->getTrueBB();
   SILBasicBlock *FalseSide = BI->getFalseBB();
-  auto TrueArgs = BI->getTrueArgs();
-  auto FalseArgs = BI->getFalseArgs();
+  // A cond_br passes no branch arguments (SIL has no critical edges).
+  ArrayRef<SILValue> TrueArgs;
+  ArrayRef<SILValue> FalseArgs;
 
   // If the condition is an integer literal, we can constant fold the branch.
   if (auto *IL = dyn_cast<IntegerLiteralInst>(BI->getCondition())) {
@@ -1513,7 +1510,7 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
           Builder.createCondBranch(
               BI->getLoc(),
               invertExpectAndApplyTo(Builder, BI->getCondition(), Cond),
-              FalseSide, FalseArgs, TrueSide, TrueArgs, BI->getFalseBBCount(),
+              FalseSide, TrueSide, BI->getFalseBBCount(),
               BI->getTrueBBCount());
           BI->eraseFromParent();
           addToWorklist(ThisBB);
@@ -1558,12 +1555,10 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
                << "true-trampoline from bb" << ThisBB->getDebugID() << " to bb"
                << trueTrampolineDest.destBB->getDebugID() << '\n');
 
-    SmallVector<SILValue, 4> falseArgsCopy(FalseArgs.begin(), FalseArgs.end());
     eraseTrampolineDestArgs(trueTrampolineDest);
     SILBuilderWithScope(BI).createCondBranch(
         BI->getLoc(), BI->getCondition(), trueTrampolineDest.destBB,
-        {}, FalseSide, falseArgsCopy,
-        BI->getTrueBBCount(), BI->getFalseBBCount());
+        FalseSide, BI->getTrueBBCount(), BI->getFalseBBCount());
     BI->eraseFromParent();
 
     substitutedBlockPreds(TrueSide, ThisBB);
@@ -1581,11 +1576,10 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
                << "false-trampoline from bb" << ThisBB->getDebugID() << " to bb"
                << falseTrampolineDest.destBB->getDebugID() << '\n');
 
-    SmallVector<SILValue, 4> trueArgsCopy(TrueArgs.begin(), TrueArgs.end());
     eraseTrampolineDestArgs(falseTrampolineDest);
     SILBuilderWithScope(BI).createCondBranch(
-        BI->getLoc(), BI->getCondition(), TrueSide, trueArgsCopy,
-        falseTrampolineDest.destBB, {}, BI->getTrueBBCount(),
+        BI->getLoc(), BI->getCondition(), TrueSide,
+        falseTrampolineDest.destBB, BI->getTrueBBCount(),
         BI->getFalseBBCount());
     BI->eraseFromParent();
 
@@ -1606,7 +1600,7 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
     ++NumConstantFolded;
   };
   if (trueTrampolineDest.destBB == FalseSide
-      && trueTrampolineDest.newSourceBranchArgs == FalseArgs) {
+      && trueTrampolineDest.newSourceBranchArgs.empty()) {
     condBrToBr(trueTrampolineDest.newSourceBranchArgs, FalseSide);
     removeIfDead(TrueSide);
     return true;
@@ -3054,8 +3048,6 @@ private:
   bool createNewArguments();
   void replaceIncomingArgs(SILBuilder &B, BranchInst *BI,
                            llvm::SmallVectorImpl<SILValue> &NewIncomingValues);
-  void replaceIncomingArgs(SILBuilder &B, CondBranchInst *CBI,
-                           llvm::SmallVectorImpl<SILValue> &NewIncomingValues);
 };
 } // end anonymous namespace
 
@@ -3072,46 +3064,6 @@ void ArgumentSplitter::replaceIncomingArgs(
   }
   std::reverse(NewIncomingValues.begin(), NewIncomingValues.end());
   B.createBranch(BI->getLoc(), BI->getDestBB(), NewIncomingValues);
-}
-
-void ArgumentSplitter::replaceIncomingArgs(
-    SILBuilder &B, CondBranchInst *CBI,
-    llvm::SmallVectorImpl<SILValue> &NewIncomingValues) {
-  llvm::SmallVector<SILValue, 4> OldIncomingValues;
-  ArrayRef<SILValue> NewTrueValues, NewFalseValues;
-
-  unsigned ArgIndex = Arg->getIndex();
-  if (Arg->getParent() == CBI->getTrueBB()) {
-    ArrayRef<Operand> TrueArgs = CBI->getTrueOperands();
-    for (unsigned i : llvm::reverse(indices(TrueArgs))) {
-      // Skip this argument.
-      if (i == ArgIndex)
-        continue;
-      NewIncomingValues.push_back(TrueArgs[i].get());
-    }
-    std::reverse(NewIncomingValues.begin(), NewIncomingValues.end());
-    for (SILValue V : CBI->getFalseArgs())
-      OldIncomingValues.push_back(V);
-    NewTrueValues = NewIncomingValues;
-    NewFalseValues = OldIncomingValues;
-  } else {
-    ArrayRef<Operand> FalseArgs = CBI->getFalseOperands();
-    for (unsigned i : llvm::reverse(indices(FalseArgs))) {
-      // Skip this argument.
-      if (i == ArgIndex)
-        continue;
-      NewIncomingValues.push_back(FalseArgs[i].get());
-    }
-    std::reverse(NewIncomingValues.begin(), NewIncomingValues.end());
-    for (SILValue V : CBI->getTrueArgs())
-      OldIncomingValues.push_back(V);
-    NewTrueValues = OldIncomingValues;
-    NewFalseValues = NewIncomingValues;
-  }
-
-  B.createCondBranch(CBI->getLoc(), CBI->getCondition(), CBI->getTrueBB(),
-                     NewTrueValues, CBI->getFalseBB(), NewFalseValues,
-                     CBI->getTrueBBCount(), CBI->getFalseBBCount());
 }
 
 bool ArgumentSplitter::createNewArguments() {
@@ -3232,12 +3184,10 @@ bool ArgumentSplitter::split() {
       NewIncomingValues.push_back(ProjInst);
     }
 
-    if (auto *Br = dyn_cast<BranchInst>(OldTerm)) {
-      replaceIncomingArgs(B, Br, NewIncomingValues);
-    } else {
-      auto *CondBr = cast<CondBranchInst>(OldTerm);
-      replaceIncomingArgs(B, CondBr, NewIncomingValues);
-    }
+    // Only a BranchInst can carry phi arguments: SIL has no critical edges, so
+    // a phi block is only ever reached through unconditional branches.
+    auto *Br = cast<BranchInst>(OldTerm);
+    replaceIncomingArgs(B, Br, NewIncomingValues);
 
     OldTerm->eraseFromParent();
     NewIncomingValues.clear();
