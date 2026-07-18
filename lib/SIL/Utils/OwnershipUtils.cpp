@@ -521,6 +521,40 @@ bool swift::visitGuaranteedForwardingPhisForSSAValue(
   return true;
 }
 
+bool swift::visitExtendedGuaranteedForwardingPhis(
+    SILValue value, function_ref<bool(Operand *)> visitor) {
+  assert(value->getOwnershipKind() == OwnershipKind::Guaranteed);
+
+  ValueWorklist worklist(value);
+
+  while (auto val = worklist.pop()) {
+    for (auto *use : val->getUses()) {
+      if (use->getOperandOwnership() !=
+          OperandOwnership::GuaranteedForwarding) {
+        continue;
+      }
+      if (auto phiOperand = PhiOperand(use)) {
+        if (!visitor(use)) {
+          return false;
+        }
+        // Look through BorrowedFromInst to find further forwarding uses
+        // that go through the phi's borrowed_from result.
+        SILValue phiVal = phiOperand.getValue();
+        if (auto *bfi = getBorrowedFromUser(phiVal))
+          worklist.pushIfNotVisited(SILValue(bfi));
+      } else {
+        ForwardingOperand(use).visitForwardedValues([&](SILValue result) {
+          if (result->getOwnershipKind() == OwnershipKind::None)
+            return true;
+          worklist.pushIfNotVisited(result);
+          return true;
+        });
+      }
+    }
+  }
+  return true;
+}
+
 // Find all use points of \p guaranteedValue within its borrow scope. All use
 // points will be dominated by \p guaranteedValue.
 //
