@@ -199,7 +199,7 @@ UNINTERESTING_FEATURE(SameElementRequirements)
 UNINTERESTING_FEATURE(SendingArgsAndResults)
 UNINTERESTING_FEATURE(CheckImplementationOnly)
 UNINTERESTING_FEATURE(CheckImplementationOnlyStrict)
-UNINTERESTING_FEATURE(SafeImplementationOnly)
+UNINTERESTING_FEATURE(SerializeAbstractTypeLayoutForHiddenTypes)
 UNINTERESTING_FEATURE(EnforceSPIOperatorGroup)
 
 static bool usesFeatureCAttribute(Decl *decl) {

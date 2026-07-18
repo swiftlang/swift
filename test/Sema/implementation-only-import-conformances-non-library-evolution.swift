@@ -13,7 +13,14 @@
 // RUN:  -swift-version 6 -verify-additional-prefix opt-in- \
 // RUN:  -enable-experimental-feature CheckImplementationOnly
 
+/// SerializeAbstractTypeLayoutForHiddenTypes suppresses implicitly exported
+/// ABI-surface diagnostics.
+// RUN: %target-typecheck-verify-swift -I %t \
+// RUN:  -swift-version 6 \
+// RUN:  -enable-experimental-feature SerializeAbstractTypeLayoutForHiddenTypes
+
 // REQUIRES: swift_feature_CheckImplementationOnly
+// REQUIRES: swift_feature_SerializeAbstractTypeLayoutForHiddenTypes
 
 import NormalLibrary
 @_implementationOnly import BADLibrary // expected-not-opt-in-warning {{safely use '@_implementationOnly' without library evolution by setting '-enable-experimental-feature CheckImplementationOnly' for 'main'}}
@@ -91,11 +98,13 @@ struct InternalInferredAssociatedTypeImpl {
 extension InternalInferredAssociatedTypeImpl: PublicAssociatedTypeProto {}
 // expected-not-opt-in-warning @-1 {{cannot use conformance of 'NormalStruct' to 'NormalProto' here; 'BADLibrary' has been imported as implementation-only}}
 // expected-opt-in-error @-2 {{cannot use conformance of 'NormalStruct' to 'NormalProto' here; 'BADLibrary' has been imported as implementation-only}}
-// expected-note @-3 {{in associated type 'Self.Assoc' (inferred as 'NormalStruct')}}
+// expected-not-opt-in-note @-3 {{in associated type 'Self.Assoc' (inferred as 'NormalStruct')}}
+// expected-opt-in-note @-4 {{in associated type 'Self.Assoc' (inferred as 'NormalStruct')}}
 extension InternalInferredAssociatedTypeImpl: UFIAssociatedTypeProto {}
 // expected-not-opt-in-warning @-1 {{cannot use conformance of 'NormalStruct' to 'NormalProto' here; 'BADLibrary' has been imported as implementation-only}}
 // expected-opt-in-error @-2 {{cannot use conformance of 'NormalStruct' to 'NormalProto' here; 'BADLibrary' has been imported as implementation-only}}
-// expected-note @-3 {{in associated type 'Self.Assoc' (inferred as 'NormalStruct')}}
+// expected-not-opt-in-note @-3 {{in associated type 'Self.Assoc' (inferred as 'NormalStruct')}}
+// expected-opt-in-note @-4 {{in associated type 'Self.Assoc' (inferred as 'NormalStruct')}}
 
 extension InternalInferredAssociatedTypeImpl: InternalAssociatedTypeProto {} // okay
 
@@ -106,11 +115,13 @@ internal struct PublicExplicitAssociatedTypeImpl {
 extension PublicExplicitAssociatedTypeImpl: PublicAssociatedTypeProto {}
 // expected-not-opt-in-warning @-1 {{cannot use conformance of 'NormalStruct' to 'NormalProto' here; 'BADLibrary' has been imported as implementation-only}}
 // expected-opt-in-error @-2 {{cannot use conformance of 'NormalStruct' to 'NormalProto' here; 'BADLibrary' has been imported as implementation-only}}
-// expected-note@-3 {{in associated type 'Self.Assoc' (inferred as 'NormalStruct')}}
+// expected-not-opt-in-note@-3 {{in associated type 'Self.Assoc' (inferred as 'NormalStruct')}}
+// expected-opt-in-note@-4 {{in associated type 'Self.Assoc' (inferred as 'NormalStruct')}}
 
 extension PublicExplicitAssociatedTypeImpl: UFIAssociatedTypeProto {}
 // expected-not-opt-in-warning @-1 {{cannot use conformance of 'NormalStruct' to 'NormalProto' here; 'BADLibrary' has been imported as implementation-only}}
 // expected-opt-in-error @-2 {{cannot use conformance of 'NormalStruct' to 'NormalProto' here; 'BADLibrary' has been imported as implementation-only}}
-// expected-note@-3 {{in associated type 'Self.Assoc' (inferred as 'NormalStruct')}}
+// expected-not-opt-in-note@-3 {{in associated type 'Self.Assoc' (inferred as 'NormalStruct')}}
+// expected-opt-in-note@-4 {{in associated type 'Self.Assoc' (inferred as 'NormalStruct')}}
 
 extension PublicExplicitAssociatedTypeImpl: InternalAssociatedTypeProto {} // okay
