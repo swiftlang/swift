@@ -639,12 +639,12 @@ bb3(%6 : $Builtin.Word):
 // CHECK-LABEL: sil public_external [transparent] @test_cond_branch_basic_block_args
 sil [transparent] [serialized] @test_cond_branch_basic_block_args : $@convention(thin) (Int, Builtin.Int1) -> Int {
 bb0(%0 : $Int, %1 : $Builtin.Int1):
-  cond_br %1, bb1(%0 : $Int), bb2(%0 : $Int)
-  // CHECK: cond_br %1, bb2(%0 : $Int), bb1(%0 : $Int)
-bb1(%3 : $Int):
-  br bb3 (%3 : $Int)
-bb2(%2 : $Int):
-  br bb3(%2 : $Int)
+  cond_br %1, bb1, bb2
+  // CHECK: cond_br %1, bb2, bb1
+bb1:
+  br bb3 (%0 : $Int)
+bb2:
+  br bb3(%0 : $Int)
 bb3(%4 : $Int):
   return %4 : $Int
 }

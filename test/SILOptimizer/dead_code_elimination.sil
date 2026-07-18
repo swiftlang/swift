@@ -117,7 +117,7 @@ bb4:
   %44 = struct_extract %43 : $Bool, #Bool._value
 // CHECK-NOT: cond_br
 // CHECK: br bb5
-  cond_br %44, bb5, bb6(%28 : $Int32)
+  cond_br %44, bb5, bbTrampoline1
 
 bb5:
   %46 = integer_literal $Builtin.Int32, 0
@@ -130,7 +130,7 @@ bb6(%49 : $Int32):
   %53 = builtin "cmp_eq_Int32"(%50 : $Builtin.Int32, %52 : $Builtin.Int32) : $Builtin.Int1
   %54 = struct $Bool (%53 : $Builtin.Int1)
   %55 = struct_extract %54 : $Bool, #Bool._value
-  cond_br %55, bb7, bb8(%29 : $Int32)
+  cond_br %55, bb7, bbTrampoline2
 
 bb7:
   %57 = integer_literal $Builtin.Int32, 0
@@ -182,6 +182,12 @@ bb10:
   %90 = tuple ()
 // CHECK: return
   return %90 : $()
+
+bbTrampoline1:
+  br bb6(%28 : $Int32)
+
+bbTrampoline2:
+  br bb8(%29 : $Int32)
 }
 
 sil @take_int32 : $@convention(thin) (Int32) -> ()

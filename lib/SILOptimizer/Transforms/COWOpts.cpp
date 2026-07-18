@@ -295,10 +295,8 @@ void COWOptsPass::collectEscapePoints(SILValue v,
                             escapePoints, handled);
         break;
       case SILInstructionKind::CondBranchInst:
-        if (use->getOperandNumber() != CondBranchInst::ConditionIdx) {
-          collectEscapePoints(cast<CondBranchInst>(user)->getArgForOperand(use),
-                              escapePoints, handled);
-        }
+        // A cond_br only uses its condition operand and passes no branch
+        // arguments, so there is nothing to collect through it.
         break;
       case SILInstructionKind::StructInst:
       case SILInstructionKind::StructExtractInst:

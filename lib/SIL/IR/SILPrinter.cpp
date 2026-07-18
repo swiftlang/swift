@@ -3297,9 +3297,7 @@ public:
   void visitCondBranchInst(CondBranchInst *CBI) {
     *this << Ctx.getID(CBI->getCondition()) << ", "
           << Ctx.getID(CBI->getTrueBB());
-    printBranchArgs(CBI->getTrueArgs());
     *this << ", " << Ctx.getID(CBI->getFalseBB());
-    printBranchArgs(CBI->getFalseArgs());
     if (CBI->getTrueBBCount())
       *this << " !true_count(" << CBI->getTrueBBCount().getValue() << ")";
     if (CBI->getFalseBBCount())

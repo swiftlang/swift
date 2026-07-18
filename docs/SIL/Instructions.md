@@ -5173,25 +5173,16 @@ destination basic block.
 ### cond_br
 
 ```
-sil-terminator ::= 'cond_br' sil-operand ','
-                     sil-identifier '(' (sil-operand (',' sil-operand)*)? ')' ','
-                     sil-identifier '(' (sil-operand (',' sil-operand)*)? ')'
+sil-terminator ::= 'cond_br' sil-operand ',' sil-identifier ',' sil-identifier
 
-cond_br %0 : $Builtin.Int1, true_label (%a : $A, %b : $B, ...), 
-                               false_label (%x : $X, %y : $Y, ...)
+cond_br %0 : $Builtin.Int1, true_label, false_label
 // %0 must be of $Builtin.Int1 type
 // `true_label` and `false_label` must refer to block labels within the
 //   current function and must not be identical
-// %a, %b, etc. must be of the types of `true_label`'s arguments
-// %x, %y, etc. must be of the types of `false_label`'s arguments
 ```
 
 Conditionally branches to `true_label` if `%0` is equal to `1` or to
-`false_label` if `%0` is equal to `0`, binding the corresponding set of
-values to the arguments of the chosen destination block.
-
-In OSSA, `cond_br` must not have any arguments because in OSSA critical control
-flow edges are not allowed.
+`false_label` if `%0` is equal to `0`.
 
 ### switch_value
 

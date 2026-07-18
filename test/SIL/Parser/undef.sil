@@ -279,11 +279,13 @@ bb1(%x : $()):
 
 sil @cond_br_test : $() -> () {
 bb0:
-  // CHECK: cond_br undef, bb1(undef : $()), bb2
-  cond_br undef, bb1(undef : $()), bb2
-bb1(%1 : $()):
-  br bb2
+  // CHECK: cond_br undef, bb1, bb2
+  cond_br undef, bb1, bb2
+bb1:
+  br bb3
 bb2:
+  br bb3
+bb3:
   return undef : $()
 }
 

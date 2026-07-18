@@ -176,14 +176,28 @@ bb1:
 // This is a loop!
 bb2:
   %5 = apply %4(%3) : $@convention(method) (@guaranteed X) -> Int
-  cond_br undef, bb2, bb3
+  cond_br undef, bb5, bb8
 
 bb3:
-  cond_br undef, bb3, bb1
+  cond_br undef, bb6, bb7
 
 bb4:
   strong_release %0 : $Y
   return undef : $Int
+
+// Trampoline blocks to avoid critical edges from the cond_br's in bb2 and bb3
+// (bb1, bb2, and bb3 all have two predecessors).
+bb5:
+  br bb2
+
+bb6:
+  br bb3
+
+bb7:
+  br bb1
+
+bb8:
+  br bb3
 }
 
 sil @takeY : $@convention(thin) (@guaranteed Y) -> ()

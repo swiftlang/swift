@@ -538,32 +538,9 @@ TermInst *swift::addArgumentsToBranch(ArrayRef<SILValue> vals,
                                       SILBasicBlock *dest, TermInst *branch) {
   SILBuilderWithScope builder(branch);
 
-  if (auto *cbi = dyn_cast<CondBranchInst>(branch)) {
-    SmallVector<SILValue, 8> trueArgs;
-    SmallVector<SILValue, 8> falseArgs;
-
-    for (auto arg : cbi->getTrueArgs())
-      trueArgs.push_back(arg);
-
-    for (auto arg : cbi->getFalseArgs())
-      falseArgs.push_back(arg);
-
-    if (dest == cbi->getTrueBB()) {
-      for (auto val : vals)
-        trueArgs.push_back(val);
-      assert(trueArgs.size() == dest->getNumArguments());
-    } else {
-      for (auto val : vals)
-        falseArgs.push_back(val);
-      assert(falseArgs.size() == dest->getNumArguments());
-    }
-
-    return builder.createCondBranch(
-        cbi->getLoc(), cbi->getCondition(), cbi->getTrueBB(), trueArgs,
-        cbi->getFalseBB(), falseArgs, cbi->getTrueBBCount(),
-        cbi->getFalseBBCount());
-  }
-
+  // Only a BranchInst can carry phi arguments: SIL has no critical edges, so a
+  // block with phi arguments is only ever reached through unconditional
+  // branches (never a cond_br).
   if (auto *bi = dyn_cast<BranchInst>(branch)) {
     SmallVector<SILValue, 8> args;
 

@@ -438,6 +438,7 @@ void DCE::markTerminatorArgsLive(SILBasicBlock *Pred,
   case TermKind::SwitchValueInst:
   case TermKind::SwitchEnumAddrInst:
   case TermKind::CheckedCastAddrBranchInst:
+  case TermKind::CondBranchInst:
     llvm_unreachable("Unexpected argument for terminator kind!");
     break;
 
@@ -456,21 +457,6 @@ void DCE::markTerminatorArgsLive(SILBasicBlock *Pred,
     markValueLive(cast<BranchInst>(Term)->getArg(ArgIndex));
     break;
 
-  case TermKind::CondBranchInst: {
-    auto *CondBr = cast<CondBranchInst>(Term);
-
-    if (CondBr->getTrueBB() == Succ) {
-      auto TrueArgs = CondBr->getTrueArgs();
-      markValueLive(TrueArgs[ArgIndex]);
-    }
-
-    if (CondBr->getFalseBB() == Succ) {
-      auto FalseArgs = CondBr->getFalseArgs();
-      markValueLive(FalseArgs[ArgIndex]);
-    }
-
-    break;
-  }
   case TermKind::AwaitAsyncContinuationInst:
   case TermKind::TryApplyInst: {
     assert(ArgIndex == 0 && "Expect a single argument!");

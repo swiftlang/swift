@@ -930,7 +930,6 @@ struct BridgedInstruction {
   BRIDGED_INLINE bool MarkUnresolvedNonCopyableValue_isStrict() const;
   BRIDGED_INLINE void RefCountingInst_setIsAtomic(bool isAtomic) const;
   BRIDGED_INLINE bool RefCountingInst_getIsAtomic() const;
-  BRIDGED_INLINE SwiftInt CondBranchInst_getNumTrueArgs() const;
   BRIDGED_INLINE void AllocRefInstBase_setIsStackAllocatable() const;
   BRIDGED_INLINE bool AllocRefInst_isBare() const;
   BRIDGED_INLINE void AllocRefInst_setIsBare() const;

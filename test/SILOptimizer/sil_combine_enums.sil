@@ -59,7 +59,7 @@ bb2:                                              // Preds: bb0
 
 // CHECK-LABEL: sil @eliminate_select_enum_addr
 // CHECK-NOT: select_enum_addr
-// CHECK: select_enum
+// CHECK: switch_enum
 // CHECK: return
 
 sil @eliminate_select_enum_addr : $@convention(thin) () -> Int {
@@ -77,7 +77,7 @@ bb0:
   %t = integer_literal $Builtin.Int1, -1
   %f = integer_literal $Builtin.Int1, 0
   %b = select_enum_addr %7 : $*Optional<SomeClass>, case #Optional.some!enumelt: %t, case #Optional.none!enumelt: %f : $Builtin.Int1
-  cond_br %b, bb1, bb2
+  cond_br %b, bb3, bb2
 
 bb1:
   %11 = unchecked_inplace_enum_data_addr %7 : $*Optional<SomeClass>, #Optional.some!enumelt
@@ -92,10 +92,12 @@ bb1:
   return %16 : $Int
 
 bb2:
-  // Invoke something here and jump to bb1. This prevents a cond_br(select_enum) -> switch_enum conversion,
-  // since it would introduce a critical edge.
+  // Invoke something here before jumping to bb1.
   %20 = function_ref @external_func: $@convention(thin) () -> ()
   apply %20(): $@convention(thin) () -> ()
+  br bb1
+
+bb3:
   br bb1
 }
 
@@ -201,7 +203,7 @@ bb0(%0 : $*Int32, %1 : $Builtin.Int32, %2 : $Builtin.Int1):
   %i2 = load %0 : $*Int32
   %en = enum $Optional<Int32>, #Optional.none!enumelt
   store %en to %s1 : $*Optional<Int32>
-  cond_br %2, bb1, bb2
+  cond_br %2, bb1, bb3
 
 bb1:
   %e1 = init_enum_data_addr %s1 : $*Optional<Int32>, #Optional.some!enumelt
@@ -215,10 +217,13 @@ bb1:
   store %i to %0 : $*Int32
   br bb2
 
-bb2:                                              // Preds: bb0 bb1
+bb2:                                              // Preds: bb1 bb3
   inject_enum_addr %s1 : $*Optional<Int32>, #Optional.some!enumelt
   dealloc_stack %s1 : $*Optional<Int32>
   return %i2 : $Int32
+
+bb3:                                              // Preds: bb0
+  br bb2
 }
 
 // CHECK-LABEL: sil @fail_to_canonicalize_init_enum_data_addr
@@ -341,19 +346,23 @@ bb3:
 }
 
 
-// Check that cond_br(select_enum) is not converted into switch_enum as it would create a critical edge, which
-// is not originating from cond_br/br. And this is forbidden in a canonical SIL form.
+// Check that cond_br(select_enum) is converted into switch_enum.
+// (Previously, when the destination blocks were allowed to share a
+// predecessor via a critical edge, this conversion was blocked to avoid
+// introducing a critical edge. Critical edges are no longer permitted in
+// SIL at all, so the source below is expressed without one, and the
+// conversion is legal.)
 //
 // CHECK-LABEL: sil @dont_convert_select_enum_cond_br_to_switch_enum
-// CHECK: select_enum
-// CHECK-NOT: switch_enum
+// CHECK-NOT: select_enum
+// CHECK: switch_enum
 // CHECK: return
 sil @dont_convert_select_enum_cond_br_to_switch_enum : $@convention(thin) (@owned Optional<SomeClass>) -> Int {
 bb0(%0 : $Optional<SomeClass>):
   %2 = integer_literal $Builtin.Int1, 0
   %3 = integer_literal $Builtin.Int1, -1
   %4 = select_enum %0 : $Optional<SomeClass>, case #Optional.none!enumelt: %3, case #Optional.some!enumelt: %2 : $Builtin.Int1
-  cond_br %4, bb2, bb1
+  cond_br %4, bb2, bb3
 
 bb1:
   %5 = unchecked_enum_data %0 : $Optional<SomeClass>, #Optional.some!enumelt
@@ -366,6 +375,9 @@ bb1:
 bb2:
   %10 = function_ref @external_func: $@convention(thin) () -> ()
   apply %10(): $@convention(thin) () -> ()
+  br bb1
+
+bb3:
   br bb1
 }
 
