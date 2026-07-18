@@ -136,6 +136,50 @@ bool FrontendOptions::doesActionRequireSwiftStandardLibrary(ActionType action) {
   llvm_unreachable("Unknown ActionType");
 }
 
+bool FrontendOptions::doesActionTypeCheckWholeModule(ActionType action) {
+  switch (action) {
+  case ActionType::Typecheck:
+  case ActionType::DumpAST:
+  case ActionType::PrintAST:
+  case ActionType::PrintASTDecl:
+  case ActionType::DumpScopeMaps:
+  case ActionType::DumpTypeInfo:
+  case ActionType::EmitSILGenOSSA:
+  case ActionType::EmitSILGen:
+  case ActionType::EmitSIL:
+  case ActionType::EmitLoweredSIL:
+  case ActionType::EmitSIBGen:
+  case ActionType::EmitSIB:
+  case ActionType::EmitModuleOnly:
+  case ActionType::MergeModules:
+  case ActionType::EmitAssembly:
+  case ActionType::EmitIRGen:
+  case ActionType::EmitIR:
+  case ActionType::EmitBC:
+  case ActionType::EmitObject:
+  case ActionType::Immediate:
+    return true;
+  case ActionType::NoneAction:
+  case ActionType::Parse:
+  case ActionType::ResolveImports:
+  case ActionType::DumpParse:
+  case ActionType::DumpInterfaceHash:
+  case ActionType::EmitImportedModules:
+  case ActionType::EmitPCH:
+  case ActionType::CompileModuleFromInterface:
+  case ActionType::TypecheckModuleFromInterface:
+  case ActionType::REPL:
+  case ActionType::EmitPCM:
+  case ActionType::DumpPCM:
+  case ActionType::EmitPolyglotAST:
+  case ActionType::ScanDependencies:
+  case ActionType::PrintVersion:
+  case ActionType::PrintArguments:
+    return false;
+  }
+  llvm_unreachable("Unknown ActionType");
+}
+
 bool FrontendOptions::doesActionRequireInputs(ActionType action) {
   switch (action) {
   case ActionType::NoneAction:

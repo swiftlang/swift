@@ -1209,9 +1209,12 @@ static bool shouldEmitSymbolGraph(const CompilerInvocation &Invocation) {
   const auto &opts = Invocation.getFrontendOptions();
   if (Invocation.getSymbolGraphOptions().OutputDir.empty())
     return false;
+  // Only actions that type-check the whole module can produce a symbol graph.
+  if (!FrontendOptions::doesActionTypeCheckWholeModule(opts.RequestedAction))
+    return false;
   // For module-emitting actions, the symbol graph is produced as part of
-  // serialization. The type-check-only case is handled here.
-  if (opts.RequestedAction != FrontendOptions::ActionType::Typecheck)
+  // serialization instead.
+  if (opts.InputsAndOutputs.hasModuleOutputPath())
     return false;
   return opts.InputsAndOutputs.isWholeModule();
 }
