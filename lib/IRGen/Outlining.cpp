@@ -105,7 +105,7 @@ void OutliningMetadataCollector::collectTypeMetadataForDeinit(SILType ty) {
   auto *nominal = ty.getASTType()->getAnyNominal();
   if (!nominal)
     return;
-  if (!nominal->getValueTypeDestructor())
+  if (!nominal->hasValueTypeDestructor())
     return;
   assert(ty.isMoveOnly());
 

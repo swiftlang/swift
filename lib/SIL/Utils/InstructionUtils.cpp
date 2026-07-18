@@ -1491,7 +1491,7 @@ bool swift::shouldExpand(SILModule &module, SILType ty) {
   //
   // TODO: we could loosen this requirement if all paths lead to a drop_deinit.
   if (auto *nominalTy = ty.getNominalOrBoundGenericNominal()) {
-    if (nominalTy->getValueTypeDestructor())
+    if (nominalTy->hasValueTypeDestructor())
       return false;
   }
 

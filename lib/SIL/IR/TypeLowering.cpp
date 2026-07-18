@@ -1732,7 +1732,7 @@ namespace {
                             TypeExpansionKind loweringStyle) const override {
       // A value type with a deinit cannot be memberwise destroyed.
       if (auto *nominal = getLoweredType().getNominalOrBoundGenericNominal()) {
-        if (nominal->getValueTypeDestructor()) {
+        if (nominal->hasValueTypeDestructor()) {
           emitDestroyValue(B, loc, aggValue);
           return;
         }
@@ -2718,7 +2718,7 @@ namespace {
       if (origType.isNoncopyable(structType)) {
         properties.setNonTrivial();
         properties.setLexical(IsLexical);
-        if (D->getValueTypeDestructor()) {
+        if (D->hasValueTypeDestructor()) {
           properties.setCustomDeinit(MayHaveCustomDeinit);
         }
         if (properties.isAddressOnly())
@@ -2831,7 +2831,7 @@ namespace {
       if (origType.isNoncopyable(enumType)) {
         properties.setNonTrivial();
         properties.setLexical(IsLexical);
-        if (D->getValueTypeDestructor()) {
+        if (D->hasValueTypeDestructor()) {
           properties.setCustomDeinit(MayHaveCustomDeinit);
         }
         if (properties.isAddressOnly())
