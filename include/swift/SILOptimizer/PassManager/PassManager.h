@@ -107,11 +107,6 @@ public:
 
   SILFunction *lookupStdlibFunction(StringRef name) override;
 
-  void initializeSSAUpdater(SILFunction *function, SILType type, ValueOwnershipKind ownership) override;
-  void SSAUpdater_addAvailableValue(SILBasicBlock *block, SILValue value) override;
-  SILValue SSAUpdater_getValueAtEndOfBlock(SILBasicBlock *block) override;
-  SILValue SSAUpdater_getValueInMiddleOfBlock(SILBasicBlock *block) override;
-
   /// Called by the pass manager before the pass starts running.
   void startModulePassRun(SILModuleTransform *transform);
 
