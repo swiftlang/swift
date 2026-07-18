@@ -1488,20 +1488,21 @@ public:
 /// intrusively linked somewhere due to stealers.
 ///
 /// Why the enqueue must happen after the lock is dropped
-/// ----------------------------------------------------- The Task Status
-/// Lock is a hybrid lock: an "is-locked" bit in the ActiveTaskStatus word
-/// plus a real mutex in the task's private storage. On unlock, the bit is
-/// cleared via CAS *before* the mutex is released (see withStatusRecordLock
-/// in TaskStatus.cpp). During that window, any thread that observes the
-/// ActiveTaskStatus with the bit clear is free to make forward progress
-/// on the Task using lock-free CAS paths. If we called swift_task_enqueue
-/// while still under the lock, another thread could pick the Task up off
-/// the target executor, run it to completion, and attempt to dispose of it
-/// before this thread had finished releasing the mutex, leaving us operating
-/// on a freed task. Splitting "decide what to enqueue" (which requires the
-/// ActiveTaskStatus to be quiescent) from the actual enqueue avoids that
-/// race — the caller does the mutation under the lock and then hands the
-/// returned Job off to swift_task_enqueue only after the lock is released.
+/// -----------------------------------------------------
+/// The Task Status Lock is a hybrid lock: an "is-locked" bit in the
+/// ActiveTaskStatus word plus a real mutex in the task's private storage.
+/// On unlock, the bit is cleared via CAS *before* the mutex is released
+/// (see withStatusRecordLock in TaskStatus.cpp). During that window,
+/// any thread that observes the ActiveTaskStatus with the bit clear
+/// is free to make forward progress on the Task using lock-free CAS
+/// paths. If we called swift_task_enqueue while still under the lock,
+/// another thread could pick the Task up off the target executor, run it
+/// to completion, and attempt to dispose of it before this thread had
+/// finished releasing the mutex, leaving us operating on a freed task.
+/// Splitting "decide what to enqueue" (which requires the ActiveTaskStatus
+/// to be quiescent) from the actual enqueue avoids that race — the
+/// caller does the mutation under the lock and then hands the returned
+/// Job off to swift_task_enqueue only after the lock is released.
 ///
 /// The escalate path (swift_executor_escalate) is exempted
 /// from having to drop the lock first because its caller must
