@@ -2039,7 +2039,7 @@ shouldEmitPartialMutationError(UseState &useState, PartialMutation::Kind kind,
           (kind == PartialMutation::Kind::Consume) && useState.sawDropDeinit &&
           (nom ==
            useState.address->getType().getNominalOrBoundGenericNominal());
-      if (nom->getValueTypeDestructor() && !isAllowedPartialConsume) {
+      if (nom->hasValueTypeDestructor() && !isAllowedPartialConsume) {
         // If we find one, emit an error since we are going to have to extract
         // through the deinit. Emit a nice error saying what it is. Since we
         // are emitting an error, we do a bit more work and construct the

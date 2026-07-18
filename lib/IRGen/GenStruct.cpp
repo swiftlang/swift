@@ -1447,7 +1447,7 @@ public:
         FieldInfos, NextExplosionIndex, llvmType, TotalStride,
         std::move(SpareBits), TotalAlignment,
         (SwiftDecl &&
-         (SwiftDecl->getValueTypeDestructor() || hasReferenceField))
+         (SwiftDecl->hasValueTypeDestructor() || hasReferenceField))
             ? IsNotTriviallyDestroyable
             : IsTriviallyDestroyable,
         (SwiftDecl && !SwiftDecl->canBeCopyable()) ? IsNotCopyable : IsCopyable,
