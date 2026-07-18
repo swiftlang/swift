@@ -572,11 +572,10 @@ static bool dominates(DominanceInfo *DT, SILValue V, SILBasicBlock *B) {
   return false;
 }
 
-/// Subtract a constant from a builtin integer value.
-static SILValue getSub(SILLocation Loc, SILValue Val, unsigned SubVal,
+static SILValue getSub(SILLocation Loc, SILValue Val, SILValue SubVal,
                        SILBuilder &B) {
   SmallVector<SILValue, 4> Args(1, Val);
-  Args.push_back(B.createIntegerLiteral(Loc, Val->getType(), SubVal));
+  Args.push_back(SubVal);
   Args.push_back(B.createIntegerLiteral(
       Loc, SILType::getBuiltinIntegerType(1, B.getASTContext()), 1));
 
@@ -585,10 +584,10 @@ static SILValue getSub(SILLocation Loc, SILValue Val, unsigned SubVal,
   return B.createTupleExtract(Loc, AI, 0);
 }
 
-static SILValue getAdd(SILLocation Loc, SILValue Val, unsigned AddVal,
+static SILValue getAdd(SILLocation Loc, SILValue Val, SILValue AddVal,
                        SILBuilder &B) {
   SmallVector<SILValue, 4> Args(1, Val);
-  Args.push_back(B.createIntegerLiteral(Loc, Val->getType(), AddVal));
+  Args.push_back(AddVal);
   Args.push_back(B.createIntegerLiteral(
       Loc, SILType::getBuiltinIntegerType(1, B.getASTContext()), 1));
 
@@ -619,12 +618,29 @@ struct InductionInfo {
 
   SILInstruction *getInstruction() { return Inc; }
 
-  SILValue getFirstValue(SILLocation loc, SILBuilder &B, unsigned AddVal) {
-    return AddVal != 0 ? getAdd(loc, Start, AddVal, B) : Start;
+  SILValue getFirstValue(SILLocation loc, SILBuilder &B, SILValue offset) {
+    return offset != nullptr ? getAdd(loc, Start, offset, B) : Start;
   }
 
-  SILValue getLastValue(SILLocation loc, SILBuilder &B, unsigned SubVal) {
-    return SubVal != 0 ? getSub(loc, End, SubVal, B) : End;
+  SILValue getLastValue(SILLocation loc, SILBuilder &B, SILValue offset) {
+    if (offset == nullptr) {
+      // For simple patterns like arr[i], the last index is End - 1
+      return getSub(loc, End, B.createIntegerLiteral(loc, End->getType(), 1),
+                    B);
+    } else {
+      // Check if offset is a constant 1 to avoid redundant 1 - 1 calculation
+      if (auto *literalOffset = dyn_cast<IntegerLiteralInst>(offset)) {
+        if (literalOffset->getValue() == 1) {
+          return End;
+        }
+      }
+
+      // For offset patterns like arr[base + i], the last index is End + offset
+      // - 1
+      auto EndPlusOffset = getAdd(loc, End, offset, B);
+      return getSub(loc, EndPlusOffset,
+                    B.createIntegerLiteral(loc, End->getType(), 1), B);
+    }
   }
 
   /// If necessary insert an overflow for this induction variable.
@@ -781,69 +797,89 @@ static bool isGuaranteedToBeExecuted(DominanceInfo *DT, SILBasicBlock *Block,
 /// induction variable.
 class AccessFunction {
   InductionInfo *Ind;
-  bool preIncrement;
+  SILValue offset;
 
-  AccessFunction(InductionInfo *I, bool isPreIncrement = false)
-      : Ind(I), preIncrement(isPreIncrement) {}
+  AccessFunction(InductionInfo *I, SILValue offset = SILValue())
+      : Ind(I), offset(offset) {}
 
 public:
   operator bool() { return Ind != nullptr; }
 
   static AccessFunction getLinearFunction(SILValue Idx,
-                                          InductionAnalysis &IndVars) {
+                                          InductionAnalysis &IndVars,
+                                          DominanceInfo *DT,
+                                          SILBasicBlock *Preheader) {
     // Match the actual induction variable buried in the integer struct.
-    // bb(%ivar)
-    // %2 = struct $Int(%ivar : $Builtin.Word)
-    //    = apply %check_bounds(%array, %2) :
-    // or
     // bb(%ivar1)
-    // %ivar2 = builtin "sadd_with_overflow_Int64"(%ivar1,...)
-    // %t = tuple_extract %ivar2
+    // %base = struct $Int(%offset : $Builtin.Word)
+    // %ivar_struct = struct $Int(%ivar1 : $Builtin.Word)
+    // %add = builtin "sadd_with_overflow_Int64"(%offset, %ivar1, ...)
+    // %t = tuple_extract %add
     // %s = struct $Int(%t : $Builtin.Word)
     //    = apply %check_bounds(%array, %s) :
 
-    bool preIncrement = false;
+    SILValue offset;
 
     auto ArrayIndexStruct = dyn_cast<StructInst>(Idx);
     if (!ArrayIndexStruct)
       return nullptr;
 
     auto AsArg = dyn_cast<SILArgument>(ArrayIndexStruct->getElements()[0]);
-
-    if (!AsArg) {
-      auto *TupleExtract =
-          dyn_cast<TupleExtractInst>(ArrayIndexStruct->getElements()[0]);
-
-      if (!TupleExtract) {
-        return nullptr;
+    if (AsArg) {
+      if (auto *Ind = IndVars[AsArg]) {
+        // Simple arr[i] pattern - no offset
+        return AccessFunction(Ind);
       }
-
-      auto *Builtin = dyn_cast<BuiltinInst>(TupleExtract->getOperand());
-      if (!Builtin || Builtin->getBuiltinKind() != BuiltinValueKind::SAddOver) {
-        return nullptr;
-      }
-
-      AsArg = dyn_cast<SILArgument>(Builtin->getArguments()[0]);
-      if (!AsArg) {
-        return nullptr;
-      }
-
-      auto *incrVal = dyn_cast<IntegerLiteralInst>(Builtin->getArguments()[1]);
-      if (!incrVal || incrVal->getValue() != 1)
-        return nullptr;
-
-      preIncrement = true;
+      return nullptr;
     }
 
-    if (auto *Ind = IndVars[AsArg])
-      return AccessFunction(Ind, preIncrement);
+    auto *TupleExtract =
+        dyn_cast<TupleExtractInst>(ArrayIndexStruct->getElements()[0]);
+
+    if (!TupleExtract) {
+      return nullptr;
+    }
+
+    auto *Builtin = dyn_cast<BuiltinInst>(TupleExtract->getOperand());
+    if (!Builtin || Builtin->getBuiltinKind() != BuiltinValueKind::SAddOver) {
+      return nullptr;
+    }
+
+    // Check for i + offset pattern
+    SILValue firstArg = Builtin->getArguments()[0];
+    SILValue secondArg = Builtin->getArguments()[1];
+
+    // Try first argument as induction variable, second as offset
+    AsArg = dyn_cast<SILArgument>(firstArg);
+    if (AsArg && IndVars[AsArg]) {
+      offset = secondArg;
+    } else {
+      // Try second argument as induction variable, first as offset
+      AsArg = dyn_cast<SILArgument>(secondArg);
+      if (AsArg && IndVars[AsArg]) {
+        offset = firstArg;
+      } else {
+        return nullptr;
+      }
+    }
+
+    // Check if the offset dominates the preheader
+    if (offset && !dominates(DT, offset, Preheader)) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << " offset does not dominate preheader: " << *offset);
+      return nullptr;
+    }
+
+    if (auto *Ind = IndVars[AsArg]) {
+      return AccessFunction(Ind, offset);
+    }
 
     return nullptr;
   }
 
   /// Returns true if the loop iterates from 0 until count of \p selfValue.
   bool isZeroToCount(SILValue selfValue) {
-    if (preIncrement) {
+    if (offset) {
       return false;
     }
     return getZeroToCountOfSelf(Ind->Start, Ind->End) == selfValue;
@@ -851,8 +887,7 @@ public:
 
   SILValue getFirstValue(SILInstruction *insertPt) {
     SILBuilderWithScope builder(insertPt);
-    auto firstValue =
-        Ind->getFirstValue(insertPt->getLoc(), builder, preIncrement ? 1 : 0);
+    auto firstValue = Ind->getFirstValue(insertPt->getLoc(), builder, offset);
     auto intType = SILType::getPrimitiveObjectType(
         builder.getASTContext().getIntType()->getCanonicalType());
     return builder.createStruct(insertPt->getLoc(), intType, {firstValue});
@@ -860,8 +895,7 @@ public:
 
   SILValue getLastValue(SILInstruction *insertPt) {
     SILBuilderWithScope builder(insertPt);
-    auto lastValue =
-        Ind->getLastValue(insertPt->getLoc(), builder, preIncrement ? 0 : 1);
+    SILValue lastValue = Ind->getLastValue(insertPt->getLoc(), builder, offset);
     auto intType = SILType::getPrimitiveObjectType(
         builder.getASTContext().getIntType()->getCanonicalType());
     return builder.createStruct(insertPt->getLoc(), intType, {lastValue});
@@ -876,7 +910,7 @@ public:
     SILBuilderWithScope Builder(Preheader->getTerminator(), AI);
 
     // Get the first induction value.
-    auto FirstVal = Ind->getFirstValue(Loc, Builder, preIncrement ? 1 : 0);
+    auto FirstVal = Ind->getFirstValue(Loc, Builder, offset);
     // Clone the struct for the start index.
     auto Start = cast<SingleValueInstruction>(CheckToHoist.getIndex())
                      ->clone(Preheader->getTerminator());
@@ -888,7 +922,7 @@ public:
     NewCheck->setOperand(1, Start);
 
     // Get the last induction value.
-    auto LastVal = Ind->getLastValue(Loc, Builder, preIncrement ? 0 : 1);
+    auto LastVal = Ind->getLastValue(Loc, Builder, offset);
     // Clone the struct for the end index.
     auto End = cast<SingleValueInstruction>(CheckToHoist.getIndex())
                    ->clone(Preheader->getTerminator());
@@ -1644,7 +1678,8 @@ bool BoundsCheckOpts::hoistArrayBoundsChecksInLoop(
 
     // Get the access function "a[f(i)]". At the moment this handles only the
     // identity function.
-    auto F = AccessFunction::getLinearFunction(ArrayIndex, indVars);
+    auto F =
+        AccessFunction::getLinearFunction(ArrayIndex, indVars, DT, preheader);
     if (!F) {
       LLVM_DEBUG(llvm::dbgs() << " not a linear function " << *Inst);
       continue;
@@ -1735,7 +1770,7 @@ bool BoundsCheckOpts::hoistFixedStorageBoundsChecksInLoop(
     }
 
     auto accessFunction =
-        AccessFunction::getLinearFunction(indexValue, indVars);
+        AccessFunction::getLinearFunction(indexValue, indVars, DT, preheader);
     if (!accessFunction) {
       LLVM_DEBUG(llvm::dbgs() << " not a linear function " << *inst);
       continue;
