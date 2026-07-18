@@ -69,7 +69,7 @@ public enum OkayEnum {
 // CHECK-NEXT: }
 // CHECK-RECOVERY-LABEL: enum OkayEnum {
 // CHECK-RECOVERY-NEXT:   case noPayload
-// CHECK-RECOVERY-NEXT:   case plainOldAlias(Any, Int32)
+// CHECK-RECOVERY-NEXT:   case plainOldAlias(Any, CInt)
 // CHECK-RECOVERY-NEXT:   case other(Int)
 // CHECK-RECOVERY-NEXT:   static func == (a: OkayEnum, b: OkayEnum) -> Bool
 // CHECK-RECOVERY-NEXT: }

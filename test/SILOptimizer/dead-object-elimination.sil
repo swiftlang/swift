@@ -5779,3 +5779,49 @@ bb0(%0 : @owned $Builtin.NativeObject):
   return %r
 }
 
+// CHECK-LABEL: sil [ossa] @cleanup_inserted_phis :
+// CHECK:         %1 = begin_borrow %0
+// CHECK:       bb9:
+// CHECK:         end_borrow %1
+// CHECK:         destroy_value %0
+// CHECK-LABEL: } // end sil function 'cleanup_inserted_phis'
+sil [ossa] @cleanup_inserted_phis : $@convention(thin) (@owned Kl) -> () {
+bb0(%0 : @owned $Kl):
+  %1 = alloc_stack $Kl
+  store %0 to [init] %1
+  %3 = load_borrow %1
+  fix_lifetime %3
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  cond_br undef, bb5, bb6
+
+bb3:
+  br bb4
+
+bb4:
+  br bb9
+
+bb5:
+  br bb9
+
+bb6:
+  cond_br undef, bb7, bb8
+
+bb7:
+  br bb3
+
+bb8:
+  br bb4
+
+bb9:
+  end_borrow %3
+  %15 = load [take] %1
+  destroy_value %15
+  dealloc_stack %1
+  %18 = tuple ()
+  return %18
+}

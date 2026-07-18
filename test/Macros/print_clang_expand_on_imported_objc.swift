@@ -13,4 +13,4 @@
 import CompletionHandlerGlobals
 
 // CHECK: class Computer
-// CHECK: @_alwaysEmitIntoClient public final func multiply(_ x: Double, by y: Double) async -> Double
+// CHECK: @_alwaysEmitIntoClient public final func multiply(_ x: CDouble, by y: CDouble) async -> CDouble

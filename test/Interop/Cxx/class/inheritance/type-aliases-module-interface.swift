@@ -5,13 +5,13 @@
 // CHECK-NEXT:   struct Struct {
 // CHECK-NEXT:     init()
 // CHECK-NEXT:   }
-// CHECK-NEXT:   typealias T = Int32
+// CHECK-NEXT:   typealias T = CInt
 // CHECK-NEXT:   typealias U = Base.Struct
 // CHECK-NEXT: }
 
 // CHECK-NEXT: struct Derived {
 // CHECK-NEXT:   init()
 // CHECK-NEXT:   typealias Struct = Base.Struct
-// CHECK-NEXT:   typealias T = Int32
+// CHECK-NEXT:   typealias T = CInt
 // CHECK-NEXT:   typealias U = Base.Struct
 // CHECK-NEXT: }

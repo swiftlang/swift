@@ -5,11 +5,11 @@
 // This test case checks that ClangImporter can import declarations using various bounds attributes,
 // rather than being marked unavailable because of an unknown type.
 
-// CHECK:      var len: Int32
+// CHECK:      var len: CInt
 // CHECK-NEXT: var a: <<error type>>
 // CHECK-NEXT: var b: UnsafePointer<CChar>!
-// CHECK-NEXT: var c: UnsafeMutablePointer<UnsafeMutablePointer<Int32>?>!
-// BOUNDS-SAFETY-NEXT: var d: UnsafeMutablePointer<Int32>!
+// CHECK-NEXT: var c: UnsafeMutablePointer<UnsafeMutablePointer<CInt>?>!
+// BOUNDS-SAFETY-NEXT: var d: UnsafeMutablePointer<CInt>!
 
 
 // RUN: %target-swift-frontend -Xcc -fexperimental-bounds-safety-attributes -emit-module -plugin-path %swift-plugin-dir -I %S/Inputs %s

@@ -7,28 +7,28 @@
 
 // CHECK: struct ConstContiguousIterator : UnsafeCxxContiguousIterator, UnsafeCxxRandomAccessIterator, UnsafeCxxInputIterator {
 // CHECK:   func successor() -> ConstContiguousIterator
-// CHECK:   typealias Pointee = Int32
-// CHECK:   typealias Distance = Int32
-// CHECK:   var pointee: Int32
+// CHECK:   typealias Pointee = CInt
+// CHECK:   typealias Distance = CInt
+// CHECK:   var pointee: CInt
 // CHECK: }
 
 // CHECK: struct HasCustomContiguousIteratorTag : UnsafeCxxContiguousIterator, UnsafeCxxRandomAccessIterator, UnsafeCxxInputIterator {
 // CHECK:   func successor() -> HasCustomContiguousIteratorTag
-// CHECK:   typealias Pointee = Int32
-// CHECK:   typealias Distance = Int32
-// CHECK:   var pointee: Int32
+// CHECK:   typealias Pointee = CInt
+// CHECK:   typealias Distance = CInt
+// CHECK:   var pointee: CInt
 // CHECK: }
 
 // CHECK: struct MutableContiguousIterator : UnsafeCxxMutableContiguousIterator, UnsafeCxxMutableRandomAccessIterator, UnsafeCxxMutableInputIterator {
 // CHECK:   func successor() -> MutableContiguousIterator
-// CHECK:   typealias Pointee = Int32
-// CHECK:   typealias Distance = Int32
-// CHECK:   var pointee: Int32
+// CHECK:   typealias Pointee = CInt
+// CHECK:   typealias Distance = CInt
+// CHECK:   var pointee: CInt
 // CHECK: }
 
 // CHECK: struct HasNoContiguousIteratorConcept : UnsafeCxxRandomAccessIterator, UnsafeCxxInputIterator {
 // CHECK:   func successor() -> HasNoContiguousIteratorConcept
-// CHECK:   typealias Pointee = Int32
-// CHECK:   typealias Distance = Int32
-// CHECK:   var pointee: Int32
+// CHECK:   typealias Pointee = CInt
+// CHECK:   typealias Distance = CInt
+// CHECK:   var pointee: CInt
 // CHECK: }

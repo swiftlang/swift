@@ -24,7 +24,7 @@ typedef char *charptr_t;
 // expected-expansion@+7:66{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func test_fooptr(_ p: UnsafeRawBufferPointer) -> OpaquePointer! {|}}
-//   expected-remark@3{{macro content: |    let len = Int32(exactly: p.count)!|}}
+//   expected-remark@3{{macro content: |    let len = CInt(exactly: p.count)!|}}
 //   expected-remark@4{{macro content: |    return unsafe test_fooptr(len, OpaquePointer(p.baseAddress))|}}
 //   expected-remark@5{{macro content: |}|}}
 // }}
@@ -33,7 +33,7 @@ fooptr_t __single test_fooptr(int len, fooptr_t __sized_by(len) p);
 // expected-expansion@+7:81{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func test_fooptr2(_ p: UnsafeRawBufferPointer) -> UnsafeRawBufferPointer {|}}
-//   expected-remark@3{{macro content: |    let len = Int32(exactly: p.count)!|}}
+//   expected-remark@3{{macro content: |    let len = CInt(exactly: p.count)!|}}
 //   expected-remark@4{{macro content: |    return unsafe UnsafeRawBufferPointer(start: unsafe UnsafeRawPointer(unsafe test_fooptr2(len, OpaquePointer(p.baseAddress))), count: Int(CInt(4)))|}}
 //   expected-remark@5{{macro content: |}|}}
 // }}
@@ -42,7 +42,7 @@ fooptr_t __single __sized_by(4) test_fooptr2(int len, fooptr_t __sized_by(len) p
 // expected-expansion@+7:72{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func test_fooptr3(_ p: UnsafeRawBufferPointer) -> UnsafeRawBufferPointer {|}}
-//   expected-remark@3{{macro content: |    let len = Int32(exactly: p.count)!|}}
+//   expected-remark@3{{macro content: |    let len = CInt(exactly: p.count)!|}}
 //   expected-remark@4{{macro content: |    return unsafe UnsafeRawBufferPointer(start: unsafe UnsafeRawPointer(unsafe test_fooptr3(len, OpaquePointer(p.baseAddress))), count: Int(CInt(4)))|}}
 //   expected-remark@5{{macro content: |}|}}
 // }}
@@ -51,7 +51,7 @@ fooptr_t __sized_by(4) test_fooptr3(int len, fooptr_t __sized_by(len) p);
 // expected-expansion@+7:76{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func test_fooptr4(_ p: UnsafeRawBufferPointer) -> OpaquePointer {|}}
-//   expected-remark@3{{macro content: |    let len = Int32(exactly: p.count)!|}}
+//   expected-remark@3{{macro content: |    let len = CInt(exactly: p.count)!|}}
 //   expected-remark@4{{macro content: |    return unsafe test_fooptr4(len, OpaquePointer(p.baseAddress))|}}
 //   expected-remark@5{{macro content: |}|}}
 // }}
@@ -60,7 +60,7 @@ fooptr_t __single _Nonnull test_fooptr4(int len, fooptr_t __sized_by(len) p);
 // expected-expansion@+9:67{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func test_fooptr5(_ p: UnsafeRawBufferPointer) -> OpaquePointer {|}}
-//   expected-remark@3{{macro content: |    let len = Int32(exactly: p.count)!|}}
+//   expected-remark@3{{macro content: |    let len = CInt(exactly: p.count)!|}}
 //   Diverges due to https://github.com/swiftlang/llvm-project/issues/13277
 //   expected-attr-remark@4{{macro content: |    return unsafe test_fooptr5(len, OpaquePointer(p.baseAddress))|}}
 //   expected-bounds-remark@4{{macro content: |    return unsafe test_fooptr5(len, OpaquePointer(p.baseAddress!))|}}
@@ -71,7 +71,7 @@ layer2_t __single test_fooptr5(int len, layer2_t __sized_by(len) p);
 // expected-expansion@+7:69{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func test_voidptr(_ p: UnsafeMutableRawBufferPointer) -> UnsafeMutableRawPointer! {|}}
-//   expected-remark@3{{macro content: |    let len = Int32(exactly: p.count)!|}}
+//   expected-remark@3{{macro content: |    let len = CInt(exactly: p.count)!|}}
 //   expected-remark@4{{macro content: |    return unsafe test_voidptr(len, p.baseAddress)|}}
 //   expected-remark@5{{macro content: |}|}}
 // }}
@@ -80,7 +80,7 @@ voidptr_t __single test_voidptr(int len, voidptr_t __sized_by(len) p);
 // expected-expansion@+7:69{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func test_charptr(_ p: UnsafeMutableRawBufferPointer) -> UnsafeMutablePointer<CChar>! {|}}
-//   expected-remark@3{{macro content: |    let len = Int32(exactly: p.count)!|}}
+//   expected-remark@3{{macro content: |    let len = CInt(exactly: p.count)!|}}
 //   expected-remark@4{{macro content: |    return unsafe test_charptr(len, p.baseAddress?.assumingMemoryBound(to: CChar.self))|}}
 //   expected-remark@5{{macro content: |}|}}
 // }}
@@ -97,31 +97,31 @@ module Test {
 import Test
 
 
-func call_test_fooptr(_ len: Int32, _ p: OpaquePointer!) -> OpaquePointer! {
+func call_test_fooptr(_ len: CInt, _ p: OpaquePointer!) -> OpaquePointer! {
   return unsafe test_fooptr(len, p)
 }
 
-func call_test_fooptr2(_ len: Int32, _ p: OpaquePointer!) -> OpaquePointer! {
+func call_test_fooptr2(_ len: CInt, _ p: OpaquePointer!) -> OpaquePointer! {
   return unsafe test_fooptr2(len, p)
 }
 
-func call_test_fooptr3(_ len: Int32, _ p: OpaquePointer!) -> OpaquePointer! {
+func call_test_fooptr3(_ len: CInt, _ p: OpaquePointer!) -> OpaquePointer! {
   return unsafe test_fooptr3(len, p)
 }
 
-func call_test_fooptr4(_ len: Int32, _ p: OpaquePointer!) -> OpaquePointer {
+func call_test_fooptr4(_ len: CInt, _ p: OpaquePointer!) -> OpaquePointer {
   return unsafe test_fooptr4(len, p)
 }
 
-func call_test_fooptr5(_ len: Int32, _ p: OpaquePointer!) -> OpaquePointer {
+func call_test_fooptr5(_ len: CInt, _ p: OpaquePointer!) -> OpaquePointer {
   return unsafe test_fooptr5(len, p)
 }
 
-func call_test_voidptr(_ len: Int32, _ p: UnsafeMutableRawPointer!) -> UnsafeMutableRawPointer! {
+func call_test_voidptr(_ len: CInt, _ p: UnsafeMutableRawPointer!) -> UnsafeMutableRawPointer! {
   return unsafe test_voidptr(len, p)
 }
 
-func call_test_charptr(_ len: Int32, _ p: UnsafeMutablePointer<CChar>!) -> UnsafeMutablePointer<CChar>! {
+func call_test_charptr(_ len: CInt, _ p: UnsafeMutablePointer<CChar>!) -> UnsafeMutablePointer<CChar>! {
   return unsafe test_charptr(len, p)
 }
 

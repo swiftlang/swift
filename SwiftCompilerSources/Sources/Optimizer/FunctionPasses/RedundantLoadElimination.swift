@@ -346,6 +346,7 @@ private extension LoadingInstruction {
 
 private func replace(load: LoadingInstruction, with availableValues: [AvailableValue], _ context: FunctionPassContext) {
   var ssaUpdater = SSAUpdater(type: load.type, ownership: load.ownership, context)
+  defer { ssaUpdater.deinitialize() }
 
   for availableValue in availableValues.replaceCopyAddrsWithLoadsAndStores(context) {
     let block = availableValue.instruction.parentBlock
@@ -373,7 +374,7 @@ private func replace(load: LoadingInstruction, with availableValues: [AvailableV
     //     store %3 to %addr   // another available value
     //     cond_br bb1, bb2
     //
-    newValue = ssaUpdater.getValue(inMiddleOf: load.parentBlock)
+    newValue = ssaUpdater.getValue(atBeginOf: load.parentBlock)
   }
 
   let originalLoad = load.materializeLoadForReplacement(context)
