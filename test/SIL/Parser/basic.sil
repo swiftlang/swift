@@ -719,12 +719,12 @@ bb3(%6 : $Builtin.Word):
 // CHECK-LABEL: sil @test_cond_branch_basic_block_args
 sil @test_cond_branch_basic_block_args : $@convention(thin) (Int, Builtin.Int1) -> Int {
 bb0(%0 : $Int, %1 : $Builtin.Int1):
-  cond_br %1, bb1(%0 : $Int), bb2(%0 : $Int)
-// CHECK: cond_br %1, bb1(%0 : $Int), bb2(%0 : $Int)
-bb1(%3 : $Int):
-  br bb3 (%3 : $Int)
-bb2(%2 : $Int):
-  br bb3(%2 : $Int)
+  cond_br %1, bb1, bb2
+// CHECK: cond_br %1, bb1, bb2
+bb1:
+  br bb3 (%0 : $Int)
+bb2:
+  br bb3(%0 : $Int)
 bb3(%4 : $Int):
   return %4 : $Int
 }
@@ -1618,8 +1618,8 @@ sil @value_names : $@convention(thin) (Builtin.Int1) -> () {
 entry(%param : $Builtin.Int1):
 // CHECK-NEXT: %1 = tuple ()
   %v_o_i_d = tuple ()
-// CHECK-NEXT: cond_br %0, bb1, bb2
-  cond_br %param, then, else
+// CHECK-NEXT: cond_br %0, bb1, bb3
+  cond_br %param, then, elseTrampoline
 
 // CHECK: bb1:
 then:
@@ -1634,6 +1634,11 @@ else:
   %3void = tuple ()
 // CHECK-NEXT: return %5 : $()
   return %3void : $()
+
+// CHECK: bb3:
+elseTrampoline:
+// CHECK-NEXT: br bb2
+  br else
 }
 // CHECK: } // end sil function 'value_names'
 

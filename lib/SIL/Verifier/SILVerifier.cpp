@@ -96,10 +96,6 @@ static llvm::cl::opt<bool> VerifyDebugValueExpr("verify-debug-value-expr",
 static llvm::cl::opt<bool> SkipConvertEscapeToNoescapeAttributes(
     "verify-skip-convert-escape-to-noescape-attributes", llvm::cl::init(false));
 
-// Allow unit tests to gradually migrate toward -allow-critical-edges=false.
-static llvm::cl::opt<bool> AllowCriticalEdges("allow-critical-edges",
-                                              llvm::cl::init(true));
-
 static llvm::cl::opt<bool> VerifyReducibleLoops(
     "verify-reducible-loops", llvm::cl::init(false),
     llvm::cl::desc("Verify that SIL does not contain irreducible loops"));
@@ -1511,20 +1507,14 @@ public:
     assert(arg->isPhi() && "precondition");
     for (SILBasicBlock *predBB : arg->getParent()->getPredecessorBlocks()) {
       auto *TI = predBB->getTerminator();
+      require(isa<BranchInst>(TI), "All phi inputs must be branch operands.");
       if (F.hasOwnership()) {
-        require(isa<BranchInst>(TI), "All phi inputs must be branch operands.");
-
         // Address-only values are potentially unmovable when borrowed. See also
         // checkOwnershipForwardingInst. A phi implies a move of its arguments
         // because they can't necessarily all reuse the same storage.
         require((!arg->getType().isAddressOnly(F)
                  || arg->getOwnershipKind() != OwnershipKind::Guaranteed),
                 "Guaranteed address-only phi not allowed--implies a copy");
-      } else {
-        // FIXME: when critical edges are removed and cond_br arguments are
-        // disallowed, only allow BranchInst.
-        require(isa<BranchInst>(TI) || isa<CondBranchInst>(TI),
-                "All phi argument inputs must be from branches.");
       }
     }
     if (arg->isPhi()) {
@@ -6050,34 +6040,15 @@ public:
                         1, cbi->getCondition()->getType().getASTContext()),
                     "condition of conditional branch must have Int1 type");
 
-    require(cbi->getTrueArgs().size() == cbi->getTrueBB()->args_size(),
-            "true branch has wrong number of arguments for dest bb");
     require(cbi->getTrueBB() != cbi->getFalseBB(), "identical destinations");
-    require(std::equal(cbi->getTrueArgs().begin(), cbi->getTrueArgs().end(),
-                       cbi->getTrueBB()->args_begin(),
-                       [&](SILValue branchArg, SILArgument *bbArg) {
-                         return verifyBranchArgs(branchArg, bbArg);
-                       }),
-            "true branch argument types do not match arguments for dest bb");
 
-    require(cbi->getFalseArgs().size() == cbi->getFalseBB()->args_size(),
-            "false branch has wrong number of arguments for dest bb");
-    require(std::equal(cbi->getFalseArgs().begin(), cbi->getFalseArgs().end(),
-                       cbi->getFalseBB()->args_begin(),
-                       [&](SILValue branchArg, SILArgument *bbArg) {
-                         return verifyBranchArgs(branchArg, bbArg);
-                       }),
-            "false branch argument types do not match arguments for dest bb");
-    // When we are in ossa, cond_br can not have any arguments that are
-    // non-trivial.
-    if (!F.hasOwnership())
-      return;
-
-    require(llvm::all_of(cbi->getOperandValues(),
-                         [&](SILValue v) -> bool {
-                           return v->getType().isTrivial(*cbi->getFunction());
-                         }),
-            "cond_br must not have a non-trivial value in ossa.");
+    // A cond_br never passes branch arguments: because SIL does not contain
+    // critical edges, both destinations have a single predecessor and therefore
+    // must not take any block arguments.
+    require(cbi->getTrueBB()->args_empty(),
+            "true branch destination must not take arguments");
+    require(cbi->getFalseBB()->args_empty(),
+            "false branch destination must not take arguments");
   }
 
   void checkDynamicMethodBranchInst(DynamicMethodBranchInst *DMBI) {
@@ -7227,31 +7198,17 @@ public:
   }
 
   void verifyBranches(const SILFunction *F) {
-    // Verify no critical edge.
-    auto requireNonCriticalSucc = [this](const TermInst *termInst,
-                                         const Twine &message) {
-      // A critical edge has more than one outgoing edges from the source
-      // block.
-      auto succBlocks = termInst->getSuccessorBlocks();
-      if (succBlocks.size() <= 1)
-        return;
-
-      for (const SILBasicBlock *destBB : succBlocks) {
-        // And its destination block has more than one predecessor.
-        _require(destBB->getSinglePredecessorBlock(), message);
-      }
-    };
-
     for (auto &bb : *F) {
       const TermInst *termInst = bb.getTerminator();
       VerifierErrorEmitterGuard guard(this, termInst);
 
-      if (isSILOwnershipEnabled() && F->hasOwnership()) {
-        requireNonCriticalSucc(termInst, "critical edges not allowed in OSSA");
-      }
-      // In Lowered SIL, they are allowed on conditional branches only.
-      if (!AllowCriticalEdges && !isa<CondBranchInst>(termInst)) {
-        requireNonCriticalSucc(termInst, "only cond_br critical edges allowed");
+      // A critical edge has more than one outgoing edges from the source
+      // block.
+      if (!isa<BranchInst>(termInst)) {
+        for (const SILBasicBlock *destBB : termInst->getSuccessorBlocks()) {
+          // And its destination block has more than one predecessor.
+          _require(destBB->getSinglePredecessorBlock(), "critical edges not allowed");
+        }
       }
     }
   }

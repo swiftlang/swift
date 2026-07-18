@@ -1164,22 +1164,14 @@ SILInstruction *SILCombiner::visitCondBranchInst(CondBranchInst *CBI) {
                             m_One()))) &&
       X->getType() ==
           SILType::getBuiltinIntegerType(1, CBI->getModule().getASTContext())) {
-    SmallVector<SILValue, 4> OrigTrueArgs, OrigFalseArgs;
-    for (const auto Op : CBI->getTrueArgs())
-      OrigTrueArgs.push_back(Op);
-    for (const auto Op : CBI->getFalseArgs())
-      OrigFalseArgs.push_back(Op);
+    // A cond_br passes no branch arguments, so just swap the destinations.
     return Builder.createCondBranch(CBI->getLoc(), X,
-                                    CBI->getFalseBB(), OrigFalseArgs,
-                                    CBI->getTrueBB(), OrigTrueArgs);
+                                    CBI->getFalseBB(), CBI->getTrueBB());
   }
 
   // cond_br (select_enum) -> switch_enum
   // This pattern often occurs as a result of using optionals.
   if (auto *SEI = dyn_cast<SelectEnumInst>(CBI->getCondition())) {
-    // No bb args should be passed
-    if (!CBI->getTrueArgs().empty() || !CBI->getFalseArgs().empty())
-      return nullptr;
     auto EnumOperandTy = SEI->getEnumOperand()->getType();
     // Type should be loadable and copyable.
     // TODO: Generalize to work without copying address-only or noncopyable

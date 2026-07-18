@@ -482,8 +482,8 @@ private:
   }
 
   void init(CondBranchInst *cbi) {
-    addValues(makeOperandRefRange(cbi->getTrueOperands()), cbi->getTrueBB());
-    addValues(makeOperandRefRange(cbi->getFalseOperands()), cbi->getFalseBB());
+    // A cond_br passes no branch arguments (SIL has no critical edges), so
+    // there are no values flowing to its successor blocks.
   }
 
   void init(DynamicMethodBranchInst *dmBranchInst) {

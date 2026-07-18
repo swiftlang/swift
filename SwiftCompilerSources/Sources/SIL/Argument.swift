@@ -113,7 +113,7 @@ public struct Phi {
     var preds = argument.parentBlock.predecessors
     if let pred = preds.next() {
       let term = pred.terminator
-      guard term is BranchInst || term is CondBranchInst else {
+      guard term is BranchInst else {
         return nil
       }
     } else {
@@ -130,9 +130,6 @@ public struct Phi {
     switch operand.instruction {
     case let br as BranchInst:
       self.init(br.getArgument(for: operand))
-    case let condBr as CondBranchInst:
-      guard let arg = condBr.getArgument(for: operand) else { return nil }
-      self.init(arg)
     default:
       return nil
     }
@@ -152,14 +149,6 @@ public struct Phi {
     switch predecessor.terminator {
     case let br as BranchInst:
       return br.operands[blockArgIdx]
-    case let condBr as CondBranchInst:
-      if condBr.trueBlock == successor {
-        assert(condBr.falseBlock != successor)
-        return condBr.trueOperands[blockArgIdx]
-      } else {
-        assert(condBr.falseBlock == successor)
-        return condBr.falseOperands[blockArgIdx]
-      }
     default:
       fatalError("wrong terminator for phi-argument")
     }

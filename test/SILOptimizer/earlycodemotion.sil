@@ -344,12 +344,9 @@ bb3:
 // CHECK-NEXT: function_ref blocker
 // CHECK-NEXT: function_ref @blocker
 // CHECK-NEXT: cond_br
-// CHECK: bb1:
-// CHECK: bb2:
-// CHECK-NEXT: select_enum
+// CHECK-NOT: retain_value
+// CHECK: select_enum
 // CHECK-NEXT: cond_br
-// CHECK: bb3:
-// CHECK-NOT: unchecked_enum_data
 // CHECK-NOT: retain_value
 // CHECK-LABEL: } // end sil function 'sink_ref_count_ops_enum_over_select_enum_2'
 sil @sink_ref_count_ops_enum_over_select_enum_2 : $@convention(thin) (Optional<Builtin.Int32>) -> () {
@@ -357,12 +354,12 @@ bb0(%0 : $Optional<Builtin.Int32>):
   %t = integer_literal $Builtin.Int1, 1
   %f = integer_literal $Builtin.Int1, 0
   %1 = function_ref @blocker : $@convention(thin) () -> ()
-  cond_br undef, bb1, bb2
+  cond_br undef, bb1, bb5
 
 bb1:
   retain_value %0 : $Optional<Builtin.Int32>
   %100 = select_enum %0 : $Optional<Builtin.Int32>, case #Optional.some!enumelt: %t, case #Optional.none!enumelt: %f : $Builtin.Int1
-  cond_br %100, bb2, bb3
+  cond_br %100, bb6, bb3
 
 bb2:
   br bb4
@@ -373,6 +370,12 @@ bb3:
 bb4:
   %2 = tuple()
   return %2 : $()
+
+bb5:
+  br bb2
+
+bb6:
+  br bb2
 }
 
 // CHECK-LABEL: sil @sink_ref_count_ops_enum_over_select_enum_3 : $@convention(thin) (Optional<Builtin.Int32>) -> () {
@@ -382,11 +385,9 @@ bb4:
 // CHECK-NEXT: function_ref blocker
 // CHECK-NEXT: function_ref @blocker
 // CHECK-NEXT: cond_br
-// CHECK: bb2:
 // CHECK-NOT: retain_value
-// CHECK-NEXT: select_enum
+// CHECK: select_enum
 // CHECK-NEXT: cond_br
-// CHECK-NOT: unchecked_enum_data
 // CHECK-NOT: retain_value
 // CHECK-LABEL: } // end sil function 'sink_ref_count_ops_enum_over_select_enum_3'
 sil @sink_ref_count_ops_enum_over_select_enum_3 : $@convention(thin) (Optional<Builtin.Int32>) -> () {
@@ -394,12 +395,12 @@ bb0(%0 : $Optional<Builtin.Int32>):
   %t = integer_literal $Builtin.Int1, 1
   %f = integer_literal $Builtin.Int1, 0
   %1 = function_ref @blocker : $@convention(thin) () -> ()
-  cond_br undef, bb1, bb3
+  cond_br undef, bb1, bb5
 
 bb1:
   retain_value %0 : $Optional<Builtin.Int32>
   %100 = select_enum %0 : $Optional<Builtin.Int32>, case #Optional.some!enumelt: %t, case #Optional.none!enumelt: %f : $Builtin.Int1
-  cond_br %100, bb2, bb3
+  cond_br %100, bb2, bb6
 
 bb2:
   br bb4
@@ -410,6 +411,12 @@ bb3:
 bb4:
   %2 = tuple()
   return %2 : $()
+
+bb5:
+  br bb3
+
+bb6:
+  br bb3
 }
 
 // CHECK-LABEL: sil @sink_ref_count_ops_enum_over_select_enum_4 : $@convention(thin) (Optional<Builtin.NativeObject>, Optional<Builtin.NativeObject>) -> Optional<Builtin.NativeObject> {
@@ -814,7 +821,7 @@ bb3:
 // CHECK-LABEL: sil @enum_simplification_test8 : $@convention(thin) (Optional<Builtin.NativeObject>) -> () {
 // CHECK: bb0([[INPUT:%[0-9]+]] : $Optional<Builtin.NativeObject>):
 // CHECK-NOT: retain_value [[INPUT]]
-// CHECK: bb2:
+// CHECK: bb1:
 // CHECK-NEXT: [[PAYLOAD:%[0-9]+]] = unchecked_enum_data [[INPUT]]
 // CHECK-NOT: strong_retain
 // CHECK-NOT: retain_value
@@ -822,11 +829,11 @@ bb3:
 // CHECK: retain_value [[INPUT]]
 sil @enum_simplification_test8 : $@convention(thin) (Optional<Builtin.NativeObject>) -> () {
 bb0(%0 : $Optional<Builtin.NativeObject>):
-  cond_br undef, bb1, bb2
+  cond_br undef, bb1, bb5
 
 bb1:
   %1 = unchecked_enum_data %0 : $Optional<Builtin.NativeObject>, #Optional.some!enumelt
-  cond_br undef, bb2, bb3
+  cond_br undef, bb6, bb3
 
 bb2:
   retain_value %0 : $Optional<Builtin.NativeObject>
@@ -840,6 +847,12 @@ bb4:
   retain_value %0 : $Optional<Builtin.NativeObject>
   %9999 = tuple()
   return %9999 : $()
+
+bb5:
+  br bb2
+
+bb6:
+  br bb2
 }
 
 // CHECK-LABEL: sil @enum_simplification_test9 : $@convention(thin) (Optional<Builtin.NativeObject>) -> () {
@@ -922,7 +935,7 @@ bb1:
 // Single BB Loop
 bb2:
   retain_value %0 : $Optional<Builtin.NativeObject>
-  cond_br undef, bb2, bb9999
+  cond_br undef, bb10, bb11
 
 bb3:
   br bb4
@@ -935,12 +948,24 @@ bb4:
 
 bb5:
   retain_value %0 : $Optional<Builtin.NativeObject>
-  cond_br undef, bb4, bb9999
+  cond_br undef, bb12, bb13
 
 bb9999:
   retain_value %0 : $Optional<Builtin.NativeObject>
   %9999 = tuple()
   return %9999 : $()
+
+bb10:
+  br bb2
+
+bb11:
+  br bb9999
+
+bb12:
+  br bb4
+
+bb13:
+  br bb9999
 }
 
 // Make sure we don't propagate state out of loops.
@@ -960,7 +985,7 @@ bb2:
 
 bb3:
   retain_value %0 : $Optional<Builtin.NativeObject>
-  cond_br undef, bb3, bb4
+  cond_br undef, bb6, bb4
 
 bb4:
   br bb5
@@ -969,6 +994,9 @@ bb5:
   retain_value %0 : $Optional<Builtin.NativeObject>
   %9999 = tuple()
   return %9999 : $()
+
+bb6:
+  br bb3
 }
 
 // CHECK-LABEL: sil @enum_simplification_test14 : $@convention(thin) (Either) -> () {
@@ -1418,18 +1446,21 @@ bb2(%4 : $X):
 //CHECK-LABEL: @cond_branch0
 sil @cond_branch0: $@convention(thin) (@owned X) -> Int {
 bb0(%0 : $X):
-  cond_br undef, bb1(%0 : $X), bb2(%0 : $X)
+  cond_br undef, bb4, bb1
 
-bb1(%1 : $X):
+bb4:
+  br bb2(%0 : $X)
+
+bb1:
   //CHECK: strong_release %0
-  strong_release %1 : $X
-  br bb2(%1 : $X)
+  strong_release %0 : $X
+  br bb2(%0 : $X)
 
 bb2(%4 : $X):
   br bb3(%4 : $X)
 
 bb3(%6 : $X):
-  //CHECK: strong_release %6
+  //CHECK: strong_release %5
   strong_release %6 : $X
   br bb3(%6 : $X)
 }

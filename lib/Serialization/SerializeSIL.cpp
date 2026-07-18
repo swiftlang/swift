@@ -1655,27 +1655,15 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     break;
   }
   case SILInstructionKind::CondBranchInst: {
-    // Format: condition, true basic block ID, a list of arguments, false basic
-    // block ID, a list of arguments. Use SILOneTypeValuesLayout: the type is
-    // for condition, the list has value for condition, true basic block ID,
-    // false basic block ID, number of true arguments, and a list of true|false
-    // arguments.
+    // Format: condition, true basic block ID, false basic block ID, and a
+    // (now always zero) count of true arguments. A cond_br never passes branch
+    // arguments because SIL does not contain critical edges.
     const CondBranchInst *CBI = cast<CondBranchInst>(&SI);
     SmallVector<ValueID, 4> ListOfValues;
     ListOfValues.push_back(addValueRef(CBI->getCondition()));
     ListOfValues.push_back(BasicBlockMap[CBI->getTrueBB()]);
     ListOfValues.push_back(BasicBlockMap[CBI->getFalseBB()]);
-    ListOfValues.push_back(CBI->getTrueArgs().size());
-    for (auto Elt : CBI->getTrueArgs()) {
-      ListOfValues.push_back(S.addTypeRef(Elt->getType().getRawASTType()));
-      ListOfValues.push_back((unsigned)Elt->getType().getCategory());
-      ListOfValues.push_back(addValueRef(Elt));
-    }
-    for (auto Elt : CBI->getFalseArgs()) {
-      ListOfValues.push_back(S.addTypeRef(Elt->getType().getRawASTType()));
-      ListOfValues.push_back((unsigned)Elt->getType().getCategory());
-      ListOfValues.push_back(addValueRef(Elt));
-    }
+    ListOfValues.push_back(0);
 
     SILOneTypeValuesLayout::emitRecord(
         Out, ScratchRecord, SILAbbrCodes[SILOneTypeValuesLayout::Code],

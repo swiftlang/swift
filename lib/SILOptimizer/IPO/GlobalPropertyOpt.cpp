@@ -393,9 +393,9 @@ void GlobalPropertyOpt::scanInstructions() {
             SILValue PredArg;
             if (auto *BI = dyn_cast<BranchInst>(Term)) {
               PredArg = BI->getArg(argIdx);
-            } else if (auto *CBI = dyn_cast<CondBranchInst>(Term)) {
-              PredArg = CBI->getArgForDestBB(&BB, BBArg);
             }
+            // A cond_br passes no branch arguments (SIL has no critical edges),
+            // so a block with arguments is never reached through one.
             if (PredArg) {
               addDependency(getValueEntry(PredArg), getValueEntry(BBArg));
             } else {

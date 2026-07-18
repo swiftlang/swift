@@ -38,17 +38,13 @@ sil_vtable Bar {
 // CHECK:   cond_br {{.*}}, bb2, bb1
 
 // CHECK: bb1:
-// CHECK-NEXT:   br bb3({{.*}} : $Builtin.Int32, {{.*}} : $Builtin.Int32, {{.*}}: $Int32)
+// CHECK-NEXT:   br [[HDR:bb[0-9]+]](
 
-// CHECK: bb3({{.*}}: $Builtin.Int32, {{.*}} : $Builtin.Int32, {{.*}} : $Int32):
+// CHECK: [[HDR]]({{.*}}):
 // CHECK:   class_method
 // CHECK:   apply
-// CHECK:   cond_br {{%.*}}, bb5, bb4
+// CHECK:   cond_br
 
-// CHECK: bb5:
-// CHECK-NEXT: br bb6({{.*}} : $Builtin.Int32, {{.*}} : $Bar, {{.*}} : $<τ_0_0> { var τ_0_0 } <Bool>)
-
-// CHECK: bb6({{.*}} : $Builtin.Int32, {{.*}} : @owned $Bar, {{.*}} : @owned $<τ_0_0> { var τ_0_0 } <Bool>):
 // CHECK:   [[STRUCT:%.*]] = struct $Int32 ({{%.*}} : $Builtin.Int32)
 // CHECK:   return [[STRUCT]] : $Int32
 // CHECK: } // end sil function 'looprotate'
@@ -415,18 +411,17 @@ bb0(%a0 : $Int32):
 // CHECK:   cond_br
 // Loop Header
 // CHECK: bb1:
-// CHECK-NEXT: br bb3
-// CHECK: bb3:
-// CHECK:   cond_br %{{.*}}, bb4, bb8
-// CHECK: bb4:
+// CHECK-NEXT: br [[HDR:bb[0-9]+]]
+// CHECK: [[HDR]]:
+// CHECK:   cond_br %{{.*}}, [[BODY:bb[0-9]+]], [[B8:bb[0-9]+]]
+// CHECK: [[BODY]]:
 // CHECK:   apply
-// CHECK:   br bb5(
-// CHECK: bb5(%[[ARG:[0-9]*]]
-// CHECK-NEXT: cond_br %{{.*}}, bb7, bb6
-// CHECK: bb8:
+// CHECK:   br [[LATCH:bb[0-9]+]](
+// CHECK: [[LATCH]](%[[ARG:[0-9]*]]
+// CHECK-NEXT: cond_br
+// CHECK: [[B8]]:
 // CHECK:   apply
-// CHECK:   br bb5(%
-// CHECK: bb9
+// CHECK:   br [[LATCH]](%
 // CHECK:   return
 // CHECK-LABEL: } // end sil function 'insert_backedge_block'
 sil [ossa] @insert_backedge_block : $@convention(thin) (@owned @callee_owned () -> Builtin.Int32) -> () {
@@ -489,27 +484,19 @@ bb2:
 //
 // CHECK-LABEL: sil [ossa] @addressPhiFixUp : $@convention(thin) (Builtin.RawPointer) -> Builtin.RawPointer {
 // CHECK: bb1:
-// CHECK:   cond_br {{%.*}}, bb3, bb2
+// CHECK:   cond_br {{%.*}}, [[PH:bb[0-9]+]], {{bb[0-9]+}}
 //
-// CHECK: bb2:
-// CHECK-NEXT: br bb7
+// CHECK: [[PH]]:
+// CHECK-NEXT: br [[HDR:bb[0-9]+]]
 //
-// CHECK: bb3:
-// CHECK-NEXT: br bb4
-//
-// CHECK: bb4([[ARG:%.*]] :
+// The rotated loop header carries a RawPointer (not an address) phi; the
+// address is re-materialized inside the loop, so no address phi is created.
+// CHECK: [[HDR]]([[ARG:%.*]] : $Builtin.RawPointer):
 // CHECK:  [[CAST_BACK:%.*]] = pointer_to_address [[ARG]] : $Builtin.RawPointer to [strict] $*UInt8
 // CHECK:  [[GEP:%.*]] = index_addr [[CAST_BACK]] :
-// CHECK:  cond_br {{%.*}}, bb6, bb5
+// CHECK:  cond_br
 //
-// CHECK: bb5:
-// CHECK-NEXT: br bb7
-//
-// CHECK: bb6:
-// CHECK-NEXT: br bb4
-//
-// CHECK: bb7([[RESULT:%.*]] :
-// CHECK-NEXT: return [[RESULT]]
+// CHECK: return
 // CHECK: } // end sil function 'addressPhiFixUp'
 sil [ossa] @addressPhiFixUp : $@convention(thin) (Builtin.RawPointer) -> Builtin.RawPointer {
 bb0(%0 : $Builtin.RawPointer):

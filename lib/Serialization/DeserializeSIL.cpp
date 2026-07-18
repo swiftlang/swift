@@ -3539,35 +3539,18 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     break;
   }
   case SILInstructionKind::CondBranchInst: {
-    // Format: condition, true basic block ID, a list of arguments, false basic
-    // block ID, a list of arguments. Use SILOneTypeValuesLayout: the type is
-    // for condition, the list has value for condition, true basic block ID,
-    // false basic block ID, number of true arguments, and a list of true|false
-    // arguments.
+    // Format: condition, true basic block ID, false basic block ID, and a
+    // (always zero) count of true arguments. A cond_br never passes branch
+    // arguments because SIL does not contain critical edges.
     SILValue Cond = getLocalValue(
         Builder.maybeGetFunction(), ListOfValues[0],
         getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn));
 
-    unsigned NumTrueArgs = ListOfValues[3];
-    unsigned StartOfTrueArg = 4;
-    unsigned StartOfFalseArg = StartOfTrueArg + 3*NumTrueArgs;
-    SmallVector<SILValue, 4> TrueArgs;
-    for (unsigned I = StartOfTrueArg, E = StartOfFalseArg; I < E; I += 3)
-      TrueArgs.push_back(
-          getLocalValue(Builder.maybeGetFunction(), ListOfValues[I + 2],
-                        getSILType(MF->getType(ListOfValues[I]),
-                                   (SILValueCategory)ListOfValues[I + 1], Fn)));
-
-    SmallVector<SILValue, 4> FalseArgs;
-    for (unsigned I = StartOfFalseArg, E = ListOfValues.size(); I < E; I += 3)
-      FalseArgs.push_back(
-          getLocalValue(Builder.maybeGetFunction(), ListOfValues[I + 2],
-                        getSILType(MF->getType(ListOfValues[I]),
-                                   (SILValueCategory)ListOfValues[I + 1], Fn)));
+    assert(ListOfValues[3] == 0 && "cond_br must not have branch arguments");
 
     ResultInst = Builder.createCondBranch(
-        Loc, Cond, getBBForReference(Fn, ListOfValues[1]), TrueArgs,
-        getBBForReference(Fn, ListOfValues[2]), FalseArgs);
+        Loc, Cond, getBBForReference(Fn, ListOfValues[1]),
+        getBBForReference(Fn, ListOfValues[2]));
     break;
   }
   case SILInstructionKind::AwaitAsyncContinuationInst: {

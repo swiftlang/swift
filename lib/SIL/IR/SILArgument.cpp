@@ -150,38 +150,24 @@ bool SILPhiArgument::isPhi() const {
     return true;
 
   auto *termInst = predBlock->getTerminator();
-  return isa<BranchInst>(termInst) || isa<CondBranchInst>(termInst);
+  return isa<BranchInst>(termInst);
 }
 
 static Operand *getIncomingPhiOperandForPred(const SILBasicBlock *parentBlock,
                                              const SILBasicBlock *predBlock,
                                              unsigned argIndex) {
-  auto *predBlockTermInst = predBlock->getTerminator();
-  if (auto *bi = dyn_cast<BranchInst>(predBlockTermInst)) {
-    return &const_cast<BranchInst *>(bi)->getAllOperands()[argIndex];
-  }
-
-  // FIXME: Disallowing critical edges in SIL would enormously simplify phi and
-  // branch handling and reduce expensive analysis invalidation. If that is
-  // done, then only BranchInst will participate in phi operands, eliminating
-  // the need to search for the appropriate CondBranchInst operand.
-  return cast<CondBranchInst>(predBlockTermInst)
-      ->getOperandForDestBB(parentBlock, argIndex);
+  // Only a BranchInst can pass phi arguments: SIL does not contain critical
+  // edges, so a block with multiple predecessors (a phi) is only ever reached
+  // through unconditional branches.
+  auto *bi = cast<BranchInst>(predBlock->getTerminator());
+  return &const_cast<BranchInst *>(bi)->getAllOperands()[argIndex];
 }
 
 static SILValue getIncomingPhiValueForPred(const SILBasicBlock *parentBlock,
                                            const SILBasicBlock *predBlock,
                                            unsigned argIndex) {
-  const auto *predBlockTermInst = predBlock->getTerminator();
-  if (auto *bi = dyn_cast<BranchInst>(predBlockTermInst))
-    return bi->getArg(argIndex);
-
-  // FIXME: Disallowing critical edges in SIL would enormously simplify phi and
-  // branch handling and reduce expensive analysis invalidation. If that is
-  // done, then only BranchInst will participate in phi operands, eliminating
-  // the need to search for the appropriate CondBranchInst operand.
-  return cast<CondBranchInst>(predBlockTermInst)
-      ->getArgForDestBB(parentBlock, argIndex);
+  // Only a BranchInst can pass phi arguments (see above).
+  return cast<BranchInst>(predBlock->getTerminator())->getArg(argIndex);
 }
 
 SILValue SILPhiArgument::getIncomingPhiValue(SILBasicBlock *predBlock) const {
@@ -327,12 +313,10 @@ getSingleTerminatorOperandForPred(const SILBasicBlock *parentBlock,
   case TermKind::DynamicMethodBranchInst:
   case TermKind::YieldInst:
   case TermKind::AwaitAsyncContinuationInst:
+  case TermKind::CondBranchInst:
     return SILValue();
   case TermKind::BranchInst:
     return cast<const BranchInst>(predTermInst)->getArg(argIndex);
-  case TermKind::CondBranchInst:
-    return cast<const CondBranchInst>(predTermInst)
-        ->getArgForDestBB(parentBlock, argIndex);
   case TermKind::CheckedCastBranchInst:
     return cast<const CheckedCastBranchInst>(predTermInst)->getOperand();
   case TermKind::SwitchEnumInst:
@@ -407,22 +391,6 @@ SILPhiArgument *BranchInst::getArgForOperand(const Operand *oper) {
   assert(oper->getUser() == this);
   return cast<SILPhiArgument>(
       getDestBB()->getArgument(oper->getOperandNumber()));
-}
-
-const SILPhiArgument *
-CondBranchInst::getArgForOperand(const Operand *oper) const {
-  assert(oper->getUser() == this);
-
-  unsigned operIdx = oper->getOperandNumber();
-  if (isTrueOperandIndex(operIdx)) {
-    return cast<SILPhiArgument>(getTrueBB()->getArgument(
-        operIdx - getTrueOperands().front().getOperandNumber()));
-  }
-  if (isFalseOperandIndex(operIdx)) {
-    return cast<SILPhiArgument>(getFalseBB()->getArgument(
-        operIdx - getFalseOperands().front().getOperandNumber()));
-  }
-  return nullptr;
 }
 
 //===----------------------------------------------------------------------===//

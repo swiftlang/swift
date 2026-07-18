@@ -19,11 +19,11 @@ func sum(_ x: UInt64, _ y: UInt64) -> UInt64 {
 // TESTSIL: [[GLOBALVAR:%.*]] = global_addr @$s17merge_exclusivity5checks6UInt64Vvp
 // TESTSIL: [[B1:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[GLOBALVAR]]
 // TESTSIL: end_access [[B1]]
-// TESTSIL: bb4{{.*}}:
+// TESTSIL: bb5{{.*}}:
 // TESTSIL: [[B2b:%.*]] = begin_access [modify] [static] [no_nested_conflict] [[GLOBALVAR]]
 // TESTSIL: store {{.*}} to [[B2b]]
 // TESTSIL: end_access [[B2b]]
-// TESTSIL: bb5:
+// TESTSIL: bb6:
 // TESTSIL: [[B3b:%.*]] = begin_access [modify] [static] [no_nested_conflict] [[GLOBALVAR]]
 // TESTSIL: store {{.*}} to [[B3b]]
 // TESTSIL: end_access [[B3b]]

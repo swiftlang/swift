@@ -26,7 +26,6 @@ _swift_complete()
     COMPREPLY=( $(compgen -W "\
       -aa-kind \
       -allocbox-to-stack-analyze-apply \
-      -allow-critical-edges \
       -basic-dynamic-replacement \
       -bug-reducer-tester-failure-kind \
       -bug-reducer-tester-target-func \

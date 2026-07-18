@@ -3848,14 +3848,12 @@ SILCloner<ImplClass>::visitBranchInst(BranchInst *Inst) {
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitCondBranchInst(CondBranchInst *Inst) {
-  auto TrueArgs = getOpValueArray<8>(Inst->getTrueArgs());
-  auto FalseArgs = getOpValueArray<8>(Inst->getFalseArgs());
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(
       Inst, getBuilder().createCondBranch(
                 getOpLocation(Inst->getLoc()), getOpValue(Inst->getCondition()),
-                getOpBasicBlock(Inst->getTrueBB()), TrueArgs,
-                getOpBasicBlock(Inst->getFalseBB()), FalseArgs,
+                getOpBasicBlock(Inst->getTrueBB()),
+                getOpBasicBlock(Inst->getFalseBB()),
                 Inst->getTrueBBCount(), Inst->getFalseBBCount()));
 }
 

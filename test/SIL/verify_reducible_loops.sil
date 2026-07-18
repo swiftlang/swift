@@ -15,18 +15,36 @@ import Builtin
 
 sil @irreducible_loop : $@convention(thin) (Builtin.Int1) -> () {
 bb0(%0 : $Builtin.Int1):
-  cond_br %0, bb1, bb2
+  cond_br %0, bb9, bb4
 
 // bb1 and bb2 form an irreducible loop: both are entry points
 // from outside and both branch to each other.
 bb1:
-  cond_br %0, bb2, bb3
+  cond_br %0, bb7, bb8
 
 bb2:
-  cond_br %0, bb1, bb3
+  cond_br %0, bb5, bb6
 
 bb3:
   %r = tuple ()
   return %r : $()
+
+bb4:
+  br bb2
+
+bb5:
+  br bb1
+
+bb6:
+  br bb3
+
+bb7:
+  br bb2
+
+bb8:
+  br bb3
+
+bb9:
+  br bb1
 }
 
