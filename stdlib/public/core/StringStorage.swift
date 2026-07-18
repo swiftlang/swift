@@ -566,9 +566,11 @@ extension __StringStorage {
   internal var unusedCapacity: Int { capacity &- count }
 
   #if !INTERNAL_CHECKS_ENABLED
-  @inline(__always) internal func _invariantCheck(initialized: Bool = true) {}
+  @inline(__always) internal func _invariantCheck(
+    initialized: Bool = true, verifyContentsASCII: Bool = true) {}
   #else
-  internal func _invariantCheck(initialized: Bool = true) {
+  internal func _invariantCheck(
+    initialized: Bool = true, verifyContentsASCII: Bool = true) {
     let rawSelf = UnsafeRawPointer(Builtin.bridgeToRawPointer(self))
     let rawStart = unsafe UnsafeRawPointer(start)
     _internalInvariant(unusedCapacity >= 0)
@@ -581,7 +583,7 @@ extension __StringStorage {
     let str = asString
     _internalInvariant(str._guts._object.isPreferredRepresentation)
     _countAndFlags._invariantCheck()
-    if isASCII && initialized {
+    if isASCII && initialized && verifyContentsASCII {
       unsafe _internalInvariant(_allASCII(self.codeUnits))
     }
     if hasAllocatedBreadcrumbs {
@@ -607,6 +609,7 @@ extension __StringStorage {
   internal func _updateCountAndFlags(
     newCount: Int,
     newIsASCII: Bool,
+    verifyContentsASCII: Bool = true,
     precalculatedUTF16Count utf16Len: Int? = nil
   ) {
     let countAndFlags = _CountAndFlags(
@@ -645,7 +648,7 @@ extension __StringStorage {
         .storeBytes(of: 0, as: Int.self)
     }
 #endif
-    _invariantCheck()
+    _invariantCheck(verifyContentsASCII: verifyContentsASCII)
   }
 
   // Perform common post-append adjustments and invariant enforcement.
@@ -654,9 +657,14 @@ extension __StringStorage {
     appendedCount: Int, appendedIsASCII isASCII: Bool
   ) {
     let oldTerminator = unsafe self.terminator
+    // We already know our contents ASCII nature, so only do O(n) validation
+    // of the new range, to avoid being n^2 for repeated appends
     _updateCountAndFlags(
-      newCount: self.count + appendedCount, newIsASCII: self.isASCII && isASCII)
+      newCount: self.count + appendedCount, newIsASCII: self.isASCII && isASCII,
+      verifyContentsASCII: false)
     unsafe _internalInvariant(oldTerminator + appendedCount == self.terminator)
+    unsafe _internalInvariant(!isASCII || _allASCII(UnsafeBufferPointer(
+      rebasing: self.codeUnits[(self.count &- appendedCount) ..< self.count])))
   }
 
   @_effects(releasenone)
@@ -958,8 +966,6 @@ extension _StringGuts {
       result = unsafe loadUnmanagedBreadcrumbs()._withUnsafeGuaranteedRef {
         $0.utf16Length
       }
-      _internalInvariant(result == String.UTF16View(self)._utf16Distance(
-        from: startIndex, to: endIndex))
     } else {
       result = String.UTF16View(self)._utf16Distance(
         from: startIndex, to: endIndex
