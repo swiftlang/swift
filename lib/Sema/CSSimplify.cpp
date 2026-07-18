@@ -7232,7 +7232,18 @@ bool ConstraintSystem::repairFailures(
   case ConstraintLocator::KeyPathDynamicMember: {
     if (lhs->isPlaceholder() || rhs->isPlaceholder())
       return true;
-    break;
+    if (lhs->isTypeVariableOrMember())
+      break;
+    // If the subscript's value type is not fully resolved, hold its parameters
+    // so the failure surfaces as an inference error rather than a redundant one.
+    if (rhs->hasTypeVariable()) {
+      recordAnyTypeVarAsPotentialHole(rhs);
+      return true;
+    }
+    // Nothing else repairs a mismatch here, so record one to allow diagnosis.
+    conversionsOrFixes.push_back(ContextualMismatch::create(
+        *this, lhs, rhs, getConstraintLocator(locator)));
+    return true;
   }
 
   default:
