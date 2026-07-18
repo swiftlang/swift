@@ -25,8 +25,8 @@ extension X: P {
 
 
 //--- b.swift
-// B-OBJDUMP: R_ARM_REL32 $e4main1XVMf
-// B-OBJDUMP: R_ARM_REL32 $e4main1XVAA1PAAWP
+// B-OBJDUMP: R_ARM_THM_MOVW_ABS_NC $e4main1XVMf
+// B-OBJDUMP: R_ARM_THM_MOVW_ABS_NC $e4main1XVAA1PAAWP
 public func getP() -> any P {
   return X()
 }
