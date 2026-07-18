@@ -138,7 +138,7 @@ __swift_ptrdiff_t _swift_mutex_tryLock(void *mutex) {
   return os_unfair_lock_trylock(&m->u.unfair) ? 1 : 0;
 }
 
-void _swift_tls_init(swift_tls_key_t key, swift_tls_dtor_t destructor) {
+void _swift_tls_init(swift_tls_key_t key, __swift_tls_dtor_t destructor) {
   trap_if(
       pthread_key_init_np((int)swift_embedded_platform_tls_key(key),
                           destructor) != 0);

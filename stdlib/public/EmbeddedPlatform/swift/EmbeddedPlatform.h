@@ -69,7 +69,14 @@ typedef __swift_ptrdiff_t swift_tls_key_t;
 #define EMBEDDED_SWIFT_NULLABLE
 #endif
 
-typedef void (*swift_tls_dtor_t)(void * EMBEDDED_SWIFT_NULLABLE);
+/**
+ * A function called with a non-NULL TLS value when the execution context that
+ * owns it exits.
+ *
+ * A platform with a fixed set of execution contexts that never exit may never
+ * call this function.
+ */
+typedef void (*__swift_tls_dtor_t)(void * EMBEDDED_SWIFT_NULLABLE);
 
 #if defined(__has_feature) && (__has_feature(bounds_attributes) || __has_feature(bounds_safety_attributes))
 #define EMBEDDED_SWIFT_COUNTED_BY(N) __attribute__((__counted_by__(N)))
@@ -392,14 +399,18 @@ __swift_ptrdiff_t _swift_mutex_tryLock(void * EMBEDDED_SWIFT_NONNULL mutex);
 
 /**
  * Initializes a reserved TLS key. `key` is one of the numeric reserved keys
- * described by `SWIFT_TLS_KEY_COUNT`. `destructor` may be NULL.
+ * described by `SWIFT_TLS_KEY_COUNT`. `destructor` may be NULL. This function
+ * is called at most once for each key that needs a destructor.
  */
 void _swift_tls_init(swift_tls_key_t key,
-                     swift_tls_dtor_t EMBEDDED_SWIFT_NULLABLE destructor);
+                     __swift_tls_dtor_t EMBEDDED_SWIFT_NULLABLE destructor);
 
 /**
  * Returns the value stored for a TLS key in the current execution context, or
  * NULL if no value has been stored.
+ *
+ * This function may be called before `_swift_tls_init`. In that case, it must
+ * return NULL until a value is stored for the key.
  *
  * Precondition: `key < SWIFT_TLS_KEY_COUNT`.
  */
@@ -407,6 +418,9 @@ void * EMBEDDED_SWIFT_NULLABLE _swift_tls_get(swift_tls_key_t key);
 
 /**
  * Stores a value for a TLS key in the current execution context.
+ *
+ * This function may be called before `_swift_tls_init`. The platform must make
+ * storage available for the key on demand in that case.
  *
  * Precondition: `key < SWIFT_TLS_KEY_COUNT`.
  */

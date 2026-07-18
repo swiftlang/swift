@@ -68,7 +68,13 @@ struct Main {
     check(_swift_thread_isMain() != 0)
     check(!embeddedPlatformWorkerIsMain())
 
-    for key in 0..<8 {
+    check(_swift_tls_get(0) == nil)
+    let lazyValue = UnsafeMutableRawPointer(bitPattern: 1)
+    _swift_tls_set(0, lazyValue)
+    check(_swift_tls_get(0) == lazyValue)
+    _swift_tls_set(0, nil)
+
+    for key in 1..<8 {
       _swift_tls_init(key, nil)
       check(_swift_tls_get(key) == nil)
 

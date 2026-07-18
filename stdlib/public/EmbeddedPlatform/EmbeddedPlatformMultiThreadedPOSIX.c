@@ -67,7 +67,7 @@ static int swift_embedded_platform_tls_is_initialized(swift_tls_key_t key) {
 
 static void
 swift_embedded_platform_tls_init_if_needed(swift_tls_key_t key,
-                                           swift_tls_dtor_t destructor) {
+                                           __swift_tls_dtor_t destructor) {
   trap_if(key < 0 || key >= SWIFT_TLS_KEY_COUNT);
   trap_if(pthread_mutex_lock(&swift_embedded_platform_tls_lock) != 0);
   if (!swift_embedded_platform_tls_key_initialized[key]) {
@@ -116,7 +116,7 @@ __swift_ptrdiff_t _swift_mutex_tryLock(void *mutex) {
   return pthread_mutex_trylock((pthread_mutex_t *)mutex) == 0 ? 1 : 0;
 }
 
-void _swift_tls_init(swift_tls_key_t key, swift_tls_dtor_t destructor) {
+void _swift_tls_init(swift_tls_key_t key, __swift_tls_dtor_t destructor) {
   swift_embedded_platform_tls_init_if_needed(key, destructor);
 }
 

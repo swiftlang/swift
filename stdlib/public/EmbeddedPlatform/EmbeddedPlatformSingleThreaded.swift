@@ -76,7 +76,7 @@ public func _swift_mutex_tryLock(_ mutex: UnsafeMutableRawPointer) -> Int {
 }
 
 fileprivate struct SingleThreadedTLS {
-  static let keyCount = 8
+  static let keyCount = Int(SWIFT_TLS_KEY_COUNT)
   static var values = [8 of UnsafeMutableRawPointer?](repeating: nil)
 }
 
@@ -89,11 +89,13 @@ public func _swift_tls_init(
 
 @implementation @c
 public func _swift_tls_get(_ key: Int) -> UnsafeMutableRawPointer? {
+  precondition(key >= 0 && key < SingleThreadedTLS.keyCount)
   return SingleThreadedTLS.values[key]
 }
 
 @implementation @c
 public func _swift_tls_set(_ key: Int, _ value: UnsafeMutableRawPointer?) {
+  precondition(key >= 0 && key < SingleThreadedTLS.keyCount)
   SingleThreadedTLS.values[key] = value
 }
 
