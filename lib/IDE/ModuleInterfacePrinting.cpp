@@ -401,6 +401,14 @@ getDeclsFromCrossImportOverlay(ModuleDecl *Overlay, ModuleDecl *Declaring,
   return {Imports, Remainder};
 }
 
+static Decl *originatingDecl(Decl *aux) {
+  SourceLoc loc = aux->getLoc();
+  auto *sf = aux->getModuleContext()->getSourceFileContainingLocation(loc);
+  if (!sf || sf->Kind != SourceFileKind::MacroExpansion)
+    return nullptr;
+  return sf->getMacroExpansion().dyn_cast<Decl *>();
+}
+
 static void printCrossImportOverlays(ModuleDecl *Declaring, ASTContext &Ctx,
                                      ASTPrinter &Printer,
                                      const PrintOptions &Options,
@@ -629,7 +637,14 @@ void swift::ide::printModuleInterface(
       }
     };
 
-    if (auto clangNode = getEffectiveClangNode(D)) {
+    auto originatingDeclOrSelf = [](Decl *aux) -> Decl * {
+      Decl *res = originatingDecl(aux);
+      if (!res)
+        return aux;
+      return res;
+    };
+
+    if (auto clangNode = getEffectiveClangNode(originatingDeclOrSelf(D))) {
       if (auto namespaceDecl =
               dyn_cast_or_null<clang::NamespaceDecl>(clangNode.getAsDecl())) {
         // An imported namespace decl will contain members from all redecls, so
@@ -724,6 +739,11 @@ void swift::ide::printModuleInterface(
     std::stable_sort(P.second.begin(), P.second.end(),
                      [&](std::pair<Decl *, clang::SourceLocation> LHS,
                          std::pair<Decl *, clang::SourceLocation> RHS) -> bool {
+      // Sort peer macros immediately after their originating decl.
+      if (RHS.first == originatingDecl(LHS.first)) 
+        return false;
+      if (LHS.first == originatingDecl(RHS.first)) 
+        return true;
       return ClangSourceManager.isBeforeInTranslationUnit(LHS.second,
                                                           RHS.second);
     });
