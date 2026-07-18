@@ -23,7 +23,16 @@
 // RUN:   -internal-import-bridging-header %t/objc-bridging-header.h \
 // RUN:   -swift-version 6 -enable-library-evolution
 
+// Test SerializeAbstractTypeLayoutForHiddenTypes suppresses these exportability diagnostics
+// as if library evolution was enabled.
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck %t/main.swift \
+// RUN:   -verify -verify-ignore-unrelated -verify-ignore-unknown \
+// RUN:   -internal-import-bridging-header %t/objc-bridging-header.h \
+// RUN:   -swift-version 6 \
+// RUN:   -enable-experimental-feature SerializeAbstractTypeLayoutForHiddenTypes
+
 // REQUIRES: objc_interop
+// REQUIRES: swift_feature_SerializeAbstractTypeLayoutForHiddenTypes
 
 //--- objc-bridging-header.h
 #import <Foundation.h>
