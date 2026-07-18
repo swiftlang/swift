@@ -3537,30 +3537,6 @@ OptionalBridgedFunction BridgedContext::lookupStdlibFunction(BridgedStringRef na
   return {context->lookupStdlibFunction(name.unbridged())};
 }
 
-void BridgedContext::SSAUpdater_initialize(BridgedType type, BridgedValue::Ownership ownership) const {
-  context->initializeSSAUpdater(context->getFunction(), type.unbridged(), BridgedValue::unbridge(ownership));
-}
-
-void BridgedContext::SSAUpdater_addAvailableValue(BridgedBasicBlock block, BridgedValue value) const {
-  context->SSAUpdater_addAvailableValue(block.unbridged(), value.getSILValue());
-}
-
-BridgedValue BridgedContext::SSAUpdater_getValueAtEndOfBlock(BridgedBasicBlock block) const {
-  return {context->SSAUpdater_getValueAtEndOfBlock(block.unbridged())};
-}
-
-BridgedValue BridgedContext::SSAUpdater_getValueInMiddleOfBlock(BridgedBasicBlock block) const {
-  return {context->SSAUpdater_getValueInMiddleOfBlock(block.unbridged())};
-}
-
-SwiftInt BridgedContext::SSAUpdater_getNumInsertedPhis() const {
-  return (SwiftInt)context->SSAUpdater_getInsertedPhis().size();
-}
-
-BridgedValue BridgedContext::SSAUpdater_getInsertedPhi(SwiftInt idx) const {
-  return {context->SSAUpdater_getInsertedPhis()[idx]};
-}
-
 BridgedBasicBlockSet BridgedContext::allocBasicBlockSet() const {
   return {context->allocBlockSet()};
 }
