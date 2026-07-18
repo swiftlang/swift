@@ -3076,6 +3076,14 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
   indent();
 }
 
+static Decl *originatingDecl(Decl *aux) {
+  SourceLoc loc = aux->getLoc();
+  auto *sf = aux->getModuleContext()->getSourceFileContainingLocation(loc);
+  if (!sf || sf->Kind != SourceFileKind::MacroExpansion)
+    return nullptr;
+  return sf->getMacroExpansion().dyn_cast<Decl *>();
+}
+
 /// Sort and print Clang record members in the following order:
 ///
 ///   struct PrintMe {
@@ -3092,6 +3100,21 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
 static bool sortClangDecls(Decl *lhs, Decl *rhs) {
   auto &SM = lhs->getASTContext().SourceMgr;
   auto *CML = lhs->getASTContext().getClangModuleLoader();
+
+  // If this is a decl from a macro expansion, sort it with its original.
+  Decl *lhsOrig = originatingDecl(lhs);
+  Decl *rhsOrig = originatingDecl(rhs);
+
+  // The original comes first, followed by aux decls.
+  if (lhsOrig == rhs)
+    return false;
+  if (rhsOrig == lhs)
+    return true;
+
+  if (lhsOrig)
+    lhs = lhsOrig;
+  if (rhsOrig)
+    rhs = rhsOrig;
 
   auto getClangDecl = [&CML](Decl *d) -> const clang::Decl * {
     // Has an attached clang::Decl

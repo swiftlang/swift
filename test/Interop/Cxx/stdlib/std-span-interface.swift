@@ -34,14 +34,14 @@ import CxxStdlib
 // CHECK:      struct X {
 // CHECK-NEXT:   init()
 // CHECK-NEXT:   mutating func methodWithSafeWrapper(_ s: ConstSpanOfInt)
+// CHECK-NEXT:   /// This is an auto-generated wrapper for safer interop
+// CHECK-NEXT:   @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+// CHECK-NEXT:   @_alwaysEmitIntoClient @_disfavoredOverload public mutating func methodWithSafeWrapper(_ s: Span<CInt>)
 // CHECK-NEXT:   mutating func getMutable(_ s: ConstSpanOfInt) -> SpanOfInt
-// CHECK-DAG:    /// This is an auto-generated wrapper for safer interop
-// CHECK-DAG:    @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
-// CHECK-DAG:    @_alwaysEmitIntoClient @_disfavoredOverload public mutating func methodWithSafeWrapper(_ s: Span<CInt>)
-// CHECK-LEGCAY-DAG: /// This is an auto-generated wrapper for safer interop
-// CHECK-LEGACY-DAG: @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
-// CHECK-LEGACY-DAG: @_lifetime(&self)
-// CHECK-LEGACY-DAG: @_alwaysEmitIntoClient @_disfavoredOverload public mutating func getMutable(_ s: Span<CInt>) -> MutableSpan<CInt>
+// CHECK-LEGACY-NEXT:   /// This is an auto-generated wrapper for safer interop
+// CHECK-LEGACY-NEXT:   @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+// CHECK-LEGACY-NEXT:   @_lifetime(&self)
+// CHECK-LEGACY-NEXT:   @_alwaysEmitIntoClient @_disfavoredOverload public mutating func getMutable(_ s: Span<CInt>) -> MutableSpan<CInt>
 // CHECK-NEXT: }
 
 // CHECK:      mutating func methodWithMutableSafeWrapper(_ s: SpanOfInt)
@@ -53,20 +53,21 @@ import CxxStdlib
 // CHECK: struct SpanWithoutTypeAlias {
 // CHECK-NEXT:   init()
 // CHECK-NEXT:   mutating func bar() -> std.{{.*}}span<__cxxConst<CInt>, _C{{.*}}_{{.*}}>
+// CHECK-LEGACY-NEXT:   /// This is an auto-generated wrapper for safer interop
+// CHECK-LEGACY-NEXT:   @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+// CHECK-LEGACY-NEXT:   @_lifetime(&self)
+// CHECK-LEGACY-NEXT:   @_alwaysEmitIntoClient @_disfavoredOverload public mutating func bar() -> Span<CInt>
 // CHECK-NEXT:   mutating func foo(_ s: std.{{.*}}span<__cxxConst<CInt>, _C{{.*}}_{{.*}}>)
+// CHECK-NEXT:   /// This is an auto-generated wrapper for safer interop
+// CHECK-NEXT:   @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+// CHECK-NEXT:   @_alwaysEmitIntoClient @_disfavoredOverload public mutating func foo(_ s: Span<CInt>)
 // CHECK-NEXT:   mutating func nestedTemplateInstantiationReturn() -> std.{{.*}}span<S<CInt>, _C{{.*}}_{{.*}}>
 // CHECK-NEXT:   mutating func nestedTemplateInstantiationParam(_ s: std.{{.*}}span<S<CInt>, _C{{.*}}_{{.*}}>)
 // CHECK-NEXT:   mutating func nestedTemplateInstantiationReturnCounted(_ len: CInt) -> UnsafeMutablePointer<S<CInt>>!
 // CHECK-NEXT:   mutating func nestedTemplateInstantiationParamCounted(_ p: UnsafeMutablePointer<S<CInt>>!, _ len: CInt)
 // CHECK-NEXT:   mutating func otherTemplatedType(_ copy: ConstSpanOfInt, _: S<CInt>)
 // CHECK-NEXT:   mutating func otherTemplatedType2(_ copy: ConstSpanOfInt, _: UnsafeMutablePointer<S<CInt>>!)
-// CHECK-LEGACY-DAG:   /// This is an auto-generated wrapper for safer interop
-// CHECK-LEGACY-DAG:   @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
-// CHECK-LEGACY-DAG:   @_lifetime(&self)
-// CHECK-LEGACY-DAG:   @_alwaysEmitIntoClient @_disfavoredOverload public mutating func bar() -> Span<CInt>
-// CHECK-DAG:   /// This is an auto-generated wrapper for safer interop
-// CHECK-DAG:   @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
-// CHECK-DAG:   @_alwaysEmitIntoClient @_disfavoredOverload public mutating func foo(_ s: Span<CInt>)
+// CHECK-NEXT:   mutating func otherTemplatedTypeReturn(_ copy: ConstSpanOfInt) -> UnsafeMutablePointer<S<CInt>>!
 // CHECK-NEXT: }
 
 // CHECK: class DependsOnSelfFRT {
