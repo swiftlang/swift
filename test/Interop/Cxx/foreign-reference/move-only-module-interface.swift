@@ -2,8 +2,8 @@
 
 // CHECK: class MoveOnly {
 // CHECK: init
-// CHECK:   func test() -> Int32
-// CHECK:   func testMutable() -> Int32
+// CHECK:   func test() -> CInt
+// CHECK:   func testMutable() -> CInt
 // CHECK:   class func create() -> MoveOnly
 // CHECK: }
 // CHECK-NOT: func moveIntoResult(_ x: MoveOnly) -> MoveOnly
@@ -17,16 +17,16 @@
 
 // CHECK: class PrivateCopyCtor {
 // CHECK: init
-// CHECK:   func test() -> Int32
-// CHECK:   func testMutable() -> Int32
+// CHECK:   func test() -> CInt
+// CHECK:   func testMutable() -> CInt
 // CHECK:   class func create() -> PrivateCopyCtor
 // CHECK: }
 // CHECK-NOT: func moveIntoResult(_ x: PrivateCopyCtor) -> PrivateCopyCtor
 
 // CHECK: class BadCopyCtor {
 // CHECK: init
-// CHECK:   func test() -> Int32
-// CHECK:   func testMutable() -> Int32
+// CHECK:   func test() -> CInt
+// CHECK:   func testMutable() -> CInt
 // CHECK:   class func create() -> BadCopyCtor
 // CHECK: }
 // CHECK-NOT: func moveIntoResult(_ x: BadCopyCtor) -> BadCopyCtor

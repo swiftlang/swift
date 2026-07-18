@@ -25,7 +25,7 @@
 // APPKIT-NEXT: @available(swift, obsoleted: 3, renamed: "ancestorShared(with:)")
 // APPKIT-NEXT: func ancestorSharedWithView(_ aView: NSView) -> NSView?
 // APPKIT-NEXT: func addSubview(_ aView: NSView)
-// APPKIT-NEXT: func addSubview(_ aView: NSView, positioned place: UInt32, relativeTo otherView: NSView?)
+// APPKIT-NEXT: func addSubview(_ aView: NSView, positioned place: CUnsignedInt, relativeTo otherView: NSView?)
 // APPKIT-NEXT: unowned(unsafe) var superview: @sil_unmanaged NSView? { get }
 // APPKIT-NEXT: var layer: CALayer?
 // APPKIT-NEXT: var trackingAreas: [Any] { get }

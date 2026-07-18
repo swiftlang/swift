@@ -10,14 +10,13 @@
 
 // CHECK-STRING: enum std {
 // CHECK-STRING:   typealias size_t = size_t
-// CHECK-STRING:   static func to_string(_ _Val: Int32) -> std.string
-// CHECK-STRING:   static func to_wstring(_ _Val: Int32) -> std.wstring
+// CHECK-STRING:   static func to_string(_ _Val: CInt) -> std.string
+// CHECK-STRING:   static func to_wstring(_ _Val: CInt) -> std.wstring
 // CHECK-STRING:   struct basic_string<CChar, std.char_traits<CChar>, std.allocator<CChar>> : CxxMutableRandomAccessCollection, CxxIterable {
 // CHECK-STRING:     typealias value_type = CChar
 // CHECK-STRING:   }
 // CHECK-STRING:   struct basic_string<CChar16, std.char_traits<CChar16>, std.allocator<CChar16>> : CxxMutableRandomAccessCollection, CxxIterable {
-// CHECK-STRING:     typealias value_type = UInt16
-// FIXME: why the value type is different from CChar16?
+// CHECK-STRING:     typealias value_type = CChar16
 // CHECK-STRING:   }
 // CHECK-STRING:   typealias string = std.basic_string<CChar, std.char_traits<CChar>, std.allocator<CChar>>
 // CHECK-STRING:   typealias wstring = std.basic_string<CWideChar, std.char_traits<CWideChar>, std.allocator<CWideChar>>

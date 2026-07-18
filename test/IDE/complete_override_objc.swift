@@ -31,6 +31,6 @@ class Sub : FooClassBase {
 class Sub : FooClassDerived {
   var #^PROPERTY^#
 }
-// PROPERTY-DAG: Decl[InstanceVar]/Super/Erase[4]: override var fooProperty1: Int32;
-// PROPERTY-DAG: Decl[InstanceVar]/Super/Erase[4]: override var fooProperty2: Int32;
-// PROPERTY-DAG: Decl[InstanceVar]/Super/Erase[4]: override var fooProperty3: Int32;
+// PROPERTY-DAG: Decl[InstanceVar]/Super/Erase[4]: override var fooProperty1: CInt;
+// PROPERTY-DAG: Decl[InstanceVar]/Super/Erase[4]: override var fooProperty2: CInt;
+// PROPERTY-DAG: Decl[InstanceVar]/Super/Erase[4]: override var fooProperty3: CInt;

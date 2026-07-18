@@ -3,26 +3,26 @@
 // REQUIRES: swift_feature_ForeignReferenceTypeInheritance
 
 // CHECK: class Base {
-// CHECK:   var baseValue: Int32
-// CHECK:   func getBaseValue() -> Int32
-// CHECK:   func setBaseValue(_ v: Int32)
+// CHECK:   var baseValue: CInt
+// CHECK:   func getBaseValue() -> CInt
+// CHECK:   func setBaseValue(_ v: CInt)
 // CHECK:   class func create() -> Base
 // CHECK: }
 
 // CHECK: class Derived : Base {
-// CHECK:   var derivedValue: Int32
-// CHECK:   func getDerivedValue() -> Int32
+// CHECK:   var derivedValue: CInt
+// CHECK:   func getDerivedValue() -> CInt
 // CHECK:   override class func create() -> Derived
 // CHECK: }
 
 // CHECK: class LeafDerived : Derived {
-// CHECK:   var leafValue: Int32
-// CHECK:   func getLeafValue() -> Int32
+// CHECK:   var leafValue: CInt
+// CHECK:   func getLeafValue() -> CInt
 // CHECK:   override class func create() -> LeafDerived
 // CHECK: }
 
 // CHECK: class Unrelated {
-// CHECK:   var unrelatedValue: Int32
+// CHECK:   var unrelatedValue: CInt
 // CHECK:   class func create() -> Unrelated
 // CHECK: }
 
@@ -30,14 +30,14 @@
 // CHECK: class VirtualDerived {
 
 // CHECK: class RefCountedBase {
-// CHECK:   var baseField: Int32
-// CHECK:   func getBaseValue() -> Int32
+// CHECK:   var baseField: CInt
+// CHECK:   func getBaseValue() -> CInt
 // CHECK:   class func create() -> RefCountedBase
 // CHECK: }
 
 // CHECK: class RefCountedDerived : RefCountedBase {
-// CHECK:   var derivedField: Int32
-// CHECK:   func getDerivedField() -> Int32
+// CHECK:   var derivedField: CInt
+// CHECK:   func getDerivedField() -> CInt
 // CHECK:   override class func create() -> RefCountedDerived
 // CHECK: }
 
@@ -48,18 +48,18 @@
 // CHECK: class ReannotatedRefCountedDerived {
 
 // CHECK: class DerivedFromEmptyAndBase : Base {
-// CHECK:   var extraValue: Int32
-// CHECK:   func getExtraValue() -> Int32
+// CHECK:   var extraValue: CInt
+// CHECK:   func getExtraValue() -> CInt
 // CHECK:   override class func create() -> DerivedFromEmptyAndBase
 // CHECK: }
 
 // CHECK: class CRTPBase<CRTPDerived> {
-// CHECK:   var crtpBaseValue: Int32
+// CHECK:   var crtpBaseValue: CInt
 // CHECK:   func derivedSelf() -> CRTPDerived!
 // CHECK: }
 
 // CHECK: class CRTPDerived : CRTPBase<CRTPDerived> {
-// CHECK:   var crtpDerivedValue: Int32
+// CHECK:   var crtpDerivedValue: CInt
 // CHECK:   class func create() -> CRTPDerived
 // CHECK: }
 

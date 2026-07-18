@@ -4,15 +4,15 @@
 
 // FRT types are imported as Swift classes.
 // CHECK: class ImmortalNode {
-// CHECK:   var value: Int32
+// CHECK:   var value: CInt
 // CHECK: }
 
 // CHECK: class ImmortalNode2 {
-// CHECK:   var value: Int32
+// CHECK:   var value: CInt
 // CHECK: }
 
 // CHECK: class SharedNode {
-// CHECK:   var value: Int32
+// CHECK:   var value: CInt
 // CHECK:   func retain()
 // CHECK:   func release()
 // CHECK: }
