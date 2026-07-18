@@ -1224,8 +1224,8 @@ bb4(%31 : $Builtin.Int32):
 // RANGECHECK: [[TRUE:%.*]] = struct $Bool ([[MINUS1]] : $Builtin.Int1)
 // RANGECHECK: [[ZERO:%.*]] = integer_literal $Builtin.Int32, 0
 // RANGECHECK: [[INTZERO:%.*]] = struct $Int32 ([[ZERO]] : $Builtin.Int32)
-// RANGECHECK: [[FOUR:%.*]] = integer_literal $Builtin.Int32, 4
 // RANGECHECK: [[ONE:%.*]] = integer_literal $Builtin.Int32, 1
+// RANGECHECK: [[FOUR:%.*]] = integer_literal $Builtin.Int32, 4
 // RANGECHECK: [[ANOTHERTRUE:%.*]] = integer_literal $Builtin.Int1, -1
 // RANGECHECK: [[INTONEADD:%.*]] = builtin "sadd_with_overflow_Int32"([[ZERO]] : $Builtin.Int32, [[ONE]] : $Builtin.Int32, [[ANOTHERTRUE]] : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
 // RANGECHECK: [[INTONEEX:%.*]] = tuple_extract [[INTONEADD]] : $(Builtin.Int32, Builtin.Int1), 0
