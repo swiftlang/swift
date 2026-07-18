@@ -590,11 +590,18 @@ void importer::getNormalInvocationArguments(
 
   // Swift generates position-independent code by default, so establish `-fPIC`
   // as the baseline for any code Clang emits (e.g. inline functions). `-fPIC`
-  // is not supported on Windows, which is implicitly position-independent. This
-  // is only a default: because the last PIC-related flag wins, a subsequent
-  // `-Xcc -fno-pic` (etc.) overrides it, and the resulting relocation model is
-  // read back from Clang for Swift's own code generation.
-  if (!triple.isOSWindows())
+  //
+  // Embedded Swift targeting a bare-metal ("-none-" OS) triple is an
+  // exception: we let Clang use the target's default relocation model
+  // (typically static) rather than forcing firmware into PIC. Users can still
+  // opt in explicitly with -Xcc -fPIC.
+  //
+  // This is only a default: because the last PIC-related flag wins, a
+  // subsequent `-Xcc -fno-pic` (etc.) overrides it, and the resulting
+  // relocation model is read back from Clang for Swift's own code generation.
+  bool bareMetalEmbedded =
+      LangOpts.hasFeature(Feature::Embedded) && triple.getOSName() == "none";
+  if (!triple.isOSWindows() && !bareMetalEmbedded)
     invocationArgStrs.insert(invocationArgStrs.end(), {"-fPIC"});
 
   // Enable modules.
