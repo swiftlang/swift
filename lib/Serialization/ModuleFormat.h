@@ -2711,6 +2711,11 @@ namespace decls_block {
                                            BCFixed<3>,  // threading model
                                            BCBlob>;     // IID/CLSID
 
+  using CalledDeclAttrLayout = BCRecordLayout<
+    Called_DECL_ATTR,
+    BCFixed<2> // execution semantics
+  >;
+
   // clang-format on
 
 #undef SYNTAX_SUGAR_TYPE_LAYOUT

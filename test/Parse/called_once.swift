@@ -48,4 +48,18 @@ func testInvalidResult() -> @called(once) Int {
   // expected-error@-1 {{'@called' only applies to function types}}
 }
 
-// TODO: add closure support `_ = { @called(once) in }`
+func testClosure() {
+  _ = { @called(once) in 42 }
+  // expected-forbidden-error@-1 {{'@called' attribute is only valid when experimental feature CalledAttribute is enabled}}
+  _ = { @called(once) (x: Int, y: String) -> Void in }
+  // expected-forbidden-error@-1 {{'@called' attribute is only valid when experimental feature CalledAttribute is enabled}}
+
+  @called(once) func local() {}
+  // expected-supported-error@-1 {{'@called(once)' attribute cannot be applied to this declaration}}
+  // expected-forbidden-error@-2 {{'called(once)' attribute is only valid when experimental feature CalledAttribute is enabled}}
+
+  @called(once) let x: () -> Void = { }
+  // expected-supported-error@-1 {{'@called(once)' attribute cannot be applied to this declaration}}
+  // expected-forbidden-error@-2 {{'called(once)' attribute is only valid when experimental feature CalledAttribute is enabled}}
+  _ = x
+}

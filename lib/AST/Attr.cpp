@@ -2150,6 +2150,11 @@ StringRef DeclAttribute::getAttrName() const {
     return cast<LifetimeAttr>(this)->isUnderscored() ? "_lifetime" : "lifetime";
   case DeclAttrKind::Nonexhaustive:
     return "nonexhaustive";
+  case DeclAttrKind::Called:
+    switch (cast<CalledAttr>(this)->getSemantics()) {
+    case ExecutionSemantics::Once:
+      return "called(once)";
+    }
   }
   llvm_unreachable("bad DeclAttrKind");
 }

@@ -542,6 +542,8 @@ public:
   void visitAddressableForDependenciesAttr(AddressableForDependenciesAttr *attr);
   void visitUnsafeAttr(UnsafeAttr *attr);
   void visitUnsafeSelfDependentResultAttr(UnsafeSelfDependentResultAttr *attr);
+
+  void visitCalledAttr(CalledAttr *attr);
 };
 
 } // end anonymous namespace
@@ -9113,6 +9115,14 @@ void AttributeChecker::visitUnsafeSelfDependentResultAttr(
                      diag::unsafe_self_dependent_result_attr_on_invalid_decl);
 }
 
+void AttributeChecker::visitCalledAttr(CalledAttr *attr) {
+  if (!Ctx.LangOpts.hasFeature(Feature::CalledAttribute)) {
+    diagnoseAndRemoveAttr(attr, diag::requires_experimental_feature, "@called",
+                          false, Feature::CalledAttribute.getName());
+    return;
+  }
+}
+
 namespace {
 
 class ClosureAttributeChecker
@@ -9168,6 +9178,15 @@ public:
         !ctx.LangOpts.hasFeature(Feature::ClosureIsolation)) {
       visitDeclAttribute(attr);
     }
+  }
+
+  void visitCalledAttr(CalledAttr *attr) {
+    if (ctx.LangOpts.hasFeature(Feature::CalledAttribute))
+      return;
+
+    ctx.Diags.diagnose(attr->getLocation(), diag::requires_experimental_feature,
+                       "@called", false, Feature::CalledAttribute.getName());
+    attr->setInvalid();
   }
 
   void visitCustomAttr(CustomAttr *attr) {

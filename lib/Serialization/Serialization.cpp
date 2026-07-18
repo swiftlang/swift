@@ -3064,6 +3064,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     case DeclAttrKind::PrivateImport:
     case DeclAttrKind::AllowFeatureSuppression:
     case DeclAttrKind::Diagnose:
+    case DeclAttrKind::Called:
       llvm_unreachable("cannot serialize attribute");
 
 #define SIMPLE_DECL_ATTR(_, CLASS, ...)                                        \

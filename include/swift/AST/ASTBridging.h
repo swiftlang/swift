@@ -1420,6 +1420,12 @@ BridgedUnavailableFromAsyncAttr BridgedUnavailableFromAsyncAttr_createParsed(
     BridgedASTContext cContext, swift::SourceLoc atLoc,
     swift::SourceRange range, BridgedStringRef cMessage);
 
+SWIFT_NAME("BridgedCalledAttr.createParsed(_:atLoc:range:semantics:)")
+BridgedCalledAttr
+BridgedCalledAttr_createParsed(BridgedASTContext cContext,
+                               swift::SourceLoc atLoc, swift::SourceRange range,
+                               swift::ExecutionSemantics semantics);
+
 //===----------------------------------------------------------------------===//
 // MARK: Decls
 //===----------------------------------------------------------------------===//

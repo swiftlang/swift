@@ -147,6 +147,11 @@ enum : unsigned {
       static_cast<unsigned>(NonexhaustiveMode::Last_NonexhaustiveMode))
 };
 
+enum : unsigned {
+  NumExecutionSemanticsBits = countBitsUsed(
+      static_cast<unsigned>(ExecutionSemantics::Last_ExecutionSemantics))
+};
+
 enum : unsigned { NumDeclAttrKindBits = countBitsUsed(NumDeclAttrKinds - 1) };
 
 enum : unsigned { NumTypeAttrKindBits = countBitsUsed(NumTypeAttrKinds - 1) };
@@ -296,6 +301,10 @@ protected:
 
     SWIFT_INLINE_BITFIELD(COMAttr, DeclAttribute, 3,
       threading : 3
+    );
+
+    SWIFT_INLINE_BITFIELD(CalledAttr, DeclAttribute, NumExecutionSemanticsBits,
+      Semantics : NumExecutionSemanticsBits
     );
   } Bits;
   // clang-format on
@@ -3830,6 +3839,35 @@ public:
   }
 };
 
+class CalledAttr : public DeclAttribute {
+public:
+  CalledAttr(SourceLoc atLoc, SourceRange range, ExecutionSemantics semantics,
+             bool implicit = false)
+      : DeclAttribute(DeclAttrKind::Called, atLoc, range, implicit) {
+    Bits.CalledAttr.Semantics = unsigned(semantics);
+  }
+
+  CalledAttr(ExecutionSemantics semantics)
+      : CalledAttr(SourceLoc(), SourceRange(), semantics) {}
+
+  bool isOnce() const { return getSemantics() == ExecutionSemantics::Once; }
+
+  ExecutionSemantics getSemantics() const {
+    return ExecutionSemantics(Bits.CalledAttr.Semantics);
+  }
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DeclAttrKind::Called;
+  }
+
+  CalledAttr *clone(ASTContext &ctx) const {
+    return new (ctx) CalledAttr(AtLoc, Range, getSemantics(), isImplicit());
+  }
+
+  bool isEquivalent(const CalledAttr *other, Decl *attachedTo) const {
+    return getSemantics() == other->getSemantics();
+  }
+};
 
 /// The kind of unary operator, if any.
 enum class UnaryOperatorKind : uint8_t { None, Prefix, Postfix };

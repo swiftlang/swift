@@ -4345,6 +4345,19 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
 
     break;
   }
+
+  case DeclAttrKind::Called: {
+    auto semantics = parseSingleAttrOption<ExecutionSemantics>(
+        *this, Loc, AttrRange, AttrName, DK,
+        {{Context.Id_once, ExecutionSemantics::Once}});
+    if (!semantics)
+      return makeParserSuccess();
+
+    if (!DiscardAttribute)
+      Attributes.add(new (Context) CalledAttr(AtLoc, AttrRange, *semantics));
+
+    break;
+  }
   }
 
   if (DuplicateAttribute) {
