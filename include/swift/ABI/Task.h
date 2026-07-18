@@ -604,20 +604,14 @@ public:
   /// `swift_task_popTaskExecutorPreference(record)` method pair.
   void dropInitialTaskExecutorPreferenceRecord();
 
-  /// Copy the `HasDeadline` flag from `parent` onto `this` when the
-  /// parent has any deadline installed.
+  /// Copy the `HasDeadline` flag from `parent` onto `this`.
   ///
-  /// Called once during child-task creation (in
-  /// `swift_task_create_common`) so structured children observe
-  /// `Task.hasActiveDeadline` correctly: the flag lets the fast-path
-  /// checks bail out cheaply for non-inheriting cases, and
-  /// `swift_task_findNearestDeadlineForClock` walks into the parent
-  /// chain via `childFragment()->getParent()` on a miss.
+  /// Structured children observe `Task.hasActiveDeadline` correctly: the
+  /// flag lets the fast-path checks bail out cheaply for non-inheriting
+  /// cases, and `swift_task_findNearestDeadlineForClock` walks into the
+  /// parent chain via `childFragment()->getParent()` on a miss.
   ///
-  /// We do NOT copy the parent's deadline records themselves; the
-  /// runtime lookup walks up the structured-parent chain instead. This
-  /// mirrors the task-local storage pattern where the child's list
-  /// links to the parent's.
+  /// We do NOT copy the parent's deadline records themselves.
   void inheritDeadlineFlagFrom(AsyncTask *parent);
 
   // ==== Task Local Values ----------------------------------------------------

@@ -2917,9 +2917,10 @@ enum class TaskStatusRecordKind : uint8_t {
   TaskCancellationScope = 8,
 
   /// A TaskCancellationShieldRecord, present on the chain iff a cancellation
-  /// shield is currently active. Its position in the chain (relative to any
-  /// `TaskCancellationScope` records) tells the runtime whether a shield
-  /// masks a scope's cancellation at the current call site.
+  /// shield is currently active. This is new in Swift 6.5, and allows to
+  /// handle nesting within cancellation scopes properly. Previously shields
+  /// were only a flag, but this is insufficient to handle nested scopes
+  /// within the same task.
   CancellationShield = 9,
 
   // Kinds >= 192 are private to the implementation.

@@ -1023,18 +1023,13 @@ static void
 swift_task_cancelCancellationScopeWithReasonImpl(
     TaskCancellationScopeRecord *record, size_t reason) {
   // Cancelling a scope is a local operation on the scope's own atomic flag.
-  // Unlike `swift_task_cancel`, it does NOT set the task's own IsCancelled
-  // flag. To make code that reacts to cancellation via
-  // `withTaskCancellationHandler` (including `Task.sleep`, `URLSession`
-  // handlers, etc.) wake up when the scope is cancelled, we also fire any
-  // `CancellationNotificationStatusRecord`s that were installed inside the
-  // scope's dynamic extent - i.e., records that live on the chain between
-  // the innermost record and the scope record itself (records pushed while
-  // the scope was active).
+  // Unlike `swift_task_cancel`, it does not set the task's own IsCancelled
+  // flag. We fire any `CancellationNotificationStatusRecord`s installed
+  // inside the scope's dynamic extent so `withTaskCancellationHandler`-based
+  // operations (`Task.sleep`, URLSession handlers, etc.) wake up.
   //
-  // This function may be called from ANY thread / task context (the scope
-  // handle is `Sendable`), so we use the record's stored `OwningTask`
-  // pointer, NOT `swift_task_getCurrent()`.
+  // Callable from any thread/task context, so we use the record's stored
+  // `OwningTask` pointer rather than `swift_task_getCurrent()`.
   if (!record)
     return;
 
@@ -1045,19 +1040,7 @@ swift_task_cancelCancellationScopeWithReasonImpl(
     return;
 
   // Walk the chain under the record lock. The chain is push-ordered
-  // (innermost first). Anything between the head and the scope was
-  // installed while the scope was active - stop when we hit the scope.
-  //
-  // Two things happen for each record in that range:
-  //   1. Any `CancellationNotificationStatusRecord` fires so operations
-  //      that installed handlers wake up.
-  //   2. Any `TaskCancellationScopeRecord` (an INNER scope, pushed while
-  //      this outer scope was active) is also marked cancelled - matching
-  //      "as-if child task" semantics: cancelling an outer scope should
-  //      cancel any nested inner scopes so they observe as cancelled too.
-  //      Firing their inner notification handlers is handled by walking
-  //      them as we encounter them here (they'll appear before their own
-  //      scope record does).
+  // (innermost first); stop when we hit the scope itself.
   withStatusRecordLock(task, [&](ActiveTaskStatus status) {
     for (auto cur : status.records()) {
       if (cur == record)
@@ -1082,19 +1065,15 @@ swift_task_cancelCancellationScopeWithReasonImpl(
         break;
       }
       case TaskStatusRecordKind::ChildTask: {
-        // Structured child tasks (async let) spawned inside the scope get
-        // cancelled with the scope's reason. This matches "as-if child
-        // task" semantics for the scope itself: cancelling the scope
-        // behaves like cancelling a child task, so its own children
-        // cascade.
+        // Structured child tasks (async let) spawned inside the scope
+        // cascade with the scope's reason.
         auto childRecord = cast<ChildTaskStatusRecord>(cur);
         for (AsyncTask *child : childRecord->children())
           swift_task_cancelWithReason(child, reason);
         break;
       }
       case TaskStatusRecordKind::TaskGroup: {
-        // TaskGroup children spawned inside the scope also cascade. This
-        // matches the whole-task-cancel path via _swift_taskGroup_cancel.
+        // TaskGroup children spawned inside the scope also cascade.
         auto groupRecord = cast<TaskGroupTaskStatusRecord>(cur);
         _swift_taskGroup_cancel(groupRecord->getGroup(), reason);
         break;
@@ -1109,9 +1088,7 @@ swift_task_cancelCancellationScopeWithReasonImpl(
 SWIFT_CC(swift)
 static bool
 swift_task_cancellationScopeIsCancelledImpl(TaskCancellationScopeRecord *record) {
-  // Reads the record's own atomic flag directly. No task lookup, no chain
-  // walk. Safe to call from any thread; the record has stable identity for
-  // its dynamic extent.
+  // Read the record's own atomic flag directly. Safe from any thread.
   if (!record)
     return false;
   return record->isCancelled();
@@ -1122,13 +1099,10 @@ swift::_swift_task_getCancellationScope(AsyncTask *task) {
   // The `HasTaskCancellationScope` flag must have been checked by the caller;
   // this walker takes the record lock unconditionally.
   //
-  // Walk innermost-first. A `TaskCancellationShieldRecord` encountered before
-  // any cancelled scope means the current call site is inside a shield that
-  // was pushed after (deeper than) the innermost cancelled scope; the shield
-  // masks the scope at this position - return nullptr so `isCancelled()`
-  // reads false, matching the "as-if child task" analog. A shield encountered
-  // AFTER a cancelled scope in the walk order would be outside the scope
-  // and cannot mask it - but we've already returned by then.
+  // Walk innermost-first. A `TaskCancellationShieldRecord` seen before any
+  // cancelled scope means the call site is inside a shield deeper than the
+  // innermost cancelled scope - return nullptr so `isCancelled()` reads
+  // false, matching "as-if child task" semantics.
   TaskCancellationScopeRecord *found = nullptr;
   ::withStatusRecordLock(task, [&](ActiveTaskStatus status) {
     for (auto record : status.records()) {

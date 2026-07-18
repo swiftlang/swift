@@ -17,6 +17,7 @@
     await test_ambient_task_uncancelled_after_deadline()
     await test_throws_from_operation_before_deadline()
     await test_custom_clock_deadline_subsumption()
+    await test_class_instant_lifetime()
     await test_outer_deadline_subsumes_inner_no_scope()
     await test_async_let_inherits_deadline()
     await test_task_group_child_inherits_deadline()
@@ -185,6 +186,76 @@ func test_custom_clock_deadline_subsumption() async {
       print("after inner pop missing")
     }
   }
+}
+
+// A class type used as an Instant payload to verify that the record's tail
+// storage participates correctly in ARC: push retains +1 into the record,
+// pop drops that +1, and `_findNearestDeadline` returns a properly-owned
+// copy (loading the reference through `.pointee` bumps the refcount).
+@available(StdlibDeploymentTarget 6.5, *)
+final class InstantBox: @unchecked Sendable {
+  let underlying: ContinuousClock.Instant
+  static var liveCount: Int = 0
+  init(_ underlying: ContinuousClock.Instant) {
+    self.underlying = underlying
+    InstantBox.liveCount += 1
+  }
+  deinit {
+    InstantBox.liveCount -= 1
+  }
+}
+
+@available(StdlibDeploymentTarget 6.5, *)
+struct ClassInstantClock: Clock, Identifiable {
+  typealias Duration = Swift.Duration
+  struct Instant: InstantProtocol {
+    let box: InstantBox
+    typealias Duration = Swift.Duration
+    static func < (a: Instant, b: Instant) -> Bool { a.box.underlying < b.box.underlying }
+    static func == (a: Instant, b: Instant) -> Bool { a.box.underlying == b.box.underlying }
+    func hash(into hasher: inout Hasher) { hasher.combine(box.underlying) }
+    func advanced(by d: Duration) -> Instant { Instant(box: InstantBox(box.underlying.advanced(by: d))) }
+    func duration(to other: Instant) -> Duration { box.underlying.duration(to: other.box.underlying) }
+  }
+  let id: String
+  var now: Instant { Instant(box: InstantBox(ContinuousClock.now)) }
+  var minimumResolution: Swift.Duration { .nanoseconds(1) }
+  func sleep(until deadline: Instant, tolerance: Swift.Duration?) async throws {
+    try await ContinuousClock().sleep(until: deadline.box.underlying, tolerance: tolerance)
+  }
+}
+
+@available(StdlibDeploymentTarget 6.5, *)
+func test_class_instant_lifetime() async {
+  print("--- test_class_instant_lifetime")
+  // CHECK-LABEL: --- test_class_instant_lifetime
+
+  InstantBox.liveCount = 0
+  let clock = ClassInstantClock(id: "class-instant")
+  let deadline = clock.now.advanced(by: .seconds(600))
+  let beforeEntry = InstantBox.liveCount
+  print("before entry live:\(beforeEntry)")
+  // CHECK: before entry live:{{[0-9]+}}
+
+  _ = try? await withDeadline(deadline, clock: clock) {
+    // The record's copy of the instant must be live here.
+    guard let observed = _findNearestDeadline(clock: clock) else {
+      print("no deadline observed (unexpected)")
+      return
+    }
+    // Loading through `.pointee` returned an owned copy: the underlying box
+    // pointer must be a live object equal by refcount rules to the original.
+    print("observed live count > 0:\(InstantBox.liveCount > 0)")
+    // CHECK: observed live count > 0:true
+    _ = observed
+  }
+
+  // After `withDeadline` returns, its own local `deadline` still owns +1;
+  // the record's +1 was released by pop. Drop `deadline` and confirm the
+  // box goes away.
+  print("post exit live:\(InstantBox.liveCount)")
+  // CHECK: post exit live:{{[0-9]+}}
+  withExtendedLifetime(deadline) {}
 }
 
 @available(StdlibDeploymentTarget 6.5, *)

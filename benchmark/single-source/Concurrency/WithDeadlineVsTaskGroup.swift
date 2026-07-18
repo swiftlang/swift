@@ -35,9 +35,6 @@ public var benchmarks: [BenchmarkInfo] {
   ]
 }
 
-// Deterministic, non-trivial "work" the operation performs. Same body used
-// in both the withDeadline and the naive-taskgroup variants so any
-// difference in wall-clock reflects the framing cost, not the work.
 @inline(never)
 private func doWork() -> Int {
   var acc = 0

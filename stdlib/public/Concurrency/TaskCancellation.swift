@@ -429,7 +429,7 @@ func _taskRemoveCancellationHandler(
 ///   withUnsafeCurrentTask { $0?.cancel() } // cancel the task
 ///
 ///   await withTaskCancellationShield {
-///     // Child tasks created here do NOT observe the parent's cancellation
+///     // Child tasks created here do _not_ observe the parent's cancellation
 ///     // and therefore start as not cancelled. They can be individually cancelled though.
 ///     await withTaskGroup(of: Void.self) { group in
 ///       group.addTask {
@@ -452,7 +452,7 @@ func _taskRemoveCancellationHandler(
 /// await withTaskGroup(of: Void.self) { group in
 ///   group.cancelAll()
 ///   withTaskCancellationShield {
-///     group.addTask { print(Task.isCancelled) } // true - child IS cancelled
+///     group.addTask { print(Task.isCancelled) } // true - child is cancelled
 ///   }
 ///   group.addTask {
 ///     withTaskCancellationShield { print(Task.isCancelled) } // false - shielded inside child
@@ -523,7 +523,7 @@ public nonisolated(nonsending) func withTaskCancellationShield<Value, Failure>(
 ///   withUnsafeCurrentTask { $0?.cancel() } // cancel the task
 ///
 ///   await withTaskCancellationShield {
-///     // Child tasks created here do NOT observe the parent's cancellation
+///     // Child tasks created here do _not_ observe the parent's cancellation
 ///     // and therefore start as not cancelled. They can be individually cancelled though.
 ///     await withTaskGroup(of: Void.self) { group in
 ///       group.addTask {
@@ -546,7 +546,7 @@ public nonisolated(nonsending) func withTaskCancellationShield<Value, Failure>(
 /// await withTaskGroup(of: Void.self) { group in
 ///   group.cancelAll()
 ///   withTaskCancellationShield {
-///     group.addTask { print(Task.isCancelled) } // true - child IS cancelled
+///     group.addTask { print(Task.isCancelled) } // true - child is cancelled
 ///   }
 ///   group.addTask {
 ///     withTaskCancellationShield { print(Task.isCancelled) } // false - shielded inside child

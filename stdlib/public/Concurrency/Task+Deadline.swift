@@ -181,9 +181,7 @@ public nonisolated(nonsending) func withDeadline<Return, Failure, C>(
 /// relative timeout, measured against `clock.now` at the point of call.
 ///
 /// This is a shorthand for the instant-based `withDeadline` that constructs
-/// the deadline as `clock.now.advanced(by: timeout)` and forwards to the
-/// primary entry point; all deadline composition rules (minimum-expiration
-/// nesting, subsumption per clock identity) apply exactly as they do there.
+/// the deadline as `clock.now.advanced(by: timeout)`.
 ///
 /// ```swift
 /// let value = try await withDeadline(in: .seconds(5)) {
@@ -191,50 +189,7 @@ public nonisolated(nonsending) func withDeadline<Return, Failure, C>(
 /// }
 /// ```
 ///
-/// ## Behavior
-///
-/// The function exhibits the following behavior based on deadline and operation completion:
-///
-/// - If the operation completes successfully before deadline: Returns the operation result.
-/// - If the operation throws an error before deadline: Throws the operation error.
-/// - If deadline expires and operation completes successfully: Returns the operation result.
-/// - If deadline expires and operation throws an error: Throws the operation error,
-///     potentially a ``CancellationError`` caused by cancellation caused by the expired deadline.
-///
-/// When the deadline expires `Task.isCancelled` returns true for the duration of `operation`.
-/// This cancellation does not affect the "outer" task in which the deadline operation was started:
-///
-/// ```
-/// try await withDeadline(in: .seconds(2)) {
-///   while !Task.isCancelled {
-///     try? await Task.sleep(for: .seconds(1))
-///   }
-///   assert(Task.isCancelled == true)
-/// }
-/// assert(Task.isCancelled == false) // the outer task is unaffected
-/// ```
-///
-/// This means:
-///
-/// - `Task.isCancelled` observed inside `operation` returns `true` after the deadline is exceeded.
-/// - Child tasks, created using `async let`, or task groups, inside `operation`
-///     are cancelled automatically when the deadline is exceeded.
-/// - `withTaskCancellationHandler` handlers created within `operation` are triggered es expected.
-/// - The enclosing task's `Task.isCancelled` is unaffected.
-///
-/// When a deadline expires, semantically the scope of the task which is running the `operation`
-/// becomes cancelled. This is observable using `Task.isCancelled` and similar APIs, and has
-/// the usual effect on child tasks an task cancellation handlers.
-///
-/// Even though this a deadline's expiry cancels the operation scope, the `withDeadline` block still
-/// will await for the operation to complete. This is consistent with Swift's approach to cooperative
-/// cancellation and structured concurrency. It does mean however that operation code must be checking
-/// for cancellation if it wants to react and return "early".
-///
-/// The `withDeadline` function may return after the deadline has expired, as there is no guarantee on
-/// interrupting the operation's execution. Similarily, even if the deadline is set in the past, the
-/// operation will still always execute - and it is up to the operation (or any of its parts, or child tasks)
-/// to check e.g. `Task.isCancelled` if it should proceed with its computation or not.
+/// See ``withDeadline(_:tolerance:clock:operation:)`` for full behavior.
 ///
 /// - Parameters:
 ///   - timeout: The duration, relative to `clock.now`, by which the
@@ -243,7 +198,7 @@ public nonisolated(nonsending) func withDeadline<Return, Failure, C>(
 ///   - clock: The clock to use for measuring time. Defaults to ``ContinuousClock``.
 ///   - operation: The asynchronous operation to complete before the deadline.
 ///
-/// - Returns: The result of the operation if it completes successfully before or after the deadline expires.
+/// - Returns: The result of the operation.
 /// - Throws: The error thrown by the operation.
 @available(StdlibDeploymentTarget 6.5, *)
 public nonisolated(nonsending) func withDeadline<Return, Failure, C>(
@@ -273,50 +228,7 @@ public nonisolated(nonsending) func withDeadline<Return, Failure, C>(
 /// alone cannot infer `C` from `timeout` when the `clock:` argument is
 /// defaulted.
 ///
-/// ## Behavior
-///
-/// The function exhibits the following behavior based on deadline and operation completion:
-///
-/// - If the operation completes successfully before deadline: Returns the operation result.
-/// - If the operation throws an error before deadline: Throws the operation error.
-/// - If deadline expires and operation completes successfully: Returns the operation result.
-/// - If deadline expires and operation throws an error: Throws the operation error,
-///     potentially a ``CancellationError`` caused by cancellation caused by the expired deadline.
-///
-/// When the deadline expires `Task.isCancelled` returns true for the duration of `operation`.
-/// This cancellation does not affect the "outer" task in which the deadline operation was started:
-///
-/// ```
-/// try await withDeadline(in: .seconds(2)) {
-///   while !Task.isCancelled {
-///     try? await Task.sleep(for: .seconds(1))
-///   }
-///   assert(Task.isCancelled == true)
-/// }
-/// assert(Task.isCancelled == false) // the outer task is unaffected
-/// ```
-///
-/// This means:
-///
-/// - `Task.isCancelled` observed inside `operation` returns `true` after the deadline is exceeded.
-/// - Child tasks, created using `async let`, or task groups, inside `operation`
-///     are cancelled automatically when the deadline is exceeded.
-/// - `withTaskCancellationHandler` handlers created within `operation` are triggered es expected.
-/// - The enclosing task's `Task.isCancelled` is unaffected.
-///
-/// When a deadline expires, semantically the scope of the task which is running the `operation`
-/// becomes cancelled. This is observable using `Task.isCancelled` and similar APIs, and has
-/// the usual effect on child tasks an task cancellation handlers.
-///
-/// Even though this a deadline's expiry cancels the operation scope, the `withDeadline` block still
-/// will await for the operation to complete. This is consistent with Swift's approach to cooperative
-/// cancellation and structured concurrency. It does mean however that operation code must be checking
-/// for cancellation if it wants to react and return "early".
-///
-/// The `withDeadline` function may return after the deadline has expired, as there is no guarantee on
-/// interrupting the operation's execution. Similarily, even if the deadline is set in the past, the
-/// operation will still always execute - and it is up to the operation (or any of its parts, or child tasks)
-/// to check e.g. `Task.isCancelled` if it should proceed with its computation or not.
+/// See ``withDeadline(_:tolerance:clock:operation:)`` for full behavior.
 ///
 /// - Parameters:
 ///   - timeout: The duration, relative to `ContinuousClock().now`, by which
@@ -324,7 +236,7 @@ public nonisolated(nonsending) func withDeadline<Return, Failure, C>(
 ///   - tolerance: The tolerance used for the sleep.
 ///   - operation: The asynchronous operation to complete before the deadline.
 ///
-/// - Returns: The result of the operation if it completes successfully before or after the deadline expires.
+/// - Returns: The result of the operation.
 /// - Throws: The error thrown by the operation.
 @available(StdlibDeploymentTarget 6.5, *)
 public nonisolated(nonsending)
@@ -397,17 +309,12 @@ extension Task where Success == Never, Failure == Never {
 
 /// Swift-side helper called by the runtime for each deadline record whose
 /// `ClockType` metadata pointer-equals the caller's `C`. Reads the record's
-/// inline-stored clock as a `C` value and compares identities via `Identifiable`.
+/// inline-stored clock as a `C` value and compares identities via
+/// `Identifiable`.
 ///
-/// **Precondition (upheld by the runtime):** the outer walker in
-/// `swift_task_findNearestDeadlineForClockImpl` calls this bridge only after
-/// pointer-equality checking `record->ClockType == C-metadata`. The trailing
-/// storage at `recordClockStorage` was initialized on push via
-/// `clockType->vw_initializeWithCopy(..., incomingClock: C)`, so the bytes
-/// there are a valid `C`. No dynamic downcast is needed - there is no class
-/// instance to downcast; the bytes ARE the value. This matches how
-/// `TaskLocal` loads back a stored task-local: identity of the key/type
-/// gates the load, no runtime type check is performed.
+/// The runtime pointer-equality checks `record->ClockType == C-metadata`
+/// before calling this bridge, so `recordClockStorage` is guaranteed to
+/// hold a valid `C`.
 ///
 /// C++-side ABI signature (see TaskStatus.cpp):
 ///
@@ -441,25 +348,21 @@ internal func _task_deadline_recordHasSameClock<C: Clock & Identifiable>(
 @_spi(Concurrency)
 @available(StdlibDeploymentTarget 6.5, *)
 public func _findNearestDeadline<C: Clock & Identifiable>(clock: C) -> C.Instant? {
-  // Direct-call into the runtime via `@_silgen_name`. Swift's standard
-  // generic ABI passes:
-  //   - `queryClock`  as `@in_guaranteed C`  (indirect, +0)
-  //   - `C`'s type metadata
-  //   - `C: Clock` witness table
-  //   - `C: Identifiable` witness table
-  // which is exactly what `swift_task_findNearestDeadlineForClock`'s
-  // C++ signature expects. The WTs reach the Swift bridge
+  // Swift's generic ABI passes (clock, C-metadata, Clock WT, Identifiable WT)
+  // into the C++ runtime symbol; the WTs reach the Swift bridge
   // `_task_deadline_recordHasSameClock` so it can compare `.id`s.
   //
-  // Result: a borrowed +0 pointer into the matched record's tail storage
-  // aligned at `C.Instant`, or null.
+  // Returns a pointer into the matched record's tail storage aligned at
+  // `C.Instant`, or null. The record's copy stays live until the matching
+  // `swift_task_popDeadline` runs `vw_destroy` on it.
   guard let matched =
       unsafe _swift_task_findNearestDeadlineForClock(queryClock: clock) else {
     return nil
   }
 
-  // Copy the instant out of the record's storage; the record continues
-  // to own it (a subsequent pop will run vw_destroy on it).
+  // `.pointee` loads-with-copy through the record's storage, producing an
+  // owned +1 `C.Instant` for the caller (for class-typed Instants this
+  // bumps the refcount). The record continues to own its copy.
   return unsafe UnsafeRawPointer(matched)
     .assumingMemoryBound(to: C.Instant.self).pointee
 }

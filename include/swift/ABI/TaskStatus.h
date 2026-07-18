@@ -237,10 +237,7 @@ private:
   FunctionType *__ptrauth_swift_cancellation_notification_function Function;
   void *Argument;
 
-  /// Handlers must run at most once per registration, even when both a
-  /// scoped cancellation (via `TaskCancellationScopeRecord`) and whole-task
-  /// cancellation (via `swift_task_cancel`) reach this record. This flag
-  /// is flipped exactly once by the first caller of `run()`.
+  /// FIXME: Investigate whether this at-most-once flag is actually needed.
   std::atomic<bool> Fired{false};
 
 public:
@@ -249,8 +246,6 @@ public:
         Function(fn), Argument(arg) {}
 
   void run() {
-    // Ensure the handler fires at most once, even if we're driven by both
-    // a scope cancel and a subsequent whole-task cancel.
     bool expected = false;
     if (!Fired.compare_exchange_strong(expected, true,
                                        std::memory_order_relaxed))
@@ -452,37 +447,27 @@ public:
   AsyncTask *&getNextWaitingTask();
 };
 
-/// A status record which represents a `withDeadline` deadline installed on
-/// the current task. Multiple deadlines for the same clock are coalesced by
-/// the Swift-side subsumption fast-path before ever being pushed here.
+/// A status record that represents a task deadline. Multiple deadlines may
+/// be installed on the same task, however they may differ by clock identity.
 ///
-/// The record itself is two words beyond the standard TaskStatusRecord
-/// header: the metatype of the caller's generic Clock type C, and a
-/// retained pointer to a Swift `_ClockBox<C>` that owns both the clock
-/// instance and the deadline instant. All identity and comparison logic
-/// lives on the Swift side; the C++ runtime only pointer-equal-checks
-/// `ClockType` and dispatches identity-equality into Swift via a bridged
-/// generic function (mirroring the executor pattern in Actor.cpp).
+/// The innermost record for any given clock identity always is the "nearest"
+/// deadline, because by construction we only install deadlines which are
+/// more narrow than an already existing one. I.e. a search for nearest
+/// deadline can always stop at first matching record.
 class TaskDeadlineStatusRecord : public TaskStatusRecord {
-  /// Metatype of the caller's generic Clock type C. Fast filter during
-  /// chain walks: if two records' ClockType pointers don't match, they
-  /// are for different clocks and no Swift bridge call is needed.
+  /// Clock type.
   const Metadata *ClockType;
 
-  /// Metatype of `C.Instant`. Needed to compute the instant's offset in
-  /// the trailing storage and to run its destroy value witness on pop.
+  /// Metatype of the Clock.Instant (where Clock is our ClockType).
   const Metadata *InstantType;
 
-  /// True iff this record was the FIRST deadline installed on the owning
-  /// task (i.e. the task had `HasDeadline == false` at push time and this
-  /// push flipped it to true). Enables `swift_task_popDeadline` to clear
-  /// `HasDeadline` without walking the record chain to count remaining
-  /// deadlines - the invariant is that only the outermost record's pop
-  /// clears the flag, matching the invariant that only the outermost
-  /// push sets it.
+  /// True iff the record is the first task in this entire task hierarchy,
+  /// including any parent tasks. This allows short-circuting lookups, and
+  /// resetting the HasDeadline flag used for avoiding slow-path deadline
+  /// lookups in `isCancelled`.
   bool IsOutermostDeadline;
 
-  // Trailing task-allocated storage (uninitialized in this class body):
+  // Trailing tail-allocated storage (uninitialized in this class body):
   //   [pad to ClockType.vw_alignment()]
   //   C bytes                            <- getClockStorage()
   //   [pad to InstantType.vw_alignment()]
@@ -536,27 +521,20 @@ public:
 };
 
 /// A status record which represents a scoped cancellation domain that is
-/// independent of whole-task cancellation. Cancelling the scope is a local
-/// operation: it does not set the task's own cancellation flag and does not
-/// invoke `CancellationNotificationStatusRecord`s registered outside the
-/// scope's dynamic extent. Handlers registered INSIDE the scope's dynamic
-/// extent (records installed on the chain between the scope record and the
-/// innermost record at cancellation time) are fired so operations like
-/// `Task.sleep` that rely on `withTaskCancellationHandler` wake up.
+/// independent of whole-task cancellation. Cancelling the scope does not set
+/// the task's own cancellation flag; only handlers registered _inside_ the
+/// scope's dynamic extent are fired.
 class TaskCancellationScopeRecord : public TaskStatusRecord {
-  /// The task that installed this scope. Stored so that
-  /// `swift_task_cancelCancellationScope` can be called from any thread /
-  /// task context; the scope's owning task is well-defined at push time and
-  /// does not change over the record's lifetime.
+  /// The task that installed this scope.
   AsyncTask *OwningTask;
 
-  std::atomic<bool> Cancelled{false};
+  /// Packed state: bit 0 is the cancelled flag; the remaining bits hold
+  /// the cancellation reason (matching the `size_t reason` ABI used by
+  /// `swift_task_cancelWithReason`). Written once at cancellation time
+  /// as a single atomic store so readers observe a consistent pair.
+  std::atomic<uintptr_t> State{0};
 
-  /// Cancellation reason, meaningful only while `Cancelled` is true.
-  /// Matches the `size_t reason` ABI used by `swift_task_cancelWithReason`
-  /// (0 = unspecified, 1 = deadlineExpired, etc.). Written once at
-  /// cancellation time; readers observe the store paired with `Cancelled`.
-  std::atomic<size_t> Reason{0};
+  static constexpr uintptr_t CancelledBit = 1;
 
 public:
   explicit TaskCancellationScopeRecord(AsyncTask *owningTask)
@@ -564,15 +542,15 @@ public:
         OwningTask(owningTask) {}
 
   AsyncTask *getOwningTask() const { return OwningTask; }
-  bool isCancelled() const { return Cancelled.load(std::memory_order_relaxed); }
-  size_t getReason() const { return Reason.load(std::memory_order_relaxed); }
+  bool isCancelled() const {
+    return (State.load(std::memory_order_relaxed) & CancelledBit) != 0;
+  }
+  size_t getReason() const {
+    return State.load(std::memory_order_relaxed) >> 1;
+  }
   void cancel(size_t reason = 0) {
-    // Store the reason FIRST so any reader that sees `Cancelled=true` also
-    // sees a consistent reason. Both are relaxed because the surrounding
-    // status-record lock provides the ordering between cancel-writes and
-    // isCancelled-reads on the isCancelled path.
-    Reason.store(reason, std::memory_order_relaxed);
-    Cancelled.store(true, std::memory_order_relaxed);
+    State.store((static_cast<uintptr_t>(reason) << 1) | CancelledBit,
+                std::memory_order_relaxed);
   }
 
   static bool classof(const TaskStatusRecord *record) {
@@ -581,15 +559,8 @@ public:
 };
 
 /// A status record representing an active `withTaskCancellationShield` block.
-/// Present on the record chain iff a shield is currently installed. Carries
-/// no state of its own; the record's position in the LIFO chain, relative
-/// to any `TaskCancellationScopeRecord`, is what the runtime consults when
-/// deciding whether a scope's cancellation is masked at a given call site.
-///
-/// The `HasActiveTaskCancellationShield` bit in `ActiveTaskStatus` remains
-/// the fast-path signal for whole-task cancellation masking and handler
-/// suppression; this record adds the positional information needed to
-/// answer scope-versus-shield ordering questions.
+/// Its position in the LIFO chain relative to any `TaskCancellationScopeRecord`
+/// determines whether a scope's cancellation is masked at a given call site.
 class TaskCancellationShieldRecord : public TaskStatusRecord {
 public:
   TaskCancellationShieldRecord()

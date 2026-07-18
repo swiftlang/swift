@@ -17,10 +17,6 @@
 // Two group variants:
 //   - one child (minimal group overhead)
 //   - 100 children (steady-state group churn)
-//
-// All child bodies do the same tiny deterministic work so the wall-clock
-// difference reflects the structural overhead of each construct, not the
-// per-child work.
 
 import TestsUtils
 
@@ -42,8 +38,6 @@ public var benchmarks: [BenchmarkInfo] {
   return b
 }
 
-// Tiny deterministic work; matches the shape used in WithDeadlineVsTaskGroup
-// so cross-file comparisons are apples-to-apples.
 @inline(never)
 private func doWork() -> Int {
   var acc = 0

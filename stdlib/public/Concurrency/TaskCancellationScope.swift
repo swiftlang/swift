@@ -19,17 +19,11 @@ import Swift
 /// task, distinct from whole-task cancellation.
 ///
 /// Unlike `Task.cancel()`, which flips the enclosing task's own `isCancelled`
-/// state, `TaskCancellationScope.cancel()` only affects code running inside the
-/// `__withTaskCancellationScope { scope in ... }` operation. Structured child tasks
-/// spawned inside the scope (via `TaskGroup` or `async let`) are NOT
-/// automatically cancelled through this mechanism.
-///
-/// This type is `~Copyable` and `~Escapable`: the scope handle exists only
-/// for the duration of `__withTaskCancellationScope`'s operation and cannot leave
-/// that operation. Cancel from an external task by capturing the scope in a
-/// closure whose lifetime the caller has proven does not outlive the operation
-/// (typically via a synchronous timer job whose disarm-on-scope-exit is
-/// enforced by the executor's synchronous `cancel(_:)` contract).
+/// state, `TaskCancellationScope.cancel()` only affects code running inside
+/// the `__withTaskCancellationScope { scope in ... }` operation. Structured
+/// child tasks spawned inside the scope (via `TaskGroup` or `async let`)
+/// cascade: they observe `Task.isCancelled == true` just as they would inside
+/// a cancelled parent task.
 ///
 /// This is a low-level building block for higher-level primitives such as
 /// `withDeadline`; direct client use is discouraged and gated on
@@ -50,27 +44,17 @@ public struct TaskCancellationScope: ~Copyable, ~Escapable {
 
   /// Cancel this scope.
   ///
-  /// Setting the scope's cancellation flag causes `Task.isCancelled` to
-  /// return `true` for code running inside `__withTaskCancellationScope`'s
-  /// operation (or its non-child callees), and fires any `withTaskCancellationHandler`
-  /// handlers installed while the scope was active - this is what allows
-  /// operations like `Task.sleep(for:)` inside the scope to return early.
+  /// Causes `Task.isCancelled` to return `true` for code running inside the
+  /// scope's `operation` and fires any `withTaskCancellationHandler` handlers
+  /// installed while the scope was active (this is what allows operations
+  /// like `Task.sleep(for:)` inside the scope to return early).
   ///
-  /// It does NOT set the enclosing task's own cancellation flag, and it
-  /// does NOT invoke handlers installed outside the scope's dynamic extent.
+  /// It does _not_ set the enclosing task's own cancellation flag, and it
+  /// does _not_ invoke handlers installed outside the scope's dynamic extent.
   ///
-  /// Cancellation cascades. Cancelling this scope also cascades to:
-  /// - any nested inner `__withTaskCancellationScope` records, which are
-  ///   marked cancelled with the same reason;
-  /// - any structured child tasks (`async let`, `TaskGroup`) spawned
-  ///   inside the scope, which are cancelled with the same reason.
-  /// This matches the "as-if child task" semantics: cancelling a parent
-  /// cancels its children.
-  ///
-  /// Each `CancellationNotificationStatusRecord` handler fires at most
-  /// once across scope-cancel and whole-task-cancel combined, so a
-  /// subsequent whole-task cancellation will not double-fire handlers that
-  /// were already invoked by scope cancellation.
+  /// Cancellation cascades to nested inner `__withTaskCancellationScope`
+  /// records and to structured child tasks (`async let`, `TaskGroup`)
+  /// spawned inside the scope, mirroring "as-if child task" semantics.
   ///
   /// Multiple calls to `cancel()` are safe; subsequent calls are no-ops.
   public func cancel() {
@@ -85,10 +69,7 @@ public struct TaskCancellationScope: ~Copyable, ~Escapable {
   ///
   /// Reads the scope record's own atomic cancellation flag directly, so
   /// this ignores whether the enclosing task has a whole-task cancellation
-  /// or any surrounding cancellation shield. Useful in tests that need to
-  /// observe scope cascade behavior (an outer scope's `cancel()` marks
-  /// nested inner scopes cancelled) without going through
-  /// `Task.isCancelled`.
+  /// or any surrounding cancellation shield.
   public var isCancelled: Bool {
     unsafe _taskCancellationScopeIsCancelled(record: _record)
   }
@@ -100,20 +81,15 @@ public struct TaskCancellationScope: ~Copyable, ~Escapable {
 /// Executes an operation inside a fresh cancellation scope.
 ///
 /// The `operation` closure receives a `TaskCancellationScope` handle. Calling
-/// `scope.cancel()` (from `operation` itself, or from any other concurrency
-/// context that has captured the handle for the duration of `operation`) causes
-/// `Task.isCancelled` to return `true` for code executing inside `operation`,
-/// and wakes up any `withTaskCancellationHandler`-based operations
-/// (including `Task.sleep`) installed inside the scope.
+/// `scope.cancel()` causes `Task.isCancelled` to return `true` for code
+/// executing inside `operation`, and wakes up any
+/// `withTaskCancellationHandler`-based operations (including `Task.sleep`)
+/// installed inside the scope.
 ///
-/// The scope's effects on `Task.isCancelled` are strictly local to `operation`;
-/// the enclosing task's own cancellation state is unchanged. Structured
-/// children (`TaskGroup` / `async let`) spawned inside `operation` ARE
-/// cascaded when the scope is cancelled: `scope.cancel()` walks the record
-/// chain from the innermost record down to the scope record and cancels any
-/// `ChildTask` / `TaskGroup` records in that range, so nested children see
-/// `Task.isCancelled == true` just as they would inside a cancelled child
-/// task.
+/// The scope's effects on `Task.isCancelled` are strictly local to
+/// `operation`; the enclosing task's own cancellation state is unchanged.
+/// Structured children (`TaskGroup` / `async let`) spawned inside `operation`
+/// cascade when the scope is cancelled.
 ///
 /// This is a low-level primitive intended for building higher-level control
 /// abstractions such as `withDeadline`. It is gated on `@_spi(Concurrency)`

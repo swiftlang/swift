@@ -13,19 +13,11 @@
 // Measure `Task.isCancelled` under various shield/scope
 // nesting shapes. Each variant sets up a specific record-chain state,
 // then runs a hot inner loop of `Task.isCancelled` reads.
-//
-// Expected outcomes qualitatively:
-//   - FastPath / ShieldOnly: no scope on chain -> bit-only fast path, cheapest
-//   - InScope*: scope on chain -> walker takes the record lock every read
-//   - InnerShield vs OuterShield: same walker cost + one shield-record hit
 
 @_spi(Concurrency) import _Concurrency
 import TestsUtils
 
 public var benchmarks: [BenchmarkInfo] {
-  // These benchmarks exercise APIs currently only present on the
-  // just-built toolchain / stdlib. On any shipping OS the `#available`
-  // check below fails and the benchmark list is empty.
   guard #available(macOS 9999, *) else { return [] }
   return [
     BenchmarkInfo(name: "TaskIsCancelled.FastPath",
