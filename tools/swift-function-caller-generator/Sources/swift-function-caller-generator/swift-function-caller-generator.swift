@@ -35,14 +35,6 @@ import CRT
 import WinSDK
 #endif
 
-protocol Named {
-  var name: TokenSyntax { get }
-}
-extension ClassDeclSyntax: Named {
-}
-extension StructDeclSyntax: Named {
-}
-
 @main
 class SwiftMacroTestGen: SyntaxVisitor {
   static func main() {
@@ -145,7 +137,7 @@ class SwiftMacroTestGen: SyntaxVisitor {
     return walker.hasCallableFunction
   }
 
-  func visitPreImpl(_ node: DeclGroupSyntax & Named) -> SyntaxVisitorContinueKind {
+  func visitPreImpl(_ node: DeclGroupSyntax, type: TypeSyntaxProtocol) -> SyntaxVisitorContinueKind {
     guard shouldVisit(node) else {
       return .skipChildren
     }
@@ -155,27 +147,33 @@ class SwiftMacroTestGen: SyntaxVisitor {
     let e = ExtensionDeclSyntax(
       leadingTrivia: .newline, attributes: attributes.with(\.leadingTrivia, Trivia()),
       modifiers: node.modifiers.with(\.leadingTrivia, Trivia()), extensionKeyword: keyword,
-      extendedType: IdentifierTypeSyntax(name: node.name),
+      extendedType: type,
       memberBlock: MemberBlockSyntax(stringLiteral: "{"))
     print(e)
     return .visitChildren
   }
-  func visitPostImpl(_ node: DeclGroupSyntax & Named) {
+  func visitPostImpl(_ node: DeclGroupSyntax) {
     if shouldVisit(node) {
       print("}")
     }
   }
 
   override func visit(_ node: ClassDeclSyntax) -> SyntaxVisitorContinueKind {
-    visitPreImpl(node)
+    visitPreImpl(node, type: IdentifierTypeSyntax(name: node.name))
   }
   override func visitPost(_ node: ClassDeclSyntax) {
     visitPostImpl(node)
   }
   override func visit(_ node: StructDeclSyntax) -> SyntaxVisitorContinueKind {
-    visitPreImpl(node)
+    visitPreImpl(node, type: IdentifierTypeSyntax(name: node.name))
   }
   override func visitPost(_ node: StructDeclSyntax) {
+    visitPostImpl(node)
+  }
+  override func visit(_ node: ExtensionDeclSyntax) -> SyntaxVisitorContinueKind {
+    visitPreImpl(node, type: node.extendedType)
+  }
+  override func visitPost(_ node: ExtensionDeclSyntax) {
     visitPostImpl(node)
   }
 
@@ -329,6 +327,9 @@ func getParentType(_ node: some SyntaxProtocol) -> TokenSyntax? {
   }
   if let classType = parent.as(ClassDeclSyntax.self) {
     return classType.name
+  }
+  if let extensionType = parent.as(ExtensionDeclSyntax.self) {
+    return TokenSyntax("\(raw: extensionType.extendedType.trimmedDescription)")
   }
   return getParentType(parent)
 }

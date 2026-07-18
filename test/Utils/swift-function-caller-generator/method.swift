@@ -16,6 +16,12 @@ class Bar {
   class func classFunction(x: Int) -> Int
 }
 
+extension Foo {
+  func extensionMethod(x: Int) -> Int
+
+  mutating func mutatingExtensionMethod(p: UnsafeMutablePointer<Int>)
+}
+
 //--- out.swift.expected
 import Test
 
@@ -35,5 +41,14 @@ extension Foo {
 extension Bar {
   func call_classFunction(x: Int) -> Int {
     return Bar.classFunction(x: x)
+  }
+}
+
+extension Foo {
+  func call_extensionMethod(x: Int) -> Int {
+    return extensionMethod(x: x)
+  }
+  mutating func call_mutatingExtensionMethod(p: UnsafeMutablePointer<Int>) {
+    return unsafe mutatingExtensionMethod(p: p)
   }
 }
