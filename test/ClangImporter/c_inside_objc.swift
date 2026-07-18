@@ -18,8 +18,8 @@
 
 // CHECK-LABEL: func nestedFunc()
 // CHECK-LABEL: struct NestedDeclaredStruct {
-// CHECK-LABEL: typealias NestedTypedef = Int32
-// CHECK-LABEL: let nestedGlobal: Int32
+// CHECK-LABEL: typealias NestedTypedef = CInt
+// CHECK-LABEL: let nestedGlobal: CInt
 
 // CHECK-LABEL: struct ForwardDeclaredStruct {
 

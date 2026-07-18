@@ -4,9 +4,9 @@
 // getters and setters.
 
 // CHECK:      struct BitFields {
-// CHECK-NEXT:   init(a: UInt32, b: UInt32, c: UInt32)
+// CHECK-NEXT:   init(a: CUnsignedInt, b: CUnsignedInt, c: CUnsignedInt)
 // CHECK-NEXT:   init()
-// CHECK-NEXT:   var a: UInt32
-// CHECK-NEXT:   var b: UInt32
-// CHECK-NEXT:   var c: UInt32
+// CHECK-NEXT:   var a: CUnsignedInt
+// CHECK-NEXT:   var b: CUnsignedInt
+// CHECK-NEXT:   var c: CUnsignedInt
 // CHECK-NEXT: }

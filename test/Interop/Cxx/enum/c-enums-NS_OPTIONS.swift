@@ -6,9 +6,9 @@ import CenumsNSOptions
 // CHECK-NOT: typealias NSBinarySearchingOptions = UInt
 
 // CHECK: struct NSBinarySearchingOptions : OptionSet, @unchecked Sendable {
-// CHECK-NEXT:   init(rawValue: UInt)
-// CHECK-NEXT:   let rawValue: UInt
-// CHECK-NEXT:   typealias RawValue = UInt
+// CHECK-NEXT:   init(rawValue: CUnsignedLong)
+// CHECK-NEXT:   let rawValue: CUnsignedLong
+// CHECK-NEXT:   typealias RawValue = CUnsignedLong
 // CHECK-NEXT:   typealias Element = NSBinarySearchingOptions
 // CHECK-NEXT:   typealias ArrayLiteralElement = NSBinarySearchingOptions
 // CHECK-NEXT:   static var firstEqual: NSBinarySearchingOptions { get }

@@ -19,7 +19,7 @@
 // CHECK: error: reference to declaration 'foo' broken by a context change; the declaration kind of 'foo' from 'A' changed since building 'LibWithXRef'
 // CHECK: note: the declaration was expected to be found in module 'A' at '{{.*}}module.modulemap'
 // CHECK: note: the declaration was actually found in module 'A' at '{{.*}}module.modulemap'
-// CHECK: note: a candidate was filtered out because of a type mismatch; expected: '() -> ()', found: '() -> Float'
+// CHECK: note: a candidate was filtered out because of a type mismatch; expected: '() -> ()', found: '() -> CFloat'
 // CHECK-NOT: *** DESERIALIZATION FAILURE ***
 
 //--- module.modulemap

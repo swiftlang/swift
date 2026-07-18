@@ -3,13 +3,13 @@
 
 // CHECK: public struct Leaky {
 
-// CHECK:   private typealias PrivateAlias = Bool
+// CHECK:   private typealias PrivateAlias = CBool
 
 // CHECK:   private struct PrivateRec {
 // CHECK:     private init()
 // CHECK:     public init()
 // CHECK:     public func privateRecMethod()
-// CHECK:     public static var PRIVATE_REC_CONST: Bool { get }
+// CHECK:     public static var PRIVATE_REC_CONST: CBool { get }
 // CHECK:   }
 
 // CHECK:   private struct PrivateEnum : Hashable, Equatable, RawRepresentable {
@@ -26,7 +26,7 @@
 // CHECK:     case privateEnumClassMember
 // CHECK:   }
 
-// CHECK:   private static var PRIVATE_CONST: Bool { get }
+// CHECK:   private static var PRIVATE_CONST: CBool { get }
 
 // CHECK:   private static var privateAliasVal: Leaky.PrivateAlias
 // CHECK:   private static var privateRecVal: Leaky.PrivateRec
@@ -63,9 +63,9 @@
 // CHECK:   }
 
 // CHECK:   public struct RecWithPrivateConst {
-// CHECK:     public init(mem: Bool)
+// CHECK:     public init(mem: CBool)
 // CHECK:     public init()
-// CHECK:     public var mem: Bool { get }
+// CHECK:     public var mem: CBool { get }
 // CHECK:   }
 
 // CHECK:   public static func staticReturningPrivateAlias() -> Leaky.PrivateAlias
@@ -91,7 +91,7 @@
 // CHECK:   public func defaultArgOfPrivateRec(_ a: Leaky.PrivateRec = cxxDefaultArg)
 // CHECK:   public func defaultArgOfPrivateEnum(_ a: Leaky.PrivateEnum = cxxDefaultArg)
 // CHECK:   public func defaultArgOfPrivateEnumClass(_ a: Leaky.PrivateEnumClass = cxxDefaultArg)
-// CHECK:   public func defaultArgOfPrivateConst(_ a: Bool = cxxDefaultArg)
-// CHECK:   public func defaultArgOfPrivateRecConst(_ a: Bool = cxxDefaultArg)
+// CHECK:   public func defaultArgOfPrivateConst(_ a: CBool = cxxDefaultArg)
+// CHECK:   public func defaultArgOfPrivateRecConst(_ a: CBool = cxxDefaultArg)
 
 // CHECK: }

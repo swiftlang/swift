@@ -3,56 +3,56 @@
 // CHECK: mutating func nonConstMethod()
 // CHECK: func constMethod()
 
-// CHECK: mutating func nonConstPassThrough(_ a: Int32) -> Int32
-// CHECK: func constPassThrough(_ a: Int32) -> Int32
+// CHECK: mutating func nonConstPassThrough(_ a: CInt) -> CInt
+// CHECK: func constPassThrough(_ a: CInt) -> CInt
 
-// CHECK: mutating func nonConstSum(_ a: Int32, _ b: Int32) -> Int32
-// CHECK: func constSum(_ a: Int32, _ b: Int32) -> Int32
+// CHECK: mutating func nonConstSum(_ a: CInt, _ b: CInt) -> CInt
+// CHECK: func constSum(_ a: CInt, _ b: CInt) -> CInt
 
-// CHECK: mutating func nonConstSum(_ a: NonTrivialInWrapper, _ b: NonTrivialInWrapper) -> Int32
-// CHECK: func constSum(_ a: NonTrivialInWrapper, _ b: NonTrivialInWrapper) -> Int32
+// CHECK: mutating func nonConstSum(_ a: NonTrivialInWrapper, _ b: NonTrivialInWrapper) -> CInt
+// CHECK: func constSum(_ a: NonTrivialInWrapper, _ b: NonTrivialInWrapper) -> CInt
 
 // CHECK: mutating func nonConstSumAsWrapper(_ a: NonTrivialInWrapper, _ b: NonTrivialInWrapper) -> NonTrivialInWrapper
 // CHECK: func constSumAsWrapper(_ a: NonTrivialInWrapper, _ b: NonTrivialInWrapper) -> NonTrivialInWrapper
 
-// CHECK: mutating func nonConstPassThroughAsWrapper(_ a: Int32) -> NonTrivialInWrapper
-// CHECK: func constPassThroughAsWrapper(_ a: Int32) -> NonTrivialInWrapper
+// CHECK: mutating func nonConstPassThroughAsWrapper(_ a: CInt) -> NonTrivialInWrapper
+// CHECK: func constPassThroughAsWrapper(_ a: CInt) -> NonTrivialInWrapper
 
 // CHECK: struct HasInitMethods {
-// CHECK:   init(field: Int32)
+// CHECK:   init(field: CInt)
 // CHECK:   init()
-// CHECK:   func `init`() -> Int32
-// CHECK:   mutating func initMutating(_ n: Int32) -> Int32
+// CHECK:   func `init`() -> CInt
+// CHECK:   mutating func initMutating(_ n: CInt) -> CInt
 // CHECK: }
 
 // CHECK: struct HasInitWithBackticks {
-// CHECK:   init(x: Int32)
-// CHECK:   func `init`() -> Int32
+// CHECK:   init(x: CInt)
+// CHECK:   func `init`() -> CInt
 // CHECK: }
 
 // CHECK: struct HasRenamedInitMethods {
-// CHECK:   func start() -> Int32
-// CHECK:   func startWith(_ a: Int32) -> Int32
+// CHECK:   func start() -> CInt
+// CHECK:   func startWith(_ a: CInt) -> CInt
 // CHECK: }
 
 // CHECK: struct HasStaticInitFactoryAndInitMethod {
-// CHECK:   func `init`() -> Int32
-// CHECK:   init(value: Int32)
+// CHECK:   func `init`() -> CInt
+// CHECK:   init(value: CInt)
 // CHECK: }
 
 // CHECK: struct HasNonInitializerStaticInitMethod {
 // CHECK:   init()
-// CHECK:   static func nonInitializer(_ value: Int32) -> Int32
+// CHECK:   static func nonInitializer(_ value: CInt) -> CInt
 // CHECK: }
 
 // CHECK: struct ConstructorWithRenamedLabel {
-// CHECK:   init(renamed v: Int32)
+// CHECK:   init(renamed v: CInt)
 // CHECK: }
 
 // CHECK: struct WithFactory {
-// CHECK:   init(x: Int32)
+// CHECK:   init(x: CInt)
 // CHECK: }
 
 // CHECK: extension WithFactory {
-// CHECK:   init(n: Int32)
+// CHECK:   init(n: CInt)
 // CHECK: }

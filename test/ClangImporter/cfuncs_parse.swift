@@ -17,8 +17,8 @@ func test_cfunc2(_ i: Int) {
 #endif
   _ = f as Float
   cfunc2(b:17, a:i) // expected-error{{extraneous argument labels 'b:a:' in call}}
-  // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type 'Int32'}}
-  cfunc2(17, i) // expected-error{{cannot convert value of type 'Int' to expected argument type 'Int32'}}
+  // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type 'CInt' (aka 'Int32')}}
+  cfunc2(17, i) // expected-error{{cannot convert value of type 'Int' to expected argument type 'CInt' (aka 'Int32')}}
 }
 
 func test_cfunc3_a() {
@@ -187,11 +187,11 @@ func test_decay() {
 func test_nested_pointers() {
   nested_pointer(nil)
   nested_pointer_audited(nil)
-  nested_pointer_audited2(nil) // expected-error {{'nil' is not compatible with expected argument type 'UnsafePointer<UnsafePointer<Int32>?>'}}
+  nested_pointer_audited2(nil) // expected-error {{'nil' is not compatible with expected argument type 'UnsafePointer<UnsafePointer<CInt>?>' (aka 'UnsafePointer<Optional<UnsafePointer<Int32>>>')}}
 
-  nested_pointer(0) // expected-error {{expected argument type 'UnsafePointer<UnsafePointer<Int32>?>'}}
-  nested_pointer_audited(0) // expected-error {{expected argument type 'UnsafePointer<UnsafePointer<Int32>>'}}
-  nested_pointer_audited2(0) // expected-error {{expected argument type 'UnsafePointer<UnsafePointer<Int32>?>'}}
+  nested_pointer(0) // expected-error {{cannot convert value of type 'Int' to expected argument type 'UnsafePointer<UnsafePointer<CInt>?>' (aka 'UnsafePointer<Optional<UnsafePointer<Int32>>>')}}
+  nested_pointer_audited(0) // expected-error {{cannot convert value of type 'Int' to expected argument type 'UnsafePointer<UnsafePointer<CInt>>' (aka 'UnsafePointer<UnsafePointer<Int32>>')}}
+  nested_pointer_audited2(0) // expected-error {{cannot convert value of type 'Int' to expected argument type 'UnsafePointer<UnsafePointer<CInt>?>' (aka 'UnsafePointer<Optional<UnsafePointer<Int32>>>')}}
 }
 
 func exit(_: Float) {} // expected-note {{found this candidate}}

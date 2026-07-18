@@ -11,4 +11,4 @@ func test(_ b : Base) {
 // CHECK: c:objc(cs)Base(im)doIt:
 // CHECK: (Base) -> (Int32) -> ()
 // CHECK: Mixed
-// CHECK: <Declaration>func doIt(_ arg: <Type usr="s:s5Int32V">Int32</Type>)</Declaration>
+// CHECK: <Declaration>func doIt(_ arg: <Type usr="s:s4CInta">CInt</Type>)</Declaration>

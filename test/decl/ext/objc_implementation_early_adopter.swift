@@ -16,7 +16,7 @@ protocol EmptySwiftProto {}
   // FIXME: give better diagnostic expected-note@-8 {{missing instance method 'method(fromHeader3:)'}} {{none}}
   // expected-note@-9 {{missing instance method 'extensionMethod(fromHeader2:)'}} {{none}}
   // expected-note@-10 {{missing property 'readonlyPropertyFromHeader7'}}
-  // expected-note@-11 {{add stubs for missing '@implementation' requirements}} {{76-76=\n    @objc(methodFromHeader3:)\n    open func method(fromHeader3 param: Int32) {\n        <#code#>\n    \}\n\n    @objc(methodFromHeader4:)\n    open func method(fromHeader4 param: Int32) {\n        <#code#>\n    \}\n\n    @objc(propertyFromHeader7)\n    open var propertyFromHeader7: Int32\n\n    @objc(propertyFromHeader8)\n    open var propertyFromHeader8: Int32\n\n    @objc(propertyFromHeader9)\n    open var propertyFromHeader9: Int32\n\n    @objc(readonlyPropertyFromHeader7)\n    open let readonlyPropertyFromHeader7: Int32\n\n    @objc(extensionMethodFromHeader2:)\n    open func extensionMethod(fromHeader2 param: Int32) {\n        <#code#>\n    \}\n}}
+  // expected-note@-11 {{add stubs for missing '@implementation' requirements}} {{76-76=\n    @objc(methodFromHeader3:)\n    open func method(fromHeader3 param: CInt) {\n        <#code#>\n    \}\n\n    @objc(methodFromHeader4:)\n    open func method(fromHeader4 param: CInt) {\n        <#code#>\n    \}\n\n    @objc(propertyFromHeader7)\n    open var propertyFromHeader7: CInt\n\n    @objc(propertyFromHeader8)\n    open var propertyFromHeader8: CInt\n\n    @objc(propertyFromHeader9)\n    open var propertyFromHeader9: CInt\n\n    @objc(readonlyPropertyFromHeader7)\n    open let readonlyPropertyFromHeader7: CInt\n\n    @objc(extensionMethodFromHeader2:)\n    open func extensionMethod(fromHeader2 param: CInt) {\n        <#code#>\n    \}\n}}
   // expected-warning@-12 {{'@objc @implementation' extension does not implement initializer 'init(fromSuperclass2:)' inherited from its superclass; invoking it from Objective-C will trap at runtime}}
 
   func method(fromHeader1: CInt) {
@@ -52,7 +52,7 @@ protocol EmptySwiftProto {}
   // expected-warning@-1 {{property 'methodFromHeader5' does not match the instance method declared by the header}}
 
   func method(fromHeader6: Double) {
-    // expected-warning@-1 {{instance method 'method(fromHeader6:)' of type '(Double) -> ()' does not match type '(Int32) -> Void' declared by the header}}
+    // expected-warning@-1 {{instance method 'method(fromHeader6:)' of type '(Double) -> ()' does not match type '(CInt) -> Void' (aka '(Int32) -> ()') declared by the header; this will become an error after adopting '@implementation'}}
   }
 
   var propertyFromHeader1: CInt
@@ -90,7 +90,7 @@ protocol EmptySwiftProto {}
   }
 
   var propertyFromHeader11: Float
-  // expected-warning@-1 {{property 'propertyFromHeader11' of type 'Float' does not match type 'Int32' declared by the header}}
+  // expected-warning@-1 {{property 'propertyFromHeader11' of type 'Float' does not match type 'CInt' (aka 'Int32') declared by the header; this will become an error after adopting '@implementation'}}
 
   var readonlyPropertyFromHeader1: CInt
   // OK, provides an implementation with a stored property that's nonpublicly settable
@@ -179,7 +179,7 @@ protocol EmptySwiftProto {}
   }
 
   class func classMethod3(_: Float) {
-    // expected-warning@-1 {{class method 'classMethod3' of type '(Float) -> ()' does not match type '(Int32) -> Void' declared by the header}}
+    // expected-warning@-1 {{class method 'classMethod3' of type '(Float) -> ()' does not match type '(CInt) -> Void' (aka '(Int32) -> ()') declared by the header; this will become an error after adopting '@implementation'}}
   }
 
   func instanceMethod1(_: CInt) {
@@ -243,7 +243,7 @@ protocol EmptySwiftProto {}
   // FIXME: give better diagnostic expected-note@-3 {{missing instance method 'categoryMethod(fromHeader3:)'}} {{none}}
   // expected-note@-4 {{missing property 'categoryPropertyFromHeader5'}} {{none}}
   // expected-note@-5 {{missing property 'categoryReadonlyPropertyFromHeader1'}} {{none}}
-  // expected-note@-6 {{add stubs for missing '@implementation' requirements}} {{61-61=\n    @objc(categoryMethodFromHeader3:)\n    open func categoryMethod(fromHeader3 param: Int32) {\n        <#code#>\n    \}\n\n    @objc(categoryMethodFromHeader4:)\n    open func categoryMethod(fromHeader4 param: Int32) {\n        <#code#>\n    \}\n\n    @objc(categoryPropertyFromHeader5)\n    open var categoryPropertyFromHeader5: Int32 {\n        get {\n            <#code#>\n        \}\n        set {\n            <#code#>\n        \}\n    \}\n\n    @objc(categoryReadonlyPropertyFromHeader1)\n    open var categoryReadonlyPropertyFromHeader1: Int32 {\n        <#code#>\n    \}\n}}
+  // expected-note@-6 {{add stubs for missing '@implementation' requirements}} {{61-61=\n    @objc(categoryMethodFromHeader3:)\n    open func categoryMethod(fromHeader3 param: CInt) {\n        <#code#>\n    \}\n\n    @objc(categoryMethodFromHeader4:)\n    open func categoryMethod(fromHeader4 param: CInt) {\n        <#code#>\n    \}\n\n    @objc(categoryPropertyFromHeader5)\n    open var categoryPropertyFromHeader5: CInt {\n        get {\n            <#code#>\n        \}\n        set {\n            <#code#>\n        \}\n    \}\n\n    @objc(categoryReadonlyPropertyFromHeader1)\n    open var categoryReadonlyPropertyFromHeader1: CInt {\n        <#code#>\n    \}\n}}
 
   func method(fromHeader3: CInt) {
     // FIXME: should emit expected-DISABLED-error@-1 {{instance method 'method(fromHeader3:)' should be implemented in extension for main class interface, not category 'PresentAdditions'}}
@@ -554,12 +554,12 @@ func CImplFuncMissing(_: Int32) {
 
 @_objcImplementation @_cdecl("CImplFuncMismatch1")
 func CImplFuncMismatch1(_: Float) {
-  // expected-warning@-1 {{global function 'CImplFuncMismatch1' of type '(Float) -> ()' does not match type '(Int32) -> Void' declared by the header}}
+  // expected-warning@-1 {{global function 'CImplFuncMismatch1' of type '(Float) -> ()' does not match type '(CInt) -> Void' (aka '(Int32) -> ()') declared by the header; this will become an error after adopting '@implementation'}}
 }
 
 @implementation @_cdecl("CImplFuncMismatch2")
 func CImplFuncMismatch2(_: Int32) -> Float {
-  // expected-error@-1 {{global function 'CImplFuncMismatch2' of type '(Int32) -> Float' does not match type '(Int32) -> Void' declared by the header}}
+  // expected-error@-1 {{global function 'CImplFuncMismatch2' of type '(Int32) -> Float' does not match type '(CInt) -> Void' (aka '(Int32) -> ()') declared by the header}}
 }
 
 @implementation @_cdecl("CImplFuncMismatch3")
@@ -590,7 +590,7 @@ func CImplFuncMismatch3a(_: Int32) -> Any? {
 
 @_objcImplementation @_cdecl("CImplFuncMismatch4a")
 func CImplFuncMismatch4a(_: Int32) -> Any {
-  // expected-warning@-1 {{global function 'CImplFuncMismatch4a' of type '(Int32) -> Any' does not match type '(Int32) -> Any?' declared by the header}}
+  // expected-warning@-1 {{global function 'CImplFuncMismatch4a' of type '(Int32) -> Any' does not match type '(CInt) -> Any?' (aka '(Int32) -> Optional<Any>') declared by the header; this will become an error after adopting '@implementation'}}
 }
 
 @implementation @_cdecl("CImplFuncMismatch5a")
