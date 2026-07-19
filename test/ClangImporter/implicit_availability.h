@@ -44,8 +44,7 @@ AVAIL(macos, deprecated=15.0)
 @interface ExplicitlyAvailableDepSeparate
 - (void)doThing;
 @end
-// CHECK-NEXT: @available(macOS 14.0, *)
-// CHECK-NEXT: @available(macOS, deprecated: 15.0)
+// CHECK-NEXT: @available(macOS, introduced: 14.0, deprecated: 15.0)
 // CHECK-NEXT: class ExplicitlyAvailableDepSeparate {
 // CHECK-NEXT:   class func doThing()
 // CHECK-NEXT:   func doThing()
@@ -69,59 +68,49 @@ struct REF RefType {};
 // CHECK-NEXT: }
 
 struct REF AVAIL(macos, introduced=26.0) LateRefType {};
-// FIXME: this is invalid syntax in Swift
-// CHECK-NEXT: @available(macOS 13.3.0, macOS 26.0, *)
+// A foreign reference type with an explicit (later) availability merges
+// the implicit runtime availability and the explicit one.
+// CHECK-NEXT: @available(macOS 26.0, *)
 // CHECK-NEXT: class LateRefType {
 // CHECK-NEXT: }
 
 struct REF AVAIL(macos, deprecated=15.0, message="gone") DeprecatedRef {};
-// CHECK-NEXT: @available(macOS 13.3.0, *)
-// CHECK-NEXT: @available(macOS, deprecated: 15.0, message: "gone")
+// CHECK-NEXT: @available(macOS, introduced: 13.3.0, deprecated: 15.0, message: "gone")
 // CHECK-NEXT: class DeprecatedRef {
 // CHECK-NEXT: }
 
 struct REF AVAIL(macos, unavailable, message="nope") UnavailableRef {};
-// CHECK-NEXT: @available(macOS 13.3.0, *)
 // CHECK-NEXT: @available(macOS, unavailable, message: "nope")
 // CHECK-NEXT: class UnavailableRef {
 // CHECK-NEXT: }
 
 struct REF AVAIL(macos, introduced=14.0, deprecated=15.0) LateIntroDepRef {};
-// CHECK-NEXT: @available(macOS 13.3.0, *)
 // CHECK-NEXT: @available(macOS, introduced: 14.0, deprecated: 15.0)
 // CHECK-NEXT: class LateIntroDepRef {
 // CHECK-NEXT: }
 
 struct REF AVAIL(macos, introduced=12.0, deprecated=15.0) EarlyIntroLateDepRef {};
-// CHECK-NEXT: @available(macOS 13.3.0, *)
-// CHECK-NEXT: @available(macOS, introduced: 12.0, deprecated: 15.0)
+// CHECK-NEXT: @available(macOS, introduced: 13.3.0, deprecated: 15.0)
 // CHECK-NEXT: class EarlyIntroLateDepRef {
 // CHECK-NEXT: }
 
 struct REF AVAIL(macos, introduced=12.0, deprecated=13.0) EarlyIntroEarlyDepRef {};
-// CHECK-NEXT: @available(macOS 13.3.0, *)
-// CHECK-NEXT: @available(macOS, introduced: 12.0, deprecated: 13.0)
+// CHECK-NEXT: @available(macOS, introduced: 13.3.0, deprecated: 13.0)
 // CHECK-NEXT: class EarlyIntroEarlyDepRef {
 // CHECK-NEXT: }
 
 struct REF AVAIL(macos, introduced=12.0) AVAIL(macos, deprecated=13.0) EarlyIntroEarlyDepRefSeparate {};
-// FIXME: this is invalid syntax in Swift
-// CHECK-NEXT: @available(macOS 13.3.0, macOS 12.0, *)
-// CHECK-NEXT: @available(macOS, deprecated: 13.0)
+// CHECK-NEXT: @available(macOS, introduced: 13.3.0, deprecated: 13.0)
 // CHECK-NEXT: class EarlyIntroEarlyDepRefSeparate {
 // CHECK-NEXT: }
 
 struct REF AVAIL(macos, deprecated=13.0) DepOnlyEarly {};
-// FIXME: this is invalid syntax in Swift
-// CHECK-NEXT: @available(macOS 13.3.0, *)
-// CHECK-NEXT: @available(macOS, deprecated: 13.0)
+// CHECK-NEXT: @available(macOS, introduced: 13.3.0, deprecated: 13.0)
 // CHECK-NEXT: class DepOnlyEarly {
 // CHECK-NEXT: }
 
 struct REF AVAIL(macos, deprecated=14.0) DepOnlyLate {};
-// FIXME: this is invalid syntax in Swift
-// CHECK-NEXT: @available(macOS 13.3.0, *)
-// CHECK-NEXT: @available(macOS, deprecated: 14.0)
+// CHECK-NEXT: @available(macOS, introduced: 13.3.0, deprecated: 14.0)
 // CHECK-NEXT: class DepOnlyLate {
 // CHECK-NEXT: }
 
