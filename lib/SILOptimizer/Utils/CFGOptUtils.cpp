@@ -33,31 +33,11 @@ TermInst *swift::addNewEdgeValueToBranch(TermInst *branch, SILBasicBlock *dest,
   SILBuilderWithScope builder(branch);
   TermInst *newBr = nullptr;
 
-  if (auto *cbi = dyn_cast<CondBranchInst>(branch)) {
-    SmallVector<SILValue, 8> trueArgs;
-    SmallVector<SILValue, 8> falseArgs;
-
-    for (auto arg : cbi->getTrueArgs())
-      trueArgs.push_back(arg);
-
-    for (auto arg : cbi->getFalseArgs())
-      falseArgs.push_back(arg);
-
-    if (dest == cbi->getTrueBB()) {
-      trueArgs.push_back(val);
-      assert(trueArgs.size() == dest->getNumArguments());
-    }
-    if (dest == cbi->getFalseBB()) {
-      falseArgs.push_back(val);
-      assert(falseArgs.size() == dest->getNumArguments());
-    }
-
-    newBr = builder.createCondBranch(
-        cbi->getLoc(), cbi->getCondition(), cbi->getTrueBB(), trueArgs,
-        cbi->getFalseBB(), falseArgs, cbi->getTrueBBCount(),
-        cbi->getFalseBBCount());
-    deleter.getCallbacks().createdNewInst(newBr);
-  } else if (auto *bi = dyn_cast<BranchInst>(branch)) {
+  // Only a BranchInst can carry phi arguments: SIL has no critical edges, so a
+  // block with phi arguments is only ever reached through unconditional
+  // branches. Clients that create critical edges (e.g. LoopRotate) must split
+  // them before adding phi operands with the SSA updater.
+  if (auto *bi = dyn_cast<BranchInst>(branch)) {
     SmallVector<SILValue, 8> args;
 
     for (auto arg : bi->getArgs())
@@ -68,7 +48,7 @@ TermInst *swift::addNewEdgeValueToBranch(TermInst *branch, SILBasicBlock *dest,
     newBr = builder.createBranch(bi->getLoc(), bi->getDestBB(), args);
     deleter.getCallbacks().createdNewInst(newBr);
   } else {
-    // At the moment we can only add arguments to br and cond_br.
+    // At the moment we can only add arguments to br.
     llvm_unreachable("Can't add argument to terminator");
   }
 
@@ -93,38 +73,9 @@ static void deleteTriviallyDeadOperandsOfDeadArgument(
 TermInst *swift::deleteEdgeValue(TermInst *branch, SILBasicBlock *destBlock,
                                  size_t argIndex, bool cleanupDeadPhiOps,
                                  InstModCallbacks callbacks) {
-  if (auto *cbi = dyn_cast<CondBranchInst>(branch)) {
-    SmallVector<SILValue, 8> trueArgs;
-    SmallVector<SILValue, 8> falseArgs;
-
-    llvm::copy(cbi->getTrueArgs(), std::back_inserter(trueArgs));
-    llvm::copy(cbi->getFalseArgs(), std::back_inserter(falseArgs));
-
-    if (destBlock == cbi->getTrueBB()) {
-      if (cleanupDeadPhiOps) {
-        deleteTriviallyDeadOperandsOfDeadArgument(cbi->getTrueOperands(),
-                                                  argIndex, callbacks);
-      }
-      trueArgs.erase(trueArgs.begin() + argIndex);
-    }
-
-    if (destBlock == cbi->getFalseBB()) {
-      if (cleanupDeadPhiOps) {
-        deleteTriviallyDeadOperandsOfDeadArgument(cbi->getFalseOperands(),
-                                                  argIndex, callbacks);
-      }
-      falseArgs.erase(falseArgs.begin() + argIndex);
-    }
-
-    SILBuilderWithScope builder(cbi);
-    auto *result = builder.createCondBranch(
-        cbi->getLoc(), cbi->getCondition(), cbi->getTrueBB(), trueArgs,
-        cbi->getFalseBB(), falseArgs, cbi->getTrueBBCount(),
-        cbi->getFalseBBCount());
-    branch->eraseFromParent();
-    return result;
-  }
-
+  // Only a BranchInst can carry phi arguments: SIL has no critical edges, so a
+  // block with phi arguments is only ever reached through unconditional
+  // branches (never a cond_br).
   if (auto *bi = dyn_cast<BranchInst>(branch)) {
     SmallVector<SILValue, 8> args;
     llvm::copy(bi->getArgs(), std::back_inserter(args));
@@ -184,47 +135,9 @@ TermInst *swift::changeEdgeValue(TermInst *branch, SILBasicBlock *dest,
                                  size_t idx, SILValue Val) {
   SILBuilderWithScope builder(branch);
 
-  if (auto *cbi = dyn_cast<CondBranchInst>(branch)) {
-    SmallVector<SILValue, 8> trueArgs;
-    SmallVector<SILValue, 8> falseArgs;
-
-    OperandValueArrayRef oldTrueArgs = cbi->getTrueArgs();
-    bool branchOnTrue = cbi->getTrueBB() == dest;
-    assert((!branchOnTrue || idx < oldTrueArgs.size()) && "Not enough edges");
-
-    // Copy the edge values overwriting the edge at idx.
-    for (unsigned i = 0, e = oldTrueArgs.size(); i != e; ++i) {
-      if (branchOnTrue && idx == i)
-        trueArgs.push_back(Val);
-      else
-        trueArgs.push_back(oldTrueArgs[i]);
-    }
-    assert(trueArgs.size() == cbi->getTrueBB()->getNumArguments()
-           && "Destination block's number of arguments must match");
-
-    OperandValueArrayRef oldFalseArgs = cbi->getFalseArgs();
-    bool branchOnFalse = cbi->getFalseBB() == dest;
-    assert((!branchOnFalse || idx < oldFalseArgs.size()) && "Not enough edges");
-
-    // Copy the edge values overwriting the edge at idx.
-    for (unsigned i = 0, e = oldFalseArgs.size(); i != e; ++i) {
-      if (branchOnFalse && idx == i)
-        falseArgs.push_back(Val);
-      else
-        falseArgs.push_back(oldFalseArgs[i]);
-    }
-    assert(falseArgs.size() == cbi->getFalseBB()->getNumArguments()
-           && "Destination block's number of arguments must match");
-
-    cbi = builder.createCondBranch(
-        cbi->getLoc(), cbi->getCondition(), cbi->getTrueBB(), trueArgs,
-        cbi->getFalseBB(), falseArgs, cbi->getTrueBBCount(),
-        cbi->getFalseBBCount());
-    branch->dropAllReferences();
-    branch->eraseFromParent();
-    return cbi;
-  }
-
+  // Only a BranchInst can carry phi arguments: SIL has no critical edges, so a
+  // block with phi arguments is only ever reached through unconditional
+  // branches (never a cond_br).
   if (auto *bi = dyn_cast<BranchInst>(branch)) {
     SmallVector<SILValue, 8> args;
 

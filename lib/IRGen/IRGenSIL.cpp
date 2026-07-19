@@ -5496,9 +5496,6 @@ void IRGenSILFunction::visitCondBranchInst(swift::CondBranchInst *i) {
   llvm::Value *condValue =
     getLoweredExplosion(i->getCondition(), &Builder).claimNext();
 
-  addIncomingSILArgumentsToPHINodes(*this, trueBB, i->getTrueArgs());
-  addIncomingSILArgumentsToPHINodes(*this, falseBB, i->getFalseArgs());
-
   llvm::MDNode *Weights = nullptr;
   auto TrueBBCount = i->getTrueBBCount();
   auto FalseBBCount = i->getFalseBBCount();

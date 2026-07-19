@@ -29,8 +29,8 @@ struct NoAttribute {
 
 // CHECK: struct Record {
 // CHECK:   init()
-// CHECK:   mutating func getX() -> Int32
-// CHECK:   var x: Int32 { mutating get }
+// CHECK:   mutating func getX() -> CInt
+// CHECK:   var x: CInt { mutating get }
 // CHECK: }
 
 // CHECK:      struct NoAttribute {

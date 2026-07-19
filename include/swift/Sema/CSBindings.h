@@ -152,7 +152,7 @@ struct PotentialBinding {
   /// Determine whether this binding could be a viable candidate
   /// to be "joined" with some other binding. It has to be at least
   /// a non-default r-value supertype binding with no type variables.
-  bool isViableForJoin() const;
+  bool isViableForJoinOrMeet() const;
 
   static PotentialBinding forHole(TypeVariableType *typeVar,
                                   ConstraintLocator *locator) {
@@ -508,6 +508,9 @@ public:
   /// Check whether this binding set belongs to a type variable
   /// that represents a generic parameter.
   bool forGenericParameter() const;
+
+  /// Whether the binding set is for a named or `_` pattern decl.
+  bool isForPatternDecl() const;
 
   /// Whether the binding set has changed after construction, in which
   /// case we must recompute it on the next call to determineBestBindings().

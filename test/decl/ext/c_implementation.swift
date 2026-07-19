@@ -30,12 +30,12 @@ func CImplFuncMissing(_: Int32) {
 
 @implementation @c
 func CImplFuncMismatch1(_: Float) {
-  // expected-error@-1 {{global function 'CImplFuncMismatch1' of type '(Float) -> ()' does not match type '(Int32) -> Void' declared by the header}}
+  // expected-error@-1 {{global function 'CImplFuncMismatch1' of type '(Float) -> ()' does not match type '(CInt) -> Void' (aka '(Int32) -> ()') declared by the header}}
 }
 
 @implementation @c
 func CImplFuncMismatch2(_: Int32) -> Float {
-  // expected-error@-1 {{global function 'CImplFuncMismatch2' of type '(Int32) -> Float' does not match type '(Int32) -> Void' declared by the header}}
+  // expected-error@-1 {{global function 'CImplFuncMismatch2' of type '(Int32) -> Float' does not match type '(CInt) -> Void' (aka '(Int32) -> ()') declared by the header}}
 }
 
 @implementation @c(CImplFuncNameMismatch1)

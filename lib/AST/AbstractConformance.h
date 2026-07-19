@@ -19,10 +19,12 @@
 #define SWIFT_AST_ABSTRACT_CONFORMANCE_H
 
 #include "swift/AST/Type.h"
+#include "swift/AST/TypeAlignments.h"
 #include "llvm/ADT/FoldingSet.h"
 
 namespace swift {
-class AbstractConformance final : public llvm::FoldingSetNode {
+class alignas(1 << ConformanceAlignInBits) AbstractConformance final
+    : public llvm::FoldingSetNode {
   Type conformingType;
   ProtocolDecl *requirement;
 

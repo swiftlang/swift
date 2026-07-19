@@ -1386,8 +1386,20 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, Type Ty, TypeInitInfo Info) :
 
 static std::vector<DeclAttrKind> collectDeclAttributes(Decl *D) {
   std::vector<DeclAttrKind> Results;
-  for (auto *Attr: D->getAttrs())
+  for (auto *Attr: D->getAttrs()) {
+    // A plain `nonisolated` keyword is a no-op under nonisolated default
+    // isolation, so don't record it here -- otherwise the digester flags adding
+    // it as a breaking change. Gated to the main module, where default isolation
+    // is authoritative; imported modules and MainActor default are unaffected.
+    if (auto *niso = dyn_cast<NonisolatedAttr>(Attr)) {
+      auto &Ctx = D->getASTContext();
+      if (niso->getModifier() == NonIsolatedModifier::None &&
+          D->getModuleContext() == Ctx.MainModule &&
+          Ctx.LangOpts.DefaultIsolationBehavior == DefaultIsolation::Nonisolated)
+        continue;
+    }
     Results.push_back(Attr->getKind());
+  }
   if (auto *VD = dyn_cast<ValueDecl>(D)) {
 #define HANDLE(COND, KIND_NAME)                                                                   \
     if (VD->COND && !llvm::is_contained(Results, DeclAttrKind::KIND_NAME))                        \

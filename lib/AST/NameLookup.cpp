@@ -3401,13 +3401,18 @@ directReferencesForTypeRepr(Evaluator &evaluator, ASTContext &ctx,
     return result;
   }
 
+  case TypeReprKind::Protocol:
+    // `P.Protocol` refers, for the purpose of extension binding, to the
+    // protocol `P` itself (a protocol metatype extension binds to `P`).
+    return directReferencesForTypeRepr(
+        evaluator, ctx, cast<ProtocolTypeRepr>(typeRepr)->getBase(), dc, options);
+
   case TypeReprKind::Error:
   case TypeReprKind::Function:
   case TypeReprKind::Ownership:
   case TypeReprKind::CompileTimeLiteral:
   case TypeReprKind::ConstValue:
   case TypeReprKind::Metatype:
-  case TypeReprKind::Protocol:
   case TypeReprKind::SILBox:
   case TypeReprKind::Placeholder:
   case TypeReprKind::Pack:

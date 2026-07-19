@@ -3999,8 +3999,10 @@ public:
       return;
     }
 
-    // Validate metatype extension constraints.
-    if (ED->isMetatypeExtension()) {
+    // Validate metatype extension constraints.  Skip when the extended type
+    // did not resolve — e.g. `S.Protocol` on a non-protocol `S`, which has
+    // already been diagnosed as an invalid `.Protocol` spelling.
+    if (ED->isMetatypeExtension() && !extType->hasError()) {
       if (!isCOMMetatypeExtension(ED)) {
         ED->diagnose(diag::metatype_extension_com_only);
         ED->setInvalid();

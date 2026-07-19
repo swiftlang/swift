@@ -19,6 +19,13 @@ from . import product
 from ..helpers import wasmsysroothelpers
 
 
+def file_prefix_map():
+    """OLD=NEW build-tree source map from TOOLCHAIN_FILE_PREFIX_MAP (set by build-toolchain.py in the
+    swift-lab-wasm repo), or None when unset. Fed to -ffile-prefix-map / -file-prefix-map so the
+    compiler strips the build path from __FILE__/#file literals baked into the served artifacts."""
+    return os.environ.get('TOOLCHAIN_FILE_PREFIX_MAP')
+
+
 class WASISysroot(product.Product):
     @classmethod
     def product_source_name(cls):
@@ -105,6 +112,10 @@ class WASISysroot(product.Product):
         if enable_wasi_threads:
             c_flags.append('-pthread')
             cxx_flags.append('-pthread')
+        prefix_map = file_prefix_map()
+        if prefix_map:
+            c_flags.append('-ffile-prefix-map=' + prefix_map)
+            cxx_flags.append('-ffile-prefix-map=' + prefix_map)
         c_flags_str = ' '.join(c_flags)
         cxx_flags_str = ' '.join(cxx_flags)
 

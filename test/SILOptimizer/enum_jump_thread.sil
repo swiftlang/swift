@@ -25,7 +25,7 @@ bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int1):
 
 bb1:
   %2 = enum $E, #E.A!enumelt
-  cond_br %1, bb2, bb3(%2 : $E)
+  cond_br %1, bb2, bb6
 
 // CHECK: [[ENUM1:%[0-9]+]] = enum $E, #E.B
 // CHECK-NEXT: [[ENUM2:%[0-9]+]] = enum $E2, #E2.Y!enumelt, [[ENUM1]]
@@ -47,6 +47,9 @@ bb4:
 // CHECK-NEXT: return
 bb5(%7 : $E2):
   return %7 : $E2
+
+bb6:
+  br bb3(%2 : $E)
 }
 
 // CHECK-LABEL: sil @test_enum_addr

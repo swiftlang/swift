@@ -9,9 +9,9 @@
 @_exported import Namespace.Baz
 
 enum foo {
-  static func foo_func(_ p: UnsafeMutablePointer<Float>!, _ len: Int32)
+  static func foo_func(_ p: UnsafeMutablePointer<CFloat>!, _ len: CInt)
   /// This is an auto-generated wrapper for safer interop
-  @_alwaysEmitIntoClient @_disfavoredOverload public static func foo_func(_ p: UnsafeMutableBufferPointer<Float>)
+  @_alwaysEmitIntoClient @_disfavoredOverload public static func foo_func(_ p: UnsafeMutableBufferPointer<CFloat>)
   static func foo_func2(_ p: UnsafePointer<baz_t>!, _ len: baz_t)
   /// This is an auto-generated wrapper for safer interop
   @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)

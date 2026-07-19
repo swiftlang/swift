@@ -6192,7 +6192,7 @@ NOTE(shared_state_nonisolated_unsafe,none,
 NOTE(note_actor_isolated_witness,none,
      "%0 %kind1 cannot satisfy %2 requirement",
      (ActorIsolation, const ValueDecl *, ActorIsolation))
-ERROR(actor_cannot_conform_to_global_actor_protocol,none,
+GROUPED_ERROR(actor_cannot_conform_to_global_actor_protocol,ActorConformanceToGlobalActorProtocol,none,
       "actor %0 cannot conform to global-actor-isolated protocol %1",
       (Type, Type))
 NOTE(protocol_isolated_to_global_actor_here,none,
@@ -6251,19 +6251,19 @@ NOTE(in_derived_witness, none,
 ERROR(non_sendable_arg_into_actor,none,
       "non-Sendable type %0 cannot be sent into %2 context in call to %kind1",
       (Type, const ValueDecl *, ActorIsolation))
-ERROR(non_sendable_arg_exits_actor,none,
+GROUPED_ERROR(non_sendable_arg_exits_actor,NonSendableExitingActor,none,
       "non-Sendable type %0 cannot exit %2 context in call to nonisolated "
       "%kind1",
       (Type, const ValueDecl *, ActorIsolation))
-ERROR(non_sendable_param_in_witness,none,
+GROUPED_ERROR(non_sendable_param_in_witness,NonSendableInAsyncConformanceOrOverride,none,
       "non-Sendable parameter type %0 cannot be sent from caller of "
       "protocol requirement %1 into %2 implementation",
       (Type, const ValueDecl *, ActorIsolation))
-ERROR(non_sendable_param_in_override,none,
+GROUPED_ERROR(non_sendable_param_in_override,NonSendableInAsyncConformanceOrOverride,none,
       "non-Sendable parameter type %0 cannot be sent from caller of "
       "superclass %kind1 into %2 override",
       (Type, const ValueDecl *, ActorIsolation))
-ERROR(non_sendable_param_in_objc,none,
+GROUPED_ERROR(non_sendable_param_in_objc,NonSendableObjCInterop,none,
       "non-Sendable parameter type %0 of %2 '@objc' %kind1 cannot cross actor "
       "boundary",
       (Type, const ValueDecl *, ActorIsolation))
@@ -6272,39 +6272,39 @@ ERROR(non_sendable_result_into_actor,none,
       "non-Sendable result type %0 cannot be sent from %2 context in call "
       "to %kind1",
       (Type, const ValueDecl *, ActorIsolation))
-ERROR(non_sendable_result_exits_actor,none,
+GROUPED_ERROR(non_sendable_result_exits_actor,NonSendableExitingActor,none,
       "non-Sendable result type %0 cannot exit %2 context in call to "
       "nonisolated %kind1",
       (Type, const ValueDecl *, ActorIsolation))
-ERROR(non_sendable_result_in_witness,none,
+GROUPED_ERROR(non_sendable_result_in_witness,NonSendableInAsyncConformanceOrOverride,none,
       "non-Sendable type %0 cannot be returned from %2 implementation "
       "to caller of protocol requirement %1",
       (Type, const ValueDecl *, ActorIsolation))
-ERROR(non_sendable_result_in_override,none,
+GROUPED_ERROR(non_sendable_result_in_override,NonSendableInAsyncConformanceOrOverride,none,
       "non-Sendable type %0 cannot be returned from %2 override to "
       "caller of superclass %kind1",
       (Type, const ValueDecl *, ActorIsolation))
-ERROR(non_sendable_result_in_objc,none,
+GROUPED_ERROR(non_sendable_result_in_objc,NonSendableObjCInterop,none,
       "non-Sendable type %0 returned by %2 '@objc' %kind1 cannot cross "
       "actor boundary",
       (Type, const ValueDecl *, ActorIsolation))
 
-ERROR(non_sendable_property_exits_actor,none,
+GROUPED_ERROR(non_sendable_property_exits_actor,NonSendableExitingActor,none,
       "non-Sendable type %0 of %kind1 cannot exit %2 context",
       (Type, const ValueDecl *, ActorIsolation))
 ERROR(non_sendable_property_into_actor,none,
       "non-Sendable type %0 of nonisolated %kind1 cannot be sent to "
       "%2 context",
       (Type, const ValueDecl *, ActorIsolation))
-ERROR(non_sendable_property_in_witness,none,
+GROUPED_ERROR(non_sendable_property_in_witness,NonSendableInAsyncConformanceOrOverride,none,
       "non-Sendable type %0 cannot be returned from %2 implementation "
       "to caller of protocol requirement %1",
       (Type, const ValueDecl *, ActorIsolation))
-ERROR(non_sendable_property_in_override,none,
+GROUPED_ERROR(non_sendable_property_in_override,NonSendableInAsyncConformanceOrOverride,none,
       "non-Sendable type %0 cannot be returned from %2 override to "
       "caller of superclass %kind1",
       (Type, const ValueDecl *, ActorIsolation))
-ERROR(non_sendable_property_in_objc,none,
+GROUPED_ERROR(non_sendable_property_in_objc,NonSendableObjCInterop,none,
       "non-Sendable type %0 returned by %2 '@objc' %kind1 cannot cross "
       "actor boundary",
       (Type, const ValueDecl *, ActorIsolation))

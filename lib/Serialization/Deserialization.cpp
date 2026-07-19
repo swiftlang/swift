@@ -5435,15 +5435,13 @@ public:
     DeclID extendedNominalID;
     DeclContextID contextID;
     bool isImplicit;
-    bool isMetatypeExtension;
     GenericSignatureID genericSigID;
     unsigned numConformances, numInherited;
     ArrayRef<uint64_t> data;
 
     decls_block::ExtensionLayout::readRecord(scratch, extendedTypeID,
                                              extendedNominalID, contextID,
-                                             isImplicit, isMetatypeExtension,
-                                             genericSigID,
+                                             isImplicit, genericSigID,
                                              numConformances, numInherited,
                                              data);
 
@@ -5469,7 +5467,8 @@ public:
 
     auto extension = ExtensionDecl::create(ctx, SourceLoc(), nullptr, { },
                                            DC, nullptr);
-    extension->setIsMetatypeExtension(isMetatypeExtension);
+    // `isMetatypeExtension` is not stored: it is derived from the extended type
+    // (the protocol metatype `(any P).Type`), which is restored below.
     declOrOffset = extension;
 
     // Generic parameter lists are written from outermost to innermost.

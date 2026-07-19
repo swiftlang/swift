@@ -231,22 +231,6 @@ static void rewriteNewLoopEntryCheckBlock(
   }
 }
 
-/// Update the dominator tree after rotating the loop.
-/// The former preheader now dominates all of the former headers children. The
-/// former latch now dominates the former header.
-static void updateDomTree(DominanceInfo *domInfo, SILBasicBlock *preheader,
-                          SILBasicBlock *latch, SILBasicBlock *header) {
-  auto *headerN = domInfo->getNode(header);
-  SmallVector<DominanceInfoNode *, 4> Children(headerN->begin(),
-                                               headerN->end());
-  auto *preheaderN = domInfo->getNode(preheader);
-  for (auto *Child : Children)
-    domInfo->changeImmediateDominator(Child, preheaderN);
-
-  if (header != latch)
-    domInfo->changeImmediateDominator(headerN, domInfo->getNode(latch));
-}
-
 static bool rotateLoopAtMostUpToLatch(SILLoop *loop, DominanceInfo *domInfo,
                                       SILLoopInfo *loopInfo, SILPassManager *pm) {
   auto *latch = loop->getLoopLatch();
@@ -448,23 +432,24 @@ static bool rotateLoop(SILLoop *loop, DominanceInfo *domInfo,
   preheaderBranch->dropAllReferences();
   preheaderBranch->eraseFromParent();
 
+  // A cond_br carries no branch arguments (SIL has no critical edges). Cloning
+  // the header's conditional branch into the preheader created critical edges
+  // from the preheader and the original header to the new header and the loop
+  // exit. Split them now, before running the SSA updater below: the updater
+  // inserts phi operands on predecessor terminators, which is only possible for
+  // unconditional branches.
+  splitCriticalEdgesFrom(preheader, nullptr, loopInfo);
+  splitCriticalEdgesFrom(header, nullptr, loopInfo);
+
   // If there were any uses of instructions in the duplicated loop entry check
   // block rewrite them using the ssa updater.
   rewriteNewLoopEntryCheckBlock(header, preheader, valueMap, pm);
 
   loop->moveToHeader(newHeader);
 
-  // Now the original preheader dominates all of headers children and the
-  // original latch dominates the header.
-  updateDomTree(domInfo, preheader, latch, header);
-
-  assert(domInfo->getNode(newHeader)->getIDom() == domInfo->getNode(preheader));
-  assert(!domInfo->dominates(header, exit)
-         || domInfo->getNode(exit)->getIDom() == domInfo->getNode(preheader));
-  assert(domInfo->getNode(header)->getIDom() == domInfo->getNode(latch)
-         || ((header == latch)
-             && domInfo->getNode(header)->getIDom()
-                    == domInfo->getNode(preheader)));
+  // The rotation and the critical-edge splitting above changed the CFG
+  // significantly. Recompute dominance rather than updating it incrementally.
+  domInfo->recalculate(*header->getParent());
 
   // Beautify the IR. Move the old header to after the old latch as it is now
   // the latch.

@@ -120,7 +120,7 @@ import _Concurrency
 // CHECK-NEXT: {{^}} @objc optional func missingAtAttributeMethod()
 // CHECK-NEXT: {{^[}]$}}
 
-// CHECK: {{^}}nonisolated var MAGIC_NUMBER: Int32 { get }
+// CHECK: {{^}}nonisolated var MAGIC_NUMBER: CInt { get }
 
 // CHECK: func doSomethingConcurrently(_ block: @Sendable () -> Void)
 

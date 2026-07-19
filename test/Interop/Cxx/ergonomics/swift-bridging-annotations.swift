@@ -118,7 +118,7 @@ private:
 
 // CHECK: struct SelfContained {
 
-// CHECK:   func returnsIndependent() -> UnsafePointer<Int32>!
+// CHECK:   func returnsIndependent() -> UnsafePointer<CInt>!
 
 // CHECK: class SharedObject {
 // CHECK:   class func create() -> SharedObject!

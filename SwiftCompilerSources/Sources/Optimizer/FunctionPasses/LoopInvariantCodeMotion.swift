@@ -778,7 +778,8 @@ private extension MovableInstructions {
       ownership: phiOwnership,
       context
     )
-    
+    defer { ssaUpdater.deinitialize() }
+
     // Set all stored values as available values in the ssaUpdater.
     for case let storeInst as StoreInst in loadsAndStores where storeInst.storesTo(accessPath) {
       ssaUpdater.addAvailableValue(storeInst.source, in: storeInst.parentBlock)
@@ -839,8 +840,8 @@ private extension MovableInstructions {
       }
       
       // If we didn't see a store in this block yet, get the current value from the ssaUpdater.
-      let rootVal = currentVal ?? ssaUpdater.getValue(inMiddleOf: block)
-      
+      let rootVal = currentVal ?? ssaUpdater.getValue(atBeginOf: block)
+
       if loadInst.operand.value.accessPath == accessPath {
         if loadInst.loadOwnership == .copy {
           let builder = Builder(before: loadInst, context)
@@ -877,7 +878,7 @@ private extension MovableInstructions {
       let builder = Builder(before: exitBlock.instructions.first!, context)
       
       builder.createStore(
-        source: ssaUpdater.getValue(inMiddleOf: exitBlock),
+        source: ssaUpdater.getValue(atBeginOf: exitBlock),
         destination: initialAddr,
         ownership: firstStore.storeOwnership
       )

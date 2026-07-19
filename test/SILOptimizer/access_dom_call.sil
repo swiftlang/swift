@@ -190,13 +190,13 @@ bb0(%0 : $C):
 sil @testDomLoopAMD : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : $C):
   br bb1
-  
+
 bb1:
   br bb2
 
 bb2:
   br bb3
-  
+
 bb3:
   %m = class_method %0 : $C, #C.field!modify : (C) -> () -> (), $@yield_once @convention(method) (@guaranteed C) -> @yields @inout Int64
   (%3, %4) = begin_apply %m(%0) : $@yield_once @convention(method) (@guaranteed C) -> @yields @inout Int64
@@ -205,9 +205,12 @@ bb3:
   end_access %a1 : $*Int64
   end_apply %4 as $()
   %cond = integer_literal $Builtin.Int1, 1
-  cond_br %cond, bb2, bb4
+  cond_br %cond, bb5, bb4
 
 bb4:
   %10 = tuple ()
   return %10 : $()
+
+bb5:
+  br bb2
 }

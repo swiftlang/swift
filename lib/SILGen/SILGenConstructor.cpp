@@ -326,9 +326,11 @@ emitApplyOfInitAccessor(SILGenFunction &SGF, SILLocation loc,
   arguments.push_back(SGF.B.createMetatype(loc, SGF.getLoweredType(metatypeTy)));
 
   SubstitutionMap subs;
-  if (auto *env =
-          accessor->getDeclContext()->getGenericEnvironmentOfContext()) {
-    subs = env->getForwardingSubstitutionMap();
+  if (fnType->getInvocationGenericSignature()) {
+    if (auto *env =
+            accessor->getDeclContext()->getGenericEnvironmentOfContext()) {
+      subs = env->getForwardingSubstitutionMap();
+    }
   }
 
   (void)SGF.B.createApply(loc, accessorRef, subs, arguments, ApplyOptions());

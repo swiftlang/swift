@@ -238,6 +238,42 @@ bool ExportContext::mustOnlyReferenceExportedDecls() const {
   return Exported || FragileKind.kind != FragileFunctionKind::None;
 }
 
+static bool shouldSuppressExportabilityDiagnosticsForHiddenTypes(
+    const ASTContext &ctx, DisallowedOriginKind originKind,
+    ExportedLevel exportedLevel) {
+
+  // Without library evolution, hidden types that do not participate in the
+  // public API of a module may still affect its ABI. These diagnostics warn
+  // about scenarios where a hidden type affects module ABI. However, having
+  // differing diagnostics depending on whether library evolution is enabled is
+  // not a long term solution, and SerializeAbstractTypeLayoutForHiddenTypes is
+  // intended to replace these diagnostics. When enabled, we will detect when a
+  // hidden type contributes to module ABI and encode information about the type
+  // in the module interface, rather than diagnosing the leak.
+
+  if (!ctx.LangOpts.hasFeature(
+          Feature::SerializeAbstractTypeLayoutForHiddenTypes))
+    return false;
+
+  if (exportedLevel != ExportedLevel::ImplicitlyExported)
+    return false;
+
+  switch (originKind) {
+    case DisallowedOriginKind::ImplementationOnly:
+    case DisallowedOriginKind::ImplementationOnlyMemoryLayout:
+    case DisallowedOriginKind::InternalBridgingHeaderImport:
+      return true;
+    case DisallowedOriginKind::None:
+    case DisallowedOriginKind::NonPublicImport:
+    case DisallowedOriginKind::SPIOnly:
+    case DisallowedOriginKind::SPIImported:
+    case DisallowedOriginKind::SPILocal:
+    case DisallowedOriginKind::MissingImport:
+    case DisallowedOriginKind::FragileCxxAPI:
+      return false;
+  }
+}
+
 DiagnosticBehavior
 ExportContext::behaviorForReferenceToOrigin(const ValueDecl *D,
                                             DisallowedOriginKind originKind)
@@ -248,6 +284,12 @@ const {
   // If we can capture the layouts of hidden types, suppress
   // diagnostic.
   if (encapsulatedAsHiddenStoredProperty(D, originKind))
+    return DiagnosticBehavior::Ignore;
+
+  auto &ctx = DC->getASTContext();
+
+  if (shouldSuppressExportabilityDiagnosticsForHiddenTypes(
+          ctx, originKind, getExportedLevel()))
     return DiagnosticBehavior::Ignore;
 
   // Exportability checks for non-library-evolution mode have less restrictions
@@ -295,7 +337,6 @@ const {
 
   // Exportability checking for non-library-evolution was introduced late,
   // downgrade errors to warnings by default.
-  auto &ctx = DC->getASTContext();
   if (getExportedLevel() == ExportedLevel::ImplicitlyExported &&
       originKind != DisallowedOriginKind::ImplementationOnlyMemoryLayout &&
       !ctx.LangOpts.hasFeature(Feature::CheckImplementationOnly) &&

@@ -4,7 +4,7 @@
 // RUN: %target-swift-frontend -plugin-path %swift-plugin-dir -I %t/Inputs -cxx-interoperability-mode=default %t/template.swift -dump-macro-expansions -emit-ir -o %t/out -verify -verify-ignore-unrelated -eager-macro-checking
 // RUN: %target-swift-ide-test -plugin-path %swift-plugin-dir -I %t/Inputs -cxx-interoperability-mode=default -print-module -module-to-print=Template -source-filename=x | %FileCheck %s
 
-// CHECK: func cb_template<T>(_ p: UnsafePointer<T>!, _ size: Int{{.*}}) -> UnsafePointer<T>
+// CHECK: func cb_template<T>(_ p: UnsafePointer<T>!, _ size: CInt) -> UnsafePointer<T>
 // CHECK: func eb_template<T>(_ p: UnsafePointer<T>!, _ end: UnsafePointer<T>!) -> UnsafePointer<T>
 // CHECK: func s_template<T>(_ p: UnsafePointer<T>!) -> UnsafePointer<T>
 // CHECK: func ui_template<T>(_ p: UnsafePointer<T>!) -> UnsafePointer<T>

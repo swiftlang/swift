@@ -1354,6 +1354,10 @@ bool BridgedInstruction::OpenExistentialAddr_isImmutable() const {
   }
 }
 
+BridgedGenericEnvironment BridgedInstruction::OpenExistentialRefInst_getDefinedGenericEnvironment() const {
+  return {getAs<swift::OpenExistentialRefInst>()->getDefinedOpenedArchetype()->getGenericEnvironment()};
+}
+
 BridgedGlobalVar BridgedInstruction::GlobalAccessInst_getGlobal() const {
   return {getAs<swift::GlobalAccessInst>()->getReferencedGlobal()};
 }
@@ -1771,10 +1775,6 @@ bool BridgedInstruction::RefCountingInst_getIsAtomic() const {
   return getAs<swift::RefCountingInst>()->getAtomicity() == swift::RefCountingInst::Atomicity::Atomic;
 }
 
-SwiftInt BridgedInstruction::CondBranchInst_getNumTrueArgs() const {
-  return getAs<swift::CondBranchInst>()->getNumTrueArgs();
-}
-
 void BridgedInstruction::AllocRefInstBase_setIsStackAllocatable() const {
   getAs<swift::AllocRefInstBase>()->setStackAllocatable();
 }
@@ -2151,9 +2151,11 @@ BridgedArgument BridgedBasicBlock::addBlockArgument(BridgedType type, BridgedVal
 
 BridgedArgument
 BridgedBasicBlock::insertPhiArgument(SwiftInt index, BridgedType type,
-                                     BridgedValue::Ownership ownership) const {
+                                     BridgedValue::Ownership ownership,
+                                     OptionalBridgedDeclObj decl) const {
   return {unbridged()->insertPhiArgument(index, type.unbridged(),
-                                         BridgedValue::unbridge(ownership))};
+                                         BridgedValue::unbridge(ownership),
+                                         decl.getAs<swift::ValueDecl>())};
 }
 
 BridgedArgument BridgedBasicBlock::addFunctionArgument(BridgedType type) const {
@@ -3533,30 +3535,6 @@ void BridgedContext::salvageDebugInfo(BridgedInstruction inst) {
 
 OptionalBridgedFunction BridgedContext::lookupStdlibFunction(BridgedStringRef name) const {
   return {context->lookupStdlibFunction(name.unbridged())};
-}
-
-void BridgedContext::SSAUpdater_initialize(BridgedType type, BridgedValue::Ownership ownership) const {
-  context->initializeSSAUpdater(context->getFunction(), type.unbridged(), BridgedValue::unbridge(ownership));
-}
-
-void BridgedContext::SSAUpdater_addAvailableValue(BridgedBasicBlock block, BridgedValue value) const {
-  context->SSAUpdater_addAvailableValue(block.unbridged(), value.getSILValue());
-}
-
-BridgedValue BridgedContext::SSAUpdater_getValueAtEndOfBlock(BridgedBasicBlock block) const {
-  return {context->SSAUpdater_getValueAtEndOfBlock(block.unbridged())};
-}
-
-BridgedValue BridgedContext::SSAUpdater_getValueInMiddleOfBlock(BridgedBasicBlock block) const {
-  return {context->SSAUpdater_getValueInMiddleOfBlock(block.unbridged())};
-}
-
-SwiftInt BridgedContext::SSAUpdater_getNumInsertedPhis() const {
-  return (SwiftInt)context->SSAUpdater_getInsertedPhis().size();
-}
-
-BridgedValue BridgedContext::SSAUpdater_getInsertedPhi(SwiftInt idx) const {
-  return {context->SSAUpdater_getInsertedPhis()[idx]};
 }
 
 BridgedBasicBlockSet BridgedContext::allocBasicBlockSet() const {

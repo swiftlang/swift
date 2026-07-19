@@ -37,17 +37,13 @@ sil_vtable Bar {
 // CHECK:   cond_br {{.*}}, bb2, bb1
 
 // CHECK: bb1:
-// CHECK-NEXT:   br bb3({{.*}} : $Builtin.Int32, {{.*}} : $Builtin.Int32, {{.*}}: $Int32)
+// CHECK-NEXT:   br [[HDR:bb[0-9]+]](
 
-// CHECK: bb3({{.*}}: $Builtin.Int32, {{.*}} : $Builtin.Int32, {{.*}} : $Int32):
+// CHECK: [[HDR]]({{.*}}):
 // CHECK:   class_method
 // CHECK:   apply
-// CHECK:   cond_br {{%.*}}, bb5, bb4
+// CHECK:   cond_br
 
-// CHECK: bb5:
-// CHECK-NEXT:   br bb6({{.*}} : $Builtin.Int32)
-
-// CHECK: bb6({{.*}} : $Builtin.Int32):
 // CHECK:   [[STRUCT:%.*]] = struct $Int32 ({{%.*}} : $Builtin.Int32)
 // CHECK:   return [[STRUCT]] : $Int32
 // CHECK: } // end sil function 'looprotate'
@@ -175,7 +171,7 @@ bb0(%0 : $Int32):
 bb1(%4 : $Builtin.Int32, %5 : $Builtin.Int32):
   %6 = struct $Int32 (%5 : $Builtin.Int32)
   %8 = builtin "cmp_eq_Word"(%5 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int1
-  cond_br %8, bb3(%4 : $Builtin.Int32), bb2
+  cond_br %8, bb3, bb2
 
 bb2:
   %10 = integer_literal $Builtin.Int32, 1
@@ -190,8 +186,8 @@ bb2:
   %21 = tuple_extract %20 : $(Builtin.Int32, Builtin.Int1), 0
   br bb1(%21 : $Builtin.Int32, %14 : $Builtin.Int32)
 
-bb3 (%23 : $Builtin.Int32) :
-  %24 = struct $Int32 (%23 : $Builtin.Int32)
+bb3:
+  %24 = struct $Int32 (%4 : $Builtin.Int32)
   return %24 : $Int32
 }
 
@@ -245,11 +241,11 @@ bb0:
 
 bb1(%1 : $Builtin.Int32, %2 : $Builtin.Int32):    // Preds: bb0 bb2
   %3 = integer_literal $Builtin.Int1, 0           // user: %4
-  cond_br %3, bb2(%1 : $Builtin.Int32, %2 : $Builtin.Int32), bb10 // id: %4
+  cond_br %3, bb11, bb10 // id: %4
 
 bb2(%5 : $Builtin.Int32, %6 : $Builtin.Int32):    // Preds: bb1 bb8
   %7 = integer_literal $Builtin.Int1, -1          // user: %8
-  cond_br %7, bb3, bb1(%5 : $Builtin.Int32, %6 : $Builtin.Int32) // id: %8
+  cond_br %7, bb3, bb12 // id: %8
 
 bb3:                                              // Preds: bb2
   %9 = integer_literal $Builtin.Int32, 0          // user: %11
@@ -288,6 +284,12 @@ bb9:                                              // Preds: bb4
 bb10:                                             // Preds: bb1
   %34 = tuple ()                                  // user: %35
   return %34 : $()                                // id: %35
+
+bb11:
+  br bb2(%1 : $Builtin.Int32, %2 : $Builtin.Int32)
+
+bb12:
+  br bb1(%5 : $Builtin.Int32, %6 : $Builtin.Int32)
 }
 
 // CHECK-LABEL: dont_looprotate_objc
@@ -346,18 +348,17 @@ bb0(%a0 : $Int32):
 // CHECK:   cond_br
 // Loop Header
 // CHECK: bb1:
-// CHECK-NEXT: br bb3
-// CHECK: bb3:
-// CHECK:   cond_br %{{.*}}, bb4, bb8
-// CHECK: bb4:
+// CHECK-NEXT: br [[HDR:bb[0-9]+]]
+// CHECK: [[HDR]]:
+// CHECK:   cond_br %{{.*}}, [[BODY:bb[0-9]+]], [[B8:bb[0-9]+]]
+// CHECK: [[BODY]]:
 // CHECK:   apply
-// CHECK:   br bb5(
-// CHECK: bb5(%[[ARG:[0-9]*]]
-// CHECK-NEXT: cond_br %{{.*}}, bb7, bb6
-// CHECK: bb8:
+// CHECK:   br [[LATCH:bb[0-9]+]](
+// CHECK: [[LATCH]](%[[ARG:[0-9]*]]
+// CHECK-NEXT: cond_br
+// CHECK: [[B8]]:
 // CHECK:   apply
-// CHECK:   br bb5(%
-// CHECK: bb9
+// CHECK:   br [[LATCH]](%
 // CHECK:   return
 sil @insert_backedge_block : $@convention(thin) (@owned @callee_owned () -> Builtin.Int32) -> () {
 bb0(%0 : $@callee_owned () -> Builtin.Int32):
@@ -390,17 +391,21 @@ bb5:
 // CHECK: bb0({{.*}}):
 // CHECK:   br bb1
 // CHECK: bb1:
-// CHECK:   cond_br {{.*}}, bb1, bb2
+// CHECK:   cond_br {{.*}}, bb3, bb2
 // CHECK: bb2:
 // CHECK:   return
+// CHECK: bb3:
+// CHECK:   br bb1
 sil @dont_rotate_single_basic_block_loop : $@convention(thin) (Builtin.Int1) -> () {
 bb0(%0 : $Builtin.Int1):
   br bb1
 bb1:
-  cond_br %0, bb1, bb2
+  cond_br %0, bb3, bb2
 bb2:
  %1 = tuple ()
  return %1 : $()
+bb3:
+  br bb1
 }
 
 // CHECK-LABEL: sil @dont_rotate_single_basic_block_loop_split_backedge

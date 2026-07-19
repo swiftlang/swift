@@ -2057,7 +2057,7 @@ ExtensionDecl::ExtensionDecl(SourceLoc extensionLoc,
 {
   Bits.ExtensionDecl.DefaultAndMaxAccessLevel = 0;
   Bits.ExtensionDecl.HasLazyConformances = false;
-  Bits.ExtensionDecl.IsMetatypeExtension = false;
+
   setTrailingWhereClause(trailingWhereClause);
 }
 
@@ -2080,6 +2080,16 @@ ExtensionDecl *ExtensionDecl::create(ASTContext &ctx, SourceLoc extensionLoc,
     result->setClangNode(clangNode);
 
   return result;
+}
+
+bool ExtensionDecl::isMetatypeExtension() const {
+  // A parsed `extension P.Protocol` keeps its `ProtocolTypeRepr`; recognize the
+  // form from that without forcing type resolution.  Deserialized and
+  // compiler-synthesized extensions have no representation, but their extended
+  // type is the protocol metatype `(any P).Type`, so recognize it from there.
+  if (auto *repr = getExtendedTypeRepr())
+    return isa<ProtocolTypeRepr>(repr);
+  return getExtendedType()->is<MetatypeType>();
 }
 
 void ExtensionDecl::setConformanceLoader(LazyMemberLoader *lazyLoader,
@@ -6069,16 +6079,39 @@ bool NominalTypeDecl::isStrictlyResilient() const {
   return isResilient() && !getModuleContext()->allowNonResilientAccess();
 }
 
-DestructorDecl *NominalTypeDecl::getValueTypeDestructor() {
-  if (!isa<StructDecl>(this) && !isa<EnumDecl>(this)) {
-    return nullptr;
+bool NominalTypeDecl::hasValueTypeDestructor() const {
+  // Fast path: we already checked.
+  if (auto cached = getCachedValueTypeDestructor())
+    return *cached;
+
+  // Otherwise, do the lookup, which updates the cached bit for next time.
+  return getValueTypeDestructor() != nullptr;
+}
+
+DestructorDecl *NominalTypeDecl::getValueTypeDestructor() const {
+  bool needsUpdate = true;
+
+  if (auto cached = getCachedValueTypeDestructor()) {
+    // Skip everything else if we know we don't have a destructor.
+    if (!*cached)
+      return nullptr;
+
+    needsUpdate = false;
   }
-  
-  auto found = lookupDirect(DeclBaseName::createDestructor());
-  if (found.size() != 1) {
-    return nullptr;
-  }
-  return cast<DestructorDecl>(found[0]);
+
+  NominalTypeDecl *nominalDecl = const_cast<NominalTypeDecl *>(this);
+
+  // We might have a destructor, go check.
+  DestructorDecl *result = nullptr;
+  auto found = nominalDecl->lookupDirect(DeclBaseName::createDestructor());
+  if (found.size() == 1)
+    result = cast<DestructorDecl>(found[0]);
+
+  ASSERT(needsUpdate || result != nullptr && "Where did my destructor go?");
+  if (needsUpdate)
+    nominalDecl->setCachedValueTypeDestructor(result != nullptr);
+
+  return result;
 }
 
 static bool isOriginallyDefinedIn(const Decl *D, const ModuleDecl* MD) {
@@ -6634,7 +6667,6 @@ AssociatedTypeDecl::getOverriddenDecls() const {
   return assocTypes;
 }
 
-namespace {
 static AssociatedTypeDecl *getAssociatedTypeAnchor(
                       const AssociatedTypeDecl *ATD,
                       llvm::SmallSet<const AssociatedTypeDecl *, 8> &searched) {
@@ -6658,7 +6690,6 @@ static AssociatedTypeDecl *getAssociatedTypeAnchor(
   }
 
   return bestAnchor;
-}
 }
 
 AssociatedTypeDecl *AssociatedTypeDecl::getAssociatedTypeAnchor() const {

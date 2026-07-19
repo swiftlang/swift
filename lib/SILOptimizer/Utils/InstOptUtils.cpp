@@ -340,15 +340,6 @@ void swift::eraseUsesOfValue(SILValue v) {
   }
 }
 
-bool swift::hasValueDeinit(SILType type) {
-  // Do not look inside an aggregate type that has a user-deinit, for which
-  // memberwise-destruction is not equivalent to aggregate destruction.
-  if (auto *nominal = type.getNominalOrBoundGenericNominal()) {
-    return nominal->getValueTypeDestructor() != nullptr;
-  }
-  return false;
-}
-
 SILValue swift::
 getConcreteValueOfExistentialBox(AllocExistentialBoxInst *existentialBox,
                                   SILInstruction *ignoreUser) {
@@ -547,32 +538,9 @@ TermInst *swift::addArgumentsToBranch(ArrayRef<SILValue> vals,
                                       SILBasicBlock *dest, TermInst *branch) {
   SILBuilderWithScope builder(branch);
 
-  if (auto *cbi = dyn_cast<CondBranchInst>(branch)) {
-    SmallVector<SILValue, 8> trueArgs;
-    SmallVector<SILValue, 8> falseArgs;
-
-    for (auto arg : cbi->getTrueArgs())
-      trueArgs.push_back(arg);
-
-    for (auto arg : cbi->getFalseArgs())
-      falseArgs.push_back(arg);
-
-    if (dest == cbi->getTrueBB()) {
-      for (auto val : vals)
-        trueArgs.push_back(val);
-      assert(trueArgs.size() == dest->getNumArguments());
-    } else {
-      for (auto val : vals)
-        falseArgs.push_back(val);
-      assert(falseArgs.size() == dest->getNumArguments());
-    }
-
-    return builder.createCondBranch(
-        cbi->getLoc(), cbi->getCondition(), cbi->getTrueBB(), trueArgs,
-        cbi->getFalseBB(), falseArgs, cbi->getTrueBBCount(),
-        cbi->getFalseBBCount());
-  }
-
+  // Only a BranchInst can carry phi arguments: SIL has no critical edges, so a
+  // block with phi arguments is only ever reached through unconditional
+  // branches (never a cond_br).
   if (auto *bi = dyn_cast<BranchInst>(branch)) {
     SmallVector<SILValue, 8> args;
 
@@ -2166,8 +2134,14 @@ static void salvagePackElementSetDebugInfo(PackElementSetInst *PESI) {
 // TODO: whenever a debug_value is inserted at a new location, check that no
 // other debug_value instructions exist between the old and new location for
 // the same variable.
+//
+// TODO: Kill all debug uses when the salvage fails.
 void swift::salvageDebugInfo(SILInstruction *I) {
   if (!I)
+    return;
+
+  // Instructions with type dependent operands cannot be salvaged.
+  if (I->getNumTypeDependentOperands() != 0)
     return;
 
   if (auto *SI = dyn_cast<StoreInst>(I)) {
@@ -2310,6 +2284,10 @@ void swift::salvageDebugInfo(SILInstruction *I) {
     salvageDestructureInst(I);
 
   if (isa<AddressToPointerInst>(I) || isa<PointerToAddressInst>(I))
+    salvageUnaryInst(cast<SingleValueInstruction>(I));
+
+  if (isa<UpcastInst>(I) || isa<UncheckedRefCastInst>(I) ||
+      isa<ConvertEscapeToNoEscapeInst>(I))
     salvageUnaryInst(cast<SingleValueInstruction>(I));
 
   if (isa<StructElementAddrInst>(I) || isa<TupleElementAddrInst>(I) ||

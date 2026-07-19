@@ -1065,6 +1065,11 @@ class InitExistentialRefInst : SingleValueInstruction, UnaryInstruction, InitExi
 final public
 class OpenExistentialRefInst : SingleValueInstruction, UnaryInstruction {
   public var existential: Value { operand.value }
+
+  /// The generic environment that this instruction's opened archetype lives in.
+  public var definedGenericEnvironment: GenericEnvironment {
+    GenericEnvironment(bridged: bridged.OpenExistentialRefInst_getDefinedGenericEnvironment())
+  }
 }
 
 final public
@@ -2287,29 +2292,6 @@ final public class CondBranchInst : TermInst {
   public var falseBlock: BasicBlock { successors[1] }
 
   public var condition: Value { operands[0].value }
-
-  public var trueOperands: OperandArray { operands[1..<(bridged.CondBranchInst_getNumTrueArgs() &+ 1)] }
-  public var falseOperands: OperandArray {
-    let ops = operands
-    return ops[(bridged.CondBranchInst_getNumTrueArgs() &+ 1)..<ops.count]
-  }
-
-  /// Returns the true or false block argument for the cond_br `operand`.
-  ///
-  /// Return nil if `operand` is the condition itself.
-  public func getArgument(for operand: Operand) -> Argument? {
-    let opIdx = operand.index
-    if opIdx == 0 {
-      return nil
-    }
-    let argIdx = opIdx - 1
-    let numTrueArgs = bridged.CondBranchInst_getNumTrueArgs()
-    if (0..<numTrueArgs).contains(argIdx) {
-      return trueBlock.arguments[argIdx]
-    } else {
-      return falseBlock.arguments[argIdx - numTrueArgs]
-    }
-  }
 }
 
 final public class SwitchValueInst : TermInst {

@@ -5,7 +5,7 @@
 // RUN: %target-swift-frontend -plugin-path %swift-plugin-dir -I %t/Inputs -cxx-interoperability-mode=default %t/method.swift -dump-macro-expansions -typecheck -verify -eager-macro-checking
 
 // CHECK: @_alwaysEmitIntoClient 
-// CHECK-SAME: public mutating func bar(_ p: UnsafeMutableBufferPointer<Float>)
+// CHECK-SAME: public mutating func bar(_ p: UnsafeMutableBufferPointer<CFloat>)
 
 //--- Inputs/module.modulemap
 module Method {

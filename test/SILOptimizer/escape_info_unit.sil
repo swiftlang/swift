@@ -265,11 +265,14 @@ bb7(%22 : $LinkedNode):
   store %1 to %23 : $*X
   %25 = ref_element_addr %22 : $LinkedNode, #LinkedNode.next
   %26 = load %25 : $*LinkedNode
-  cond_br undef, bb7(%26 : $LinkedNode), bb8
+  cond_br undef, bb9, bb8
 
 bb8:
   %28 = tuple ()
   return %28 : $()
+
+bb9:
+  br bb7(%26 : $LinkedNode)
 }
 
 // CHECK-LABEL: Escape information for callee_may_store_to_non_escaping_argument:

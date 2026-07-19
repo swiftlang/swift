@@ -579,7 +579,7 @@ bb4:
   br bb5
 
 bb5:
-  cond_br undef, bb4, bb6
+  cond_br undef, bb8, bb6
 
 bb6:
   br bb7
@@ -590,6 +590,9 @@ bb7:
   dealloc_stack %0 : $*NonSendableKlass
   %9999 = tuple ()
   return %9999 : $()
+
+bb8:
+  br bb4
 }
 
 // CHECK: begin running test 1 of 1 on temp_alloc_stack_different_block_larger_cfg_2: sil_isolation_info_inference with: @trace[0]
@@ -621,7 +624,7 @@ bb4:
 bb5:
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f(%0) : $@convention(thin) @async () -> @out NonSendableKlass
   destroy_addr %0 : $*NonSendableKlass
-  cond_br undef, bb4, bb6
+  cond_br undef, bb8, bb6
 
 bb6:
   br bb7
@@ -630,6 +633,9 @@ bb7:
   dealloc_stack %0 : $*NonSendableKlass
   %9999 = tuple ()
   return %9999 : $()
+
+bb8:
+  br bb4
 }
 
 // CHECK: begin running test 1 of 1 on temp_alloc_stack_different_block_larger_cfg_3: sil_isolation_info_inference with: @trace[0]
@@ -661,7 +667,7 @@ bb4:
 bb5:
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f(%0) : $@convention(thin) @async () -> @out NonSendableKlass
   destroy_addr %0 : $*NonSendableKlass
-  cond_br undef, bb4, bb6
+  cond_br undef, bb8, bb6
 
 bb6:
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f(%0) : $@convention(thin) @async () -> @out NonSendableKlass
@@ -672,6 +678,9 @@ bb7:
   dealloc_stack %0 : $*NonSendableKlass
   %9999 = tuple ()
   return %9999 : $()
+
+bb8:
+  br bb4
 }
 
 // CHECK: begin running test 1 of 1 on temp_alloc_stack_different_block_larger_cfg_4: sil_isolation_info_inference with: @trace[0]
@@ -706,7 +715,7 @@ bb4:
 bb5:
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f(%0) : $@convention(thin) @async () -> @out NonSendableKlass
   destroy_addr %0 : $*NonSendableKlass
-  cond_br undef, bb4, bb6
+  cond_br undef, bb8, bb6
 
 bb6:
   apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f(%0) : $@convention(thin) @async () -> @out NonSendableKlass
@@ -717,6 +726,9 @@ bb7:
   dealloc_stack %0 : $*NonSendableKlass
   %9999 = tuple ()
   return %9999 : $()
+
+bb8:
+  br bb4
 }
 
 // CHECK: begin running test 1 of 1 on temp_alloc_stack_different_block_larger_cfg_5: sil_isolation_info_inference with: @trace[0]
@@ -1356,7 +1368,7 @@ bb0(%0 : @guaranteed $MainActorIsolatedStruct):
 sil [ossa] @test_nonisolated_unsafe_field_override_struct_addr : $@convention(thin) (@in_guaranteed MainActorIsolatedStruct) -> () {
 bb0(%0 : $*MainActorIsolatedStruct):
   specify_test "sil_isolation_info_inference @trace[0]"
-  debug_value %0 : $*MainActorIsolatedStruct, let, name "self", expr op_deref
+  debug_value %0 : $*MainActorIsolatedStruct, let, name "self"
   %1 = struct_element_addr %0 : $*MainActorIsolatedStruct, #MainActorIsolatedStruct.nsNonisolatedUnsafe
   debug_value [trace] %1
   %9999 = tuple ()
@@ -1370,7 +1382,7 @@ bb0(%0 : $*MainActorIsolatedStruct):
 sil [ossa] @test_nonisolated_unsafe_field_override_generic_struct_addr : $@convention(thin) <T> (@in_guaranteed MainActorIsolatedGenericStruct<T>) -> () {
 bb0(%0 : $*MainActorIsolatedGenericStruct<T>):
   specify_test "sil_isolation_info_inference @trace[0]"
-  debug_value %0 : $*MainActorIsolatedGenericStruct<T>, let, name "self", expr op_deref
+  debug_value %0 : $*MainActorIsolatedGenericStruct<T>, let, name "self"
   %1 = struct_element_addr %0 : $*MainActorIsolatedGenericStruct<T>, #MainActorIsolatedGenericStruct.nsNonisolatedUnsafe
   debug_value [trace] %1
   %9999 = tuple ()
@@ -1384,7 +1396,7 @@ bb0(%0 : $*MainActorIsolatedGenericStruct<T>):
 sil [ossa] @test_nonisolated_unsafe_field_override_nonisolated_generic_struct_addr : $@convention(thin) <T> (@in_guaranteed NonisolatedGenericStruct<T>) -> () {
 bb0(%0 : $*NonisolatedGenericStruct<T>):
   specify_test "sil_isolation_info_inference @trace[0]"
-  debug_value %0 : $*NonisolatedGenericStruct<T>, let, name "self", expr op_deref
+  debug_value %0 : $*NonisolatedGenericStruct<T>, let, name "self"
   %1 = struct_element_addr %0 : $*NonisolatedGenericStruct<T>, #NonisolatedGenericStruct.nsNonisolatedUnsafe
   debug_value [trace] %1
   %9999 = tuple ()

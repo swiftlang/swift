@@ -1473,6 +1473,17 @@ namespace {
       if (!nominal)
         return result;
 
+      // GenericContextDescriptorFlags must be zero for descriptors that might
+      // be seen by a pre-5.8 runtime, so omit this on pre-5.8 targets unless
+      // we're building the runtime itself.
+      auto deploymentAvailability =
+          AvailabilityRange::forDeploymentTarget(IGM.Context);
+      if (!IGM.Context.LangOpts.DisableAvailabilityChecking &&
+          !deploymentAvailability.isContainedIn(
+              IGM.Context.getSwift58Availability()) &&
+          !IGM.getSwiftModule()->isStdlibModule())
+        return result;
+
       auto checkProtocol = [&](InvertibleProtocolKind kind) {
         switch (nominal->canConformTo(kind)) {
         case TypeDecl::CanBeInvertible::Never:
@@ -3640,7 +3651,7 @@ static void emitInitializeRawLayout(IRGenFunction &IGF, SILType likeType,
 
     // PODness comes directly from the like type if we 'movesAsLike'. A custom
     // deinit on the raw layout type however automatically forces non-pod.
-    if (T.getStructOrBoundGenericStruct()->getValueTypeDestructor()) {
+    if (T.getStructOrBoundGenericStruct()->hasValueTypeDestructor()) {
       rawLayoutFlags = IGF.Builder.CreateOr(rawLayoutFlags,
                           IGM.getSize(Size((uint8_t) RawLayoutFlags::IsNonPOD)));
     } else {
@@ -3650,7 +3661,7 @@ static void emitInitializeRawLayout(IRGenFunction &IGF, SILType likeType,
                             IGM.getSize(Size((uint8_t) RawLayoutFlags::IsNonPOD)));
       rawLayoutFlags = IGF.Builder.CreateSelect(isPOD, rawLayoutFlags, isNonPODFlags);
     }
-  } else if (T.getStructOrBoundGenericStruct()->getValueTypeDestructor()) {
+  } else if (T.getStructOrBoundGenericStruct()->hasValueTypeDestructor()) {
     rawLayoutFlags = IGF.Builder.CreateOr(rawLayoutFlags,
                             IGM.getSize(Size((uint8_t) RawLayoutFlags::IsNonPOD)));
   }
