@@ -9,15 +9,18 @@
 // rdar://59431058
 // Let's make sure this works, but let's not encourage its spread...
 
-// HEADER: class Trunk {
-// HEADER:   init!()
-// HEADER:   class func addLimb(_ limb: (any Trunk.Branch)!)
-// HEADER:   func addLimb(_ limb: (any Trunk.Branch)!)
-// HEADER:   func addLimbs(_ limbs: [any Trunk.Branch]!)
-// HEADER: }
-// HEADER: protocol Branch {
-// HEADER:   func flower()
-// HEADER: }
+// HEADER:      class Trunk {
+// HEADER-NEXT:   init!()
+// HEADER-NEXT:   class func addLimb(_ limb: (any Trunk.Branch)!)
+// HEADER-NEXT:   func addLimb(_ limb: (any Trunk.Branch)!)
+// HEADER-NEXT:   class func addLimbs(_ limbs: [any Trunk.Branch]!)
+// HEADER-NEXT:   func addLimbs(_ limbs: [any Trunk.Branch]!)
+// HEADER-NEXT: }
+// HEADER-NEXT: extension Trunk {
+// HEADER-NEXT:   protocol Branch {
+// HEADER-NEXT:     func flower()
+// HEADER-NEXT:   }
+// HEADER-NEXT: }
 
 func grow(_ branch: Trunk.Branch, from trunk: Trunk) {
   branch.flower()
@@ -33,7 +36,6 @@ class SturdyBranch: Trunk.Branch {
   func flower() {}
 }
 
-// FIXME: Odd that name lookup can't find this...
 class NormalBranch: Branch { // expected-error {{cannot find type 'Branch' in scope}}
   func flower() {}
 }
