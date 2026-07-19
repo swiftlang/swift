@@ -54,9 +54,11 @@ inline void tls_init_once(once_t &token, tls_key key, tls_dtor_t dtor) {
 }
 #endif // SWIFT_THREADING_USE_RESERVED_TLS_KEYS
 
-using threading_impl::tls_alloc;
 using threading_impl::tls_get;
 using threading_impl::tls_set;
+
+#if !SWIFT_THREADING_USE_RESERVED_TLS_KEYS
+using threading_impl::tls_alloc;
 
 /// tls_alloc_once() - Allocate TLS key, once only
 inline void tls_alloc_once(once_t &token, tls_key_t &key, tls_dtor_t dtor) {
@@ -74,6 +76,7 @@ inline void tls_alloc_once(once_t &token, tls_key_t &key, tls_dtor_t dtor) {
       },
       (void *)&info);
 }
+#endif // !SWIFT_THREADING_USE_RESERVED_TLS_KEYS
 #endif // !SWIFT_THREADING_NONE
 
 // -- High-level TLS classes --------------------------------------------------
@@ -110,8 +113,9 @@ template <class T> struct TLSPointer {
 //   then create an ordinary global.
 //
 // - On platforms that don't define SWIFT_THREAD_LOCAL, we have to simulate
-//   thread-local storage.  Fortunately, all of these platforms (at least
-//   for now) support pthread_getspecific or similar.
+//   thread-local storage. Some implementations allocate keys dynamically with
+//   pthread_getspecific or similar, while others provide a fixed set of
+//   reserved keys.
 #ifdef SWIFT_THREAD_LOCAL
 template <class T>
 class ThreadLocal {
@@ -136,6 +140,7 @@ public:
   }
 };
 #else
+#if !SWIFT_THREADING_USE_RESERVED_TLS_KEYS
 // A wrapper around a TLS key that is lazily initialized using swift::once.
 class ThreadLocalKey {
   // We rely on the zero-initialization of objects with static storage
@@ -155,6 +160,7 @@ public:
     return key;
   }
 };
+#endif // !SWIFT_THREADING_USE_RESERVED_TLS_KEYS
 
 #if SWIFT_THREADING_USE_RESERVED_TLS_KEYS
 // A type representing a constant TLS key, for use on platforms
