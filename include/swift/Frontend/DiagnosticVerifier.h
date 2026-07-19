@@ -19,6 +19,7 @@
 #define SWIFT_FRONTEND_DIAGNOSTIC_VERIFIER_H
 
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/Support/SourceMgr.h"
@@ -178,11 +179,13 @@ private:
   bool parseTargetBufferName(StringRef &MatchStart, StringRef &Out, size_t &TextStartIdx);
   unsigned parseExpectedDiagInfo(unsigned BufferID, StringRef MatchStart,
                                  unsigned &PrevExpectedContinuationLine,
-                                 ExpectedDiagnosticInfo &Expected);
+                                 ExpectedDiagnosticInfo &Expected,
+                                 bool InExpansion = false);
   void parseNestedExpectedDiagInfoBlock(
       unsigned BufferID, StringRef MatchStartIn,
       unsigned &PrevExpectedContinuationLine,
-      std::vector<ExpectedDiagnosticInfo> &NestedDiagsOut, size_t &End);
+      std::vector<ExpectedDiagnosticInfo> &NestedDiagsOut, size_t &End,
+      bool InExpansion = false);
   void
   verifyDiagnostics(std::vector<ExpectedDiagnosticInfo> &ExpectedDiagnostics,
                     unsigned BufferID, std::optional<size_t> ParentID);
@@ -218,11 +221,37 @@ private:
   };
 
   /// Map from location marker names to their buffer and line number.
-  /// Populated by scanForMarkers() before parsing expected diagnostics.
+  /// Populated by scanForMarkers() before parsing expected diagnostics. Plain
+  /// '// #name' markers are recorded with their resolved location. Expansion-
+  /// relative '// #name@N' markers are recorded with a sentinel buffer of 0
+  /// until the enclosing expected-expansion block is parsed and
+  /// processExpansionMarkerDefinitions() binds them.
   llvm::StringMap<MarkerLocation> LocationMarkers;
 
-  /// Scan the buffer for location marker definitions (// #name).
+  /// Definition sites (pointing at the '#') of expansion-relative markers
+  /// ("// #name@N") seen inside an expected-expansion block in the buffer being
+  /// verified. These are recorded whether or not the marker bound successfully.
+  /// Used to diagnose such markers that appear outside any expansion block.
+  llvm::SmallPtrSet<const char *, 4> ExpansionMarkerLocs;
+
+  /// Scan the buffer for location marker definitions ('// #name' and
+  /// '// #name@N') and register them in LocationMarkers.
   void scanForMarkers(unsigned BufferID);
+
+  /// Handle location marker definitions found inside an expected-expansion
+  /// block whose interior text is \p BlockText. A plain "// #name" is banned;
+  /// an expansion-relative "// #name@N" is bound to line N of the expansion
+  /// buffer \p ExpansionBufferID (0 if the expansion was not produced).
+  void processExpansionMarkerDefinitions(StringRef BlockText,
+                                         unsigned ExpansionBufferID);
+
+  /// Resolve '@#marker' references in \p Diags (and their children) whose
+  /// resolution was deferred because the marker is a '// #name@N' whose
+  /// enclosing expected-expansion block is parsed later in the file than the
+  /// reference. References whose marker could not be bound (e.g. the expansion
+  /// was not produced) are dropped; undefined markers are diagnosed earlier,
+  /// during parsing.
+  void resolveDeferredMarkers(std::vector<ExpectedDiagnosticInfo> &Diags);
 
   /// Check whether any location marker is defined at the given buffer and line.
   bool hasMarkerAtLine(unsigned BufferID, unsigned Line) const;
