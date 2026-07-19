@@ -954,8 +954,9 @@ bool swift::performCompileStepsPostSema(
 
     SILOptions SILOpts = getSILOptions(PSPs, auxPSPs);
     IRGenOptions irgenOpts = Invocation.getIRGenOptions();
-    auto SM = performASTLowering(mod, Instance.getSILTypes(), SILOpts,
-                                 &irgenOpts);
+    std::unique_ptr<SILModule> SM;
+    SM = performASTLowering(mod, Instance.getSILTypes(), SILOpts,
+                            &irgenOpts);
     return performCompileStepsPostSILGen(Instance, std::move(SM), mod, PSPs,
                                          ReturnValue, observer,
                                          CommandLineArgs, auxPSPs);
@@ -973,8 +974,9 @@ bool swift::performCompileStepsPostSema(
           Instance.getPrimarySpecificPathsForSourceFile(*PrimaryFile);
       SILOptions SILOpts = getSILOptions(PSPs, emptyAuxPSPs);
     IRGenOptions irgenOpts = Invocation.getIRGenOptions();
-      auto SM = performASTLowering(*PrimaryFile, Instance.getSILTypes(),
-                                   SILOpts, &irgenOpts);
+      std::unique_ptr<SILModule> SM;
+      SM = performASTLowering(*PrimaryFile, Instance.getSILTypes(),
+                              SILOpts, &irgenOpts);
       result |= performCompileStepsPostSILGen(Instance, std::move(SM),
                                               PrimaryFile, PSPs, ReturnValue,
                                               observer, CommandLineArgs);
@@ -992,7 +994,8 @@ bool swift::performCompileStepsPostSema(
         const PrimarySpecificPaths &PSPs =
             Instance.getPrimarySpecificPathsForPrimary(SASTF->getFilename());
         SILOptions SILOpts = getSILOptions(PSPs, emptyAuxPSPs);
-        auto SM = performASTLowering(*SASTF, Instance.getSILTypes(), SILOpts);
+        std::unique_ptr<SILModule> SM;
+        SM = performASTLowering(*SASTF, Instance.getSILTypes(), SILOpts);
         result |= performCompileStepsPostSILGen(Instance, std::move(SM), mod,
                                                 PSPs, ReturnValue, observer,
                                                 CommandLineArgs);
@@ -1041,6 +1044,7 @@ static bool emitAnyWholeModulePostTypeCheckSupplementaryOutputs(
 
   if ((!Context.hadError() || opts.AllowModuleWithCompilerErrors) &&
       opts.InputsAndOutputs.hasClangHeaderOutputPath()) {
+    FrontendStatsTracer tracer(Instance.getStatsReporter(), "EmitObjCHeader");
     std::string BridgingHeaderPathForPrint = Instance.getBridgingHeaderPath();
     if (!BridgingHeaderPathForPrint.empty()) {
       if (opts.BridgingHeaderDirForPrint.has_value()) {
@@ -1101,6 +1105,7 @@ static bool emitAnyWholeModulePostTypeCheckSupplementaryOutputs(
   }
 
   {
+    FrontendStatsTracer tracer(Instance.getStatsReporter(), "EmitTBD");
     hadAnyError |= writeTBDIfNeeded(Instance);
   }
 
@@ -1287,17 +1292,27 @@ static void performEndOfPipelineActions(CompilerInstance &Instance) {
   }
 
   if (shouldEmitIndexData(Invocation)) {
+    FrontendStatsTracer tracer(Instance.getStatsReporter(), "EmitIndexData");
     emitIndexData(Instance);
   }
 
   // Emit Swiftdeps for every file in the batch.
-  emitSwiftdepsForAllPrimaryInputsIfNeeded(Instance);
+  {
+    FrontendStatsTracer tracer(Instance.getStatsReporter(), "EmitSwiftDeps");
+    emitSwiftdepsForAllPrimaryInputsIfNeeded(Instance);
+  }
 
   // Emit Make-style dependencies.
-  emitMakeDependenciesIfNeeded(Instance);
+  {
+    FrontendStatsTracer tracer(Instance.getStatsReporter(), "EmitMakeDeps");
+    emitMakeDependenciesIfNeeded(Instance);
+  }
 
   // Emit extracted constant values for every file in the batch
-  emitConstValuesForAllPrimaryInputsIfNeeded(Instance);
+  {
+    FrontendStatsTracer tracer(Instance.getStatsReporter(), "EmitConstValues");
+    emitConstValuesForAllPrimaryInputsIfNeeded(Instance);
+  }
 
   // Make sure we emitted an error if we encountered an invalid conformance.
   // This is important since `ASTContext::hadError` accounts for delayed
@@ -1410,6 +1425,7 @@ static bool performScanDependencies(CompilerInstance &Instance) {
 }
 
 static bool performParseOnly(ModuleDecl &MainModule) {
+  FrontendStatsTracer tracer(MainModule.getASTContext().Stats, "Parse");
   // A -parse invocation only cares about the side effects of parsing, so
   // force the parsing of all the source files.
   for (auto *file : MainModule.getFiles()) {
@@ -2151,6 +2167,7 @@ static void freeASTContextIfPossible(CompilerInstance &Instance) {
 static bool generateCode(CompilerInstance &Instance, StringRef OutputFilename,
                          llvm::Module *IRModule,
                          llvm::GlobalVariable *HashGlobal) {
+  FrontendStatsTracer tracer(Instance.getStatsReporter(), "LLVM pipeline");
   const auto &opts = Instance.getInvocation().getIRGenOptions();
   std::unique_ptr<llvm::TargetMachine> TargetMachine = createTargetMachine(
       opts, Instance.getASTContext(), Instance.getSharedCASInstance());
@@ -2345,7 +2362,10 @@ static bool performCompileStepsPostSILGen(
   if (Context.hadError())
     return !opts.AllowModuleWithCompilerErrors;
 
-  runSILLoweringPasses(*SM);
+  {
+    FrontendStatsTracer tracer(Instance.getStatsReporter(), "SILLowering");
+    runSILLoweringPasses(*SM);
+  }
 
   // If we are asked to emit lowered SIL, dump it now and return.
   if (Action == FrontendOptions::ActionType::EmitLoweredSIL)
@@ -2422,7 +2442,8 @@ static bool performCompileStepsPostSILGen(
       Invocation.getCASOptions().EnableCaching && IRGenOpts.UseCASBackend
           ? &Instance.getCASOutputBackend()
           : nullptr;
-  auto IRModule = generateIR(
+  GeneratedModule IRModule = GeneratedModule::null();
+  IRModule = generateIR(
       IRGenOpts, Invocation.getTBDGenOptions(), std::move(SM), PSPs,
       Instance.getSharedCASInstance(), casBackend, OutputFilename, MSF,
       HashGlobal, ParallelOutputFilenames, ParallelIROutputFilenames,
@@ -2797,7 +2818,11 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   }
 
   int ReturnValue = 0;
-  bool HadError = performCompile(*Instance, ReturnValue, observer, Args);
+  bool HadError;
+  {
+    FrontendStatsTracer tracer(Instance->getStatsReporter(), "ExecuteCompiler");
+    HadError = performCompile(*Instance, ReturnValue, observer, Args);
+  }
 
   if (verifierEnabled) {
     DiagnosticEngine &diags = Instance->getDiags();

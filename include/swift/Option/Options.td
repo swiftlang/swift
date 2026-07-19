@@ -445,6 +445,21 @@ def profile_stats_entities: Flag<["-"], "profile-stats-entities">,
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Profile changes to stats in -stats-output-dir, subdivided by source entity">;
 
+def emit_time_trace_path : Separate<["-"], "emit-time-trace-path">,
+  Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath, CacheInvariant]>,
+  HelpText<"Emit time trace output to <path>">,
+  MetaVarName<"<path>">;
+def emit_time_trace_path_EQ : Joined<["-"], "emit-time-trace-path=">,
+  Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath, CacheInvariant]>,
+  Alias<emit_time_trace_path>;
+def time_trace_granularity : Separate<["-"], "time-trace-granularity">,
+  Flags<[FrontendOption, NoInteractiveOption, CacheInvariant]>,
+  HelpText<"Minimum time granularity (in microseconds) for time trace events">,
+  MetaVarName<"<microseconds>">;
+def time_trace_granularity_EQ : Joined<["-"], "time-trace-granularity=">,
+  Flags<[FrontendOption, NoInteractiveOption, CacheInvariant]>,
+  Alias<time_trace_granularity>;
+
 def emit_dependencies : Flag<["-"], "emit-dependencies">,
   Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput]>,
   HelpText<"Emit basic Make-compatible dependencies files">;

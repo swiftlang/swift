@@ -39,6 +39,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/GraphWriter.h"
 #include "llvm/Support/ManagedStatic.h"
+#include "llvm/Support/TimeProfiler.h"
 #include <fstream>
 
 #ifndef SWIFT_ENABLE_SWIFT_IN_SWIFT
@@ -720,6 +721,10 @@ void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
     forcePrecomputeAnalyses(F);
   }
   
+  std::string TraceName =
+      ("SILFunctionPass (" + SFT->getTag() + ")").str();
+  llvm::TimeTraceScope TimeScope(TraceName, F->getName());
+
   llvm::sys::TimePoint<> startTime = std::chrono::system_clock::now();
   std::chrono::nanoseconds duration(0);
 
@@ -750,7 +755,7 @@ void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
         invalidateAnalysis(F, SILAnalysis::InvalidationKind::Everything);
         F->restoreFromSnapshot(SnapshotID);
       }
-      
+
       // Continue time measurement (including flushing deleted instructions).
       startTime = std::chrono::system_clock::now();
     } else {
@@ -952,18 +957,21 @@ void SILPassManager::runModulePass(unsigned TransIdx) {
     runSwiftModuleVerification();
   }
 
+  std::string TraceName = ("SILModulePass (" + SMT->getTag() + ")").str();
+  llvm::TimeTraceScope TimeScope(TraceName);
+
   swiftPassInvocation.startModulePassRun(SMT);
 
   llvm::sys::TimePoint<> StartTime = std::chrono::system_clock::now();
   assert(analysesUnlocked() && "Expected all analyses to be unlocked!");
   SMT->run();
   assert(analysesUnlocked() && "Expected all analyses to be unlocked!");
-  
+
   if (!CurrentPassHasInvalidated && Mod->hasInstructionsScheduledForDeletion()) {
     // Last chance for invalidating analysis if the pass forgot to call invalidateAnalysis.
     invalidateAllAnalysis();
   }
-  
+
   Mod->flushDeletedInsts();
   swiftPassInvocation.finishedModulePassRun();
 

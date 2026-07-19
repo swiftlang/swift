@@ -19,6 +19,8 @@
 #include "llvm/Support/Timer.h"
 #include <optional>
 
+namespace llvm { struct TimeTraceProfilerEntry; }
+
 #include <thread>
 #include <tuple>
 
@@ -178,6 +180,15 @@ private:
   /// Whether we are printing all stats even if they are zero.
   bool IsPrintingZeroStats;
 
+  /// Whether we have a stats output directory (vs. time-trace-only mode).
+  bool HasStatsOutputDir;
+
+  /// Path for time trace output. Empty if time tracing is not requested.
+  std::string TimeTracePath;
+
+  /// Minimum time granularity (in microseconds) for time trace events.
+  unsigned TimeTraceGranularity;
+
   void publishAlwaysOnStatsToLLVM();
   void printAlwaysOnStatsAndTimers(raw_ostream &OS);
 
@@ -190,7 +201,9 @@ private:
                        bool TraceEvents,
                        bool ProfileEvents,
                        bool ProfileEntities,
-                       bool PrintZeroStats);
+                       bool PrintZeroStats,
+                       StringRef TimeTracePath = "",
+                       unsigned TimeTraceGranularity = 500);
 public:
   UnifiedStatsReporter(StringRef ProgramName,
                        StringRef ModuleName,
@@ -205,10 +218,13 @@ public:
                        bool TraceEvents,
                        bool ProfileEvents,
                        bool ProfileEntities,
-                       bool PrintZeroStats);
+                       bool PrintZeroStats,
+                       StringRef TimeTracePath = "",
+                       unsigned TimeTraceGranularity = 500);
   ~UnifiedStatsReporter();
 
   bool fineGrainedTimers() const { return FineGrainedTimers; }
+  unsigned getTimeTraceGranularity() const { return TimeTraceGranularity; }
 
   AlwaysOnDriverCounters &getDriverCounters();
   AlwaysOnFrontendCounters &getFrontendCounters();
@@ -239,6 +255,7 @@ public:
   StringRef EventName;
   const void *Entity;
   const UnifiedStatsReporter::TraceFormatter *Formatter;
+  llvm::TimeTraceProfilerEntry *TimeTraceEntry = nullptr;
   FrontendStatsTracer();
   FrontendStatsTracer(FrontendStatsTracer&& other);
   FrontendStatsTracer& operator=(FrontendStatsTracer&&);

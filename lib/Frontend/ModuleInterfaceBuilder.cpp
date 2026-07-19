@@ -273,7 +273,8 @@ std::error_code ExplicitModuleInterfaceBuilder::buildSwiftModuleFromInterface(
   auto Mod = Instance.getMainModule();
   Mod->setIsBuiltFromInterface(true);
   auto &TC = Instance.getSILTypes();
-  auto SILMod = performASTLowering(Mod, TC, SILOpts);
+  std::unique_ptr<SILModule> SILMod;
+  SILMod = performASTLowering(Mod, TC, SILOpts);
   if (!SILMod) {
     LLVM_DEBUG(llvm::dbgs() << "SILGen did not produce a module\n");
     return std::make_error_code(std::errc::not_supported);
