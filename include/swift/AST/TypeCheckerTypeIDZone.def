@@ -588,8 +588,8 @@ SWIFT_REQUEST(TypeChecker, IsNonUserModuleRequest,
 SWIFT_REQUEST(TypeChecker, TypeCheckObjCImplementationRequest,
               unsigned(ExtensionDecl *),
               Cached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, TypeCheckCDeclFunctionRequest,
-              evaluator::SideEffect(FunctionDecl *, CDeclAttr *),
+SWIFT_REQUEST(TypeChecker, TypeCheckForeignFunctionRequest,
+              evaluator::SideEffect(FunctionDecl *, DeclAttribute *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, TypeCheckCDeclEnumRequest,
               evaluator::SideEffect(EnumDecl *, CDeclAttr *),

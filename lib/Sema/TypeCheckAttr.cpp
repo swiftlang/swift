@@ -1899,6 +1899,20 @@ visitObjCImplementationAttr(ObjCImplementationAttr *attr) {
     // FIXME: if (AFD->getCDeclName().empty())
 
     if (!AFD->getImplementedObjCDecl()) {
+      // A @cxx function whose signature is not representable in C++ cannot
+      // match anything; the representability diagnostics explain the failure
+      // better than "not found" would, so check them first and stand down if
+      // they fire.
+      if (auto *cxxAttr = AFD->getAttrs().getAttribute<CxxDeclAttr>(
+              /*AllowInvalid=*/true)) {
+        auto *FD = dyn_cast<FuncDecl>(AFD);
+        if (FD && !cxxAttr->isInvalid())
+          evaluateOrDefault(Ctx.evaluator,
+                            TypeCheckForeignFunctionRequest{FD, cxxAttr}, {});
+        if (cxxAttr->isInvalid())
+          return;
+      }
+
       diagnose(attr->getLocation(),
                diag::attr_objc_implementation_func_not_found,
                AFD->getCDeclName(), AFD);

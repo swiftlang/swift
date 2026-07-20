@@ -11331,6 +11331,9 @@ bool AbstractFunctionDecl::isObjCInstanceMethod() const {
 }
 
 std::optional<ForeignLanguage> AbstractFunctionDecl::getCDeclKind() const {
+  if (getAttrs().hasAttribute<CxxDeclAttr>())
+    return ForeignLanguage::Cxx;
+
   auto attr = getAttrs().getAttribute<CDeclAttr>();
   if (!attr)
     return std::nullopt;
