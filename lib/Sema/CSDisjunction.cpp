@@ -267,7 +267,6 @@ static bool areConservativelyCompatibleArgumentLabels(
   case OverloadChoiceKind::Decl:
   case OverloadChoiceKind::DeclViaBridge:
   case OverloadChoiceKind::DeclViaDynamic:
-  case OverloadChoiceKind::DeclViaUnwrappedOptional:
     decl = choice.getDecl();
     break;
 

@@ -10590,6 +10590,74 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
     }
   }
 
+  // Implicit member syntax against a function-typed expected type: look up the
+  // member on the function's return type. This lets a leading dot name a static
+  // member (e.g. an enum case with a payload) whose unapplied reference is a
+  // function producing the return type, as in 'Foo<X>(.b)' where '.b' resolves
+  // to the case constructor 'X.b: (Int) -> X'. Such candidates are ranked
+  // strictly below any member found directly on the expected type, so they only
+  // win where the direct lookup has no viable candidate.
+  if (ctx.LangOpts.hasFeature(Feature::ImplicitMemberOnFunctionType) &&
+      constraintKind == ConstraintKind::UnresolvedValueMember &&
+      baseObjTy->is<AnyMetatypeType>()) {
+    if (auto *fnTy = instanceTy->getAs<FunctionType>()) {
+      Type resultTy = fnTy->getResult();
+
+      // If the return type isn't resolved enough to look members up, delay.
+      if (resultTy->isTypeVariableOrMember()) {
+        result.OverallResult = MemberLookupResult::Unsolved;
+        return result;
+      }
+
+      if (resultTy->mayHaveMembers()) {
+        auto resultLookup = performMemberLookup(
+            constraintKind, memberName, MetatypeType::get(resultTy),
+            functionRefInfo, memberLocator, includeInaccessibleMembers);
+
+        // If the return-type lookup can't be resolved yet, delay rather than
+        // fall through to a premature "no such member" result.
+        if (resultLookup.OverallResult == MemberLookupResult::Unsolved) {
+          result.OverallResult = MemberLookupResult::Unsolved;
+          return result;
+        }
+
+        // Re-form the static members found on the return type as
+        // 'DeclViaFunctionResult' choices. Only plain declaration references
+        // are considered: we deliberately do not look through a second layer
+        // of bridging, optional unwrapping, or dynamic lookup on the return
+        // type. Whether each candidate's unapplied type is actually compatible
+        // with the function type is determined later by the surrounding
+        // conversion constraints.
+        //
+        // We intentionally do *not* pre-filter to only function-shaped members
+        // here. In a chained implicit member expression (SE-0287) the leading
+        // dot may name a plain value member of the return type that a later
+        // element turns into the function type (e.g. '.a.asFunction', where 'a'
+        // has no payload), so dropping non-function members would reject valid
+        // chains. Filtering only terminal (non-chain) positions was measured to
+        // remove no viable candidates -- it only drops losers that the solver's
+        // score cutoff and disjunction-favoring already prune -- so it isn't
+        // worth the added machinery.
+        for (const auto &choice : resultLookup.ViableCandidates) {
+          // Only a plain, first-level declaration reference. Optional unwrapping
+          // and function-result look-through both now read as
+          // OverloadChoiceKind::Decl, so exclude them explicitly (a bare
+          // getKind() check no longer does) to preserve the no-second-hop rule
+          // documented above -- e.g. don't resolve '.b' against '(Int) -> E?' by
+          // unwrapping the optional return type.
+          if (choice.getKind() != OverloadChoiceKind::Decl ||
+              choice.isDeclViaUnwrappedOptional() ||
+              choice.isDeclViaFunctionResult())
+            continue;
+
+          result.addViable(OverloadChoice::getDeclViaFunctionResult(
+              choice.getBaseType(), choice.getDecl(),
+              choice.getFunctionRefInfo()));
+        }
+      }
+    }
+  }
+
   if (!instanceTy->mayHaveMembers())
     return result;
 
@@ -12232,9 +12300,7 @@ static Type getOpenedResultBuilderTypeFor(ConstraintSystem &cs,
   auto *calleeLocator = cs.getCalleeLocator(cs.getConstraintLocator(locator));
   auto selectedOverload = cs.findSelectedOverloadFor(calleeLocator);
   if (!(selectedOverload &&
-        (selectedOverload->choice.getKind() == OverloadChoiceKind::Decl ||
-         selectedOverload->choice.getKind() ==
-             OverloadChoiceKind::DeclViaUnwrappedOptional)))
+        selectedOverload->choice.getKind() == OverloadChoiceKind::Decl))
     return Type();
 
   auto *choice = selectedOverload->choice.getDecl();

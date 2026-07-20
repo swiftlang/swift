@@ -237,7 +237,6 @@ static bool sameOverloadChoice(const OverloadChoice &x,
   case OverloadChoiceKind::Decl:
   case OverloadChoiceKind::DeclViaDynamic:
   case OverloadChoiceKind::DeclViaBridge:
-  case OverloadChoiceKind::DeclViaUnwrappedOptional:
   case OverloadChoiceKind::DynamicMemberLookup:
   case OverloadChoiceKind::KeyPathDynamicMemberLookup:
     return sameDecl(x.getDecl(), y.getDecl());
@@ -1239,24 +1238,49 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
       }
     }
     
+    // A directly-found member beats one found by unwrapping an optional base.
+    // Both read as OverloadChoiceKind::Decl, so this is not a kind mismatch
+    // below; distinguish them via the sub-flag. This mirrors the Decl-vs-
+    // DeclViaUnwrappedOptional case of the kind-mismatch rule that applied
+    // before DeclViaUnwrappedOptional was demoted to a Decl sub-flag. A member
+    // reached by looking through a function result also reads as a plain Decl
+    // and so also beats an unwrapped one here, exactly as it did then. (Uses
+    // getKind() == Decl rather than isDecl() so that dynamic/bridge choices --
+    // which also carry a decl -- are left to the kind-mismatch rule below.)
+    if (choice1.getKind() == OverloadChoiceKind::Decl &&
+        choice2.getKind() == OverloadChoiceKind::Decl &&
+        choice1.isDeclViaUnwrappedOptional() !=
+            choice2.isDeclViaUnwrappedOptional()) {
+      identical = false;
+      if (choice1.isDeclViaUnwrappedOptional())
+        score2 += weight;
+      else
+        score1 += weight;
+      continue;
+    }
+
     // If the kinds of overload choice don't match...
     if (choice1.getKind() != choice2.getKind()) {
       identical = false;
-      
+
       // A declaration found directly beats any declaration found via dynamic
-      // lookup, bridging, or optional unwrapping.
-      if ((choice1.getKind() == OverloadChoiceKind::Decl) &&
+      // lookup or bridging. A member found by unwrapping an optional base reads
+      // as a plain Decl but is *not* "direct" for this purpose -- before the
+      // demotion it tied with dynamic/bridge -- so exclude it. (A function-
+      // result look-through also reads as Decl and does beat them, as it did
+      // when it too was a distinct kind.)
+      if ((choice1.getKind() == OverloadChoiceKind::Decl &&
+           !choice1.isDeclViaUnwrappedOptional()) &&
           (choice2.getKind() == OverloadChoiceKind::DeclViaDynamic ||
-           choice2.getKind() == OverloadChoiceKind::DeclViaBridge ||
-           choice2.getKind() == OverloadChoiceKind::DeclViaUnwrappedOptional)) {
+           choice2.getKind() == OverloadChoiceKind::DeclViaBridge)) {
         score1 += weight;
         continue;
       }
 
       if ((choice1.getKind() == OverloadChoiceKind::DeclViaDynamic ||
-           choice1.getKind() == OverloadChoiceKind::DeclViaBridge ||
-           choice1.getKind() == OverloadChoiceKind::DeclViaUnwrappedOptional) &&
-          choice2.getKind() == OverloadChoiceKind::Decl) {
+           choice1.getKind() == OverloadChoiceKind::DeclViaBridge) &&
+          (choice2.getKind() == OverloadChoiceKind::Decl &&
+           !choice2.isDeclViaUnwrappedOptional())) {
         score2 += weight;
         continue;
       }
@@ -1301,7 +1325,6 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     case OverloadChoiceKind::DeclViaDynamic:
     case OverloadChoiceKind::Decl:
     case OverloadChoiceKind::DeclViaBridge:
-    case OverloadChoiceKind::DeclViaUnwrappedOptional:
     case OverloadChoiceKind::DynamicMemberLookup:
     case OverloadChoiceKind::KeyPathDynamicMemberLookup:
       break;

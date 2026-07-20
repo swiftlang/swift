@@ -1593,8 +1593,14 @@ private:
 
   bool isContextualMismatch() const {
     auto *locator = getLocator();
+    // A leading-dot member reference whose (unapplied) function type has too
+    // many parameters for the contextual function type is a conversion
+    // failure, not a call with extra arguments to remove -- there is no call
+    // to attach an argument-removal diagnostic to. Treat it as a contextual
+    // mismatch so it reports "cannot convert value of type ... to ...".
     return locator->isLastElement<LocatorPathElt::ContextualType>() ||
-           locator->isLastElement<LocatorPathElt::ApplyArgToParam>();
+           locator->isLastElement<LocatorPathElt::ApplyArgToParam>() ||
+           locator->isLastElement<LocatorPathElt::UnresolvedMemberChainResult>();
   }
 };
 
