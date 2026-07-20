@@ -384,7 +384,7 @@ private:
 
   SILInstruction *createApplyWithConcreteType(
       FullApplySite Apply,
-      const llvm::SmallDenseMap<unsigned, ConcreteOpenedExistentialInfo> &COEIs,
+      llvm::SmallDenseMap<unsigned, ConcreteOpenedExistentialInfo> &COEIs,
       SILBuilderContext &BuilderCtx);
 
   // Common utility function to replace the WitnessMethodInst using a
