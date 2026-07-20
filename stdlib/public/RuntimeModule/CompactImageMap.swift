@@ -52,6 +52,12 @@ public enum CompactImageMapFormat {
     case sixtyFourBit = 2
   }
 
+  /// Maximum number of images we support in an image map
+  static let maxImageCount = 1_048_576
+
+  /// Maximum number of bytes in a build ID
+  static let maxBuildIdLength = 1_024
+
   /// Run a closure for each prefix of the specified string
   static func forEachPrefix(of str: String.UTF8View.SubSequence,
                             body: (String) -> ()) {
@@ -305,7 +311,9 @@ public enum CompactImageMapFormat {
       }
 
       // Next is the image count
-      guard let count = decodeCount() else {
+      guard let count = decodeCount(),
+                count >= 0
+                && count <= CompactImageMapFormat.maxImageCount else {
         return nil
       }
 
@@ -315,7 +323,7 @@ public enum CompactImageMapFormat {
       var images: [ImageMap.Image] = []
       var lastAddress: UInt64 = 0
 
-      images.reserveCapacity(count)
+      images.reserveCapacity(min(count, 4096))
 
       for _ in 0..<count {
         // Decode the header byte
@@ -359,7 +367,9 @@ public enum CompactImageMapFormat {
         #endif
 
         // Next, get the build ID byte count
-        guard let buildIdBytes = decodeCount() else {
+        guard let buildIdBytes = decodeCount(),
+              buildIdBytes >= 0
+              && buildIdBytes <= CompactImageMapFormat.maxBuildIdLength else {
           return nil
         }
 
