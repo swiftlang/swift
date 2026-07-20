@@ -3118,6 +3118,49 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     break;
   }
 
+  case DeclAttrKind::CxxDecl: {
+    StringRef CxxName;
+    if (consumeIfAttributeLParen()) {
+      // The optional identifier argument is the C++ function name the
+      // importer matches against.
+      auto skipToEnd = [&]() {
+        skipUntil(tok::r_paren);
+        consumeIf(tok::r_paren);
+      };
+
+      // A C++ operator name spelled without backticks lexes as Swift's
+      // 'operator' keyword followed by further tokens. Give it a targeted
+      // error.
+      if (Tok.is(tok::kw_operator) &&
+          peekToken().isNot(tok::r_paren, tok::colon)) {
+        diagnose(Loc, diag::attr_cxx_operator_name_backticks, AttrName);
+        skipToEnd();
+        return makeParserSuccess();
+      }
+
+      if (Tok.isNot(tok::identifier) || peekToken().is(tok::colon)) {
+        diagnose(Loc, diag::attr_expected_cxx_name, AttrName);
+        skipToEnd();
+        return makeParserSuccess();
+      }
+      CxxName = Tok.getText();
+      consumeToken(tok::identifier);
+
+      AttrRange = SourceRange(Loc, Tok.getRange().getStart());
+      if (!consumeIf(tok::r_paren)) {
+        diagnose(Loc, diag::attr_expected_rparen, AttrName,
+                 DeclAttribute::isDeclModifier(DK));
+        return makeParserSuccess();
+      }
+    } else {
+      AttrRange = SourceRange(Loc);
+    }
+
+    Attributes.add(new (Context) CxxDeclAttr(CxxName, AtLoc, AttrRange,
+                                             /*Implicit=*/false));
+    break;
+  }
+
   case DeclAttrKind::CDecl: {
     if (AttrName == "c") {
       std::optional<StringRef> CName;
