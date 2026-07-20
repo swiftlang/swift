@@ -970,10 +970,19 @@ private:
     // the module on disk is Bar (.swiftmodule or .swiftinterface), and is used
     // for loading and mangling.
     StringRef Name = M->getRealName().str();
-    // Handle bridging header imports. If there is a cache key, use cache key as
-    // path if debug module path is specified.
-    if (Name == CLANG_HEADER_MODULE_NAME && !Opts.BridgingPCHCacheKey.empty())
-      Path = Opts.BridgingPCHCacheKey;
+    // Handle bridging header imports.
+    if (Name == CLANG_HEADER_MODULE_NAME) {
+      if (!Opts.BridgingPCHCacheKey.empty()) {
+        // If there is a cache key, use it as the (stable) path.
+        Path = Opts.BridgingPCHCacheKey;
+      } else {
+        // Otherwise `Path` is the precompiled bridging header, which lives in a
+        // temporary directory whose name is randomized on every compiler
+        // invocation. Recording that transient path in the debug info would
+        // make the output non-deterministic, so only keep the stable file name.
+        Path = llvm::sys::path::filename(Path);
+      }
+    }
     return getOrCreateModule(M, TheCU, Name, Path);
   }
 
