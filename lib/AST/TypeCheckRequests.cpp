@@ -1293,9 +1293,6 @@ void swift::simple_display(llvm::raw_ostream &out,
   case ImplicitMemberAction::ResolveImplicitInit:
     out << "resolve implicit initializer";
     break;
-  case ImplicitMemberAction::ResolveCodingKeys:
-    out << "resolve CodingKeys";
-    break;
   case ImplicitMemberAction::ResolveEncodable:
     out << "resolve Encodable.encode(to:)";
     break;

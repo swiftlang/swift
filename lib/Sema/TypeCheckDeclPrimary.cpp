@@ -517,9 +517,13 @@ static void checkInheritanceClause(
 }
 
 static void installCodingKeysIfNecessary(NominalTypeDecl *NTD) {
-  auto req =
-    ResolveImplicitMemberRequest{NTD, ImplicitMemberAction::ResolveCodingKeys};
-  (void)evaluateOrDefault(NTD->getASTContext().evaluator, req, {});
+  auto &evaluator = NTD->getASTContext().evaluator;
+  // Ensure CodingKeys exists if it should be synthesized.
+  (void)evaluateOrDefault(evaluator, SynthesizeCodingKeysRequest{NTD}, {});
+  // Emit Codable-specific diagnostics for immutable stored properties even
+  // when conformance derivation hasn't been driven through this path.
+  (void)evaluateOrDefault(evaluator,
+                          CheckCodableStoredPropertiesRequest{NTD}, {});
 }
 
 // Check for static properties that produce empty option sets
@@ -3469,6 +3473,8 @@ public:
     (void) CD->getDestructor();
 
     TypeChecker::checkDeclAttributes(CD);
+
+    installCodingKeysIfNecessary(CD);
 
     if (CD->isActor())
       TypeChecker::checkConcurrencyAvailability(CD->getLoc(), CD);

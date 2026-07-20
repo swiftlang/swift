@@ -25,6 +25,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Stmt.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceLoc.h"
@@ -101,9 +102,14 @@ static EnumDecl *lookupEvaluatedCodingKeysEnum(ASTContext &C,
   if (codingKeyDecls.empty())
     return nullptr;
 
-  auto *codingKeysDecl = codingKeyDecls.front();
-  if (auto *typealiasDecl = dyn_cast<TypeAliasDecl>(codingKeysDecl))
+  Decl *codingKeysDecl = codingKeyDecls.front();
+  if (auto *typealiasDecl = dyn_cast<TypeAliasDecl>(codingKeysDecl)) {
+    // The typealias may point at an unresolved or non-nominal type; bail
+    // out in that case rather than crashing the dyn_cast below.
     codingKeysDecl = typealiasDecl->getDeclaredInterfaceType()->getAnyNominal();
+    if (!codingKeysDecl)
+      return nullptr;
+  }
 
   return dyn_cast<EnumDecl>(codingKeysDecl);
 }
@@ -1383,64 +1389,9 @@ deriveBodyDecodable_init(AbstractFunctionDecl *initDecl, void *) {
           lookupVarDeclForCodingKeysCase(conformanceDC, elt, targetDecl);
 
       // Don't output a decode statement for a let with an initial value.
+      // Diagnostics for this situation are emitted separately by
+      // CheckCodableStoredPropertiesRequest.
       if (varDecl->isLet() && varDecl->isParentInitialized()) {
-        // But emit a warning to let the user know that it won't be decoded.
-        auto lookupResult =
-            codingKeysEnum->lookupDirect(varDecl->getBaseName());
-        auto keyExistsInCodingKeys =
-            llvm::any_of(lookupResult, [&](ValueDecl *VD) {
-              if (isa<EnumElementDecl>(VD)) {
-                return VD->getBaseName() == varDecl->getBaseName();
-              }
-              return false;
-            });
-        auto *encodableProto = C.getProtocol(KnownProtocolKind::Encodable);
-        bool conformsToEncodable =
-            (bool) lookupConformance(
-                targetDecl->getDeclaredInterfaceType(), encodableProto);
-
-        // Strategy to use for CodingKeys enum diagnostic part - this is to
-        // make the behaviour more explicit:
-        //
-        // 1. If we have an *implicit* CodingKeys enum:
-        // (a) If the type is Decodable only, explicitly define the enum and
-        //     remove the key from it. This makes it explicit that the key
-        //     will not be decoded.
-        // (b) If the type is Codable, explicitly define the enum and keep the
-        //     key in it. This is because removing the key will break encoding
-        //     which is mostly likely not what the user expects.
-        //
-        // 2. If we have an *explicit* CodingKeys enum:
-        // (a) If the type is Decodable only and the key exists in the enum,
-        //     then explicitly remove the key from the enum. This makes it
-        //     explicit that the key will not be decoded.
-        // (b) If the type is Decodable only and the key does not exist in
-        //     the enum, do nothing. This is because the user has explicitly
-        //     made it clear that they don't want the key to be decoded.
-        // (c) If the type is Codable, do nothing. This is because removing
-        //     the key will break encoding which is most likely not what the
-        //     user expects.
-        if (!codingKeysEnum->isImplicit()) {
-          if (conformsToEncodable || !keyExistsInCodingKeys) {
-            continue;
-          }
-        }
-
-        varDecl->diagnose(diag::decodable_property_will_not_be_decoded);
-        if (codingKeysEnum->isImplicit()) {
-          varDecl->diagnose(
-              diag::decodable_property_init_or_codingkeys_implicit,
-              conformsToEncodable ? 0 : 1, varDecl->getName());
-        } else {
-          varDecl->diagnose(
-              diag::decodable_property_init_or_codingkeys_explicit,
-              varDecl->getName());
-        }
-        if (auto *PBD = varDecl->getParentPatternBinding()) {
-          varDecl->diagnose(diag::decodable_make_property_mutable)
-              .fixItReplace(PBD->getLoc(), "var");
-        }
-
         continue;
       }
 
@@ -2148,4 +2099,105 @@ ValueDecl *DerivedConformance::deriveDecodable(ValueDecl *requirement) {
   assert(delayedNotes.empty());
 
   return deriveDecodable_init(*this);
+}
+
+/// Looks up the stored property on \c target whose name matches the given
+/// CodingKeys case identifier. Returns nullptr if no such non-static
+/// property exists.
+static VarDecl *lookupStoredPropertyForCodingKey(NominalTypeDecl *target,
+                                                 Identifier name) {
+  for (auto decl : target->lookupDirect(DeclName(name))) {
+    auto *vd = dyn_cast<VarDecl>(decl);
+    if (!vd)
+      continue;
+    if (auto *backingVar = vd->getPropertyWrapperBackingProperty())
+      vd = backingVar;
+    if (vd->isStatic())
+      continue;
+    return vd;
+  }
+  return nullptr;
+}
+
+/// Walks the CodingKeys enum and warns about immutable stored properties
+/// that have an initial value: they cannot be decoded, so the user's intent
+/// is ambiguous and worth flagging.
+///
+/// This logic used to live inside the body synthesizer for the derived
+/// init(from:); pulling it out lets the diagnostic fire without depending
+/// on Codable conformance derivation, which is what avoids the request
+/// cycle when an explicit CodingKeys is referenced from a property wrapper
+/// initializer.
+static void diagnoseImmutableLetsInDecodable(NominalTypeDecl *target) {
+  auto &C = target->getASTContext();
+
+  // Only emit diagnostics for types that actually need to decode.
+  auto *decodableProto = C.getProtocol(KnownProtocolKind::Decodable);
+  if (!decodableProto)
+    return;
+  if (!lookupConformance(target->getDeclaredInterfaceType(), decodableProto))
+    return;
+
+  auto *codingKeysEnum = lookupEvaluatedCodingKeysEnum(C, target);
+  if (!codingKeysEnum)
+    return;
+
+  auto *encodableProto = C.getProtocol(KnownProtocolKind::Encodable);
+  bool conformsToEncodable =
+      encodableProto && (bool)lookupConformance(
+                            target->getDeclaredInterfaceType(), encodableProto);
+
+  for (auto *elt : codingKeysEnum->getAllElements()) {
+    auto *varDecl =
+        lookupStoredPropertyForCodingKey(target, elt->getBaseIdentifier());
+    if (!varDecl)
+      continue;
+    if (!(varDecl->isLet() && varDecl->isParentInitialized()))
+      continue;
+
+    auto lookupResult = codingKeysEnum->lookupDirect(varDecl->getBaseName());
+    auto keyExistsInCodingKeys =
+        llvm::any_of(lookupResult, [&](ValueDecl *VD) {
+          if (isa<EnumElementDecl>(VD)) {
+            return VD->getBaseName() == varDecl->getBaseName();
+          }
+          return false;
+        });
+
+    // Strategy for the diagnostic when an explicit CodingKeys is present:
+    //
+    // 1. If we have an *implicit* CodingKeys enum, always warn — suggest the
+    //    user define the enum explicitly so they can opt out of decoding
+    //    this key.
+    // 2. If we have an *explicit* CodingKeys enum:
+    //    (a) Decodable-only and key is in the enum -> warn; suggest
+    //        removing the key from the enum.
+    //    (b) Decodable-only and key is not in the enum -> silent; the user
+    //        has already opted out.
+    //    (c) Codable -> silent; removing the key would break encoding.
+    if (!codingKeysEnum->isImplicit()) {
+      if (conformsToEncodable || !keyExistsInCodingKeys)
+        continue;
+    }
+
+    varDecl->diagnose(diag::decodable_property_will_not_be_decoded);
+    if (codingKeysEnum->isImplicit()) {
+      varDecl->diagnose(diag::decodable_property_init_or_codingkeys_implicit,
+                        conformsToEncodable ? 0 : 1, varDecl->getName());
+    } else {
+      varDecl->diagnose(diag::decodable_property_init_or_codingkeys_explicit,
+                        varDecl->getName());
+    }
+    if (auto *PBD = varDecl->getParentPatternBinding()) {
+      varDecl->diagnose(diag::decodable_make_property_mutable)
+          .fixItReplace(PBD->getLoc(), "var");
+    }
+  }
+}
+
+evaluator::SideEffect
+CheckCodableStoredPropertiesRequest::evaluate(Evaluator &evaluator,
+                                              NominalTypeDecl *target) const {
+  diagnoseImmutableLetsInDecodable(target);
+  return std::make_tuple<>();
 }
