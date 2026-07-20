@@ -5060,9 +5060,10 @@ void ValueDecl::setInterfaceType(Type type) {
 }
 
 StringRef ValueDecl::getCDeclName() const {
-  // Treat imported C functions as implicitly @_cdecl.
+  // Treat imported C and C++ functions as implicitly @_cdecl / @cxx.
   if (auto clangDecl = dyn_cast_or_null<clang::FunctionDecl>(getClangDecl())) {
-    if (clangDecl->getLanguageLinkage() == clang::CLanguageLinkage
+    if ((clangDecl->getLanguageLinkage() == clang::CLanguageLinkage ||
+         clangDecl->getLanguageLinkage() == clang::CXXLanguageLinkage)
           && clangDecl->getIdentifier())
       return clangDecl->getName();
   }
