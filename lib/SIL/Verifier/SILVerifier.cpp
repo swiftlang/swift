@@ -88,11 +88,6 @@ static llvm::cl::opt<bool> VerifyDIHoles("verify-di-holes", llvm::cl::init(
 #endif
                                                                 ));
 
-// Verify the type chain of debug_value instructions. Disabled by default
-// while we fix all root causes.
-static llvm::cl::opt<bool> VerifyDebugValueExpr("verify-debug-value-expr",
-                                                llvm::cl::init(false));
-
 static llvm::cl::opt<bool> SkipConvertEscapeToNoescapeAttributes(
     "verify-skip-convert-escape-to-noescape-attributes", llvm::cl::init(false));
 
@@ -1966,9 +1961,7 @@ public:
     }
 
     // Type chain: SSA operand -> DebugBB -> deref -> fragments -> vartype
-    if (VerifyDebugValueExpr)
-      require(inst->isExprTypeValid(),
-              "debug_value type chain should hold");
+    require(inst->isExprTypeValid(), "debug_value type chain should hold");
   }
 
   void checkInstructionsDebugInfo(SILInstruction *inst) {
