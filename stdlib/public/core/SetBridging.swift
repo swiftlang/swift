@@ -49,7 +49,7 @@ internal func _stdlib_NSSet_allObjects(_ object: AnyObject) -> _BridgingBuffer {
         // stack buffer; copy the +0 references out without retaining.
         let items = unsafe UnsafeMutableRawPointer(statePtr.pointee.itemsPtr!)
           .assumingMemoryBound(to: AnyObject.self)
-        let target = UnsafeMutableRawPointer(storage.baseAddress + materialized)
+        let target = unsafe UnsafeMutableRawPointer(storage.baseAddress + materialized)
         unsafe target.copyMemory(
           from: items,
           byteCount: batch * MemoryLayout<AnyObject>.stride
