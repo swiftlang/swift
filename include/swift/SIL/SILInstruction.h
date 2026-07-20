@@ -5873,6 +5873,12 @@ public:
     return sharedUInt8().DebugValueInst.prependDeref;
   }
 
+  /// Converts the op_deref flag into an explicit load at the end of the
+  /// reconstruction block. This is used after type substitution when an
+  /// address-only generic type becomes loadable, making the deref
+  /// representable as a real load instruction.
+  void convertDerefToLoad();
+
   /// Prepends a deref operator to this debug_value in place.
   /// This must be called when the operand is changed from an object type to
   /// an address type (when moved to the stack, for example).
