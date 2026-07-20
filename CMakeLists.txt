@@ -824,8 +824,8 @@ cmake_dependent_option(SWIFT_ENABLE_SOURCEKIT_TESTS
 option(SWIFT_THREADING_PACKAGE
   "Override the threading package used for the build.  This can either be a
    single package name, or a semicolon separated sequence of sdk:package pairs.
-   Valid package names are 'pthreads', 'darwin', 'linux', 'win32', 'c11', 'none'
-   or the empty string for the SDK default.")
+   Valid package names are 'pthreads', 'darwin', 'linux', 'win32', 'c11', 'none',
+   'embedded', or the empty string for the SDK default.")
 
 option(SWIFT_THREADING_HAS_DLSYM
   "Enable the use of the dlsym() function.  This gets used to provide TSan
