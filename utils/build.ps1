@@ -3290,7 +3290,8 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
       $Targets += @("SwiftCompilerPlugin", "check-swift")
     }
     if ($TestLLDB) { $Targets += @("check-lldb") }
-    if ($TestLLDBSwift) { $Targets += @("check-lldb-swift") }
+    # check-lldb-swift is rerun 10x below as a CI flakiness probe (see the loop
+    # after the build), so it is deliberately not added to the one-shot targets.
     if ($TestLLDB -or $TestLLDBSwift) {
       # Override test filter for known issues in downstream LLDB
       Load-LitTestOverrides ([IO.Path]::GetFullPath([IO.Path]::Combine($PSScriptRoot, "..", "..", "llvm-project", "lldb", "test", "windows-swift-llvm-lit-test-overrides.txt")))
@@ -3416,6 +3417,26 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
     $Targets = @("swift-test-stdlib") + $Targets
 
     Build-CMakeProject @BuildCMakeArgs -BuildTargets $Targets
+
+    # CI flakiness probe: rerun the check-lldb-swift target 10 times in a row.
+    # Every iteration runs even if a previous one failed, so the log captures the
+    # full 10-run picture; the build then fails if any run failed.
+    if ($TestLLDBSwift) {
+      $FailedRuns = @()
+      foreach ($Run in 1..10) {
+        Write-Host "=== check-lldb-swift: flakiness run $Run of 10 ==="
+        try {
+          Build-CMakeProject @BuildCMakeArgs -BuildTargets @("check-lldb-swift")
+        } catch {
+          Write-Warning "check-lldb-swift run $Run failed: $($_.Exception.Message)"
+          $FailedRuns += $Run
+        }
+      }
+      Write-Host "=== check-lldb-swift: $(10 - $FailedRuns.Count)/10 runs passed ==="
+      if ($FailedRuns.Count -gt 0) {
+        throw "check-lldb-swift failed on run(s): $($FailedRuns -join ', ') of 10"
+      }
+    }
   }
 }
 
