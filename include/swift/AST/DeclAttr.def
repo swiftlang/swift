@@ -933,7 +933,13 @@ DECL_ATTR(com, COM,
   ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove | ForbiddenInABIAttr,
   176)
 
-LAST_DECL_ATTR(COM)
+DECL_ATTR(cxx, CxxDecl,
+  OnFunc,
+  LongAttribute | ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  177)
+DECL_ATTR_FEATURE_REQUIREMENT(CxxDecl, CxxImplementation)
+
+LAST_DECL_ATTR(CxxDecl)
 
 #undef DECL_ATTR_ALIAS
 #undef CONTEXTUAL_DECL_ATTR_ALIAS

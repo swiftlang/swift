@@ -531,6 +531,9 @@ EXPERIMENTAL_FEATURE(ImportCxxMembersLazily, true)
 /// superclass.
 EXPERIMENTAL_FEATURE(ForeignReferenceTypeInheritance, true)
 
+/// Enable @cxx @implementation for implementing C++ functions in Swift.
+EXPERIMENTAL_FEATURE(CxxImplementation, true)
+
 /// `yielding borrow`/`yielding mutate` single-yield coroutine accessors
 // TODO: When this is turned on by default, take care of:
 // * "TODO" around line 8100 of lib/Parse/ParseDecl.cpp

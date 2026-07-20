@@ -140,6 +140,8 @@ extension ASTGenVisitor {
         return handle(self.generateCDeclAttr(attribute: node)?.asDeclAttribute)
       case .COM:
         return handle(self.generateCOMAttr(attribute: node)?.asDeclAttribute)
+      case .CxxDecl:
+        return handle(self.generateCxxDeclAttr(attribute: node)?.asDeclAttribute)
       case .Derivative:
         return handle(self.generateDerivativeAttr(attribute: node)?.asDeclAttribute)
       case .Differentiable:
@@ -595,6 +597,32 @@ extension ASTGenVisitor {
       range: self.generateAttrSourceRange(node),
       name: name ?? "",
       underscored: underscored
+    )
+  }
+
+  func generateCxxDeclAttr(attribute node: AttributeSyntax) -> BridgedCxxDeclAttr? {
+    // The optional `name: "..."` argument is the C++ function name the
+    // importer matches against.
+    var name: BridgedStringRef = ""
+    if node.arguments != nil {
+      guard let parsed = self.generateWithLabeledExprListArguments(attribute: node, { args in
+        self.generateConsumingSimpleStringLiteralAttrOption(args: &args, label: "name")
+      }) else {
+        return nil
+      }
+      // An explicit `name:` must not be empty.
+      if parsed.count == 0 {
+        self.diagnose(.emptyCxxAttributeName(node))
+        return nil
+      }
+      name = parsed
+    }
+
+    return .createParsed(
+      self.ctx,
+      atLoc: self.generateSourceLoc(node.atSign),
+      range: self.generateAttrSourceRange(node),
+      name: name
     )
   }
 

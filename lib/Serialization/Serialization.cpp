@@ -3140,6 +3140,14 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
+    case DeclAttrKind::CxxDecl: {
+      auto *theAttr = cast<CxxDeclAttr>(DA);
+      auto abbrCode = S.DeclTypeAbbrCodes[CxxDeclDeclAttrLayout::Code];
+      CxxDeclDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                        theAttr->isImplicit(), theAttr->Name);
+      return;
+    }
+
     case DeclAttrKind::SPIAccessControl: {
       auto theAttr = cast<SPIAccessControlAttr>(DA);
       auto abbrCode = S.DeclTypeAbbrCodes[SPIAccessControlDeclAttrLayout::Code];

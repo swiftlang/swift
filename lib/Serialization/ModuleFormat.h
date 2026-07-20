@@ -59,7 +59,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
 const uint16_t SWIFTMODULE_VERSION_MINOR =
-    1012; // drop metatype extension flag (derived from the extended type)
+    1013; // @cxx attribute
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -2329,6 +2329,12 @@ namespace decls_block {
     BCFixed<1>, // implicit flag
     BCFixed<1>, // underscored flag
     BCBlob      // cname
+  >;
+
+  using CxxDeclDeclAttrLayout = BCRecordLayout<
+    CxxDecl_DECL_ATTR,
+    BCFixed<1>, // implicit flag
+    BCBlob      // cxx name
   >;
 
   using ImplementsDeclAttrLayout = BCRecordLayout<

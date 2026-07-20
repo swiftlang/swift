@@ -418,6 +418,7 @@ public:
   void visitAvailableAttr(AvailableAttr *attr);
 
   void visitCDeclAttr(CDeclAttr *attr);
+  void visitCxxDeclAttr(CxxDeclAttr *attr);
   void visitCOMAttr(COMAttr *attr);
   void visitExposeAttr(ExposeAttr *attr);
   void visitExternAttr(ExternAttr *attr);
@@ -2463,6 +2464,32 @@ void AttributeChecker::visitCDeclAttr(CDeclAttr *attr) {
   if (D->getAttrs().getAttribute<ObjCAttr>()) {
     diagnose(attr->getLocation(), diag::cdecl_incompatible_with_objc, D);
   }
+}
+
+void AttributeChecker::visitCxxDeclAttr(CxxDeclAttr *attr) {
+  // @cxx requires C++ interop.
+  if (!Ctx.LangOpts.EnableCXXInterop)
+    diagnose(attr->getLocation(), diag::cxx_attr_requires_cxx_interop,
+             attr->getAttrName());
+
+  // Only top-level func decls are currently supported.
+  if (D->getDeclContext()->isTypeContext())
+    diagnose(attr->getLocation(), diag::cdecl_not_at_top_level, attr);
+
+  // Reject using both @cxx and @objc on the same decl.
+  if (D->getAttrs().getAttribute<ObjCAttr>())
+    diagnose(attr->getLocation(), diag::cxx_incompatible_with_objc, D);
+
+  // Reject using both @cxx and @c/@_cdecl on the same decl.
+  if (auto *cAttr = D->getAttrs().getAttribute<CDeclAttr>())
+    diagnose(attr->getLocation(), diag::cxx_incompatible_with_cdecl, cAttr, D);
+
+  // @cxx currently requires @implementation.
+  // AllowInvalid=true so that if @implementation is present but malformed, its
+  // own diagnostics cover the problem.
+  if (!D->getAttrs().getAttribute<ObjCImplementationAttr>(
+          /*AllowInvalid=*/true))
+    diagnose(attr->getLocation(), diag::cxx_attr_requires_implementation);
 }
 
 void AttributeChecker::visitCOMAttr(COMAttr *attr) {

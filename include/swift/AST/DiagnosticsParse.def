@@ -1582,6 +1582,12 @@ ERROR(attr_com_unknown_label, none,
 ERROR(attr_com_unknown_threading_model, none,
       "unknown threading model '%0'; expected 'single', 'apartment', 'free', 'both', or 'neutral'", (StringRef))
 
+// @cxx
+ERROR(attr_cxx_empty_name,none,
+      "C++ function name in 'cxx' attribute cannot be empty", ())
+ERROR(attr_cxx_expected_name_label,none,
+      "expected 'name:' in 'cxx' attribute", ())
+
 ERROR(alignment_must_be_positive_integer,none,
       "alignment value must be a positive integer literal", ())
 

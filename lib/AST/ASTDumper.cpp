@@ -5275,6 +5275,11 @@ public:
     printFieldQuoted(Attr->Name, Label::always("name"));
     printFoot();
   }
+  void visitCxxDeclAttr(CxxDeclAttr *Attr, Label label) {
+    printCommon(Attr, "cxx_decl_attr", label);
+    printFieldQuoted(Attr->Name, Label::always("name"));
+    printFoot();
+  }
   void
   visitClangImporterSynthesizedTypeAttr(ClangImporterSynthesizedTypeAttr *Attr,
                                         Label label) {
