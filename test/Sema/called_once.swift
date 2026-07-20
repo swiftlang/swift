@@ -70,3 +70,42 @@ protocol Q {
 struct S3: Q {
   func run(_: @called(once) () -> Void) {} // Ok (because `@called(once)` is more narrow then plain escaping type.
 }
+
+func testClosures() {
+  let _: @called(once) () -> Void = { } // Ok
+
+  let fn = { @called(once) in }
+  let _: () -> Void = fn
+  // expected-error@-1 {{invalid conversion from '@called(once)' function of type '@called(once) () -> ()' to function type '() -> Void'}}
+
+  func once(_: consuming (@called(once) () -> Void)?) {}
+
+  once { } // Ok
+  once { @called(once) in // Ok
+  }
+
+  func plain(_: () -> Void) {}
+  func plainEscaping(_: @escaping () -> Void) {}
+
+  plain { @called(once) in
+    // expected-error@-1 {{invalid conversion from '@called(once)' function of type '@called(once) () -> ()' to function type '() -> Void'}}
+  }
+  plainEscaping { @called(once) in
+    // expected-error@-1 {{invalid conversion from '@called(once)' function of type '@called(once) () -> ()' to function type '() -> Void'}}
+  }
+
+  func generic<T>(_: T) {} // expected-note 2 {{required by local function 'generic' where 'T' = '@called(once) () -> ()'}}
+
+  generic(fn)
+  // expected-error@-1 {{type '@called(once) () -> ()' cannot conform to 'Copyable'}}
+  // expected-note@-2 {{only concrete types such as structs, enums and classes can conform to protocols}}
+
+  generic { @called(once) in }
+  // expected-error@-1 {{type '@called(once) () -> ()' cannot conform to 'Copyable'}}
+  // expected-note@-2 {{only concrete types such as structs, enums and classes can conform to protocols}}
+
+  func genericNC<T: ~Copyable>(_: consuming T) {}
+
+  genericNC(fn) // Ok
+  genericNC { @called(once) in } // Ok
+}
