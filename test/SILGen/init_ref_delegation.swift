@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -Xllvm -sil-print-types %s -disable-objc-attr-requires-foundation-module -enable-objc-interop
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck %s
 
 struct X { }

@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -Xllvm -sil-print-types -module-name dynamic_lookup -enable-objc-interop -parse-as-library -disable-objc-attr-requires-foundation-module -disable-availability-checking %s
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name dynamic_lookup -enable-objc-interop -parse-as-library -disable-objc-attr-requires-foundation-module -disable-availability-checking %s | %FileCheck %s
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name dynamic_lookup -enable-objc-interop -parse-as-library -disable-objc-attr-requires-foundation-module -disable-availability-checking  %s | %FileCheck %s --check-prefix=GUARANTEED
 

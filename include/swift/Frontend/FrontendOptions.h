@@ -197,6 +197,7 @@ public:
     EmitImportedModules, ///< Emit the modules that this one imports
     EmitPCH,             ///< Emit PCH of imported bridging header
 
+    EmitSILGenOSSA, ///< SIL after SILGen's cleanup passes (complete OSSA).
     EmitSILGen, ///< Emit raw SIL
     EmitSIL,    ///< Emit canonical SIL
 
@@ -254,6 +255,9 @@ public:
   /// debugger to use. When unset, the options will only be present if the
   /// module appears to not be a public module.
   std::optional<bool> SerializeOptionsForDebugging;
+  /// When true, generated .swiftsourceinfo files will apply prefix maps from
+  /// -file-prefix-map flag and use a 0 value for the last modified timestamp.
+  bool PrefixMapSourceInfo = false;
 
   /// When true the debug prefix map entries will be applied to debugging
   /// options before serialization. These can be reconstructed at debug time by

@@ -13,6 +13,7 @@
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 // UNSUPPORTED: back_deployment_runtime
+// REQUIRES: optimized_stdlib
 
 import Foundation
 import CoreGraphics

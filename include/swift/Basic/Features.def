@@ -590,7 +590,7 @@ EXPERIMENTAL_FEATURE(ImportMacroAliases, true)
 LANGUAGE_FEATURE(BorrowAndMutateAccessors, 507, "borrow and mutate accessors")
 
 /// Enable borrowing for-in loops
-EXPERIMENTAL_FEATURE(BorrowingForLoop, true)
+LANGUAGE_FEATURE(BorrowingForLoop, 0, "borrowing for-in loops")
 
 /// Allow use of @inline(always) attribute
 SUPPRESSIBLE_LANGUAGE_FEATURE(InlineAlways, 496, "@inline(always) attribute")
@@ -605,6 +605,9 @@ EXPERIMENTAL_FEATURE(StandaloneSwiftAvailability, true)
 /// Allow enabling dynamic exclusivity in Embedded Swift.
 EXPERIMENTAL_FEATURE(EmbeddedDynamicExclusivity, true)
 
+/// Allow enabling dynamic keypaths in Embedded Swift.
+EXPERIMENTAL_FEATURE(EmbeddedKeyPaths, true)
+
 /// Emit typed allocation calls in Embedded Swift.
 EXPERIMENTAL_FEATURE(TypedAllocation, true)
 
@@ -615,6 +618,11 @@ EXPERIMENTAL_FEATURE(CheckImplementationOnly, true)
 /// report references to implementation-only imported modules.
 EXPERIMENTAL_FEATURE(CheckImplementationOnlyStrict, false)
 
+/// Serialize abstract layout information for hidden types (@_implementationOnly, or
+/// from -internal-import-bridging-header) that contribute to module ABI. The goal
+// is to make leaking such types into module ABI safe, even without library evolution.
+EXPERIMENTAL_FEATURE(SerializeAbstractTypeLayoutForHiddenTypes, true)
+
 /// Check that use sites have the required @_spi import for operators.
 EXPERIMENTAL_FEATURE(EnforceSPIOperatorGroup, true)
 
@@ -624,8 +632,8 @@ EXPERIMENTAL_FEATURE(Reparenting, true)
 /// Allows a `get` returning a noncopyable type have owned semantics in opaque interfaces.
 EXPERIMENTAL_FEATURE(UnderscoreOwned, true)
 
-/// Allow access to the BorrowingSequence protocols/types outside the stdlib.
-EXPERIMENTAL_FEATURE(BorrowingSequence, true)
+/// Allow access to the Iterable protocols/types outside the stdlib.
+LANGUAGE_FEATURE(BorrowingSequence, 516, "Iterable protocol")
 
 /// Turns some source breaking access control warnings into errors.
 EXPERIMENTAL_FEATURE(StrictAccessControl, true)
@@ -636,11 +644,6 @@ EXPERIMENTAL_FEATURE(AbstractStoredPropertyLayout, false)
 
 /// Allow use of macros to derive various conformances
 EXPERIMENTAL_FEATURE(DeriveConformancesViaMacros, false)
-  
-/// Defer checking of global-actor-isolated initializers (and the
-/// global-actor-isolated stored properties they access) from Sema to the
-/// SIL-level flow-isolation pass, allowing more programs to be accepted.
-EXPERIMENTAL_FEATURE(FlowIsolationGlobalActor, false)
 
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE

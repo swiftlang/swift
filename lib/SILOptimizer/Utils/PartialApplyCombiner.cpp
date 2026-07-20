@@ -136,9 +136,8 @@ bool PartialApplyCombiner::copyArgsToTemporaries(
     endLifetimeAtFrontier(tmp, partialApplyFrontier, builderCtxt, callbacks);
   }
 
-  DeadEndBlocks deBlocks(pai->getFunction());
   for (auto *storeBorrow : storeBorrowsToHandle) {
-    if (extendStoreBorrow(storeBorrow, paiUses, &deBlocks, callbacks)) {
+    if (extendStoreBorrow(storeBorrow, paiUses, callbacks)) {
       continue;
     }
     SILBuilderWithScope builder(pai, builderCtxt);

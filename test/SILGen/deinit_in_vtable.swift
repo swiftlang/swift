@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 // RUN: %target-swift-emit-sil -Xllvm -sil-full-demangle -O %s | %FileCheck %s
 
 // The second run tests is it can be compiled without crashes.

@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -module-name test -enable-experimental-feature UnderscoreOwned -enable-experimental-feature Lifetimes %s
 // RUN: %target-swift-emit-silgen -module-name test -enable-experimental-feature UnderscoreOwned -enable-experimental-feature Lifetimes %s | %FileCheck %s
 // RUN: %target-swift-emit-sil -module-name test -enable-experimental-feature UnderscoreOwned -enable-experimental-feature Lifetimes %s -sil-verify-all
 

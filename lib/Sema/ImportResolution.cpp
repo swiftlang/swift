@@ -28,6 +28,7 @@
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/ClangImporter/ClangModule.h"
+#include "swift/AST/PrettyStackTrace.h"
 #include "swift/Subsystems.h"
 #include "swift/SymbolGraphGen/DocumentationCategory.h"
 #include "clang/Basic/Module.h"
@@ -347,6 +348,8 @@ void swift::performImportResolutionForClangMacroBuffer(
 //===----------------------------------------------------------------------===//
 
 void ImportResolver::visitImportDecl(ImportDecl *ID) {
+  PrettyStackTraceDecl debugStack("resolving", ID);
+
   assert(unboundImports.empty());
 
   // `CxxStdlib` is the only accepted spelling of the C++ stdlib module name.
@@ -380,6 +383,7 @@ void ImportResolver::bindPendingImports() {
 
 void ImportResolver::bindImport(UnboundImport &&I) {
   auto ID = I.getImportDecl();
+  PrettyStackTraceDecl debugStack("binding", ID.getPtrOrNull());
 
   if (!I.checkNotTautological(SF)) {
     // No need to process this import further.
@@ -930,6 +934,8 @@ void UnboundImport::validateResilience(NullablePtr<ModuleDecl> topLevelModule,
         inFlight.fixItReplace(import.implementationOnlyRange, "internal");
       }
     } else if (!ctx.LangOpts.hasFeature(Feature::CheckImplementationOnly) &&
+               !ctx.LangOpts.hasFeature(
+                   Feature::SerializeAbstractTypeLayoutForHiddenTypes) &&
                !shouldSuppressNonResilientImplementationOnlyImportDiagnostic(
             targetName.str(), importerName.str())) {
       ctx.Diags.diagnose(import.importLoc,
@@ -1358,7 +1364,7 @@ ScopedImportLookupRequest::evaluate(Evaluator &evaluator,
                  /*hasModuleSelector=*/true, decls,
                  NLKind::QualifiedLookup, ResolutionKind::Overloadable,
                  import->getDeclContext()->getModuleScopeContext(),
-                 import->getLoc(), NL_QualifiedDefault);
+                 import->getLoc(), NLFlags::QualifiedDefault);
 
   // `import macro` has not been implementd. Filter them out for now.
   llvm::erase_if(decls, [](ValueDecl *VD) {

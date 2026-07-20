@@ -254,10 +254,10 @@ static bool canTerminatorUseValue(TermInst *TI, SILValue Ptr,
     return doOperandsAlias(BI->getAllOperands(), Ptr, AA);
   }
 
-  if (auto *CBI = dyn_cast<CondBranchInst>(TI)) {
-    bool First = doOperandsAlias(CBI->getTrueOperands(), Ptr, AA);
-    bool Second = doOperandsAlias(CBI->getFalseOperands(), Ptr, AA);
-    return First || Second;
+  if (isa<CondBranchInst>(TI)) {
+    // A cond_br only uses its Int1 condition operand and passes no branch
+    // arguments, so it never uses a reference-counted value.
+    return false;
   }
 
   if (auto *SWEI = dyn_cast<SwitchEnumInst>(TI)) {

@@ -1,6 +1,5 @@
 // RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-sil -module-name=test %s | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 
 // CHECK-LABEL: sil hidden @$s4test6testitySiAA1CCF :
 // CHECK:         ref_element_addr [immutable] %0 : $C, #C.a

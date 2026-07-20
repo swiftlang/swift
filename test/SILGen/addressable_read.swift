@@ -1,3 +1,4 @@
+// RUN: %target-swift-frontend -emit-silgen-ossa -o /dev/null -sil-verify-all -enable-sil-opaque-values -verify  -enable-experimental-feature AddressableParameters %s
 // RUN: %target-swift-frontend -emit-sil -verify  -enable-experimental-feature AddressableParameters %s
 
 // REQUIRES: swift_feature_AddressableParameters

@@ -23,6 +23,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/AST/LookupKinds.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PropertyWrappers.h"
@@ -38,10 +39,10 @@ using namespace swift;
 /// be kept in sync with importEnumCaseAlias in the ClangImporter library.
 static EnumElementDecl *extractEnumElement(DeclContext *DC, SourceLoc UseLoc,
                                            const VarDecl *constant) {
-  if (auto constraint =
-          getUnsatisfiedAvailabilityConstraint(constant, DC, UseLoc)) {
+  if (auto restriction =
+          getUnsatisfiedAvailabilityRestriction(constant, DC, UseLoc)) {
     // Only diagnose explicit unavailability.
-    if (constraint->isUnavailable())
+    if (restriction->isUnavailable())
       diagnoseDeclAvailability(constant, UseLoc, nullptr,
                                ExportContext::forFunctionBody(DC, UseLoc));
   }
@@ -157,7 +158,7 @@ static LookupResult lookupMembers(DeclContext *DC, Type ty, DeclNameRef name,
 
   // Look up the case inside the enum.
   // FIXME: We should be able to tell if this is a private lookup.
-  NameLookupOptions lookupOptions = defaultMemberLookupOptions;
+  NLOptions lookupOptions = defaultMemberLookupOptions;
   return TypeChecker::lookupMember(DC, ty, name, UseLoc, lookupOptions);
 }
 

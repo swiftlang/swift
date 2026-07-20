@@ -137,7 +137,7 @@ extension ContinuousClock: Clock {
 @_unavailableInEmbedded
 extension ContinuousClock {
   @available(SwiftStdlib 5.7, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public var systemEpoch: Instant {
     unsafe unsafeBitCast(Duration.seconds(0), to: Instant.self)
   }
@@ -172,40 +172,35 @@ extension ContinuousClock.Instant: InstantProtocol {
     return lhs._value < rhs._value
   }
 
-  @_alwaysEmitIntoClient
-  @inlinable
+  @export(implementation)
   public static func + (
     _ lhs: ContinuousClock.Instant, _ rhs: Swift.Duration
   ) -> ContinuousClock.Instant {
     lhs.advanced(by: rhs)
   }
 
-  @_alwaysEmitIntoClient
-  @inlinable
+  @export(implementation)
   public static func += (
     _ lhs: inout ContinuousClock.Instant, _ rhs: Swift.Duration
   ) {
     lhs = lhs.advanced(by: rhs)
   }
 
-  @_alwaysEmitIntoClient
-  @inlinable
+  @export(implementation)
   public static func - (
     _ lhs: ContinuousClock.Instant, _ rhs: Swift.Duration
   ) -> ContinuousClock.Instant {
     lhs.advanced(by: .zero - rhs)
   }
 
-  @_alwaysEmitIntoClient
-  @inlinable
+  @export(implementation)
   public static func -= (
     _ lhs: inout ContinuousClock.Instant, _ rhs: Swift.Duration
   ) {
     lhs = lhs.advanced(by: .zero - rhs)
   }
 
-  @_alwaysEmitIntoClient
-  @inlinable
+  @export(implementation)
   public static func - (
     _ lhs: ContinuousClock.Instant, _ rhs: ContinuousClock.Instant
   ) -> Swift.Duration {

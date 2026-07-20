@@ -1,7 +1,6 @@
 // RUN: %target-sil-opt -enable-sil-verify-all %s -onone-simplification -simplify-instruction=apply | %FileCheck %s -check-prefix=CHECK -check-prefix=CHECKONONE
 // RUN: %target-sil-opt -enable-sil-verify-all %s -simplification -simplify-instruction=apply | %FileCheck %s -check-prefix=CHECK -check-prefix=CHECKO
 
-// REQUIRES: swift_in_compiler
 
 sil_stage canonical
 

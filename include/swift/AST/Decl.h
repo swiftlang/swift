@@ -34,6 +34,7 @@
 #include "swift/AST/Import.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/LayoutConstraint.h"
+#include "swift/AST/LookupKinds.h"
 #include "swift/AST/LifetimeAnnotation.h"
 #include "swift/AST/ProtocolConformanceOptions.h"
 #include "swift/AST/ReferenceCounting.h"
@@ -100,7 +101,6 @@ namespace swift {
   class MacroDefinition;
   class ModuleDecl;
   class NamedPattern;
-  enum NLOptions : unsigned;
   class EnumCaseDecl;
   class EnumElementDecl;
   class ParameterList;
@@ -652,7 +652,7 @@ protected:
     IsDebuggerAlias : 1
   );
 
-  SWIFT_INLINE_BITFIELD(NominalTypeDecl, GenericTypeDecl, 1+1+1,
+  SWIFT_INLINE_BITFIELD(NominalTypeDecl, GenericTypeDecl, 1+1+1+1+1,
     /// Whether we have already added implicitly-defined initializers
     /// to this declaration.
     AddedImplicitInitializers : 1,
@@ -661,7 +661,13 @@ protected:
     HasLazyConformances : 1,
 
     /// Whether this nominal type is having its semantic members resolved.
-    IsComputingSemanticMembers : 1
+    IsComputingSemanticMembers : 1,
+
+    /// Whether we've computed HasDestructor.
+    HasDestructorComputed : 1,
+
+    /// Whether we have a user-defined deinit.
+    HasDestructor : 1
   );
 
   SWIFT_INLINE_BITFIELD_FULL(ProtocolDecl, NominalTypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+8,
@@ -741,16 +747,17 @@ protected:
     IsActor : 1
   );
 
-  SWIFT_INLINE_BITFIELD(StructDecl, NominalTypeDecl, 1 + 1 + 1,
-                        /// True if this struct has storage for fields that
-                        /// aren't accessible in Swift.
-                        HasUnreferenceableStorage : 1,
-                        /// True if this struct is imported from C++ and does
-                        /// not have trivial value witness functions.
-                        IsCxxNonTrivial : 1,
-                        /// True if this struct is imported from C and has
-                        /// address diversified ptrauth qualified field.
-                        IsNonTrivialPtrAuth : 1);
+  SWIFT_INLINE_BITFIELD(StructDecl, NominalTypeDecl, 1+1+1,
+    /// True if this struct has storage for fields that
+    /// aren't accessible in Swift.
+    HasUnreferenceableStorage : 1,
+    /// True if this struct is imported from C++ and does
+    /// not have trivial value witness functions.
+    IsCxxNonTrivial : 1,
+    /// True if this struct is imported from C and has
+    /// address diversified ptrauth qualified field.
+    IsNonTrivialPtrAuth : 1
+  );
 
   SWIFT_INLINE_BITFIELD(EnumDecl, NominalTypeDecl, 2+1+1,
     /// True if the enum has cases and at least one case has associated values.
@@ -1384,6 +1391,13 @@ public:
 
     return getClangNodeImpl().getAsMacro();
   }
+
+  /// Returns true if there is a Clang decl from which this declaration was
+  /// synthesized and that declaration was annotated as deprecated. This is
+  /// useful for distinguishing whether the source declaration was deprecated
+  /// independently of the availability of imported Swift declaration, which
+  /// may be different according to ClangImporter rules.
+  bool isClangDeclDeprecated() const;
 
   /// If this is the Swift implementation of a declaration imported from ObjC,
   /// returns the imported declaration. (If there are several, only the main
@@ -2149,6 +2163,12 @@ public:
   SourceRange getBraces() const { return Braces; }
   void setBraces(SourceRange braces) { Braces = braces; }
 
+  /// Whether this is a protocol metatype extension (`extension P.Protocol`).
+  /// Derived from the extended type representation for parsed extensions, or
+  /// from the extended type (the protocol metatype `(any P).Type`) for a
+  /// deserialized or synthesized extension that has no representation.
+  bool isMetatypeExtension() const;
+
   bool hasBeenBound() const { return ExtendedNominal.getInt(); }
 
   void setExtendedNominal(NominalTypeDecl *n) {
@@ -2185,6 +2205,7 @@ public:
   /// Repr would not be available if the extension was been loaded
   /// from a serialized module.
   TypeRepr *getExtendedTypeRepr() const { return ExtendedTypeRepr; }
+  void setExtendedTypeRepr(TypeRepr *repr) { ExtendedTypeRepr = repr; }
                               
   /// Retrieve the set of protocols that this type inherits (i.e,
   /// explicitly conforms to).
@@ -4483,12 +4504,31 @@ protected:
     IterableDeclContext(IterableDeclContextKind::NominalTypeDecl)
   {
     Bits.NominalTypeDecl.AddedImplicitInitializers = false;
-    ExtensionGeneration = 0;
     Bits.NominalTypeDecl.HasLazyConformances = false;
     Bits.NominalTypeDecl.IsComputingSemanticMembers = false;
+    Bits.NominalTypeDecl.HasDestructorComputed = false;
+    Bits.NominalTypeDecl.HasDestructor = false;
+    ExtensionGeneration = 0;
   }
 
   friend class ProtocolType;
+
+  std::optional<bool> getCachedValueTypeDestructor() const {
+    if (isa<StructDecl>(this) || isa<EnumDecl>(this)) {
+      if (Bits.NominalTypeDecl.HasDestructorComputed)
+        return Bits.NominalTypeDecl.HasDestructor;
+
+      return std::nullopt;
+    } else {
+      return false;
+    }
+  }
+
+  void setCachedValueTypeDestructor(bool value) {
+    ASSERT(isa<StructDecl>(this) || isa<EnumDecl>(this));
+    Bits.NominalTypeDecl.HasDestructorComputed = true;
+    Bits.NominalTypeDecl.HasDestructor = value;
+  }
 
 public:
   using GenericTypeDecl::getASTContext;
@@ -4801,7 +4841,11 @@ public:
 
   /// Return the `DestructorDecl` for a struct or enum's `deinit` declaration.
   /// Returns null if the type is a class, or does not have a declared `deinit`.
-  DestructorDecl *getValueTypeDestructor();
+  bool hasValueTypeDestructor() const;
+
+  /// Return the `DestructorDecl` for a struct or enum's `deinit` declaration.
+  /// Returns null if the type is a class, or does not have a declared `deinit`.
+  DestructorDecl *getValueTypeDestructor() const;
 
   /// Does a conformance for a given invertible protocol exist for this
   /// type declaration.

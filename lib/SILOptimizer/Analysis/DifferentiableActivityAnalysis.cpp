@@ -197,10 +197,9 @@ void DifferentiableActivityInfo::propagateVaried(
       setVariedAndPropagateToUsers(bi->getArgForOperand(operand), i);
   }
   // Handle `cond_br`.
-  else if (auto *cbi = dyn_cast<CondBranchInst>(inst)) {
-    if (isVaried(operand->get(), i))
-      if (auto *destBBArg = cbi->getArgForOperand(operand))
-        setVariedAndPropagateToUsers(destBBArg, i);
+  else if (isa<CondBranchInst>(inst)) {
+    // A cond_br only uses its condition operand and passes no branch arguments,
+    // so there is no destination block argument to propagate variedness to.
   }
   // Handle `checked_cast_addr_br`.
   // Propagate variedness from source operand to destination operand, in

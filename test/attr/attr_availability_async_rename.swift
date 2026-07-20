@@ -86,7 +86,6 @@ func defaultedParamsEnd4(newArg: Int, arg: Int = 0) async { }
 @available(macOS, introduced: 12, renamed: "manyAttrsOld()")
 @available(*, renamed: "manyAttrsNew()")
 @available(*, renamed: "manyAttrsNewOther()")
-@available(macOS, deprecated: 12, renamed: "manyAttrsOld()")
 @available(*, deprecated)
 func manyAttrs(completionHandler: @escaping () -> Void) { }
 
@@ -286,7 +285,7 @@ func asyncContext(t: HandlerTest) async {
   // expected-warning@+1{{consider using asynchronous alternative function}}
   defaultedParamsEnd4(arg: 1) { }
   // expected-warning@+2{{consider using asynchronous alternative function}}
-  // expected-warning@+1{{'manyAttrs(completionHandler:)' is deprecated}}{{documentation-file=deprecated-declaration}}
+  // expected-warning@+1{{'manyAttrs(completionHandler:)' is deprecated}}
   manyAttrs() { }
   // expected-warning@+1{{consider using asynchronous alternative function}}
   macOSOnly() { }

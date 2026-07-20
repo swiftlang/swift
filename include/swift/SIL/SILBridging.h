@@ -315,6 +315,8 @@ struct BridgedType {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getEnumCasePayload(EnumElementIterator i, BridgedFunction f) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType
   getEnumCasePayload(SwiftInt caseIndex, BridgedFunction f) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE  BridgedType getEnumCasePayload(BridgedDeclObj caseDecl,
+                                                                     BridgedFunction f) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj
   getEnumElementDecl(EnumElementIterator i) const;
   BRIDGED_INLINE SwiftInt getNumTupleElements() const;
@@ -582,6 +584,7 @@ struct BridgedFunction {
   BRIDGED_INLINE bool hasValidLinkageForFragileRef(SerializedKind) const;
   BRIDGED_INLINE ThunkKind isThunk() const;
   BRIDGED_INLINE void setThunk(ThunkKind) const;
+  BRIDGED_INLINE bool isWithoutActuallyEscapingThunk() const;
   BRIDGED_INLINE bool needsStackProtection() const;
   BRIDGED_INLINE bool shouldOptimize() const;
   BRIDGED_INLINE bool isReferencedInModule() const;
@@ -825,6 +828,7 @@ struct BridgedInstruction {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType InitExistentialAddrInst_getFormalConcreteType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedConformanceArray InitExistentialMetatypeInst_getConformances() const;
   BRIDGED_INLINE bool OpenExistentialAddr_isImmutable() const;
+  BRIDGED_INLINE BridgedGenericEnvironment OpenExistentialRefInst_getDefinedGenericEnvironment() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedGlobalVar GlobalAccessInst_getGlobal() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedGlobalVar AllocGlobalInst_getGlobal() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedFunction FunctionRefBaseInst_getReferencedFunction() const;
@@ -926,7 +930,6 @@ struct BridgedInstruction {
   BRIDGED_INLINE bool MarkUnresolvedNonCopyableValue_isStrict() const;
   BRIDGED_INLINE void RefCountingInst_setIsAtomic(bool isAtomic) const;
   BRIDGED_INLINE bool RefCountingInst_getIsAtomic() const;
-  BRIDGED_INLINE SwiftInt CondBranchInst_getNumTrueArgs() const;
   BRIDGED_INLINE void AllocRefInstBase_setIsStackAllocatable() const;
   BRIDGED_INLINE bool AllocRefInst_isBare() const;
   BRIDGED_INLINE void AllocRefInst_setIsBare() const;
@@ -935,6 +938,14 @@ struct BridgedInstruction {
   BRIDGED_INLINE bool KeyPathInst_hasPattern() const;
   BRIDGED_INLINE SwiftInt KeyPathInst_getNumComponents() const;
   BRIDGED_INLINE void KeyPathInst_getReferencedFunctions(SwiftInt componentIdx, KeyPathFunctionResults * _Nonnull results) const;
+  /// If this `keypath_inst` will be emitted as a statically-instantiated
+  /// immortal object in Embedded Swift, returns the concrete key path class
+  /// type (`KeyPath<Root, Value>` / `WritableKeyPath<Root, Value>` /
+  /// `ReferenceWritableKeyPath<Root, Value>`) picked by IRGen for the
+  /// object's isa.  Callers (Swift-side embedded passes) use this to force
+  /// specialization of that class's vtable before IRGen runs.  Returns an
+  /// invalid type if the key path isn't statically instantiable.
+  SWIFT_IMPORT_UNSAFE BridgedType KeyPathInst_getStaticInstanceClassType() const;
   BRIDGED_INLINE void GlobalAddrInst_clearToken() const;
   BRIDGED_INLINE bool GlobalValueInst_isBare() const;
   BRIDGED_INLINE void GlobalValueInst_setIsBare() const;
@@ -1070,13 +1081,13 @@ struct BridgedBasicBlock {
   BRIDGED_INLINE SwiftInt getNumArguments() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedArgument getArgument(SwiftInt index) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedArgument addBlockArgument(BridgedType type, BridgedValue::Ownership ownership) const;
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedArgument
-  insertPhiArgument(SwiftInt index, BridgedType type,
-                    BridgedValue::Ownership ownership) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedArgument insertPhiArgument(
+      SwiftInt index, BridgedType type, BridgedValue::Ownership ownership,
+      OptionalBridgedDeclObj decl) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedArgument addFunctionArgument(BridgedType type) const;
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedArgument insertFunctionArgument(SwiftInt atPosition, BridgedType type,
-                                                                            BridgedValue::Ownership ownership,
-                                                                            OptionalBridgedDeclObj decl) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedArgument insertFunctionArgument(
+      SwiftInt atPosition, BridgedType type, BridgedValue::Ownership ownership,
+      OptionalBridgedDeclObj decl) const;
   BRIDGED_INLINE void eraseArgument(SwiftInt index) const;
   BRIDGED_INLINE void moveAllInstructionsToBegin(BridgedBasicBlock dest) const;
   BRIDGED_INLINE void moveAllInstructionsToEnd(BridgedBasicBlock dest) const;
@@ -1332,6 +1343,8 @@ struct BridgedBuilder{
                                                                                 BridgedType type) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createUncheckedValueCast(BridgedValue op,
                                                                                  BridgedType type) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createUncheckedTrivialBitCast(BridgedValue op,
+                                                                                      BridgedType type) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createUpcast(BridgedValue op, BridgedType type) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createCheckedCastAddrBranch(
       BridgedValue source, BridgedCanType sourceFormalType,
@@ -1478,6 +1491,9 @@ struct BridgedBuilder{
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createEndCOWMutationAddr(BridgedValue instance) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createMarkDependence(
     BridgedValue value, BridgedValue base, BridgedInstruction::MarkDependenceKind dependenceKind) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createMarkDependence(
+    BridgedValue value, BridgedValue base, BridgedValue::Ownership ownership,
+    BridgedInstruction::MarkDependenceKind dependenceKind) const;
 
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createMarkDependenceAddr(
     BridgedValue value, BridgedValue base, BridgedInstruction::MarkDependenceKind dependenceKind) const;
@@ -1629,16 +1645,6 @@ struct BridgedContext {
   static BRIDGED_INLINE void copyInstructionBefore(BridgedInstruction inst, BridgedInstruction beforeInst);
   static BRIDGED_INLINE void salvageDebugInfo(BridgedInstruction inst);
 
-    // SSAUpdater
-
-  BRIDGED_INLINE void SSAUpdater_initialize(BridgedFunction function, BridgedType type,
-                                            BridgedValue::Ownership ownership) const;
-  BRIDGED_INLINE void SSAUpdater_addAvailableValue(BridgedBasicBlock block, BridgedValue value) const;
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedValue SSAUpdater_getValueAtEndOfBlock(BridgedBasicBlock block) const;
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedValue SSAUpdater_getValueInMiddleOfBlock(BridgedBasicBlock block) const;
-  BRIDGED_INLINE SwiftInt SSAUpdater_getNumInsertedPhis() const;
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedValue SSAUpdater_getInsertedPhi(SwiftInt idx) const;
-
   // Sets
 
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedBasicBlockSet allocBasicBlockSet() const;
@@ -1670,6 +1676,13 @@ struct BridgedCloner {
   BridgedCloner(BridgedGlobalVar var, BridgedContext context);
   BridgedCloner(BridgedInstruction inst, BridgedContext context);
   BridgedCloner(BridgedFunction emptyFunction, BridgedContext context);
+  /// Clones instructions one at a time within `function`, remapping only the
+  /// local archetypes registered via `registerLocalArchetypeRemapping`.
+  /// Unlike the other constructors, operands and successor blocks that are
+  /// not themselves being cloned are reused unchanged, i.e. this does not
+  /// clone a region.
+  BridgedCloner(BridgedFunction function, BridgedContext context,
+                bool forLocalArchetypeRemapping);
   void destroy(BridgedContext context);
   SWIFT_IMPORT_UNSAFE BridgedFunction getCloned() const;
   SWIFT_IMPORT_UNSAFE BridgedBasicBlock getClonedBasicBlock(BridgedBasicBlock originalBasicBlock) const;
@@ -1682,6 +1695,10 @@ struct BridgedCloner {
   void recordFoldedValue(BridgedValue orig, BridgedValue mapped) const;
   BridgedInstruction clone(BridgedInstruction inst) const;
   void setInsertionBlockIfNotSet(BridgedBasicBlock block) const;
+  void setInsertionPoint(BridgedInstruction beforeInst) const;
+  void registerLocalArchetypeRemapping(BridgedGenericEnvironment from,
+                                       BridgedGenericEnvironment to) const;
+  SWIFT_IMPORT_UNSAFE BridgedType getOpType(BridgedType type) const;
 };
 
 struct BridgedTypeSubstCloner {

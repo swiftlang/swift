@@ -3498,8 +3498,8 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
         std::optional<COMThreadingModel> Model =
             llvm::StringSwitch<std::optional<COMThreadingModel>>(Tok.getText())
                 .Case("single", COMThreadingModel::Single)
-                .Cases("apartment", "sta", COMThreadingModel::Apartment)
-                .Cases("free", "mta", COMThreadingModel::Free)
+                .Cases({"apartment", "sta"}, COMThreadingModel::Apartment)
+                .Cases({"free", "mta"}, COMThreadingModel::Free)
                 .Case("both", COMThreadingModel::Both)
                 .Case("neutral", COMThreadingModel::Neutral)
                 .Default(std::nullopt);
@@ -7564,6 +7564,7 @@ Parser::parseDeclExtension(ParseDeclOptions Flags, DeclAttributes &Attributes) {
                                              CurDeclContext,
                                              trailingWhereClause);
   ext->attachParsedAttrs(Attributes);
+
   if (trailingWhereHadCodeCompletion && CodeCompletionCallbacks)
     CodeCompletionCallbacks->setParsedDecl(ext);
 

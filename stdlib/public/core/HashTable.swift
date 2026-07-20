@@ -60,7 +60,7 @@ internal struct _HashTable {
   /// bitset, then its out-of-bounds bits are guaranteed to be all set. These
   /// filler bits are there to speed up finding holes -- they don't correspond
   /// to occupied buckets in the table.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal var bitset: _UnsafeBitset {
     unsafe _UnsafeBitset(words: words, wordCount: wordCount)
   }

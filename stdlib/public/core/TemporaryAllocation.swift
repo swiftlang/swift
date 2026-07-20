@@ -23,7 +23,7 @@ import SwiftShims
 ///     not be negative.
 ///
 /// - Returns: The number of bytes required for the allocation.
-@_alwaysEmitIntoClient @_transparent
+@export(implementation) @_transparent
 internal func _byteCountForTemporaryAllocation<T: ~Copyable>(
   of type: T.Type,
   capacity: Int
@@ -58,7 +58,7 @@ internal func _byteCountForTemporaryAllocation<T: ~Copyable>(
 ///
 /// - Returns: Whether or not there is sufficient space on the stack to allocate
 ///   `byteCount` bytes of memory.
-@_alwaysEmitIntoClient @_transparent
+@export(implementation) @_transparent
 internal func _isStackAllocationSafe(byteCount: Int, alignment: Int) -> Bool {
   // PRECONDITIONS: Non-positive alignments are nonsensical, as are
   // non-power-of-two alignments.
@@ -112,7 +112,7 @@ internal func _isStackAllocationSafe(byteCount: Int, alignment: Int) -> Bool {
 ///
 /// This function encapsulates the various calls to builtins required by
 /// `withUnsafeTemporaryAllocation()`.
-@_alwaysEmitIntoClient @_transparent
+@export(implementation) @_transparent
 internal func _withUnsafeTemporaryAllocation<
   T: ~Copyable, R: ~Copyable, E: Error
 >(
@@ -141,7 +141,7 @@ internal func _withUnsafeTemporaryAllocation<
   return try body(stackAddress)
 }
 
-@_alwaysEmitIntoClient @_transparent
+@export(implementation) @_transparent
 internal func _withUnprotectedUnsafeTemporaryAllocation<
   T: ~Copyable, R: ~Copyable, E: Error
 >(
@@ -170,7 +170,7 @@ internal func _withUnprotectedUnsafeTemporaryAllocation<
   return try body(stackAddress)
 }
 
-@_alwaysEmitIntoClient @_transparent
+@export(implementation) @_transparent
 internal func _fallBackToHeapAllocation<R: ~Copyable, E: Error>(
   byteCount: Int,
   alignment: Int,
@@ -215,7 +215,7 @@ internal func _fallBackToHeapAllocation<R: ~Copyable, E: Error>(
 /// The buffer pointer passed to `body` (as well as any pointers to elements in
 /// the buffer) must not escape. It will be deallocated when `body` returns and
 /// cannot be used afterward.
-@_alwaysEmitIntoClient @_transparent
+@export(implementation) @_transparent
 @safe
 public func withUnsafeTemporaryAllocation<R: ~Copyable, E: Error>(
   byteCount: Int,
@@ -257,7 +257,7 @@ public func withUnsafeTemporaryAllocation<R: ~Copyable, E: Error>(
 ///
 /// - Throws: Whatever is thrown by `body`.
 @available(SwiftCompatibilitySpan 5.0, *)
-@_alwaysEmitIntoClient @_transparent
+@export(implementation) @_transparent
 public func withTemporaryAllocation<T: ~Copyable, R: ~Copyable, E: Error>(
   of type: T.Type,
   capacity: Int,
@@ -299,7 +299,7 @@ public func withTemporaryAllocation<T: ~Copyable, R: ~Copyable, E: Error>(
 ///
 /// - Throws: Whatever is thrown by `body`.
 @available(SwiftCompatibilitySpan 5.0, *)
-@_alwaysEmitIntoClient @_transparent
+@export(implementation) @_transparent
 public func withTemporaryAllocation<R: ~Copyable, E: Error>(
   byteCount: Int,
   alignment: Int,
@@ -321,7 +321,7 @@ public func withTemporaryAllocation<R: ~Copyable, E: Error>(
 ///
 /// This function is similar to `withUnsafeTemporaryAllocation`, except that it
 /// doesn't trigger stack protection for the stack allocated memory.
-@_alwaysEmitIntoClient @_transparent
+@export(implementation) @_transparent
 public func _withUnprotectedUnsafeTemporaryAllocation<R: ~Copyable, E: Error>(
   byteCount: Int,
   alignment: Int,
@@ -367,7 +367,7 @@ public func _withUnprotectedUnsafeTemporaryAllocation<R: ~Copyable, E: Error>(
 /// The buffer pointer passed to `body` (as well as any pointers to elements in
 /// the buffer) must not escape. It will be deallocated when `body` returns and
 /// cannot be used afterward.
-@_alwaysEmitIntoClient @_transparent
+@export(implementation) @_transparent
 @safe
 public func withUnsafeTemporaryAllocation<
   T: ~Copyable, R: ~Copyable,
@@ -396,7 +396,7 @@ public func withUnsafeTemporaryAllocation<
 ///
 /// This function is similar to `withUnsafeTemporaryAllocation`, except that it
 /// doesn't trigger stack protection for the stack allocated memory.
-@_alwaysEmitIntoClient @_transparent
+@export(implementation) @_transparent
 public func _withUnprotectedUnsafeTemporaryAllocation<
   T: ~Copyable, R: ~Copyable,
   E: Error

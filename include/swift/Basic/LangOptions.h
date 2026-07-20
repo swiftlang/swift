@@ -653,6 +653,9 @@ namespace swift {
     /// Enables dumping type witness systems from associated type inference.
     bool DumpTypeWitnessSystems = false;
 
+    /// Maximum iteration count for associated type inference.
+    unsigned AssociatedTypeInferenceIterations = 1000000;
+
     /// Enables dumping macro expansions.
     bool DumpMacroExpansions = false;
 
@@ -1068,6 +1071,10 @@ namespace swift {
     /// Enable experimental optimization to skip contradictory disjunction
     /// choices.
     bool SolverPruneDisjunctions = true;
+
+    /// Enable an inefficient form of inference, which will sometimes prevent
+    /// exact binding promotion from taking place.
+    bool SolverEnableEnumerateSupertypes = true;
   };
 
   /// Options for controlling the behavior of the Clang importer.

@@ -1,3 +1,6 @@
+// FIXME: crashes under opaque values
+// RUN: not --crash %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s -disable-availability-checking
+
 // RUN: %target-swift-emit-silgen %s -disable-availability-checking | %FileCheck %s
 
 import Synchronization

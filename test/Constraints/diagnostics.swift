@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -solver-disable-enumerate-supertypes
 
 protocol P {
   associatedtype SomeType
@@ -1591,4 +1591,24 @@ do {
   _ = {
     let x: String = 0 // expected-error {{cannot convert value of type 'Int' to specified type 'String'}}
   }. // expected-error {{expected member name following '.'}}
+}
+
+// rdar://169736579
+do {
+  class C {}
+
+  class D: C {
+   var bar: Int = 0
+  }
+
+  func foo<T>(_ x: T, _ fn: (T) -> Void) {}
+
+  func bar(_ x: D) {
+    foo(x) { y in
+      let x = y.bar
+      bar(0, 0)
+      // expected-error@-1 {{extra argument in call}}
+      // expected-error@-2 {{cannot convert value of type 'Int' to expected argument type 'D'}}
+    }
+  }
 }

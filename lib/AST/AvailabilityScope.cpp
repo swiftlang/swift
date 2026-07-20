@@ -17,7 +17,6 @@
 #include "swift/AST/AvailabilityScope.h"
 
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/AvailabilityConstraint.h"
 #include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/MacroDeclaration.h"
@@ -445,9 +444,9 @@ AvailabilityScope::getExplicitAvailabilityRange(AvailabilityDomain domain,
 
   case Reason::Decl: {
     auto decl = Node.getAsDecl();
-    if (auto constraint = swift::getAvailabilityConstraintForDeclInDomain(
-            decl, AvailabilityContext::forAlwaysAvailable(ctx), domain))
-      return constraint->getAttr().getIntroducedRange(ctx);
+    if (auto restriction = AvailabilityContext::forAlwaysAvailable(ctx)
+                               .restrictionForDeclInDomain(decl, domain))
+      return restriction->getAttr().getIntroducedRange(ctx);
 
     return std::nullopt;
   }

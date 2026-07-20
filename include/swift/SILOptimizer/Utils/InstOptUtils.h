@@ -150,14 +150,10 @@ void collectUsesOfValue(SILValue V,
 /// value itself)
 void eraseUsesOfValue(SILValue value);
 
-/// Return true if \p type is a value type (struct/enum) that requires
-/// deinitialization beyond destruction of its members.
-bool hasValueDeinit(SILType type);
-
 /// Return true if \p value has a value type (struct/enum) that requires
 /// deinitialization beyond destruction of its members.
 inline bool hasValueDeinit(SILValue value) {
-  return hasValueDeinit(value->getType());
+  return value->getType().isValueTypeWithDeinit();
 }
 
 /// Gets the concrete value which is stored in an existential box.
@@ -583,11 +579,6 @@ bool tryEliminateOnlyOwnershipUsedForwardingInst(
 /// Constant-fold the Builtin.canBeClass if the type is known.
 IntegerLiteralInst *optimizeBuiltinCanBeObjCClass(BuiltinInst *bi,
                                                   SILBuilder &builder);
-
-/// Performs "predictable" dead allocation optimizations.
-///
-/// See the PredictableDeadAllocationElimination pass.
-bool eliminateDeadAllocations(SILFunction *fn, DominanceInfo *domInfo);
 
 bool specializeClassMethodInst(ClassMethodInst *cm);
 bool specializeWitnessMethodInst(WitnessMethodInst *wm);

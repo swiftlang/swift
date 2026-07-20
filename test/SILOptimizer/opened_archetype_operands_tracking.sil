@@ -1,7 +1,6 @@
 // RUN: %target-sil-opt -sil-print-types -sil-inline-generics -enable-sil-verify-all %s -O | %FileCheck %s
 // RUN: %target-sil-opt -sil-print-types -jumpthread-simplify-cfg -enable-sil-verify-all %s -O | %FileCheck --check-prefix=CHECK-SIMPLIFY-CFG %s
 
-// REQUIRES: swift_in_compiler
 
 // Check some corner cases related to tracking of opened archetypes.
 // For example, the compiler used to crash compiling the "process" function (rdar://28024272)
@@ -287,7 +286,7 @@ bb0(%0 : $C):
   strong_retain %0 : $C
   release_value %1 : $MyOptional<C>
   %6 = integer_literal $Builtin.Int1, -1
-  cond_br %6, bb5, bb1
+  cond_br %6, bb6, bb1
 
 bb1:
   %8 = enum $MyOptional<C>, #MyOptional.some!enumelt, %0 : $C
@@ -312,4 +311,9 @@ bb4:
 bb5:
   %22 = tuple ()
   return %22 : $()
+
+// Trampoline to avoid the critical edge from bb0's cond_br to bb5 (which
+// also has bb4 as a predecessor).
+bb6:
+  br bb5
 } // end sil function 'test_infinite_loop_in_unreachable_block'

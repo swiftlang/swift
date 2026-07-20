@@ -13,8 +13,6 @@
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 
-// REQUIRES: rdar107657204
-
 //--- header.h
 
 #import <Foundation/Foundation.h>

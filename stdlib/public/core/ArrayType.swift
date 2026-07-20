@@ -70,7 +70,7 @@ extension _ArrayProtocol {
   // Since RangeReplaceableCollection now has a version of filter that is less
   // efficient, we should make the default implementation coming from Sequence
   // preferred.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public consuming func filter<E: Error>(
     _ isIncluded: (Element) throws(E) -> Bool
   ) throws(E) -> [Element] {

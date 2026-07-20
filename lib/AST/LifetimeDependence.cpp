@@ -212,6 +212,9 @@ void LifetimeDependenceInfo::getConcatenatedData(
   if (hasAddressableParamIndices()) {
     pushData(getAddressableIndices());
   }
+  if (hasConditionallyAddressableParamIndices()) {
+    pushData(getConditionallyAddressableIndices());
+  }
 }
 
 namespace {

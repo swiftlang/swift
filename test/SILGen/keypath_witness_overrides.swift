@@ -1,5 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -module-name protocol_overrides -emit-module -enable-library-evolution -emit-module-path=%t/protocol_overrides.swiftmodule %S/Inputs/protocol_overrides.swift
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s -I %t
 // RUN: %target-swift-emit-silgen %s -I %t | %FileCheck %s
 
 // Check that keypath formation properly records the point at which the witness

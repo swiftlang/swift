@@ -82,19 +82,19 @@ extension DefaultIndices: Collection {
     return self
   }
   
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func index(_ i: Index, offsetBy distance: Int) -> Index {
     return _elements.index(i, offsetBy: distance)
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func index(
     _ i: Index, offsetBy distance: Int, limitedBy limit: Index
   ) -> Index? {
     return _elements.index(i, offsetBy: distance, limitedBy: limit)
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func distance(from start: Index, to end: Index) -> Int {
     return _elements.distance(from: start, to: end)
   }

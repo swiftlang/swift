@@ -6,7 +6,6 @@
 /// TEST: Deserializing Lib module should not cause an assert fail.
 // RUN: %target-swift-frontend -emit-sil -sil-verify-all %t/Client.swift -I%t
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: asserts
 
 //--- Client.swift

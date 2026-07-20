@@ -67,29 +67,10 @@ struct OwnershipModelEliminatorVisitor
   /// builderCtxStorage.
   SILBuilderContext builderCtx;
 
-  /// A possibly null, possibly owned, possibly unowned pointer.
-  /// Owned if the boolean is true.
-  llvm::PointerIntPair<DominanceInfo *, 1, bool> domTree;
-
-  DominanceInfo *getDomTree(SILFunction *fn) {
-    if (!domTree.getPointer())
-      domTree = {new DominanceInfo(fn), true};
-    return domTree.getPointer();
-  }
-
-  ~OwnershipModelEliminatorVisitor() {
-    if (domTree.getInt())
-      delete domTree.getPointer();
-  }
-
   /// Construct an OME visitor for eliminating ownership from \p fn.
-  OwnershipModelEliminatorVisitor(SILFunction &fn,
-                                  DominanceAnalysis *da = nullptr)
+  OwnershipModelEliminatorVisitor(SILFunction &fn)
       : trackingList(), instructionsToSimplify(),
         builderCtx(fn.getModule(), &trackingList) {
-    if (da)
-      if (auto *cached = da->maybeGet(&fn).getPtrOrNull())
-        domTree = {cached, false};
   }
 
   /// A "syntactic" high level function that combines our insertPt with a
@@ -480,48 +461,6 @@ bool OwnershipModelEliminatorVisitor::visitUnmanagedAutoreleaseValueInst(
   return true;
 }
 
-// Poison every debug variable associated with \p value.
-static void injectDebugPoison(DestroyValueInst *destroy) {
-  // TODO: SILDebugVariable should define it's key. Until then, we try to be
-  // consistent with IRGen.
-  using StackSlotKey =
-      std::pair<unsigned, std::pair<const SILDebugScope *, StringRef>>;
-  // This DenseSet points to StringRef memory into the debug_value insts.
-  llvm::SmallDenseSet<StackSlotKey> poisonedVars;
-
-  SILValue destroyedValue = destroy->getOperand();
-  for (Operand *use : getDebugUses(destroyedValue)) {
-    auto debugVal = dyn_cast<DebugValueInst>(use->getUser());
-    if (!debugVal || debugVal->poisonRefs())
-      continue;
-
-    const SILDebugScope *scope = debugVal->getDebugScope();
-    auto loc = debugVal->getLoc();
-
-    std::optional<SILDebugVariable> varInfo = debugVal->getVarInfo();
-    if (!varInfo)
-      continue;
-
-    unsigned argNo = varInfo->ArgNo;
-    if (!poisonedVars.insert({argNo, {scope, varInfo->Name}}).second)
-      continue;
-
-    SILBuilder builder(destroy);
-    // The poison DebugValue's DebugLocation must be identical to the original
-    // DebugValue. The DebugScope is used to identify the variable's unique
-    // shadow copy. The SILLocation is used to determine the VarDecl, which is
-    // necessary in some cases to derive a unique variable name.
-    //
-    // This debug location is obviously inconsistent with surrounding code, but
-    // IRGen is responsible for fixing this.
-    builder.setCurrentDebugScope(scope);
-    auto *newDebugVal =
-        builder.createDebugValue(loc, destroyedValue, *varInfo, PoisonRefs);
-    assert(*(newDebugVal->getVarInfo()) == *varInfo && "lost in translation");
-    (void)newDebugVal;
-  }
-}
-
 bool OwnershipModelEliminatorVisitor::visitPartialApplyInst(
     PartialApplyInst *inst) {
   // Escaping closures don't need attention beyond what we already perform.
@@ -664,16 +603,6 @@ bool OwnershipModelEliminatorVisitor::visitDestroyValueInst(
   withBuilder<void>(dvi, [&](SILBuilder &b, SILLocation loc) {
     b.emitDestroyValueOperation(loc, operand);
   });
-  // Kill debug_values that appear after the destroy: this instruction might
-  // free stored pointers, so later debug uses are wrong.
-  for (auto *use : getDebugUses(operand)) {
-    auto *dbgInst = cast<DebugValueInst>(use->getUser());
-    if (getDomTree(dvi->getFunction())->dominates(dvi, dbgInst))
-      dbgInst->killOperand();
-  }
-  if (dvi->poisonRefs()) {
-    injectDebugPoison(dvi);
-  }
   eraseInstruction(dvi);
   return true;
 }
@@ -822,8 +751,7 @@ bool OwnershipModelEliminatorVisitor::visitDestructureTupleInst(
 //                           Top Level Entry Point
 //===----------------------------------------------------------------------===//
 
-static bool stripOwnership(SILFunction &func,
-                           DominanceAnalysis *domAnalysis = nullptr) {
+static bool stripOwnership(SILFunction &func) {
   // If F is an external declaration, do not process it.
   if (func.isExternalDeclaration())
     return false;
@@ -865,7 +793,7 @@ static bool stripOwnership(SILFunction &func,
 
   bool madeChange = false;
   SmallVector<SILInstruction *, 32> createdInsts;
-  OwnershipModelEliminatorVisitor visitor(func, domAnalysis);
+  OwnershipModelEliminatorVisitor visitor(func);
 
   for (auto &block : func) {
     // Change all arguments to have OwnershipKind::None.
@@ -966,7 +894,7 @@ struct OwnershipModelEliminator : SILModuleTransform {
         getPassManager()->runSwiftFunctionVerification(&f);
       }
 
-      if (stripOwnership(f, getAnalysis<DominanceAnalysis>())) {
+      if (stripOwnership(f)) {
         auto InvalidKind = SILAnalysis::InvalidationKind::BranchesAndInstructions;
         invalidateAnalysis(&f, InvalidKind);
       }

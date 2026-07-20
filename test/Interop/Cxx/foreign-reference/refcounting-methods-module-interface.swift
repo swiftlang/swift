@@ -20,19 +20,19 @@
 // CHECK: }
 
 // CHECK: class TemplatedDerivedHasRelease<CFloat> {
-// CHECK:   var value: Float
+// CHECK:   var value: CFloat
 // CHECK:   func doReleaseTemplated()
 // CHECK:   func doRetainInBase()
 // CHECK: }
 // CHECK: class TemplatedDerivedHasRelease<CInt> {
-// CHECK:   var value: Int32
+// CHECK:   var value: CInt
 // CHECK:   func doReleaseTemplated()
 // CHECK:   func doRetainInBase()
 // CHECK: }
 
 // CHECK-OFF: class CRTPDerived {
 // CHECK-ON: class CRTPDerived : CRTPBase<CRTPDerived> {
-// CHECK:   var value: Int32
+// CHECK:   var value: CInt
 // CHECK: }
 
 // CHECK: class VirtualRetainRelease {
@@ -53,5 +53,5 @@
 // CHECK-ON: class DerivedPureVirtualRetainRelease : PureVirtualRetainRelease {
 // CHECK:   func doRetainPure()
 // CHECK:   func doReleasePure()
-// CHECK:   var refCount: Int32
+// CHECK:   var refCount: CInt
 // CHECK: }

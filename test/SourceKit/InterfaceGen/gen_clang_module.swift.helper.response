@@ -1,7 +1,7 @@
 import FooHelper.FooHelperExplicit
 import FooHelper.FooHelperSub
 
-public func fooHelperFunc1(_ a: Int32) -> Int32
+public func fooHelperFunc1(_ a: CInt) -> CInt
 
 public var FooHelperUnnamedEnumeratorA1: Int { get }
 
@@ -67,61 +67,61 @@ public var FooHelperUnnamedEnumeratorA2: Int { get }
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
     key.offset: 98,
-    key.length: 5
+    key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 108,
-    key.length: 5
+    key.offset: 107,
+    key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 115,
+    key.offset: 113,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 122,
+    key.offset: 120,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 126,
+    key.offset: 124,
     key.length: 28
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 156,
+    key.offset: 154,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 162,
+    key.offset: 160,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 169,
+    key.offset: 167,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 176,
+    key.offset: 174,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 180,
+    key.offset: 178,
     key.length: 28
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 210,
+    key.offset: 208,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 216,
+    key.offset: 214,
     key.length: 3
   }
 ]
@@ -147,26 +147,26 @@ public var FooHelperUnnamedEnumeratorA2: Int { get }
     key.length: 12
   },
   {
-    key.kind: source.lang.swift.ref.struct,
+    key.kind: source.lang.swift.ref.typealias,
     key.offset: 98,
-    key.length: 5,
+    key.length: 4,
+    key.is_system: 1
+  },
+  {
+    key.kind: source.lang.swift.ref.typealias,
+    key.offset: 107,
+    key.length: 4,
     key.is_system: 1
   },
   {
     key.kind: source.lang.swift.ref.struct,
-    key.offset: 108,
-    key.length: 5,
-    key.is_system: 1
-  },
-  {
-    key.kind: source.lang.swift.ref.struct,
-    key.offset: 156,
+    key.offset: 154,
     key.length: 3,
     key.is_system: 1
   },
   {
     key.kind: source.lang.swift.ref.struct,
-    key.offset: 210,
+    key.offset: 208,
     key.length: 3,
     key.is_system: 1
   }
@@ -177,10 +177,10 @@ public var FooHelperUnnamedEnumeratorA2: Int { get }
     key.accessibility: source.lang.swift.accessibility.public,
     key.name: "fooHelperFunc1(_:)",
     key.offset: 73,
-    key.length: 40,
-    key.typename: "Int32",
+    key.length: 38,
+    key.typename: "CInt",
     key.nameoffset: 78,
-    key.namelength: 26,
+    key.namelength: 25,
     key.attributes: [
       {
         key.offset: 66,
@@ -193,8 +193,8 @@ public var FooHelperUnnamedEnumeratorA2: Int { get }
         key.kind: source.lang.swift.decl.var.parameter,
         key.name: "a",
         key.offset: 93,
-        key.length: 10,
-        key.typename: "Int32"
+        key.length: 9,
+        key.typename: "CInt"
       }
     ]
   },
@@ -202,16 +202,16 @@ public var FooHelperUnnamedEnumeratorA2: Int { get }
     key.kind: source.lang.swift.decl.var.global,
     key.accessibility: source.lang.swift.accessibility.public,
     key.name: "FooHelperUnnamedEnumeratorA1",
-    key.offset: 122,
+    key.offset: 120,
     key.length: 45,
     key.typename: "Int",
-    key.nameoffset: 126,
+    key.nameoffset: 124,
     key.namelength: 28,
-    key.bodyoffset: 161,
+    key.bodyoffset: 159,
     key.bodylength: 5,
     key.attributes: [
       {
-        key.offset: 115,
+        key.offset: 113,
         key.length: 6,
         key.attribute: source.decl.attribute.public
       }
@@ -221,16 +221,16 @@ public var FooHelperUnnamedEnumeratorA2: Int { get }
     key.kind: source.lang.swift.decl.var.global,
     key.accessibility: source.lang.swift.accessibility.public,
     key.name: "FooHelperUnnamedEnumeratorA2",
-    key.offset: 176,
+    key.offset: 174,
     key.length: 45,
     key.typename: "Int",
-    key.nameoffset: 180,
+    key.nameoffset: 178,
     key.namelength: 28,
-    key.bodyoffset: 215,
+    key.bodyoffset: 213,
     key.bodylength: 5,
     key.attributes: [
       {
-        key.offset: 169,
+        key.offset: 167,
         key.length: 6,
         key.attribute: source.decl.attribute.public
       }

@@ -1250,7 +1250,7 @@ bb3:
 // CHECK-NEXT:   strong_retain [[ARG]]
 // CHECK-NEXT:   strong_retain [[ARG]]
 // CHECK-NEXT:   strong_retain [[ARG]]
-// CHECK-NEXT:   cond_br undef, bb1, bb4
+// CHECK-NEXT:   cond_br undef, bb5, bb4
 //
 // CHECK: bb1:
 // CHECK-NEXT: function_ref use_c
@@ -1275,13 +1275,16 @@ bb3:
 // CHECK-NEXT: strong_release [[ARG]]
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
+//
+// CHECK: bb5:
+// CHECK-NEXT: br bb1
 // CHECK-NEXT: } // end sil function 'test_apply_pai_in_loop_with_diamond'
 sil @test_apply_pai_in_loop_with_diamond : $@convention(thin) (@guaranteed C) ->  () {
 bb0(%0: $C):
   strong_retain %0 : $C
   %closure_fun = function_ref @guaranteed_closure_func : $@convention(thin) (@guaranteed C) -> ()
   %closure = partial_apply [callee_guaranteed] %closure_fun(%0) : $@convention(thin) (@guaranteed C) -> ()
-  cond_br undef, bb2, bb5
+  cond_br undef, bb6, bb5
 
 bb2:
   apply %closure() : $@callee_guaranteed () -> ()
@@ -1298,6 +1301,9 @@ bb5:
   strong_release %0: $C
   %tuple = tuple()
   return %tuple : $()
+
+bb6:
+  br bb2
 }
 
 // CHECK-LABEL: sil @test_apply_pai_in_diamond : $@convention(thin) (@guaranteed C) ->  () {

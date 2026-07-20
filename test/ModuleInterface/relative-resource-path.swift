@@ -1,4 +1,5 @@
 // REQUIRES: OS=macosx
+// REQUIRES: SWIFT_STDLIB_ARCH=arm64
 
 // RUN: %empty-directory(%t.relative_resource_path)
 // RUN: %empty-directory(%t.mcp)

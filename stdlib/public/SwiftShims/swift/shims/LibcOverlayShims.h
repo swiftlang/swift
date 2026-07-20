@@ -20,7 +20,7 @@
 
 #include "Visibility.h"
 
-#if defined(__OpenBSD__)
+#if defined(__OpenBSD__) || defined(__linux__) || defined(__wasi__)
 #include <stdio.h>
 #endif
 #if defined(_WIN32) && !defined(__CYGWIN__)
@@ -120,7 +120,7 @@ int static inline _swift_stdlib_openat(int fd, const char *path, int oflag,
 }
 #endif
 
-#if defined(__OpenBSD__)
+#if defined(__OpenBSD__) || defined(__linux__) || defined(__wasi__)
 static inline void *_swift_stdlib_stdin(void) {
   return stdin;
 }
@@ -130,6 +130,20 @@ static inline void *_swift_stdlib_stdout(void) {
 }
 
 static inline void *_swift_stdlib_stderr(void) {
+  return stderr;
+}
+#endif
+
+#if defined(_WIN32)
+static inline FILE *_swift_stdlib_stdin(void) {
+  return stdin;
+}
+
+static inline FILE *_swift_stdlib_stdout(void) {
+  return stdout;
+}
+
+static inline FILE *_swift_stdlib_stderr(void) {
   return stderr;
 }
 #endif

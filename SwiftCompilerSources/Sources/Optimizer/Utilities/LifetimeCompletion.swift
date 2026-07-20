@@ -150,6 +150,14 @@ func completeLifetime(of value: Value,
   }
 }
 
+func completeLifetime(ofOwned value: Value, createEnd: (Builder) -> (), _ context: FunctionPassContext) {
+  complete(value: value,
+           isEnd: { $0.endsLifetime },
+           createEnd: createEnd,
+           getDeadEnd: { $0.terminator as? UnreachableInst },
+           context)
+}
+
 /// Complete lifetimes of all `values` at `deadEnds` instructions.
 /// Instead of completing the lifetimes at `unreachable` instructions, they are
 /// complete at custom `deadEnd` points.

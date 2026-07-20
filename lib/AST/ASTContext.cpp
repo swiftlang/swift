@@ -337,13 +337,13 @@ struct ASTContext::Implementation {
   /// The declaration of 'AsyncSequence.makeAsyncIterator()'.
   FuncDecl *MakeAsyncIterator = nullptr;
 
-  /// The declaration of 'BorrowingSequence.makeBorrowingIterator()'.
+  /// The declaration of 'Iterable.makeBorrowingIterator()'.
   FuncDecl *MakeBorrowingIterator = nullptr;
 
   /// The declaration of 'IteratorProtocol.next()'.
   FuncDecl *IteratorNext = nullptr;
 
-  /// The declaration of 'IteratorProtocol.nextSpan(maximumCount:)'.
+  /// The declaration of 'IteratorProtocol.nextSpan(maxCount:)'.
   FuncDecl *BorrowingIteratorNextSpan = nullptr;
 
   /// The declaration of 'AsyncIteratorProtocol.next()'.
@@ -1134,12 +1134,12 @@ FuncDecl *ASTContext::getSequenceMakeIterator() const {
   return nullptr;
 }
 
-FuncDecl *ASTContext::getBorrowingSequenceMakeBorrowingIterator() const {
+FuncDecl *ASTContext::getIterableMakeBorrowingIterator() const {
   if (getImpl().MakeBorrowingIterator) {
     return getImpl().MakeBorrowingIterator;
   }
 
-  auto proto = getProtocol(KnownProtocolKind::BorrowingSequence);
+  auto proto = getProtocol(KnownProtocolKind::Iterable);
   if (!proto)
     return nullptr;
 
@@ -1424,7 +1424,7 @@ DECLTYPE *ASTContext::get##NAME##Decl() const { \
        * and the Clang module it imports. */ \
       SmallVector<ValueDecl *, 1> decls; \
       M->lookupQualified(M, DeclNameRef(getIdentifier(#NAME)), SourceLoc(), \
-                         NL_OnlyTypes, decls); \
+                         (NLFlags::OnlyTypes), decls); \
       if (decls.size() == 1 && isa<DECLTYPE>(decls[0])) { \
         auto decl = cast<DECLTYPE>(decls[0]); \
         if (isa<ProtocolDecl>(decl) \
@@ -1547,7 +1547,7 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
   case KnownProtocolKind::CxxMutableRandomAccessCollection:
   case KnownProtocolKind::CxxSet:
   case KnownProtocolKind::CxxSequence:
-  case KnownProtocolKind::CxxBorrowingSequence:
+  case KnownProtocolKind::CxxIterable:
   case KnownProtocolKind::CxxUniqueSet:
   case KnownProtocolKind::CxxVector:
   case KnownProtocolKind::CxxSpan:
@@ -1569,6 +1569,12 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
       NameLookupKind = NLKind::QualifiedLookup;
       M = TheBuiltinModule;
     }
+    break;
+  case KnownProtocolKind::IUnknown:
+  case KnownProtocolKind::ISwiftObject:
+    M = getLoadedModule(Id_COM);
+    if (!M)
+      M = MainModule;
     break;
   default:
     M = getStdlibModule();
@@ -1767,7 +1773,7 @@ ConcreteDeclRef ASTContext::getRegexInitDecl(Type regexType) const {
                 {Id_regexString, Id_version});
   SmallVector<ValueDecl *, 1> results;
   spModule->lookupQualified(getRegexType(), DeclNameRef(name),
-                            SourceLoc(), NL_IncludeUsableFromInline,
+                            SourceLoc(), NLFlags::IncludeUsableFromInline,
                             results);
   assert(results.size() == 1);
   auto *foundDecl = cast<ConstructorDecl>(results[0]);
@@ -1792,7 +1798,7 @@ static ConcreteDeclRef getCGFloatOrDoubleInitDecl(
   // control. But there is only going to be one overload that exactly
   // with no label and the right argument type.
   toDecl->lookupQualified(toDecl, initRef, SourceLoc(),
-                          NL_QualifiedDefault, candidates);
+                          NLFlags::QualifiedDefault, candidates);
 
   for (auto *candidate : candidates) {
     auto *ctor = cast<ConstructorDecl>(candidate);
@@ -2813,8 +2819,9 @@ bool ASTContext::canImportModuleImpl(
       !(isSourceCanImport && !version.empty()))
     return false;
 
-  auto missingVersion = [this, &loc, &ModuleName, &isUnderlyingVersion,
-                         isSourceCanImport]() -> bool {
+  auto missingVersion =
+      [this, &loc, &ModuleName, &isUnderlyingVersion, isSourceCanImport](
+          const llvm::VersionTuple &underlyingClangVersion) -> bool {
     // The module version could not be parsed from the preferred source for
     // this query. Diagnose (only for source-level `#if canImport` queries) and
     // return `true` to indicate that the unversioned module will satisfy the
@@ -2824,8 +2831,18 @@ bool ASTContext::canImportModuleImpl(
       auto diagLoc = mID.Loc;
       if (mID.Loc.isInvalid())
         diagLoc = loc;
-      Diags.diagnose(diagLoc, diag::cannot_find_module_version, mID.Item.str(),
-                     isUnderlyingVersion);
+      Diags.diagnoseWithNotes(
+          Diags.diagnose(diagLoc, diag::cannot_find_module_version,
+                         mID.Item.str(), isUnderlyingVersion),
+          [&]() {
+            // A `_version` query has no user version to compare against, but
+            // the underlying Clang module does carry one. Attach a note that
+            // points the user at `_underlyingVersion`, which can check it.
+            if (!isUnderlyingVersion && !underlyingClangVersion.empty())
+              Diags.diagnose(diagLoc,
+                             diag::cannot_find_module_version_use_underlying,
+                             mID.Item.str(), underlyingClangVersion);
+          });
     }
     return true;
   };
@@ -2844,7 +2861,7 @@ bool ASTContext::canImportModuleImpl(
     if (!foundComparisonVersion.empty())
       return version <= foundComparisonVersion;
     else
-      return missingVersion();
+      return missingVersion(Found->second.UnderlyingVersion);
   }
 
   // When looking up a module, each module importer will report back
@@ -2949,7 +2966,7 @@ bool ASTContext::canImportModuleImpl(
   const auto &queryVersion =
       isUnderlyingVersion ? underlyingVersionInfo : versionInfo;
   if (queryVersion.getVersion().empty())
-    return missingVersion();
+    return missingVersion(underlyingVersionInfo.getVersion());
 
   return version <= queryVersion.getVersion();
 }
@@ -6575,6 +6592,9 @@ ASTContext::getForeignRepresentationInfo(NominalTypeDecl *nominal,
     // Pre-populate the foreign-representable cache with known types.
     if (auto stdlib = getStdlibModule()) {
       addTrivial(getIdentifier("OpaquePointer"), stdlib, true);
+
+      // CVaListPointer is the Swift stand-in for C's `va_list`.
+      addTrivial(getIdentifier("CVaListPointer"), stdlib);
 
       // Builtin types
       // FIXME: Layering violation to use the ClangImporter's define.

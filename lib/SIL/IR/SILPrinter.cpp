@@ -350,7 +350,7 @@ void SILDeclRef::print(raw_ostream &OS) const {
     OS << "<file>";
     break;
   case LocKind::Decl: {
-    if (kind != Kind::Func) {
+    if (kind != Kind::Func && kind != Kind::DistributedThunk) {
       printValueDecl(getDecl(), OS);
       break;
     }
@@ -360,11 +360,9 @@ void SILDeclRef::print(raw_ostream &OS) const {
       printValueDecl(getDecl(), OS);
       if (isDistributed()) {
         OS << "!distributed";
-        OS << "(" << getDecl() << ")";
       }
       if (isDistributedThunk()) {
         OS << "!distributed_thunk";
-        OS << "(" << getDecl() << ")";
       }
       isDot = false;
       break;
@@ -373,11 +371,9 @@ void SILDeclRef::print(raw_ostream &OS) const {
     printValueDecl(accessor->getStorage(), OS);
     if (isDistributed()) {
       OS << "!distributed";
-      OS << "(" << getDecl() << ")";
     }
     if (isDistributedThunk()) {
       OS << "!distributed_thunk";
-      OS << "(" << getDecl() << ")";
     }
     switch (accessor->getAccessorKind()) {
     case AccessorKind::WillSet:
@@ -473,6 +469,9 @@ void SILDeclRef::print(raw_ostream &OS) const {
     break;
   case SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue:
     OS << "!projectedvalueinit";
+    break;
+  case SILDeclRef::Kind::DistributedThunk:
+    // Already handled in the LocKind::Decl branch above.
     break;
   }
 
@@ -749,6 +748,8 @@ namespace swift {
 
 static bool hasValidControlFlow(const SILFunction *f) {
   for (auto &block : *f) {
+    if (block.empty())
+      return false;
     if (!isa<TermInst>(&block.back()))
       return false;
   }
@@ -2218,8 +2219,6 @@ public:
   }
 
   void visitDebugValueInst(DebugValueInst *DVI) {
-    if (DVI->poisonRefs())
-      *this << "[poison] ";
     if (DVI->usesMoveableValueDebugInfo() &&
         !DVI->getOperand()->getType().isMoveOnly())
       *this << "[moveable_value_debuginfo] ";
@@ -2585,8 +2584,6 @@ public:
 #include "swift/AST/ReferenceStorage.def"
 
   void visitDestroyValueInst(DestroyValueInst *I) {
-    if (I->poisonRefs())
-      *this << "[poison] ";
     if (I->isDeadEnd())
       *this << "[dead_end] ";
     *this << getIDAndType(I->getOperand());
@@ -3301,9 +3298,7 @@ public:
   void visitCondBranchInst(CondBranchInst *CBI) {
     *this << Ctx.getID(CBI->getCondition()) << ", "
           << Ctx.getID(CBI->getTrueBB());
-    printBranchArgs(CBI->getTrueArgs());
     *this << ", " << Ctx.getID(CBI->getFalseBB());
-    printBranchArgs(CBI->getFalseArgs());
     if (CBI->getTrueBBCount())
       *this << " !true_count(" << CBI->getTrueBBCount().getValue() << ")";
     if (CBI->getFalseBBCount())

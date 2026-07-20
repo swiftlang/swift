@@ -10,7 +10,7 @@
 // CHECK:   struct A {
 // CHECK:     init()
 // CHECK:     struct B {
-// CHECK:       init(_: Int32)
+// CHECK:       init(_: CInt)
 // CHECK:       init(_: CChar)
 // CHECK:     }
 // CHECK:   }

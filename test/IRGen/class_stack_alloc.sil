@@ -1,6 +1,5 @@
 // RUN: %target-swift-frontend -stack-promotion-limit 48 -Onone -emit-ir %s | %FileCheck %s -DINT=i%target-ptrsize
 
-// REQUIRES: swift_in_compiler
 
 import Builtin
 import Swift

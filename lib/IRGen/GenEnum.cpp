@@ -2202,11 +2202,25 @@ namespace {
       unsigned extraInhabitantCount = getFixedExtraInhabitantCount(IGF.IGM);
       if (!tagBits ||
           ElementsWithNoPayload.size() != extraInhabitantCount + 1) {
-        payloadResult = payload.emitCompare(
-            IGF,
-            extraInhabitantCount == 0 ? APInt::getAllOnes(PayloadBitCount)
-                                      : ti.getFixedExtraInhabitantMask(IGF.IGM),
-            payloadTag);
+        // When the no-payload case is represented using an extra inhabitant of
+        // the payload, only the bits that actually carry the extra-inhabitant
+        // discriminator are significant; the remaining payload bits may hold
+        // arbitrary garbage (e.g. a value produced by the runtime value
+        // witness, which only sets the spare bits). Mask the comparison to the
+        // payload's extra-inhabitant mask in that case. The all-ones
+        // (whole-value) mask is only correct when the payload has no extra
+        // inhabitants of its own -- it must not be selected merely because
+        // *this* enum has exhausted its own residual extra inhabitants (which
+        // can happen for deeply nested optionals), since the no-payload case is
+        // still extra-inhabitant encoded.
+        unsigned payloadExtraInhabitantCount =
+            ti.getFixedExtraInhabitantCount(IGF.IGM);
+        payloadResult =
+            payload.emitCompare(IGF,
+                                payloadExtraInhabitantCount == 0
+                                    ? APInt::getAllOnes(PayloadBitCount)
+                                    : ti.getFixedExtraInhabitantMask(IGF.IGM),
+                                payloadTag);
       }
 
       // If any tag bits are present, they must match.
@@ -5236,16 +5250,14 @@ namespace {
 
     void collectMetadataForOutlining(OutliningMetadataCollector &collector,
                                      SILType T) const override {
-      if (CopyDestroyKind != Normal) {
-        return;
-      }
-
-      for (auto &payloadCasePair : ElementsWithPayload) {
-        SILType payloadT = T.getEnumElementType(
-            payloadCasePair.decl, collector.IGF.getSILModule(),
-            collector.IGF.IGM.getMaximalTypeExpansionContext());
-        auto &payloadTI = *payloadCasePair.ti;
-        payloadTI.collectMetadataForOutlining(collector, payloadT);
+      if (CopyDestroyKind == Normal) {
+        for (auto &payloadCasePair : ElementsWithPayload) {
+          SILType payloadT = T.getEnumElementType(
+              payloadCasePair.decl, collector.IGF.getSILModule(),
+              collector.IGF.IGM.getMaximalTypeExpansionContext());
+          auto &payloadTI = *payloadCasePair.ti;
+          payloadTI.collectMetadataForOutlining(collector, payloadT);
+        }
       }
       collector.collectTypeMetadata(T);
     }
@@ -6390,7 +6402,7 @@ EnumImplStrategy::get(TypeConverter &TC, SILType type, EnumDecl *theEnum) {
   unsigned numElements = 0;
   TypeInfoKind tik = Loadable;
   IsFixedSize_t alwaysFixedSize = IsFixedSize;
-  auto triviallyDestroyable = theEnum->getValueTypeDestructor()
+  auto triviallyDestroyable = theEnum->hasValueTypeDestructor()
     ? IsNotTriviallyDestroyable : IsTriviallyDestroyable;
   auto copyable = !theEnum->canBeCopyable()
     ? IsNotCopyable : IsCopyable;
@@ -7083,7 +7095,7 @@ TypeInfo *SinglePayloadEnumImplStrategy::completeFixedLayout(
   auto alignment = payloadTI.getFixedAlignment();
   applyLayoutAttributes(TC.IGM, theEnum, /*fixed*/true, alignment);
 
-  auto deinit = theEnum->getValueTypeDestructor()
+  auto deinit = theEnum->hasValueTypeDestructor()
     ? IsNotTriviallyDestroyable : IsTriviallyDestroyable;
   auto copyable = !theEnum->canBeCopyable()
     ? IsNotCopyable : IsCopyable;
@@ -7122,7 +7134,7 @@ TypeInfo *SinglePayloadEnumImplStrategy::completeDynamicLayout(
   
   auto enumAccessible = IsABIAccessible_t(TC.IGM.isTypeABIAccessible(Type));
 
-  auto deinit = theEnum->getValueTypeDestructor()
+  auto deinit = theEnum->hasValueTypeDestructor()
     ? IsNotTriviallyDestroyable : IsTriviallyDestroyable;
   auto copyable = !theEnum->canBeCopyable()
     ? IsNotCopyable : IsCopyable;
@@ -7162,7 +7174,7 @@ MultiPayloadEnumImplStrategy::completeFixedLayout(TypeConverter &TC,
   Alignment worstAlignment(1);
   auto isCopyable = !theEnum->canBeCopyable()
     ? IsNotCopyable : IsCopyable;
-  auto isTriviallyDestroyable = theEnum->getValueTypeDestructor()
+  auto isTriviallyDestroyable = theEnum->hasValueTypeDestructor()
     ? IsNotTriviallyDestroyable : IsTriviallyDestroyable;
   IsBitwiseTakable_t isBT = IsBitwiseTakableAndBorrowable;
   PayloadSize = 0;
@@ -7330,7 +7342,7 @@ TypeInfo *MultiPayloadEnumImplStrategy::completeDynamicLayout(
   // during initializeMetadata. We can at least glean the best available
   // static information from the payloads.
   Alignment alignment(1);
-  auto td = theEnum->getValueTypeDestructor()
+  auto td = theEnum->hasValueTypeDestructor()
     ? IsNotTriviallyDestroyable : IsTriviallyDestroyable;
   auto bt = IsBitwiseTakableAndBorrowable;
   for (auto &element : ElementsWithPayload) {

@@ -2,7 +2,7 @@
 
 // CHECK: struct S1 {
 // CHECK:   struct S2 {
-// CHECK:     var A: Bool
+// CHECK:     var A: CBool
 // CHECK:   }
 // CHECK: }
 
@@ -18,7 +18,7 @@
  
 // CHECK: struct U3 {
 // CHECK:   struct E1 : Hashable, Equatable, RawRepresentable {
-// CHECK:     typealias RawValue = {{UInt32|Int32}}
+// CHECK:     typealias RawValue = {{CUnsignedInt|CInt}}
 // CHECK:   }
 // CHECK: }
  
@@ -30,7 +30,7 @@
 // CHECK: struct S6 {
 // CHECK:   init()
 // CHECK:   struct E3 : Hashable, Equatable, RawRepresentable {
-// CHECK:     typealias RawValue = {{UInt32|Int32}}
+// CHECK:     typealias RawValue = {{CUnsignedInt|CInt}}
 // CHECK:   }
 // CHECK: }
  
@@ -51,7 +51,7 @@
 // CHECK: struct S10 {
 // CHECK:   struct U8 {
 // CHECK:     struct E4 : Hashable, Equatable, RawRepresentable {
-// CHECK:       typealias RawValue = {{UInt32|Int32}}
+// CHECK:       typealias RawValue = {{CUnsignedInt|CInt}}
 // CHECK:     }
 // CHECK:   }
 // CHECK: }
@@ -86,9 +86,9 @@
 // CHECK:   struct HasNestedForwardDeclaration {
 // CHECK:     init()
 // CHECK:     struct IsNestedForwardDeclaration {
-// CHECK:       init(a: Int32)
+// CHECK:       init(a: CInt)
 // CHECK:       init()
-// CHECK:       var a: Int32
+// CHECK:       var a: CInt
 // CHECK:     }
 // CHECK:   }
 // CHECK:   static func takesHasNestedForwardDeclaration(_: NestedDeclIsAFirstForwardDeclaration.HasNestedForwardDeclaration)

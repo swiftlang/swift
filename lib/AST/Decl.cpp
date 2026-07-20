@@ -2057,6 +2057,7 @@ ExtensionDecl::ExtensionDecl(SourceLoc extensionLoc,
 {
   Bits.ExtensionDecl.DefaultAndMaxAccessLevel = 0;
   Bits.ExtensionDecl.HasLazyConformances = false;
+
   setTrailingWhereClause(trailingWhereClause);
 }
 
@@ -2079,6 +2080,16 @@ ExtensionDecl *ExtensionDecl::create(ASTContext &ctx, SourceLoc extensionLoc,
     result->setClangNode(clangNode);
 
   return result;
+}
+
+bool ExtensionDecl::isMetatypeExtension() const {
+  // A parsed `extension P.Protocol` keeps its `ProtocolTypeRepr`; recognize the
+  // form from that without forcing type resolution.  Deserialized and
+  // compiler-synthesized extensions have no representation, but their extended
+  // type is the protocol metatype `(any P).Type`, so recognize it from there.
+  if (auto *repr = getExtendedTypeRepr())
+    return isa<ProtocolTypeRepr>(repr);
+  return getExtendedType()->is<MetatypeType>();
 }
 
 void ExtensionDecl::setConformanceLoader(LazyMemberLoader *lazyLoader,
@@ -5069,7 +5080,7 @@ abi_role_detail::Storage abi_role_detail::computeStorage(Decl *decl) {
 }
 
 ABIRole::ABIRole(NLOptions opts)
-  : value(opts & NL_ABIProviding ? ProvidesABI : ProvidesAPI)
+  : value(opts.contains(NLFlags::ABIProviding) ? ProvidesABI : ProvidesAPI)
 { }
 
 VarDecl *PatternBindingDecl::
@@ -6068,16 +6079,39 @@ bool NominalTypeDecl::isStrictlyResilient() const {
   return isResilient() && !getModuleContext()->allowNonResilientAccess();
 }
 
-DestructorDecl *NominalTypeDecl::getValueTypeDestructor() {
-  if (!isa<StructDecl>(this) && !isa<EnumDecl>(this)) {
-    return nullptr;
+bool NominalTypeDecl::hasValueTypeDestructor() const {
+  // Fast path: we already checked.
+  if (auto cached = getCachedValueTypeDestructor())
+    return *cached;
+
+  // Otherwise, do the lookup, which updates the cached bit for next time.
+  return getValueTypeDestructor() != nullptr;
+}
+
+DestructorDecl *NominalTypeDecl::getValueTypeDestructor() const {
+  bool needsUpdate = true;
+
+  if (auto cached = getCachedValueTypeDestructor()) {
+    // Skip everything else if we know we don't have a destructor.
+    if (!*cached)
+      return nullptr;
+
+    needsUpdate = false;
   }
-  
-  auto found = lookupDirect(DeclBaseName::createDestructor());
-  if (found.size() != 1) {
-    return nullptr;
-  }
-  return cast<DestructorDecl>(found[0]);
+
+  NominalTypeDecl *nominalDecl = const_cast<NominalTypeDecl *>(this);
+
+  // We might have a destructor, go check.
+  DestructorDecl *result = nullptr;
+  auto found = nominalDecl->lookupDirect(DeclBaseName::createDestructor());
+  if (found.size() == 1)
+    result = cast<DestructorDecl>(found[0]);
+
+  ASSERT(needsUpdate || result != nullptr && "Where did my destructor go?");
+  if (needsUpdate)
+    nominalDecl->setCachedValueTypeDestructor(result != nullptr);
+
+  return result;
 }
 
 static bool isOriginallyDefinedIn(const Decl *D, const ModuleDecl* MD) {
@@ -6633,7 +6667,6 @@ AssociatedTypeDecl::getOverriddenDecls() const {
   return assocTypes;
 }
 
-namespace {
 static AssociatedTypeDecl *getAssociatedTypeAnchor(
                       const AssociatedTypeDecl *ATD,
                       llvm::SmallSet<const AssociatedTypeDecl *, 8> &searched) {
@@ -6657,7 +6690,6 @@ static AssociatedTypeDecl *getAssociatedTypeAnchor(
   }
 
   return bestAnchor;
-}
 }
 
 AssociatedTypeDecl *AssociatedTypeDecl::getAssociatedTypeAnchor() const {
@@ -6841,7 +6873,7 @@ NominalTypeDecl::getExecutorOwnedEnqueueFunction() const {
   llvm::SmallVector<ValueDecl *, 2> results;
   lookupQualified(getSelfNominalTypeDecl(),
                   DeclNameRef(C.Id_enqueue),
-                  getLoc(), NL_ProtocolMembers,
+                  getLoc(), NLFlags::ProtocolMembers,
                   results);
 
   for (auto candidate: results) {
@@ -6880,7 +6912,7 @@ NominalTypeDecl::getExecutorLegacyOwnedEnqueueFunction() const {
   llvm::SmallVector<ValueDecl *, 2> results;
   lookupQualified(getSelfNominalTypeDecl(),
                   DeclNameRef(C.Id_enqueue),
-                  getLoc(), NL_ProtocolMembers,
+                  getLoc(), NLFlags::ProtocolMembers,
                   results);
 
   for (auto candidate: results) {
@@ -6919,7 +6951,7 @@ NominalTypeDecl::getExecutorLegacyUnownedEnqueueFunction() const {
   llvm::SmallVector<ValueDecl *, 2> results;
   lookupQualified(getSelfNominalTypeDecl(),
                   DeclNameRef(C.Id_enqueue),
-                  getLoc(), NL_ProtocolMembers,
+                  getLoc(), NLFlags::ProtocolMembers,
                   results);
 
   for (auto candidate: results) {
@@ -7880,7 +7912,8 @@ void ProtocolDecl::computeKnownProtocolKind() const {
       !module->getName().is("_Differentiation") &&
       !module->getName().is("_Concurrency") &&
       !module->getName().is("Distributed") && 
-      !module->getName().is("Cxx")) {
+      !module->getName().is("Cxx") &&
+      !module->getName().is("COM")) {
     const_cast<ProtocolDecl *>(this)->Bits.ProtocolDecl.KnownProtocol = 1;
     return;
   }
@@ -9612,7 +9645,17 @@ Type DeclContext::getSelfInterfaceType() const {
     if (auto *builtinTupleDecl = dyn_cast<BuiltinTupleDecl>(nominalDecl))
       return builtinTupleDecl->getTupleSelfType(dyn_cast<ExtensionDecl>(this));
 
-    if (isa<ProtocolDecl>(nominalDecl)) {
+    if (auto *proto = dyn_cast<ProtocolDecl>(nominalDecl)) {
+      // For metatype extensions, Self is the metatype of the existential
+      // type.  Members are instance members of the metatype, so their self
+      // parameter has type (any P).Type.
+      for (auto *dc = this; dc; dc = dc->getParent()) {
+        if (dc->isMetatypeExtension())
+          return MetatypeType::get(proto->getDeclaredExistentialType());
+        if (isa<ExtensionDecl>(dc) || isa<NominalTypeDecl>(dc))
+          break;
+      }
+
       auto *genericParams = nominalDecl->getGenericParams();
       return genericParams->getParams().front()
           ->getDeclaredInterfaceType();
@@ -12464,7 +12507,7 @@ const VarDecl *ClassDecl::getUnownedExecutorProperty() const {
   llvm::SmallVector<ValueDecl *, 2> results;
   this->lookupQualified(getSelfNominalTypeDecl(),
                         DeclNameRef(C.Id_unownedExecutor),
-                        getLoc(), NL_ProtocolMembers,
+                        getLoc(), NLFlags::ProtocolMembers,
                         results);
 
   for (auto candidate: results) {
@@ -12765,6 +12808,13 @@ void Decl::setClangNode(ClangNode Node) {
 #include "swift/AST/DeclNodes.def"
   }
   *(ptr - 1) = Node.getOpaqueValue();
+}
+
+bool Decl::isClangDeclDeprecated() const {
+  if (const clang::Decl *decl = getClangDecl())
+    return decl->isDeprecated();
+
+  return false;
 }
 
 // See swift/Basic/Statistic.h for declaration: this enables tracing Decls, is

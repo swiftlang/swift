@@ -182,7 +182,7 @@ CONSTANT_OWNERSHIP_INST(None, DifferentiabilityWitnessFunction)
 // TODO: It would be great to get rid of these.
 CONSTANT_OWNERSHIP_INST(Unowned, RawPointerToRef)
 CONSTANT_OWNERSHIP_INST(Unowned, ObjCProtocol)
-CONSTANT_OWNERSHIP_INST(Unowned, ValueToBridgeObject)
+CONSTANT_OWNERSHIP_INST(None, ValueToBridgeObject)
 CONSTANT_OWNERSHIP_INST(None, GetAsyncContinuation)
 CONSTANT_OWNERSHIP_INST(None, GetAsyncContinuationAddr)
 CONSTANT_OWNERSHIP_INST(None, ThinToThickFunction)
@@ -762,6 +762,10 @@ ValueOwnershipKind ValueBase::getOwnershipKind() const {
     // variable. We don't verify ownership there so just return
     // OwnershipKind::None.
     if (!f)
+      return OwnershipKind::None;
+
+    // Debug reconstruction blocks don't participate in the ownership system.
+    if (block->isDebugReconstructionBlock())
       return OwnershipKind::None;
 
     // Now that we know that we do have a block/function, check if we have

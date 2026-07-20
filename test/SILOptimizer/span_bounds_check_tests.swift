@@ -8,7 +8,6 @@
 // RUN:   -enable-experimental-feature Lifetimes \
 // RUN:   | %FileCheck %s  --check-prefix=CHECK-IR
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_Lifetimes
 // REQUIRES: swift_stdlib_no_asserts, optimized_stdlib
 
@@ -377,5 +376,20 @@ public func span_different_self_sum(p: borrowing Span<Int>, q: borrowing Span<In
     let a = p[i]
     let b = q[i]
     return a &+ b
+}
+
+// Bounds check should be hoisted but not eliminated for preincrement patterns
+// SIL optimizer optimizes the loop but keeps bounds checks
+
+// CHECK-SIL-LABEL: sil @$s23span_bounds_check_tests0A21_hoist_dont_eliminate0A0Sis4SpanVySiG_tF :
+// CHECK-SIL: cond_fail {{.*}}, "Index out of bounds"
+// CHECK-SIL: cond_fail {{.*}}, "Index out of bounds"
+// CHECK-SIL-LABEL: } // end sil function '$s23span_bounds_check_tests0A21_hoist_dont_eliminate0A0Sis4SpanVySiG_tF'
+public func span_hoist_dont_eliminate(span: Span<Int>) -> Int {
+  var sum = 0
+  for i in 0...span.count {
+    sum &+= span[i]
+  }
+  return sum
 }
 

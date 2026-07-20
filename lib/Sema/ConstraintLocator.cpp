@@ -771,6 +771,15 @@ bool ConstraintLocator::isForPatternMatch() const {
   return getPatternMatch() != nullptr;
 }
 
+bool ConstraintLocator::isForPatternDecl() const {
+  return isLastElement<LocatorPathElt::PatternDecl>();
+}
+
+bool ConstraintLocator::isForCollectionElement() const {
+  return isExpr<CollectionExpr>(getAnchor()) && getPath().size() == 1 &&
+         isLastElement<LocatorPathElt::TupleElement>();
+}
+
 bool ConstraintLocator::isMemberRef() const {
   if (isLastElement<LocatorPathElt::Member>()) {
     return true;

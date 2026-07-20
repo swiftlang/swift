@@ -85,10 +85,18 @@ Here is how to dump the IR after the main phases of the Swift compiler
 swiftc -dump-ast -O file.swift
 ```
 
-* **SILGen** To print the SIL immediately after SILGen:
+* **SILGen** To print the SIL immediately after SILGen (without any SIL verification):
 
 ```sh
-swiftc -emit-silgen -O file.swift
+swiftc -emit-silgen file.swift
+```
+
+* **SILGen (OSSA)** To print verified SIL immediately after SILGen's cleanup passes that 
+  turn it into complete OSSA SIL, stopping before running any diagnostic passes. This is a
+  frontend-only flag:
+
+```sh
+swift-frontend -emit-silgen-ossa file.swift
 ```
 
 * **Mandatory SIL passes** To print the SIL after the mandatory passes:
@@ -272,6 +280,18 @@ A short (non-exhaustive) list of SIL printing options:
   modifies a function and print the entire module if a module pass modifies
   the SILModule.
 
+* `-Xllvm -sil-print-pass-name`: Print the name (and index and function) of
+  each pass as it runs, without dumping any SIL. Also reports passes that were
+  skipped or disabled. Useful for seeing the sequence of passes the pass
+  manager runs.
+
+* `-Xllvm -sil-print-pass-time`: Print the wall-clock time each pass takes.
+  Filter out short passes with `-Xllvm -sil-print-pass-time-threshold=$MS`,
+  which suppresses any pass that runs for fewer than `$MS` milliseconds.
+
+* `-Xllvm -sil-print-pass-md5`: Print an MD5 of the module after each pass that
+  invalidated analyses. Useful for spotting which pass changed the SIL.
+
 * `-Xllvm -sil-print-around=$PASS_NAME`: Print the SIL before and after a pass
   with name `$PASS_NAME` runs on a function or module.
   By default it prints the whole module. To print only specific functions, add
@@ -285,6 +305,17 @@ A short (non-exhaustive) list of SIL printing options:
 
 NOTE: This may emit a lot of text to stderr, so be sure to pipe the
 output to a file.
+
+* `-Xllvm -sil-view-dom=<pass_count>`: Open a graphical view of the dominator
+  tree for the function at the given pass count. The graph shows the full
+  contents of each basic block.
+
+* `-Xllvm -sil-view-dom-only=<pass_count>`: Like `-sil-view-dom`, but the
+  graph shows only basic block labels without their contents.
+
+  NOTE: These flags use `llvm::ViewGraph`, which on macOS relies on the
+  `open` program. `.dot` files must be associated with a dot viewer such as
+  Graphviz for the graph to display.
 
 ### Getting CommandLine for swift stdlib from Ninja to enable dumping stdlib SIL
 

@@ -21,12 +21,14 @@ swift_compiler_sources(Optimizer
   CondFailOptimization.swift
   CopyToBorrowOptimization.swift
   DeadAccessScopeElimination.swift
+  DeadObjectElimination.swift
   DeadStoreElimination.swift
   DeinitDevirtualizer.swift
   DestroyHoisting.swift
   DiagnoseInfiniteRecursion.swift
   EmbeddedWitnessCallSpecialization.swift
   InitializeStaticGlobals.swift
+  KillInvalidDebugValues.swift
   LetPropertyLowering.swift
   LifetimeDependenceDiagnostics.swift
   LifetimeDependenceInsertion.swift

@@ -167,16 +167,9 @@ static OperandValueArrayRef getEdgeValuesForTerminator(TermInst *ti,
            "Incoming edge block and phi block mismatch");
     return br->getArgs();
   }
-  if (auto *cbi = dyn_cast<CondBranchInst>(ti)) {
-    bool isTrueEdge = cbi->getTrueBB() == toBlock;
-    assert(((isTrueEdge && cbi->getTrueBB() == toBlock) ||
-            cbi->getFalseBB() == toBlock) &&
-           "Incoming edge block and phi block mismatch");
-    return isTrueEdge ? cbi->getTrueArgs() : cbi->getFalseArgs();
-  }
 
-  // We need a predecessor who is capable of holding outgoing branch
-  // arguments.
+  // Only a BranchInst can carry phi arguments: SIL has no critical edges, so a
+  // phi block is only ever reached through unconditional branches.
   llvm_unreachable("Unrecognized terminator leading to phi block");
 }
 
@@ -444,19 +437,12 @@ UseWrapper::UseWrapper(Operand *inputUse) {
 
   // Conditional branch user.
   if (auto *cbi = dyn_cast<CondBranchInst>(user)) {
-    auto operands = user->getAllOperands();
-    auto numTrueArgs = cbi->getTrueArgs().size();
-    for (auto pair : llvm::enumerate(operands)) {
+    // A cond_br only uses its condition operand and passes no branch arguments
+    // (SIL has no critical edges).
+    for (auto pair : llvm::enumerate(cbi->getAllOperands())) {
       if (inputUse == &pair.value()) {
-        unsigned i = pair.index();
-        // We treat the condition as part of the true args.
-        if (i < numTrueArgs + 1) {
-          index = i;
-          type = kCondBranchUseTrue;
-        } else {
-          index = i - numTrueArgs - 1;
-          type = kCondBranchUseFalse;
-        }
+        index = pair.index();
+        type = kCondBranchUseTrue;
         parent = cbi->getParent();
         return;
       }
@@ -480,14 +466,10 @@ Operand *UseWrapper::getOperand() {
 
   case kCondBranchUseTrue:
   case kCondBranchUseFalse: {
+    // A cond_br only uses its condition operand and passes no branch arguments.
     auto *cbi = cast<CondBranchInst>(parent->getTerminator());
-    auto indexToUse = [&]() -> unsigned {
-      if (type == kCondBranchUseTrue)
-        return index;
-      return cbi->getTrueArgs().size() + 1 + index;
-    }();
-    assert(indexToUse < cbi->getAllOperands().size());
-    return &cbi->getAllOperands()[indexToUse];
+    assert(index < cbi->getAllOperands().size());
+    return &cbi->getAllOperands()[index];
   }
   }
 

@@ -1,6 +1,5 @@
 // RUN: %target-sil-opt -enable-sil-verify-all %s -onone-simplification -simplify-instruction=struct_extract | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 
 import Swift
 import Builtin

@@ -195,18 +195,18 @@ extension MutatingContext {
     _bridged.eraseInstruction(instruction.bridged, salvageDebugInfo)
   }
 
-  public func erase(instructionIncludingAllUsers inst: Instruction) {
+  public func erase(instructionIncludingAllUsers inst: Instruction, salvageDebugInfo: Bool = true) {
     if inst.isDeleted {
       return
     }
     for result in inst.results {
-      for use in result.uses {
-        erase(instructionIncludingAllUsers: use.instruction)
+      // salvageDebugInfo may create new `debug_value` users, which are inserted at the begin of the
+      // use-list. Therefore we cannot iterate with a `for use in result.uses`.
+      while let use = result.uses.first {
+        erase(instructionIncludingAllUsers: use.instruction, salvageDebugInfo: salvageDebugInfo)
       }
     }
-    // We rely that after deleting the instruction its operands have no users.
-    // Therefore `salvageDebugInfo` must be turned off because we cannot insert debug_value instructions.
-    erase(instruction: inst, salvageDebugInfo: false)
+    erase(instruction: inst, salvageDebugInfo: salvageDebugInfo)
   }
 
   public func erase<S: Sequence>(instructions: S) where S.Element: Instruction {

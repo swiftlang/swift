@@ -15,7 +15,6 @@ target_link_libraries(swiftFrontendTool PRIVATE
     swiftDemangling
     swiftDependencyScan
     swiftFrontend
-    swiftImmediate
     swiftIndex
     swiftIRGen
     swiftMigrator
@@ -26,6 +25,11 @@ target_link_libraries(swiftFrontendTool PRIVATE
     swiftSILGen
     swiftSILOptimizer
     swiftThreading)
+
+if (SWIFT_BUILD_IMMEDIATE_MODE)
+  target_link_libraries(swiftFrontendTool PRIVATE
+    swiftImmediate)
+endif()
 
 if (SWIFT_BUILD_SWIFT_SYNTAX)
   target_link_libraries(swiftFrontendTool PRIVATE

@@ -106,9 +106,9 @@ struct FwdContainer::Forward {
 // CHECK-NEXT:   init()
 // CHECK-NEXT:   typealias ForwardAlias = FwdContainer.Forward
 // CHECK-NEXT:   struct Forward {
-// CHECK-NEXT:     init(value: Int32)
+// CHECK-NEXT:     init(value: CInt)
 // CHECK-NEXT:     init()
-// CHECK-NEXT:     var value: Int32
+// CHECK-NEXT:     var value: CInt
 // CHECK-NEXT:   }
 // CHECK-NEXT: }
 

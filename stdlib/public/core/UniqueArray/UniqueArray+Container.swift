@@ -16,7 +16,7 @@ extension UniqueArray where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public var isEmpty: Bool {
     _storage.isEmpty
@@ -26,7 +26,7 @@ extension UniqueArray where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public var count: Int {
     _storage.count
@@ -47,7 +47,7 @@ extension UniqueArray where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public var startIndex: Int {
     _storage.startIndex
@@ -58,7 +58,7 @@ extension UniqueArray where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public var endIndex: Int {
     _storage.count
@@ -68,7 +68,7 @@ extension UniqueArray where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public var indices: Range<Int> {
     _storage.indices
@@ -82,7 +82,7 @@ extension UniqueArray where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public subscript(position: Int) -> Element {
     @_transparent
     @_unsafeSelfDependentResult
@@ -110,7 +110,7 @@ extension UniqueArray where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public mutating func swapAt(_ i: Int, _ j: Int) {
     _storage.swapAt(i, j)
   }
@@ -130,7 +130,7 @@ extension UniqueArray where Element: ~Copyable {
   /// - Returns: The index immediately following `i`.
   /// - Complexity: O(1)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public func index(after index: Int) -> Int {
     index + 1
@@ -148,7 +148,7 @@ extension UniqueArray where Element: ~Copyable {
   /// - Returns: The index immediately preceding `i`.
   /// - Complexity: O(1)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public func index(before index: Int) -> Int {
     index - 1
@@ -165,7 +165,7 @@ extension UniqueArray where Element: ~Copyable {
   ///     than `endIndex`.
   /// - Complexity: O(1)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public func formIndex(after index: inout Int) {
     index += 1
@@ -182,7 +182,7 @@ extension UniqueArray where Element: ~Copyable {
   ///     `startIndex`.
   /// - Complexity: O(1)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public func formIndex(before index: inout Int) {
     index -= 1
@@ -206,7 +206,7 @@ extension UniqueArray where Element: ~Copyable {
   ///    calls to `index(before:)`.
   /// - Complexity: O(1)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public func index(_ index: Int, offsetBy n: Int) -> Int {
     index + n
@@ -225,7 +225,7 @@ extension UniqueArray where Element: ~Copyable {
   /// - Returns: The distance between `start` and `end`.
   /// - Complexity: O(1)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public func distance(from start: Index, to end: Index) -> Int {
     end - start
@@ -263,7 +263,7 @@ extension UniqueArray where Element: ~Copyable {
   ///    effect.
   /// - Complexity: O(1)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func formIndex(
     _ index: inout Index,
     offsetBy n: inout Int,

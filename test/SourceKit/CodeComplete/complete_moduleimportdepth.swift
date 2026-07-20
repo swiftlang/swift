@@ -24,14 +24,14 @@ func test() {
 
 // FooHelper.FooHelperExplicit == 1
 // CHECK-LABEL:  key.name: "fooHelperExplicitFrameworkFunc1(:)",
-// CHECK-NEXT:   key.description: "fooHelperExplicitFrameworkFunc1(a: Int32)",
-// CHECK-NEXT:   key.typename: "Int32",
+// CHECK-NEXT:   key.description: "fooHelperExplicitFrameworkFunc1(a: CInt)",
+// CHECK-NEXT:   key.typename: "CInt",
 // CHECK-NEXT:   key.context: source.codecompletion.context.othermodule,
 // CHECK-NEXT:   key.moduleimportdepth: 1,
 // CHECK-NEXT:   key.num_bytes_to_erase: 0,
 // CHECK-NOT:    key.modulename
 // CHECK:        key.modulename: "FooHelper.FooHelperExplicit"
-// CHECK-NEXT:   key.sourcetext: "fooHelperExplicitFrameworkFunc1(<#T##a: Int32##Int32#>)"
+// CHECK-NEXT:   key.sourcetext: "fooHelperExplicitFrameworkFunc1(<#T##a: CInt##CInt#>)"
 // CHECK-NEXT: },
 
 // ImportsImportsFoo == 1

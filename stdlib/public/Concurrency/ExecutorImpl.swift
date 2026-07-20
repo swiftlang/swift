@@ -68,6 +68,7 @@ internal func getMainExecutor() -> UnownedSerialExecutor {
 @available(SwiftStdlib 6.2, *)
 @_silgen_name("swift_task_enqueueMainExecutorImpl")
 @diagnose(UselessAvailabilityCheck, as: ignored)
+@diagnose(DeprecatedDeclaration, as: ignored)
 internal func enqueueOnMainExecutor(job unownedJob: UnownedJob) {
   #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   if #available(StdlibDeploymentTarget 6.3, *) {

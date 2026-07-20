@@ -1092,7 +1092,6 @@ public:
 
   DebugValueInst *createDebugValue(
       SILLocation Loc, SILValue src, SILDebugVariable Var,
-      PoisonRefs_t poisonRefs = DontPoisonRefs,
       UsesMoveableValueDebugInfo_t wasMoved = DoesNotUseMoveableValueDebugInfo,
       bool trace = false, bool overrideLoc = true);
 
@@ -1484,7 +1483,6 @@ public:
   }
 
   DestroyValueInst *createDestroyValue(SILLocation Loc, SILValue operand,
-                                       PoisonRefs_t poisonRefs = DontPoisonRefs,
                                        IsDeadEnd_t isDeadEnd = IsntDeadEnd) {
     ASSERT(getFunction().hasOwnership());
     ASSERT(isLoadableOrOpaque(operand->getType()));
@@ -1492,7 +1490,7 @@ public:
            "Should not be passing trivial values to this api. Use instead "
            "emitDestroyValueOperation");
     return insert(new (getModule()) DestroyValueInst(
-        getSILDebugLocation(Loc), operand, poisonRefs, isDeadEnd));
+        getSILDebugLocation(Loc), operand, isDeadEnd));
   }
 
   MoveValueInst *createMoveValue(
@@ -1727,6 +1725,11 @@ public:
                            ArrayRef<SILValue> Elements,
                            ValueOwnershipKind forwardingOwnershipKind) {
     ASSERT(isLoadableOrOpaque(Ty) || isInsertingIntoGlobal());
+    // Debug reconstruction blocks have no ownership semantics.
+    if (BB && BB->isDebugReconstructionBlock())
+      forwardingOwnershipKind = OwnershipKind::None;
+    else
+      forwardingOwnershipKind = forwardingOwnershipKind.forwardToInit(Ty);
     return insert(StructInst::create(getSILDebugLocation(Loc), Ty, Elements,
                                      getModule(), forwardingOwnershipKind));
   }
@@ -1776,6 +1779,12 @@ public:
            (isInsertingIntoGlobal() && getTypeLowering(Ty).isFixedABI()));
     // Assert that this works and does not crash.
     (void)getModule().getCaseIndex(Element);
+
+    // Debug reconstruction blocks have no ownership semantics.
+    if (BB && BB->isDebugReconstructionBlock())
+      forwardingOwnershipKind = OwnershipKind::None;
+    else
+      forwardingOwnershipKind = forwardingOwnershipKind.forwardToInit(Ty);
 
     return insert(new (getModule())
                       EnumInst(getSILDebugLocation(Loc), Operand, Element, Ty,
@@ -2809,41 +2818,9 @@ public:
                    ProfileCounter Target1Count = ProfileCounter(),
                    ProfileCounter Target2Count = ProfileCounter()) {
     return insertTerminator(
-        CondBranchInst::create(getSILDebugLocation(Loc), Cond, Target1, Target2,
-                               Target1Count, Target2Count, getFunction()));
-  }
-
-  CondBranchInst *
-  createCondBranch(SILLocation Loc, SILValue Cond, SILBasicBlock *Target1,
-                   ArrayRef<SILValue> Args1, SILBasicBlock *Target2,
-                   ArrayRef<SILValue> Args2,
-                   ProfileCounter Target1Count = ProfileCounter(),
-                   ProfileCounter Target2Count = ProfileCounter()) {
-    return insertTerminator(
-        CondBranchInst::create(getSILDebugLocation(Loc), Cond, Target1, Args1,
-                               Target2, Args2, Target1Count, Target2Count, getFunction()));
-  }
-
-  CondBranchInst *
-  createCondBranch(SILLocation Loc, SILValue Cond, SILBasicBlock *Target1,
-                   OperandValueArrayRef Args1, SILBasicBlock *Target2,
-                   OperandValueArrayRef Args2,
-                   ProfileCounter Target1Count = ProfileCounter(),
-                   ProfileCounter Target2Count = ProfileCounter()) {
-    SmallVector<SILValue, 6> ArgsCopy1;
-    SmallVector<SILValue, 6> ArgsCopy2;
-
-    ArgsCopy1.reserve(Args1.size());
-    ArgsCopy2.reserve(Args2.size());
-
-    for (auto I = Args1.begin(), E = Args1.end(); I != E; ++I)
-      ArgsCopy1.push_back(*I);
-    for (auto I = Args2.begin(), E = Args2.end(); I != E; ++I)
-      ArgsCopy2.push_back(*I);
-
-    return insertTerminator(CondBranchInst::create(
-        getSILDebugLocation(Loc), Cond, Target1, ArgsCopy1, Target2, ArgsCopy2,
-        Target1Count, Target2Count, getFunction()));
+        new (getModule()) CondBranchInst(getSILDebugLocation(Loc),
+                                         Cond, Target1, Target2,
+                                         Target1Count, Target2Count));
   }
 
   BranchInst *createBranch(SILLocation Loc, SILBasicBlock *TargetBlock) {

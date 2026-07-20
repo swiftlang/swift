@@ -771,7 +771,7 @@ PrimaryAssociatedTypesRequest::evaluate(Evaluator &evaluator,
 
     decl->lookupQualified(ArrayRef<NominalTypeDecl *>(decl),
                           DeclNameRef(pair.first), decl->getLoc(),
-                          NL_QualifiedDefault | NL_OnlyTypes,
+                          {NLFlags::QualifiedDefault, NLFlags::OnlyTypes},
                           result);
 
     AssociatedTypeDecl *bestAssocType = nullptr;
@@ -3104,6 +3104,16 @@ ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
     return error();
   }
 
+  // A protocol metatype extension `extension P.Protocol` extends the metatype
+  // of a protocol existential.  Accept it here — the metatype and non-nominal
+  // checks below would otherwise reject it — leaving the extended nominal (the
+  // protocol `P`) to be resolved separately.  Whether such an extension is
+  // permitted (only for `@com` protocols) is enforced during extension
+  // validation.
+  if (auto *metatype = extendedType->getAs<MetatypeType>())
+    if (metatype->getInstanceType()->isExistentialType())
+      return extendedType;
+
   // Hack to allow extending a generic typealias.
   if (auto *unboundGeneric = extendedType->getAs<UnboundGenericType>()) {
     if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(unboundGeneric->getDecl())) {
@@ -3147,6 +3157,47 @@ ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
   return extendedType;
 }
 
+namespace {
+ProtocolConformance *deriveImplicitCOMConformance(NominalTypeDecl *NTD,
+                                                  KnownProtocolKind KP) {
+  const auto *CD = dyn_cast<ClassDecl>(NTD);
+  if (CD == nullptr)
+    return nullptr;
+
+  if (!CD->getAttrs().hasAttribute<COMAttr>())
+    return nullptr;
+
+  ASTContext &context = NTD->getASTContext();
+  auto *protocol = context.getProtocol(KP);
+  if (protocol == nullptr)
+    return nullptr;
+
+  // Ensure that `ISwiftObject` is always compiler managed.
+  if (KP == KnownProtocolKind::ISwiftObject) {
+    llvm::SmallVector<ProtocolConformance *, 2> conformances;
+    NTD->lookupConformance(protocol, conformances);
+    if (!conformances.empty()) {
+      context.Diags.diagnose(CD->getLoc(), diag::attr_com_explicit_iswiftobject);
+      if (auto *A = CD->getAttrs().getAttribute<COMAttr>())
+        context.Diags.diagnose(A->getLocation(),
+                               diag::attr_com_iswiftobject_implied);
+      return conformances.front();
+    }
+  }
+
+  auto conformance =
+      context.getNormalConformance(NTD->getDeclaredInterfaceType(), protocol,
+                                   NTD->getLoc(), /*inheritedTypeRepr=*/nullptr,
+                                   /*conformanceDC=*/NTD,
+                                   ProtocolConformanceState::Complete,
+                                   ProtocolConformanceOptions());
+  conformance->setSourceKindAndImplyingConformance(ConformanceEntryKind::Synthesized,
+                                                   nullptr);
+  NTD->registerProtocolConformance(conformance, /*synthesized=*/true);
+  return conformance;
+}
+}
+
 //----------------------------------------------------------------------------//
 // ImplicitKnownProtocolConformanceRequest
 //----------------------------------------------------------------------------//
@@ -3159,6 +3210,9 @@ ImplicitKnownProtocolConformanceRequest::evaluate(Evaluator &evaluator,
     return deriveImplicitSendableConformance(evaluator, nominal);
   case KnownProtocolKind::BitwiseCopyable:
     return deriveImplicitBitwiseCopyableConformance(nominal);
+  case KnownProtocolKind::IUnknown:
+  case KnownProtocolKind::ISwiftObject:
+    return deriveImplicitCOMConformance(nominal, kp);
   default:
     llvm_unreachable("non-implicitly derived KnownProtocol");
   }

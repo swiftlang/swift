@@ -1,7 +1,6 @@
 // RUN: %target-swift-frontend -parse-as-library -O -emit-ir  %s | %FileCheck %s
 // RUN: %target-swift-frontend -parse-as-library -Osize -emit-ir  %s | %FileCheck %s
 // REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
-// REQUIRES: swift_in_compiler
 
 // The required relocation format for a single return LLVM instruction are not necessarily
 // supported on object file formats other than Mach-O.

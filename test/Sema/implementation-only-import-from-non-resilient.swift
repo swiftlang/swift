@@ -8,11 +8,11 @@
 // RUN:   -enable-library-evolution -swift-version 5
 
 /// Build a client with and without library-evolution.
-// RUN: %target-swift-frontend -typecheck %t/client-non-resilient.swift -I %t -verify
+// RUN: %target-swift-frontend -typecheck %t/client-non-resilient.swift -I %t \
+// RUN:   -verify -verify-additional-prefix default-
 // RUN: %target-swift-frontend -typecheck %t/client-non-resilient.swift -I %t -verify \
+// RUN:   -verify-additional-prefix default- \
 // RUN:   -warnings-as-errors -Wwarning ImplementationOnlyDeprecated
-// RUN: %target-swift-frontend -typecheck %t/client-resilient.swift -I %t -verify \
-// RUN:   -enable-library-evolution -swift-version 5
 
 /// Some imports are exempt.
 // RUN: %target-swift-frontend -emit-module %t/empty.swift \
@@ -20,6 +20,15 @@
 // RUN:   -enable-library-evolution -swift-version 5
 // RUN: %target-swift-frontend -typecheck %t/Crypto.swift -I %t -verify \
 // RUN:   -module-name Crypto
+
+// Verify SerializeAbstractTypeLayoutForHiddenTypes suppresses diagnostics warning about @_implementationOnly use without library-evolution or CheckImplementationOnly
+// RUN: %target-swift-frontend -typecheck %t/client-non-resilient.swift -I %t \
+// RUN:   -verify \
+// RUN:   -enable-experimental-feature SerializeAbstractTypeLayoutForHiddenTypes
+// RUN: %target-swift-frontend -typecheck %t/client-resilient.swift -I %t -verify \
+// RUN:   -enable-library-evolution -swift-version 5
+
+// REQUIRES: swift_feature_SerializeAbstractTypeLayoutForHiddenTypes
 
 //--- module.modulemap
 module ClangModuleA {
@@ -41,12 +50,12 @@ module ClangModuleB {
 //--- empty.swift
 
 //--- client-non-resilient.swift
-@_implementationOnly import SwiftModuleA // expected-warning {{safely use '@_implementationOnly' without library evolution by setting '-enable-experimental-feature CheckImplementationOnly' for 'main'}}
-@_implementationOnly import SwiftModuleA // expected-warning {{safely use '@_implementationOnly' without library evolution by setting '-enable-experimental-feature CheckImplementationOnly' for 'main'}}
+@_implementationOnly import SwiftModuleA // expected-default-warning {{safely use '@_implementationOnly' without library evolution by setting '-enable-experimental-feature CheckImplementationOnly' for 'main'}}
+@_implementationOnly import SwiftModuleA // expected-default-warning {{safely use '@_implementationOnly' without library evolution by setting '-enable-experimental-feature CheckImplementationOnly' for 'main'}}
 import SwiftModuleB
 
-@_implementationOnly import ClangModuleA // expected-warning {{safely use '@_implementationOnly' without library evolution by setting '-enable-experimental-feature CheckImplementationOnly' for 'main'}}
-@_implementationOnly import ClangModuleA.Submodule // expected-warning {{safely use '@_implementationOnly' without library evolution by setting '-enable-experimental-feature CheckImplementationOnly' for 'main'}}
+@_implementationOnly import ClangModuleA // expected-default-warning {{safely use '@_implementationOnly' without library evolution by setting '-enable-experimental-feature CheckImplementationOnly' for 'main'}}
+@_implementationOnly import ClangModuleA.Submodule // expected-default-warning {{safely use '@_implementationOnly' without library evolution by setting '-enable-experimental-feature CheckImplementationOnly' for 'main'}}
 import ClangModuleB
 
 //--- client-resilient.swift

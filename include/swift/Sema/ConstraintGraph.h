@@ -101,6 +101,11 @@ public:
     return *Set;
   }
 
+  const inference::BindingSet &getBindingSet() const {
+    ASSERT(hasBindingSet());
+    return *Set;
+  }
+
   bool hasBindingSet() const {
     return Set.has_value();
   }

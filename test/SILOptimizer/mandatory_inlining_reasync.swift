@@ -1,7 +1,6 @@
 // RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-sil -enable-experimental-concurrency -target %target-swift-5.1-abi-triple %s | %FileCheck %s
 // REQUIRES: concurrency
 
-// REQUIRES: swift_in_compiler
 
 @_transparent
 func reasyncFunction(_ value: Optional<Int>, _ fn: () async throws -> Int) reasync rethrows -> Int {

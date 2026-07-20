@@ -1888,6 +1888,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.DumpTypeWitnessSystems = Args.hasArg(OPT_dump_type_witness_systems);
 
+  setUnsignedIntegerArgument(OPT_max_associated_type_inference_iterations,
+                             Opts.AssociatedTypeInferenceIterations);
+
   for (auto &block: FrontendOpts.BlocklistConfigFilePaths)
     Opts.BlocklistConfigFilePaths.push_back(block);
   if (const Arg *A = Args.getLastArg(options::OPT_concurrency_model)) {
@@ -2146,6 +2149,11 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
       Args.hasFlag(OPT_solver_enable_performance_hacks,
                    OPT_solver_disable_performance_hacks,
                    Opts.SolverEnablePerformanceHacks);
+
+  Opts.SolverEnableEnumerateSupertypes =
+      Args.hasFlag(OPT_solver_enable_enumerate_supertypes,
+                   OPT_solver_disable_enumerate_supertypes,
+                   Opts.SolverEnableEnumerateSupertypes);
 
   if (FrontendOpts.RequestedAction == FrontendOptions::ActionType::Immediate)
     Opts.DeferToRuntime = true;

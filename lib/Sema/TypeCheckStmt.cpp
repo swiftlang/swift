@@ -1567,7 +1567,7 @@ public:
         diagnosed = true;
 
       // has to have a deinit or else it's pointless.
-      } else if (!nominalDecl->getValueTypeDestructor()) {
+      } else if (!nominalDecl->hasValueTypeDestructor()) {
         ctx.Diags.diagnose(DS->getDiscardLoc(),
                            diag::discard_no_deinit,
                            nominalType)
@@ -2588,7 +2588,7 @@ static bool checkSuperInit(ConstructorDecl *fromCtor,
     superclassDecl->synthesizeSemanticMembersIfNeeded(
         DeclBaseName::createConstructor());
 
-    NLOptions subOptions = NL_QualifiedDefault;
+    NLOptions subOptions = NLFlags::QualifiedDefault;
 
     SmallVector<ValueDecl *, 4> lookupResults;
     fromCtor->lookupQualified(superclassDecl,
@@ -3701,30 +3701,26 @@ FuncDecl *TypeChecker::getForEachIteratorNextFunction(
   return ctx.getAsyncIteratorNext();
 }
 
-bool swift::shouldUseBorrowingSequence(ASTContext &ctx, Type seqTy,
+bool swift::shouldUseIterable(ASTContext &ctx, Type seqTy,
                                        bool isAsync, SourceLoc loc,
                                        DeclContext *dc) {
-  if (!ctx.LangOpts.hasFeature(Feature::BorrowingForLoop)) {
-    return false;
-  }
-
   if (isAsync || seqTy->isExistentialType()) {
     return false;
   }
 
   auto *borrowingSeqProto =
-      ctx.getProtocol(KnownProtocolKind::BorrowingSequence);
+      ctx.getProtocol(KnownProtocolKind::Iterable);
   if (!borrowingSeqProto) {
     return false;
   }
 
-  // Always prefer conformance to Sequence over BorrowingSequence when
+  // Always prefer conformance to Sequence over Iterable when
   // both are available.
   if (lookupConformance(seqTy, ctx.getProtocol(KnownProtocolKind::Sequence))) {
     return false;
   }
 
-  // Fall back to Sequence if no conformance to BorrowingSequence is found.
+  // Fall back to Sequence if no conformance to Iterable is found.
   // This ensures that we maintain Sequence as the minimal required
   // conformance.
   auto seqConformanceRef = lookupConformance(seqTy, borrowingSeqProto);
@@ -3767,21 +3763,23 @@ public:
         (stmt->getWhere() && stmt->getWhere()->getType()->hasError()))
       return nullptr;
 
-    isBorrowing = shouldUseBorrowingSequence(ctx, seqType, isAsync,
+    isBorrowing = shouldUseIterable(ctx, seqType, isAsync,
                                              sequence->getStartLoc(), dc);
 
     sequenceProto =
         isAsync ? ctx.getProtocol(KnownProtocolKind::AsyncSequence)
                 : (isBorrowing
-                       ? ctx.getProtocol(KnownProtocolKind::BorrowingSequence)
+                       ? ctx.getProtocol(KnownProtocolKind::Iterable)
                        : ctx.getProtocol(KnownProtocolKind::Sequence));
     seqConformanceRef = lookupConformance(seqType, sequenceProto);
     ASSERT(!seqConformanceRef.isInvalid() || seqType->isExistentialType());
 
-    if (auto constraint = seqConformanceRef.getAvailabilityConstraint(
-            dc, stmt->getForLoc())) {
-      emitDiagnosticsForUnavailableConformance(seqType, constraint.value());
-      return nullptr;
+    if (!ctx.LangOpts.DisableAvailabilityChecking) {
+      if (auto restriction = seqConformanceRef.getAvailabilityRestriction(
+              dc, stmt->getForLoc())) {
+        emitDiagnosticsForUnavailableConformance(seqType, restriction.value());
+        return nullptr;
+      }
     }
 
     buildMakeIteratorVar();
@@ -3801,13 +3799,12 @@ public:
   }
 
 private:
-  void
-  emitDiagnosticsForUnavailableConformance(Type seqType,
-                                           AvailabilityConstraint constraint) {
+  void emitDiagnosticsForUnavailableConformance(
+      Type seqType, AvailabilityRestriction restriction) {
     auto loc = stmt->getForLoc();
     auto protoDecl = seqConformanceRef.getProtocol();
 
-    auto domainAndRange = constraint.getDomainAndRange(ctx);
+    auto domainAndRange = restriction.getDomainAndRange(ctx);
     auto domain = domainAndRange.getDomain();
     auto range = domainAndRange.getRange();
     if (domain.isVersioned() && range.hasMinimumVersion()) {
@@ -3815,7 +3812,7 @@ private:
                          seqType, protoDecl,
                          domain.getNameForAttributePrinting(),
                          range.getVersionString());
-      fixAvailability(loc, dc, constraint.getFixItDomainAndRange(ctx), ctx);
+      fixAvailability(loc, dc, restriction.getFixItDomainAndRange(ctx), ctx);
     } else {
       ctx.Diags.diagnose(
           loc, diag::for_loop_sequence_conformance_unavailable_unconditionally,
@@ -3849,7 +3846,7 @@ private:
   }
 
   Expr *buildNextSpanCall(DeclRefExpr *makeIteratorVarRef) {
-    // For borrowing: call nextSpan(maximumCount: Int.max)
+    // For borrowing: call nextSpan(maxCount: Int.max)
     auto *nextSpanFn = ctx.getBorrowingIteratorNextSpan();
     auto associatedType =
         sequenceProto->getAssociatedType(ctx.Id_BorrowingIterator);
@@ -3866,9 +3863,9 @@ private:
     auto *intRef = TypeExpr::createImplicit(ctx.getIntType(), ctx);
     auto *maxRef = UnresolvedDotExpr::createImplicit(ctx, intRef, ctx.Id_max);
 
-    // Create argument: maximumCount: Int.max
+    // Create argument: maxCount: Int.max
     auto *args =
-        ArgumentList::forImplicitSingle(ctx, ctx.Id_maximumCount, maxRef);
+        ArgumentList::forImplicitSingle(ctx, ctx.Id_maxCount, maxRef);
 
     return CallExpr::createImplicit(ctx, nextSpanRef, args);
   }
@@ -3947,7 +3944,7 @@ private:
     // that in a special variable which is going to be used by SILGen.
     FuncDecl *makeIterator =
         isAsync ? ctx.getAsyncSequenceMakeAsyncIterator()
-                : (isBorrowing ? ctx.getBorrowingSequenceMakeBorrowingIterator()
+                : (isBorrowing ? ctx.getIterableMakeBorrowingIterator()
                                : ctx.getSequenceMakeIterator());
 
     ConcreteDeclRef witness;

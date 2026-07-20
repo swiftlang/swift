@@ -195,6 +195,10 @@ bool findUsesOfSimpleValue(SILValue value,
 bool visitGuaranteedForwardingPhisForSSAValue(
     SILValue value, function_ref<bool(Operand *)> func);
 
+/// Visit all GuaranteedForwardingPhis of \p value, following phi uses.
+bool visitExtendedGuaranteedForwardingPhis(
+    SILValue value, function_ref<bool(Operand *)> visitor);
+
 //===----------------------------------------------------------------------===//
 //                                Abstractions
 //===----------------------------------------------------------------------===//
@@ -647,8 +651,7 @@ struct BorrowedValue {
   /// \p deadEndBlocks is optional during transition. It will be completely
   /// removed in an upcoming commit.
   template <typename Instructions>
-  bool areWithinExtendedScope(Instructions insts,
-                              DeadEndBlocks *deadEndBlocks) const;
+  bool areWithinExtendedScope(Instructions insts) const;
 
   /// Returns true if \p uses are completely within this borrow introducer's
   /// local scope.
@@ -661,8 +664,7 @@ struct BorrowedValue {
   ///
   /// \p deadEndBlocks is optional during transition. It will be completely
   /// removed in an upcoming commit.
-  bool areUsesWithinExtendedScope(ArrayRef<Operand *> uses,
-                                  DeadEndBlocks *deadEndBlocks) const;
+  bool areUsesWithinExtendedScope(ArrayRef<Operand *> uses) const;
 
   /// Given a local borrow scope introducer, visit all non-forwarding consuming
   /// users. This means that this looks through guaranteed block arguments. \p
@@ -1103,8 +1105,7 @@ struct AddressOwnership {
   ///
   /// Precondition: all \p uses are dominated by the beginning of the address'
   /// lifetime or borrow scope.
-  bool areUsesWithinLifetime(ArrayRef<Operand *> uses,
-                             DeadEndBlocks &deadEndBlocks) const;
+  bool areUsesWithinLifetime(ArrayRef<Operand *> uses) const;
 };
 
 class OwnedValueIntroducerKind {

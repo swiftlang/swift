@@ -385,19 +385,6 @@ namespace {
       return T;
     }
 
-    constexpr bool isCCharBuiltinType(clang::BuiltinType::Kind kind) {
-      switch (kind) {
-      default:
-        return false;
-#define MAP_BUILTIN_TYPE(CLANG_BUILTIN_KIND, SWIFT_TYPE_NAME)
-        /* Intentionally empty; fallback to default label. */
-#define MAP_BUILTIN_CCHAR_TYPE(CLANG_BUILTIN_KIND, SWIFT_TYPE_NAME)          \
-    case clang::BuiltinType::CLANG_BUILTIN_KIND:
-#include "swift/ClangImporter/BuiltinMappedTypes.def"
-        return true;
-      }
-    }
-
     ImportResult VisitBuiltinType(const clang::BuiltinType *type) {
       const clang::BuiltinType::Kind kind = type->getKind();
       if (kind == clang::BuiltinType::Void)
@@ -407,12 +394,7 @@ namespace {
       if (!swiftTypeName)
         return Type();
 
-      Type swiftType =
-          Impl.getNamedSwiftType(Impl.getStdlibModule(), *swiftTypeName);
-      // FIXME: stop unwrapping typealiases
-      if (!isCCharBuiltinType(kind))
-        swiftType = unwrapCType(swiftType);
-      return swiftType;
+      return Impl.getNamedSwiftType(Impl.getStdlibModule(), *swiftTypeName);
     }
 
     ImportResult VisitBitIntType(const clang::BitIntType *type) {
@@ -921,6 +903,16 @@ namespace {
         if (auto result = importObjCTypeParamDecl(objcTypeParamDecl))
           return result.value();
         return Visit(type->getLocallyUnqualifiedSingleStepDesugaredType());
+      }
+
+      if (const clang::TypedefNameDecl *D = type->getDecl()) {
+        if (D->isImplicit() && D->getDeclName().isIdentifier() &&
+            D->getName().contains(' ')) {
+          // When clang encounters a bounds attribute (e.g. `__single`) applied to
+          // a typedef type (`foo_t`) it uses a hack where it synthesizes a new
+          // typedef with the name `foo_t __single`, including the space.
+          return Visit(type->getLocallyUnqualifiedSingleStepDesugaredType());
+        }
       }
 
       // Import the underlying declaration.

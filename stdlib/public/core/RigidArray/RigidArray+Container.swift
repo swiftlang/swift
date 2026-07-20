@@ -16,7 +16,7 @@ extension _RigidArray where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   internal var isEmpty: Bool {
     count == 0
@@ -26,7 +26,7 @@ extension _RigidArray where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   internal var count: Int {
     _count
@@ -48,7 +48,7 @@ extension _RigidArray where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   internal var startIndex: Int {
     0
@@ -60,7 +60,7 @@ extension _RigidArray where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   internal var endIndex: Int {
     count
@@ -70,13 +70,13 @@ extension _RigidArray where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   internal var indices: Range<Int> {
     unsafe Range(uncheckedBounds: (0, count))
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   internal func _checkItemIndex(_ index: Int) {
     _precondition(
@@ -84,7 +84,7 @@ extension _RigidArray where Element: ~Copyable {
       "Index out of bounds")
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   internal func _checkValidIndex(_ index: Int) {
     _precondition(
@@ -92,7 +92,7 @@ extension _RigidArray where Element: ~Copyable {
       "Index out of bounds")
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   internal func _checkValidBounds(_ subrange: Range<Int>) {
     _precondition(
@@ -103,7 +103,7 @@ extension _RigidArray where Element: ~Copyable {
 
 @available(SwiftStdlib 6.4, *)
 extension _RigidArray where Element: ~Copyable {
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   internal func _ptr(to index: Int) -> UnsafePointer<Element> {
     _checkItemIndex(index)
@@ -111,7 +111,7 @@ extension _RigidArray where Element: ~Copyable {
     return unsafe UnsafePointer(p)
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   internal mutating func _mutablePtr(
     to index: Int
@@ -128,7 +128,7 @@ extension _RigidArray where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal subscript(position: Int) -> Element {
     @_transparent
     @_unsafeSelfDependentResult
@@ -156,7 +156,7 @@ extension _RigidArray where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal mutating func swapAt(_ i: Int, _ j: Int) {
     _checkItemIndex(i)
     _checkItemIndex(j)
@@ -178,7 +178,7 @@ extension _RigidArray where Element: ~Copyable {
   /// - Returns: The index immediately following `i`.
   /// - Complexity: O(1)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   internal func index(after index: Int) -> Int {
     index + 1
@@ -196,7 +196,7 @@ extension _RigidArray where Element: ~Copyable {
   /// - Returns: The index immediately preceding `i`.
   /// - Complexity: O(1)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   internal func index(before index: Int) -> Int {
     index - 1
@@ -213,7 +213,7 @@ extension _RigidArray where Element: ~Copyable {
   ///     than `endIndex`.
   /// - Complexity: O(1)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   internal func formIndex(after index: inout Int) {
     index += 1
@@ -230,7 +230,7 @@ extension _RigidArray where Element: ~Copyable {
   ///     `startIndex`.
   /// - Complexity: O(1)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   internal func formIndex(before index: inout Int) {
     index -= 1
@@ -254,7 +254,7 @@ extension _RigidArray where Element: ~Copyable {
   ///    calls to `index(before:)`.
   /// - Complexity: O(1)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   internal func index(_ index: Int, offsetBy n: Int) -> Int {
     index + n
@@ -273,7 +273,7 @@ extension _RigidArray where Element: ~Copyable {
   /// - Returns: The distance between `start` and `end`.
   /// - Complexity: O(1)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   internal func distance(from start: Index, to end: Index) -> Int {
     end - start
@@ -311,7 +311,7 @@ extension _RigidArray where Element: ~Copyable {
   ///    effect.
   /// - Complexity: O(1)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal func formIndex(
     _ index: inout Index,
     offsetBy n: inout Int,

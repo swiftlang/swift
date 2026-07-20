@@ -493,6 +493,14 @@ BridgedType BridgedType::getEnumCasePayload(SwiftInt caseIndex,
   return swift::SILType();
 }
 
+BridgedType BridgedType::getEnumCasePayload(BridgedDeclObj caseDecl,
+                                            BridgedFunction f) const {
+  auto *elt = caseDecl.getAs<swift::EnumElementDecl>();
+  if (elt->hasAssociatedValues())
+    return unbridged().getEnumElementType(elt, f.getFunction());
+  return swift::SILType();
+}
+
 SwiftInt BridgedType::getNumTupleElements() const {
   return unbridged().getNumTupleElements();
 }
@@ -947,6 +955,10 @@ void BridgedFunction::setThunk(ThunkKind kind) const {
   getFunction()->setThunk((swift::IsThunk_t)kind);
 }
 
+bool BridgedFunction::isWithoutActuallyEscapingThunk() const {
+  return getFunction()->isWithoutActuallyEscapingThunk();
+}
+
 BridgedFunction::SerializedKind BridgedFunction::getSerializedKind() const {
   return (SerializedKind)getFunction()->getSerializedKind();
 }
@@ -1340,6 +1352,10 @@ bool BridgedInstruction::OpenExistentialAddr_isImmutable() const {
     case swift::OpenedExistentialAccess::Immutable: return true;
     case swift::OpenedExistentialAccess::Mutable: return false;
   }
+}
+
+BridgedGenericEnvironment BridgedInstruction::OpenExistentialRefInst_getDefinedGenericEnvironment() const {
+  return {getAs<swift::OpenExistentialRefInst>()->getDefinedOpenedArchetype()->getGenericEnvironment()};
 }
 
 BridgedGlobalVar BridgedInstruction::GlobalAccessInst_getGlobal() const {
@@ -1759,10 +1775,6 @@ bool BridgedInstruction::RefCountingInst_getIsAtomic() const {
   return getAs<swift::RefCountingInst>()->getAtomicity() == swift::RefCountingInst::Atomicity::Atomic;
 }
 
-SwiftInt BridgedInstruction::CondBranchInst_getNumTrueArgs() const {
-  return getAs<swift::CondBranchInst>()->getNumTrueArgs();
-}
-
 void BridgedInstruction::AllocRefInstBase_setIsStackAllocatable() const {
   getAs<swift::AllocRefInstBase>()->setStackAllocatable();
 }
@@ -2139,9 +2151,11 @@ BridgedArgument BridgedBasicBlock::addBlockArgument(BridgedType type, BridgedVal
 
 BridgedArgument
 BridgedBasicBlock::insertPhiArgument(SwiftInt index, BridgedType type,
-                                     BridgedValue::Ownership ownership) const {
+                                     BridgedValue::Ownership ownership,
+                                     OptionalBridgedDeclObj decl) const {
   return {unbridged()->insertPhiArgument(index, type.unbridged(),
-                                         BridgedValue::unbridge(ownership))};
+                                         BridgedValue::unbridge(ownership),
+                                         decl.getAs<swift::ValueDecl>())};
 }
 
 BridgedArgument BridgedBasicBlock::addFunctionArgument(BridgedType type) const {
@@ -2646,6 +2660,11 @@ BridgedInstruction BridgedBuilder::createUncheckedValueCast(BridgedValue op, Bri
                                               type.unbridged())};
 }
 
+BridgedInstruction BridgedBuilder::createUncheckedTrivialBitCast(BridgedValue op, BridgedType type) const {
+  return {unbridged().createUncheckedTrivialBitCast(regularLoc(), op.getSILValue(),
+                                                    type.unbridged())};
+}
+
 BridgedInstruction BridgedBuilder::createUpcast(BridgedValue op, BridgedType type) const {
   return {unbridged().createUpcast(regularLoc(), op.getSILValue(),
                                    type.unbridged())};
@@ -2773,7 +2792,7 @@ BridgedInstruction BridgedBuilder::createCopyAddr(BridgedValue from, BridgedValu
 }
 
 BridgedInstruction BridgedBuilder::createDestroyValue(BridgedValue op, bool isDeadEnd) const {
-  return {unbridged().createDestroyValue(regularLoc(), op.getSILValue(), swift::DontPoisonRefs,
+  return {unbridged().createDestroyValue(regularLoc(), op.getSILValue(),
                                          swift::IsDeadEnd_t(isDeadEnd))};
 }
 
@@ -3129,6 +3148,14 @@ BridgedBuilder::createEndCOWMutationAddr(BridgedValue instance) const {
 
 BridgedInstruction BridgedBuilder::createMarkDependence(BridgedValue value, BridgedValue base, BridgedInstruction::MarkDependenceKind kind) const {
   return {unbridged().createMarkDependence(regularLoc(), value.getSILValue(), base.getSILValue(), swift::MarkDependenceKind(kind))};
+}
+
+BridgedInstruction BridgedBuilder::createMarkDependence(BridgedValue value, BridgedValue base,
+                                                        BridgedValue::Ownership ownership,
+                                                        BridgedInstruction::MarkDependenceKind kind) const {
+  return {unbridged().createMarkDependence(regularLoc(), value.getSILValue(), base.getSILValue(),
+                                           BridgedValue::unbridge(ownership),
+                                           swift::MarkDependenceKind(kind))};
 }
 
 BridgedInstruction BridgedBuilder::createMarkDependenceAddr(BridgedValue value, BridgedValue base, BridgedInstruction::MarkDependenceKind kind) const {
@@ -3508,31 +3535,6 @@ void BridgedContext::salvageDebugInfo(BridgedInstruction inst) {
 
 OptionalBridgedFunction BridgedContext::lookupStdlibFunction(BridgedStringRef name) const {
   return {context->lookupStdlibFunction(name.unbridged())};
-}
-
-void BridgedContext::SSAUpdater_initialize(BridgedFunction function, BridgedType type,
-                                           BridgedValue::Ownership ownership) const {
-  context->initializeSSAUpdater(function.getFunction(), type.unbridged(), BridgedValue::unbridge(ownership));
-}
-
-void BridgedContext::SSAUpdater_addAvailableValue(BridgedBasicBlock block, BridgedValue value) const {
-  context->SSAUpdater_addAvailableValue(block.unbridged(), value.getSILValue());
-}
-
-BridgedValue BridgedContext::SSAUpdater_getValueAtEndOfBlock(BridgedBasicBlock block) const {
-  return {context->SSAUpdater_getValueAtEndOfBlock(block.unbridged())};
-}
-
-BridgedValue BridgedContext::SSAUpdater_getValueInMiddleOfBlock(BridgedBasicBlock block) const {
-  return {context->SSAUpdater_getValueInMiddleOfBlock(block.unbridged())};
-}
-
-SwiftInt BridgedContext::SSAUpdater_getNumInsertedPhis() const {
-  return (SwiftInt)context->SSAUpdater_getInsertedPhis().size();
-}
-
-BridgedValue BridgedContext::SSAUpdater_getInsertedPhi(SwiftInt idx) const {
-  return {context->SSAUpdater_getInsertedPhis()[idx]};
 }
 
 BridgedBasicBlockSet BridgedContext::allocBasicBlockSet() const {

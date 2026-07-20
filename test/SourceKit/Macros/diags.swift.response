@@ -206,6 +206,9 @@
             }
           ]
         }
+      ],
+      key.educational_note_paths: [
+        "https://docs.swift.org/compiler/documentation/diagnostics/variable-never-mutated"
       ]
     },
     {

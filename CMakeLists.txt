@@ -636,7 +636,7 @@ set(SWIFT_DARWIN_DEPLOYMENT_VERSION_IOS "16.0" CACHE STRING
 set(SWIFT_DARWIN_DEPLOYMENT_VERSION_TVOS "16.0" CACHE STRING
     "Minimum deployment target version for tvOS")
 
-set(SWIFT_DARWIN_DEPLOYMENT_VERSION_WATCHOS "6.0" CACHE STRING
+set(SWIFT_DARWIN_DEPLOYMENT_VERSION_WATCHOS "9.0" CACHE STRING
     "Minimum deployment target version for watchOS")
 
 set(SWIFT_DARWIN_DEPLOYMENT_VERSION_XROS "1.0" CACHE STRING
@@ -882,6 +882,10 @@ option(SWIFT_BUILD_SWIFT_SYNTAX
   "Enable building swift syntax"
   FALSE)
 
+option(SWIFT_BUILD_IMMEDIATE_MODE
+  "Build immediate/-interpret JIT mode (swiftImmediate). Requires LLVM's ORC/ExecutionEngine JIT libraries, which are unavailable on a JIT-less host such as a WebAssembly runtime."
+  TRUE)
+
 option(SWIFT_BUILD_REGEX_PARSER_IN_COMPILER
     "Build the Swift regex parser as part of the compiler."
     TRUE)
@@ -1074,6 +1078,10 @@ if(SWIFT_INCLUDE_TOOLS AND SWIFT_BUILD_SWIFT_SYNTAX AND SWIFT_ENABLE_SWIFT_IN_SW
     endif()
   endif()
   add_definitions(-DSWIFT_BUILD_SWIFT_SYNTAX)
+endif()
+
+if(SWIFT_BUILD_IMMEDIATE_MODE)
+  add_definitions(-DSWIFT_BUILD_IMMEDIATE_MODE)
 endif()
 
 if(BOOTSTRAPPING_MODE MATCHES "HOSTTOOLS|.*-WITH-HOSTLIBS")
@@ -1432,6 +1440,26 @@ if(SWIFT_PARALLEL_LINK_JOBS)
     set_property(GLOBAL APPEND PROPERTY JOB_POOLS swift_link_job_pool=${SWIFT_PARALLEL_LINK_JOBS})
     set(CMAKE_JOB_POOL_LINK swift_link_job_pool)
   endif()
+endif()
+
+# Cap concurrency for embedded-stdlib Swift compilations.
+#
+# `SWIFT_PARALLEL_EMBEDDED_COMPILE_JOBS` defaults to a small fraction of
+# the host's logical cores so the C++ build phase still gets to run at
+# full parallelism; only the embedded Swift compilations queue up through
+# this pool.
+if(CMAKE_MAKE_PROGRAM MATCHES "ninja")
+  if(NOT DEFINED SWIFT_PARALLEL_EMBEDDED_COMPILE_JOBS)
+    cmake_host_system_information(
+      RESULT _swift_embedded_pool_cores QUERY NUMBER_OF_LOGICAL_CORES)
+    math(EXPR SWIFT_PARALLEL_EMBEDDED_COMPILE_JOBS
+         "(${_swift_embedded_pool_cores} + 3) / 4")
+    if(SWIFT_PARALLEL_EMBEDDED_COMPILE_JOBS LESS 1)
+      set(SWIFT_PARALLEL_EMBEDDED_COMPILE_JOBS 1)
+    endif()
+  endif()
+  set_property(GLOBAL APPEND PROPERTY
+    JOB_POOLS swift_embedded_compile_job_pool=${SWIFT_PARALLEL_EMBEDDED_COMPILE_JOBS})
 endif()
 
 # Set the CMAKE_OSX_* variables in a way that minimizes conflicts.

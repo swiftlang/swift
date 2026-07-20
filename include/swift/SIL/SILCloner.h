@@ -1793,7 +1793,7 @@ SILCloner<ImplClass>::visitDebugValueInst(DebugValueInst *Inst) {
   remapDebugVariable(VarInfo);
   auto *NewInst = getBuilder().createDebugValue(
       Inst->getLoc(), getOpValue(Inst->getOperand()), *VarInfo,
-      Inst->poisonRefs(), Inst->usesMoveableValueDebugInfo(), Inst->hasTrace());
+      Inst->usesMoveableValueDebugInfo(), Inst->hasTrace());
 
   // Clone the debug-only reconstruction block if present.
   if (auto *SrcDebugBB = Inst->getDebugReconstructionBlock()) {
@@ -1801,6 +1801,14 @@ SILCloner<ImplClass>::visitDebugValueInst(DebugValueInst *Inst) {
         NewInst->getFunction()->createEmptyDebugReconstructionBlock();
     NewInst->setDebugReconstructionBlock(NewDebugBB);
     asImpl().cloneDebugBasicBlock(SrcDebugBB, NewDebugBB);
+    
+    // Type substitutions may map an address-only (generic) type to something
+    // else, in which case, the op_deref must be converted to a load.
+    if (NewInst->hasDeref()) {
+      auto *ret = cast<ReturnInst>(NewDebugBB->getTerminator());
+      if (ret->getOperand()->getType().isLoadableOrOpaque(*NewInst->getFunction()))
+        NewInst->convertDerefToLoad();
+    }
   }
 
   recordClonedInstruction(Inst, NewInst);
@@ -2543,7 +2551,7 @@ void SILCloner<ImplClass>::visitDestroyValueInst(DestroyValueInst *Inst) {
   recordClonedInstruction(Inst, getBuilder().createDestroyValue(
                                     getOpLocation(Inst->getLoc()),
                                     getOpValue(Inst->getOperand()),
-                                    Inst->poisonRefs(), Inst->isDeadEnd()));
+                                    Inst->isDeadEnd()));
 }
 
 template <typename ImplClass>
@@ -3848,14 +3856,12 @@ SILCloner<ImplClass>::visitBranchInst(BranchInst *Inst) {
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitCondBranchInst(CondBranchInst *Inst) {
-  auto TrueArgs = getOpValueArray<8>(Inst->getTrueArgs());
-  auto FalseArgs = getOpValueArray<8>(Inst->getFalseArgs());
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(
       Inst, getBuilder().createCondBranch(
                 getOpLocation(Inst->getLoc()), getOpValue(Inst->getCondition()),
-                getOpBasicBlock(Inst->getTrueBB()), TrueArgs,
-                getOpBasicBlock(Inst->getFalseBB()), FalseArgs,
+                getOpBasicBlock(Inst->getTrueBB()),
+                getOpBasicBlock(Inst->getFalseBB()),
                 Inst->getTrueBBCount(), Inst->getFalseBBCount()));
 }
 

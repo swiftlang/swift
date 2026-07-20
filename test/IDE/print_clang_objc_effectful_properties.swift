@@ -44,4 +44,4 @@
 
 // CHECK-LABEL: class NotEffProps : NSObject {
 // CHECK-NOT: var
-// CHECK: func EffPropGetDogWithCompletion(_ s: OpaquePointer, _ myBlock: @escaping (NSObject) -> Void) -> Double
+// CHECK: func EffPropGetDogWithCompletion(_ s: OpaquePointer, _ myBlock: @escaping (NSObject) -> Void) -> CDouble

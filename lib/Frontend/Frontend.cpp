@@ -246,6 +246,11 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
       opts.SerializeOptionsForDebugging.value_or(
           !module->isExternallyConsumed());
 
+  serializationOpts.PrefixMapSourceInfo = opts.PrefixMapSourceInfo;
+  if (opts.PrefixMapSourceInfo) {
+    serializationOpts.SourceInfoPrefixMap = getIRGenOptions().FilePrefixMap;
+  }
+
   serializationOpts.PathObfuscator = opts.serializedPathObfuscator;
   if (serializationOpts.SerializeOptionsForDebugging &&
       opts.DebugPrefixSerializedDebuggingOptions) {
@@ -882,17 +887,27 @@ bool CompilerInstance::setUpModuleLoaders() {
           IgnoreSourceInfoFile);
   }
 
+  bool needTargetCodeGenOpts =
+      FrontendOptions::doesActionGenerateSIL(FEOpts.RequestedAction);
+
   // Wire up the Clang importer. If the user has specified an SDK, use it.
   // Otherwise, we just keep it around as our interface to Clang's ABI
   // knowledge.
   std::unique_ptr<ClangImporter> clangImporter = ClangImporter::create(
       *Context, &Invocation.getIRGenOptions(), Invocation.getPCHHash(),
       CASIDForPCH, getDependencyTracker(), /*ignoreFileMapping=*/false,
-      getSharedCASInstance(), getSharedCacheInstance());
+      /*needCodeGenTargetOpts=*/needTargetCodeGenOpts, getSharedCASInstance(),
+      getSharedCacheInstance());
   if (!clangImporter) {
     Diagnostics.diagnose(SourceLoc(), diag::error_clang_importer_create_fail);
     return true;
   }
+
+  // If memory statistics were requested, start tracking per-module materialized
+  // decl counts now, before any significant deserialization occurs.
+  if (FEOpts.CompilerDebuggingOpts.PrintClangStats ||
+      !FEOpts.StatsOutputDir.empty())
+    clangImporter->enableMemoryStatistics();
 
   // Configure ModuleInterfaceChecker for the ASTContext.
   auto const &Clang = clangImporter->getClangInstance();
@@ -1215,6 +1230,15 @@ bool CompilerInvocation::shouldImportCxx() const {
   return true;
 }
 
+bool CompilerInvocation::shouldImportCOM() const {
+  const auto &LangOpts = getLangOptions();
+  const auto &FEOpts = getFrontendOptions();
+
+  return LangOpts.EnableCOMInterop &&
+      !LangOpts.DisableImplicitCOMModuleImport &&
+      FEOpts.InputMode != FrontendOptions::ParseInputMode::SwiftModuleInterface;
+}
+
 /// Implicitly import the SwiftOnoneSupport module in non-optimized
 /// builds. This allows for use of popular specialized functions
 /// from the standard library, which makes the non-optimized builds
@@ -1302,6 +1326,12 @@ bool CompilerInstance::canImportCxxShim() const {
               .DependencyScanningSubInvocation;
 }
 
+bool CompilerInstance::canImportCOM() const {
+  const auto &ASTContext = getASTContext();
+  ImportPath::Module::Builder mod(ASTContext.getIdentifier(COM_MODULE_NAME));
+  return ASTContext.testImportModule(mod.get());
+}
+
 bool CompilerInstance::supportCaching() const {
   if (!Invocation.getCASOptions().EnableCaching)
     return false;
@@ -1384,6 +1414,10 @@ ImplicitImportInfo CompilerInstance::getImplicitImportInfo() const {
     if (canImportCxxShim())
       pushImport(CXX_SHIM_NAME, {ImportFlags::ImplementationOnly});
   }
+
+  if (Invocation.getLangOptions().EnableCOMInterop)
+    if (Invocation.shouldImportCOM() && canImportCOM())
+      pushImport(COM_MODULE_NAME);
 
   imports.ShouldImportUnderlyingModule = frontendOpts.ImportUnderlyingModule;
   if (frontendOpts.ModuleHasBridgingHeader) {
@@ -1855,9 +1889,10 @@ static bool performMandatorySILPasses(CompilerInvocation &Invocation,
                                       SILModule *SM) {
   FrontendStatsTracer tracer(SM->getASTContext().Stats,
                              "SIL-mandatory-passes");
+  auto Action = Invocation.getFrontendOptions().RequestedAction;
+
   // Don't run diagnostic passes at all when merging modules.
-  if (Invocation.getFrontendOptions().RequestedAction ==
-      FrontendOptions::ActionType::MergeModules) {
+  if (Action == FrontendOptions::ActionType::MergeModules) {
     return false;
   }
   if (Invocation.getDiagnosticOptions().SkipDiagnosticPasses) {
@@ -1865,7 +1900,18 @@ static bool performMandatorySILPasses(CompilerInvocation &Invocation,
     // to run the ownership evaluator.
     return runSILOwnershipEliminatorPass(*SM);
   }
-  return runSILDiagnosticPasses(*SM);
+
+  const bool RequestedSILGenOSSA =
+    (Action == FrontendOptions::ActionType::EmitSILGenOSSA);
+
+  // Run the passes SILGen relies on to reach verified OSSA SIL.
+  runSILGenPasses(*SM, /*VerifySILGen=*/RequestedSILGenOSSA);
+
+  // Stop here if the OSSA after SILGen is all that was requested.
+  if (RequestedSILGenOSSA)
+    return true;
+
+  return runSILDiagnosticPasses(*SM, /*RunSILGenPasses=*/false);
 }
 
 /// Perform SIL optimization passes if optimizations haven't been disabled.

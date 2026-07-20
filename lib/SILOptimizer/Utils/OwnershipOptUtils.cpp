@@ -207,7 +207,7 @@ GuaranteedOwnershipExtension::checkBorrowExtension(
   assert(guaranteedLiveness.empty());
   borrow.computeTransitiveLiveness(guaranteedLiveness);
 
-  if (guaranteedLiveness.areUsesWithinBoundary(newUses, &deBlocks))
+  if (guaranteedLiveness.areUsesWithinBoundary(newUses))
     return Valid; // reuse the borrow scope as-is
 
   beginBorrow = dyn_cast<BeginBorrowInst>(borrow.value);
@@ -254,7 +254,7 @@ GuaranteedOwnershipExtension::checkLifetimeExtension(
       ownedLifetime.updateForUse(user, true);
     }
   }
-  if (ownedLifetime.areUsesWithinBoundary(newUses, &deBlocks))
+  if (ownedLifetime.areUsesWithinBoundary(newUses))
     return Valid;
 
   return ExtendLifetime; // Can't cover newUses without destroy sinking.
@@ -484,8 +484,7 @@ bool OwnershipRAUWHelper::mayIntroduceUnoptimizableCopies() {
     return false;
   }
 
-  if (areUsesWithinValueLifetime(newValue, ctx->guaranteedUsePoints,
-                                 &ctx->deBlocks)) {
+  if (areUsesWithinValueLifetime(newValue, ctx->guaranteedUsePoints)) {
     return false;
   }
   return true;
@@ -504,15 +503,13 @@ bool swift::areUsesWithinLexicalValueLifetime(SILValue value,
     auto *function = value->getFunction();
     MultiDefPrunedLiveness liveness(function);
     borrowedValue.computeTransitiveLiveness(liveness);
-    DeadEndBlocks deadEndBlocks(function);
-    return liveness.areUsesWithinBoundary(uses, &deadEndBlocks);
+    return liveness.areUsesWithinBoundary(uses);
   }
 
   return false;
 }
 
-bool swift::areUsesWithinValueLifetime(SILValue value, ArrayRef<Operand *> uses,
-                                       DeadEndBlocks *deBlocks) {
+bool swift::areUsesWithinValueLifetime(SILValue value, ArrayRef<Operand *> uses) {
   assert(value->getFunction()->hasOwnership());
 
   if (value->getOwnershipKind() == OwnershipKind::None) {
@@ -539,7 +536,7 @@ bool swift::areUsesWithinValueLifetime(SILValue value, ArrayRef<Operand *> uses,
   SSAPrunedLiveness liveness(value->getFunction());
   liveness.initializeDef(value);
   liveness.computeSimple();
-  return liveness.areUsesWithinBoundary(uses, deBlocks);
+  return liveness.areUsesWithinBoundary(uses);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1477,7 +1474,7 @@ OwnershipRAUWHelper::OwnershipRAUWHelper(OwnershipFixupContext &inputCtx,
     invalidate();
     return;
   }
-  if (addressOwnership.areUsesWithinLifetime(oldValueUses, ctx->deBlocks)) {
+  if (addressOwnership.areUsesWithinLifetime(oldValueUses)) {
     // We do not need to copy the base value! Clear the extra info we have.
     ctx->extraAddressFixupInfo.clear();
     return;
@@ -1921,7 +1918,6 @@ bool swift::createBorrowScopeForPhiOperands(SILPhiArgument *newPhi) {
 
 bool swift::extendStoreBorrow(StoreBorrowInst *sbi,
                               SmallVectorImpl<Operand *> &newUses,
-                              DeadEndBlocks *deadEndBlocks,
                               InstModCallbacks callbacks) {
   ScopedAddressValue scopedAddress(sbi);
 
@@ -1934,7 +1930,7 @@ bool swift::extendStoreBorrow(StoreBorrowInst *sbi,
       scopedAddress.computeTransitiveLiveness(storeBorrowLiveness);
 
   // If all new uses are within store_borrow boundary, no need for extension.
-  if (storeBorrowLiveness.areUsesWithinBoundary(newUses, deadEndBlocks)) {
+  if (storeBorrowLiveness.areUsesWithinBoundary(newUses)) {
     return true;
   }
 
@@ -1945,15 +1941,13 @@ bool swift::extendStoreBorrow(StoreBorrowInst *sbi,
   // store_borrow extension is possible only when there are no other
   // store_borrows to the same destination within the store_borrow's lifetime
   // built from newUsers.
-  if (hasOtherStoreBorrowsInLifetime(sbi, &storeBorrowLiveness,
-                                     deadEndBlocks)) {
+  if (hasOtherStoreBorrowsInLifetime(sbi, &storeBorrowLiveness)) {
     return false;
   }
 
   InstModCallbacks tempCallbacks = callbacks;
   InstructionDeleter deleter(std::move(tempCallbacks));
-  GuaranteedOwnershipExtension borrowExtension(deleter, *deadEndBlocks,
-                                               sbi->getFunction());
+  GuaranteedOwnershipExtension borrowExtension(deleter, sbi->getFunction());
   auto status = borrowExtension.checkBorrowExtension(
       BorrowedValue(sbi->getSrc()), newUses);
   if (status == GuaranteedOwnershipExtension::Invalid) {

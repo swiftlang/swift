@@ -47,6 +47,20 @@ typedef unsigned long long __swift_typeid_t;
  */
 typedef unsigned long long __swift_options_t;
 
+typedef __swift_ptrdiff_t swift_tls_key_t;
+
+/**
+ * Number of reserved TLS keys used by Embedded Swift runtime components.
+ *
+ * The numeric values are kept in sync with the reserved keys in
+ * swift/Threading/TLSKeys.h. The EmbeddedPlatform TLS contract does not
+ * provide dynamic key allocation; every key passed to the `_swift_tls_*`
+ * functions will be one of these reserved values. The key values are dense in
+ * the range `[0, SWIFT_TLS_KEY_COUNT)`, so platform implementations may use
+ * them directly as array indices.
+ */
+#define SWIFT_TLS_KEY_COUNT 8
+
 #if __has_feature(nullability)
 #define EMBEDDED_SWIFT_NONNULL _Nonnull
 #define EMBEDDED_SWIFT_NULLABLE _Nullable
@@ -54,6 +68,15 @@ typedef unsigned long long __swift_options_t;
 #define EMBEDDED_SWIFT_NONNULL
 #define EMBEDDED_SWIFT_NULLABLE
 #endif
+
+/**
+ * A function called with a non-NULL TLS value when the execution context that
+ * owns it exits.
+ *
+ * A platform with a fixed set of execution contexts that never exit may never
+ * call this function.
+ */
+typedef void (*__swift_tls_dtor_t)(void * EMBEDDED_SWIFT_NULLABLE);
 
 #if defined(__has_feature) && (__has_feature(bounds_attributes) || __has_feature(bounds_safety_attributes))
 #define EMBEDDED_SWIFT_COUNTED_BY(N) __attribute__((__counted_by__(N)))
@@ -93,17 +116,37 @@ typedef unsigned long long __swift_options_t;
  * entrypoints might be optional, where the entrypoint is needed only when
  * certain Swift functionality is used.
  */
-#define EMBEDDED_SWIFT_PLATFORM_VERSION_MINOR 0
+#define EMBEDDED_SWIFT_PLATFORM_VERSION_MINOR 1
+
+/**
+ * The number of pointer-size words that will be used to store a Mutex (as
+ * provided by the Synchronization library).
+ *
+ * This needs to be large enough to accommodate any implementation of Mutex that
+ * can be implemented for that given platform (e.g., via the `_swift_mutex_*`
+ * functions). It can be defined externally (via `-D` on the command line for
+ * Clang, `-Xcc -D` for Swift) to a different value, but that value must be
+ * consistent throughout the build to prevent ABI mismatches.
+ */
+#ifndef EMBEDDED_SWIFT_MUTEX_NUM_WORDS
+#if defined(__APPLE__) && __SIZEOF_POINTER__ == 4
+// On 32-bit Apple targets (e.g., watchOS armv7k / arm64_32) `pthread_mutex_t`
+// is 40 bytes, which doesn't fit in 8 four-byte words.
+#define EMBEDDED_SWIFT_MUTEX_NUM_WORDS (__swift_ptrdiff_t)12
+#else
+#define EMBEDDED_SWIFT_MUTEX_NUM_WORDS (__swift_ptrdiff_t)8
+#endif
+#endif
 
 /**
  * Determine the version of the platform abstraction layer that the Embedded
  * Swift library was built with.
  *
- * Parameters:
- * - `major`: The value of EMBEDDED_SWIFT_PLATFORM_VERSION_MAJOR that the
- *   Swift standard library was built with.
- * - `minor`: The value of EMBEDDED_SWIFT_PLATFORM_VERSION_MINOR that the
- *   Swift standard library was built with.
+ * - Parameters:
+ *   - major: The value of EMBEDDED_SWIFT_PLATFORM_VERSION_MAJOR that the
+ *     Swift standard library was built with.
+ *   - minor: The value of EMBEDDED_SWIFT_PLATFORM_VERSION_MINOR that the
+ *     Swift standard library was built with.
  *
  * This function is provided by the Swift standard library, and declared here
  * for the convenience of C clients.
@@ -134,63 +177,83 @@ typedef enum EMBEDDED_SWIFT_OPTION_SET: __swift_options_t {
   /**
    * No options.
    */
-  SWIFT_FREE_NONE EMBEDDED_SWIFT_NAME(none) = 0,
-} swift_free_flags_t EMBEDDED_SWIFT_NAME(SwiftFreeFlags);
+  SWIFT_DEALLOC_NONE EMBEDDED_SWIFT_NAME(none) = 0,
+} swift_dealloc_flags_t EMBEDDED_SWIFT_NAME(SwiftDeallocFlags);
+
+/**
+ * Options provided to the Swift mutex initialization function.
+ */
+typedef enum EMBEDDED_SWIFT_OPTION_SET: __swift_options_t {
+  /**
+   * No options.
+   */
+  SWIFT_MUTEX_NONE EMBEDDED_SWIFT_NAME(none) = 0,
+
+  /**
+   * Diagnose mutex misuse when the platform can do so cheaply.
+   */
+  SWIFT_MUTEX_CHECKED EMBEDDED_SWIFT_NAME(checked) = 0x01,
+
+  /**
+   * Allow the same execution context to acquire the mutex recursively.
+   */
+  SWIFT_MUTEX_RECURSIVE EMBEDDED_SWIFT_NAME(recursive) = 0x02
+} swift_mutex_flags_t EMBEDDED_SWIFT_NAME(SwiftMutexFlags);
 
 /**
  * Allocates memory and returns the resulting pointer.
  *
- * Parameters:
- *   - `size`: the minimum number of bytes to allocate.
- *   - `alignment`: the minimum alignment of the resulting pointer, which must
+ * - Parameters:
+ *   - alignment: The minimum alignment of the resulting pointer, which must
  *     be a power of at least as large as `sizeof(void *)`.
- *   - `flags`: flags to control the behavior of the allocation.
+ *   - size: The minimum number of bytes to allocate.
+ *   - flags: Flags to control the behavior of the allocation.
  *
- * Returns the allocated pointer, or NULL on failure.
+ * - Returns: The allocated pointer, or NULL on failure.
  *
  * This function is required when using any Embedded Swift facility that
  * requires memory allocation from the heap, whether explicitly (e.g., via the
  * `allocate` operation on unsafe pointers) or implicitly (e.g., creating a
  * copy-on-write array or an instance of a class type).
- * 
+ *
  * This function can be implemented as a call to `posix_memalign`.
  */
 void * EMBEDDED_SWIFT_NULLABLE _swift_allocate(__swift_size_t alignment, __swift_size_t size, swift_alloc_flags_t flags);
 
 /**
- * Frees the memory referenced by `ptr`.
+ * Deallocates the memory referenced by `ptr`.
  *
- * Parameters:
- *   - `ptr`: The pointer to be freed. If it is NULL, the operation does
+ * - Parameters:
+ *   - ptr: The pointer to be deallocated. If it is NULL, the operation does
  *     nothing.
- *   - `size`: the number of allocated bytes, which may be -1 if it is not
- *     known.
- *   - `alignment`: the minimum alignment of the resulting pointer, which must
+ *   - alignment: The minimum alignment of the resulting pointer, which must
  *     be a power of at least as large as `sizeof(void *)`, or be zero to
  *     indicate that the alignment is not known.
- *   - `flags`: flags to control the behavior of the free.
+ *   - size: The number of allocated bytes, which may be -1 if it is not
+ *     known.
+ *   - flags: Flags to control the behavior of the deallocation.
  *
  * This function is required when using any Embedded Swift facility that
  * requires memory allocation from the heap, whether explicitly (e.g., via the
  * `allocate` operation on unsafe pointers) or implicitly (e.g., creating a
  * copy-on-write array or an instance of a class type).
- * 
+ *
  * This function can be implemented as a direct call to `free`.
  */
-void _swift_free(void * EMBEDDED_SWIFT_NONNULL ptr, __swift_size_t alignment, __swift_size_t size, swift_free_flags_t flags);
+void _swift_deallocate(void * EMBEDDED_SWIFT_NONNULL ptr, __swift_size_t alignment, __swift_size_t size, swift_dealloc_flags_t flags);
 
 /**
  * Allocates memory with a given type and returns the resulting pointer.
  *
- * Parameters:
- *   - `size`: the minimum number of bytes to allocate.
- *   - `alignment`: the minimum alignment of the resulting pointer, which must
+ * - Parameters:
+ *   - size: The minimum number of bytes to allocate.
+ *   - alignment: The minimum alignment of the resulting pointer, which must
  *     be a power of at least as large as `sizeof(void *)`.
- *   - `flags`: flags to control the behavior of the allocation.
- *   - `typeId`: an identifier used by a typed allocator to e.g. place the
+ *   - flags: Flags to control the behavior of the allocation.
+ *   - typeId: An identifier used by a typed allocator to e.g. place the
  *     allocation in a particular bucket.
  *
- * Returns the allocated pointer, or NULL on failure.
+ * - Returns: The allocated pointer, or NULL on failure.
  *
  * This function is required when using any Embedded Swift facility that
  * requires typed memory allocation from the heap, e.g. class instance
@@ -205,12 +268,12 @@ void * EMBEDDED_SWIFT_NULLABLE _swift_typedAllocate(
 /**
  * Writes a sequence of UTF-8 code points to standard output.
  *
- * Parameters:
- *   - `chars`: the UTF-8 code points to standard output. It is not
+ * - Parameters:
+ *   - chars: The UTF-8 code points to standard output. It is not
  *     NULL-terminated.
- *   - `count`: the number of UTF-8 code points.
+ *   - count: The number of UTF-8 code points.
  *
- * Returns the number of characters that were written.
+ * - Returns: The number of characters that were written.
  *
  * This function is required when using the Embedded Swift print() facilities.
  *
@@ -224,9 +287,9 @@ __swift_size_t _swift_writeToStandardOutput(
 /**
  * Generates random bytes into the given buffer.
  *
- * Parameters:
- *   - `buffer`: the buffer into which the random bytes should be generated.
- *   - `nbytes`: the number of bytes that should be generated into the buffer.
+ * - Parameters:
+ *   - buffer: The buffer into which the random bytes should be generated.
+ *   - nbytes: The number of bytes that should be generated into the buffer.
  *
  * This function is required when using Swift's SystemRandomNumberGenerator, the
  * default random number generator used for shuffling elements and producing
@@ -244,16 +307,16 @@ void _swift_generateRandom(void * EMBEDDED_SWIFT_NONNULL EMBEDDED_SWIFT_SIZED_BY
 /**
  * Generates random bytes intended for a hashing seed into the given buffer.
  *
- * Parameters:
- *   - `buffer`: the buffer into which the random bytes should be generated.
- *   - `nbytes`: the number of bytes that should be generated into the buffer.
+ * - Parameters:
+ *   - buffer: The buffer into which the random bytes should be generated.
+ *   - nbytes: The number of bytes that should be generated into the buffer.
  *
  * This function is required when using Swift's hashed collections, such as Set
  * and Dictionary, to provide random seeding for the hash functions. Random
  * seeding makes hash values differ from one execute to the next, mitigating
  * against denial-of-service attacks that target a known hash function. The
  * random number generator provided here need not be cryptographically
- * secure. An implementation may choose to provide constant values random than a
+ * secure. An implementation may choose to provide constant values rather than a
  * random seed to make hashing deterministic.
  *
  * This function can be implemented as a direct call to `arc4random_buf`.
@@ -264,9 +327,9 @@ void _swift_generateRandomHashSeed(void * EMBEDDED_SWIFT_NONNULL EMBEDDED_SWIFT_
  * Retrieve a pointer that will be used to retain information needed for Swift's
  * dynamic exclusivity checking.
  *
- * Returns the pointer most recently passed to `_swift_setExclusivityTLS` on
- * this thread. If `_swift_setExclusivityTLS` has not been called on this
- * thread, returns NULL.
+ * - Returns: The pointer most recently passed to `_swift_setExclusivityTLS` on
+ *   this thread. If `_swift_setExclusivityTLS` has not been called on this
+ *   thread, returns NULL.
  *
  * In a single-threaded environment, the `_swift_getExclusivityTLS` and
  * `_swift_setExclusivityTLS` functions can get and set a global variable that
@@ -286,8 +349,8 @@ void * EMBEDDED_SWIFT_NULLABLE _swift_getExclusivityTLS(void);
  * Set the pointer that will be used to retain information needed for Swift's
  * dynamic exclusivity checking.
  *
- * Parameters:
- *   - `ptr`: the pointer to set. A subsequent call to
+ * - Parameters:
+ *   - ptr: The pointer to set. A subsequent call to
  *     `_swift_getExclusivityTLS` on the same thread (without an intervening
  *     call to `_swift_setExclusivityTLS`) shall return `ptr`.
  *
@@ -297,10 +360,96 @@ void * EMBEDDED_SWIFT_NULLABLE _swift_getExclusivityTLS(void);
 void _swift_setExclusivityTLS(void * EMBEDDED_SWIFT_NULLABLE ptr);
 
 /**
+ * Initializes a mutex.
+ *
+ * - Parameters:
+ *   - mutex: Opaque caller-owned mutex storage initialized by this function
+ *     and later passed to the other `_swift_mutex_*` functions. The contents
+ *     are private to the platform implementation. The storage is at least
+ *     EMBEDDED_SWIFT_MUTEX_NUM_WORDS pointer-sized words and has pointer
+ *     alignment.
+ *   - flags: Flags controlling mutex behavior.
+ *
+ * This function is required when using Synchronization.Mutex.
+ */
+void _swift_mutex_init(void * EMBEDDED_SWIFT_NONNULL mutex,
+                       swift_mutex_flags_t flags);
+
+/**
+ * Destroys a mutex initialized by `_swift_mutex_init`.
+ *
+ * - Parameters:
+ *   - mutex: The mutex to destroy. Must not be locked.
+ */
+void _swift_mutex_destroy(void * EMBEDDED_SWIFT_NONNULL mutex);
+
+/**
+ * Acquires a mutex, blocking or spinning until ownership is obtained.
+ *
+ * - Parameters:
+ *   - mutex: The mutex to acquire.
+ */
+void _swift_mutex_lock(void * EMBEDDED_SWIFT_NONNULL mutex);
+
+/**
+ * Releases a mutex held by the current execution context.
+ *
+ * - Parameters:
+ *   - mutex: The mutex to release.
+ */
+void _swift_mutex_unlock(void * EMBEDDED_SWIFT_NONNULL mutex);
+
+/**
+ * Attempts to acquire a mutex without blocking.
+ *
+ * - Parameters:
+ *   - mutex: The mutex to attempt to acquire.
+ *
+ * - Returns: Nonzero if the mutex was acquired, or zero if it was not acquired.
+ */
+__swift_ptrdiff_t _swift_mutex_tryLock(void * EMBEDDED_SWIFT_NONNULL mutex);
+
+/**
+ * Initializes a reserved TLS key. `key` is one of the numeric reserved keys
+ * described by `SWIFT_TLS_KEY_COUNT`. `destructor` may be NULL. This function
+ * is called at most once for each key that needs a destructor.
+ */
+void _swift_tls_init(swift_tls_key_t key,
+                     __swift_tls_dtor_t EMBEDDED_SWIFT_NULLABLE destructor);
+
+/**
+ * Returns the value stored for a TLS key in the current execution context, or
+ * NULL if no value has been stored.
+ *
+ * This function may be called before `_swift_tls_init`. In that case, it must
+ * return NULL until a value is stored for the key.
+ *
+ * Precondition: `key < SWIFT_TLS_KEY_COUNT`.
+ */
+void * EMBEDDED_SWIFT_NULLABLE _swift_tls_get(swift_tls_key_t key);
+
+/**
+ * Stores a value for a TLS key in the current execution context.
+ *
+ * This function may be called before `_swift_tls_init`. The platform must make
+ * storage available for the key on demand in that case.
+ *
+ * Precondition: `key < SWIFT_TLS_KEY_COUNT`.
+ */
+void _swift_tls_set(swift_tls_key_t key,
+                    void * EMBEDDED_SWIFT_NULLABLE value);
+
+/**
+ * Returns nonzero when the current execution context is the platform's main
+ * execution context.
+ */
+__swift_ptrdiff_t _swift_thread_isMain(void);
+
+/**
  * Exit the program.
  *
- * Parameters:
- * - `code`: the exit code, which is typically 0 for normal termination.
+ * - Parameters:
+ *   - code: The exit code, which is typically 0 for normal termination.
  *
  * This function must not return.
  *
@@ -309,11 +458,6 @@ void _swift_setExclusivityTLS(void * EMBEDDED_SWIFT_NULLABLE ptr);
  */
 void _swift_exit(__swift_ptrdiff_t code);
 
-#undef EMBEDDED_SWIFT_SINGLE
-#undef EMBEDDED_SWIFT_SIZED_BY
-#undef EMBEDDED_SWIFT_COUNTED_BY
-#undef EMBEDDED_SWIFT_NULLABLE
-#undef EMBEDDED_SWIFT_NONNULL
 #undef EMBEDDED_SWIFT_NAME
 #undef EMBEDDED_SWIFT_OPTION_SET
 

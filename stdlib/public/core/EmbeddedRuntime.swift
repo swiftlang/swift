@@ -137,8 +137,8 @@ public struct HeapObject {
 @_extern(c, "_swift_allocate")
 public func _swift_allocate(_ alignment: Int, _ size: Int, _ flags: CUnsignedLongLong) -> UnsafeMutableRawPointer?
 
-@_extern(c, "_swift_free")
-public func _swift_free(_ p: UnsafeMutableRawPointer, _ alignment: Int, _ size: Int, _ flags: CUnsignedLongLong)
+@_extern(c, "_swift_deallocate")
+public func _swift_deallocate(_ p: UnsafeMutableRawPointer, _ alignment: Int, _ size: Int, _ flags: CUnsignedLongLong)
 
 @_extern(c, "_swift_generateRandom")
 public func _swift_generateRandom(_ buf: UnsafeMutableRawPointer, _ nbytes: Int)
@@ -197,7 +197,7 @@ public func swift_slowAlloc(_ size: Int, _ alignMask: Int) -> UnsafeMutableRawPo
 @c
 public func swift_slowDealloc(_ ptr: UnsafeMutableRawPointer, _ size: Int, _ alignMask: Int) {
 #if SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
-  unsafe _swift_free(ptr, size, alignMask, 0)
+  unsafe _swift_deallocate(ptr, size, alignMask, 0)
 #else
   unsafe free(ptr)
 #endif
@@ -225,7 +225,7 @@ public func swift_allocObjectTyped(metadata: Builtin.RawPointer, requiredSize: I
   let object = unsafe p.assumingMemoryBound(to: HeapObject.self)
   unsafe _swift_embedded_set_heap_object_metadata_pointer(object, UnsafeMutablePointer<ClassMetadata>(metadata))
   unsafe object.pointee.refcount = 1
-  return unsafe p._rawValue
+  return p._rawValue
 #else
   swift_allocObject(metadata: metadata, requiredSize: requiredSize, requiredAlignmentMask: requiredAlignmentMask)
 #endif
@@ -926,6 +926,17 @@ func _embeddedReportExclusivityViolation(
   Builtin.int_trap()
 }
 
+private func intToFloatChunkFactor<T: ExpressibleByFloatLiteral>() -> T {
+#if _pointerBitWidth(_64)
+  return 0x1p64
+#elseif _pointerBitWidth(_32)
+  return 0x1p32
+#else
+#warning("Unsupported platform")
+  fatalError()
+#endif
+}
+
 // IntegerLiteral-to-FloatingPoint conversion
 
 /// Convert a `Builtin.IntegerLiteral` value to a binary floating-point type.
@@ -951,8 +962,7 @@ public func _swift_intToFloat32(
 
   // Multi-chunk: lower chunks contribute as unsigned digits in base
   // 2^bitsPerChunk; only the top chunk carries the sign.
-  let chunkFactor: Float = bitsPerChunk == 64 ? 0x1p64 : 0x1p32
-
+  let chunkFactor: Float = intToFloatChunkFactor()
   var result = Float(unsafe data[0])
   var scale = chunkFactor
   for i in 1 ..< numChunks - 1 {
@@ -975,8 +985,7 @@ public func _swift_intToFloat64(
     return Double(Int(bitPattern: unsafe data[0]))
   }
 
-  let chunkFactor: Double = bitsPerChunk == 64 ? 0x1p64 : 0x1p32
-
+  let chunkFactor: Double = intToFloatChunkFactor()
   var result = Double(unsafe data[0])
   var scale = chunkFactor
   for i in 1 ..< numChunks - 1 {
@@ -996,7 +1005,7 @@ public func swift_getPlatformLayerVersion(
   _ minor: UnsafeMutablePointer<Int>
 ) {
   unsafe major.pointee = 1 // EMBEDDED_SWIFT_PLATFORM_VERSION_MAJOR
-  unsafe minor.pointee = 0 // EMBEDDED_SWIFT_PLATFORM_VERSION_MINOR
+  unsafe minor.pointee = 1 // EMBEDDED_SWIFT_PLATFORM_VERSION_MINOR
 }
 #endif
 

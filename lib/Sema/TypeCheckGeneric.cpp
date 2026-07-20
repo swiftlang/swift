@@ -957,6 +957,13 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
   } else if (auto *ext = dyn_cast<ExtensionDecl>(GC)) {
     loc = ext->getLoc();
 
+    // A protocol metatype extension has no generic signature — its members are
+    // static members of the protocol metatype and cannot reference Self.  Bail
+    // before inspecting the extended type, which is the metatype `(any P).Type`
+    // rather than a nominal that requirements could be collected from.
+    if (ext->isMetatypeExtension())
+      return nullptr;
+
     collectAdditionalExtensionRequirements(ext->getExtendedType(), extraReqs);
 
     auto *extendedNominal = ext->getExtendedNominal();

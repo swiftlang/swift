@@ -1,10 +1,9 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -O -Xllvm -sil-disable-pass=function-signature-opts %s -parse-as-library -enable-experimental-feature Embedded -module-name main -emit-irgen | %FileCheck %s --check-prefix CHECK-IR
 // RUN: %target-swift-frontend -O -Xllvm -sil-disable-pass=function-signature-opts %s -parse-as-library -enable-experimental-feature Embedded -c -o %t/main.o
-// RUN: %target-embedded-link %target-clang-resource-dir-opt %t/main.o %target-embedded-posix-shim -o %t/a.out -dead_strip
+// RUN: %target-embedded-link %target-clang-resource-dir-opt %t/main.o -o %t/a.out -dead_strip
 // RUN: %target-run %t/a.out | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
 // REQUIRES: swift_feature_Embedded

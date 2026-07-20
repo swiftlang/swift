@@ -135,7 +135,7 @@ bb0:
   %7 = struct $Int64 (%6 : $Builtin.Int64)
   %8 = struct $X (%7 : $Int64)
   store %8 to %3 : $*X
-  cond_br undef, bb1, bb2
+  cond_br undef, bb1, bb3
 
 bb1:
   br bb2
@@ -147,6 +147,9 @@ bb2:
   destroy_addr %2 : $*P
   dealloc_stack %2 : $*P
   return %12 : $Int64
+
+bb3:
+  br bb2
 }
 
 // CHECK-LABEL: sil @existential_is_overwritten_by_store

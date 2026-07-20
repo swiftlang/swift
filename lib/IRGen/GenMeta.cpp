@@ -1033,7 +1033,7 @@ namespace {
               entry.getFunction().getAutoDiffDerivativeFunctionIdentifier());
         if (entry.getFunction().isDistributedThunk()) {
           flags = flags.withIsAsync(true);
-          declRef = declRef.asDistributed();
+          declRef = declRef.getDistributedThunkDeclRef();
         }
         addDiscriminator(flags, schema, declRef);
       }
@@ -1471,6 +1471,17 @@ namespace {
       InvertibleProtocolSet result;
       auto nominal = dyn_cast<NominalTypeDecl>(Type);
       if (!nominal)
+        return result;
+
+      // GenericContextDescriptorFlags must be zero for descriptors that might
+      // be seen by a pre-5.8 runtime, so omit this on pre-5.8 targets unless
+      // we're building the runtime itself.
+      auto deploymentAvailability =
+          AvailabilityRange::forDeploymentTarget(IGM.Context);
+      if (!IGM.Context.LangOpts.DisableAvailabilityChecking &&
+          !deploymentAvailability.isContainedIn(
+              IGM.Context.getSwift58Availability()) &&
+          !IGM.getSwiftModule()->isStdlibModule())
         return result;
 
       auto checkProtocol = [&](InvertibleProtocolKind kind) {
@@ -3640,7 +3651,7 @@ static void emitInitializeRawLayout(IRGenFunction &IGF, SILType likeType,
 
     // PODness comes directly from the like type if we 'movesAsLike'. A custom
     // deinit on the raw layout type however automatically forces non-pod.
-    if (T.getStructOrBoundGenericStruct()->getValueTypeDestructor()) {
+    if (T.getStructOrBoundGenericStruct()->hasValueTypeDestructor()) {
       rawLayoutFlags = IGF.Builder.CreateOr(rawLayoutFlags,
                           IGM.getSize(Size((uint8_t) RawLayoutFlags::IsNonPOD)));
     } else {
@@ -3650,7 +3661,7 @@ static void emitInitializeRawLayout(IRGenFunction &IGF, SILType likeType,
                             IGM.getSize(Size((uint8_t) RawLayoutFlags::IsNonPOD)));
       rawLayoutFlags = IGF.Builder.CreateSelect(isPOD, rawLayoutFlags, isNonPODFlags);
     }
-  } else if (T.getStructOrBoundGenericStruct()->getValueTypeDestructor()) {
+  } else if (T.getStructOrBoundGenericStruct()->hasValueTypeDestructor()) {
     rawLayoutFlags = IGF.Builder.CreateOr(rawLayoutFlags,
                             IGM.getSize(Size((uint8_t) RawLayoutFlags::IsNonPOD)));
   }
@@ -7597,7 +7608,7 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
     
   // The other known protocols aren't special at runtime.
   case KnownProtocolKind::Sequence:
-  case KnownProtocolKind::BorrowingSequence:
+  case KnownProtocolKind::Iterable:
   case KnownProtocolKind::AsyncSequence:
   case KnownProtocolKind::IteratorProtocol:
   case KnownProtocolKind::BorrowingIteratorProtocol:
@@ -7662,7 +7673,7 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::CxxMutableRandomAccessCollection:
   case KnownProtocolKind::CxxSet:
   case KnownProtocolKind::CxxSequence:
-  case KnownProtocolKind::CxxBorrowingSequence:
+  case KnownProtocolKind::CxxIterable:
   case KnownProtocolKind::CxxUniqueSet:
   case KnownProtocolKind::CxxVector:
   case KnownProtocolKind::CxxSpan:
@@ -7687,6 +7698,8 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::SendableMetatype:
   case KnownProtocolKind::ConvertibleToBytes:
   case KnownProtocolKind::ConvertibleFromBytes:
+  case KnownProtocolKind::IUnknown:
+  case KnownProtocolKind::ISwiftObject:
     return SpecialProtocol::None;
   }
 
@@ -7983,9 +7996,23 @@ GenericArgumentMetadata irgen::addGenericRequirements(
                                            /*key argument*/false,
                                            isPackRequirement,
                                            isValueRequirement);
+      // Pass along the generic signature so that, if the runtime demangler is
+      // too old to understand this type's mangled name and we fall back to a
+      // dangling metadata-accessor function, the accessor can map the
+      // type-parameter-dependent type into a generic environment and bind it
+      // from the generic requirements buffer at runtime.
+      //
+      // Use the CanType overload rather than the Type overload: the latter
+      // reduces the type against the signature, which would collapse the RHS
+      // of a same-type requirement onto its equivalence-class representative
+      // (e.g. `T.A == T.B` would be recorded as `T.A == T.A`) and corrupt the
+      // requirement. We want the original RHS, just mangled with the signature
+      // available for the dangling-accessor fallback.
       auto typeName =
-          IGM.getTypeRef(requirement.getSecondType(), nullptr,
-                         MangledTypeRefRole::Metadata).first;
+          IGM.getTypeRef(requirement.getSecondType()->getCanonicalType(),
+                         sig.getCanonicalSignature(),
+                         MangledTypeRefRole::Metadata)
+              .first;
 
       addGenericRequirement(IGM, B, metadata, sig, flags,
                             requirement.getFirstType(),
@@ -8200,6 +8227,27 @@ llvm::GlobalValue *irgen::emitCoroFunctionPointer(IRGenModule &IGM,
   builder.addInt64(typeId->getLimitedValue());
   return cast<llvm::GlobalValue>(
       IGM.defineCoroFunctionPointer(entity, builder.finishAndCreateFuture()));
+}
+
+// Same as above, but can be used for synthetic functions that
+// don't have a matching SIL function.
+llvm::Constant *irgen::emitLocalCoroFunctionPointer(IRGenModule &IGM,
+                                                    llvm::Function *function,
+                                                    llvm::StringRef name) {
+  ConstantInitBuilder initBuilder(IGM);
+  ConstantStructBuilder builder(
+      initBuilder.beginStruct(IGM.CoroFunctionPointerTy));
+  builder.addCompactFunctionReference(function);
+  builder.addInt32(0);
+  auto *typeId = IGM.getMallocTypeId(function);
+  ASSERT(typeId->getIntegerType() == IGM.Int64Ty);
+  builder.addInt64(typeId->getLimitedValue());
+  // Internal linkage: each module that needs it gets its own copy, so there is
+  // no external symbol to resolve.
+  auto *var = builder.finishAndCreateGlobal(name, IGM.getPointerAlignment(),
+                                            /*constant*/ true,
+                                            llvm::GlobalValue::InternalLinkage);
+  return var;
 }
 
 static FormalLinkage getExistentialShapeLinkage(CanGenericSignature genSig,

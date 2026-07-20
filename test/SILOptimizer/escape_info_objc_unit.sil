@@ -1,6 +1,5 @@
 // RUN: %target-sil-opt %s -test-runner -module-name=test -o /dev/null | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: objc_interop
 // REQUIRES: PTRSIZE=64
 

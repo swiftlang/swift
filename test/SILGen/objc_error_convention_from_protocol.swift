@@ -1,3 +1,4 @@
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-silgen-ossa -o /dev/null -sil-verify-all -enable-sil-opaque-values %s -import-objc-header %S/Inputs/objc_error_convention_from_protocol.h
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-silgen %s -import-objc-header %S/Inputs/objc_error_convention_from_protocol.h | %FileCheck %s
 // REQUIRES: objc_interop
 

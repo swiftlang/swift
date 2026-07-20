@@ -4,7 +4,6 @@
 // FIXME: check copy-propagation output instead once it is the default mode
 // RUN: %target-sil-opt -sil-print-types -enable-objc-interop -enforce-exclusivity=none -enable-sil-verify-all %s -sil-combine -enable-copy-propagation -enable-lexical-lifetimes=false | %FileCheck %s --check-prefix=CHECK_COPYPROP
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: objc_codegen
 
 // Declare this SIL to be canonical because some tests break raw SIL
@@ -118,6 +117,11 @@ case i(CopyableStruct)
 
 struct CopyableStruct {
   var guts: AnyObject
+}
+
+struct MoveOnlyData<T> : ~Copyable {
+  @_hasStorage let value: T { get }
+  deinit
 }
 
 //////////////////////
@@ -513,12 +517,12 @@ bb0(%0 : $*Builtin.Word, %1 : $Builtin.RawPointer):
 // CHECK-NEXT: load
 // CHECK-NEXT: return
 // CHECK: } // end sil function 'a2p_p2a_reinterpret_cast_word_raw_pointer1'
-sil [ossa] @a2p_p2a_reinterpret_cast_word_raw_pointer1 : $@convention(thin) (@inout Builtin.Word, Builtin.RawPointer) -> Int32 {
+sil [ossa] @a2p_p2a_reinterpret_cast_word_raw_pointer1 : $@convention(thin) (@inout Builtin.Word, Builtin.RawPointer) -> Int8 {
 bb0(%0 : $*Builtin.Word, %1 : $Builtin.RawPointer):
   %2 = address_to_pointer %0 : $*Builtin.Word to $Builtin.RawPointer
-  %3 = pointer_to_address %2 : $Builtin.RawPointer to [strict] $*Int32
-  %4 = load [trivial] %3 : $*Int32
-  return %4 : $Int32
+  %3 = pointer_to_address %2 : $Builtin.RawPointer to [strict] $*Int8
+  %4 = load [trivial] %3 : $*Int8
+  return %4 : $Int8
 }
 
 sil @useInt : $@convention(thin) (Int32) -> ()
@@ -3290,9 +3294,7 @@ bb0(%0 : @owned $Builtin.NativeObject):
 
 // CHECK-LABEL: sil [ossa] @test_cmp_xor_canonicalization :
 // CHECK:bb0([[ARG:%.*]] : $Builtin.Int1
-// CHECK:  [[FALSE:%.*]] = integer_literal $Builtin.Int1, 0
-// CHECK:  [[NE:%.*]] = builtin "cmp_ne_Int1"([[ARG]] : $Builtin.Int1, [[FALSE]]
-// CHECK:  return [[NE]]
+// CHECK:  return [[ARG]]
 // CHECK: } // end sil function 'test_cmp_xor_canonicalization'
 sil [ossa] @test_cmp_xor_canonicalization : $@convention(thin) (Builtin.Int1) -> Builtin.Int1 {
 bb0(%0 : $Builtin.Int1):
@@ -4004,9 +4006,10 @@ bb0:
   return %9 : $AnyObject
 }
 
-// Int1_const == x -> x == Int1_const
+// Int1_const == x -> x == Int1_const -> x == false -> !x
 // CHECK-LABEL: sil [ossa] @canonicalize_bool_eq_checks :
-// CHECK: builtin "cmp_eq_Int1"(%0 : $Builtin.Int1, %1 :
+// CHECK: [[L:%.*]] = integer_literal $Builtin.Int1, -1
+// CHECK: builtin "xor_Int1"(%0 : $Builtin.Int1, [[L]] :
 // CHECK: } // end sil function 'canonicalize_bool_eq_checks'
 sil [ossa] @canonicalize_bool_eq_checks : $@convention(thin) (Builtin.Int1) -> Builtin.Int1 {
 bb0(%0 : $Builtin.Int1):
@@ -4015,9 +4018,9 @@ bb0(%0 : $Builtin.Int1):
   return %2 : $Builtin.Int1
 }
 
-// Int1_const != x -> x != Int1_const
+// Int1_const != x -> x != Int1_const -> x != false -> x
 // CHECK-LABEL: sil [ossa] @canonicalize_bool_ne_checks :
-// CHECK: builtin "cmp_ne_Int1"(%0 : $Builtin.Int1, %1 :
+// CHECK: return %0
 // CHECK: } // end sil function 'canonicalize_bool_ne_checks'
 sil [ossa] @canonicalize_bool_ne_checks : $@convention(thin) (Builtin.Int1) -> Builtin.Int1 {
 bb0(%0 : $Builtin.Int1):
@@ -5755,3 +5758,14 @@ bb5:
   return %44
 }
 
+// Just check that SILCombine doesn't produce illegal SIL.
+sil [ossa] @dont_convert_operand_of_drop_deinit_to_guaranteed : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%2 : @guaranteed $Klass):
+  %28 = copy_value %2
+  %33 = struct $MoveOnlyData<Klass> (%28)
+  %62 = drop_deinit %33
+  %63 = destructure_struct %62
+  destroy_value %63
+  %r = tuple ()
+  return %r
+}

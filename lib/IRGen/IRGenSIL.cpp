@@ -1046,8 +1046,6 @@ public:
             ValueDomPoints.push_back({Storage, getActiveDominancePoint()});
       }
 
-    // This condition must be consistent with emitPoisonDebugValueInst to avoid
-    // generating extra shadow copies for debug_value [poison].
     if (!shouldShadowVariable(VarInfo, IsAnonymous)
         || !shouldShadowStorage(Storage, StorageType)) {
       return Storage;
@@ -1230,7 +1228,6 @@ public:
   void emitErrorResultVar(CanSILFunctionType FnTy,
                           SILResultInfo ErrorInfo,
                           DebugValueInst *DbgValue);
-  void emitPoisonDebugValueInst(DebugValueInst *i);
   void emitDebugInfoBeforeAllocStack(AllocStackInst *i,
                                      const TypeInfo &type,
                                      DebugTypeInfo &DbgTy);
@@ -1795,6 +1792,8 @@ public:
   llvm::Value *getCallerErrorResultArgument() override {
     llvm_unreachable("should not be used");
   }
+  // Claimed lazily off the back; emitEntryPointArgumentsNativeCC binds the
+  // context first so this lands on the indirect error slot.
   llvm::Value *getCallerTypedErrorResultArgument() override {
     return allParamValues.takeLast();
   }
@@ -2214,6 +2213,40 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
   }
 
   SILFunctionConventions fnConv(funcTy, IGF.getSILModule());
+
+  // Bind the self/context parameter, the last parameter of the async entry
+  // signature. Factored out so async binds it before popping the error result
+  // and the sync path after; returns true if it bound or claimed the context.
+  auto bindContextParameter = [&]() -> bool {
+    if (hasSelfContextParameter(funcTy)) {
+      SILArgument *selfParam = params.back();
+      params = params.drop_back();
+      bindParameter(
+          IGF, *emission, 0, selfParam,
+          fnConv.getSILArgumentType(fnConv.getNumSILArguments() - 1,
+                                    IGF.IGM.getMaximalTypeExpansionContext()),
+          [&](unsigned startIndex, unsigned size) {
+            assert(size == 1);
+            Explosion selfTemp;
+            selfTemp.add(emission->getContext());
+            return selfTemp;
+          });
+    } else if ((!funcTy->isAsync() && funcTy->hasErrorResult()) ||
+               funcTy->getRepresentation() ==
+                   SILFunctionTypeRepresentation::Thick) {
+      // Even without a 'self', an error result (sync) or a thick context still
+      // occupies a context slot here.
+      llvm::Value *contextPtr = emission->getContext();
+      (void)contextPtr;
+      assert(contextPtr->getType() == IGF.IGM.RefCountedPtrTy);
+    } else {
+      return false;
+    }
+    return true;
+  };
+
+  bool boundContextParameter = false;
+
   if (funcTy->isAsync()) {
     emitAsyncFunctionEntry(IGF, getAsyncContextLayout(IGF.IGM, IGF.CurSILFn),
                            LinkEntity::forSILFunction(IGF.CurSILFn),
@@ -2226,6 +2259,8 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
       // Remap the entry block.
       IGF.LoweredBBs[&*IGF.CurSILFn->begin()] = LoweredBB(IGF.Builder.GetInsertBlock(), {});
     }
+    // Bind the context before the error result is popped below.
+    boundContextParameter = bindContextParameter();
   }
 
   // Bind the error result by popping it off the parameter list.
@@ -2272,37 +2307,12 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
     }
   }
 
-  SILFunctionConventions conv(funcTy, IGF.getSILModule());
+  // Sync path: bind the context after the error result (async bound it above).
+  if (!funcTy->isAsync())
+    boundContextParameter = bindContextParameter();
 
-  // The 'self' argument might be in the context position, which is
-  // now the end of the parameter list.  Bind it now.
-  if (hasSelfContextParameter(funcTy)) {
-    SILArgument *selfParam = params.back();
-    params = params.drop_back();
-
-    bindParameter(
-        IGF, *emission, 0, selfParam,
-        conv.getSILArgumentType(conv.getNumSILArguments() - 1,
-                                IGF.IGM.getMaximalTypeExpansionContext()),
-        [&](unsigned startIndex, unsigned size) {
-          assert(size == 1);
-          Explosion selfTemp;
-          selfTemp.add(emission->getContext());
-          return selfTemp;
-        });
-
-    // Even if we don't have a 'self', if we have an error result, we
-    // should have a placeholder argument here.
-    //
-    // For async functions, there will be a thick context within the async
-    // context whenever there is no self context.
-  } else if ((!funcTy->isAsync() && funcTy->hasErrorResult()) ||
-             funcTy->getRepresentation() ==
-                 SILFunctionTypeRepresentation::Thick) {
-    llvm::Value *contextPtr = emission->getContext();
-    (void)contextPtr;
-    assert(contextPtr->getType() == IGF.IGM.RefCountedPtrTy);
-  } else if (isKeyPathAccessorRepresentation(funcTy->getRepresentation())) {
+  if (!boundContextParameter &&
+      isKeyPathAccessorRepresentation(funcTy->getRepresentation())) {
     auto genericEnv = IGF.CurSILFn->getGenericEnvironment();
     SmallVector<GenericRequirement, 4> requirements;
     CanGenericSignature genericSig;
@@ -2348,7 +2358,7 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
         componentArgsBuf = allParamValues.takeLast();
         bindParameter(
             IGF, *emission, baseIndexOfIndicesArguments + i, indicesArg,
-            conv.getSILArgumentType(baseIndexOfIndicesArguments + i,
+            fnConv.getSILArgumentType(baseIndexOfIndicesArguments + i,
                                     IGF.IGM.getMaximalTypeExpansionContext()),
             [&](unsigned startIndex, unsigned size) {
               assert(size == 1);
@@ -2374,9 +2384,9 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
   // Map the remaining SIL parameters to LLVM parameters.
   unsigned i = 0;
   for (SILArgument *param : params) {
-    auto argIdx = conv.getSILArgIndexOfFirstParam() + i;
+    auto argIdx = fnConv.getSILArgIndexOfFirstParam() + i;
     bindParameter(IGF, *emission, i, param,
-                  conv.getSILArgumentType(
+                  fnConv.getSILArgumentType(
                       argIdx, IGF.IGM.getMaximalTypeExpansionContext()),
                   [&](unsigned index, unsigned size) {
                     return emission->getArgumentExplosion(index, size);
@@ -5486,9 +5496,6 @@ void IRGenSILFunction::visitCondBranchInst(swift::CondBranchInst *i) {
   llvm::Value *condValue =
     getLoweredExplosion(i->getCondition(), &Builder).claimNext();
 
-  addIncomingSILArgumentsToPHINodes(*this, trueBB, i->getTrueArgs());
-  addIncomingSILArgumentsToPHINodes(*this, falseBB, i->getFalseArgs());
-
   llvm::MDNode *Weights = nullptr;
   auto TrueBBCount = i->getTrueBBCount();
   auto FalseBBCount = i->getFalseBBCount();
@@ -6063,107 +6070,6 @@ void IRGenSILFunction::emitErrorResultVar(CanSILFunctionType FnTy,
                                          /*InCoroContext=*/false, ArtificialValue);
 }
 
-void IRGenSILFunction::emitPoisonDebugValueInst(DebugValueInst *i) {
-  auto varInfo = i->getVarInfo();
-  assert(varInfo && "debug_value without debug info");
-
-  bool isAnonymous = false;
-  varInfo->Name = getVarName(i, isAnonymous);
-
-  SILValue silVal = i->getOperand();
-  SILType silTy = silVal->getType();
-  SILType unwrappedTy = silTy.unwrapOptionalType();
-  CanType refTy = unwrappedTy.getASTType();
-  // TODO: Handling nontrivial aggregates requires implementing poisonRefs
-  // within TypeInfo. However, this could inflate code size for large types.
-  assert(refTy->isAnyClassReferenceType() && "type can't handle poison");
-
-  Explosion e = getLoweredExplosion(silVal);
-  llvm::Value *storage = e.claimNext();
-  auto storageTy = storage->getType();
-  // Safeguard: don't try to poison an non-word sized value. Not sure how this
-  // could ever happen.
-  if (!storageTy->isPointerTy() && storageTy != IGM.SizeTy)
-    return;
-
-  // Only the first word of the value is poisoned.
-  //
-  // TODO: This assumes that only class references are poisoned (as guaranteed
-  // by MandatoryCopyPropagation). And it assumes the reference is the first
-  // value (class existential witnesses are laid out after the class reference).
-  bool singleValueExplosion = e.empty();
-  (void)e.claimAll();
-
-  // Only poison shadow references if this storage is purely used as a shadow
-  // copy--poison should never affect program behavior. Also filter everything
-  // not handled by emitShadowCopyIfNeeded to avoid extra shadow copies.
-  if (!shouldShadowVariable(*varInfo, isAnonymous)
-      || !shouldShadowStorage(storage, nullptr)) {
-    return;
-  }
-
-  // The original decl scope.
-  const SILDebugScope *scope = i->getDebugScope();
-
-  // Shadow allocas are pointer aligned.
-  auto ptrAlign = IGM.getPointerAlignment();
-
-  // Emit or recover the unique shadow copy.
-  //
-  // FIXME: To limit perturbing original source, this follows the strange
-  // emitShadowCopyIfNeeded logic that has separate paths for single-value
-  // vs. multi-value explosions.
-  Address shadowAddress;
-  if (singleValueExplosion) {
-    shadowAddress = emitShadowCopy(storage, scope, *varInfo, ptrAlign, false,
-                                   false /*was moved*/);
-  } else {
-    assert(refTy->isClassExistentialType() && "unknown multi-value explosion");
-    // FIXME: Handling Optional existentials requires TypeInfo
-    // support. Otherwise we would need to assume the layout of the reference
-    // and bitcast everything below to scalar integers.
-    if (silTy != unwrappedTy)
-      return;
-
-    unsigned argNo = varInfo->ArgNo;
-    auto &alloca = ShadowStackSlots[{argNo, {scope, varInfo->Name}}];
-    if (!alloca.isValid()) {
-      auto &lti = cast<LoadableTypeInfo>(IGM.getTypeInfo(silTy));
-      alloca =
-        lti.allocateStack(*this, silTy, varInfo->Name + ".debug").getAddress();
-    }
-    shadowAddress = emitClassExistentialValueAddress(*this, alloca, silTy);
-  }
-  Size::int_type poisonInt = IGM.TargetInfo.ReferencePoisonDebugValue;
-  assert((poisonInt & IGM.TargetInfo.PointerSpareBits.asAPInt()) == 0);
-  llvm::Value *poisonedVal = llvm::ConstantInt::get(IGM.SizeTy, poisonInt);
-
-  // If the current value is nil (Optional's extra inhabitant), then don't
-  // overwrite it with poison. This way, lldb will correctly display
-  // Optional.None rather than telling the user that an object was
-  // deinitialized, when there was no object to begin with. This could also be
-  // done with a spare-bits mask to handle arbitrary enums but extra inhabitants
-  // are tricky.
-  if (!storageTy->isPointerTy()) {
-    assert(storageTy == IGM.SizeTy && "can't handle non-word values");
-    llvm::Value *currentBits =
-      Builder.CreateBitOrPointerCast(storage, IGM.SizeTy);
-    llvm::Value *zeroWord = llvm::ConstantInt::get(IGM.SizeTy, 0);
-    llvm::Value *isNil = Builder.CreateICmpEQ(currentBits, zeroWord);
-    poisonedVal = Builder.CreateSelect(isNil, currentBits, poisonedVal);
-  }
-  llvm::Value *newShadowVal =
-    Builder.CreateBitOrPointerCast(poisonedVal, storageTy);
-
-  assert(canAllocaStoreValue(shadowAddress, newShadowVal, *varInfo, scope) &&
-         "shadow copy can't handle poison");
-    
-  // The poison stores have an artificial location within the original variable
-  // declaration's scope.
-  ArtificialLocation autoRestore(scope, IGM.DebugInfo.get(), Builder);
-  Builder.CreateStore(newShadowVal, shadowAddress.getAddress(), ptrAlign);
-}
-
 /// Determine whether the debug-info-carrying instruction \c i belongs to an
 /// async function and thus may get allocated in the coroutine context. These
 /// variables need to be marked with the Coro flag, so LLVM's CoroSplit pass can
@@ -6207,12 +6113,6 @@ static void salvageDebugReconstructionInst(llvm::Instruction *I) {
 void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
   auto SILVal = i->getOperand();
   bool IsAddrVal = SILVal->getType().isAddress();
-  if (i->poisonRefs()) {
-    assert(!IsAddrVal &&
-           "SIL values with address type should not have poison");
-    emitPoisonDebugValueInst(i);
-    return;
-  }
   if (i->getDebugScope()->getInlinedFunction()->isTransparent())
     return;
 
@@ -7319,6 +7219,12 @@ void IRGenSILFunction::visitBeginUnpairedAccessInst(
     return;
 
   case SILAccessEnforcement::Dynamic: {
+    // In Embedded Swift, suppress the swift_beginAccess call if dynamic
+    // exclusivity is not enabled.
+    if (getSILModule().getOptions().EmbeddedSwift &&
+        !getSILModule().getOptions().EnforceExclusivityDynamic)
+      return;
+
     llvm::Value *scratch = getLoweredAddress(access->getBuffer()).getAddress();
 
     llvm::Value *pointer =
@@ -7445,6 +7351,12 @@ void IRGenSILFunction::visitEndUnpairedAccessInst(EndUnpairedAccessInst *i) {
     return;
 
   case SILAccessEnforcement::Dynamic: {
+    // In Embedded Swift, suppress the swift_endAccess call if dynamic
+    // exclusivity is not enabled.
+    if (getSILModule().getOptions().EmbeddedSwift &&
+        !getSILModule().getOptions().EnforceExclusivityDynamic)
+      return;
+
     auto scratch = getLoweredAddress(i->getBuffer()).getAddress();
 
     auto call =
@@ -8104,6 +8016,19 @@ void IRGenSILFunction::visitFunctionExtractIsolationInst(
 }
 
 void IRGenSILFunction::visitKeyPathInst(swift::KeyPathInst *I) {
+  // In embedded Swift, key paths whose pattern is fully-known at compile
+  // time (no substitutions, no captured operands, only supported component
+  // kinds) get emitted as immortal constant globals rather than being
+  // instantiated at runtime through `swift_getKeyPath` (which isn't
+  // available in embedded builds anyway).
+  if (IGM.canEmitStaticKeyPathInstance(I)) {
+    llvm::Constant *staticInstance = IGM.emitStaticKeyPathInstance(I);
+    Explosion e;
+    e.add(staticInstance);
+    setLoweredExplosion(I, e);
+    return;
+  }
+
   auto pattern = IGM.getAddrOfKeyPathPattern(I->getPattern(), I->getLoc());
   // Build up the argument vector to instantiate the pattern here.
   std::optional<StackAddress> dynamicArgsBuf;

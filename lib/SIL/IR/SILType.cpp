@@ -195,6 +195,8 @@ bool SILType::isEmpty(const SILFunction &F) const {
                                 F.getResilienceExpansion())) {
       return false;
     }
+    if (structDecl->hasUnreferenceableStorage())
+      return false;
 
     TypeExpansionContext typeEx = F.getTypeExpansionContext();
     for (VarDecl *field : structDecl->getStoredProperties()) {
@@ -1170,7 +1172,7 @@ bool SILType::isValueTypeWithDeinit() const {
   // Do not look inside an aggregate type that has a user-deinit, for which
   // memberwise-destruction is not equivalent to aggregate destruction.
   if (auto *nominal = getNominalOrBoundGenericNominal()) {
-    return nominal->getValueTypeDestructor() != nullptr;
+    return nominal->hasValueTypeDestructor();
   }
   return false;
 }

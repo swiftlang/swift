@@ -145,7 +145,7 @@ void SILGenModule::useConformancesFromType(SILInstruction *inst, CanType type) {
 
     // If this is an imported noncopyable type with a deinitializer, record it.
     if (decl->hasClangNode() && !decl->canBeCopyable() &&
-        decl->getValueTypeDestructor() &&
+        decl->hasValueTypeDestructor() &&
         importedNontrivialNoncopyableTypes.insert(decl).second) {
       visitImportedNontrivialNoncopyableType(decl);
     }

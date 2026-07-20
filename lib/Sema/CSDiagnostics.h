@@ -114,18 +114,18 @@ protected:
   }
 
   Type getContextualType(ASTNode anchor) const {
-    auto &cs = getConstraintSystem();
-    return cs.getContextualType(anchor, /*forConstraint=*/false);
+    return getSolution().getContextualType(anchor);
   }
 
   TypeLoc getContextualTypeLoc(ASTNode anchor) const {
-    auto &cs = getConstraintSystem();
-    return cs.getContextualTypeLoc(anchor);
+    auto &solution = getSolution();
+    if (auto contextualInfo = solution.getContextualTypeInfo(anchor))
+      return contextualInfo->typeLoc;
+    return TypeLoc();
   }
 
   ContextualTypePurpose getContextualTypePurpose(ASTNode anchor) const {
-    auto &cs = getConstraintSystem();
-    return cs.getContextualTypePurpose(anchor);
+    return getSolution().getContextualTypePurpose(anchor);
   }
 
   DeclContext *getDC() const {
@@ -663,8 +663,7 @@ public:
             locator->isForContextualType()
                 ? locator->castLastElementTo<LocatorPathElt::ContextualType>()
                       .getPurpose()
-                : solution.getConstraintSystem().getContextualTypePurpose(
-                      locator->getAnchor()),
+                : solution.getContextualTypePurpose(locator->getAnchor()),
             lhs, rhs, locator, fixBehavior) {}
 
   ContextualFailure(const Solution &solution, ContextualTypePurpose purpose,
@@ -691,7 +690,7 @@ public:
   bool diagnoseAsNote() override;
 
   /// If the type of a key path literal is read-only due to setter
-  /// availability constraints but the context requires a writable
+  /// availability restrictions but the context requires a writable
   /// key path, let's produce a tailed availability diagnostic that
   /// points to the offending setter.
   bool diagnoseKeyPathLiteralMutabilityMismatch() const;
@@ -2406,15 +2405,6 @@ public:
   bool diagnoseAsError() override;
 };
 
-class InvalidUseOfTrailingClosure final : public ArgumentMismatchFailure {
-public:
-  InvalidUseOfTrailingClosure(const Solution &solution, Type argType,
-                              Type paramType, ConstraintLocator *locator)
-      : ArgumentMismatchFailure(solution, argType, paramType, locator) {}
-
-  bool diagnoseAsError() override;
-};
-
 /// Diagnose the invalid conversion of a temporary pointer argument generated
 /// from an X-to-pointer conversion to an @_nonEphemeral parameter.
 ///
@@ -3390,13 +3380,14 @@ public:
 /// let x: InlineArray<4, Int> = [1, 2] // expected '4' elements but got '2'
 /// \endcode
 class IncorrectInlineArrayLiteralCount final : public FailureDiagnostic {
-  Type lhsCount, rhsCount;
+  unsigned lhsCount, rhsCount;
 
 public:
-  IncorrectInlineArrayLiteralCount(const Solution &solution, Type lhsCount,
-                            Type rhsCount, ConstraintLocator *locator)
-      : FailureDiagnostic(solution, locator), lhsCount(resolveType(lhsCount)),
-        rhsCount(resolveType(rhsCount)) {}
+  IncorrectInlineArrayLiteralCount(const Solution &solution, unsigned lhsCount,
+                                   unsigned rhsCount,
+                                   ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator), lhsCount(lhsCount),
+        rhsCount(rhsCount) {}
 
   bool diagnoseAsError() override;
 };
@@ -3423,6 +3414,23 @@ public:
                                 ProtocolConformance *conformance,
                                 ConstraintLocator *locator)
       : FailureDiagnostic(solution, locator), conformance(conformance) {}
+
+  bool diagnoseAsError() override;
+};
+
+/// Diagnose situations when a key path dynamic member lookup expects
+/// a `ReferenceWritableKeyPath` but the base is not a class and so
+/// the argument is `WritableKeyPath`.
+class NonClassBaseInDynamicMemberLookup final : public FailureDiagnostic {
+  Type BaseType;
+  ValueDecl *Member;
+
+public:
+  NonClassBaseInDynamicMemberLookup(const Solution &solution, Type baseType,
+                                    ValueDecl *member,
+                                    ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator), BaseType(resolveType(baseType)),
+        Member(member) {}
 
   bool diagnoseAsError() override;
 };

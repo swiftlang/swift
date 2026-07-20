@@ -1310,7 +1310,7 @@ static CanType getKnownType(std::optional<CanType> &cacheSlot, ASTContext &C,
       // themselves.
       SmallVector<ValueDecl *, 2> decls;
       mod->lookupQualified(mod, DeclNameRef(C.getIdentifier(typeName)),
-                           SourceLoc(), NL_QualifiedDefault, decls);
+                           SourceLoc(), NLFlags::QualifiedDefault, decls);
       if (decls.size() != 1)
         return CanType();
 
@@ -1863,6 +1863,11 @@ class DestructureInputs {
   SmallBitVector &AddressableLoweredParameters;
   SmallBitVector &ConditionallyAddressableLoweredParameters;
   unsigned NextOrigParamIndex = 0;
+  /// Whether the result has a scoped (borrow) lifetime dependency on a foreign
+  /// 'self' (e.g. a C++ method's 'this'). Set before
+  /// maybeAddForeignParameters() so that the foreign self is lowered as
+  /// addressable-for-dependencies.
+  bool ForeignSelfHasScopedDependency = false;
 
   void addLoweredParameter(SILParameterInfo parameter,
                            unsigned formalParameterIndex) {
@@ -1974,11 +1979,6 @@ private:
       }
     }
 
-    // Add any foreign parameters that are positioned at the start
-    // of the sequence.  visit() will add foreign parameters that are
-    // positioned after any parameters it adds.
-    maybeAddForeignParameters();
-    
     // Parameters may lower differently when they have scoped dependencies.
     SmallBitVector paramsWithScopedDependencies(params.size(), false);
     for (auto &depInfo : extInfoBuilder.getLifetimeDependencies()) {
@@ -1986,7 +1986,18 @@ private:
         paramsWithScopedDependencies |= scopeIndices->getBitVector();
       }
     }
-    
+
+    if (Foreign.self.isInstance() && !params.empty()) {
+      // The foreign self is the last formal parameter.
+      ForeignSelfHasScopedDependency =
+          paramsWithScopedDependencies[params.size() - 1];
+    }
+
+    // Add any foreign parameters that are positioned at the start
+    // of the sequence.  visit() will add foreign parameters that are
+    // positioned after any parameters it adds.
+    maybeAddForeignParameters();
+
     // Process all the non-self parameters.
     origType.forEachFunctionParam(params.drop_back(hasSelf ? 1 : 0),
                                   /*ignore final orig param*/ hasSelf,
@@ -2301,7 +2312,7 @@ private:
       // This is a "self", but it's not a Swift self, we handle it differently.
       visit(ForeignSelf->SubstSelfParam.getValueOwnership(),
             Foreign.self.getSelfIndex(),
-            /*forSelf=*/false, /*scoped dependency=*/false,
+            /*forSelf=*/false, ForeignSelfHasScopedDependency,
             ForeignSelf->OrigSelfParam,
             ForeignSelf->SubstSelfParam.getParameterType(), {});
     }
@@ -3536,7 +3547,8 @@ static CanSILFunctionType getNativeSILFunctionType(
       return getSILFunctionTypeForConventions(DefaultInitializerConventions());
     case SILDeclRef::Kind::Allocator:
       return getSILFunctionTypeForConventions(DefaultAllocatorConventions());
-    case SILDeclRef::Kind::Func: {
+    case SILDeclRef::Kind::Func:
+    case SILDeclRef::Kind::DistributedThunk: {
       // If we have a setter, use the special setter convention. This ensures
       // that we take normal parameters at +1.
       if (constant) {
@@ -4404,6 +4416,10 @@ static const clang::Decl *findClangMethod(ValueDecl *method) {
 
     if (auto overridden = methodFn->getOverriddenDecl())
       return findClangMethod(overridden);
+
+    if (auto *implementedDecl = method->getImplementedObjCDecl())
+      if (auto *implementedFunction = implementedDecl->getClangDecl())
+        return implementedFunction;
   }
 
   if (auto *constructor = dyn_cast<ConstructorDecl>(method)) {
@@ -4479,6 +4495,7 @@ static ObjCSelectorFamily getObjCSelectorFamily(SILDeclRef c) {
   case SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue:
   case SILDeclRef::Kind::EntryPoint:
   case SILDeclRef::Kind::AsyncEntryPoint:
+  case SILDeclRef::Kind::DistributedThunk:
     llvm_unreachable("Unexpected Kind of foreign SILDeclRef");
   }
 
@@ -4818,6 +4835,7 @@ TypeConverter::getDeclRefRepresentation(SILDeclRef c) {
       return SILFunctionTypeRepresentation::Thin;
 
     case SILDeclRef::Kind::Func:
+    case SILDeclRef::Kind::DistributedThunk:
       if (c.getDecl()->getDeclContext()->isTypeContext())
         return SILFunctionTypeRepresentation::Method;
       return SILFunctionTypeRepresentation::Thin;
@@ -5203,6 +5221,7 @@ CanAnyFunctionType TypeConverter::getBridgedFunctionType(
 static AbstractFunctionDecl *getBridgedFunction(SILDeclRef declRef) {
   switch (declRef.kind) {
   case SILDeclRef::Kind::Func:
+  case SILDeclRef::Kind::DistributedThunk:
   case SILDeclRef::Kind::Allocator:
   case SILDeclRef::Kind::Initializer:
     return (declRef.hasDecl()

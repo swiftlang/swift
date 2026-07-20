@@ -20,7 +20,7 @@
 // expected-expansion@+7:46{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func simple(_ p: UnsafeMutableRawBufferPointer) {|}}
-//   expected-remark@3{{macro content: |    let len = Int32(exactly: p.count)!|}}
+//   expected-remark@3{{macro content: |    let len = CInt(exactly: p.count)!|}}
 //   expected-remark@4{{macro content: |    return unsafe simple(len, p.baseAddress)|}}
 //   expected-remark@5{{macro content: |}|}}
 // }}
@@ -29,7 +29,7 @@ void simple(int len, void * __sized_by(len) p);
 // expected-expansion@+7:32{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func swiftAttr(_ p: UnsafeMutableRawBufferPointer) {|}}
-//   expected-remark@3{{macro content: |    let len = Int32(exactly: p.count)!|}}
+//   expected-remark@3{{macro content: |    let len = CInt(exactly: p.count)!|}}
 //   expected-remark@4{{macro content: |    return unsafe swiftAttr(len, p.baseAddress)|}}
 //   expected-remark@5{{macro content: |}|}}
 // }}
@@ -39,7 +39,7 @@ void swiftAttr(int len, void *p) __attribute__((swift_attr(
 // expected-expansion@+10:74{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func shared(_ p1: UnsafeMutableRawBufferPointer, _ p2: UnsafeMutableRawBufferPointer) {|}}
-//   expected-remark@3{{macro content: |    let len = Int32(exactly: p2.count)!|}}
+//   expected-remark@3{{macro content: |    let len = CInt(exactly: p2.count)!|}}
 //   expected-remark@4{{macro content: |    if p1.count != len {|}}
 //   expected-remark@5{{macro content: |      fatalError("bounds check failure in shared: expected \\(len) but got \\(p1.count)")|}}
 //   expected-remark@6{{macro content: |    }|}}
@@ -50,7 +50,7 @@ void shared(int len, void * __sized_by(len) p1, void * __sized_by(len) p2);
 
 // expected-expansion@+9:72{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func complexExpr(_ len: Int32, _ offset: Int32, _ p: UnsafeMutableRawBufferPointer) {|}}
+//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func complexExpr(_ len: CInt, _ offset: CInt, _ p: UnsafeMutableRawBufferPointer) {|}}
 //   expected-remark@3{{macro content: |    if p.count != (len - offset) {|}}
 //   expected-remark@4{{macro content: |      fatalError("bounds check failure in complexExpr: expected \\((len - offset)) but got \\(p.count)")|}}
 //   expected-remark@5{{macro content: |    }|}}
@@ -62,7 +62,7 @@ void complexExpr(int len, int offset, void * __sized_by(len - offset) p);
 // expected-expansion@+7:73{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func nullUnspecified(_ p: UnsafeMutableRawBufferPointer) {|}}
-//   expected-remark@3{{macro content: |    let len = Int32(exactly: p.count)!|}}
+//   expected-remark@3{{macro content: |    let len = CInt(exactly: p.count)!|}}
 //   expected-remark@4{{macro content: |    return unsafe nullUnspecified(len, p.baseAddress)|}}
 //   expected-remark@5{{macro content: |}|}}
 // }}
@@ -71,24 +71,42 @@ void nullUnspecified(int len, void * __sized_by(len) _Null_unspecified p);
 // expected-expansion@+7:56{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func nonnull(_ p: UnsafeMutableRawBufferPointer) {|}}
-//   expected-remark@3{{macro content: |    let len = Int32(exactly: p.count)!|}}
+//   expected-remark@3{{macro content: |    let len = CInt(exactly: p.count)!|}}
 //   expected-remark@4{{macro content: |    return unsafe nonnull(len, p.baseAddress!)|}}
 //   expected-remark@5{{macro content: |}|}}
 // }}
 void nonnull(int len, void * __sized_by(len) _Nonnull p);
 
+// expected-expansion@+7:61{{
+//   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
+//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func nonnullTyped(_ p: UnsafeMutableRawBufferPointer) {|}}
+//   expected-remark@3{{macro content: |    let len = CInt(exactly: p.count)!|}}
+//   expected-remark@4{{macro content: |    return unsafe nonnullTyped(len, p.baseAddress!.assumingMemoryBound(to: CChar.self))|}}
+//   expected-remark@5{{macro content: |}|}}
+// }}
+void nonnullTyped(int len, char * __sized_by(len) _Nonnull p);
+
 // expected-expansion@+7:58{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func nullable(_ p: UnsafeMutableRawBufferPointer) {|}}
-//   expected-remark@3{{macro content: |    let len = Int32(exactly: p.count)!|}}
+//   expected-remark@3{{macro content: |    let len = CInt(exactly: p.count)!|}}
 //   expected-remark@4{{macro content: |    return unsafe nullable(len, p.baseAddress)|}}
 //   expected-remark@5{{macro content: |}|}}
 // }}
 void nullable(int len, void * __sized_by(len) _Nullable p);
 
+// expected-expansion@+7:63{{
+//   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
+//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func nullableTyped(_ p: UnsafeMutableRawBufferPointer) {|}}
+//   expected-remark@3{{macro content: |    let len = CInt(exactly: p.count)!|}}
+//   expected-remark@4{{macro content: |    return unsafe nullableTyped(len, p.baseAddress?.assumingMemoryBound(to: CChar.self))|}}
+//   expected-remark@5{{macro content: |}|}}
+// }}
+void nullableTyped(int len, char * __sized_by(len) _Nullable p);
+
 // expected-expansion@+6:45{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func returnPointer(_ len: Int32) -> UnsafeMutableRawBufferPointer {|}}
+//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func returnPointer(_ len: CInt) -> UnsafeMutableRawBufferPointer {|}}
 //   expected-remark@3{{macro content: |    return unsafe UnsafeMutableRawBufferPointer(start: unsafe returnPointer(len), count: Int(len))|}}
 //   expected-remark@4{{macro content: |}|}}
 // }}
@@ -98,7 +116,7 @@ typedef struct foo opaque_t;
 // expected-expansion@+7:50{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func opaque(_ p: UnsafeRawBufferPointer) {|}}
-//   expected-remark@3{{macro content: |    let len = Int32(exactly: p.count)!|}}
+//   expected-remark@3{{macro content: |    let len = CInt(exactly: p.count)!|}}
 //   expected-remark@4{{macro content: |    return unsafe opaque(len, OpaquePointer(p.baseAddress))|}}
 //   expected-remark@5{{macro content: |}|}}
 // }}
@@ -108,25 +126,24 @@ typedef opaque_t *opaqueptr_t;
 // expected-expansion@+7:54{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func opaqueptr(_ p: UnsafeRawBufferPointer) {|}}
-//   expected-remark@3{{macro content: |    let len = Int32(exactly: p.count)!|}}
+//   expected-remark@3{{macro content: |    let len = CInt(exactly: p.count)!|}}
 //   expected-remark@4{{macro content: |    return unsafe opaqueptr(len, OpaquePointer(p.baseAddress))|}}
 //   expected-remark@5{{macro content: |}|}}
 // }}
 void opaqueptr(int len, opaqueptr_t __sized_by(len) p);
 
-// expected-expansion@+8:48{{
+// expected-expansion@+7:48{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func charsized(_ _charsized_param0: UnsafeMutableRawBufferPointer) {|}}
-//   expected-remark@3{{macro content: |    let _charsized_param1 = Int32(exactly: _charsized_param0.count)!|}}
-//   expected-error@4{{value of optional type 'UnsafeMutableRawPointer?' must be unwrapped to refer to member 'assumingMemoryBound' of wrapped base type 'UnsafeMutableRawPointer'}}
-//   expected-remark@4{{macro content: |    return unsafe charsized(_charsized_param0.baseAddress.assumingMemoryBound(to: CChar.self), _charsized_param1)|}}
+//   expected-remark@3{{macro content: |    let _charsized_param1 = CInt(exactly: _charsized_param0.count)!|}}
+//   expected-remark@4{{macro content: |    return unsafe charsized(_charsized_param0.baseAddress?.assumingMemoryBound(to: CChar.self), _charsized_param1)|}}
 //   expected-remark@5{{macro content: |}|}}
 // }}
 void charsized(char *__sized_by(size), int size);
 
 // expected-expansion@+6:45{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func bytesized(_ size: Int32) -> UnsafeMutableRawBufferPointer {|}}
+//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func bytesized(_ size: CInt) -> UnsafeMutableRawBufferPointer {|}}
 //   expected-remark@3{{macro content: |    return unsafe UnsafeMutableRawBufferPointer(start: unsafe bytesized(size), count: Int(size))|}}
 //   expected-remark@4{{macro content: |}|}}
 // }}
@@ -135,12 +152,11 @@ uint8_t *__sized_by(size) bytesized(int size);
 void doublebytesized(uint16_t *__sized_by(size), int size);
 
 typedef uint8_t * bytesizedptr_t;
-// expected-expansion@+8:66{{
+// expected-expansion@+7:66{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func aliasedBytesized(_ p: UnsafeMutableRawBufferPointer) {|}}
-//   expected-remark@3{{macro content: |    let size = Int32(exactly: p.count)!|}}
-//   expected-error@4{{value of optional type 'UnsafeMutableRawPointer?' must be unwrapped to refer to member 'assumingMemoryBound' of wrapped base type 'UnsafeMutableRawPointer'}}
-//   expected-remark@4{{macro content: |    return unsafe aliasedBytesized(p.baseAddress.assumingMemoryBound(to: UInt8.self), size)|}}
+//   expected-remark@3{{macro content: |    let size = CInt(exactly: p.count)!|}}
+//   expected-remark@4{{macro content: |    return unsafe aliasedBytesized(p.baseAddress?.assumingMemoryBound(to: UInt8.self), size)|}}
 //   expected-remark@5{{macro content: |}|}}
 // }}
 void aliasedBytesized(bytesizedptr_t __sized_by(size) p, int size);
@@ -151,65 +167,73 @@ module Test {
 }
 
 //--- test.swift
-// GENERATED-BY: %target-swift-ide-test -print-module -module-to-print=Test -plugin-path %swift-plugin-dir -I %t -source-filename=x -enable-experimental-feature SafeInteropWrappersNullAsEmptySpan -Xcc -Wno-nullability-completeness > %t/Test-interface.swift && %swift-function-caller-generator Test %t/Test-interface.swift
-// GENERATED-HASH: aa0ef698c5b89ce6cae09977d23227d1ff414b5f3d685beb8e3fae593ab566a0
+// GENERATED-BY: %target-swift-ide-test -print-module -module-to-print=Test -plugin-path %swift-plugin-dir -I %t -source-filename=x -Xcc -Wno-nullability-completeness > %t/Test-interface.swift && %swift-function-caller-generator Test %t/Test-interface.swift
+// GENERATED-HASH: 4c7858f3a0bd8638c97e736244b26b6e0baaaa0a253dd5254e738ef536b873cb
 import Test
 
 
 
-func call_simple(_ len: Int32, _ p: UnsafeMutableRawPointer!) {
+func call_simple(_ len: CInt, _ p: UnsafeMutableRawPointer!) {
   return unsafe simple(len, p)
 }
 
-func call_swiftAttr(_ len: Int32, _ p: UnsafeMutableRawPointer!) {
+func call_swiftAttr(_ len: CInt, _ p: UnsafeMutableRawPointer!) {
   return unsafe swiftAttr(len, p)
 }
 
-func call_shared(_ len: Int32, _ p1: UnsafeMutableRawPointer!, _ p2: UnsafeMutableRawPointer!) {
+func call_shared(_ len: CInt, _ p1: UnsafeMutableRawPointer!, _ p2: UnsafeMutableRawPointer!) {
   return unsafe shared(len, p1, p2)
 }
 
-func call_complexExpr(_ len: Int32, _ offset: Int32, _ p: UnsafeMutableRawPointer!) {
+func call_complexExpr(_ len: CInt, _ offset: CInt, _ p: UnsafeMutableRawPointer!) {
   return unsafe complexExpr(len, offset, p)
 }
 
-func call_nullUnspecified(_ len: Int32, _ p: UnsafeMutableRawPointer!) {
+func call_nullUnspecified(_ len: CInt, _ p: UnsafeMutableRawPointer!) {
   return unsafe nullUnspecified(len, p)
 }
 
-func call_nonnull(_ len: Int32, _ p: UnsafeMutableRawPointer) {
+func call_nonnull(_ len: CInt, _ p: UnsafeMutableRawPointer) {
   return unsafe nonnull(len, p)
 }
 
-func call_nullable(_ len: Int32, _ p: UnsafeMutableRawPointer?) {
+func call_nonnullTyped(_ len: CInt, _ p: UnsafeMutablePointer<CChar>) {
+  return unsafe nonnullTyped(len, p)
+}
+
+func call_nullable(_ len: CInt, _ p: UnsafeMutableRawPointer?) {
   return unsafe nullable(len, p)
 }
 
-func call_returnPointer(_ len: Int32) -> UnsafeMutableRawPointer! {
+func call_nullableTyped(_ len: CInt, _ p: UnsafeMutablePointer<CChar>?) {
+  return unsafe nullableTyped(len, p)
+}
+
+func call_returnPointer(_ len: CInt) -> UnsafeMutableRawPointer! {
   return unsafe returnPointer(len)
 }
 
-func call_opaque(_ len: Int32, _ p: OpaquePointer!) {
+func call_opaque(_ len: CInt, _ p: OpaquePointer!) {
   return unsafe opaque(len, p)
 }
 
-func call_opaqueptr(_ len: Int32, _ p: OpaquePointer!) {
+func call_opaqueptr(_ len: CInt, _ p: OpaquePointer!) {
   return unsafe opaqueptr(len, p)
 }
 
-func call_charsized(_ _charsized_param0: UnsafeMutablePointer<CChar>!, _ size: Int32) {
+func call_charsized(_ _charsized_param0: UnsafeMutablePointer<CChar>!, _ size: CInt) {
   return unsafe charsized( _charsized_param0, size)
 }
 
-func call_bytesized(_ size: Int32) -> UnsafeMutablePointer<UInt8>! {
+func call_bytesized(_ size: CInt) -> UnsafeMutablePointer<UInt8>! {
   return unsafe bytesized(size)
 }
 
-func call_doublebytesized(_ _doublebytesized_param0: UnsafeMutablePointer<UInt16>!, _ size: Int32) {
+func call_doublebytesized(_ _doublebytesized_param0: UnsafeMutablePointer<UInt16>!, _ size: CInt) {
   return unsafe doublebytesized( _doublebytesized_param0, size)
 }
 
-func call_aliasedBytesized(_ p: UnsafeMutablePointer<UInt8>!, _ size: Int32) {
+func call_aliasedBytesized(_ p: UnsafeMutablePointer<UInt8>!, _ size: CInt) {
   return unsafe aliasedBytesized(p, size)
 }
 
@@ -217,7 +241,7 @@ func call_aliasedBytesized(_ p: UnsafeMutablePointer<UInt8>!, _ size: Int32) {
   return unsafe aliasedBytesized(p)
 }
 
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_bytesized(_ size: Int32) -> UnsafeMutableRawBufferPointer {
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_bytesized(_ size: CInt) -> UnsafeMutableRawBufferPointer {
   return unsafe bytesized(size)
 }
 
@@ -225,12 +249,16 @@ func call_aliasedBytesized(_ p: UnsafeMutablePointer<UInt8>!, _ size: Int32) {
   return unsafe charsized(_charsized_param0)
 }
 
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_complexExpr(_ len: Int32, _ offset: Int32, _ p: UnsafeMutableRawBufferPointer) {
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_complexExpr(_ len: CInt, _ offset: CInt, _ p: UnsafeMutableRawBufferPointer) {
   return unsafe complexExpr(len, offset, p)
 }
 
 @_alwaysEmitIntoClient @_disfavoredOverload public func call_nonnull(_ p: UnsafeMutableRawBufferPointer) {
   return unsafe nonnull(p)
+}
+
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_nonnullTyped(_ p: UnsafeMutableRawBufferPointer) {
+  return unsafe nonnullTyped(p)
 }
 
 @_alwaysEmitIntoClient @_disfavoredOverload public func call_nullUnspecified(_ p: UnsafeMutableRawBufferPointer) {
@@ -241,6 +269,10 @@ func call_aliasedBytesized(_ p: UnsafeMutablePointer<UInt8>!, _ size: Int32) {
   return unsafe nullable(p)
 }
 
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_nullableTyped(_ p: UnsafeMutableRawBufferPointer) {
+  return unsafe nullableTyped(p)
+}
+
 @_alwaysEmitIntoClient @_disfavoredOverload public func call_opaque(_ p: UnsafeRawBufferPointer) {
   return unsafe opaque(p)
 }
@@ -249,7 +281,7 @@ func call_aliasedBytesized(_ p: UnsafeMutablePointer<UInt8>!, _ size: Int32) {
   return unsafe opaqueptr(p)
 }
 
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_returnPointer(_ len: Int32) -> UnsafeMutableRawBufferPointer {
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_returnPointer(_ len: CInt) -> UnsafeMutableRawBufferPointer {
   return unsafe returnPointer(len)
 }
 

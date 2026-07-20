@@ -61,12 +61,15 @@ bb1:
   %2 = function_ref @random_counter : $@convention(thin) () -> Builtin.Int1
   %3 = apply %2() : $@convention(thin) () -> Builtin.Int1
   %4 = integer_literal $Builtin.Int64, 48
-  cond_br %3, bb1, bb2
+  cond_br %3, bb3, bb2
 
 bb2:
   %5 = integer_literal $Builtin.Int64, 59
   %6 = tuple()
   return %6 : $()
+
+bb3:
+  br bb1
 }
 
 // For now until the proper unreachable pruning code is committed for
@@ -136,7 +139,7 @@ bb0(%0 : $B):
 sil @removeTriviallyDeadCrossBasicBlocks : $@convention(thin) (@owned B, Builtin.Int1) -> () {
 bb0(%0: $B, %1: $Builtin.Int1):
   %5 = unchecked_ref_cast %0 : $B to $Builtin.NativeObject
-  cond_br %1, bb1, bb2
+  cond_br %1, bb1, bb3
 bb1:
   br bb2
 bb2:
@@ -145,6 +148,8 @@ bb2:
   %21 = unchecked_ref_cast %5 : $Builtin.NativeObject to $B
   %32 = tuple ()
   return %32 : $()
+bb3:
+  br bb2
 }
 
 // CHECK-LABEL: sil @dead_use_of_alloc_stack
@@ -635,13 +640,15 @@ bb0(%0 : $*D, %1 : $Builtin.Word):
 sil @cse_unchecked_ref_cast : $@convention(thin) (@owned B, Builtin.Int1) -> (Builtin.NativeObject, Builtin.NativeObject) {
 bb0(%0: $B, %1: $Builtin.Int1):
   %5 = unchecked_ref_cast %0 : $B to $Builtin.NativeObject
-  cond_br %1, bb1, bb2
+  cond_br %1, bb1, bb3
 bb1:
   br bb2
 bb2:
   %21 = unchecked_ref_cast %0 : $B to $Builtin.NativeObject
   %32 = tuple(%5 : $Builtin.NativeObject, %21 : $Builtin.NativeObject)
   return %32 : $(Builtin.NativeObject, Builtin.NativeObject)
+bb3:
+  br bb2
 }
 
 // CHECK-LABEL: sil @cse_raw_pointer_to_ref

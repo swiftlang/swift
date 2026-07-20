@@ -1732,7 +1732,7 @@ namespace {
                             TypeExpansionKind loweringStyle) const override {
       // A value type with a deinit cannot be memberwise destroyed.
       if (auto *nominal = getLoweredType().getNominalOrBoundGenericNominal()) {
-        if (nominal->getValueTypeDestructor()) {
+        if (nominal->hasValueTypeDestructor()) {
           emitDestroyValue(B, loc, aggValue);
           return;
         }
@@ -2391,6 +2391,7 @@ namespace {
       // opaque for code generation purposes.
       properties.setAddressOnly();
       properties.setInfinite();
+      properties.setNonTrivial();
       return handleAddressOnly(type, properties);
     }
 
@@ -2717,7 +2718,7 @@ namespace {
       if (origType.isNoncopyable(structType)) {
         properties.setNonTrivial();
         properties.setLexical(IsLexical);
-        if (D->getValueTypeDestructor()) {
+        if (D->hasValueTypeDestructor()) {
           properties.setCustomDeinit(MayHaveCustomDeinit);
         }
         if (properties.isAddressOnly())
@@ -2830,7 +2831,7 @@ namespace {
       if (origType.isNoncopyable(enumType)) {
         properties.setNonTrivial();
         properties.setLexical(IsLexical);
-        if (D->getValueTypeDestructor()) {
+        if (D->hasValueTypeDestructor()) {
           properties.setCustomDeinit(MayHaveCustomDeinit);
         }
         if (properties.isAddressOnly())
@@ -4381,9 +4382,11 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
     return cast<AnyFunctionType>(derivativeFnTy->getCanonicalType());
   }
 
-  auto *vd = c.loc.dyn_cast<ValueDecl *>();
+  auto *vd = c.getDecl();
+
   switch (c.kind) {
-  case SILDeclRef::Kind::Func: {
+  case SILDeclRef::Kind::Func:
+  case SILDeclRef::Kind::DistributedThunk: {
     CanAnyFunctionType funcTy;
     if (auto *ACE = c.loc.dyn_cast<AbstractClosureExpr *>()) {
       funcTy = cast<AnyFunctionType>(ACE->getType()->getCanonicalType());
@@ -4471,6 +4474,7 @@ TypeConverter::getGenericSignatureWithCapturedEnvironments(SILDeclRef c) {
   /// Get the function generic params, including outer params.
   switch (c.kind) {
   case SILDeclRef::Kind::Func:
+  case SILDeclRef::Kind::DistributedThunk:
   case SILDeclRef::Kind::Allocator:
   case SILDeclRef::Kind::Initializer:
   case SILDeclRef::Kind::Destroyer:
