@@ -2099,7 +2099,7 @@ static void salvagePackElementSetDebugInfo(PackElementSetInst *PESI) {
   TupleType *tupleType = nullptr;
 
   if (packType.getElementTypes().size() == 1) {
-    silType = PESI->getFunction()->getLoweredType(packType.getElementType(0));
+    silType = packType->getSILElementType(0).getObjectType();
   } else {
     llvm::SmallVector<TupleTypeElt, 4> tupleElements;
     for (const auto &elementType : packType.getElementTypes()) {
