@@ -2397,6 +2397,9 @@ bool Decl::hasOnlyCEntryPoint() const {
       return true;
   }
 
+  if (getAttrs().hasAttribute<CxxDeclAttr>())
+    return true;
+
   return false;
 }
 
