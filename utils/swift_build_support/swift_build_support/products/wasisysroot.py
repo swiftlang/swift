@@ -248,12 +248,9 @@ class WASISysroot(product.Product):
             cmake.cmake_options.define(
                 'WASM_COMPONENT_LD_EXECUTABLE:FILEPATH', component_ld_path)
 
-        # wasm-ld ships with lld, co-located with llvm-ar in the fresh LLVM build,
-        # so os.path.dirname(ar_path) is its directory (correct even when
-        # --native-clang-tools-path diverges from the LLVM tools path). The
-        # sub-build does not put that dir on PATH, and clang cannot forward
-        # --wasm-ld-path under -fuse-ld=<wasmkit-component-ld>; expose it on PATH
-        # so the link driver's PATH fallback resolves wasm-ld.
+        # The component link driver finds wasm-ld via PATH (clang can't forward
+        # its path under -fuse-ld), but the sub-build doesn't add it; prepend
+        # the LLVM bin dir, where wasm-ld sits beside llvm-ar.
         llvm_bin_dir = os.path.dirname(ar_path)
         saved_path = os.environ.get('PATH', '')
         os.environ['PATH'] = llvm_bin_dir + os.pathsep + saved_path

@@ -60,7 +60,7 @@ add_swift_target_library(swiftWASILibc ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SD
       ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
       ${swift_platform_compile_flags}
     LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
-    TARGET_SDKS WASI
+    TARGET_SDKS WASI WASIP2
     INSTALL_IN_COMPONENT sdk-overlay
     DEPENDS wasilibc_modulemap)
 
@@ -479,6 +479,85 @@ if("WASI" IN_LIST SWIFT_SDKS)
 
   endforeach()
 endif()
+if("WASIP2" IN_LIST SWIFT_SDKS)
+  set(wasilibc_modulemap_source "wasi-libc.modulemap")
+  foreach(arch ${SWIFT_SDK_WASIP2_ARCHITECTURES})
+    set(arch_subdir "${SWIFT_SDK_WASIP2_LIB_SUBDIR}/${arch}")
+    set(module_dir "${SWIFTLIB_DIR}/${arch_subdir}")
+    set(module_dir_static "${SWIFTSTATICLIB_DIR}/${arch_subdir}")
+    set(module_dir_embedded "${SWIFTLIB_DIR}/embedded/${arch}")
+
+    add_custom_command_target(
+      copy_wasilibc_modulemap_resource
+      COMMAND
+        "${CMAKE_COMMAND}" "-E" "make_directory" ${module_dir} ${module_dir_static}
+      COMMAND
+        "${CMAKE_COMMAND}" "-E" "copy_if_different"
+          "${CMAKE_CURRENT_SOURCE_DIR}/${wasilibc_modulemap_source}" ${module_dir}
+      COMMAND
+        "${CMAKE_COMMAND}" "-E" "copy_if_different"
+          "${CMAKE_CURRENT_SOURCE_DIR}/${wasilibc_modulemap_source}" ${module_dir_static}
+      OUTPUT ${module_dir}/${wasilibc_modulemap_source} ${module_dir_static}/${wasilibc_modulemap_source}
+      COMMENT "Copying WASILibc modulemap to resource directories")
+    add_dependencies(sdk-overlay ${copy_wasilibc_modulemap_resource})
+    list(APPEND wasilibc_modulemap_target_list ${copy_wasilibc_modulemap_resource})
+
+    swift_install_in_component(FILES "${wasilibc_modulemap_source}"
+                               DESTINATION "lib/swift/${arch_subdir}"
+                               COMPONENT sdk-overlay)
+    if(SWIFT_BUILD_STATIC_STDLIB)
+      swift_install_in_component(FILES "${wasilibc_modulemap_source}"
+                                 DESTINATION "lib/swift_static/${arch_subdir}"
+                                 COMPONENT sdk-overlay)
+    endif()
+
+    if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
+      add_custom_command_target(
+        copy_wasilibc_modulemap_embedded_resource
+        COMMAND
+          "${CMAKE_COMMAND}" "-E" "make_directory" ${module_dir} ${module_dir_embedded}
+        COMMAND
+          "${CMAKE_COMMAND}" "-E" "copy_if_different"
+            "${CMAKE_CURRENT_SOURCE_DIR}/${wasilibc_modulemap_source}" ${module_dir_embedded}
+        OUTPUT "${module_dir_embedded}/${wasilibc_modulemap_source}"
+        COMMENT "Copying WASILibc modulemap to resource directories")
+      add_dependencies(sdk-overlay ${copy_wasilibc_modulemap_embedded_resource})
+      list(APPEND wasilibc_modulemap_target_list ${copy_wasilibc_modulemap_embedded_resource})
+
+      swift_install_in_component(FILES "${wasilibc_modulemap_source}"
+                                 DESTINATION "lib/swift/embedded/${arch}"
+                                 COMPONENT sdk-overlay)
+    endif()
+
+    set(wasilibc_apinotes_source "SwiftWASILibc.apinotes")
+    add_custom_command_target(
+      copy_wasilibc_apinotes_resource
+      COMMAND
+        "${CMAKE_COMMAND}" "-E" "make_directory" ${SWIFTLIB_DIR}/apinotes ${SWIFTSTATICLIB_DIR}/apinotes
+      COMMAND
+        "${CMAKE_COMMAND}" "-E" "copy_if_different"
+          "${CMAKE_CURRENT_SOURCE_DIR}/${wasilibc_apinotes_source}" ${SWIFTLIB_DIR}/apinotes
+      COMMAND
+        "${CMAKE_COMMAND}" "-E" "copy_if_different"
+          "${CMAKE_CURRENT_SOURCE_DIR}/${wasilibc_apinotes_source}" ${SWIFTSTATICLIB_DIR}/apinotes
+      OUTPUT
+        ${SWIFTLIB_DIR}/apinotes/${wasilibc_apinotes_source}
+        ${SWIFTSTATICLIB_DIR}/apinotes/${wasilibc_apinotes_source}
+      COMMENT "Copying WASILibc API notes to resource directories")
+
+    list(APPEND wasilibc_modulemap_target_list ${copy_wasilibc_apinotes_resource})
+    add_dependencies(sdk-overlay ${copy_wasilibc_apinotes_resource})
+    swift_install_in_component(FILES "${wasilibc_apinotes_source}"
+                               DESTINATION "lib/swift/apinotes"
+                               COMPONENT sdk-overlay)
+    if(SWIFT_BUILD_STATIC_STDLIB)
+      swift_install_in_component(FILES "${wasilibc_apinotes_source}"
+                                 DESTINATION "lib/swift_static/apinotes"
+                                 COMPONENT sdk-overlay)
+    endif()
+
+  endforeach()
+endif()
 add_custom_target(wasilibc_modulemap DEPENDS ${wasilibc_modulemap_target_list})
 set_property(TARGET wasilibc_modulemap PROPERTY FOLDER "Miscellaneous")
 add_dependencies(sdk-overlay wasilibc_modulemap)
@@ -609,6 +688,35 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
       SDK "embedded"
       ARCHITECTURE "${arch}"
       ARCHITECTURE_SUBDIR_NAME "${triple}"
+      DEPENDS embedded-stdlib-${triple} wasilibc_modulemap
+      INSTALL_IN_COMPONENT sdk-overlay
+    )
+    add_dependencies(embedded-stdlib-platform embedded-stdlib-platform-${triple})
+  endif()
+
+  if(SWIFT_WASIP2_SYSROOT_PATH)
+    set(arch "wasm32")
+    set(triple "wasm32-unknown-wasip2")
+
+    set(SWIFT_SDK_embedded_ARCH_${arch}_MODULE "${triple}")
+    set(SWIFT_SDK_embedded_ARCH_${arch}_TRIPLE "${triple}")
+    add_swift_target_library_single(
+      embedded-stdlib-platform-${triple}
+      swiftWASILibc
+      IS_STDLIB
+        ${swift_platform_sources}
+        POSIXError.swift
+
+      GYB_SOURCES
+        ${swift_platform_gyb_sources}
+        WASILibc.swift.gyb
+
+      SWIFT_COMPILE_FLAGS
+        -enable-experimental-feature Embedded
+        -Xfrontend -emit-empty-object-file
+
+      SDK "embedded"
+      ARCHITECTURE "${arch}"
       DEPENDS embedded-stdlib-${triple} wasilibc_modulemap
       INSTALL_IN_COMPONENT sdk-overlay
     )
