@@ -621,7 +621,6 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
     add_swift_target_library_single(
       embedded-stdlib-platform-${triple}
       swiftEmscriptenLibc
-      ONLY_SWIFTMODULE
       IS_STDLIB IS_FRAGILE
         ${swift_platform_sources}
         POSIXError.swift
