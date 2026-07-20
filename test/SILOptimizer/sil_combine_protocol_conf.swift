@@ -151,9 +151,9 @@ public class Other {
 // CHECK: tuple_extract
 // CHECK: cond_fail
 // CHECK: [[R4:%.*]] = ref_element_addr [immutable] %0 : $Other, #Other.s
-// CHECK: [[O4:%.*]] = open_existential_addr immutable_access %36 : $*any MultipleConformanceProtocol to $*@opened("{{.*}}", any MultipleConformanceProtocol) Self
-// CHECK: [[W4:%.*]] = witness_method $@opened("{{.*}}", any MultipleConformanceProtocol) Self, #MultipleConformanceProtocol.foo : <Self where Self : MultipleConformanceProtocol> (Self) -> () -> Int, %37 : $*@opened("{{.*}}", any MultipleConformanceProtocol) Self : $@convention(witness_method: MultipleConformanceProtocol) <τ_0_0 where τ_0_0 : MultipleConformanceProtocol> (@in_guaranteed τ_0_0) -> Int
-// CHECK: apply [[W4]]<@opened("{{.*}}", any MultipleConformanceProtocol) Self>(%37) : $@convention(witness_method: MultipleConformanceProtocol) <τ_0_0 where τ_0_0 : MultipleConformanceProtocol> (@in_guaranteed τ_0_0) -> Int
+// CHECK: [[O4:%.*]] = open_existential_addr immutable_access [[R4]] : $*any MultipleConformanceProtocol to $*@opened("{{.*}}", any MultipleConformanceProtocol) Self
+// CHECK: [[W4:%.*]] = witness_method $@opened("{{.*}}", any MultipleConformanceProtocol) Self, #MultipleConformanceProtocol.foo : <Self where Self : MultipleConformanceProtocol> (Self) -> () -> Int, [[O4]] : $*@opened("{{.*}}", any MultipleConformanceProtocol) Self : $@convention(witness_method: MultipleConformanceProtocol) <τ_0_0 where τ_0_0 : MultipleConformanceProtocol> (@in_guaranteed τ_0_0) -> Int
+// CHECK: apply [[W4]]<@opened("{{.*}}", any MultipleConformanceProtocol) Self>([[O4]]) : $@convention(witness_method: MultipleConformanceProtocol) <τ_0_0 where τ_0_0 : MultipleConformanceProtocol> (@in_guaranteed τ_0_0) -> Int
 // CHECK: struct_extract
 // CHECK: builtin
 // CHECK: tuple_extract

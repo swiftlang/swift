@@ -1,0 +1,73 @@
+// RUN: %target-sil-opt %s -dce | %FileCheck %s
+
+// Test that DeadCodeElimination salvages debug info for dead instructions.
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+struct TwoFields {
+  @_hasStorage var x: Int64 { get set }
+  @_hasStorage var y: Int64 { get set }
+}
+
+
+// CHECK-LABEL: sil @test_dce_struct_extract
+// CHECK: bb0(%0 : $TwoFields):
+// CHECK:   debug_value %0, let, name "field", transform {
+// CHECK:   bb0(%0 : $TwoFields):
+// CHECK:     %1 = struct_extract %0, #TwoFields.x
+// CHECK:     return %1
+// CHECK:   }
+// CHECK:   [[Y:%[0-9]+]] = struct_extract %0, #TwoFields.y
+// CHECK:   debug_value [[Y]], let, name "live"
+// CHECK-NOT: transform
+// CHECK:   return [[Y]]
+sil @test_dce_struct_extract : $@convention(thin) (TwoFields) -> Int64 {
+bb0(%0 : $TwoFields):
+  %1 = struct_extract %0 : $TwoFields, #TwoFields.x
+  debug_value %1 : $Int64, let, name "field"
+  %2 = struct_extract %0 : $TwoFields, #TwoFields.y
+  debug_value %2 : $Int64, let, name "live"
+  return %2 : $Int64
+}
+
+// CHECK-LABEL: sil @test_dce_chain
+// CHECK: bb0(%0 : $TwoFields):
+// CHECK:   debug_value %0, let, name "inner", transform {
+// CHECK:   bb0(%0 : $TwoFields):
+// CHECK:     %1 = struct_extract %0, #TwoFields.x
+// CHECK:     %2 = struct_extract %1, #Int64._value
+// CHECK:     return %2
+// CHECK:   }
+// CHECK:   return
+sil @test_dce_chain : $@convention(thin) (TwoFields) -> Int64 {
+bb0(%0 : $TwoFields):
+  %1 = struct_extract %0 : $TwoFields, #TwoFields.x
+  %2 = struct_extract %1 : $Int64, #Int64._value
+  debug_value %2 : $Builtin.Int64, let, name "inner"
+  %3 = struct_extract %0 : $TwoFields, #TwoFields.y
+  return %3 : $Int64
+}
+
+// Test that salvaging works even when the function argument has no live use.
+// The debug_value should still reference %0 through the reconstruction block.
+// CHECK-LABEL: sil @test_dce_dead_arg
+// CHECK: bb0(%0 : $TwoFields):
+// CHECK:   debug_value %0, let, name "field", transform {
+// CHECK:   bb0(%0 : $TwoFields):
+// CHECK:     %1 = struct_extract %0, #TwoFields.x
+// CHECK:     %2 = struct_extract %1, #Int64._value
+// CHECK:     return %2
+// CHECK:   }
+// CHECK:   [[RET:%[0-9]+]] = integer_literal
+// CHECK:   return [[RET]]
+sil @test_dce_dead_arg : $@convention(thin) (TwoFields) -> Builtin.Int64 {
+bb0(%0 : $TwoFields):
+  %1 = struct_extract %0 : $TwoFields, #TwoFields.x
+  %2 = struct_extract %1 : $Int64, #Int64._value
+  debug_value %2 : $Builtin.Int64, let, name "field"
+  %3 = integer_literal $Builtin.Int64, 42
+  return %3 : $Builtin.Int64
+}
