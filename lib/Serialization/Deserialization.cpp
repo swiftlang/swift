@@ -8050,6 +8050,7 @@ Expected<Type> DESERIALIZE_TYPE(SIL_FUNCTION_TYPE)(
   bool unimplementable;
   bool sendable;
   bool noescape;
+  bool calledOnce;
   uint8_t rawIsolation;
   bool hasErrorResult;
   unsigned numParams;
@@ -8064,7 +8065,7 @@ Expected<Type> DESERIALIZE_TYPE(SIL_FUNCTION_TYPE)(
   decls_block::SILFunctionTypeLayout::readRecord(
       scratch, sendable, async, rawCoroutineKind, rawCalleeConvention,
       rawRepresentation, pseudogeneric, noescape, unimplementable,
-      rawIsolation, rawDiffKind, hasErrorResult,
+      calledOnce, rawIsolation, rawDiffKind, hasErrorResult,
       numParams, numYields, numResults, rawInvocationGenericSig,
       rawInvocationSubs, rawPatternSubs, clangFunctionTypeID, variableData);
 
@@ -8090,11 +8091,12 @@ Expected<Type> DESERIALIZE_TYPE(SIL_FUNCTION_TYPE)(
   if (!isolation)
     return MF.diagnoseFatal();
 
-  auto extInfo = SILFunctionType::ExtInfoBuilder(
-                     *representation, pseudogeneric, noescape, sendable, async,
-                     unimplementable, *isolation, *diffKind, clangFunctionType,
-                     /*LifetimeDependenceInfo*/ {})
-                     .build();
+  auto extInfo =
+      SILFunctionType::ExtInfoBuilder(
+          *representation, pseudogeneric, noescape, sendable, async,
+          unimplementable, calledOnce, *isolation, *diffKind, clangFunctionType,
+          /*LifetimeDependenceInfo*/ {})
+          .build();
 
   // Process the coroutine kind.
   auto coroutineKind = getActualSILCoroutineKind(rawCoroutineKind);
