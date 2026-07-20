@@ -929,11 +929,6 @@ bool ArgsToFrontendOptionsConverter::checkUnusedSupplementaryOutputPaths()
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_module_summary);
     return true;
   }
-  if (!FrontendOptions::canActionEmitModule(Opts.RequestedAction) &&
-      !Opts.SymbolGraphOutputDir.empty()) {
-    Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_symbol_graph);
-    return true;
-  }
   return false;
 }
 

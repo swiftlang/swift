@@ -180,8 +180,6 @@ ERROR(error_mode_cannot_emit_interface,none,
       "this mode does not support emitting module interface files", ())
 ERROR(error_mode_cannot_emit_module_summary,none,
       "this mode does not support emitting module summary files", ())
-ERROR(error_mode_cannot_emit_symbol_graph,none,
-      "this mode does not support emitting symbol graph files", ())
 ERROR(error_mode_cannot_emit_abi_descriptor,none,
       "this mode does not support emitting ABI descriptor files", ())
 ERROR(error_mode_cannot_emit_api_descriptor,none,
