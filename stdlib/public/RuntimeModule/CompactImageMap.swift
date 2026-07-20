@@ -261,7 +261,11 @@ public enum CompactImageMapFormat {
               }
               code = (code << 8) | Int(byte)
             }
-            code += 64
+            let (newCode, overflow) = code.addingReportingOverflow(64)
+            if overflow {
+              return nil
+            }
+            code = newCode
           }
 
           #if DEBUG_COMPACT_IMAGE_MAP
