@@ -903,16 +903,22 @@ static void diagnoseReadWriteMutatingnessMismatch(
   bool hasCoroutineAccessorFeature =
       storage->getASTContext().LangOpts.hasFeature(Feature::CoroutineAccessors);
 
+  // Name an accessor for the diagnostic.  When we have the parsed accessor
+  // decl, use it so that a `_read`/`_modify` that was rewritten to its yielding
+  // counterpart is still named with the spelling the user wrote.
+  auto nameForAccessor = [&](AccessorKind kind) -> StringRef {
+    if (auto *decl = storage->getParsedAccessor(kind))
+      return getAccessorNameForDiagnostic(
+          decl, /*article=*/false, /*underscored=*/hasCoroutineAccessorFeature);
+    return getAccessorNameForDiagnostic(
+        kind, /*article=*/false, /*underscored=*/hasCoroutineAccessorFeature);
+  };
+
   auto readerAccessor = directAccessorKindForReadImpl(storage->getReadImpl());
   StringRef readerAccessorName =
-      readerAccessor.has_value()
-          ? getAccessorNameForDiagnostic(
-                *readerAccessor, /*article=*/false,
-                /*underscored=*/hasCoroutineAccessorFeature)
-          : "the inherited accessor";
-  StringRef writerAccessorName =
-      getAccessorNameForDiagnostic(writerAccesor, /*article=*/false,
-                                   /*underscored=*/hasCoroutineAccessorFeature);
+      readerAccessor.has_value() ? nameForAccessor(*readerAccessor)
+                                 : "the inherited accessor";
+  StringRef writerAccessorName = nameForAccessor(writerAccesor);
   unsigned diagnosticForm;
   if (isModifierMutating) {
     // modifier can't be mutating when both the setter is nonmutating and the
@@ -934,7 +940,7 @@ static void diagnoseReadWriteMutatingnessMismatch(
 
   modifyAccessor->diagnose(
       diag::readwriter_mutatingness_differs_from_reader_or_writer_mutatingness,
-      getAccessorNameForDiagnostic(readWriterAccessor, /*article=*/false,
+      getAccessorNameForDiagnostic(modifyAccessor, /*article=*/false,
                                    /*underscored=*/hasCoroutineAccessorFeature),
       isModifierMutating ? SelfAccessKind::Mutating
                          : SelfAccessKind::NonMutating,
@@ -3045,7 +3051,7 @@ RequiresOpaqueAccessorsRequest::evaluate(Evaluator &evaluator,
 ///
 /// The underscored accessor could, however, still be required for ABI
 /// stability.
-static bool requiresCorrespondingUnderscoredCoroutineAccessorImpl(
+static bool requiresCorrespondingLegacyCoroutineAccessorImpl(
     AbstractStorageDecl const *storage, AccessorKind kind,
     AccessorDecl const *decl, AbstractStorageDecl const *derived) {
   auto &ctx = storage->getASTContext();
@@ -3062,7 +3068,7 @@ static bool requiresCorrespondingUnderscoredCoroutineAccessorImpl(
     while ((current = current->getOverriddenDecl())) {
       auto *currentDecl = cast_or_null<AccessorDecl>(
           decl ? decl->getOverriddenDecl() : nullptr);
-      if (requiresCorrespondingUnderscoredCoroutineAccessorImpl(
+      if (requiresCorrespondingLegacyCoroutineAccessorImpl(
               current, kind, currentDecl, derived)) {
         return true;
       }
@@ -3081,8 +3087,16 @@ static bool requiresCorrespondingUnderscoredCoroutineAccessorImpl(
       ResilienceStrategy::Resilient)
     return false;
 
-  // Non-exported storage has no ABI to keep stable.
-  if (isExported(storage) != ExportedLevel::Exported)
+  // Storage that isn't visible outside its module has no ABI to keep stable.
+  // "Visible outside the module" means public/`@usableFromInline` (which
+  // isExported reports as Exported) or package: a separately-compiled module in
+  // the same package can call it across a resilience boundary, so it needs the
+  // stable (underscored) ABI too.
+  if (isExported(storage) != ExportedLevel::Exported &&
+      !storage
+           ->getFormalAccessScope(/*useDC=*/nullptr,
+                                  /*treatUsableFromInlineAsPublic=*/true)
+           .isPackage())
     return false;
 
   // The non-underscored accessor is not present, the underscored accessor
@@ -3128,9 +3142,9 @@ static bool requiresCorrespondingUnderscoredCoroutineAccessorImpl(
   return true;
 }
 
-bool AbstractStorageDecl::requiresCorrespondingUnderscoredCoroutineAccessor(
+bool AbstractStorageDecl::requiresCorrespondingLegacyCoroutineAccessor(
     AccessorKind kind, AccessorDecl const *decl) const {
-  return requiresCorrespondingUnderscoredCoroutineAccessorImpl(
+  return requiresCorrespondingLegacyCoroutineAccessorImpl(
       this, kind, decl,
       /*derived=*/this);
 }
@@ -3146,7 +3160,7 @@ bool RequiresOpaqueModifyCoroutineRequest::evaluate(
     return false;
 
   if (hasModifyFeature && isUnderscored) {
-    return storage->requiresCorrespondingUnderscoredCoroutineAccessor(
+    return storage->requiresCorrespondingLegacyCoroutineAccessor(
         AccessorKind::YieldingMutate);
   }
 

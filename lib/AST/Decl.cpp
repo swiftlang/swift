@@ -3724,7 +3724,7 @@ bool AbstractStorageDecl::requiresOpaqueSetter() const {
 bool AbstractStorageDecl::requiresOpaqueReadCoroutine() const {
   ASTContext &ctx = getASTContext();
   if (ctx.LangOpts.hasFeature(Feature::CoroutineAccessors))
-    return requiresCorrespondingUnderscoredCoroutineAccessor(
+    return requiresCorrespondingLegacyCoroutineAccessor(
         AccessorKind::YieldingBorrow);
 
   return getOpaqueReadOwnership() == OpaqueReadOwnership::YieldingBorrow ||
@@ -8041,8 +8041,18 @@ StringRef swift::getAccessorNameForDiagnostic(AccessorKind accessorKind,
 StringRef swift::getAccessorNameForDiagnostic(AccessorDecl *accessor,
                                               bool article,
                                               std::optional<bool> underscored) {
+  auto kind = accessor->getAccessorKind();
+  // A yield_once_2 coroutine accessor that the user spelled with the
+  // underscored keyword (`_read`/`_modify`) should be named with that spelling
+  // in diagnostics rather than as `yielding borrow`/`yielding mutate`.
+  if (accessor->isSpelledWithLegacyCoroutineSyntax()) {
+    if (kind == AccessorKind::YieldingBorrow)
+      kind = AccessorKind::Read;
+    else if (kind == AccessorKind::YieldingMutate)
+      kind = AccessorKind::Modify;
+  }
   return getAccessorNameForDiagnostic(
-      accessor->getAccessorKind(), article,
+      kind, article,
       underscored.value_or(accessor->getASTContext().LangOpts.hasFeature(
           Feature::CoroutineAccessors)));
 }
@@ -11846,6 +11856,22 @@ AccessorDecl *AccessorDecl::createParsed(
   return accessor;
 }
 
+void AccessorDecl::changeLegacyCoroutineAccessorToYielding() {
+  // The yielding counterpart has the same signature (parameters and yielded
+  // type) as the underscored one, so only the kind changes.
+  switch (getAccessorKind()) {
+  case AccessorKind::Read:
+    Bits.AccessorDecl.AccessorKind = unsigned(AccessorKind::YieldingBorrow);
+    break;
+  case AccessorKind::Modify:
+    Bits.AccessorDecl.AccessorKind = unsigned(AccessorKind::YieldingMutate);
+    break;
+  default:
+    llvm_unreachable("not an underscored coroutine accessor");
+  }
+  SpelledWithLegacyCoroutineSyntax = true;
+}
+
 StringRef AccessorDecl::implicitParameterNameFor(AccessorKind kind) {
   switch (kind) {
   case AccessorKind::Set:
@@ -11960,7 +11986,7 @@ bool AccessorDecl::isRequirementWithSynthesizedDefaultImplementation() const {
   if (!requiresNewWitnessTableEntry()) {
     return false;
   }
-  return getStorage()->requiresCorrespondingUnderscoredCoroutineAccessor(
+  return getStorage()->requiresCorrespondingLegacyCoroutineAccessor(
       getAccessorKind(), this);
 }
 

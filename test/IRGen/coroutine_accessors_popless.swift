@@ -62,41 +62,6 @@
 // CHECK-SAME:      _swift_coro_task_dealloc
 // CHECK-SAME:  }
 
-// CHECK-arm64e-LABEL: _swift_coro_typed_malloc.ptrauth = private constant {
-// CHECK-arm64e-SAME:    ptr @_swift_coro_typed_malloc,
-// CHECK-arm64e-SAME:    i32 0,
-// CHECK-arm64e-SAME:    i64 ptrtoint (
-// CHECK-arm64e-SAME:      ptr getelementptr inbounds (
-// CHECK-arm64e-SAME:        %swift.coro_allocator,
-// CHECK-arm64e-SAME:        ptr @_swift_coro_typed_malloc_allocator,
-// CHECK-arm64e-SAME:        i32 0,
-// CHECK-arm64e-SAME:        i32 1
-// CHECK-arm64e-SAME:      ) to i64
-// CHECK-arm64e-SAME:    ),
-// CHECK-arm64e-SAME:    i64 24469 }
-// CHECK-arm64e-SAME:  section "llvm.ptrauth"
-// CHECK-arm64e-SAME:  align 8
-// CHECK-arm64e-LABEL: _swift_coro_free.ptrauth = private constant {
-// CHECK-arm64e-SAME:    ptr @_swift_coro_free,
-// CHECK-arm64e-SAME:    i32 0,
-// CHECK-arm64e-SAME:    i64 ptrtoint (
-// CHECK-arm64e-SAME:      ptr getelementptr inbounds (
-// CHECK-arm64e-SAME:        %swift.coro_allocator,
-// CHECK-arm64e-SAME:        ptr @_swift_coro_typed_malloc_allocator,
-// CHECK-arm64e-SAME:        i32 0,
-// CHECK-arm64e-SAME:        i32 2
-// CHECK-arm64e-SAME:      ) to i64
-// CHECK-arm64e-SAME:    ),
-// CHECK-arm64e-SAME:    i64 40879 },
-// CHECK-arm64e-SAME:  section "llvm.ptrauth",
-// CHECK-arm64e-SAME:  align 8
-
-// CHECK-apple-LABEL: _swift_coro_typed_malloc_allocator = linkonce_odr hidden constant %swift.coro_allocator {
-// CHECK-apple-SAME:       i32 259,
-// CHECK-apple-SAME:       _swift_coro_typed_malloc
-// CHECK-apple-SAME:       _swift_coro_free
-// CHECK-apple-SAME:  }
-
 // CHECK-LABEL: @_swift_coro_alloc(
 // CHECK-SAME:      ptr [[FRAME:%[^,]+]]
 // CHECK-SAME:      ptr swiftcoro [[ALLOCATOR:%[^,]+]],
@@ -270,8 +235,13 @@ public var force_yield_once_convention : () {
     let nothing: () = ()
     yield nothing
   }
-// CHECK-LABEL: define{{.*}} swiftcc { ptr, ptr } @increment_i_yield_once(
-//                  ptr noalias dereferenceable(32) %0
+// With the CoroutineAccessors feature enabled, `_read`/`_modify` use the exact
+// same yield_once_2 ABI as `yielding borrow`/`yielding mutate`.  This is
+// therefore identical to increment_i_yield_once_2 below: it forwards the
+// caller's coroutine allocator rather than allocating its own frame.
+// CHECK-LABEL: define{{.*}} swiftcorocc { ptr, ptr } @increment_i_yield_once(
+//                  ptr noalias %0
+// CHECK-SAME:      ptr swiftcoro [[ALLOCATOR:%[^)]+]]
 // CHECK-SAME:  )
 // CHECK-SAME:  {
 //      :         [[SIZE_32:%[^,]+]] = load i32
@@ -289,7 +259,7 @@ public var force_yield_once_convention : () {
 // CHECK:         [[RAMP:%[^,]+]] = call ptr @llvm.coro.prepare.retcon(ptr @"$s27coroutine_accessors_popless1iSivx")
 // CHECK:         [[RETVAL:%[^,]+]] = call swiftcorocc { ptr, ptr } [[RAMP]](
 // CHECK-SAME:         [[FRAME]],
-// CHECK-apple-SAME:         _swift_coro_typed_malloc_allocator
+// CHECK-SAME:         [[ALLOCATOR]]
 // CHECK-SAME:    )
 // CHECK:         [[CONTINUATION:%[^,]+]] = extractvalue { ptr, ptr } [[RETVAL]], 0
 // CHECK:         [[YIELD:%[^,]+]] = extractvalue { ptr, ptr } [[RETVAL]], 1
@@ -298,14 +268,12 @@ public var force_yield_once_convention : () {
 // CHECK-SAME:    )
 // CHECK:         call swiftcorocc void [[CONTINUATION]](
 // CHECK-SAME:        [[FRAME]],
-// CHECK-apple-SAME:        _swift_coro_typed_malloc_allocator
+// CHECK-SAME:        [[ALLOCATOR]]
 // CHECK-SAME:    )
 // CHECK:         call void @llvm.lifetime.end.p0(i64 -1, ptr [[FRAME]])
 // CHECK:         call void @llvm.coro.alloca.free.frame(token [[ALLOCATION]])
 // CHECK:       }
 
-  // TODO: `_modify` should use `yield_once_2` with CoroutineAccessors enabled,
-  // the same ABI as `yielding mutate`
   @_silgen_name("increment_i_yield_once")
   _modify {
     increment(&i)

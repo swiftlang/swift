@@ -338,7 +338,7 @@ public struct ImplCStored : ~Copyable & P3 {
 }
 
 @frozen
-public struct ImplAUnderscoredCoroutineAccessors : ~Copyable & P1 {
+public struct ImplALegacyCoroutineAccessors : ~Copyable & P1 {
   var _i: U
   public var ubgs: U {
     _read {
@@ -348,102 +348,23 @@ public struct ImplAUnderscoredCoroutineAccessors : ~Copyable & P1 {
       yield &_i
     }
   }
-// CHECK-LABEL: sil{{.*}} [ossa] @$s17read_requirements34ImplAUnderscoredCoroutineAccessorsV4ubgsAA1UVvr : {{.*}} {
-// CHECK:       bb0(
-// CHECK-SAME:      [[SELF:%[^:]+]]
-// CHECK-SAME:  ):
-// CHECK:         [[COPY_UNCHECKED:%[^,]+]] = copy_value [[SELF]]
-// CHECK:         [[COPY:%[^,]+]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[COPY_UNCHECKED]]
-// CHECK:         [[BORROW:%[^,]+]] = begin_borrow [[COPY]]
-// CHECK:         [[VALUE:%[^,]+]] = struct_extract [[BORROW]]
-// CHECK:             #ImplAUnderscoredCoroutineAccessors._i
-// CHECK:         yield [[VALUE]] : $U
-// CHECK:             resume [[SUCCESS:bb[0-9]+]]
-// CHECK:             unwind [[FAILURE:bb[0-9]+]]
-// CHECK:       [[SUCCESS]]:
-// CHECK:         end_borrow [[BORROW]]
-// CHECK:         destroy_value [[COPY]]
-// CHECK:         return
-// CHECK:       [[FAILURE]]:
-// CHECK:         end_borrow [[BORROW]]
-// CHECK:         destroy_value [[COPY]]
-// CHECK:         unwind
-// CHECK-LABEL: } // end sil function '$s17read_requirements34ImplAUnderscoredCoroutineAccessorsV4ubgsAA1UVvr'
-// CHECK-LABEL: sil{{.*}} [ossa] @$s17read_requirements34ImplAUnderscoredCoroutineAccessorsV4ubgsAA1UVvy : {{.*}} {
-// CHECK:       bb0(
-// CHECK-SAME:      [[SELF:%[^:]+]]
-// CHECK-SAME:  ):
-// CHECK:         [[SELF_COPY_UNCHECKED:%[^,]+]] = copy_value [[SELF]]
-// CHECK:         [[SELF_COPY:%[^,]+]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[SELF_COPY_UNCHECKED]]
-// CHECK:         [[SELF_BORROW:%[^,]+]] = begin_borrow [[SELF_COPY]]
-// CHECK:         [[READER:%[^,]+]] = function_ref @$s17read_requirements34ImplAUnderscoredCoroutineAccessorsV4ubgsAA1UVvr
-// CHECK:         ([[VALUE:%[^,]+]], [[TOKEN:%[^,]+]]) = begin_apply [[READER]]([[SELF_BORROW]])
-// CHECK:         [[VALUE_COPY_UNCHECKED:%[^,]+]] = copy_value [[VALUE]]
-// CHECK:         [[VALUE_COPY:%[^,]+]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[VALUE_COPY_UNCHECKED]]
-// CHECK:         [[VALUE_BORROW:%[^,]+]] = begin_borrow [[VALUE_COPY]]
-// CHECK:         yield [[VALUE_BORROW]]
-// CHECK-SAME:        resume [[SUCCESS:bb[0-9]+]]
-// CHECK-SAME:        unwind [[FAILURE:bb[0-9]+]]
-// CHECK:       [[SUCCESS]]:
-// CHECK:         end_borrow [[VALUE_BORROW]]
-// CHECK:         destroy_value [[VALUE_COPY]]
-// CHECK:         end_apply [[TOKEN]]
-// CHECK:         end_borrow [[SELF_BORROW]]
-// CHECK:         destroy_value [[SELF_COPY]]
-// CHECK:         return
-// CHECK:       [[FAILURE]]:
-// CHECK:         end_borrow [[VALUE_BORROW]]
-// CHECK:         destroy_value [[VALUE_COPY]]
-// CHECK:         end_apply [[TOKEN]]
-// CHECK:         end_borrow [[SELF_BORROW]]
-// CHECK:         destroy_value [[SELF_COPY]]
-// CHECK:         unwind
-// CHECK-LABEL: } // end sil function '$s17read_requirements34ImplAUnderscoredCoroutineAccessorsV4ubgsAA1UVvy'
-// CHECK-LABEL: sil{{.*}} [ossa] @$s17read_requirements34ImplAUnderscoredCoroutineAccessorsVAA2P1A2aDP4ubgsAA1UVvrTW : {{.*}} {
-// CHECK:       bb0(
-// CHECK-SAME:      [[SELF_ADDR:%[^:]+]]
-// CHECK-SAME:  ):
-// CHECK:         [[SELF:%[^,]+]] = load_borrow [[SELF_ADDR]]
-// CHECK:         [[READER:%[^,]+]] = function_ref @$s17read_requirements34ImplAUnderscoredCoroutineAccessorsV4ubgsAA1UVvr
-// CHECK:         ([[VALUE:%[^,]+]], [[TOKEN:%[^,]+]]) = begin_apply [[READER]]([[SELF]])
-// CHECK:         yield [[VALUE]]
-// CHECK:             resume [[SUCCESS:bb[0-9]+]]
-// CHECK:             unwind [[FAILURE:bb[0-9]+]]
-// CHECK:       [[SUCCESS]]:
-// CHECK:         end_apply [[TOKEN]]
-// CHECK:         end_borrow [[SELF]]
-// CHECK:         return
-// CHECK:       [[FAILURE]]:
-// CHECK:         abort_apply [[TOKEN]]
-// CHECK:         end_borrow [[SELF]]
-// CHECK:         unwind
-// CHECK-LABEL: } // end sil function '$s17read_requirements34ImplAUnderscoredCoroutineAccessorsVAA2P1A2aDP4ubgsAA1UVvrTW'
-// CHECK-LABEL: sil{{.*}} [ossa] @$s17read_requirements34ImplAUnderscoredCoroutineAccessorsVAA2P1A2aDP4ubgsAA1UVvyTW : {{.*}} {
-// CHECK:       bb0(
-// CHECK-SAME:      [[SELF_ADDR:%[^:]+]]
-// CHECK-SAME:  ):
-// CHECK:         [[SELF:%[^,]+]] = load_borrow [[SELF_ADDR]]
-// CHECK:         [[READER:%[^,]+]] = function_ref @$s17read_requirements34ImplAUnderscoredCoroutineAccessorsV4ubgsAA1UVvy
-// CHECK:         ([[VALUE:%[^,]+]], [[TOKEN:%[^,]+]], [[ALLOCATION:%[^,]+]]) = begin_apply [[READ2ER]]([[SELF]])
-// CHECK:         yield [[VALUE]]
-// CHECK:             resume [[SUCCESS:bb[0-9]+]]
-// CHECK:             unwind [[FAILURE:bb[0-9]+]]
-// CHECK:       [[SUCCESS]]:
-// CHECK:         end_apply [[TOKEN]]
-// CHECK:         dealloc_stack [[ALLOCATION]]
-// CHECK:         end_borrow [[SELF]]
-// CHECK:         return
-// CHECK:       [[FAILURE]]:
-// CHECK:         end_apply [[TOKEN]]
-// CHECK:         dealloc_stack [[ALLOCATION]]
-// CHECK:         end_borrow [[SELF]]
-// CHECK:         unwind
-// CHECK-LABEL: } // end sil function '$s17read_requirements34ImplAUnderscoredCoroutineAccessorsVAA2P1A2aDP4ubgsAA1UVvyTW'
+// With the CoroutineAccessors feature enabled, `_read`/`_modify` use the same
+// yield_once_2 ABI as `yielding borrow`/`yielding mutate`, so this type emits
+// the same accessors as ImplACoroutineAccessors above (modulo the mangled type
+// name), which verify the bodies in full.  Here we confirm the accessor set and
+// forwarding: the yield_once_2 vy/vx are the primary implementations and, because
+// this type predates the feature, the additive yield_once vr/vM forward to them.
+// CHECK-LABEL: sil{{.*}} @$s17read_requirements29ImplALegacyCoroutineAccessorsV4ubgsAA1UVvy : $@yield_once_2 @convention
+// CHECK-LABEL: sil{{.*}} @$s17read_requirements29ImplALegacyCoroutineAccessorsV4ubgsAA1UVvx : $@yield_once_2 @convention
+// CHECK-LABEL: sil{{.*}} @$s17read_requirements29ImplALegacyCoroutineAccessorsV4ubgsAA1UVvr : $@yield_once @convention
+// CHECK:         function_ref @$s17read_requirements29ImplALegacyCoroutineAccessorsV4ubgsAA1UVvy
+// CHECK-LABEL: sil{{.*}} @$s17read_requirements29ImplALegacyCoroutineAccessorsV4ubgsAA1UVvM : $@yield_once @convention
+// CHECK:         function_ref @$s17read_requirements29ImplALegacyCoroutineAccessorsV4ubgsAA1UVvx
 }
 
 @frozen
 @available(SwiftStdlib 9999, *)
-public struct ImplBUnderscoredCoroutineAccessors : ~Copyable & P2 {
+public struct ImplBLegacyCoroutineAccessors : ~Copyable & P2 {
   var _i: U
   public var urs: U {
     _read {
@@ -453,180 +374,32 @@ public struct ImplBUnderscoredCoroutineAccessors : ~Copyable & P2 {
       yield &_i
     }
   }
-// CHECK-LABEL: sil{{.*}} [ossa] @$s17read_requirements34ImplBUnderscoredCoroutineAccessorsV3ursAA1UVvr : {{.*}} {
-// CHECK:       bb0(
-// CHECK-SAME:      [[SELF:%[^:]+]]
-// CHECK-SAME:  ):
-// CHECK:         [[COPY_UNCHECKED:%[^,]+]] = copy_value [[SELF]]
-// CHECK:         [[COPY:%[^,]+]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[COPY_UNCHECKED]]
-// CHECK:         [[BORROW:%[^,]+]] = begin_borrow [[COPY]]
-// CHECK:         [[VALUE:%[^,]+]] = struct_extract [[BORROW]]
-// CHECK-SAME:        #ImplBUnderscoredCoroutineAccessors._i
-// CHECK:         yield [[VALUE]]
-// CHECK-SAME:        resume [[SUCCESS:bb[0-9]+]]
-// CHECK-SAME:        unwind [[FAILURE:bb[0-9]+]]
-// CHECK:       [[SUCCESS]]:
-// CHECK:         end_borrow [[BORROW]]
-// CHECK:         destroy_value [[COPY]]
-// CHECK:         return
-// CHECK:       [[FAILURE]]:
-// CHECK:         end_borrow [[BORROW]]
-// CHECK:         destroy_value [[COPY]]
-// CHECK:         unwind
-// CHECK-LABEL: } // end sil function '$s17read_requirements34ImplBUnderscoredCoroutineAccessorsV3ursAA1UVvr'
-// CHECK-LABEL: sil{{.*}} [ossa] @$s17read_requirements34ImplBUnderscoredCoroutineAccessorsV3ursAA1UVvy : {{.*}} {
-// CHECK:       bb0(
-// CHECK-SAME:      [[SELF:%[^:]+]]
-// CHECK-SAME:  ):
-// CHECK:         [[SELF_COPY_UNCHECKED:%[^,]+]] = copy_value [[SELF]]
-// CHECK:         [[SELF_COPY:%[^,]+]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[SELF_COPY_UNCHECKED]]
-// CHECK:         [[SELF_BORROW:%[^,]+]] = begin_borrow [[SELF_COPY]]
-// CHECK:         [[READER:%[^,]+]] = function_ref @$s17read_requirements34ImplBUnderscoredCoroutineAccessorsV3ursAA1UVvr
-// CHECK:         ([[VALUE:%[^,]+]], [[TOKEN:%[^,]+]]) = begin_apply [[READER]]([[SELF_BORROW]])
-// CHECK:         [[VALUE_COPY_UNCHECKED:%[^,]+]] = copy_value [[VALUE]]
-// CHECK:         [[VALUE_COPY:%[^,]+]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[VALUE_COPY_UNCHECKED]]
-// CHECK:         [[VALUE_BORROW:%[^,]+]] = begin_borrow [[VALUE_COPY]]
-// CHECK:         yield [[VALUE_BORROW]]
-// CHECK-SAME:        resume [[SUCCESS:bb[0-9]+]]
-// CHECK-SAME:        unwind [[FAILURE:bb[0-9]+]]
-// CHECK:       [[SUCCESS]]:
-// CHECK:         end_borrow [[VALUE_BORROW]]
-// CHECK:         destroy_value [[VALUE_COPY]]
-// CHECK:         end_apply [[TOKEN]]
-// CHECK:         end_borrow [[SELF_BORROW]]
-// CHECK:         destroy_value [[SELF_COPY]]
-// CHECK:         return
-// CHECK:       [[FAILURE]]:
-// CHECK:         end_borrow [[VALUE_BORROW]]
-// CHECK:         destroy_value [[VALUE_COPY]]
-// CHECK:         end_apply [[TOKEN]]
-// CHECK:         end_borrow [[SELF_BORROW]]
-// CHECK:         destroy_value [[SELF_COPY]]
-// CHECK:         unwind
-// CHECK-LABEL: } // end sil function '$s17read_requirements34ImplBUnderscoredCoroutineAccessorsV3ursAA1UVvy'
-// CHECK-LABEL: sil{{.*}} [ossa] @$s17read_requirements34ImplBUnderscoredCoroutineAccessorsVAA2P2A2aDP3ursAA1UVvyTW : {{.*}} {
-// CHECK:       bb0(
-// CHECK-SAME:      [[SELF_ADDR:%[^:]+]]
-// CHECK-SAME:  ):
-// CHECK:         [[SELF:%[^,]+]] = load_borrow [[SELF_ADDR]]
-// CHECK:         [[READER:%[^,]+]] = function_ref @$s17read_requirements34ImplBUnderscoredCoroutineAccessorsV3ursAA1UVvy
-// CHECK:         ([[VALUE:%[^,]+]], [[TOKEN:%[^,]+]], [[ALLOCATION:%[^,]+]]) = begin_apply [[READ2ER]]([[SELF]])
-// CHECK:         yield [[VALUE]]
-// CHECK:             resume [[SUCCESS:bb[0-9]+]]
-// CHECK:             unwind [[FAILURE:bb[0-9]+]]
-// CHECK:       [[SUCCESS]]:
-// CHECK:         end_apply [[TOKEN]]
-// CHECK:         dealloc_stack [[ALLOCATION]]
-// CHECK:         end_borrow [[SELF]]
-// CHECK:         return
-// CHECK:       [[FAILURE]]:
-// CHECK:         end_apply [[TOKEN]]
-// CHECK:         dealloc_stack [[ALLOCATION]]
-// CHECK:         end_borrow [[SELF]]
-// CHECK:         unwind
-// CHECK-LABEL: } // end sil function '$s17read_requirements34ImplBUnderscoredCoroutineAccessorsVAA2P2A2aDP3ursAA1UVvyTW'
+// ImplB is introduced at the feature's own availability, so there is no old ABI
+// to preserve: only the yield_once_2 accessors are emitted, no yield_once vr/vM.
+// CHECK-LABEL: sil{{.*}} @$s17read_requirements29ImplBLegacyCoroutineAccessorsV3ursAA1UVvy : $@yield_once_2 @convention
+// CHECK-LABEL: sil{{.*}} @$s17read_requirements29ImplBLegacyCoroutineAccessorsV3ursAA1UVvx : $@yield_once_2 @convention
+// CHECK-NOT:   @$s17read_requirements29ImplBLegacyCoroutineAccessorsV3ursAA1UVvr :
+// CHECK-NOT:   @$s17read_requirements29ImplBLegacyCoroutineAccessorsV3ursAA1UVvM :
 }
 
 @frozen
 @available(SwiftStdlib 6.0, *)
-public struct ImplCUnderscoredCoroutineAccessors : ~Copyable & P3 {
+public struct ImplCLegacyCoroutineAccessors : ~Copyable & P3 {
   var _i: U
   public var ur: U {
     _read {
       yield _i
     }
   }
-// CHECK-LABEL: sil{{.*}} [ossa] @$s17read_requirements34ImplCUnderscoredCoroutineAccessorsV2urAA1UVvr : {{.*}} {
-// CHECK:       bb0(
-// CHECK-SAME:      [[SELF:%[^:]+]]
-// CHECK-SAME:  ):
-// CHECK:         [[COPY_UNCHECKED:%[^,]+]] = copy_value [[SELF]]
-// CHECK:         [[COPY:%[^,]+]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[COPY_UNCHECKED]]
-// CHECK:         [[BORROW:%[^,]+]] = begin_borrow [[COPY]]
-// CHECK:         [[VALUE:%[^,]+]] = struct_extract [[BORROW]]
-// CHECK-SAME:        #ImplCUnderscoredCoroutineAccessors._i
-// CHECK:         yield [[VALUE]]
-// CHECK-SAME:        resume [[SUCCESS:bb[0-9]+]]
-// CHECK-SAME:        unwind [[FAILURE:bb[0-9]+]]
-// CHECK:       [[SUCCESS]]:
-// CHECK:         end_borrow [[BORROW]]
-// CHECK:         destroy_value [[COPY]]
-// CHECK:         return
-// CHECK:       [[FAILURE]]:
-// CHECK:         end_borrow [[BORROW]]
-// CHECK:         destroy_value [[COPY]]
-// CHECK:         unwind
-// CHECK-LABEL: } // end sil function '$s17read_requirements34ImplCUnderscoredCoroutineAccessorsV2urAA1UVvr'
-// CHECK-LABEL: sil{{.*}} [ossa] @$s17read_requirements34ImplCUnderscoredCoroutineAccessorsV2urAA1UVvy : {{.*}} {
-// CHECK:       bb0(
-// CHECK-SAME:      [[SELF:%[^:]+]]
-// CHECK-SAME:  ):
-// CHECK:         [[SELF_COPY_UNCHECKED:%[^,]+]] = copy_value [[SELF]]
-// CHECK:         [[SELF_COPY:%[^,]+]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[SELF_COPY_UNCHECKED]]
-// CHECK:         [[SELF_BORROW:%[^,]+]] = begin_borrow [[SELF_COPY]]
-// CHECK:         [[READER:%[^,]+]] = function_ref @$s17read_requirements34ImplCUnderscoredCoroutineAccessorsV2urAA1UVvr
-// CHECK:         ([[VALUE:%[^,]+]], [[TOKEN:%[^,]+]]) = begin_apply [[READER]]([[SELF_BORROW]])
-// CHECK:         [[VALUE_COPY_UNCHECKED:%[^,]+]] = copy_value [[VALUE]]
-// CHECK:         [[VALUE_COPY:%[^,]+]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[VALUE_COPY_UNCHECKED]]
-// CHECK:         [[VALUE_BORROW:%[^,]+]] = begin_borrow [[VALUE_COPY]]
-// CHECK:         yield [[VALUE_BORROW]]
-// CHECK-SAME:        resume [[SUCCESS:bb[0-9]+]]
-// CHECK-SAME:        unwind [[FAILURE:bb[0-9]+]]
-// CHECK:       [[SUCCESS]]:
-// CHECK:         end_borrow [[VALUE_BORROW]]
-// CHECK:         destroy_value [[VALUE_COPY]]
-// CHECK:         end_apply [[TOKEN]]
-// CHECK:         end_borrow [[SELF_BORROW]]
-// CHECK:         destroy_value [[SELF_COPY]]
-// CHECK:         return
-// CHECK:       [[FAILURE]]:
-// CHECK:         end_borrow [[VALUE_BORROW]]
-// CHECK:         destroy_value [[VALUE_COPY]]
-// CHECK:         end_apply [[TOKEN]]
-// CHECK:         end_borrow [[SELF_BORROW]]
-// CHECK:         destroy_value [[SELF_COPY]]
-// CHECK:         unwind
-// CHECK-LABEL: } // end sil function '$s17read_requirements34ImplCUnderscoredCoroutineAccessorsV2urAA1UVvy'
-// CHECK-LABEL: sil{{.*}} [ossa] @$s17read_requirements34ImplCUnderscoredCoroutineAccessorsVAA2P3A2aDP2urAA1UVvrTW : {{.*}} {
-// CHECK:       bb0(
-// CHECK-SAME:      [[SELF_ADDR:%[^:]+]]
-// CHECK:       ):
-// CHECK:         [[SELF:%[^,]+]] = load_borrow [[SELF_ADDR]]
-// CHECK:         [[READER:%[^,]+]] = function_ref @$s17read_requirements34ImplCUnderscoredCoroutineAccessorsV2urAA1UVvr
-// CHECK:         ([[VALUE:%[^,]+]], [[TOKEN:%[^,]+]]) = begin_apply [[READER]]([[SELF]])
-// CHECK:         yield [[VALUE]]
-// CHECK:             resume [[SUCCESS:bb[0-9]+]]
-// CHECK:             unwind [[FAILURE:bb[0-9]+]]
-// CHECK:       [[SUCCESS]]:
-// CHECK:         end_apply [[TOKEN]]
-// CHECK:         end_borrow [[SELF]]
-// CHECK:         return
-// CHECK:       [[FAILURE]]:
-// CHECK:         abort_apply [[TOKEN]]
-// CHECK:         end_borrow [[SELF]]
-// CHECK:         unwind
-// CHECK-LABEL: } // end sil function '$s17read_requirements34ImplCUnderscoredCoroutineAccessorsVAA2P3A2aDP2urAA1UVvrTW'
-// CHECK-LABEL: sil{{.*}} [ossa] @$s17read_requirements34ImplCUnderscoredCoroutineAccessorsVAA2P3A2aDP2urAA1UVvyTW : {{.*}} {
-// CHECK:       bb0(
-// CHECK-SAME:      [[SELF_ADDR:%[^:]+]]
-// CHECK-SAME:  ):
-// CHECK:         [[SELF:%[^,]+]] = load_borrow [[SELF_ADDR]]
-// CHECK:         [[READ2ER:%[^,]+]] = function_ref @$s17read_requirements34ImplCUnderscoredCoroutineAccessorsV2urAA1UVvy
-// CHECK:         ([[VALUE:%[^,]+]], [[TOKEN:%[^,]+]], [[ALLOCATION:%[^,]+]]) = begin_apply [[READ2ER]]([[SELF]])
-// CHECK:         yield [[VALUE]]
-// CHECK:             resume [[SUCCESS:bb[0-9]+]]
-// CHECK:             unwind [[FAILURE:bb[0-9]+]]
-// CHECK:       [[SUCCESS]]:
-// CHECK:         end_apply [[TOKEN]]
-// CHECK:         dealloc_stack [[ALLOCATION]]
-// CHECK:         end_borrow [[SELF]]
-// CHECK:         return
-// CHECK:       [[FAILURE]]:
-// CHECK:         end_apply [[TOKEN]]
-// CHECK:         dealloc_stack [[ALLOCATION]]
-// CHECK:         end_borrow [[SELF]]
-// CHECK:         unwind
-// CHECK-LABEL: } // end sil function '$s17read_requirements34ImplCUnderscoredCoroutineAccessorsVAA2P3A2aDP2urAA1UVvyTW'
+// With the CoroutineAccessors feature enabled, `_read` uses the same yield_once_2
+// ABI as `yielding borrow`, so this type emits the same accessors as
+// ImplCCoroutineAccessors above (modulo the mangled type name), which verify the
+// body in full.  Here we confirm the accessor set and forwarding: the
+// yield_once_2 vy is the primary implementation and, because this type predates
+// the feature, the additive yield_once vr forwards to it.
+// CHECK-LABEL: sil{{.*}} @$s17read_requirements29ImplCLegacyCoroutineAccessorsV2urAA1UVvy : $@yield_once_2 @convention
+// CHECK-LABEL: sil{{.*}} @$s17read_requirements29ImplCLegacyCoroutineAccessorsV2urAA1UVvr : $@yield_once @convention
+// CHECK:         function_ref @$s17read_requirements29ImplCLegacyCoroutineAccessorsV2urAA1UVvy
 }
 
 struct ImplACoroutineAccessors : ~Copyable & P1 {
@@ -1469,35 +1242,35 @@ public struct ImplCUnsafeAddressors : P3 {
 // CHECK-SAME:      : @$s17read_requirements11ImplCStoredVAA2P3A2aDP2urAA1UVvyTW
 // CHECK-NEXT:  }
 
-// CHECK-LABEL: sil_witness_table{{.*}} ImplAUnderscoredCoroutineAccessors: P1 module read_requirements {
+// CHECK-LABEL: sil_witness_table{{.*}} ImplALegacyCoroutineAccessors: P1 module read_requirements {
 // CHECK-NEXT:    method #P1.ubgs!read
-// CHECK-SAME:        : @$s17read_requirements34ImplAUnderscoredCoroutineAccessorsVAA2P1A2aDP4ubgsAA1UVvrTW
+// CHECK-SAME:        : @$s17read_requirements29ImplALegacyCoroutineAccessorsVAA2P1A2aDP4ubgsAA1UVvrTW
 // CHECK-NEXT:    method #P1.ubgs!yielding_borrow
-// CHECK-SAME:      : @$s17read_requirements34ImplAUnderscoredCoroutineAccessorsVAA2P1A2aDP4ubgsAA1UVvyTW
+// CHECK-SAME:      : @$s17read_requirements29ImplALegacyCoroutineAccessorsVAA2P1A2aDP4ubgsAA1UVvyTW
 // CHECK-NEXT:    method #P1.ubgs!setter
-// CHECK-SAME:        : @$s17read_requirements34ImplAUnderscoredCoroutineAccessorsVAA2P1A2aDP4ubgsAA1UVvsTW
+// CHECK-SAME:        : @$s17read_requirements29ImplALegacyCoroutineAccessorsVAA2P1A2aDP4ubgsAA1UVvsTW
 // CHECK-NEXT:    method #P1.ubgs!modify
-// CHECK-SAME:        : @$s17read_requirements34ImplAUnderscoredCoroutineAccessorsVAA2P1A2aDP4ubgsAA1UVvMTW
+// CHECK-SAME:        : @$s17read_requirements29ImplALegacyCoroutineAccessorsVAA2P1A2aDP4ubgsAA1UVvMTW
 // CHECK-NEXT:    method #P1.ubgs!yielding_mutate
-// CHECK-SAME:      : @$s17read_requirements34ImplAUnderscoredCoroutineAccessorsVAA2P1A2aDP4ubgsAA1UVvxTW
+// CHECK-SAME:      : @$s17read_requirements29ImplALegacyCoroutineAccessorsVAA2P1A2aDP4ubgsAA1UVvxTW
 // CHECK-NEXT:  }
 
-// CHECK-LABEL: sil_witness_table{{.*}} ImplBUnderscoredCoroutineAccessors: P2 module read_requirements {
+// CHECK-LABEL: sil_witness_table{{.*}} ImplBLegacyCoroutineAccessors: P2 module read_requirements {
 // CHECK-unstable:    method #P2.urs!read
 // CHECK-NEXT:    method #P2.urs!yielding_borrow
-// CHECK-SAME:      : @$s17read_requirements34ImplBUnderscoredCoroutineAccessorsVAA2P2A2aDP3ursAA1UVvyTW
+// CHECK-SAME:      : @$s17read_requirements29ImplBLegacyCoroutineAccessorsVAA2P2A2aDP3ursAA1UVvyTW
 // CHECK-NEXT:    method #P2.urs!setter
-// CHECK-SAME:        : @$s17read_requirements34ImplBUnderscoredCoroutineAccessorsVAA2P2A2aDP3ursAA1UVvsTW
+// CHECK-SAME:        : @$s17read_requirements29ImplBLegacyCoroutineAccessorsVAA2P2A2aDP3ursAA1UVvsTW
 // CHECK-unstable:    method #P2.urs!modify
 // CHECK-NEXT:    method #P2.urs!yielding_mutate
-// CHECK-SAME:      : @$s17read_requirements34ImplBUnderscoredCoroutineAccessorsVAA2P2A2aDP3ursAA1UVvxTW
+// CHECK-SAME:      : @$s17read_requirements29ImplBLegacyCoroutineAccessorsVAA2P2A2aDP3ursAA1UVvxTW
 // CHECK-NEXT:  }
 
-// CHECK-LABEL: sil_witness_table{{.*}} ImplCUnderscoredCoroutineAccessors: P3 module read_requirements {
+// CHECK-LABEL: sil_witness_table{{.*}} ImplCLegacyCoroutineAccessors: P3 module read_requirements {
 // CHECK-NEXT:    method #P3.ur!read
-// CHECK-SAME:        : @$s17read_requirements34ImplCUnderscoredCoroutineAccessorsVAA2P3A2aDP2urAA1UVvrTW
+// CHECK-SAME:        : @$s17read_requirements29ImplCLegacyCoroutineAccessorsVAA2P3A2aDP2urAA1UVvrTW
 // CHECK-NEXT:    method #P3.ur!yielding_borrow
-// CHECK-SAME:      : @$s17read_requirements34ImplCUnderscoredCoroutineAccessorsVAA2P3A2aDP2urAA1UVvyTW
+// CHECK-SAME:      : @$s17read_requirements29ImplCLegacyCoroutineAccessorsVAA2P3A2aDP2urAA1UVvyTW
 // CHECK-NEXT:  }
 
 // CHECK-LABEL: sil_witness_table{{.*}} ImplACoroutineAccessors: P1 module read_requirements {

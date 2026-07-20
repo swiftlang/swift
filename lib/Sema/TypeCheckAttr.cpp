@@ -6596,6 +6596,14 @@ findAutoDiffOriginalFunctionDecl(
           if (candidate) {
             maybeAccessorKind = AccessorKind::YieldingMutate;
           }
+        } else if (accessorKind == AccessorKind::Read) {
+          // With the CoroutineAccessors feature, a `_read` is represented as a
+          // `yielding borrow`.  Find it, but keep `maybeAccessorKind` as `Read`
+          // so diagnostics still refer to the `_read` spelling the user wrote.
+          candidate = asd->getOpaqueAccessor(AccessorKind::YieldingBorrow);
+        } else if (accessorKind == AccessorKind::Modify) {
+          // Likewise `_modify` is represented as a `yielding mutate`.
+          candidate = asd->getOpaqueAccessor(AccessorKind::YieldingMutate);
         }
       }
       // Error if candidate is missing the requested accessor.
