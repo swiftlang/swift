@@ -35,7 +35,8 @@ struct stack_bounds {
 // Try to autodetect if we aren't told what to do
 #if !SWIFT_THREADING_NONE && !SWIFT_THREADING_DARWIN &&                        \
     !SWIFT_THREADING_LINUX && !SWIFT_THREADING_PTHREADS &&                     \
-    !SWIFT_THREADING_C11 && !SWIFT_THREADING_WIN32
+    !SWIFT_THREADING_C11 && !SWIFT_THREADING_WIN32 &&                          \
+    !SWIFT_THREADING_EMBEDDED
 #ifdef __APPLE__
 #define SWIFT_THREADING_DARWIN 1
 #elif defined(__linux__)
@@ -65,6 +66,8 @@ struct stack_bounds {
 #include "Impl/C11.h"
 #elif SWIFT_THREADING_WIN32
 #include "Impl/Win32.h"
+#elif SWIFT_THREADING_EMBEDDED
+#include "Impl/ThreadEmbeddedImpl.h"
 #else
 #error You need to implement Threading/Impl.h for your threading package.
 #endif
