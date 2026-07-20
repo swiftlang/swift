@@ -1511,6 +1511,11 @@ void diagnoseMissingImports(SourceFile &sf);
 bool shouldUseIterable(ASTContext &ctx, Type seqTy, bool isAsync,
                                 SourceLoc loc, DeclContext *dc);
 
+/// Returns true if \p fromModule may define \p symbol. The Swift runtime
+/// reserves a set of symbol names (swift_retain etc.) that only the standard
+/// library and runtime-adjacent modules may implement.
+bool canDeclareSymbolName(StringRef symbol, ModuleDecl *fromModule);
+
 } // end namespace swift
 
 #endif
