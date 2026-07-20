@@ -1022,9 +1022,16 @@ static inline void swift_deallocObjectImpl(HeapObject *object,
   assert(object->refCounts.isDeiniting());
   SWIFT_RT_TRACK_INVOCATION(object, swift_deallocObject);
 #if SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS
+  // `allocatedSize` measures the whole allocation from its base, `addressPoint`
+  // measures the prefix of the object. Clobbering
+  // `allocatedSize - sizeof(HeapObject)` bytes starting at the header would run
+  // `addressPoint` bytes past the end of the allocation and corrupt the
+  // adjacent block's allocator metadata. Only poison the stored properties that
+  // actually fit between the header and the end of the allocation.
+  size_t addressPoint = getInstanceAddressPoint(object->metadata);
   memset_pattern8((uint8_t *)object + sizeof(HeapObject),
                   "\xF0\xEF\xBE\xAD\xDE\xED\xFE\x0F", // 0x0ffeeddeadbeeff0
-                  allocatedSize - sizeof(HeapObject));
+                  allocatedSize - addressPoint - sizeof(HeapObject));
 #endif
 
   // If we are tracking leaks, stop tracking this object.
