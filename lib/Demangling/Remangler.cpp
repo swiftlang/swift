@@ -842,6 +842,14 @@ ManglingError Remangler::mangleNoEscapeFunctionType(Node *node,
   return ManglingError::Success;
 }
 
+ManglingError Remangler::mangleCalledOnceFunctionType(Node *node,
+                                                      unsigned depth) {
+  RETURN_IF_ERROR(
+      mangleChildNodesReversed(node, depth + 1)); // argument tuple, result type
+  Buffer << "XO";
+  return ManglingError::Success;
+}
+
 ManglingError Remangler::mangleBoundGenericClass(Node *node, unsigned depth) {
   return mangleAnyNominalType(node, depth + 1);
 }

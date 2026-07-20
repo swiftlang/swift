@@ -755,6 +755,7 @@ Types
   FUNCTION-KIND ::= 'zC' C-TYPE              // C function pointer / C++ method type with non-canonical C type
   FUNCTION-KIND ::= 'A'                      // @auto_closure function type (escaping)
   FUNCTION-KIND ::= 'E'                      // function type (noescape)
+  FUNCTION-KIND ::= 'O'                      // `@called(once)` function type
 
   C-TYPE ::= NATURAL IDENTIFIER-STRING       // raw Itanium mangling
 

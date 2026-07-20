@@ -350,6 +350,7 @@ bool NodePrinter::isSimpleType(NodePointer Node) {
   case Node::Kind::EscapingAutoClosureType:
   case Node::Kind::EscapingObjCBlock:
   case Node::Kind::NoEscapeFunctionType:
+  case Node::Kind::CalledOnceFunctionType:
   case Node::Kind::ExplicitClosure:
   case Node::Kind::Extension:
   case Node::Kind::ExtensionAttachedMacroExpansion:
@@ -839,6 +840,9 @@ void NodePrinter::printFunctionType(NodePointer LabelList, NodePointer node,
   case Node::Kind::FunctionType:
   case Node::Kind::UncurriedFunctionType:
   case Node::Kind::NoEscapeFunctionType:
+    break;
+  case Node::Kind::CalledOnceFunctionType:
+    Printer << "@called(once) ";
     break;
   case Node::Kind::AutoClosureType:
   case Node::Kind::EscapingAutoClosureType:
@@ -1392,6 +1396,7 @@ static bool needSpaceBeforeType(NodePointer Type) {
     case Node::Kind::FunctionType:
     case Node::Kind::NoEscapeFunctionType:
     case Node::Kind::UncurriedFunctionType:
+    case Node::Kind::CalledOnceFunctionType:
     case Node::Kind::DependentGenericType:
       return false;
     default:
@@ -1731,6 +1736,7 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
   case Node::Kind::FunctionType:
   case Node::Kind::UncurriedFunctionType:
   case Node::Kind::NoEscapeFunctionType:
+  case Node::Kind::CalledOnceFunctionType:
   case Node::Kind::AutoClosureType:
   case Node::Kind::EscapingAutoClosureType:
   case Node::Kind::ThinFunctionType:
@@ -3632,7 +3638,8 @@ NodePointer NodePrinter::printEntity(NodePointer Entity, unsigned depth,
           t->getKind() != Node::Kind::NoEscapeFunctionType &&
           t->getKind() != Node::Kind::UncurriedFunctionType &&
           t->getKind() != Node::Kind::CFunctionPointer &&
-          t->getKind() != Node::Kind::ThinFunctionType) {
+          t->getKind() != Node::Kind::ThinFunctionType &&
+          t->getKind() != Node::Kind::CalledOnceFunctionType) {
         TypePr = TypePrinting::WithColon;
       }
     }
