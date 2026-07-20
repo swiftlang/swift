@@ -1897,6 +1897,20 @@ visitObjCImplementationAttr(ObjCImplementationAttr *attr) {
     }
 
     if (!AFD->getImplementedObjCDecl()) {
+      // A @cxx function whose signature is not representable in C++ cannot
+      // match anything; the representability diagnostics explain the failure
+      // better than "not found" would, so check them first and stand down if
+      // they fire.
+      if (auto *cxxAttr = AFD->getAttrs().getAttribute<CxxDeclAttr>(
+              /*AllowInvalid=*/true)) {
+        auto *FD = dyn_cast<FuncDecl>(AFD);
+        if (FD && !cxxAttr->isInvalid())
+          evaluateOrDefault(Ctx.evaluator,
+                            TypeCheckForeignFunctionRequest{FD, cxxAttr}, {});
+        if (cxxAttr->isInvalid())
+          return;
+      }
+
       StringRef name = AFD->getCDeclName();
       if (name.empty())
         name = AFD->getNameStr();
