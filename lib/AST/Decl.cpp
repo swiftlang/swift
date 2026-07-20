@@ -3502,21 +3502,23 @@ static bool mayReferenceUseCoroutineAccessorOnStorage(
   if (!resilient)
     return true;
 
-  // Without knowing where the storage is referenced, it can't be known that
-  // a coroutine accessor is available.
-  if (!reference) {
-    return false;
-  }
+  // A resilient access may use the new (yield_once_2) coroutine accessor only
+  // if the caller is guaranteed to run at or after the feature's availability.
+  // With a source location, use the (possibly `if #available`-refined)
+  // availability there; without one, fall back to the caller's deployment
+  // target.  If the caller's deployment target predates the feature we must call
+  // the old ABI -- such a target may run against pre-feature frameworks that
+  // only have it -- and the emission policy guarantees that any accessor
+  // reachable from pre-feature code (i.e. itself available before the feature)
+  // has that old ABI, so this can never select a missing symbol.
+  auto callerAvailability =
+      reference ? AvailabilityContext::forLocation(reference->first.Start,
+                                                   reference->second)
+                      .getPlatformRange()
+                : AvailabilityContext::forDeploymentTarget(ctx).getPlatformRange();
+  auto featureAvailability = ctx.getCoroutineAccessorsAvailability();
 
-  // A resilient access to storage may only use a coroutine accessor if the
-  // storage became available no earlier than the feature.
-  auto referenceAvailability = AvailabilityContext::forLocation(
-                                   reference->first.Start, reference->second)
-                                   .getPlatformRange();
-  auto featureAvailability =
-      storage->getASTContext().getCoroutineAccessorsAvailability();
-
-  return referenceAvailability.isContainedIn(featureAvailability);
+  return callerAvailability.isContainedIn(featureAvailability);
 }
 
 static AccessStrategy getOpaqueReadAccessStrategy(
