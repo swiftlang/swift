@@ -5,6 +5,8 @@
 import Swift
 import Builtin
 
+class C {}
+
 // CHECK-LABEL: sil @merge_blocks_same_location1
 // CHECK:         %0 = integer_literal $Builtin.Int64, 0
 // CHECK:         fix_lifetime %0 : $Builtin.Int64
@@ -96,5 +98,84 @@ bb1(%2 : $Builtin.Int64):
 
 bb2:
   br bb1(%2 : $Builtin.Int64)
+}
+
+// A phi with the same incoming value on all edges is replaced by that value.
+// CHECK-LABEL: sil [ossa] @replace_phi_with_same_incoming
+// CHECK:       bb3:
+// CHECK-NEXT:    return %0
+// CHECK:       } // end sil function 'replace_phi_with_same_incoming'
+sil [ossa] @replace_phi_with_same_incoming : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int64):
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3(%0 : $Builtin.Int64)
+
+bb2:
+  br bb3(%0 : $Builtin.Int64)
+
+bb3(%3 : $Builtin.Int64):
+  return %3 : $Builtin.Int64
+}
+
+// A re-borrow phi whose incoming operands are all `begin_borrow`s of the same value
+// is replaced by a single `begin_borrow` in the phi's block.
+// CHECK-LABEL: sil [ossa] @replace_reborrow_of_begin_borrows
+// CHECK:       bb1:
+// CHECK-NEXT:    br bb3
+// CHECK:       bb2:
+// CHECK-NEXT:    br bb3
+// CHECK:       bb3:
+// CHECK-NEXT:    [[B:%.*]] = begin_borrow %0 : $C
+// CHECK-NEXT:    fix_lifetime [[B]] : $C
+// CHECK-NEXT:    end_borrow [[B]] : $C
+// CHECK-NEXT:    destroy_value %0 : $C
+// CHECK:       } // end sil function 'replace_reborrow_of_begin_borrows'
+sil [ossa] @replace_reborrow_of_begin_borrows : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %b1 = begin_borrow %0 : $C
+  br bb3(%b1 : $C)
+
+bb2:
+  %b2 = begin_borrow %0 : $C
+  br bb3(%b2 : $C)
+
+bb3(%r : @reborrow $C):
+  %bf = borrowed %r : $C from (%0 : $C)
+  fix_lifetime %bf : $C
+  end_borrow %bf : $C
+  destroy_value %0 : $C
+  %t = tuple ()
+  return %t : $()
+}
+
+// A re-borrow phi whose incoming `begin_borrow`s borrow different values must not be replaced.
+// CHECK-LABEL: sil [ossa] @dont_replace_reborrow_of_different_values
+// CHECK:       bb3([[R:%.*]] : @reborrow $C):
+// CHECK-NEXT:    borrowed [[R]] : $C from
+// CHECK:       } // end sil function 'dont_replace_reborrow_of_different_values'
+sil [ossa] @dont_replace_reborrow_of_different_values : $@convention(thin) (@owned C, @owned C) -> () {
+bb0(%0 : @owned $C, %1 : @owned $C):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %b1 = begin_borrow %0 : $C
+  br bb3(%b1 : $C)
+
+bb2:
+  %b2 = begin_borrow %1 : $C
+  br bb3(%b2 : $C)
+
+bb3(%r : @reborrow $C):
+  %bf = borrowed %r : $C from (%0 : $C, %1 : $C)
+  end_borrow %bf : $C
+  destroy_value %0 : $C
+  destroy_value %1 : $C
+  %t = tuple ()
+  return %t : $()
 }
 
