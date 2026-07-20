@@ -1185,6 +1185,9 @@ void SILPassManager::addFunctionToWorklist(SILFunction *F,
       llvm::dbgs() << F->getName() << " was derived from "
                    << DerivedFrom->getName() << "\n";
     }
+
+    notifySILModuleStatsOfFunctionDerivedFrom(*this, F, DerivedFrom);
+
     // When SILVerifyAll is enabled, individual functions are verified after
     // function passes are run upon them. This means that any functions created
     // by a function pass will not be verified after the pass runs. Thus
