@@ -349,6 +349,10 @@ public enum CompactImageMapFormat {
         }
         let endOfText = baseAddress &+ eotOffset
 
+        guard endOfText > baseAddress else {
+          return nil
+        }
+
         #if DEBUG_COMPACT_IMAGE_MAP
         print("address = \(hex(address)), eotOffset = \(hex(eotOffset))")
         print("baseAddress = \(hex(baseAddress)), endOfText = \(hex(endOfText))")
