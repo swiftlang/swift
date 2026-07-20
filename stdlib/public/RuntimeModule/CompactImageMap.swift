@@ -719,7 +719,8 @@ public enum CompactImageMapFormat {
             }
 
             // Check for /<name>.framework/Versions/<version>/<name>
-            if let name = source.images[ndx].name, !name.isEmpty {
+            if let name = source.images[ndx].name,
+               !name.isEmpty && name.utf8.count <= 64 {
               let nameCount = name.utf8.count
               let expectedLen = 1 // '/'
                 + nameCount       // <name>
