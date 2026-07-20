@@ -35,11 +35,12 @@ def compile_and_stat(compile_args, output_file):
     compilation has finished.
     """
 
-    logFile = open(output_file + ".log", "w")
-
-    subprocess.check_call(compile_args, stdout=logFile)
-
-    logFile.close()
+    # The compiler writes its `-sil-print-pass-md5` output directly to
+    # ``output_file + ".log"`` (see the `-sil-print-pass-md5=` argument added in
+    # main()), so we don't redirect stdout/stderr here. That keeps the
+    # compiler's stdout/stderr going to the console, so "real" diagnostics stay
+    # visible in the CI log.
+    subprocess.check_call(compile_args)
 
     md5 = subprocess.check_output(["md5", "-q", output_file],
                                   universal_newlines=True)
@@ -104,7 +105,7 @@ def main():
 
     new_args += [
       '-Xllvm', '-print-no-uuids',
-      '-Xllvm', '-sil-print-pass-md5']
+      '-Xllvm', '-sil-print-pass-md5=' + output_file + '.log']
 
     if EMIT_IR:
       new_args += [
