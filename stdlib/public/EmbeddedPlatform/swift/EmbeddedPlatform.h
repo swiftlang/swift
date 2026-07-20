@@ -118,6 +118,10 @@ typedef void (*__swift_tls_dtor_t)(void * EMBEDDED_SWIFT_NULLABLE);
  */
 #define EMBEDDED_SWIFT_PLATFORM_VERSION_MINOR 1
 
+#if defined(__cplusplus)
+extern "C" {
+#endif
+
 /**
  * The number of pointer-size words that will be used to store a Mutex (as
  * provided by the Synchronization library).
@@ -457,6 +461,10 @@ __swift_ptrdiff_t _swift_thread_isMain(void);
  * function.
  */
 void _swift_exit(__swift_ptrdiff_t code);
+
+#if defined(__cplusplus)
+}
+#endif
 
 #undef EMBEDDED_SWIFT_NAME
 #undef EMBEDDED_SWIFT_OPTION_SET
