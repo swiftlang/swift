@@ -850,12 +850,12 @@ Type ASTBuilder::createImplFunctionType(
   // TODO: Handle LifetimeDependenceInfo here. Sibling of the AST-level TODO
   // at the top of `createFunctionType` above; both must be implemented before
   // the IRGen workaround in lib/IRGen/IRGenDebugInfo.cpp can be removed.
-  auto einfo =
-      SILFunctionType::ExtInfoBuilder(
-          representation, flags.isPseudogeneric(), !flags.isEscaping(),
-          flags.isSendable(), flags.isAsync(), unimplementable, isolation,
-          diffKind, clangFnType, /*LifetimeDependenceInfo*/ {})
-          .build();
+  auto einfo = SILFunctionType::ExtInfoBuilder(
+                   representation, flags.isPseudogeneric(), !flags.isEscaping(),
+                   flags.isSendable(), flags.isAsync(), unimplementable,
+                   flags.isCalledOnce(), isolation, diffKind, clangFnType,
+                   /*LifetimeDependenceInfo*/ {})
+                   .build();
 
   return SILFunctionType::get(genericSig, einfo, funcCoroutineKind,
                               funcCalleeConvention, funcParams, funcYields,

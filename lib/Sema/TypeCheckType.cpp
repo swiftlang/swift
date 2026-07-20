@@ -5045,9 +5045,14 @@ NeverNullType TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
     }
   }
 
+  bool isCalledOnce = false;
+  if (auto *called = claim<CalledTypeAttr>(attrs)) {
+    isCalledOnce = called->isOnce();
+  }
+
   auto extInfoBuilder = SILFunctionType::ExtInfoBuilder(
       representation, pseudogeneric, noescape, sendable, async, unimplementable,
-      isolation, diffKind, clangFnType,
+      isCalledOnce, isolation, diffKind, clangFnType,
       /*LifetimeDependenceInfo*/ {});
 
   // Resolve parameter and result types using the function's generic

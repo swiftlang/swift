@@ -326,9 +326,8 @@ static bool isCalledOnceFunctionType(EitherFunctionType eitherFnTy) {
     return fnTy->isCalledOnce();
   }
 
-  // TODO: Implement this for SILFunctionType when the
-  // information is in SILExtInfo available.
-  return false;
+  auto silFnTy = cast<const SILFunctionType *>(eitherFnTy);
+  return silFnTy->isCalledOnce();
 }
 
 /// Whether the given function type conforms to Copyable.
