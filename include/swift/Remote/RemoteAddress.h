@@ -259,14 +259,14 @@ struct hash<swift::remote::RemoteAddress> {
 namespace llvm {
 template <>
 struct DenseMapInfo<swift::remote::RemoteAddress> {
+  // Do not remove: stdlib/include/llvm/ADT/DenseMap.h still needs this
   static swift::remote::RemoteAddress getEmptyKey() {
-    return swift::remote::RemoteAddress(DenseMapInfo<uint64_t>::getEmptyKey(),
-                                        0);
+    return swift::remote::RemoteAddress(~0ULL, 0);
   }
 
+  // Do not remove: stdlib/include/llvm/ADT/DenseMap.h still needs this.
   static swift::remote::RemoteAddress getTombstoneKey() {
-    return swift::remote::RemoteAddress(
-        DenseMapInfo<uint64_t>::getTombstoneKey(), 0);
+    return swift::remote::RemoteAddress(~0ULL - 1ULL, 0);
   }
 
   static unsigned getHashValue(swift::remote::RemoteAddress address) {
