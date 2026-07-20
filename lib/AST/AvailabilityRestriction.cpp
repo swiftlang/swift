@@ -214,8 +214,10 @@ getDeprecationRestrictionForAttr(const Decl *decl,
   if (availableRange && availableRange->isKnownUnreachable())
     return std::nullopt;
 
-  if (attr.isUnconditionallyDeprecated())
-    return AvailabilityRestriction::deprecated(attr);
+  if (attr.isUnconditionallyDeprecated()) {
+    if (attr.getDomain().isUniversal() || availableRange)
+      return AvailabilityRestriction::deprecated(attr);
+  }
 
   auto &ctx = decl->getASTContext();
   if (auto deprecatedRange = attr.getDeprecatedRange(ctx)) {
@@ -224,8 +226,7 @@ getDeprecationRestrictionForAttr(const Decl *decl,
     if (includeSoftDeprecation)
       return AvailabilityRestriction::deprecated(attr);
 
-    auto deploymentRange = attr.getDomain().getDeploymentRange(ctx);
-    if (deploymentRange && deploymentRange->isContainedIn(*deprecatedRange))
+    if (availableRange && availableRange->isContainedIn(*deprecatedRange))
       return AvailabilityRestriction::deprecated(attr);
   }
 
