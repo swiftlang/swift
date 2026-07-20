@@ -185,6 +185,13 @@ extension ASTGenDiagnostic {
       message: "argument cannot be an interpolated string literal"
     )
   }
+
+  static func emptyCxxAttributeName(_ attribute: AttributeSyntax) -> Self {
+    Self(
+      node: attribute,
+      message: "C++ function name in 'cxx' attribute cannot be empty"
+    )
+  }
 }
 
 extension ASTGenDiagnostic {
