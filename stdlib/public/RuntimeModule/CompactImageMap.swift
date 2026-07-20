@@ -127,7 +127,7 @@ public enum CompactImageMapFormat {
         bytes.append(byte)
       }
 
-      return String(decoding: bytes, as: UTF8.self)
+      return String(validating: bytes, as: UTF8.self)
     }
 
     mutating func decodeAddress(_ count: Int) -> UInt64? {
@@ -176,7 +176,7 @@ public enum CompactImageMapFormat {
           #if DEBUG_COMPACT_IMAGE_MAP
           print("end")
           #endif
-          return String(decoding: resultBytes, as: UTF8.self)
+          return String(validating: resultBytes, as: UTF8.self)
         } else if byte < 0x40 {
           // `str`
           let count = Int(byte)
@@ -191,8 +191,10 @@ public enum CompactImageMapFormat {
             }
             if base + n > stringBase! && (char == slash
                                             || char == backslash) {
-              let prefix = String(decoding: resultBytes[stringBase!..<base+n],
-                                  as: UTF8.self)
+              guard let prefix = String(validating: resultBytes[stringBase!..<base+n],
+                                        as: UTF8.self) else {
+                return nil
+              }
               #if DEBUG_COMPACT_IMAGE_MAP
               print("define \(nextCode) = \(prefix)")
               #endif
@@ -244,7 +246,7 @@ public enum CompactImageMapFormat {
           resultBytes.append(slash)
           resultBytes.append(contentsOf: nameBytes)
 
-          return String(decoding: resultBytes, as: UTF8.self)
+          return String(validating: resultBytes, as: UTF8.self)
         } else {
           // `expand`
           var code: Int
@@ -535,7 +537,7 @@ public enum CompactImageMapFormat {
             return infoByte
 
           case let .platform(ndx):
-            let length = UInt8(source.platform.utf8.count)
+            let length = UInt8(clamping: source.platform.utf8.count)
             let byte: UInt8
 
             if ndx == -1 {
