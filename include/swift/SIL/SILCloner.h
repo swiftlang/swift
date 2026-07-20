@@ -1801,6 +1801,14 @@ SILCloner<ImplClass>::visitDebugValueInst(DebugValueInst *Inst) {
         NewInst->getFunction()->createEmptyDebugReconstructionBlock();
     NewInst->setDebugReconstructionBlock(NewDebugBB);
     asImpl().cloneDebugBasicBlock(SrcDebugBB, NewDebugBB);
+    
+    // Type substitutions may map an address-only (generic) type to something
+    // else, in which case, the op_deref must be converted to a load.
+    if (NewInst->hasDeref()) {
+      auto *ret = cast<ReturnInst>(NewDebugBB->getTerminator());
+      if (ret->getOperand()->getType().isLoadableOrOpaque(*NewInst->getFunction()))
+        NewInst->convertDerefToLoad();
+    }
   }
 
   recordClonedInstruction(Inst, NewInst);
