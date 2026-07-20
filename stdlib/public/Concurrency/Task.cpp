@@ -89,11 +89,6 @@ const void *const swift::_swift_concurrency_debug_asyncTaskSlabMetadata =
 bool swift::_swift_concurrency_debug_supportsPriorityEscalation =
     SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION;
 
-// ************************* PLEASE UPDATE DEBUG.H DOCS ***************************************
-// * When changing this version number you MUST document the change in `Concurrency/Debug.h`. *
-// ********************************************************************************************
-uint32_t swift::_swift_concurrency_debug_internal_layout_version = 2;
-
 void FutureFragment::destroy() {
   auto queueHead = waitQueue.load(std::memory_order_acquire);
   switch (queueHead.getStatus()) {

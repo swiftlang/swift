@@ -24,10 +24,11 @@
 #endif
 
 #include "../CompatibilityOverride/CompatibilityOverride.h"
-#include "swift/ABI/Actor.h"
-#include "swift/ABI/Task.h"
+#include "Debug.h"
 #include "ExecutorBridge.h"
 #include "TaskPrivate.h"
+#include "swift/ABI/Actor.h"
+#include "swift/ABI/Task.h"
 #include "swift/Basic/HeaderFooterLayout.h"
 #include "swift/Basic/PriorityQueue.h"
 #include "swift/Concurrency/Actor.h"
@@ -2970,3 +2971,11 @@ bool swift::swift_distributed_actor_is_remote(HeapObject *_actor) {
 bool DefaultActorImpl::isDistributedRemote() {
   return this->isDistributedRemoteActor;
 }
+
+// ************************* PLEASE UPDATE DEBUG.H DOCS ************************
+// * When changing this version number you MUST document the change in         *
+// * `Concurrency/Debug.h`.                                                    *
+// *****************************************************************************
+[[gnu::used, gnu::retain]]
+uint32_t swift::_swift_concurrency_debug_internal_layout_version =
+    (static_cast<uint32_t>(SWIFT_THREAD_LOCAL_STORAGE_KIND) << 24) | 3;
