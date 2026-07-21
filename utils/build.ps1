@@ -953,6 +953,7 @@ enum Project {
   BootstrapRuntimeModule
   BootstrapStringProcessing
   BootstrapSynchronization
+  BootstrapCOM
   BootstrapDistributed
   BootstrapObservation
   BootstrapDifferentiation
@@ -1012,6 +1013,7 @@ enum Project {
   DynamicRuntimeModule
   DynamicStringProcessing
   DynamicSynchronization
+  DynamicCOM
   DynamicDistributed
   DynamicObservation
   DynamicDispatch
@@ -1024,6 +1026,7 @@ enum Project {
   StaticRuntimeModule
   StaticStringProcessing
   StaticSynchronization
+  StaticCOM
   StaticDistributed
   StaticObservation
   StaticDifferentiation
@@ -4349,6 +4352,7 @@ function Repair-WindowsSDKAssemblyManifests([Hashtable] $Platform, [string] $Run
 $SDKSupplementalRuntimes = @(
   "StringProcessing",
   "Synchronization",
+  "COM",
   "Distributed",
   "Observation",
   "Differentiation",
@@ -4377,9 +4381,10 @@ function Build-SDK([Hashtable] $Platform, [Hashtable] $Context) {
     $SDKInstallDefines.CMAKE_INSTALL_BINDIR = $SDKRuntimeBin
     $SDKInstallDefines.CMAKE_INSTALL_LIBEXECDIR = $SDKLibexecDir
   }
-  $BUILD_SHARED_LIBS     = if ($Static) { "NO" } else { "YES" }
-  $RuntimeBinaryCache    = Get-ProjectBinaryCache $Platform ([Project]"${Variant}Runtime")
-  $OverlayBinaryCache    = Get-ProjectBinaryCache $Platform ([Project]"${Variant}Overlay")
+  $BUILD_SHARED_LIBS          = if ($Static) { "NO" } else { "YES" }
+  $RuntimeBinaryCache         = Get-ProjectBinaryCache $Platform ([Project]"${Variant}Runtime")
+  $OverlayBinaryCache         = Get-ProjectBinaryCache $Platform ([Project]"${Variant}Overlay")
+  $SynchronizationBinaryCache = Get-ProjectBinaryCache $Platform ([Project]"${Variant}Synchronization")
 
   # TODO: remove this once the migration is completed.
   Invoke-IsolatingEnvVars {
@@ -4516,6 +4521,39 @@ function Build-SDK([Hashtable] $Platform, [Hashtable] $Context) {
             # FIXME(compnerd) this currently causes a build failure on Windows, but
             # this should be enabled when building the dynamic runtime.
             SwiftSynchronization_ENABLE_LIBRARY_EVOLUTION = "NO";
+          })
+      }
+    }
+
+    if ($SupplementalRuntimes -contains "COM") {
+      Record-OperationTime $Platform "Build-${Variant}COM" {
+        Build-CMakeProject `
+          -Src $SourceCache\swift\Runtimes\Supplemental\COM `
+          -Bin (Get-ProjectBinaryCache $Platform ([Project]"${Variant}COM")) `
+          -InstallTo "$SDKRoot\usr" `
+          -Platform $Platform `
+          -CCompiler $Compilers.GNUC `
+          -SwiftCompiler $Compilers.Swift `
+          -SwiftSDK $null `
+          -Defines ($SDKInstallDefines + @{
+            BUILD_SHARED_LIBS = $BUILD_SHARED_LIBS;
+            CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+            CMAKE_Swift_FLAGS = if ($DebugInfo) {
+              @("-experimental-serialize-debug-info")
+            } else {
+              @()
+            };
+
+            SWIFT_ASSEMBLY_VERSION = "$ProductVersion";
+            SWIFT_PUBLIC_KEY_TOKEN = "$WindowsSxSAssemblyPublicKeyToken";
+
+            SwiftCore_DIR             = "$RuntimeBinaryCache\cmake\SwiftCore";
+            SwiftOverlay_DIR          = "$OverlayBinaryCache\cmake\SwiftOverlay";
+            SwiftSynchronization_DIR  = "$SynchronizationBinaryCache\cmake\SwiftSynchronization";
+
+            # FIXME(compnerd) this currently causes a build failure on Windows, but
+            # this should be enabled when building the dynamic runtime.
+            SwiftCOM_ENABLE_LIBRARY_EVOLUTION = "NO";
           })
       }
     }
