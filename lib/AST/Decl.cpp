@@ -1056,6 +1056,14 @@ bool Decl::isInMacroExpansionInContext() const {
   return swift::isMacroExpansionInContext(getStartLoc(), parentSF);
 }
 
+Decl *Decl::getMacroExpansionOriginatingDecl() const {
+  SourceLoc loc = getLoc();
+  auto *sf = getModuleContext()->getSourceFileContainingLocation(loc);
+  if (!sf || sf->Kind != SourceFileKind::MacroExpansion)
+    return nullptr;
+  return sf->getMacroExpansion().dyn_cast<Decl *>();
+}
+
 bool Decl::isInMacroExpansionFromClangHeader() const {
   SourceLoc declLoc = getLoc();
   if (declLoc.isInvalid())
