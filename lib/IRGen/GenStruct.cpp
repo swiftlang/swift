@@ -17,6 +17,8 @@
 #include "GenStruct.h"
 
 #include "IRGen.h"
+#include "IRGenMangler.h"
+#include "swift/AST/AbstractLayout.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
@@ -48,6 +50,7 @@
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
 #include "llvm/Support/Error.h"
+#include "llvm/Support/ErrorHandling.h"
 #include <iterator>
 
 #include "GenDecl.h"
@@ -59,6 +62,7 @@
 #include "IndirectTypeInfo.h"
 #include "MemberAccessStrategy.h"
 #include "MetadataLayout.h"
+#include "NativeConventionSchema.h"
 #include "NonFixedTypeInfo.h"
 #include "ResilientTypeInfo.h"
 #include "Signature.h"
@@ -96,6 +100,64 @@ static clang::CXXDestructorDecl *getCXXDestructor(SILType type) {
   return cxxRecordDecl->getDestructor();
 }
 namespace {
+
+static NativeConventionLLVMTypeKind
+getNativeConventionLLVMTypeKind(llvm::Type *type) {
+  if (isa<llvm::IntegerType>(type))
+    return NativeConventionLLVMTypeKind::Integer;
+  if (isa<llvm::PointerType>(type))
+    return NativeConventionLLVMTypeKind::Pointer;
+  if (type->isHalfTy())
+    return NativeConventionLLVMTypeKind::Half;
+  if (type->isFloatTy())
+    return NativeConventionLLVMTypeKind::Float;
+  if (type->isDoubleTy())
+    return NativeConventionLLVMTypeKind::Double;
+  if (type->isFP128Ty())
+    return NativeConventionLLVMTypeKind::FP128;
+  if (type->isPPC_FP128Ty())
+    return NativeConventionLLVMTypeKind::PPCFP128;
+  if (type->isX86_FP80Ty())
+    return NativeConventionLLVMTypeKind::X86FP80;
+  if (isa<llvm::FixedVectorType>(type))
+    return NativeConventionLLVMTypeKind::FixedVector;
+  llvm_unreachable("unsupported native convention component type");
+}
+
+static uint64_t getNativeConventionLLVMTypePayload(llvm::Type *type) {
+  if (auto *intType = dyn_cast<llvm::IntegerType>(type))
+    return intType->getBitWidth();
+  if (auto *ptrType = dyn_cast<llvm::PointerType>(type))
+    return ptrType->getAddressSpace();
+  return 0;
+}
+
+static NativeConventionComponent
+getNativeConventionComponent(clang::CharUnits begin, clang::CharUnits end,
+                             llvm::Type *type) {
+  NativeConventionComponent component;
+  component.begin = begin.getQuantity();
+  component.end = end.getQuantity();
+  component.typeKind = getNativeConventionLLVMTypeKind(type);
+  component.typePayload = getNativeConventionLLVMTypePayload(type);
+  component.vectorElementKind = NativeConventionLLVMTypeKind::Integer;
+  component.vectorElementPayload = 0;
+
+  if (auto *vectorType = dyn_cast<llvm::FixedVectorType>(type)) {
+    auto *elementType = vectorType->getElementType();
+    component.typePayload = vectorType->getNumElements();
+    component.vectorElementKind =
+        getNativeConventionLLVMTypeKind(elementType);
+    assert(component.vectorElementKind !=
+               NativeConventionLLVMTypeKind::FixedVector &&
+           "nested native convention vectors are unsupported");
+    component.vectorElementPayload =
+        getNativeConventionLLVMTypePayload(elementType);
+  }
+
+  return component;
+}
+
   class StructFieldInfo : public RecordField<StructFieldInfo> {
   public:
     StructFieldInfo(VarDecl *field, const TypeInfo &type)
@@ -455,6 +517,38 @@ namespace {
       }
 
       lowering.addTypedData(ClangDecl, offset.asCharUnits());
+    }
+
+    AbstractTypeLayout *
+    getAbstractTypeLayout(IRGenModule &IGM, ASTContext &ctx) const override {
+      bool bitwiseCopyable =
+          isTriviallyDestroyable(ResilienceExpansion::Minimal) ==
+              IsTriviallyDestroyable &&
+          isCopyable(ResilienceExpansion::Minimal) == IsCopyable;
+      if (!bitwiseCopyable) {
+        llvm::report_fatal_error(
+            "Producing an abstract type layout for non-trivial Clang record is not yet supported");
+      }
+
+      auto *layout = new (ctx) LoadableTrivialHiddenTypeAbstractLayout(
+          getFixedSize().getValue(), getFixedAlignment().getValue(),
+          getFixedStride().getValue(), bitwiseCopyable,
+          /*opaque=*/false);
+
+      auto &parameterSchema = nativeParameterValueSchema(IGM);
+      auto &resultSchema = nativeReturnValueSchema(IGM);
+      layout->nativeParameterRequiresIndirect =
+          parameterSchema.requiresIndirect();
+      layout->nativeResultRequiresIndirect = resultSchema.requiresIndirect();
+
+      parameterSchema.enumerateComponents(
+          [&](clang::CharUnits begin, clang::CharUnits end,
+              llvm::Type *type) {
+            layout->nativeComponents.push_back(
+                getNativeConventionComponent(begin, end, type));
+          });
+
+      return layout;
     }
 
     std::nullopt_t getNonFixedOffsets(IRGenFunction &IGF) const {

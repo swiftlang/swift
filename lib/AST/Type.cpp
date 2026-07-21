@@ -235,6 +235,13 @@ bool CanType::isReferenceTypeImpl(CanType type, const GenericSignatureImpl *sig,
   case TypeKind::SILFunction:
     return functionsCount;
 
+  case TypeKind::HiddenTypeLayoutInfo: {
+    auto *layout =
+        cast<HiddenTypeLayoutInfoType>(type)->getDecl()->getAbstractLayout();
+    assert(layout && "HiddenTypeLayoutInfoType should have abstract layout");
+    return layout->referenceCountingSystem.has_value();
+  }
+
   // Nothing else is statically just a class reference.
   case TypeKind::SILBlockStorage:
   case TypeKind::Error:
@@ -270,7 +277,6 @@ bool CanType::isReferenceTypeImpl(CanType type, const GenericSignatureImpl *sig,
   case TypeKind::BuiltinTuple:
   case TypeKind::ErrorUnion:
   case TypeKind::Integer:
-  case TypeKind::Hidden:
   case TypeKind::BuiltinUnboundGeneric:
   case TypeKind::BuiltinFixedArray:
   case TypeKind::BuiltinBorrow:
@@ -1882,6 +1888,7 @@ CanType TypeBase::computeCanonicalType() {
   case TypeKind::SILFunction:
   case TypeKind::SILToken:
   case TypeKind::SILMoveOnlyWrapped:
+  case TypeKind::HiddenTypeLayoutInfo:
   case TypeKind::Join:
   case TypeKind::Meet:
     ABORT([&](llvm::raw_ostream &out) {
@@ -4767,6 +4774,15 @@ ReferenceCounting TypeBase::getReferenceCounting() {
     return cast<ExistentialType>(type)->getConstraintType()
         ->getReferenceCounting();
 
+  case TypeKind::HiddenTypeLayoutInfo: {
+    auto *layout =
+        cast<HiddenTypeLayoutInfoType>(this)->getDecl()->getAbstractLayout();
+    assert(layout);
+    auto refcounting = layout->referenceCountingSystem;
+    assert(refcounting);
+    return *refcounting;
+  }
+
   case TypeKind::Function:
   case TypeKind::GenericFunction:
   case TypeKind::SILFunction:
@@ -4806,7 +4822,6 @@ ReferenceCounting TypeBase::getReferenceCounting() {
   case TypeKind::BuiltinTuple:
   case TypeKind::ErrorUnion:
   case TypeKind::Integer:
-  case TypeKind::Hidden:
   case TypeKind::BuiltinUnboundGeneric:
   case TypeKind::BuiltinFixedArray:
   case TypeKind::BuiltinBorrow:

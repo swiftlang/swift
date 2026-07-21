@@ -2287,6 +2287,7 @@ namespace {
     UNSUPPORTED_METADATA(ReferenceStorage)
     UNSUPPORTED_METADATA(SILFunction)
     UNSUPPORTED_METADATA(SILToken)
+    UNSUPPORTED_METADATA(HiddenTypeLayoutInfo) // We will add support later
     UNSUPPORTED_METADATA(SILMoveOnlyWrapped)
     UNSUPPORTED_METADATA(GenericTypeParam)
     UNSUPPORTED_METADATA(DependentMember)
@@ -2294,7 +2295,6 @@ namespace {
     UNSUPPORTED_METADATA(InOut)
     UNSUPPORTED_METADATA(Error)
     UNSUPPORTED_METADATA(Integer)
-    UNSUPPORTED_METADATA(Hidden)
     UNSUPPORTED_METADATA(SILBlockStorage)
     UNSUPPORTED_METADATA(BuiltinDefaultActorStorage)
     UNSUPPORTED_METADATA(BuiltinNonDefaultDistributedActorStorage)

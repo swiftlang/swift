@@ -24,6 +24,7 @@
 #include "llvm/TargetParser/Triple.h"
 
 namespace swift {
+class HiddenTypeLayoutInfoDecl;
 class ModuleFile;
 class PathObfuscator;
 class ModuleFileSharedCore;
@@ -504,6 +505,9 @@ public:
   void collectAllGroups(SmallVectorImpl<StringRef> &Names) const override;
 
   virtual void getTopLevelDecls(SmallVectorImpl<Decl*> &results) const override;
+
+  void getHiddenTypeLayoutInfoDecls(
+      SmallVectorImpl<HiddenTypeLayoutInfoDecl *> &results) const;
 
   virtual void getExportedPrespecializations(
       SmallVectorImpl<Decl *> &results) const override;

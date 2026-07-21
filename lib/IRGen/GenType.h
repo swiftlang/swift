@@ -64,7 +64,7 @@ namespace irgen {
   class FixedTypeInfo;
   class LoadableTypeInfo;
   class TypeInfo;
-  
+
 /// The helper class for generating types.
 class TypeConverter {
 public:
@@ -152,6 +152,7 @@ private:
   void addForwardDecl(TypeBase *key);
 
   const TypeInfo *convertType(CanType T);
+  const TypeInfo *convertHiddenTypeLayoutInfoType(HiddenTypeLayoutInfoType *T);
   const TypeInfo *convertAnyNominalType(CanType T, NominalTypeDecl *D);
   const TypeInfo *convertTupleType(TupleType *T);
   const TypeInfo *convertClassType(CanType type, ClassDecl *D);

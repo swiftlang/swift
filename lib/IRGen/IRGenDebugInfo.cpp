@@ -1983,16 +1983,11 @@ private:
     case TypeKind::Module:
     case TypeKind::BuiltinUnboundGeneric:
     case TypeKind::BuiltinBorrow:
+    case TypeKind::HiddenTypeLayoutInfo:
       ABORT([&](llvm::raw_ostream &out) {
         out << "Don't know how to emit debug info for type:\n";
         BaseTy->dump(out);
       });
-
-    case TypeKind::Hidden: {
-      unsigned FwdDeclLine = 0;
-      return createOpaqueStruct(Scope, MangledName, MainFile, FwdDeclLine,
-                                SizeInBits, AlignInBits, Flags, MangledName);
-    }
 
     case TypeKind::BuiltinFixedArray: {
       if (Opts.DebugInfoLevel > IRGenDebugInfoLevel::ASTTypes) {

@@ -19,9 +19,7 @@
 #include "ClangDerivedConformances.h"
 #include "ImporterImpl.h"
 #include "SwiftDeclSynthesizer.h"
-#include "swift/AST/AbstractLayout.h"
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/ASTMangler.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/Builtins.h"
@@ -95,7 +93,6 @@
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/ErrorHandling.h"
-#include "llvm/Support/MathExtras.h"
 #include "llvm/Support/Path.h"
 
 #include <algorithm>
@@ -11340,44 +11337,6 @@ struct ClangDeclTraceFormatter : public UnifiedStatsReporter::TraceFormatter {
 };
 
 static ClangDeclTraceFormatter TF;
-
-// MARK: - Abstract Layout Computation
-
-std::optional<AbstractTypeLayout>
-swift::computeClangAbstractLayout(const NominalTypeDecl *decl) {
-  auto *clangDecl =
-      dyn_cast_or_null<clang::RecordDecl>(decl->getClangDecl());
-  if (!clangDecl)
-    return std::nullopt;
-
-  clangDecl = clangDecl->getDefinition();
-  if (!clangDecl)
-    return std::nullopt;
-
-  auto &ctx = decl->getASTContext();
-  auto *clangLoader = ctx.getClangModuleLoader();
-  if (!clangLoader)
-    return std::nullopt;
-
-  auto &clangCtx = clangLoader->getClangASTContext();
-  const auto &recordLayout = clangCtx.getASTRecordLayout(clangDecl);
-
-  AbstractTypeLayout result;
-  result.mangledName = Mangle::ASTMangler(ctx).mangleNominalType(decl);
-  result.size = recordLayout.getSize().getQuantity();
-  result.alignment = recordLayout.getAlignment().getQuantity();
-  result.stride = llvm::alignTo(result.size, result.alignment);
-
-  Type swiftType = decl->getDeclaredInterfaceType();
-  result.bitwiseCopyable = swiftType->isBitwiseCopyable();
-
-  if (auto *structDecl = dyn_cast<StructDecl>(decl))
-    result.isOpaque = structDecl->isCxxNonTrivial();
-  else
-    result.isOpaque = false;
-
-  return result;
-}
 
 template<>
 const UnifiedStatsReporter::TraceFormatter*

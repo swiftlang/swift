@@ -34,8 +34,12 @@ class NativeConventionSchema {
 
 public:
   using EnumerationCallback = SwiftAggLowering::EnumerationCallback;
+  using FinishedComponent = SwiftAggLowering::FinishedComponent;
 
   NativeConventionSchema(IRGenModule &IGM, const TypeInfo *TI, bool isResult);
+  NativeConventionSchema(IRGenModule &IGM,
+                         ArrayRef<FinishedComponent> components,
+                         bool requiresIndirect);
 
   NativeConventionSchema() = delete;
   NativeConventionSchema(const NativeConventionSchema &) = delete;

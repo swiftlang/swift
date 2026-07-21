@@ -1992,6 +1992,12 @@ SerializedASTFile::getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {
   File.getTopLevelDecls(results);
 }
 
+void SerializedASTFile::getHiddenTypeLayoutInfoDecls(
+    SmallVectorImpl<HiddenTypeLayoutInfoDecl *> &results) const {
+  if (auto error = File.getHiddenTypeLayoutInfoDecls(results))
+    File.fatal(std::move(error));
+}
+
 void SerializedASTFile::getExportedPrespecializations(
     SmallVectorImpl<Decl *> &results) const {
   File.getExportedPrespecializations(results);

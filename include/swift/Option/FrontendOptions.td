@@ -758,9 +758,6 @@ def dump_clang_lookup_tables : Flag<["-"], "dump-clang-lookup-tables">,
   HelpText<"Dump the importer's Swift-name-to-Clang-name lookup tables to "
            "stderr">;
 
-def dump_abstract_layout : Flag<["-"], "dump-abstract-layout">,
-  HelpText<"Dump abstract layout information for Clang-backed types">;
-
 def dump_hidden_type_layouts : Flag<["-"], "dump-hidden-type-layouts">,
   HelpText<"Dump every hidden-type layout known to this compilation, "
            "including those deserialized from imported swiftmodules">;

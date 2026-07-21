@@ -206,9 +206,6 @@ bool ArgsToFrontendOptionsConverter::convert(
   Opts.CompilerDebuggingOpts.DumpClangLookupTables |=
       Args.hasArg(OPT_dump_clang_lookup_tables);
 
-  Opts.CompilerDebuggingOpts.DumpAbstractLayout |=
-      Args.hasArg(OPT_dump_abstract_layout);
-
   Opts.CompilerDebuggingOpts.DumpHiddenTypeLayouts |=
       Args.hasArg(OPT_dump_hidden_type_layouts);
 

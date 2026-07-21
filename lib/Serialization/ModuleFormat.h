@@ -58,8 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR =
-    1012; // drop metatype extension flag (derived from the extended type)
+const uint16_t SWIFTMODULE_VERSION_MINOR = 1013; // add hidden loadable struct record
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -868,12 +867,6 @@ enum BlockID {
   /// \sa decl_member_tables_block
   DECL_MEMBER_TABLES_BLOCK_ID,
 
-  /// The hidden-type layouts block, which records layout information
-  /// for stored property that is hidden from module clients.
-  ///
-  /// \sa hidden_type_layouts_block
-  HIDDEN_TYPE_LAYOUTS_BLOCK_ID,
-
   /// The module documentation container block, which contains all other
   /// documentation blocks.
   ///
@@ -1631,11 +1624,6 @@ namespace decls_block {
     INTEGER_TYPE,
     BCFixed<1>,   // is negative?
     BCBlob        // integer value text
-  );
-
-  TYPE_LAYOUT(HiddenTypeLayout,
-    HIDDEN_TYPE,
-    BCBlob        // mangled name of the original (hidden) type
   );
 
   using TypeAliasLayout = BCRecordLayout<
@@ -2705,6 +2693,21 @@ namespace decls_block {
                                            BCFixed<3>,  // threading model
                                            BCBlob>;     // IID/CLSID
 
+  // Abstract hidden type layout information for XREF fallback records.
+  using LoadableTrivialHiddenTypeLayoutDescriptorLayout = BCRecordLayout<
+    HIDDEN_LOADABLE_TRIVIAL_TYPE,
+    BCFixed<3>,        // abstract layout kind
+    BCVBR<16>,         // SILTypeProperties raw flags
+    IdentifierIDField, // mangled type name
+    DeclIDField,       // parent decl
+    BCVBR<16>,         // size
+    BCVBR<16>,         // alignment
+    BCVBR<16>,         // stride
+    BCFixed<1>,        // bitwise copyable
+    BCFixed<1>,        // native parameter requires indirect
+    BCFixed<1>,        // native result requires indirect
+    BCArray<BCVBR<16>> // native convention components
+  >;
   // clang-format on
 
 #undef SYNTAX_SUGAR_TYPE_LAYOUT
@@ -2807,7 +2810,10 @@ namespace index_block {
     SUBSTITUTION_MAP_OFFSETS,
     CLANG_TYPE_OFFSETS,
     EXPORTED_PRESPECIALIZATION_DECLS,
-    LastRecordKind = EXPORTED_PRESPECIALIZATION_DECLS,
+
+    HIDDEN_TYPE_LAYOUT_INFORMATION_RECORD_OFFSETS,
+    HIDDEN_TYPE_FALLBACK_TABLE,
+    LastRecordKind = HIDDEN_TYPE_FALLBACK_TABLE,
   };
 
   constexpr const unsigned RecordIDFieldWidth = 5;
@@ -2888,23 +2894,6 @@ namespace decl_member_tables_block {
     DECL_MEMBERS, // record ID
     BCVBR<16>,  // table offset within the blob (see below)
     BCBlob  // maps from DeclIDs to DeclID vectors
-  >;
-}
-
-/// \sa HIDDEN_TYPE_LAYOUTS_BLOCK_ID
-namespace hidden_type_layouts_block {
-  enum RecordKind {
-    HIDDEN_TYPE_LAYOUT = 1,
-  };
-
-  using HiddenTypeLayoutLayout = BCRecordLayout<
-    HIDDEN_TYPE_LAYOUT,
-    BCVBR<32>,    // size (bytes)
-    BCVBR<8>,     // alignment (bytes)
-    BCVBR<32>,    // stride (bytes)
-    BCFixed<1>,   // bitwiseCopyable (always 1 in V1)
-    BCFixed<1>,   // opaque (always 0 in V1)
-    BCBlob        // mangled name of the hidden type
   >;
 }
 

@@ -267,6 +267,12 @@ private:
   /// Identifiers referenced by this module.
   ArrayRef<RawBitOffset> Identifiers;
 
+  /// Hidden type layout info decls referenced by this module.
+  ArrayRef<RawBitOffset> HiddenTypeLayoutInfoDecls;
+
+  /// Fallback table: flat pairs of (xrefDeclID, hiddenLayoutDeclID).
+  ArrayRef<uint64_t> HiddenTypeFallbackTableData;
+
   class DeclTableInfo;
   using SerializedDeclTable =
       llvm::OnDiskIterableChainedHashTable<DeclTableInfo>;
@@ -310,8 +316,6 @@ private:
   std::unique_ptr<SerializedNestedTypeDeclsTable> NestedTypeDecls;
   std::unique_ptr<SerializedDeclMemberNamesTable> DeclMemberNames;
   std::unique_ptr<SerializedDeclFingerprintsTable> DeclFingerprints;
-
-  llvm::StringMap<AbstractTypeLayout> HiddenTypeLayouts;
 
   class ObjCMethodTableInfo;
   using SerializedObjCMethodTable =
@@ -524,11 +528,6 @@ private:
   ///
   /// Returns false if there was an error.
   bool readIndexBlock(llvm::BitstreamCursor &cursor);
-
-  /// Reads the hidden-type layouts block, populating HiddenTypeLayouts.
-  ///
-  /// Returns false if there was an error.
-  bool readHiddenTypeLayoutsBlock(llvm::BitstreamCursor &cursor);
 
   /// Read an on-disk decl hash table stored in
   /// \c comment_block::DeclCommentListLayout format.

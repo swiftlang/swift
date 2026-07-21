@@ -44,6 +44,7 @@ namespace llvm {
 namespace swift {
 class Decl;
 class FileUnit;
+class HiddenTypeLayoutInfoDecl;
 class ModuleDecl;
 class Pattern;
 class ProtocolConformance;
@@ -304,6 +305,14 @@ private:
 
   /// Identifiers referenced by this module.
   MutableArrayRef<SerializedIdentifier> Identifiers;
+
+  /// Hidden type layout info decls referenced by this module.
+  MutableArrayRef<Serialized<Decl*>> HiddenTypeLayoutInfoDecls;
+
+  /// Maps DeclIDs of XREFs to DeclIDs of hidden layout fallback records.
+  llvm::DenseMap<uint32_t, uint32_t> HiddenTypeFallbackMap;
+
+  void populateHiddenTypeFallbackMap(std::shared_ptr<const ModuleFileSharedCore> core);
 
   using SerializedDeclMembersTable =
       ModuleFileSharedCore::SerializedDeclMembersTable;
@@ -575,6 +584,9 @@ public:
 
   // Out of line to avoid instantiation OnDiskChainedHashTable here.
   ~ModuleFile();
+
+  llvm::Error getHiddenTypeLayoutInfoDecls(
+      SmallVectorImpl<HiddenTypeLayoutInfoDecl *> &results);
 
   /// The name of the module.
   StringRef getName() const {
@@ -930,17 +942,6 @@ public:
     return Core->TargetTriple;
   }
 
-  /// Look up the layout of a hidden type by its mangled name. Returns
-  /// std::nullopt if this module does not define a layout for that mangled
-  /// name.
-  std::optional<AbstractTypeLayout>
-  lookupHiddenTypeLayout(StringRef mangledName) const {
-    auto it = Core->HiddenTypeLayouts.find(mangledName);
-    if (it == Core->HiddenTypeLayouts.end())
-      return std::nullopt;
-    return it->second;
-  }
-
   /// AST-verify imported decls.
   ///
   /// Has no effect in NDEBUG builds.
@@ -1075,6 +1076,10 @@ public:
   getDeclChecked(
     serialization::DeclID DID,
     llvm::function_ref<bool(DeclAttributes)> matchAttributes = nullptr);
+
+  /// Returns a stub decl based on hidden type layout information.
+  llvm::Expected<HiddenTypeLayoutInfoDecl *>
+  getHiddenTypeLayoutInfoDecl(serialization::DeclID DID);
 
   /// Returns the decl context with the given ID, deserializing it if needed.
   DeclContext *getDeclContext(serialization::DeclContextID DID);
