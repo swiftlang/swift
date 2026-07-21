@@ -434,19 +434,20 @@ extension ImageSource: MemoryReader {
     return bytes.loadUnaligned(fromByteOffset: offset, as: type)
   }
 
-  public func fetchString(from address: Address) throws -> String? {
-    let offset = Int(address)
+  public func fetchString(from address: Address) throws
+    -> (String?, consumedBytes: Int) {
     guard let offset = Int(exactly: address),
             offset >= 0 && offset <= bytes.count else {
       throw ImageSourceError.outOfBoundsRead
     }
-    let len = strnlen(bytes.baseAddress! + offset, bytes.count - offset)
+    let maxLen = bytes.count - offset
+    let len = strnlen(bytes.baseAddress! + offset, maxLen)
     let stringBytes = bytes[offset..<offset+len]
-    return String(decoding: stringBytes, as: UTF8.self)
+    return (String(decoding: stringBytes, as: UTF8.self),
+            consumedBytes: len == maxLen ? maxLen : len + 1)
   }
 
   public func fetchString(from address: Address, length: Int) throws -> String? {
-    let offset = Int(address)
     guard let offset = Int(exactly: address),
             bytes.count >= length &&
             offset >= 0 && offset <= bytes.count - length else {
@@ -499,10 +500,11 @@ struct ImageSourceCursor {
   }
 
   mutating func readString() throws -> String? {
-    guard let result = try source.fetchString(from: pos) else {
+    guard let (result, count) = try? source.fetchString(from: pos),
+          let result else {
       return nil
     }
-    pos += Size(result.utf8.count + 1) // +1 for the NUL
+    pos += Size(count) // +1 for the NUL
     return result
   }
 

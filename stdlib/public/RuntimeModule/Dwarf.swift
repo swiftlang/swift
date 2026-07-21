@@ -1397,7 +1397,8 @@ class DwarfReader<S: DwarfSource & AnyObject> {
         if !shouldFetchIndirect {
           return .stringFromStrTab(offset)
         } else {
-          guard let string = try strSection.fetchString(from: offset) else {
+          let (string, _) = try strSection.fetchString(from: offset)
+          guard let string else {
             throw DwarfError.badString
           }
           return .string(string)
@@ -1427,7 +1428,8 @@ class DwarfReader<S: DwarfSource & AnyObject> {
         if !shouldFetchIndirect {
           return .stringFromLineStrTab(offset)
         } else {
-          guard let string = try lineStrSection.fetchString(from: offset) else {
+          let (string, _) = try lineStrSection.fetchString(from: offset)
+          guard let string else {
             throw DwarfError.badString
           }
           return .string(string)
@@ -1477,8 +1479,8 @@ class DwarfReader<S: DwarfSource & AnyObject> {
                                               as: UInt32.self)))
           }
 
-          guard let string = try strSection.fetchString(from: actualOffset)
-          else {
+          let (string, _) = try strSection.fetchString(from: actualOffset)
+          guard let string else {
             throw DwarfError.badString
           }
           return .string(string)
