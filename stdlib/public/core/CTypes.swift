@@ -84,15 +84,15 @@ public typealias CFloat = Float
 /// The C 'double' type.
 public typealias CDouble = Double
 
-// The triple-slash documentation comments below are duplicated to work around
-// a limitation in DocC, where it doesn't apply comments to each branch of the
-// pound-if (rdar://128616139).
+// Because CLongDouble varies by platform, its documentation comments are
+// repeated so they appear before each declaration.  The documentation can't
+// appear just once here, before the #if.  (rdar://128616139)
 #if os(anyAppleOS)
 // On Darwin, long double is Float80 on x86, and Double otherwise.
 #if arch(x86_64) || arch(i386)
 /// The C 'long double' type.
 ///
-/// This type's definition varies by platform,
+/// This type's definition varies by platform
 /// to match the variable definition of the C `long double` type.
 /// `CLongDouble` is a type alias for `Double` (`Float64`)
 /// on Apple silicon,
@@ -101,15 +101,15 @@ public typealias CDouble = Double
 /// on Android running on ARM,
 /// and on OpenBSD running on 64-bit ARM.
 /// `CLongDouble` is a type alias for `Float80`
-/// on Apple platforms running on Intel,
-/// on Linux running on Intel,
-/// on OpenBSD running on 64-bit Intel,
-/// and on FreeBSD running on Intel.
+/// on Apple platforms running on Intel-based processors,
+/// on Linux running on Intel-based processors,
+/// on OpenBSD running on 64-bit Intel-based processors,
+/// and on FreeBSD running on Intel-based processors.
 public typealias CLongDouble = Float80
 #else
 /// The C 'long double' type.
 ///
-/// This type's definition varies by platform,
+/// This type's definition varies by platform
 /// to match the variable definition of the C `long double` type.
 /// `CLongDouble` is a type alias for `Double` (`Float64`)
 /// on Apple silicon,
@@ -118,17 +118,17 @@ public typealias CLongDouble = Float80
 /// on Android running on ARM,
 /// and on OpenBSD running on 64-bit ARM.
 /// `CLongDouble` is a type alias for `Float80`
-/// on Apple platforms running on Intel,
-/// on Linux running on Intel,
-/// on OpenBSD running on 64-bit Intel,
-/// and on FreeBSD running on Intel.
+/// on Apple platforms running on Intel-based processors,
+/// on Linux running on Intel-based processors,
+/// on OpenBSD running on 64-bit Intel-based processors,
+/// and on FreeBSD running on Intel-based processors.
 public typealias CLongDouble = Double
 #endif
 #elseif os(Windows)
 // On Windows, long double is always Double.
 /// The C 'long double' type.
 ///
-/// This type's definition varies by platform,
+/// This type's definition varies by platform
 /// to match the variable definition of the C `long double` type.
 /// `CLongDouble` is a type alias for `Double` (`Float64`)
 /// on Apple silicon,
@@ -137,10 +137,10 @@ public typealias CLongDouble = Double
 /// on Android running on ARM,
 /// and on OpenBSD running on 64-bit ARM.
 /// `CLongDouble` is a type alias for `Float80`
-/// on Apple platforms running on Intel,
-/// on Linux running on Intel,
-/// on OpenBSD running on 64-bit Intel,
-/// and on FreeBSD running on Intel.
+/// on Apple platforms running on Intel-based processors,
+/// on Linux running on Intel-based processors,
+/// on OpenBSD running on 64-bit Intel-based processors,
+/// and on FreeBSD running on Intel-based processors.
 public typealias CLongDouble = Double
 #elseif os(Linux)
 // On Linux/x86, long double is Float80.
@@ -150,7 +150,7 @@ public typealias CLongDouble = Double
 #if arch(x86_64) || arch(i386)
 /// The C 'long double' type.
 ///
-/// This type's definition varies by platform,
+/// This type's definition varies by platform
 /// to match the variable definition of the C `long double` type.
 /// `CLongDouble` is a type alias for `Double` (`Float64`)
 /// on Apple silicon,
@@ -159,17 +159,17 @@ public typealias CLongDouble = Double
 /// on Android running on ARM,
 /// and on OpenBSD running on 64-bit ARM.
 /// `CLongDouble` is a type alias for `Float80`
-/// on Apple platforms running on Intel,
-/// on Linux running on Intel,
-/// on OpenBSD running on 64-bit Intel,
-/// and on FreeBSD running on Intel.
+/// on Apple platforms running on Intel-based processors,
+/// on Linux running on Intel-based processors,
+/// on OpenBSD running on 64-bit Intel-based processors,
+/// and on FreeBSD running on Intel-based processors.
 public typealias CLongDouble = Float80
 #elseif arch(s390x)
 // On s390x '-mlong-double-64' option with size of 64-bits makes the
 // Long Double type equivalent to Double type.
 /// The C 'long double' type.
 ///
-/// This type's definition varies by platform,
+/// This type's definition varies by platform
 /// to match the variable definition of the C `long double` type.
 /// `CLongDouble` is a type alias for `Double` (`Float64`)
 /// on Apple silicon,
@@ -178,10 +178,10 @@ public typealias CLongDouble = Float80
 /// on Android running on ARM,
 /// and on OpenBSD running on 64-bit ARM.
 /// `CLongDouble` is a type alias for `Float80`
-/// on Apple platforms running on Intel,
-/// on Linux running on Intel,
-/// on OpenBSD running on 64-bit Intel,
-/// and on FreeBSD running on Intel.
+/// on Apple platforms running on Intel-based processors,
+/// on Linux running on Intel-based processors,
+/// on OpenBSD running on 64-bit Intel-based processors,
+/// and on FreeBSD running on Intel-based processors.
 public typealias CLongDouble = Double
 #endif
 #elseif os(Android)
@@ -190,7 +190,7 @@ public typealias CLongDouble = Double
 #if arch(arm)
 /// The C 'long double' type.
 ///
-/// This type's definition varies by platform,
+/// This type's definition varies by platform
 /// to match the variable definition of the C `long double` type.
 /// `CLongDouble` is a type alias for `Double` (`Float64`)
 /// on Apple silicon,
@@ -199,17 +199,17 @@ public typealias CLongDouble = Double
 /// on Android running on ARM,
 /// and on OpenBSD running on 64-bit ARM.
 /// `CLongDouble` is a type alias for `Float80`
-/// on Apple platforms running on Intel,
-/// on Linux running on Intel,
-/// on OpenBSD running on 64-bit Intel,
-/// and on FreeBSD running on Intel.
+/// on Apple platforms running on Intel-based processors,
+/// on Linux running on Intel-based processors,
+/// on OpenBSD running on 64-bit Intel-based processors,
+/// and on FreeBSD running on Intel-based processors.
 public typealias CLongDouble = Double
 #endif
 #elseif os(OpenBSD)
 #if arch(x86_64)
 /// The C 'long double' type.
 ///
-/// This type's definition varies by platform,
+/// This type's definition varies by platform
 /// to match the variable definition of the C `long double` type.
 /// `CLongDouble` is a type alias for `Double` (`Float64`)
 /// on Apple silicon,
@@ -218,15 +218,15 @@ public typealias CLongDouble = Double
 /// on Android running on ARM,
 /// and on OpenBSD running on 64-bit ARM.
 /// `CLongDouble` is a type alias for `Float80`
-/// on Apple platforms running on Intel,
-/// on Linux running on Intel,
-/// on OpenBSD running on 64-bit Intel,
-/// and on FreeBSD running on Intel.
+/// on Apple platforms running on Intel-based processors,
+/// on Linux running on Intel-based processors,
+/// on OpenBSD running on 64-bit Intel-based processors,
+/// and on FreeBSD running on Intel-based processors.
 public typealias CLongDouble = Float80
 #elseif arch(arm64)
 /// The C 'long double' type.
 ///
-/// This type's definition varies by platform,
+/// This type's definition varies by platform
 /// to match the variable definition of the C `long double` type.
 /// `CLongDouble` is a type alias for `Double` (`Float64`)
 /// on Apple silicon,
@@ -235,10 +235,10 @@ public typealias CLongDouble = Float80
 /// on Android running on ARM,
 /// and on OpenBSD running on 64-bit ARM.
 /// `CLongDouble` is a type alias for `Float80`
-/// on Apple platforms running on Intel,
-/// on Linux running on Intel,
-/// on OpenBSD running on 64-bit Intel,
-/// and on FreeBSD running on Intel.
+/// on Apple platforms running on Intel-based processors,
+/// on Linux running on Intel-based processors,
+/// on OpenBSD running on 64-bit Intel-based processors,
+/// and on FreeBSD running on Intel-based processors.
 public typealias CLongDouble = Double
 #else
 #error("CLongDouble needs to be defined for this OpenBSD architecture")
@@ -249,7 +249,7 @@ public typealias CLongDouble = Double
 #if arch(x86_64) || arch(i386)
 /// The C 'long double' type.
 ///
-/// This type's definition varies by platform,
+/// This type's definition varies by platform
 /// to match the variable definition of the C `long double` type.
 /// `CLongDouble` is a type alias for `Double` (`Float64`)
 /// on Apple silicon,
@@ -258,17 +258,17 @@ public typealias CLongDouble = Double
 /// on Android running on ARM,
 /// and on OpenBSD running on 64-bit ARM.
 /// `CLongDouble` is a type alias for `Float80`
-/// on Apple platforms running on Intel,
-/// on Linux running on Intel,
-/// on OpenBSD running on 64-bit Intel,
-/// and on FreeBSD running on Intel.
+/// on Apple platforms running on Intel-based processors,
+/// on Linux running on Intel-based processors,
+/// on OpenBSD running on 64-bit Intel-based processors,
+/// and on FreeBSD running on Intel-based processors.
 public typealias CLongDouble = Float80
 #endif
 #elseif $Embedded
 #if arch(x86_64) || arch(i386)
 /// The C 'long double' type.
 ///
-/// This type's definition varies by platform,
+/// This type's definition varies by platform
 /// to match the variable definition of the C `long double` type.
 /// `CLongDouble` is a type alias for `Double` (`Float64`)
 /// on Apple silicon,
@@ -277,10 +277,10 @@ public typealias CLongDouble = Float80
 /// on Android running on ARM,
 /// and on OpenBSD running on 64-bit ARM.
 /// `CLongDouble` is a type alias for `Float80`
-/// on Apple platforms running on Intel,
-/// on Linux running on Intel,
-/// on OpenBSD running on 64-bit Intel,
-/// and on FreeBSD running on Intel.
+/// on Apple platforms running on Intel-based processors,
+/// on Linux running on Intel-based processors,
+/// on OpenBSD running on 64-bit Intel-based processors,
+/// and on FreeBSD running on Intel-based processors.
 public typealias CLongDouble = Double
 #endif
 #else
