@@ -151,6 +151,9 @@ param
   [switch] $IncludeSBoM = $false,
   [string] $SyftVersion = "1.40.0",
 
+  # CMake
+  [string] $CMakeVersion = "4.4.1",
+
   # Dependency Download Retries
   [ValidateRange(1, [int]::MaxValue)]
   [int] $DownloadRetryCount = 3,
@@ -507,6 +510,25 @@ $KnownSyft = @{
   }
 }
 
+$KnownCMakes = @{
+  "4.4.1" = @{
+    AMD64 = @{
+      URL = "https://cmake.org/files/v4.4/cmake-4.4.1-windows-x86_64.zip"
+      SHA256 = "091919E1CDE162B69D2D5E0F3B1F5670C973E72133F78126FBB18042947D6F19"
+      FileName = "cmake-4.4.1-windows-x86_64.zip"
+      CMakeRoot = [IO.Path]::Combine("$BinaryCache", "cmake-4.4.1", "cmake-4.4.1-windows-x86_64", "share", "cmake-4.4")
+      Path = [IO.Path]::Combine("$BinaryCache", "cmake-4.4.1", "cmake-4.4.1-windows-x86_64", "bin", "cmake.exe")
+    };
+    ARM64 = @{
+      URL = "https://cmake.org/files/v4.4/cmake-4.4.1-windows-arm64.zip"
+      SHA256 = "DC59D9F377F891B8DA42EDE22F53717034A9D093092FCEAF6297FEEEC6AFBA29"
+      FileName = "cmake-4.4.1-windows-arm64.zip"
+      CMakeRoot = [IO.Path]::Combine("$BinaryCache", "cmake-4.4.1", "cmake-4.4.1-windows-arm64", "share", "cmake-4.4")
+      Path = [IO.Path]::Combine("$BinaryCache", "cmake-4.4.1", "cmake-4.4.1-windows-arm64", "bin", "cmake.exe")
+    };
+  }
+}
+
 $BuildArchName = if ($env:PROCESSOR_ARCHITEW6432) { $env:PROCESSOR_ARCHITEW6432 } else { $env:PROCESSOR_ARCHITECTURE }
 # TODO: Support other cross-compilation scenarios.
 $BuildOS = [OS]::Windows
@@ -515,17 +537,6 @@ $HostOS = [OS]::Windows
 $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
 $VSInstallRoot = & $vswhere -nologo -latest -products "*" -all -prerelease -property installationPath
 $msbuild = "$VSInstallRoot\MSBuild\Current\Bin\$BuildArchName\MSBuild.exe"
-
-function Get-CMake {
-  try {
-    return (Get-Command "cmake.exe" -ErrorAction Stop).Source
-  } catch {
-    if (Test-Path -Path "${VSInstallRoot}\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin" -PathType Container) {
-      return "${VSInstallRoot}\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe"
-    }
-  }
-  throw "CMake not found on Path nor in the Visual Studio Installation. Please Install CMake to continue."
-}
 
 function Get-Ninja {
   try {
@@ -538,10 +549,6 @@ function Get-Ninja {
   throw "Ninja not found on Path nor in the Visual Studio Installation. Please Install Ninja to continue."
 }
 
-$cmake = Get-CMake
-$CMakeVersion = if ((& $cmake --version | Select-Object -First 1) -Match '(\d+\.\d+\.\d+)') {
-  [version]$Matches[1]
-}
 $ninja = Get-Ninja
 
 $NugetRoot = "$BinaryCache\nuget"
@@ -756,6 +763,10 @@ function Get-EmbeddedPythonInstallDir() {
 
 function Get-Syft {
   return $KnownSyft[$SyftVersion][$BuildArchName]
+}
+
+function Get-CMake {
+  return $KnownCMakes[$CMakeVersion][$BuildArchName]
 }
 
 function Get-InstallDir([Hashtable] $Platform) {
@@ -1698,6 +1709,12 @@ function Get-Dependencies {
     Extract-Toolchain "$PinnedToolchain.exe" -ToolchainName $ToolchainVersionIdentifier
     Write-Success "Swift Toolchain $PinnedVersion"
 
+    # Install CMake.
+    $CMake = Get-CMake
+    DownloadAndVerify $CMake.URL "$BinaryCache\cmake-$CMakeVersion.zip" $CMake.SHA256
+    Expand-ZipFile "cmake-$CMakeVersion.zip" -ExtractPath "cmake-$CMakeVersion"
+    Write-Success "CMake $CMakeVersion"
+
     if ($Android) {
       $NDK = Get-AndroidNDK
       DownloadAndVerify $NDK.URL "$BinaryCache\android-ndk-$AndroidNDKVersion-windows.zip" $NDK.SHA256
@@ -1876,11 +1893,7 @@ $Compilers = @{
       DriverStyle       = [DriverStyle]::Swift
       Flags             = @()
       DebugFlags        = { param([string] $Format)
-        if ($Format -eq "dwarf") {
-          @("-g", "-debug-info-format=dwarf")
-        } else {
-          @("-g", "-debug-info-format=codeview", "-Xlinker", "/DEBUG")
-        }
+        @("-g", "-debug-info-format=${Format}")
       }
       AssumeFunctional  = $false
     }
@@ -1932,11 +1945,7 @@ $Compilers = @{
       DriverStyle       = [DriverStyle]::Swift
       Flags             = @()
       DebugFlags        = { param([string] $Format)
-        if ($Format -eq "dwarf") {
-          @("-g", "-debug-info-format=dwarf")
-        } else {
-          @("-g", "-debug-info-format=codeview", "-Xlinker", "/DEBUG")
-        }
+        @("-g", "-debug-info-format=${Format}")
       }
       AssumeFunctional  = $true
     }
@@ -1988,11 +1997,7 @@ $Compilers = @{
       DriverStyle       = [DriverStyle]::Swift
       Flags             = @()
       DebugFlags        = { param([string] $Format)
-        if ($Format -eq "dwarf") {
-          @("-g", "-debug-info-format=dwarf")
-        } else {
-          @("-g", "-debug-info-format=codeview", "-Xlinker", "/DEBUG")
-        }
+        @("-g", "-debug-info-format=${Format}")
       }
       AssumeFunctional  = $true
     }
@@ -2061,8 +2066,6 @@ function Build-CMakeProject {
 
   $Stopwatch = [Diagnostics.Stopwatch]::StartNew()
 
-  # Enter the developer command shell early so we can resolve cmake.exe
-  # for version checks.
   Invoke-IsolatingEnvVars {
     if ($Platform.OS -eq [OS]::Windows) {
       Invoke-VsDevShell $Platform
@@ -2082,70 +2085,14 @@ function Build-CMakeProject {
     $UseSwift = $SwiftCompiler -ne $null
     $PlatformDebugFormat = $Platform.DebugFormat
 
-    # Starting with CMake 3.30, CMake propagates linker flags to Swift.
-    $CMakePassesSwiftLinkerFlags = $CMakeVersion -ge [version]'3.30'
-    # CMP0181 enables support for the `LINKER:flag1,flag2,...` syntax in
-    # `CMAKE_[EXE|SHARED|MODULE]_LINKER_FLAGS[_<CONFIG>]` variables.
-    $CMakeSupportsCMP0181 = $CMakeVersion -ge [version]'4.0'
-
-    # We need to manually prefix linker flags with `-Xlinker` if we are using
-    # the GNU driver or if Swift is used as the linker driver.
-    # This is not necessary with CMake 4.0+ as CMP0181 simplifies the handling
-    # of linker arguments.
-    enum LinkerFlagHandling {
-      CMP0181
-      XLinkerPrefix
-      None
-    }
-    # Whether CMake invokes the linker directly with MSVC-style flags (true
-    # for both `cl.exe` and `clang-cl.exe` since CMake detects clang-cl as
-    # MSVC-like and bypasses the compiler driver for the link step).
-    $UsesDirectMSVCLinker =
-      ($UseC   -and $CCompiler.DriverStyle   -in @([DriverStyle]::CL, [DriverStyle]::ClangCL)) -or
-      ($UseCXX -and $CXXCompiler.DriverStyle -in @([DriverStyle]::CL, [DriverStyle]::ClangCL))
-    $FlagHandling = if ($CMakeSupportsCMP0181) {
-      # With CMP0181, the `LINKER:` generator expression can always be used.
-      [LinkerFlagHandling]::CMP0181
-    } elseif ($UsesDirectMSVCLinker) {
-      # `link.exe` / `lld-link.exe` invoked directly does not understand the
-      # `-Xlinker` prefix.  MSVC-style flags (`/INCREMENTAL:NO`, etc.) pass
-      # through verbatim.
-      [LinkerFlagHandling]::None
-    } else {
-      # Otherwise, we are probably using clang and/or swift as the link
-      # driver; prefix the linker flags with `-Xlinker`.
-      [LinkerFlagHandling]::XLinkerPrefix
-    }
-
-    # Helper cmdlet to add linker flags with the appropriate handling based on
-    # the linker driver and CMake version.
-    function Convert-LinkerFlags([string[]]$Value) {
-      switch ($FlagHandling) {
-        CMP0181 {
-          $Value | ForEach-Object { "LINKER:$_" }
-        }
-        XLinkerPrefix {
-          $NewValue = @()
-          foreach ($Flag in $Value) {
-            $NewValue += "-Xlinker"
-            $NewValue += $Flag
-          }
-          $NewValue
-        }
-        None {
-          $Value
-        }
-      }
-    }
-
     function Add-LinkerFlagsDefine([hashtable]$Defines, [string[]]$Value) {
-      $Value = Convert-LinkerFlags $Value
+      $Value = $Value | ForEach-Object { "LINKER:$_" }
       Add-FlagsDefine $Defines CMAKE_EXE_LINKER_FLAGS $Value
       Add-FlagsDefine $Defines CMAKE_SHARED_LINKER_FLAGS $Value
     }
 
     function Add-SharedLinkerFlagsDefine([hashtable]$Defines, [string[]]$Value) {
-      $Value = Convert-LinkerFlags $Value
+      $Value = $Value | ForEach-Object { "LINKER:$_" }
       Add-FlagsDefine $Defines CMAKE_SHARED_LINKER_FLAGS $Value
       Add-FlagsDefine $Defines CMAKE_MODULE_LINKER_FLAGS $Value
     }
@@ -2153,10 +2100,15 @@ function Build-CMakeProject {
     # Add additional defines (unless already present)
     $Defines = $Defines.Clone()
 
-    # Always enable CMP0181 if available.
-    if ($CMakeSupportsCMP0181) {
-      Add-KeyValueIfNew $Defines CMAKE_POLICY_DEFAULT_CMP0181 NEW
-    }
+    # CMake configuration.
+    $env:CMAKE_ROOT = (Get-CMake).CMakeRoot
+    $CMakeBin = (Get-CMake).Path
+    # Enable CMP0181: Link command-line fragment variables are parsed and re-quoted.
+    Add-KeyValueIfNew $Defines CMAKE_POLICY_DEFAULT_CMP0181 NEW
+    # Enable CMP0214: Honor CMAKE_EXE_LINKER_FLAGS for Swift executable targets.
+    Add-KeyValueIfNew $Defines CMAKE_POLICY_DEFAULT_CMP0214 NEW
+    # Enable CMP0215: Ninja generators emit Swift modules separately from compilation.
+    Add-KeyValueIfNew $Defines CMAKE_POLICY_DEFAULT_CMP0215 NEW
 
     Add-KeyValueIfNew $Defines CMAKE_BUILD_TYPE Release
 
@@ -2254,20 +2206,13 @@ function Build-CMakeProject {
             Add-FlagsDefine $Defines CMAKE_Swift_FLAGS @("-gnone")
           }
 
-          if ($CMakePassesSwiftLinkerFlags) {
-            # CMake 3.30+ passes all linker flags to Swift as the linker driver,
-            # including those from the internal CMake modules files, without
-            # a `-Xlinker` prefix. This causes build failures as Swift cannot
-            # parse linker flags.
-            # Overwrite the release linker flags to be empty to avoid this.
-            Add-KeyValueIfNew $Defines CMAKE_EXE_LINKER_FLAGS_RELEASE ""
-            Add-KeyValueIfNew $Defines CMAKE_SHARED_LINKER_FLAGS_RELEASE ""
-          } else {
-            # Disable EnC as that introduces padding in the conformance tables
-            Add-FlagsDefine $Defines CMAKE_Swift_FLAGS @("-Xlinker", "/INCREMENTAL:NO")
-            # Swift requires COMDAT folding and de-duplication
-            Add-FlagsDefine $Defines CMAKE_Swift_FLAGS @("-Xlinker", "/OPT:REF", "-Xlinker", "/OPT:ICF")
-          }
+          # CMake 3.30+ passes all linker flags to Swift as the linker driver,
+          # including those from the internal CMake modules files, without
+          # a `-Xlinker` prefix. This causes build failures as Swift cannot
+          # parse linker flags.
+          # Overwrite the release linker flags to be empty to avoid this.
+          Add-KeyValueIfNew $Defines CMAKE_EXE_LINKER_FLAGS_RELEASE ""
+          Add-KeyValueIfNew $Defines CMAKE_SHARED_LINKER_FLAGS_RELEASE ""
         }
 
         Add-LinkerFlagsDefine $Defines @("/INCREMENTAL:NO", "/OPT:REF", "/OPT:ICF")
@@ -2481,20 +2426,20 @@ function Build-CMakeProject {
       $cmakeGenerateArgs += @("-D", "$($Define.Key)=$Value")
     }
 
-    Write-Host "$cmake $cmakeGenerateArgs"
-    Invoke-Program $cmake @cmakeGenerateArgs
+    Write-Host "$CMakeBin $cmakeGenerateArgs"
+    Invoke-Program $CMakeBin @cmakeGenerateArgs
 
     # Build all requested targets
     foreach ($Target in $BuildTargets) {
       if ($Target -eq "default") {
-        Invoke-Program $cmake --build $Bin
+        Invoke-Program $CMakeBin --build $Bin
       } else {
-        Invoke-Program $cmake --build $Bin --target $Target
+        Invoke-Program $CMakeBin --build $Bin --target $Target
       }
     }
 
     if ($BuildTargets.Length -eq 0 -and $InstallTo) {
-      Invoke-Program $cmake --build $Bin --target install
+      Invoke-Program $CMakeBin --build $Bin --target install
     }
   }
 
@@ -4241,7 +4186,9 @@ function Build-SDK([Hashtable] $Platform, [Hashtable] $Context) {
     Invoke-VsDevShell $BuildPlatform
 
     Push-Location "${SourceCache}\swift\Runtimes"
-    Start-Process -Wait -WindowStyle Hidden -FilePath $cmake -ArgumentList @("-P", "Resync.cmake")
+    $env:CMAKE_ROOT = (Get-CMake).CMakeRoot
+    $CMakeBin = (Get-CMake).Path
+    Start-Process -Wait -WindowStyle Hidden -FilePath $CMakeBin -ArgumentList @("-P", "Resync.cmake")
     Pop-Location
   }
 
