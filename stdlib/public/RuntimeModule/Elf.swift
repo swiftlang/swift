@@ -1256,14 +1256,19 @@ final class ElfImage<SomeElfTraits: ElfTraits> : DwarfSource {
 
       mutating func startHeader() {
         let ph = image.programHeaders[hdrNdx]
+        let limit = ImageSource.Address(image.source.bytes.count)
+        let (base, size): (ImageSource.Address, ImageSource.Address)
 
         if image.source.isMappedImage {
-          noteAddr = ImageSource.Address(ph.p_vaddr)
-          noteEnd = noteAddr + ImageSource.Address(ph.p_memsz)
+          (base, size) = (ImageSource.Address(ph.p_vaddr),
+                          ImageSource.Address(ph.p_memsz))
         } else {
-          noteAddr = ImageSource.Address(ph.p_offset)
-          noteEnd = noteAddr + ImageSource.Address(ph.p_filesz)
+          (base, size) = (ImageSource.Address(ph.p_offset),
+                          ImageSource.Address(ph.p_filesz))
         }
+        noteAddr = Swift.min(base, limit)
+        let (end, ov) = base.addingReportingOverflow(size)
+        noteEnd = ov ? limit : Swift.min(end, limit)
       }
 
       @_specialize(kind: full, where SomeElfTraits == Elf32Traits)
@@ -1292,6 +1297,12 @@ final class ElfImage<SomeElfTraits: ElfTraits> : DwarfSource {
           }
 
           do {
+            if noteEnd - noteAddr < MemoryLayout<Traits.Nhdr>.size {
+              // The segment is corrupted
+              noteAddr = noteEnd
+              continue
+            }
+
             let nhdr = maybeSwap(try image.source.fetch(from: noteAddr,
                                                         as: Traits.Nhdr.self))
 
