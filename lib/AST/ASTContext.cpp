@@ -25,6 +25,7 @@
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/ConformanceLookup.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/DiagnosticsSema.h"
@@ -65,6 +66,7 @@
 #include "swift/Basic/BasicBridging.h"
 #include "swift/Basic/BlockList.h"
 #include "swift/Basic/Compiler.h"
+#include "swift/Basic/Feature.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/StringExtras.h"
@@ -4372,11 +4374,15 @@ AnyFunctionType::Param swift::computeSelfParam(AbstractFunctionDecl *AFD,
             isDynamicSelf = true;
     }
   } else if (isa<DestructorDecl>(AFD)) {
-    // Destructors only correctly appear on classes today. (If move-only types
-    // have destructors, they probably would want to consume self.)
-    // Note that we can't assert(containerTy->hasReferenceSemantics()) here
-    // since incorrect or incomplete code could have deinit decls in invalid
-    // contexts, and we need to recover gracefully in those cases.
+    if (Ctx.LangOpts.hasFeature(Feature::MutateAndConsumeInDeinit)) {
+      // In a noncopyable type, the `self` declaration behaves like a
+      // `consuming` binding.
+      auto nomTy = selfTy->getAnyNominal();
+
+      if (nomTy && (isa<StructDecl>(nomTy) || isa<EnumDecl>(nomTy))) {
+        selfAccess = SelfAccessKind::Consuming;
+      }
+    }
   }
 
   if (isDynamicSelf)

@@ -1575,8 +1575,14 @@ public:
   /// emitSelfDecl - Emit a SILArgument for 'self', register it in varlocs, set
   /// up debug info, etc.  This returns the 'self' value.
   ///
-  /// This is intended to only be used for destructors.
-  SILValue emitSelfDeclForDestructor(VarDecl *selfDecl);
+  /// This is intended to only be used for class `deinit`s.
+  SILValue emitSelfDeclForClassDeinit(VarDecl *selfDecl);
+
+  /// emitSelfDecl - Emit a SILArgument for 'self', register it in varlocs, set
+  /// up debug info, etc.  This returns the 'self' value.
+  ///
+  /// This is intended to only be used for struct or enum `deinit`s.
+  SILValue emitSelfDeclForMoveOnlyDeinit(VarDecl *selfDecl);
 
   /// Emits a temporary allocation that will be deallocated automatically at the
   /// end of the current scope. Returns the address of the allocation.

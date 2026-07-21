@@ -52,6 +52,7 @@
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeWalker.h"
+#include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Bridging/ASTGen.h"
@@ -2152,9 +2153,21 @@ ParamSpecifierRequest::evaluate(Evaluator &evaluator,
       }
       llvm_unreachable("nonexhaustive switch");
     } else {
-      return (selfParam.getParameterFlags().isInOut()
-              ? ParamSpecifier::InOut
-              : ParamSpecifier::Default);
+      switch (auto specifier = selfParam.getParameterFlags()
+                .getOwnershipSpecifier()) {
+      // TODO: can we just forward the specifier we computed for `selfParam` in
+      // all cases?
+      case ParamSpecifier::InOut:
+      case ParamSpecifier::Consuming:
+        return specifier;
+
+      case ParamSpecifier::Borrowing:
+      case ParamSpecifier::Default:
+      case ParamSpecifier::LegacyShared:
+      case ParamSpecifier::LegacyOwned:
+      case ParamSpecifier::ImplicitlyCopyableConsuming:
+        return ParamSpecifier::Default;
+      }
     }
   }
 

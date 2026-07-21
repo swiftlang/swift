@@ -1966,8 +1966,9 @@ shouldEmitPartialMutationError(UseState &useState, PartialMutation::Kind kind,
   // Allowing full object consumption in a deinit is still not allowed.
   if (iterType == targetType && !isa<DropDeinitInst>(user)) {
     // Don't allow whole-value consumption of `self` from a `deinit`.
-    if (!fn->getModule().getASTContext().LangOpts
-            .hasFeature(Feature::ConsumeSelfInDeinit)
+    auto &Ctx = fn->getModule().getASTContext();
+    if (!Ctx.LangOpts.hasFeature(Feature::ConsumeSelfInDeinit)
+        && !Ctx.LangOpts.hasFeature(Feature::MutateAndConsumeInDeinit)
         && kind == PartialMutation::Kind::Consume
         && useState.sawDropDeinit
         // TODO: Revisit this when we introduce deinits on enums.
