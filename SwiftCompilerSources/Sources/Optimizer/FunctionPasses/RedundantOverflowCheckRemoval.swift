@@ -391,6 +391,13 @@ private func isOverflowCheckRemoved(by constraint: Constraint, _ builtin: Builti
       if l == a, isLiteral(b, 1) { return true }
       if l == b, isLiteral(a, 1) { return true }
     }
+    // `x + c` (c > 0) bounds-checked `< 0` afterwards: an overflow makes the sum
+    // negative, so that check traps anyway.
+    if constraint.relationship == .sle, isLiteral(l, 0),
+       let sum = r as? TupleExtractInst, sum.fieldIndex == 0, sum.tuple == builtin,
+       isKnownPositive(a) || isKnownPositive(b) {
+      return true
+    }
     return false
 
   case .UAddOver:
