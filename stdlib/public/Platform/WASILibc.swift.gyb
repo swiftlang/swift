@@ -65,9 +65,10 @@ public let ${prefix}_TRUE_MIN = ${type}.leastNonzeroMagnitude
 
 public let MAP_FAILED: UnsafeMutableRawPointer! = UnsafeMutableRawPointer(bitPattern: -1)
 
-// FILE is an opaque type on WASI libc (struct _IO_FILE is only
-// forward-declared), so these are OpaquePointers rather than
-// UnsafeMutablePointer<FILE>.
+// FILE is opaque on WASI libc - the underlying `struct _IO_FILE` is only
+// forward-declared, so use OpaquePointer. Client code that needs to
+// interoperate with <stdio.h> functions can bridge via `typealias File =
+// OpaquePointer` under `#if os(WASI)`.
 nonisolated(unsafe) public var stdin: OpaquePointer {
   OpaquePointer(_swift_stdlib_stdin())
 }
