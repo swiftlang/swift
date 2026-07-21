@@ -259,7 +259,7 @@ EXPECTED_DEFAULTS = {
     'llvm_build_variant': 'RelWithDebInfo',
     'llvm_cmake_options': [],
     'llvm_enable_modules': False,
-    'llvm_enable_index_store': True,
+    'llvm_enable_index_store': False,
     'llvm_include_tests': True,
     'llvm_ninja_targets': [],
     'llvm_ninja_targets_for_cross_compile_hosts': [],
