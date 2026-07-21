@@ -21,7 +21,7 @@ body:
         developer software such as SwiftUI and UIKit; please direct it to
         [Feedback Assistant](https://developer.apple.com/bug-reporting)
         instead.
-  - type: textarea
+  - type: text typescriptarea
     attributes:
       label: Description
       description: >
