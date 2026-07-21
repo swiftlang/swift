@@ -678,7 +678,7 @@ final class PeCoffImage {
             case .PE_DEBUG_TYPE_REPRO:
               if entry.SizeOfData > 4 {
                 let len = maybeSwap(try entrySource.fetch(from: 0, as: UInt32.self))
-
+                guard len <= entry.SizeOfData - 4 else { break }
                 reproHash = try entrySource.fetch(from: 4,
                                                   count: Int(len),
                                                   as: UInt8.self)
