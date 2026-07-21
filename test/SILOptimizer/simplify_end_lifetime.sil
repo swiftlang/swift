@@ -237,6 +237,11 @@ bb3:
 // CHECK-LABEL: sil [ossa] @debug_user :
 // CHECK:       bb0(%0 : @owned $D):
 // CHECK-NEXT:    end_lifetime %0
+// CHECK-NEXT:    debug_value %0, let, name "x", transform {
+// CHECK:           bb0(%0 : $D):
+// CHECK-NEXT:        %1 = upcast %0 to $C
+// CHECK-NEXT:        return %1
+// CHECK-NEXT:    }
 // CHECK-NEXT:    tuple
 // CHECK:       } // end sil function 'debug_user'
 sil [ossa] @debug_user : $@convention(thin) (@owned D) -> () {

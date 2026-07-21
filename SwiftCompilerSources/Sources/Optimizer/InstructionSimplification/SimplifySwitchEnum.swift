@@ -58,7 +58,7 @@ extension SwitchEnumInst : OnoneSimplifiable {
     }
 
     if canEraseEnumInst {
-      context.erase(instructionIncludingDebugUses: enumInst)
+      context.erase(instruction: enumInst)
     }
   }
 }

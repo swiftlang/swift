@@ -172,8 +172,8 @@ extension MutatingContext {
   }
 
   /// Removes and deletes `instruction`.
-  /// If `salvageDebugInfo` is true, compensating `debug_value` instructions are inserted for certain
-  /// kind of instructions.
+  /// If `salvageDebugInfo` is true, `debug_value` users of the instructions will be rewritten
+  /// Otherwise, the instruction must not have any uses at this point.
   public func erase(instruction: Instruction, salvageDebugInfo: Bool = true) {
     if !instruction.isInStaticInitializer {
       verifyIsTransforming(function: instruction.parentFunction)
@@ -195,30 +195,27 @@ extension MutatingContext {
     _bridged.eraseInstruction(instruction.bridged, salvageDebugInfo)
   }
 
-  public func erase(instructionIncludingAllUsers inst: Instruction, salvageDebugInfo: Bool = true) {
+  /// Removes and deletes `inst` and all its users.
+  /// `debug_value` users of any deleted instruction will be rewritten.
+  public func erase(instructionIncludingAllUsers inst: Instruction) {
     if inst.isDeleted {
       return
     }
     for result in inst.results {
       // salvageDebugInfo may create new `debug_value` users, which are inserted at the begin of the
       // use-list. Therefore we cannot iterate with a `for use in result.uses`.
-      while let use = result.uses.first {
-        erase(instructionIncludingAllUsers: use.instruction, salvageDebugInfo: salvageDebugInfo)
+      // Debug users must not be deleted before salvageDebugInfo is called later.
+      while let use = result.uses.ignoreDebugUses.first {
+        erase(instructionIncludingAllUsers: use.instruction)
       }
     }
-    erase(instruction: inst, salvageDebugInfo: salvageDebugInfo)
+    erase(instruction: inst)
   }
 
   public func erase<S: Sequence>(instructions: S) where S.Element: Instruction {
     for inst in instructions {
       erase(instruction: inst)
     }
-  }
-
-  public func erase(instructionIncludingDebugUses inst: Instruction) {
-    precondition(inst.results.allSatisfy { $0.uses.ignoreDebugUses.isEmpty })
-    salvageDebugInfo(of: inst)
-    erase(instructionIncludingAllUsers: inst)
   }
 
   public func erase(block: BasicBlock) {

@@ -88,7 +88,7 @@ private extension BeginCOWMutationInst {
       let endCOW = use.instruction as! EndCOWMutationInst
       endCOW.replace(with: instance, context)
     }
-    context.erase(instructionIncludingDebugUses: self)
+    context.erase(instruction: self)
     return true
   }
 
@@ -105,8 +105,8 @@ private extension BeginCOWMutationInst {
     }
 
     instanceResult.uses.replaceAll(with: endCOW.instance, context)
-    context.erase(instructionIncludingDebugUses: self)
-    context.erase(instructionIncludingDebugUses: endCOW)
+    context.erase(instruction: self)
+    context.erase(instruction: endCOW)
     return true
   }
 }
