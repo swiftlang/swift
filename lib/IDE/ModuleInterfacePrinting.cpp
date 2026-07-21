@@ -401,14 +401,6 @@ getDeclsFromCrossImportOverlay(ModuleDecl *Overlay, ModuleDecl *Declaring,
   return {Imports, Remainder};
 }
 
-static Decl *originatingDecl(Decl *aux) {
-  SourceLoc loc = aux->getLoc();
-  auto *sf = aux->getModuleContext()->getSourceFileContainingLocation(loc);
-  if (!sf || sf->Kind != SourceFileKind::MacroExpansion)
-    return nullptr;
-  return sf->getMacroExpansion().dyn_cast<Decl *>();
-}
-
 static void printCrossImportOverlays(ModuleDecl *Declaring, ASTContext &Ctx,
                                      ASTPrinter &Printer,
                                      const PrintOptions &Options,
@@ -638,7 +630,7 @@ void swift::ide::printModuleInterface(
     };
 
     auto originatingDeclOrSelf = [](Decl *aux) -> Decl * {
-      Decl *res = originatingDecl(aux);
+      Decl *res = aux->getMacroExpansionOriginatingDecl();
       if (!res)
         return aux;
       return res;
@@ -740,9 +732,9 @@ void swift::ide::printModuleInterface(
                      [&](std::pair<Decl *, clang::SourceLocation> LHS,
                          std::pair<Decl *, clang::SourceLocation> RHS) -> bool {
       // Sort peer macros immediately after their originating decl.
-      if (RHS.first == originatingDecl(LHS.first)) 
+      if (RHS.first == LHS.first->getMacroExpansionOriginatingDecl())
         return false;
-      if (LHS.first == originatingDecl(RHS.first)) 
+      if (LHS.first == RHS.first->getMacroExpansionOriginatingDecl())
         return true;
       return ClangSourceManager.isBeforeInTranslationUnit(LHS.second,
                                                           RHS.second);
