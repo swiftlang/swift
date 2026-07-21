@@ -145,7 +145,7 @@ public func span_sum_iterate_to_deducible_count1_with_trap(_ v: Span<Int>, _ n: 
 // CHECK-IR: @llvm.vector.reduce.add
 public func span_sum_iterate_to_deducible_count2_wo_trap(_ v: Span<Int>, _ n: Int) -> Int {
   var sum = 0
-  precondition(n <= v.count)
+  precondition(n < v.count)
   for i in 0...n {
     sum &+= v[i]
   }
@@ -164,7 +164,7 @@ public func span_sum_iterate_to_deducible_count2_wo_trap(_ v: Span<Int>, _ n: In
 // CHECK-SIL-LABEL: } // end sil function '$s23span_bounds_check_tests0A42_sum_iterate_to_deducible_count2_with_trapySis4SpanVySiG_SitF'
 public func span_sum_iterate_to_deducible_count2_with_trap(_ v: Span<Int>, _ n: Int) -> Int {
   var sum = 0
-  precondition(n <= v.count)
+  precondition(n < v.count)
   for i in 0...n {
     sum += v[i]
   }
