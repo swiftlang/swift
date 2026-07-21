@@ -24,6 +24,7 @@
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/FieldSensitivePrunedLiveness.h"
 #include "swift/SIL/SILArgument.h"
+#include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Utils/VariableNameUtils.h"
 #include "llvm/Support/Debug.h"
 
@@ -556,6 +557,26 @@ void DiagnosticEmitter::emitAddressDiagnostic(
     diagnose(astContext, violatingUser,
              diag::sil_movechecking_consuming_use_here);
     return;
+  }
+
+  // In a `deinit`, the `self` value is implicitly consumed, marked by an
+  // implicit `drop_deinit` instruction. In this situation, it isn't helpful to
+  // point at the `drop_deinit` itself as a "consuming use" as if the developer
+  // had written it, so instead explain the limitation more directly.
+  auto violatingLoc = violatingUser->getLoc();
+  if (violatingLoc.isImplicit()) {
+    auto violatingParam = violatingLoc.getAsASTNode<ParamDecl>();
+    if (isa<DropDeinitInst>(violatingUser)
+        && violatingParam
+        && violatingParam->isSelfParameter()
+        && isa<DestructorDecl>(violatingParam->getDeclContext())) {
+      diagnose(astContext, lastLiveUser,
+               isUseConsuming
+                 ? diag::sil_movechecking_consume_entire_self_in_deinit
+                 : diag::sil_movechecking_mutate_entire_self_in_deinit,
+               violatingParam->getTypeInContext());
+      return;
+    }
   }
 
   // First if we are consuming emit an error for no implicit copy semantics.
