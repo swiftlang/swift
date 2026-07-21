@@ -1631,8 +1631,8 @@ static void emitIndirectResultParameters(SILGenFunction &SGF,
   // And the abstraction pattern may force an indirect return even if the
   // concrete type wouldn't normally be returned indirectly.
   if (!SILAddressConventions::isReturnedIndirectlyInSIL(resultConvType,
-                                                       SGF.SGM.M)) {
-    if (!SILAddressConventions(SGF.SGM.M).useLoweredAddresses()
+                                                       SGF.F)) {
+    if (SGF.SGM.M.usesOpaqueValues()
         || origResultType.getResultConvention(SGF.SGM.Types) != AbstractionPattern::Indirect)
       return;
   }
@@ -1668,8 +1668,8 @@ static void emitIndirectErrorParameter(SILGenFunction &SGF,
   // And the abstraction pattern may force an indirect return even if the
   // concrete type wouldn't normally be returned indirectly.
   if (!SILAddressConventions::isThrownIndirectlyInSIL(errorConvType,
-                                                     SGF.SGM.M)) {
-    if (!SILAddressConventions(SGF.SGM.M).useLoweredAddresses()
+                                                     SGF.F)) {
+    if (SGF.SGM.M.usesOpaqueValues()
         || origErrorType.getErrorConvention(SGF.SGM.Types)
             != AbstractionPattern::Indirect)
       return;

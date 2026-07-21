@@ -632,7 +632,9 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
     auto SubstCalleeType = GenCalleeType->substGenericArgs(
         M, Subs, Builder.getTypeExpansionContext());
     SubstCalleeSILType = SILType::getPrimitiveObjectType(SubstCalleeType);
-    SILFunctionConventions Conv(SubstCalleeType, M);
+    SILFunctionConventions Conv(
+        SubstCalleeType,
+        SILAddressConventions::forFunction(Builder.getFunction()));
     ResultType = Conv.getSILResultType(Builder.getTypeExpansionContext());
     if (FunctionTy->hasErrorResult()) {
       errorType = Conv.getSILErrorType(Builder.getTypeExpansionContext());

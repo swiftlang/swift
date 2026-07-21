@@ -40,8 +40,9 @@ namespace {
 class OperandOwnershipClassifier
   : public SILInstructionVisitor<OperandOwnershipClassifier, OperandOwnership> {
   LLVM_ATTRIBUTE_UNUSED SILModule &mod;
-  // Allow module conventions to be overridden while lowering between canonical
-  // and lowered SIL stages.
+  // Address conventions for classifying this operand. Overridable so
+  // AddressLowering can classify operands in address form before the function's
+  // lowered bit is set.
   SILAddressConventions silConv;
 
   const Operand &op;
@@ -1161,8 +1162,12 @@ Operand::getOperandOwnership(SILAddressConventions *silConv) const {
       return OperandOwnership(OperandOwnership::InstantaneousUse);
     }
   }
+  // Default to the lowered-addresses state of the function containing this
+  // operand's user, not the module stage: an already-lowered function must
+  // classify its operands in address form even while the module flag is false.
   SILAddressConventions overrideConv =
-      silConv ? *silConv : SILAddressConventions(getUser()->getModule());
+      silConv ? *silConv
+              : SILAddressConventions::forFunction(*getUser()->getFunction());
   OperandOwnershipClassifier classifier(overrideConv, *this);
   return classifier.visit(const_cast<SILInstruction *>(getUser()));
 }

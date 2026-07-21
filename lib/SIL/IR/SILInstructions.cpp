@@ -858,10 +858,14 @@ ApplyInst::create(SILDebugLocation loc, SILValue callee, SubstitutionMap subs,
       parentFunction.getTypeExpansionContext());
   auto substCalleeTy = substCalleeSILTy.getAs<SILFunctionType>();
 
+  // The result type is in address form iff this call site is lowered:
+  // AddressLowering may force lowered conventions explicitly (before it has set
+  // the function's bit), or the containing function may already be lowered
+  // while the module stage is still Raw.
   SILFunctionConventions conv(
-      substCalleeTy, moduleConventions.has_value()
-                         ? moduleConventions.value()
-                         : SILAddressConventions(parentFunction.getModule()));
+      substCalleeTy,
+      SILAddressConventions::forFunctionWithOverride(
+          parentFunction.getModule(), moduleConventions, &parentFunction));
   SILType result =
       conv.getSILResultType(parentFunction.getTypeExpansionContext());
 
@@ -908,10 +912,14 @@ BeginApplyInst *BeginApplyInst::create(
       parentFunction.getTypeExpansionContext());
   auto substCalleeType = substCalleeSILType.castTo<SILFunctionType>();
 
+  // Keyed to this call site's lowered-addresses state, like ApplyInst::create:
+  // AddressLowering may force lowered conventions explicitly (before it has set
+  // the function's bit), or the containing function may already be lowered
+  // while the module stage is still Raw. Either makes the yields address form.
   SILFunctionConventions conv(
-      substCalleeType, moduleConventions.has_value()
-                           ? moduleConventions.value()
-                           : SILAddressConventions(parentFunction.getModule()));
+      substCalleeType,
+      SILAddressConventions::forFunctionWithOverride(
+          parentFunction.getModule(), moduleConventions, &parentFunction));
 
   SmallVector<SILType, 8> resultTypes;
   SmallVector<ValueOwnershipKind, 8> resultOwnerships;
@@ -921,11 +929,9 @@ BeginApplyInst *BeginApplyInst::create(
         conv.getSILType(yield, parentFunction.getTypeExpansionContext());
     auto argConvention = SILArgumentConvention(yield.getConvention());
     resultTypes.push_back(yieldType);
-    resultOwnerships.push_back(ValueOwnershipKind(
-        parentFunction, yieldType, argConvention,
-        moduleConventions.has_value()
-            ? moduleConventions.value()
-            : SILAddressConventions(parentFunction.getModule())));
+    resultOwnerships.push_back(ValueOwnershipKind(parentFunction, yieldType,
+                                                  argConvention,
+                                                  conv.silConv));
   }
 
   auto tokenTy = SILType::getSILTokenType(parentFunction.getASTContext());

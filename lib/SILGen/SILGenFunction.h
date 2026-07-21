@@ -328,7 +328,7 @@ public:
   /// The SILFunction being constructed.
   SILFunction &F;
 
-  /// The SILAddressConventions for this SIL module.
+  /// F's lowered-addresses state, for conventions queries.
   SILAddressConventions silConv;
 
   bool useLoweredAddresses() const { return silConv.useLoweredAddresses(); }

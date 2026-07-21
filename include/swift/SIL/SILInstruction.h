@@ -2957,7 +2957,11 @@ public:
     return getCallee()->getType().template castTo<SILFunctionType>();
   }
   SILFunctionConventions getOrigCalleeConv() const {
-    return SILFunctionConventions(getOrigCalleeType(), this->getModule());
+    // Keyed to the containing function's lowered-addresses state (see
+    // getSubstCalleeConv), not the module stage.
+    return SILFunctionConventions(
+        getOrigCalleeType(),
+        SILAddressConventions::forFunction(*this->getFunction()));
   }
 
   /// Get the type of the callee with the applied substitutions.
@@ -2973,7 +2977,15 @@ public:
   }
   
   SILFunctionConventions getSubstCalleeConv() const {
-    return SILFunctionConventions(getSubstCalleeType(), this->getModule());
+    // Keyed to the lowered-addresses state of the function containing this
+    // apply, not the module stage: AddressLowering rewrites a call's operands
+    // in the caller's context, so the operand shapes track the caller's state
+    // even while the module flag is still false. Routed through a free helper
+    // because reading the bit needs the complete SILFunction, only
+    // forward-declared here.
+    return SILFunctionConventions(
+        getSubstCalleeType(),
+        SILAddressConventions::forFunction(*this->getFunction()));
   }
 
   bool isCalleeNoReturn() const {
@@ -3652,9 +3664,6 @@ public:
 
   CanSILFunctionType getFunctionType() const {
     return getType().castTo<SILFunctionType>();
-  }
-  SILFunctionConventions getConventions() const {
-    return SILFunctionConventions(getFunctionType(), getModule());
   }
 
   ArrayRef<Operand> getAllOperands() const { return {}; }

@@ -429,6 +429,10 @@ protected:
   /// at the lifetime boundary of the inlined result.
   void fixupReturnBorrow();
 
+  /// Inlining splices the callee into the caller; the caller's lowered-address
+  /// form is its own and must not be overwritten with the callee's.
+  bool isWholeFunctionClone() const { return false; }
+
   const SILDebugScope *getOrCreateInlineScope(const SILDebugScope *DS);
 
   void postProcess(SILInstruction *Orig, SILInstruction *Cloned) {

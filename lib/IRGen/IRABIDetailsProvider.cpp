@@ -89,7 +89,7 @@ namespace swift {
 class IRABIDetailsProviderImpl {
 public:
   IRABIDetailsProviderImpl(ModuleDecl &mod, const IRGenOptions &opts)
-      : typeConverter(mod, /*addressLowered=*/true),
+      : typeConverter(mod),
         silMod(SILModule::createEmptyModule(&mod, typeConverter, silOpts)),
         IRGen(opts, *silMod), IGM(IRGen, IRGen.createTargetMachine()) {}
 

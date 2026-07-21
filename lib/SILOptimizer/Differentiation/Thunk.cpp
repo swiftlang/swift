@@ -141,8 +141,9 @@ SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
   SILBuilder builder(entry);
   createEntryArguments(thunk);
 
-  SILFunctionConventions fromConv(fromType, module);
-  SILFunctionConventions toConv(toType, module);
+  SILAddressConventions silConv = SILAddressConventions::forFunction(*thunk);
+  SILFunctionConventions fromConv(fromType, silConv);
+  SILFunctionConventions toConv(toType, silConv);
   assert(toConv.useLoweredAddresses());
 
   // Forward thunk arguments, handling ownership convention mismatches.
@@ -669,7 +670,8 @@ getOrCreateSubsetParametersThunkForLinearMap(
   collectAllActualResultsInTypeOrder(ai, pullbackDirectResults, allResults);
   // Collect pullback semantic result arguments in type order.
   unsigned semanticResultArgIdx = 0;
-  SILFunctionConventions origConv(origFnType, thunk->getModule());
+  SILFunctionConventions origConv(
+      origFnType, SILAddressConventions::forFunction(*thunk));
   for (auto paramIdx : actualConfig.parameterIndices->getIndices()) {
     auto paramInfo = origConv.getParameters()[paramIdx];
     if (!paramInfo.isAutoDiffSemanticResult())

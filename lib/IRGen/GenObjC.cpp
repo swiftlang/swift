@@ -991,7 +991,8 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
     formalIndirectResult = params.claimNext();
   } else {
     SILType appliedResultTy = origMethodType->getDirectFormalResultsType(
-        IGM.getSILModule(), IGM.getMaximalTypeExpansionContext());
+        IGM.getSILModule(), IGM.getMaximalTypeExpansionContext(),
+        /*loweredAddresses=*/true);
     indirectedResultTI =
       &cast<LoadableTypeInfo>(IGM.getTypeInfo(appliedResultTy));
     auto &nativeSchema = indirectedResultTI->nativeReturnValueSchema(IGM);
@@ -1083,7 +1084,8 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
     cleanup();
     auto &callee = emission->getCallee();
     auto resultType = callee.getOrigFunctionType()->getDirectFormalResultsType(
-        IGM.getSILModule(), IGM.getMaximalTypeExpansionContext());
+        IGM.getSILModule(), IGM.getMaximalTypeExpansionContext(),
+        /*loweredAddresses=*/true);
     subIGF.emitScalarReturn(resultType, resultType, result,
                             /*isSwiftCCReturn=*/true,
                             /*isOutlined=*/false,

@@ -867,12 +867,14 @@ void ReabstractionInfo::createSubstitutedAndSpecializedTypes() {
 
   // Try to convert indirect incoming parameters to direct parameters.
   unsigned i = 0;
+  SILFunctionConventions substConv(
+      SubstitutedType, SILAddressConventions::forFunctionOrRawSIL(
+                           getNonSpecializedFunction(), getModule()));
   for (SILParameterInfo PI : SubstitutedType->getParameters()) {
     auto IdxToInsert = IdxForParam;
     ++IdxForParam;
     unsigned paramIdx = i++;
 
-    SILFunctionConventions substConv(SubstitutedType, getModule());
     TypeCategory tc = getParamTypeCategory(PI, substConv, getResilienceExpansion());
     if (tc == NotLoadable)
       continue;
@@ -2045,7 +2047,9 @@ void ReabstractionInfo::finishPartialSpecializationPreparation(
 ReabstractionInfo::TypeCategory ReabstractionInfo::handleReturnAndError(SILResultInfo RI, unsigned argIdx) {
   assert(RI.isFormalIndirect());
 
-  SILFunctionConventions substConv(SubstitutedType, getModule());
+  SILFunctionConventions substConv(
+      SubstitutedType, SILAddressConventions::forFunctionOrRawSIL(
+                           getNonSpecializedFunction(), getModule()));
   TypeCategory tc = getReturnTypeCategory(RI, substConv, getResilienceExpansion());
   if (tc != NotLoadable) {
     Conversions.set(argIdx);
@@ -2549,7 +2553,9 @@ swift::replaceWithSpecializedCallee(ApplySite applySite, SILValue callee,
   auto calleeSubstFnTy = canFnTy->substGenericArgs(
       *callee->getModule(), subs, reInfo.getResilienceExpansion());
   auto calleeSILSubstFnTy = SILType::getPrimitiveObjectType(calleeSubstFnTy);
-  SILFunctionConventions substConv(calleeSubstFnTy, builder.getModule());
+  SILFunctionConventions substConv(
+      calleeSubstFnTy,
+      SILAddressConventions::forFunction(*applySite.getFunction()));
 
   switch (applySite.getKind()) {
   case ApplySiteKind::TryApplyInst: {
@@ -2789,7 +2795,7 @@ SILFunction *ReabstractionThunkGenerator::createThunk() {
     Thunk->setOwnershipEliminated();
   }
 
-  if (!SILAddressConventions(M).useLoweredAddresses()) {
+  if (!Thunk->hasLoweredAddresses()) {
     for (auto SpecArg : SpecializedFunc->getArguments()) {
       auto *NewArg = EntryBB->createFunctionArgument(SpecArg->getType(),
                                                      SpecArg->getDecl());
@@ -2862,7 +2868,8 @@ FullApplySite ReabstractionThunkGenerator::createApplyAndReturn(
     Builder.emitStoreValueOperation(Loc, returnValue, resultAddr.returnAddress,
                                     StoreOwnershipQualifier::Init);
     SILType VoidTy = OrigPAI->getSubstCalleeType()->getDirectFormalResultsType(
-        M, Builder.getTypeExpansionContext());
+        M, Builder.getTypeExpansionContext(),
+        Builder.getFunction().hasLoweredAddresses());
     assert(VoidTy.isVoid());
     returnValue = Builder.createTuple(Loc, VoidTy, {});
   }
@@ -2883,9 +2890,9 @@ static SILFunctionArgument *addFunctionArgument(SILFunction *function,
   return arg;
 }
 
-/// Create SIL arguments for a reabstraction thunk with lowered addresses. This
-/// may involve replacing indirect arguments with loads and stores. Return the
-/// SILArgument for the address of an indirect result, or nullptr.
+/// Create SIL arguments for a reabstraction thunk with lowered addresses,
+/// replacing indirect arguments with loads and stores as needed. Return the
+/// SILArgument for an indirect result's address, or nullptr.
 ///
 /// FIXME: Remove this if we don't need to create reabstraction thunks after
 /// address lowering.
@@ -2898,7 +2905,8 @@ ReabstractionThunkGenerator::convertReabstractionThunkArguments(
   CanSILFunctionType SpecType = SpecializedFunc->getLoweredFunctionType();
   auto specConv = SpecializedFunc->getConventions();
   (void)specConv;
-  SILFunctionConventions substConv(thunkType, M);
+  SILFunctionConventions substConv(
+      thunkType, SILAddressConventions::forFunction(*Thunk));
 
   assert(specConv.useLoweredAddresses());
 

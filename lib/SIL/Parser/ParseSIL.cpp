@@ -7203,7 +7203,8 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
         silFnTy->substGenericArgs(SILMod, subs, B.getTypeExpansionContext());
     FnTy = SILType::getPrimitiveObjectType(substFTI);
   }
-  SILFunctionConventions substConv(substFTI, B.getModule());
+  SILFunctionConventions substConv(
+      substFTI, SILAddressConventions::forFunction(B.getFunction()));
 
   // Validate the operand count.
   if (substConv.getNumSILArguments() != ArgNames.size() &&
@@ -7781,9 +7782,6 @@ bool SILParserState::parseDeclSILStage(Parser &P) {
   }
   
   M.setStage(stage);
-  if (M.getOptions().EnableSILOpaqueValues) {
-    M.setLoweredAddresses(stage != SILStage::Raw);
-  }
   DidParseSILStage = true;
   return false;
 }

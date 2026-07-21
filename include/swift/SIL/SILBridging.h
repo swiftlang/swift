@@ -1580,7 +1580,7 @@ struct BridgedContext {
   BridgedOwnedString getModuleDescription() const;
   BRIDGED_INLINE SILStage getSILStage() const;
   BRIDGED_INLINE bool moduleIsSerialized() const;
-  BRIDGED_INLINE bool moduleHasLoweredAddresses() const;
+  BRIDGED_INLINE bool usesOpaqueValues() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj getCurrentModuleContext() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedFunction lookupFunction(BridgedStringRef name) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedVTable lookupVTable(BridgedDeclObj classDecl) const;

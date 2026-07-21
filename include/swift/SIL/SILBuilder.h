@@ -51,9 +51,10 @@ class SILBuilderContext {
 
   SILModule &Module;
 
-  /// Allow the SIL module conventions to be overridden within the builder.
-  /// This supports passes that lower SIL to a new stage.
-  SILAddressConventions silConv = SILAddressConventions(Module);
+  /// The builder's address conventions, overridable for passes that lower SIL
+  /// to a new stage. Seeded with the Raw-stage SIL representation.
+  SILAddressConventions silConv =
+      SILAddressConventions::forRawSIL(Module);
 
   /// If this pointer is non-null, then any inserted instruction is
   /// recorded in this list.
@@ -1117,7 +1118,7 @@ public:
 
   UnownedCopyValueInst *createUnownedCopyValue(SILLocation Loc,
                                                SILValue operand) {
-    ASSERT(!getFunction().getModule().useLoweredAddresses());
+    ASSERT(!getFunction().hasLoweredAddresses());
     auto type = operand->getType()
                     .getReferenceStorageType(getFunction().getASTContext(),
                                              ReferenceOwnership::Unowned)
@@ -1127,7 +1128,7 @@ public:
   }
 
   WeakCopyValueInst *createWeakCopyValue(SILLocation Loc, SILValue operand) {
-    ASSERT(!getFunction().getModule().useLoweredAddresses());
+    ASSERT(!getFunction().hasLoweredAddresses());
     auto type = operand->getType()
                     .getReferenceStorageType(getFunction().getASTContext(),
                                              ReferenceOwnership::Weak)
@@ -1757,7 +1758,7 @@ public:
   createTupleAddrConstructor(SILLocation Loc, SILValue DestAddr,
                              ArrayRef<SILValue> Elements,
                              IsInitialization_t IsInitOfDest) {
-    ASSERT(getFunction().getModule().useLoweredAddresses());
+    ASSERT(getFunction().hasLoweredAddresses());
     return insert(TupleAddrConstructorInst::create(getSILDebugLocation(Loc),
                                                    DestAddr, Elements,
                                                    IsInitOfDest, getModule()));
@@ -2357,7 +2358,7 @@ public:
                                                SILValue packIndex,
                                                SILValue tuple,
                                                SILType elementType) {
-    ASSERT(!getFunction().getModule().useLoweredAddresses());
+    ASSERT(!getFunction().hasLoweredAddresses());
     return insert(TuplePackExtractInst::create(
         getFunction(), getSILDebugLocation(loc), packIndex, tuple, elementType,
         tuple->getOwnershipKind()));
@@ -3346,15 +3347,24 @@ private:
       // sync. We don't care if an instruction is used in global_addr.
       if (F)
         TheInst->verifyDebugInfo();
-      TheInst->verifyOperandOwnership(&C.silConv);
+      // Treat the operands as lowered if either the builder's configured
+      // conventions say so or the function itself has been lowered.
+      SILAddressConventions opOwnershipConv =
+          SILAddressConventions::forFunctionWithOverride(getModule(), C.silConv,
+                                                         F);
+      TheInst->verifyOperandOwnership(&opOwnershipConv);
     }
 #endif
   }
 
   bool isLoadableOrOpaque(SILType Ty) {
-    auto &M = C.Module;
+    // Per-function lowered state when building into a function, build-mode
+    // default when inserting into a global (no function in scope).
+    bool loweredAddresses =
+        SILAddressConventions::forFunctionOrRawSIL(maybeGetFunction(), C.Module)
+            .useLoweredAddresses();
 
-    if (!SILAddressConventions(M).useLoweredAddresses())
+    if (!loweredAddresses)
       return true;
 
     return getTypeProperties(Ty).isLoadable();

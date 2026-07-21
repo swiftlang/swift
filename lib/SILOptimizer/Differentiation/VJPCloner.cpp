@@ -1145,7 +1145,8 @@ public:
         vjp->createBasicBlockBefore(getOpBasicBlock(tai->getNormalBB()));
     normalBB->createPhiArgument(
         vjpFnTy->getDirectFormalResultsType(getModule(),
-                                            TypeExpansionContext::minimal()),
+                                            TypeExpansionContext::minimal(),
+                                            vjp->hasLoweredAddresses()),
         tai->getNormalBB()->getArgument(0)->getOwnershipKind());
 
     // Apply the VJP.

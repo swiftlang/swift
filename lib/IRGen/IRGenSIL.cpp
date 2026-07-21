@@ -2083,7 +2083,7 @@ static ArrayRef<SILArgument *> emitEntryPointIndirectReturn(
     llvm::function_ref<bool(SILType)> requiresIndirectResult) {
   // Map an indirect return for a type SIL considers loadable but still
   // requires an indirect return at the IR level.
-  SILFunctionConventions fnConv(funcTy, IGF.getSILModule());
+  SILFunctionConventions fnConv(funcTy, IGF.IGM.silConv);
   SILType directResultType = IGF.CurSILFn->mapTypeIntoEnvironment(
       fnConv.getSILResultType(IGF.IGM.getMaximalTypeExpansionContext()));
 
@@ -2212,7 +2212,7 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
                                    witnessMetadata);
   }
 
-  SILFunctionConventions fnConv(funcTy, IGF.getSILModule());
+  SILFunctionConventions fnConv(funcTy, IGF.IGM.silConv);
 
   // Bind the self/context parameter, the last parameter of the async entry
   // signature. Factored out so async binds it before popping the error result
@@ -2310,6 +2310,7 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
   // Sync path: bind the context after the error result (async bound it above).
   if (!funcTy->isAsync())
     boundContextParameter = bindContextParameter();
+
 
   if (!boundContextParameter &&
       isKeyPathAccessorRepresentation(funcTy->getRepresentation())) {
@@ -3903,7 +3904,7 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
                             getLoweredValue(site.getCallee());
 
   auto args = site.getArguments();
-  SILFunctionConventions origConv(origCalleeType, getSILModule());
+  SILFunctionConventions origConv(origCalleeType, IGM.silConv);
   assert(origConv.getNumSILArguments() == args.size());
 
   // Extract 'self' if it needs to be passed as the context parameter.
@@ -4052,7 +4053,7 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
     auto tryApplyInst = cast<TryApplyInst>(i);
 
     // Load the error value.
-    SILFunctionConventions substConv(substCalleeType, getSILModule());
+    SILFunctionConventions substConv(substCalleeType, IGM.silConv);
     SILType errorType =
         substConv.getSILErrorType(IGM.getMaximalTypeExpansionContext());
     Address calleeErrorSlot = emission->getCalleeErrorSlot(
@@ -4518,7 +4519,7 @@ static void emitReturnInst(IRGenSILFunction &IGF,
                            CanSILFunctionType fnType,
                            bool mayPeepholeLoad) {
   SILFunctionConventions conv(IGF.CurSILFn->getLoweredFunctionType(),
-                              IGF.getSILModule());
+                              IGF.IGM.silConv);
 
   auto getNullErrorValue = [&] () -> llvm::Value* {
     if (!conv.isTypedError()) {
@@ -4664,7 +4665,7 @@ void IRGenSILFunction::visitReturnInst(swift::ReturnInst *i) {
 
 void IRGenSILFunction::visitThrowInst(swift::ThrowInst *i) {
   SILFunctionConventions conv(CurSILFn->getLoweredFunctionType(),
-                              getSILModule());
+                              IGM.silConv);
   assert(!conv.hasIndirectSILErrorResults());
 
   if (!isAsync()) {
@@ -4780,7 +4781,7 @@ void IRGenSILFunction::visitThrowInst(swift::ThrowInst *i) {
 
 void IRGenSILFunction::visitThrowAddrInst(swift::ThrowAddrInst *i) {
   SILFunctionConventions conv(CurSILFn->getLoweredFunctionType(),
-                              getSILModule());
+                              IGM.silConv);
   assert(conv.isTypedError());
   assert(conv.hasIndirectSILErrorResults());
 
@@ -4826,7 +4827,7 @@ void IRGenSILFunction::visitUnwindInst(swift::UnwindInst *i) {
 
 void IRGenSILFunction::visitYieldInst(swift::YieldInst *i) {
   auto coroutineType = CurSILFn->getLoweredFunctionType();
-  SILFunctionConventions coroConv(coroutineType, getSILModule());
+  SILFunctionConventions coroConv(coroutineType, IGM.silConv);
 
   GenericContextScope scope(IGM, coroutineType->getInvocationGenericSignature());
 

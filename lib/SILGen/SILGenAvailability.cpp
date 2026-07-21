@@ -182,7 +182,8 @@ static void emitBackDeployForwardApplyAndReturnOrThrow(
   auto fnType = SGF.SGM.Types.getConstantOverrideType(TEC, function);
   auto silFnType =
       SILType::getPrimitiveObjectType(fnType).castTo<SILFunctionType>();
-  SILFunctionConventions fnConv(silFnType, SGF.SGM.M);
+  SILFunctionConventions fnConv(
+      silFnType, SILAddressConventions::forFunction(SGF.F));
 
   SILValue functionRef = SGF.emitGlobalFunctionRef(loc, function);
 
