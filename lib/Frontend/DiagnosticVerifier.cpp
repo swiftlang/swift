@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Frontend/DiagnosticVerifier.h"
+#include "swift/AST/Attr.h"
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/Assertions.h"
@@ -23,10 +24,12 @@
 #include "swift/Parse/Lexer.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/Twine.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/ScopedPrinter.h"
 #include "llvm/Support/raw_ostream.h"
 #include <optional>
 
@@ -575,8 +578,10 @@ void DiagnosticVerifier::printDiagnostic(const llvm::SMDiagnostic &Diag) const {
     SourceLoc ParentLoc = GSI->originalSourceRange.getStart();
     if (ParentLoc.isInvalid())
       return;
+    const ExpansionContext &ctx = Expansions.find(ParentLoc)->getSecond();
+    auto idx = llvm::to_string(ctx.expansionIndex(BufferID));
     printDiagnostic(SM.GetMessage(ParentLoc, llvm::SourceMgr::DK_Note,
-                                  "in expansion from here", {}, {}));
+                                  "in expansion " + idx + " from here", {}, {}));
   }
 }
 
@@ -799,9 +804,36 @@ void DiagnosticVerifier::parseNestedExpectedDiagInfoBlock(
     unsigned &PrevExpectedContinuationLine,
     std::vector<ExpectedDiagnosticInfo> &NestedDiagsOut, size_t &End,
     bool InExpansion) {
+  // Find the '}}' that closes this block by balancing brace pairs. Callers
+  // enter this function already inside one block. Normalize by skipping a
+  // leading '{{' if present and starting at depth 1, then scanning for the '}}'
+  // that returns to depth 0.
+  size_t BlockClose = StringRef::npos;
+  {
+    size_t Depth = 1;
+    for (size_t P = MatchStartIn.starts_with("{{") ? 2 : 0,
+                E = MatchStartIn.size();
+         P + 1 < E;) {
+      if (MatchStartIn[P] == '{' && MatchStartIn[P + 1] == '{') {
+        ++Depth;
+        P += 2;
+      } else if (MatchStartIn[P] == '}' && MatchStartIn[P + 1] == '}') {
+        if (--Depth == 0) {
+          BlockClose = P;
+          break;
+        }
+        P += 2;
+      } else {
+        ++P;
+      }
+    }
+  }
+
   size_t NestedMatch = MatchStartIn.find("expected-");
-  if (NestedMatch == StringRef::npos) {
-    End = MatchStartIn.find("}}");
+  // A block with no nested 'expected-' directive before its own closing '}}'.
+  if (NestedMatch == StringRef::npos ||
+      (BlockClose != StringRef::npos && NestedMatch > BlockClose)) {
+    End = BlockClose;
     return;
   }
   // Scan the memory buffer looking for expected-note/warning/error.
@@ -1059,8 +1091,15 @@ unsigned DiagnosticVerifier::parseExpectedDiagInfo(
 
     SourceLoc ExpansionLoc =
         SM.getLocForLineCol(BufferID, Expected.LineNo, *Expected.ColumnNo);
-    // The buffer this expansion expands to, if it was produced (0 otherwise).
-    unsigned ExpansionBufferID = Expansions.lookup(ExpansionLoc);
+    // Bind this block's '#name@N' markers to the specific sibling expansion
+    // this directive targets. Directives at a shared location are parsed in
+    // source order, which is the same order the verifier numbers expansion
+    // indices, so nextParseBuffer() hands back the matching buffer (0 if this
+    // directive has no corresponding produced expansion).
+    auto ExpansionIt = Expansions.find(ExpansionLoc);
+    std::optional<unsigned> ExpansionBufferID = std::nullopt;
+    if (ExpansionIt != Expansions.end())
+      ExpansionBufferID = ExpansionIt->second.nextParseBuffer();
     processExpansionMarkerDefinitions(MatchStart.slice(2, End),
                                       ExpansionBufferID);
   } else {
@@ -1301,12 +1340,19 @@ void DiagnosticVerifier::verifyDiagnostics(
     // Check to see if we had this expected diagnostic.
     if (expected.Classification == DiagnosticKindExpansion) {
       SourceLoc Loc = SM.getLocForLineCol(BufferID, expected.LineNo, *expected.ColumnNo);
-      if (Expansions.count(Loc) == 0) {
+      auto It = Expansions.find(Loc);
+      // nextBuffer() yields std::nullopt both when no expansion was produced
+      // at this location and when every produced expansion has already been
+      // claimed by an earlier directive (i.e. there are more directives than
+      // sibling expansions). Either way this directive has nothing to bind to.
+      std::optional<unsigned> ExpansionBufferID;
+      if (It != Expansions.end())
+        ExpansionBufferID = It->second.nextBuffer();
+      if (!ExpansionBufferID) {
         addError(expected.ExpectedStart, "expected expansion not produced");
         continue;
       }
-      unsigned ExpansionBufferID = Expansions[Loc];
-      verifyDiagnostics(expected.NestedDiags, ExpansionBufferID,
+      verifyDiagnostics(expected.NestedDiags, *ExpansionBufferID,
                         /*ParentDiagnostic=*/std::nullopt);
       if (expected.NestedDiags.empty())
         ExpectedDiagnostics.erase(ExpectedDiagnostics.begin()+i);
@@ -1771,7 +1817,7 @@ void DiagnosticVerifier::scanForMarkers(unsigned BufferID) {
 
 /// Handle location marker definitions found inside an expected-expansion block.
 void DiagnosticVerifier::processExpansionMarkerDefinitions(
-    StringRef BlockText, unsigned ExpansionBufferID) {
+    StringRef BlockText, std::optional<unsigned> ExpansionBufferID) {
   forEachMarkerDefinition(
       BlockText, [&](const char *HashLoc, StringRef MarkerName,
                      std::optional<unsigned> ExpansionLine) {
@@ -1797,7 +1843,7 @@ void DiagnosticVerifier::processExpansionMarkerDefinitions(
         if (!ExpansionBufferID)
           return;
 
-        if (SM.getLocForLineCol(ExpansionBufferID, *ExpansionLine, 1)
+        if (SM.getLocForLineCol(*ExpansionBufferID, *ExpansionLine, 1)
                 .isInvalid()) {
           addError(HashLoc, "line " + Twine(*ExpansionLine) +
                                 " does not exist in the expansion buffer");
@@ -1811,7 +1857,7 @@ void DiagnosticVerifier::processExpansionMarkerDefinitions(
         // than clobbering it.
         MarkerLocation &MarkerLoc = LocationMarkers[MarkerName];
         if (MarkerLoc.BufferID == 0)
-          MarkerLoc = {ExpansionBufferID, *ExpansionLine};
+          MarkerLoc = {*ExpansionBufferID, *ExpansionLine};
       });
 }
 
@@ -2074,7 +2120,7 @@ void DiagnosticVerifier::printRemainingDiagnostics() const {
 }
 
 static void
-processExpansions(SourceManager &SM, llvm::DenseMap<SourceLoc, unsigned> &Expansions,
+processExpansions(SourceManager &SM, llvm::DenseMap<SourceLoc, DiagnosticVerifier::ExpansionContext> &Expansions,
                   std::vector<CapturedDiagnosticInfo> &CapturedDiagnostics) {
   for (auto &diag : CapturedDiagnostics) {
     if (!diag.SourceBufferID.has_value())
@@ -2086,13 +2132,16 @@ processExpansions(SourceManager &SM, llvm::DenseMap<SourceLoc, unsigned> &Expans
     SourceLoc ExpansionStart = GSI->originalSourceRange.getStart();
     if (ExpansionStart.isInvalid())
       continue;
-    if (Expansions.count(ExpansionStart)) {
-      ASSERT(Expansions[ExpansionStart] == diag.SourceBufferID.value() &&
-             "diagnostics in multiple expansions for the same decl not "
-             "supported by -verify");
-      continue;
-    }
-    Expansions.insert(std::make_pair(ExpansionStart, diag.SourceBufferID.value()));
+    // Order sibling expansions by the source location of the attached-macro
+    // attribute that produced each, so the first attribute in source order
+    // becomes expansion index 0 (matching the order 'expected-expansion'
+    // directives are written). Buffers with no attribute fall back to
+    // buffer-ID order via a zero key.
+    uintptr_t SortKey = 0;
+    if (GSI->attachedMacroCustomAttr)
+      SortKey = reinterpret_cast<uintptr_t>(
+          GSI->attachedMacroCustomAttr->getLocation().getPointer());
+    Expansions[ExpansionStart].addBuffer(diag.SourceBufferID.value(), SortKey);
   }
 }
 
