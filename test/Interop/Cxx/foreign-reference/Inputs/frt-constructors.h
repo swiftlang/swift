@@ -148,3 +148,47 @@ FRTMixedConventionCtorsUnretainedByDefault {
 
   FRTMixedConventionCtorsUnretainedByDefault(int, int) : refs(0) {}
 };
+
+struct
+  __attribute__((swift_attr("import_reference")))
+  __attribute__((swift_attr("retain:.retain")))
+  __attribute__((swift_attr("release:.release")))
+FRTUnavailableCtor {
+  mutable int refs = 1;
+  void retain() const { check(); ++refs; }
+  void release() const { --refs; check(); if (refs == 0) delete this; }
+  void check() const { if (refs < 0) __builtin_trap(); }
+
+  __attribute__((swift_attr("returns_retained")))
+  __attribute__((availability(swift, unavailable, message="cannot use this constructor")))
+  FRTUnavailableCtor() : refs(1) {}
+  // expected-note@-1 {{'init()' has been explicitly marked unavailable here}}
+};
+
+struct
+  __attribute__((swift_attr("import_reference")))
+  __attribute__((swift_attr("retain:.retain")))
+  __attribute__((swift_attr("release:.release")))
+FRTMixedAvailabilityCtors {
+  mutable int refs = 1;
+  void retain() const { check(); ++refs; }
+  void release() const { --refs; check(); if (refs == 0) delete this; }
+  void check() const { if (refs < 0) __builtin_trap(); }
+
+  __attribute__((swift_attr("returns_retained")))
+  FRTMixedAvailabilityCtors() : refs(1) {}
+
+  __attribute__((swift_attr("returns_retained")))
+  __attribute__((availability(swift, unavailable, message="cannot construct from an int")))
+  FRTMixedAvailabilityCtors(int) : refs(1) {}
+  // expected-note@-1 {{'init(_:)' has been explicitly marked unavailable here}}
+
+  __attribute__((swift_attr("returns_retained")))
+  __attribute__((unavailable("cannot construct from two ints")))
+  FRTMixedAvailabilityCtors(int, int) : refs(1) {}
+  // expected-note@-1 {{'init(_:_:)' has been explicitly marked unavailable here}}
+
+  __attribute__((swift_attr("returns_retained")))
+  __attribute__((deprecated("don't construct from three ints")))
+  FRTMixedAvailabilityCtors(int, int, int) : refs(1) {}
+};

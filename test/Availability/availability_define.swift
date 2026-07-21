@@ -59,7 +59,7 @@ func client() {
   onMacOS50()
   onMacOS51_0() // expected-error {{is only available in macOS 51.0 or newer}}
   // expected-note @-1 {{add 'if #available' version check}}
-  onMacOSDeprecated()
+  onMacOSDeprecated() // expected-warning {{'onMacOSDeprecated()' was deprecated in macOS 50}}
 
   if #available(_iOS54Aligned, *) {
     onMacOS51_0()

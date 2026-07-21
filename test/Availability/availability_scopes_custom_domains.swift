@@ -21,7 +21,6 @@ func unavailableInA() { }
 @available(B)
 func availableInAB() { }
 
-// FIXME: [availability] Should be "available=A"
-// CHECK: {{^}}  (decl version={{.*}} deprecated decl=deprecatedInA()
+// CHECK: {{^}}  (decl version={{.*}} decl=deprecatedInA()
 @available(A, deprecated)
 func deprecatedInA() { }
