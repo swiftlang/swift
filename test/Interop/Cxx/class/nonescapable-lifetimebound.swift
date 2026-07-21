@@ -253,6 +253,15 @@ public:
 inline void retainSharedOwnerBox(SharedOwnerBox *) {}
 inline void releaseSharedOwnerBox(SharedOwnerBox *) {}
 
+struct NonTrivialByValue {
+    int data;
+    NonTrivialByValue(const NonTrivialByValue &o) : data(o.data) {}
+    ~NonTrivialByValue() {}
+};
+View fromNonTrivialValue(NonTrivialByValue o [[clang::lifetimebound]]);
+View fromTrivialValue(Owner o [[clang::lifetimebound]]);
+View fromPointer(const int *p [[clang::lifetimebound]]);
+
 // CHECK: sil {{.*}}[clang makeOwner] {{.*}}: $@convention(c) () -> Owner
 // CHECK: sil {{.*}}[clang getView] {{.*}} : $@convention(c) (@in_guaranteed Owner) -> @lifetime(borrow address 0) @owned View
 // CHECK: sil {{.*}}[clang getViewFromFirst] {{.*}} : $@convention(c) (@in_guaranteed Owner, @in_guaranteed Owner) -> @lifetime(borrow address 0) @owned View
@@ -272,6 +281,9 @@ inline void releaseSharedOwnerBox(SharedOwnerBox *) {}
 // CHECK: sil {{.*}}[clang makeAnonUnionNonEscapable] {{.*}} : $@convention(c) (@in_guaranteed Owner) -> @lifetime(borrow address 0) @owned HasAnonUnion<NonEscapable>
 // CHECK: sil {{.*}}[clang makeAnonStructNonEscapable] {{.*}} : $@convention(c) (@in_guaranteed Owner) -> @lifetime(borrow address 0) @owned HasAnonStruct<NonEscapable>
 // CHECK: sil {{.*}}[clang makeNonEscapableHasAnonUnionNonEscapable] {{.*}} : $@convention(c) (@in_guaranteed Owner) -> @lifetime(borrow address 0) @owned NonEscapableHasAnonUnion<NonEscapable>
+// CHECK: sil {{.*}}[clang fromNonTrivialValue] {{.*}} : $@convention(c) (@in{{(_cxx)?}} NonTrivialByValue) -> @lifetime(immortal) @owned View
+// CHECK: sil {{.*}}[clang fromTrivialValue] {{.*}} : $@convention(c) (Owner) -> @lifetime(immortal) @owned View
+// CHECK: sil {{.*}}[clang fromPointer] {{.*}} : $@convention(c) (Optional<UnsafePointer<Int32>>) -> @lifetime(immortal) @owned View
 
 //--- test.swift
 
@@ -311,6 +323,13 @@ func anonymousUnionsAndStructs(_ v: borrowing View) {
     let _ = makeAnonUnionNonEscapable(o)
     let _ = makeAnonStructNonEscapable(o)
     let _ = makeNonEscapableHasAnonUnionNonEscapable(o)
+}
+
+func byValueAndPointerLifetimebound(_ n: NonTrivialByValue, _ o: Owner,
+                                    _ p: UnsafePointer<CInt>) {
+    let _ = fromNonTrivialValue(n)
+    let _ = fromTrivialValue(o)
+    let _ = fromPointer(p)
 }
 
 //--- escaping_scopes.swift
