@@ -3557,6 +3557,8 @@ static AccessStrategy getOpaqueReadWriteAccessStrategy(
     return AccessStrategy::getAccessor(AccessorKind::YieldingMutate, dispatch);
   if (storage->requiresOpaqueModifyCoroutine())
     return AccessStrategy::getAccessor(AccessorKind::Modify, dispatch);
+  if (storage->requiresOpaqueMutateAccessor())
+    return AccessStrategy::getAccessor(AccessorKind::Mutate, dispatch);
   return AccessStrategy::getMaterializeToTemporary(
       getOpaqueReadAccessStrategy(storage, dispatch, nullptr,
                                   ResilienceExpansion::Minimal, location,
