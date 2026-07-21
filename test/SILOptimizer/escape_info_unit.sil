@@ -1638,3 +1638,39 @@ bb0:
   return %1
 }
 
+struct WrapperS {
+  @_hasStorage var x: X
+}
+
+sil [ossa] @borrow_accessor_x : $@convention(method) (@in_guaranteed WrapperS) -> @guaranteed X {
+[%0: escape v** -> %r.v**, escape v**.c*.v** -> %r.v**.c*.v**]
+bb0(%0 : $*WrapperS):
+  %1 = struct_element_addr %0, #WrapperS.x
+  %2 = load_borrow %1
+  return_borrow %2 from_scopes (%2)
+}
+
+sil [ossa] @noescape_x : $@convention(thin) (@guaranteed X) -> () {
+[%0: noescape **]
+}
+
+// CHECK-LABEL: Escape information for test_borrow_accessor_noescape:
+// CHECK:  -    :   %0 = alloc_ref $X
+// CHECK: End function test_borrow_accessor_noescape
+sil [ossa] @test_borrow_accessor_noescape : $@convention(thin) () -> () {
+bb0:
+  specify_test "escape_info"
+  %0 = alloc_ref $X
+  %stk = alloc_stack $WrapperS
+  %s = struct $WrapperS (%0 : $X)
+  store %s to [init] %stk
+  %func = function_ref @borrow_accessor_x : $@convention(method) (@in_guaranteed WrapperS) -> @guaranteed X
+  %k = apply %func(%stk) : $@convention(method) (@in_guaranteed WrapperS) -> @guaranteed X
+  %use = function_ref @noescape_x : $@convention(thin) (@guaranteed X) -> ()
+  apply %use(%k) : $@convention(thin) (@guaranteed X) -> ()
+  destroy_addr %stk
+  dealloc_stack %stk
+  %r = tuple ()
+  return %r
+}
+

@@ -1417,3 +1417,56 @@ bb0(%0 : $*X, %1 : $X):
   %r = tuple ()
   return %r : $()
 }
+
+struct WrapperSE {
+  @_hasStorage var x: X
+}
+
+// CHECK-LABEL: sil [ossa] @borrow_accessor_se
+// CHECK-NEXT:  [%0: read s0.v**]
+// CHECK-NEXT:  [global: ]
+// CHECK-NEXT:  {{^[^[]}}
+sil [ossa] @borrow_accessor_se : $@convention(method) (@in_guaranteed WrapperSE) -> @guaranteed X {
+bb0(%0 : $*WrapperSE):
+  %1 = struct_element_addr %0, #WrapperSE.x
+  %2 = load_borrow %1
+  return_borrow %2 from_scopes (%2)
+}
+
+// CHECK-LABEL: sil [ossa] @mutate_accessor_se
+// CHECK-NEXT:  [%0: read s0.v**]
+// CHECK-NEXT:  [global: ]
+// CHECK-NEXT:  {{^[^[]}}
+sil [ossa] @mutate_accessor_se : $@convention(thin) (@inout WrapperSE) -> @inout X {
+bb0(%0 : $*WrapperSE):
+  %1 = struct_element_addr %0, #WrapperSE.x
+  return %1
+}
+
+// CHECK-LABEL: sil [ossa] @call_borrow_accessor_se
+// CHECK-NEXT:  [%0: read s0.v**]
+// CHECK-NEXT:  [global: read,write,copy,destroy,allocate,deinit_barrier]
+// CHECK-NEXT:  {{^[^[]}}
+sil [ossa] @call_borrow_accessor_se : $@convention(thin) (@in_guaranteed WrapperSE) -> () {
+bb0(%0 : $*WrapperSE):
+  %func = function_ref @borrow_accessor_se : $@convention(method) (@in_guaranteed WrapperSE) -> @guaranteed X
+  %k = apply %func(%0) : $@convention(method) (@in_guaranteed WrapperSE) -> @guaranteed X
+  %use = function_ref @unknown_func : $@convention(thin) () -> ()
+  apply %use() : $@convention(thin) () -> ()
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @call_mutate_accessor_se
+// CHECK-NEXT:  [%0: read v**, write v**.v**, destroy v**.v**]
+// CHECK-NEXT:  [%1: write c*.v**, copy c*.v**]
+// CHECK-NEXT:  [global: write,copy]
+// CHECK-NEXT:  {{^[^[]}}
+sil [ossa] @call_mutate_accessor_se : $@convention(thin) (@inout WrapperSE, @owned X) -> () {
+bb0(%0 : $*WrapperSE, %1 : @owned $X):
+  %func = function_ref @mutate_accessor_se : $@convention(thin) (@inout WrapperSE) -> @inout X
+  %addr = apply %func(%0) : $@convention(thin) (@inout WrapperSE) -> @inout X
+  store %1 to [assign] %addr
+  %r = tuple ()
+  return %r
+}
