@@ -8,7 +8,7 @@
 
 // RUN: %target-codesign %t/swift-objc-execution
 // RUN: %target-run %t/swift-objc-execution | %FileCheck %s
-// RUN: %target-run %t/swift-objc-execution | %FileCheck --check-prefix=DESTROY %s
+// RUN: %target-run %t/swift-objc-execution | %FileCheck --check-prefix=DESTROY --implicit-check-not "destroy ObjCKlass" %s
 
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
@@ -160,7 +160,8 @@ int main() {
   assert(globalCounter == 0);
 // CHECK: create ObjCKlass
 // CHECK-NEXT: OBJClass: 1
-// CHECK-NEXT: create ObjCKlass
+// Original ObjCKlass instance can be released eagerly here.
+// CHECK: create ObjCKlass
 // CHECK: OBJClass: 2
 // CHECK-NEXT: NIL
 // DESTROY: destroy ObjCKlass
