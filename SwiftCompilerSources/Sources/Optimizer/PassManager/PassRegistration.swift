@@ -99,6 +99,7 @@ private func registerSwiftPasses() {
   registerPass(simplificationPass, { simplificationPass.run($0) })
   registerPass(ononeSimplificationPass, { ononeSimplificationPass.run($0) })
   registerPass(lateOnoneSimplificationPass, { lateOnoneSimplificationPass.run($0) })
+  registerPass(debugReconstructionBlockSimplificationPass, { debugReconstructionBlockSimplificationPass.run($0) })
   registerPass(cleanupDebugStepsPass, { cleanupDebugStepsPass.run($0) })
   registerPass(namedReturnValueOptimization, { namedReturnValueOptimization.run($0) })
   registerPass(stripObjectHeadersPass, { stripObjectHeadersPass.run($0) })
