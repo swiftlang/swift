@@ -25,6 +25,7 @@
 #include "swift/AST/Initializer.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/SynthesizedDeclBuilder.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
@@ -185,10 +186,8 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
           C, new (C) DeclRefExpr(selfDecl, dloc, implicit), //  TODO: make createImplicit
           C.Id_actorSystem);
 
-  auto *systemVar = new (C) VarDecl(
-      /*isStatic=*/false, VarDecl::Introducer::Let, sloc, C.Id_system, thunk);
-  systemVar->setImplicit();
-  systemVar->setSynthesized();
+  VarDecl *systemVar =
+      VarDeclBuilder(thunk, C.Id_system).introducer(VarDecl::Introducer::Let);
 
   Pattern *systemPattern = NamedPattern::createImplicit(C, systemVar);
 
@@ -200,11 +199,8 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
   remoteBranchStmts.push_back(systemVar);
 
   // --- invocationEncoder = system.makeInvocationEncoder()
-  auto *invocationVar =
-      new (C) VarDecl(/*isStatic=*/false, VarDecl::Introducer::Var, sloc,
-                      C.Id_invocation, thunk);
-  invocationVar->setImplicit();
-  invocationVar->setSynthesized();
+  VarDecl *invocationVar = VarDeclBuilder(thunk, C.Id_invocation)
+                               .introducer(VarDecl::Introducer::Var);
 
   {
     Pattern *invocationPattern = NamedPattern::createImplicit(C, invocationVar);
@@ -280,11 +276,8 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
         // --- Prepare the RemoteCallArgument<Value> for the argument
         auto argumentVarName = C.getIdentifier("_" + parameterName.str());
         StructDecl *RCA = C.getRemoteCallArgumentDecl();
-        VarDecl *callArgVar =
-            new (C) VarDecl(/*isStatic=*/false, VarDecl::Introducer::Let, sloc,
-                            argumentVarName, thunk);
-        callArgVar->setImplicit();
-        callArgVar->setSynthesized();
+        VarDecl *callArgVar = VarDeclBuilder(thunk, argumentVarName)
+                                  .introducer(VarDecl::Introducer::Let);
 
         Pattern *callArgPattern = NamedPattern::createImplicit(C, callArgVar);
 
@@ -468,8 +461,9 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
   }
 
   // === Prepare the 'RemoteCallTarget'
-  auto *targetVar = new (C) VarDecl(
-      /*isStatic=*/false, VarDecl::Introducer::Let, sloc, C.Id_target, thunk);
+  VarDecl *targetVar = VarDeclBuilder(thunk, C.Id_target)
+                           .introducer(VarDecl::Introducer::Let)
+                           .type(remoteCallTargetTy);
 
   {
     // --- Mangle the thunk name
@@ -481,10 +475,6 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
                                   SourceRange(), implicit);
 
     // --- let target = RemoteCallTarget(<mangled name>)
-    targetVar->setInterfaceType(remoteCallTargetTy);
-    targetVar->setImplicit();
-    targetVar->setSynthesized();
-
     Pattern *targetPattern = NamedPattern::createImplicit(C, targetVar);
 
     auto remoteCallTargetInitDecl =
@@ -804,11 +794,8 @@ deriveBodyDistributed_resolvableProxyAdapterThunk(AbstractFunctionDecl *thunk,
     // let __result = try await self.<func>(...)
     // The thunk body is entirely synthesized; there are no user-written locals
     // in scope, so the `__result` name cannot collide.
-    auto *resultVar =
-        new (C) VarDecl(/*isStatic=*/false, VarDecl::Introducer::Let, sloc,
-                        C.getIdentifier("__result"), thunk);
-    resultVar->setImplicit();
-    resultVar->setSynthesized();
+    VarDecl *resultVar = VarDeclBuilder(thunk, C.getIdentifier("__result"))
+                             .introducer(VarDecl::Introducer::Let);
 
     Pattern *resultPattern = NamedPattern::createImplicit(C, resultVar);
     auto resultPB = PatternBindingDecl::createImplicit(
@@ -1257,10 +1244,8 @@ GetDistributedActorIDPropertyRequest::evaluate(Evaluator &evaluator,
     return lookupDistributedActorProperty(nominal, C.Id_id);
 
   // ==== Synthesize and add 'id' property to the actor decl
-  auto *propDecl = new (C) VarDecl(/*IsStatic*/ false, VarDecl::Introducer::Let,
-                                   SourceLoc(), C.Id_id, nominal);
-  propDecl->setImplicit();
-  propDecl->setSynthesized();
+  VarDecl *propDecl =
+      VarDeclBuilder(nominal, C.Id_id).introducer(VarDecl::Introducer::Let);
   propDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
 
   // NOTE: The type for this property is lazily computed by
@@ -1310,10 +1295,8 @@ VarDecl *GetDistributedActorSystemPropertyRequest::evaluate(
     return lookupDistributedActorProperty(nominal, C.Id_actorSystem);
 
   // ==== Synthesize and add 'actorSystem' property to the actor decl
-  auto *propDecl = new (C) VarDecl(/*IsStatic*/ false, VarDecl::Introducer::Let,
-                                   SourceLoc(), C.Id_actorSystem, nominal);
-  propDecl->setImplicit();
-  propDecl->setSynthesized();
+  VarDecl *propDecl = VarDeclBuilder(nominal, C.Id_actorSystem)
+                          .introducer(VarDecl::Introducer::Let);
   propDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
 
   // NOTE: The type for this property is lazily computed by

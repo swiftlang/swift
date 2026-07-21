@@ -25,6 +25,7 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Stmt.h"
+#include "swift/AST/SynthesizedDeclBuilder.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "llvm/ADT/APInt.h"
@@ -357,13 +358,9 @@ deriveEquatable_eq(
   auto selfIfaceTy = parentDC->getSelfInterfaceType();
 
   auto getParamDecl = [&](StringRef s) -> ParamDecl * {
-    auto *param = new (C) ParamDecl(SourceLoc(),
-                                    SourceLoc(), Identifier(), SourceLoc(),
-                                    C.getIdentifier(s), parentDC);
-    param->setSpecifier(ParamSpecifier::Default);
-    param->setInterfaceType(selfIfaceTy);
-    param->setImplicit();
-    return param;
+    return ParamDecl::createImplicit(C, Identifier(), C.getIdentifier(s),
+                                     selfIfaceTy, parentDC,
+                                     ParamSpecifier::Default);
   };
 
   ParameterList *params = ParameterList::create(C, {
@@ -513,12 +510,8 @@ deriveHashable_hashInto(
   Type hasherType = hasherDecl->getDeclaredInterfaceType();
 
   // Params: self (implicit), hasher
-  auto *hasherParamDecl = new (C) ParamDecl(SourceLoc(),
-                                            SourceLoc(), C.Id_into, SourceLoc(),
-                                            C.Id_hasher, parentDC);
-  hasherParamDecl->setSpecifier(ParamSpecifier::InOut);
-  hasherParamDecl->setInterfaceType(hasherType);
-  hasherParamDecl->setImplicit();
+  auto *hasherParamDecl = ParamDecl::createImplicit(
+      C, C.Id_into, C.Id_hasher, hasherType, parentDC, ParamSpecifier::InOut);
 
   ParameterList *params = ParameterList::createWithoutLoc(hasherParamDecl);
 
@@ -847,12 +840,9 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
     return nullptr;
   }
 
-  VarDecl *hashValueDecl =
-    new (C) VarDecl(/*IsStatic*/false, VarDecl::Introducer::Var,
-                    SourceLoc(), C.Id_hashValue, parentDC);
-  hashValueDecl->setInterfaceType(intType);
-  hashValueDecl->setSynthesized();
-  hashValueDecl->setImplicit();
+  VarDecl *hashValueDecl = VarDeclBuilder(parentDC, C.Id_hashValue)
+                               .introducer(VarDecl::Introducer::Var)
+                               .type(intType);
   hashValueDecl->setImplInfo(StorageImplInfo::getImmutableComputed());
   hashValueDecl->copyFormalAccessFrom(derived.Nominal,
                                       /*sourceIsParentContext*/ true);
@@ -881,13 +871,7 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
       derived.Nominal->isActor())
     hashValueDecl->addAttribute(NonisolatedAttr::createImplicit(C));
 
-  Pattern *hashValuePat =
-      NamedPattern::createImplicit(C, hashValueDecl, intType);
-  hashValuePat = TypedPattern::createImplicit(C, hashValuePat, intType);
-
-  auto *patDecl = PatternBindingDecl::createImplicit(
-      C, StaticSpellingKind::None, hashValuePat, /*InitExpr*/ nullptr,
-      parentDC);
+  PatternBindingDecl *patDecl = PatternBindingDeclBuilder(hashValueDecl);
 
   derived.addMembersToConformanceContext({hashValueDecl, patDecl});
 

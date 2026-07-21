@@ -893,7 +893,7 @@ extension FunctionPassContext {
   func removeTriviallyDeadInstructionsIgnoringDebugUses(in function: Function) {
     for inst in function.reversedInstructions {
       if inst.isTriviallyDeadIgnoringDebugUses {
-        erase(instructionIncludingDebugUses: inst)
+        erase(instruction: inst)
       }
     }
   }
@@ -944,7 +944,7 @@ extension SimplifyContext {
     second.replace(with: replacement, self)
 
     if canEraseFirst {
-      erase(instructionIncludingDebugUses: first)
+      erase(instruction: first)
     }
   }
 }

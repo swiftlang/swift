@@ -353,6 +353,11 @@ bb0(%0 : @owned $D):
 
 // CHECK-LABEL:      sil [ossa] @dont_remove_with_debug_user :
 // CHECK:            bb0
+// CHECK-O-NEXT:       debug_value %0, let, name "x", transform {
+// CHECK-O:              bb0(%0 : $D):
+// CHECK-O-NEXT:           %1 = upcast %0 to $C
+// CHECK-O-NEXT:           return %1
+// CHECK-O-NEXT:       }
 // CHECK-O-NEXT:       destroy_value %0
 // CHECK-O-NEXT:       tuple
 // CHECK-ONONE-NEXT:   %1 = upcast
