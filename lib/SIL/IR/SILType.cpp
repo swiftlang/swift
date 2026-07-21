@@ -1145,8 +1145,8 @@ bool SILType::isMoveOnly(bool orWrapped) const {
     return fnTy->isTrivialNoEscape();
   }
    */
-  if (isa<SILFunctionType>(ty))
-    return false;
+  if (auto F = dyn_cast<SILFunctionType>(ty))
+    return F->isCalledOnce();
 
   // Treat all other SIL-specific types as Copyable.
   if (isa<SILBlockStorageType>(ty) || isa<SILBoxType>(ty) ||
