@@ -600,6 +600,10 @@ public:
   LLVM_READONLY
   bool isInSwiftinterface() const;
 
+  /// Returns true if the context is in a SourceFile, excluding
+  /// `.swiftinterface` files.
+  bool isInSwiftSourceFile() const;
+
   /// Determine whether this declaration context is generic, meaning that it or
   /// any of its parents have generic parameters.
   bool isGenericContext() const;

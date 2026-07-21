@@ -1239,8 +1239,7 @@ GetDistributedActorIDPropertyRequest::evaluate(Evaluator &evaluator,
 
   // If we're in a deserialized module or swift interface we expect to be able
   // to find this through name lookup.
-  auto *DC = nominal->getDeclContext();
-  if (!DC->getParentSourceFile() || DC->isInSwiftinterface())
+  if (!nominal->isInSwiftSourceFile())
     return lookupDistributedActorProperty(nominal, C.Id_id);
 
   // ==== Synthesize and add 'id' property to the actor decl
@@ -1290,8 +1289,7 @@ VarDecl *GetDistributedActorSystemPropertyRequest::evaluate(
 
   // If we're in a deserialized module or swift interface we expect to be able
   // to find this through name lookup.
-  auto *DC = nominal->getDeclContext();
-  if (!DC->getParentSourceFile() || DC->isInSwiftinterface())
+  if (!nominal->isInSwiftSourceFile())
     return lookupDistributedActorProperty(nominal, C.Id_actorSystem);
 
   // ==== Synthesize and add 'actorSystem' property to the actor decl
