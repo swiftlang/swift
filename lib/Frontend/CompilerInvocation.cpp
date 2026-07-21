@@ -3982,6 +3982,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Opts.EmitSingletonMetadataPointers = true;
   }
 
+  if (Args.hasArg(OPT_disable_emit_singleton_metadata_pointer)) {
+    Opts.EmitSingletonMetadataPointers = false;
+  }
+
   if (const Arg *A = Args.getLastArg(OPT_read_legacy_type_info_path_EQ)) {
     Opts.ReadLegacyTypeInfoPath = A->getValue();
   }

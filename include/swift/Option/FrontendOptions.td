@@ -1305,6 +1305,10 @@ def emit_singleton_metadata_pointer : Flag<["-"], "emit-singleton-metadata-point
    HelpText<"Emit a pointer to the corresponding type metadata into non-public "
             "non-generic type descriptors.">;
 
+def disable_emit_singleton_metadata_pointer : Flag<["-"], "disable-emit-singleton-metadata-pointer">,
+   HelpText<"Do not emit a pointer to the corresponding type metadata into "
+            "non-public non-generic type descriptors.">;
+
 def read_legacy_type_info_path_EQ : Joined<["-"], "read-legacy-type-info-path=">,
   HelpText<"Read legacy type layout from the given path instead of default path">;
 
