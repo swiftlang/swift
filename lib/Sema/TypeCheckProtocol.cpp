@@ -2045,6 +2045,31 @@ checkWitnessAvailability(const ValueDecl *requirement, const ValueDecl *witness,
   return requiredContext.unsatisfiedRestrictionForDecl(witness, flags);
 }
 
+/// Returns the strongest known non-custom `@_effects` guarantee declared on
+/// \p decl, or `EffectsKind::Unspecified` if there is none.
+static EffectsKind getKnownEffectsKind(const ValueDecl *decl) {
+  auto kind = EffectsKind::Unspecified;
+  for (auto *attr : decl->getAttrs().getAttributes<EffectsAttr>()) {
+    auto *effectsAttr = cast<EffectsAttr>(attr);
+    if (effectsAttr->getKind() == EffectsKind::Custom)
+      continue;
+    kind = std::min(kind, effectsAttr->getKind());
+  }
+  return kind;
+}
+
+static StringRef getEffectsAttrSpelling(EffectsKind kind) {
+  switch (kind) {
+  case EffectsKind::ReadNone: return "_effects(readnone)";
+  case EffectsKind::ReadOnly: return "_effects(readonly)";
+  case EffectsKind::ReleaseNone: return "_effects(releasenone)";
+  case EffectsKind::ReadWrite: return "_effects(readwrite)";
+  case EffectsKind::Unspecified: return "_effects(unspecified)";
+  case EffectsKind::Custom: return "_effects";
+  }
+  llvm_unreachable("bad EffectsKind");
+}
+
 RequirementCheck WitnessChecker::checkWitness(ValueDecl *requirement,
                                               const RequirementMatch &match) {
   if (!match.OptionalAdjustments.empty())
@@ -2104,6 +2129,18 @@ RequirementCheck WitnessChecker::checkWitness(ValueDecl *requirement,
     auto conformanceContext = AvailabilityContext::forDeclSignature(DC->getInnermostDeclarationDeclContext());
     if (!conformanceContext.isDeprecated()) {
       return RequirementCheck(CheckKind::DefaultWitnessDeprecated);
+    }
+  }
+
+  if (isa<AbstractFunctionDecl>(requirement) ||
+      isa<AbstractStorageDecl>(requirement)) {
+    auto reqEffects = getKnownEffectsKind(requirement);
+    auto witnessEffects = getKnownEffectsKind(match.Witness);
+    if (reqEffects < EffectsKind::ReadWrite && witnessEffects > reqEffects) {
+      Context.Diags.diagnose(match.Witness, diag::witness_weaker_effects,
+                             match.Witness, getEffectsAttrSpelling(reqEffects));
+      Context.Diags.diagnose(requirement, diag::witness_weaker_effects_req,
+                             getEffectsAttrSpelling(reqEffects));
     }
   }
 
