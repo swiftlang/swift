@@ -1047,6 +1047,7 @@ struct BridgedArgument {
   BRIDGED_INLINE bool FunctionArgument_isLexical() const;
   BRIDGED_INLINE bool FunctionArgument_isClosureCapture() const;
   BRIDGED_INLINE void setReborrow(bool reborrow) const;
+  BRIDGED_INLINE void setOwnership(BridgedValue::Ownership ownership) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedDeclObj getDecl() const;
   BRIDGED_INLINE void copyFlags(BridgedArgument fromArgument) const;
 };

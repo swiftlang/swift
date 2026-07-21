@@ -61,6 +61,8 @@
 
 PASS(AllocBoxToStack, "allocbox-to-stack",
      "stack promotion of box objects")
+PASS(CopySinking, "copy-sinking",
+     "Sinks copy instructions over terminator instructions")
 PASS(CopyToBorrowOptimization, "copy-to-borrow-optimization",
      "Convert load [copy] instructions to load_borrow and remove copies of borrowed values")
 PASS(AssumeSingleThreaded, "sil-assume-single-threaded",
