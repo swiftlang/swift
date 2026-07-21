@@ -13,6 +13,10 @@
 @_exported import SwiftAndroid // Clang module
 import SwiftOverlayShims
 
+// FILE is opaque on Android (bionic) - the underlying `struct __sFILE` is
+// not exposed in a way that Clang can import into Swift, so use OpaquePointer.
+// Client code that needs to interoperate with <stdio.h> functions can bridge
+// via `typealias File = OpaquePointer` under `#if os(Android)`.
 nonisolated(unsafe) public var stdin: OpaquePointer {
   OpaquePointer(_swift_stdlib_stdin())
 }

@@ -51,3 +51,18 @@ nonisolated func useFromNonisolatedContext() {
     _ = stdout
     _ = stderr
 }
+
+// Make sure we can pass stdout/stderr to `FILE *` parameters of stdio functions
+// imported from the same overlay.
+//
+// On Android and WASI `FILE *` imports as OpaquePointer, so those platforms
+// require a bridging typealias at each call site (see swift-inspect for the
+// pattern). This check therefore runs only where FILE is a nominal type.
+#if !os(Android) && !os(WASI)
+func passToStdioFunctions() {
+    setvbuf(stdout, nil, _IOLBF, 0)
+    setvbuf(stderr, nil, _IOLBF, 0)
+    fflush(stdout)
+    fputs("hi", stderr)
+}
+#endif
