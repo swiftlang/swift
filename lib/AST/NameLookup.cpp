@@ -2246,18 +2246,20 @@ static void populateMembersForLazyName(DeclName name, NominalTypeDecl *decl,
   // member) would re-enter this very lookup.
   if (ctx.LangOpts.EnableCOMInterop) {
     if (auto *PD = dyn_cast<ProtocolDecl>(decl)) {
-      if (baseName == ctx.Id_IID && PD->getAttrs().hasAttribute<COMAttr>() &&
-          PD->getDeclContext()->getParentSourceFile())
+      if (name.isSimpleName(ctx.Id_IID) &&
+          PD->getAttrs().hasAttribute<COMAttr>() && PD->isInSwiftSourceFile()) {
         evaluateOrDefault(ctx.evaluator, SynthesizeCOMInterfaceIDRequest{PD},
                           nullptr);
+      }
     } else if (auto *CD = dyn_cast<ClassDecl>(decl)) {
-      if (baseName == ctx.Id_CLSID && CD->getAttrs().hasAttribute<COMAttr>() &&
-          CD->getDeclContext()->getParentSourceFile())
+      if (name.isSimpleName(ctx.Id_CLSID) &&
+          CD->getAttrs().hasAttribute<COMAttr>() && CD->isInSwiftSourceFile()) {
         evaluateOrDefault(ctx.evaluator,
                           SynthesizeCOMImplementationIDRequest{CD}, nullptr);
+      }
     }
   }
-  
+
   // Ensure `id` and `actorSystem` are populated for a distributed actor.
   // These have lazily-computed types, so should not create a cycle.
   if (name.isSimpleName(ctx.Id_id) && decl->isInSwiftSourceFile())
