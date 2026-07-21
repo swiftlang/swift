@@ -2138,37 +2138,7 @@ ParamSpecifierRequest::evaluate(Evaluator &evaluator,
     auto selfParam = computeSelfParam(afd,
                                       /*isInitializingCtor*/true,
                                       /*wantDynamicSelf*/false);
-    if (auto fd = dyn_cast<FuncDecl>(afd)) {
-      switch (fd->getSelfAccessKind()) {
-      case SelfAccessKind::LegacyConsuming:
-        return ParamSpecifier::LegacyOwned;
-      case SelfAccessKind::Consuming:
-        return ParamSpecifier::Consuming;
-      case SelfAccessKind::Borrowing:
-        return ParamSpecifier::Borrowing;
-      case SelfAccessKind::Mutating:
-        return ParamSpecifier::InOut;
-      case SelfAccessKind::NonMutating:
-        return ParamSpecifier::Default;
-      }
-      llvm_unreachable("nonexhaustive switch");
-    } else {
-      switch (auto specifier = selfParam.getParameterFlags()
-                .getOwnershipSpecifier()) {
-      // TODO: can we just forward the specifier we computed for `selfParam` in
-      // all cases?
-      case ParamSpecifier::InOut:
-      case ParamSpecifier::Consuming:
-        return specifier;
-
-      case ParamSpecifier::Borrowing:
-      case ParamSpecifier::Default:
-      case ParamSpecifier::LegacyShared:
-      case ParamSpecifier::LegacyOwned:
-      case ParamSpecifier::ImplicitlyCopyableConsuming:
-        return ParamSpecifier::Default;
-      }
-    }
+    return selfParam.getParameterFlags().getOwnershipSpecifier();
   }
 
   if (auto *accessor = dyn_cast<AccessorDecl>(dc)) {
