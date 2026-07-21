@@ -1,0 +1,250 @@
+// RUN: %target-sil-opt -copy-sinking %s | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+
+class C {}
+
+class SubKlass : C {}
+
+// CHECK-LABEL: sil [ossa] @sink_over_enum :
+// CHECK:         switch_enum %0
+// CHECK:       bb2([[P:%.*]] : @guaranteed $C):
+// CHECK-NEXT:    [[C:%.*]] = copy_value [[P]]
+// CHECK-NEXT:    return [[C]]
+// CHECK:       } // end sil function 'sink_over_enum'
+sil [ossa] @sink_over_enum : $@convention(thin) (@guaranteed Optional<C>) -> @owned C {
+bb0(%0 : @guaranteed $Optional<C>):
+  %2 = copy_value %0
+  switch_enum %2, case #Optional.some!enumelt: bb2, case #Optional.none!enumelt: bb1
+
+bb1:
+  %4 = integer_literal $Builtin.Int1, -1
+  cond_fail %4, "Unexpectedly found nil while unwrapping an Optional value"
+  unreachable
+
+bb2(%7 : @owned $C):
+  return %7
+}
+
+// CHECK-LABEL: sil [ossa] @sink_over_checked_cast :
+// CHECK:         checked_cast_br C in %0 to SubKlass, bb1, bb2
+// CHECK:       bb1([[S:%.*]] : @guaranteed $SubKlass):
+// CHECK-NEXT:    [[C1:%.*]] = copy_value [[S]]
+// CHECK-NEXT:    enum $Optional<SubKlass>, #Optional.some!enumelt, [[C1]]
+// CHECK:       bb2([[B:%.*]] : @guaranteed $C):
+// CHECK-NEXT:    [[C2:%.*]] = copy_value [[B]]
+// CHECK-NEXT:    destroy_value [[C2]]
+// CHECK:       } // end sil function 'sink_over_checked_cast'
+sil [ossa] @sink_over_checked_cast : $@convention(thin) (@guaranteed C) -> @owned Optional<SubKlass> {
+bb0(%0 : @guaranteed $C):
+  %2 = copy_value %0
+  checked_cast_br C in %2 to SubKlass, bb1, bb2
+
+bb1(%4 : @owned $SubKlass):
+  %5 = enum $Optional<SubKlass>, #Optional.some!enumelt, %4
+  br bb3(%5)
+
+
+bb2(%7 : @owned $C):
+  destroy_value %7
+  %9 = enum $Optional<SubKlass>, #Optional.none!enumelt
+  br bb3(%9)
+
+bb3(%11 : @owned $Optional<SubKlass>):
+  return %11
+}
+
+// CHECK-LABEL: sil [ossa] @sink_over_phi :
+// CHECK:       bb1:
+// CHECK-NEXT:    br bb3(%0)
+// CHECK:       bb2:
+// CHECK-NEXT:    br bb3(%0)
+// CHECK:       bb3([[P:%.*]] : @guaranteed $C):
+// CHECK-NEXT:    [[BF:%.*]] = borrowed [[P]] from (%0)
+// CHECK-NEXT:    [[C:%.*]] = copy_value [[BF]]
+// CHECK-NEXT:    return [[C]]
+// CHECK:       } // end sil function 'sink_over_phi'
+sil [ossa] @sink_over_phi : $@convention(thin) (@guaranteed C) -> @owned C {
+bb0(%0 : @guaranteed $C):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %2 = copy_value %0
+  br bb3(%2)
+
+bb2:
+  %4 = copy_value %0
+  br bb3(%4)
+
+
+bb3(%6 : @owned $C):
+  return %6
+}
+
+// CHECK-LABEL: sil [ossa] @sink_load_over_enum :
+// CHECK:         %1 = load_borrow %0
+// CHECK-NEXT:    switch_enum %1
+// CHECK:       bb1:
+// CHECK-NEXT:    end_borrow %1
+// CHECK:       bb2([[P:%.*]] : @guaranteed $C):
+// CHECK-NEXT:    [[C:%.*]] = copy_value [[P]]
+// CHECK-NEXT:    end_borrow %1
+// CHECK-NEXT:    return [[C]]
+// CHECK:       } // end sil function 'sink_load_over_enum'
+sil [ossa] @sink_load_over_enum : $@convention(thin) (@inout Optional<C>) -> @owned C {
+bb0(%0 : $*Optional<C>):
+  %2 = load [copy] %0
+  switch_enum %2, case #Optional.some!enumelt: bb2, case #Optional.none!enumelt: bb1
+
+bb1:
+  %4 = integer_literal $Builtin.Int1, -1
+  cond_fail %4, "Unexpectedly found nil while unwrapping an Optional value"
+  unreachable
+
+bb2(%7 : @owned $C):
+  return %7
+}
+
+// CHECK-LABEL: sil [ossa] @sink_load_over_enum_modified_address :
+// CHECK:         %1 = load [copy] %0
+// CHECK:       bb2([[P:%.*]] : @owned $C):
+// CHECK-NEXT:    return [[P]]
+// CHECK:       } // end sil function 'sink_load_over_enum_modified_address'
+sil [ossa] @sink_load_over_enum_modified_address : $@convention(thin) (@inout Optional<C>) -> @owned C {
+bb0(%0 : $*Optional<C>):
+  %2 = load [copy] %0
+  %3 = apply undef(%0) : $@convention(thin) (@inout Optional<C>) -> ()
+  switch_enum %2, case #Optional.some!enumelt: bb2, case #Optional.none!enumelt: bb1
+
+bb1:
+  %4 = integer_literal $Builtin.Int1, -1
+  cond_fail %4, "Unexpectedly found nil while unwrapping an Optional value"
+  unreachable
+
+bb2(%7 : @owned $C):
+  return %7
+}
+
+// CHECK-LABEL: sil [ossa] @sink_over_enum_extend_scope :
+// CHECK:         %1 = begin_borrow %0
+// CHECK-NEXT:    switch_enum %1
+// CHECK:       bb1:
+// CHECK-NEXT:    end_borrow %1
+// CHECK:       bb2([[P:%.*]] : @guaranteed $C):
+// CHECK-NEXT:    [[C:%.*]] = copy_value [[P]]
+// CHECK-NEXT:    end_borrow %1
+// CHECK:       } // end sil function 'sink_over_enum_extend_scope'
+sil [ossa] @sink_over_enum_extend_scope : $@convention(thin) (@owned Optional<C>) -> @owned C {
+bb0(%0 : @owned $Optional<C>):
+  %1 = begin_borrow %0
+  %2 = copy_value %1
+  end_borrow %1
+  switch_enum %2, case #Optional.some!enumelt: bb2, case #Optional.none!enumelt: bb1
+
+bb1:
+  destroy_value [dead_end] %0
+  %4 = integer_literal $Builtin.Int1, -1
+  cond_fail %4, "Unexpectedly found nil while unwrapping an Optional value"
+  unreachable
+
+bb2(%7 : @owned $C):
+  destroy_value %0
+  return %7
+}
+
+// CHECK-LABEL: sil [ossa] @sink_over_phi_wrong_liverange :
+// CHECK:       bb1:
+// CHECK-NEXT:    copy_value
+// CHECK:       bb2:
+// CHECK-NEXT:    copy_value
+// CHECK:       } // end sil function 'sink_over_phi_wrong_liverange'
+sil [ossa] @sink_over_phi_wrong_liverange : $@convention(thin) (@owned C) -> @owned C {
+bb0(%0 : @owned $C):
+  %1 = begin_borrow %0
+  cond_br undef, bb1, bb2
+
+bb1:
+  %2 = copy_value %1
+  end_borrow %1
+  br bb3(%2)
+
+bb2:
+  %4 = copy_value %1
+  end_borrow %1
+  br bb3(%4)
+
+
+bb3(%6 : @owned $C):
+  destroy_value %0
+  return %6
+}
+
+// CHECK-LABEL: sil [ossa] @sink_over_enum_no_single_copy_use :
+// CHECK:         copy_value
+// CHECK:         switch_enum
+// CHECK:       } // end sil function 'sink_over_enum_no_single_copy_use'
+sil [ossa] @sink_over_enum_no_single_copy_use : $@convention(thin) (@guaranteed Optional<C>) -> @owned C {
+bb0(%0 : @guaranteed $Optional<C>):
+  %2 = copy_value %0
+  fix_lifetime %2
+  switch_enum %2, case #Optional.some!enumelt: bb2, case #Optional.none!enumelt: bb1
+
+bb1:
+  %4 = integer_literal $Builtin.Int1, -1
+  cond_fail %4, "Unexpectedly found nil while unwrapping an Optional value"
+  unreachable
+
+bb2(%7 : @owned $C):
+  return %7
+}
+
+// CHECK-LABEL: sil [ossa] @sink_over_phi_no_single_copy_use :
+// CHECK:       bb1:
+// CHECK-NEXT:    copy_value
+// CHECK:       bb2:
+// CHECK-NEXT:    copy_value
+// CHECK:       } // end sil function 'sink_over_phi_no_single_copy_use'
+sil [ossa] @sink_over_phi_no_single_copy_use : $@convention(thin) (@guaranteed C) -> @owned C {
+bb0(%0 : @guaranteed $C):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %2 = copy_value %0
+  fix_lifetime %2
+  br bb3(%2)
+
+bb2:
+  %4 = copy_value %0
+  br bb3(%4)
+
+
+bb3(%6 : @owned $C):
+  return %6
+}
+
+// CHECK-LABEL: sil [ossa] @cast_does_not_preserve_ownership :
+// CHECK:         %1 = copy_value %0
+// CHECK-NEXT:    checked_cast_br AnyObject in %1 to C
+// CHECK:       } // end sil function 'cast_does_not_preserve_ownership'
+sil [ossa] @cast_does_not_preserve_ownership : $@convention(thin) (@guaranteed AnyObject) -> @owned C {
+bb0(%0 : @guaranteed $AnyObject):
+  %1 = copy_value %0
+  checked_cast_br AnyObject in %1 to C, bb1, bb2
+
+bb1(%3 : @owned $C):
+  br bb3(%3)
+
+
+bb2(%5 : @owned $AnyObject):
+  destroy_value %5
+  unreachable
+
+bb3(%8 : @owned $C):
+  return %8
+}
+
+
