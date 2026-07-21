@@ -276,7 +276,7 @@ private func sllConsumedResults(
               flags: .placementRearranged
             )
           }
-        } else if let nominalTypeScope = Syntax(parent).asProtocol(SyntaxProtocol.self) as? NominalTypeDeclSyntax,
+        } else if let nominalTypeScope = Syntax(parent).asProtocol(SyntaxProtocol.self) as? NominalTypeDeclScopeSyntax,
           nominalTypeScope.inheritanceClause?.range.contains(lookupToken.position) ?? false
         {
           // If lookup started from nominal type inheritance clause, reverse introduced names.
