@@ -794,3 +794,26 @@ bb0(%x : $Builtin.Int64, %y: $Builtin.Int64):
   %ret = tuple ()
   return %ret : $()
 } // end sil function 'cond_fail_of_cmp'
+
+// The sibling block doesn't execute the cond_fail on %cmp, so its overflow check must be kept.
+// CHECK-LABEL: @cond_fail_of_cmp_sibling_block
+// CHECK: cond_fail {{.*}}"arithmetic overflow"
+// CHECK: } // end sil function 'cond_fail_of_cmp_sibling_block'
+sil @cond_fail_of_cmp_sibling_block : $@convention(thin) (Builtin.Int64, Builtin.Int1) -> Builtin.Int64 {
+bb0(%x : $Builtin.Int64, %p : $Builtin.Int1):
+  %c2 = integer_literal $Builtin.Int64, 2
+  %cmp = builtin "cmp_slt_Int64"(%x : $Builtin.Int64, %c2 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %p, bb2, bb1
+bb1:
+  cond_fail %cmp : $Builtin.Int1, "x must be >= 2"
+  br bb3(%x : $Builtin.Int64)
+bb2:
+  %ovfl = integer_literal $Builtin.Int1, -1
+  %sub = builtin "ssub_with_overflow_Int64"(%x : $Builtin.Int64, %c2 : $Builtin.Int64, %ovfl : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %res = tuple_extract %sub : $(Builtin.Int64, Builtin.Int1), 0
+  %ov = tuple_extract %sub : $(Builtin.Int64, Builtin.Int1), 1
+  cond_fail %ov : $Builtin.Int1, "arithmetic overflow"
+  br bb3(%res : $Builtin.Int64)
+bb3(%r : $Builtin.Int64):
+  return %r : $Builtin.Int64
+} // end sil function 'cond_fail_of_cmp_sibling_block'
