@@ -1444,22 +1444,23 @@ final class ElfImage<SomeElfTraits: ElfTraits> : DwarfSource {
       let stringShdr = sectionHeaders[Int(header.e_shstrndx)]
       let base = ImageSource.Address(stringShdr.sh_offset)
       let end = base + ImageSource.Size(stringShdr.sh_size)
-      let stringSource = source[base..<end]
-      let stringSect = ElfStringSection(source: stringSource)
+      if let stringSource = try? source[base..<end] {
+        let stringSect = ElfStringSection(source: stringSource)
 
-      for shdr in sectionHeaders {
-        // All other fields are undefined for SHT_NULL
-        if shdr.sh_type == .SHT_NULL {
-          continue
-        }
+        for shdr in sectionHeaders {
+          // All other fields are undefined for SHT_NULL
+          if shdr.sh_type == .SHT_NULL {
+            continue
+          }
 
-        guard let name = stringSect.getStringAt(index: Int(shdr.sh_name)) else {
-          continue
-        }
+          guard let name = stringSect.getStringAt(index: Int(shdr.sh_name)) else {
+            continue
+          }
 
-        if name == ".eh_frame" {
-          ehFrameInfo.ehFrameSection = Range(base: ImageSource.Address(shdr.sh_offset),
-                                             size: ImageSource.Size(shdr.sh_size))
+          if name == ".eh_frame" {
+            ehFrameInfo.ehFrameSection = Range(base: ImageSource.Address(shdr.sh_offset),
+                                               size: ImageSource.Size(shdr.sh_size))
+          }
         }
       }
     }
@@ -1500,7 +1501,7 @@ final class ElfImage<SomeElfTraits: ElfTraits> : DwarfSource {
       do {
         let base = ImageSource.Address(stringShdr.sh_offset)
         let end = base + ImageSource.Size(stringShdr.sh_size)
-        let stringSource = source[base..<end]
+        let stringSource = try source[base..<end]
         let stringSect = ElfStringSection(source: stringSource)
 
         for shdr in sectionHeaders {
@@ -1517,7 +1518,7 @@ final class ElfImage<SomeElfTraits: ElfTraits> : DwarfSource {
           if name == sname {
             let base = ImageSource.Address(shdr.sh_offset)
             let end = base + ImageSource.Size(shdr.sh_size)
-            let subSource = source[base..<end]
+            let subSource = try source[base..<end]
 
             if (shdr.sh_flags & Traits.Shdr.Flags(SHF_COMPRESSED)) != 0 {
               return try ImageSource(elfCompressedImageSource: subSource,
@@ -1530,7 +1531,7 @@ final class ElfImage<SomeElfTraits: ElfTraits> : DwarfSource {
           if zname == sname {
             let base = ImageSource.Address(shdr.sh_offset)
             let end = base + ImageSource.Size(shdr.sh_size)
-            let subSource = source[base..<end]
+            let subSource = try source[base..<end]
 
             return try ImageSource(gnuCompressedImageSource: subSource)
           }
@@ -1869,7 +1870,7 @@ extension ElfImage: SymbolSource {
       return nil
     }
     let size = Int(exactly: symbol.size) ?? Int.max
-    
+
     return SymbolSource.Symbol(
       name: symbol.name,
       offset: offset,
