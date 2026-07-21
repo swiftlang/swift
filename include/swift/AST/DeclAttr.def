@@ -849,7 +849,7 @@ SIMPLE_DECL_ATTR(sensitive, Sensitive,
 
 SIMPLE_DECL_ATTR(unsafe, Unsafe,
   OnAbstractFunction | OnSubscript | OnVar | OnMacro | OnNominalType | OnExtension | OnTypeAlias | OnEnumElement | OnImport,
-  UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
   160)
 
 DECL_ATTR(lifetime, Lifetime,
@@ -870,7 +870,7 @@ SIMPLE_DECL_ATTR(_addressableForDependencies, AddressableForDependencies,
 
 SIMPLE_DECL_ATTR(safe, Safe,
   OnAbstractFunction | OnSubscript | OnVar | OnMacro | OnNominalType | OnExtension | OnEnumElement,
-  UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
   164)
 
 DECL_ATTR(abi, ABI,
