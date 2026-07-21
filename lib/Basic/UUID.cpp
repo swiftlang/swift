@@ -92,6 +92,25 @@ std::optional<swift::UUID> swift::UUID::fromString(const char *s) {
 #endif
 }
 
+void swift::UUID::getCanonicalBytes(unsigned char (&bytes)[Size]) const {
+#if defined(_WIN32)
+  // Value is a Win32 ::UUID; Data1/Data2/Data3 are native-endian. Swap them
+  // back to string order. Data4 is a byte array.
+  bytes[0] = Value[3];
+  bytes[1] = Value[2];
+  bytes[2] = Value[1];
+  bytes[3] = Value[0];
+  bytes[4] = Value[5];
+  bytes[5] = Value[4];
+  bytes[6] = Value[7];
+  bytes[7] = Value[6];
+  for (unsigned i = 8; i < Size; ++i)
+    bytes[i] = Value[i];
+#else
+  memcpy(bytes, Value, Size);
+#endif
+}
+
 void swift::UUID::toString(llvm::SmallVectorImpl<char> &out) const {
   out.resize(UUID::StringBufferSize);
 #if defined(_WIN32)

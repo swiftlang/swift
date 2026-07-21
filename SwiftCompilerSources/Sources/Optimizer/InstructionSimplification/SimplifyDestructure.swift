@@ -154,7 +154,7 @@ private extension DestructureInstruction {
 
     context.erase(instruction: self)
     if canEraseConstructure {
-      context.erase(instructionIncludingDebugUses: constructure)
+      context.erase(instruction: constructure)
     }
   }
 

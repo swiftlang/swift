@@ -255,11 +255,10 @@ static ParamDecl *createMemberwiseInitParameter(DeclContext *DC,
   }
 
   // Create the parameter.
-  auto *arg = new (ctx) ParamDecl(SourceLoc(), paramLoc, var->getName(),
-                                  paramLoc, var->getName(), DC);
-  arg->setSpecifier(ParamSpecifier::Default);
-  arg->setInterfaceType(varInterfaceType);
-  arg->setImplicit();
+  ParamDecl *arg =
+      ParamDecl::createImplicit(ctx, /*specifierLoc=*/SourceLoc(), paramLoc,
+                                var->getName(), paramLoc, var->getName(),
+                                varInterfaceType, DC, ParamSpecifier::Default);
   arg->setAutoClosure(isAutoClosure);
 
   // Don't allow the parameter to accept temporary pointer conversions.
@@ -317,11 +316,10 @@ createImplicitConstructor(NominalTypeDecl *decl, ImplicitConstructorKind ICK,
       auto systemTy = getDistributedActorSystemType(classDecl);
 
       // Create the parameter. API name is actorSystem, local name is system
-      auto *arg = new (ctx) ParamDecl(SourceLoc(), Loc, ctx.Id_actorSystem, Loc,
-                                      ctx.Id_system, decl);
-      arg->setSpecifier(ParamSpecifier::Default);
-      arg->setInterfaceType(systemTy);
-      arg->setImplicit();
+      ParamDecl *arg =
+          ParamDecl::createImplicit(ctx, /*specifierLoc=*/SourceLoc(), Loc,
+                                    ctx.Id_actorSystem, Loc, ctx.Id_system,
+                                    systemTy, decl, ParamSpecifier::Default);
 
       params.push_back(arg);
     }

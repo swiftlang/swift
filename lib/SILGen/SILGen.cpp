@@ -2283,15 +2283,27 @@ void SILGenModule::emitSourceFile(SourceFile *sf) {
   // synthesized file unit to cover all macro-generated extension decls.
   if (auto *synthesizedFile = sf->getSynthesizedFile()) {
     for (auto *D : synthesizedFile->getTopLevelDecls()) {
-      if (!isa<ExtensionDecl>(D))
+      auto *ext = dyn_cast<ExtensionDecl>(D);
+      if (!ext)
         continue;
 
-      auto *sf = D->getInnermostDeclContext()->getParentSourceFile();
+      // COM synthesis records an `IID` accessor in a protocol metatype
+      // extension here (a user-written metatype extension would live in the
+      // source file's top-level decls, so within the synthesized file unit
+      // this form is unambiguously synthesized).  Its members need SILGen like
+      // any other; without this its getter is never emitted and clients that
+      // reference `P.IID` fail to link.
+      if (ext->isMetatypeExtension()) {
+        visit(ext);
+        continue;
+      }
+
+      auto *sf = ext->getInnermostDeclContext()->getParentSourceFile();
       if (sf->getFulfilledMacroRole() != MacroRole::Conformance &&
           sf->getFulfilledMacroRole() != MacroRole::Extension)
         continue;
 
-      visit(D);
+      visit(ext);
     }
   }
 
