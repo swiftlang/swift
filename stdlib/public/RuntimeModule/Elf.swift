@@ -1865,10 +1865,15 @@ extension ElfImage: SymbolSource {
       return nil
     }
 
+    guard let offset = Int(exactly: relativeAddress - symbol.value) else {
+      return nil
+    }
+    let size = Int(exactly: symbol.size) ?? Int.max
+    
     return SymbolSource.Symbol(
       name: symbol.name,
-      offset: Int(relativeAddress - symbol.value),
-      size: Int(symbol.size)
+      offset: offset,
+      size: size
     )
   }
 
