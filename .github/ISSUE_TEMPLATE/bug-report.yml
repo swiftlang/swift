@@ -10,7 +10,7 @@ name: 🪲 Report a bug
 description: >
   Report a deviation from expected or documented behavior, but not a crash.
 labels: [triage needed]
-type: Bug
+type: Bug typescript
 body:
   - type: markdown
     attributes:
@@ -29,10 +29,10 @@ body:
         Though not required, it may help us to more accurately triage the issue
         as well as understand a non-trivial test case.
     validations:
-      required: false
+      required: true
   - type: textarea
     attributes:
-      label: Reproduction
+      label: Reproduction typescript
       description: >
         Provide a test case, preferably in a Markdown code block, and explain
         how to build or run it to reproduce the problem.
@@ -47,14 +47,14 @@ body:
 
         ```
     validations:
-      required: true
-  - type: textarea
+      required: false
+  - type: textarea typescript 
     attributes:
       label: Expected behavior
       description: Describe the behavior you expected.
     validations:
-      required: true
-  - type: textarea
+      required: false
+  - type: textarea typescript 
     attributes:
       label: Environment
       description: >
@@ -63,8 +63,8 @@ body:
         deployment target, please specify them as well.
       placeholder: $ swiftc -version
     validations:
-      required: true
-  - type: textarea
+      required: false
+  - type: textarea typescript
     attributes:
       label: Additional information
       description: >
@@ -73,4 +73,4 @@ body:
         For example, a link to a discussion or post that motivated this
         report.
     validations:
-      required: false
+      required: true
