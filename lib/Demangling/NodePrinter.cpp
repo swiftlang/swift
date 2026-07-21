@@ -389,6 +389,7 @@ bool NodePrinter::isSimpleType(NodePointer Node) {
   case Node::Kind::ImplEscaping:
   case Node::Kind::ImplErasedIsolation:
   case Node::Kind::ImplNonisolatedNonsendingIsolation:
+  case Node::Kind::ImplCalledOnceFunction:
   case Node::Kind::ImplSendingResult:
   case Node::Kind::ImplConvention:
   case Node::Kind::ImplParameterResultDifferentiability:
@@ -2908,7 +2909,10 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     return nullptr;
   case Node::Kind::ImplErasedIsolation:
     Printer << "@isolated(any)";
-    return nullptr;    
+    return nullptr;
+  case Node::Kind::ImplCalledOnceFunction:
+    Printer << "@called(once)";
+    return nullptr;
   case Node::Kind::ImplCoroutineKind:
     // Skip if text is empty.
     if (Node->getText().empty())

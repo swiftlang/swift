@@ -2351,6 +2351,9 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn,
     break;
   }
 
+  if (fn->isCalledOnce())
+    OpArgs.push_back('O');
+
   // Differentiability kind.
   auto diffKind = fn->getExtInfo().getDifferentiabilityKind();
   if (diffKind != DifferentiabilityKind::NonDifferentiable) {

@@ -1274,6 +1274,8 @@ protected:
           flags = flags.withNonisolatedNonsendingIsolation();
         } else if (child->getKind() == NodeKind::ImplErasedIsolation) {
           flags = flags.withErasedIsolation();
+        } else if (child->getKind() == NodeKind::ImplCalledOnceFunction) {
+          flags = flags.withCalledOnce();
         } else if (child->getKind() == NodeKind::ImplParameter) {
           if (decodeImplFunctionParam(child, depth + 1, parameters))
             return MAKE_NODE_TYPE_ERROR0(child,
