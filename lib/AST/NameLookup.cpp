@@ -2257,6 +2257,13 @@ static void populateMembersForLazyName(DeclName name, NominalTypeDecl *decl,
                           SynthesizeCOMImplementationIDRequest{CD}, nullptr);
     }
   }
+  
+  // Ensure `id` and `actorSystem` are populated for a distributed actor.
+  // These have lazily-computed types, so should not create a cycle.
+  if (name.isSimpleName(ctx.Id_id) && decl->isInSwiftSourceFile())
+    (void)decl->getDistributedActorIDProperty();
+  if (name.isSimpleName(ctx.Id_actorSystem) && decl->isInSwiftSourceFile())
+    (void)decl->getDistributedActorSystemProperty();
 }
 
 TinyPtrVector<ValueDecl *>
