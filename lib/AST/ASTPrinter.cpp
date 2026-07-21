@@ -3093,6 +3093,21 @@ static bool sortClangDecls(Decl *lhs, Decl *rhs) {
   auto &SM = lhs->getASTContext().SourceMgr;
   auto *CML = lhs->getASTContext().getClangModuleLoader();
 
+  // If this is a decl from a macro expansion, sort it with its original.
+  Decl *lhsOrig = lhs->getMacroExpansionOriginatingDecl();
+  Decl *rhsOrig = rhs->getMacroExpansionOriginatingDecl();
+
+  // The original comes first, followed by aux decls.
+  if (lhsOrig == rhs)
+    return false;
+  if (rhsOrig == lhs)
+    return true;
+
+  if (lhsOrig)
+    lhs = lhsOrig;
+  if (rhsOrig)
+    rhs = rhsOrig;
+
   auto getClangDecl = [&CML](Decl *d) -> const clang::Decl * {
     // Has an attached clang::Decl
     if (auto *D = d->getClangDecl())

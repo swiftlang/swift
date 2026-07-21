@@ -1178,6 +1178,11 @@ public:
   unsigned getAttachedMacroDiscriminator(DeclBaseName macroName, MacroRole role,
                                          const CustomAttr *attr) const;
 
+  /// If this declaration was produced by expanding a macro, retrieve the
+  /// declaration that the macro expansion originated from. Returns \c nullptr
+  /// if this declaration is not part of a macro expansion.
+  Decl *getMacroExpansionOriginatingDecl() const;
+
   /// Returns the resolved type for the give custom attribute attached to this
   /// declaration.
   Type getResolvedCustomAttrType(CustomAttr *attr) const;
