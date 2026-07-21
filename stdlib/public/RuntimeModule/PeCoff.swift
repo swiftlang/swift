@@ -529,8 +529,9 @@ final class PeCoffImage {
           continue
         }
 
-        // And, at that, only those that have a section number
-        if symbol.SectionNumber <= 0 {
+        // And, at that, only those that have a valid section number
+        guard symbol.SectionNumber > 0
+              && symbol.SectionNumber <= sections.count else {
           continue
         }
 
