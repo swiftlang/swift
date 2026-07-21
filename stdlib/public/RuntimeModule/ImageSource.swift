@@ -415,9 +415,9 @@ struct ImageSource: CustomStringConvertible {
 extension ImageSource: MemoryReader {
   public func fetch(from address: Address,
                     into buffer: UnsafeMutableRawBufferPointer) throws {
-    let offset = Int(address)
-    guard bytes.count >= buffer.count &&
-            offset <= bytes.count - buffer.count else {
+    guard let offset = Int(exactly: address),
+          bytes.count >= buffer.count &&
+            offset >= 0 && offset <= bytes.count - buffer.count else {
       throw ImageSourceError.outOfBoundsRead
     }
     buffer.copyMemory(from: UnsafeRawBufferPointer(
@@ -426,8 +426,9 @@ extension ImageSource: MemoryReader {
 
   public func fetch<T>(from address: Address, as type: T.Type) throws -> T {
     let size = MemoryLayout<T>.size
-    let offset = Int(address)
-    guard offset <= bytes.count - size else {
+    guard let offset = Int(exactly: address),
+            bytes.count >= size &&
+            offset >= 0 && offset <= bytes.count - size else {
       throw ImageSourceError.outOfBoundsRead
     }
     return bytes.loadUnaligned(fromByteOffset: offset, as: type)
@@ -435,6 +436,10 @@ extension ImageSource: MemoryReader {
 
   public func fetchString(from address: Address) throws -> String? {
     let offset = Int(address)
+    guard let offset = Int(exactly: address),
+            offset >= 0 && offset <= bytes.count else {
+      throw ImageSourceError.outOfBoundsRead
+    }
     let len = strnlen(bytes.baseAddress! + offset, bytes.count - offset)
     let stringBytes = bytes[offset..<offset+len]
     return String(decoding: stringBytes, as: UTF8.self)
@@ -442,6 +447,11 @@ extension ImageSource: MemoryReader {
 
   public func fetchString(from address: Address, length: Int) throws -> String? {
     let offset = Int(address)
+    guard let offset = Int(exactly: address),
+            bytes.count >= length &&
+            offset >= 0 && offset <= bytes.count - length else {
+      throw ImageSourceError.outOfBoundsRead
+    }
     let stringBytes = bytes[offset..<offset+length]
     return String(decoding: stringBytes, as: UTF8.self)
   }
