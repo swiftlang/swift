@@ -7,7 +7,8 @@
 // RUN: %target-swift-frontend -typecheck -plugin-path %swift-plugin-dir -I %t -cxx-interoperability-mode=default \
 // RUN:   %t/test.swift -verify -verify-additional-file %t%{fs-sep}test.h -Rmacro-expansions -suppress-notes -eager-macro-checking \
 // RUN:   -Xcc -Wno-nullability-completeness -target %target-swift-6.2-abi-triple \
-// RUN:   -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature SafeInteropWrappersNullAsEmptySpan
+// RUN:   -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature SafeInteropWrappersNullAsEmptySpan \
+// RUN:   -verify-additional-prefix %target-vendor-
 
 //--- test.h
 #define __counted_by(x) __attribute__((__counted_by__(x)))
@@ -158,7 +159,7 @@ struct SWIFT_REFERENCE RefType {
   // FIXME: merge availability with that of surrounding context
   // expected-expansion@+15:80{{
   //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-  //   expected-error@2{{instance method cannot be more available than enclosing scope}}
+  //   expected-apple-error@2{{instance method cannot be more available than enclosing scope}}
   //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_disfavoredOverload|}}
   //   expected-remark@3{{macro content: |public final func refNoescape(_ p: Span<CInt>) {|}}
   //   expected-remark@4{{macro content: |    let len = CInt(exactly: p.count)!|}}
@@ -189,7 +190,7 @@ struct SWIFT_REFERENCE RefType {
   // FIXME: merge availability with that of surrounding context
   // expected-expansion@+20:103{{
   //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-  //   expected-error@2{{instance method cannot be more available than enclosing scope}}
+  //   expected-apple-error@2{{instance method cannot be more available than enclosing scope}}
   //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_lifetime(p: copy p) @_disfavoredOverload|}}
   //   expected-remark@3{{macro content: |public final func refLifetimebound(_ p: inout MutableSpan<CInt>) -> MutableSpan<CInt> {|}}
   //   expected-remark@4{{macro content: |    let len = CInt(exactly: p.count)!|}}
