@@ -3,6 +3,7 @@
 
 // RUN: %target-swift-frontend -emit-module -module-name Legacy \
 // RUN:     -enable-library-evolution \
+// RUN:     -swift-version 5 \
 // RUN:     -o %t/Legacy.swiftmodule \
 // RUN:     -emit-module-interface-path %t/Legacy.swiftinterface \
 // RUN:     -enable-experimental-feature DefaultIsolationPerFile \
@@ -13,6 +14,7 @@
 
 // RUN: %target-swift-frontend -emit-module -module-name Ordering \
 // RUN:     -enable-library-evolution \
+// RUN:     -swift-version 5 \
 // RUN:     -o %t/Ordering.swiftmodule \
 // RUN:     -emit-module-interface-path %t/Ordering.swiftinterface \
 // RUN:     -enable-experimental-feature DefaultIsolationPerFile \
