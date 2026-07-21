@@ -155,9 +155,60 @@ private struct OverflowCheckRemover {
     else {
       return false
     }
+    // `x - min(a, x)` can't trap.
+    if isRedundantMinSubtraction(builtin, at: condFail.parentBlock) {
+      return true
+    }
     for constraint in constraints {
       if constraint.dominatingBlock.dominates(condFail.parentBlock, domTree),
          isOverflowCheckRemoved(by: constraint, builtin) {
+        return true
+      }
+    }
+    return false
+  }
+
+  /// Whether `builtin` computes `x - min(a, x)`, which can't trap: `min(a, x) <= x` keeps the
+  /// result in `[0, x]`. A signed subtraction also needs `a >= 0`, else `x - a` can overflow.
+  private func isRedundantMinSubtraction(_ builtin: BuiltinInst, at block: BasicBlock) -> Bool {
+    let isSigned: Bool
+    switch builtin.id {
+    case .SSubOver: isSigned = true
+    case .USubOver: isSigned = false
+    default:        return false
+    }
+    let x = builtin.operands[0].value
+    guard let (a, b) = matchMinDiamond(builtin.operands[1].value, wantSigned: isSigned) else {
+      return false
+    }
+    // The minuend must be one of the compared operands, so that the subtrahend is `<= x`.
+    let other: Value
+    if x == a {
+      other = b
+    } else if x == b {
+      other = a
+    } else {
+      return false
+    }
+    // Unsigned subtraction only traps on underflow, which `min(a, x) <= x` rules out.
+    if !isSigned {
+      return true
+    }
+    // Signed: also rule out overflow above.
+    return isKnownNonNegative(other, at: block)
+  }
+
+  /// Whether `value` is non-negative at `block`: a non-negative literal, or covered by a dominating
+  /// `0 <= value` constraint.
+  private func isKnownNonNegative(_ value: Value, at block: BasicBlock) -> Bool {
+    if let literal = literalValue(value) {
+      return literal >= 0
+    }
+    for constraint in constraints {
+      if constraint.relationship == .sle,
+         let left = literalValue(constraint.left), left >= 0,
+         constraint.right == value,
+         constraint.dominatingBlock.dominates(block, domTree) {
         return true
       }
     }
@@ -251,6 +302,50 @@ private struct OverflowCheckRemover {
                                     relationship: falseRelation))
     }
   }
+}
+
+/// Matches a `min` lowered to a diamond and returns the two compared operands (the merged value is
+/// `<=` both). The comparison's signedness must match `wantSigned`, e.g.
+///
+///   %c = builtin "cmp_[su]l[te]"(%a, %b)
+///   cond_br %c, trueBB, falseBB
+/// trueBB:  br mergeBB(%a)   // the true edge carries %a, the smaller
+/// falseBB: br mergeBB(%b)
+/// mergeBB(%min):
+///
+private func matchMinDiamond(_ value: Value, wantSigned: Bool) -> (Value, Value)? {
+  guard let phi = Phi(value) else {
+    return nil
+  }
+  // Exactly two incoming edges, both from a single common conditional block.
+  var predecessors = phi.predecessors
+  guard let pred0 = predecessors.next(), let pred1 = predecessors.next(),
+        predecessors.next() == nil,
+        let condBlock = pred0.singlePredecessor, condBlock == pred1.singlePredecessor,
+        let condBranch = condBlock.terminator as? CondBranchInst
+  else {
+    return nil
+  }
+  let trueBlock = condBranch.trueBlock
+  let falseBlock = condBranch.falseBlock
+  guard (pred0 == trueBlock && pred1 == falseBlock) || (pred1 == trueBlock && pred0 == falseBlock),
+        let comparison = condBranch.condition as? BuiltinInst
+  else {
+    return nil
+  }
+  switch comparison.id {
+  case .ICMP_SLT, .ICMP_SLE: if !wantSigned { return nil }
+  case .ICMP_ULT, .ICMP_ULE: if wantSigned { return nil }
+  default: return nil
+  }
+  // For `min`, the true edge (where op0 <(=) op1) carries op0, the smaller one.
+  let op0 = comparison.operands[0].value
+  let op1 = comparison.operands[1].value
+  if phi.incomingOperand(inPredecessor: trueBlock).value == op0,
+     phi.incomingOperand(inPredecessor: falseBlock).value == op1 {
+    return (op0, op1)
+  }
+  return nil
 }
 
 /// The arithmetic-overflow builtins and the relation each one expresses when it doesn't trap.
