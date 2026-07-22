@@ -911,7 +911,7 @@ ASTContext::ASTContext(
 
 void ASTContext::Implementation::dump(llvm::raw_ostream &os) const {
   os << "-------------------------------------------------\n";
-  os << "Arena\t0\t" << Allocator.getBytesAllocated() << "\n";
+  os << "Arena\t0\t" << Allocator.getTotalMemory() << "\n";
   Permanent.dump(os);
 
 #define SIZE(Name) os << #Name << "\t" << Name.size() << "\t0\n"
@@ -1015,7 +1015,7 @@ void ASTContext::setStatsReporter(UnifiedStatsReporter *stats) {
   Stats = stats;
 
   stats->getFrontendCounters().NumASTBytesAllocated =
-      getAllocator().getBytesAllocated();
+      getAllocator().getTotalMemory();
 
   if (stats->fineGrainedTimers())
     evaluator.setStatsReporter(stats);
@@ -3531,7 +3531,7 @@ size_t ASTContext::getSolverMemory() const {
 
   if (getImpl().CurrentConstraintSolverArena) {
     Size += getImpl().CurrentConstraintSolverArena->getTotalMemory();
-    Size += getImpl().CurrentConstraintSolverArena->Allocator.getBytesAllocated();
+    Size += getImpl().CurrentConstraintSolverArena->Allocator.getTotalMemory();
   }
 
   return Size;
