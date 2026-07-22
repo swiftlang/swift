@@ -1,0 +1,29 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -sil-combine | %FileCheck %s
+
+// Test that convert_function is correctly salvaged into a debug
+// reconstruction block by tryEliminateOnlyOwnershipUsedForwardingInst
+// in SILCombine's visitConvertFunctionInst.
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+// CHECK-LABEL: sil @test_salvage_convert_function
+// CHECK: bb0(%0 :
+// CHECK:   debug_value %0, let, name "fn", transform {
+// CHECK:   bb0(%0 :
+// CHECK:     %1 = convert_function %0 to $@callee_guaranteed () -> (@out Any, @error any Error)
+// CHECK:     return %1
+// CHECK:   }
+// CHECK:   strong_release %0
+// CHECK:   return
+// CHECK-LABEL: } // end sil function 'test_salvage_convert_function'
+sil @test_salvage_convert_function : $@convention(thin) (@guaranteed @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <Any>) -> () {
+bb0(%0 : $@callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <Any>):
+  %1 = convert_function %0 : $@callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <Any> to $@callee_guaranteed () -> (@out Any, @error any Error)
+  debug_value %1 : $@callee_guaranteed () -> (@out Any, @error any Error), let, name "fn"
+  strong_release %1 : $@callee_guaranteed () -> (@out Any, @error any Error)
+  %r = tuple ()
+  return %r : $()
+}
