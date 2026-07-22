@@ -178,8 +178,9 @@ private struct EagerMaterialization {
   }
 
   public mutating func deinitialize() {
+    let dea = context.deadEndBlocks
     for block in function.blocks
-    where block.isReachableExitBlock {
+        where block.isReachableExitBlock && !dea.isDeadEnd(block) {
       let deallocBuilder = Builder(before: block.terminator, context)
       for alloc in allocStacks.reversed() {
         deallocBuilder.createDeallocStack(alloc)
