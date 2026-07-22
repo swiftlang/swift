@@ -224,7 +224,8 @@ FunctionSignatureTransformDescriptor::createOptimizedSILFunctionName() {
 /// Collect all archetypes used by a function.
 static bool usesGenerics(SILFunction *F,
                          ArrayRef<SILParameterInfo> InterfaceParams,
-                         ArrayRef<SILResultInfo> InterfaceResults) {
+                         ArrayRef<SILResultInfo> InterfaceResults,
+                         llvm::SmallVector<DebugValueInst *> &DebugUses) {
   CanSILFunctionType FTy = F->getLoweredFunctionType();
   auto HasGenericSignature = FTy->getInvocationGenericSignature() != nullptr;
   if (!HasGenericSignature)
@@ -262,16 +263,16 @@ static bool usesGenerics(SILFunction *F,
     return UsesGenerics;
 
   for (auto &BB : *F) {
-    for (auto &I : BB) {
-      for (auto Arg : BB.getArguments()) {
-        if (&BB != &*F->begin()) {
-          // Scan types of all BB arguments. Ignore the entry BB, because
-          // it is handled in a special way.
-           Arg->getType().getASTType().visit(FindArchetypesAndGenericTypes);
-           if (UsesGenerics)
-             return UsesGenerics;
-        }
+    for (auto Arg : BB.getArguments()) {
+      if (&BB != &*F->begin()) {
+        // Scan types of all BB arguments. Ignore the entry BB, because
+        // it is handled in a special way.
+         Arg->getType().getASTType().visit(FindArchetypesAndGenericTypes);
+         if (UsesGenerics)
+           return UsesGenerics;
       }
+    }
+    for (auto &I : BB) {
       // Scan types of all operands.
       for (auto &Op : I.getAllOperands()) {
         Op.get()->getType().getASTType().visit(FindArchetypesAndGenericTypes);
@@ -299,6 +300,17 @@ static bool usesGenerics(SILFunction *F,
       // Scan the result type of the instruction.
       for (auto V : I.getResults()) {
         V->getType().getASTType().visit(FindArchetypesAndGenericTypes);
+      }
+
+      if (auto *DVI = dyn_cast<DebugValueInst>(&I)) {
+        if (std::optional<SILType> VarType = DVI->getVarInfo()->Type)
+          VarType->getASTType().visit(FindArchetypesAndGenericTypes);
+
+        // If there are only debug uses of the generic, don't keep it.
+        if (UsesGenerics) {
+          UsesGenerics = false;
+          DebugUses.push_back(DVI);
+        }
       }
 
       if (UsesGenerics)
@@ -396,7 +408,9 @@ FunctionSignatureTransformDescriptor::createOptimizedSILFunctionType() {
     // callee at the LLVM IR level.
     // TODO: Implement a more precise analysis, so that we can eliminate only
     // those generic parameters which are not used.
-    UsesGenerics = usesGenerics(F, InterfaceParams, InterfaceResults);
+    llvm::SmallVector<DebugValueInst *> DebugUses;
+    UsesGenerics = usesGenerics(F, InterfaceParams, InterfaceResults,
+                                DebugUses);
 
     // The set of used archetypes is complete now.
     if (!UsesGenerics) {
@@ -412,6 +426,24 @@ FunctionSignatureTransformDescriptor::createOptimizedSILFunctionType() {
                  for (auto Result : InterfaceResults) {
                    Result.getInterfaceType().dump(llvm::dbgs());
                  });
+
+      // If there are only debug uses of the generics, rewrite them.
+      // They cannot use the removed generic type in any way (fragment,
+      // var type, and operand type).
+      // The variable is replaced with an empty tuple as a placeholder, as in
+      // this case, the whole type is removed and there's no other way to
+      // represent that.
+      auto VoidTy = SILType::getEmptyTupleType(F->getASTContext());
+      SILValue Undef = SILUndef::get(F, VoidTy);
+      for (auto *DVI : DebugUses) {
+        SILDebugVariable VarInfo = DVI->getCompleteVarInfo();
+        VarInfo.Type = VoidTy;
+        VarInfo.DIExpr = {};
+
+        SILBuilder Builder(DVI, DVI->getDebugScope());
+        Builder.createDebugValue(DVI->getLoc(), Undef, VarInfo);
+        DVI->eraseFromParent();
+      }
     }
   }
 

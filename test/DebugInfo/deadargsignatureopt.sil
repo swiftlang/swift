@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -dead-arg-signature-opt %s | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all -dead-arg-signature-opt -function-signature-opts %s | %FileCheck %s
 
 // Test that debug_value instructions referencing dead arguments are preserved
 // (with undef operand) in the specialized function.
@@ -35,4 +35,32 @@ bb0:
   %1 = function_ref @one_arg_dead : $@convention(method) (Int32, Int32, @thin Int32.Type) -> Bool
   %2 = partial_apply %1(%0) : $@convention(method) (Int32, Int32, @thin Int32.Type) -> Bool
   return %2 : $@callee_owned (Int32, Int32) -> Bool
+}
+
+// Test that when a generic function has a dead self argument whose type carries
+// the generic parameter, and only debug_value instructions reference that type,
+// the optimization removes the generic signature and rewrites the debug_value
+// to use Void.
+
+class Foo<T> {}
+
+// CHECK-LABEL: sil shared @$s11generic_barTf4d_n : $@convention(thin) () -> () {
+// CHECK:         debug_value undef : $(), let, name "self"
+// CHECK:         return
+// CHECK-LABEL: } // end sil function '$s11generic_barTf4d_n'
+sil @generic_bar : $@convention(method) <T> (@guaranteed Foo<T>) -> () {
+bb0(%0 : $Foo<T>):
+  debug_value %0 : $Foo<T>, let, name "self", type $Foo<T>
+  %t = tuple ()
+  return %t : $()
+}
+
+sil @call_generic_bar : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref $Foo<Int>
+  %1 = function_ref @generic_bar : $@convention(method) <T> (@guaranteed Foo<T>) -> ()
+  %2 = apply %1<Int>(%0) : $@convention(method) <T> (@guaranteed Foo<T>) -> ()
+  strong_release %0 : $Foo<Int>
+  %t = tuple ()
+  return %t : $()
 }
