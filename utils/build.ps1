@@ -1492,10 +1492,24 @@ function Get-Dependencies {
       if (Test-Path $Destination) { return }
 
       New-Item -ItemType Directory (Split-Path -Path $Destination -Parent) -ErrorAction Ignore | Out-Null
-      $WebClient.DownloadFile($URL, $Destination)
-      $SHA256 = Get-FileHash -Path $Destination -Algorithm SHA256
-      if ($SHA256.Hash -ne $Hash) {
-        throw "SHA256 mismatch ($($SHA256.Hash) vs $Hash)"
+
+      $MaxAttempts = 3
+      for ($Attempt = 1; $Attempt -le $MaxAttempts; $Attempt++) {
+        try {
+          $WebClient.DownloadFile($URL, $Destination)
+          $SHA256 = Get-FileHash -Path $Destination -Algorithm SHA256
+          if ($SHA256.Hash -ne $Hash) {
+            throw "SHA256 mismatch ($($SHA256.Hash) vs $Hash)"
+          }
+          return
+        } catch {
+          Remove-Item -Path $Destination -ErrorAction Ignore
+          if ($Attempt -eq $MaxAttempts) {
+            throw
+          }
+          Write-Warning "Download of $URL failed (attempt $Attempt/$MaxAttempts): $_"
+          Start-Sleep -Seconds ([Math]::Pow(2, $Attempt))
+        }
       }
     }
 
