@@ -173,8 +173,22 @@ void LinearMapInfo::populateBranchingTraceDecl(SILBasicBlock *originalBB,
   }
 }
 
-
 Type LinearMapInfo::getLinearMapType(ADContext &context, FullApplySite fai) {
+  if (isApplySiteOfDifferentiableClosure(fai)) {
+    // Right now, we only support closures capturing exactly one argument with
+    // the type equal to the result type.
+    // TODO: support arbitrary captured argument types and result types.
+    auto callee = cast<ApplyInst>(fai.getInstruction())->getCallee();
+    auto silFunctionType = callee->getType().getAs<SILFunctionType>();
+    auto singleResultType =
+        silFunctionType->getSingleResult().getInterfaceType();
+    auto singleParamType = singleResultType;
+    FunctionType::ExtInfo info;
+    SmallVector<AnyFunctionType::Param, 1> params = {
+        AnyFunctionType::Param(singleParamType)};
+    return FunctionType::get(params, singleResultType, info);
+  }
+
   SmallVector<SILValue, 4> allResults;
   SmallVector<unsigned, 8> activeParamIndices;
   SmallVector<unsigned, 8> activeResultIndices;
@@ -447,6 +461,13 @@ void LinearMapInfo::generateDifferentiationDataStructures(
 /// 3. The instruction has both an active result (direct or indirect) and an
 ///    active argument.
 bool LinearMapInfo::shouldDifferentiateApplySite(FullApplySite applySite) {
+  if (isApplySiteOfDifferentiableClosure(applySite)) {
+    auto callee = cast<ApplyInst>(applySite.getInstruction())->getCallee();
+    if (activityInfo.getActivity(callee, config)
+            .contains(ActivityFlags::Varied))
+      return true;
+  }
+
   // Function applications with an active inout argument should be
   // differentiated.
   for (auto inoutArg : applySite.getInoutArguments())
