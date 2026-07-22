@@ -47,7 +47,7 @@ func borrow<T>(_ t: T) {}
 @propertyWrapper struct BoxWrapper<T> { var wrappedValue: T }
 
 // CaptureKind::Immutable, canGuarantee=true, isPack=true
-// CHECK-LABEL: sil {{.*}}[ossa] @$s22opaque_values_closures30captureImmutablePackGuaranteed1tyxxQp_tRvzlF6$deferL_yyRvzlF : {{.*}} {
+// CHECK-LABEL: sil {{.*}}[ossa] [opaque] @$s22opaque_values_closures30captureImmutablePackGuaranteed1tyxxQp_tRvzlF6$deferL_yyRvzlF : {{.*}} {
 // CHECK:       bb0(%0 : @closureCapture
 // CHECK-LABEL: } // end sil function '$s22opaque_values_closures30captureImmutablePackGuaranteed1tyxxQp_tRvzlF6$deferL_yyRvzlF'
 func captureImmutablePackGuaranteed<each T>(t: repeat each T) {
@@ -55,7 +55,7 @@ func captureImmutablePackGuaranteed<each T>(t: repeat each T) {
 }
 
 // CaptureKind::Immutable, canGuarantee=true, isPack=false
-// CHECK-LABEL: sil {{.*}}[ossa] @$s22opaque_values_closures26captureImmutableGuaranteed1tyx_tlF : {{.*}} {
+// CHECK-LABEL: sil {{.*}}[ossa] [opaque] @$s22opaque_values_closures26captureImmutableGuaranteed1tyx_tlF : {{.*}} {
 // CHECK:       bb0([[INSTANCE:%[^,]+]] :
 // CHECK:         [[STACK:%[^,]+]] = alloc_stack [lexical] [var_decl] $T, let, name "x"
 // CHECK:         [[VAR:%[^,]+]] = mark_uninitialized [var] [[STACK]]
@@ -68,7 +68,7 @@ func captureImmutablePackGuaranteed<each T>(t: repeat each T) {
 // CHECK:         destroy_addr [[VAR]]
 // CHECK:         dealloc_stack [[STACK]]
 // CHECK-LABEL: } // end sil function '$s22opaque_values_closures26captureImmutableGuaranteed1tyx_tlF'
-// CHECK-LABEL: sil {{.*}}[ossa] @$s22opaque_values_closures26captureImmutableGuaranteed1tyx_tlF6$deferL_yylF : {{.*}} {
+// CHECK-LABEL: sil {{.*}}[ossa] [opaque] @$s22opaque_values_closures26captureImmutableGuaranteed1tyx_tlF6$deferL_yylF : {{.*}} {
 // CHECK:       bb0([[INSTANCE:%[^,]+]] : @closureCapture @guaranteed $T):
 // CHECK:         [[BORROW:%[^,]+]] = function_ref @$s22opaque_values_closures6borrowyyxlF : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> () 
 // CHECK:         apply [[BORROW]]<T>([[INSTANCE]]) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
@@ -80,7 +80,7 @@ func captureImmutableGuaranteed<T>(t: T) {
 }
 
 // CaptureKind::Immutable, canGuarantee=false, isPack=true
-// CHECK-LABEL: sil {{.*}}[ossa] @$s22opaque_values_closures25captureImmutableOwnedPackyyxxQpRvzlF : {{.*}} {
+// CHECK-LABEL: sil {{.*}}[ossa] [opaque] @$s22opaque_values_closures25captureImmutableOwnedPackyyxxQpRvzlF : {{.*}} {
 // CHECK:         [[CLOSURE:%[^,]+]] = function_ref @$s22opaque_values_closures25captureImmutableOwnedPackyyxxQpRvzlFyyXEfU_
 // CHECK:         [[STACK_TUPLE:%[^,]+]] = alloc_stack $(repeat each T)
 // CHECK:         [[CONTEXT:%[^,]+]] = partial_apply [callee_guaranteed] [[CLOSURE]]<Pack{repeat each T}>([[STACK_TUPLE]])
@@ -90,7 +90,7 @@ func captureImmutableGuaranteed<T>(t: T) {
 // CHECK:         destroy_value [[NOESCAPE_CONTEXT]]
 // CHECK:         destroy_value [[CONTEXT]]
 // CHECK-LABEL: } // end sil function '$s22opaque_values_closures25captureImmutableOwnedPackyyxxQpRvzlF'
-// CHECK-LABEL: sil {{.*}}[ossa] @$s22opaque_values_closures25captureImmutableOwnedPackyyxxQpRvzlFyyXEfU_ : $@convention(thin) <each T> (@in_guaranteed (repeat each T)) -> () {
+// CHECK-LABEL: sil {{.*}}[ossa] [opaque] @$s22opaque_values_closures25captureImmutableOwnedPackyyxxQpRvzlFyyXEfU_ : $@convention(thin) <each T> (@in_guaranteed (repeat each T)) -> () {
 // CHECK:       bb0(%0 : @closureCapture $*(repeat each T)):
 // CHECK-LABEL: } // end sil function '$s22opaque_values_closures25captureImmutableOwnedPackyyxxQpRvzlFyyXEfU_'
 func captureImmutableOwnedPack<each T>(_ ts: repeat each T) {
@@ -101,7 +101,7 @@ func captureImmutableOwnedPack<each T>(_ ts: repeat each T) {
 func captureImmutableOwnedPack_callee(_ cl: () -> ()) {}
 
 // CaptureKind::Immutable, canGuarantee=false, isPack=false
-// CHECK-LABEL: sil hidden [ossa] @$s22opaque_values_closures21captureImmutableOwnedyyxlF : $@convention(thin) <T> (@in_guaranteed T) -> () {
+// CHECK-LABEL: sil hidden [ossa] [opaque] @$s22opaque_values_closures21captureImmutableOwnedyyxlF : $@convention(thin) <T> (@in_guaranteed T) -> () {
 // CHECK:       bb0([[INSTANCE:%[^,]+]] :
 // CHECK:         [[CLOSURE:%[^,]+]] = function_ref @$s22opaque_values_closures21captureImmutableOwnedyyxlFyyXEfU_
 // CHECK:         [[COPY:%[^,]+]] = copy_value [[INSTANCE]]
@@ -112,7 +112,7 @@ func captureImmutableOwnedPack_callee(_ cl: () -> ()) {}
 // CHECK:         destroy_value [[NOESCAPE_CONTEXT]]
 // CHECK:         destroy_value [[CONTEXT]]
 // CHECK-LABEL: } // end sil function '$s22opaque_values_closures21captureImmutableOwnedyyxlF'
-// CHECK-LABEL: sil {{.*}}[ossa] @$s22opaque_values_closures21captureImmutableOwnedyyxlFyyXEfU_ : {{.*}} {
+// CHECK-LABEL: sil {{.*}}[ossa] [opaque] @$s22opaque_values_closures21captureImmutableOwnedyyxlFyyXEfU_ : {{.*}} {
 // CHECK:       bb0(%0 : @closureCapture @guaranteed $T):
 // CHECK-LABEL: } // end sil function '$s22opaque_values_closures21captureImmutableOwnedyyxlFyyXEfU_'
 func captureImmutableOwned<T>(_ t: T) {
@@ -123,7 +123,7 @@ func captureImmutableOwned<T>(_ t: T) {
 func captureImmutableOwned_callee(_ cl: () -> ()) {}
 
 // CaptureKind::StorageAddress, isMoveOnlyWrapped=false, isPack=false
-// CHECK-LABEL: sil {{.*}}[ossa] @$s22opaque_values_closures21captureStorageAddressyyAA1GVyxGzlF : {{.*}} {
+// CHECK-LABEL: sil {{.*}}[ossa] [opaque] @$s22opaque_values_closures21captureStorageAddressyyAA1GVyxGzlF : {{.*}} {
 // CHECK:       bb0([[ADDR:%[^,]+]] :
 // CHECK:         [[CLOSURE:%[^,]+]] = function_ref @$s22opaque_values_closures21captureStorageAddressyyAA1GVyxGzlFyAEXEfU_
 // CHECK:         [[CONTEXT:%[^,]+]] = partial_apply [callee_guaranteed] [[CLOSURE]]<T>([[ADDR]])
@@ -134,7 +134,7 @@ func captureImmutableOwned_callee(_ cl: () -> ()) {}
 // CHECK:         destroy_value [[NOESCAPE_CONTEXT]]
 // CHECK:         destroy_value [[CONVERTED_CONTEXT]]
 // CHECK-LABEL: } // end sil function '$s22opaque_values_closures21captureStorageAddressyyAA1GVyxGzlF'
-// CHECK-LABEL: sil {{.*}}[ossa] @$s22opaque_values_closures21captureStorageAddressyyAA1GVyxGzlFyAEXEfU_ : {{.*}} {
+// CHECK-LABEL: sil {{.*}}[ossa] [opaque] @$s22opaque_values_closures21captureStorageAddressyyAA1GVyxGzlFyAEXEfU_ : {{.*}} {
 // CHECK:       bb0(%0 : {{.*}}, 
 // CHECK:           %1 : @closureCapture $*G<T>):
 // CHECK-LABEL: } // end sil function '$s22opaque_values_closures21captureStorageAddressyyAA1GVyxGzlFyAEXEfU_'
@@ -158,7 +158,7 @@ func captureStorageAddress_callee<T>(_ t: (G<T>) -> ()) {}
 //    }
 
 // CaptureKind::ImmutableBox, non-opaque, canGuarantee=true, captureCanEscape=true
-// CHECK-LABEL: sil {{.*}}[ossa] @$s22opaque_values_closures46captureImmutableBoxNonopaqueGuaranteedEscapingyyxmlF : {{.*}} {
+// CHECK-LABEL: sil {{.*}}[ossa] [opaque] @$s22opaque_values_closures46captureImmutableBoxNonopaqueGuaranteedEscapingyyxmlF : {{.*}} {
 // CHECK:       bb0([[T:%[^,]+]] :
 // CHECK:         [[BOX:%[^,]+]] = alloc_box ${ var TakingMOG }, var
 // CHECK:         [[BOX_LIFETIME:%[^,]+]] = begin_borrow [var_decl] [[BOX]]
@@ -169,7 +169,7 @@ func captureStorageAddress_callee<T>(_ t: (G<T>) -> ()) {}
 // CHECK:         end_borrow [[BOX_LIFETIME]]
 // CHECK:         destroy_value [[BOX]]
 // CHECK-LABEL: } // end sil function '$s22opaque_values_closures46captureImmutableBoxNonopaqueGuaranteedEscapingyyxmlF'
-// CHECK-LABEL: sil {{.*}}[ossa] @$s22opaque_values_closures46captureImmutableBoxNonopaqueGuaranteedEscapingyyxmlF5localL_yylF : {{.*}} {
+// CHECK-LABEL: sil {{.*}}[ossa] [opaque] @$s22opaque_values_closures46captureImmutableBoxNonopaqueGuaranteedEscapingyyxmlF5localL_yylF : {{.*}} {
 // CHECK:       bb0(%0 : @closureCapture @guaranteed ${ var TakingMOG },
 // CHECK-LABEL: } // end sil function '$s22opaque_values_closures46captureImmutableBoxNonopaqueGuaranteedEscapingyyxmlF5localL_yylF'
 func captureImmutableBoxNonopaqueGuaranteedEscaping<T>(_ t: T.Type) {
@@ -185,7 +185,7 @@ struct TakingMOG {
 }
 
 // CaptureKind::ImmutableBox, non-opaque, canGuarantee=false, captureCanEscape=true
-// CHECK-LABEL: sil {{.*}}[ossa] @$s22opaque_values_closures41captureImmutableBoxNonopaqueOwnedEscapingyyxmlF : {{.*}} {
+// CHECK-LABEL: sil {{.*}}[ossa] [opaque] @$s22opaque_values_closures41captureImmutableBoxNonopaqueOwnedEscapingyyxmlF : {{.*}} {
 // CHECK:         [[IMMUTABLEBOX:%[^,]+]] = alloc_box $<τ_0_0> { let MOG<τ_0_0> } <T>, let
 // CHECK:         [[IMMUTABLEBOX_LIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[IMMUTABLEBOX]]
 // CHECK:         [[IMMUTABLEBOX_ADDR:%[^,]+]] = project_box [[IMMUTABLEBOX_LIFETIME]]
@@ -200,7 +200,7 @@ struct TakingMOG {
 // CHECK:         end_borrow [[IMMUTABLEBOX_LIFETIME]]
 // CHECK:         destroy_value [[IMMUTABLEBOX]]
 // CHECK-LABEL: } // end sil function '$s22opaque_values_closures41captureImmutableBoxNonopaqueOwnedEscapingyyxmlF'
-// CHECK-LABEL: sil {{.*}}[ossa] @$s22opaque_values_closures41captureImmutableBoxNonopaqueOwnedEscapingyyxmlFyycfU_ : {{.*}} {
+// CHECK-LABEL: sil {{.*}}[ossa] [opaque] @$s22opaque_values_closures41captureImmutableBoxNonopaqueOwnedEscapingyyxmlFyycfU_ : {{.*}} {
 // CHECK:       bb0(%0 : @closureCapture @guaranteed $<τ_0_0> { let MOG<τ_0_0> } <T>):
 // CHECK-LABEL: } // end sil function '$s22opaque_values_closures41captureImmutableBoxNonopaqueOwnedEscapingyyxmlFyycfU_'
 func captureImmutableBoxNonopaqueOwnedEscaping<T>(_ t: T.Type) {
@@ -222,7 +222,7 @@ func captureImmutableBoxNonopaqueOwnedEscaping_callee(_ t: @escaping () -> ()) {
 //    }
 
 // CaptureKind::Box, opaque, canGuarantee=true, captureCanEscape=true
-// CHECK-LABEL: sil {{.*}}[ossa] @$s22opaque_values_closures34captureBoxOpaqueGuaranteedEscapingyyF : {{.*}} {
+// CHECK-LABEL: sil {{.*}}[ossa] [opaque] @$s22opaque_values_closures34captureBoxOpaqueGuaranteedEscapingyyF : {{.*}} {
 // CHECK:         [[BOX:%[^,]+]] = alloc_box ${ var @_opaqueReturnTypeOf("$s22opaque_values_closures39captureBoxOpaqueGuaranteedEscaping_vendQryF", 0) __ }, var
 // CHECK:         [[BOX_LIFETIME:%[^,]+]] = begin_borrow [var_decl] [[BOX]]
 // CHECK:         [[BOX_ADDR:%[^,]+]] = project_box [[BOX_LIFETIME]]
@@ -239,7 +239,7 @@ func captureImmutableBoxNonopaqueOwnedEscaping_callee(_ t: @escaping () -> ()) {
 // CHECK:         destroy_value [[BOX2]]
 // CHECK:         destroy_value [[BOX]]
 // CHECK-LABEL: } // end sil function '$s22opaque_values_closures34captureBoxOpaqueGuaranteedEscapingyyF'
-// CHECK-LABEL: sil {{.*}}[ossa] @$s22opaque_values_closures34captureBoxOpaqueGuaranteedEscapingyyF5localL_yyxAA1PRzlF : {{.*}} {
+// CHECK-LABEL: sil {{.*}}[ossa] [opaque] @$s22opaque_values_closures34captureBoxOpaqueGuaranteedEscapingyyF5localL_yyxAA1PRzlF : {{.*}} {
 // CHECK:       bb0(%0 : @guaranteed $T, 
 // CHECK-SAME:      %1 : @closureCapture @guaranteed ${ var @_opaqueReturnTypeOf("$s22opaque_values_closures39captureBoxOpaqueGuaranteedEscaping_vendQryF", 0) __ }):
 // CHECK-LABEL: } // end sil function '$s22opaque_values_closures34captureBoxOpaqueGuaranteedEscapingyyF5localL_yyxAA1PRzlF'
@@ -253,7 +253,7 @@ func captureBoxOpaqueGuaranteedEscaping() {
 func captureBoxOpaqueGuaranteedEscaping_vend() -> some P { return PImpl() }
 
 // CaptureKind::Box, opaque, canGuarantee=false, captureCanEscape=true
-// CHECK-LABEL: sil {{.*}}[ossa] @$s22opaque_values_closures29captureBoxOpaqueOwnedEscapingyyF : {{.*}} {
+// CHECK-LABEL: sil {{.*}}[ossa] [opaque] @$s22opaque_values_closures29captureBoxOpaqueOwnedEscapingyyF : {{.*}} {
 // CHECK:         [[BOX:%[^,]+]] = alloc_box ${ var @_opaqueReturnTypeOf("$s22opaque_values_closures34captureBoxOpaqueOwnedEscaping_vendQryF", 0) __ }, var
 // CHECK:         [[BOX_LIFETIME:%[^,]+]] = begin_borrow [var_decl] [[BOX]]
 // CHECK:         [[BOX_ADDR:%[^,]+]] = project_box [[BOX_LIFETIME]]
@@ -270,7 +270,7 @@ func captureBoxOpaqueGuaranteedEscaping_vend() -> some P { return PImpl() }
 // CHECK:         destroy_value [[CONTEXT]]
 // CHECK:         destroy_value [[BOX]]
 // CHECK-LABEL: } // end sil function '$s22opaque_values_closures29captureBoxOpaqueOwnedEscapingyyF'
-// CHECK-LABEL: sil {{.*}}[ossa] @$s22opaque_values_closures29captureBoxOpaqueOwnedEscapingyyFyAA0defgH5_vendQryFQOyQo_cfU_ : {{.*}} {
+// CHECK-LABEL: sil {{.*}}[ossa] [opaque] @$s22opaque_values_closures29captureBoxOpaqueOwnedEscapingyyFyAA0defgH5_vendQryFQOyQo_cfU_ : {{.*}} {
 // CHECK:       bb0(%0 : $PImpl, 
 // CHECK-SAME:      %1 : @closureCapture @guaranteed ${ var @_opaqueReturnTypeOf("$s22opaque_values_closures34captureBoxOpaqueOwnedEscaping_vendQryF", 0) __ }):
 // CHECK-LABEL: } // end sil function '$s22opaque_values_closures29captureBoxOpaqueOwnedEscapingyyFyAA0defgH5_vendQryFQOyQo_cfU_'
@@ -304,7 +304,7 @@ func captureBoxOpaqueOwnedEscaping_callee<T : P>(_ t: T, _ c: @escaping (T) -> (
 //    }
 
 // CaptureKind::Box, non-opaque, canGuarantee=true, captureCanEscape=true
-// CHECK-LABEL: sil {{.*}}[ossa] @$s22opaque_values_closures37captureBoxNonopaqueGuaranteedEscapingyyxyXElF : {{.*}} {
+// CHECK-LABEL: sil {{.*}}[ossa] [opaque] @$s22opaque_values_closures37captureBoxNonopaqueGuaranteedEscapingyyxyXElF : {{.*}} {
 // CHECK:       bb0([[GET:%[^,]+]] :
 // CHECK:         [[BOX:%[^,]+]] = alloc_box $<τ_0_0> { var Array<τ_0_0> } <U>, var
 // CHECK:         [[BOX_LIFETIME:%[^,]+]] = begin_borrow [var_decl] [[BOX]]
@@ -315,7 +315,7 @@ func captureBoxOpaqueOwnedEscaping_callee<T : P>(_ t: T, _ c: @escaping (T) -> (
 // CHECK:         end_borrow [[BOX_LIFETIME]]
 // CHECK:         destroy_value [[BOX]]
 // CHECK-LABEL: } // end sil function '$s22opaque_values_closures37captureBoxNonopaqueGuaranteedEscapingyyxyXElF'
-// CHECK-LABEL: sil {{.*}}[ossa] @$s22opaque_values_closures37captureBoxNonopaqueGuaranteedEscapingyyxyXElF5localL_yylF : {{.*}} {
+// CHECK-LABEL: sil {{.*}}[ossa] [opaque] @$s22opaque_values_closures37captureBoxNonopaqueGuaranteedEscapingyyxyXElF5localL_yylF : {{.*}} {
 // CHECK:       bb0(%0 : @closureCapture @guaranteed $<τ_0_0> { var Array<τ_0_0> } <U>, 
 // CHECK:           %1 :
 // CHECK-LABEL: } // end sil function '$s22opaque_values_closures37captureBoxNonopaqueGuaranteedEscapingyyxyXElF5localL_yylF'
@@ -329,7 +329,7 @@ func captureBoxNonopaqueGuaranteedEscaping<U>(_ get: () -> U) {
 }
 
 // CaptureKind::Box, non-opaque, canGuarantee=false, captureCanEscape=true
-// CHECK-LABEL: sil {{.*}}[ossa] @$s22opaque_values_closures32captureBoxNonopaqueOwnedEscapingyyF : {{.*}} {
+// CHECK-LABEL: sil {{.*}}[ossa] [opaque] @$s22opaque_values_closures32captureBoxNonopaqueOwnedEscapingyyF : {{.*}} {
 // CHECK:         [[BOX:%[^,]+]] = alloc_box ${ var C }, var
 // CHECK:         [[BOX_LIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[BOX]]
 // CHECK:         [[BOX_ADDR:%[^,]+]] = project_box [[BOX_LIFETIME]]
@@ -347,7 +347,7 @@ func captureBoxNonopaqueGuaranteedEscaping<U>(_ get: () -> U) {
 // CHECK:         end_borrow [[BOX_LIFETIME]]
 // CHECK:         destroy_value [[BOX]]
 // CHECK-LABEL: } // end sil function '$s22opaque_values_closures32captureBoxNonopaqueOwnedEscapingyyF'
-// CHECK-LABEL: sil {{.*}}[ossa] @$s22opaque_values_closures32captureBoxNonopaqueOwnedEscapingyyFyAA1CCcfU_ : {{.*}} {
+// CHECK-LABEL: sil {{.*}}[ossa] [opaque] @$s22opaque_values_closures32captureBoxNonopaqueOwnedEscapingyyFyAA1CCcfU_ : {{.*}} {
 // CHECK:       bb0(%0 : {{.*}}, 
 // CHECK:           %1 : @closureCapture @guaranteed ${ var C }):
 // CHECK-LABEL: } // end sil function '$s22opaque_values_closures32captureBoxNonopaqueOwnedEscapingyyFyAA1CCcfU_'
@@ -361,7 +361,7 @@ func captureBoxNonopaqueOwnedEscaping_callee<T>(_ t: T, _ c: @escaping (T) -> ()
 func captureBoxNonopaqueOwnedEscaping_vend() -> C { return C() }
 
 // CaptureKind::Box, non-opaque, canGuarantee=false, captureCanEscape=false
-// CHECK-LABEL: sil {{.*}}[ossa] @$s22opaque_values_closures35captureBoxNonopaqueOwnedNonescapingyyxyXElF : {{.*}} {
+// CHECK-LABEL: sil {{.*}}[ossa] [opaque] @$s22opaque_values_closures35captureBoxNonopaqueOwnedNonescapingyyxyXElF : {{.*}} {
 // CHECK:       bb0([[GET:%[^,]+]] :
 // CHECK:         [[BOX:%[^,]+]] = alloc_box $<τ_0_0> { var BoxWrapper<τ_0_0> } <U>, var
 // CHECK:         [[VAR:%[^,]+]] = mark_uninitialized [var] [[BOX]]
@@ -374,7 +374,7 @@ func captureBoxNonopaqueOwnedEscaping_vend() -> C { return C() }
 // CHECK:         end_borrow [[VAR_LIFETIME]]
 // CHECK:         destroy_value [[VAR]]
 // CHECK-LABEL: } // end sil function '$s22opaque_values_closures35captureBoxNonopaqueOwnedNonescapingyyxyXElF'
-// CHECK-LABEL: sil {{.*}}[ossa] @$s22opaque_values_closures35captureBoxNonopaqueOwnedNonescapingyyxyXElF5localL_yylF : {{.*}}
+// CHECK-LABEL: sil {{.*}}[ossa] [opaque] @$s22opaque_values_closures35captureBoxNonopaqueOwnedNonescapingyyxyXElF5localL_yylF : {{.*}}
 // CHECK:       bb0(%0 : @closureCapture @guaranteed $<τ_0_0> { var BoxWrapper<τ_0_0> } <U>,
 // CHECK-SAME:      %1 :
 // CHECK-LABEL: } // end sil function '$s22opaque_values_closures35captureBoxNonopaqueOwnedNonescapingyyxyXElF5localL_yylF'

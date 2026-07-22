@@ -1009,8 +1009,8 @@ protected:
       : IGM(IGM), subIGF(subIGF), fwd(fwd), staticFnPtr(staticFnPtr),
         calleeHasContext(calleeHasContext), origSig(origSig),
         origType(origType), substType(substType), outType(outType), subs(subs),
-        conventions(conventions), origConv(origType, IGM.getSILModule()),
-        outConv(outType, IGM.getSILModule()),
+        conventions(conventions),
+        origConv(origType, IGM.silConv), outConv(outType, IGM.silConv),
         origParams(subIGF.collectParameters()) {}
 
 public:
@@ -1025,7 +1025,7 @@ public:
     // Lower the forwarded arguments in the original function's generic context.
     GenericContextScope scope(IGM, origType->getInvocationGenericSignature());
 
-    SILFunctionConventions origConv(origType, IGM.getSILModule());
+    SILFunctionConventions origConv(origType, IGM.silConv);
     auto &outResultTI = IGM.getTypeInfo(
         outConv.getSILResultType(IGM.getMaximalTypeExpansionContext()));
     auto &nativeResultSchema = outResultTI.nativeReturnValueSchema(IGM);
@@ -1245,7 +1245,7 @@ public:
   }
   void createReturn(llvm::CallInst *call) override {
     // Reabstract the result value as substituted.
-    SILFunctionConventions origConv(origType, IGM.getSILModule());
+    SILFunctionConventions origConv(origType, IGM.silConv);
     auto &outResultTI = IGM.getTypeInfo(
         outConv.getSILResultType(IGM.getMaximalTypeExpansionContext()));
     auto &nativeResultSchema = outResultTI.nativeReturnValueSchema(IGM);
@@ -1760,7 +1760,7 @@ static llvm::Value *emitPartialApplicationForwarder(
   auto outSig = IGM.getSignature(outType);
   llvm::AttributeList outAttrs = outSig.getAttributes();
   llvm::FunctionType *fwdTy = outSig.getType();
-  SILFunctionConventions outConv(outType, IGM.getSILModule());
+  SILFunctionConventions outConv(outType, IGM.silConv);
   std::optional<AsyncContextLayout> asyncLayout;
 
   StringRef FnName;

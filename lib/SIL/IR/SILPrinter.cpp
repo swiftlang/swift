@@ -3980,6 +3980,11 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   if (!isExternalDeclaration() && hasOwnership())
     OS << "[ossa] ";
 
+  // If this function is not yet address-lowered in an opaque values build,
+  // indicate this with [opaque].
+  if (!hasLoweredAddresses())
+    OS << "[opaque] ";
+
   if (needsStackProtection())
     OS << "[stack_protection] ";
 

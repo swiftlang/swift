@@ -619,7 +619,7 @@ namespace {
     bool isAddressableParam(unsigned paramIdx);
 
     SILFunctionConventions getSILFuncConventions() const {
-      return SILFunctionConventions(FnType, IGM.getSILModule());
+      return SILFunctionConventions(FnType, IGM.silConv);
     }
 
     unsigned getCurParamIndex() {
@@ -2256,7 +2256,7 @@ hasIndirectTypedErrorResultSlot(IRGenModule &IGM, CanSILFunctionType funcTy) {
   if (!funcTy->hasErrorResult())
     return false;
 
-  SILFunctionConventions fnConv(funcTy, IGM.getSILModule());
+  SILFunctionConventions fnConv(funcTy, IGM.silConv);
   if (!fnConv.isTypedError())
     return false;
 
@@ -2817,7 +2817,7 @@ public:
   }
   SILType getParameterType(unsigned index) override {
     SILFunctionConventions origConv(getCallee().getOrigFunctionType(),
-                                    IGF.getSILModule());
+                                    IGF.IGM.silConv);
     return origConv.getSILArgumentType(
         index, IGF.IGM.getMaximalTypeExpansionContext());
   }
@@ -2868,7 +2868,7 @@ public:
       // The invariant is that this is always zero-initialized, so we
       // don't need to do anything extra here.
       auto substFnType = CurCallee.getSubstFunctionType();
-      SILFunctionConventions fnConv(substFnType, IGF.getSILModule());
+      SILFunctionConventions fnConv(substFnType, IGF.IGM.silConv);
       Address errorResultSlot = IGF.getCalleeErrorResultSlot(
           fnConv.getSILErrorType(IGF.IGM.getMaximalTypeExpansionContext()),
           fnConv.isTypedError());
@@ -2931,7 +2931,7 @@ public:
     Explosion adjusted;
 
     auto origCalleeType = CurCallee.getOrigFunctionType();
-    SILFunctionConventions fnConv(origCalleeType, IGF.getSILModule());
+    SILFunctionConventions fnConv(origCalleeType, IGF.IGM.silConv);
 
     // Pass along the indirect result pointers.
     auto passIndirectResults = [&]() {
@@ -3047,7 +3047,7 @@ public:
   void emitCallToUnmappedExplosion(llvm::CallBase *call,
                                    Explosion &out) override {
     SILFunctionConventions fnConv(getCallee().getOrigFunctionType(),
-                                  IGF.getSILModule());
+                                  IGF.IGM.silConv);
     bool mayReturnErrorDirectly = mayReturnTypedErrorDirectly();
 
     // Bail out immediately on a void result.
@@ -3128,7 +3128,7 @@ public:
   }
   Address getCalleeErrorSlot(SILType errorType, bool isCalleeAsync) override {
     SILFunctionConventions fnConv(getCallee().getOrigFunctionType(),
-                                  IGF.getSILModule());
+                                  IGF.IGM.silConv);
 
     return IGF.getCalleeErrorResultSlot(errorType, fnConv.isTypedError());
   };
@@ -3245,7 +3245,7 @@ public:
     };
 
     // Add the indirect typed error result if we have one.
-    SILFunctionConventions fnConv(fnType, IGF.getSILModule());
+    SILFunctionConventions fnConv(fnType, IGF.IGM.silConv);
     if (fnType->hasErrorResult() && fnConv.isTypedError()) {
       // The invariant is that this is always zero-initialized, so we
       // don't need to do anything extra here.
@@ -3307,7 +3307,7 @@ public:
 
   SILType getParameterType(unsigned index) override {
     SILFunctionConventions origConv(getCallee().getOrigFunctionType(),
-                                    IGF.getSILModule());
+                                    IGF.IGM.silConv);
     return origConv.getSILArgumentType(
         index, IGF.IGM.getMaximalTypeExpansionContext());
   }
@@ -3318,7 +3318,7 @@ public:
     // convention.
 
     auto origCalleeType = CurCallee.getOrigFunctionType();
-    SILFunctionConventions fnConv(origCalleeType, IGF.getSILModule());
+    SILFunctionConventions fnConv(origCalleeType, IGF.IGM.silConv);
 
     // Pass along the indirect result pointers.
     original.transferInto(asyncExplosion, fnConv.getNumIndirectSILResults());
@@ -3458,7 +3458,7 @@ public:
                        suspendResultTy->element_end());
 
     auto substCalleeType = getCallee().getSubstFunctionType();
-    SILFunctionConventions substConv(substCalleeType, IGF.getSILModule());
+    SILFunctionConventions substConv(substCalleeType, IGF.IGM.silConv);
     auto hasError = substCalleeType->hasErrorResult();
     SILType errorType;
     if (hasError)
@@ -3466,7 +3466,7 @@ public:
           substConv.getSILErrorType(IGM.getMaximalTypeExpansionContext());
 
     SILFunctionConventions fnConv(getCallee().getOrigFunctionType(),
-                                  IGF.getSILModule());
+                                  IGF.IGM.silConv);
 
     // Get the natural IR type in the body of the function that makes
     // the call. This may be different than the IR type returned by the
@@ -3554,7 +3554,7 @@ public:
   }
   Address getCalleeErrorSlot(SILType errorType, bool isCalleeAsync) override {
 		SILFunctionConventions fnConv(getCallee().getOrigFunctionType(),
-                                  IGF.getSILModule());
+                                  IGF.IGM.silConv);
     return IGF.getCalleeErrorResultSlot(errorType, fnConv.isTypedError());
   }
 
@@ -3673,7 +3673,7 @@ void CallEmission::emitToUnmappedMemory(Address result) {
     assert(!isa<llvm::UndefValue>(Args[1]));
   }
   SILFunctionConventions FnConv(CurCallee.getSubstFunctionType(),
-                                IGF.getSILModule());
+                                IGF.IGM.silConv);
 
 #ifndef NDEBUG
   LastArgWritten = 0; // appease an assert
@@ -3691,7 +3691,7 @@ void CallEmission::emitToUnmappedMemory(Address result) {
         1;
 
     auto substCalleeType = CurCallee.getSubstFunctionType();
-    SILFunctionConventions substConv(substCalleeType, IGF.getSILModule());
+    SILFunctionConventions substConv(substCalleeType, IGF.IGM.silConv);
     auto hasError = substCalleeType->hasErrorResult();
     SILType errorType;
     if (hasError) {
@@ -3900,12 +3900,14 @@ void CallEmission::emitToMemory(Address addr,
   auto origResultType =
       origFnType
           ->getDirectFormalResultsType(IGF.IGM.getSILModule(),
-                                       IGF.IGM.getMaximalTypeExpansionContext())
+                                       IGF.IGM.getMaximalTypeExpansionContext(),
+                                       /*loweredAddresses=*/true)
           .getASTType();
   auto substResultType =
       substFnType
           ->getDirectFormalResultsType(IGF.IGM.getSILModule(),
-                                       IGF.IGM.getMaximalTypeExpansionContext())
+                                       IGF.IGM.getMaximalTypeExpansionContext(),
+                                       /*loweredAddresses=*/true)
           .getASTType();
 
   if (origResultType->hasTypeParameter())
@@ -3979,7 +3981,7 @@ void CallEmission::emitYieldsToExplosion(Explosion &out) {
   }
 
   auto substCoroType = getCallee().getSubstFunctionType();
-  SILFunctionConventions fnConv(substCoroType, IGF.getSILModule());
+  SILFunctionConventions fnConv(substCoroType, IGF.IGM.silConv);
   for (auto yield : fnConv.getYields()) {
     YieldSchema schema(IGF.IGM, fnConv, yield);
 
@@ -4033,7 +4035,7 @@ void CallEmission::emitToExplosion(Explosion &out, bool isOutlined) {
   }
 
   SILFunctionConventions fnConv(getCallee().getSubstFunctionType(),
-                                IGF.getSILModule());
+                                IGF.IGM.silConv);
 
   if (fnConv.hasAddressResult()) {
     assert(LastArgWritten == 0 &&
@@ -4755,7 +4757,7 @@ void CallEmission::externalizeArguments(IRGenFunction &IGF, const Callee &callee
 
 bool CallEmission::mayReturnTypedErrorDirectly() const {
   SILFunctionConventions fnConv(getCallee().getOrigFunctionType(),
-                                IGF.getSILModule());
+                                IGF.IGM.silConv);
   bool mayReturnErrorDirectly = false;
   if (!convertDirectToIndirectReturn && !fnConv.hasIndirectSILResults() &&
       !fnConv.hasIndirectSILErrorResults() && fnConv.funcTy->hasErrorResult() &&
@@ -4774,7 +4776,7 @@ bool CallEmission::mayReturnTypedErrorDirectly() const {
 void CallEmission::emitToUnmappedExplosionWithDirectTypedError(
     SILType resultType, llvm::Value *result, Explosion &out) {
   SILFunctionConventions fnConv(getCallee().getOrigFunctionType(),
-                                IGF.getSILModule());
+                                IGF.IGM.silConv);
   auto &nativeSchema =
       IGF.IGM.getTypeInfo(resultType).nativeReturnValueSchema(IGF.IGM);
   auto errorType =
@@ -6729,7 +6731,7 @@ void irgen::emitAsyncReturn(IRGenFunction &IGF, AsyncContextLayout &asyncLayout,
   // Map the explosion to the native result type.
   std::optional<ArrayRef<llvm::Value *>> nativeResults = std::nullopt;
   SmallVector<llvm::Value *, 16> nativeResultsStorage;
-  SILFunctionConventions conv(fnType, IGF.getSILModule());
+  SILFunctionConventions conv(fnType, IGF.IGM.silConv);
   auto &nativeSchema =
       IGM.getTypeInfo(funcResultTypeInContext).nativeReturnValueSchema(IGM);
 

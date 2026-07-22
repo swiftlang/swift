@@ -74,7 +74,7 @@ struct AddressCapture {
   unsigned calleeArgIdx;
 
   AddressCapture(Operand &oper)
-      : site(oper.getUser()), calleeArgIdx(site.getCalleeArgIndex(oper)) {
+      : site(oper.getUser()), calleeArgIdx(site.getSubstCalleeArgIndex(oper)) {
     if (site.getOrigCalleeConv().getSILArgumentConvention(calleeArgIdx)
         != SILArgumentConvention::Indirect_InoutAliasable) {
       site = ApplySite();
@@ -768,7 +768,8 @@ SourceAccess AccessEnforcementSelection::getSourceAccess(SILValue address) {
 
 void AccessEnforcementSelection::handleApply(ApplySite apply) {
   auto calleeTy = apply.getOrigCalleeType();
-  SILFunctionConventions calleeConv(calleeTy, *getModule());
+  SILFunctionConventions calleeConv(
+      calleeTy, SILAddressConventions::forFunction(*apply.getFunction()));
 
   for (Operand &oper : apply.getArgumentOperands()) {
     AddressCapture capture(oper);

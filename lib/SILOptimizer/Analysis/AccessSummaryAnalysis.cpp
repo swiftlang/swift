@@ -275,7 +275,7 @@ void AccessSummaryAnalysis::processPartialApply(FunctionInfo *callerInfo,
 
   // The argument index in the called function.
   ApplySite site(apply);
-  unsigned calleeArgumentIndex = site.getCalleeArgIndex(*applyArgumentOperand);
+  unsigned calleeArgumentIndex = site.getSubstCalleeArgIndex(*applyArgumentOperand);
 
   processCall(callerInfo, callerArgumentIndex, calleeFunction,
               calleeArgumentIndex, order);

@@ -136,13 +136,21 @@ SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
   if (!thunk->empty())
     return thunk;
 
+  // Differentiation runs after AddressLowering, so this thunk is synthesized
+  // into an already-lowered module and its body below is emitted in
+  // lowered-address form. Record that (matching the caller) so the per-function
+  // conventions used here -- and read by later passes -- don't treat the
+  // thunk's address arguments as opaque values.
+  thunk->setHasLoweredAddresses(caller->hasLoweredAddresses());
+
   thunk->setGenericEnvironment(genericEnv);
   auto *entry = thunk->createBasicBlock();
   SILBuilder builder(entry);
   createEntryArguments(thunk);
 
-  SILFunctionConventions fromConv(fromType, module);
-  SILFunctionConventions toConv(toType, module);
+  SILAddressConventions silConv = SILAddressConventions::forFunction(*thunk);
+  SILFunctionConventions fromConv(fromType, silConv);
+  SILFunctionConventions toConv(toType, silConv);
   assert(toConv.useLoweredAddresses());
 
   // Forward thunk arguments, handling ownership convention mismatches.
@@ -433,6 +441,7 @@ getOrCreateSubsetParametersThunkForLinearMap(
   if (!thunk->empty())
     return {thunk, interfaceSubs};
 
+  thunk->setHasLoweredAddresses(parentThunk->hasLoweredAddresses());
   thunk->setGenericEnvironment(genericEnv);
   auto *entry = thunk->createBasicBlock();
   TangentBuilder builder(entry, adContext);
@@ -669,7 +678,8 @@ getOrCreateSubsetParametersThunkForLinearMap(
   collectAllActualResultsInTypeOrder(ai, pullbackDirectResults, allResults);
   // Collect pullback semantic result arguments in type order.
   unsigned semanticResultArgIdx = 0;
-  SILFunctionConventions origConv(origFnType, thunk->getModule());
+  SILFunctionConventions origConv(
+      origFnType, SILAddressConventions::forFunction(*thunk));
   for (auto paramIdx : actualConfig.parameterIndices->getIndices()) {
     auto paramInfo = origConv.getParameters()[paramIdx];
     if (!paramInfo.isAutoDiffSemanticResult())
@@ -783,6 +793,7 @@ getOrCreateSubsetParametersThunkForDerivativeFunction(
   if (!thunk->empty())
     return {thunk, interfaceSubs};
 
+  thunk->setHasLoweredAddresses(caller->hasLoweredAddresses());
   thunk->setGenericEnvironment(genericEnv);
   auto *entry = thunk->createBasicBlock();
   SILBuilder builder(entry);

@@ -145,7 +145,10 @@ static SILDeclRef getBridgingFn(std::optional<SILDeclRef> &cacheSlot,
     SILDeclRef c(fd);
     auto funcTy =
         SGM.Types.getConstantFunctionType(TypeExpansionContext::minimal(), c);
-    SILFunctionConventions fnConv(funcTy, SGM.M);
+    // No function body in scope; this only validates the bridging function's
+    // ABI shape, so use the build-mode default conventions.
+    SILFunctionConventions fnConv(
+        funcTy, SILAddressConventions::forRawSIL(SGM.M));
 
     auto toSILType = [&SGM](Type ty) {
       return SGM.Types.getLoweredType(ty, TypeExpansionContext::minimal());

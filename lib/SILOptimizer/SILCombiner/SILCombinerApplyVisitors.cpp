@@ -160,8 +160,10 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
   // relevant types from the ConvertFunction function type and AI.
   Builder.setCurrentDebugScope(AI.getDebugScope());
   OperandValueArrayRef Ops = AI.getArguments();
-  SILFunctionConventions substConventions(SubstCalleeTy, CFI->getModule());
-  SILFunctionConventions convertConventions(ConvertCalleeTy, CFI->getModule());
+  SILAddressConventions silConv =
+      SILAddressConventions::forFunction(*CFI->getFunction());
+  SILFunctionConventions substConventions(SubstCalleeTy, silConv);
+  SILFunctionConventions convertConventions(ConvertCalleeTy, silConv);
   auto context = AI.getFunction()->getTypeExpansionContext();
   auto oldOpRetTypes = substConventions.getIndirectSILResultTypes(context);
   auto newOpRetTypes = convertConventions.getIndirectSILResultTypes(context);
@@ -243,10 +245,12 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
   // Convert the direct results if they changed.
   auto oldResultTy = SubstCalleeTy
     ->getDirectFormalResultsType(AI.getModule(),
-                                 AI.getFunction()->getTypeExpansionContext());
+                                 AI.getFunction()->getTypeExpansionContext(),
+                                 AI.getFunction()->hasLoweredAddresses());
   auto newResultTy = ConvertCalleeTy
     ->getDirectFormalResultsType(AI.getModule(),
-                                 AI.getFunction()->getTypeExpansionContext());
+                                 AI.getFunction()->getTypeExpansionContext(),
+                                 AI.getFunction()->hasLoweredAddresses());
   
   // Create the new apply inst.
   if (auto *TAI = dyn_cast<TryApplyInst>(AI)) {
@@ -1274,8 +1278,8 @@ SILInstruction *SILCombiner::createApplyWithConcreteType(
                      ->getType()
                      .substGenericArgs(Apply.getModule(), NewCallSubs, context)
                      .getAs<SILFunctionType>();
-  SILFunctionConventions conv(substTy,
-                              SILModuleConventions(Apply.getModule()));
+  SILFunctionConventions conv(
+      substTy, SILAddressConventions::forFunction(*Apply.getFunction()));
   bool canUpdateArgs = true;
   bool madeUpdate = false;
   for (unsigned index = 0; index < conv.getNumSILArguments(); ++index) {
@@ -1444,7 +1448,7 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite Apply,
     return nullptr;
 
   auto SelfCOEIIt =
-      COEIs.find(Apply.getCalleeArgIndex(Apply.getSelfArgumentOperand()));
+      COEIs.find(Apply.getSubstCalleeArgIndex(Apply.getSelfArgumentOperand()));
 
   // If no SelfCOEI is found, then just update the Apply with new COEIs for
   // other arguments.

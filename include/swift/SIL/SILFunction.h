@@ -491,6 +491,10 @@ private:
   unsigned NeedBreakInfiniteLoops : 1;
   unsigned NeedCompleteLifetimes : 1;
 
+  /// Set when this function's arguments and instructions have been lowered to
+  /// address form by the AddressLowering function pass.
+  unsigned HasLoweredAddresses : 1;
+
   static void
   validateSubclassScope(SubclassScope scope, IsThunk_t isThunk,
                         const GenericSpecializationInformation *genericInfo) {
@@ -608,12 +612,14 @@ public:
   }
 
   SILFunctionConventions getConventions() const {
-    return SILFunctionConventions(LoweredType, getModule());
+    return SILFunctionConventions(
+        LoweredType, SILAddressConventions::forFunction(*this));
   }
 
   SILFunctionConventions getConventionsInContext() const {
     auto fnType = getLoweredFunctionTypeInContext(getTypeExpansionContext());
-    return SILFunctionConventions(fnType, getModule());
+    return SILFunctionConventions(
+        fnType, SILAddressConventions::forFunction(*this));
   }
 
   unsigned getIndex() const { return index; }
@@ -761,6 +767,19 @@ public:
   void setWasDeserializedCanonical(bool val = true) {
     WasDeserializedCanonical = val;
   }
+
+  /// Returns true if this function is in lowered-address form, i.e. its
+  /// address-only values are represented as raw addresses rather than opaque
+  /// SSA values.
+  ///
+  /// True if:
+  /// - AddressLowering has individually lowered this function
+  /// - The function arrived already canonical via deserialization
+  /// - In a non-opaque-values build,
+  /// - Once the module has committed past SILStage::Raw.
+  bool hasLoweredAddresses() const;
+
+  void setHasLoweredAddresses(bool val = true) { HasLoweredAddresses = val; }
 
   ForceEnableLexicalLifetimes_t forceEnableLexicalLifetimes() const {
     return ForceEnableLexicalLifetimes_t(ForceEnableLexicalLifetimes);

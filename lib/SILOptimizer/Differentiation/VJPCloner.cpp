@@ -1145,7 +1145,8 @@ public:
         vjp->createBasicBlockBefore(getOpBasicBlock(tai->getNormalBB()));
     normalBB->createPhiArgument(
         vjpFnTy->getDirectFormalResultsType(getModule(),
-                                            TypeExpansionContext::minimal()),
+                                            TypeExpansionContext::minimal(),
+                                            vjp->hasLoweredAddresses()),
         tai->getNormalBB()->getArgument(0)->getOwnershipKind());
 
     // Apply the VJP.
@@ -1591,6 +1592,7 @@ SILFunction *VJPCloner::Implementation::createEmptyPullback() {
   auto &module = context.getModule();
   pullback->setDebugScope(new (module)
                               SILDebugScope(original->getLocation(), pullback));
+  pullback->setHasLoweredAddresses(original->hasLoweredAddresses());
 
   return pullback;
 }
