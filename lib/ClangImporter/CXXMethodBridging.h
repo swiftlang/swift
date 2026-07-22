@@ -1,8 +1,9 @@
 #ifndef SWIFT_CXXMETHODBRIDGING_H
 #define SWIFT_CXXMETHODBRIDGING_H
 
-#include "clang/AST/Attr.h"
+#include "ImporterImpl.h"
 #include "clang/AST/DeclCXX.h"
+#include "clang/Basic/CharInfo.h"
 #include "llvm/ADT/StringRef.h"
 #include <string>
 
@@ -20,12 +21,19 @@ struct CXXMethodBridging {
     if (nameIsBlacklist())
       return Kind::unknown;
 
+    // This should be handled as snake case. See: rdar://89453010
+    // case. In the future we could
+    //  import these too, though.
     auto nameKind = classifyNameKind();
     if (nameKind != NameKind::title && nameKind != NameKind::camel &&
         nameKind != NameKind::lower && nameKind != NameKind::snake)
       return Kind::unknown;
 
-    if (hasSetterPrefix()) {
+    // An explicitly annotated method is routed by its shape (param count),
+    // so e.g. `settlementValue()` isn't misrouted as a setter.
+    bool hasSetPrefix = getClangName().starts_with_insensitive("set");
+    if (hasSetPrefix &&
+        (!isExplicitComputedProperty() || method->getNumParams() == 1)) {
       // Setters only have one parameter.
       if (method->getNumParams() != 1)
         return Kind::unknown;
@@ -42,19 +50,19 @@ struct CXXMethodBridging {
     if (method->getReturnType()->isVoidType())
       return Kind::unknown;
 
-    // Getters cannot take arguments.
-    if (method->getNumParams() != 0)
-      return Kind::unknown;
+    if (getClangName().starts_with_insensitive("get") ||
+        isExplicitComputedProperty()) {
+      // Getters cannot take arguments.
+      if (method->getNumParams() != 0)
+        return Kind::unknown;
 
-    // rdar://89453106 (We need to handle imported properties that return a
-    // reference)
-    if (method->getReturnType()->isReferenceType())
-      return Kind::unknown;
+      // rdar://89453106 (We need to handle imported properties that return a
+      // reference)
+      if (method->getReturnType()->isReferenceType())
+        return Kind::unknown;
 
-    // A getter is named with a "get" prefix, or -- when explicitly annotated
-    // with SWIFT_COMPUTED_PROPERTY -- with any name.
-    if (hasGetterPrefix() || isExplicitComputedProperty())
       return Kind::getter;
+    }
 
     // rdar://89453187 (Add subscripts clarification to CXXMethod Bridging to
     // clean up importDecl)
@@ -68,9 +76,7 @@ struct CXXMethodBridging {
     if (getClangName().empty())
       return NameKind::unknown;
 
-    // Any name containing an underscore is treated as snake_case, even when it
-    // also has uppercase letters (e.g. an acronym segment like
-    // `get_http_URL`).
+    // An underscore means snake_case, even alongside uppercase (e.g. `get_http_URL`).
     if (getClangName().contains('_'))
       return NameKind::snake;
     if (!hasUpper)
@@ -86,27 +92,32 @@ struct CXXMethodBridging {
     return method->getName();
   }
 
-  bool hasGetterPrefix() { return getClangName().starts_with_insensitive("get"); }
-  bool hasSetterPrefix() { return getClangName().starts_with_insensitive("set"); }
-
   bool isExplicitComputedProperty() {
-    for (const auto *attr : method->specific_attrs<clang::SwiftAttrAttr>())
-      if (attr->getAttribute() == "import_computed_property")
-        return true;
-    return false;
+    return importer::hasSwiftAttribute(method, {"import_computed_property"});
   }
 
+  // Used to pair a getter with its setter under the same GetterSetterMap key;
+  // left otherwise untransformed.
   llvm::StringRef nameWithoutAccessorPrefix() {
-    if (hasGetterPrefix() || hasSetterPrefix())
-      return getClangName().drop_front(3);
-    return getClangName();
+    llvm::StringRef name = getClangName();
+    auto kind = classify();
+    if (kind == Kind::getter)
+      name.consume_front_insensitive("get");
+    else if (kind == Kind::setter)
+      name.consume_front_insensitive("set");
+    return name;
   }
 
+  // This should be handled as snake case. See: rdar://89453010
   std::string importNameAsCamelCaseName() {
     std::string output;
     auto kind = classify();
+    bool hadPrefix = false;
     if (kind == Kind::getter || kind == Kind::setter) {
-      output = nameWithoutAccessorPrefix().str();
+      llvm::StringRef name = getClangName();
+      hadPrefix =
+          name.consume_front_insensitive(kind == Kind::getter ? "get" : "set");
+      output = name.str();
     } else {
       output = getClangName().str();
     }
@@ -118,10 +129,20 @@ struct CXXMethodBridging {
     if (classifyNameKind() == NameKind::lower)
       return output;
 
-    // The first character is always lowercase.
-    output.front() = std::tolower(output.front());
-
     if (classifyNameKind() == NameKind::snake) {
+      bool hasUpper = llvm::any_of(
+          output, [](unsigned char ch) { return clang::isUppercase(ch); });
+
+      // C++ interop doesn't rename functions on import, so a snake_case name
+      // is only stripped of its accessor prefix and trailing punctuation --
+      // never camelCased -- except for the pre-existing case below (real
+      // prefix + all-lowercase remainder), which still folds into camelCase.
+      if (!hadPrefix || hasUpper)
+        return llvm::StringRef(output).ltrim('_').str();
+
+      // The first character is always lowercase.
+      output.front() = std::tolower(output.front());
+
       for (std::size_t i = 0; i < output.size(); i++) {
         size_t next = i + 1;
         if (output[i] == '_') {
@@ -136,13 +157,11 @@ struct CXXMethodBridging {
           }
         }
       }
-      // A property name is always lowercased first. When the name started with
-      // a leading underscore (e.g. `Get_X` -> `_X` -> `X`), the real first
-      // letter wasn't lowercased above, so do it now.
-      if (!output.empty())
-        output.front() = std::tolower(output.front());
       return output;
     }
+
+    // The first character is always lowercase.
+    output.front() = std::tolower(output.front());
 
     // We already lowercased the first element, so start at one. Look at the
     // current element and the next one. To handle cases like UTF8String, start

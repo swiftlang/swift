@@ -2963,13 +2963,18 @@ namespace {
                             setter->getParameters()->get(0)->getTypeInContext()))
             continue;
 
-          // If the name that we would import this as already exists, then don't
-          // add a computed property, because it will conflict with an existing
-          // name and make both APIs unusable.
+          // Don't add a computed property if its name clashes with an
+          // existing member -- unless that "clash" is just the getter/setter
+          // it's replacing (e.g. a prefix-less annotated getter like
+          // `settlementValue()`, whose raw name equals importedName).
           CXXMethodBridging cxxMethodBridging(
               cast<clang::CXXMethodDecl>(getter->getClangDecl()));
           auto importedName = cxxMethodBridging.importNameAsCamelCaseName();
-          if (allMemberNames.contains(importedName))
+          bool isOwnAccessorName =
+              cxxMethodBridging.getClangName() == importedName ||
+              (setter && cast<clang::CXXMethodDecl>(setter->getClangDecl())
+                                 ->getName() == importedName);
+          if (allMemberNames.contains(importedName) && !isOwnAccessorName)
             continue;
 
           auto p =
@@ -2978,12 +2983,10 @@ namespace {
           // the clang decl during lazy member lookup.
           result->addMember(p);
 
-          // Deprecate the underlying accessor methods that were explicitly
-          // opted in via SWIFT_COMPUTED_PROPERTY, steering callers to the
-          // synthesized property. We only do this for the explicit
-          // attribute, not the global
-          // -cxx-interop-getters-setters-as-properties flag, to avoid flooding
-          // existing code with deprecation warnings.
+          // Deprecate accessors explicitly opted in via SWIFT_COMPUTED_PROPERTY,
+          // steering callers to the synthesized property. Not done for the
+          // global -cxx-interop-getters-setters-as-properties flag, to avoid
+          // flooding existing code with deprecation warnings.
           auto deprecateTransformedAccessor = [&](FuncDecl *accessor) {
             if (!accessor || !accessor->getClangDecl() ||
                 !hasComputedPropertyAttr(accessor->getClangDecl()))

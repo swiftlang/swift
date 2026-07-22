@@ -25,16 +25,16 @@ ExplicitComputedPropertiesRuntimeTestSuite.test("GetterOnly") {
 
 ExplicitComputedPropertiesRuntimeTestSuite.test("SnakeCaseAcronym") {
   var object = SnakeCaseAcronym()
-  expectEqual(object.get_http_URL(), object.httpURL)
+  expectEqual(object.get_http_URL(), object.http_URL)
   object.set_http_URL(7)
   expectEqual(object.get_http_URL(), 7)
-  expectEqual(object.httpURL, 7)
+  expectEqual(object.http_URL, 7)
 }
 
 ExplicitComputedPropertiesRuntimeTestSuite.test("NoPrefix") {
   let object = SnakeCaseNoPrefix()
   expectEqual(object.im_snake_case_swift_computed_property(),
-              object.imSnakeCaseSwiftComputedProperty)
+              object.im_snake_case_swift_computed_property)
 }
 
 runAllTests()

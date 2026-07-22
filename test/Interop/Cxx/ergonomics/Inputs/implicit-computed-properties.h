@@ -68,8 +68,7 @@ struct IntGetterSetter {
   void setX(int v) { val = v; }
 };
 
-// snake_case names with uppercase segments are imported as computed
-// properties too.
+// snake_case with uppercase segments is imported as a computed property too.
 struct IntGetterSetterSnakeCaseUpper {
   int val;
   int Get_X() const { return val; }

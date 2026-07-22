@@ -17,12 +17,15 @@ struct Record {
   int getX() SWIFT_COMPUTED_PROPERTY { return 42; }
 };
 
-// A getter-shaped method without SWIFT_COMPUTED_PROPERTY is only turned into a
-// computed property when -cxx-interop-getters-setters-as-properties is passed.
-// Neither RUN line here passes that flag, so this method must stay a plain
-// method with no synthesized property and no deprecation.
+// Without SWIFT_COMPUTED_PROPERTY or -cxx-interop-getters-setters-as-properties,
+// a getter-shaped method stays a plain method.
 struct NoAttribute {
   int getY() { return 42; }
+};
+
+// Shape (no parameters), not the "set"-looking name, decides this is a getter.
+struct GetterNamedLikeSetter {
+  int settlementValue() const SWIFT_COMPUTED_PROPERTY { return 42; }
 };
 
 //--- test.swift
@@ -36,5 +39,12 @@ struct NoAttribute {
 // CHECK:      struct NoAttribute {
 // CHECK-NOT:     var
 // CHECK-NEXT:    init()
-// CHECK-NEXT:    mutating func getY() -> Int32
+// CHECK-NEXT:    mutating func getY() -> CInt
+// CHECK-NEXT: }
+
+// CHECK:      struct GetterNamedLikeSetter {
+// CHECK-NEXT:    init()
+// CHECK-NEXT:    @available(*, deprecated, message: "use the 'settlementValue' property")
+// CHECK-NEXT:    func settlementValue() -> CInt
+// CHECK-NEXT:    var settlementValue: CInt { get }
 // CHECK-NEXT: }

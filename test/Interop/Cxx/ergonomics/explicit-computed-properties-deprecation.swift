@@ -29,15 +29,15 @@ struct GetterOnly {
 // CHECK:      struct GetterSetter {
 // CHECK-NEXT:    init()
 // CHECK-NEXT:    @available(*, deprecated, message: "use the 'x' property")
-// CHECK-NEXT:    func get_x() -> Int32
+// CHECK-NEXT:    func get_x() -> CInt
 // CHECK-NEXT:    @available(*, deprecated, message: "use the 'x' property")
-// CHECK-NEXT:    mutating func set_x(_ v: Int32)
-// CHECK-NEXT:    var x: Int32
+// CHECK-NEXT:    mutating func set_x(_ v: CInt)
+// CHECK-NEXT:    var x: CInt
 // CHECK-NEXT: }
 
 // CHECK:      struct GetterOnly {
 // CHECK-NEXT:    init()
 // CHECK-NEXT:    @available(*, deprecated, message: "use the 'value' property")
-// CHECK-NEXT:    func get_value() -> Int32
-// CHECK-NEXT:    var value: Int32 { get }
+// CHECK-NEXT:    func get_value() -> CInt
+// CHECK-NEXT:    var value: CInt { get }
 // CHECK-NEXT: }
