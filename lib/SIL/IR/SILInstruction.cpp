@@ -2353,6 +2353,49 @@ SILModule &SILInstructionContext::getModule() {
   return storage.get<SILFunction *>()->getModule();
 }
 
+// Defined here rather than in the header to avoid import cycles with
+// `getSingleValueCopyOrCast`.
+template <class Impl, class Base>
+SILValue ApplyInstBase<Impl, Base, false>::getCalleeOrigin() const {
+  SILValue Callee = getCallee();
+
+  while (auto *inst = Callee.getDefiningInstruction()) {
+    auto *copyOrCast = getSingleValueCopyOrCast(inst);
+    if (!copyOrCast)
+      break;
+
+    Callee = copyOrCast->getOperand(0);
+  }
+
+  return Callee;
+}
+
+template SILValue
+ApplyInstBase<ApplyInst, SingleValueInstruction, false>::getCalleeOrigin()
+    const;
+template SILValue ApplyInstBase<PartialApplyInst, SingleValueInstruction,
+                                false>::getCalleeOrigin() const;
+template SILValue ApplyInstBase<BeginApplyInst, MultipleValueInstruction,
+                                false>::getCalleeOrigin() const;
+template SILValue
+ApplyInstBase<TryApplyInst, TryApplyInstBase, false>::getCalleeOrigin() const;
+
+namespace swift::test {
+// Arguments:
+//   - instruction: the apply site whose callee origin to compute
+// Dumps:
+//   - the apply site
+//   - its callee origin
+static FunctionTest ApplyCalleeOriginTest(
+    "apply_callee_origin", [](auto &function, auto &arguments, auto &test) {
+      auto *inst = arguments.takeInstruction();
+      auto apply = ApplySite::isa(inst);
+      llvm::outs() << "Apply: ";
+      inst->print(llvm::outs());
+      llvm::outs() << "Callee origin: " << apply.getCalleeOrigin();
+    });
+} // end namespace swift::test
+
 template <class Impl, class Base>
 SILDeclRef ApplyInstBase<Impl, Base, false>::getCalleeDeclRef() const {
   SILValue origin = getCalleeOrigin();
