@@ -2311,6 +2311,21 @@ TypeResolver::resolveUnqualifiedIdentTypeRepr(UnqualifiedIdentTypeRepr *repr,
   auto *DC = getDeclContext();
   auto id = repr->getNameRef();
 
+  // A protocol metatype extension has no generic signature and its members are
+  // static members of the protocol metatype, so they cannot reference 'Self'.
+  // Diagnose before name lookup binds it to the protocol's 'Self', which would
+  // leave the member's interface type carrying an unanchored type parameter.
+  if (id.isSimpleName(ctx.Id_Self)) {
+    if (auto *typeDC = DC->getInnermostTypeContext()) {
+      if (typeDC->isMetatypeExtension()) {
+        if (!options.contains(TypeResolutionFlags::SilenceDiagnostics))
+          diagnose(repr->getLoc(), diag::metatype_extension_self);
+        repr->setInvalid();
+        return ErrorType::get(ctx);
+      }
+    }
+  }
+
   // In SIL mode, we bind generic parameters here, since name lookup
   // won't find them.
   if (silContext && silContext->GenericParams) {
@@ -2347,6 +2362,22 @@ TypeResolver::resolveUnqualifiedIdentTypeRepr(UnqualifiedIdentTypeRepr *repr,
   for (const auto &entry : globals) {
     auto *foundDC = entry.getDeclContext();
     auto *typeDecl = cast<TypeDecl>(entry.getValueDecl());
+
+    // As with 'Self' above, a member of a protocol metatype extension cannot
+    // reference the extended protocol's associated types: doing so would root
+    // the member's interface type at an unanchored 'Self'.  Diagnose before
+    // resolving the reference, which would otherwise assert while substituting.
+    if (isa<AssociatedTypeDecl>(typeDecl)) {
+      if (auto *typeDC = DC->getInnermostTypeContext()) {
+        if (typeDC->isMetatypeExtension()) {
+          if (!options.contains(TypeResolutionFlags::SilenceDiagnostics))
+            diagnose(repr->getLoc(), diag::metatype_extension_associated_type,
+                     typeDecl->getName());
+          repr->setInvalid();
+          return ErrorType::get(ctx);
+        }
+      }
+    }
 
     // Compute the type of the found declaration when referenced from this
     // location.
