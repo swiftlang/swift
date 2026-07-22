@@ -4589,8 +4589,10 @@ ClangImporter::getSwiftExplicitModuleDirectCC1Args() const {
     llvm::PrefixMapper Mapper;
     clang::dependencies::DepscanPrefixMapping::configurePrefixMapper(
         Impl.SwiftContext.SearchPathOpts.ScannerPrefixMapper, Mapper);
-    clang::dependencies::DepscanPrefixMapping::remapInvocationPaths(
-        instance, Mapper);
+    instance.withCowRef<void>([&](clang::CowCompilerInvocation &cowInstance) {
+      clang::dependencies::DepscanPrefixMapping::remapInvocationPaths(
+          cowInstance, Mapper);
+    });
     instance.getFrontendOpts().PathPrefixMappings.clear();
   }
 
