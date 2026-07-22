@@ -3,6 +3,7 @@
 // RUN: %target-swift-frontend -emit-module -enable-library-evolution -emit-module-path=%t/resilient_enum.swiftmodule -module-name=resilient_enum -I %t %S/../Inputs/resilient_enum.swift
 // RUN: %target-swift-frontend -module-name struct_resilience -Xllvm -sil-disable-pass=MandatoryARCOpts -I %t -emit-ir -enable-library-evolution %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-cpu
 // RUN: %target-swift-frontend -module-name struct_resilience -I %t -emit-ir -enable-library-evolution -O %s
+// UNSUPPORTED: CPU=wasm32
 
 import resilient_struct
 import resilient_enum
