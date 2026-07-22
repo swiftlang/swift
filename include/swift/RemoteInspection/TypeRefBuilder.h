@@ -434,11 +434,11 @@ public:
   TypeRefBuilder(const TypeRefBuilder &other) = delete;
   TypeRefBuilder &operator=(const TypeRefBuilder &other) = delete;
 
-  Mangle::ManglingFlavor getManglingFlavor() {
-    return Mangle::ManglingFlavor::Default;
-  }
+  Mangle::ManglingFlavor getManglingFlavor() { return Flavor; }
 
 private:
+  Mangle::ManglingFlavor Flavor;
+
   Demangle::Demangler Dem;
 
   /// Makes sure dynamically allocated TypeRefs stick around for the life of
@@ -798,7 +798,8 @@ public:
                                                           PointerSize>
           conformanceReader(
               Builder.OpaqueByteReader, Builder.OpaqueStringReader,
-              Builder.OpaquePointerReader, Builder.OpaqueDynamicSymbolResolver);
+              Builder.OpaquePointerReader, Builder.OpaqueDynamicSymbolResolver,
+              Builder.getManglingFlavor());
       for (const auto &section : ReflectionInfos) {
         auto ConformanceBegin = section.Conformance.startAddress();
         auto ConformanceEnd = section.Conformance.endAddress();
@@ -1536,7 +1537,10 @@ public:
 
   // Only for testing. A TypeRefBuilder built this way will not be able to
   // decode records in remote memory.
-  explicit TypeRefBuilder(ForTesting_t) : TC(*this), RDF(*this, nullptr) {}
+  explicit TypeRefBuilder(
+      ForTesting_t,
+      Mangle::ManglingFlavor flavor = Mangle::ManglingFlavor::Default)
+      : Flavor(flavor), TC(*this), RDF(*this, nullptr) {}
 
 private:
   /// Indexes of Reflection Infos we've already processed.
@@ -1616,8 +1620,10 @@ public:
   template <typename Runtime>
   TypeRefBuilder(remote::MetadataReader<Runtime, TypeRefBuilder> &reader,
                  remote::ExternalTypeRefCache *externalCache = nullptr,
-                 DescriptorFinder *externalDescriptorFinder = nullptr)
-      : TC(*this), EDF(externalDescriptorFinder), RDF(*this, externalCache),
+                 DescriptorFinder *externalDescriptorFinder = nullptr,
+                 Mangle::ManglingFlavor flavor = Mangle::ManglingFlavor::Default)
+      : Flavor(flavor), TC(*this), EDF(externalDescriptorFinder),
+        RDF(*this, externalCache),
         PointerSize(sizeof(typename Runtime::StoredPointer)),
         TypeRefDemangler([this, &reader](RemoteRef<char> string,
                                          bool useOpaqueTypeSymbolicReferences)
@@ -2329,16 +2335,19 @@ private:
     StringReader OpaqueStringReader;
     DynamicSymbolResolver OpaqueDynamicSymbolResolver;
     QualifiedContextNameReader<ObjCInteropKind, PointerSize> NameReader;
+    Mangle::ManglingFlavor Flavor;
 
     ProtocolConformanceDescriptorReader(
         ByteReader byteReader, StringReader stringReader,
         PointerReader pointerReader,
-        DynamicSymbolResolver dynamicSymbolResolver)
+        DynamicSymbolResolver dynamicSymbolResolver,
+        Mangle::ManglingFlavor flavor)
         : Error(""), OpaquePointerReader(pointerReader),
           OpaqueByteReader(byteReader), OpaqueStringReader(stringReader),
           OpaqueDynamicSymbolResolver(dynamicSymbolResolver),
           NameReader(byteReader, stringReader, pointerReader,
-                     dynamicSymbolResolver) {}
+                     dynamicSymbolResolver),
+          Flavor(flavor) {}
 
     /// Extract conforming type's name from a Conformance Descriptor
     /// Returns a pair of (mangledTypeName, fullyQualifiedTypeName)
@@ -2429,7 +2438,7 @@ private:
           typeName = nodeToString(typeRoot);
 
           auto typeMangling =
-              Demangle::mangleNode(typeRoot, Mangle::ManglingFlavor::Default);
+              Demangle::mangleNode(typeRoot, Flavor);
           if (!typeMangling.isSuccess())
             mangledTypeName = "";
           else
