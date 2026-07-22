@@ -134,6 +134,29 @@ bb0(%0 : @guaranteed $Builtin.NativeObject):
   return %9999 : $()
 }
 
+// A store_borrow is a memory/address scope, not an OSSA value lifetime. Memory
+// lifetimes and access scopes only require their scope-ending uses on
+// non-dead-end paths; they may legally leak into dead-end (unreachable)
+// regions. So a store_borrow whose address is transitively used by a
+// load_borrow that is only ended in a dead-end block must verify cleanly.
+sil [ossa] @store_borrow_load_borrow_dead_end : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : @guaranteed $Builtin.NativeObject):
+  %1 = alloc_stack $Builtin.NativeObject
+  %sb = store_borrow %0 to %1
+  cond_br undef, bb1, bb2
+
+bb1:
+  end_borrow %sb
+  dealloc_stack %1
+  %9999 = tuple()
+  return %9999
+
+bb2:
+  %lb = load_borrow %sb
+  end_borrow %lb
+  unreachable
+}
+
 sil [ossa] @load_borrow_from_class : $@convention(thin) (@guaranteed RefWithRef) -> () {
 bb0(%0 : @guaranteed $RefWithRef):
   %1 = ref_element_addr %0 : $RefWithRef, #RefWithRef.value

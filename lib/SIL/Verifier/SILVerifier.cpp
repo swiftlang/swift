@@ -3420,7 +3420,7 @@ public:
     bool success = useKind == AddressUseKind::NonEscaping;
 
     require(!success || checkScopedAddressUses(
-              scopedAddress, &scopedAddressLiveness, DEBlocks.get()),
+              scopedAddress, &scopedAddressLiveness, &getDeadEndBlocks()),
             "Ill formed store_borrow scope");
 
     require(!success || !hasOtherStoreBorrowsInLifetime(SI, &scopedAddressLiveness),
