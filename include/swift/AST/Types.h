@@ -5648,11 +5648,12 @@ public:
 
   /// Get a single non-address SILType that represents all formal direct
   /// results. The actual SIL result type of an apply instruction that calls
-  /// this function depends on the current SIL stage and is known by
-  /// SILFunctionConventions. It may be a wider tuple that includes formally
-  /// indirect results.
+  /// this function depends on the per-call-site lowered-addresses state,
+  /// supplied by the caller via \p loweredAddresses. It may be a wider tuple
+  /// that includes formally indirect results.
   SILType getDirectFormalResultsType(SILModule &M,
-                                     TypeExpansionContext expansion);
+                                     TypeExpansionContext expansion,
+                                     bool loweredAddresses);
 
   unsigned getNumIndirectFormalYields() const {
     return NumAnyIndirectFormalYieldResults;

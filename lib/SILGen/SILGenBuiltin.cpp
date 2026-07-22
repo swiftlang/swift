@@ -1256,7 +1256,7 @@ static ManagedValue emitBuiltinAutoDiffApplyDerivativeFunction(
   assert(derivativeFnType->isTrivialNoEscape());
 
   // Do the apply for the indirect result / error case.
-  if (SGF.SGM.M.useLoweredAddresses() &&
+  if (SGF.useLoweredAddresses() &&
       (derivativeFnType->hasIndirectFormalResults() ||
        derivativeFnType->hasIndirectErrorResult())) {
     assert(derivativeFnType->hasIndirectFormalResults() &&

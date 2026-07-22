@@ -2,7 +2,7 @@
 
 func take<T>(_ t: T) {}
 
-// CHECK-LABEL: sil hidden [ossa] @$s21opaque_values_invalid27forward_capture_generic_let4withSayxGx_tlF : {{.*}} {
+// CHECK-LABEL: sil hidden [ossa] [opaque] @$s21opaque_values_invalid27forward_capture_generic_let4withSayxGx_tlF : {{.*}} {
 // CHECK:         [[F:%[^,]+]] = function_ref @$s21opaque_values_invalid27forward_capture_generic_let4withSayxGx_tlF1fL_yylF {{.*}}
 // CHECK:         [[F]]<U>(undef)
 // CHECK-LABEL: } // end sil function '$s21opaque_values_invalid27forward_capture_generic_let4withSayxGx_tlF'

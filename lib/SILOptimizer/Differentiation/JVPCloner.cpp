@@ -211,7 +211,8 @@ private:
   SILValue emitZeroDirect(CanType type, SILLocation loc) {
     auto diffBuilder = getDifferentialBuilder();
     auto silType = getModule().Types.getLoweredLoadableType(
-        type, TypeExpansionContext::minimal(), getModule());
+        type, TypeExpansionContext::minimal(),
+        diffBuilder.getFunction().hasLoweredAddresses());
     auto *buffer = diffBuilder.createAllocStack(loc, silType);
     emitZeroIndirect(type, buffer, loc);
     auto loaded = diffBuilder.emitLoadValueOperation(
@@ -1711,6 +1712,7 @@ void JVPCloner::Implementation::prepareForDifferentialGeneration() {
       original->isRuntimeAccessible());
   differential->setDebugScope(
       new (module) SILDebugScope(original->getLocation(), differential));
+  differential->setHasLoweredAddresses(original->hasLoweredAddresses());
 
   return differential;
 }

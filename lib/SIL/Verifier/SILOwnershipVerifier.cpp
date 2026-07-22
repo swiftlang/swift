@@ -862,7 +862,7 @@ bool disableOwnershipVerification(const SILModule &mod) {
 //===----------------------------------------------------------------------===//
 
 void SILInstruction::verifyOperandOwnership(
-    SILModuleConventions *silConv) const {
+    SILAddressConventions *silConv) const {
   if (isStaticInitializerInst())
     return;
 

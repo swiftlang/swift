@@ -807,7 +807,8 @@ private:
           IGM.getSILModule(), fnTy, IGM.getMaximalTypeExpansionContext());
     } else if (!fnTy->getNumIndirectFormalResults()) {
       return fnTy->getDirectFormalResultsType(
-          IGM.getSILModule(), IGM.getMaximalTypeExpansionContext());
+          IGM.getSILModule(), IGM.getMaximalTypeExpansionContext(),
+          /*loweredAddresses=*/true);
     } else {
       SmallVector<TupleTypeElt, 4> eltTys;
       for (auto &result : fnTy->getResults()) {

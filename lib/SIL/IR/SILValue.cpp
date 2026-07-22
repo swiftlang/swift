@@ -322,12 +322,13 @@ StringRef OwnershipKind::asString() const {
 
 ValueOwnershipKind::ValueOwnershipKind(const SILFunction &F, SILType Type,
                                        SILArgumentConvention Convention)
-    : ValueOwnershipKind(F, Type, Convention,
-                         SILModuleConventions(F.getModule())) {}
+    : ValueOwnershipKind(
+          F, Type, Convention,
+          SILAddressConventions::forFunction(F)) {}
 
 ValueOwnershipKind::ValueOwnershipKind(const SILFunction &F, SILType Type,
                                        SILArgumentConvention Convention,
-                                       SILModuleConventions moduleConventions)
+                                       SILAddressConventions moduleConventions)
     : value(OwnershipKind::Any) {
   // Trivial types can be passed using a variety of conventions. They always
   // have trivial ownership.
@@ -484,7 +485,7 @@ SILFunction *Operand::getParentFunction() const {
 }
 
 bool Operand::canAcceptKind(ValueOwnershipKind kind,
-                            SILModuleConventions *silConv) const {
+                            SILAddressConventions *silConv) const {
   auto operandOwnership = getOperandOwnership(silConv);
   auto constraint = operandOwnership.getOwnershipConstraint();
   if (constraint.satisfiesConstraint(kind)) {
@@ -498,7 +499,7 @@ bool Operand::canAcceptKind(ValueOwnershipKind kind,
   return false;
 }
 
-bool Operand::satisfiesConstraints(SILModuleConventions *silConv) const {
+bool Operand::satisfiesConstraints(SILAddressConventions *silConv) const {
   return canAcceptKind(get()->getOwnershipKind(), silConv);
 }
 

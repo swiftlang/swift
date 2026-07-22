@@ -2374,8 +2374,9 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     auto Ty2 = MF->getType(TyID2);
     SILType FnTy = getSILType(Ty, SILValueCategory::Object, Fn);
     SILType SubstFnTy = getSILType(Ty2, SILValueCategory::Object, Fn);
-    SILFunctionConventions substConventions(SubstFnTy.castTo<SILFunctionType>(),
-                                            Builder.getModule());
+    SILFunctionConventions substConventions(
+        SubstFnTy.castTo<SILFunctionType>(),
+        SILAddressConventions::forFunctionOrRawSIL(Fn, Builder.getModule()));
     assert(substConventions.getNumSILArguments() == ListOfValues.size()
            && "Argument number mismatch in ApplyInst.");
     SmallVector<SILValue, 4> Args;
@@ -2436,8 +2437,9 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     SILBasicBlock *normalBB = getBBForReference(Fn, ListOfValues.back());
     ListOfValues = ListOfValues.drop_back();
 
-    SILFunctionConventions substConventions(SubstFnTy.castTo<SILFunctionType>(),
-                                            Builder.getModule());
+    SILFunctionConventions substConventions(
+        SubstFnTy.castTo<SILFunctionType>(),
+        SILAddressConventions::forFunctionOrRawSIL(Fn, Builder.getModule()));
     assert(substConventions.getNumSILArguments() == ListOfValues.size()
            && "Argument number mismatch in ApplyInst.");
     SmallVector<SILValue, 4> Args;
@@ -2484,8 +2486,9 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
         FnTy.castTo<SILFunctionType>()->substGenericArgs(
             Builder.getModule(), Substitutions,
             Builder.getTypeExpansionContext()));
-    SILFunctionConventions fnConv(SubstFnTy.castTo<SILFunctionType>(),
-                                  Builder.getModule());
+    SILFunctionConventions fnConv(
+        SubstFnTy.castTo<SILFunctionType>(),
+        SILAddressConventions::forFunctionOrRawSIL(Fn, Builder.getModule()));
 
     unsigned numArgs = fnConv.getNumSILArguments();
     assert(numArgs >= ListOfValues.size()

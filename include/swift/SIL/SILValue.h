@@ -48,7 +48,7 @@ class NonConsumingUseIterator;
 class TypeDependentUseIterator;
 class NonTypeDependentUseIterator;
 class SILValue;
-class SILModuleConventions;
+class SILAddressConventions;
 
 /// An enumeration which contains values for all the concrete ValueBase
 /// subclasses.
@@ -258,7 +258,7 @@ struct ValueOwnershipKind {
                      SILArgumentConvention convention);
   ValueOwnershipKind(const SILFunction &f, SILType type,
                      SILArgumentConvention convention,
-                     SILModuleConventions moduleConventions);
+                     SILAddressConventions moduleConventions);
 
   /// Parse Value into a ValueOwnershipKind.
   ///
@@ -1025,7 +1025,7 @@ inline bool canAcceptUnownedValue(OperandOwnership operandOwnership) {
 
 /// Return true if all OperandOwnership invariants hold.
 bool checkOperandOwnershipInvariants(const Operand *operand,
-                                     SILModuleConventions *silConv = nullptr);
+                                     SILAddressConventions *silConv = nullptr);
 
 /// Return the OperandOwnership for a forwarded operand when the forwarding
 /// operation has this "forwarding ownership" (as returned by
@@ -1175,12 +1175,12 @@ public:
   ///
   /// NOTE: This is implemented in OperandOwnership.cpp.
   OperandOwnership
-  getOperandOwnership(SILModuleConventions *silConv = nullptr) const;
+  getOperandOwnership(SILAddressConventions *silConv = nullptr) const;
 
   /// Return the ownership constraint that restricts what types of values this
   /// Operand can contain.
   OwnershipConstraint
-  getOwnershipConstraint(SILModuleConventions *silConv = nullptr) const {
+  getOwnershipConstraint(SILAddressConventions *silConv = nullptr) const {
     return getOperandOwnership(silConv).getOwnershipConstraint();
   }
 
@@ -1188,11 +1188,11 @@ public:
   /// ownership kind, without rewriting the instruction, would not cause the
   /// operand to violate the operand's ownership constraints.
   bool canAcceptKind(ValueOwnershipKind kind,
-                     SILModuleConventions *silConv = nullptr) const;
+                     SILAddressConventions *silConv = nullptr) const;
 
   /// Returns true if this operand and its value satisfy the operand's
   /// operand constraint.
-  bool satisfiesConstraints(SILModuleConventions *silConv = nullptr) const;
+  bool satisfiesConstraints(SILAddressConventions *silConv = nullptr) const;
 
   /// Returns true if this operand acts as a use that ends the lifetime its
   /// associated value, either by consuming the owned value or ending the

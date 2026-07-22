@@ -341,12 +341,6 @@ private:
   /// The stage of processing this module is at.
   SILStage Stage;
 
-  /// True if SIL conventions force address-only to be passed by address.
-  ///
-  /// Used for bootstrapping the AddressLowering pass. This should eventually
-  /// be inferred from the SIL stage to be true only when Stage == Lowered.
-  bool loweredAddresses;
-
   /// The set of deserialization notification handlers.
   DeserializationNotificationHandlerSet deserializationNotificationHandlers;
 
@@ -981,15 +975,11 @@ public:
     Stage = s;
   }
 
-  /// True if SIL conventions force address-only to be passed by address.
-  bool useLoweredAddresses() const { return loweredAddresses; }
-
-  void setLoweredAddresses(bool val) {
-    loweredAddresses = val;
-    if (val) {
-      Types.setLoweredAddresses();
-    }
-  }
+  /// True if -enable-sil-opaque-values was passed. Address-only types are
+  /// represented as opaque SSA values in Raw SIL rather than as raw addresses.
+  /// This is an immutable build-mode flag; use it when asking "what mode is
+  /// this compilation?" rather than "is this function in lowered form?".
+  bool usesOpaqueValues() const { return Options.EnableSILOpaqueValues; }
 
   llvm::IndexedInstrProfReader *getPGOReader() const { return PGOReader.get(); }
 

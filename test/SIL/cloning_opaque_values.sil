@@ -9,7 +9,7 @@ struct WeakBox<T : AnyObject> {
   weak var t: T?
 }
 
-// CHECK-LABEL: sil [ossa] @strong_copy_weak_value_caller : {{.*}} {
+// CHECK-LABEL: sil [ossa] [opaque] @strong_copy_weak_value_caller : {{.*}} {
 // CHECK:       bb0([[INSTANCE:%[^,]+]] :
 // CHECK:         [[WEAK_OPTIONAL:%[^,]+]] = struct_extract [[INSTANCE]]
 // CHECK:         [[STRONG_OPTIONAL:%[^,]+]] = strong_copy_weak_value [[WEAK_OPTIONAL]]
@@ -29,7 +29,7 @@ bb0(%instance : @guaranteed $WeakBox<T>):
   return %strong_optional : $Optional<T>
 }
 
-// CHECK-LABEL: sil [ossa] @tuple_pack_extract_caller : {{.*}} {
+// CHECK-LABEL: sil [ossa] [opaque] @tuple_pack_extract_caller : {{.*}} {
 // CHECK:       bb0([[TUPLE_ADDR:%[^,]+]] :
 // CHECK:         [[TUPLE:%[^,]+]] = load_borrow [[TUPLE_ADDR]]
 // CHECK:         [[ZERO:%[^,]+]] = integer_literal
@@ -56,7 +56,7 @@ entry(%tuple_addr : $*(repeat each T)):
   return %retval : $()
 }
 
-// CHECK-LABEL: sil [ossa] @weak_copy_value_caller : {{.*}} {
+// CHECK-LABEL: sil [ossa] [opaque] @weak_copy_value_caller : {{.*}} {
 // CHECK:       bb0([[STRONG_OPTIONAL:%[^,]+]] :
 // CHECK:         [[WEAK_OPTIONAL:%[^,]+]] = weak_copy_value [[STRONG_OPTIONAL]]
 // CHECK:         destroy_value [[STRONG_OPTIONAL]]

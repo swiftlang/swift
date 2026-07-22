@@ -85,9 +85,8 @@ static bool isImmutable(SILValue start, StoreWeakInst *allowableWeakStore,
       // finite amount of them at the same time.
       if (auto *pai = dyn_cast<PartialApplyInst>(user)) {
         if (auto *calleeFunc = pai->getReferencedFunctionOrNull()) {
-          auto calleeArgIndex = ApplySite(pai).getCalleeArgIndex(*use);
           auto *fArg = cast<SILFunctionArgument>(
-              calleeFunc->getArgument(calleeArgIndex));
+              ApplySite(pai).getCalleeArgument(calleeFunc, *use));
           if (fArg->isInferredImmutable()) {
             LLVM_DEBUG(llvm::dbgs()
                        << "        Found partial_apply with inferred immutable "
