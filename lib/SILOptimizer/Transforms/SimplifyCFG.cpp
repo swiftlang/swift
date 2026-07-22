@@ -2534,7 +2534,9 @@ bool SimplifyCFG::simplifyTryApplyBlock(TryApplyInst *TAI) {
   LLVM_DEBUG(llvm::dbgs() << "simplify try_apply block\n");
 
   auto CalleeFnTy = CalleeType.castTo<SILFunctionType>();
-  SILFunctionConventions calleeConv(CalleeFnTy, TAI->getModule());
+  SILAddressConventions silConv =
+      SILAddressConventions::forFunction(*TAI->getFunction());
+  SILFunctionConventions calleeConv(CalleeFnTy, silConv);
   auto ResultTy = calleeConv.getSILResultType(
       TAI->getFunction()->getTypeExpansionContext());
   auto OrigResultTy = TAI->getNormalBB()->getArgument(0)->getType();
@@ -2547,7 +2549,7 @@ bool SimplifyCFG::simplifyTryApplyBlock(TryApplyInst *TAI) {
         TAI->getModule(), TAI->getSubstitutionMap(),
         Builder.getTypeExpansionContext());
   }
-  SILFunctionConventions targetConv(TargetFnTy, TAI->getModule());
+  SILFunctionConventions targetConv(TargetFnTy, silConv);
 
   auto OrigFnTy = TAI->getCallee()->getType().getAs<SILFunctionType>();
   if (OrigFnTy->isPolymorphic()) {
@@ -2555,7 +2557,7 @@ bool SimplifyCFG::simplifyTryApplyBlock(TryApplyInst *TAI) {
         OrigFnTy->substGenericArgs(TAI->getModule(), TAI->getSubstitutionMap(),
                                    Builder.getTypeExpansionContext());
   }
-  SILFunctionConventions origConv(OrigFnTy, TAI->getModule());
+  SILFunctionConventions origConv(OrigFnTy, silConv);
   auto context = TAI->getFunction()->getTypeExpansionContext();
   SmallVector<SILValue, 8> Args;
   unsigned numArgs = TAI->getNumArguments();

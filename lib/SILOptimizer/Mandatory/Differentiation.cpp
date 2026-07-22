@@ -1029,6 +1029,9 @@ static SILFunction *createEmptyVJP(ADContext &context,
       original->isDynamicallyReplaceable(), original->isDistributed(),
       original->isRuntimeAccessible());
   vjp->setDebugScope(new (module) SILDebugScope(original->getLocation(), vjp));
+  // The VJP (and the pullback nested in it) is generated after AddressLowering
+  // in lowered-address form, so it shares the original's lowered state.
+  vjp->setHasLoweredAddresses(original->hasLoweredAddresses());
 
   if (original->getInlineStrategy() == AlwaysInline ||
       original->getInlineStrategy() == HeuristicAlwaysInline)
@@ -1077,6 +1080,10 @@ static SILFunction *createEmptyJVP(ADContext &context,
       original->isDynamicallyReplaceable(), original->isDistributed(),
       original->isRuntimeAccessible());
   jvp->setDebugScope(new (module) SILDebugScope(original->getLocation(), jvp));
+  // The JVP (and the differential nested in it) is generated after
+  // AddressLowering in lowered-address form, so it shares the original's
+  // lowered state.
+  jvp->setHasLoweredAddresses(original->hasLoweredAddresses());
 
   if (original->getInlineStrategy() == AlwaysInline ||
       original->getInlineStrategy() == HeuristicAlwaysInline)

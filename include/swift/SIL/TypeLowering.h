@@ -98,8 +98,6 @@ class TypeLowering {
 private:
   friend class TypeConverter;
 
-  virtual void setLoweredAddresses() const {}
-
 protected:
   /// The SIL type of values with this Swift type.
   mutable SILType LoweredType;
@@ -181,6 +179,17 @@ public:
   /// in SIL.
   SILType getLoweredType() const {
     return LoweredType;
+  }
+
+  /// getLoweredType - Get the type used to represent values of the Swift type
+  /// in SIL, with its value category derived from \p loweredAddresses.
+  /// 
+  /// Address-only types are by address (\c $*T) when \p loweredAddresses is
+  /// true and opaque SSA values (\c $T) otherwise.
+  SILType getLoweredType(bool loweredAddresses) const {
+    return LoweredType.getCategoryType((loweredAddresses && isAddressOnly())
+                                           ? SILValueCategory::Address
+                                           : SILValueCategory::Object);
   }
 
   /// Returns true if the SIL type is an address.
@@ -649,9 +658,6 @@ class TypeConverter {
   void removeNullEntry(const TypeKey &k);
 #endif
 
-  /// True if SIL conventions force address-only to be passed by address.
-  bool LoweredAddresses;
-
   CanGenericSignature CurGenericSignature;
 
   /// Stack of types currently being lowered as part of an aggregate.
@@ -704,7 +710,7 @@ public:
   ModuleDecl &M;
   ASTContext &Context;
 
-  TypeConverter(ModuleDecl &m, bool loweredAddresses = true);
+  TypeConverter(ModuleDecl &m);
   ~TypeConverter();
   TypeConverter(TypeConverter const &) = delete;
   TypeConverter &operator=(TypeConverter const &) = delete;
@@ -874,13 +880,29 @@ public:
       .getLoweredType();
   }
 
-  SILType getLoweredLoadableType(Type t,
-                                 TypeExpansionContext forExpansion,
-                                 SILModule &M) {
+  // Returns the lowered SIL type for a Swift type, with the value category
+  // derived from \p loweredAddresses (see TypeLowering::getLoweredType(bool)).
+  // Callers with a SILFunction pass F.hasLoweredAddresses(); context-free
+  // callers pass a fixed default.
+  SILType getLoweredType(Type t, TypeExpansionContext forExpansion,
+                         bool loweredAddresses) {
+    return getTypeLowering(t, forExpansion).getLoweredType(loweredAddresses);
+  }
+
+  SILType getLoweredType(AbstractionPattern origType, Type substType,
+                         TypeExpansionContext forExpansion,
+                         bool loweredAddresses) {
+    return getTypeLowering(origType, substType, forExpansion)
+        .getLoweredType(loweredAddresses);
+  }
+
+  // \p loweredAddresses is supplied by the caller (e.g.
+  // SILFunction::hasLoweredAddresses()), not derived from the module.
+  SILType getLoweredLoadableType(Type t, TypeExpansionContext forExpansion,
+                                 bool loweredAddresses) {
     const TypeLowering &ti = getTypeLowering(t, forExpansion);
-    assert(
-        (ti.isLoadable() || !SILModuleConventions(M).useLoweredAddresses()) &&
-        "unexpected address-only type");
+    assert((ti.isLoadable() || !loweredAddresses) &&
+           "unexpected address-only type");
     return ti.getLoweredType();
   }
 
@@ -1145,8 +1167,6 @@ public:
   void withClosureTypeInfo(AbstractClosureExpr *closure,
                            const FunctionTypeInfo &closureInfo,
                            llvm::function_ref<void()> operation);
-
-  void setLoweredAddresses();
 
 private:
   CanType computeLoweredRValueType(TypeExpansionContext context,

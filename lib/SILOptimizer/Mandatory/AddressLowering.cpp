@@ -170,21 +170,19 @@
 using namespace swift;
 using llvm::SmallSetVector;
 
-/// Get a function's convention for Lowered SIL, even though the SIL stage is
-/// still Canonical.
+/// A function's lowered-SIL convention, even while the SIL stage is Canonical.
 static SILFunctionConventions getLoweredFnConv(SILFunction *function) {
   return SILFunctionConventions(
       function->getLoweredFunctionType(),
-      SILModuleConventions::getLoweredAddressConventions(
+      SILAddressConventions::forFullyLoweredModule(
           function->getModule()));
 }
 
-/// Get a call's function convention for Lowered SIL even though the SIL stage
-/// is still Canonical.
+/// A call's lowered-SIL convention, even while the SIL stage is Canonical.
 static SILFunctionConventions getLoweredCallConv(ApplySite call) {
   return SILFunctionConventions(
       call.getSubstCalleeType(),
-      SILModuleConventions::getLoweredAddressConventions(call.getModule()));
+      SILAddressConventions::forFullyLoweredModule(call.getModule()));
 }
 
 //===----------------------------------------------------------------------===//
@@ -648,7 +646,7 @@ protected:
                         SILInstruction *originalInst) const {
     SILBuilder builder(originalInst->getParent(), insertPt);
     builder.setSILConventions(
-        SILModuleConventions::getLoweredAddressConventions(
+        SILAddressConventions::forFullyLoweredModule(
             builder.getModule()));
     builder.setCurrentDebugScope(originalInst->getDebugScope());
     return builder;
@@ -656,7 +654,7 @@ protected:
 
   void prepareBuilder(SILBuilder &builder) {
     builder.setSILConventions(
-      SILModuleConventions::getLoweredAddressConventions(
+      SILAddressConventions::forFullyLoweredModule(
         builder.getModule()));
   };
 };
@@ -839,7 +837,7 @@ void OpaqueValueVisitor::mapValueStorage() {
 /// Populate `indirectApplies`.
 void OpaqueValueVisitor::checkForIndirectApply(ApplySite applySite) {
   auto calleeConv = applySite.getSubstCalleeConv();
-  unsigned calleeArgIdx = applySite.getCalleeArgIndexOfFirstAppliedArg();
+  unsigned calleeArgIdx = applySite.getSubstCalleeArgIndexOfFirstAppliedArg();
   for (Operand &operand : applySite.getArgumentOperands()) {
     if (operand.get()->getType().isObject()) {
       auto argConv = calleeConv.getSILArgumentConvention(calleeArgIdx);
@@ -2333,7 +2331,7 @@ bool CallArgRewriter::rewriteArguments() {
           !apply.asFullApplySite()) &&
              "results should not yet be rewritten");
 
-  for (unsigned argIdx = apply.getCalleeArgIndexOfFirstAppliedArg(),
+  for (unsigned argIdx = apply.getSubstCalleeArgIndexOfFirstAppliedArg(),
                 endArgIdx = argIdx + apply.getNumArguments();
        argIdx < endArgIdx; ++argIdx) {
 
@@ -4784,14 +4782,12 @@ static void deleteRewrittenInstructions(AddressLoweringState &pass) {
 }
 
 //===----------------------------------------------------------------------===//
-//                        AddressLowering: Module Pass
+//                     AddressLowering: Function Pass
 //===----------------------------------------------------------------------===//
 
 namespace {
-// Note: the only reason this is not a FunctionTransform is to change the SIL
-// stage for all functions at once.
-class AddressLowering : public SILModuleTransform {
-  /// The entry point to this module transformation.
+class AddressLowering : public SILFunctionTransform {
+  /// The entry point to this function transformation.
   void run() override;
 
   void runOnFunction(SILFunction *F);
@@ -4853,21 +4849,23 @@ void AddressLowering::runOnFunction(SILFunction *function) {
 
   // The CFG may change because of criticalEdge splitting during
   // createStackAllocation or StackNesting.
-  invalidateAnalysis(function,
-                     SILAnalysis::InvalidationKind::BranchesAndInstructions);
+  invalidateAnalysis(SILAnalysis::InvalidationKind::BranchesAndInstructions);
 }
 
-/// The entry point to this module transformation.
+/// The entry point to this function transformation.
 void AddressLowering::run() {
-  if (getModule()->useLoweredAddresses())
+  // Skip functions already in lowered-address form: default (non-opaque-values)
+  // mode, a function this pass already lowered (pipeline restarts can re-run a
+  // function pass), or one deserialized as canonical.
+  if (getFunction()->hasLoweredAddresses())
     return;
 
-  for (auto &F : *getModule()) {
-    runOnFunction(&F);
-  }
-  // Update the SILModule before the PassManager has a chance to run
-  // verification.
-  getModule()->setLoweredAddresses(true);
+  runOnFunction(getFunction());
+
+  // Mark the function lowered now, so its conventions and verification see
+  // address form immediately (the module stage only reaches Canonical after all
+  // diagnostic passes; see runSILDiagnosticPasses in Passes.cpp).
+  getFunction()->setHasLoweredAddresses(true);
 }
 
 SILTransform *swift::createAddressLowering() { return new AddressLowering(); }

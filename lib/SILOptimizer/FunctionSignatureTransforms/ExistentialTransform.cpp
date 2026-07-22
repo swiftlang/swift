@@ -559,7 +559,9 @@ void ExistentialTransform::populateThunkBody() {
   /// Obtain the Result Type.
   SILValue ReturnValue;
   auto FunctionTy = NewF->getLoweredFunctionType();
-  SILFunctionConventions Conv(SubstCalleeType, M);
+  SILFunctionConventions Conv(
+      SubstCalleeType,
+      SILAddressConventions::forFunction(Builder.getFunction()));
   SILType ResultType = Conv.getSILResultType(Builder.getTypeExpansionContext());
 
   /// If the original function has error results,  we need to generate a

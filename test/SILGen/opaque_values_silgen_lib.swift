@@ -143,7 +143,7 @@ enum PAndSEnum { case A(EmptyP, String) }
 // Tests Empty protocol + Builtin.NativeObject enum (including opaque tuples as a return value)
 // ---
 // Swift.f010_PAndS_cases() -> ()
-// CHECK-LABEL: sil hidden [ossa] @$ss16f010_PAndS_casesyyF : $@convention(thin) () -> () {
+// CHECK-LABEL: sil hidden [ossa] [opaque] @$ss16f010_PAndS_casesyyF : $@convention(thin) () -> () {
 // CHECK: bb0:
 // CHECK:   [[MTYPE:%.*]] = metatype $@thin PAndSEnum.Type
 // CHECK:   [[EAPPLY:%.*]] = apply {{.*}}([[MTYPE]]) : $@convention(thin) (@thin PAndSEnum.Type) -> @owned @callee_guaranteed (@in_guaranteed any EmptyP, @guaranteed String) -> @out PAndSEnum
@@ -157,7 +157,7 @@ func f010_PAndS_cases() {
 // Init of Empty protocol + Builtin.NativeObject enum (including opaque tuples as a return value)
 // ---
 // implicit closure #2 (Swift.EmptyP, Swift.String) -> Swift.PAndSEnum in implicit closure #1 (Swift.PAndSEnum.Type) -> (Swift.EmptyP, Swift.String) -> Swift.PAndSEnum in Swift.f010_PAndS_cases() -> ()
-// CHECK-LABEL: sil private [ossa] @$ss16f010_PAndS_casesyyFs0B5SEnumOs6EmptyP_p_SStcACmcfu_ACsAD_p_SStcfu0_ : $@convention(thin) (@in_guaranteed any EmptyP, @guaranteed String, @thin PAndSEnum.Type) -> @out PAndSEnum {
+// CHECK-LABEL: sil private [ossa] [opaque] @$ss16f010_PAndS_casesyyFs0B5SEnumOs6EmptyP_p_SStcACmcfu_ACsAD_p_SStcfu0_ : $@convention(thin) (@in_guaranteed any EmptyP, @guaranteed String, @thin PAndSEnum.Type) -> @out PAndSEnum {
 // CHECK: bb0([[ARG0:%.*]] : @guaranteed $any EmptyP, [[ARG1:%.*]] : @guaranteed $String, [[ARG2:%.*]] : @closureCapture $@thin PAndSEnum.Type):
 // CHECK:   [[COPY0:%.*]] = copy_value [[ARG0]]
 // CHECK:   [[COPY1:%.*]] = copy_value [[ARG1]]
@@ -168,7 +168,7 @@ func f010_PAndS_cases() {
 
 // Test emitBuiltinReinterpretCast.
 // ---
-// CHECK-LABEL: sil hidden [ossa] @$ss12f020_bitCast_2toq_x_q_mtr0_lF : $@convention(thin) <T, U> (@in_guaranteed T, @thick U.Type) -> @out U {
+// CHECK-LABEL: sil hidden [ossa] [opaque] @$ss12f020_bitCast_2toq_x_q_mtr0_lF : $@convention(thin) <T, U> (@in_guaranteed T, @thick U.Type) -> @out U {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $T,
 // CHECK: [[COPY:%.*]] = copy_value [[ARG]] : $T
 // CHECK: [[CAST:%.*]] = unchecked_bitwise_cast [[COPY]] : $T to $U
@@ -182,7 +182,7 @@ func f020_bitCast<T, U>(_ x: T, to type: U.Type) -> U {
 
 // Test emitBuiltinCastReference
 // ---
-// CHECK-LABEL: sil hidden [ossa] @$ss12f021_refCast_2toq_x_q_mtr0_lF : $@convention(thin) <T, U> (@in_guaranteed T, @thick U.Type) -> @out U {
+// CHECK-LABEL: sil hidden [ossa] [opaque] @$ss12f021_refCast_2toq_x_q_mtr0_lF : $@convention(thin) <T, U> (@in_guaranteed T, @thick U.Type) -> @out U {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $T, %1 : $@thick U.Type):
 // CHECK: [[COPY:%.*]] = copy_value [[ARG]] : $T
 // CHECK: [[SRC:%.*]] = alloc_stack $T
@@ -201,7 +201,7 @@ func f021_refCast<T, U>(_ x: T, to: U.Type) -> U {
 
 // Test unsafe_bitwise_cast nontrivial ownership.
 // ---
-// CHECK-LABEL: sil [ossa] @$ss18f022_unsafeBitCast_2toq_x_q_mtr0_lF : $@convention(thin) <T, U> (@in_guaranteed T, @thick U.Type) -> @out U {
+// CHECK-LABEL: sil [ossa] [opaque] @$ss18f022_unsafeBitCast_2toq_x_q_mtr0_lF : $@convention(thin) <T, U> (@in_guaranteed T, @thick U.Type) -> @out U {
 // CHECK: bb0([[ARG0:%.*]] : @guaranteed $T, [[ARG1:%.*]] : $@thick U.Type):
 // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG0]] : $T
 // CHECK:   [[RESULT:%.*]] = unchecked_bitwise_cast [[ARG_COPY]] : $T to $U
@@ -215,7 +215,7 @@ public func f022_unsafeBitCast<T, U>(_ x: T, to type: U.Type) -> U {
 
 // Test emitSemanticStore.
 // ---
-// CHECK-LABEL: sil hidden [ossa] @$ss16f030_assigninoutyyxz_xtlF : $@convention(thin) <T> (@inout T, @in_guaranteed T) -> () {
+// CHECK-LABEL: sil hidden [ossa] [opaque] @$ss16f030_assigninoutyyxz_xtlF : $@convention(thin) <T> (@inout T, @in_guaranteed T) -> () {
 // CHECK: bb0([[ARG0:%.*]] : $*T, [[ARG1:%.*]] : @guaranteed $T):
 // CHECK:   [[CPY:%.*]] = copy_value [[ARG1]] : $T
 // CHECK:   [[READ:%.*]] = begin_access [modify] [unknown] [[ARG0]] : $*T
@@ -229,7 +229,7 @@ func f030_assigninout<T>(_ a: inout T, _ b: T) {
 
 // Test that we no longer use copy_addr or tuple_element_addr when copy by value is possible
 // ---
-// CHECK-LABEL: sil hidden [ossa] @$ss19f040_tupleReturnIntyBi64_Bi64__xt_tlF : $@convention(thin) <T> (Builtin.Int64, @in_guaranteed T) -> Builtin.Int64 {
+// CHECK-LABEL: sil hidden [ossa] [opaque] @$ss19f040_tupleReturnIntyBi64_Bi64__xt_tlF : $@convention(thin) <T> (Builtin.Int64, @in_guaranteed T) -> Builtin.Int64 {
 // CHECK: bb0([[ARG0:%.*]] : $Builtin.Int64, [[ARG1:%.*]] : @guaranteed $T):
 // CHECK:   [[ARG1_COPY:%.*]] = copy_value [[ARG1]]
 // CHECK:   [[TPL:%.*]] = tuple ([[ARG0]] : $Builtin.Int64, [[ARG1_COPY]] : $T)
@@ -249,7 +249,7 @@ func f040_tupleReturnInt<T>(_ x: (Builtin.Int64, T)) -> Builtin.Int64 {
 
 // Test returning an opaque tuple of tuples.
 // ---
-// CHECK-LABEL: sil hidden [noinline] [ossa] @$ss16f050_multiResultyx_x_xttxlF : $@convention(thin) <T> (@in_guaranteed T) -> (@out T, @out T, @out T) {
+// CHECK-LABEL: sil hidden [noinline] [ossa] [opaque] @$ss16f050_multiResultyx_x_xttxlF : $@convention(thin) <T> (@in_guaranteed T) -> (@out T, @out T, @out T) {
 // CHECK: bb0(%0 : @guaranteed $T):
 // CHECK: %[[CP1:.*]] = copy_value %{{.*}} : $T
 // CHECK: %[[CP2:.*]] = copy_value %{{.*}} : $T
@@ -265,7 +265,7 @@ func f050_multiResult<T>(_ t: T) -> (T, (T, T)) {
 
 // Test returning an opaque tuple of tuples as a concrete tuple.
 // ---
-// CHECK-LABEL: sil [ossa] @$ss20f060_callMultiResult1iBi64__Bi64__Bi64_ttBi64__tF : $@convention(thin) (Builtin.Int64) -> (Builtin.Int64, Builtin.Int64, Builtin.Int64) {
+// CHECK-LABEL: sil [ossa] [opaque] @$ss20f060_callMultiResult1iBi64__Bi64__Bi64_ttBi64__tF : $@convention(thin) (Builtin.Int64) -> (Builtin.Int64, Builtin.Int64, Builtin.Int64) {
 // CHECK: bb0(%0 : $Builtin.Int64):
 // CHECK: %[[FN:.*]] = function_ref @$ss16f050_multiResultyx_x_xttxlF : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> (@out τ_0_0, @out τ_0_0, @out τ_0_0)
 // CHECK: %[[TPL:.*]] = apply %[[FN]]<Builtin.Int64>(%0) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> (@out τ_0_0, @out τ_0_0, @out τ_0_0)
@@ -280,7 +280,7 @@ public func f060_callMultiResult(i: Builtin.Int64) -> (Builtin.Int64, (Builtin.I
 // SILGen, prepareArchetypeCallee. Materialize a
 // non-class-constrained self from a class-constrained archetype.
 // ---
-// CHECK-LABEL: sil hidden [ossa] @$ss20f070_materializeSelf1tyx_tRlzCs4FooPRzlF : $@convention(thin) <T where T : AnyObject, T : FooP> (@guaranteed T) -> () {
+// CHECK-LABEL: sil hidden [ossa] [opaque] @$ss20f070_materializeSelf1tyx_tRlzCs4FooPRzlF : $@convention(thin) <T where T : AnyObject, T : FooP> (@guaranteed T) -> () {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $T):
 // CHECK: [[WITNESS_METHOD:%.*]] = witness_method $T, #FooP.foo : <Self where Self : FooP> (Self) -> () -> () : $@convention(witness_method: FooP) <τ_0_0 where τ_0_0 : FooP> (@in_guaranteed τ_0_0) -> ()
 // CHECK: apply [[WITNESS_METHOD]]<T>([[ARG]]) : $@convention(witness_method: FooP) <τ_0_0 where τ_0_0 : FooP> (@in_guaranteed τ_0_0) -> ()
@@ -293,7 +293,7 @@ func f070_materializeSelf<T: FooP>(t: T) where T: AnyObject {
 
 // Test open existential with opaque values
 // ---
-// CHECK-LABEL: sil hidden [ossa] @$ss8f080_bar1pBi64_s1P_p_tF : $@convention(thin) (@in_guaranteed any P) -> Builtin.Int64 {
+// CHECK-LABEL: sil hidden [ossa] [opaque] @$ss8f080_bar1pBi64_s1P_p_tF : $@convention(thin) (@in_guaranteed any P) -> Builtin.Int64 {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $any P):
 // CHECK:   [[OPENED_ARG:%.*]] = open_existential_value [[ARG]] : $any P to $@opened
 // CHECK:   [[WITNESS_FUNC:%.*]] = witness_method $@opened
@@ -307,7 +307,7 @@ func f080_bar(p: P) -> Builtin.Int64 {
 
 // Test OpaqueTypeLowering copyValue and destroyValue.
 // ---
-// CHECK-LABEL: sil hidden [ossa] @$ss11f090_calleryxxlF : $@convention(thin) <T> (@in_guaranteed T) -> @out T {
+// CHECK-LABEL: sil hidden [ossa] [opaque] @$ss11f090_calleryxxlF : $@convention(thin) <T> (@in_guaranteed T) -> @out T {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $T):
 // CHECK-NOT: copy_value
 // CHECK:   [[RESULT:%.*]] = apply {{%.*}}<T>([[ARG]]) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> @out τ_0_0
@@ -320,7 +320,7 @@ func f090_caller<T>(_ t: T) -> T {
 
 // Test a simple opaque parameter and return value.
 // ---
-// CHECK-LABEL: sil hidden [ossa] @$ss13f100_identityyxxlF : $@convention(thin) <T> (@in_guaranteed T) -> @out T {
+// CHECK-LABEL: sil hidden [ossa] [opaque] @$ss13f100_identityyxxlF : $@convention(thin) <T> (@in_guaranteed T) -> @out T {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $T):
 // CHECK:   [[COPY_ARG:%.*]] = copy_value [[ARG]] : $T
 // CHECK-NOT:   destroy_value [[ARG]] : $T
@@ -332,7 +332,7 @@ func f100_identity<T>(_ t: T) -> T {
 
 // Test a guaranteed opaque parameter.
 // ---
-// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$ss19f110_GuaranteedSelfVs4FooPssACP3fooyyFTW : $@convention(witness_method: FooP) (@in_guaranteed f110_GuaranteedSelf) -> () {
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] [opaque] @$ss19f110_GuaranteedSelfVs4FooPssACP3fooyyFTW : $@convention(witness_method: FooP) (@in_guaranteed f110_GuaranteedSelf) -> () {
 // CHECK: bb0(%0 : $f110_GuaranteedSelf):
 // CHECK:   %[[F:.*]] = function_ref @$ss19f110_GuaranteedSelfV3fooyyF : $@convention(method) (f110_GuaranteedSelf) -> ()
 // CHECK:   apply %[[F]](%0) : $@convention(method) (f110_GuaranteedSelf) -> ()
@@ -344,7 +344,7 @@ struct f110_GuaranteedSelf : FooP {
 
 // Tests a corner case wherein we used to do a temporary and return a pointer to T instead of T
 // ---
-// CHECK-LABEL: sil hidden [ossa] @$ss16f120_returnValueyxxlF : $@convention(thin) <T> (@in_guaranteed T) -> @out T {
+// CHECK-LABEL: sil hidden [ossa] [opaque] @$ss16f120_returnValueyxxlF : $@convention(thin) <T> (@in_guaranteed T) -> @out T {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $T):
 // CHECK:   [[COPY_ARG1:%.*]] = copy_value [[ARG]] : $T
 // CHECK:   [[MOVE:%.*]] = move_value [lexical] [var_decl] [[COPY_ARG1]] : $T
@@ -360,7 +360,7 @@ func f120_returnValue<T>(_ x: T) -> T {
 
 // Tests Optional initialization by value
 // ---
-// CHECK-LABEL: sil hidden [ossa] @$ss9f130_wrapyxSgxlF : $@convention(thin) <T> (@in_guaranteed T) -> @out Optional<T> {
+// CHECK-LABEL: sil hidden [ossa] [opaque] @$ss9f130_wrapyxSgxlF : $@convention(thin) <T> (@in_guaranteed T) -> @out Optional<T> {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $T):
 // CHECK:   [[COPY_ARG:%.*]] = copy_value [[ARG]] : $T
 // CHECK:   [[OPTIONAL_ARG:%.*]] = enum $Optional<T>, #Optional.some!enumelt, [[COPY_ARG]] : $T
@@ -375,7 +375,7 @@ func f150_anyArg(_: Any) {}
 
 // Tests init of opaque existentials
 // ---
-// CHECK-LABEL: sil hidden [ossa] @$ss15f160_callAnyArgyyF : $@convention(thin) () -> () {
+// CHECK-LABEL: sil hidden [ossa] [opaque] @$ss15f160_callAnyArgyyF : $@convention(thin) () -> () {
 // CHECK: bb0:
 // CHECK:   [[INT_LIT:%.*]] = integer_literal $Builtin.IntLiteral, 42
 // CHECK:   [[INT_TYPE:%.*]] = metatype $@thin Int64.Type
@@ -390,7 +390,7 @@ func f160_callAnyArg() {
 
 // Tests unconditional_checked_cast for opaque values
 // ---
-// CHECK-LABEL: sil hidden [ossa] @$ss18f170_force_convertxylF : $@convention(thin) <T> () -> @out T {
+// CHECK-LABEL: sil hidden [ossa] [opaque] @$ss18f170_force_convertxylF : $@convention(thin) <T> () -> @out T {
 // CHECK: bb0:
 // CHECK-NOT: alloc_stack
 // CHECK:   [[INT_LIT:%.*]] = integer_literal $Builtin.IntLiteral, 42
@@ -411,7 +411,7 @@ func f170_force_convert<T>() -> T {
 
 // Tests supporting function for f190_return_foo_var - cast and return of protocol
 // ---
-// CHECK-LABEL: sil hidden [ossa] @$ss15f180_return_foos4FooP_pyF : $@convention(thin) () -> @out any FooP {
+// CHECK-LABEL: sil hidden [ossa] [opaque] @$ss15f180_return_foos4FooP_pyF : $@convention(thin) () -> @out any FooP {
 // CHECK: bb0:
 // CHECK:   [[INT_LIT:%.*]] = integer_literal $Builtin.IntLiteral, 42
 // CHECK:   [[INT_TYPE:%.*]] = metatype $@thin Int64.Type
@@ -426,7 +426,7 @@ var foo_var : FooP = f180_return_foo()
 
 // Tests return of global variables by doing a load of copy
 // ---
-// CHECK-LABEL: sil hidden [ossa] @$ss19f190_return_foo_vars4FooP_pyF : $@convention(thin) () -> @out any FooP {
+// CHECK-LABEL: sil hidden [ossa] [opaque] @$ss19f190_return_foo_vars4FooP_pyF : $@convention(thin) () -> @out any FooP {
 // CHECK: bb0:
 // CHECK:   [[ADDRESSOR:%.*]] = function_ref @$ss7foo_vars4FooP_pvau : $@convention(thin) () -> Builtin.RawPointer
 // CHECK:   [[RAW:%.*]] = apply [[ADDRESSOR]]()
@@ -441,7 +441,7 @@ func f190_return_foo_var() -> FooP {
 
 // Tests deinit of opaque existentials
 // ---
-// CHECK-LABEL: sil hidden [ossa] @$ss16f200_use_foo_varyyF : $@convention(thin) () -> () {
+// CHECK-LABEL: sil hidden [ossa] [opaque] @$ss16f200_use_foo_varyyF : $@convention(thin) () -> () {
 // CHECK: bb0:
 // CHECK:   [[ADDRESSOR:%.*]] = function_ref @$ss7foo_vars4FooP_pvau : $@convention(thin) () -> Builtin.RawPointer
 // CHECK:   [[RAW:%.*]] = apply [[ADDRESSOR]]()
@@ -463,7 +463,7 @@ func f200_use_foo_var() {
 
 // Tests composition erasure of opaque existentials + copy into of opaques
 // ---
-// CHECK-LABEL: sil hidden [ossa] @$ss16f210_compErasureys5Error_psAB_s4FooPpF : $@convention(thin) (@in_guaranteed any Error & FooP) -> @owned any Error {
+// CHECK-LABEL: sil hidden [ossa] [opaque] @$ss16f210_compErasureys5Error_psAB_s4FooPpF : $@convention(thin) (@in_guaranteed any Error & FooP) -> @owned any Error {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $any Error & FooP):
 // CHECK:   [[OPAQUE_ARG:%.*]] = open_existential_value [[ARG]] : $any Error & FooP to $@opened({{.*}}, any Error & FooP) Self
 // CHECK:   [[TEMP:%.*]] = alloc_stack $any Error
@@ -485,7 +485,7 @@ func f210_compErasure(_ x: FooP & Error) -> Error {
 
 // f250_testBoxT continued Test Implicit Value Construction under Opaque value mode
 // ---
-// CHECK-LABEL: sil hidden [ossa] @$ss3BoxV1tAByxGx_tcfC : $@convention(method) <T> (@in T, @thin Box<T>.Type) -> @out Box<T> {
+// CHECK-LABEL: sil hidden [ossa] [opaque] @$ss3BoxV1tAByxGx_tcfC : $@convention(method) <T> (@in T, @thin Box<T>.Type) -> @out Box<T> {
 // CHECK: bb0([[ARG0:%.*]] : @owned $T, [[ARG1:%.*]] : $@thin Box<T>.Type):
 // CHECK:   [[RETVAL:%.*]] = struct $Box<T> ([[ARG0]] : $T)
 // CHECK:   return [[RETVAL]] : $Box<T>
@@ -494,7 +494,7 @@ struct Box<T> {
   let t: T
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$ss13f250_testBoxTyyF : $@convention(thin) () -> () {
+// CHECK-LABEL: sil hidden [ossa] [opaque] @$ss13f250_testBoxTyyF : $@convention(thin) () -> () {
 // CHECK: bb0:
 // CHECK:   [[BOX_MTYPE:%.*]] = metatype $@thin Box<Int64>.Type
 // CHECK:   [[INTLIT:%.*]] = integer_literal $Builtin.IntLiteral, 42
@@ -515,7 +515,7 @@ enum AddressOnlyEnum {
 
 // Tests Address only enums
 // ---
-// CHECK-LABEL: sil hidden [ossa] @$ss15f260_AOnly_enumyys17AddressOnlyStructVF : $@convention(thin) (AddressOnlyStruct) -> () {
+// CHECK-LABEL: sil hidden [ossa] [opaque] @$ss15f260_AOnly_enumyys17AddressOnlyStructVF : $@convention(thin) (AddressOnlyStruct) -> () {
 // CHECK: bb0([[ARG:%.*]] : $AddressOnlyStruct):
 // CHECK:   [[MTYPE1:%.*]] = metatype $@thin AddressOnlyEnum.Type
 // CHECK:   [[APPLY1:%.*]] = apply {{.*}}([[MTYPE1]]) : $@convention(thin) (@thin AddressOnlyEnum.Type) -> @owned @callee_guaranteed (@in_guaranteed any EmptyP) -> @out AddressOnlyEnum
@@ -542,7 +542,7 @@ func f260_AOnly_enum(_ s: AddressOnlyStruct) {
 
 // Tests InjectOptional for opaque value types + conversion of opaque structs
 // ---
-// CHECK-LABEL: sil hidden [ossa] @$ss21f270_convOptAnyStructyys0dE0VACSgcF : $@convention(thin) (@guaranteed @callee_guaranteed (@in_guaranteed Optional<AnyStruct>) -> @out AnyStruct) -> () {
+// CHECK-LABEL: sil hidden [ossa] [opaque] @$ss21f270_convOptAnyStructyys0dE0VACSgcF : $@convention(thin) (@guaranteed @callee_guaranteed (@in_guaranteed Optional<AnyStruct>) -> @out AnyStruct) -> () {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $@callee_guaranteed (@in_guaranteed Optional<AnyStruct>) -> @out AnyStruct):
 // CHECK:   [[COPY_ARG:%.*]] = copy_value [[ARG]]
 // CHECK:   [[PAPPLY:%.*]] = partial_apply [callee_guaranteed] %{{.*}}([[COPY_ARG]]) : $@convention(thin) (@in_guaranteed Optional<AnyStruct>, @guaranteed @callee_guaranteed (@in_guaranteed Optional<AnyStruct>) -> @out AnyStruct) -> @out Optional<AnyStruct>
@@ -556,7 +556,7 @@ func f270_convOptAnyStruct(_ a1: @escaping (AnyStruct?) -> AnyStruct) {
 
 // f270_convOptAnyStruct continued Test: reabstraction thunk helper
 // ---
-// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$ss9AnyStructVSgABIegnr_A2CIegnr_TR : $@convention(thin) (@in_guaranteed Optional<AnyStruct>, @guaranteed @callee_guaranteed (@in_guaranteed Optional<AnyStruct>) -> @out AnyStruct) -> @out Optional<AnyStruct> {
+// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] [opaque] @$ss9AnyStructVSgABIegnr_A2CIegnr_TR : $@convention(thin) (@in_guaranteed Optional<AnyStruct>, @guaranteed @callee_guaranteed (@in_guaranteed Optional<AnyStruct>) -> @out AnyStruct) -> @out Optional<AnyStruct> {
 // CHECK: bb0([[ARG0:%.*]] : @guaranteed $Optional<AnyStruct>, [[ARG1:%.*]] : @guaranteed $@callee_guaranteed (@in_guaranteed Optional<AnyStruct>) -> @out AnyStruct):
 // CHECK:   [[APPLYARG:%.*]] = apply [[ARG1]]([[ARG0]]) : $@callee_guaranteed (@in_guaranteed Optional<AnyStruct>) -> @out AnyStruct
 // CHECK:   [[RETVAL:%.*]] = enum $Optional<AnyStruct>, #Optional.some!enumelt, [[APPLYARG]] : $AnyStruct
@@ -565,7 +565,7 @@ func f270_convOptAnyStruct(_ a1: @escaping (AnyStruct?) -> AnyStruct) {
 
 // Tests conversion between existential types
 // ---
-// CHECK-LABEL: sil hidden [ossa] @$ss21f280_convExistTrivialyys0D6StructVs1P_pcF : $@convention(thin) (@guaranteed @callee_guaranteed (@in_guaranteed any P) -> TrivialStruct) -> () {
+// CHECK-LABEL: sil hidden [ossa] [opaque] @$ss21f280_convExistTrivialyys0D6StructVs1P_pcF : $@convention(thin) (@guaranteed @callee_guaranteed (@in_guaranteed any P) -> TrivialStruct) -> () {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $@callee_guaranteed (@in_guaranteed any P) -> TrivialStruct):
 // CHECK:   [[COPY_ARG:%.*]] = copy_value [[ARG]]
 // CHECK:   [[PAPPLY:%.*]] = partial_apply [callee_guaranteed] %{{.*}}([[COPY_ARG]]) : $@convention(thin) (@in_guaranteed any P2, @guaranteed @callee_guaranteed (@in_guaranteed any P) -> TrivialStruct) -> @out any P2
@@ -579,7 +579,7 @@ func f280_convExistTrivial(_ s: @escaping (P) -> TrivialStruct) {
 
 // part of f280_convExistTrivial: conversion between existential types - reabstraction thunk
 // ---
-// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$ss1P_ps13TrivialStructVIegnd_s2P2_psAD_pIegnr_TR : $@convention(thin) (@in_guaranteed any P2, @guaranteed @callee_guaranteed (@in_guaranteed any P) -> TrivialStruct) -> @out any P2 {
+// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] [opaque] @$ss1P_ps13TrivialStructVIegnd_s2P2_psAD_pIegnr_TR : $@convention(thin) (@in_guaranteed any P2, @guaranteed @callee_guaranteed (@in_guaranteed any P) -> TrivialStruct) -> @out any P2 {
 // CHECK: bb0([[ARG0:%.*]] : @guaranteed $any P2, [[ARG1:%.*]] : @guaranteed $@callee_guaranteed (@in_guaranteed any P) -> TrivialStruct):
 // CHECK:   [[OPENED_ARG:%.*]] = open_existential_value [[ARG]] : $any P2 to $@opened({{.*}}, any P2) Self
 // CHECK:   [[COPIED_VAL:%.*]] = copy_value [[OPENED_ARG]]
@@ -594,7 +594,7 @@ func f280_convExistTrivial(_ s: @escaping (P) -> TrivialStruct) {
 
 // Tests conversion between existential types - optionals case
 // ---
-// CHECK-LABEL: sil hidden [ossa] @$ss21f290_convOptExistTrivyys13TrivialStructVs1P_pSgcF : $@convention(thin) (@guaranteed @callee_guaranteed (@in_guaranteed Optional<any P>) -> TrivialStruct) -> () {
+// CHECK-LABEL: sil hidden [ossa] [opaque] @$ss21f290_convOptExistTrivyys13TrivialStructVs1P_pSgcF : $@convention(thin) (@guaranteed @callee_guaranteed (@in_guaranteed Optional<any P>) -> TrivialStruct) -> () {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $@callee_guaranteed (@in_guaranteed Optional<any P>) -> TrivialStruct):
 // CHECK:   [[COPY_ARG:%.*]] = copy_value [[ARG]]
 // CHECK:   [[PAPPLY:%.*]] = partial_apply [callee_guaranteed] %{{.*}}([[COPY_ARG]]) : $@convention(thin) (Optional<TrivialStruct>, @guaranteed @callee_guaranteed (@in_guaranteed Optional<any P>) -> TrivialStruct) -> @out any P2
@@ -608,7 +608,7 @@ func f290_convOptExistTriv(_ s: @escaping (P?) -> TrivialStruct) {
 
 // part of f290_convOptExistTriv: conversion between existential types - reabstraction thunk - optionals case
 // ---
-// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$ss1P_pSgs13TrivialStructVIegnd_ADSgs2P2_pIegyr_TR : $@convention(thin) (Optional<TrivialStruct>, @guaranteed @callee_guaranteed (@in_guaranteed Optional<any P>) -> TrivialStruct) -> @out any P2 {
+// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] [opaque] @$ss1P_pSgs13TrivialStructVIegnd_ADSgs2P2_pIegyr_TR : $@convention(thin) (Optional<TrivialStruct>, @guaranteed @callee_guaranteed (@in_guaranteed Optional<any P>) -> TrivialStruct) -> @out any P2 {
 // CHECK: bb0([[ARG0:%.*]] : $Optional<TrivialStruct>, [[ARG1:%.*]] : @guaranteed $@callee_guaranteed (@in_guaranteed Optional<any P>) -> TrivialStruct):
 // CHECK:   switch_enum [[ARG0]] : $Optional<TrivialStruct>, case #Optional.some!enumelt: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
 // CHECK: [[SOME_BB]]([[OSOME:%.*]] : $TrivialStruct):
@@ -627,7 +627,7 @@ func f290_convOptExistTriv(_ s: @escaping (P?) -> TrivialStruct) {
 
 // Tests corner-case: reabstraction of an empty tuple to any
 // ---
-// CHECK-LABEL: sil hidden [ossa] @$ss20f300_convETupleToAnyyyyycF : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> () {
+// CHECK-LABEL: sil hidden [ossa] [opaque] @$ss20f300_convETupleToAnyyyyycF : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> () {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $@callee_guaranteed () -> ()):
 // CHECK:   [[COPY_ARG:%.*]] = copy_value [[ARG]]
 // CHECK:   [[PAPPLY:%.*]] = partial_apply [callee_guaranteed] %{{.*}}([[COPY_ARG]]) : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> @out Any
@@ -641,7 +641,7 @@ func f300_convETupleToAny(_ t: @escaping () -> ()) {
 
 // f300_convETupleToAny continued Test: reabstraction of () to Any
 // ---
-// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sIeg_ypIegr_TR : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> @out Any {
+// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] [opaque] @$sIeg_ypIegr_TR : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> @out Any {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $@callee_guaranteed () -> ()):
 // CHECK:   [[ASTACK:%.*]] = alloc_stack $Any
 // CHECK:   [[IADDR:%.*]] = init_existential_addr [[ASTACK]] : $*Any, $()
@@ -653,7 +653,7 @@ func f300_convETupleToAny(_ t: @escaping () -> ()) {
 
 // Tests corner-case: reabstraction of a non-empty tuple to any
 // ---
-// CHECK-LABEL: sil hidden [ossa] @$ss21f310_convnIntTupleAnyyyBi64__Bi64_tycF : $@convention(thin) (@guaranteed @callee_guaranteed () -> (Builtin.Int64, Builtin.Int64)) -> () {
+// CHECK-LABEL: sil hidden [ossa] [opaque] @$ss21f310_convnIntTupleAnyyyBi64__Bi64_tycF : $@convention(thin) (@guaranteed @callee_guaranteed () -> (Builtin.Int64, Builtin.Int64)) -> () {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $@callee_guaranteed () -> (Builtin.Int64, Builtin.Int64)):
 // CHECK:   [[COPY_ARG:%.*]] = copy_value [[ARG]]
 // CHECK:   [[PAPPLY:%.*]] = partial_apply [callee_guaranteed] %{{.*}}([[COPY_ARG]]) : $@convention(thin) (@guaranteed @callee_guaranteed () -> (Builtin.Int64, Builtin.Int64)) -> @out Any
@@ -667,7 +667,7 @@ func f310_convnIntTupleAny(_ t: @escaping () -> (Builtin.Int64, Builtin.Int64)) 
 
 // f310_convIntTupleAny continued Test: reabstraction of non-empty tuple to Any
 // ---
-// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sBi64_Bi64_Iegdd_ypIegr_TR : $@convention(thin) (@guaranteed @callee_guaranteed () -> (Builtin.Int64, Builtin.Int64)) -> @out Any {
+// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] [opaque] @$sBi64_Bi64_Iegdd_ypIegr_TR : $@convention(thin) (@guaranteed @callee_guaranteed () -> (Builtin.Int64, Builtin.Int64)) -> @out Any {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $@callee_guaranteed () -> (Builtin.Int64, Builtin.Int64)):
 // CHECK:   [[ASTACK:%.*]] = alloc_stack $Any
 // CHECK:   [[IADDR:%.*]] = init_existential_addr [[ASTACK]] : $*Any, $(Builtin.Int64, Builtin.Int64)
@@ -685,7 +685,7 @@ func f310_convnIntTupleAny(_ t: @escaping () -> (Builtin.Int64, Builtin.Int64)) 
 
 // Tests translating and imploding into Any under opaque value mode
 // ---
-// CHECK-LABEL: sil hidden [ossa] @$ss20f320_transImplodeAnyyyyypcF : $@convention(thin) (@guaranteed @callee_guaranteed (@in_guaranteed Any) -> ()) -> () {
+// CHECK-LABEL: sil hidden [ossa] [opaque] @$ss20f320_transImplodeAnyyyyypcF : $@convention(thin) (@guaranteed @callee_guaranteed (@in_guaranteed Any) -> ()) -> () {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $@callee_guaranteed (@in_guaranteed Any) -> ()):
 // CHECK:   [[COPY_ARG:%.*]] = copy_value [[ARG]]
 // CHECK:   [[PAPPLY:%.*]] = partial_apply [callee_guaranteed] %{{.*}}([[COPY_ARG]]) : $@convention(thin) (Builtin.Int64, Builtin.Int64, @guaranteed @callee_guaranteed (@in_guaranteed Any) -> ()) -> ()
@@ -699,7 +699,7 @@ func f320_transImplodeAny(_ t: @escaping (Any) -> ()) {
 
 // f320_transImplodeAny continued Test: reabstraction thunk
 // ---
-// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sypIegn_Bi64_Bi64_Iegyy_TR : $@convention(thin) (Builtin.Int64, Builtin.Int64, @guaranteed @callee_guaranteed (@in_guaranteed Any) -> ()) -> () {
+// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] [opaque] @$sypIegn_Bi64_Bi64_Iegyy_TR : $@convention(thin) (Builtin.Int64, Builtin.Int64, @guaranteed @callee_guaranteed (@in_guaranteed Any) -> ()) -> () {
 // CHECK: bb0([[ARG0:%.*]] : $Builtin.Int64, [[ARG1:%.*]] : $Builtin.Int64, [[ARG2:%.*]] : @guaranteed $@callee_guaranteed (@in_guaranteed Any) -> ()):
 // CHECK:   [[ASTACK:%.*]] = alloc_stack $Any
 // CHECK:   [[IADDR:%.*]] = init_existential_addr [[ASTACK]] : $*Any, $(Builtin.Int64, Builtin.Int64)
@@ -717,7 +717,7 @@ func f320_transImplodeAny(_ t: @escaping (Any) -> ()) {
 
 // Tests support for address only let closures under opaque value mode - they are not by-address anymore
 // ---
-// CHECK-LABEL: sil hidden [ossa] @$ss19f330_addrLetClosureyxxlF : $@convention(thin) <T> (@in_guaranteed T) -> @out T {
+// CHECK-LABEL: sil hidden [ossa] [opaque] @$ss19f330_addrLetClosureyxxlF : $@convention(thin) <T> (@in_guaranteed T) -> @out T {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $T):
 // CHECK:   [[RESULT:%.*]] = apply {{%.*}}<T>([[ARG]]) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> @out τ_0_0
 // CHECK:   return [[RESULT]] : $T
@@ -728,7 +728,7 @@ func f330_addrLetClosure<T>(_ x:T) -> T {
 
 // Tests support for capture of a mutable opaque value type
 // ---
-// CHECK-LABEL: sil hidden [ossa] @$ss15f340_captureBoxyyF : $@convention(thin) () -> () {
+// CHECK-LABEL: sil hidden [ossa] [opaque] @$ss15f340_captureBoxyyF : $@convention(thin) () -> () {
 // CHECK: bb0:
 // CHECK:   [[ALLOC_OF_BOX:%.*]] = alloc_box ${ var any EmptyP }, var, name "mutableAddressOnly"
 // CHECK:   [[BORROW_BOX:%.*]] = begin_borrow [lexical] [var_decl] [[ALLOC_OF_BOX]] : ${ var any EmptyP }
@@ -752,7 +752,7 @@ func f340_captureBox() {
 
 // Tests support for guards and indirect enums for opaque values
 // ---
-// CHECK-LABEL: sil hidden [ossa] @$ss14f360_guardEnumyys08IndirectC0OyxGlF : $@convention(thin) <T> (@guaranteed IndirectEnum<T>) -> () {
+// CHECK-LABEL: sil hidden [ossa] [opaque] @$ss14f360_guardEnumyys08IndirectC0OyxGlF : $@convention(thin) <T> (@guaranteed IndirectEnum<T>) -> () {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $IndirectEnum<T>):
 // CHECK:   [[COPY_ARG:%.*]] = copy_value [[ARG]]
 // CHECK:   switch_enum [[COPY_ARG]] : $IndirectEnum<T>, case #IndirectEnum.Node!enumelt: [[NODE_BB:bb[0-9]+]], case #IndirectEnum.Nil!enumelt: [[NIL_BB:bb[0-9]+]]
@@ -783,7 +783,7 @@ func f360_guardEnum<T>(_ e: IndirectEnum<T>) {
 
 // Tests contextual init() of opaque value types
 // ---
-// CHECK-LABEL: sil hidden [ossa] @$ss17f370_optToOptCastyxSgABlF : $@convention(thin) <T> (@in_guaranteed Optional<T>) -> @out Optional<T> {
+// CHECK-LABEL: sil hidden [ossa] [opaque] @$ss17f370_optToOptCastyxSgABlF : $@convention(thin) <T> (@in_guaranteed Optional<T>) -> @out Optional<T> {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $Optional<T>):
 // CHECK:   [[COPY_ARG:%.*]] = copy_value [[ARG]]
 // CHECK-NOT:   destroy_value [[ARG]]
@@ -795,7 +795,7 @@ func f370_optToOptCast<T>(_ x : T!) -> T? {
 
 // Tests casting optional opaques to optional opaques
 // ---
-// CHECK-LABEL: sil hidden [ossa] @$ss19f380_contextualInityyBi64_SgF : $@convention(thin) (Optional<Builtin.Int64>) -> () {
+// CHECK-LABEL: sil hidden [ossa] [opaque] @$ss19f380_contextualInityyBi64_SgF : $@convention(thin) (Optional<Builtin.Int64>) -> () {
 // CHECK: bb0([[ARG:%.*]] : $Optional<Builtin.Int64>):
 // CHECK:   [[ALLOC_OF_BOX:%.*]] = alloc_box ${ var Optional<Builtin.Int64> }, var
 // CHECK:   [[BORROW_BOX:%.*]] = begin_borrow [var_decl] [[ALLOC_OF_BOX]]
@@ -812,7 +812,7 @@ func f380_contextualInit(_ a : Builtin.Int64?) {
 
 // Tests opaque call result types
 // ---
-// CHECK-LABEL: sil hidden [ossa] @$ss19f390_addrCallResultyyxycSglF : $@convention(thin) <T> (@guaranteed Optional<@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <T>>) -> () {
+// CHECK-LABEL: sil hidden [ossa] [opaque] @$ss19f390_addrCallResultyyxycSglF : $@convention(thin) <T> (@guaranteed Optional<@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <T>>) -> () {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $Optional<@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <T>>):
 // CHECK:   [[ALLOC_OF_BOX:%.*]] = alloc_box $<τ_0_0> { var Optional<τ_0_0> } <T>
 // CHECK:   [[BORROW_BOX:%.*]] = begin_borrow [lexical] [var_decl] [[ALLOC_OF_BOX]]
@@ -838,7 +838,7 @@ func f390_addrCallResult<T>(_ f: (() -> T)?) {
 
 // Tests reabstraction / partial apply of protocols under opaque value mode
 // ---
-// CHECK-LABEL: sil hidden [ossa] @$ss16f400_maybeCloneP1cys8Clonable_p_tF : $@convention(thin) (@in_guaranteed any Clonable) -> () {
+// CHECK-LABEL: sil hidden [ossa] [opaque] @$ss16f400_maybeCloneP1cys8Clonable_p_tF : $@convention(thin) (@in_guaranteed any Clonable) -> () {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $any Clonable):
 // CHECK:   [[CLOSURE_FN:%.*]] = function_ref @{{.*}} : $@convention(thin) (@in_guaranteed any Clonable) -> @owned @callee_guaranteed () -> @out Optional<any Clonable>
 // CHECK:   [[CLOSURE:%.*]] = apply [[CLOSURE_FN]]([[ARG]]) : $@convention(thin) (@in_guaranteed any Clonable) -> @owned @callee_guaranteed () -> @out Optional<any Clonable>
@@ -852,7 +852,7 @@ func f400_maybeCloneP(c: Clonable) {
 
 // Tests global opaque values / subscript rvalues
 // ---
-// CHECK-LABEL: sil hidden [ossa] @$ss20f410_globalRvalueGetyBi64_Bi64_F : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
+// CHECK-LABEL: sil hidden [ossa] [opaque] @$ss20f410_globalRvalueGetyBi64_Bi64_F : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
 // CHECK: bb0([[ARG:%.*]] : $Builtin.Int64):
 // CHECK:   [[ADDRESSOR:%.*]] = function_ref @{{.*}} : $@convention(thin) () -> Builtin.RawPointer
 // CHECK:   [[RAW:%.*]] = apply [[ADDRESSOR]]()
@@ -873,7 +873,7 @@ func f410_globalRvalueGet(_ i : Builtin.Int64) -> Builtin.Int64 {
 
 // Tests global opaque values / subscript lvalues
 // ---
-// CHECK-LABEL: sil hidden [ossa] @$ss20f420_globalLvalueGetyBi64_SgBi64_F : $@convention(thin) (Builtin.Int64) -> Optional<Builtin.Int64> {
+// CHECK-LABEL: sil hidden [ossa] [opaque] @$ss20f420_globalLvalueGetyBi64_SgBi64_F : $@convention(thin) (Builtin.Int64) -> Optional<Builtin.Int64> {
 // CHECK: bb0([[ARG:%.*]] : $Builtin.Int64):
 // CHECK:   [[ADDRESSOR:%.*]] = function_ref @{{.*}} : $@convention(thin) () -> Builtin.RawPointer
 // CHECK:   [[RAW:%.*]] = apply [[ADDRESSOR]]()
@@ -895,7 +895,7 @@ func f420_globalLvalueGet(_ i : Builtin.Int64) -> Builtin.Int64? {
 
 // Tests tuple transformation
 // ---
-// CHECK-LABEL: sil hidden [ossa] @$ss21f430_callUnreachableF1tyx_tlF : $@convention(thin) <T> (@in_guaranteed T) -> () {
+// CHECK-LABEL: sil hidden [ossa] [opaque] @$ss21f430_callUnreachableF1tyx_tlF : $@convention(thin) <T> (@in_guaranteed T) -> () {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $T):
 // CHECK:   [[APPLY_T:%.*]] = apply %{{.*}}<((T) -> (), T)>() : $@convention(thin) <τ_0_0> () -> @out Optional<(Builtin.Int64, τ_0_0)>
 // CHECK:   switch_enum [[APPLY_T]] : $Optional<(Builtin.Int64, (@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <T, ()>, T))>, case #Optional.some!enumelt: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
@@ -920,7 +920,7 @@ func f430_callUnreachableF<T>(t: T) {
 
 // Further testing for conditional checked cast under opaque value mode - make sure we don't create a buffer for results
 // ---
-// CHECK-LABEL: sil hidden [ossa] @$ss20f440_cleanupEmissionyyxlF : $@convention(thin) <T> (@in_guaranteed T) -> () {
+// CHECK-LABEL: sil hidden [ossa] [opaque] @$ss20f440_cleanupEmissionyyxlF : $@convention(thin) <T> (@in_guaranteed T) -> () {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $T):
 // CHECK:   [[COPY_ARG:%.*]] = copy_value [[ARG]]
 // CHECK:   checked_cast_br T in [[COPY_ARG]] : $T to any EmptyP, [[CAST_OK:bb[0-9]+]], [[CAST_FAIL:bb[0-9]+]]
@@ -962,7 +962,7 @@ func f440_cleanupEmission<T>(_ x: T) {
 // stubbed out.
 @_silgen_name("_bridgeAnythingToObjectiveC")
 func _bridgeAnythingToObjectiveC<T>(_ x: T) -> AnyObject
-// CHECK-objc-LABEL: sil hidden [ossa] @$ss14f470_nativeToC7fromAnyyXlyp_tF : $@convention(thin) (@in_guaranteed Any) -> @owned AnyObject {
+// CHECK-objc-LABEL: sil hidden [ossa] [opaque] @$ss14f470_nativeToC7fromAnyyXlyp_tF : $@convention(thin) (@in_guaranteed Any) -> @owned AnyObject {
 // CHECK-objc: bb0([[ARG:%.*]] : @guaranteed $Any):
 // CHECK-objc: [[SRC:%.*]] = copy_value [[ARG]] : $Any
 // CHECK-objc: [[BORROW:%.*]] = begin_borrow [[SRC]] : $Any
@@ -984,7 +984,7 @@ func f470_nativeToC(fromAny any: Any) -> AnyObject {
 
 // Test emitOpenExistential.
 // ---
-// CHECK-LABEL: sil hidden [ossa] @$ss13f480_getError04someC0yps0C0_p_tF : $@convention(thin) (@guaranteed any Error) -> @out Any {
+// CHECK-LABEL: sil hidden [ossa] [opaque] @$ss13f480_getError04someC0yps0C0_p_tF : $@convention(thin) (@guaranteed any Error) -> @out Any {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $any Error):
 // CHECK: [[VAL:%.*]] = open_existential_box_value [[ARG]] : $any Error to $@opened("{{.*}}", any Error) Self
 // CHECK: [[COPY:%.*]] = copy_value [[VAL]] : $@opened("{{.*}}", any Error) Self
@@ -998,7 +998,7 @@ func f480_getError(someError: Error) -> Any {
 
 // Test visitBindOptionalExpr
 // ---
-// CHECK-LABEL: sil hidden [ossa] @$ss15f500_getAnyHashys1P_pSgs14ConvertibleToP_pSgF : $@convention(thin) (@in_guaranteed Optional<any ConvertibleToP>) -> @out Optional<any P> {
+// CHECK-LABEL: sil hidden [ossa] [opaque] @$ss15f500_getAnyHashys1P_pSgs14ConvertibleToP_pSgF : $@convention(thin) (@in_guaranteed Optional<any ConvertibleToP>) -> @out Optional<any P> {
 // CHECK: bb0(%0 : @guaranteed $Optional<any ConvertibleToP>):
 // CHECK: [[COPY:%.*]] = copy_value %0 : $Optional<any ConvertibleToP>
 // CHECK: switch_enum [[COPY]] : $Optional<any ConvertibleToP>, case #Optional.some!enumelt: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: {{bb[0-9]+}}
@@ -1020,7 +1020,7 @@ public protocol FooPP {
 
 // Test emitting a protocol witness for a method (with @in_guaranteed self) on a dependent generic type.
 // ---
-// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$ss15f510_OpaqueSelfVyxGs5FooPPssADP3fooxyFTW : $@convention(witness_method: FooPP) <τ_0_0> (@in_guaranteed f510_OpaqueSelf<τ_0_0>) -> @out f510_OpaqueSelf<τ_0_0> {
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] [opaque] @$ss15f510_OpaqueSelfVyxGs5FooPPssADP3fooxyFTW : $@convention(witness_method: FooPP) <τ_0_0> (@in_guaranteed f510_OpaqueSelf<τ_0_0>) -> @out f510_OpaqueSelf<τ_0_0> {
 // CHECK: bb0(%0 : @guaranteed $f510_OpaqueSelf<τ_0_0>):
 // CHECK:   [[FN:%.*]] = function_ref @$ss15f510_OpaqueSelfV3fooAByxGyF : $@convention(method) <τ_0_0> (@in_guaranteed f510_OpaqueSelf<τ_0_0>) -> @out f510_OpaqueSelf<τ_0_0>
 // CHECK:   [[RESULT:%.*]] = apply [[FN]]<τ_0_0>(%0) : $@convention(method) <τ_0_0> (@in_guaranteed f510_OpaqueSelf<τ_0_0>) -> @out f510_OpaqueSelf<τ_0_0>
@@ -1036,7 +1036,7 @@ struct f510_OpaqueSelf<Base> : FooPP {
 
 // Tests conditional value casts and correspondingly generated reabstraction thunk, with <T> types
 // ---
-// CHECK-LABEL: sil hidden [ossa] @$ss17f520_condTFromAnyyyyp_xtlF : $@convention(thin) <T> (@in_guaranteed Any, @in_guaranteed T) -> () {
+// CHECK-LABEL: sil hidden [ossa] [opaque] @$ss17f520_condTFromAnyyyyp_xtlF : $@convention(thin) <T> (@in_guaranteed Any, @in_guaranteed T) -> () {
 // CHECK: bb0([[ARG0:%.*]] : @guaranteed $Any, [[ARG1:%.*]] : @guaranteed $T):
 // CHECK:   [[COPY_ARG:%.*]] = copy_value [[ARG0]]
 // CHECK:   checked_cast_br Any in [[COPY_ARG]] : $Any to (Int64, T) -> (Int64, T), [[SUCCESS:bb[0-9]+]], {{bb[0-9]+}}
@@ -1053,7 +1053,7 @@ func f520_condTFromAny<T>(_ x: Any, _ y: T) {
 }
 
 // Make sure that we insert a destroy of the box even though we used an Builtin.Int64 type.
-// CHECK-LABEL: sil [ossa] @$ss16f530_assignToVaryyF : $@convention(thin) () -> () {
+// CHECK-LABEL: sil [ossa] [opaque] @$ss16f530_assignToVaryyF : $@convention(thin) () -> () {
 // CHECK: bb0:
 // CHECK:   [[Y_BOX:%.*]] = alloc_box ${ var Int64 }, var, name "y"
 // CHECK:   [[Y_BOX_BORROW:%.*]] = begin_borrow [var_decl] [[Y_BOX]] : ${ var Int64 }
@@ -1084,7 +1084,7 @@ public func f530_assignToVar() {
 
 // Test open_existential_value ownership
 // ---
-// CHECK-LABEL: sil [ossa] @$ss16f540_takeDecoder4fromBi1_s0C0_p_tKF : $@convention(thin) (@in_guaranteed any Decoder) -> (Builtin.Int1, @error any Error) {
+// CHECK-LABEL: sil [ossa] [opaque] @$ss16f540_takeDecoder4fromBi1_s0C0_p_tKF : $@convention(thin) (@in_guaranteed any Decoder) -> (Builtin.Int1, @error any Error) {
 // CHECK: bb0(%0 : @guaranteed $any Decoder):
 // CHECK:  [[OPENED:%.*]] = open_existential_value %0 : $any Decoder to $@opened("{{.*}}", any Decoder) Self
 // CHECK:  [[WT:%.*]] = witness_method $@opened("{{.*}}", any Decoder) Self, #Decoder.unkeyedContainer : <Self where Self : Decoder> (Self) -> () throws -> any UnkeyedDecodingContainer, [[OPENED]] : $@opened("{{.*}}", any Decoder) Self : $@convention(witness_method: Decoder) <τ_0_0 where τ_0_0 : Decoder> (@in_guaranteed τ_0_0) -> (@out any UnkeyedDecodingContainer, @error any Error)

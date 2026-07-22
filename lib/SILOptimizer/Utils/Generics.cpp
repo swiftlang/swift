@@ -527,7 +527,7 @@ static bool canDropMetatypeArg(ApplySite apply, SILFunction *callee,
 
   // We don't drop metatype arguments of not applied arguments (in case of
   // `partial_apply`).
-  unsigned firstAppliedArgIdx = apply.getCalleeArgIndexOfFirstAppliedArg();
+  unsigned firstAppliedArgIdx = apply.getSubstCalleeArgIndexOfFirstAppliedArg();
   if (firstAppliedArgIdx > calleeArgIdx)
       return false;
 
@@ -867,12 +867,14 @@ void ReabstractionInfo::createSubstitutedAndSpecializedTypes() {
 
   // Try to convert indirect incoming parameters to direct parameters.
   unsigned i = 0;
+  SILFunctionConventions substConv(
+      SubstitutedType, SILAddressConventions::forFunctionOrRawSIL(
+                           getNonSpecializedFunction(), getModule()));
   for (SILParameterInfo PI : SubstitutedType->getParameters()) {
     auto IdxToInsert = IdxForParam;
     ++IdxForParam;
     unsigned paramIdx = i++;
 
-    SILFunctionConventions substConv(SubstitutedType, getModule());
     TypeCategory tc = getParamTypeCategory(PI, substConv, getResilienceExpansion());
     if (tc == NotLoadable)
       continue;
@@ -2045,7 +2047,9 @@ void ReabstractionInfo::finishPartialSpecializationPreparation(
 ReabstractionInfo::TypeCategory ReabstractionInfo::handleReturnAndError(SILResultInfo RI, unsigned argIdx) {
   assert(RI.isFormalIndirect());
 
-  SILFunctionConventions substConv(SubstitutedType, getModule());
+  SILFunctionConventions substConv(
+      SubstitutedType, SILAddressConventions::forFunctionOrRawSIL(
+                           getNonSpecializedFunction(), getModule()));
   TypeCategory tc = getReturnTypeCategory(RI, substConv, getResilienceExpansion());
   if (tc != NotLoadable) {
     Conversions.set(argIdx);
@@ -2268,7 +2272,7 @@ prepareCallArguments(ApplySite AI, SILBuilder &Builder,
   /// SIL function conventions for the original apply site with substitutions.
   SILLocation Loc = AI.getLoc();
   auto substConv = AI.getSubstCalleeConv();
-  unsigned ArgIdx = AI.getCalleeArgIndexOfFirstAppliedArg();
+  unsigned ArgIdx = AI.getSubstCalleeArgIndexOfFirstAppliedArg();
 
   auto handleConversion = [&](SILValue InputValue) {
     // Rewriting SIL arguments is only for lowered addresses.
@@ -2549,7 +2553,9 @@ swift::replaceWithSpecializedCallee(ApplySite applySite, SILValue callee,
   auto calleeSubstFnTy = canFnTy->substGenericArgs(
       *callee->getModule(), subs, reInfo.getResilienceExpansion());
   auto calleeSILSubstFnTy = SILType::getPrimitiveObjectType(calleeSubstFnTy);
-  SILFunctionConventions substConv(calleeSubstFnTy, builder.getModule());
+  SILFunctionConventions substConv(
+      calleeSubstFnTy,
+      SILAddressConventions::forFunction(*applySite.getFunction()));
 
   switch (applySite.getKind()) {
   case ApplySiteKind::TryApplyInst: {
@@ -2789,7 +2795,7 @@ SILFunction *ReabstractionThunkGenerator::createThunk() {
     Thunk->setOwnershipEliminated();
   }
 
-  if (!SILModuleConventions(M).useLoweredAddresses()) {
+  if (!Thunk->hasLoweredAddresses()) {
     for (auto SpecArg : SpecializedFunc->getArguments()) {
       auto *NewArg = EntryBB->createFunctionArgument(SpecArg->getType(),
                                                      SpecArg->getDecl());
@@ -2862,7 +2868,8 @@ FullApplySite ReabstractionThunkGenerator::createApplyAndReturn(
     Builder.emitStoreValueOperation(Loc, returnValue, resultAddr.returnAddress,
                                     StoreOwnershipQualifier::Init);
     SILType VoidTy = OrigPAI->getSubstCalleeType()->getDirectFormalResultsType(
-        M, Builder.getTypeExpansionContext());
+        M, Builder.getTypeExpansionContext(),
+        Builder.getFunction().hasLoweredAddresses());
     assert(VoidTy.isVoid());
     returnValue = Builder.createTuple(Loc, VoidTy, {});
   }
@@ -2883,9 +2890,9 @@ static SILFunctionArgument *addFunctionArgument(SILFunction *function,
   return arg;
 }
 
-/// Create SIL arguments for a reabstraction thunk with lowered addresses. This
-/// may involve replacing indirect arguments with loads and stores. Return the
-/// SILArgument for the address of an indirect result, or nullptr.
+/// Create SIL arguments for a reabstraction thunk with lowered addresses,
+/// replacing indirect arguments with loads and stores as needed. Return the
+/// SILArgument for an indirect result's address, or nullptr.
 ///
 /// FIXME: Remove this if we don't need to create reabstraction thunks after
 /// address lowering.
@@ -2898,7 +2905,8 @@ ReabstractionThunkGenerator::convertReabstractionThunkArguments(
   CanSILFunctionType SpecType = SpecializedFunc->getLoweredFunctionType();
   auto specConv = SpecializedFunc->getConventions();
   (void)specConv;
-  SILFunctionConventions substConv(thunkType, M);
+  SILFunctionConventions substConv(
+      thunkType, SILAddressConventions::forFunction(*Thunk));
 
   assert(specConv.useLoweredAddresses());
 
@@ -2956,7 +2964,7 @@ ReabstractionThunkGenerator::convertReabstractionThunkArguments(
   for (unsigned origParamIdx = 0, specArgIdx = 0; origParamIdx < numParams; ++origParamIdx) {
     unsigned origArgIdx = ReInfo.param2ArgIndex(origParamIdx);
     if (ReInfo.isDroppedArgument(origArgIdx)) {
-      assert(origArgIdx >= ApplySite(OrigPAI).getCalleeArgIndexOfFirstAppliedArg() &&
+      assert(origArgIdx >= ApplySite(OrigPAI).getSubstCalleeArgIndexOfFirstAppliedArg() &&
              "cannot drop metatype argument of not applied argument");
       continue;
     }
@@ -3526,7 +3534,7 @@ void swift::trySpecializeApplyOfGeneric(
     auto *FRI = Builder.createFunctionRef(PAI->getLoc(), Thunk);
     SmallVector<SILValue, 4> Arguments;
     for (auto &Op : PAI->getArgumentOperands()) {
-      unsigned calleeArgIdx = ApplySite(PAI).getCalleeArgIndex(Op);
+      unsigned calleeArgIdx = ApplySite(PAI).getSubstCalleeArgIndex(Op);
       if (ReInfo.isDroppedArgument(calleeArgIdx))
         continue;
       Arguments.push_back(Op.get());

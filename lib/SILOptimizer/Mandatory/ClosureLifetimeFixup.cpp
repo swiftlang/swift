@@ -693,8 +693,6 @@ static SILValue tryRewriteToPartialApplyStack(
     saveDeleteInst(noImplicitCopyWrapperToDelete.pop_back_val());
 
   ApplySite site(newPA);
-  SILFunctionConventions calleeConv(site.getSubstCalleeType(),
-                                      newPA->getModule());
 
   // Since we create temporary allocation for in_guaranteed captures during SILGen,
   // the dealloc_stack of it can occur before the apply due to conversion scopes.
@@ -703,9 +701,7 @@ static SILValue tryRewriteToPartialApplyStack(
   // The code below proactively removes the dealloc_stack of in_guaranteed capture,
   // so that it can be reinserted at the correct place after the destroy_addr below.
   for (auto &arg : newPA->getArgumentOperands()) {
-    unsigned calleeArgumentIndex = site.getCalleeArgIndex(arg);
-    assert(calleeArgumentIndex >= calleeConv.getSILArgIndexOfFirstParam());
-    auto paramInfo = calleeConv.getParamInfoForSILArg(calleeArgumentIndex);
+    auto paramInfo = site.getParamInfoForOperand(arg);
     if (paramInfo.getConvention() == ParameterConvention::Indirect_In_Guaranteed) {
       SILValue argValue = arg.get();
       if (auto *mmci = dyn_cast<MoveOnlyWrapperToCopyableAddrInst>(argValue))

@@ -133,8 +133,7 @@ void forEachApplyDirectResult(
 
 void collectAllFormalResultsInTypeOrder(SILFunction &function,
                                         SmallVectorImpl<SILValue> &results) {
-  SILFunctionConventions convs(function.getLoweredFunctionType(),
-                               function.getModule());
+  SILFunctionConventions convs = function.getConventions();
   auto indResults = function.getIndirectResults();
   auto *retInst = cast<ReturnInst>(function.findReturnBB()->getTerminator());
   auto retVal = retInst->getOperand();
@@ -176,8 +175,6 @@ void collectAllFormalResultsInTypeOrder(SILFunction &function,
 
 void collectAllDirectResultsInTypeOrder(SILFunction &function,
                                         SmallVectorImpl<SILValue> &results) {
-  SILFunctionConventions convs(function.getLoweredFunctionType(),
-                               function.getModule());
   auto *retInst = cast<ReturnInst>(function.findReturnBB()->getTerminator());
   auto retVal = retInst->getOperand();
   if (auto *tupleInst = dyn_cast<TupleInst>(retVal))

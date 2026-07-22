@@ -182,10 +182,11 @@ CanType SILResultInfo::getReturnValueType(SILModule &M,
 
 SILType
 SILFunctionType::getDirectFormalResultsType(SILModule &M,
-                                            TypeExpansionContext context) {
+                                            TypeExpansionContext context,
+                                            bool loweredAddresses) {
   CanType type;
 
-  if (hasAddressResult(SILModuleConventions(M).useLoweredAddresses())) {
+  if (hasAddressResult(loweredAddresses)) {
     assert(getNumDirectFormalResults() == 1);
     return SILType::getPrimitiveAddressType(
         getSingleDirectFormalResult().getReturnValueType(M, this, context));
@@ -240,7 +241,11 @@ SILType SILFunctionType::getAllResultsSubstType(SILModule &M,
 SILType SILFunctionType::getFormalCSemanticResult(SILModule &M) {
   assert(getLanguage() == SILFunctionLanguage::C);
   assert(getNumResults() <= 1);
-  return getDirectFormalResultsType(M, TypeExpansionContext::minimal());
+  // C-semantic results are concrete (never GuaranteedAddress/Inout), so the
+  // lowered-addresses mode does not affect the result; no function is in scope,
+  // so use the immutable build-mode default.
+  return getDirectFormalResultsType(M, TypeExpansionContext::minimal(),
+                                    !M.usesOpaqueValues());
 }
 
 CanType

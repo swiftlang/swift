@@ -138,7 +138,7 @@ bool ExistentialSpecializer::canSpecializeExistentialArgsInFunction(
   /// function arguments.  The same SIL argument index is used for both caller
   /// and callee side arguments.
   auto origCalleeConv = Apply.getOrigCalleeConv();
-  assert(Apply.getCalleeArgIndexOfFirstAppliedArg() == 0);
+  assert(Apply.getSubstCalleeArgIndexOfFirstAppliedArg() == 0);
   for (unsigned Idx = 0, Num = CalleeArgs.size(); Idx < Num; ++Idx) {
     auto CalleeArg = CalleeArgs[Idx];
     auto ArgType = CalleeArg->getType();
