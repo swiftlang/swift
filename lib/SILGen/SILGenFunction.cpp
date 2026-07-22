@@ -1086,7 +1086,14 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
     for (auto capture : capturedArgs)
       forwardedArgs.push_back(capture.forward(*this));
 
-    auto calleeConvention = ParameterConvention::Direct_Guaranteed;
+    // A `@called(once)` closure value's callee convention must be
+    // `Direct_Owned` to match DefaultCalledOnceConventions, or the
+    // ABI-difference check treats it as needing a reabstraction thunk
+    // (which then fails: thunks are always Thin, and Thin + CalledOnce
+    // is an invalid combination).
+    auto calleeConvention = typeContext.ExpectedLoweredType->isCalledOnce()
+                                ? ParameterConvention::Direct_Owned
+                                : ParameterConvention::Direct_Guaranteed;
 
     auto resultIsolation =
         (hasErasedIsolation ? SILFunctionTypeIsolation::forErased()
