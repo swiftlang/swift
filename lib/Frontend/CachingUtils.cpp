@@ -90,9 +90,11 @@ Error cas::CachedResultLoader::replay(CallbackTy Callback) {
     }
   }
   {
-    clang::cas::CompileJobResultSchema Schema(CAS);
-    if (Schema.isRootNode(*ResultProxy)) {
-      auto Result = Schema.load(OutputRef);
+    auto Schema = clang::cas::CompileJobResultSchema::create(CAS);
+    if (!Schema)
+      return Schema.takeError();
+    if (Schema->isRootNode(*ResultProxy)) {
+      auto Result = Schema->load(OutputRef);
       if (!Result)
         return Result.takeError();
       if (auto Err = Result->forEachOutput(
