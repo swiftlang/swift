@@ -1,0 +1,34 @@
+# Verify that PathSanitizingDiff writes its sanitized input to an output file in
+# the per-test temporary namespace, and that the update plugin (exercised here
+# through its standalone entry point) uses that output to repair the reference
+# file and the corresponding split-file slice of the test.
+#
+# The %PathSanitizingDiff substitution passes --temp-dir %t automatically. The
+# output is written only on a mismatch. When the temp dir is a directory the
+# output is placed inside it as "<basename>.actual"; otherwise it is a sibling
+# formed by prefixing with the temp dir.
+
+# RUN: %empty-directory(%t)
+# RUN: cp %S/Inputs/scratch.txt %t/scratch.txt
+# RUN: cp %S/Inputs/out.expected.stale %t/out.expected
+# RUN: echo 'new line' > %t/raw.txt
+
+# No output is written when the diff matches (feed the reference to itself).
+# RUN: %PathSanitizingDiff %t/out.expected < %t/out.expected
+# RUN: not ls %t/out.expected.actual
+
+# On a mismatch (wrapped in 'not') the output holds the sanitized would-be
+# result. %t is a directory, so it lands inside it as "out.expected.actual".
+# RUN: not %PathSanitizingDiff %t/out.expected < %t/raw.txt
+# RUN: %diff %t/out.expected.actual %t/raw.txt
+
+# When the temp dir is not a directory the output is a prefixed sibling. Here
+# an explicit --temp-dir overrides the one from the substitution.
+# RUN: not %PathSanitizingDiff --temp-dir %t/nodir %t/out.expected < %t/raw.txt
+# RUN: ls %t/nodir.out.expected.actual
+
+# Repair the test from the output; the reference file and the split-file slice
+# both take on the sanitized result.
+# RUN: %update-pathsanitizing-diff-tests %t/scratch.txt %t/out.expected --temp-dir %t --split-file-dir %t
+# RUN: %diff %t/scratch.txt %S/Inputs/scratch.expected
+# RUN: %diff %t/out.expected %t/raw.txt
