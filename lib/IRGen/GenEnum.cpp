@@ -1954,11 +1954,51 @@ namespace {
       return func;
     }
 
-    static EnumPayloadSchema getPreferredPayloadSchema(Element payloadElement) {
+    /// Whether a single-payload enum with the given payload and no-payload
+    /// case count represents its empty case as the all-zero pointer (nullptr).
+    ///
+    /// This is the governing rule for the `.none == null` representation: the
+    /// enum is loadable, the payload is a single bare retainable pointer, there
+    /// is exactly one no-payload case, and the payload has extra inhabitants
+    /// (so the empty case is extra-inhabitant #0, i.e. the zero pointer). It is
+    /// shared between the payload-schema choice and the NullableRefcounted
+    /// copy/destroy decision so the two predicates cannot drift.
+    static bool isNullableRefcountedPayload(IRGenModule &IGM,
+                                            const TypeInfo &payloadTI,
+                                            TypeInfoKind tik,
+                                            unsigned numNoPayloadCases,
+                                            ReferenceCounting *refcounting) {
+      return tik >= TypeInfoKind::Loadable
+          && payloadTI.isSingleRetainablePointer(ResilienceExpansion::Maximal,
+                                                 refcounting)
+          && numNoPayloadCases == 1
+          // FIXME: All single-retainable-pointer types should eventually have
+          // extra inhabitants.
+          && cast<FixedTypeInfo>(payloadTI)
+               .getFixedExtraInhabitantCount(IGM) > 0;
+    }
+
+    static EnumPayloadSchema
+    getPreferredPayloadSchema(IRGenModule &IGM, Element payloadElement,
+                              TypeInfoKind tik, unsigned numNoPayloadCases) {
       // TODO: If the payload type info provides a preferred explosion schema,
       // use it. For now, just use a generic word-chunked schema.
-      if (auto fixedTI = dyn_cast<FixedTypeInfo>(payloadElement.ti))
+      if (auto fixedTI = dyn_cast<FixedTypeInfo>(payloadElement.ti)) {
+        // When the empty case is exactly the zero pointer, represent the
+        // payload as its own pointer type so the enum lowers to `ptr` in LLVM
+        // IR with `.none == null`, rather than an opaque integer word.
+        if (isNullableRefcountedPayload(IGM, *fixedTI, tik, numNoPayloadCases,
+                                        /*refcounting=*/nullptr)) {
+          ExplosionSchema payloadSchema;
+          fixedTI->getSchema(payloadSchema);
+          assert(payloadSchema.size() == 1 && payloadSchema.begin()->isScalar()
+                 && payloadSchema.begin()->getScalarType()->isPointerTy()
+                 && "single retainable pointer should be one scalar pointer");
+          return EnumPayloadSchema::withExplicitTypes(
+              payloadSchema.begin()->getScalarType());
+        }
         return EnumPayloadSchema(fixedTI->getFixedSize().getValueInBits());
+      }
       return EnumPayloadSchema();
     }
 
@@ -1977,7 +2017,8 @@ namespace {
                                     bitwiseTakable, NumElements,
                                     std::move(WithPayload),
                                     std::move(WithNoPayload),
-                                getPreferredPayloadSchema(WithPayload.front())),
+                                getPreferredPayloadSchema(IGM, WithPayload.front(),
+                                                          tik, WithNoPayload.size())),
                                     CopyDestroyKind(Normal),
                                     Refcounting(ReferenceCounting::Native)
     {
@@ -1993,14 +2034,9 @@ namespace {
       // If the payload is a single refcounted pointer and we have a single
       // empty case, then the layout will be a nullable pointer, and we can
       // pass enum values directly into swift_retain/swift_release as-is.
-      } else if (tik >= TypeInfoKind::Loadable
-          && payloadTI.isSingleRetainablePointer(ResilienceExpansion::Maximal,
-                                                 &Refcounting)
-          && ElementsWithNoPayload.size() == 1
-          // FIXME: All single-retainable-pointer types should eventually have
-          // extra inhabitants.
-          && cast<FixedTypeInfo>(payloadTI)
-            .getFixedExtraInhabitantCount(IGM) > 0) {
+      } else if (isNullableRefcountedPayload(IGM, payloadTI, tik,
+                                             ElementsWithNoPayload.size(),
+                                             &Refcounting)) {
         CopyDestroyKind = NullableRefcounted;
       // If the payload's value witnesses can accept the extra inhabitants we
       // use, then we can forward to them instead of checking for empty tags.
@@ -2959,7 +2995,7 @@ namespace {
       case NullableRefcounted: {
         // Bitcast to swift.refcounted*, and hand to swift_release.
         llvm::Value *val = src.claimNext();
-        llvm::Value *ptr = IGF.Builder.CreateIntToPtr(val,
+        llvm::Value *ptr = IGF.Builder.CreateBitOrPointerCast(val,
                                                 getRefcountedPtrType(IGM));
         fixLifetimeOfRefcountedPayload(IGF, ptr);
         return;

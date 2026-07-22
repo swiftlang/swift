@@ -46,7 +46,7 @@ func doTryCastFromAny<T>(_ value: Any, to: T.Type) -> T? {
   value as? T
 }
 
-// IR-LABEL: define linkonce_odr hidden swiftcc {{(i32|i64)}} @"$e4main16doTryCastFromAny_2toxSgyp_xmtlFAA03SubH0C_Tt1g5"
+// IR-LABEL: define linkonce_odr hidden swiftcc ptr @"$e4main16doTryCastFromAny_2toxSgyp_xmtlFAA03SubH0C_Tt1g5"
 // IR: call zeroext i1 @swift_dynamicCast({{.*}}ptr @"$eypMf"
 
 // IR-LABEL: testAnyExistentials

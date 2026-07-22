@@ -18,7 +18,7 @@ class MyClass {
 	{
     // Test that image is in an alloca, but not an indirect location.
     // CHECK: #dbg_declare(ptr %[[ALLOCA:.*]], ![[IMAGE:.*]], !DIExpression()
-    // CHECK: store {{(i32|i64)}} %0, ptr %[[ALLOCA]], align
+    // CHECK: store ptr %0, ptr %[[ALLOCA]], align
     // CHECK: ![[IMAGE]] = !DILocalVariable(name: "image", arg: 1
     // CHECK-NOT:                           flags:
     // CHECK-SAME:                          line: [[@LINE-7]]

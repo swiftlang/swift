@@ -1,0 +1,69 @@
+// RUN: %target-swift-frontend -primary-file %s -emit-ir | %FileCheck %s
+
+// A loadable single-level Optional of a bare retainable pointer (.none == null)
+// is lowered to `ptr` in LLVM IR, rather than a pointer-width integer.
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+class C {}
+sil_vtable C {}
+
+// A single-level Optional<class> is `ptr`.
+// CHECK-LABEL: define{{.*}} swiftcc ptr @take_optional_class(ptr %0)
+sil @take_optional_class : $@convention(thin) (@guaranteed Optional<C>) -> @owned Optional<C> {
+bb0(%0 : $Optional<C>):
+  retain_value %0 : $Optional<C>
+  return %0 : $Optional<C>
+}
+
+// Optional<AnyObject> is `ptr`.
+// CHECK-LABEL: define{{.*}} swiftcc ptr @take_optional_anyobject(ptr %0)
+sil @take_optional_anyobject : $@convention(thin) (@guaranteed Optional<AnyObject>) -> @owned Optional<AnyObject> {
+bb0(%0 : $Optional<AnyObject>):
+  retain_value %0 : $Optional<AnyObject>
+  return %0 : $Optional<AnyObject>
+}
+
+// Optional<Builtin.NativeObject> is `ptr`.
+// CHECK-LABEL: define{{.*}} swiftcc ptr @take_optional_nativeobject(ptr %0)
+sil @take_optional_nativeobject : $@convention(thin) (@guaranteed Optional<Builtin.NativeObject>) -> @owned Optional<Builtin.NativeObject> {
+bb0(%0 : $Optional<Builtin.NativeObject>):
+  retain_value %0 : $Optional<Builtin.NativeObject>
+  return %0 : $Optional<Builtin.NativeObject>
+}
+
+// The empty case is exactly the null pointer.
+// CHECK-LABEL: define{{.*}} swiftcc ptr @make_none()
+// CHECK: ret ptr null
+sil @make_none : $@convention(thin) () -> @owned Optional<C> {
+bb0:
+  %0 = enum $Optional<C>, #Optional.none!enumelt
+  return %0 : $Optional<C>
+}
+
+// A switch over the optional tests the pointer directly against null.
+// CHECK-LABEL: define{{.*}} swiftcc void @switch_optional_class(ptr %0)
+// CHECK: icmp eq ptr %0, null
+sil @switch_optional_class : $@convention(thin) (@guaranteed Optional<C>) -> () {
+bb0(%0 : $Optional<C>):
+  switch_enum %0 : $Optional<C>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+bb1(%1 : $C):
+  br bb3
+bb2:
+  br bb3
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+// Guard: a nested optional's outer `.none` is a *non-null* extra inhabitant, so
+// it keeps its integer representation and is unaffected by this change.
+// CHECK-LABEL: define{{.*}} swiftcc i{{[0-9]+}} @take_nested_optional(i{{[0-9]+}} %0)
+sil @take_nested_optional : $@convention(thin) (@guaranteed Optional<Optional<C>>) -> @owned Optional<Optional<C>> {
+bb0(%0 : $Optional<Optional<C>>):
+  retain_value %0 : $Optional<Optional<C>>
+  return %0 : $Optional<Optional<C>>
+}

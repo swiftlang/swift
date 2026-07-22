@@ -126,6 +126,22 @@ void EnumPayload::insertValue(IRGenModule &IGM,
                               unsigned payloadOffset) {
   auto &DL = IGM.DataLayout;
 
+  // Fast path: a single pointer-typed payload element (the `.none == null`
+  // optional-reference representation) stores the value directly. The integer
+  // scatter machinery below assumes integer payload values, so handle the
+  // pointer element here and keep the value pointer-typed.
+  if (payloadOffset == 0 && PayloadValues.size() == 1) {
+    auto *storedTy = getPayloadType(PayloadValues.front());
+    if (storedTy->isPointerTy() &&
+        DL.getTypeSizeInBits(storedTy) ==
+            DL.getTypeSizeInBits(value->getType())) {
+      if (value->getType() != storedTy)
+        value = builder.CreateBitOrPointerCast(value, storedTy);
+      PayloadValues.front() = value;
+      return;
+    }
+  }
+
   // Create a mask for the value we are going to insert.
   auto type = value->getType();
   auto payloadSize = getAllocSizeInBits(DL);
@@ -138,6 +154,21 @@ void EnumPayload::insertValue(IRGenModule &IGM,
 llvm::Value *EnumPayload::extractValue(IRGenFunction &IGF, llvm::Type *type,
                                        unsigned payloadOffset) const {
   auto &DL = IGF.IGM.DataLayout;
+
+  // Fast path: a single pointer-typed payload element (the `.none == null`
+  // optional-reference representation) yields the value directly. The integer
+  // gather machinery below assumes integer payload values, so handle the
+  // pointer element here.
+  if (payloadOffset == 0 && PayloadValues.size() == 1) {
+    auto *storedTy = getPayloadType(PayloadValues.front());
+    if (storedTy->isPointerTy() &&
+        DL.getTypeSizeInBits(storedTy) == DL.getTypeSizeInBits(type)) {
+      auto *v = forcePayloadValue(PayloadValues.front());
+      if (v->getType() != type)
+        v = IGF.Builder.CreateBitOrPointerCast(v, type);
+      return v;
+    }
+  }
 
   // Create a mask for the value we are going to extract.
   auto payloadSize = getAllocSizeInBits(DL);
