@@ -1180,6 +1180,17 @@ ParserResult<Pattern> Parser::parsePattern() {
     consumeToken();
     return makeParserErrorResult(new (Context) AnyPattern(Loc));
   }
+  if (Tok.is(tok::string_literal) && !Tok.isMultilineString() &&
+      Tok.getCustomDelimiterLen() == 0) {
+    StringRef content = Tok.getText().drop_front().drop_back();
+    if (Lexer::isIdentifier(content)) {
+      diagnose(Tok, diag::expected_pattern)
+          .fixItReplace(Tok.getLoc(), content);
+      SourceLoc Loc = Tok.getLoc();
+      consumeToken();
+      return makeParserErrorResult(new (Context) AnyPattern(Loc));
+    }
+  }
   diagnose(Tok, diag::expected_pattern);
   return nullptr;
 }
