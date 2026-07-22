@@ -1,7 +1,3 @@
-// This test isolates a bug in the swift-syntax diagnostic renderer: a child
-// note whose source location is in a different buffer than its parent
-// diagnostic is silently dropped.
-
 // REQUIRES: swift_swift_parser
 
 // RUN: %empty-directory(%t)
@@ -11,6 +7,8 @@
 // RUN: not env TMPDIR=%t %target-swift-frontend -swift-version 5 -typecheck %t/test.swift -load-plugin-library %t/%target-library-name(MacroDefinition) -diagnostic-style=llvm 2>&1 | %PathSanitizingDiff --sanitize-regex "MACROBUFFER=@__swiftmacro\\S*.swift" %t/llvm-render.expected
 // RUN: not env TMPDIR=%t %target-swift-frontend -swift-version 5 -typecheck %t/test.swift -load-plugin-library %t/%target-library-name(MacroDefinition) -diagnostic-style=swift 2>&1 | %PathSanitizingDiff %t/swift-syntax-render.expected
 // RUN: env TMPDIR=%t %target-swift-frontend -swift-version 5 -typecheck %t/test.swift -load-plugin-library %t/%target-library-name(MacroDefinition) -verify
+
+// Ensure that child notes in other buffers are rendered properly.
 
 //--- test.swift
 @freestanding(declaration, names: named(A), named(B), named(foo), named(addOne))
@@ -34,6 +32,17 @@ var foo: Int {
     ^
 //--- swift-syntax-render.expected
 TMP_DIR/test.swift:11:5: error: invalid redeclaration of 'foo'
+ 6 | //   expected-note@13{{'foo' previously declared here}}
+ 7 | // }}
+ 8 | #defineDeclsWithKnownNames
+   +--- macro expansion #defineDeclsWithKnownNames ---------------------
+   |11 |   }
+   |12 | }
+   |13 | var foo: Int {
+   |   |     `- note: 'foo' previously declared here
+   |14 |     1
+   |15 | }
+   +--------------------------------------------------------------------
  9 | 
 10 | // expected-error@+1{{invalid redeclaration of 'foo'}}
 11 | var foo: Int { 2 }
