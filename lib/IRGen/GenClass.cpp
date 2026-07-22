@@ -1399,17 +1399,7 @@ namespace {
         IGM.addGenericROData(dataPtr);
       }
 
-      dataPtr = llvm::ConstantExpr::getPtrToInt(dataPtr, IGM.IntPtrTy);
-
-      llvm::Constant *fields[] = {
-        rootPtr,
-        superPtr,
-        IGM.getObjCEmptyCachePtr(),
-        IGM.getObjCEmptyVTablePtr(),
-        dataPtr
-      };
-      auto init = llvm::ConstantStruct::get(IGM.ObjCClassStructTy,
-                                            llvm::ArrayRef(fields));
+      // Get the metaclass global
       llvm::Constant *uncastMetaclass;
       if (specializedGenericType) {
         uncastMetaclass =
@@ -1420,7 +1410,32 @@ namespace {
             IGM.getAddrOfMetaclassObject(getClass(), ForDefinition);
       }
       auto metaclass = cast<llvm::GlobalVariable>(uncastMetaclass);
-      metaclass->setInitializer(init);
+
+      // Build the metaclass struct using ConstantInitBuilder.
+      // addSignedPointer signs pointers with ptrauth when the schema is
+      // non-empty, and falls back to add(pointer) otherwise.
+      const auto &ptrAuth = IGM.getOptions().PointerAuth;
+
+      ConstantInitBuilder builder(IGM);
+      auto fields = builder.beginStruct(IGM.ObjCClassStructTy);
+
+      // isa pointer (metaclass of root class)
+      fields.addSignedPointer(rootPtr, ptrAuth.ObjCIsaPointers,
+                              PointerAuthEntity());
+
+      // superclass pointer
+      fields.addSignedPointer(superPtr, ptrAuth.ObjCSuperPointers,
+                              PointerAuthEntity());
+
+      // cache and vtable don't need signing
+      fields.add(IGM.getObjCEmptyCachePtr());
+      fields.add(IGM.getObjCEmptyVTablePtr());
+
+      // class_ro pointer
+      fields.addSignedPointer(dataPtr, ptrAuth.ObjCClassROPointers,
+                              PointerAuthEntity());
+
+      fields.finishAndSetAsInitializer(metaclass);
     }
     
   private:
@@ -1481,6 +1496,9 @@ namespace {
       fields.add(IGM.getAddrOfGlobalString(CategoryName,
                                            CStringSectionType::ObjCClassName));
       //   const class_t *theClass;
+      // Note: the category cls pointer is NOT signed. The ObjC runtime handles
+      // this as an unsigned pointer during category attachment. Only class
+      // metadata isa/superclass/class_ro need signing.
       fields.add(getClassMetadataRef());
       //   const method_list_t *instanceMethods;
       emitAndAddMethodList(fields, MethodListKind::InstanceMethods,
@@ -1927,7 +1945,18 @@ namespace {
       }
       llvm::Constant *methodListPtr =
           buildMethodList(methods, namePrefix, linkage);
-      builder.add(methodListPtr);
+      // Sign the method list pointer with ObjCMethodListPointer schema.
+      // This matches Clang's behavior for ObjC class and category metadata.
+      // Protocol method list pointers must NOT be signed: the ObjC runtime's
+      // fixupProtocol loads them with plain ldr (no auth instruction), so
+      // signing them causes EXC_BAD_ACCESS when the runtime dereferences the
+      // PAC-corrupted pointer.
+      const auto &schema = IGM.getOptions().PointerAuth.ObjCMethodListPointer;
+      if (!methodListPtr->isNullValue() && schema && !isBuildingProtocol()) {
+        builder.addSignedPointer(methodListPtr, schema, PointerAuthEntity());
+      } else {
+        builder.add(methodListPtr);
+      }
     }
 
     llvm::Constant *buildOptExtendedMethodTypes() {
