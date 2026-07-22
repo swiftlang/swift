@@ -4,7 +4,7 @@ Bring a C++ class into Swift under a Swift-friendly name.
 
 ## Overview
 
-When you turn on C++ interoperability, your C++ class names, methods, and conventions come across to Swift exactly as the C++ author wrote them. That often clashes with Swift's naming expectations or collides with types that already exist in your project. The bridging macros in `swift/bridging` let you reshape that boundary so the C++ API reads like idiomatic Swift.
+When you enable C++ interoperability, your C++ class names, methods, and conventions translate to Swift exactly as the C++ author wrote them. That specificity can clash with Swift's naming expectations or with types that already exist in your project. The bridging macros in `swift/bridging` let you reshape that boundary so the C++ API reads like idiomatic Swift.
 
 This article shows how to enable interoperability, expose a C++ class to Swift through a module, and use the `SWIFT_NAME` macro to give that class a Swift-friendly name. You write the same Swift code to use the class whether you choose Swift Package Manager, the command line, or Xcode, and the workflow is the same on macOS, Linux, and Windows.
 
