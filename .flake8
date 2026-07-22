@@ -26,6 +26,7 @@ filename =
     ./utils/dev-scripts/split-cmdline,
     ./utils/gyb,
     ./utils/line-directive,
+    ./utils/PathSanitizingDiff,
     ./utils/PathSanitizingFileCheck,
     ./utils/recursive-lipo,
     ./utils/round-trip-syntax-test,
