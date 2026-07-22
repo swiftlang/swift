@@ -1523,7 +1523,16 @@ bool LinkEntity::isWeakImported(ModuleDecl *module) const {
     if (baseProto->isWeakImported(module))
       return true;
 
-    return cast<ProtocolDecl>(getDecl())->isWeakImported(module);
+    // The base protocol may be available, yet reached through a @reparented
+    // extension that is itself less available than the base protocol.
+    // That extension's availability defines when the base protocol's
+    // relationship was established.
+    auto *sourceProto = cast<ProtocolDecl>(getDecl());
+    for (auto [newBase, ext, index] : sourceProto->getReparentingProtocols())
+      if (newBase == baseProto && ext->isWeakImported(module))
+        return true;
+
+    return sourceProto->isWeakImported(module);
   }
 
   case Kind::TypeMetadata:
