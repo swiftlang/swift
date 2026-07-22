@@ -34,13 +34,13 @@ enum Bas {
   case Z
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @foo(i32 %0)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @foo(ptr %0)
 sil @foo : $@convention(thin) (@owned Foo) -> () {
 entry(%0 : $Foo):
   return undef : $()
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @bar(i32 %0)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @bar(ptr %0)
 sil @bar : $@convention(thin) (@owned Bar) -> () {
 entry(%0 : $Bar):
   return undef : $()
