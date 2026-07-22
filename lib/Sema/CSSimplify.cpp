@@ -1271,6 +1271,15 @@ public:
         return false;
       }
 
+      // Validate bindings don't reference out-of-bounds indices
+      // This prevents crashes in MoveOutOfOrderArgument::diagnose()
+      for (const auto &paramBinding : bindings) {
+        for (auto idx : paramBinding) {
+          if (idx >= Arguments.size())
+            return false;
+        }
+      }
+
       auto *fix = MoveOutOfOrderArgument::create(
           CS, argIdx, prevArgIdx, bindings, CS.getConstraintLocator(Locator));
       return CS.recordFix(fix);
