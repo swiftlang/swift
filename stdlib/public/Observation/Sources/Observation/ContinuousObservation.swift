@@ -173,6 +173,10 @@ extension ContinuousObservation.State {
         borrowing ObservationTracking.Event
       ) -> Void
   ) async -> Bool {
+    // This function is `nonisolated(nonsending)` and is only reached through
+    // `trackingLoop()`, which is isolated to `apply.isolation`, so it runs on
+    // that executor on entry. Verify the chain delivered it before invoking `apply`.
+    apply.isolation?.assertIsolated()
     return await withTaskCancellationHandler(
       operation: {
         return await withUnsafeContinuation {
