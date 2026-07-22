@@ -6820,7 +6820,16 @@ public:
   }
 
   bool shouldDesugarTypeAliasType(TypeAliasType *T) {
-    return Options.PrintForSIL || Options.PrintTypeAliasUnderlyingType;
+    if (Options.PrintForSIL || Options.PrintTypeAliasUnderlyingType)
+      return true;
+
+    if (Options.UseModuleSelectors) {
+      if (T->getDecl()->isImplicit() &&
+          T->getSinglyDesugaredType()->is<GenericTypeParamType>())
+        return true;
+    }
+
+    return false;
   }
 
   void visitTypeAliasType(TypeAliasType *T,
