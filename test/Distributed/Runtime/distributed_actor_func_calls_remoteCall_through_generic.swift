@@ -14,6 +14,7 @@
 
 // FIXME(distributed): Distributed actors currently have some issues on windows, isRemote always returns false. rdar://82593574
 // UNSUPPORTED: OS=windows-msvc
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 import Distributed
 import FakeDistributedActorSystems
