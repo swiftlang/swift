@@ -1051,6 +1051,21 @@ public:
       return Storage;
     }
 
+    // The same variable can be described in one scope by debug_values of
+    // different storage kinds (e.g. a loadable value and, for async code, an
+    // alloc_box projection). Shadow slots are keyed by {ArgNo, Scope, Name} and
+    // reuse one alloca, so a differently-typed store cannot fit it; keep the
+    // existing shadow copy instead. rdar://181840734
+    unsigned ArgNo = VarInfo.ArgNo;
+    auto existingSlot =
+        ShadowStackSlots.lookup({ArgNo, {Scope, VarInfo.Name}});
+    if (!WasMoved && existingSlot.isValid() &&
+        existingSlot.getElementType() != Storage->getType() &&
+        existingSlot.getElementType() !=
+            Storage->stripPointerCasts()->getType()) {
+      return Storage;
+    }
+
     // Emit a shadow copy.
     auto shadow = emitShadowCopy(Storage, Scope, VarInfo, Align, true, WasMoved)
                       .getAddress();
