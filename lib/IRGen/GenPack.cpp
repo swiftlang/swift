@@ -223,8 +223,8 @@ llvm::Value *irgen::maskMetadataPackPointer(IRGenFunction &IGF,
   // If the pack is on the heap, the LSB is set, so mask it off.
   patternPack =
       IGF.Builder.CreatePtrToInt(patternPack, IGF.IGM.SizeTy);
-  patternPack =
-      IGF.Builder.CreateAnd(patternPack, llvm::ConstantInt::get(IGF.IGM.SizeTy, -2));
+  patternPack = IGF.Builder.CreateAnd(
+      patternPack, llvm::ConstantInt::getSigned(IGF.IGM.SizeTy, -2));
   patternPack =
       IGF.Builder.CreateIntToPtr(patternPack, IGF.IGM.TypeMetadataPtrPtrTy);
   return patternPack;
@@ -271,8 +271,8 @@ static llvm::Value *loadWitnessTableAtIndex(IRGenFunction &IGF,
   // If the pack is on the heap, the LSB is set, so mask it off.
   wtablePack =
       IGF.Builder.CreatePtrToInt(wtablePack, IGF.IGM.SizeTy);
-  wtablePack =
-      IGF.Builder.CreateAnd(wtablePack, llvm::ConstantInt::get(IGF.IGM.SizeTy, -2));
+  wtablePack = IGF.Builder.CreateAnd(
+      wtablePack, llvm::ConstantInt::getSigned(IGF.IGM.SizeTy, -2));
   wtablePack =
       IGF.Builder.CreateIntToPtr(wtablePack, IGF.IGM.WitnessTablePtrPtrTy);
 

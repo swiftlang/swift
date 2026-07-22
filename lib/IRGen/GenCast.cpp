@@ -811,8 +811,9 @@ void irgen::emitScalarExistentialDowncast(
     fastLookupIndex  = getFastLookupIndex(IGF.IGM, srcInstanceType, layout.getProtocols()[0]);
   }
   if (fastLookupIndex.has_value()) {
-    llvm::Value *indices[] = {
-         llvm::ConstantInt::get(IGF.IGM.Int32Ty, -(int)fastLookupIndex.value() - MetadataAdjustmentIndex::Class - 1)};
+    llvm::Value *indices[] = {llvm::ConstantInt::getSigned(
+        IGF.IGM.Int32Ty, -(int)fastLookupIndex.value() -
+                             int(MetadataAdjustmentIndex::Class) - 1)};
     auto addr = IGF.Builder.CreateGEP(IGF.IGM.WitnessTablePtrTy, metadataValue, indices);
     auto wt = IGF.Builder.CreateLoad(Address(
         addr, IGF.IGM.TypeMetadataPtrTy, IGF.IGM.getPointerAlignment()));

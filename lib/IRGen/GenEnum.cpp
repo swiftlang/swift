@@ -5745,8 +5745,9 @@ namespace {
                                tag);
       auto isExtraInhabitant = IGF.Builder.CreateICmpULT(index,
                               llvm::ConstantInt::get(IGF.IGM.Int32Ty, xiCount));
-      return IGF.Builder.CreateSelect(isExtraInhabitant,
-                            index, llvm::ConstantInt::get(IGM.Int32Ty, -1));
+      return IGF.Builder.CreateSelect(
+          isExtraInhabitant, index,
+          llvm::ConstantInt::getAllOnesValue(IGM.Int32Ty));
     }
 
     void storeExtraInhabitant(IRGenFunction &IGF,
