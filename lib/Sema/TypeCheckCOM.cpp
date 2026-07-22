@@ -252,8 +252,7 @@ VarDecl *SynthesizeCOMInterfaceIDRequest::evaluate(Evaluator &evaluator,
   // compiled.  A deserialized module or swiftinterface already carries the
   // synthesized extension, so find its `IID` by name lookup; re-synthesizing
   // would duplicate it, or fabricate a member absent from an older interface.
-  auto *DC = PD->getDeclContext();
-  if (!DC->getParentSourceFile() || DC->isInSwiftinterface())
+  if (!PD->isInSwiftSourceFile())
     return com::lookupCOMInterfaceID(PD);
   return com::synthesizeIIDProperty(PD, ASTContext, attr->IID);
 }
@@ -268,8 +267,7 @@ VarDecl *SynthesizeCOMImplementationIDRequest::evaluate(Evaluator &evaluator,
     return nullptr;
   // Synthesize only for a source-file class; recover the imported member by
   // name lookup (see SynthesizeCOMInterfaceIDRequest).
-  auto *DC = CD->getDeclContext();
-  if (!DC->getParentSourceFile() || DC->isInSwiftinterface())
+  if (!CD->isInSwiftSourceFile())
     return com::lookupCOMImplementationID(CD);
   return com::synthesizeCLSIDProperty(CD, ASTContext, *attr->CLSID);
 }
