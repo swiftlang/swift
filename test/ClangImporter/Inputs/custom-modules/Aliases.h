@@ -51,3 +51,26 @@ extern const int const_overloaded __attribute__((__swift_name__("overload")));
 
 void variadic(int count, ...);
 #define aliased_variadic variadic
+
+struct MyStruct {
+  int x;
+};
+typedef struct MyStruct MyStruct;
+#define ALIASED_STRUCT MyStruct
+
+union MyUnion {
+  int x;
+  float y;
+};
+typedef union MyUnion MyUnion;
+#define ALIASED_UNION MyUnion
+
+enum MyEnum {
+  MY_ENUM_A,
+  MY_ENUM_B
+};
+typedef enum MyEnum MyEnum;
+#define ALIASED_ENUM MyEnum
+
+typedef int MyInt;
+#define ALIASED_INT MyInt
