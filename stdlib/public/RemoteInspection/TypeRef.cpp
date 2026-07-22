@@ -1344,7 +1344,8 @@ Demangle::NodePointer TypeRef::getDemangling(Demangle::Demangler &Dem) const {
   return DemanglingForTypeRef(Dem).visit(this);
 }
 
-std::optional<std::string> TypeRef::mangle(Demangle::Demangler &Dem) const {
+std::optional<std::string> TypeRef::mangle(Demangle::Demangler &Dem,
+                                           Mangle::ManglingFlavor Flavor) const {
   NodePointer node = getDemangling(Dem);
   if (!node)
     return {};
@@ -1356,7 +1357,7 @@ std::optional<std::string> TypeRef::mangle(Demangle::Demangler &Dem) const {
   auto global = Dem.createNode(Node::Kind::Global);
   global->addChild(node, Dem);
 
-  auto mangling = mangleNode(global, Mangle::ManglingFlavor::Default);
+  auto mangling = mangleNode(global, Flavor);
   if (!mangling.isSuccess())
     return {};
   return mangling.result();

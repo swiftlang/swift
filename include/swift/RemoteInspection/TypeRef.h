@@ -230,7 +230,9 @@ public:
   Demangle::NodePointer getDemangling(Demangle::Demangler &Dem) const;
 
   /// Build the mangled name from this TypeRef.
-  std::optional<std::string> mangle(Demangle::Demangler &Dem) const;
+  std::optional<std::string>
+  mangle(Demangle::Demangler &Dem,
+         Mangle::ManglingFlavor Flavor = Mangle::ManglingFlavor::Default) const;
 
   bool isConcrete() const;
   bool isConcreteAfterSubstitutions(const GenericArgumentMap &Subs) const;
