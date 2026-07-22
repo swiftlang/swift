@@ -29,6 +29,10 @@ void SILLoop::dump() const {
 }
 
 SILLoopInfo::SILLoopInfo(SILFunction *F, DominanceInfo *DT) : Dominance(DT) {
+  // LoopInfoBase indexes blocks by their number (see GraphTraits for
+  // SILBasicBlock), so make sure every block has a valid, dense number before
+  // running the analysis.
+  F->renumberBlocks();
   LI.analyze(*Dominance);
 }
 
