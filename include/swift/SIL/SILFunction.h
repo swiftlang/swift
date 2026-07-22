@@ -1579,6 +1579,36 @@ public:
   const_iterator end() const { return BlockList.end(); }
   unsigned size() const { return BlockList.size(); }
 
+  /// Assigns each basic block a dense, contiguous number in the range
+  /// [0, size()), matching the block's position in the block list. This is the
+  /// numbering exposed via SILBasicBlock::getNumber() and consumed by generic
+  /// graph algorithms such as llvm::LoopInfoBase.
+  ///
+  /// The block-list change epoch (see getBlockNumberEpoch()) is only bumped if
+  /// any index actually changed, keeping any live BasicBlockData valid.
+  void renumberBlocks() {
+    bool blockListChanged = false;
+    unsigned idx = 0;
+    for (SILBasicBlock &block : *this) {
+      if (block.index != (int)idx) {
+        blockListChanged = true;
+        block.index = idx;
+      }
+      ++idx;
+    }
+    if (blockListChanged)
+      ++BlockListChangeIdx;
+  }
+
+  /// Returns an upper bound (exclusive) on the numbers returned by
+  /// SILBasicBlock::getNumber(), suitable for sizing a vector indexed by block
+  /// number.
+  unsigned getMaxBlockNumber() const { return size(); }
+
+  /// Returns the current block-numbering epoch. This changes whenever block
+  /// numbers are reassigned, allowing consumers to detect stale numbers.
+  unsigned getBlockNumberEpoch() const { return BlockListChangeIdx; }
+
   SILBasicBlock &front() { return *begin(); }
   const SILBasicBlock &front() const { return *begin(); }
 

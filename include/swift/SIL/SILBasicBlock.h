@@ -172,6 +172,18 @@ public:
   ///          debug output.
   int getDebugID() const;
 
+  /// Returns the dense, contiguous number of this block within its function,
+  /// used by generic graph algorithms (e.g. LoopInfo) to index blocks in a
+  /// vector.
+  ///
+  /// The number is only valid after SILFunction::renumberBlocks() has assigned
+  /// block numbers and while the function's block list has not changed since.
+  unsigned getNumber() const {
+    assert(index >= 0 && "block number not assigned; call "
+                         "SILFunction::renumberBlocks() first");
+    return (unsigned)index;
+  }
+
   void setDebugName(llvm::StringRef name);
   std::optional<llvm::StringRef> getDebugName() const;
 
