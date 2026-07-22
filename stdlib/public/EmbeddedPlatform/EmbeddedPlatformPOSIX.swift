@@ -13,12 +13,6 @@ func arc4random_buf(_ buf: UnsafeMutableRawPointer, _ nbytes: Int)
 @_extern(c, "putchar")
 func putchar(_: CInt) -> CInt
 
-@_extern(c, "vprintf")
-func vprintf(_ format: UnsafePointer<UInt8>, _ args: CVaListPointer) -> CInt
-
-@_extern(c, "fflush")
-func fflush(_ stream: OpaquePointer?) -> CInt
-
 @_extern(c, "exit")
 func exit(_: CInt)
 
@@ -96,40 +90,43 @@ private func _reportErrorPrefix(_ flags: UInt64) -> StaticString {
   }
 }
 
-/// Prints a fatal error report to standard output using `vprintf`, optionally
-/// prefixed by a source location, e.g. "file:line: Fatal error: message".
+/// Writes a NUL-terminated static string to standard output.
+private func _writeStaticString(_ string: StaticString) {
+  string.withUTF8Buffer { buffer in
+    _ = unsafe _swift_writeToStandardOutput(buffer.baseAddress, buffer.count)
+  }
+}
+
+/// Writes a non-negative integer to standard output in decimal.
+private func _writeInt(_ value: Int) {
+  if value >= 10 { _writeInt(value / 10) }
+  _ = putchar(CInt(UInt8(ascii: "0") + UInt8(value % 10)))
+}
+
+/// Prints a fatal error report to standard output, optionally prefixed by a
+/// source location, e.g. "file:line: Fatal error: message". Output goes through
+/// `putchar` (via `_swift_writeToStandardOutput`) so it doesn't allocate and
+/// honors any platform-provided unbuffered `putchar`.
 private func _reportError(
   prefix: StaticString,
   fileName: UnsafePointer<UInt8>?, fileNameCount: Int, line: Int,
   message: UnsafePointer<UInt8>?, messageCount: Int
 ) {
-  prefix.withUTF8Buffer { prefixBuffer in
-    // Optional "<file>:<line>: " source-location prefix.
-    if let fileName, fileNameCount > 0 {
-      _ = unsafe withVaList([CInt(fileNameCount), unsafe fileName, line]) { args in
-        unsafe vprintf(("%.*s:%ld: " as StaticString).utf8Start, args)
-      }
-    }
-
-    // The error-kind prefix, followed by ": <message>" when a message is given.
-    if let message, messageCount > 0 {
-      _ = unsafe withVaList([
-        CInt(prefixBuffer.count), prefixBuffer.baseAddress!,
-        CInt(messageCount), unsafe message,
-      ]) { args in
-        unsafe vprintf(("%.*s: %.*s\n" as StaticString).utf8Start, args)
-      }
-    } else {
-      _ = unsafe withVaList([
-        CInt(prefixBuffer.count), prefixBuffer.baseAddress!,
-      ]) { args in
-        unsafe vprintf(("%.*s\n" as StaticString).utf8Start, args)
-      }
-    }
+  // Optional "<file>:<line>: " source-location prefix.
+  if let fileName, fileNameCount > 0 {
+    _ = unsafe _swift_writeToStandardOutput(fileName, fileNameCount)
+    _writeStaticString(":")
+    _writeInt(line)
+    _writeStaticString(": ")
   }
 
-  // Flush any buffered output so the report is visible before we trap.
-  _ = fflush(nil)
+  // The error-kind prefix, followed by ": <message>" when a message is given.
+  _writeStaticString(prefix)
+  if let message, messageCount > 0 {
+    _writeStaticString(": ")
+    _ = unsafe _swift_writeToStandardOutput(message, messageCount)
+  }
+  _writeStaticString("\n")
 }
 
 @export(interface)

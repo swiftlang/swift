@@ -17,7 +17,6 @@ ___stack_chk_guard
 _abort
 _clock_gettime
 _exit
-_fflush
 _free
 _malloc
 _memcpy

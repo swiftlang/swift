@@ -15,7 +15,6 @@ ___stack_chk_fail
 ___stack_chk_guard
 _abort
 _exit
-_fflush
 _free
 _malloc
 _memcpy
