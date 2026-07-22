@@ -1790,11 +1790,6 @@ void IRGenModule::addLinkLibraries() {
     registerLinkLibrary(
         LinkLibrary{"objc", LibraryKind::Library, /*static=*/false});
 
-  if (TargetInfo.HasSwiftSwiftDirectRuntimeLibrary &&
-      getOptions().EnableSwiftDirectRetainRelease)
-    registerLinkLibrary(LinkLibrary{"swiftSwiftDirectRuntime",
-                                    LibraryKind::Library, /*static=*/true});
-
   // If C++ interop is enabled, add -lc++ on Darwin and -lstdc++ on linux.
   // Also link with C++ bridging utility module (Cxx) and C++ stdlib overlay
   // (std) if available.
@@ -2178,6 +2173,7 @@ bool IRGenModule::finalize() {
     addUsedGlobal(ModuleHash);
   }
   emitLazyPrivateDefinitions();
+  emitDirectRuntimeAsm();
 
   // Finalize Swift debug info before running Clang codegen, because it may
   // delete the llvm module.
