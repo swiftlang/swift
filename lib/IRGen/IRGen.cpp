@@ -104,6 +104,7 @@
 #include "llvm/IR/LLVMRemarkStreamer.h"
 #include "llvm/Support/ToolOutputFile.h"
 
+#include "llvm/Config/llvm-config.h"
 #include <thread>
 
 #if HAVE_UNISTD_H
@@ -1621,15 +1622,21 @@ GeneratedModule IRGenRequest::evaluate(Evaluator &evaluator,
   if (Ctx.hadError()) return GeneratedModule::null();
 
   // Free the memory occupied by the SILModule.
-  // Execute this task in parallel to the embedding of bitcode.
   auto SILModuleRelease = [&SILMod]() {
     SILMod.reset(nullptr);
   };
+#if LLVM_ENABLE_THREADS
   auto Thread = std::thread(SILModuleRelease);
   // Wait for the thread to terminate.
   SWIFT_DEFER { Thread.join(); };
 
   embedBitcode(IGM.getModule(), Opts);
+#else
+  // Starting a std::thread aborts on the no-pthread host (single-threaded
+  // WebAssembly), so run these serially instead.
+  SILModuleRelease();
+  embedBitcode(IGM.getModule(), Opts);
+#endif
 
   // TODO: Turn the module hash into an actual output.
   if (auto **outModuleHash = desc.outModuleHash) {
@@ -1991,6 +1998,7 @@ static void performParallelIRGeneration(IRGenDescriptor desc) {
 
   llvm::sys::Mutex DiagMutex;
 
+#if LLVM_ENABLE_THREADS
   // Start all the threads and do the LLVM compilation.
 
   LLVMCodeGenThreads codeGenThreads(&irgen, &DiagMutex, Opts.NumThreads - 1);
@@ -2008,6 +2016,11 @@ static void performParallelIRGeneration(IRGenDescriptor desc) {
   // Wait for all threads.
   releaseModuleThread.join();
   codeGenThreads.join();
+#else
+  LLVMCodeGenThreads codeGenThreads(&irgen, &DiagMutex, /*numThreads=*/0);
+  codeGenThreads.runMainThread();
+  SILMod.reset(nullptr);
+#endif
 }
 
 GeneratedModule swift::performIRGeneration(
