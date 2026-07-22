@@ -403,6 +403,15 @@ static ValueOwnershipKind visitFullApplySite(FullApplySite fai,
   if (isTrivial)
     return OwnershipKind::None;
 
+  // If the result type is an address, avoid consulting SILFunctionConventions
+  // to determine its ownership; we know it's None.
+  //
+  // This short-cut is needed _during_ AddressLowering for a @guaranteed_address
+  // result, as a new ApplyInst it creates with an address result happens before
+  // the global lowered-addresses flag is changed to influence getOwnershipKind.
+  if (ResultType.isAddress())
+    return OwnershipKind::None;
+
   SILFunctionConventions fnConv(fai.getSubstCalleeType(), f->getModule());
   auto results = fnConv.getDirectSILResults();
   // No results => None.

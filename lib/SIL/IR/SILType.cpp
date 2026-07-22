@@ -684,7 +684,7 @@ SILResultInfo::getOwnershipKind(SILFunction &F,
       return OwnershipKind::None;
     return OwnershipKind::Unowned;
   case ResultConvention::GuaranteedAddress:
-    return isAddressResult(SILModuleConventions(M).loweredAddresses)
+    return SILModuleConventions(M).isAddressResult(*this)
                ? OwnershipKind::None
                : OwnershipKind::Guaranteed;
   case ResultConvention::Inout:
