@@ -369,7 +369,8 @@ function(add_pure_swift_host_library name)
     # Install the Swift module into the appropriate location.
     Swift_MODULE_DIRECTORY ${module_dir}
     # NOTE: workaround for CMake not setting up include flags.
-    INTERFACE_INCLUDE_DIRECTORIES ${module_dir})
+    INTERFACE_INCLUDE_DIRECTORIES
+      "$<BUILD_INTERFACE:${module_dir}>;$<INSTALL_INTERFACE:lib${LLVM_LIBDIR_SUFFIX}/swift/host>")
 
   # Workaround to touch the library and its objects so that we don't
   # continually rebuild (again, see corresponding change in swift-syntax).
@@ -400,6 +401,15 @@ function(add_pure_swift_host_library name)
   if(SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_USE_BUILD_ID)
     target_link_options(${name} PRIVATE
       "SHELL:-Xlinker --build-id=sha1")
+  endif()
+
+  if(NOT LLVM_INSTALL_TOOLCHAIN_ONLY)
+    swift_install_in_component(TARGETS ${name}
+      EXPORT SwiftTargets
+      ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+      LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+      RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+      COMPONENT dev)
   endif()
 
   # Export this target.
@@ -499,11 +509,13 @@ function(add_pure_swift_host_tool name)
     target_link_libraries(${name} PUBLIC swiftSwiftOnoneSupport)
   endif()
 
-  # Make sure we can use the host libraries.
   target_include_directories(${name} PUBLIC
-    "${SWIFT_HOST_LIBRARIES_DEST_DIR}")
+    "$<BUILD_INTERFACE:${SWIFT_HOST_LIBRARIES_DEST_DIR}>"
+    "$<INSTALL_INTERFACE:${CMAKE_INSTALL_LIBDIR}/swift/host>")
+
   target_link_directories(${name} PUBLIC
-    "${SWIFT_HOST_LIBRARIES_DEST_DIR}")
+    "$<BUILD_INTERFACE:${SWIFT_HOST_LIBRARIES_DEST_DIR}>"
+    "$<INSTALL_INTERFACE:${CMAKE_INSTALL_LIBDIR}/swift/host>")
 
   if(LLVM_USE_LINKER)
     target_link_options(${name} PRIVATE
@@ -539,6 +551,7 @@ function(add_pure_swift_host_tool name)
   if(NOT APSHT_SWIFT_COMPONENT STREQUAL no_component)
     add_dependencies(${APSHT_SWIFT_COMPONENT} ${name})
     swift_install_in_component(TARGETS ${name}
+      EXPORT SwiftTargets
       COMPONENT ${APSHT_SWIFT_COMPONENT}
       RUNTIME DESTINATION bin)
     swift_is_installing_component(${APSHT_SWIFT_COMPONENT} is_installing)
