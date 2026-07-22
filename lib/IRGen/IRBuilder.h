@@ -295,20 +295,18 @@ public:
   
   using IRBuilderBase::CreateLifetimeStart;
   llvm::CallInst *CreateLifetimeStart(Address buf, Size size) {
-    return CreateLifetimeStart(buf,
-                   llvm::ConstantInt::get(Context, APInt(64, size.getValue())));
+    return CreateLifetimeStart(buf.getAddress());
   }
   llvm::CallInst *CreateLifetimeStart(Address buf, llvm::ConstantInt *size) {
-    return CreateLifetimeStart(buf.getAddress(), size);
+    return CreateLifetimeStart(buf.getAddress());
   }
   
   using IRBuilderBase::CreateLifetimeEnd;
   llvm::CallInst *CreateLifetimeEnd(Address buf, Size size) {
-    return CreateLifetimeEnd(buf,
-                   llvm::ConstantInt::get(Context, APInt(64, size.getValue())));
+    return CreateLifetimeEnd(buf.getAddress());
   }
   llvm::CallInst *CreateLifetimeEnd(Address buf, llvm::ConstantInt *size) {
-    return CreateLifetimeEnd(buf.getAddress(), size);
+    return CreateLifetimeEnd(buf.getAddress());
   }
 
   // We're intentionally not allowing direct use of
