@@ -332,6 +332,17 @@ namespace swift {
     /// Enable COM interop code generation and build configuration options.
     bool EnableCOMInterop = false;
 
+    /// The COM interop model, selecting an environment's conventions. Today it
+    /// picks the root type an `@com` class conforms to; other conventions (byte
+    /// order, ref-counting) attach here as they are implemented. Empty exactly
+    /// when interop is off; defaulted from the target otherwise, and the user
+    /// may override it. `ISwiftObject` is compiler-managed under every model.
+    enum class COMInteropModel {
+      Microsoft,      ///< Microsoft COM: `IUnknown` root.
+      CoreFoundation, ///< CoreFoundation CFPlugIn: `IUnknown` root.
+    };
+    std::optional<COMInteropModel> COMModel = std::nullopt;
+
     /// Enable C++ interop code generation and build configuration
     /// options. Disabled by default because there is no way to control the
     /// language mode of clang on a per-header or even per-module basis. Also
