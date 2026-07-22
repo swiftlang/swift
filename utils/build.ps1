@@ -45,6 +45,10 @@ Enable build caching using LLVM CAS to speed up rebuilds.
 Include Software Bill of Materials generation using syft. Used for compliance
 tracking.
 
+.PARAMETER DownloadRetryCount
+The number of attempts to make when downloading a dependency before giving up.
+Default: 3
+
 .PARAMETER ProductVersion
 The product version to be used when building the installer. Supports semantic
 version strings (e.g., "1.0.0"). Default: "0.0.0"
@@ -150,6 +154,10 @@ param
   # SBoM Support
   [switch] $IncludeSBoM = $false,
   [string] $SyftVersion = "1.40.0",
+
+  # Dependency Download Retries
+  [ValidateRange(1, [int]::MaxValue)]
+  [int] $DownloadRetryCount = 3,
 
   # Dependencies
   [ValidatePattern('^\d+(\.\d+)*$')]
@@ -1536,10 +1544,23 @@ function Get-Dependencies {
       if (Test-Path $Destination) { return }
 
       New-Item -ItemType Directory (Split-Path -Path $Destination -Parent) -ErrorAction Ignore | Out-Null
-      $WebClient.DownloadFile($URL, $Destination)
-      $SHA256 = Get-FileHash -Path $Destination -Algorithm SHA256
-      if ($SHA256.Hash -ne $Hash) {
-        throw "SHA256 mismatch ($($SHA256.Hash) vs $Hash)"
+
+      for ($Attempt = 1; $Attempt -le $DownloadRetryCount; $Attempt++) {
+        try {
+          $WebClient.DownloadFile($URL, $Destination)
+          $SHA256 = Get-FileHash -Path $Destination -Algorithm SHA256
+          if ($SHA256.Hash -ne $Hash) {
+            throw "SHA256 mismatch ($($SHA256.Hash) vs $Hash)"
+          }
+          return
+        } catch {
+          Remove-Item -Path $Destination -ErrorAction Ignore
+          if ($Attempt -eq $DownloadRetryCount) {
+            throw
+          }
+          Write-Warning "Download of $URL failed (attempt $Attempt/$DownloadRetryCount): $_"
+          Start-Sleep -Seconds ([Math]::Pow(2, $Attempt))
+        }
       }
     }
 
