@@ -299,11 +299,23 @@ public:
   }
   /// @}
 
+  enum class ValueDeclPredicate {
+    None,
+    Storage,
+    Var,
+    StoredVar
+  };
+  bool applyValueDeclPredicate(ValueDeclPredicate predicate,
+                               ValueDecl *&Decl,
+                               SmallVectorImpl<ValueDecl *> &values);
+
   bool parseSILDottedPath(ValueDecl *&Decl,
                           SmallVectorImpl<ValueDecl *> &values);
-  bool parseSILDottedPath(ValueDecl *&Decl) {
+  bool parseSILDottedPath(ValueDecl *&Decl, ValueDeclPredicate predicate) {
     SmallVector<ValueDecl *, 4> values;
-    return parseSILDottedPath(Decl, values);
+    if (parseSILDottedPath(Decl, values))
+      return true;
+    return applyValueDeclPredicate(predicate, Decl, values);
   }
   bool parseSILDottedPathWithoutPound(ValueDecl *&Decl,
                                       SmallVectorImpl<ValueDecl *> &values);

@@ -648,6 +648,10 @@ ERROR(sil_witness_method_type_does_not_conform,none,
 ERROR(sil_member_decl_not_found,none, "member not found", ())
 ERROR(sil_named_member_decl_not_found,none,
       "member %0 not found in type %1", (DeclName, Type))
+ERROR(sil_no_named_decl_matching_predicate,none,
+      "no declaration %0 found that is a %select{%error|property or subscript|"
+      "property|stored property}1",
+      (DeclName, unsigned))
 ERROR(sil_member_lookup_bad_type,none,
       "cannot lookup member %0 in non-nominal, non-module type %1",
       (DeclName, Type))
