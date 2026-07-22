@@ -440,6 +440,10 @@ let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOption] 
   def enable_com_interop
     : Flag<["-"], "enable-experimental-com-interop">,
       HelpText<"Enable COM interop code generation and configuration directives">;
+
+  def com_interop_model
+    : Joined<["-"], "com-interop-model=">,
+      HelpText<"Select the COM interop model: 'microsoft' or 'corefoundation'">;
 }
 
 // HIDDEN FLAGS
