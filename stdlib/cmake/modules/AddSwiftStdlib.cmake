@@ -3750,6 +3750,7 @@ endfunction()
 #     [INSTALL_BINARY]
 #     [NO_FREESTANDING_CXX]
 #     [NON_EMPTY_OBJECT_FILE]
+#     [DETECT_MALLOC_TYPE]
 #     <sources>...
 #     [GYB_SOURCES <sources>...]
 #     [SWIFT_COMPILE_FLAGS <flags>...]
@@ -3779,15 +3780,27 @@ endfunction()
 # whose swiftmodule is never imported by clients but whose object code must
 # be linked in (e.g. the EmbeddedPlatform shim archives).
 #
+# When DETECT_MALLOC_TYPE is set, each per-target build checks (via
+# check_c_source_compiles against swift/Runtime/Config.h, using that
+# target's own triple/sysroot) whether SWIFT_STDLIB_HAS_MALLOC_TYPE is
+# defined for it, and if so appends "-D SWIFT_STDLIB_HAS_MALLOC_TYPE" to
+# that target's SWIFT_COMPILE_FLAGS. This has to happen per target triple
+# (inside this function's loop) rather than in the caller, since the
+# result depends on ${mod}/${triple}.
+#
 # SKIP_*_REGEX and ONLY_*_REGEX are both multi-valued. An entry is processed
 # only when *every* ONLY_*_REGEX category that has at least one pattern has
 # at least one match, AND no SKIP_*_REGEX pattern matches.
 function(add_embedded_swift_target_library prefix library_name)
   cmake_parse_arguments(EMBLIB
-    "IS_STDLIB;IS_STDLIB_CORE;IS_SDK_OVERLAY;PARTIAL_SOURCES_INTENDED;INSTALL_BINARY;NO_FREESTANDING_CXX;NON_EMPTY_OBJECT_FILE"
+    "IS_STDLIB;IS_STDLIB_CORE;IS_SDK_OVERLAY;PARTIAL_SOURCES_INTENDED;INSTALL_BINARY;NO_FREESTANDING_CXX;NON_EMPTY_OBJECT_FILE;DETECT_MALLOC_TYPE"
     "INSTALL_IN_COMPONENT;ARCHITECTURE_KEY"
     "GYB_SOURCES;SWIFT_COMPILE_FLAGS;C_COMPILE_FLAGS;FILE_DEPENDS;DEPENDS;SKIP_ARCH_REGEX;SKIP_MOD_REGEX;SKIP_TRIPLE_REGEX;ONLY_ARCH_REGEX;ONLY_MOD_REGEX;ONLY_TRIPLE_REGEX"
     ${ARGN})
+
+  if(EMBLIB_DETECT_MALLOC_TYPE)
+    include(CheckCSourceCompiles)
+  endif()
 
   translate_flag(${EMBLIB_IS_STDLIB}              "IS_STDLIB"
                  EMBLIB_IS_STDLIB_keyword)
@@ -3895,6 +3908,45 @@ function(add_embedded_swift_target_library prefix library_name)
       list(PREPEND per_target_depends "embedded-stdlib-${mod}")
     endif()
 
+    # Propagate the value of SWIFT_STDLIB_HAS_MALLOC_TYPE defined in
+    # include/swift/Runtime/Config.h to a Swift conditional compilation
+    # flag, per target triple. This must live inside this loop (rather than
+    # in the caller) because it depends on ${mod}/${triple}, which only
+    # exist as loop variables here.
+    set(per_target_swift_compile_flags ${EMBLIB_SWIFT_COMPILE_FLAGS})
+    if(EMBLIB_DETECT_MALLOC_TYPE)
+      string(MAKE_C_IDENTIFIER "${mod}" _malloc_type_mod_id)
+      set(_malloc_type_saved_flags "${CMAKE_REQUIRED_FLAGS}")
+      set(_malloc_type_saved_includes "${CMAKE_REQUIRED_INCLUDES}")
+      set(_malloc_type_saved_defs "${CMAKE_REQUIRED_DEFINITIONS}")
+      set(CMAKE_REQUIRED_FLAGS "-target ${triple}")
+      if(SWIFT_SDK_embedded_ARCH_${arch_key}_PATH)
+        list(APPEND CMAKE_REQUIRED_FLAGS "-isysroot" "${SWIFT_SDK_embedded_ARCH_${arch_key}_PATH}")
+      endif()
+      set(CMAKE_REQUIRED_INCLUDES
+        "${SWIFT_MAIN_INCLUDE_DIR}"
+        "${SWIFT_INCLUDE_DIR}"
+        "${SWIFT_SHIMS_INCLUDE_DIR}")
+      if(SWIFT_STDLIB_HAS_DARWIN_LIBMALLOC)
+        set(CMAKE_REQUIRED_DEFINITIONS "-DSWIFT_STDLIB_HAS_DARWIN_LIBMALLOC=1")
+      else()
+        set(CMAKE_REQUIRED_DEFINITIONS "-DSWIFT_STDLIB_HAS_DARWIN_LIBMALLOC=0")
+      endif()
+      check_c_source_compiles("
+        #include \"${SWIFT_MAIN_INCLUDE_DIR}/swift/Runtime/Config.h\"
+        #if !SWIFT_STDLIB_HAS_MALLOC_TYPE
+        #error excluded target
+        #endif
+        int main(void) { return 0; }
+      " "SWIFT_STDLIB_HAS_MALLOC_TYPE_${_malloc_type_mod_id}")
+      set(CMAKE_REQUIRED_FLAGS "${_malloc_type_saved_flags}")
+      set(CMAKE_REQUIRED_INCLUDES "${_malloc_type_saved_includes}")
+      set(CMAKE_REQUIRED_DEFINITIONS "${_malloc_type_saved_defs}")
+      if(SWIFT_STDLIB_HAS_MALLOC_TYPE_${_malloc_type_mod_id})
+        list(APPEND per_target_swift_compile_flags "-D" "SWIFT_STDLIB_HAS_MALLOC_TYPE")
+      endif()
+    endif()
+
     add_swift_target_library_single(
       ${prefix}-${mod}
       ${library_name}
@@ -3907,7 +3959,7 @@ function(add_embedded_swift_target_library prefix library_name)
       ${EMBLIB_NON_EMPTY_OBJECT_FILE_keyword}
       ${EMBLIB_UNPARSED_ARGUMENTS}
       GYB_SOURCES ${EMBLIB_GYB_SOURCES}
-      SWIFT_COMPILE_FLAGS ${EMBLIB_SWIFT_COMPILE_FLAGS}
+      SWIFT_COMPILE_FLAGS ${per_target_swift_compile_flags}
       C_COMPILE_FLAGS ${EMBLIB_C_COMPILE_FLAGS}
       SDK "embedded"
       ARCHITECTURE "${arch_key}"

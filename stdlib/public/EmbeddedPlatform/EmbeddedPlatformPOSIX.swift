@@ -16,6 +16,15 @@ func putchar(_: CInt) -> CInt
 @_extern(c, "exit")
 func exit(_: CInt)
 
+@_extern(c, "malloc_type_malloc")
+func malloc_type_malloc(_ : Int, _ : UInt64) -> UnsafeMutableRawPointer
+
+@_extern(c, "malloc_type_posix_memalign")
+func malloc_type_posix_memalign(_: UnsafeMutablePointer<UnsafeMutableRawPointer?>, _: Int, _: Int, _:UInt64) -> CInt
+
+@_extern(c, "malloc_type_free")
+func malloc_type_free(_ : UnsafeMutableRawPointer, _ : UInt64)
+
 @inline(never)
 private func clearMemory(pointer: UnsafeMutableRawPointer, numBytes: Int) {
   let bytePtr = unsafe pointer.assumingMemoryBound(to: UInt8.self)
@@ -160,6 +169,26 @@ public func _swift_reportErrorAt(
   Builtin.int_trap()
 }
 
+#if SWIFT_STDLIB_HAS_MALLOC_TYPE
+// `#available` calls the non-inlinable `_stdlib_isOSVersionAtLeast`, which
+// has no body in the embedded stdlib; call the inlinable `_AEIC` entry
+// point directly instead.
+@inline(__always)
+private func _isMallocTypeOSVersionAtLeast() -> Bool {
+#if os(macOS)
+  return Bool(_stdlib_isOSVersionAtLeast_AEIC(15._builtinWordValue, 0._builtinWordValue, 0._builtinWordValue))
+#elseif os(iOS)
+  return Bool(_stdlib_isOSVersionAtLeast_AEIC(17._builtinWordValue, 0._builtinWordValue, 0._builtinWordValue))
+#elseif os(tvOS)
+  return Bool(_stdlib_isOSVersionAtLeast_AEIC(17._builtinWordValue, 0._builtinWordValue, 0._builtinWordValue))
+#elseif os(watchOS)
+  return Bool(_stdlib_isOSVersionAtLeast_AEIC(10._builtinWordValue, 0._builtinWordValue, 0._builtinWordValue))
+#else
+  return false
+#endif
+}
+#endif
+
 @export(interface)
 @implementation @c
 public func _swift_typedAllocate(_ size: Int, _ alignMask: Int, _ flags: SwiftAllocateFlags, _ typeId: UInt64) -> UnsafeMutableRawPointer? {
@@ -168,13 +197,15 @@ public func _swift_typedAllocate(_ size: Int, _ alignMask: Int, _ flags: SwiftAl
   }
 
 #if SWIFT_STDLIB_HAS_MALLOC_TYPE
-  var pointer: UnsafeMutableRawPointer? = nil
-  if #available(macOS 15, iOS 17, tvOS 17, watchOS 10, *) {
+  if _isMallocTypeOSVersionAtLeast() {
     // This check also forces "default" alignment to use malloc_memalign().
+    let MALLOC_ALIGN_MASK = 15
     if (alignMask <= MALLOC_ALIGN_MASK) {
       return unsafe malloc_type_malloc(size, typeId);
     } else {
+      var alignment: Int
       if alignMask == -1 {
+        let _swift_MinAllocationAlignment = 16
         alignment = _swift_MinAllocationAlignment
       } else {
         alignment = alignMask + 1
@@ -183,14 +214,25 @@ public func _swift_typedAllocate(_ size: Int, _ alignMask: Int, _ flags: SwiftAl
       // Do not use malloc_type_aligned_alloc() here, because we want this
       // to work if `size` is not an integer multiple of `alignment`, which
       // was a requirement of the latter in C11 (but not C17 and later).
+      var pointer: UnsafeMutableRawPointer? = nil
       guard unsafe malloc_type_posix_memalign(&pointer, alignment, size, typeId) == 0 else {
         return nil
       }
+      return pointer
     }
   }
-
-  return pointer
-#else
-  return unsafe swift_slowAlloc(size, alignMask)
 #endif
+  return unsafe swift_slowAlloc(size, alignMask)
+}
+
+@export(interface)
+@implementation @c
+public func _swift_typedDeallocate(_ pointer: UnsafeMutableRawPointer, _ size: Int, _ alignMask: Int, _ flags: SwiftDeallocFlags, _ typeId: UInt64) {
+#if SWIFT_STDLIB_HAS_MALLOC_TYPE
+  if _isMallocTypeOSVersionAtLeast() {
+    unsafe malloc_type_free(pointer, typeId);
+    return
+  }
+#endif
+  swift_slowDealloc(pointer, size, alignMask);
 }

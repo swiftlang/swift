@@ -147,7 +147,10 @@ public func _swift_generateRandom(_ buf: UnsafeMutableRawPointer, _ nbytes: Int)
 public func _swift_generateRandomHashSeed(_ buf: UnsafeMutableRawPointer, _ nbytes: Int)
 
 @_extern(c, "_swift_typedAllocate")
-public func _swift_typedAllocate(_ buf: UnsafeMutablePointer<UnsafeMutableRawPointer?>, _ size: Int, _ alignMask: Int, _ typeId: UInt64)
+public func _swift_typedAllocate(_ size: Int, _ alignMask: Int,  _ flags: CUnsignedLongLong, _ typeId: UInt64) -> UnsafeMutableRawPointer?
+
+@_extern(c, "_swift_typedDeallocate")
+public func _swift_typedDeallocate(_ buf: UnsafeMutableRawPointer, _ size: Int, _ alignMask: Int, _ flags: CUnsignedLongLong, _ typeId: UInt64)
 
 @_extern(c, "_swift_reportError")
 @usableFromInline
@@ -237,8 +240,7 @@ func swift_allocObject(metadata: UnsafeMutablePointer<ClassMetadata>, requiredSi
 @c
 public func swift_allocObjectTyped(metadata: Builtin.RawPointer, requiredSize: Int, requiredAlignmentMask: Int, typeId: UInt64) -> Builtin.RawPointer {
 #if SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
-  var _p: UnsafeMutableRawPointer? = nil
-  unsafe _swift_typedAllocate(&_p, requiredSize, requiredAlignmentMask, typeId)
+  let _p: UnsafeMutableRawPointer? = unsafe _swift_typedAllocate(requiredSize, requiredAlignmentMask, 0, typeId)
   let p = unsafe _p!
   let object = unsafe p.assumingMemoryBound(to: HeapObject.self)
   unsafe _swift_embedded_set_heap_object_metadata_pointer(object, UnsafeMutablePointer<ClassMetadata>(metadata))
@@ -258,12 +260,30 @@ public func swift_deallocUninitializedObject(object: Builtin.RawPointer, allocat
 }
 
 @c
+public func swift_deallocUninitializedObjectTyped(object: Builtin.RawPointer, allocatedSize: Int, allocatedAlignMask: Int, typeId: UInt64) {
+  swift_deallocObjectTyped(
+    object: object,
+    allocatedSize: allocatedSize,
+    allocatedAlignMask: allocatedAlignMask,
+    typeId: typeId)
+}
+
+@c
 public func swift_deallocObject(object: Builtin.RawPointer, allocatedSize: Int, allocatedAlignMask: Int) {
   unsafe swift_deallocObject(object: UnsafeMutablePointer<HeapObject>(object), allocatedSize: allocatedSize, allocatedAlignMask: allocatedAlignMask)
 }
 
 func swift_deallocObject(object: UnsafeMutablePointer<HeapObject>, allocatedSize: Int, allocatedAlignMask: Int) {
   unsafe swift_slowDealloc(UnsafeMutableRawPointer(object), allocatedSize, allocatedAlignMask)
+}
+
+@c
+public func swift_deallocObjectTyped(object: Builtin.RawPointer, allocatedSize: Int, allocatedAlignMask: Int, typeId: UInt64) {
+#if SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
+  unsafe _swift_typedDeallocate(UnsafeMutableRawPointer(object), allocatedSize, allocatedAlignMask, 0, typeId)
+#else
+  unsafe swift_deallocObject(object: UnsafeMutablePointer<HeapObject>(object), allocatedSize: allocatedSize, allocatedAlignMask: allocatedAlignMask)
+#endif
 }
 
 @c
@@ -280,6 +300,19 @@ func swift_deallocClassInstance(object: UnsafeMutablePointer<HeapObject>, alloca
 }
 
 @c
+public func swift_deallocClassInstanceTyped(object: Builtin.RawPointer, allocatedSize: Int, allocatedAlignMask: Int, typeId: UInt64) {
+#if SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
+  let p = unsafe UnsafeMutablePointer<HeapObject>(object)
+  if (unsafe p.pointee.refcount & HeapObject.doNotFreeBit) != 0 {
+    return
+  }
+  unsafe _swift_typedDeallocate(UnsafeMutableRawPointer(p), allocatedSize, allocatedAlignMask, 0, typeId)
+#else
+  unsafe swift_deallocClassInstance(object: UnsafeMutablePointer<HeapObject>(object), allocatedSize: allocatedSize, allocatedAlignMask: allocatedAlignMask)
+#endif
+}
+
+@c
 public func swift_deallocPartialClassInstance(object: Builtin.RawPointer, metadata: Builtin.RawPointer, allocatedSize: Int, allocatedAlignMask: Int) {
   unsafe swift_deallocPartialClassInstance(object: UnsafeMutablePointer<HeapObject>(object), metadata: UnsafeMutablePointer<ClassMetadata>(metadata), allocatedSize: allocatedSize, allocatedAlignMask: allocatedAlignMask)
 }
@@ -291,6 +324,11 @@ func swift_deallocPartialClassInstance(object: UnsafeMutablePointer<HeapObject>,
     guard let superclassMetadata = unsafe classMetadata.pointee.superclassMetadata else { break }
     unsafe classMetadata = superclassMetadata
   }
+}
+
+@c
+public func swift_deallocPartialClassInstanceTyped(object: Builtin.RawPointer, metadata: Builtin.RawPointer, allocatedSize: Int, allocatedAlignMask: Int, typeId: UInt64) {
+  unsafe swift_deallocPartialClassInstance(object: UnsafeMutablePointer<HeapObject>(object), metadata: UnsafeMutablePointer<ClassMetadata>(metadata), allocatedSize: allocatedSize, allocatedAlignMask: allocatedAlignMask)
 }
 
 @c
