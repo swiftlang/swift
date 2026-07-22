@@ -380,8 +380,10 @@ extension OutputSpan where Element: ~Copyable {
     @_lifetime(borrow self)
     borrowing get {
       let pointer = unsafe _pointer?.assumingMemoryBound(to: Element.self)
-      let buffer = unsafe UnsafeBufferPointer(start: pointer, count: _count)
-      let span = unsafe Span(_unsafeElements: buffer)
+      let span = unsafe Span(
+        _unchecked: pointer._unsafelyUnwrappedUnchecked,
+        count: _count
+      )
       return unsafe _overrideLifetime(span, borrowing: self)
     }
   }
@@ -393,10 +395,10 @@ extension OutputSpan where Element: ~Copyable {
     @_lifetime(&self)
     mutating get {
       let pointer = unsafe _pointer?.assumingMemoryBound(to: Element.self)
-      let buffer = unsafe UnsafeMutableBufferPointer(
-        start: pointer, count: _count
+      let span = unsafe MutableSpan(
+        _unchecked: pointer._unsafelyUnwrappedUnchecked,
+        count: _count
       )
-      let span = unsafe MutableSpan(_unsafeElements: buffer)
       return unsafe _overrideLifetime(span, mutating: &self)
     }
   }
