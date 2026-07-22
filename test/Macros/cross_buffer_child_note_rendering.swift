@@ -4,9 +4,9 @@
 // RUN: split-file %s %t
 // RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath
 
-// RUN: not env TMPDIR=%t %target-swift-frontend -swift-version 5 -typecheck %t/test.swift -load-plugin-library %t/%target-library-name(MacroDefinition) -diagnostic-style=llvm 2>&1 | %PathSanitizingDiff --sanitize-regex "MACROBUFFER=@__swiftmacro\\S*.swift" %t/llvm-render.expected
-// RUN: not env TMPDIR=%t %target-swift-frontend -swift-version 5 -typecheck %t/test.swift -load-plugin-library %t/%target-library-name(MacroDefinition) -diagnostic-style=swift 2>&1 | %PathSanitizingDiff %t/swift-syntax-render.expected
-// RUN: env TMPDIR=%t %target-swift-frontend -swift-version 5 -typecheck %t/test.swift -load-plugin-library %t/%target-library-name(MacroDefinition) -verify
+// RUN: not env %tmpdir=%t %target-swift-frontend -swift-version 5 -typecheck %t/test.swift -load-plugin-library %t/%target-library-name(MacroDefinition) -diagnostic-style=llvm 2>&1 | %PathSanitizingDiff --sanitize-regex "MACROBUFFER=@__swiftmacro\\S*.swift" %t/llvm-render.expected
+// RUN: not env %tmpdir=%t %target-swift-frontend -swift-version 5 -typecheck %t/test.swift -load-plugin-library %t/%target-library-name(MacroDefinition) -diagnostic-style=swift 2>&1 | %PathSanitizingDiff %t/swift-syntax-render.expected
+// RUN: %target-swift-frontend -swift-version 5 -typecheck %t/test.swift -load-plugin-library %t/%target-library-name(MacroDefinition) -verify
 
 // Ensure that child notes in other buffers are rendered properly.
 
