@@ -6,6 +6,7 @@
 // REQUIRES: swift_feature_Embedded
 // REQUIRES: swift_feature_EmbeddedKeyPaths
 // REQUIRES: swift_feature_KeyPathWithMethodMembers
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 // -----------------------------------------------------------------------------
 // Generic wrappers

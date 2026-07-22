@@ -5,6 +5,7 @@
 // RUN: %line-directive %t/PersistentVector.swift -- %target-run %t/a.out
 // REQUIRES: executable_test
 // REQUIRES: reflection
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 /*
 

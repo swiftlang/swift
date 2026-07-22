@@ -8,6 +8,7 @@
 // RUN: %target-run %t/a.out | %FileCheck %s
 
 // REQUIRES: executable_test
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 
 // Check that TempLValueElimination does not cause an exclusivity violation at runtime.

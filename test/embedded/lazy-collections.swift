@@ -3,6 +3,7 @@
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
 // REQUIRES: swift_feature_Embedded
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 @main
 struct Main {

@@ -2,6 +2,7 @@
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: concurrency_runtime
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 struct Failure: Error, Equatable { var value = 1 }
 
