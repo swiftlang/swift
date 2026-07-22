@@ -25,9 +25,7 @@ struct Test<U: P> {
   }
 }
 
-// https://github.com/swiftlang/swift/issues/90751 - a member whose type does
-// not satisfy the subscript's key path value type should be diagnosed rather
-// than crashing with "failed to produce diagnostic".
+// https://github.com/swiftlang/swift/issues/90751
 struct Column<Value> {}
 
 struct Columns {
