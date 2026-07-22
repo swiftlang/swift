@@ -1,0 +1,52 @@
+// RUN: %target-sil-opt -enable-sil-verify-all -allocbox-to-stack %s | %FileCheck %s
+sil_stage raw
+
+import Builtin
+
+enum Nat {
+  case zero
+  indirect case succ(Nat)
+}
+
+// When an alloc_box is promoted to the stack and a debug_value on the box has
+// a debug reconstruction block, the operand must be killed as unsalvageable.
+
+// CHECK-LABEL: sil [ossa] @box_with_debug_reconstruction_block_indirect_enum
+// CHECK: alloc_stack
+// CHECK-NOT: alloc_box
+// CHECK: debug_value undef : {{.*}}, var, name "x", type $Nat, transform
+sil [ossa] @box_with_debug_reconstruction_block_indirect_enum : $@convention(thin) () -> () {
+bb0:
+  %1 = alloc_box ${ var Nat }
+  debug_value %1 : ${ var Nat }, var, name "x", type $Nat, transform {
+  bb0(%0 : ${ var Nat }):
+    %1 = enum $Nat, #Nat.succ!enumelt, %0 : ${ var Nat }
+    return %1 : $Nat
+  }
+  %1a = project_box %1 : ${ var Nat }, 0
+  %zero = enum $Nat, #Nat.zero!enumelt
+  store %zero to [trivial] %1a : $*Nat
+  destroy_value %1 : ${ var Nat }
+  %r = tuple ()
+  return %r : $()
+}
+
+// When there is no debug reconstruction block, the debug_value should be
+// repointed to the alloc_stack with an op_deref.
+
+// CHECK-LABEL: sil [ossa] @box_without_debug_reconstruction_block
+// CHECK: [[STACK:%[0-9]+]] = alloc_stack
+// CHECK-NOT: alloc_box
+// CHECK: debug_value [[STACK]], var, name "x", expr op_deref
+// CHECK: return
+sil [ossa] @box_without_debug_reconstruction_block : $@convention(thin) () -> () {
+bb0:
+  %1 = alloc_box ${ var Nat }
+  debug_value %1 : ${ var Nat }, var, name "x"
+  %1a = project_box %1 : ${ var Nat }, 0
+  %zero = enum $Nat, #Nat.zero!enumelt
+  store %zero to [trivial] %1a : $*Nat
+  destroy_value %1 : ${ var Nat }
+  %r = tuple ()
+  return %r : $()
+}
