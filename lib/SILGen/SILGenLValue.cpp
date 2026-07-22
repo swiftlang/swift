@@ -2765,6 +2765,36 @@ namespace {
                                       getSubstFormalType(), c);
     }
 
+    bool canDropForRead(SILGenFunction &SGF) const override {
+      // For Clang-typed C function pointer fields, the orig-pattern lowering
+      // (e.g. @in_guaranteed) is what callers must use.
+      return isClangCFunctionPointerOrigToSubst();
+    }
+
+    std::optional<Conversion>
+    getUntranslationConversion(SILGenFunction &SGF) const override {
+      if (!isClangCFunctionPointerOrigToSubst())
+        return std::nullopt;
+      auto substType = getSubstFormalType();
+      SILType loweredTy = SGF.getLoweredType(OrigType, substType);
+      return Conversion::getBridging(Conversion::BridgeToObjC, substType,
+                                     substType, loweredTy, OrigType);
+    }
+
+  private:
+    /// True if this OrigToSubst reabstracts a Clang-typed C function pointer
+    /// field.
+    bool isClangCFunctionPointerOrigToSubst() const {
+      if (!OrigType.isClangType())
+        return false;
+      auto fnType = getSubstFormalType()
+                        ->lookThroughSingleOptionalType()
+                        ->getAs<AnyFunctionType>();
+      return fnType && fnType->getRepresentation() ==
+                           FunctionTypeRepresentation::CFunctionPointer;
+    }
+
+  public:
     std::unique_ptr<LogicalPathComponent>
     clone(SILGenFunction &SGF, SILLocation loc) const override {
       LogicalPathComponent *clone
@@ -5672,6 +5702,17 @@ static ArgumentSource emitBaseValueForAccessor(SILGenFunction &SGF,
 RValue SILGenFunction::emitLoadOfLValue(SILLocation loc, LValue &&src,
                                         SGFContext C, bool isBaseGuaranteed) {
   assert(isReadAccess(src.getAccessKind()));
+
+  // If the trailing translation component can be dropped on read — e.g. a
+  // Clang-typed C function pointer field whose ABI lives in the orig-pattern
+  // lowering — drop it before loading. The underlying physical component
+  // produces a value with the orig-pattern SIL type, which is the right
+  // type for callers (no value-level conversion exists to a different one).
+  if (src.isLastComponentTranslation() &&
+      src.getLastTranslationComponent().canDropForRead(*this)) {
+    src.dropLastTranslationComponent();
+  }
+
   ExecutorBreadcrumb prevExecutor;
   RValue result;
   {
@@ -6100,8 +6141,25 @@ void SILGenFunction::emitAssignToLValue(SILLocation loc,
   }
 
   // Otherwise, force the RHS now to preserve evaluation order.
+  // Try to peel a trailing translation component off the LValue and apply
+  // it as a Conversion during RHS emission, rather than untranslating an
+  // already-materialized value below.
+  std::optional<Conversion> srcConversion;
+  if (dest.isLastComponentTranslation()) {
+    srcConversion =
+        dest.getLastTranslationComponent().getUntranslationConversion(*this);
+    if (srcConversion)
+      dest.dropLastTranslationComponent();
+  }
+
   auto srcLoc = src.getLocation();
-  RValue srcValue = std::move(src).getAsRValue(*this);
+  RValue srcValue = [&]() -> RValue {
+    if (srcConversion) {
+      ManagedValue mv = std::move(src).getConverted(*this, *srcConversion);
+      return RValue(*this, srcLoc, srcConversion->getResultType(), mv);
+    }
+    return std::move(src).getAsRValue(*this);
+  }();
 
   // Peephole: instead of materializing and then assigning into a
   // translation component, untransform the value first.

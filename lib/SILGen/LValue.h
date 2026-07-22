@@ -21,6 +21,7 @@
 #ifndef SWIFT_LOWERING_LVALUE_H
 #define SWIFT_LOWERING_LVALUE_H
 
+#include "Conversion.h"
 #include "FormalEvaluation.h"
 #include "SILGenFunction.h"
 #include "Scope.h"
@@ -343,7 +344,23 @@ public:
   virtual RValue untranslate(SILGenFunction &SGF, SILLocation loc,
                              RValue &&value,
                              SGFContext ctx = SGFContext()) && = 0;
-  
+
+  /// Untranslation expressed as a Conversion applicable at the source of an
+  /// r-value (via ArgumentSource::getConverted). Returns nullopt if the
+  /// component can't be expressed this way; the caller falls back to calling
+  /// untranslate().
+  virtual std::optional<Conversion>
+  getUntranslationConversion(SILGenFunction &SGF) const {
+    return std::nullopt;
+  }
+
+  /// True if this component can be dropped on read, exposing the underlying
+  /// physical component's SIL type directly to consumers. Used when no
+  /// conversion exists between the component's outer (subst)
+  /// lowering and the inner (orig) lowering — e.g. Clang-typed C function
+  /// pointer fields where Swift's subst lowering disagrees with the C ABI
+  /// and no SIL instruction can bridge between them.
+  virtual bool canDropForRead(SILGenFunction &SGF) const { return false; }
 };
 
 inline TranslationPathComponent &PathComponent::asTranslation() {
