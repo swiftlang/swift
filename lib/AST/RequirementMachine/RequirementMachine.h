@@ -121,10 +121,16 @@ class RequirementMachine final {
     return Complete;
   }
 
+  std::optional<unsigned> checkForRecursiveRule() const;
+
   std::pair<CompletionResult, unsigned>
   computeCompletion(RewriteSystem::ValidityPolicy policy);
 
   void freeze();
+
+  void diagnoseRecursiveRequirement(SourceLoc signatureLoc,
+                                    const ProtocolDecl *proto,
+                                    unsigned ruleID) const;
 
   void computeRequirementDiagnostics(
                             SmallVectorImpl<RequirementError> &errors,

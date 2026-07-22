@@ -6,8 +6,7 @@ protocol P {
 
 struct J<A> { }
 
-// expected-error@+2 {{same-type constraint 'Self' == 'J<Self.A>' is recursive}}
-// expected-error@+1 {{no type for 'Self' can satisfy both 'Self == J<Self.A>' and 'Self : P'}}
+// expected-error@+1 {{same-type constraint 'Self' == 'J<Self.A>' is recursive}}
 extension P where Self == J<A> {
   static func just(_: A) { }
 }
