@@ -379,6 +379,7 @@ list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "Lifetimes
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "BorrowAndMutateAccessors")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "BorrowInout")
 list(APPEND swift_stdlib_compile_flags "-strict-memory-safety")
+list(APPEND swift_stdlib_compile_flags "-Werror" "StrictMemorySafety")
 
 # For `@DebugDescription`. `SWIFT_HOST_PLUGINS_DIR` is computed once in
 # stdlib/public/CMakeLists.txt.
