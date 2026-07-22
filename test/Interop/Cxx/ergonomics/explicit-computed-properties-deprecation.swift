@@ -20,12 +20,6 @@ struct GetterSetter {
   void set_x(int v) SWIFT_COMPUTED_PROPERTY {}
 };
 
-struct GetterOnly {
-  int get_value() const SWIFT_COMPUTED_PROPERTY { return 42; }
-};
-
-//--- test.swift
-
 // CHECK:      struct GetterSetter {
 // CHECK-NEXT:    init()
 // CHECK-NEXT:    @available(*, deprecated, message: "use the 'x' property")
@@ -34,6 +28,10 @@ struct GetterOnly {
 // CHECK-NEXT:    mutating func set_x(_ v: CInt)
 // CHECK-NEXT:    var x: CInt
 // CHECK-NEXT: }
+
+struct GetterOnly {
+  int get_value() const SWIFT_COMPUTED_PROPERTY { return 42; }
+};
 
 // CHECK:      struct GetterOnly {
 // CHECK-NEXT:    init()
