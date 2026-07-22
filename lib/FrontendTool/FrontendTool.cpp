@@ -76,6 +76,7 @@
 #include "swift/Serialization/SerializationOptions.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Subsystems.h"
+#include "swift/SymbolGraphGen/SymbolGraphGen.h"
 #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
 
 #include "clang/Lex/Preprocessor.h"
@@ -1197,6 +1198,24 @@ static bool shouldEmitIndexData(const CompilerInvocation &Invocation) {
   return FrontendOptions::doesActionRequireSwiftStandardLibrary(action);
 }
 
+static void emitSymbolGraph(const CompilerInstance &Instance) {
+  llvm::PrettyStackTraceFormat trace("While emitting symbol graph");
+  symbolgraphgen::emitSymbolGraphForModule(
+      Instance.getMainModule(),
+      Instance.getInvocation().getSymbolGraphOptions());
+}
+
+static bool shouldEmitSymbolGraph(const CompilerInvocation &Invocation) {
+  const auto &opts = Invocation.getFrontendOptions();
+  if (Invocation.getSymbolGraphOptions().OutputDir.empty())
+    return false;
+  // For module-emitting actions, the symbol graph is produced as part of
+  // serialization. The type-check-only case is handled here.
+  if (opts.RequestedAction != FrontendOptions::ActionType::Typecheck)
+    return false;
+  return opts.InputsAndOutputs.isWholeModule();
+}
+
 /// Perform any actions that must have access to the ASTContext, and need to be
 /// delayed until the Swift compile pipeline has finished. This may be called
 /// before or after LLVM depending on when the ASTContext gets freed.
@@ -1288,6 +1307,10 @@ static void performEndOfPipelineActions(CompilerInstance &Instance) {
 
   if (shouldEmitIndexData(Invocation)) {
     emitIndexData(Instance);
+  }
+
+  if (!ctx.hadError() && shouldEmitSymbolGraph(Invocation)) {
+    emitSymbolGraph(Instance);
   }
 
   // Emit Swiftdeps for every file in the batch.
