@@ -393,10 +393,16 @@ struct ImageSource: CustomStringConvertible {
 
   /// Get a sub-range of this ImageSource as an ImageSource
   subscript(range: Range<Address>) -> ImageSource {
-    let intRange = Int(range.lowerBound)..<Int(range.upperBound)
-    return ImageSource(storage: storage[intRange],
-                       isMappedImage: isMappedImage,
-                       path: path)
+    get throws {
+      guard let lowerBound = Int(exactly: range.lowerBound),
+            let upperBound = Int(exactly: range.upperBound),
+            lowerBound <= count, upperBound <= count else {
+        throw ImageSourceError.outOfBoundsRead
+      }
+      return ImageSource(storage: storage[lowerBound..<upperBound],
+                         isMappedImage: isMappedImage,
+                         path: path)
+    }
   }
 
   /// Mark unused bytes in the storage as used

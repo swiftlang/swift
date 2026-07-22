@@ -1036,7 +1036,7 @@ class DwarfReader<S: DwarfSource & AnyObject> {
       }
 
       // The actual program comes next
-      let program = cursor.source[cursor.pos..<nextOffset]
+      let program = try cursor.source[cursor.pos..<nextOffset]
       cursor.pos = nextOffset
 
       result.append(DwarfLineNumberInfo(
