@@ -1209,7 +1209,7 @@ SILGenFunction::ForceTryEmission::ForceTryEmission(SILGenFunction &SGF,
 
   SILValue indirectError;
   auto &errorTL = SGF.getTypeLowering(loc->getThrownError());
-  if (!errorTL.isAddressOnly()) {
+  if (!errorTL.isAddress()) {
     (void) catchBB->createPhiArgument(errorTL.getLoweredType(),
                                       OwnershipKind::Owned);
   } else {
@@ -1265,8 +1265,8 @@ void SILGenFunction::ForceTryEmission::finish() {
               return error.getType().getObjectType().getASTType();
             }, LookUpConformanceInModule());
 
-        // Generic errors are passed indirectly.
-        if (!error.getType().isAddress()) {
+        // If lowering addresses, the error must be passed indirectly.
+        if (SGF.silConv.useLoweredAddresses() && !error.getType().isAddress()) {
           auto *tmp = SGF.B.createAllocStack(
               Loc, error.getType().getObjectType(), std::nullopt);
           error.forwardInto(SGF, Loc, tmp);
