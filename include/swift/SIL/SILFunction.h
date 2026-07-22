@@ -364,6 +364,22 @@ private:
   /// block indices.
   unsigned BlockListChangeIdx = 0;
 
+  /// An upper bound (exclusive) on the block numbers currently handed out via
+  /// SILBasicBlock::getNumber(). This is reset to size() by renumberBlocks()
+  /// and bumped by assignFreshBlockNumber() so that blocks created after a
+  /// renumbering (e.g. by critical-edge splitting) can be numbered uniquely
+  /// without invalidating an already-computed dominator tree or loop info.
+  unsigned NextBlockNumber = 0;
+
+  /// The block-numbering epoch (see getBlockNumberEpoch()). Bumped only when
+  /// existing block numbers are reassigned by renumberBlocks(). Assigning a
+  /// fresh number to a brand-new block does not change it, so generic graph
+  /// algorithms indexed by block number (dominator trees, loop info) stay valid
+  /// across block insertions. This is distinct from BlockListChangeIdx, which
+  /// tracks BasicBlockData validity and changes when the Data-vector indices
+  /// are reassigned.
+  unsigned BlockNumberEpoch = 0;
+
   /// The isolation of this function.
   ActorIsolation actorIsolation;
 
@@ -1579,35 +1595,51 @@ public:
   const_iterator end() const { return BlockList.end(); }
   unsigned size() const { return BlockList.size(); }
 
-  /// Assigns each basic block a dense, contiguous number in the range
+  /// Compacts block numbers so that every block is numbered in the range
   /// [0, size()), matching the block's position in the block list. This is the
   /// numbering exposed via SILBasicBlock::getNumber() and consumed by generic
   /// graph algorithms such as llvm::LoopInfoBase.
   ///
-  /// The block-list change epoch (see getBlockNumberEpoch()) is only bumped if
-  /// any index actually changed, keeping any live BasicBlockData valid.
+  /// Blocks are numbered automatically when added to a function, so this is
+  /// only needed to compact the numbering (e.g. to bound the size of a vector
+  /// indexed by block number). It bumps the numbering epoch (see
+  /// getBlockNumberEpoch()) if any number actually changed, which invalidates
+  /// any dominator tree / loop info computed against the old numbering.
   void renumberBlocks() {
-    bool blockListChanged = false;
+    bool numbersChanged = false;
     unsigned idx = 0;
     for (SILBasicBlock &block : *this) {
-      if (block.index != (int)idx) {
-        blockListChanged = true;
-        block.index = idx;
+      if (block.blockNumber != (int)idx) {
+        numbersChanged = true;
+        block.blockNumber = idx;
       }
       ++idx;
     }
-    if (blockListChanged)
-      ++BlockListChangeIdx;
+    NextBlockNumber = idx;
+    if (numbersChanged)
+      ++BlockNumberEpoch;
+  }
+
+  /// Assigns \p block a fresh, unique block number without renumbering the
+  /// other blocks or bumping the numbering epoch (see getBlockNumberEpoch()).
+  ///
+  /// This is called automatically when a block is added to a function, so that
+  /// SILBasicBlock::getNumber() is always valid and generic graph algorithms
+  /// that are updated incrementally (e.g. a dominator tree during
+  /// critical-edge splitting) can incorporate the new block without a full
+  /// renumbering, which would invalidate them.
+  void assignFreshBlockNumber(SILBasicBlock &block) {
+    block.blockNumber = NextBlockNumber++;
   }
 
   /// Returns an upper bound (exclusive) on the numbers returned by
   /// SILBasicBlock::getNumber(), suitable for sizing a vector indexed by block
   /// number.
-  unsigned getMaxBlockNumber() const { return size(); }
+  unsigned getMaxBlockNumber() const { return NextBlockNumber; }
 
   /// Returns the current block-numbering epoch. This changes whenever block
   /// numbers are reassigned, allowing consumers to detect stale numbers.
-  unsigned getBlockNumberEpoch() const { return BlockListChangeIdx; }
+  unsigned getBlockNumberEpoch() const { return BlockNumberEpoch; }
 
   SILBasicBlock &front() { return *begin(); }
   const SILBasicBlock &front() const { return *begin(); }
