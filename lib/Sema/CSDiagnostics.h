@@ -2281,6 +2281,12 @@ public:
   /// result value.
   bool diagnoseKeyPathAsFunctionResultMismatch() const;
 
+  /// Tailored fix-it for when a value is passed where a closure is expected
+  /// and the types align precisely: '() -> T' when arg type is T (wraps arg in
+  /// '{ <expr> }'), or '(T) -> Void' when arg type is T (replaces with
+  /// '{ _ in }').
+  bool diagnoseValuePassedAsClosure() const;
+
   /// Situations like this:
   ///
   /// func foo(_: Int, _: String) {}

@@ -7739,6 +7739,9 @@ bool ArgumentMismatchFailure::diagnoseAsError() {
   if (diagnoseKeyPathAsFunctionResultMismatch())
     return true;
 
+  if (diagnoseValuePassedAsClosure())
+    return true;
+
   auto argType = getFromType();
 
   // Unresolved key path argument requires a tailored diagnostic
@@ -8122,6 +8125,47 @@ bool ArgumentMismatchFailure::diagnoseKeyPathAsFunctionResultMismatch() const {
   emitDiagnostic(diag::expr_keypath_value_covert_to_contextual_type,
                  kpValueType, paramFnType->getResult());
   return true;
+}
+
+bool ArgumentMismatchFailure::diagnoseValuePassedAsClosure() const {
+  // The inverse case (closure passed to non-closure param) belongs to
+  // diagnoseClosureMismatch().
+  if (isExpr<ClosureExpr>(getAnchor()))
+    return false;
+
+  // Only concrete (non-generic) function types. getAs<FunctionType>() fails
+  // for GenericFunctionType intentionally — the fix-it text would be
+  // type-unsafe for generic parameters.
+  auto paramFnType = getToType()->getAs<FunctionType>();
+  if (!paramFnType)
+    return false;
+
+  auto argType = getFromType();
+
+  // '() -> T' where arg type == T: wrap the argument expression in '{ <expr> }'.
+  // This is the simpler case — the user has the value and just needs to defer
+  // its evaluation.
+  if (paramFnType->getNumParams() == 0 &&
+      paramFnType->getResult()->isEqual(argType)) {
+    emitDiagnostic(diag::cannot_convert_argument_value, argType, getToType())
+        .fixItInsert(getSourceRange().Start, "{ ")
+        .fixItInsertAfter(getSourceRange().End, " }");
+    return true;
+  }
+
+  // '(T) -> Void' where arg type == T: replace the argument with '{ _ in }'.
+  // Only the single-argument case is handled; multi-argument closures would
+  // require a different fix-it string and are excluded from scope.
+  if (paramFnType->getNumParams() == 1 && paramFnType->getResult()->isVoid()) {
+    auto closureParamType = paramFnType->getParams().front().getPlainType();
+    if (argType->isEqual(closureParamType)) {
+      emitDiagnostic(diag::cannot_convert_argument_value, argType, getToType())
+          .fixItReplace(getSourceRange(), "{ _ in }");
+      return true;
+    }
+  }
+
+  return false;
 }
 
 void ExpandArrayIntoVarargsFailure::tryDropArrayBracketsFixIt(
