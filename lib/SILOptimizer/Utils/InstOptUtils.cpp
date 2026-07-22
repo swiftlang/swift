@@ -1992,6 +1992,8 @@ static void salvageBinaryInst(SingleValueInstruction *SVI) {
 /// Salvage debug info for identity-like instructions (copy_value, move_value).
 /// Just repoints debug uses to the operand.
 static void salvageIdentityInst(SingleValueInstruction *SVI) {
+  assert(SVI->getNumOperands() >= 1 &&
+         "salvageIdentityInst expects an operand");
   SmallVector<Operand *> debugUses(getDebugUses(SVI));
   for (Operand *U : debugUses) {
     auto *DbgInst = cast<DebugValueInst>(U->getUser());
@@ -2300,6 +2302,36 @@ void swift::salvageDebugInfo(SILInstruction *I) {
 
   if (isa<CopyValueInst>(I) || isa<MoveValueInst>(I))
     salvageIdentityInst(cast<SingleValueInstruction>(I));
+
+  if (auto *builtin = dyn_cast<BuiltinInst>(I)) {
+    // Only salvage side-effects free SIL builtins.
+    BuiltinInfo info = builtin->getBuiltinInfo();
+    if (info.ID != BuiltinValueKind::None && info.isReadNone()) {
+      if ((info.ID == BuiltinValueKind::SToSCheckedTrunc ||
+           info.ID == BuiltinValueKind::UToUCheckedTrunc ||
+           info.ID == BuiltinValueKind::SToUCheckedTrunc) &&
+          info.Types[0]->is<BuiltinIntegerLiteralType>())
+        // This special case creates a branch at IRGen, which is not supported
+        // for debug reconstruction blocks.
+        // As this is for integer literals only, we should be able to salvage
+        // it to a constant, but for now, skip.
+        return;
+
+      // assumeNonNegative and assumeAlignment just returns its first operand
+      if (info.ID == BuiltinValueKind::AssumeNonNegative ||
+          info.ID == BuiltinValueKind::AssumeAlignment)
+        return salvageIdentityInst(builtin);
+      // or, and, xor, cmp_* builtins:
+      if (builtin->getNumOperands() == 2)
+        return salvageBinaryInst(builtin);
+      // (z/s)extOrBitcast, truncOrBitcast, ptrtoint, inttoptr
+      if (builtin->getNumOperands() == 1)
+        return salvageUnaryInst(builtin);
+      // zeroInitializer
+      if (builtin->getNumOperands() == 0)
+        return salvageNullaryInst(builtin);
+    }
+  }
 }
 
 void swift::salvageLoadDebugInfo(LoadOperation load) {
