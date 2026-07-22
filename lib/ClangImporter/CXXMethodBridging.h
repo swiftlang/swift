@@ -110,17 +110,9 @@ struct CXXMethodBridging {
 
   // This should be handled as snake case. See: rdar://89453010
   std::string importNameAsCamelCaseName() {
-    std::string output;
-    auto kind = classify();
-    bool hadPrefix = false;
-    if (kind == Kind::getter || kind == Kind::setter) {
-      llvm::StringRef name = getClangName();
-      hadPrefix =
-          name.consume_front_insensitive(kind == Kind::getter ? "get" : "set");
-      output = name.str();
-    } else {
-      output = getClangName().str();
-    }
+    llvm::StringRef strippedName = nameWithoutAccessorPrefix();
+    bool hadPrefix = strippedName.size() != getClangName().size();
+    std::string output = strippedName.str();
 
     if (output.empty())
       return output;
