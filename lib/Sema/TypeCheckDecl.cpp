@@ -21,6 +21,7 @@
 #include "TypeCheckAccess.h"
 #include "TypeCheckAvailability.h"
 #include "TypeCheckBitwise.h"
+#include "TypeCheckCOM.h"
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckInvertible.h"
 #include "TypeCheckObjC.h"
@@ -3156,47 +3157,6 @@ ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
   return extendedType;
 }
 
-namespace {
-ProtocolConformance *deriveImplicitCOMConformance(NominalTypeDecl *NTD,
-                                                  KnownProtocolKind KP) {
-  const auto *CD = dyn_cast<ClassDecl>(NTD);
-  if (CD == nullptr)
-    return nullptr;
-
-  if (!CD->getAttrs().hasAttribute<COMAttr>())
-    return nullptr;
-
-  ASTContext &context = NTD->getASTContext();
-  auto *protocol = context.getProtocol(KP);
-  if (protocol == nullptr)
-    return nullptr;
-
-  // Ensure that `ISwiftObject` is always compiler managed.
-  if (KP == KnownProtocolKind::ISwiftObject) {
-    llvm::SmallVector<ProtocolConformance *, 2> conformances;
-    NTD->lookupConformance(protocol, conformances);
-    if (!conformances.empty()) {
-      context.Diags.diagnose(CD->getLoc(), diag::attr_com_explicit_iswiftobject);
-      if (auto *A = CD->getAttrs().getAttribute<COMAttr>())
-        context.Diags.diagnose(A->getLocation(),
-                               diag::attr_com_iswiftobject_implied);
-      return conformances.front();
-    }
-  }
-
-  auto conformance =
-      context.getNormalConformance(NTD->getDeclaredInterfaceType(), protocol,
-                                   NTD->getLoc(), /*inheritedTypeRepr=*/nullptr,
-                                   /*conformanceDC=*/NTD,
-                                   ProtocolConformanceState::Complete,
-                                   ProtocolConformanceOptions());
-  conformance->setSourceKindAndImplyingConformance(ConformanceEntryKind::Synthesized,
-                                                   nullptr);
-  NTD->registerProtocolConformance(conformance, /*synthesized=*/true);
-  return conformance;
-}
-}
-
 //----------------------------------------------------------------------------//
 // ImplicitKnownProtocolConformanceRequest
 //----------------------------------------------------------------------------//
@@ -3211,7 +3171,7 @@ ImplicitKnownProtocolConformanceRequest::evaluate(Evaluator &evaluator,
     return deriveImplicitBitwiseCopyableConformance(nominal);
   case KnownProtocolKind::IUnknown:
   case KnownProtocolKind::ISwiftObject:
-    return deriveImplicitCOMConformance(nominal, kp);
+    return com::deriveImplicitConformance(nominal, kp);
   default:
     llvm_unreachable("non-implicitly derived KnownProtocol");
   }
