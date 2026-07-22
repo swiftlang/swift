@@ -1845,6 +1845,11 @@ bool swift::tryEliminateOnlyOwnershipUsedForwardingInst(
     return false;
   }
 
+  // Rewrite debug uses separately (they might need salvaging logic).
+  // Note: We know that `forwardingInst` is salvageable as this function is
+  // only called with convert_function instructions.
+  salvageDebugInfo(forwardingInst);
+
   // Now that we know we can perform our transform, set all uses of
   // forwardingInst to be used of its operand and then delete \p forwardingInst.
   auto newValue = singleFwdOp->get();
@@ -2289,7 +2294,7 @@ void swift::salvageDebugInfo(SILInstruction *I) {
     salvageUnaryInst(cast<SingleValueInstruction>(I));
 
   if (isa<UpcastInst>(I) || isa<UncheckedRefCastInst>(I) ||
-      isa<ConvertEscapeToNoEscapeInst>(I))
+      isa<ConvertEscapeToNoEscapeInst>(I) || isa<ConvertFunctionInst>(I))
     salvageUnaryInst(cast<SingleValueInstruction>(I));
 
   if (isa<StructElementAddrInst>(I) || isa<TupleElementAddrInst>(I) ||
