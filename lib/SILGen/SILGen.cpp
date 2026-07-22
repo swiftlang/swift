@@ -2268,42 +2268,22 @@ void SILGenModule::emitSourceFile(SourceFile *sf) {
     visit(D);
   }
 
-  // FIXME: Visit macro-generated extensions separately.
-  //
-  // The code below that visits auxiliary decls of the top-level
-  // decls in the source file does not work for nested types with
-  // attached conformance macros:
+  // Visit extensions recorded in the synthesized file separately. The code
+  // above that visits auxiliary decls of the top-level decls in the source
+  // file does not work for nested types with attached conformance macros:
   // ```
   // struct Outer {
   //   @AddConformance struct Inner {}
   // }
   // ```
-  // Because the attached-to decl is not at the top-level. To fix this,
-  // visit the macro-generated conformances that are recorded in the
-  // synthesized file unit to cover all macro-generated extension decls.
+  // Because the attached-to decl is not at the top level. Other compiler
+  // features can also add extensions directly to the synthesized file.
   if (auto *synthesizedFile = sf->getSynthesizedFile()) {
     for (auto *D : synthesizedFile->getTopLevelDecls()) {
-      auto *ext = dyn_cast<ExtensionDecl>(D);
-      if (!ext)
+      if (!isa<ExtensionDecl>(D))
         continue;
 
-      // COM synthesis records an `IID` accessor in a protocol metatype
-      // extension here (a user-written metatype extension would live in the
-      // source file's top-level decls, so within the synthesized file unit
-      // this form is unambiguously synthesized).  Its members need SILGen like
-      // any other; without this its getter is never emitted and clients that
-      // reference `P.IID` fail to link.
-      if (ext->isMetatypeExtension()) {
-        visit(ext);
-        continue;
-      }
-
-      auto *sf = ext->getInnermostDeclContext()->getParentSourceFile();
-      if (sf->getFulfilledMacroRole() != MacroRole::Conformance &&
-          sf->getFulfilledMacroRole() != MacroRole::Extension)
-        continue;
-
-      visit(ext);
+      visit(D);
     }
   }
 
