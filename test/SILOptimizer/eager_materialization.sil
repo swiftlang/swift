@@ -1,0 +1,475 @@
+// RUN: %target-sil-opt %s -module-name A -eager-materialization | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+struct A {
+  let v: InlineArray<4, Builtin.Word>
+}
+
+class B {
+  let v: InlineArray<4, Builtin.Word>
+}
+
+sil [ossa] @get_a : $@convention(thin) () -> A
+sil [ossa] @get_a_ptr : $@convention(thin) () -> UnsafePointer<A>
+
+// Type A is trivial, so it is a candidate for store hoisting
+//
+// CHECK-LABEL: sil [ossa] @materialize_a : $@convention(thin) () -> () {
+// CHECK:       bb0:
+// CHECK-NEXT:    [[EAGER_ALLOC:%[0-9]+]] = alloc_stack $A
+// CHECK:         function_ref @get_a
+// CHECK-NEXT:    [[A_VALUE:%[0-9]+]] = apply
+// CHECK-NEXT:    store [[A_VALUE]] to [trivial] [[EAGER_ALLOC]]
+// CHECK-NEXT:    br bb1
+// CHECK:       bb1:
+// CHECK-NEXT:    cond_br undef, bb2, bb3
+// CHECK:       bb2:
+// CHECK-NEXT:    [[LOCAL_ALLOC:%[0-9]+]] = alloc_stack $A
+// CHECK-NEXT:    copy_addr [[EAGER_ALLOC]] to [init] [[LOCAL_ALLOC]]
+// CHECK-NEXT:    dealloc_stack [[LOCAL_ALLOC]]
+// CHECK:       bb3:
+// CHECK:         [[RESULT:%[0-9]+]] = tuple ()
+// CHECK-NEXT:    dealloc_stack [[EAGER_ALLOC]]
+// CHECK-NEXT:    return [[RESULT]]
+// CHECK-LABEL: } // end sil function 'materialize_a'
+sil [ossa] @materialize_a : $@convention(thin) () -> () {
+bb0:
+  %get_a = function_ref @get_a : $@convention(thin) () -> A
+  %a = apply %get_a() : $@convention(thin) () -> A
+  br bb1
+
+bb1:
+  cond_br undef, bb2, bb3
+
+bb2:
+  %stk = alloc_stack $A
+  store %a to [trivial] %stk
+  dealloc_stack %stk
+  br bb1
+
+bb3:
+  %result = tuple ()
+  return %result
+}
+
+// CHECK-LABEL: sil [ossa] @materialize_a_parameter : $@convention(thin) (A) -> () {
+// CHECK:       bb0(%0 : $A):
+// CHECK-NEXT:    [[EAGER_ALLOC:%[0-9]+]] = alloc_stack $A
+// CHECK-NEXT:    store %0 to [trivial] [[EAGER_ALLOC]]
+// CHECK-NEXT:    br bb1
+// CHECK:       bb1:
+// CHECK-NEXT:    cond_br undef, bb2, bb3
+// CHECK:       bb2:
+// CHECK-NEXT:    [[LOCAL_ALLOC:%[0-9]+]] = alloc_stack $A
+// CHECK-NEXT:    copy_addr [[EAGER_ALLOC]] to [init] [[LOCAL_ALLOC]]
+// CHECK-NEXT:    dealloc_stack [[LOCAL_ALLOC]]
+// CHECK:       bb3:
+// CHECK:         [[RESULT:%[0-9]+]] = tuple ()
+// CHECK-NEXT:    dealloc_stack [[EAGER_ALLOC]]
+// CHECK-NEXT:    return [[RESULT]]
+// CHECK-LABEL: } // end sil function 'materialize_a_parameter'
+sil [ossa] @materialize_a_parameter : $@convention(thin) (A) -> () {
+bb0(%0 : $A):
+  br bb1
+
+bb1:
+  cond_br undef, bb2, bb3
+
+bb2:
+  %stk = alloc_stack $A
+  store %0 to [trivial] %stk
+  dealloc_stack %stk
+  br bb1
+
+bb3:
+  %result = tuple ()
+  return %result
+}
+
+// CHECK-LABEL: sil [ossa] @materialize_no_dead_end_dealloc : $@convention(thin) () -> () {
+// CHECK:       bb0:
+// CHECK-NEXT:    [[EAGER_ALLOC:%[0-9]+]] = alloc_stack $A
+// CHECK:         function_ref @get_a
+// CHECK-NEXT:    [[A_VALUE:%[0-9]+]] = apply
+// CHECK-NEXT:    store [[A_VALUE]] to [trivial] [[EAGER_ALLOC]]
+// CHECK-NEXT:    br bb1
+// CHECK:       bb1:
+// CHECK-NEXT:    cond_br undef, bb2, bb3
+// CHECK:       bb2:
+// CHECK-NEXT:    [[LOCAL_ALLOC:%[0-9]+]] = alloc_stack $A
+// CHECK-NEXT:    copy_addr [[EAGER_ALLOC]] to [init] [[LOCAL_ALLOC]]
+// CHECK-NEXT:    dealloc_stack [[LOCAL_ALLOC]]
+// CHECK:       bb3:
+// CHECK-NEXT:    cond_br undef, bb4, bb5
+// CHECK:       bb4:
+// CHECK-NEXT:    [[RESULT:%[0-9]+]] = tuple ()
+// CHECK-NEXT:    dealloc_stack [[EAGER_ALLOC]]
+// CHECK-NEXT:    return [[RESULT]]
+// CHECK:       bb5:
+// CHECK-NEXT:    unreachable
+// CHECK-LABEL: } // end sil function 'materialize_no_dead_end_dealloc'
+sil [ossa] @materialize_no_dead_end_dealloc : $@convention(thin) () -> () {
+bb0:
+  %get_a = function_ref @get_a : $@convention(thin) () -> A
+  %a = apply %get_a() : $@convention(thin) () -> A
+  br bb1
+
+bb1:
+  cond_br undef, bb2, bb3
+
+bb2:
+  %stk = alloc_stack $A
+  store %a to [trivial] %stk
+  dealloc_stack %stk
+  br bb1
+
+bb3:
+  cond_br undef, bb4, bb5
+
+bb4:
+  %result = tuple ()
+  return %result
+
+bb5:
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @materialize_nested_loop : $@convention(thin) (A) -> () {
+// CHECK:       bb0(%0 : $A):
+// CHECK-NEXT:    [[EAGER_ALLOC:%[0-9]+]] = alloc_stack $A
+// CHECK-NEXT:    store %0 to [trivial] [[EAGER_ALLOC]]
+// CHECK-NEXT:    br bb1
+// CHECK:       bb4:
+// CHECK-NEXT:    [[LOCAL_ALLOC:%[0-9]+]] = alloc_stack $A
+// CHECK-NEXT:    copy_addr [[EAGER_ALLOC]] to [init] [[LOCAL_ALLOC]]
+// CHECK-NEXT:    dealloc_stack [[LOCAL_ALLOC]]
+// CHECK:       bb6:
+// CHECK:         [[RESULT:%[0-9]+]] = tuple ()
+// CHECK-NEXT:    dealloc_stack [[EAGER_ALLOC]]
+// CHECK-NEXT:    return [[RESULT]]
+// CHECK-LABEL: } // end sil function 'materialize_nested_loop'
+sil [ossa] @materialize_nested_loop : $@convention(thin) (A) -> () {
+bb0(%0 : $A):
+  br bb1
+
+bb1:
+  cond_br undef, bb2, bb6
+
+bb2:
+  br bb3
+
+bb3:
+  cond_br undef, bb4, bb5
+
+bb4:
+  %stk = alloc_stack $A
+  store %0 to [trivial] %stk
+  dealloc_stack %stk
+  br bb3
+
+bb5:
+  br bb1
+
+bb6:
+  %result = tuple ()
+  return %result
+}
+
+// CHECK-LABEL: sil [ossa] @materialize_nested_loop_local : $@convention(thin) () -> () {
+// CHECK:       bb0:
+// CHECK-NEXT:    [[EAGER_ALLOC:%[0-9]+]] = alloc_stack $A
+// CHECK-NEXT:    br bb1
+// CHECK:       bb2:
+// CHECK:         [[GET_A:%[0-9]+]] = function_ref @get_a
+// CHECK-NEXT:    [[A_VALUE:%[0-9]+]] = apply [[GET_A]]
+// CHECK:       bb4:
+// CHECK-NEXT:    [[LOCAL_ALLOC:%[0-9]+]] = alloc_stack $A
+// CHECK-NEXT:    copy_addr [[EAGER_ALLOC]] to [init] [[LOCAL_ALLOC]]
+// CHECK-NEXT:    dealloc_stack [[LOCAL_ALLOC]]
+// CHECK:       bb6:
+// CHECK:         [[RESULT:%[0-9]+]] = tuple ()
+// CHECK-NEXT:    dealloc_stack [[EAGER_ALLOC]]
+// CHECK-NEXT:    return [[RESULT]]
+// CHECK-LABEL: } // end sil function 'materialize_nested_loop_local'
+sil [ossa] @materialize_nested_loop_local : $@convention(thin) () -> () {
+bb0:
+  br bb1
+
+bb1:
+  cond_br undef, bb2, bb6
+
+bb2:
+  %get_a = function_ref @get_a : $@convention(thin) () -> A
+  %a = apply %get_a() : $@convention(thin) () -> A
+  br bb3
+
+bb3:
+  cond_br undef, bb4, bb5
+
+bb4:
+  %stk = alloc_stack $A
+  store %a to [trivial] %stk
+  dealloc_stack %stk
+  br bb3
+
+bb5:
+  br bb1
+
+bb6:
+  %result = tuple ()
+  return %result
+}
+
+// When the same value is stored in multiple loops, reuse it
+// CHECK-LABEL: sil [ossa] @materialize_reuse : $@convention(thin) (A) -> () {
+// CHECK:       bb0(%0 : $A):
+// CHECK-NEXT:    [[EAGER_ALLOC:%[0-9]+]] = alloc_stack $A
+// CHECK-NEXT:    store %0 to [trivial] [[EAGER_ALLOC]]
+// CHECK-NEXT:    br bb1
+// CHECK:       bb2:
+// CHECK-NEXT:    [[LOCAL_ALLOC:%[0-9]+]] = alloc_stack $A
+// CHECK-NEXT:    copy_addr [[EAGER_ALLOC]] to [init] [[LOCAL_ALLOC]]
+// CHECK-NEXT:    dealloc_stack [[LOCAL_ALLOC]]
+// CHECK:       bb5:
+// CHECK-NEXT:    [[LOCAL_ALLOC4:%[0-9]+]] = alloc_stack $A
+// CHECK-NEXT:    copy_addr [[EAGER_ALLOC]] to [init] [[LOCAL_ALLOC4]]
+// CHECK-NEXT:    dealloc_stack [[LOCAL_ALLOC4]]
+// CHECK:       bb6:
+// CHECK:         [[RESULT:%[0-9]+]] = tuple ()
+// CHECK-NEXT:    dealloc_stack [[EAGER_ALLOC]]
+// CHECK-NEXT:    return [[RESULT]]
+// CHECK-LABEL: } // end sil function 'materialize_reuse'
+sil [ossa] @materialize_reuse : $@convention(thin) (A) -> () {
+bb0(%0 : $A):
+  br bb1
+
+bb1:
+  cond_br undef, bb2, bb3
+
+bb2:
+  %stk = alloc_stack $A
+  store %0 to [trivial] %stk
+  dealloc_stack %stk
+  br bb1
+
+bb3:
+  br bb4
+
+bb4:
+  cond_br undef, bb5, bb6
+
+bb5:
+  %stk4 = alloc_stack $A
+  store %0 to [trivial] %stk4
+  dealloc_stack %stk4
+  br bb4
+
+bb6:
+  %result = tuple ()
+  return %result
+}
+
+// CHECK-LABEL: sil [ossa] @materialize_multi : $@convention(thin) () -> () {
+// CHECK:       bb0:
+// CHECK-NEXT:    [[EAGER_ALLOC:%[0-9]+]] = alloc_stack $A
+// CHECK-NEXT:    [[EAGER_ALLOC2:%[0-9]+]] = alloc_stack $A
+// CHECK:         function_ref @get_a
+// CHECK-NEXT:    [[A_VALUE:%[0-9]+]] = apply
+// CHECK-NEXT:    store [[A_VALUE]] to [trivial] [[EAGER_ALLOC]]
+// CHECK-NEXT:    [[A_VALUE2:%[0-9]+]] = apply
+// CHECK-NEXT:    store [[A_VALUE2]] to [trivial] [[EAGER_ALLOC2]]
+// CHECK-NEXT:    br bb1
+// CHECK:       bb1:
+// CHECK-NEXT:    cond_br undef, bb2, bb3
+// CHECK:       bb2:
+// CHECK-NEXT:    [[LOCAL_ALLOC:%[0-9]+]] = alloc_stack $A
+// CHECK-NEXT:    copy_addr [[EAGER_ALLOC]] to [init] [[LOCAL_ALLOC]]
+// CHECK-NEXT:    dealloc_stack [[LOCAL_ALLOC]]
+// CHECK-NEXT:    [[LOCAL_ALLOC2:%[0-9]+]] = alloc_stack $A
+// CHECK-NEXT:    copy_addr [[EAGER_ALLOC2]] to [init] [[LOCAL_ALLOC2]]
+// CHECK-NEXT:    dealloc_stack [[LOCAL_ALLOC2]]
+// CHECK:       bb3:
+// CHECK:         [[RESULT:%[0-9]+]] = tuple ()
+// CHECK-NEXT:    dealloc_stack [[EAGER_ALLOC2]]
+// CHECK-NEXT:    dealloc_stack [[EAGER_ALLOC]]
+// CHECK-NEXT:    return [[RESULT]]
+// CHECK-LABEL: } // end sil function 'materialize_multi'
+sil [ossa] @materialize_multi : $@convention(thin) () -> () {
+bb0:
+  %get_a = function_ref @get_a : $@convention(thin) () -> A
+  %a1 = apply %get_a() : $@convention(thin) () -> A
+  %a2 = apply %get_a() : $@convention(thin) () -> A
+  br bb1
+
+bb1:
+  cond_br undef, bb2, bb3
+
+bb2:
+  %stk = alloc_stack $A
+  store %a1 to [trivial] %stk
+  dealloc_stack %stk
+  %stk2 = alloc_stack $A
+  store %a2 to [trivial] %stk2
+  dealloc_stack %stk2
+  br bb1
+
+bb3:
+  %result = tuple ()
+  return %result
+}
+
+// Don't materialize eagerly if the value is not used in a loop.
+//
+// CHECK-LABEL: sil [ossa] @no_materialize_no_loop : $@convention(thin) () -> () {
+// CHECK:       bb0:
+// CHECK-NOT:     alloc_stack InlineArray<512, Int>
+// CHECK:       bb1:
+// CHECK-NEXT:    [[ALLOC:%[0-9]+]] = alloc_stack $A
+// CHECK-NEXT:    store {{.*}} to [trivial] [[ALLOC]]
+// CHECK:       bb2:
+// CHECK-NOT:     dealloc_stack
+// CHECK-LABEL: } // end sil function 'no_materialize_no_loop'
+sil [ossa] @no_materialize_no_loop : $@convention(thin) () -> () {
+bb0:
+  %get_a = function_ref @get_a : $@convention(thin) () -> A
+  %a = apply %get_a() : $@convention(thin) () -> A
+  br bb1
+
+bb1:
+  %stk = alloc_stack $A
+  store %a to [trivial] %stk
+  dealloc_stack %stk
+  br bb2
+
+bb2:
+  %result = tuple ()
+  return %result
+}
+
+// Don't materialize eagerly if the value becomes available in the same loop:
+// this would not enable other passes to eliminate the allocation & store inside
+// the loop.
+//
+// CHECK-LABEL: sil [ossa] @no_materialize_same_loop : $@convention(thin) () -> () {
+// CHECK:       bb0:
+// CHECK-NOT:     alloc_stack InlineArray<512, Int>
+// CHECK:       bb1:
+// CHECK-NEXT:    cond_br undef, bb2, bb3
+// CHECK:       bb2:
+// CHECK-NEXT:    alloc_stack $A
+// CHECK:       bb3:
+// CHECK-NOT:     dealloc_stack
+// CHECK-LABEL: } // end sil function 'no_materialize_same_loop'
+sil [ossa] @no_materialize_same_loop : $@convention(thin) () -> () {
+bb0:
+  br bb1
+
+bb1:
+  cond_br undef, bb2, bb3
+
+bb2:
+  %stk = alloc_stack $A
+  %get_a = function_ref @get_a : $@convention(thin) () -> A
+  %a = apply %get_a() : $@convention(thin) () -> A
+  store %a to [trivial] %stk
+  dealloc_stack %stk
+  br bb1
+
+bb3:
+  %result = tuple ()
+  return %result
+}
+
+// Don't materialize eagerly if the destination address of the store is not an
+// alloc_stack: this would not enable other passes to eliminate the store inside
+// the loop.
+//
+// CHECK-LABEL: sil [ossa] @no_materialize_non_stack_dest : $@convention(thin) () -> () {
+// CHECK-NOT:     alloc_stack $A
+// CHECK-LABEL: } // end sil function 'no_materialize_non_stack_dest'
+sil [ossa] @no_materialize_non_stack_dest : $@convention(thin) () -> () {
+bb0:
+  br bb1
+
+bb1:
+  cond_br undef, bb2, bb3
+
+bb2:
+  %get_a = function_ref @get_a : $@convention(thin) () -> A
+  %a = apply %get_a() : $@convention(thin) () -> A
+  %get_a_ptr = function_ref @get_a_ptr : $@convention(thin) () -> UnsafePointer<A>
+  %a_ptr = apply %get_a_ptr() : $@convention(thin) () -> UnsafePointer<A>
+  %rawval = struct_extract %a_ptr, #UnsafePointer._rawValue
+  %addr = pointer_to_address %rawval to [strict] $*A
+  store %a to [trivial] %addr
+  br bb1
+
+bb3:
+  %result = tuple ()
+  return %result
+}
+
+// Don't materialize eagerly if the destination alloc_stack is outside the loop:
+// this would not enable other passes to eliminate the store inside the loop.
+//
+// CHECK-LABEL: sil [ossa] @no_materialize_alloc_outside_loop : $@convention(thin) () -> () {
+// CHECK:       bb2:
+// CHECK-NEXT:    store
+// CHECK-LABEL: } // end sil function 'no_materialize_alloc_outside_loop'
+sil [ossa] @no_materialize_alloc_outside_loop : $@convention(thin) () -> () {
+bb0:
+  %stk = alloc_stack $A
+  %get_a = function_ref @get_a : $@convention(thin) () -> A
+  %a = apply %get_a() : $@convention(thin) () -> A
+  br bb1
+
+bb1:
+  cond_br undef, bb2, bb3
+
+bb2:
+  store %a to [trivial] %stk
+  br bb1
+
+bb3:
+  %result = tuple ()
+  dealloc_stack %stk
+  return %result
+}
+
+// Type B is non-trivial, so it cannot be hoisted
+// CHECK-LABEL: sil [ossa] @no_materialize_nontrivial : $@convention(thin) (@guaranteed B) -> () {
+// CHECK:       bb0(%0 : @guaranteed $B):
+// CHECK-NOT:     alloc_stack $B
+// CHECK-NEXT:    br bb1
+// CHECK:       bb1:
+// CHECK-NEXT:    cond_br undef, bb2, bb3
+// CHECK:       bb2:
+// CHECK-NEXT:    [[LOCAL_ALLOC:%[0-9]+]] = alloc_stack $B
+// CHECK-NEXT:    [[BORROW:%[0-9]+]] = store_borrow %0 to [[LOCAL_ALLOC]]
+// CHECK-NEXT:    end_borrow [[BORROW]]
+// CHECK-NEXT:    dealloc_stack [[LOCAL_ALLOC]]
+// CHECK:       bb3:
+// CHECK-NOT:     dealloc_stack
+// CHECK-LABEL: } // end sil function 'no_materialize_nontrivial'
+sil [ossa] @no_materialize_nontrivial : $@convention(thin) (@guaranteed B) -> () {
+bb0(%0 : @guaranteed $B):
+  br bb1
+
+bb1:
+  cond_br undef, bb2, bb3
+
+bb2:
+  %stk = alloc_stack $B
+  %borrow = store_borrow %0 to %stk
+  end_borrow %borrow
+  dealloc_stack %stk
+  br bb1
+
+bb3:
+  %result = tuple ()
+  return %result
+}
