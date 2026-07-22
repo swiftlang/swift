@@ -230,10 +230,23 @@ public:
   Demangle::NodePointer getDemangling(Demangle::Demangler &Dem) const;
 
   /// Build the mangled name from this TypeRef.
-  std::optional<std::string> mangle(Demangle::Demangler &Dem) const;
+  std::optional<std::string>
+  mangle(Demangle::Demangler &Dem,
+         Mangle::ManglingFlavor Flavor = Mangle::ManglingFlavor::Default) const;
 
   bool isConcrete() const;
   bool isConcreteAfterSubstitutions(const GenericArgumentMap &Subs) const;
+
+  /// Compare this TypeRef to \p Other structurally, recursing into their
+  /// operands rather than comparing pointers. TypeRefs allocated by the same
+  /// TypeRefBuilder are already uniqued (see FIND_OR_CREATE_TYPEREF), so
+  /// pointer equality is sufficient for those; this is for comparing
+  /// TypeRefs coming from different builders, e.g. in tests.
+  bool deepEquals(const TypeRef &Other) const;
+
+  /// Equivalent to lhs->deepEquals(*rhs), except either argument may
+  /// be null; two null pointers compare equal.
+  static bool deepEquals(const TypeRef *lhs, const TypeRef *rhs);
 
   const TypeRef *subst(TypeRefBuilder &Builder,
                        const GenericArgumentMap &Subs) const;
