@@ -50,6 +50,18 @@ def add_shared_arguments(parser):
     )
 
     parser.add_argument(
+        "--sanitize-regex",
+        help="replace text matching the given regex with another string. "
+        "Unlike --sanitize, SOURCE is treated as a regular expression and is "
+        "used verbatim: it is not path-normalized, not regex-escaped, and no "
+        "slash compatibility substitution is applied to it.",
+        metavar="REPLACEMENT=SOURCE",
+        action="append",
+        dest="sanitize_regexes",
+        default=[],
+    )
+
+    parser.add_argument(
         "--enable-windows-compatibility",
         help="Enable Windows path compatibility, which checks against both "
         "forward slashes and backward slashes.",
@@ -95,6 +107,14 @@ def sanitize(text, args):
             replacement,
             text,
         )
+
+    # Regex sanitizations are applied after the literal path replacements above
+    # so that they can match already-sanitized text. The source is used
+    # verbatim as a regex, so the caller is responsible for any escaping and
+    # for slash handling.
+    for s in args.sanitize_regexes:
+        replacement, pattern = s.split("=", 1)
+        text = re.sub(pattern, replacement, text)
 
     # Because we force the backtracer on in the tests, we can get runtime
     # warnings about privileged programs.  Suppress those, and also the
