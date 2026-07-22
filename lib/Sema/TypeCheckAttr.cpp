@@ -4758,12 +4758,24 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
 
     // Try resolving an attached macro attribute.
     if (auto *macro = attr->getResolvedMacro()) {
+      // If any attached role applies, ignore the non-applicable roles.
+      SmallVector<MacroRole, 2> invalidRoles;
       for (auto *roleAttr : macro->getAttrs().getAttributes<MacroRoleAttr>()) {
         auto role = roleAttr->getMacroRole();
-        if (isInvalidAttachedMacro(role, D)) {
-          diagnoseAndRemoveAttr(attr, diag::macro_attached_to_invalid_decl,
-                                getMacroRoleString(role), D);
+        if (!isAttachedMacro(role))
+          continue;
+
+        if (!isInvalidAttachedMacro(role, D)) {
+          invalidRoles.clear();
+          break;
         }
+
+        invalidRoles.push_back(role);
+      }
+
+      for (auto role : invalidRoles) {
+        diagnoseAndRemoveAttr(attr, diag::macro_attached_to_invalid_decl,
+                              getMacroRoleString(role), D);
       }
 
       // Macros can't be attached to ABI-only decls. (If we diagnosed above,
