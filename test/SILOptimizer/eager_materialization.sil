@@ -90,6 +90,8 @@ bb3:
   return %result
 }
 
+sil [ossa] @noreturn : $@convention(thin) () -> Never
+
 // CHECK-LABEL: sil [ossa] @materialize_no_dead_end_dealloc : $@convention(thin) () -> () {
 // CHECK:       bb0:
 // CHECK-NEXT:    [[EAGER_ALLOC:%[0-9]+]] = alloc_stack $A
@@ -103,14 +105,10 @@ bb3:
 // CHECK-NEXT:    [[LOCAL_ALLOC:%[0-9]+]] = alloc_stack $A
 // CHECK-NEXT:    copy_addr [[EAGER_ALLOC]] to [init] [[LOCAL_ALLOC]]
 // CHECK-NEXT:    dealloc_stack [[LOCAL_ALLOC]]
-// CHECK:       bb3:
-// CHECK-NEXT:    cond_br undef, bb4, bb5
 // CHECK:       bb4:
-// CHECK-NEXT:    [[RESULT:%[0-9]+]] = tuple ()
-// CHECK-NEXT:    dealloc_stack [[EAGER_ALLOC]]
-// CHECK-NEXT:    return [[RESULT]]
+// CHECK-NOT:     dealloc_stack
 // CHECK:       bb5:
-// CHECK-NEXT:    unreachable
+// CHECK-NOT:     dealloc_stack
 // CHECK-LABEL: } // end sil function 'materialize_no_dead_end_dealloc'
 sil [ossa] @materialize_no_dead_end_dealloc : $@convention(thin) () -> () {
 bb0:
@@ -131,8 +129,10 @@ bb3:
   cond_br undef, bb4, bb5
 
 bb4:
-  %result = tuple ()
-  return %result
+  %noreturn = function_ref @noreturn : $@convention(thin) () -> Never
+  apply %noreturn() : $@convention(thin) () -> Never
+  %deadResult = tuple ()
+  return %deadResult
 
 bb5:
   unreachable
