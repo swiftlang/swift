@@ -64,7 +64,7 @@ class CheckCompilerInitAttr {
   }
 
   // NB: this case is testing whether we only get a note for `whatever` and not `poster`
-  init(v2: Void) {} // expected-error {{return from initializer without initializing all stored properties}}
+  init(v2: Void) {} // expected-error {{return from initializer without initializing all stored properties}} {{29:3-3=self.ivar = ivar\n}}
 }
 
 class AgainCheckCompilerInitAttr {
@@ -72,9 +72,9 @@ class AgainCheckCompilerInitAttr {
   var whenever: Int
 
   // NB: this case ensures we still get a note for `cleanup` because no other properties are uninitialized
-  init() {
+  init() {// expected-error {{return from initializer without initializing all stored properties}}
     whenever = 0
-  } // expected-error {{return from initializer without initializing all stored properties}}
+  }
 }
 
 class Super {

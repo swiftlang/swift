@@ -13,11 +13,11 @@ class FailableInitThatFailsReallyHard {
 // Failable initializers must produce correct diagnostics
 struct A {
   var x: Int  // expected-note {{'self.x' not initialized}}
-  init?(i: Int) {
+  init?(i: Int) {// expected-error {{return from initializer without initializing all stored properties}} {{20:3-3=self.x = x\n}} {{15-15=, x: Int}}
     if i > 0 {
       self.x = i
     }
-  } // expected-error {{return from initializer without initializing all stored properties}}
+  }
 }
 
 // Delegating, failable initializers that doesn't initialize along all paths must produce correct diagnostics.
