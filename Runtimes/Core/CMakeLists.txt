@@ -22,8 +22,6 @@
 # TODO:
 # Platform support:
 #   - Work on/Verify Linux native builds
-# Embedded
-#   -- -Xfrontend -emit-empty-object-file
 
 cmake_minimum_required(VERSION 3.29)
 # TODO before requiring CMake 4.1 or later
@@ -43,9 +41,12 @@ list(APPEND CMAKE_MODULE_PATH
   ${SwiftCore_CMAKE_MODULES_DIR}
   "${CMAKE_SOURCE_DIR}/../cmake/modules")
 
-include(CMakeWorkarounds)
-
 include(SwiftProjectVersion)
+include(EmbeddedGuard)
+option(SwiftCore_EMBEDDED "Enable building the embedded runtime" OFF)
+swift_embedded_guard()
+
+include(CMakeWorkarounds)
 project(SwiftCore
   LANGUAGES C CXX Swift
   VERSION ${SWIFT_RUNTIME_VERSION})
