@@ -2538,41 +2538,43 @@ private:
         IsRef(true) {}
   };
 
-  bool walkToDeclPre(Decl *D, CharSourceRange Range) override {
+  PreWalkAction walkToDeclPre(Decl *D, CharSourceRange Range) override {
     if (Range.getByteLength() == 0)
-      return true;
+      return Action::Continue();
     if (auto *VD = dyn_cast<ValueDecl>(D))
       annotateSourceEntity({ Range, VD, nullptr, /*IsRef=*/false});
-    return true;
+    return Action::Continue();
   }
 
-  bool visitDeclReference(ValueDecl *D, SourceRange Range, TypeDecl *CtorTyRef,
-                          ExtensionDecl *ExtTyRef, Type Ty,
-                          ReferenceMetaData Data) override {
+  PostWalkAction visitDeclReference(ValueDecl *D, SourceRange Range,
+                                    TypeDecl *CtorTyRef,
+                                    ExtensionDecl *ExtTyRef, Type Ty,
+                                    ReferenceMetaData Data) override {
     if (Data.isImplicit) {
-      return true;
+      return Action::Continue();
     }
     CharSourceRange CharRange = Lexer::getCharSourceRangeFromSourceRange(
         D->getASTContext().SourceMgr, Range);
     annotateSourceEntity({CharRange, D, CtorTyRef, /*IsRef=*/true});
-    return true;
+    return Action::Continue();
   }
 
-  bool visitSubscriptReference(ValueDecl *D, SourceRange Range,
-                               ReferenceMetaData Data,
-                               bool IsOpenBracket) override {
+  PostWalkAction visitSubscriptReference(ValueDecl *D, SourceRange Range,
+                                         ReferenceMetaData Data,
+                                         bool IsOpenBracket) override {
     return visitDeclReference(D, Range, nullptr, nullptr, Type(), Data);
   }
 
-  bool visitCallArgName(Identifier Name, CharSourceRange Range,
-                        ValueDecl *D) override {
+  PostWalkAction visitCallArgName(Identifier Name, CharSourceRange Range,
+                                  ValueDecl *D) override {
     annotateSourceEntity({ Range, D, Name });
-    return true;
+    return Action::Continue();
   }
 
-  bool visitModuleReference(ModuleEntity Mod, CharSourceRange Range) override {
+  PostWalkAction visitModuleReference(ModuleEntity Mod,
+                                      CharSourceRange Range) override {
     annotateSourceEntity({ Range, Mod });
-    return true;
+    return Action::Continue();
   }
 
   void annotateSourceEntity(const SemanticSourceEntity &Entity) {
@@ -4055,16 +4057,16 @@ public:
     : SM(SM), BufferID(BufferID), OS(OS) { }
 
 private:
-  bool walkToDeclPre(Decl *D, CharSourceRange Range) override {
+  PreWalkAction walkToDeclPre(Decl *D, CharSourceRange Range) override {
     if (auto *VD = dyn_cast<ValueDecl>(D))
       printUSR(VD, Range.getStart());
-    return true;
+    return Action::Continue();
   }
 
-  bool walkToExprPre(Expr *E) override {
+  PreWalkAction walkToExprPre(Expr *E) override {
     if (auto *DRE = dyn_cast<DeclRefExpr>(E))
       printUSR(DRE->getDecl(), E->getLoc());
-    return true;
+    return Action::Continue();
   }
 
   void printUSR(const ValueDecl *VD, SourceLoc Loc) {
@@ -4104,24 +4106,25 @@ public:
                         const PrintOptions &PO)
       : Ctx(Ctx), Stream(Stream), PO(PO) {}
 
-  bool walkToDeclPre(Decl *D, CharSourceRange range) override {
+  PreWalkAction walkToDeclPre(Decl *D, CharSourceRange range) override {
     if (auto *VD = dyn_cast<ValueDecl>(D)) {
       if (SeenDecls.insert(VD).second)
         tryDemangleDecl(VD, range, /*isRef=*/false);
       NestedDCs.push_back(VD->getInnermostDeclContext());
     }
-    return true;
+    return Action::Continue();
   }
 
-  bool walkToDeclPost(Decl *D) override {
+  PostWalkAction walkToDeclPost(Decl *D) override {
     if (isa<ValueDecl>(D))
       NestedDCs.pop_back();
-    return true;
+    return Action::Continue();
   }
 
-  bool visitDeclReference(ValueDecl *D, SourceRange Range, TypeDecl *CtorTyRef,
-                          ExtensionDecl *ExtTyRef, Type T,
-                          ReferenceMetaData Data) override {
+  PostWalkAction visitDeclReference(ValueDecl *D, SourceRange Range,
+                                    TypeDecl *CtorTyRef,
+                                    ExtensionDecl *ExtTyRef, Type T,
+                                    ReferenceMetaData Data) override {
     CharSourceRange CharRange = Lexer::getCharSourceRangeFromSourceRange(
         D->getASTContext().SourceMgr, Range);
     if (SeenDecls.insert(D).second)
@@ -4135,7 +4138,7 @@ public:
                        : NestedDCs.back()),
                       CharRange);
     }
-    return true;
+    return Action::Continue();
   }
 
 private:
