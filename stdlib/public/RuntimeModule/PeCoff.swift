@@ -671,7 +671,10 @@ final class PeCoffImage {
                                                as: UInt8.self)
               let age = maybeSwap(try entrySource.fetch(from: 20,
                                                         as: UInt32.self))
-              let pdbFile = try entrySource.fetchString(from: 24)!
+              let (pdbFile, _) = try entrySource.fetchString(from: 24)
+              guard let pdbFile else {
+                break
+              }
 
               self.codeview = PeCodeview(uuid: uuid, age: age, pdbPath: pdbFile)
 

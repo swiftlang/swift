@@ -1577,12 +1577,12 @@ final class ElfImage<SomeElfTraits: ElfTraits> : DwarfSource {
       return nil
     }
 
-    guard let link = try? section.fetchString(from: 0) else {
+    guard let (link, linkCount) = try? section.fetchString(from: 0),
+          let link else {
       return nil
     }
 
-    let nullIndex = ImageSource.Address(link.utf8.count)
-    let crcIndex = (nullIndex + 4) & ~3
+    let crcIndex = (ImageSource.Address(linkCount) + 3) & ~3
 
     guard let unswappedCrc = try? section.fetch(
             from: crcIndex, as: UInt32.self
@@ -1606,13 +1606,12 @@ final class ElfImage<SomeElfTraits: ElfTraits> : DwarfSource {
       return nil
     }
 
-    guard let link = try? section.fetchString(from: 0) else {
+    guard let (link, linkCount) = try? section.fetchString(from: 0),
+          let link else {
       return nil
     }
 
-    let nullIndex = link.utf8.count
-
-    let uuid = [UInt8](section.bytes[(nullIndex + 1)...])
+    let uuid = [UInt8](section.bytes[linkCount...])
 
     return DebugAltLinkInfo(link: link, uuid: uuid)
   }
