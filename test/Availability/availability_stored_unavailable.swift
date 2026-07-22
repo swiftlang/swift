@@ -125,14 +125,14 @@ struct BadStruct {
     get { UnavailableMacOSStruct() }
   }
 
-  // expected-error@+1 {{computed property with initial value cannot be marked unavailable with '@available'}}
+  // expected-warning@+1 {{computed property with initial value cannot be marked unavailable with '@available'; this will be an error in a future Swift language mode}}
   @available(macOS, unavailable)
   var computedUnavailableMacOSWithInitialValue: UnavailableMacOSStruct = .init() { // expected-error {{'UnavailableMacOSStruct' is unavailable in macOS}}
     init { _ = newValue }
     get { UnavailableMacOSStruct() } // expected-error {{'UnavailableMacOSStruct' is unavailable in macOS}}
   }
 
-  // expected-error@+1 {{computed property with initial value cannot be marked unavailable with '@available'}}
+  // expected-warning@+1 {{computed property with initial value cannot be marked unavailable with '@available'; this will be an error in a future Swift language mode}}
   @available(*, unavailable)
   var computedUniversallyUnavailableWithInitialValue: UniversallyUnavailableStruct = .init() { // expected-error {{'UniversallyUnavailableStruct' is unavailable}}
     init { _ = newValue }
