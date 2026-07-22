@@ -19,7 +19,8 @@ extension _RigidArray where Element: ~Copyable {
   @export(implementation)
   @_transparent
   internal init() {
-    unsafe _storage = .init(start: nil, count: 0)
+    unsafe _ptr = ._dangling()
+    _capacity = 0
     _count = 0
   }
   
@@ -29,9 +30,11 @@ extension _RigidArray where Element: ~Copyable {
   internal init(capacity: Int) {
     _precondition(capacity >= 0, "Array capacity must be nonnegative")
     if capacity > 0 {
-      unsafe _storage = .allocate(capacity: capacity)
+      unsafe _ptr = .allocate(capacity: capacity)
+      _capacity = capacity
     } else {
-      unsafe _storage = .init(start: nil, count: 0)
+      unsafe _ptr = ._dangling()
+      _capacity = 0
     }
     _count = 0
   }

@@ -53,21 +53,29 @@
 @usableFromInline
 internal struct _RigidArray<Element: ~Copyable>: ~Copyable {
   @usableFromInline
-  internal var _storage: UnsafeMutableBufferPointer<Element>
+  internal var _ptr: UnsafeMutablePointer<Element>
+
+  @usableFromInline
+  internal var _capacity: Int
 
   @usableFromInline
   internal var _count: Int
 
   @export(implementation)
   deinit {
-    unsafe _storage.extracting(0 ..< _count).deinitialize()
-    unsafe _storage.deallocate()
+    if _capacity == 0 {
+      return
+    }
+
+    unsafe _ptr.deinitialize(count: _count)
+    unsafe _ptr.deallocate()
   }
   
   @export(implementation)
   internal init(_storage: UnsafeMutableBufferPointer<Element>, count: Int) {
-    unsafe self._storage = _storage
-    self._count = count
+    unsafe _ptr = _storage.baseAddress._unsafelyUnwrappedUnchecked
+    _capacity = _storage.count
+    _count = count
   }
 }
 
@@ -76,6 +84,13 @@ extension _RigidArray: @unchecked Sendable where Element: Sendable & ~Copyable {
 
 @available(SwiftStdlib 6.4, *)
 extension _RigidArray where Element: ~Copyable {
+  @available(SwiftStdlib 6.4, *)
+  @export(implementation)
+  @_transparent
+  internal var _storage: UnsafeMutableBufferPointer<Element> {
+    unsafe UnsafeMutableBufferPointer<Element>(start: _ptr, count: _capacity)
+  }
+
   /// The maximum number of elements this rigid array can hold.
   ///
   /// - Complexity: O(1)
@@ -83,7 +98,7 @@ extension _RigidArray where Element: ~Copyable {
   @export(implementation)
   @_transparent
   internal var capacity: Int {
-    _assumeNonNegative(unsafe _storage.count)
+    _assumeNonNegative(_capacity)
   }
 
   /// The number of additional elements that can be added to this array without
@@ -251,8 +266,13 @@ extension _RigidArray where Element: ~Copyable {
       capacity: Swift.max(newCapacity, count))
     let i = unsafe newStorage.moveInitialize(fromContentsOf: _items)
     _internalInvariant(i == count)
-    unsafe _storage.deallocate()
-    unsafe _storage = newStorage
+
+    if _capacity != 0 {
+      unsafe _storage.deallocate()
+    }
+
+    unsafe _ptr = newStorage.baseAddress._unsafelyUnwrappedUnchecked
+    _capacity = newStorage.count
   }
 
   /// Ensure that the array has capacity to store the specified number of
