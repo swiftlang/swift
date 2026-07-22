@@ -349,6 +349,7 @@ HeapNonFixedOffsets::HeapNonFixedOffsets(IRGenFunction &IGF,
       case ElementLayout::Kind::Empty:
       case ElementLayout::Kind::EmptyTailAllocatedCType:
       case ElementLayout::Kind::Fixed:
+      case ElementLayout::Kind::Hollow:
         // Don't need to dynamically calculate this offset.
         Offsets.push_back(nullptr);
         break;
