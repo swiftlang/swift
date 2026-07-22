@@ -2671,6 +2671,8 @@ Type IntrinsicTypeDecoder::decodeImmediate() {
   case IITDescriptor::Subdivide4:
   case IITDescriptor::PPCQuad:
   case IITDescriptor::AArch64Svcount:
+  case IITDescriptor::WasmExternref:
+  case IITDescriptor::WasmFuncref:
   case IITDescriptor::OneNthEltsVec:
     // These types cannot be expressed in swift yet.
     return Type();
