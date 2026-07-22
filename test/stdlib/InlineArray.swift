@@ -40,6 +40,8 @@ enum InlineArrayTests {
     testSuite.test("Uninhabited", testUninhabited)
     testSuite.test("Throws",      testThrows)
     testSuite.test("Closures",    testClosures)
+    testSuite.test("Regression1", testCollectionConformanceRegression1)
+    testSuite.test("Regression2", testCollectionConformanceRegression2)
     runAllTests()
   }
 
@@ -220,6 +222,38 @@ enum InlineArrayTests {
     }
 
     expectEqual(x, 10)
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// MARK: Regression tests
+//===----------------------------------------------------------------------===//
+
+extension InlineArray: @retroactive Collection {
+  public var startIndex: Int { 0 }
+  public var endIndex: Int { count }
+  public func index(after i: Int) -> Int { i + 1 }
+}
+
+extension InlineArrayTests {
+  @available(SwiftStdlib 6.2, *)
+  static func testCollectionConformanceRegression1() {
+    let arr = [4 of Int](repeating: 7)
+
+    for x in arr {
+      blackhole(x)
+    }
+  }
+
+  @available(SwiftStdlib 6.2, *)
+  static func testCollectionConformanceRegression2() {
+    func sum<C: Collection<Int>>(_ c: C) -> Int {
+        var s = 0
+        for x in c { s += x }
+        return s
+    }
+
+    blackhole(sum([4 of Int](repeating: 7)))
   }
 }
 
