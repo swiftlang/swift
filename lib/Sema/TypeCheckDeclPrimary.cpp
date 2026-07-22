@@ -366,8 +366,13 @@ static void checkInheritanceClause(
       // non-@objc protocols.
       if (layout.explicitSuperclass &&
           !canHaveSuperclass) {
-        decl->diagnose(diag::inheritance_from_protocol_with_superclass,
-                       inheritedTy);
+        if (!isa<ClassDecl>(decl) && !isa<ProtocolDecl>(decl)) {
+          decl->diagnose(diag::concrete_type_in_conformance_composition,
+                         layout.explicitSuperclass);
+        } else {
+          decl->diagnose(diag::inheritance_from_protocol_with_superclass,
+                         inheritedTy);
+        }
         continue;
       }
 
@@ -509,8 +514,10 @@ static void checkInheritanceClause(
 
     // We can't inherit from a non-class, non-protocol type.
     decl->diagnose(canHaveSuperclass
-                   ? diag::inheritance_from_non_protocol_or_class
-                   : diag::inheritance_from_non_protocol,
+                       ? diag::inheritance_from_non_protocol_or_class
+                       : ((!isa<ClassDecl>(decl) && !isa<ProtocolDecl>(decl))
+                              ? diag::conformance_to_non_protocol
+                              : diag::inheritance_from_non_protocol),
                    inheritedTy);
     // FIXME: Note pointing to the declaration 'inheritedTy' references?
   }
