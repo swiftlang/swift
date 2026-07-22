@@ -629,6 +629,394 @@ TEST(TypeRefTest, DeriveSubstitutions) {
   EXPECT_EQ(SubstTwo, ResultTwo);
 }
 
+// TypeRef::deepEquals() must compare structurally rather than by pointer, so
+// that TypeRefs built by two independent TypeRefBuilders (which do not share
+// a uniquing table) can still be recognized as equal.
+TEST(TypeRefTest, EqualsAcrossBuilders) {
+  TypeRefBuilder Builder1(TypeRefBuilder::ForTesting);
+  TypeRefBuilder Builder2(TypeRefBuilder::ForTesting);
+
+  auto N1 = Builder1.createNominalType(ABC_decl, nullptr);
+  auto N2 = Builder2.createNominalType(ABC_decl, nullptr);
+  auto N3 = Builder2.createNominalType(ABCD_decl, nullptr);
+
+  EXPECT_NE(N1, N2);
+  EXPECT_TRUE(TypeRef::deepEquals(N1, N2));
+  EXPECT_TRUE(N1->deepEquals(*N2));
+  EXPECT_FALSE(N2->deepEquals(*N3));
+  EXPECT_FALSE(TypeRef::deepEquals(N1, N3));
+
+  auto GTP00_1 = Builder1.createGenericTypeParameterType(0, 0);
+  auto GTP00_2 = Builder2.createGenericTypeParameterType(0, 0);
+  std::vector<const TypeRef *> Args1{N1, GTP00_1};
+  std::vector<const TypeRef *> Args2{N2, GTP00_2};
+
+  auto BG1 = Builder1.createBoundGenericType(ABC_decl, Args1, nullptr);
+  auto BG2 = Builder2.createBoundGenericType(ABC_decl, Args2, nullptr);
+  EXPECT_TRUE(TypeRef::deepEquals(BG1, BG2));
+
+  auto F1 = Builder1.createFunctionType(
+      {N1}, N1, FunctionTypeFlags(), ExtendedFunctionTypeFlags(),
+      FunctionMetadataDifferentiabilityKind::NonDifferentiable, nullptr,
+      nullptr);
+  auto F2 = Builder2.createFunctionType(
+      {N2}, N2, FunctionTypeFlags(), ExtendedFunctionTypeFlags(),
+      FunctionMetadataDifferentiabilityKind::NonDifferentiable, nullptr,
+      nullptr);
+  auto F3 = Builder2.createFunctionType(
+      {N2}, N2, FunctionTypeFlags().withThrows(true),
+      ExtendedFunctionTypeFlags(),
+      FunctionMetadataDifferentiabilityKind::NonDifferentiable, nullptr,
+      nullptr);
+  EXPECT_TRUE(TypeRef::deepEquals(F1, F2));
+  EXPECT_FALSE(TypeRef::deepEquals(F1, F3));
+
+  EXPECT_TRUE(TypeRef::deepEquals(nullptr, nullptr));
+  EXPECT_FALSE(TypeRef::deepEquals(N1, nullptr));
+  EXPECT_FALSE(TypeRef::deepEquals(nullptr, N1));
+  EXPECT_FALSE(TypeRef::deepEquals(N1, GTP00_1));
+}
+
+// deepEquals must be reflexive (a value equals itself) and must distinguish
+// TypeRefs of different kinds even when they carry similar payloads.
+TEST(TypeRefTest, DeepEqualsReflexiveAndKindMismatch) {
+  TypeRefBuilder Builder(TypeRefBuilder::ForTesting);
+
+  auto N = Builder.createNominalType(ABC_decl, nullptr);
+  auto BI = Builder.createBuiltinType(ABC, ABC);
+  auto FC = Builder.createForeignClassType(ABC);
+  auto OC = Builder.createObjCClassType(ABC);
+
+  EXPECT_TRUE(N->deepEquals(*N));
+  EXPECT_TRUE(BI->deepEquals(*BI));
+  EXPECT_TRUE(TypeRef::deepEquals(N, N));
+
+  EXPECT_FALSE(TypeRef::deepEquals(N, BI));
+  EXPECT_FALSE(TypeRef::deepEquals(N, FC));
+  EXPECT_FALSE(TypeRef::deepEquals(FC, OC));
+  EXPECT_FALSE(TypeRef::deepEquals(BI, OC));
+}
+
+// Structural comparison for the leaf/name-carrying kinds: Builtin, ObjCClass,
+// ObjCProtocol, ForeignClass, Integer, and GenericTypeParameter.
+TEST(TypeRefTest, DeepEqualsLeafKinds) {
+  TypeRefBuilder B1(TypeRefBuilder::ForTesting);
+  TypeRefBuilder B2(TypeRefBuilder::ForTesting);
+
+  // Builtin: equal iff mangled name matches.
+  EXPECT_TRUE(TypeRef::deepEquals(B1.createBuiltinType(ABC, ABC),
+                                  B2.createBuiltinType(ABC, ABC)));
+  EXPECT_FALSE(TypeRef::deepEquals(B1.createBuiltinType(ABC, ABC),
+                                   B2.createBuiltinType(ABCD, ABCD)));
+
+  // ObjC class.
+  EXPECT_TRUE(TypeRef::deepEquals(B1.createObjCClassType(MyClass),
+                                  B2.createObjCClassType(MyClass)));
+  EXPECT_FALSE(TypeRef::deepEquals(B1.createObjCClassType(MyClass),
+                                   B2.createObjCClassType(NotMyClass)));
+
+  // ObjC protocol.
+  EXPECT_TRUE(TypeRef::deepEquals(B1.createObjCProtocolType(MyProtocol),
+                                  B2.createObjCProtocolType(MyProtocol)));
+  EXPECT_FALSE(TypeRef::deepEquals(B1.createObjCProtocolType(MyProtocol),
+                                   B2.createObjCProtocolType(Shmrotocol)));
+
+  // Foreign class.
+  EXPECT_TRUE(TypeRef::deepEquals(B1.createForeignClassType(ABC),
+                                  B2.createForeignClassType(ABC)));
+  EXPECT_FALSE(TypeRef::deepEquals(B1.createForeignClassType(ABC),
+                                   B2.createForeignClassType(ABCD)));
+
+  // Integer: equal iff value matches (including sign).
+  EXPECT_TRUE(TypeRef::deepEquals(B1.createIntegerType(42),
+                                  B2.createIntegerType(42)));
+  EXPECT_FALSE(TypeRef::deepEquals(B1.createIntegerType(42),
+                                   B2.createIntegerType(43)));
+  EXPECT_FALSE(TypeRef::deepEquals(B1.createIntegerType(1),
+                                   B2.createNegativeIntegerType(-1)));
+
+  // Generic type parameter: equal iff both depth and index match.
+  EXPECT_TRUE(TypeRef::deepEquals(B1.createGenericTypeParameterType(1, 2),
+                                  B2.createGenericTypeParameterType(1, 2)));
+  EXPECT_FALSE(TypeRef::deepEquals(B1.createGenericTypeParameterType(1, 2),
+                                   B2.createGenericTypeParameterType(1, 3)));
+  EXPECT_FALSE(TypeRef::deepEquals(B1.createGenericTypeParameterType(1, 2),
+                                   B2.createGenericTypeParameterType(0, 2)));
+}
+
+// Opaque type refs are singletons with no payload; any two compare equal.
+TEST(TypeRefTest, DeepEqualsOpaque) {
+  TypeRefBuilder B1(TypeRefBuilder::ForTesting);
+  TypeRefBuilder B2(TypeRefBuilder::ForTesting);
+
+  EXPECT_TRUE(TypeRef::deepEquals(B1.getOpaqueType(), B2.getOpaqueType()));
+  EXPECT_TRUE(TypeRef::deepEquals(B1.getOpaqueType(), OpaqueTypeRef::get()));
+}
+
+// Tuples compare their labels and their elements element-wise.
+TEST(TypeRefTest, DeepEqualsTuple) {
+  TypeRefBuilder B1(TypeRefBuilder::ForTesting);
+  TypeRefBuilder B2(TypeRefBuilder::ForTesting);
+
+  auto A1 = B1.createNominalType(ABC_decl, nullptr);
+  auto X1 = B1.createNominalType(XYZ_decl, nullptr);
+  auto A2 = B2.createNominalType(ABC_decl, nullptr);
+  auto X2 = B2.createNominalType(XYZ_decl, nullptr);
+
+  StringRef Labels[] = {"first", "second"};
+  StringRef OtherLabels[] = {"first", "third"};
+
+  auto T1 = B1.createTupleType({A1, X1}, Labels);
+  auto T2 = B2.createTupleType({A2, X2}, Labels);
+  EXPECT_TRUE(TypeRef::deepEquals(T1, T2));
+
+  // Same elements, different labels.
+  auto T3 = B2.createTupleType({A2, X2}, OtherLabels);
+  EXPECT_FALSE(TypeRef::deepEquals(T1, T3));
+
+  // Same labels, different element order.
+  auto T4 = B2.createTupleType({X2, A2}, Labels);
+  EXPECT_FALSE(TypeRef::deepEquals(T1, T4));
+
+  // Different arity.
+  StringRef OneLabel[] = {"first"};
+  auto T5 = B2.createTupleType({A2}, OneLabel);
+  EXPECT_FALSE(TypeRef::deepEquals(T1, T5));
+
+  // Empty tuples (Void) are equal.
+  EXPECT_TRUE(TypeRef::deepEquals(
+      B1.createTupleType({}, ArrayRef<StringRef>()),
+      B2.createTupleType({}, ArrayRef<StringRef>())));
+}
+
+// Metatype compares its instance type and its abstract-ness; existential
+// metatype compares only its instance type.
+TEST(TypeRefTest, DeepEqualsMetatypes) {
+  TypeRefBuilder B1(TypeRefBuilder::ForTesting);
+  TypeRefBuilder B2(TypeRefBuilder::ForTesting);
+
+  auto N1 = B1.createNominalType(ABC_decl, nullptr);
+  auto M1 = B2.createNominalType(ABC_decl, nullptr);
+  auto Other = B2.createNominalType(XYZ_decl, nullptr);
+
+  EXPECT_TRUE(TypeRef::deepEquals(B1.createMetatypeType(N1, std::nullopt),
+                                  B2.createMetatypeType(M1, std::nullopt)));
+  EXPECT_FALSE(TypeRef::deepEquals(B1.createMetatypeType(N1, std::nullopt),
+                                   B2.createMetatypeType(Other, std::nullopt)));
+
+  // wasAbstract differs (Thick -> abstract, default -> not abstract).
+  EXPECT_FALSE(TypeRef::deepEquals(
+      B1.createMetatypeType(N1, std::nullopt),
+      B2.createMetatypeType(M1, Demangle::ImplMetatypeRepresentation::Thick)));
+
+  EXPECT_TRUE(
+      TypeRef::deepEquals(B1.createExistentialMetatypeType(N1),
+                          B2.createExistentialMetatypeType(M1)));
+  EXPECT_FALSE(
+      TypeRef::deepEquals(B1.createExistentialMetatypeType(N1),
+                          B2.createExistentialMetatypeType(Other)));
+}
+
+// Dependent member types compare member name, protocol, and base type.
+TEST(TypeRefTest, DeepEqualsDependentMember) {
+  TypeRefBuilder B1(TypeRefBuilder::ForTesting);
+  TypeRefBuilder B2(TypeRefBuilder::ForTesting);
+
+  auto Base1 = B1.createNominalType(ABC_decl, nullptr);
+  auto Base2 = B2.createNominalType(ABC_decl, nullptr);
+  auto OtherBase = B2.createNominalType(XYZ_decl, nullptr);
+  TypeRefBuilder::BuiltProtocolDecl P1 = std::make_pair(MyProtocol, false);
+  TypeRefBuilder::BuiltProtocolDecl P2 = std::make_pair(Shmrotocol, false);
+
+  EXPECT_TRUE(TypeRef::deepEquals(
+      B1.createDependentMemberType("Element", Base1, P1),
+      B2.createDependentMemberType("Element", Base2, P1)));
+
+  // Different member name.
+  EXPECT_FALSE(TypeRef::deepEquals(
+      B1.createDependentMemberType("Element", Base1, P1),
+      B2.createDependentMemberType("Index", Base2, P1)));
+
+  // Different protocol.
+  EXPECT_FALSE(TypeRef::deepEquals(
+      B1.createDependentMemberType("Element", Base1, P1),
+      B2.createDependentMemberType("Element", Base2, P2)));
+
+  // Different base type.
+  EXPECT_FALSE(TypeRef::deepEquals(
+      B1.createDependentMemberType("Element", Base1, P1),
+      B2.createDependentMemberType("Element", OtherBase, P1)));
+}
+
+// Protocol compositions compare their protocol list, superclass, and the
+// explicit-AnyObject / class-bound bit.
+TEST(TypeRefTest, DeepEqualsProtocolComposition) {
+  TypeRefBuilder B1(TypeRefBuilder::ForTesting);
+  TypeRefBuilder B2(TypeRefBuilder::ForTesting);
+
+  TypeRefBuilder::BuiltProtocolDecl P = std::make_pair(MyProtocol, false);
+  TypeRefBuilder::BuiltProtocolDecl Q = std::make_pair(Shmrotocol, false);
+
+  auto PC1 = B1.createProtocolCompositionType({P, Q}, nullptr, false);
+  auto PC2 = B2.createProtocolCompositionType({P, Q}, nullptr, false);
+  EXPECT_TRUE(TypeRef::deepEquals(PC1, PC2));
+
+  // Different protocol set.
+  auto PC3 = B2.createProtocolCompositionType({P}, nullptr, false);
+  EXPECT_FALSE(TypeRef::deepEquals(PC1, PC3));
+
+  // Different class-bound bit.
+  auto PC4 = B2.createProtocolCompositionType({P, Q}, nullptr, true);
+  EXPECT_FALSE(TypeRef::deepEquals(PC1, PC4));
+
+  // Different superclass (nullptr vs. present).
+  auto Super = B2.createNominalType(MyClass_decl, nullptr);
+  auto PC5 = B2.createProtocolCompositionType({P, Q}, Super, false);
+  EXPECT_FALSE(TypeRef::deepEquals(PC1, PC5));
+
+  // Empty composition (Any) equal across builders.
+  EXPECT_TRUE(TypeRef::deepEquals(
+      B1.createProtocolCompositionType({}, nullptr, false),
+      B2.createProtocolCompositionType({}, nullptr, false)));
+}
+
+// Each reference-storage flavor (weak/unowned/unmanaged) compares its
+// referent type, and the flavors are distinct from one another.
+TEST(TypeRefTest, DeepEqualsReferenceStorage) {
+  TypeRefBuilder B1(TypeRefBuilder::ForTesting);
+  TypeRefBuilder B2(TypeRefBuilder::ForTesting);
+
+  auto N1 = B1.createNominalType(MyClass_decl, nullptr);
+  auto N2 = B2.createNominalType(MyClass_decl, nullptr);
+  auto Other = B2.createNominalType(NotMyClass_decl, nullptr);
+
+  EXPECT_TRUE(TypeRef::deepEquals(B1.createWeakStorageType(N1),
+                                  B2.createWeakStorageType(N2)));
+  EXPECT_FALSE(TypeRef::deepEquals(B1.createWeakStorageType(N1),
+                                   B2.createWeakStorageType(Other)));
+
+  EXPECT_TRUE(TypeRef::deepEquals(B1.createUnownedStorageType(N1),
+                                  B2.createUnownedStorageType(N2)));
+  EXPECT_FALSE(TypeRef::deepEquals(B1.createUnownedStorageType(N1),
+                                   B2.createUnownedStorageType(Other)));
+
+  EXPECT_TRUE(TypeRef::deepEquals(B1.createUnmanagedStorageType(N1),
+                                  B2.createUnmanagedStorageType(N2)));
+  EXPECT_FALSE(TypeRef::deepEquals(B1.createUnmanagedStorageType(N1),
+                                   B2.createUnmanagedStorageType(Other)));
+
+  // Different storage flavors wrapping the same referent are different kinds.
+  EXPECT_FALSE(TypeRef::deepEquals(B1.createWeakStorageType(N1),
+                                   B2.createUnownedStorageType(N2)));
+  EXPECT_FALSE(TypeRef::deepEquals(B1.createUnownedStorageType(N1),
+                                   B2.createUnmanagedStorageType(N2)));
+}
+
+// Builtin.FixedArray compares its size and element operands; Builtin.Borrow
+// compares its referent.
+TEST(TypeRefTest, DeepEqualsBuiltinFixedArrayAndBorrow) {
+  TypeRefBuilder B1(TypeRefBuilder::ForTesting);
+  TypeRefBuilder B2(TypeRefBuilder::ForTesting);
+
+  auto Elt1 = B1.createNominalType(ABC_decl, nullptr);
+  auto Elt2 = B2.createNominalType(ABC_decl, nullptr);
+  auto OtherElt = B2.createNominalType(XYZ_decl, nullptr);
+
+  auto FA1 = B1.createBuiltinFixedArrayType(B1.createIntegerType(4), Elt1);
+  auto FA2 = B2.createBuiltinFixedArrayType(B2.createIntegerType(4), Elt2);
+  EXPECT_TRUE(TypeRef::deepEquals(FA1, FA2));
+
+  // Different count.
+  auto FA3 = B2.createBuiltinFixedArrayType(B2.createIntegerType(5), Elt2);
+  EXPECT_FALSE(TypeRef::deepEquals(FA1, FA3));
+
+  // Different element type.
+  auto FA4 = B2.createBuiltinFixedArrayType(B2.createIntegerType(4), OtherElt);
+  EXPECT_FALSE(TypeRef::deepEquals(FA1, FA4));
+
+  // Builtin.Borrow compares its referent.
+  EXPECT_TRUE(TypeRef::deepEquals(B1.createBuiltinBorrowType(Elt1),
+                                  B2.createBuiltinBorrowType(Elt2)));
+  EXPECT_FALSE(TypeRef::deepEquals(B1.createBuiltinBorrowType(Elt1),
+                                   B2.createBuiltinBorrowType(OtherElt)));
+}
+
+// SILBox-with-layout compares its fields (type and mutability), its
+// substitutions, and its requirements.
+TEST(TypeRefTest, DeepEqualsSILBoxWithLayout) {
+  using Field = TypeRefBuilder::BuiltSILBoxField;
+  using Subst = TypeRefBuilder::BuiltSubstitution;
+  TypeRefBuilder B1(TypeRefBuilder::ForTesting);
+  TypeRefBuilder B2(TypeRefBuilder::ForTesting);
+
+  auto A1 = B1.createNominalType(ABC_decl, nullptr);
+  auto A2 = B2.createNominalType(ABC_decl, nullptr);
+  auto X1 = B1.createNominalType(XYZ_decl, nullptr);
+  auto X2 = B2.createNominalType(XYZ_decl, nullptr);
+  auto GTP1 = B1.createGenericTypeParameterType(0, 0);
+  auto GTP2 = B2.createGenericTypeParameterType(0, 0);
+
+  auto makeBox = [](TypeRefBuilder &B, const TypeRef *fieldTy, bool mutableField,
+                    const TypeRef *param, const TypeRef *arg) {
+    llvm::SmallVector<Field, 1> Fields{Field(fieldTy, mutableField)};
+    llvm::SmallVector<Subst, 1> Subs{Subst(param, arg)};
+    llvm::SmallVector<TypeRefBuilder::BuiltRequirement, 0> Reqs;
+    return B.createSILBoxTypeWithLayout(Fields, Subs, Reqs, {});
+  };
+
+  auto Box1 = makeBox(B1, A1, /*mutable*/ true, GTP1, X1);
+  auto Box2 = makeBox(B2, A2, /*mutable*/ true, GTP2, X2);
+  EXPECT_TRUE(TypeRef::deepEquals(Box1, Box2));
+
+  // Different field mutability.
+  auto Box3 = makeBox(B2, A2, /*mutable*/ false, GTP2, X2);
+  EXPECT_FALSE(TypeRef::deepEquals(Box1, Box3));
+
+  // Different field type.
+  auto Box4 = makeBox(B2, X2, /*mutable*/ true, GTP2, X2);
+  EXPECT_FALSE(TypeRef::deepEquals(Box1, Box4));
+
+  // Different substitution argument.
+  auto Box5 = makeBox(B2, A2, /*mutable*/ true, GTP2, A2);
+  EXPECT_FALSE(TypeRef::deepEquals(Box1, Box5));
+}
+
+// deepEquals must recurse into nested structure and only report equal when the
+// whole tree matches; a difference buried deep in the tree must be detected.
+TEST(TypeRefTest, DeepEqualsRecursesIntoNestedStructure) {
+  TypeRefBuilder B1(TypeRefBuilder::ForTesting);
+  TypeRefBuilder B2(TypeRefBuilder::ForTesting);
+
+  // Build Outer<Inner<ABC>> in each builder, then perturb the innermost leaf.
+  auto build = [](TypeRefBuilder &B, const TypeRefDecl &leaf) {
+    auto Leaf = B.createNominalType(leaf, nullptr);
+    auto Inner = B.createBoundGenericType(XYZ_decl, {Leaf}, nullptr);
+    return B.createBoundGenericType(ABC_decl, {Inner}, nullptr);
+  };
+
+  auto Tree1 = build(B1, ABC_decl);
+  auto Tree2 = build(B2, ABC_decl);
+  EXPECT_TRUE(TypeRef::deepEquals(Tree1, Tree2));
+
+  // A leaf difference three levels deep must make the trees unequal.
+  auto Tree3 = build(B2, ABCD_decl);
+  EXPECT_FALSE(TypeRef::deepEquals(Tree1, Tree3));
+
+  // A nominal type's parent chain participates in the comparison.
+  auto Parent1 = B1.createNominalType(MyModule_decl, nullptr);
+  auto Nested1 = B1.createNominalType(MyClass_decl, Parent1);
+  auto Parent2 = B2.createNominalType(MyModule_decl, nullptr);
+  auto Nested2 = B2.createNominalType(MyClass_decl, Parent2);
+  auto OtherParent = B2.createNominalType(Shmodule_decl, nullptr);
+  auto NestedOther = B2.createNominalType(MyClass_decl, OtherParent);
+
+  EXPECT_TRUE(TypeRef::deepEquals(Nested1, Nested2));
+  EXPECT_FALSE(TypeRef::deepEquals(Nested1, NestedOther));
+  // Same leaf name, but one has a parent and the other does not.
+  auto NoParent = B2.createNominalType(MyClass_decl, nullptr);
+  EXPECT_FALSE(TypeRef::deepEquals(Nested1, NoParent));
+}
+
 // Verify that the MultiPayloadEnumDescriptor spare-bit-mask accessors defend
 // against malformed __swift5_mpenum records supplied by an inspected process,
 // rather than trusting the record's declared mask size.
