@@ -587,6 +587,9 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
   case llvm::Triple::Emscripten:
     addPlatformConditionValue(PlatformConditionKind::OS, "Emscripten");
     break;
+  case llvm::Triple::UEFI:
+    addPlatformConditionValue(PlatformConditionKind::OS, "UEFI");
+    break;
   case llvm::Triple::UnknownOS:
     if (Target.getOSName() == "none") {
       addPlatformConditionValue(PlatformConditionKind::OS, "none");

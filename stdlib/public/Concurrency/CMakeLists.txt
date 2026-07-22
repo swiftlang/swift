@@ -320,6 +320,14 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
       continue()
     endif()
 
+    # Skip Concurrency for UEFI: it is a freestanding environment with no OS
+    # concurrency primitives, and the macOS SDK C++ headers used to build
+    # embedded Concurrency on Darwin hosts are not compatible with the UEFI
+    # target ABI.
+    if("${triple}" MATCHES "-uefi$")
+      continue()
+    endif()
+
     if (SWIFT_HOST_VARIANT STREQUAL "linux")
       if(NOT "${mod}" MATCHES "-linux-gnu$")
         continue()
