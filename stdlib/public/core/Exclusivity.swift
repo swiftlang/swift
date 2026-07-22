@@ -643,8 +643,9 @@ fileprivate func reportExclusivityError(
           0)
       #else
       unsafe _embeddedReportFatalError(
-          prefix: prefix,
-          message: messageBuffer)
+        kind: .fatal(),
+        message: messageBuffer
+      )
       #endif
     }
   }
