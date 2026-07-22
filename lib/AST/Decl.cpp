@@ -6811,13 +6811,6 @@ void NominalTypeDecl::synthesizeSemanticMembersIfNeeded(DeclName member) {
   auto baseName = member.getBaseName();
   auto &Context = getASTContext();
 
-  // For a distributed actor `id` and `actorSystem` can be synthesized without
-  // causing cycles so do them above the cycle guard.
-  if (member.isSimpleName(Context.Id_id))
-    (void)getDistributedActorIDProperty();
-  if (member.isSimpleName(Context.Id_actorSystem))
-    (void)getDistributedActorSystemProperty();
-
   // Silently break cycles here because we can't be sure when and where a
   // request to synthesize will come from yet.
   // FIXME: rdar://56844567
