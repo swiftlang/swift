@@ -33,6 +33,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/Module.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
@@ -3067,6 +3068,18 @@ static bool requiresCorrespondingUnderscoredCoroutineAccessorImpl(
       }
     }
   }
+
+  // Unless we're building with library evolution, there is no stable ABI to
+  // preserve: the underscored (yield_once_1) accessor is pure overhead, so emit
+  // only the new (yield_once_2) ABI.  This covers non-resilient modules on every
+  // platform as well as non-ABI-stable builds such as Embedded and the static
+  // (LINUX_STATIC) standard library.  Note this comes *after* the override walk
+  // above: a decl in a non-resilient module overriding a resilient superclass
+  // must still emit the underscored accessor to dispatch through the super's ABI
+  // slot (that recursive call evaluates the super's own module resilience).
+  if (storage->getModuleContext()->getResilienceStrategy() !=
+      ResilienceStrategy::Resilient)
+    return false;
 
   // Non-exported storage has no ABI to keep stable.
   if (isExported(storage) != ExportedLevel::Exported)
