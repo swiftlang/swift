@@ -3517,6 +3517,19 @@ struct DefaultBlockConventions : Conventions {
   }
 };
 
+/// The default conventions for `@called(once)` closures.
+///
+/// Calling such a value is itself the consuming use that enforces
+/// call-at-most-once, so its context must be owned rather than guaranteed.
+struct DefaultCalledOnceConventions : DefaultConventions {
+  DefaultCalledOnceConventions()
+      : DefaultConventions(NormalParameterConvention::Guaranteed) {}
+
+  ParameterConvention getCallee() const override {
+    return ParameterConvention::Direct_Owned;
+  }
+};
+
 } // end anonymous namespace
 
 static CanSILFunctionType getSILFunctionTypeForAbstractCFunction(
@@ -3575,6 +3588,10 @@ static CanSILFunctionType getNativeSILFunctionType(
               DefaultSetterConventions(), *constant);
         }
       }
+
+      if (substInterfaceType->isCalledOnce())
+        return getSILFunctionTypeForConventions(DefaultCalledOnceConventions());
+
       return getSILFunctionTypeForConventions(
           DefaultConventions(NormalParameterConvention::Guaranteed));
     }
