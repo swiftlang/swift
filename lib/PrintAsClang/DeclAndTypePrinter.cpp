@@ -15,6 +15,7 @@
 #include "OutputLanguageMode.h"
 #include "PrimitiveTypeMapping.h"
 #include "PrintClangClassType.h"
+#include "PrintClangExistentialType.h"
 #include "PrintClangFunction.h"
 #include "PrintClangValueType.h"
 #include "SwiftToClangInteropContext.h"
@@ -38,6 +39,7 @@
 #include "swift/AST/TypeVisitor.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/Feature.h"
 #include "swift/IDE/CommentConversion.h"
 #include "swift/IRGen/IRABIDetailsProvider.h"
 #include "swift/IRGen/Linking.h"
@@ -465,6 +467,16 @@ private:
 
   void visitProtocolDecl(ProtocolDecl *PD) {
     printDocumentationComment(PD);
+
+    if (outputLang == OutputLanguageMode::Cxx) {
+      if (!PD->isObjC() &&
+          getASTContext().LangOpts.hasFeature(
+              Feature::CxxExistentialInterop)) {
+        ClangExistentialTypePrinter(os, owningPrinter.outOfLineDefinitionsOS)
+            .printExistentialTypeDecl(PD, owningPrinter);
+      }
+      return;
+    }
 
     StringRef customName = getNameForObjC(PD, CustomNamesOnly);
     if (customName.empty()) {
@@ -1765,6 +1777,8 @@ private:
     os << "}\n";
     if (result.isObjCxxOnly())
       os << "#endif // defined(__OBJC__)\n";
+    if (result.needsExistentialGuard())
+      os << "#endif // SWIFT_CXX_EXISTENTIAL_INTEROP && __cpp_concepts\n";
   }
 
   enum class PrintLeadingSpace : bool {
@@ -3183,6 +3197,16 @@ bool DeclAndTypePrinter::shouldInclude(const ValueDecl *VD) {
     return false;
 
   return true;
+}
+
+std::string DeclAndTypePrinter::ensureCompositionEmitted(
+    ArrayRef<const ProtocolDecl *> protocols) {
+  auto name = ClangExistentialTypePrinter::getCompositionName(protocols);
+  if (emittedCompositions.insert(name).second) {
+    ClangExistentialTypePrinter(os, outOfLineDefinitionsOS)
+        .printCompositionTypeDecl(protocols, name, *this);
+  }
+  return name;
 }
 
 bool DeclAndTypePrinter::isZeroSized(const NominalTypeDecl *decl) {

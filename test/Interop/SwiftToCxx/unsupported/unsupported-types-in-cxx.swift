@@ -1,8 +1,10 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -module-name Functions -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/functions.h
+// RUN: %target-swift-frontend %s -module-name Functions -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/functions.h -enable-experimental-feature CxxExistentialInterop
 // RUN: %FileCheck %s < %t/functions.h
 
 // RUN: %check-interop-cxx-header-in-clang(%t/functions.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY)
+
+// REQUIRES: swift_feature_CxxExistentialInterop
 
 public func takeFloat(_ x: Float) {}
 
@@ -11,6 +13,10 @@ public func takesTuple(_ x: (Float, Float)) {}
 public func takesVoid(_ x: ()) {}
 
 // CHECK:     takeFloat
+
+public protocol TestProtocol {}
+
+// CHECK: class{{.*}} TestProtocol final : public swift::_impl::SwiftExistentialType<_impl::TestProtocolTag> {
 
 public enum MoveOnlyEnum: ~Copyable {
     case a
@@ -23,10 +29,6 @@ public struct MoveOnlyStruct: ~Copyable {
 }
 
 // CHECK: class MoveOnlyStruct { } SWIFT_UNAVAILABLE_MSG("noncopyable struct 'MoveOnlyStruct' can not yet be represented in C++");
-
-public protocol TestProtocol {}
-
-// CHECK: class TestProtocol { } SWIFT_UNAVAILABLE_MSG("protocol 'TestProtocol' can not yet be represented in C++");
 
 // CHECK: // Unavailable in C++: Swift global function 'takesTuple(_:)'. Parameter 'x' of type '(Float, Float)' is not representable in C++.
 // CHECK: // Unavailable in C++: Swift global function 'takesVoid(_:)'. Parameter 'x' of type '()' is not representable in C++.

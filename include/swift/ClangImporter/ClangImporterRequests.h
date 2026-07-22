@@ -425,7 +425,9 @@ enum class CxxRecordSemanticsKind {
   Reference,
   Iterator,
   // A C++ record that represents a Swift class type exposed to C++ from Swift.
-  SwiftClassType
+  SwiftClassType,
+  // A C++ record that represents a Swift protocol existential wrapper.
+  SwiftExistentialType
 };
 
 struct CxxRecordSemanticsDescriptor final {

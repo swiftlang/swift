@@ -865,6 +865,11 @@ clang::QualType ClangTypeConverter::visit(Type type) {
   return static_cast<super *>(this)->visit(type);
 }
 
+void ClangTypeConverter::registerMapping(Type swiftType,
+                                         clang::QualType clangType) {
+  Cache.insert({swiftType, clangType});
+}
+
 clang::QualType ClangTypeConverter::convert(Type type) {
   auto it = Cache.find(type);
   if (it != Cache.end())
