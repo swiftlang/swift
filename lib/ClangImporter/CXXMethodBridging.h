@@ -133,7 +133,7 @@ struct CXXMethodBridging {
         return llvm::StringRef(output).ltrim('_').str();
 
       // The first character is always lowercase.
-      output.front() = std::tolower(output.front());
+      output.front() = clang::toLowercase(output.front());
 
       for (std::size_t i = 0; i < output.size(); i++) {
         size_t next = i + 1;
@@ -153,7 +153,7 @@ struct CXXMethodBridging {
     }
 
     // The first character is always lowercase.
-    output.front() = std::tolower(output.front());
+    output.front() = clang::toLowercase(output.front());
 
     // We already lowercased the first element, so start at one. Look at the
     // current element and the next one. To handle cases like UTF8String, start
