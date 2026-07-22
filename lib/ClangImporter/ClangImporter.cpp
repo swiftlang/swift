@@ -6546,10 +6546,8 @@ static void cloneImportedAttributes(ValueDecl *fromDecl, ValueDecl *toDecl) {
     }
     case DeclAttrKind::Custom: {
       CustomAttr *cAttr = cast<CustomAttr>(attr);
-      toDecl->addAttribute(
-          CustomAttr::create(context, SourceLoc(), cAttr->getTypeExpr(),
-                             /*owner*/ toDecl, cAttr->getInitContext(),
-                             cAttr->getArgs(), /*implicit*/ true));
+      if (cAttr->canClone())
+        toDecl->addAttribute(cAttr->clone(context));
       break;
     }
     case DeclAttrKind::DiscardableResult: {
