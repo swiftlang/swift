@@ -447,7 +447,8 @@ where Element.Stride: BinaryInteger {
   }
 
   public subscript(position: Index) -> Element {
-    _failEarlyRangeCheck(position, bounds: startIndex..<endIndex)
+    unsafe _failEarlyRangeCheck(
+      position, bounds: Range(uncheckedBounds: (startIndex, endIndex)))
     return _start.advanced(by: Element.Stride(position) * _stride)
   }
 
