@@ -3779,11 +3779,28 @@ TypeResolver::resolveAttributedType(TypeRepr *repr, TypeResolutionOptions option
     return false;
   };
 
-  // If we're in an inheritance clause, check for a global actor.
+  // If we're in an inheritance clause, check for a global actor. Global
+  // actor annotations are only meaningful on protocol conformances, as part
+  // of SE-0466 isolated conformances; they have no effect on a class base
+  // type or an enum's raw type; reject them there.
   if (options.is(TypeResolverContext::Inherited)) {
     CustomAttr *customAttr = nullptr;
-    (void)resolveGlobalActor(repr->getLoc(), options,
-                             customAttr, attrs);
+    Type globalActorType =
+        resolveGlobalActor(repr->getLoc(), options, customAttr, attrs);
+    if (customAttr && !ty->hasError() && !ty->isConstraintType()) {
+      bool isRawType = isa_and_nonnull<EnumDecl>(getDeclContext()->getAsDecl());
+      diagnoseInvalid(repr, customAttr->getLocation(),
+                      diag::global_actor_on_non_protocol_inheritance,
+                      globalActorType, isRawType, ty);
+      diagnose(customAttr->getLocation(),
+               diag::global_actor_on_non_protocol_inheritance_explanation,
+               isRawType);
+      diagnose(customAttr->getLocation(),
+               diag::global_actor_on_non_protocol_inheritance_remove,
+               globalActorType)
+          .fixItRemove(customAttr->getRangeWithAt());
+      ty = ErrorType::get(getASTContext());
+    }
   }
 
   if (handleInheritedOnly(claim<UncheckedTypeAttr>(attrs)) ||
