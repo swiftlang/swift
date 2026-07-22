@@ -5771,9 +5771,6 @@ NOTE(because_rethrows_default_argument_throws,none,
 NOTE(because_rethrows_conformance_throws,none,
      "call is to 'rethrows' function, but a conformance has a throwing witness", ())
 
-ERROR(for_throw_without_try,none,
-      "for-in loop can throw, but is not marked with 'try'", ())
-
 ERROR(throwing_call_in_nonthrowing_autoclosure,none,
       "%0 can throw, but it is executed in a non-throwing "
       "autoclosure",(StringRef))
@@ -5798,6 +5795,18 @@ ERROR(throw_in_defer_body,none,
       "errors cannot be thrown out of a defer body", ())
 ERROR(throwing_op_in_defer_body,none,
       "%0 can throw, but errors cannot be thrown out of a defer body", (StringRef))
+ERROR(for_each_throwing_without_try,none,
+      "'for-in' loop can throw, but is not marked with 'try'", ())
+ERROR(for_each_throwing_unhandled,none,
+      "errors thrown from 'for-in' loop are not handled", ())
+ERROR(for_each_throwing_in_rethrows_function,none,
+      "errors thrown from 'for-in' loop are not handled; a function declared "
+      "'rethrows' may only throw if its parameter does", ())
+ERROR(for_each_throwing_in_nonexhaustive_catch,none,
+      "errors thrown from 'for-in' loop are not handled because the "
+      "enclosing catch is not exhaustive", ())
+ERROR(for_each_throwing_in_defer_body,none,
+      "errors thrown from 'for-in' loop cannot be thrown out of a defer body", ())
 ERROR(async_defer_in_non_async_context,none,
       "'async' defer must appear within an 'async' context", ())
 
