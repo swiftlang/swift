@@ -330,7 +330,7 @@ DECL_ATTR(__synthesized_protocol, SynthesizedProtocol,
 
 SIMPLE_DECL_ATTR(testable, Testable,
   OnImport,
-  UserInaccessible | NotSerialized | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | UnreachableInABIAttr,
+  NotSerialized | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | UnreachableInABIAttr,
   55)
 
 DECL_ATTR(_alignment, Alignment,
@@ -413,7 +413,7 @@ DECL_ATTR(_restatedObjCConformance, RestatedObjCConformance,
 
 DECL_ATTR(implementation, ObjCImplementation,
   OnExtension | OnAbstractFunction,
-  UserInaccessible | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove | ForbiddenInABIAttr,
+  ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove | ForbiddenInABIAttr,
   72)
 DECL_ATTR_ALIAS(_objcImplementation, ObjCImplementation)
 
@@ -761,12 +761,12 @@ DECL_ATTR_ALIAS(freestanding, MacroRole)
 
 SIMPLE_DECL_ATTR(used, Used,
   OnAbstractFunction | OnVar,
-  UserInaccessible | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove | ForbiddenInABIAttr,
+  ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove | ForbiddenInABIAttr,
   143)
 
 DECL_ATTR(section, Section,
   OnAbstractFunction | OnVar,
-  UserInaccessible | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove | ForbiddenInABIAttr,
+  ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove | ForbiddenInABIAttr,
   144)
 
 DECL_ATTR(storageRestrictions, StorageRestrictions,
@@ -849,7 +849,7 @@ SIMPLE_DECL_ATTR(sensitive, Sensitive,
 
 SIMPLE_DECL_ATTR(unsafe, Unsafe,
   OnAbstractFunction | OnSubscript | OnVar | OnMacro | OnNominalType | OnExtension | OnTypeAlias | OnEnumElement | OnImport,
-  UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
   160)
 
 DECL_ATTR(lifetime, Lifetime,
@@ -870,7 +870,7 @@ SIMPLE_DECL_ATTR(_addressableForDependencies, AddressableForDependencies,
 
 SIMPLE_DECL_ATTR(safe, Safe,
   OnAbstractFunction | OnSubscript | OnVar | OnMacro | OnNominalType | OnExtension | OnEnumElement,
-  UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
   164)
 
 DECL_ATTR(abi, ABI,
@@ -909,7 +909,7 @@ SIMPLE_DECL_ATTR(concurrent, Concurrent,
 
 DECL_ATTR(specialized, Specialized,
   OnConstructor | OnFunc | OnAccessor,
-  AllowMultipleAttributes | LongAttribute | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  AllowMultipleAttributes | LongAttribute | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
   172)
 
 
