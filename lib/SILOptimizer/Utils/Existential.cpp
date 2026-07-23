@@ -15,6 +15,7 @@
 #include "swift/AST/LocalArchetypeRequirementCollector.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/SIL/BasicBlockUtils.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "llvm/ADT/SmallPtrSet.h"
 
 using namespace swift;
@@ -210,7 +211,11 @@ OpenedArchetypeInfo::OpenedArchetypeInfo(Operand &use) {
   if (auto *Open = dyn_cast<OpenExistentialRefInst>(openedVal)) {
     OpenedArchetype = Open->getType().castTo<ExistentialArchetypeType>();
     OpenedArchetypeValue = Open;
-    ExistentialValue = Open->getOperand();
+    // In OSSA the existential reference may be wrapped in ownership
+    // instructions (e.g. begin_borrow or copy_value) before it is opened. Look
+    // through them so that the underlying init_existential_ref can be found by
+    // ConcreteExistentialInfo.
+    ExistentialValue = lookThroughOwnershipInsts(Open->getOperand());
     return;
   }
   if (auto *Open = dyn_cast<OpenExistentialMetatypeInst>(openedVal)) {

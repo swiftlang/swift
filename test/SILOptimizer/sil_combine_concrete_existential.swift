@@ -69,8 +69,7 @@ final class CC: PP {
 // CHECK: [[EI:%.*]] = end_init_let_ref %0
 // CHECK: [[E1:%.*]] = init_existential_ref [[EI]] : $CC : $CC, $any PP
 // CHECK: [[O1:%.*]] = open_existential_ref [[E1]] : $any PP to $@opened({{.*}}, any PP) Self
-// CHECK: [[U1:%.*]] = unchecked_ref_cast [[EI]] : $CC to $@opened({{.*}}, any PP) Self
-// CHECK: [[E2:%.*]] = init_existential_ref [[U1]] : $@opened({{.*}}, any PP) Self : $@opened({{.*}}, any PP) Self, $any PP
+// CHECK: [[E2:%.*]] = init_existential_ref [[O1]] : $@opened({{.*}}, any PP) Self : $@opened({{.*}}, any PP) Self, $any PP
 // CHECK: [[O2:%.*]] = open_existential_ref [[E2]] : $any PP to $@opened({{.*}}, any PP) Self
 // CHECK: apply {{%.*}}<@opened({{.*}}, any PP) Self>([[O2]])
 // CHECK-NOT:     apply
