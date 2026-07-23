@@ -4296,68 +4296,93 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
       //    if <expr> != nil {
       //
       if (auto SC = StmtConditionForVD[var]) {
-        // We only handle the "if let" case right now, since it is vastly the
-        // most common situation that people run into.
-        if (SC->getCond().size() == 1) {
-          auto pattern = SC->getCond()[0].getPattern();
-          if (auto OSP = dyn_cast<OptionalSomePattern>(pattern))
-            if (auto LP = dyn_cast<BindingPattern>(OSP->getSubPattern()))
-              if (isa<NamedPattern>(LP->getSubPattern())) {
-                auto initExpr = SC->getCond()[0].getInitializer();
-                if (initExpr->getStartLoc().isValid()) {
-                  if (isUsedInInactive(var))
-                    continue;
+        // The variable may be bound by any of the conditions, and there may
+        // be other conditions (boolean tests, #available, or other bindings)
+        // before or after it. Find the optional binding that introduces this
+        // variable so we can offer the tuned fix-it.
+        bool handled = false;
+        for (auto &cond : SC->getCond()) {
+          // Only optional-binding conditions can produce this fix-it, and this
+          // kind check must come first: getPattern()/getInitializer()/
+          // getIntroducerLoc() assert on boolean and #available conditions.
+          if (cond.getKind() != StmtConditionElement::CK_PatternBinding)
+            continue;
 
-                  unsigned noParens = initExpr->canAppendPostfixExpression();
+          auto OSP = dyn_cast<OptionalSomePattern>(cond.getPattern());
+          if (!OSP)
+            continue;
+          auto LP = dyn_cast<BindingPattern>(OSP->getSubPattern());
+          if (!LP)
+            continue;
+          auto NP = dyn_cast<NamedPattern>(LP->getSubPattern());
+          if (!NP || NP->getDecl() != var)
+            continue;
 
-                  // If the subexpr is an "as?" cast, we can rewrite it to
-                  // be an "is" test.
-                  ConditionalCheckedCastExpr *CCE = nullptr;
+          // This is the condition binding our variable. If we can't form a
+          // fix-it for it, stop and fall through to the generic handling
+          // below.
+          auto initExpr = cond.getInitializer();
+          if (!initExpr || !initExpr->getStartLoc().isValid())
+            break;
 
-                  // initExpr can be wrapped inside parens or try expressions.
-                  if (auto ccExpr = dyn_cast<ConditionalCheckedCastExpr>(
-                          initExpr->getValueProvidingExpr())) {
-                    if (!ccExpr->isImplicit()) {
-                      CCE = ccExpr;
-                      noParens = true;
-                    }
-                  }
+          if (isUsedInInactive(var)) {
+            handled = true;
+            break;
+          }
 
-                  // In cases where the value is optional, the cast expr is
-                  // wrapped inside OptionalEvaluationExpr. Unwrap it to get
-                  // ConditionalCheckedCastExpr.
-                  if (auto oeExpr = dyn_cast<OptionalEvaluationExpr>(
-                          initExpr->getValueProvidingExpr())) {
-                    if (auto ccExpr = dyn_cast<ConditionalCheckedCastExpr>(
-                            oeExpr->getSubExpr()->getValueProvidingExpr())) {
-                      if (!ccExpr->isImplicit()) {
-                        CCE = ccExpr;
-                        noParens = true;
-                      }
-                    }
-                  }
+          unsigned noParens = initExpr->canAppendPostfixExpression();
 
-                  auto diagIF = Diags.diagnose(var->getLoc(),
-                                               diag::pbd_never_used_stmtcond,
-                                            var->getName());
-                  auto introducerLoc = SC->getCond()[0].getIntroducerLoc();
-                  diagIF.fixItReplaceChars(introducerLoc,
-                                           initExpr->getStartLoc(),
-                                           &"("[noParens]);
+          // If the subexpr is an "as?" cast, we can rewrite it to be an
+          // "is" test.
+          ConditionalCheckedCastExpr *CCE = nullptr;
 
-                  if (CCE) {
-                    // If this was an "x as? T" check, rewrite it to "x is T".
-                    diagIF.fixItReplace(SourceRange(CCE->getLoc(),
-                                                    CCE->getQuestionLoc()),
-                                        "is");
-                  } else {
-                    diagIF.fixItInsertAfter(initExpr->getEndLoc(),
-                                            &") != nil"[noParens]);
-                  }
-                  continue;
-                }
+          // initExpr can be wrapped inside parens or try expressions.
+          if (auto ccExpr = dyn_cast<ConditionalCheckedCastExpr>(
+                  initExpr->getValueProvidingExpr())) {
+            if (!ccExpr->isImplicit()) {
+              CCE = ccExpr;
+              noParens = true;
+            }
+          }
+
+          // In cases where the value is optional, the cast expr is wrapped
+          // inside OptionalEvaluationExpr. Unwrap it to get
+          // ConditionalCheckedCastExpr.
+          if (auto oeExpr = dyn_cast<OptionalEvaluationExpr>(
+                  initExpr->getValueProvidingExpr())) {
+            if (auto ccExpr = dyn_cast<ConditionalCheckedCastExpr>(
+                    oeExpr->getSubExpr()->getValueProvidingExpr())) {
+              if (!ccExpr->isImplicit()) {
+                CCE = ccExpr;
+                noParens = true;
               }
+            }
+          }
+
+          auto diagIF = Diags.diagnose(var->getLoc(),
+                                       diag::pbd_never_used_stmtcond,
+                                       var->getName());
+          diagIF.fixItReplaceChars(cond.getIntroducerLoc(),
+                                   initExpr->getStartLoc(),
+                                   &"("[noParens]);
+
+          if (CCE) {
+            // If this was an "x as? T" check, rewrite it to "x is T".
+            diagIF.fixItReplace(SourceRange(CCE->getLoc(),
+                                            CCE->getQuestionLoc()),
+                                "is");
+          } else {
+            diagIF.fixItInsertAfter(initExpr->getEndLoc(),
+                                    &") != nil"[noParens]);
+          }
+          handled = true;
+          break;
         }
+
+        // We emitted (or deliberately suppressed) the diagnostic for this
+        // variable; don't fall through to the generic '_' fix-it.
+        if (handled)
+          continue;
       }
 
       // If the variable is defined in a pattern that isn't one of the usual
