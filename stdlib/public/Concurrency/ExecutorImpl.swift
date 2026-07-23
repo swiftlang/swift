@@ -150,3 +150,54 @@ internal func enqueueOnGlobalExecutor(seconds: CLongLong,
   #endif
 }
 #endif
+
+#if $Embedded
+// In Embedded Swift the global executor's delayed/deadline enqueue is routed to
+// the cooperative executor via a concrete `as? CooperativeExecutor` cast, because
+// a dynamic cast to the `SchedulingExecutor` protocol always returns nil under
+// Embedded Swift (so the non-Embedded `asSchedulingExecutor!` path above is unusable).
+@available(SwiftStdlib 6.2, *)
+@_silgen_name("swift_task_enqueueGlobalWithDelayImpl")
+@diagnose(UselessAvailabilityCheck, as: ignored)
+internal func enqueueOnGlobalExecutor(delay: CUnsignedLongLong,
+                                      job unownedJob: UnownedJob) {
+  if #available(StdlibDeploymentTarget 6.3, *) {
+    if let cooperativeExecutor = Task.defaultExecutor as? CooperativeExecutor {
+      cooperativeExecutor.enqueueGlobalWithDelay(ExecutorJob(unownedJob),
+                                                 nanoseconds: delay)
+    } else {
+      fatalError("default executor does not support delayed enqueue")
+    }
+  } else {
+    fatalError("this should never happen")
+  }
+}
+
+@available(SwiftStdlib 6.2, *)
+@_silgen_name("swift_task_enqueueGlobalWithDeadlineImpl")
+@diagnose(UselessAvailabilityCheck, as: ignored)
+internal func enqueueOnGlobalExecutor(seconds: CLongLong,
+                                      nanoseconds: CLongLong,
+                                      leewaySeconds: CLongLong,
+                                      leewayNanoseconds: CLongLong,
+                                      clock: CInt,
+                                      job unownedJob: UnownedJob) {
+  if #available(StdlibDeploymentTarget 6.3, *) {
+    guard let cooperativeExecutor = Task.defaultExecutor as? CooperativeExecutor else {
+      fatalError("default executor does not support deadline enqueue")
+    }
+    let clockID: _ClockID
+    switch clock {
+    case _ClockID.continuous.rawValue: clockID = .continuous
+    case _ClockID.suspending.rawValue: clockID = .suspending
+    default: fatalError("Unknown clock ID \(clock)")
+    }
+    cooperativeExecutor.enqueueGlobalWithDeadline(ExecutorJob(unownedJob),
+                                                  seconds: seconds,
+                                                  nanoseconds: nanoseconds,
+                                                  clock: clockID)
+  } else {
+    fatalError("this should never happen")
+  }
+}
+#endif

@@ -13,7 +13,6 @@
 import Swift
 
 #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-@_unavailableInEmbedded
 extension ContinuousClock {
   func timestamp(for instant: Instant)
     -> (clockID: _ClockID, seconds: Int64, nanoseconds: Int64)
@@ -31,7 +30,6 @@ extension ContinuousClock {
   }
 }
 
-@_unavailableInEmbedded
 extension SuspendingClock {
   func timestamp(for instant: Instant)
     -> (clockID: _ClockID, seconds: Int64, nanoseconds: Int64)
@@ -72,6 +70,97 @@ fileprivate func durationComponents<C: Clock>(for duration: C.Duration, clock: C
   #endif
   fatalError("unknown clock in fallback path")
 }
+
+#if $Embedded
+// Concrete deadline-based sleep used by Embedded clocks. It takes the deadline
+// already decomposed into clock-absolute components, avoiding the associated-type
+// dynamic casts (`instant as! ContinuousClock.Instant`) that Embedded Swift forbids.
+// It mirrors the structure of the generic `_sleep<C>` below, and is gated to
+// `$Embedded` so it is not compiled as dead code in non-Embedded builds.
+@available(StdlibDeploymentTarget 6.3, *)
+extension Task where Success == Never, Failure == Never {
+  internal static func _sleepUntilDeadline(
+    clockID: _ClockID,
+    seconds: Int64, nanoseconds: Int64,
+    toleranceSeconds: Int64, toleranceNanoseconds: Int64
+  ) async throws {
+    // Create a token which will initially have the value "not started", which
+    // means the continuation has neither been created nor completed.
+    let token = unsafe UnsafeSleepStateToken()
+
+    do {
+      // Install a cancellation handler to resume the continuation by
+      // throwing CancellationError.
+      try await withTaskCancellationHandler {
+        let _: () = try unsafe await withUnsafeThrowingContinuation { continuation in
+          while true {
+            let state = unsafe token.load()
+            switch unsafe state {
+            case .notStarted:
+              // Try to swap in the continuation state.
+              let newState = unsafe SleepState.activeContinuation(continuation)
+              if unsafe !token.exchange(expected: state, desired: newState) {
+                // Keep trying!
+                continue
+              }
+              let sleepTaskFlags = taskCreateFlags(
+                priority: nil, isChildTask: false, copyTaskLocals: false,
+                inheritContext: false, enqueueJob: false,
+                addPendingGroupTaskUnconditionally: false,
+                isDiscardingTask: false, isSynchronousStart: false)
+              let (sleepTask, _) = Builtin.createAsyncTask(sleepTaskFlags) {
+                unsafe onSleepWake(token)
+              }
+              let job = Builtin.convertTaskToJob(sleepTask)
+              _enqueueJobGlobalWithDeadline(
+                seconds, nanoseconds,
+                toleranceSeconds, toleranceNanoseconds,
+                clockID.rawValue, UnownedJob(context: job))
+              return
+
+            case .activeContinuation, .finished:
+              fatalError("Impossible to have multiple active continuations")
+            case .cancelled:
+              fatalError("Impossible to have cancelled before we began")
+            case .cancelledBeforeStarted:
+              // Finish the continuation normally. We'll throw later, after
+              // we clean up.
+              unsafe continuation.resume()
+              return
+            }
+          }
+        }
+      } onCancel: {
+        unsafe onSleepCancel(token)
+      }
+
+      // Determine whether we got cancelled before we even started.
+      let cancelledBeforeStarted: Bool
+      switch unsafe token.load() {
+      case .notStarted, .activeContinuation, .cancelled:
+        fatalError("Invalid state for non-cancelled sleep task")
+      case .cancelledBeforeStarted:
+        cancelledBeforeStarted = true
+      case .finished:
+        cancelledBeforeStarted = false
+      }
+      // We got here without being cancelled, so deallocate the storage for
+      // the flag word and continuation.
+      unsafe token.deallocate()
+      // If we got cancelled before we even started, throw the cancellation
+      // error now.
+      if cancelledBeforeStarted {
+        throw _Concurrency.CancellationError()
+      }
+    } catch {
+      // The task was cancelled; propagate the error. The "on wake" task is
+      // responsible for deallocating the flag word and continuation, if it's
+      // still running.
+      throw error
+    }
+  }
+}
+#endif
 
 @available(StdlibDeploymentTarget 5.7, *)
 @_unavailableInEmbedded
@@ -205,8 +294,10 @@ extension Task where Success == Never, Failure == Never {
       throw error
     }
   }
+}
 
-  #if !$Embedded
+@available(StdlibDeploymentTarget 5.7, *)
+extension Task where Success == Never, Failure == Never {
   /// Suspends the current task until the given deadline within a tolerance.
   ///
   /// If the task is canceled before the time ends, this function throws
@@ -243,7 +334,6 @@ extension Task where Success == Never, Failure == Never {
   ) async throws {
     try await clock.sleep(for: duration, tolerance: tolerance)
   }
-  #endif
 }
 #else
 @available(SwiftStdlib 5.7, *)
