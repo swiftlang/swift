@@ -374,10 +374,10 @@ public:
     static constexpr size_t ActiveTaskStatusSize = 2 * sizeof(void *);
 #endif
 
-    // Private storage is currently 6 pointers, 16 bytes of non-pointer data,
+    // Private storage is currently 8 pointers, 16 bytes of non-pointer data,
     // 8 bytes of padding, the ActiveTaskStatus, and a RecursiveMutex.
     static constexpr size_t PrivateStorageSize =
-      6 * sizeof(void *) + 16 + 8 + ActiveTaskStatusSize
+      8 * sizeof(void *) + 16 + 8 + ActiveTaskStatusSize
       + sizeof(RecursiveMutex);
 
     char Storage[PrivateStorageSize];

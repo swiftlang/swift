@@ -125,6 +125,8 @@ struct AsyncTaskPrivateStorage {
   uint32_t Id;
   typename Runtime::StoredSize BasePriority;
   typename Runtime::StoredPointer DependencyRecord;
+  typename Runtime::StoredPointer RegistryNext;
+  typename Runtime::StoredPointer RegistryPrev;
 };
 
 template <typename Runtime, typename ActiveTaskStatus>
