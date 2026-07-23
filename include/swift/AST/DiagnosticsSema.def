@@ -328,6 +328,8 @@ ERROR(cannot_convert_initializer_value_anyobject,none,
       "value of type %0 expected to be instance of class or "
       "class-constrained type",
       (Type, Type))
+ERROR(cannot_convert_noncopyable_value_to_anyobject,none,
+      "value of noncopyable type %0 cannot be converted to %1", (Type, Type))
 ERROR(cannot_convert_initializer_value_nil,none,
       "'nil' cannot initialize specified type %0", (Type))
 
