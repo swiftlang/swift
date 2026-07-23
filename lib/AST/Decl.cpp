@@ -2967,8 +2967,14 @@ bool PatternBindingDecl::hasSingleVarConstantFoldedInit() const {
 Expr *PatternBindingDecl::getExecutableInit(unsigned i) const {
   auto idxInit = getPatternList()[i].getExecutableInit();
   if (auto &ctx = getASTContext(); idxInit && hasSingleVarConstantFoldedInit())
-    return evaluateOrDefault(ctx.evaluator,
-                             ConstantFoldExpression{idxInit, &ctx}, {});
+    // Code generation: fold silently. Any diagnostics about a non-foldable
+    // '@const'/'@section' initializer are the verifier's responsibility
+    // (diagnoseInvalidConstExpressions), not code generation's -- emitting them
+    // here would duplicate/preempt those and set the error flag that makes the
+    // const-value SIL passes bail.
+    return evaluateOrDefault(
+        ctx.evaluator,
+        ConstantFoldExpression{idxInit, &ctx, /*emitDiagnostics=*/false}, {});
   return idxInit;
 }
 

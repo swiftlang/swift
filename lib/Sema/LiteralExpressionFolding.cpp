@@ -200,9 +200,14 @@ public:
 /// value operands.
 class ConstantFolder {
   ASTContext &Ctx;
+  /// Whether to emit diagnostics when the expression cannot be folded to a
+  /// literal. Verification passes this true; code generation passes it false
+  /// and leaves diagnostics to the verifier.
+  bool EmitDiagnostics;
 
 public:
-  ConstantFolder(ASTContext &ctx) : Ctx(ctx) {}
+  ConstantFolder(ASTContext &ctx, bool emitDiagnostics)
+      : Ctx(ctx), EmitDiagnostics(emitDiagnostics) {}
   Expr *fold(const Expr *expr) {
     // If this expression failed to type-check, no need to attempt to
     // fold it since we likely won't be able to do anything meaningful
@@ -213,7 +218,7 @@ public:
       return nullptr;
     }
 
-    ConstantWalker walker(Ctx);
+    ConstantWalker walker(Ctx, EmitDiagnostics);
     const_cast<Expr *>(expr)->walk(walker);
     ASSERT(walker.hasConstantValueFor(expr) &&
            "No value or error computed by constant-folding AST walker");
@@ -229,11 +234,13 @@ public:
 private:
   class ConstantWalker : public ASTWalker {
     ASTContext &Ctx;
+    bool EmitDiagnostics;
     llvm::DenseMap<Expr *, FoldingErrorOr<ConstantValuePtr>>
         ConstValuesOrErrors;
 
   public:
-    ConstantWalker(ASTContext &ctx) : Ctx(ctx) {}
+    ConstantWalker(ASTContext &ctx, bool emitDiagnostics)
+        : Ctx(ctx), EmitDiagnostics(emitDiagnostics) {}
 
     PostWalkResult<Expr *> walkToExprPost(Expr *expr) override {
       ConstValuesOrErrors.insert({expr, tryFoldExpression(expr)});
@@ -277,15 +284,25 @@ private:
       return FoldingError(IllegalConstError::Default, expr->getLoc());
     }
 
-    ConstantValuePtr foldIntegerLiteralExpr(const IntegerLiteralExpr *expr) {
+    FoldingErrorOr<ConstantValuePtr>
+    foldIntegerLiteralExpr(const IntegerLiteralExpr *expr) {
       auto exprType = expr->getType();
       auto value = expr->getValue();
       auto resultBitWidth = getIntegerBitWidth(exprType, Ctx);
-      if (isSignedIntegerType(exprType))
-        return std::make_unique<IntegerValue>(value.sextOrTrunc(resultBitWidth),
-                                              true);
-      return std::make_unique<IntegerValue>(value.zextOrTrunc(resultBitWidth),
-                                            false);
+      bool isSigned = isSignedIntegerType(exprType);
+      // Don't silently truncate a literal whose magnitude doesn't fit the
+      // target type; leave it unfolded so the existing overflow diagnostic
+      // (from the SIL constant-propagation pass, or the type checker) still
+      // fires. UpstreamError suppresses the generic folding follow-up.
+      unsigned needed =
+          isSigned ? value.getSignificantBits() : value.getActiveBits();
+      if (needed > resultBitWidth)
+        return FoldingError(IllegalConstError::UpstreamError, expr->getLoc());
+      if (isSigned)
+        return ConstantValuePtr(std::make_unique<IntegerValue>(
+            value.sextOrTrunc(resultBitWidth), true));
+      return ConstantValuePtr(std::make_unique<IntegerValue>(
+          value.zextOrTrunc(resultBitWidth), false));
     }
 
     FoldingErrorOr<ConstantValuePtr> tryFoldBinaryExpr(const BinaryExpr *expr) {
@@ -355,7 +372,6 @@ private:
     FoldingErrorOr<ConstantValuePtr> foldDeclRefExpr(const DeclRefExpr *expr) {
       if (const VarDecl *varDecl = dyn_cast<VarDecl>(expr->getDecl()))
         return foldVarDeclRef(varDecl, expr->getLoc());
-
       return FoldingError(IllegalConstError::OpaqueDeclRef, expr->getLoc());
     }
 
@@ -386,15 +402,17 @@ private:
       if (!varDecl->hasClangNode() && varDecl->isLet()) {
         auto access = varDecl->getFormalAccess();
         if (access >= AccessLevel::Package) {
-          Ctx.Diags.diagnose(referenceLoc, diag::const_public_let_ref, access);
+          if (EmitDiagnostics)
+            Ctx.Diags.diagnose(referenceLoc, diag::const_public_let_ref, access);
           return FoldingError(IllegalConstError::UpstreamError, referenceLoc);
         }
 
         // Safe here: the package/public/open cases returned above, so the
         // formal access is below public as `isUsableFromInline()` asserts.
         if (varDecl->isUsableFromInline()) {
-          Ctx.Diags.diagnose(referenceLoc,
-                             diag::const_usable_from_inline_let_ref);
+          if (EmitDiagnostics)
+            Ctx.Diags.diagnose(referenceLoc,
+                               diag::const_usable_from_inline_let_ref);
           return FoldingError(IllegalConstError::UpstreamError, referenceLoc);
         }
       }
@@ -429,12 +447,15 @@ private:
 
     FoldingErrorOr<ConstantValuePtr>
     tryFoldDeclRefInitializerExpr(const Expr *expr, SourceLoc referenceLoc) {
-      bool previouslyFolded =
-          Ctx.evaluator.hasCachedResult(ConstantFoldExpression{expr, &Ctx});
+      // Recurse with the same diagnostic mode as this fold, so a silent
+      // (code-generation) fold does not leak sub-expression diagnostics.
+      bool previouslyFolded = Ctx.evaluator.hasCachedResult(
+          ConstantFoldExpression{expr, &Ctx, EmitDiagnostics});
       // Request the init expression of this declaration to be
       // constant-folded.
-      if (auto foldedLiteralExpr =
-              dyn_cast<LiteralExpr>(swift::foldLiteralExpression(expr, &Ctx)))
+      if (auto foldedLiteralExpr = dyn_cast<LiteralExpr>(evaluateOrDefault(
+              Ctx.evaluator, ConstantFoldExpression{expr, &Ctx, EmitDiagnostics},
+              {})))
         return tryFoldLiteralExpression(foldedLiteralExpr);
       // If this is the first time we have requested to constant-fold this
       // declaration's initializer and have failed to do so, emit a note
@@ -534,14 +555,16 @@ private:
         // amount and bit width; return `UpstreamError` to suppress the
         // generic "not a literal expression" follow-up.
         if (rhsVal->getIsSigned() && rhsInt.isNegative()) {
-          Ctx.Diags.diagnose(sourceLocation, diag::const_shift_negative);
+          if (EmitDiagnostics)
+            Ctx.Diags.diagnose(sourceLocation, diag::const_shift_negative);
           return FoldingError(IllegalConstError::UpstreamError, sourceLocation);
         }
         unsigned width = lhsInt.getBitWidth();
         uint64_t amountValue = rhsInt.getLimitedValue();
         if (amountValue >= width) {
-          Ctx.Diags.diagnose(sourceLocation, diag::const_shift_out_of_range,
-                             static_cast<unsigned>(amountValue), width);
+          if (EmitDiagnostics)
+            Ctx.Diags.diagnose(sourceLocation, diag::const_shift_out_of_range,
+                               static_cast<unsigned>(amountValue), width);
           return FoldingError(IllegalConstError::UpstreamError, sourceLocation);
         }
         unsigned amount = static_cast<unsigned>(amountValue);
@@ -637,18 +660,23 @@ private:
   }
 
   void emitFoldingErrorDiagnostic(const FoldingError &foldingError) {
+    if (!EmitDiagnostics)
+      return;
     diagnoseError(foldingError.sourceLocation, foldingError.code, Ctx.Diags);
   }
 };
 } // anonymous namespace
 
 Expr *swift::foldLiteralExpression(const Expr *expr, ASTContext *ctx) {
-  return evaluateOrDefault(ctx->evaluator, ConstantFoldExpression{expr, ctx},
+  return evaluateOrDefault(ctx->evaluator,
+                           ConstantFoldExpression{expr, ctx,
+                                                  /*emitDiagnostics=*/true},
                            {});
 }
 
 Expr *ConstantFoldExpression::evaluate(Evaluator &evaluator, const Expr *expr,
-                                       ASTContext *ctx) const {
+                                       ASTContext *ctx,
+                                       bool emitDiagnostics) const {
   // Only integer literal expressions are folded. Expressions of other types
   // (non-integer literals, tuples, arrays, ...) are returned unchanged so they
   // are never routed through the integer constant-folder, which would reject
