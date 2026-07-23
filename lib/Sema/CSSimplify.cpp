@@ -6891,6 +6891,14 @@ bool ConstraintSystem::repairFailures(
                                 locator))
       return true;
 
+    if (auto *oee = getAsExpr<OptionalEvaluationExpr>(locator.getAnchor())) {
+      if (auto *assign = dyn_cast<AssignExpr>(oee->getSubExpr())) {
+        conversionsOrFixes.push_back(IgnoreAssignmentDestinationType::create(
+            *this, lhs, rhs, getConstraintLocator(assign)));
+        return true;
+      }
+    }
+
     if (path.size() > 1) {
       path.pop_back();
       if (path.back().is<LocatorPathElt::SequenceElementType>()) {
