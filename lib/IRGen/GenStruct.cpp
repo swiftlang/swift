@@ -1356,6 +1356,27 @@ namespace {
                                            StructLayout &&layout) {
       auto structAccessible = IsABIAccessible_t(
         IGM.getSILModule().isTypeMetadataAccessible(TheStruct));
+
+      // For ~Copyable types that contain @_rawLayout fields, force VWT-based
+      // destruction. Element-wise destruction generates incorrect
+      // invariant.load IR under -O for public types when @_rawLayout fields
+      // are present.
+      if (!TheStruct->isCopyable()) {
+        bool hasRawLayoutField = false;
+        for (auto &field : fields) {
+          if (auto *fieldNom = field.getType(IGM, SILType::getPrimitiveAddressType(TheStruct))
+                  .getASTType()->getAnyNominal()) {
+            if (fieldNom->getAttrs().hasAttribute<RawLayoutAttr>()) {
+              hasRawLayoutField = true;
+              break;
+            }
+          }
+        }
+        if (hasRawLayoutField) {
+          structAccessible = IsNotABIAccessible;
+          fieldsAccessible = FieldsAreNotABIAccessible;
+        }
+      }
       return NonFixedStructTypeInfo::create(fields, fieldsAccessible,
                                             layout.getType(),
                                             layout.getAlignment(),
