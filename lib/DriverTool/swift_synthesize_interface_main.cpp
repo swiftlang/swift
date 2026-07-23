@@ -20,6 +20,7 @@
 #include "swift/AST/SearchPathOptions.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/LLVMInitialize.h"
+#include "swift/Basic/Feature.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/Version.h"
 #include "swift/Driver/PluginPaths.h"
@@ -396,6 +397,14 @@ int swift_synthesize_interface_main(ArrayRef<const char *> Args,
     printOpts.AccessFilter = *MinAccessLevel;
     if (printOpts.AccessFilter < AccessLevel::Public)
       printOpts.PrintAccess = true;
+  }
+
+  // Under strict memory safety, print @unsafe even though the attribute is
+  // normally implicit and hidden.
+  if (Invocation.getLangOptions().hasFeature(Feature::StrictMemorySafety,
+                                             /*allowMigration=*/true)) {
+    printOpts.AlwaysIncludeAttrList.push_back(DeclAttrKind::Unsafe);
+    printOpts.AlwaysIncludeAttrList.push_back(DeclAttrKind::Safe);
   }
 
   swift::OptionSet<swift::ide::ModuleTraversal> traversalOpts = std::nullopt;
