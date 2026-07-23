@@ -666,6 +666,10 @@ struct MemberLookupResult {
     /// This is a static/class member being accessed through an instance.
     UR_TypeMemberOnInstance,
 
+    /// This is a member of a protocol metatype extension being accessed
+    /// through the metatype of a conforming type.
+    UR_MetatypeExtensionMemberOnConformingType,
+
     /// This is a mutating member, being used on an rvalue.
     UR_MutatingMemberOnRValue,
 

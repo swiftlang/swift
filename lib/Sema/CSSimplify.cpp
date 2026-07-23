@@ -10780,10 +10780,15 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
     };
 
     // Metatype extension members are only accessible on the protocol
-    // metatype itself, not on conforming types.
+    // metatype itself, not on conforming types. Keep the declaration as an
+    // unviable candidate so diagnostics can explain that distinction.
     if (decl->getDeclContext()->isMetatypeExtension() &&
-        !instanceTy->isExistentialType())
+        !instanceTy->isExistentialType()) {
+      result.addUnviable(
+          candidate,
+          MemberLookupResult::UR_MetatypeExtensionMemberOnConformingType);
       return;
+    }
 
     // See if we have an instance method, instance member or static method,
     // and check if it can be accessed on our base type.
@@ -11450,6 +11455,12 @@ static ConstraintFix *fixMemberRef(
                        cs, baseTy, choice.getDecl(), memberName, locator)
                  : nullptr;
     }
+
+    case MemberLookupResult::UR_MetatypeExtensionMemberOnConformingType:
+      return choice.isDecl()
+                 ? AllowMetatypeExtensionMemberOnConformingType::create(
+                       cs, baseTy, choice.getDecl(), memberName, locator)
+                 : nullptr;
 
     case MemberLookupResult::UR_WrongModule:
       ASSERT(choice.isDecl());
@@ -16184,6 +16195,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::RemoveUnwrap:
   case FixKind::DefineMemberBasedOnUse:
   case FixKind::AllowTypeOrInstanceMember:
+  case FixKind::AllowMetatypeExtensionMemberOnConformingType:
   case FixKind::AllowInvalidPartialApplication:
   case FixKind::AllowInvalidInitRef:
   case FixKind::AllowClosureParameterDestructuring:
