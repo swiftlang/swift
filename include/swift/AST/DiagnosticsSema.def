@@ -150,6 +150,10 @@ ERROR(could_not_use_instance_member_on_type,none,
       "%select{| of type %2}3 cannot be used on"
       "%select{| instance of nested}3 type %0",
       (Type, DeclNameRef, Type, bool))
+ERROR(metatype_extension_member_on_conforming_type,none,
+      "metatype extension member %1 cannot be used on conforming type %0; "
+      "it is only available on the protocol metatype",
+      (Type, const ValueDecl *))
 GROUPED_ERROR(could_not_use_member_on_existential,ExistentialMemberAccess,none,
       "member %1 cannot be used on value of type %0; consider using a"
       " generic constraint instead",

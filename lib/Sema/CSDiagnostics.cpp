@@ -5252,6 +5252,16 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
   return false;
 }
 
+bool InvalidMetatypeExtensionMemberRefFailure::diagnoseAsError() {
+  auto baseType = resolveType(BaseType)->getWithoutSpecifierType();
+  baseType = baseType->getMetatypeInstanceType();
+
+  emitDiagnostic(diag::metatype_extension_member_on_conforming_type, baseType,
+                 Member)
+      .highlight(getSourceRange());
+  return true;
+}
+
 bool PartialApplicationFailure::diagnoseAsError() {
   auto *anchor = castToExpr<UnresolvedDotExpr>(getRawAnchor());
 
