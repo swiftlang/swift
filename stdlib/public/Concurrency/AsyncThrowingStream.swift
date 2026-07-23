@@ -417,6 +417,9 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
 @available(SwiftStdlib 5.1, *)
 extension AsyncThrowingStream: AsyncSequence {
   /// The asynchronous iterator for iterating an asynchronous stream.
+  ///
+  /// This type doesn't conform to `Sendable`. Don't use it from multiple
+  /// concurrent contexts.
   public struct Iterator: AsyncIteratorProtocol {
     let context: _Context
 
