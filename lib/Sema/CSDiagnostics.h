@@ -835,6 +835,7 @@ public:
         attributeKind(attributeKind) {}
 
   bool diagnoseAsError() override;
+  bool diagnoseAsNote() override;
 
 private:
   /// Emit tailored diagnostics for no-escape/non-sendable parameter
