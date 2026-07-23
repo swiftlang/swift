@@ -5324,6 +5324,10 @@ ERROR(passing_noattrfunc_to_attrfunc,none,
       "passing %select{non-escaping|non-Sendable}0 parameter %1 to function "
       "expecting %select{an '@escaping'|a '@Sendable'}0 closure",
       (unsigned, Identifier))
+NOTE(candidate_expects_escaping_argument,none,
+     "candidate expects %select{an '@escaping'|a '@Sendable'}0 closure for "
+     "parameter #%1, but argument %2 is %select{non-escaping|non-Sendable}0",
+     (unsigned, unsigned, StringRef))
 ERROR(converting_noescape_param_to_generic_type,none,
       "converting non-escaping parameter %0 to generic parameter %1 may allow it to escape",
       (Identifier, Type))
