@@ -711,3 +711,21 @@ bb0(%0 : @noImplicitCopy @_eagerMove $Trivial):
   %99 = tuple ()
   return %99 : $()
 }
+
+// Regression test for https://github.com/swiftlang/swift/issues/87454
+// Ensure convert_escape_to_noescape is handled without crashing.
+//
+// CHECK-LABEL: sil [ossa] @convert_escape_to_noescape_moveonly : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> () {
+// CHECK: convert_escape_to_noescape
+// CHECK-LABEL: } // end sil function 'convert_escape_to_noescape_moveonly'
+sil [ossa] @convert_escape_to_noescape_moveonly : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> () {
+bb0(%0 : @guaranteed $@callee_guaranteed () -> ()):
+  %1 = copyable_to_moveonlywrapper [guaranteed] %0 : $@callee_guaranteed () -> ()
+  %2 = moveonlywrapper_to_copyable [guaranteed] %1 : $@moveOnly @callee_guaranteed () -> ()
+  %3 = copy_value %2 : $@callee_guaranteed () -> ()
+  %4 = convert_escape_to_noescape %3 : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
+  destroy_value %4 : $@noescape @callee_guaranteed () -> ()
+  destroy_value %3 : $@callee_guaranteed () -> ()
+  %99 = tuple ()
+  return %99 : $()
+}
