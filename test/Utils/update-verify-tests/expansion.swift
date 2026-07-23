@@ -39,6 +39,49 @@
 // RUN: %target-swift-frontend-verify -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/nested.swift
 // RUN: %diff %t/nested.swift %t/nested.swift.expected
 
+// RUN: not %target-swift-frontend-verify -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/multiple-at-same-location.swift 2>%t/output.txt
+// RUN: %update-verify-tests < %t/output.txt
+// RUN: %target-swift-frontend-verify -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/multiple-at-same-location.swift
+// RUN: %diff %t/multiple-at-same-location.swift %t/multiple-at-same-location.swift.expected
+
+// Sibling expansions where each expansion emits several diagnostics: every
+// diagnostic must route into the matching sibling and accumulate there.
+// RUN: not %target-swift-frontend-verify -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/sibling-multiple-diags.swift 2>%t/output.txt
+// RUN: %update-verify-tests < %t/output.txt
+// RUN: %target-swift-frontend-verify -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/sibling-multiple-diags.swift
+// RUN: %diff %t/sibling-multiple-diags.swift %t/sibling-multiple-diags.swift.expected
+
+// Sibling expansions with pre-existing (empty) directives already present: the
+// diagnostics must be routed into the existing directives by index rather than
+// synthesizing new ones.
+// RUN: not %target-swift-frontend-verify -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/sibling-existing.swift 2>%t/output.txt
+// RUN: %update-verify-tests < %t/output.txt
+// RUN: %target-swift-frontend-verify -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/sibling-existing.swift
+// RUN: %diff %t/sibling-existing.swift %t/sibling-existing.swift.expected
+
+// Three sibling expansions at one location, to check index routing scales past
+// two.
+// RUN: not %target-swift-frontend-verify -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/sibling-three.swift 2>%t/output.txt
+// RUN: %update-verify-tests < %t/output.txt
+// RUN: %target-swift-frontend-verify -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/sibling-three.swift
+// RUN: %diff %t/sibling-three.swift %t/sibling-three.swift.expected
+
+// One sibling directive already exists (index 0); the other sibling must be
+// synthesized (index 1) and laid out after the existing one so source order
+// matches expansion-index order.
+// RUN: not %target-swift-frontend-verify -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/sibling-partial.swift 2>%t/output.txt
+// RUN: %update-verify-tests < %t/output.txt
+// RUN: %target-swift-frontend-verify -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/sibling-partial.swift
+// RUN: %diff %t/sibling-partial.swift %t/sibling-partial.swift.expected
+
+// Stale sibling directives whose target declaration was deleted, so their
+// offsets dangle past the end of the file: they must be dropped rather than
+// crashing on the out-of-range target.
+// RUN: not %target-swift-frontend-verify -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/sibling-gone.swift 2>%t/output.txt
+// RUN: %update-verify-tests < %t/output.txt
+// RUN: %target-swift-frontend-verify -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/sibling-gone.swift
+// RUN: %diff %t/sibling-gone.swift %t/sibling-gone.swift.expected
+
 // RUN: not %target-swift-frontend-verify -I %t -plugin-path %swift-plugin-dir -typecheck %t/unparsed.swift 2>%t/output.txt -Rmacro-expansions
 // RUN: not %update-verify-tests < %t/output.txt | %FileCheck --check-prefix CHECK-UNPARSED %s
 
@@ -311,6 +354,337 @@ func bar(_ y: Int) {
 //   expected-error@10{{argument passed to call that takes no arguments}}
 // }}
 func bar() {}
+
+//--- multiple-at-same-location.swift
+// Two peer macros attached to the same declaration expand at the same source
+// location, so their diagnostics share one expansion source location but land
+// in distinct expansion buffers. The verifier reports each nested diagnostic
+// with the index of the expansion it came from ("in expansion N from here"),
+// and update-verify-tests must route each into the matching sibling
+// expansion directive rather than merging them or swapping them.
+@attached(peer, names: overloaded)
+macro unstringifyPeer(_ s: String) =
+    #externalMacro(module: "UnstringifyMacroDefinition", type: "UnstringifyPeerMacro")
+@attached(peer, names: overloaded)
+macro unstringifyPeer2(_ s: String) =
+    #externalMacro(module: "UnstringifyMacroDefinition", type: "UnstringifyPeerMacro")
+
+@unstringifyPeer("""
+func baz(_ x: Int) {
+    let a = x
+}
+""")
+@unstringifyPeer2("""
+func baz(_ y: String) {
+    let b = y
+}
+""")
+func baz() {}
+
+//--- multiple-at-same-location.swift.expected
+// Two peer macros attached to the same declaration expand at the same source
+// location, so their diagnostics share one expansion source location but land
+// in distinct expansion buffers. The verifier reports each nested diagnostic
+// with the index of the expansion it came from ("in expansion N from here"),
+// and update-verify-tests must route each into the matching sibling
+// expansion directive rather than merging them or swapping them.
+@attached(peer, names: overloaded)
+macro unstringifyPeer(_ s: String) =
+    #externalMacro(module: "UnstringifyMacroDefinition", type: "UnstringifyPeerMacro")
+@attached(peer, names: overloaded)
+macro unstringifyPeer2(_ s: String) =
+    #externalMacro(module: "UnstringifyMacroDefinition", type: "UnstringifyPeerMacro")
+
+// expected-note@+1{{in expansion of macro 'unstringifyPeer' on global function 'baz()' here}}
+@unstringifyPeer("""
+func baz(_ x: Int) {
+    let a = x
+}
+""")
+// expected-note@+1{{in expansion of macro 'unstringifyPeer2' on global function 'baz()' here}}
+@unstringifyPeer2("""
+func baz(_ y: String) {
+    let b = y
+}
+""")
+// expected-expansion@+6:14{{
+//   expected-warning@2{{initialization of immutable value 'a' was never used; consider replacing with assignment to '_' or removing it}}
+// }}
+// expected-expansion@+3:14{{
+//   expected-warning@2{{initialization of immutable value 'b' was never used; consider replacing with assignment to '_' or removing it}}
+// }}
+func baz() {}
+
+//--- sibling-multiple-diags.swift
+// Each of the two sibling expansions emits multiple diagnostics; every one must
+// be routed into its own sibling directive and accumulate there.
+@attached(peer, names: overloaded)
+macro unstringifyPeer(_ s: String) =
+    #externalMacro(module: "UnstringifyMacroDefinition", type: "UnstringifyPeerMacro")
+@attached(peer, names: overloaded)
+macro unstringifyPeer2(_ s: String) =
+    #externalMacro(module: "UnstringifyMacroDefinition", type: "UnstringifyPeerMacro")
+
+@unstringifyPeer("""
+func baz(_ x: Int) {
+    let a = x
+    let b = x
+}
+""")
+@unstringifyPeer2("""
+func baz(_ y: String) {
+    let c = y
+    let d = y
+}
+""")
+func baz() {}
+
+//--- sibling-multiple-diags.swift.expected
+// Each of the two sibling expansions emits multiple diagnostics; every one must
+// be routed into its own sibling directive and accumulate there.
+@attached(peer, names: overloaded)
+macro unstringifyPeer(_ s: String) =
+    #externalMacro(module: "UnstringifyMacroDefinition", type: "UnstringifyPeerMacro")
+@attached(peer, names: overloaded)
+macro unstringifyPeer2(_ s: String) =
+    #externalMacro(module: "UnstringifyMacroDefinition", type: "UnstringifyPeerMacro")
+
+// expected-note@+1 2{{in expansion of macro 'unstringifyPeer' on global function 'baz()' here}}
+@unstringifyPeer("""
+func baz(_ x: Int) {
+    let a = x
+    let b = x
+}
+""")
+// expected-note@+1 2{{in expansion of macro 'unstringifyPeer2' on global function 'baz()' here}}
+@unstringifyPeer2("""
+func baz(_ y: String) {
+    let c = y
+    let d = y
+}
+""")
+// expected-expansion@+8:14{{
+//   expected-warning@2{{initialization of immutable value 'a' was never used; consider replacing with assignment to '_' or removing it}}
+//   expected-warning@3{{initialization of immutable value 'b' was never used; consider replacing with assignment to '_' or removing it}}
+// }}
+// expected-expansion@+4:14{{
+//   expected-warning@2{{initialization of immutable value 'c' was never used; consider replacing with assignment to '_' or removing it}}
+//   expected-warning@3{{initialization of immutable value 'd' was never used; consider replacing with assignment to '_' or removing it}}
+// }}
+func baz() {}
+
+//--- sibling-existing.swift
+// The sibling expansion directives already exist but are empty; their
+// diagnostics must be routed into the existing directives by index instead of
+// synthesizing new ones.
+@attached(peer, names: overloaded)
+macro unstringifyPeer(_ s: String) =
+    #externalMacro(module: "UnstringifyMacroDefinition", type: "UnstringifyPeerMacro")
+@attached(peer, names: overloaded)
+macro unstringifyPeer2(_ s: String) =
+    #externalMacro(module: "UnstringifyMacroDefinition", type: "UnstringifyPeerMacro")
+
+// expected-note@+1{{in expansion of macro 'unstringifyPeer' on global function 'baz()' here}}
+@unstringifyPeer("""
+func baz(_ x: Int) {
+    let a = x
+}
+""")
+// expected-note@+1{{in expansion of macro 'unstringifyPeer2' on global function 'baz()' here}}
+@unstringifyPeer2("""
+func baz(_ y: String) {
+    let b = y
+}
+""")
+// expected-expansion@+4:14{{
+// }}
+// expected-expansion@+2:14{{
+// }}
+func baz() {}
+
+//--- sibling-existing.swift.expected
+// The sibling expansion directives already exist but are empty; their
+// diagnostics must be routed into the existing directives by index instead of
+// synthesizing new ones.
+@attached(peer, names: overloaded)
+macro unstringifyPeer(_ s: String) =
+    #externalMacro(module: "UnstringifyMacroDefinition", type: "UnstringifyPeerMacro")
+@attached(peer, names: overloaded)
+macro unstringifyPeer2(_ s: String) =
+    #externalMacro(module: "UnstringifyMacroDefinition", type: "UnstringifyPeerMacro")
+
+// expected-note@+1{{in expansion of macro 'unstringifyPeer' on global function 'baz()' here}}
+@unstringifyPeer("""
+func baz(_ x: Int) {
+    let a = x
+}
+""")
+// expected-note@+1{{in expansion of macro 'unstringifyPeer2' on global function 'baz()' here}}
+@unstringifyPeer2("""
+func baz(_ y: String) {
+    let b = y
+}
+""")
+// expected-expansion@+6:14{{
+//   expected-warning@2{{initialization of immutable value 'a' was never used; consider replacing with assignment to '_' or removing it}}
+// }}
+// expected-expansion@+3:14{{
+//   expected-warning@2{{initialization of immutable value 'b' was never used; consider replacing with assignment to '_' or removing it}}
+// }}
+func baz() {}
+
+//--- sibling-three.swift
+// Three sibling expansions at one location, to check that index routing scales
+// past two.
+@attached(peer, names: overloaded)
+macro unstringifyPeer(_ s: String) =
+    #externalMacro(module: "UnstringifyMacroDefinition", type: "UnstringifyPeerMacro")
+@attached(peer, names: overloaded)
+macro unstringifyPeer2(_ s: String) =
+    #externalMacro(module: "UnstringifyMacroDefinition", type: "UnstringifyPeerMacro")
+@attached(peer, names: overloaded)
+macro unstringifyPeer3(_ s: String) =
+    #externalMacro(module: "UnstringifyMacroDefinition", type: "UnstringifyPeerMacro")
+
+@unstringifyPeer("""
+func baz(_ x: Int) {
+    let a = x
+}
+""")
+@unstringifyPeer2("""
+func baz(_ y: String) {
+    let b = y
+}
+""")
+@unstringifyPeer3("""
+func baz(_ z: Double) {
+    let c = z
+}
+""")
+func baz() {}
+
+//--- sibling-three.swift.expected
+// Three sibling expansions at one location, to check that index routing scales
+// past two.
+@attached(peer, names: overloaded)
+macro unstringifyPeer(_ s: String) =
+    #externalMacro(module: "UnstringifyMacroDefinition", type: "UnstringifyPeerMacro")
+@attached(peer, names: overloaded)
+macro unstringifyPeer2(_ s: String) =
+    #externalMacro(module: "UnstringifyMacroDefinition", type: "UnstringifyPeerMacro")
+@attached(peer, names: overloaded)
+macro unstringifyPeer3(_ s: String) =
+    #externalMacro(module: "UnstringifyMacroDefinition", type: "UnstringifyPeerMacro")
+
+// expected-note@+1{{in expansion of macro 'unstringifyPeer' on global function 'baz()' here}}
+@unstringifyPeer("""
+func baz(_ x: Int) {
+    let a = x
+}
+""")
+// expected-note@+1{{in expansion of macro 'unstringifyPeer2' on global function 'baz()' here}}
+@unstringifyPeer2("""
+func baz(_ y: String) {
+    let b = y
+}
+""")
+// expected-note@+1{{in expansion of macro 'unstringifyPeer3' on global function 'baz()' here}}
+@unstringifyPeer3("""
+func baz(_ z: Double) {
+    let c = z
+}
+""")
+// expected-expansion@+9:14{{
+//   expected-warning@2{{initialization of immutable value 'a' was never used; consider replacing with assignment to '_' or removing it}}
+// }}
+// expected-expansion@+6:14{{
+//   expected-warning@2{{initialization of immutable value 'b' was never used; consider replacing with assignment to '_' or removing it}}
+// }}
+// expected-expansion@+3:14{{
+//   expected-warning@2{{initialization of immutable value 'c' was never used; consider replacing with assignment to '_' or removing it}}
+// }}
+func baz() {}
+
+//--- sibling-partial.swift
+// One sibling expansion directive (index 0) is already present and correct; the
+// other sibling's diagnostic is unexpected and must be added as a new directive
+// placed after the existing one, not ahead of it.
+@attached(peer, names: overloaded)
+macro unstringifyPeer(_ s: String) =
+    #externalMacro(module: "UnstringifyMacroDefinition", type: "UnstringifyPeerMacro")
+@attached(peer, names: overloaded)
+macro unstringifyPeer2(_ s: String) =
+    #externalMacro(module: "UnstringifyMacroDefinition", type: "UnstringifyPeerMacro")
+
+// expected-note@+1{{in expansion of macro 'unstringifyPeer' on global function 'baz()' here}}
+@unstringifyPeer("""
+func baz(_ x: Int) {
+    let a = x
+}
+""")
+// expected-note@+1{{in expansion of macro 'unstringifyPeer2' on global function 'baz()' here}}
+@unstringifyPeer2("""
+func baz(_ y: String) {
+    let b = y
+}
+""")
+// expected-expansion@+3:14{{
+//   expected-warning@2{{initialization of immutable value 'a' was never used; consider replacing with assignment to '_' or removing it}}
+// }}
+func baz() {}
+
+//--- sibling-partial.swift.expected
+// One sibling expansion directive (index 0) is already present and correct; the
+// other sibling's diagnostic is unexpected and must be added as a new directive
+// placed after the existing one, not ahead of it.
+@attached(peer, names: overloaded)
+macro unstringifyPeer(_ s: String) =
+    #externalMacro(module: "UnstringifyMacroDefinition", type: "UnstringifyPeerMacro")
+@attached(peer, names: overloaded)
+macro unstringifyPeer2(_ s: String) =
+    #externalMacro(module: "UnstringifyMacroDefinition", type: "UnstringifyPeerMacro")
+
+// expected-note@+1{{in expansion of macro 'unstringifyPeer' on global function 'baz()' here}}
+@unstringifyPeer("""
+func baz(_ x: Int) {
+    let a = x
+}
+""")
+// expected-note@+1{{in expansion of macro 'unstringifyPeer2' on global function 'baz()' here}}
+@unstringifyPeer2("""
+func baz(_ y: String) {
+    let b = y
+}
+""")
+// expected-expansion@+6:14{{
+//   expected-warning@2{{initialization of immutable value 'a' was never used; consider replacing with assignment to '_' or removing it}}
+// }}
+// expected-expansion@+3:14{{
+//   expected-warning@2{{initialization of immutable value 'b' was never used; consider replacing with assignment to '_' or removing it}}
+// }}
+func baz() {}
+
+//--- sibling-gone.swift
+@attached(peer, names: overloaded)
+macro unstringifyPeer(_ s: String) =
+    #externalMacro(module: "UnstringifyMacroDefinition", type: "UnstringifyPeerMacro")
+
+// The declaration these sibling directives targeted was deleted, so their
+// '@+N' offsets now dangle past the end of the file.
+// expected-expansion@+4:14{{
+//   expected-warning@2{{initialization of immutable value 'b' was never used; consider replacing with assignment to '_' or removing it}}
+// }}
+// expected-expansion@+2:14{{
+//   expected-warning@2{{initialization of immutable value 'a' was never used; consider replacing with assignment to '_' or removing it}}
+// }}
+
+//--- sibling-gone.swift.expected
+@attached(peer, names: overloaded)
+macro unstringifyPeer(_ s: String) =
+    #externalMacro(module: "UnstringifyMacroDefinition", type: "UnstringifyPeerMacro")
+
+// The declaration these sibling directives targeted was deleted, so their
+// '@+N' offsets now dangle past the end of the file.
 
 //--- unparsed.h
 // CHECK-UNPARSED: no files updated: found diagnostics in unparsed files TMP_DIR{{/|\\}}unparsed.h
