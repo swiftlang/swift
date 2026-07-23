@@ -574,7 +574,7 @@ public func extractInlinableText(
   var parser = Parser(
     textBuffer,
     swiftVersion: Parser.SwiftVersion(from: astContext),
-    experimentalFeatures: Parser.ExperimentalFeatures(from: astContext)
+    languageFeatures: Parser.LanguageFeatures(from: astContext)
   )
   let syntax = SourceFileSyntax.parse(from: &parser)
 
