@@ -40,7 +40,6 @@
 
 GROUP(no_group,none,"")
 
-GROUP(ActorConformanceToGlobalActorProtocol,none,"actors-cannot-conform-to-global-actor-protocols")
 GROUP(ActorIsolatedCall,none,"actor-isolated-call")
 GROUP(ActorIsolatedMutatingAsync,none,"actor-isolated-mutating-async")
 GROUP(AddPreconcurrencyImport,none,"add-preconcurrency-import")

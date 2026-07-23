@@ -6077,7 +6077,7 @@ NOTE(shared_state_nonisolated_unsafe,none,
 NOTE(note_actor_isolated_witness,none,
      "%0 %kind1 cannot satisfy %2 requirement",
      (ActorIsolation, const ValueDecl *, ActorIsolation))
-GROUPED_ERROR(actor_cannot_conform_to_global_actor_protocol,ActorConformanceToGlobalActorProtocol,none,
+ERROR(actor_cannot_conform_to_global_actor_protocol,none,
       "actor %0 cannot conform to global-actor-isolated protocol %1",
       (Type, Type))
 NOTE(protocol_isolated_to_global_actor_here,none,
