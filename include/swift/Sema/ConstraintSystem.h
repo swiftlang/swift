@@ -972,6 +972,11 @@ private:
   /// The set of parameters that have been inferred to be 'isolated'.
   llvm::SmallDenseSet<ParamDecl *, 2> isolatedParams;
 
+  /// Ownership specifiers inferred for closure parameters in the current
+  /// constraint system.
+  llvm::SmallDenseMap<const ParamDecl *, ParamSpecifier, 2>
+      inferredParamSpecifiers;
+
   /// The set of closures that have been inferred to be "isolated by
   /// preconcurrency".
   llvm::SmallDenseSet<const ClosureExpr *, 2> preconcurrencyClosures;
@@ -2539,6 +2544,18 @@ public:
   /// Undo the above change.
   void removeIsolatedParam(ParamDecl *param);
 
+  /// Record the ownership convention inferred for a closure parameter from its
+  /// contextual type.
+  void recordInferredParamSpecifier(ParamDecl *param, ParamSpecifier specifier);
+
+  /// Undo the above change.
+  void removeInferredParamSpecifier(ParamDecl *param);
+
+  /// Retrieve the ownership specifier inferred for a closure parameter during
+  /// solving, if any.
+  std::optional<ParamSpecifier>
+  getInferredParamSpecifier(const ParamDecl *param) const;
+
   /// Used by the above to update preconcurrencyClosures and record a change in
   /// the trail.
   void recordPreconcurrencyClosure(const ClosureExpr *closure);
@@ -2906,6 +2923,12 @@ private:
                                   DeclContext *UseDC,
                                   ConstraintLocator *locator,
                                   bool wantInterfaceType);
+
+  /// Tries to wrap \p requestedType in an lvalue based on the mutability of \p
+  /// value in the context of the current solve.
+  Type tryProduceLValueForReference(VarDecl *value, Type requestedType,
+                                    Type baseType, DeclContext *useDC,
+                                    ConstraintLocator *locator);
 
   std::pair<Type, Type> getOpenedStorageType(
       Type baseTy, AbstractStorageDecl *value, DeclContext *useDC,
