@@ -116,14 +116,8 @@ public struct HeapObject {
 #endif
 
 #if _pointerBitWidth(_64)
-#if os(Android) && arch(arm64)
-  // Android AArch64 stores the high spare bits in the second-highest byte.
   static let immortalObjectPointerBit = _bridgeObjectTaggedPointerBits
   static let bridgeObjectToPlainObjectMask = ~_objectPointerSpareBits
-#else
-  static let immortalObjectPointerBit = UInt(0x8000_0000_0000_0000)
-  static let bridgeObjectToPlainObjectMask = UInt(0x8fff_ffff_ffff_fff8)
-#endif
 #elseif _pointerBitWidth(_32)
   static let bridgeObjectToPlainObjectMask = UInt(0xffff_ffff)
 #elseif _pointerBitWidth(_16)
