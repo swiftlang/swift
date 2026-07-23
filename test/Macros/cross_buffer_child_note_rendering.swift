@@ -4,7 +4,7 @@
 // RUN: split-file %s %t
 // RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath
 
-// RUN: not env %tmpdir=%t %target-swift-frontend -swift-version 5 -typecheck %t/test.swift -load-plugin-library %t/%target-library-name(MacroDefinition) -diagnostic-style=llvm 2>&1 | %PathSanitizingDiff --sanitize-regex "MACROBUFFER=@__swiftmacro\\S*.swift" %t/llvm-render.expected
+// RUN: not env %tmpdir=%t %target-swift-frontend -swift-version 5 -typecheck %t/test.swift -load-plugin-library %t/%target-library-name(MacroDefinition) -diagnostic-style=llvm 2>&1 | %PathSanitizingDiff --sanitize-regex "MACROFILE=@__swiftmacro\\S*.swift" --sanitize-path-regex "MACROPATH=TMP_DIR/swift-generated-sources/MACROFILE" %t/llvm-render.expected
 // RUN: not env %tmpdir=%t %target-swift-frontend -swift-version 5 -typecheck %t/test.swift -load-plugin-library %t/%target-library-name(MacroDefinition) -diagnostic-style=swift 2>&1 | %PathSanitizingDiff %t/swift-syntax-render.expected
 // RUN: %target-swift-frontend -swift-version 5 -typecheck %t/test.swift -load-plugin-library %t/%target-library-name(MacroDefinition) -verify
 
@@ -27,7 +27,7 @@ var foo: Int { 2 }
 TMP_DIR/test.swift:11:5: error: invalid redeclaration of 'foo'
 var foo: Int { 2 }
     ^
-TMP_DIR/swift-generated-sources/MACROBUFFER:13:5: note: 'foo' previously declared here
+MACROPATH:13:5: note: 'foo' previously declared here
 var foo: Int {
     ^
 //--- swift-syntax-render.expected

@@ -13,9 +13,11 @@
 # their input; they only differ in how they compare the sanitized text
 # (FileCheck directives vs. diff against a reference file).
 
+import argparse
 import os
 import platform
 import re
+from enum import Enum
 
 
 # LLVM Lit performs realpath with the config path, so all paths are relative
@@ -32,6 +34,31 @@ def normalize_if_path(s):
         return os.path.abspath(s).replace("\\", "/")
     else:
         return os.path.realpath(s)
+
+
+class SanitizerKind(Enum):
+    REGEX = 1
+    PATH_REGEX = 2
+
+
+class _AppendSanitizeRegex(argparse.Action):
+    """Append ``(kind, value)`` pairs onto a single ordered list.
+
+    Both ``--sanitize-regex`` and ``--sanitize-path-regex`` feed the same
+    destination so that their relative order on the command line is preserved:
+    a later pattern may depend on the replacement performed by an earlier one
+    (e.g. a path regex whose SOURCE references an earlier regex's REPLACEMENT).
+    The ``kind`` records which flag produced each entry.
+    """
+
+    def __init__(self, option_strings, dest, kind, **kwargs):
+        self._kind = kind
+        super().__init__(option_strings, dest, **kwargs)
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        items = list(getattr(namespace, self.dest, []))
+        items.append((self._kind, values))
+        setattr(namespace, self.dest, items)
 
 
 def add_shared_arguments(parser):
@@ -56,9 +83,24 @@ def add_shared_arguments(parser):
         "used verbatim: it is not path-normalized, not regex-escaped, and no "
         "slash compatibility substitution is applied to it.",
         metavar="REPLACEMENT=SOURCE",
-        action="append",
+        action=_AppendSanitizeRegex,
+        kind=SanitizerKind.REGEX,
         dest="sanitize_regexes",
-        default=[],
+    )
+
+    parser.add_argument(
+        "--sanitize-path-regex",
+        help="replace text matching the given regex with another string. "
+        "Unlike --sanitize, SOURCE is treated as a regular expression and is "
+        "not path-normalized or regex-escaped. Unlike --sanitize-regex, slash "
+        "compatibility substitution is applied to it, however. If you need to "
+        "use / or \\ for non-path-separator purposes in your regex, split that "
+        "out into a separate --sanitize-regex first and include the REPLACEMENT"
+        " of that pattern in your path's SOURCE pattern.",
+        metavar="REPLACEMENT=SOURCE",
+        action=_AppendSanitizeRegex,
+        kind=SanitizerKind.PATH_REGEX,
+        dest="sanitize_regexes",
     )
 
     parser.add_argument(
@@ -81,6 +123,8 @@ def add_shared_arguments(parser):
         help="Ignore warnings from the Swift runtime",
         action="store_true",
     )
+
+    parser.set_defaults(sanitize_regexes=[])
 
 
 def sanitize(text, args):
@@ -109,11 +153,13 @@ def sanitize(text, args):
         )
 
     # Regex sanitizations are applied after the literal path replacements above
-    # so that they can match already-sanitized text. The source is used
-    # verbatim as a regex, so the caller is responsible for any escaping and
-    # for slash handling.
-    for s in args.sanitize_regexes:
+    # so that they can match already-sanitized text.
+    for kind, s in args.sanitize_regexes:
+        # FIXME: provide a way to escape "=" for use in regex matching
         replacement, pattern = s.split("=", 1)
+        if kind == SanitizerKind.PATH_REGEX and args.enable_windows_compatibility:
+            pattern = pattern.replace("\\", "/")
+            pattern = re.sub(r"/", slashes_re, pattern)
         text = re.sub(pattern, replacement, text)
 
     # Because we force the backtracer on in the tests, we can get runtime
