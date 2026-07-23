@@ -124,7 +124,7 @@ def _echo_command(command, stream, prefix=ECHO_PREFIX):
 
     stream = _get_stream_file(stream)
 
-    stream.write('{}{}\n'.format(prefix, quote(command)))
+    stream.write(f'{prefix}{quote(command)}\n')
     stream.flush()
 
 
@@ -144,8 +144,7 @@ def _normalize_args(args):
         if isinstance(arg, AbstractWrapper):
             return list(map(_convert_pathlib_path, arg.command))
 
-        raise ValueError('Invalid argument type: {}'.format(
-            type(arg).__name__))
+        raise ValueError(f'Invalid argument type: {type(arg).__name__}')
 
     if isinstance(args, AbstractWrapper):
         return normalize_arg(args)
@@ -209,7 +208,7 @@ def quote(command):
     if isinstance(command, collections.abc.Iterable):
         return ' '.join([_quote(arg) for arg in _normalize_args(command)])
 
-    raise ValueError('Invalid command type: {}'.format(type(command).__name__))
+    raise ValueError(f'Invalid command type: {type(command).__name__}')
 
 
 def rerun_as_root():
@@ -494,15 +493,13 @@ class ExecutableWrapper(AbstractWrapper):
 
     def __init__(self):
         if self.EXECUTABLE is None:
-            raise AttributeError('{}.EXECUTABLE cannot be None'.format(
-                type(self).__name__))
+            raise AttributeError(f'{type(self).__name__}.EXECUTABLE cannot be None')
 
         self.EXECUTABLE = _convert_pathlib_path(self.EXECUTABLE)
 
         if not isinstance(self.EXECUTABLE, (str,)):
             raise AttributeError(
-                '{}.EXECUTABLE must be an executable name or path'.format(
-                    type(self).__name__))
+                f'{type(self).__name__}.EXECUTABLE must be an executable name or path')
 
         super(ExecutableWrapper, self).__init__()
 
