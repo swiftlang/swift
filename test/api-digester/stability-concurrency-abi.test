@@ -91,6 +91,11 @@ Func withTaskCancellationHandler(operation:onCancel:) has mangled name changing 
 // Task.value adopted typed throws and old one needed `@_silgen_name` which this test doesn't understand how to handle.
 Accessor Task.value.Get() has been removed
 
+// Typed throws adoption for methods that throw _Concurrency.CancellationError()
+Func Task.checkCancellation() has been removed
+Func Task.sleep(nanoseconds:) has been renamed to Func __untyped_throws_sleep(nanoseconds:)
+Func Task.sleep(nanoseconds:) has mangled name changing from 'static (extension in _Concurrency):Swift.Task< where A == Swift.Never, B == Swift.Never>.sleep(nanoseconds: Swift.UInt64) async throws -> ()' to 'static (extension in _Concurrency):Swift.Task< where A == Swift.Never, B == Swift.Never>.__untyped_throws_sleep(nanoseconds: Swift.UInt64) async throws -> ()'
+
 // AsyncStream.init(unfolding:onCancel:) uses @_silgen_name to preserve mangling after adding @preconcurrency.
 Constructor AsyncStream.init(unfolding:onCancel:) has mangled name changing from 'Swift.AsyncStream.init(unfolding: () async -> Swift.Optional<A>, onCancel: Swift.Optional<@Sendable () -> ()>) -> Swift.AsyncStream<A>' to 'Swift.AsyncStream.init(unfolding: () async -> Swift.Optional<A>, onCancel: Swift.Optional<() -> ()>) -> Swift.AsyncStream<A>'
 

@@ -81,15 +81,15 @@ extension Task where Success == Never, Failure == Never {
     until instant: C.Instant,
     tolerance: C.Duration?,
     clock: C
-  ) async throws {
+  ) async throws(_Concurrency.CancellationError) {
     // Create a token which will initially have the value "not started", which
     // means the continuation has neither been created nor completed.
     let token = unsafe UnsafeSleepStateToken()
 
-    do {
+    do throws(_Concurrency.CancellationError) {
       // Install a cancellation handler to resume the continuation by
       // throwing CancellationError.
-      try await withTaskCancellationHandler {
+      try await withTaskCancellationHandler { () throws(_Concurrency.CancellationError) in
         let _: () = try unsafe await withUnsafeThrowingContinuation { continuation in
           while true {
             let state = unsafe token.load()
@@ -217,12 +217,42 @@ extension Task where Success == Never, Failure == Never {
   ///       try await Task.sleep(until: .now + .seconds(3))
   ///
   @available(SwiftStdlib 5.7, *)
+  @_alwaysEmitIntoClient
+  @abi(
+    static func __typed_throws_sleep<C: Clock>(
+      until deadline: C.Instant,
+      tolerance: C.Instant.Duration?,
+      clock: C
+    ) async throws(_Concurrency.CancellationError)
+  )
   public static func sleep<C: Clock>(
     until deadline: C.Instant,
     tolerance: C.Instant.Duration? = nil,
     clock: C = .continuous
+  ) async throws(_Concurrency.CancellationError) {
+    do {
+      try await clock.sleep(until: deadline, tolerance: tolerance)
+    } catch {
+      throw error as! _Concurrency.CancellationError
+    }
+  }
+  
+  @available(SwiftStdlib 5.7, *)
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    static func sleep<C: Clock>(
+      until deadline: C.Instant,
+      tolerance: C.Instant.Duration?,
+      clock: C
+    ) async throws
+  )
+  @usableFromInline
+  internal static func __untyped_throws_sleep<C: Clock>(
+    until deadline: C.Instant,
+    tolerance: C.Instant.Duration? = nil,
+    clock: C = .continuous
   ) async throws {
-    try await clock.sleep(until: deadline, tolerance: tolerance)
+    try await Self.sleep(until: deadline, tolerance: tolerance, clock: clock)
   }
 
   /// Suspends the current task for the given duration.
@@ -240,7 +270,7 @@ extension Task where Success == Never, Failure == Never {
     for duration: C.Instant.Duration,
     tolerance: C.Instant.Duration? = nil,
     clock: C = .continuous
-  ) async throws {
+  ) async throws(_Concurrency.CancellationError) {
     try await clock.sleep(for: duration, tolerance: tolerance)
   }
   #endif
