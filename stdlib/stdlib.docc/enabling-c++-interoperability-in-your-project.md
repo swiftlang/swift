@@ -4,10 +4,9 @@ Bring a C++ class into Swift under a Swift-friendly name.
 
 ## Overview
 
-When you enable C++ interoperability, your C++ class names, methods, and conventions translate to Swift exactly as the C++ author wrote them. That specificity can clash with Swift's naming expectations or with types that already exist in your project. The bridging macros in `swift/bridging` let you reshape that boundary so the C++ API reads like idiomatic Swift.
+When you enable C++ interoperability, your C++ class names, methods, and conventions translate to Swift exactly as the C++ author wrote them. That specificity can sometimes clash with Swift's naming expectations or with types that already exist in your project. The bridging macros in `swift/bridging` let you reshape how your C++ API appears in Swift so it reads like idiomatic Swift.
 
-This article demonstrates how to enable interoperability, expose a C++ class to Swift through a module, and use the `SWIFT_NAME` macro to give the class a Swift-friendly name. The Swift code to use a new class is identical whether you're working in Swift Package Manager, the command line, or Xcode, and the workflow to use the bridge is the same on macOS, Linux, and Windows.
-
+This article demonstrates how to enable interoperability, expose a C++ class to Swift through a module, and use the `SWIFT_NAME` macro to give the class a Swift-friendly name. The Swift code to use a new class is identical whether you're working in Swift Package Manager, the command line, or Xcode, and the workflow to expose your C++ to Swift is the same on macOS, Linux, and Windows.
 
 ## Enable C++ interoperability
 
@@ -15,7 +14,9 @@ Interoperability is off by default. Turning it on tells the Swift compiler to re
 
 If you're using Swift Package Manager, add `.interoperabilityMode(.Cxx)` to the `swiftSettings` of the Swift target that imports your C++ code rather than the C++ library target itself. You write the full `Package.swift` when you expose the module.
 
-For command-line users, pass `-cxx-interoperability-mode=default` to `swiftc` when you compile the project. If you're using Xcode, set the C++ and Objective-C Interoperability build setting to C++/Objective-C++ on your target and your project.
+For command line users, pass `-cxx-interoperability-mode=default` to `swiftc` when you compile the project.
+
+If you're using Xcode, select your target and open the Build Settings tab. Search for the C++ and Objective-C Interoperability build setting, and set it to C++ / Objective-C++.
 
 
 ## Create your C++ class
@@ -26,13 +27,11 @@ If you're using Swift Package Manager, put `Error.hpp` in your C++ target's publ
 
 1. Add a C++ file with File > New > File from Template… 
 2. Check "Also create a header file" if the template doesn't make one. 
-3. Add the file to your app target. If Xcode offers to create a bridging header, decline it. 
+3. Add the file to your app target. If Xcode offers to create a bridging header, decline it.
 
+> Note: This article uses a module map instead. If a bridging header already exists, or you create one by accident, keep it. Deleting the file makes the build fail because Xcode still looks for the bridging header after you remove it.
 
-
-A _bridging header_ and a _module map_ perform the same job of exposing your C++ to Swift, so you only need one. This example uses the module map: it's the standard mechanism on macOS, Linux, and Windows, and it also works in Xcode.
-
-Define your class in a header, and add `#include <swift/bridging>` at the top. The header ships with the Swift toolchain and the compiler finds it automatically, with no extra search path to set. The header supplies the bridging macros, including `SWIFT_NAME`, which controls how the class crosses over into Swift.
+Define your class in `Error.hpp`, and add `#include <swift/bridging>` at the top. The `<swift/bridging>` header ships with the Swift toolchain and the compiler finds it automatically, with no extra search path to set. The header supplies the bridging macros, including `SWIFT_NAME`, which controls how the class crosses over into Swift.
 
 Place `SWIFT_NAME` at the end of the declaration you want to rename: for a class, after the closing brace and before the semicolon; for a function, at the end of the declaration. Here you rename the class to `CxxErrorExample` so it doesn't collide with Swift's own `Error`. The macro only changes the name Swift sees. The C++ name stays `Error` for your C++ code.
 
@@ -68,6 +67,8 @@ Notice that `print()` is declared `const`. That matters on the Swift side, as th
 
 ## Expose the class through a module
 
+This article exposes your C++ to Swift with a module map. It's the standard mechanism on macOS, Linux, and Windows, and it also works in Xcode.
+
 Swift imports C++ as a _module_, the unit Swift brings in with `import`, and a module map is how you present a set of C++ headers to Swift as one importable unit.
 
 The module name can't replicate an existing Swift import, type, or the name of your class. In this example, the class is called `Error`, so rename the module `ErrorLib` to keep it distinct from Swift's `Error`.
@@ -87,7 +88,7 @@ The module name can't replicate an existing Swift import, type, or the name of y
                 └── main.swift
         ```
 
-        Declare a C++ library target for the header and source. As well as a Swift executable target that depends on it and turns on interoperability:
+        Declare a C++ library target for the header and source, as well as a Swift executable target that depends on it and turns on interoperability:
 
         ```swift
         // swift-tools-version: 6.0
@@ -145,21 +146,13 @@ The module name can't replicate an existing Swift import, type, or the name of y
         }
         ```
 
-        In the target's build settings, add the directory that contains `module.modulemap` to Import Paths (the `SWIFT_INCLUDE_PATHS` build setting), such as`$(SRCROOT)/YourFolderName`. This step is the Xcode equivalent of the command-line `-I` flag. Without it, Swift can't locate the module map that defines `ErrorLib`, and the build fails.
+        In the target's build settings, add the directory that contains `module.modulemap` to Import Paths (the `SWIFT_INCLUDE_PATHS` build setting), such as `$(SRCROOT)/YourFolderName`. This step is the Xcode equivalent of the command-line `-I` flag. Without it, Swift can't locate the module map that defines `ErrorLib`, and the build fails.
     }
 }
 
 ## Use the C++ module from Swift
 
-To use the C++ module, import it by name in a Swift file:
-
-```swift
-import ErrorLib
-```
-
-`ErrorLib` is the module name you set up in the previous step. That's what gives Swift something to `import`.
-
-Now create an instance and call its method in `main.swift`:
+To use the C++ module, import it by name in a Swift file. Create an instance and call its method in `main.swift`:
 
 ```swift
 import ErrorLib
@@ -170,21 +163,19 @@ let message = String(error.print())
 print(message)
 ```
 
-Here you can use a `let` instead of a `var`. Swift imports a `const` C++ member function as a nonmutating method, so calling `error.print()` doesn't require the instance to be mutable. If you drop `const` from `print()`, Swift imports it as `mutating`. A mutating call on a `let` fails to compile, so you need a `var`. The `const` you wrote earlier is allows this code to read like ordinary, idiomatic Swift.
+Here you can use a `let` instead of a `var`. Swift imports a `const` C++ member function as a nonmutating method, so calling `error.print()` doesn't require the instance to be mutable. If you drop `const` from `print()`, Swift imports it as `mutating`. A mutating call on a `let` fails to compile, so you need a `var`. The `const` you wrote earlier allows this code to read like ordinary, idiomatic Swift.
 
-The return value comes across just as smoothly, because `std::string` bridges to Swift's `String` for free. The `print()` method returns a C++ `std::string`, and Swift's C++ standard-library interoperability gives you a `String` initializer that converts it directly. That's all `String(error.print())` is doing, and you don't need to import anything extra for it.
+The return value comes across just as smoothly, because `std::string` bridges to Swift's `String` for free. The `print()` method returns a C++ `std::string`, and Swift's C++ standard-library interoperability gives you a `String` initializer that converts it directly.
 
-Calling the method also looks like any other Swift type: `error.print()` is just a method call, exactly like calling a method on a native Swift value, and the interoperability boundary disappears at the call site.
+Calling the method also looks like any other Swift type: `error.print()` is just a method call, exactly like calling a method on a native Swift value.
+
+## Compile your code
 
 If you're using Swift Package Manager, run the executable with `swift run ErrorExample` from the package's root directory, the one containing `Package.swift`. Here, `ErrorExample` is the name of the executable target rather than the package, which is `ErrorLib`. Swift resolves the `import` through the package graph, and `CxxErrorExample` is available throughout the target. This prints `Error message!`.
 
-If you're using the command-line, compile the Swift and C++ together and run the result. The `-I .` points Swift at the directory holding `module.modulemap`, and a single invocation compiles both languages. On macOS, prefix the command with `xcrun` so it uses your installed Xcode toolchain; on Linux and Windows, call `swiftc` directly:
+If you're using the command line, compile the Swift and C++ together and run the result. The `-I .` points Swift at the directory holding `module.modulemap`, and a single invocation compiles both languages.
 
 ```
-# macOS
-xcrun swiftc -cxx-interoperability-mode=default -I . main.swift Error.cpp -o main
-
-# Linux and Windows
 swiftc -cxx-interoperability-mode=default -I . main.swift Error.cpp -o main
 
 ./main
@@ -196,4 +187,4 @@ If you're using Xcode, build and run. The `import` resolves through your module 
 
 ## Manage the instance's lifetime
 
-Swift imports a C++ class or struct as a value type by default, so `error` behaves like a Swift struct: there's no ARC and no manual `delete`, and Swift calls the C++ destructor when `error` goes out of scope. If you instead want reference semantics, `swift/bridging` provides macros like `SWIFT_SHARED_REFERENCE.`
+Swift imports a C++ class or struct as a value type by default, so `error` behaves like a Swift struct: there's no ARC and no manual `delete`, and Swift calls the C++ destructor when `error` goes out of scope. If you instead want reference semantics, `swift/bridging` provides macros like `SWIFT_SHARED_REFERENCE`.
