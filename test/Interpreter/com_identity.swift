@@ -3,8 +3,11 @@
 // RUN: %target-build-swift-dylib(%t/%target-library-name(Widget)) -emit-module-path %t/Widget.swiftmodule -module-name Widget -Xfrontend -enable-experimental-com-interop -I %t -L %t -lCOM %target-rpath(%t) %S/Inputs/com_widget.swift
 // RUN: %target-build-swift %s -o %t/a.out -module-name main -Xfrontend -enable-experimental-com-interop -I %t -L %t -lCOM -lWidget %target-rpath(%t)
 // RUN: %target-codesign %t/a.out %t/%target-library-name(COM) %t/%target-library-name(Widget)
-// RUN: %target-run %t/a.out | %FileCheck %s
+// RUN: %target-run %t/a.out %t/%target-library-name(COM) %t/%target-library-name(Widget) | %FileCheck %s
 // REQUIRES: executable_test
+
+// Note: we pass the libraries as command line arguments so that test runs using
+// remote-run will copy them across to the runner.
 
 // A client resolves an imported `@com` interface's `IID` and class's `CLSID`
 // from the deserialized synthesized extension and reaches them at runtime;
