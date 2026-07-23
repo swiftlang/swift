@@ -14,10 +14,11 @@ struct Outer {
 
 // CHECK-LABEL: sil [ossa] @simple_delay_struct :
 // CHECK:       bb0
+// CHECK-NEXT:    debug_value %0, var, name "y", type $S, expr op_fragment:#S.a
+// CHECK-NEXT:    debug_value %1, var, name "y", type $S, expr op_fragment:#S.b
 // CHECK-NEXT:    debug_value %0, var, name "x", type $S, expr op_fragment:#S.a
 // CHECK-NEXT:    debug_value %1, var, name "x", type $S, expr op_fragment:#S.b
 // CHECK-NEXT:    [[B:%.*]] = begin_borrow %0
-// TODO: begin_borrow should get salvaged too.
 // CHECK-NEXT:    fix_lifetime [[B]]
 // CHECK-NEXT:    fix_lifetime %1
 // CHECK-NEXT:    end_borrow [[B]]
