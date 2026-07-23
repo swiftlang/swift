@@ -49,18 +49,7 @@ bool DominanceInfo::properlyDominates(SILInstruction *a, SILInstruction *b) {
   if (aBlock != bBlock)
     return properlyDominates(a->getParent(), b->getParent());
 
-  // Otherwise, they're in the same block, and we just need to check
-  // whether B comes after A.  This is a non-strict computation.
-  auto aIter = a->getIterator();
-  auto bIter = b->getIterator();
-  auto fIter = aBlock->begin();
-  while (bIter != fIter) {
-    --bIter;
-    if (aIter == bIter)
-      return true;
-  }
-
-  return false;
+  return a->strictlyDominatesInBlock(b);
 }
 
 /// Does value A properly dominate instruction B?
