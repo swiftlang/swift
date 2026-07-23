@@ -346,6 +346,8 @@ WARNING(unreachable_code_after_stmt,none,
         "be executed", (unsigned))
 WARNING(unreachable_case,none,
         "%select{case|default}0 will never be executed", (bool))
+NOTE(default_after_catchall,none,
+     "a 'default' case is equivalent to a catch-all case; remove one", ())
 WARNING(switch_on_a_constant,none,
         "switch condition evaluates to a constant", ())
 NOTE(unreachable_code_note,none, "will never be executed", ())
