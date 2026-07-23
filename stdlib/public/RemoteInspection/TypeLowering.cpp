@@ -2240,8 +2240,16 @@ public:
         // Zero-sized enum with only one empty case
         return TC.makeTypeInfo<TrivialEnumTypeInfo>(Kind, Cases);
       } else {
-        // Enum that has only one payload case is represented as that case
-        return TC.getTypeInfo(LastPayloadCaseTR, ExternalTypeInfo);
+        // Single-case enum with a payload: same layout as the payload,
+        // but wrapped in a SinglePayloadEnumTypeInfo to preserve case metadata.
+        auto *CaseTI = TC.getTypeInfo(LastPayloadCaseTR, ExternalTypeInfo);
+        if (CaseTI == nullptr)
+          return nullptr;
+        NumExtraInhabitants = CaseTI->getNumExtraInhabitants();
+        unsigned Stride = CaseTI->getStride();
+        return TC.makeTypeInfo<SinglePayloadEnumTypeInfo>(
+            Size, Alignment, Stride, NumExtraInhabitants, Borrowability,
+            AddressableForDependencies, Kind, Cases);
       }
     }
 
