@@ -1904,6 +1904,14 @@ static void salvageNullaryInst(SingleValueInstruction *inst) {
 static void salvageUnaryInst(SingleValueInstruction *SVI) {
   assert(SVI->getNumOperands() == 1 &&
          "salvageUnaryInst expects a single operand");
+  // Having an opened existential type salvaged into the debug reconstruction
+  // block is a problem: when the instruction defining the archetype is
+  // removed, it would leave an undef with a dangling opened existential type,
+  // which would trip the SIL verifier.
+  // There should be no debug use if the operand is null, but bail early.
+  if (!SVI->getOperand(0) || SVI->getOperand(0)->getType().hasOpenedExistential()) {
+    return;
+  }
   SmallVector<Operand *> debugUses(getDebugUses(SVI));
   for (Operand *U : debugUses) {
     auto *DbgInst = cast<DebugValueInst>(U->getUser());
@@ -2297,7 +2305,8 @@ void swift::salvageDebugInfo(SILInstruction *I) {
   if (isa<IndexAddrInst>(I) || isa<IndexRawPointerInst>(I))
     salvageBinaryInst(cast<SingleValueInstruction>(I));
 
-  if (isa<CopyValueInst>(I) || isa<MoveValueInst>(I))
+  if (isa<CopyValueInst>(I) || isa<MoveValueInst>(I) ||
+      isa<BeginBorrowInst>(I))
     salvageIdentityInst(cast<SingleValueInstruction>(I));
 
   if (auto *builtin = dyn_cast<BuiltinInst>(I)) {
