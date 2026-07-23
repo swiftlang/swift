@@ -656,6 +656,13 @@ function(_compile_swift_files
 
   if(SWIFT_STDLIB_EXPERIMENTAL_HERMETIC_SEAL_AT_LINK)
     list(APPEND swift_flags "-experimental-hermetic-seal-at-link")
+    if(SWIFT_STDLIB_ENABLE_LTO STREQUAL "full")
+      list(APPEND swift_flags "-lto=llvm-full")
+    elseif(SWIFT_STDLIB_ENABLE_LTO STREQUAL "thin")
+      list(APPEND swift_flags "-lto=llvm-thin")
+    else()
+      message(FATAL_ERROR "SWIFT_STDLIB_EXPERIMENTAL_HERMETIC_SEAL_AT_LINK requires SWIFT_STDLIB_ENABLE_LTO to be 'full' or 'thin', but got: '${SWIFT_STDLIB_ENABLE_LTO}'")
+    endif()
   endif()
 
   list(APPEND swift_flags "-enable-experimental-feature" "SuppressedAssociatedTypesWithDefaults")
