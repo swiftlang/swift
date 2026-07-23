@@ -42,6 +42,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
     "-import-bridging-header" ${CMAKE_CURRENT_SOURCE_DIR}/swift/EmbeddedPlatform.h
     -enable-experimental-feature Extern
     -enable-experimental-feature AllowRuntimeSymbolDeclarations
+    "-enable-builtin-module"
     "-disable-bridging-pch")
 
   add_embedded_swift_target_library(
