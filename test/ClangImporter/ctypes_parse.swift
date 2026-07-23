@@ -466,10 +466,12 @@ func testSmallArrayNewtype(small: SmallArrayNewtype) {
   // expected-legacy-c-array-error@-1 {{cannot convert value of type '(CInt, CInt, CInt, CInt)' (aka '(Int32, Int32, Int32, Int32)') to specified type 'InlineArray<4, Int32>'}}
 
   _ = SmallArrayNewtype(rawValue: (0, 0, 0, 0))
-  // expected-modern-c-array-error@-1 {{cannot convert value of type '(Int, Int, Int, Int)' to expected argument type '[4 of CInt]' (aka 'InlineArray<4, Int32>')}}
+  // expected-modern-c-array-error@-1 {{array of type '[4 of CInt]' (aka 'InlineArray<4, Int32>') cannot be used with tuple}}
+  // expected-modern-c-array-note@-2 {{did you mean to use an array literal instead?}}
 
   _ = SmallArrayNewtype(rawValue: [0, 0, 0, 0])
-  // expected-legacy-c-array-error@-1 {{cannot convert value of type '[Int]' to expected argument type '(CInt, CInt, CInt, CInt)' (aka '(Int32, Int32, Int32, Int32)')}}
+  // expected-legacy-c-array-error@-1 {{tuple of type '(CInt, CInt, CInt, CInt)' (aka '(Int32, Int32, Int32, Int32)') cannot be used with array literal}}
+  // expected-legacy-c-array-note@-2 {{did you mean to use a tuple instead?}}
 }
 
 @available(anyAppleOS 26, *)
