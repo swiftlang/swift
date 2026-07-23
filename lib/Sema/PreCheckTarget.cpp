@@ -1171,6 +1171,12 @@ class PreCheckTarget final : public ASTWalker {
   ASTContext &Ctx;
   DeclContext *DC;
 
+  /// The location of the target being pre-checked. Used to recognize when the
+  /// walk itself targets code inside a macro expansion buffer, in which case
+  /// declarations belonging to that same buffer are part of the target and
+  /// must be walked rather than skipped as macro-generated.
+  SourceLoc TargetLoc;
+
   /// A stack of expressions being walked, used to determine where to
   /// insert RebindSelfInConstructorExpr nodes.
   llvm::SmallVector<Expr *, 8> ExprStack;
@@ -1249,12 +1255,13 @@ class PreCheckTarget final : public ASTWalker {
   /// expressions do nothing.
   void transformForExpression(SingleValueStmtExpr *E);
 
-  PreCheckTarget(DeclContext *dc) : Ctx(dc->getASTContext()), DC(dc) {}
+  PreCheckTarget(DeclContext *dc, SourceLoc targetLoc)
+      : Ctx(dc->getASTContext()), DC(dc), TargetLoc(targetLoc) {}
 
 public:
   static std::optional<SyntacticElementTarget>
   check(const SyntacticElementTarget &target) {
-    PreCheckTarget checker(target.getDeclContext());
+    PreCheckTarget checker(target.getDeclContext(), target.getLoc());
     auto newTarget = target.walk(checker);
     if (!newTarget)
       return std::nullopt;
@@ -1269,6 +1276,25 @@ public:
 
   MacroWalking getMacroWalkingBehavior() const override {
     return MacroWalking::Arguments;
+  }
+
+  bool isDeclInMacroExpansion(Decl *decl) const override {
+    if (!ASTWalker::isDeclInMacroExpansion(decl))
+      return false;
+
+    // The pre-checked target may itself be code in a macro expansion buffer,
+    // e.g. the rewritten expression of an expression macro. Declarations that
+    // live in the same buffer as the target - such as the pattern bindings of
+    // a closure's capture list - are part of the target and must be walked;
+    // treating them as foreign macro-generated declarations would leave their
+    // initializers unresolved when they reach the constraint system.
+    auto declLoc = decl->getLoc();
+    if (TargetLoc.isInvalid() || declLoc.isInvalid())
+      return true;
+
+    auto &SM = Ctx.SourceMgr;
+    return SM.findBufferContainingLoc(declLoc) !=
+           SM.findBufferContainingLoc(TargetLoc);
   }
 
   VarDecl *getImplicitSelfDeclForSuperContext(SourceLoc Loc);
