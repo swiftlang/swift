@@ -3356,8 +3356,9 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
     if ($TestSwift) {
       $Targets += @("SwiftCompilerPlugin", "check-swift")
     }
-    if ($TestLLDB) { $Targets += @("check-lldb") }
-    if ($TestLLDBSwift) { $Targets += @("check-lldb-swift") }
+    $LLDBTargets = @()
+    if ($TestLLDB) { $LLDBTargets += @("check-lldb") }
+    if ($TestLLDBSwift) { $LLDBTargets += @("check-lldb-swift") }
     if ($TestLLDB -or $TestLLDBSwift) {
       # Override test filter for known issues in downstream LLDB
       Load-LitTestOverrides ([IO.Path]::GetFullPath([IO.Path]::Combine($PSScriptRoot, "..", "..", "llvm-project", "lldb", "test", "windows-swift-llvm-lit-test-overrides.txt")))
@@ -3395,7 +3396,7 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
       }
     }
 
-    if (-not $Targets) {
+    if ((-not $Targets) -and (-not $LLDBTargets)) {
       Write-Warning "Test-Compilers invoked without specifying test target(s)."
     }
 
@@ -3462,7 +3463,9 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
                                    "sourcekitd-test.exe",
                                    "swift-ide-test.exe",
                                    "swift-plugin-server.exe",
-                                   "swiftc-legacy-driver.exe"
+                                   "swiftc-legacy-driver.exe",
+                                   "lldb.exe",
+                                   "repl_swift.exe"
                                  )
       # SxS only probes the EXE's own directory for the named assembly.
       if (Test-Path (Join-Path $Stage2LibexecSwiftDir "swift-backtrace.exe")) {
@@ -3481,8 +3484,14 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
     # that load them, otherwise the linker races with memory-mapped DLLs
     # causing LNK1104. Build swift-test-stdlib first to enforce ordering.
     $Targets = @("swift-test-stdlib") + $Targets
-
     Build-CMakeProject @BuildCMakeArgs -BuildTargets $Targets
+
+    if ($LLDBTargets) {
+      Invoke-IsolatingEnvVars {
+        $env:SDKROOT = $SwiftSDK
+        Build-CMakeProject @BuildCMakeArgs -BuildTargets $LLDBTargets
+      }
+    }
   }
 }
 
