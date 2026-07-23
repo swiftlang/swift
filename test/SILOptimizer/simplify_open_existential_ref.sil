@@ -155,6 +155,32 @@ bb0(%0 : @guaranteed $Klass):
   return %r : $()
 }
 
+// A guaranteed existential whose opened archetype is named as the *destination* type of
+// an unrelated `unchecked_ref_cast` -- a type-dependent, not a data, operand -- while that
+// cast's real operand is a completely different value (%1). The type-dependent operand
+// must not be mistaken for the cast's data operand: doing so would incorrectly redirect
+// the unrelated cast's real operand to `ier.instance` (%0) instead of leaving %1 alone.
+// CHECK-LABEL: sil [ossa] @fold_guaranteed_ignoring_type_dependent_cast_operand :
+// CHECK:         [[IER:%.*]] = init_existential_ref %0
+// CHECK:         [[OER:%.*]] = open_existential_ref [[IER]]
+// CHECK:         [[UNRELATED:%.*]] = unchecked_ref_cast %1 : $Klass to $@opened{{.*}} Self
+// CHECK:         fix_lifetime [[UNRELATED]]
+// CHECK:         [[CAST:%.*]] = unchecked_ref_cast %0 : $Klass to $Klass
+// CHECK:         apply {{%[0-9]+}}([[CAST]])
+// CHECK-LABEL: } // end sil function 'fold_guaranteed_ignoring_type_dependent_cast_operand'
+sil [ossa] @fold_guaranteed_ignoring_type_dependent_cast_operand : $@convention(thin) (@guaranteed Klass, @guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass, %1 : @guaranteed $Klass):
+  %2 = init_existential_ref %0 : $Klass : $Klass, $AnyObject
+  %3 = open_existential_ref %2 : $AnyObject to $@opened("BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB", AnyObject) Self
+  %4 = unchecked_ref_cast %1 : $Klass to $@opened("BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB", AnyObject) Self
+  fix_lifetime %4
+  %5 = unchecked_ref_cast %3 : $@opened("BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB", AnyObject) Self to $Klass
+  %6 = function_ref @takeKlass : $@convention(thin) (@guaranteed Klass) -> ()
+  %7 = apply %6(%5) : $@convention(thin) (@guaranteed Klass) -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
 // A non-OSSA function (post-ownership-lowering SIL, no explicit ownership qualifiers).
 // `forwardingOwnership`/`ownership` both report `.none` here, so this takes the same
 // permissive path as the guaranteed case above.

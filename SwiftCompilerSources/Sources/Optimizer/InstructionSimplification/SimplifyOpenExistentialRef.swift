@@ -98,6 +98,7 @@ extension OpenExistentialRefInst: OnoneSimplifiable, SILCombineSimplifiable {
         }
         beginBorrows.append(bb)
       } else if let urc = use.instruction as? UncheckedRefCastInst,
+        use == urc.operand,
         urc.type.isHeapObjectReferenceType
       {
         casts.append(urc)
