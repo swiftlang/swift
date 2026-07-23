@@ -2879,7 +2879,11 @@ const RecordTypeInfo *TypeConverter::getClassInstanceTypeInfo(
     std::vector<FieldTypeInfo> Fields;
     if (!getBuilder().getFieldTypeRefs(TR, *FD.get(), ExternalTypeInfo,
                                        Fields)) {
-      setError("cannot get fields", TR);
+      if (getBuilder().getLastDemangleFailure() ==
+          remote::DemangleFailureReason::AccessorFunctionReference)
+        setError("cannot get fields: accessor function symbolic reference", TR);
+      else
+        setError("cannot get fields", TR);
       return nullptr;
     }
 
