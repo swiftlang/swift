@@ -1162,6 +1162,27 @@ class PrintAST : public ASTVisitor<PrintAST> {
     printType(T, outermostOptions);
   }
 
+  /// Print a `TypeRepr` directly while threading a resolved tuple type 
+  /// into `PrintOptions::CurrentTupleTypeReprResolvedType` for the 
+  /// duration of the print, mirroring what `printTypeLoc` does. 
+  /// 
+  /// Use this for the rare sites that bypass `printTypeLoc()` and 
+  // call `TypeRepr::print()` themselves.
+  void printTypeReprWithResolvedTuple(
+      TypeRepr *repr, Type resolvedTy,
+      NonRecursivePrintOptions nrOptions = std::nullopt) {
+    PrintOptions::OverrideScope scope(Options);
+    if (isa<TupleTypeRepr>(repr)) {
+      if (resolvedTy) {
+        if (auto tupleTy = resolvedTy->getAs<TupleType>()) {
+          OVERRIDE_PRINT_OPTION_UNCONDITIONAL(
+            scope, CurrentTupleTypeReprResolvedType, tupleTy);
+        }
+      }
+    }
+    repr->print(Printer, Options, nrOptions);
+  }
+
   void printTypeLoc(const TypeLoc &TL,
         NonRecursivePrintOptions outermostOptions = std::nullopt,
         std::optional<llvm::function_ref<void()>> printBeforeType = std::nullopt) {
@@ -1175,7 +1196,7 @@ class PrintAST : public ASTVisitor<PrintAST> {
     // is null.
     if (willUseTypeReprPrinting(TL, CurrentType, Options)) {
       if (auto repr = TL.getTypeRepr())
-        repr->print(Printer, Options, outermostOptions);
+        printTypeReprWithResolvedTuple(repr, TL.getType(), outermostOptions);
       return;
     }
 
@@ -4835,7 +4856,7 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
           if (auto *sendingRepr = dyn_cast<SendingTypeRepr>(repr)) {
             repr = sendingRepr->getBase();
           }
-          repr->print(Printer, Options, nrOptions);
+          printTypeReprWithResolvedTuple(repr, ResultTyLoc.getType(), nrOptions);
           usedTypeReprPrinting = true;
         }
       }
