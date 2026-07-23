@@ -865,7 +865,7 @@ internal func _resumeUnsafeThrowingContinuationWithError<T>(
 #endif
 
 
-/// Invokes the passed in closure with a unsafe continuation for the current task.
+/// Invokes the passed in closure with an unsafe continuation for the current task.
 ///
 /// The body of the closure executes synchronously on the calling task, and once it returns
 /// the calling task is suspended. It is possible to immediately resume the task, or escape the
@@ -915,7 +915,7 @@ public func withUnsafeContinuation<T>( // source-compatibility overload
   }
 }
 
-/// Invokes the passed in closure with a unsafe continuation for the current task.
+/// Invokes the passed in closure with an unsafe continuation for the current task.
 ///
 /// The body of the closure executes synchronously on the calling task, and once it returns
 /// the calling task is suspended. It is possible to immediately resume the task, or escape the
