@@ -3277,8 +3277,8 @@ internal func _appendingKeyPaths<
           let endOfReferencePrefix: Bool
           if leafHasReferencePrefix {
             endOfReferencePrefix = false
-          } else if isLast && leafIsReferenceWritable {
-            endOfReferencePrefix = true
+          } else if leafIsReferenceWritable {
+            endOfReferencePrefix = isLast
           } else {
             endOfReferencePrefix = component.header.endOfReferencePrefix
           }
