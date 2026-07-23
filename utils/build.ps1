@@ -4112,6 +4112,7 @@ function Build-Testing([Hashtable] $Platform,
     -SwiftSDK $SwiftSDK `
     -Defines @{
       BUILD_SHARED_LIBS = "YES";
+      ArgumentParser_DIR = (Get-ProjectCMakeModules $Platform ArgumentParser);
       CMAKE_INSTALL_BINDIR = $Platform.BinaryDir;
       CMAKE_Swift_FLAGS = $SwiftFlags;
       SwiftTesting_MACRO = "$(Get-ProjectBinaryCache $BuildPlatform BootstrapTestingMacros)\TestingMacros.dll";

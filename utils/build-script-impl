@@ -2401,6 +2401,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DFoundation_DIR=$(build_directory ${host} foundation)/cmake/modules
                     -DSwiftTesting_DIR=$(build_directory ${host} swifttesting)/cmake/modules
                     -DSwiftTestingMacros_DIR=$(build_directory ${host} swifttestingmacros)/cmake/modules
+                    -DSwiftTestingHarness_DIR=$(build_directory ${host} swifttestingharness)/cmake/modules
                     -DLLVM_DIR=$(build_directory ${host} llvm)/lib/cmake/llvm
 
                     -DXCTEST_PATH_TO_LIBDISPATCH_SOURCE:PATH=${LIBDISPATCH_SOURCE_DIR}
