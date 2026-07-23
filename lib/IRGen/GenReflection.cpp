@@ -1138,7 +1138,16 @@ public:
         },
         section);
 
-    if (IGM.IRGen.Opts.ConditionalRuntimeRecords) {
+    // @objc protocols use ObjC protocol records instead of Swift protocol
+    // descriptors. getTypeEntityReference would forward-declare a Swift
+    // protocol descriptor that is never defined, causing an LLVM verifier
+    // error. Skip conditional entries for @objc protocols since their ObjC
+    // protocol records are always kept alive.
+    bool isObjCProtocol = false;
+    if (auto proto = dyn_cast<ProtocolDecl>(NTD))
+      isObjCProtocol = proto->isObjC();
+
+    if (IGM.IRGen.Opts.ConditionalRuntimeRecords && !isObjCProtocol) {
       // Allow dead-stripping `var` (the reflection record) when the type
       // (NTD) is not referenced.
       auto ref = IGM.getTypeEntityReference(const_cast<NominalTypeDecl *>(NTD));
