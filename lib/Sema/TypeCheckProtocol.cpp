@@ -5130,7 +5130,9 @@ static bool isolationsMatch(
   if (lhs.isGlobalActor() && rhs.isGlobalActor())
     return lhs.getGlobalActor()->isEqual(rhs.getGlobalActor());
 
-  if (lhs.isActorInstanceForSelfParameter() &&
+  if (lhs.getKind() == ActorIsolation::ActorInstance &&
+      rhs.getKind() == ActorIsolation::ActorInstance &&
+      lhs.isActorInstanceForSelfParameter() &&
       rhs.isActorInstanceForSelfParameter())
     return true;
 
@@ -5279,20 +5281,33 @@ static void diagnoseConformanceIsolationErrors(
     // Suggest isolating the conformance, if possible.
     if (potentialIsolation && potentialIsolation->isGlobalActor() &&
         !conformance->isIsolated()) {
-      bool isMainActor = false;
-      Type globalActorType = potentialIsolation->getGlobalActor();
-      if (auto nominal = globalActorType->getAnyNominal())
-        isMainActor = nominal->isMainActor();
+      // Skip the suggestion when the conforming nominal already carries the
+      // same global actor: the inserted attribute would either duplicate the
+      // nominal's isolation, or (when the conformance is explicitly
+      // 'nonisolated') conflict with it.
+      auto *nominal =
+          conformance->getDeclContext()->getSelfNominalTypeDecl();
+      bool redundantWithNominal =
+          nominal &&
+          isolationsMatch(getActorIsolation(nominal), *potentialIsolation);
 
-      // Take permanent ownership of the string. The diagnostic may outlive this
-      // function call.
-      auto globalActorTypeStr = ctx.AllocateCopy(globalActorType.getString());
-      auto diag =
-          ctx.Diags.diagnose(conformance->getProtocolNameLoc(),
-                             diag::note_isolate_conformance_to_global_actor,
-                             globalActorType, isMainActor, globalActorTypeStr);
-      conformance->applyConformanceAttribute(diag,
-                                             "@" + globalActorTypeStr.str());
+      if (!redundantWithNominal) {
+        bool isMainActor = false;
+        Type globalActorType = potentialIsolation->getGlobalActor();
+        if (auto nominal = globalActorType->getAnyNominal())
+          isMainActor = nominal->isMainActor();
+
+        // Take permanent ownership of the string. The diagnostic may outlive
+        // this function call.
+        auto globalActorTypeStr =
+            ctx.AllocateCopy(globalActorType.getString());
+        auto diag =
+            ctx.Diags.diagnose(conformance->getProtocolNameLoc(),
+                               diag::note_isolate_conformance_to_global_actor,
+                               globalActorType, isMainActor, globalActorTypeStr);
+        conformance->applyConformanceAttribute(diag,
+                                               "@" + globalActorTypeStr.str());
+      }
     }
 
     // If the conformance could be @preconcurrency, suggest it.
