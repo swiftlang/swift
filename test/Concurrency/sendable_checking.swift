@@ -38,6 +38,7 @@ func acceptSendableFn(_: @Sendable @escaping () -> Void) { }
 
 @available(SwiftStdlib 5.1, *)
 func testCV(
+// expected-note@-1 {{update '@available' attribute on enclosing}}
   ns1: NS1, ns1array: [NS1], ns2: NS2, ns3: NS3, ns4: NS4,
   fn: @escaping () -> Void
   // expected-note @-1 {{parameter 'fn' is implicitly non-Sendable}}
@@ -61,6 +62,7 @@ func testCV(
 
 @available(SwiftStdlib 5.1, *)
 func testCV(
+// expected-note@-1 {{update '@available' attribute on enclosing}}
   ns1: NS1, ns1array: [NS1], ns2: NS2, ns3: NS3, ns4: NS4,
   fn: @escaping () -> Void
   // expected-note@-1{{parameter 'fn' is implicitly non-Sendable}}
