@@ -222,14 +222,21 @@ class LeafNode : Taggable {}
 
 sil @genericTake : $@convention(thin) <T where T : Taggable> (@guaranteed T) -> ()
 sil @genericPush : $@convention(thin) <T where T : Taggable> (@guaranteed T) -> ()
+sil @genericConsume : $@convention(thin) <T where T : Taggable> (@owned T) -> ()
 
 // CHECK-LABEL: sil [ossa] @siblingGenericApplies :
-// CHECK-NOT: open_existential_ref
+// CHECK: [[EXIST:%.*]] = open_existential_ref
+// CHECK: [[BORROW1:%.*]] = begin_borrow [[EXIST]]
+// CHECK: [[CAST1:%.*]] = unchecked_ref_cast [[BORROW1]]{{.*}}to $LeafNode
+// CHECK: [[BORROW2:%.*]] = begin_borrow [[EXIST]]
+// CHECK: [[CAST2:%.*]] = unchecked_ref_cast [[BORROW2]]{{.*}}to $LeafNode
 // CHECK: function_ref @genericTake
-// CHECK: apply {{%[0-9]+}}<LeafNode>(%0)
+// CHECK: apply {{%[0-9]+}}<LeafNode>([[CAST2]])
 // CHECK: function_ref @genericPush
-// CHECK: apply {{%[0-9]+}}<LeafNode>(%0)
-// CHECK-NOT: open_existential_ref
+// CHECK: apply {{%[0-9]+}}<LeafNode>([[CAST1]])
+// CHECK: end_borrow [[BORROW2]]
+// CHECK: end_borrow [[BORROW1]]
+// CHECK: destroy_value [[EXIST]]
 // CHECK-LABEL: } // end sil function 'siblingGenericApplies'
 sil [ossa] @siblingGenericApplies : $@convention(thin) (@owned LeafNode) -> () {
 bb0(%0 : @owned $LeafNode):
@@ -242,4 +249,131 @@ bb0(%0 : @owned $LeafNode):
   destroy_value %5
   %14 = tuple ()
   return %14 : $()
+}
+
+//===----------------------------------------------------------------------===//
+// Regression test: an `open_existential_ref` is used by two sibling generic
+// `apply`s that take the existential with *different* ownership
+// conventions: one `@guaranteed`, the other `@owned`.
+//
+// SILCombine devirtualizes the `@guaranteed` sibling first via a
+// `begin_borrow` of the shared existential (casting it directly would
+// consume it, breaking the other sibling). It then devirtualizes the
+// `@owned` sibling by casting the existential directly, consuming it exactly
+// as the original apply would have. The sibling-fixup logic in
+// `createApplyWithConcreteType` must recognize that this direct, owned cast
+// is itself a consuming use of the existential -- not just a
+// `destroy_value` -- and close the earlier borrow scope with an `end_borrow`
+// right before it. Otherwise the `begin_borrow` is left with no
+// lifetime-ending use, failing OSSA verification.
+//===----------------------------------------------------------------------===//
+
+// CHECK-LABEL: sil [ossa] @mixedOwnershipSiblingApplies :
+// CHECK: [[EXIST:%.*]] = open_existential_ref
+// CHECK: [[BORROW:%.*]] = begin_borrow [[EXIST]]
+// CHECK: [[CAST1:%.*]] = unchecked_ref_cast [[BORROW]]{{.*}}to $LeafNode
+// CHECK: function_ref @genericTake
+// CHECK: apply {{%[0-9]+}}<LeafNode>([[CAST1]])
+// CHECK: function_ref @genericConsume
+// CHECK: end_borrow [[BORROW]]
+// CHECK: [[CAST2:%.*]] = unchecked_ref_cast [[EXIST]]{{.*}}to $LeafNode
+// CHECK: apply {{%[0-9]+}}<LeafNode>([[CAST2]])
+// CHECK-LABEL: } // end sil function 'mixedOwnershipSiblingApplies'
+sil [ossa] @mixedOwnershipSiblingApplies : $@convention(thin) (@owned LeafNode) -> () {
+bb0(%0 : @owned $LeafNode):
+  %4 = init_existential_ref %0 : $LeafNode : $LeafNode, $any Taggable
+  %5 = open_existential_ref %4 to $@opened("22222222-2222-2222-2222-222222222222", any Taggable) Self
+  %6 = function_ref @genericTake : $@convention(thin) <τ_0_0 where τ_0_0 : Taggable> (@guaranteed τ_0_0) -> ()
+  %7 = apply %6<@opened("22222222-2222-2222-2222-222222222222", any Taggable) Self>(%5) : $@convention(thin) <τ_0_0 where τ_0_0 : Taggable> (@guaranteed τ_0_0) -> ()
+  %9 = function_ref @genericConsume : $@convention(thin) <τ_0_0 where τ_0_0 : Taggable> (@owned τ_0_0) -> ()
+  %10 = apply %9<@opened("22222222-2222-2222-2222-222222222222", any Taggable) Self>(%5) : $@convention(thin) <τ_0_0 where τ_0_0 : Taggable> (@owned τ_0_0) -> ()
+  %14 = tuple ()
+  return %14 : $()
+}
+
+//===----------------------------------------------------------------------===//
+// Regression test: CSE merges two `open_existential_ref`s of the same
+// (owned, lexically borrowed) existential into one shared, owned value, used
+// by a sibling `witness_method` apply and by a `store_borrow` (through
+// another sibling `witness_method` apply).
+//
+// SILCombine's existential devirtualization tries to prove the shared
+// existential's concrete type. Casting the existential directly would
+// consume it, leaving the `store_borrow` sibling without a valid value to
+// reference. A `store_borrow`'s source operand must also exactly match the
+// type of its destination `alloc_stack`, which still uses the abstract
+// opened-archetype type, so redirecting it to a concrete-typed cast would
+// desync that type and fail verification.
+// SILCombine instead builds the concrete cast from a `begin_borrow` of the
+// shared existential, so the existential itself is never consumed and
+// remains available, in its original type, for the `store_borrow` sibling.
+// The borrow scope is closed with `end_borrow` right before the
+// existential's own `destroy_value`.
+//===----------------------------------------------------------------------===//
+
+protocol Identifiable2 {
+  func identify()
+}
+
+protocol Updatable2 : AnyObject {
+  func update()
+}
+
+class Foo : Identifiable2, Updatable2 {
+  init()
+  func update()
+  func identify()
+}
+
+sil hidden [ossa] @$s3Foo8identifyTW : $@convention(witness_method: Identifiable2) (@in_guaranteed Foo) -> () {
+bb0(%0 : $*Foo):
+  %1 = tuple ()
+  return %1 : $()
+}
+
+sil hidden [ossa] @$s3Foo6updateTW : $@convention(witness_method: Updatable2) (@guaranteed Foo) -> () {
+bb0(%0 : @guaranteed $Foo):
+  %1 = tuple ()
+  return %1 : $()
+}
+
+sil_witness_table Foo: Identifiable2 module main {
+  method #Identifiable2.identify: @$s3Foo8identifyTW
+}
+
+sil_witness_table Foo: Updatable2 module main {
+  method #Updatable2.update: @$s3Foo6updateTW
+}
+
+// CHECK-LABEL: sil [ossa] @sharedExistentialWithStoreBorrowSibling :
+// CHECK: [[EXIST:%.*]] = open_existential_ref
+// CHECK: [[BORROW:%.*]] = begin_borrow [[EXIST]]
+// CHECK: [[CAST:%.*]] = unchecked_ref_cast [[BORROW]]
+// CHECK: apply {{%[0-9]+}}([[CAST]])
+// CHECK: store_borrow [[EXIST]] to
+// CHECK: witness_method $@opened{{.*}}, {{.*}}, [[EXIST]]
+// CHECK: end_borrow [[BORROW]]
+// CHECK: destroy_value [[EXIST]]
+// CHECK-LABEL: } // end sil function 'sharedExistentialWithStoreBorrowSibling'
+sil [ossa] @sharedExistentialWithStoreBorrowSibling : $@convention(thin) (@owned Foo) -> () {
+bb0(%0 : @owned $Foo):
+  %4 = init_existential_ref %0 : $Foo : $Foo, $any Identifiable2 & Updatable2
+  %5 = begin_borrow [lexical] %4 : $any Identifiable2 & Updatable2
+
+  %6 = open_existential_ref %5 : $any Identifiable2 & Updatable2 to $@opened("33333333-3333-3333-3333-333333333333", any Identifiable2 & Updatable2) Self
+  %7 = witness_method $@opened("33333333-3333-3333-3333-333333333333", any Identifiable2 & Updatable2) Self, #Updatable2.update, %6 : $@opened("33333333-3333-3333-3333-333333333333", any Identifiable2 & Updatable2) Self : $@convention(witness_method: Updatable2) <τ_0_0 where τ_0_0 : Updatable2> (@guaranteed τ_0_0) -> ()
+  %10 = apply %7<@opened("33333333-3333-3333-3333-333333333333", any Identifiable2 & Updatable2) Self>(%6) : $@convention(witness_method: Updatable2) <τ_0_0 where τ_0_0 : Updatable2> (@guaranteed τ_0_0) -> ()
+
+  %11 = open_existential_ref %5 : $any Identifiable2 & Updatable2 to $@opened("44444444-4444-4444-4444-444444444444", any Identifiable2 & Updatable2) Self
+  %12 = alloc_stack $@opened("44444444-4444-4444-4444-444444444444", any Identifiable2 & Updatable2) Self
+  %13 = store_borrow %11 to %12 : $*@opened("44444444-4444-4444-4444-444444444444", any Identifiable2 & Updatable2) Self
+  %14 = witness_method $@opened("44444444-4444-4444-4444-444444444444", any Identifiable2 & Updatable2) Self, #Identifiable2.identify, %11 : $@opened("44444444-4444-4444-4444-444444444444", any Identifiable2 & Updatable2) Self : $@convention(witness_method: Identifiable2) <τ_0_0 where τ_0_0 : Identifiable2> (@in_guaranteed τ_0_0) -> ()
+  %15 = apply %14<@opened("44444444-4444-4444-4444-444444444444", any Identifiable2 & Updatable2) Self>(%13) : $@convention(witness_method: Identifiable2) <τ_0_0 where τ_0_0 : Identifiable2> (@in_guaranteed τ_0_0) -> ()
+  end_borrow %13 : $*@opened("44444444-4444-4444-4444-444444444444", any Identifiable2 & Updatable2) Self
+  dealloc_stack %12 : $*@opened("44444444-4444-4444-4444-444444444444", any Identifiable2 & Updatable2) Self
+
+  end_borrow %5 : $any Identifiable2 & Updatable2
+  destroy_value %4 : $any Identifiable2 & Updatable2
+  %r = tuple ()
+  return %r : $()
 }
