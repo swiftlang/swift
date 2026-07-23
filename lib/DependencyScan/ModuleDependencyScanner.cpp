@@ -1615,7 +1615,10 @@ void ModuleDependencyScanner::resolveHeaderDependenciesForModule(
   auto extractHeaderContent =
       [&](const SwiftBinaryModuleDependencyStorage &binaryMod)
       -> std::unique_ptr<llvm::MemoryBuffer> {
-    auto header = binaryMod.headerImport;
+    auto header =
+        ReversePrefixMapping
+            ? ReversePrefixMapping->mapToString(binaryMod.headerImport)
+            : binaryMod.headerImport;
     // Check to see if the header input exists on disk.
     auto FS = ScanASTContext.SourceMgr.getFileSystem();
     if (FS->exists(header))

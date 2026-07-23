@@ -3866,14 +3866,21 @@ ContextualFailure::getDiagnosticFor(ContextualTypePurpose context,
 
 bool NonClassTypeToAnyObjectConversionFailure::diagnoseAsError() {
   auto locator = getLocator();
-  if (locator->isForContextualType()) {
-    return ContextualFailure::diagnoseAsError();
-  }
-
   auto fromType = getFromType();
   auto toType = getToType();
   assert(fromType);
   assert(toType);
+
+  if (fromType->isNoncopyable()) {
+    emitDiagnostic(diag::cannot_convert_noncopyable_value_to_anyobject,
+                   fromType, toType);
+    return true;
+  }
+
+  if (locator->isForContextualType()) {
+    return ContextualFailure::diagnoseAsError();
+  }
+
   if (locator->isLastElement<LocatorPathElt::ApplyArgToParam>()) {
     ArgumentMismatchFailure failure(getSolution(), fromType, toType, locator);
     return failure.diagnoseAsError();
