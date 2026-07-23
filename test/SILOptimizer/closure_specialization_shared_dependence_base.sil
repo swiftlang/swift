@@ -1,0 +1,64 @@
+// RUN: %target-sil-opt -enable-sil-verify-all -closure-specialization %s | %FileCheck %s
+
+// The same value is captured by two closures passed to one call, each with a mark_dependence
+// on it. After specialization, each base must be re-materialized on its own closure's argument.
+
+import Builtin
+
+class Storage {}
+
+struct Val {}
+
+sil private [readonly] [ossa] @takesTwoClosures : $@convention(thin) (@guaranteed @noescape @callee_guaranteed (Val) -> Val, @guaranteed @noescape @callee_guaranteed (Val) -> Val) -> Val {
+bb0(%0 : @guaranteed $@noescape @callee_guaranteed (Val) -> Val, %1 : @guaranteed $@noescape @callee_guaranteed (Val) -> Val):
+  %v = struct $Val ()
+  %a = apply %0(%v) : $@noescape @callee_guaranteed (Val) -> Val
+  %b = apply %1(%v) : $@noescape @callee_guaranteed (Val) -> Val
+  return %a : $Val
+}
+
+sil private [ossa] @closureA : $@convention(thin) (Val, @guaranteed Storage) -> Val {
+bb0(%0 : $Val, %1 : @closureCapture @guaranteed $Storage):
+  %r = struct $Val ()
+  return %r : $Val
+}
+
+sil private [ossa] @closureB : $@convention(thin) (Val, @guaranteed Storage) -> Val {
+bb0(%0 : $Val, %1 : @closureCapture @guaranteed $Storage):
+  %r = struct $Val ()
+  return %r : $Val
+}
+
+// The two captures become two arguments, and each closure's mark_dependence is re-materialized on
+// its own argument: closureA's on %0, closureB's on %1.
+// CHECK-LABEL: sil {{.*}}@$s16takesTwoClosures{{.*}}Tf1cc_n : $@convention(thin) (@guaranteed Storage, @guaranteed Storage) -> Val {
+// CHECK:       [[PA0:%[0-9]+]] = partial_apply [callee_guaranteed] [on_stack] {{%[0-9]+}}(%0)
+// CHECK:       mark_dependence [[PA0]] on %0
+// CHECK:       [[PA1:%[0-9]+]] = partial_apply [callee_guaranteed] [on_stack] {{%[0-9]+}}(%1)
+// CHECK:       mark_dependence [[PA1]] on %1
+// CHECK-LABEL: } // end sil function '$s16takesTwoClosures{{.*}}Tf1cc_n'
+
+// The apply is rewritten to a direct call passing the shared capture once per closure; the dead
+// closures and their mark_dependences are deleted.
+// CHECK-LABEL: sil [ossa] @testSharedDependenceBase : $@convention(method) (@guaranteed Storage) -> Val {
+// CHECK-NOT:   partial_apply
+// CHECK-NOT:   mark_dependence
+// CHECK:       [[F:%[0-9]+]] = function_ref @$s16takesTwoClosures{{.*}}Tf1cc_n
+// CHECK:       apply [[F]](%0, %0)
+// CHECK-NOT:   partial_apply
+// CHECK-NOT:   mark_dependence
+// CHECK-LABEL: } // end sil function 'testSharedDependenceBase'
+sil [ossa] @testSharedDependenceBase : $@convention(method) (@guaranteed Storage) -> Val {
+bb0(%0 : @guaranteed $Storage):
+  %fa = function_ref @closureA : $@convention(thin) (Val, @guaranteed Storage) -> Val
+  %paA = partial_apply [callee_guaranteed] [on_stack] %fa(%0) : $@convention(thin) (Val, @guaranteed Storage) -> Val
+  %mdA = mark_dependence %paA : $@noescape @callee_guaranteed (Val) -> Val on %0 : $Storage
+  %fb = function_ref @closureB : $@convention(thin) (Val, @guaranteed Storage) -> Val
+  %paB = partial_apply [callee_guaranteed] [on_stack] %fb(%0) : $@convention(thin) (Val, @guaranteed Storage) -> Val
+  %mdB = mark_dependence %paB : $@noescape @callee_guaranteed (Val) -> Val on %0 : $Storage
+  %f = function_ref @takesTwoClosures : $@convention(thin) (@guaranteed @noescape @callee_guaranteed (Val) -> Val, @guaranteed @noescape @callee_guaranteed (Val) -> Val) -> Val
+  %r = apply %f(%mdA, %mdB) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed (Val) -> Val, @guaranteed @noescape @callee_guaranteed (Val) -> Val) -> Val
+  destroy_value %mdB
+  destroy_value %mdA
+  return %r : $Val
+}
