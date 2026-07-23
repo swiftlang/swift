@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.19.6)
+cmake_minimum_required(VERSION 3.29)
 
 
 #  set_property(GLOBAL PROPERTY GLOBAL_DEPENDS_DEBUG_MODE 1)
@@ -8,21 +8,6 @@ cmake_minimum_required(VERSION 3.19.6)
 # rdar://37725888
 if(POLICY CMP0068)
   cmake_policy(SET CMP0068 OLD)
-endif()
-
-# Honour CMAKE_CXX_STANDARD in try_compile(), needed for check_cxx_native_regex.
-if(POLICY CMP0067)
-  cmake_policy(SET CMP0067 NEW)
-endif()
-
-# Convert relative paths to absolute for subdirectory `target_sources`
-if(POLICY CMP0076)
-  cmake_policy(SET CMP0076 NEW)
-endif()
-
-# Don't clobber existing variable values when evaluating `option()` declarations.
-if(POLICY CMP0077)
-  cmake_policy(SET CMP0077 NEW)
 endif()
 
 # Add path for custom CMake modules.
