@@ -49,6 +49,15 @@ final public class GlobalVariable : CustomStringConvertible, HasShortDescription
   /// For example, `public_external` linkage.
   public var isDefinedExternally: Bool { linkage.isExternal }
 
+  /// True, if the global variable is weakly imported, i.e. it may not be available at
+  /// runtime because it was introduced in an OS version which is newer than the
+  /// deployment target.
+  ///
+  /// The address of a weakly-imported global is null if the symbol is unavailable at
+  /// runtime. Therefore the global must only be accessed behind a matching `#available`
+  /// check and such an access must not be executed speculatively.
+  public var isWeaklyImported: Bool { bridged.isWeaklyImported() }
+
   public var staticInitializerInstructions: InstructionList? {
     if let firstStaticInitInst = bridged.getFirstStaticInitInst().instruction {
       return InstructionList(first: firstStaticInitInst)

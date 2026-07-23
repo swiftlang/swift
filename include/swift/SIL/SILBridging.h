@@ -675,6 +675,7 @@ struct BridgedGlobalVar {
   BRIDGED_INLINE BridgedLinkage getLinkage() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE swift::SourceLoc getSourceLocation() const;
   BRIDGED_INLINE bool isPossiblyUsedExternally() const;
+  BRIDGED_INLINE bool isWeaklyImported() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedInstruction getFirstStaticInitInst() const;
   bool canBeInitializedStatically() const;
   bool mustBeInitializedStatically() const;
