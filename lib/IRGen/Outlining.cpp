@@ -31,6 +31,7 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/IRGen/GenericRequirement.h"
 #include "swift/IRGen/Linking.h"
+#include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/SILModule.h"
 
 using namespace swift;
@@ -86,6 +87,19 @@ void OutliningMetadataCollector::collectTypeMetadataForLayout(SILType ty) {
   // non ABI accessible field/element types.
   if (isa<FixedTypeInfo>(ti) || !ti.isABIAccessible()) {
     return;
+  }
+
+  // A file-private/private nominal's metadata is only accessible from its
+  // defining file, so this outlined function's collected signature (and body)
+  // differs between that file -- which inlines the value operation using the
+  // type's metadata, collected here -- and any other file, which falls back to
+  // the enclosing type's value witness. Record that so the function is emitted
+  // with per-file private linkage instead of shared linkonce_odr, otherwise the
+  // two signatures would merge under one mangled name.  See
+  // getOrCreateOutlined{Destroy,CopyAddrHelper}Function.
+  if (auto *nominal = astType->getAnyNominal()) {
+    if (getDeclLinkage(nominal) == FormalLinkage::Private)
+      SignatureDependsOnFilePrivateType = true;
   }
 
   // If the type is a legal formal type, add it as a formal type.
@@ -504,8 +518,15 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedCopyAddrHelperFunction(
   // The default hidden linkonce_odr might lead to linking an implementation
   // from another file that head a different expansion/different
   // signature/different implementation.
+  //
+  // Likewise, a file-private/private type in the layout is only metadata-
+  // accessible from its defining file, so the collected metadata signature (and
+  // body) differs between that file and any other, which would otherwise merge
+  // under the shared mangled name. In both cases, fall back to per-file private
+  // linkage so each file gets its own self-consistent copy.
   if (getTypeProperties(T, TypeExpansionContext::minimal())
-        .isTypeExpansionSensitive()) {
+          .isTypeExpansionSensitive() ||
+      collector.signatureDependsOnFilePrivateType()) {
     linkage = &privateLinkage;
   }
 
@@ -577,8 +598,15 @@ llvm::Constant *IRGenModule::getOrCreateOutlinedDestroyFunction(
   // The default hidden linkonce_odr might lead to linking an implementation
   // from another file that head a different expansion/different
   // signature/different implementation.
+  //
+  // Likewise, a file-private/private type in the layout is only metadata-
+  // accessible from its defining file, so the collected metadata signature (and
+  // body) differs between that file and any other, which would otherwise merge
+  // under the shared mangled name. In both cases, fall back to per-file
+  // private linkage so each file gets its own self-consistent copy.
   if (getTypeProperties(T, TypeExpansionContext::minimal())
-        .isTypeExpansionSensitive()) {
+          .isTypeExpansionSensitive() ||
+      collector.signatureDependsOnFilePrivateType()) {
     linkage = &privateLinkage;
   }
 

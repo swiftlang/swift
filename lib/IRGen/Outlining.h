@@ -116,6 +116,18 @@ public:
                                  Explosion &params) const;
   void materialize();
 
+  /// Whether the collected metadata (and therefore the outlined function's
+  /// signature/body) depends on a type whose metadata is only accessible from
+  /// its defining file -- i.e. a file-private/private nominal.  Such a function
+  /// must not be shared across files via linkonce_odr, because the defining
+  /// file can access the private type's metadata (and inline using it) while
+  /// other files fall back to the enclosing type's value witness, producing a
+  /// different signature under the same mangled name.  See
+  /// getOrCreateOutlined{Destroy,CopyAddrHelper}Function.
+  bool signatureDependsOnFilePrivateType() const {
+    return SignatureDependsOnFilePrivateType;
+  }
+
 private:
   void collectTypeMetadataForLayout(SILType ty);
   void collectTypeMetadataForDeinit(SILType ty);
@@ -300,6 +312,7 @@ private:
     }
   };
   State state;
+  bool SignatureDependsOnFilePrivateType = false;
   bool hasFinished() const {
     return state == State::Kind::Empty || state == State::Kind::Collected;
   }
