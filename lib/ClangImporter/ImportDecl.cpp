@@ -852,6 +852,16 @@ classImplementsProtocol(const clang::ObjCInterfaceDecl *constInterface,
   return interface->ClassImplementsProtocol(proto, checkCategories);
 }
 
+/// Set weak storage interface on a VarDecl, wrapping its type in
+/// WeakStorageType and adding the ReferenceOwnershipAttr.
+static void setWeakStorageInterface(VarDecl *var, Type type) {
+  ASTContext &ctx = var->getASTContext();
+  var->getAttrs().add(new (ctx)
+                          ReferenceOwnershipAttr(ReferenceOwnership::Weak));
+  var->setInterfaceType(WeakStorageType::get(
+      type->isOptional() ? type : type->wrapInOptionalType(), ctx));
+}
+
 static void
 applyPropertyOwnership(VarDecl *prop,
                        clang::ObjCPropertyAttribute::Kind attrs) {
@@ -865,10 +875,7 @@ applyPropertyOwnership(VarDecl *prop,
     return;
   }
   if (attrs & clang::ObjCPropertyAttribute::kind_weak) {
-    prop->addAttribute(new (ctx)
-                           ReferenceOwnershipAttr(ReferenceOwnership::Weak));
-    prop->setInterfaceType(WeakStorageType::get(
-        prop->getInterfaceType(), ctx));
+    setWeakStorageInterface(prop, prop->getInterfaceType());
     return;
   }
   if ((attrs & clang::ObjCPropertyAttribute::kind_assign) ||
@@ -2427,6 +2434,7 @@ namespace {
           };
 
       bool isNonTrivialPtrAuth = false;
+      bool hasArcFields = false;
       // FIXME: We should actually support strong ARC references and similar in
       // C structs. That'll require some SIL and IRGen work, though.
       if (decl->isNonTrivialToPrimitiveCopy() ||
@@ -2435,23 +2443,31 @@ namespace {
                                   .EnableImportPtrauthFieldFunctionPointers &&
                               isNonTrivialDueToAddressDiversifiedPtrAuth(decl);
         if (!isNonTrivialPtrAuth) {
-          // Note that there is a third predicate related to these,
-          // isNonTrivialToPrimitiveDefaultInitialize. That one's not important
-          // for us because Swift never "trivially default-initializes" a struct
-          // (i.e. uses whatever bits were lying around as an initial value).
+          // Check if the non-triviality is due to ARC fields and the
+          // experimental feature flag is enabled.
+          if (Impl.SwiftContext.LangOpts.hasFeature(
+                  Feature::ImportCStructsWithArcFields)) {
+            hasArcFields = true;
+          } else {
+            // Note that there is a third predicate related to these,
+            // isNonTrivialToPrimitiveDefaultInitialize. That one's not
+            // important for us because Swift never "trivially
+            // default-initializes" a struct (i.e. uses whatever bits were lying
+            // around as an initial value).
 
-          // FIXME: It would be nice to instead import the declaration but mark
-          // it as unavailable, but then it might get used as a type for an
-          // imported function and the developer would be able to use it without
-          // referencing the name, which would sidestep our availability
-          // diagnostics.
-          Impl.addImportDiagnostic(
-              decl,
-              Diagnostic(
-                  diag::record_non_trivial_copy_destroy,
-                  Impl.SwiftContext.AllocateCopy(decl->getNameAsString())),
-              decl->getLocation());
-          return nullptr;
+            // FIXME: It would be nice to instead import the declaration but
+            // mark it as unavailable, but then it might get used as a type for
+            // an imported function and the developer would be able to use it
+            // without referencing the name, which would sidestep our
+            // availability diagnostics.
+            Impl.addImportDiagnostic(
+                decl,
+                Diagnostic(
+                    diag::record_non_trivial_copy_destroy,
+                    Impl.SwiftContext.AllocateCopy(decl->getNameAsString())),
+                decl->getLocation());
+            return nullptr;
+          }
         }
       }
 
@@ -2669,6 +2685,13 @@ namespace {
             auto varDecl = dyn_cast<clang::VarDecl>(nd);
             // Static fields don't affect the memberwise initializer.
             if (!(varDecl && varDecl->isStaticDataMember())) {
+              // For structs with ARC fields, a partial import is a
+              // correctness bug — the layout would be wrong. Bail out
+              // entirely rather than importing a subset of fields.
+              if (hasArcFields) {
+                eraseCacheOnBailOut();
+                return nullptr;
+              }
               // We don't know what this member is.
               // Assume it may be important in C.
               hasUnreferenceableStorage = true;
@@ -2784,6 +2807,81 @@ namespace {
           result->addMemberToLookupTable(member);
       }
 
+      // For ARC structs, detect fields whose ObjC type has a Swift bridge
+      // (e.g., NSString → String). For each such field, make the stored
+      // property private (with a _ prefix) and add a computed property
+      // with the original name and the bridged Swift type.
+      bool hasBridgedFields = false;
+      SmallVector<SwiftDeclSynthesizer::BridgedInitParam, 4> bridgedInitParams;
+      if (hasArcFields && isa<StructDecl>(result)) {
+        for (unsigned i = 0; i < members.size(); i++) {
+          auto *member = members[i];
+          auto *clangField =
+              dyn_cast_or_null<clang::FieldDecl>(member->getClangDecl());
+          if (!clangField) {
+            bridgedInitParams.push_back(
+                {member->getName(), member->getInterfaceType(),
+                 member->isImplicitlyUnwrappedOptional()});
+            continue;
+          }
+
+          auto objcLifetime = clangField->getType().getObjCLifetime();
+          if (objcLifetime != clang::Qualifiers::OCL_Strong) {
+            bridgedInitParams.push_back(
+                {member->getName(), member->getInterfaceType(),
+                 member->isImplicitlyUnwrappedOptional()});
+            continue;
+          }
+
+          // Try importing the field type with bridging enabled.
+          auto bridgedImport =
+              Impl.importType(clangField->getType(), ImportTypeKind::Property,
+                              ImportDiagnosticAdder(Impl, clangField,
+                                                    clangField->getLocation()),
+                              isInSystemModule(dc), Bridgeability::Full,
+                              getImportTypeAttrs(clangField));
+
+          if (!bridgedImport ||
+              bridgedImport.getType()->isEqual(member->getInterfaceType())) {
+            bridgedInitParams.push_back(
+                {member->getName(), member->getInterfaceType(),
+                 member->isImplicitlyUnwrappedOptional()});
+            continue;
+          }
+
+          // This field bridges. Rename the stored field and make it private.
+          auto originalName = member->getName();
+          auto bridgedType = bridgedImport.getType();
+
+          auto storedName =
+              Impl.SwiftContext.getIdentifier(("_" + originalName.str()).str());
+          member->setName(storedName);
+          member->overwriteAccess(AccessLevel::Private);
+          member->overwriteSetterAccess(AccessLevel::Private);
+
+          // Create a computed property with the original name.
+          auto *computedVar = new (Impl.SwiftContext) VarDecl(
+              /*IsStatic*/ false, VarDecl::Introducer::Var, SourceLoc(),
+              originalName, result);
+          computedVar->setInterfaceType(bridgedType);
+          computedVar->setImplicit();
+          computedVar->copyFormalAccessFrom(result);
+          ClangImporter::Implementation::recordImplicitUnwrapForDecl(
+              computedVar, bridgedImport.isImplicitlyUnwrapped());
+          if (clangField->getType().isConstQualified())
+            computedVar->overwriteSetterAccess(AccessLevel::Private);
+
+          synthesizer.makeBridgedFieldAccessors(cast<StructDecl>(result),
+                                                computedVar, member);
+
+          result->addMember(computedVar);
+
+          bridgedInitParams.push_back({originalName, bridgedType,
+                                       bridgedImport.isImplicitlyUnwrapped()});
+          hasBridgedFields = true;
+        }
+      }
+
       const clang::CXXRecordDecl *cxxRecordDecl =
           dyn_cast<clang::CXXRecordDecl>(decl);
       bool hasBaseClasses = cxxRecordDecl &&
@@ -2865,12 +2963,18 @@ namespace {
         //
         // If we can completely represent the struct in SIL, leave the body
         // implicit, otherwise synthesize one to call property setters.
-        auto valueCtor = synthesizer.createValueConstructor(
-            result, members,
-            /*want param names*/ true,
-            /*want body*/ hasUnreferenceableStorage);
-        if (!hasUnreferenceableStorage)
-          valueCtor->setIsMemberwiseInitializer(MemberwiseInitKind::Regular);
+        ConstructorDecl *valueCtor;
+        if (hasBridgedFields) {
+          valueCtor = synthesizer.createBridgedValueConstructor(
+              result, members, bridgedInitParams, /*wantBody=*/true);
+        } else {
+          valueCtor = synthesizer.createValueConstructor(
+              result, members,
+              /*want param names*/ true,
+              /*want body*/ hasUnreferenceableStorage);
+          if (!hasUnreferenceableStorage)
+            valueCtor->setIsMemberwiseInitializer(MemberwiseInitKind::Regular);
+        }
 
         if (isNonEscapable)
           markReturnsUnsafeNonescapable(valueCtor);
@@ -4891,12 +4995,19 @@ namespace {
         importedType = ImportedType(closureType, false);
       }
 
-      if (!importedType)
-        importedType =
-            Impl.importType(decl->getType(), ImportTypeKind::RecordField,
-                            ImportDiagnosticAdder(Impl, decl, decl->getLocation()),
-                            isInSystemModule(dc), Bridgeability::None,
-                            getImportTypeAttrs(decl));
+      auto objcLifetime = decl->getType().getObjCLifetime();
+
+      if (!importedType) {
+        auto importTypeKind = ImportTypeKind::RecordField;
+        if (objcLifetime == clang::Qualifiers::OCL_Weak)
+          importTypeKind = ImportTypeKind::RecordFieldWithReferenceSemantics;
+
+        importedType = Impl.importType(
+            decl->getType(), importTypeKind,
+            ImportDiagnosticAdder(Impl, decl, decl->getLocation()),
+            isInSystemModule(dc), Bridgeability::None,
+            getImportTypeAttrs(decl));
+      }
       if (!importedType) {
         Impl.addImportDiagnostic(
             decl, Diagnostic(diag::record_field_not_imported, decl),
@@ -4904,23 +5015,39 @@ namespace {
         return nullptr;
       }
 
-      auto type = importedType.getType();
-
       auto result = Impl.createDeclWithClangNode<VarDecl>(
           decl, importer::convertClangAccess(decl->getAccess()),
           /*IsStatic*/ false, VarDecl::Introducer::Var,
           Impl.importSourceLoc(decl->getLocation()), name, dc);
+
+      result->setInterfaceType(importedType.getType());
+      ClangImporter::Implementation::recordImplicitUnwrapForDecl(
+          result, importedType.isImplicitlyUnwrapped());
+
       if (decl->getType().isConstQualified()) {
         // Note that in C++ there are ways to change the values of const
         // members, so we don't use WriteImplKind::Immutable storage.
         assert(result->supportsMutation());
         result->overwriteSetterAccess(AccessLevel::Private);
       }
+
       result->setIsObjC(false);
       result->setIsDynamic(false);
-      result->setInterfaceType(type);
-      ClangImporter::Implementation::recordImplicitUnwrapForDecl(
-          result, importedType.isImplicitlyUnwrapped());
+
+      // Handle ARC ownership for struct fields.
+      if (objcLifetime == clang::Qualifiers::OCL_Weak) {
+        if (auto nullability = decl->getType()->getNullability()) {
+          // A weak + nonnull field can't be represented in Swift — refuse it
+          // and let VisitRecordDecl fail the whole struct.
+          if (*nullability == clang::NullabilityKind::NonNull) {
+            Impl.addImportDiagnostic(
+                decl, Diagnostic(diag::record_field_weak_nonnull, decl),
+                decl->getSourceRange().getBegin());
+            return nullptr;
+          }
+        }
+        setWeakStorageInterface(result, importedType.getType());
+      }
 
       // Handle attributes.
       if (decl->hasAttr<clang::IBOutletAttr>())

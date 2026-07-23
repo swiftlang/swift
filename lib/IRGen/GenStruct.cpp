@@ -75,6 +75,7 @@ enum class StructTypeInfoKind {
   FixedStructTypeInfo,
   LoadableClangRecordTypeInfo,
   AddressOnlyClangRecordTypeInfo,
+  AddressOnlyArcClangRecordTypeInfo,
   NonFixedStructTypeInfo,
   ResilientStructTypeInfo
 };
@@ -547,6 +548,117 @@ namespace {
                         bool isOutlined) const override {
       emitCopyWithCopyFunction(IGF, T, src, dst);
       destroy(IGF, src, T, isOutlined);
+    }
+
+    std::nullopt_t getNonFixedOffsets(IRGenFunction &IGF) const {
+      return std::nullopt;
+    }
+    std::nullopt_t getNonFixedOffsets(IRGenFunction &IGF, SILType T) const {
+      return std::nullopt;
+    }
+    MemberAccessStrategy
+    getNonFixedFieldAccessStrategy(IRGenModule &IGM, SILType T,
+                                   const ClangFieldInfo &field) const {
+      llvm_unreachable("non-fixed field in Clang type?");
+    }
+  };
+
+  /// A type implementation for address-only C record types with ARC fields
+  /// (e.g. __weak). VWT operations delegate to Clang-synthesized helper
+  /// functions that know how to copy/move/destroy ARC-qualified fields.
+  class AddressOnlyArcClangRecordTypeInfo final
+      : public StructTypeInfoBase<AddressOnlyArcClangRecordTypeInfo,
+                                  FixedTypeInfo, ClangFieldInfo> {
+    const clang::RecordDecl *clangDecl;
+
+    clang::QualType getClangQualType() const {
+      return clang::QualType(clangDecl->getTypeForDecl(), 0);
+    }
+
+    void emitCopyWithCopyConstructor(IRGenFunction &IGF, SILType T,
+                                     Address src, Address dst) const {
+      auto *fn = clang::CodeGen::getNonTrivialCStructCopyConstructor(
+          IGF.IGM.getClangCGM(), dst.getAlignment(), src.getAlignment(),
+          /*isVolatile*/ false, getClangQualType());
+      IGF.Builder.CreateCall(fn->getFunctionType(), fn,
+                             {dst.getAddress(), src.getAddress()});
+    }
+
+    void emitMoveWithMoveConstructor(IRGenFunction &IGF, SILType T,
+                                     Address src, Address dst) const {
+      auto *fn = clang::CodeGen::getNonTrivialCStructMoveConstructor(
+          IGF.IGM.getClangCGM(), dst.getAlignment(), src.getAlignment(),
+          /*isVolatile*/ false, getClangQualType());
+      IGF.Builder.CreateCall(fn->getFunctionType(), fn,
+                             {dst.getAddress(), src.getAddress()});
+    }
+
+    void emitDestructor(IRGenFunction &IGF, SILType T, Address addr) const {
+      auto *fn = clang::CodeGen::getNonTrivialCStructDestructor(
+          IGF.IGM.getClangCGM(), addr.getAlignment(),
+          /*isVolatile*/ false, getClangQualType());
+      IGF.Builder.CreateCall(fn->getFunctionType(), fn, {addr.getAddress()});
+    }
+
+  public:
+    AddressOnlyArcClangRecordTypeInfo(ArrayRef<ClangFieldInfo> fields,
+                                      llvm::Type *storageType, Size size,
+                                      Alignment align,
+                                      IsCopyable_t isCopyable,
+                                      const clang::RecordDecl *clangDecl)
+        : StructTypeInfoBase(
+              StructTypeInfoKind::AddressOnlyArcClangRecordTypeInfo, fields,
+              FieldsAreABIAccessible, storageType, size,
+              SpareBitVector(
+                  std::optional<APInt>{llvm::APInt(size.getValueInBits(), 0)}),
+              align, IsNotTriviallyDestroyable, IsNotBitwiseTakable, isCopyable,
+              IsFixedSize, IsABIAccessible),
+          clangDecl(clangDecl) {}
+
+    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM, SILType T,
+                                          bool useStructLayouts) const override {
+      return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
+    }
+
+    void initializeFromParams(IRGenFunction &IGF, Explosion &params,
+                              Address addr, SILType T,
+                              bool isOutlined) const override {
+      llvm_unreachable("Address-only ARC C types cannot be initialized "
+                       "from an explosion.");
+    }
+
+    void initializeWithCopy(IRGenFunction &IGF, Address dst, Address src,
+                            SILType T, bool isOutlined) const override {
+      emitCopyWithCopyConstructor(IGF, T, src, dst);
+    }
+
+    void assignWithCopy(IRGenFunction &IGF, Address dst, Address src, SILType T,
+                        bool isOutlined) const override {
+      auto *fn = clang::CodeGen::getNonTrivialCStructCopyAssignmentOperator(
+          IGF.IGM.getClangCGM(), dst.getAlignment(), src.getAlignment(),
+          /*isVolatile*/ false, getClangQualType());
+      IGF.Builder.CreateCall(fn->getFunctionType(), fn,
+                             {dst.getAddress(), src.getAddress()});
+    }
+
+    void initializeWithTake(IRGenFunction &IGF, Address dst, Address src,
+                            SILType T, bool isOutlined,
+                            bool zeroizeIfSensitive) const override {
+      emitMoveWithMoveConstructor(IGF, T, src, dst);
+    }
+
+    void assignWithTake(IRGenFunction &IGF, Address dst, Address src, SILType T,
+                        bool isOutlined) const override {
+      auto *fn = clang::CodeGen::getNonTrivialCStructMoveAssignmentOperator(
+          IGF.IGM.getClangCGM(), dst.getAlignment(), src.getAlignment(),
+          /*isVolatile*/ false, getClangQualType());
+      IGF.Builder.CreateCall(fn->getFunctionType(), fn,
+                             {dst.getAddress(), src.getAddress()});
+    }
+
+    void destroy(IRGenFunction &IGF, Address addr, SILType T,
+                 bool isOutlined) const override {
+      emitDestructor(IGF, T, addr);
     }
 
     std::nullopt_t getNonFixedOffsets(IRGenFunction &IGF) const {
@@ -1405,6 +1517,9 @@ class ClangRecordLowering {
   // are not trivial in Swift, they cannot be copied using memcpy as we need to
   // do the proper retain operations.
   bool hasReferenceField = false;
+  // Structs containing __weak fields must be address-only because the ObjC
+  // runtime tracks weak reference slots by address.
+  bool hasWeakField = false;
 
 public:
   ClangRecordLowering(IRGenModule &IGM, StructDecl *swiftDecl,
@@ -1438,6 +1553,13 @@ public:
     }
     if (SwiftType.getStructOrBoundGenericStruct()->isNonTrivialPtrAuth()) {
       return AddressOnlyPointerAuthRecordTypeInfo::create(
+          FieldInfos, llvmType, TotalStride, TotalAlignment,
+          (SwiftDecl && !SwiftDecl->canBeCopyable())
+            ? IsNotCopyable : IsCopyable,
+          ClangDecl);
+    }
+    if (hasWeakField) {
+      return AddressOnlyArcClangRecordTypeInfo::create(
           FieldInfos, llvmType, TotalStride, TotalAlignment,
           (SwiftDecl && !SwiftDecl->canBeCopyable())
             ? IsNotCopyable : IsCopyable,
@@ -1576,8 +1698,12 @@ private:
           SwiftType.getFieldType(swiftField, IGM.getSILModule(),
                                  IGM.getMaximalTypeExpansionContext())));
       addField(swiftField, offset, fieldTI, isZeroSized);
-      auto fieldTy =
-          swiftField->getInterfaceType()->lookThroughSingleOptionalType();
+      auto fieldInterfaceTy = swiftField->getInterfaceType();
+      if (isa<WeakStorageType>(fieldInterfaceTy.getPointer())) {
+        hasReferenceField = true;
+        hasWeakField = true;
+      }
+      auto fieldTy = fieldInterfaceTy->lookThroughSingleOptionalType();
       if (fieldTy->isAnyClassReferenceType() &&
           fieldTy->getReferenceCounting() != ReferenceCounting::None)
         hasReferenceField = true;
@@ -1692,6 +1818,9 @@ private:
       return structTI.as<LoadableClangRecordTypeInfo>().op(IGF, __VA_ARGS__);  \
     case StructTypeInfoKind::AddressOnlyClangRecordTypeInfo:                   \
       return structTI.as<AddressOnlyCXXClangRecordTypeInfo>().op(IGF,          \
+                                                                 __VA_ARGS__); \
+    case StructTypeInfoKind::AddressOnlyArcClangRecordTypeInfo:                \
+      return structTI.as<AddressOnlyArcClangRecordTypeInfo>().op(IGF,          \
                                                                  __VA_ARGS__); \
     case StructTypeInfoKind::LoadableStructTypeInfo:                           \
       return structTI.as<LoadableStructTypeInfo>().op(IGF, __VA_ARGS__);       \
