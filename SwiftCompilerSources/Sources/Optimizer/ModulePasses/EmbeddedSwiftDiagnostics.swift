@@ -149,7 +149,9 @@ private struct FunctionChecker {
       }
 
     case let ba as BeginApplyInst:
-      if context.options.noAllocations {
+      // The old yield_once_1 coroutine uses a heap-allocated frame, so it
+      // cannot be used in no-allocations mode.
+      if context.options.noAllocations && !ba.isCalleeAllocated {
         throw Diagnostic(.embedded_swift_allocating_coroutine, at: instruction.location)
       }
       try checkApply(apply: ba)
