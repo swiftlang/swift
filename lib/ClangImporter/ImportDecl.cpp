@@ -959,6 +959,12 @@ static bool shouldEagerlyImportClangRecordMember(const clang::NamedDecl *decl,
   if (auto *fn = dyn_cast<clang::FunctionDecl>(decl)) {
     switch (fn->getDeclName().getNameKind()) {
     case clang::DeclarationName::CXXOperatorName:
+      if (fn->getOverloadedOperator() == clang::OverloadedOperatorKind::OO_Call)
+        // operator() can be imported lazily because, unlike other operators,
+        // it is imported directly rather than via a shim, and thus can be
+        // looked up lazily.
+        return false;
+      return true;
     case clang::DeclarationName::CXXConversionFunctionName:
     case clang::DeclarationName::CXXConstructorName:
       // Eagerly import operators, conversions, and constructors for now.
