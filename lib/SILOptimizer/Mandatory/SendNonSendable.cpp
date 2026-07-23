@@ -752,9 +752,10 @@ void IsolationHistoryNoteEmitter::collectIsolationHistoryNotes() {
         break;
 
       case Node::CFGHistoryJoin:
-        // Save the joined branch for later and continue on the parent path.
-        if (auto *joinedNode = node->getFirstArgAsNode())
-          worklist.push_back(joinedNode);
+        // The joined branch now lives in a predecessor block's exit partition
+        // (node->getFirstArgAsBlock()) rather than an inline history node.
+        // Recovering and walking it is deferred; for now we do not follow
+        // joins.
         break;
 
       case Node::AddNewRegionForElement:
