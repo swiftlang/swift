@@ -165,7 +165,7 @@ print(message)
 
 Here you can use a `let` instead of a `var`. Swift imports a `const` C++ member function as a nonmutating method, so calling `error.print()` doesn't require the instance to be mutable. If you drop `const` from `print()`, Swift imports it as `mutating`. A mutating call on a `let` fails to compile, so you need a `var`. The `const` you wrote earlier allows this code to read like ordinary, idiomatic Swift.
 
-The return value comes across just as smoothly, because `std::string` bridges to Swift's `String` for free. The `print()` method returns a C++ `std::string`, and Swift's C++ standard-library interoperability gives you a `String` initializer that converts it directly.
+The return value comes across just as smoothly, because the `print()` method returns a C++ `std::string` and Swift's C++ standard-library interoperability gives you a `String` initializer that converts it directly. The initializer copies the string's bytes into a native Swift `String`, so it runs in O(*n) time, where *n* is the number of bytes in the C++ string.
 
 Calling the method also looks like any other Swift type: `error.print()` is just a method call, exactly like calling a method on a native Swift value.
 
