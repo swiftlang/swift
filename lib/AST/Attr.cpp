@@ -825,6 +825,16 @@ void DeclAttributes::print(ASTPrinter &Printer, const PrintOptions &Options,
   auto *SF = D ? D->getDeclContext()->getParentSourceFile() : nullptr;
 
   for (auto DA : llvm::reverse(FlattenedAttrs)) {
+    AttributeVector &which = DA->isDeclModifier() ? modifiers :
+                             isa<BackDeployedAttr>(DA) ? backDeployedAttributes :
+                             DA->isLongAttribute() ? longAttributes :
+                             attributes;
+
+    if (Options.alwaysIncludeAttrKind(DA->getKind())) {
+      which.push_back(DA);
+      continue;
+    }
+
     // Don't skip implicit custom attributes. Custom attributes like global
     // actor isolation have critical semantic meaning and should never be
     // suppressed. Other custom attrs that can be suppressed, like macros,
@@ -889,10 +899,6 @@ void DeclAttributes::print(ASTPrinter &Printer, const PrintOptions &Options,
       }
     }
 
-    AttributeVector &which = DA->isDeclModifier() ? modifiers :
-                             isa<BackDeployedAttr>(DA) ? backDeployedAttributes :
-                             DA->isLongAttribute() ? longAttributes :
-                             attributes;
     which.push_back(DA);
   }
 
