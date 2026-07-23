@@ -4799,6 +4799,48 @@ void ConstraintSystem::diagnoseFailureFor(SyntacticElementTarget target) {
         .highlight(closure->getSourceRange());
       return;
     }
+
+    if (auto *call = dyn_cast<CallExpr>(expr->getSemanticsProvidingExpr())) {
+      ClosureExpr *builderClosure = nullptr;
+      if (auto *args = call->getArgs()) {
+        for (const auto &arg : *args) {
+          auto *argExpr = arg.getExpr();
+          if (!argExpr)
+            continue;
+
+          auto *closure =
+              dyn_cast<ClosureExpr>(argExpr->getSemanticsProvidingExpr());
+          if (!closure)
+            continue;
+
+          if (getAppliedResultBuilderTransform(closure)) {
+            builderClosure = closure;
+            break;
+          }
+        }
+      }
+
+      if (builderClosure) {
+        auto *fn = call->getFn()->getSemanticsProvidingExpr();
+
+        if (auto *UDE = dyn_cast<UnresolvedDotExpr>(fn)) {
+          DE.diagnose(UDE->getLoc(), diag::ambiguous_decl_ref, UDE->getName())
+              .highlight(UDE->getSourceRange());
+          return;
+        }
+
+        if (auto *ODRE = dyn_cast<OverloadedDeclRefExpr>(fn)) {
+          DE.diagnose(ODRE->getLoc(), diag::ambiguous_decl_ref,
+                      ODRE->getName())
+              .highlight(ODRE->getSourceRange());
+          return;
+        }
+
+        DE.diagnose(builderClosure->getLoc(), diag::cannot_infer_closure_type)
+            .highlight(builderClosure->getSourceRange());
+        return;
+      }
+    }
   }
 
   // Emit a poor fallback message.
