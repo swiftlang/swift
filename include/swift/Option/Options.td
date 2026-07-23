@@ -844,6 +844,11 @@ def emit_clang_header_nonmodular_includes : Flag<["-"], "emit-clang-header-nonmo
   Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput]>,
   HelpText<"Augment emitted Objective-C header with textual imports for every included modular import">;
 
+def generated_header_underlying_module_include_base : Separate<["-"], "generated-header-underlying-module-include-base">,
+  Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath]>,
+  MetaVarName<"<path>">,
+  HelpText<"When emitting the generated Objective-C header for a mixed-source module, import the underlying Clang module's headers using quoted includes relative to <path>, instead of assuming a framework-style umbrella header named after the module">;
+
 def emit_clang_header_path : Separate<["-"], "emit-clang-header-path">,
   Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath,
          SupplementaryOutput, CacheInvariant]>,
