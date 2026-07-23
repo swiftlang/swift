@@ -387,6 +387,19 @@ void BridgedPassContext::fixStackNesting(BridgedFunction function) const {
   invocation->setNeedFixStackNesting(false);
 }
 
+BridgedOwnedString BridgedPassContext::mangleWithAutoDiffBranchTracingEnum(
+    BridgedValue arg, SwiftInt argIdx, BridgedFunction pullback) const {
+  auto pass = Demangle::SpecializationPass::ClosureSpecializer;
+  auto serializedKind = pullback.getFunction()->getSerializedKind();
+  Mangle::FunctionSignatureSpecializationMangler mangler(
+      pullback.getFunction()->getASTContext(), pass, serializedKind,
+      pullback.getFunction());
+
+  mangler.setArgumentAutoDiffBranchTracingEnum(argIdx, arg.getSILValue());
+
+  return BridgedOwnedString(mangler.mangle());
+}
+
 bool BridgedPassContext::enableSimplificationFor(BridgedInstruction inst) const {
   // Fast-path check.
   if (SimplifyInstructionTest.empty() && !SILPassManager::isAnyPassDisabled())

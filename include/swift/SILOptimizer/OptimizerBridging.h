@@ -228,6 +228,9 @@ struct BridgedPassContext {
   BridgedOwnedString mangleWithExplodedPackArgs(BridgedArrayRef bridgedPackArgs,
                                                 BridgedFunction applySiteCallee) const;
   BridgedOwnedString mangleWithChangedRepresentation(BridgedFunction applySiteCallee) const;
+  BridgedOwnedString
+  mangleWithAutoDiffBranchTracingEnum(BridgedValue arg, SwiftInt argIdx,
+                                      BridgedFunction pullback) const;
 
   void inlineFunction(BridgedInstruction apply, bool mandatoryInline) const;
   void eraseFunction(BridgedFunction function) const;

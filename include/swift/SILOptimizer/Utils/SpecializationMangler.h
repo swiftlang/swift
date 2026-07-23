@@ -69,6 +69,7 @@ class FunctionSignatureSpecializationMangler : public SpecializationMangler {
     BoxToStack = 4,
     InOutToOut = 5,
     ClosurePropPreviousArg = 6, // the same closure as a previous `ClosureProp` argument
+    AutoDiffBranchTracingEnum = 7,
 
     First_Option = 0,
     Last_Option = 31,
@@ -87,6 +88,7 @@ class FunctionSignatureSpecializationMangler : public SpecializationMangler {
     ArgumentModifier kind;
     union {
       SILInstruction *inst;
+      ValueBase *value;     // only for `AutoDiffBranchTracingEnum`
       unsigned otherArgIdx; // only for `ClosurePropPreviousArg`
     };
 
@@ -116,6 +118,8 @@ public:
 
   void setArgumentClosureProp(unsigned OrigArgIdx, SILInstruction *closure);
   void setArgumentClosurePropPreviousArg(unsigned OrigArgIdx, unsigned otherArgIdx);
+  void setArgumentAutoDiffBranchTracingEnum(unsigned OrigArgIdx,
+                                            ValueBase *Arg);
   void setArgumentDead(unsigned OrigArgIdx);
   void setArgumentOwnedToGuaranteed(unsigned OrigArgIdx);
   void setArgumentGuaranteedToOwned(unsigned OrigArgIdx);
@@ -135,6 +139,7 @@ public:
 private:
   void mangleConstantProp(SILInstruction *constInst);
   void mangleClosureProp(SILInstruction *Inst);
+  void mangleAutoDiffBranchTracingEnum(ValueBase *Arg);
   void mangleArgument(ArgInfo argInfo);
   void mangleReturnValue(ReturnValueModifierIntBase RetMod);
 };
