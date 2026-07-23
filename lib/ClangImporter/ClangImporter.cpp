@@ -5813,60 +5813,14 @@ SourceLoc swift::extractNearestSourceLoc(EscapabilityLookupDescriptor) {
   return SourceLoc();
 }
 
-// Just create a specialized function decl for "__swift_interopStaticCast"
-// using the types base and derived.
-static
-DeclRefExpr *getInteropStaticCastDeclRefExpr(ASTContext &ctx,
-                                             const clang::Module *owningModule,
-                                             Type base, Type derived) {
-  if (base->isForeignReferenceType() && derived->isForeignReferenceType()) {
-    base = base->wrapInPointer(PTK_UnsafePointer);
-    derived = derived->wrapInPointer(PTK_UnsafePointer);
-  }
-
-  // Lookup our static cast helper function in the C++ shim module.
-  auto wrapperModule = ctx.getLoadedModule(ctx.getIdentifier(CXX_SHIM_NAME));
-  assert(wrapperModule &&
-         "CxxShim module is required when using members of a base class. "
-         "Make sure you `import CxxShim`.");
-
-  SmallVector<ValueDecl *, 1> results;
-  ctx.lookupInModule(wrapperModule, "__swift_interopStaticCast", results);
-  assert(
-      results.size() == 1 &&
-      "Did you forget to define a __swift_interopStaticCast helper function?");
-  FuncDecl *staticCastFn = cast<FuncDecl>(results.back());
-
-  // Now we have to force instantiate this. We can't let the type checker do
-  // this yet because it can't infer the "To" type.
-  auto subst =
-      SubstitutionMap::get(staticCastFn->getGenericSignature(), {derived, base},
-                           LookUpConformanceInModule());
-  auto functionTemplate = const_cast<clang::FunctionTemplateDecl *>(
-      cast<clang::FunctionTemplateDecl>(staticCastFn->getClangDecl()));
-  auto spec = ctx.getClangModuleLoader()->instantiateCXXFunctionTemplate(
-      ctx, functionTemplate, subst);
-  auto specializedStaticCastFn =
-      cast<FuncDecl>(ctx.getClangModuleLoader()->importDeclDirectly(spec));
-
-  auto staticCastRefExpr = new (ctx)
-      DeclRefExpr(ConcreteDeclRef(specializedStaticCastFn), DeclNameLoc(),
-                  /*implicit*/ true);
-  staticCastRefExpr->setType(specializedStaticCastFn->getInterfaceType());
-
-  return staticCastRefExpr;
-}
-
 // Create the following expressions:
 // %0 = Builtin.addressof(&self)
 // %1 = Builtin.reinterpretCast<UnsafeMutablePointer<Derived>>(%0)
-// %2 = __swift_interopStaticCast<UnsafeMutablePointer<Base>?>(%1)
-// %3 = %2!
-// return %3.pointee
-static
-MemberRefExpr *getSelfInteropStaticCast(FuncDecl *funcDecl,
-                                        NominalTypeDecl *baseStruct,
-                                        NominalTypeDecl *derivedStruct) {
+// %2 = __swift_interopStaticCast_...(%1) // UnsafeMutablePointer<Base>
+// return %2.pointee
+static MemberRefExpr *getSelfInteropStaticCast(FuncDecl *funcDecl,
+                                               NominalTypeDecl *baseStruct,
+                                               NominalTypeDecl *derivedStruct) {
   auto &ctx = funcDecl->getASTContext();
 
   auto mutableSelf = [&ctx](FuncDecl *funcDecl) {
@@ -5912,15 +5866,30 @@ MemberRefExpr *getSelfInteropStaticCast(FuncDecl *funcDecl,
                           Argument::unlabeled(rawSelfPointer));
   selfPointer->setType(derivedPtrType);
 
-  auto staticCastRefExpr = getInteropStaticCastDeclRefExpr(
-      ctx, baseStruct->getClangDecl()->getOwningModule(),
-      baseStruct->getSelfInterfaceType()->wrapInPointer(
-          PTK_UnsafeMutablePointer),
-      derivedStruct->getSelfInterfaceType()->wrapInPointer(
-          PTK_UnsafeMutablePointer));
+  auto *baseRecord =
+      dyn_cast_or_null<clang::CXXRecordDecl>(baseStruct->getClangDecl());
+  auto *derivedRecord =
+      dyn_cast_or_null<clang::CXXRecordDecl>(derivedStruct->getClangDecl());
+  if (!baseRecord || !derivedRecord)
+    return nullptr;
+
+  // Synthesize call to __swift_interopStaticCast_...(), which is just a wrapper
+  // around C++ static_cast() to upcast from derived to base.
+  auto *importer = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
+  FuncDecl *castFn =
+      SwiftDeclSynthesizer(importer).makeBaseClassPointerCastFunction(
+          derivedRecord, baseRecord);
+  if (!castFn)
+    return nullptr;
+
+  auto *staticCastRefExpr =
+      new (ctx) DeclRefExpr(ConcreteDeclRef(castFn), DeclNameLoc(),
+                            /*implicit*/ true);
+  staticCastRefExpr->setType(castFn->getInterfaceType());
+
   auto *argList = ArgumentList::forImplicitUnlabeled(ctx, {selfPointer});
   auto casted = CallExpr::createImplicit(ctx, staticCastRefExpr, argList);
-  // This will be "Optional<UnsafeMutablePointer<Base>>"
+  // This will be "UnsafeMutablePointer<Base>" (non-optional)
   casted->setType(cast<FunctionType>(staticCastRefExpr->getType().getPointer())
                       ->getResult());
   casted->setThrows(nullptr);
@@ -6401,10 +6370,9 @@ synthesizeBaseClassFieldAddressGetterBody(AbstractFunctionDecl *afd,
 // For setters we have to pass self as a pointer and then emit an assign:
 //   %0 = Builtin.addressof(&self)
 //   %1 = Builtin.reinterpretCast<UnsafeMutablePointer<Derived>>(%0)
-//   %2 = __swift_interopStaticCast<UnsafeMutablePointer<Base>?>(%1)
-//   %3 = %2!
-//   %4 = %3.pointee
-//   assign newValue to %4
+//   %2 = __swift_interopStaticCast_...(%1) // UnsafeMutablePointer<Base>
+//   %3 = %2.pointee
+//   assign newValue to %3
 static std::pair<BraceStmt *, bool>
 synthesizeBaseClassFieldSetterBody(AbstractFunctionDecl *afd, void *context) {
   auto setterDecl = cast<AccessorDecl>(afd);
@@ -6418,6 +6386,13 @@ synthesizeBaseClassFieldSetterBody(AbstractFunctionDecl *afd, void *context) {
 
   auto *pointeePropertyRefExpr =
       getSelfInteropStaticCast(setterDecl, baseStruct, derivedStruct);
+  if (!pointeePropertyRefExpr) {
+    ctx.Diags.diagnose(SourceLoc(), diag::failed_base_method_call_synthesis,
+                       setterDecl, baseStruct);
+    auto body = BraceStmt::create(ctx, SourceLoc(), {}, SourceLoc(),
+                                  /*implicit=*/true);
+    return {body, /*isTypeChecked=*/true};
+  }
 
   Expr *storedRef = nullptr;
   if (auto subscript = dyn_cast<SubscriptDecl>(baseClassVar)) {
