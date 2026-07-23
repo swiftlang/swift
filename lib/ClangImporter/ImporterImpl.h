@@ -788,6 +788,13 @@ private:
   llvm::DenseMap<NominalTypeDecl *, FuncDecl *> importedOperatorBoolCache;
 
 public:
+  /// Cache of synthesized derived-to-base pointer upcast functions,
+  /// keyed by the (derived, base) C++ record pair.
+  llvm::DenseMap<
+      std::pair<const clang::CXXRecordDecl *, const clang::CXXRecordDecl *>,
+      FuncDecl *>
+      synthesizedBaseCastFunctions;
+
   llvm::DenseMap<const clang::ParmVarDecl*, FuncDecl*> defaultArgGenerators;
 
   bool isDefaultArgSafeToImport(const clang::ParmVarDecl *param);
