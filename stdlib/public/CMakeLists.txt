@@ -203,7 +203,8 @@ if((NOT SWIFT_HOST_VARIANT STREQUAL "macosx") AND
   (NOT SWIFT_HOST_VARIANT STREQUAL "linux") AND
   (NOT SWIFT_HOST_VARIANT STREQUAL "wasi") AND
   (NOT SWIFT_HOST_VARIANT STREQUAL "emscripten") AND
-  (NOT SWIFT_HOST_VARIANT STREQUAL "windows"))
+  (NOT SWIFT_HOST_VARIANT STREQUAL "windows") AND
+  (NOT SWIFT_HOST_VARIANT STREQUAL "android"))
   set(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB FALSE)
 elseif(BOOTSTRAPPING_MODE STREQUAL "OFF")
   set(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB FALSE)
@@ -329,6 +330,20 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB
       "i686    i686-unknown-windows-msvc   i686-unknown-windows-msvc"
       "x86_64  x86_64-unknown-windows-msvc x86_64-unknown-windows-msvc"
     )
+  elseif (SWIFT_HOST_VARIANT STREQUAL "android")
+    # Normalized module name so clients resolve it, but the compile triple is
+    # pinned to the API level so libc++ uses pthread_cond_timedwait rather than
+    # the API-30-only pthread_cond_clockwait.
+    list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
+      "${SWIFT_HOST_VARIANT_ARCH} ${SWIFT_HOST_VARIANT_ARCH}-unknown-linux-android ${SWIFT_HOST_VARIANT_ARCH}-unknown-linux-android${SWIFT_ANDROID_API_LEVEL}"
+    )
+    file(GLOB _swift_android_ndk_sysroots
+      "${SWIFT_ANDROID_NDK_PATH}/toolchains/llvm/prebuilt/*/sysroot")
+    if(_swift_android_ndk_sysroots)
+      list(GET _swift_android_ndk_sysroots 0 _swift_android_ndk_sysroot)
+      list(APPEND SWIFT_EMBEDDED_STDLIB_SDKS_FOR_TARGET_TRIPLES
+        "${SWIFT_HOST_VARIANT_ARCH}-unknown-linux-android${SWIFT_ANDROID_API_LEVEL}@${_swift_android_ndk_sysroot}")
+    endif()
   endif()
 endif()
 
