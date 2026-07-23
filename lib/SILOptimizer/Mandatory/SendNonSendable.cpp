@@ -482,10 +482,10 @@ public:
   /// Single-use entry point. Constructs an internal emitter from the inputs
   /// and emits any isolation-history notes that apply.
   static void emit(SILFunction *fn, RegionAnalysisValueMap &valueMap,
-                   Element sentElement, IsolationHistory isolationHistory,
+                   Element sentElement, Partition &&partition,
                    SILDynamicMergedIsolationInfo regionInfo) {
     IsolationHistoryNoteEmitter emitter(fn, valueMap, sentElement,
-                                        isolationHistory, regionInfo);
+                                        std::move(partition), regionInfo);
     emitter.emitHelper();
   }
 
@@ -516,8 +516,8 @@ private:
   /// The element whose path into the isolated region we are explaining.
   Element inputSentElement;
 
-  /// The isolation history DAG to walk.
-  IsolationHistory inputIsolationHistory;
+  /// The input partition to use for our emission.
+  Partition inputPartition;
 
   /// Merged isolation info for the receiving region. Supplies the
   /// task-isolated flag and the descriptive-kind string used in the
@@ -543,11 +543,10 @@ private:
   Identifier isolatedName;
 
   IsolationHistoryNoteEmitter(SILFunction *fn, RegionAnalysisValueMap &valueMap,
-                              Element sentElement,
-                              IsolationHistory isolationHistory,
+                              Element sentElement, Partition &&partition,
                               SILDynamicMergedIsolationInfo regionInfo)
       : inputFn(fn), inputValueMap(valueMap), inputSentElement(sentElement),
-        inputIsolationHistory(isolationHistory), inputRegionInfo(regionInfo) {}
+        inputPartition(std::move(partition)), inputRegionInfo(regionInfo) {}
 
   void emitHelper() {
     if (!shouldEmit())
@@ -675,7 +674,7 @@ void IsolationHistoryNoteEmitter::collectIsolationHistoryNotes() {
   // Work list of nodes to try if the current path finds nothing. Each entry
   // is the head of an alternative path to explore.
   SmallVector<const Node *, 4> worklist;
-  worklist.push_back(inputIsolationHistory.getHead());
+  worklist.push_back(inputPartition.getIsolationHistory().getHead());
 
   // Set to true when the most recently seen MergeElementRegions involved an
   // already-tracked element being merged with something that is itself
@@ -2632,20 +2631,19 @@ class SentNeverSendableDiagnosticEmitter {
   /// region).
   Element sentElement;
 
-  /// The isolation history of the partition at the point of the error.
-  IsolationHistory isolationHistory;
+  /// The partition at the point of the error.
+  Partition partition;
 
   using SentNeverSendableError = PartitionOpError::SentNeverSendableError;
 
 public:
   SentNeverSendableDiagnosticEmitter(RegionAnalysisFunctionInfo *info,
-                                     SentNeverSendableError error)
+                                     SentNeverSendableError &&error)
       : valueMap(info->getValueMap()),
         diagnosticEmitter(error.op->getSourceOp(),
                           valueMap.getRepresentative(error.sentElement),
                           error.isolationRegionInfo),
-        sentElement(error.sentElement),
-        isolationHistory(error.isolationHistory) {}
+        sentElement(error.sentElement), partition(std::move(error.partition)) {}
 
   /// Gathers diagnostics. Returns false if we emitted a "I don't understand
   /// error". If we emit such an error, we should bail without emitting any
@@ -2688,7 +2686,7 @@ private:
 void SentNeverSendableDiagnosticEmitter::emitIsolationHistoryNoteIfNeeded() {
   IsolationHistoryNoteEmitter::emit(
       diagnosticEmitter.getOperand()->getFunction(), valueMap, sentElement,
-      isolationHistory, diagnosticEmitter.getIsolationRegionInfo());
+      std::move(partition), diagnosticEmitter.getIsolationRegionInfo());
 }
 
 bool SentNeverSendableDiagnosticEmitter::initForSendingPartialApply(
@@ -3098,7 +3096,7 @@ public:
   class LastValueEnum;
 
   InOutSendingReturnedDiagnosticEmitter(RegionAnalysisFunctionInfo *raFuncInfo,
-                                        Error error)
+                                        Error &&error)
       : raFuncInfo(raFuncInfo),
         functionExitingInst(cast<TermInst>(error.op->getSourceInst())),
         inoutSendingParam(raFuncInfo->getValueMap().getRepresentative(
@@ -3745,7 +3743,7 @@ private:
 
 public:
   InOutSendingNotDisconnectedAtExitDiagnosticEmitter(
-      RegionAnalysisFunctionInfo *info, Error error)
+      RegionAnalysisFunctionInfo *info, Error &&error)
       : functionExitingInst(cast<TermInst>(error.op->getSourceInst())),
         inoutSendingParam(
             info->getValueMap().getRepresentative(error.inoutSendingElement)),
@@ -3886,7 +3884,7 @@ private:
 
 public:
   AssignNeverSendableIntoSendingResultDiagnosticEmitter(
-      RegionAnalysisFunctionInfo *info, Error error)
+      RegionAnalysisFunctionInfo *info, Error &&error)
       : srcOperand(error.op->getSourceOp()), outSendingResult(error.destValue),
         neverSentValue(error.srcValue),
         isolatedValueIsolationRegionInfo(error.srcIsolationRegionInfo) {}
@@ -4456,7 +4454,7 @@ private:
 
 public:
   UnknownCodePatternDiagnosticEmitter(RegionAnalysisFunctionInfo *info,
-                                      Error error)
+                                      Error &&error)
       : inst(error.op->getSourceInst()) {}
 
   void emit() {
@@ -4491,7 +4489,7 @@ struct IncompatibleRegionMergeDiagnosticEmitter {
   RegionMergeReason reason;
 
   IncompatibleRegionMergeDiagnosticEmitter(RegionAnalysisFunctionInfo *info,
-                                           Error error)
+                                           Error &&error)
       : valueMap(info->getValueMap()), op(error.op->getSourceOp()),
         srcRegionValueElt(error.srcRegionElt),
         srcIsolationInfo(error.srcIsolationRegionInfo),

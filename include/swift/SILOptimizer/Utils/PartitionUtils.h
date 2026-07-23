@@ -1097,6 +1097,17 @@ public:
   /// \returns true if there is more history that can be popped.
   bool popHistory(SmallVectorImpl<IsolationHistory> &foundJoinedHistories);
 
+  /// Pop one history node (a single node; multiple nodes can make up one
+  /// PartitionOp worth of history). Undoes the popped node's effect on the
+  /// partition. Callers that want to inspect the popped node should read
+  /// \c getIsolationHistory().getHead() *before* calling.
+  ///
+  /// Same sending-state precondition as \c popHistory.
+  ///
+  /// \returns false when the popped node is a SequenceBoundary or the history
+  /// is empty; true otherwise.
+  bool popHistoryOnce(SmallVectorImpl<IsolationHistory> &foundJoinHistoryNodes);
+
   /// Returns true if this value has any isolation history stored.
   bool hasHistory() const { return bool(history.getHead()); }
 
@@ -1223,12 +1234,6 @@ public:
   Region merge(Element fst, Element snd, bool updateHistory = true);
 
 private:
-  /// Pop one history node. Multiple history nodes can make up one PartitionOp
-  /// worth of history, so this is called by popHistory.
-  ///
-  /// Returns true if we succesfully popped a single history node.
-  bool popHistoryOnce(SmallVectorImpl<IsolationHistory> &foundJoinHistoryNodes);
-
   /// A canonical region is defined to have its region number as equal to the
   /// minimum element number of all of its assigned element numbers. This
   /// routine goes through the element -> region map and transforms the
@@ -1360,17 +1365,15 @@ public:
     Element sentElement;
     SILDynamicMergedIsolationInfo isolationRegionInfo;
 
-    /// The isolation history of the partition at the point the send was
-    /// detected. Used to emit notes explaining why a disconnected element ended
-    /// up in an isolated region.
-    IsolationHistory isolationHistory;
+    /// The partition at the point where the error was emitted. Used for
+    /// isolation history rewinding.
+    Partition partition;
 
     SentNeverSendableError(const PartitionOp &op, Element sentElement,
                            SILDynamicMergedIsolationInfo isolationRegionInfo,
-                           IsolationHistory isolationHistory)
+                           const Partition &p)
         : op(&op), sentElement(sentElement),
-          isolationRegionInfo(isolationRegionInfo),
-          isolationHistory(isolationHistory) {}
+          isolationRegionInfo(isolationRegionInfo), partition(p) {}
 
     SentNeverSendableError(SentNeverSendableError &&other) = default;
     SentNeverSendableError &operator=(SentNeverSendableError &&other) = default;
@@ -2571,8 +2574,8 @@ private:
     }
 
     // Ok, we actually need to emit a call to the callback.
-    return handleError(SentNeverSendableError(
-        op, elt, dynamicMergedIsolationInfo, p.getIsolationHistory()));
+    return handleError(
+        SentNeverSendableError(op, elt, dynamicMergedIsolationInfo, p));
   }
 };
 
