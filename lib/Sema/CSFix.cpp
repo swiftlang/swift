@@ -1029,7 +1029,8 @@ bool AllowInvalidMemberRef::diagnoseForAmbiguity(
 bool AllowTypeOrInstanceMember::diagnose(const Solution &solution,
                                          bool asNote) const {
   AllowTypeOrInstanceMemberFailure failure(solution, getBaseType(), getMember(),
-                                           getMemberName(), getLocator());
+                                           getMemberName(), BaseExpr,
+                                           getLocator());
   return failure.diagnose(asNote);
 }
 
@@ -1037,8 +1038,19 @@ AllowTypeOrInstanceMember *
 AllowTypeOrInstanceMember::create(ConstraintSystem &cs, Type baseType,
                                   ValueDecl *member, DeclNameRef usedName,
                                   ConstraintLocator *locator) {
-  return new (cs.getAllocator())
-      AllowTypeOrInstanceMember(cs, baseType, member, usedName, locator);
+
+  Expr *baseExpr = nullptr;
+
+  if (auto *anchor = locator->getAnchor().dyn_cast<Expr *>()) {
+    if (auto *UDE = dyn_cast<UnresolvedDotExpr>(anchor))
+      baseExpr = UDE->getBase();
+    else if (auto *MRE = dyn_cast<MemberRefExpr>(anchor))
+      baseExpr = MRE->getBase();
+    else if (auto *DME = dyn_cast<DynamicMemberRefExpr>(anchor))
+      baseExpr = DME->getBase();
+  }
+  return new (cs.getAllocator()) AllowTypeOrInstanceMember(
+      cs, baseType, member, usedName, baseExpr, locator);
 }
 
 bool AllowInvalidPartialApplication::diagnose(const Solution &solution,

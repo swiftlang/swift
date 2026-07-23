@@ -129,7 +129,7 @@ class Y5 {
   static var x = X()
   
   subscript(idx: Int) -> X {
-    get { return x } // expected-error {{static member 'x' cannot be used on instance of type 'Y5'}}
+    get { return x } // expected-error {{static member 'x' can only be used on the type 'Y5', not on the instance self}}
     set {}
   }
 }
