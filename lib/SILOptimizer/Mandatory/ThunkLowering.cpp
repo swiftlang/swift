@@ -12,6 +12,7 @@
 
 #include "swift/AST/ASTMangler.h"
 #include "swift/Basic/Defer.h"
+#include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILBuilder.h"
 
 #include "swift/SILOptimizer/PassManager/Passes.h"
@@ -398,6 +399,8 @@ class ThunkLoweringPass : public SILModuleTransform {
     for (auto fi = mod->begin(), fe = mod->end(); fi != fe;) {
       auto *fn = &*fi;
       ++fi;
+
+      PrettyStackTraceSILFunction stackTrace("running thunk lowering on", fn);
 
       for (auto &block : *fn) {
         for (auto ii = block.begin(), ie = block.end(); ii != ie;) {

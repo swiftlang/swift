@@ -19,6 +19,7 @@
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/LinearLifetimeChecker.h"
 #include "swift/SIL/OwnershipUtils.h"
+#include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
@@ -1102,6 +1103,8 @@ class MandatoryInlining : public SILModuleTransform {
 
     SILOptFunctionBuilder FuncBuilder(*this);
     for (auto &F : *M) {
+      PrettyStackTraceSILFunction stackTrace("running mandatory inlining on",
+                                             &F);
       switch (F.isThunk()) {
       case IsThunk_t::IsThunk:
       case IsThunk_t::IsReabstractionThunk:
