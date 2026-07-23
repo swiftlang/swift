@@ -4486,7 +4486,16 @@ namespace {
       SmallBitVector inheritLifetimeParamIndicesForReturn(dependencyVecSize);
       SmallBitVector scopedLifetimeParamIndicesForReturn(dependencyVecSize);
       SmallBitVector paramHasAnnotation(dependencyVecSize);
-      std::map<unsigned, SmallBitVector> inheritedArgDependences;
+      // For each target parameter (e.g. the parameter named in a
+      // 'lifetime_capture_by'), track the sources it inherits its lifetime from
+      // ('copy') separately from the sources it is scoped by ('borrow').
+      struct TargetDependenceIndices {
+        SmallBitVector inheritIndices;
+        SmallBitVector scopeIndices;
+        TargetDependenceIndices(unsigned size)
+            : inheritIndices(size), scopeIndices(size) {}
+      };
+      std::map<unsigned, TargetDependenceIndices> capturedArgDependences;
       auto processLifetimeBound = [&](unsigned idx, clang::QualType ty,
                                       bool forSelf = false) {
         warnForEscapableReturnType();
@@ -4501,13 +4510,17 @@ namespace {
       auto processLifetimeCaptureBy =
           [&](const clang::LifetimeCaptureByAttr *attr, unsigned idx,
               clang::QualType ty) {
-            // FIXME: support scoped lifetimes. This is not straightforward as
-            // const T& is imported as taking a value
-            //        and we assume the address of T would not escape. An
-            //        annotation in this case contradicts our assumptions. We
-            //        should diagnose that, and support this for the non-const
-            //        case.
-            if (isEscapable(ty))
+            // When the captured parameter is passed by reference, the callee
+            // may store the address of the referent into the capturing
+            // parameter. Model this as a scoped ('borrow') dependency: the
+            // capturing value must not outlive the borrow of this argument.
+            //
+            // FIXME: for a non-reference escapable parameter we have no way to
+            // express that its address escapes (it is imported by value and we
+            // assume its address does not escape), so we still skip it. We
+            // should diagnose that case instead.
+            bool isScoped = ty->isReferenceType();
+            if (!isScoped && isEscapable(ty))
               return;
             for (auto param : attr->params()) {
               // FIXME: Swift assumes no escaping to globals. We should diagnose
@@ -4518,17 +4531,19 @@ namespace {
                 continue;
 
               paramHasAnnotation[idx] = true;
+              unsigned targetIdx;
               if (isa<clang::CXXMethodDecl>(decl) &&
                   param == clang::LifetimeCaptureByAttr::This) {
-                auto [it, inserted] = inheritedArgDependences.try_emplace(
-                    result->getSelfIndex(), SmallBitVector(dependencyVecSize));
-                it->second[idx] = true;
+                targetIdx = result->getSelfIndex();
               } else {
-                auto [it, inserted] = inheritedArgDependences.try_emplace(
-                    param - isa<clang::CXXMethodDecl>(decl),
-                    SmallBitVector(dependencyVecSize));
-                it->second[idx] = true;
+                targetIdx = param - isa<clang::CXXMethodDecl>(decl);
               }
+              auto [it, inserted] = capturedArgDependences.try_emplace(
+                  targetIdx, dependencyVecSize);
+              if (isScoped)
+                it->second.scopeIndices[idx] = true;
+              else
+                it->second.inheritIndices[idx] = true;
             }
           };
       for (auto [idx, param] : llvm::enumerate(decl->parameters())) {
@@ -4549,12 +4564,15 @@ namespace {
             attr, result->getSelfIndex(),
             cast<clang::CXXMethodDecl>(decl)->getThisType()->getPointeeType());
 
-      for (auto& [idx, inheritedDepVec]: inheritedArgDependences) {
+      for (auto &[idx, depIndices] : capturedArgDependences) {
         lifetimeDependencies.emplace_back(
-            inheritedDepVec.any()
-                ? IndexSubset::get(Impl.SwiftContext, inheritedDepVec)
+            depIndices.inheritIndices.any()
+                ? IndexSubset::get(Impl.SwiftContext, depIndices.inheritIndices)
                 : nullptr,
-            nullptr, idx, LifetimeFlags().withAnnotated());
+            depIndices.scopeIndices.any()
+                ? IndexSubset::get(Impl.SwiftContext, depIndices.scopeIndices)
+                : nullptr,
+            idx, LifetimeFlags().withAnnotated());
       }
 
       if (inheritLifetimeParamIndicesForReturn.any() ||
