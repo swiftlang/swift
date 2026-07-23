@@ -4657,6 +4657,61 @@ namespace {
       Impl.swiftify(result);
     }
 
+    /// Apply the __Unsafe-method rename to \a imported, imported from \a decl.
+    ///
+    /// Instantiation is gated on ImportCxxMembersLazily; without that
+    /// feature ClangImporter eagerly instantiates typedef members, so the
+    /// return type is usually already instantiated by the time we get here.
+    ///
+    /// This is done post-import so we don't eagerly instantiate templates for
+    /// methods we may not import.
+    void renameToUnsafeIfNeeded(const clang::CXXMethodDecl *clangDecl,
+                                ValueDecl *swiftDecl) {
+      if (isa<clang::CXXConstructorDecl, clang::CXXDestructorDecl,
+              clang::CXXConversionDecl>(clangDecl) ||
+          clangDecl->getOverloadedOperator() !=
+              clang::OverloadedOperatorKind::OO_None)
+        // Does not apply to operators, ctors, dtors, conversions
+        return;
+
+      if (Impl.SwiftContext.LangOpts.hasFeature(
+              Feature::ImportCxxMembersLazily)) {
+        using ClassTmplSpec = clang::ClassTemplateSpecializationDecl;
+
+        auto retTy = desugarIfElaborated(clangDecl->getReturnType());
+        auto *retTemplate =
+            dyn_cast_or_null<ClassTmplSpec>(retTy->getAsTagDecl());
+
+        if (retTemplate && !retTemplate->hasDefinition()) {
+          // N.B. InstantiateClassTemplateSpecialization() returns true if it
+          // encountered an error while instantiating the returned template.
+          (void)Impl.getClangSema().InstantiateClassTemplateSpecialization(
+              clangDecl->getLocation(),
+              const_cast<ClassTmplSpec *>(retTemplate),
+              clang::TemplateSpecializationKind::TSK_ImplicitInstantiation,
+              /*Complain*/ false, /*PrimaryStrictPackMatch*/ false);
+        }
+      }
+
+      auto importedName = Impl.importFullName(clangDecl, Impl.CurrentVersion);
+      if (!importedName || importedName.hasCustomName())
+        return;
+      if (evaluateOrDefault(Impl.SwiftContext.evaluator,
+                            IsSafeUseOfCxxDecl({clangDecl, Impl.SwiftContext}),
+                            {}))
+        return;
+
+      DeclName currentName = swiftDecl->getName();
+      Identifier unsafeId = Impl.SwiftContext.getIdentifier(
+          ("__" + currentName.getBaseIdentifier().str() + "Unsafe").str());
+      DeclName unsafeName = currentName.isCompoundName()
+                                ? DeclName(Impl.SwiftContext, unsafeId,
+                                           currentName.getArgumentNames())
+                                : DeclName(unsafeId);
+      if (currentName != unsafeName)
+        swiftDecl->setName(unsafeName);
+    }
+
     Decl *VisitCXXMethodDecl(const clang::CXXMethodDecl *decl) {
       // The static `operator ()` introduced in C++ 23 is still callable as an
       // instance operator in C++, and we want to preserve the ability to call
@@ -4691,53 +4746,7 @@ namespace {
       // Post-VisitFunctionDecl(), perform special handling that is specific
       // to importing CXXMethodDecls...
 
-      // For regular methods (not operators, ctors, dtors, conversions),
-      // instantiate the return-type template (if needed) and apply the
-      // __Unsafe-method rename here. This is done post-import so we don't
-      // eagerly instantiate templates for methods we may not import.
-      //
-      // Instantiation is gated on ImportCxxMembersLazily; without that
-      // feature ClangImporter eagerly instantiates typedef members, so the
-      // return type is usually already instantiated by the time we get here.
-      if (!isa<clang::CXXConstructorDecl, clang::CXXDestructorDecl,
-               clang::CXXConversionDecl>(decl) &&
-          decl->getOverloadedOperator() ==
-              clang::OverloadedOperatorKind::OO_None) {
-
-        if (Impl.SwiftContext.LangOpts.hasFeature(
-                Feature::ImportCxxMembersLazily)) {
-          using ClassTmplSpec = clang::ClassTemplateSpecializationDecl;
-
-          auto retTy = desugarIfElaborated(decl->getReturnType());
-          auto *retTemplate =
-              dyn_cast_or_null<ClassTmplSpec>(retTy->getAsTagDecl());
-
-          if (retTemplate && !retTemplate->hasDefinition()) {
-            // N.B. InstantiateClassTemplateSpecialization() returns true if it
-            // encountered an error while instantiating the returned template.
-            (void)Impl.getClangSema().InstantiateClassTemplateSpecialization(
-                decl->getLocation(), const_cast<ClassTmplSpec *>(retTemplate),
-                clang::TemplateSpecializationKind::TSK_ImplicitInstantiation,
-                /*Complain*/ false, /*PrimaryStrictPackMatch*/ false);
-          }
-        }
-
-        auto importedName = Impl.importFullName(decl, Impl.CurrentVersion);
-        if (importedName && !importedName.hasCustomName() &&
-            !evaluateOrDefault(Impl.SwiftContext.evaluator,
-                               IsSafeUseOfCxxDecl({decl, Impl.SwiftContext}),
-                               {})) {
-          DeclName currentName = method->getName();
-          Identifier unsafeId = Impl.SwiftContext.getIdentifier(
-              ("__" + currentName.getBaseIdentifier().str() + "Unsafe").str());
-          DeclName unsafeName = currentName.isCompoundName()
-                                    ? DeclName(Impl.SwiftContext, unsafeId,
-                                               currentName.getArgumentNames())
-                                    : DeclName(unsafeId);
-          if (currentName != unsafeName)
-            method->setName(unsafeName);
-        }
-      }
+      renameToUnsafeIfNeeded(decl, method);
 
       // Do not expose constructors of abstract C++ classes.
       if (auto recordDecl =
@@ -5123,8 +5132,16 @@ namespace {
             return isa<clang::TemplateTypeParmDecl>(param);
           }))
         return nullptr;
-      return importFunctionDecl(decl->getAsFunction(), importedName,
-                                correctSwiftName, std::nullopt, decl);
+      auto *imported = importFunctionDecl(decl->getAsFunction(), importedName,
+                                          correctSwiftName, std::nullopt, decl);
+      if (imported) {
+        // Member function templates bypass VisitCXXMethodDecl, so the unsafe
+        // method rename that that performs must be applied here too.
+        if (auto *MD = dyn_cast<clang::CXXMethodDecl>(decl->getAsFunction()))
+          renameToUnsafeIfNeeded(MD, cast<ValueDecl>(imported));
+      }
+
+      return imported;
     }
 
     Decl *VisitClassTemplateDecl(const clang::ClassTemplateDecl *decl) {
