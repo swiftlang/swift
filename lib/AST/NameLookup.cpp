@@ -2510,7 +2510,8 @@ static bool isAcceptableLookupResult(const DeclContext *dc, NLOptions options,
   // Filter out designated initializers, if requested.
   if (onlyCompleteObjectInits) {
     if (auto ctor = dyn_cast<ConstructorDecl>(decl)) {
-      if (isa<ClassDecl>(ctor->getDeclContext()) && !ctor->isInheritable())
+      auto *dc = ctor->getDeclContext()->getImplementedObjCContext();
+      if (isa<ClassDecl>(dc) && !ctor->isInheritable())
         return false;
     } else {
       return false;
