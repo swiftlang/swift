@@ -102,6 +102,10 @@ ERROR(could_not_find_subscript_member_tuple_did_you_mean_use_dot, none,
       "cannot access element using subscript for tuple type %0; "
       "did you mean to use '.%1'?", (Type, StringRef))
 
+ERROR(could_not_find_tuple_member_did_you_mean_use_subscript, none,
+      "cannot access element using tuple member for non-tuple type %0; "
+      "did you mean to use '[%1]'?", (Type, unsigned))
+
 ERROR(could_not_find_enum_case,none,
       "enum type %0 has no case %1; did you mean %2?",
       (Type, DeclNameRef, DeclName))
@@ -5044,13 +5048,25 @@ ERROR(string_literal_broken_proto,none,
       "protocol 'ExpressibleByStringLiteral' is broken", ())
 
 // Array literals
-ERROR(should_use_dictionary_literal,none,
+ERROR(should_use_dictionary_literal_not_array_literal,none,
       "dictionary of type %0 cannot be %select{used|initialized}1 "
       "with array literal", (Type, bool))
 NOTE(meant_dictionary_lit,none,
      "did you mean to use a dictionary literal instead?", ())
 ERROR(should_use_empty_dictionary_literal,none,
       "use [:] to get an empty dictionary literal", ())
+
+ERROR(should_use_tuple_not_array_literal,none,
+      "tuple of type %0 cannot be %select{used|initialized}1 "
+      "with array literal", (Type, bool))
+NOTE(meant_tuple,none,
+     "did you mean to use a tuple instead?", ())
+
+ERROR(should_use_array_literal_not_tuple,none,
+      "array of type %0 cannot be %select{used|initialized}1 "
+      "with tuple", (Type, bool))
+NOTE(meant_array,none,
+     "did you mean to use an array literal instead?", ())
 
 // Dictionary literals
 WARNING(duplicated_literal_keys_in_dictionary_literal, none,

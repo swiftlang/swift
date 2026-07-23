@@ -815,6 +815,30 @@ public:
   bool diagnoseAsError() override;
 };
 
+/// Diagnose errors related to using an array literal where a
+/// tuple is expected.
+class ArrayLiteralToTupleConversionFailure final : public ContextualFailure {
+public:
+  ArrayLiteralToTupleConversionFailure(const Solution &solution,
+                                       Type arrayTy, Type tupleTy,
+                                       ConstraintLocator *locator)
+      : ContextualFailure(solution, arrayTy, tupleTy, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
+/// Diagnose errors related to using a tuple where an array literal
+/// is expected.
+class TupleToArrayConversionFailure final : public ContextualFailure {
+public:
+  TupleToArrayConversionFailure(const Solution &solution,
+                                Type arrayTy, Type tupleTy,
+                                ConstraintLocator *locator)
+      : ContextualFailure(solution, arrayTy, tupleTy, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
 /// Diagnose errors related to converting function type which
 /// isn't explicitly '@escaping' or '@Sendable' to some other type.
 class AttributedFuncToTypeConversionFailure final : public ContextualFailure {
@@ -1315,6 +1339,15 @@ private:
   ///   _ = tuple[0] // -> tuple.0.
   ///  ```
   bool diagnoseForSubscriptMemberWithTupleBase() const;
+
+  /// Tailored diagnostics for tuple element on a base type with an appropriate
+  /// subscript.
+  /// e.g
+  /// ```swift
+  ///   let ary: [2 of Int] = [0, 0]
+  ///   _ = ary.0 // -> ary[0]
+  ///  ```
+  bool diagnoseForTupleElementWithSubscriptMemberBase() const;
 
   static DeclName findCorrectEnumCaseName(Type Ty,
                                           TypoCorrectionResults &corrections,

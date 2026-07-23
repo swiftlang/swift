@@ -3839,6 +3839,17 @@ int TupleType::getNamedElementId(Identifier I) const {
   return -1;
 }
 
+bool TupleType::isHomogeneous() const {
+  if (getNumElements() == 0)
+    return true;
+
+  CanType firstTy = getElementType(0)->getCanonicalType();
+  return llvm::all_of(getElementTypes(), [&](Type elemTy) {
+    return elemTy->isTypeVariableOrMember() ||
+              elemTy->getCanonicalType() == firstTy;
+  });
+}
+
 ArchetypeType::ArchetypeType(TypeKind Kind,
                              const ASTContext *Ctx,
                              RecursiveTypeProperties properties,

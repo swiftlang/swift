@@ -327,6 +327,12 @@ enum class FixKind : uint8_t {
   /// dictionary literals when used as such.
   TreatArrayLiteralAsDictionary,
 
+  /// Treat array literals as if they were tuple literals when used as such.
+  TreatArrayLiteralAsTuple,
+
+  /// Treat tuple literals as if they were array literals when used as such.
+  TreatTupleAsArrayLiteral,
+
   /// Explicitly specify the type to disambiguate between possible member base
   /// types.
   SpecifyBaseTypeForOptionalUnresolvedMember,
@@ -955,6 +961,58 @@ public:
 
   static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::TreatArrayLiteralAsDictionary;
+  }
+};
+
+class TreatArrayLiteralAsTuple final : public ContextualMismatch {
+  TreatArrayLiteralAsTuple(ConstraintSystem &cs, Type tupleTy,
+                           Type arrayTy, ConstraintLocator *locator)
+      : ContextualMismatch(cs, FixKind::TreatArrayLiteralAsTuple,
+                           tupleTy, arrayTy, locator) {
+      }
+
+public:
+  std::string getName() const override {
+    return "treat array literal as tuple";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
+    return diagnose(*commonFixes.front().first);
+  }
+
+  static TreatArrayLiteralAsTuple *attempt(ConstraintSystem &cs,
+                                           Type tupleTy, Type arrayTy,
+                                           ConstraintLocator *loc);
+
+  static bool classof(const ConstraintFix *fix) {
+    return fix->getKind() == FixKind::TreatArrayLiteralAsTuple;
+  }
+};
+
+class TreatTupleAsArrayLiteral final : public ContextualMismatch {
+  TreatTupleAsArrayLiteral(ConstraintSystem &cs, Type tupleTy,
+                           Type arrayTy, ConstraintLocator *locator)
+      : ContextualMismatch(cs, FixKind::TreatTupleAsArrayLiteral,
+                           tupleTy, arrayTy, locator) {
+      }
+
+public:
+  std::string getName() const override {
+    return "treat tuple as array literal";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
+    return diagnose(*commonFixes.front().first);
+  }
+
+  static TreatTupleAsArrayLiteral *attempt(ConstraintSystem &cs,
+                                           Type tupleTy, Type arrayTy,
+                                           ConstraintLocator *loc);
+
+  static bool classof(const ConstraintFix *fix) {
+    return fix->getKind() == FixKind::TreatTupleAsArrayLiteral;
   }
 };
 
