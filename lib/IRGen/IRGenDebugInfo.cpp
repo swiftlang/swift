@@ -3056,8 +3056,7 @@ IRGenDebugInfoImpl::IRGenDebugInfoImpl(const IRGenOptions &Opts,
   std::tie(Major, Minor) = version::getSwiftNumericVersion();
   unsigned MajorRuntimeVersion = Major;
 
-  // No split DWARF on Darwin.
-  StringRef SplitName = StringRef();
+  StringRef SplitName = StringRef(Opts.SplitDwarfFile);
   // Note that File + Dir need not result in a valid path.
   // The directory part of the main file is the current working directory.
   std::string RemappedFile = DebugPrefixMap.remapPath(SourcePath);

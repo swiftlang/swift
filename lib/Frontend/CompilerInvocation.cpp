@@ -3678,6 +3678,12 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
                      A->getAsString(Args), A->getValue());
   }
 
+  if (auto A = Args.getLastArg(OPT_split_dwarf_output)) {
+    Opts.SplitDwarfOutput = A->getValue();
+    Opts.SplitDwarfFile =
+        llvm::sys::path::filename(Opts.SplitDwarfOutput).str();
+  }
+
   if (auto *A =
           Args.getLastArg(OPT_debug_module_path, OPT_debug_module_self_key)) {
     if (A->getOption().matches(OPT_debug_module_self_key)) {
