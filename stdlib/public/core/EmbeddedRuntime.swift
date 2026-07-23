@@ -149,6 +149,24 @@ public func _swift_generateRandomHashSeed(_ buf: UnsafeMutableRawPointer, _ nbyt
 @_extern(c, "_swift_typedAllocate")
 public func _swift_typedAllocate(_ buf: UnsafeMutablePointer<UnsafeMutableRawPointer?>, _ size: Int, _ alignMask: Int, _ typeId: UInt64)
 
+@_extern(c, "_swift_reportError")
+@usableFromInline
+internal func _swift_reportError(
+  _ message: UnsafePointer<UInt8>?,
+  _ messageCount: Int,
+  _ flags: CUnsignedLongLong
+)
+
+@_extern(c, "_swift_reportErrorAt")
+@usableFromInline
+internal func _swift_reportErrorAt(
+  _ message: UnsafePointer<UInt8>?,
+  _ messageCount: Int,
+  _ fileName: UnsafePointer<UInt8>?,
+  _ fileNameCount: Int,
+  _ line: Int,
+  _ flags: CUnsignedLongLong
+)
 #else
 // Interface that predates the introduction of swift/EmbeddedPlatform.h
 
@@ -887,6 +905,79 @@ func _embeddedReportFatalErrorInFile(prefix: StaticString, message: UnsafeBuffer
   print(prefix, terminator: "")
   if message.count > 0 { print(": ", terminator: "") }
   unsafe print(message)
+}
+
+// Error-kind-based variants. On platforms that provide the Embedded Swift
+// platform layer, the numeric `kind` is passed through to `_swift_reportError`
+// so the platform can format the error itself; otherwise the prefix is printed.
+// These are `@usableFromInline` (referenced by the emitted-into-client
+// `_assertionFailure` entrypoints) but kept out of line so the cold reporting
+// path isn't inlined into every call site.
+
+@usableFromInline
+@inline(never)
+func _embeddedReportFatalError(kind: Int, message: StaticString) {
+#if SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
+  message.withUTF8Buffer { messageBuffer in
+    unsafe _swift_reportError(
+      messageBuffer.baseAddress, messageBuffer.count, CUnsignedLongLong(kind))
+  }
+#else
+  print(kind._failureMessagePrefix(), terminator: "")
+  if message.utf8CodeUnitCount > 0 { print(": ", terminator: "") }
+  print(message)
+#endif
+}
+
+@usableFromInline
+@inline(never)
+func _embeddedReportFatalError(kind: Int, message: UnsafeBufferPointer<UInt8>) {
+#if SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
+  unsafe _swift_reportError(
+    message.baseAddress, message.count, CUnsignedLongLong(kind))
+#else
+  print(kind._failureMessagePrefix(), terminator: "")
+  if message.count > 0 { print(": ", terminator: "") }
+  unsafe print(message)
+#endif
+}
+
+@usableFromInline
+@inline(never)
+func _embeddedReportFatalErrorInFile(kind: Int, message: StaticString, file: StaticString, line: UInt) {
+#if SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
+  message.withUTF8Buffer { messageBuffer in
+    file.withUTF8Buffer { fileBuffer in
+      unsafe _swift_reportErrorAt(
+        messageBuffer.baseAddress, messageBuffer.count,
+        fileBuffer.baseAddress, fileBuffer.count, Int(line), CUnsignedLongLong(kind))
+    }
+  }
+#else
+  print(file, terminator: ":")
+  print(line, terminator: ": ")
+  print(kind._failureMessagePrefix(), terminator: "")
+  if message.utf8CodeUnitCount > 0 { print(": ", terminator: "") }
+  print(message)
+#endif
+}
+
+@usableFromInline
+@inline(never)
+func _embeddedReportFatalErrorInFile(kind: Int, message: UnsafeBufferPointer<UInt8>, file: StaticString, line: UInt) {
+#if SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
+  file.withUTF8Buffer { fileBuffer in
+    unsafe _swift_reportErrorAt(
+      message.baseAddress, message.count,
+      fileBuffer.baseAddress, fileBuffer.count, Int(line), CUnsignedLongLong(kind))
+  }
+#else
+  print(file, terminator: ":")
+  print(line, terminator: ": ")
+  print(kind._failureMessagePrefix(), terminator: "")
+  if message.count > 0 { print(": ", terminator: "") }
+  unsafe print(message)
+#endif
 }
 
 extension Access.Action {

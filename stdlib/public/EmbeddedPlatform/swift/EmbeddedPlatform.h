@@ -42,8 +42,8 @@ typedef ptrdiff_t __swift_ptrdiff_t;
 typedef unsigned long long __swift_typeid_t;
 
 /**
- * 64-bit type  information that is used for typed allocation and
- * deallocation.
+ * 64-bit option set used to provide options for various functions in the
+ * platform abstraction layer.
  */
 typedef unsigned long long __swift_options_t;
 
@@ -88,16 +88,28 @@ typedef void (*__swift_tls_dtor_t)(void * EMBEDDED_SWIFT_NULLABLE);
 #define EMBEDDED_SWIFT_SINGLE
 #endif
 
-#if defined(__has_feature) && __has_attribute(flag_enum)
+#if defined(__has_attribute) && __has_attribute(flag_enum) && __has_attribute(enum_extensibility)
 #define EMBEDDED_SWIFT_OPTION_SET __attribute__((flag_enum,enum_extensibility(open)))
 #else
 #define EMBEDDED_SWIFT_OPTION_SET
 #endif
 
-#if defined(__has_feature) && __has_attribute(swift_name)
+#if defined(__has_attribute) && __has_attribute(swift_name)
 #define EMBEDDED_SWIFT_NAME(_name) __attribute__((swift_name(#_name)))
 #else
 #define EMBEDDED_SWIFT_NAME(_name)
+#endif
+
+#if defined(__has_attribute) && __has_attribute(noreturn)
+#define EMBEDDED_SWIFT_NORETURN __attribute__((noreturn))
+#else
+#define EMBEDDED_SWIFT_NORETURN
+#endif
+
+#if defined(__has_attribute) && __has_attribute(enum_extensibility)
+#define EMBEDDED_SWIFT_ENUM __attribute__((enum_extensibility(open)))
+#else
+#define EMBEDDED_SWIFT_ENUM
 #endif
 
 /**
@@ -183,6 +195,28 @@ typedef enum EMBEDDED_SWIFT_OPTION_SET: __swift_options_t {
    */
   SWIFT_DEALLOC_NONE EMBEDDED_SWIFT_NAME(none) = 0,
 } swift_dealloc_flags_t EMBEDDED_SWIFT_NAME(SwiftDeallocFlags);
+
+/**
+ * The kind of error being reported.
+ */
+typedef enum EMBEDDED_SWIFT_ENUM {
+  /**
+   * A fatal error, produced by fatalError(...).
+   */
+  SWIFT_ERROR_FATAL EMBEDDED_SWIFT_NAME(fatal) = 0,
+
+  /**
+   * A precondition failure, produced by precondition(...).
+   */
+  SWIFT_ERROR_PRECONDITION EMBEDDED_SWIFT_NAME(precondition),
+
+  /**
+   * An assertion failure, produced by assert(...).
+   *
+   * These won't occur when assertions are disabled, e.g., in release builds.
+   */
+  SWIFT_ERROR_ASSERTION EMBEDDED_SWIFT_NAME(assertion),
+} swift_error_kind_t EMBEDDED_SWIFT_NAME(SwiftErrorKind);
 
 /**
  * Options provided to the Swift mutex initialization function.
@@ -287,6 +321,45 @@ void * EMBEDDED_SWIFT_NULLABLE _swift_typedAllocate(
 __swift_size_t _swift_writeToStandardOutput(
     const unsigned char * EMBEDDED_SWIFT_NULLABLE EMBEDDED_SWIFT_COUNTED_BY(count) chars,
     __swift_size_t count);
+
+/**
+ * Reports a fatal error and terminates the program.
+ *
+ * - Parameters:
+ *   - message: The UTF-8 code points that make up the failure message. It is
+ *     not NULL-terminated. May be NULL when messageCount is 0.
+ *   - messageCount: The number of UTF-8 code points in message.
+ *   - flags: Flags that describe more about the error condition. The lower 8
+ *     bits contain a swift_error_kind_t / SwiftErrorKind value.
+ */
+void _swift_reportError(
+    const unsigned char * EMBEDDED_SWIFT_NULLABLE EMBEDDED_SWIFT_COUNTED_BY(messageCount) message,
+    __swift_size_t messageCount,
+    __swift_options_t flags
+) EMBEDDED_SWIFT_NORETURN;
+
+/**
+ * Reports a fatal error at a given file/line and terminates the program.
+ *
+ * - Parameters:
+ *   - message: The UTF-8 code points that make up the failure message. It is
+ *     not NULL-terminated. May be NULL when messageCount is 0.
+ *   - messageCount: The number of UTF-8 code points in message.
+ *   - fileName: The UTF-8 code points that make up the file name. It is
+ *     not NULL-terminated. May be NULL when fileNameCount is 0.
+ *   - fileNameCount: The number of UTF-8 code points in fileName.
+ *   - line: The line number within the file at which the error occurred.
+ *   - flags: Flags that describe more about the error condition. The lower 8
+ *     bits contain a swift_error_kind_t / SwiftErrorKind value.
+ */
+void _swift_reportErrorAt(
+    const unsigned char * EMBEDDED_SWIFT_NULLABLE EMBEDDED_SWIFT_COUNTED_BY(messageCount) message,
+    __swift_size_t messageCount,
+    const unsigned char * EMBEDDED_SWIFT_NULLABLE EMBEDDED_SWIFT_COUNTED_BY(fileNameCount) fileName,
+    __swift_size_t fileNameCount,
+    __swift_size_t line,
+    __swift_options_t flags
+) EMBEDDED_SWIFT_NORETURN;
 
 /**
  * Generates random bytes into the given buffer.
