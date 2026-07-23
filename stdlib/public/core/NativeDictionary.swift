@@ -459,7 +459,7 @@ internal func KEY_TYPE_OF_DICTIONARY_VIOLATES_HASHABLE_REQUIREMENTS(
   _ keyType: Any.Type
 ) -> Never {
   _assertionFailure(
-    "Fatal error",
+    kind: .fatal(),
     """
     Duplicate keys of type '\(keyType)' were found in a Dictionary.
     This usually means either that the type violates Hashable's requirements, or

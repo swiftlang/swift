@@ -1,3 +1,5 @@
+import Builtin
+
 // POSIX dependencies
 @_extern(c, "posix_memalign")
 func posix_memalign(_: UnsafeMutablePointer<UnsafeMutableRawPointer?>, _: Int, _: Int) -> CInt
@@ -75,6 +77,87 @@ public func _swift_writeToStandardOutput(
 @implementation @c
 public func _swift_exit(_ code: Int) {
   exit(CInt(code))
+}
+
+/// The human-readable prefix that precedes an error message, chosen by the
+/// error kind held in the low 8 bits of `flags` (a `swift_error_kind_t` /
+/// `SwiftErrorKind` value).
+private func _reportErrorPrefix(_ flags: UInt64) -> StaticString {
+  switch flags & 0xff {
+  case 1: return "Precondition failed" // SwiftErrorKind.precondition
+  case 2: return "Assertion failed"    // SwiftErrorKind.assertion
+  default: return "Fatal error"        // SwiftErrorKind.fatal
+  }
+}
+
+/// Writes a NUL-terminated static string to standard output.
+private func _writeStaticString(_ string: StaticString) {
+  string.withUTF8Buffer { buffer in
+    _ = unsafe _swift_writeToStandardOutput(buffer.baseAddress, buffer.count)
+  }
+}
+
+/// Writes a non-negative integer to standard output in decimal.
+private func _writeInt(_ value: Int) {
+  if value >= 10 { _writeInt(value / 10) }
+  _ = putchar(CInt(UInt8(ascii: "0") + UInt8(value % 10)))
+}
+
+/// Prints a fatal error report to standard output, optionally prefixed by a
+/// source location, e.g. "file:line: Fatal error: message". Output goes through
+/// `putchar` (via `_swift_writeToStandardOutput`) so it doesn't allocate and
+/// honors any platform-provided unbuffered `putchar`.
+private func _reportError(
+  prefix: StaticString,
+  fileName: UnsafePointer<UInt8>?, fileNameCount: Int, line: Int,
+  message: UnsafePointer<UInt8>?, messageCount: Int
+) {
+  // Optional "<file>:<line>: " source-location prefix.
+  if let fileName, fileNameCount > 0 {
+    _ = unsafe _swift_writeToStandardOutput(fileName, fileNameCount)
+    _writeStaticString(":")
+    _writeInt(line)
+    _writeStaticString(": ")
+  }
+
+  // The error-kind prefix, followed by ": <message>" when a message is given.
+  _writeStaticString(prefix)
+  if let message, messageCount > 0 {
+    _writeStaticString(": ")
+    _ = unsafe _swift_writeToStandardOutput(message, messageCount)
+  }
+  _writeStaticString("\n")
+}
+
+@export(interface)
+@implementation @c
+public func _swift_reportError(
+  _ message: UnsafePointer<UInt8>?,
+  _ messageCount: Int,
+  _ flags: UInt64
+) -> Never {
+  unsafe _reportError(
+    prefix: _reportErrorPrefix(flags),
+    fileName: nil, fileNameCount: 0, line: 0,
+    message: message, messageCount: messageCount)
+  Builtin.int_trap()
+}
+
+@export(interface)
+@implementation @c
+public func _swift_reportErrorAt(
+  _ message: UnsafePointer<UInt8>?,
+  _ messageCount: Int,
+  _ fileName: UnsafePointer<UInt8>?,
+  _ fileNameCount: Int,
+  _ line: Int,
+  _ flags: UInt64
+) -> Never {
+  unsafe _reportError(
+    prefix: _reportErrorPrefix(flags),
+    fileName: fileName, fileNameCount: fileNameCount, line: line,
+    message: message, messageCount: messageCount)
+  Builtin.int_trap()
 }
 
 @export(interface)
