@@ -9335,7 +9335,8 @@ ObjCSelector VarDecl::getDefaultObjCSetterSelector(ASTContext &ctx,
 /// If this is a simple 'let' constant, emit a note with a fixit indicating
 /// that it can be rewritten to a 'var'.  This is used in situations where the
 /// compiler detects obvious attempts to mutate a constant.
-void VarDecl::emitLetToVarNoteIfSimple(DeclContext *UseDC) const {
+void VarDecl::emitLetToVarNoteIfSimple(DeclContext *UseDC,
+                                       SourceLoc failingExprLoc) const {
   // If it isn't a 'let', don't touch it.
   if (!isLet()) return;
 
@@ -9369,8 +9370,27 @@ void VarDecl::emitLetToVarNoteIfSimple(DeclContext *UseDC) const {
     }
   }
 
-  // Besides self, don't suggest mutability for explicit function parameters.
-  if (isa<ParamDecl>(this)) return;
+  // For explicit function parameters, suggest declaring a local mutable copy
+  // just above the failing expression.
+  if (isa<ParamDecl>(this)) {
+    if (failingExprLoc.isValid()) {
+      auto insertLoc =
+          Lexer::getLocForStartOfLine(getASTContext().SourceMgr, failingExprLoc);
+      llvm::SmallString<32> buf;
+      llvm::raw_svector_ostream os(buf);
+      DeclName(getName()).print(os, /*skipEmptyArgumentNames=*/true,
+                                /*escapeIfNeeded=*/true);
+      auto nameStr = buf.str();
+      llvm::SmallString<64> varDecl;
+      (llvm::Twine("var ") + nameStr + " = " + nameStr).toVector(varDecl);
+      auto insertText = (varDecl + "\n").str();
+      getASTContext().Diags
+          .diagnose(failingExprLoc, diag::add_var_shadow_to_param,
+                    varDecl.str())
+          .fixItInsert(insertLoc, insertText);
+    }
+    return;
+  }
 
   // Don't suggest any fixes for capture list elements.
   if (isCaptureList()) return;
