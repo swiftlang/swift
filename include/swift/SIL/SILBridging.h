@@ -904,8 +904,12 @@ struct BridgedInstruction {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedBasicBlock BranchInst_getTargetBlock() const;
   BRIDGED_INLINE SwiftInt SwitchEnumInst_getNumCases() const;
   BRIDGED_INLINE SwiftInt SwitchEnumInst_getCaseIndex(SwiftInt idx) const;
-  BRIDGED_INLINE OptionalBridgedBasicBlock
-  SwitchEnumInst_getSuccessorForDefault() const;
+  BRIDGED_INLINE SwiftInt SwitchEnumInst_getUniqueCaseForDefault() const;
+  BRIDGED_INLINE OptionalBridgedBasicBlock SwitchEnumInst_getSuccessorForDefault() const;
+  BRIDGED_INLINE SwiftInt SwitchEnumAddrInst_getNumCases() const;
+  BRIDGED_INLINE SwiftInt SwitchEnumAddrInst_getCaseIndex(SwiftInt idx) const;
+  BRIDGED_INLINE SwiftInt SwitchEnumAddrInst_getUniqueCaseForDefault() const;
+  BRIDGED_INLINE OptionalBridgedBasicBlock SwitchEnumAddrInst_getSuccessorForDefault() const;
   BRIDGED_INLINE SwiftInt StoreInst_getStoreOwnership() const;
   BRIDGED_INLINE SwiftInt AssignInst_getAssignOwnership() const;
   BRIDGED_INLINE MarkDependenceKind MarkDependenceInst_dependenceKind() const;

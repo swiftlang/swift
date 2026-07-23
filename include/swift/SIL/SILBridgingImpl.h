@@ -1670,9 +1670,40 @@ SwiftInt BridgedInstruction::SwitchEnumInst_getCaseIndex(SwiftInt idx) const {
   return seInst->getModule().getCaseIndex(seInst->getCase(idx).first);
 }
 
+SwiftInt BridgedInstruction::SwitchEnumInst_getUniqueCaseForDefault() const {
+  auto *seInst = getAs<swift::SwitchEnumInst>();
+  if (auto caseDecl = seInst->getUniqueCaseForDefault())
+    return seInst->getModule().getCaseIndex(caseDecl.get());
+  return -1;
+}
+
 OptionalBridgedBasicBlock
 BridgedInstruction::SwitchEnumInst_getSuccessorForDefault() const {
   auto *seInst = getAs<swift::SwitchEnumInst>();
+  if (seInst->hasDefault())
+    return {seInst->getDefaultBB()};
+  return {nullptr};
+}
+
+SwiftInt BridgedInstruction::SwitchEnumAddrInst_getNumCases() const {
+  return getAs<swift::SwitchEnumAddrInst>()->getNumCases();
+}
+
+SwiftInt BridgedInstruction::SwitchEnumAddrInst_getCaseIndex(SwiftInt idx) const {
+  auto *seInst = getAs<swift::SwitchEnumAddrInst>();
+  return seInst->getModule().getCaseIndex(seInst->getCase(idx).first);
+}
+
+SwiftInt BridgedInstruction::SwitchEnumAddrInst_getUniqueCaseForDefault() const {
+  auto *seInst = getAs<swift::SwitchEnumAddrInst>();
+  if (auto caseDecl = seInst->getUniqueCaseForDefault())
+    return seInst->getModule().getCaseIndex(caseDecl.get());
+  return -1;
+}
+
+OptionalBridgedBasicBlock
+BridgedInstruction::SwitchEnumAddrInst_getSuccessorForDefault() const {
+  auto *seInst = getAs<swift::SwitchEnumAddrInst>();
   if (seInst->hasDefault())
     return {seInst->getDefaultBB()};
   return {nullptr};
