@@ -612,9 +612,38 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
     }
 
     // Cleanup after this initialization.
-    SILValue v = maybeEmitPropertyWrapperInitFromValue(SGF, Loc, field, subs,
-                                                       std::move(value))
-        .forwardAsSingleStorageValue(SGF, fieldTy, Loc);
+    RValue fieldRValue = maybeEmitPropertyWrapperInitFromValue(
+        SGF, Loc, field, subs, std::move(value));
+
+    // Conversions must always be done at +1.
+    ManagedValue mv = std::move(fieldRValue).ensurePlusOne(SGF, Loc)
+                          .getAsSingleValue(SGF, Loc);
+
+    // If the lowered types differ due to reabstraction (e.g., a C function
+    // pointer field whose return type bridges differently), convert using
+    // emitSubstToOrigValue before handling any ReferenceStorageType
+    // conversion.
+    // Skip this when the mismatch is solely due to reference storage type
+    // wrapping (weak/unowned/unmanaged) — emitConversionFromSemanticValue
+    // handles that case.
+    if (mv.getType() != fieldTy &&
+        !fieldTy.getASTType()->is<ReferenceStorageType>()) {
+      AbstractionPattern origFieldTy =
+          SGF.SGM.Types.getAbstractionPattern(field);
+      CanType substFieldTy;
+      if (field->hasClangNode()) {
+        substFieldTy = origFieldTy.getType();
+      } else {
+        substFieldTy = selfTy.getASTType()
+                           ->getTypeOfMember(field)
+                           ->getCanonicalType();
+      }
+      mv = SGF.emitSubstToOrigValue(Loc, mv, origFieldTy, substFieldTy,
+                                    fieldTy);
+    }
+
+    SILValue v = SGF.emitConversionFromSemanticValue(Loc, mv.forward(SGF),
+                                                     fieldTy);
 
     eltValues.push_back(v);
   }
