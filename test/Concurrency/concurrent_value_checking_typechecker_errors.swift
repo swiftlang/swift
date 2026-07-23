@@ -62,6 +62,6 @@ class C12: @unchecked C11 { } // expected-error {{'@unchecked' cannot apply to n
 
 protocol P { }
 
-protocol Q: @unchecked Sendable { } // expected-error {{'@unchecked' only applies in inheritance clauses}}
+protocol Q: @unchecked Sendable { } // expected-error {{'attribute .@unchecked. cannot be applied to a type}}
 
-typealias TypeAlias1 = @unchecked P // expected-error {{'@unchecked' only applies in inheritance clauses}}
+typealias TypeAlias1 = @unchecked P // expected-error {{'attribute .@unchecked. cannot be applied to a type}}
