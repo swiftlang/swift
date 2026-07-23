@@ -2178,21 +2178,39 @@ private:
     case TypeKind::ProtocolComposition: {
       auto *CompTy = BaseTy->castTo<ProtocolCompositionType>();
 
-      // A composition's mangled name will always be that of the canonical
-      // composition type. This means that a composition can be canonicalized
-      // into a single protocol type. For example, given:
+      // A composition's mangled name (which is used as its UID) is always that
+      // of the canonical composition type. A sugared composition can therefore
+      // share a UID with a structurally different type. For example, given:
       //
       // protocol P {}
       // typealias P2 = P
       // func f(param: (any P & P2)) {}
       //
-      // The canonical type of "param" is simply P. To make sure we don't have
-      // two conflicting types with the same mangled name (one being the
-      // protocol composition, the other being only the protocol), In that case,
-      // emit debug info as only the protocol type.
+      // the canonical type of "param" is simply P, so emitting the composition
+      // would produce a DIType conflicting with the plain protocol P under the
+      // same UID. In that case, emit debug info for only the protocol type.
       auto CanTy = BaseTy->getCanonicalType();
       if (!isa<ProtocolCompositionType>(CanTy)) {
         return getOrCreateDesugaredType(CanTy, DbgTy);
+      }
+
+      // A sugared composition can also be *redundant*: one of its members
+      // already implies the whole composition, so that member shares the
+      // composition's canonical type -- and hence its UID. For example:
+      //
+      // typealias Basic = A & B
+      // typealias Complex = Basic & A
+      //
+      // "Complex" has sugared members [Basic, A] but canonicalizes to "A & B",
+      // exactly like its member "Basic". Emitting the sugared members would
+      // recursively create a second DICompositeType for "Basic" with the same
+      // (canonical) UID as "Complex", tripping the "conflicting types for one
+      // UID" uniquing invariant. When a member carries the whole composition's
+      // canonical type, emit debug info for the canonical type instead so that
+      // a given UID always maps to a single DIType.
+      for (const Type MemberTy : CompTy->getMembers()) {
+        if (MemberTy->getCanonicalType() == CanTy)
+          return getOrCreateDesugaredType(CanTy, DbgTy);
       }
 
       llvm::TempDICompositeType FwdDecl(DBuilder.createReplaceableCompositeType(
