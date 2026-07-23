@@ -2692,11 +2692,8 @@ bb3:
   return %2 : $()
 }
 
-// We do not perform this optimization in SILCombine in OSSA since we would be
-// deleting an edge from the CFG.
-//
 // CHECK-LABEL: sil [ossa] @resilient_enum_case_propagation :
-// CHECK: switch_enum_addr
+// CHECK-NOT: switch_enum_addr
 // CHECK: } // end sil function 'resilient_enum_case_propagation'
 sil [ossa] @resilient_enum_case_propagation : $@convention(thin) () -> Builtin.Int64 {
 bb0:
