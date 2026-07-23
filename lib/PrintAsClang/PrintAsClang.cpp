@@ -122,6 +122,7 @@ static void writePrologue(raw_ostream &out, ASTContext &ctx,
          "#if __has_include(<swift/objc-prologue.h>)\n"
          "# include <swift/objc-prologue.h>\n"
          "#endif\n"
+         "#include <stdarg.h>\n"
          "\n"
          "#pragma clang diagnostic ignored \"-Wauto-import\"\n";
   emitObjCConditional(out,
