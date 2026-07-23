@@ -467,8 +467,6 @@ clang::QualType ClangTypeConverter::visitTupleType(TupleType *type) {
 
 clang::QualType
 ClangTypeConverter::convertCArrayType(Type eltTy, const APInt &size) {
-  ASSERT(!size.isZero());
-
   auto clangEltTy = convert(eltTy);
   if (clangEltTy.isNull())
     return clang::QualType();
@@ -577,27 +575,42 @@ ClangTypeConverter::visitBoundGenericClassType(BoundGenericClassType *type) {
 
 clang::QualType
 ClangTypeConverter::visitBoundGenericType(BoundGenericType *type) {
-  // The only supported conversions are for T?, SIMD*<T>, and *Pointer<T>,
-  // so there should only be a single generic type argument.
-  if (type->getGenericArgs().size() != 1)
-    return clang::QualType();
+  switch (type->getGenericArgs().size()) {
+  case 1: {
+    // The supported conversions are for T?, SIMD*<T>, and *Pointer<T>.
+    auto argType = type->getGenericArgs()[0]->getCanonicalType();
 
-  auto argType = type->getGenericArgs()[0]->getCanonicalType();
+    if (type->getDecl()->isOptionalDecl()) {
+      auto innerTy = convert(argType);
+      if (swift::canImportAsOptional(innerTy.getTypePtrOrNull()) ||
+          argType->isForeignReferenceType())
+        return innerTy;
+      return clang::QualType();
+    }
 
-  if (type->getDecl()->isOptionalDecl()) {
-    auto innerTy = convert(argType);
-    if (swift::canImportAsOptional(innerTy.getTypePtrOrNull()) ||
-        argType->isForeignReferenceType())
-      return innerTy;
-    return clang::QualType();
+    if (auto kind = classifyPointer(type))
+      return convertPointerType</*templateArgument=*/false>(argType,
+                                                            kind.value());
+
+    if (auto width = classifySIMD(type))
+      return convertSIMDType</*templateArgument=*/false>(argType, width.value());
+
+    break;
   }
 
-  if (auto kind = classifyPointer(type))
-    return convertPointerType</*templateArgument=*/false>(argType,
-                                                          kind.value());
+  case 2: {
+    // The supported conversion is for InlineArray<N, T>.
+    if (auto count = type->getInlineArrayCount()) {
+      auto elemType = type->getInlineArrayElementType();
+      return convertCArrayType(elemType, *count);
+    }
 
-  if (auto width = classifySIMD(type))
-    return convertSIMDType</*templateArgument=*/false>(argType, width.value());
+    break;
+  }
+
+  default:
+    break;
+  }
 
   return clang::QualType();
 }
