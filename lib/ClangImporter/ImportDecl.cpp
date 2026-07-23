@@ -4489,9 +4489,15 @@ namespace {
         if (importedAsClass(ty, forSelf))
           hasSkippedLifetimeAnnotation = true;
         paramHasAnnotation[idx] = true;
-        // 'self' and lvalue/rvalue references borrow the referent's storage.
-        if (forSelf || ty->isReferenceType())
+        // 'self' and lvalue references borrow the referent's storage.
+        if (forSelf || ty->isLValueReferenceType())
           scopedLifetimeParamIndicesForReturn[idx] = true;
+        // An rvalue reference is imported as 'consuming'; its storage is not
+        // guaranteed to outlive the call, so we cannot form a scoped
+        // dependency on it, nor can the result inherit its lifetime as if it
+        // were passed by value. Import the API as @unsafe.
+        else if (ty->isRValueReferenceType())
+          hasSkippedLifetimeAnnotation = true;
         // A non-escapable passed by value: the result inherits its lifetime.
         else if (!isEscapable(ty))
           inheritLifetimeParamIndicesForReturn[idx] = true;
