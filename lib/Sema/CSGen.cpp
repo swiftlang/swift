@@ -1667,7 +1667,8 @@ namespace {
         if (numElements > 1) {
           bool isIniting =
               CS.getContextualTypePurpose(expr) == CTP_Initialization;
-          DE.diagnose(expr->getStartLoc(), diag::should_use_dictionary_literal,
+          DE.diagnose(expr->getStartLoc(),
+                      diag::should_use_dictionary_literal_not_array_literal,
                       contextualType->lookThroughAllOptionalTypes(), isIniting);
 
           auto diagnostic =
