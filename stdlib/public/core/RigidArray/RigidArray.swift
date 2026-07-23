@@ -70,13 +70,6 @@ internal struct _RigidArray<Element: ~Copyable>: ~Copyable {
     unsafe _ptr.deinitialize(count: _count)
     unsafe _ptr.deallocate()
   }
-  
-  @export(implementation)
-  internal init(_storage: UnsafeMutableBufferPointer<Element>, count: Int) {
-    unsafe _ptr = _storage.baseAddress._unsafelyUnwrappedUnchecked
-    _capacity = _storage.count
-    _count = count
-  }
 }
 
 @available(SwiftStdlib 6.4, *)
@@ -88,7 +81,10 @@ extension _RigidArray where Element: ~Copyable {
   @export(implementation)
   @_transparent
   internal var _storage: UnsafeMutableBufferPointer<Element> {
-    unsafe UnsafeMutableBufferPointer<Element>(start: _ptr, count: _capacity)
+    unsafe UnsafeMutableBufferPointer<Element>(
+      _uncheckedStart: _ptr,
+      count: _capacity
+    )
   }
 
   /// The maximum number of elements this rigid array can hold.
