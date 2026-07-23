@@ -269,15 +269,10 @@ bb0(%0 : @owned $LeafNode):
 //===----------------------------------------------------------------------===//
 
 // CHECK-LABEL: sil [ossa] @mixedOwnershipSiblingApplies :
-// CHECK: [[EXIST:%.*]] = open_existential_ref
-// CHECK: [[BORROW:%.*]] = begin_borrow [[EXIST]]
-// CHECK: [[CAST1:%.*]] = unchecked_ref_cast [[BORROW]]{{.*}}to $LeafNode
-// CHECK: function_ref @genericTake
-// CHECK: apply {{%[0-9]+}}<LeafNode>([[CAST1]])
-// CHECK: function_ref @genericConsume
-// CHECK: end_borrow [[BORROW]]
-// CHECK: [[CAST2:%.*]] = unchecked_ref_cast [[EXIST]]{{.*}}to $LeafNode
-// CHECK: apply {{%[0-9]+}}<LeafNode>([[CAST2]])
+// CHECK: [[TAKE:%.*]] = function_ref @genericTake
+// CHECK: apply [[TAKE]]<LeafNode>(%0)
+// CHECK: [[CONSUME:%.*]] = function_ref @genericConsume
+// CHECK: apply [[CONSUME]]<LeafNode>(%0)
 // CHECK-LABEL: } // end sil function 'mixedOwnershipSiblingApplies'
 sil [ossa] @mixedOwnershipSiblingApplies : $@convention(thin) (@owned LeafNode) -> () {
 bb0(%0 : @owned $LeafNode):

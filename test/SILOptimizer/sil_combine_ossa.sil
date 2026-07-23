@@ -2814,9 +2814,8 @@ bb0(%0 : @owned $Klass):
 }
 
 // CHECK-LABEL: sil [ossa] @collapse_existential_pack_unpack_unchecked_ref_cast_owned3 :
-// TODO-CHECK-NOT:     init_existential_ref
-// TODO-CHECK-NOT:     open_existential_ref
-// CHECK:     apply {{.*}}<Klass>
+// CHECK-NOT:     init_existential_ref
+// CHECK-NOT:     open_existential_ref
 // CHECK: } // end sil function 'collapse_existential_pack_unpack_unchecked_ref_cast_owned3'
 sil [ossa] @collapse_existential_pack_unpack_unchecked_ref_cast_owned3 : $@convention(thin) (@owned Klass) -> @owned Builtin.NativeObject {
 bb0(%0 : @owned $Klass):
