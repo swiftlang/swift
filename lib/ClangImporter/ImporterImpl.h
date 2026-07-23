@@ -2090,6 +2090,15 @@ bool isForwardDeclOfType(const clang::Decl *decl);
 /// type.
 bool isBoolOrBoolEnumType(Type ty);
 
+/// Returns \c true if \p type will be imported as a different type when
+/// when \c Feature::ModernImportedCArrays is enabled.
+bool hasLegacyCArrayType(clang::QualType type);
+
+/// If \p modernType is the modern type of an imported fixed-size C array
+/// ( \c InlineArray ), compute the legacy tuple type that would be used
+/// when \c Feature::ModernImportedCArrays is not enabled.
+ImportedType computeLegacyCArrayType(ImportedType modernType);
+
 /// Whether we should suppress the import of the given Clang declaration.
 bool shouldSuppressDeclImport(const clang::Decl *decl);
 

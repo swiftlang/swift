@@ -5,6 +5,12 @@
 // RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -o %t/test.swiftmodule %t/test.swift -I %t -strict-memory-safety \
 // RUN:   -verify -verify-additional-file %t%{fs-sep}foo.h -verify-additional-file %t%{fs-sep}bar.h -verify-additional-file %t%{fs-sep}baz.h -verify-additional-file %t%{fs-sep}qux.h -Rmacro-expansions -eager-macro-checking
 
+// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -o %t/test.swiftmodule %t/test.swift -I %t -strict-memory-safety \
+// RUN:    -enable-experimental-feature ModernImportedCArrays -DMODERN_C_ARRAYS -target %target-has-inline-array-triple \
+// RUN:   -verify -verify-additional-file %t%{fs-sep}foo.h -verify-additional-file %t%{fs-sep}bar.h -verify-additional-file %t%{fs-sep}baz.h -verify-additional-file %t%{fs-sep}qux.h -Rmacro-expansions -eager-macro-checking
+
+// REQUIRES: swift_feature_ModernImportedCArrays
+
 // Macro expansions in foo.h do not have access to the definition of `struct qux`,
 // so don't attach macro on functions that use contain that type in foo.h.
 // bar.h imports the type, so attach the macro.
@@ -141,8 +147,18 @@ import Foo
 import Bar
 import Baz
 
+#if MODERN_C_ARRAYS
+@available(anyAppleOS 26, *)
+typealias QuxPointerPair = [2 of UnsafeMutablePointer<qux>?]
+#else
+typealias QuxPointerPair = (UnsafeMutablePointer<qux>?, UnsafeMutablePointer<qux>?)
+#endif
+
+#if MODERN_C_ARRAYS
+@available(anyAppleOS 26, *)
+#endif
 func callFoo(_ x: UnsafeMutablePointer<qux>, _ y: UnsafeMutablePointer<UnsafeMutablePointer<qux>?>, _ z: UnsafeMutablePointer<container_t>,
-             _ zz: UnsafeMutablePointer<(UnsafeMutablePointer<qux>?, UnsafeMutablePointer<qux>?)>,
+             _ zz: UnsafeMutablePointer<QuxPointerPair>,
              _ p: UnsafeMutablePointer<CInt>, _ len: CInt) {
   unsafe foo(x, p, len)
   unsafe fooIndirect(y, p, len)
@@ -156,8 +172,11 @@ func callTestEnum(_ x: UnsafeMutablePointer<fwd_declared_enum>,
   unsafe testEnum(x, p, len)
 }
 
+#if MODERN_C_ARRAYS
+@available(anyAppleOS 26, *)
+#endif
 func callFoo2(_ x: UnsafeMutablePointer<qux>, _ y: UnsafeMutablePointer<UnsafeMutablePointer<qux>?>, _ z: UnsafeMutablePointer<container_t>,
-              _ zz: UnsafeMutablePointer<(UnsafeMutablePointer<qux>?, UnsafeMutablePointer<qux>?)>,
+              _ zz: UnsafeMutablePointer<QuxPointerPair>,
               _ p: UnsafeMutableBufferPointer<CInt>) {
   // expected-error@+2{{missing argument for parameter #3 in call}}
   // expected-error@+1{{cannot convert value of type 'UnsafeMutableBufferPointer<CInt>' (aka 'UnsafeMutableBufferPointer<Int32>') to expected argument type 'UnsafeMutablePointer<CInt>' (aka 'UnsafeMutablePointer<Int32>')}}

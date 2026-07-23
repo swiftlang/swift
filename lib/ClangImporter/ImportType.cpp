@@ -691,29 +691,20 @@ namespace {
     }
 
     ImportResult VisitConstantArrayType(const clang::ConstantArrayType *type) {
-      // FIXME: Map to a real fixed-size Swift array type when we have those.
-      // Importing as a tuple at least fills the right amount of space, and
-      // we can cheese static-offset "indexing" using .$n operations.
-
       Type elementType = Impl.importTypeIgnoreIUO(
           type->getElementType(), ImportTypeKind::Value, addImportDiagnostic,
           AllowNSUIntegerAsInt, Bridgeability::None, ImportTypeAttrs());
       if (!elementType)
         return Type();
 
-      auto size = type->getSize().getZExtValue();
+      if (type->getSize().isZero())
+        // Tail-allocated array: we don't know the actual size, but we import
+        // as `Void` so the offset can be computed.
+        // FIXME: Can we do something better than this?
+        return Impl.SwiftContext.TheEmptyTupleType;
 
-      // An array of size N is imported as an N-element tuple which
-      // takes very long to compile. We chose 4096 as the upper limit because
-      // we don't want to break arrays of size PATH_MAX.
-      if (size > 4096)
-        return Type();
-
-      if (size == 1)
-        return elementType;
-
-      SmallVector<TupleTypeElt, 8> elts{static_cast<size_t>(size), elementType};
-      return TupleType::get(elts, elementType->getASTContext());
+      auto countType = IntegerType::get(type->getSize(), Impl.SwiftContext);
+      return InlineArrayType::get(countType, elementType);
     }
 
     ImportResult VisitVectorType(const clang::VectorType *type) {
@@ -1018,6 +1009,11 @@ namespace {
           break;
         LLVM_FALLTHROUGH;
       default:
+        // Type is transformed by ImportDecl
+        if (underlyingResult.AbstractType->isInlineArray()
+              && mappedType->is<TupleType>())
+          break;
+
         if (!underlyingResult.AbstractType->isEqual(mappedType)) {
           underlyingResult.AbstractType->dump(llvm::errs());
           mappedType->dump(llvm::errs());
@@ -3834,4 +3830,127 @@ static Type getNamedProtocolType(ClangImporter::Implementation &impl,
 
 Type ClangImporter::Implementation::getNSObjectProtocolType() {
   return getNamedProtocolType(*this, "NSObject");
+}
+
+// An array of size N is imported as an N-element tuple which
+// takes very long to compile. We chose 4096 as the upper limit because
+// we don't want to break arrays of size PATH_MAX.
+constexpr unsigned MAX_TUPLE_SIZE = 4096;
+
+namespace {
+enum class HasLegacyCArrayResult : uint8_t {
+  None,
+  Importable,
+  Unimportable
+};
+}
+
+static HasLegacyCArrayResult hasLegacyCArrayTypeImpl(clang::QualType clangType){
+  auto desugaredType = clangType->getUnqualifiedDesugaredType();
+
+  if (auto arrayType = dyn_cast<clang::ConstantArrayType>(desugaredType)) {
+    // Tail-allocated array imported as an empty tuple in both legacy and modern
+    // modes.
+    // FIXME: Do better.
+    if (arrayType->getSize().isZero())
+      return HasLegacyCArrayResult::None;
+
+    if (arrayType->getLimitedSize() > MAX_TUPLE_SIZE)
+      return HasLegacyCArrayResult::Unimportable;
+
+    if (hasLegacyCArrayTypeImpl(arrayType->getElementType())
+            == HasLegacyCArrayResult::Unimportable)
+      return HasLegacyCArrayResult::Unimportable;
+
+    return HasLegacyCArrayResult::Importable;
+  }
+
+  if (auto pointerType = dyn_cast<clang::PointerType>(desugaredType)) {
+    auto result = hasLegacyCArrayTypeImpl(pointerType->getPointeeType());
+
+    // We can import pointers to otherwise unimportable arrays as OpaquePointer.
+    result = std::min(result, HasLegacyCArrayResult::Importable);
+
+    return result;
+  }
+
+  if (auto blockType = dyn_cast<clang::BlockPointerType>(desugaredType)) {
+    return hasLegacyCArrayTypeImpl(blockType->getPointeeType());
+  }
+
+  if (auto funcType = dyn_cast<clang::FunctionType>(desugaredType)) {
+    auto result = HasLegacyCArrayResult::None;
+    auto ratchetResult = [&](HasLegacyCArrayResult newResult) {
+      result = std::max(result, newResult);
+    };
+
+    if (auto protoFuncType = dyn_cast<clang::FunctionProtoType>(funcType)) {
+      for (auto paramType : protoFuncType->getParamTypes()) {
+        ratchetResult(hasLegacyCArrayTypeImpl(paramType));
+      }
+    }
+    ratchetResult(hasLegacyCArrayTypeImpl(funcType->getReturnType()));
+
+    return result;
+  }
+
+  return HasLegacyCArrayResult::None;
+}
+
+bool importer::hasLegacyCArrayType(clang::QualType clangType) {
+  return hasLegacyCArrayTypeImpl(clangType) != HasLegacyCArrayResult::None;
+}
+
+/// \returns \c Type() if there is a C array but it is not representable as a
+/// tuple; converted type otherwise.
+static Type computeLegacyCArrayTypeImpl(Type modernType) {
+  if (modernType.isNull())
+    return modernType;
+
+  return modernType.transformRec([](TypeBase *ty) -> std::optional<Type> {
+    auto desugaredType = ty->getDesugaredType();
+
+    // Special case for pointers: If the pointee is a C array that *can't* be
+    // imported as a legacy type, we need to map to OpaquePointer.
+    if (auto pointee = desugaredType->getAnyPointerElementType()) {
+      auto legacyPointee = computeLegacyCArrayTypeImpl(pointee);
+      if (legacyPointee.isNull())
+        return desugaredType->getASTContext().getOpaquePointerDecl()
+                  ->getDeclaredInterfaceType();
+    }
+
+    // The rest of this is concerned with the main event: InlineArray.
+    auto elementType = desugaredType->getInlineArrayElementType();
+    if (!elementType)
+      // Ordinary type, walk into its children.
+      return std::nullopt;
+
+    // The element type could itself be a (modern) C array.
+    elementType = computeLegacyCArrayTypeImpl(elementType);
+    if (elementType.isNull())
+      // Whoops, it was un-importable.
+      return Type();
+
+    auto size = desugaredType->getInlineArrayCount()->getZExtValue();
+
+    if (size > MAX_TUPLE_SIZE)
+      return Type();
+
+    // There's no such thing as a 1-tuple.
+    if (size == 1)
+      return elementType;
+
+    SmallVector<TupleTypeElt, 8> elts{static_cast<size_t>(size), elementType};
+    auto tupleType = TupleType::get(elts, elementType->getASTContext());
+
+    return tupleType;
+  });
+}
+
+ImportedType importer::computeLegacyCArrayType(ImportedType modernType) {
+  auto legacyType = computeLegacyCArrayTypeImpl(modernType.getType());
+  if (!legacyType)
+    return ImportedType();
+
+  return { legacyType, modernType.isImplicitlyUnwrapped() };
 }

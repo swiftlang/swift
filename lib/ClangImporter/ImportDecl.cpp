@@ -1110,6 +1110,8 @@ namespace {
     SwiftDeclSynthesizer synthesizer;
 
     CArrayProjection currentCArrayProjection;
+    bool didImportCArrayType = false;
+    bool hasComputedAccessLevel = false;
 
     /// The version that we're being asked to import for. May not be the version
     /// the user requested, as we may be forming an alternate for diagnostic
@@ -1241,6 +1243,46 @@ namespace {
               name.getInitKind() == CtorInitializerKind::ConvenienceFactory);
     }
 
+    /// Update `needsDualCArrayProjection` based on whether `type` has a legacy
+    /// C array type.
+    void willImportType(clang::QualType type) {
+      setNeedsLegacyCArrayProjectionIf(importer::hasLegacyCArrayType(type));
+    }
+
+    void setNeedsLegacyCArrayProjectionIf(bool value) {
+      ASSERT(!hasComputedAccessLevel || didImportCArrayType || !value
+              && "cannot import type after access level has been determined; "
+                 "may lead to inconsistent import decisions");
+      didImportCArrayType |= value;
+    }
+
+    void clearNeedsLegacyCArrayProjection() {
+      didImportCArrayType = false;
+      hasComputedAccessLevel = false;
+    }
+
+    /// If necessary, modify an imported type (and optionally an imported
+    /// parameter list) to use the legacy projection's types.
+    ImportedType didImportType(ImportedType result,
+                               ParameterList **params = nullptr) {
+      if (currentCArrayProjection != CArrayProjection::Legacy)
+        return result;
+
+      if (params && *params) {
+        for (auto param : **params) {
+          auto newParamType = importer::computeLegacyCArrayType(
+                                  { param->getInterfaceType(), false });
+          param->setInterfaceType(newParamType.getType());
+        }
+      }
+
+      return importer::computeLegacyCArrayType(result);
+    }
+
+    Type didImportType(Type result, ParameterList **params = nullptr) {
+      return didImportType(ImportedType(result, false), params).getType();
+    }
+
     /// Import the given Clang type into Swift.
     ///
     /// This wrapper adds logic for handling dual C array projections.
@@ -1301,13 +1343,16 @@ namespace {
         ImportTypeAttrs attrs,
         OptionalTypeKind optional = OTK_ImplicitlyUnwrappedOptional,
         bool resugarNSErrorPointer = true,
-        std::optional<unsigned> completionHandlerErrorParamIndex = std::nullopt) {
+        std::optional<unsigned> completionHandlerErrorParamIndex=std::nullopt) {
+      ASSERT(kind != ImportTypeKind::Typedef && "wrong method for typealiases");
+      willImportType(type);
+
       auto result = Impl.importType(type, kind, addImportDiagnosticFn,
                                     allowNSUIntegerAsInt, topLevelBridgeability,
                                     attrs, optional, resugarNSErrorPointer,
                                     completionHandlerErrorParamIndex);
 
-      return result;
+      return didImportType(result);
     }
 
     /// Import the given Clang type into Swift.
@@ -1328,12 +1373,15 @@ namespace {
         ImportTypeAttrs attrs,
         OptionalTypeKind optional = OTK_ImplicitlyUnwrappedOptional,
         bool resugarNSErrorPointer = true) {
+      ASSERT(kind != ImportTypeKind::Typedef && "wrong method for typealiases");
+      willImportType(type);
+
       auto result = Impl.importTypeIgnoreIUO(type, kind, addImportDiagnosticFn,
                                              allowNSUIntegerAsInt,
                                              topLevelBridgeability, attrs,
                                              optional, resugarNSErrorPointer);
 
-      return result;
+      return didImportType(result);
     }
 
     /// Import the given Clang type into Swift as the underlying type of a
@@ -1366,6 +1414,11 @@ namespace {
                                              topLevelBridgeability, attrs,
                                              optional, resugarNSErrorPointer);
 
+      // Import according to whichever projection is visible, not
+      // unconditionally modern.
+      if (Impl.VisibleCArrayProjection == CArrayProjection::Legacy)
+        return importer::computeLegacyCArrayType({result, false}).getType();
+
       return result;
     }
 
@@ -1384,10 +1437,12 @@ namespace {
     ImportedType importFunctionReturnType(
         DeclContext *dc, const clang::FunctionDecl *clangDecl,
         bool allowNSUIntegerAsInt) {
+      willImportType(clangDecl->getReturnType());
+
       auto result = Impl.importFunctionReturnType(dc, clangDecl,
                                                   allowNSUIntegerAsInt);
 
-      return result;
+      return didImportType(result);
     }
 
     /// Import the parameter and return types of an Objective-C method.
@@ -1423,11 +1478,15 @@ namespace {
         std::optional<ForeignAsyncConvention> &asyncConv,
         std::optional<ForeignErrorConvention> &errorConv,
         SpecialMethodKind kind) {
+      willImportType(clangDecl->getReturnType());
+      for (auto param : params)
+        willImportType(param->getType());
+
       auto result = Impl.importMethodParamsAndReturnType(
           dc, clangDecl, params, isVariadic, isFromSystemModule, bodyParams,
           importedName, asyncConv, errorConv, kind);
 
-      return result;
+      return didImportType(result, bodyParams);
     }
 
     /// Import the given function type.
@@ -1453,11 +1512,15 @@ namespace {
         ArrayRef<const clang::ParmVarDecl *> params, bool isVariadic,
         bool isFromSystemModule, DeclName name, ParameterList *&parameterList,
         ArrayRef<GenericTypeParamDecl *> genericParams) {
+      willImportType(clangDecl->getReturnType());
+      for (auto param : params)
+        willImportType(param->getType());
+
       auto result = Impl.importFunctionParamsAndReturnType(
           dc, clangDecl, params, isVariadic, isFromSystemModule, name,
           parameterList, genericParams);
 
-      return result;
+      return didImportType(result, &parameterList);
     }
 
     /// Determines what the type of an effectful, computed read-only property
@@ -1468,10 +1531,14 @@ namespace {
                                              DeclContext *dc,
                                              importer::ImportedName name,
                                              bool isFromSystemModule) {
+      willImportType(decl->getReturnType());
+      for (auto param : decl->parameters())
+        willImportType(param->getType());
+
       auto result = Impl.importEffectfulPropertyType(decl, dc, name,
                                                      isFromSystemModule);
 
-      return result;
+      return didImportType(result);
     }
 
     /// Import the type of an Objective-C method that will be imported as an
@@ -1501,35 +1568,123 @@ namespace {
                                       bool isFromSystemModule,
                                       importer::ImportedName importedName,
                                       ParameterList **params) {
+      willImportType(property->getType());
+      willImportType(clangDecl->getReturnType());
+      for (auto param : clangDecl->parameters())
+        willImportType(param->getType());
+
       auto result = Impl.importAccessorParamsAndReturnType(
           dc, property, clangDecl, isFromSystemModule, importedName, params);
 
-      return result;
+      return didImportType(result, params);
     }
 
     /// This wrapper adds logic for handling dual C array projections.
     ImportedType importPropertyType(const clang::ObjCPropertyDecl *clangDecl,
                                     bool isFromSystemModule) {
+      willImportType(clangDecl->getType());
+
       auto result = Impl.importPropertyType(clangDecl, isFromSystemModule);
 
-      return result;
+      return didImportType(result);
+    }
+
+    AccessLevel getMaxAccessLevel(CArrayProjection projection, bool needsBoth) {
+      if (needsBoth && Impl.VisibleCArrayProjection != projection)
+        return AccessLevel::Internal;
+      return AccessLevel::Open;
     }
 
     /// Determine the Swift access level for a given clang decl.
     ///
     /// This wrapper adds logic for handling dual C array projections.
     AccessLevel getAccessLevel(const clang::Decl *decl) {
-      return convertClangAccess(decl->getAccess());
+      // Make sure we don't change `hasLegacyCArrayType` after we've called
+      // this method.
+      hasComputedAccessLevel = true;
+
+      auto naturalAccessLevel = convertClangAccess(decl->getAccess());
+      auto maxAccessLevel =
+          getMaxAccessLevel(currentCArrayProjection,
+                            currentCArrayProjection == CArrayProjection::Legacy
+                                || needsLegacyCArrayProjection());
+
+      return std::min(naturalAccessLevel, maxAccessLevel);
+    }
+
+    /// Add an \c @available attribute with the minimum version to be able to
+    /// use \c InlineArray . Use this only for declarations that \em don't pass
+    /// through \c ClangImporter::Implementation::importAttributes() .
+    void addInlineArrayAvailability(Decl *decl) {
+      auto introduced = Impl.SwiftContext.getInlineArrayAvailability()
+                                            .getRawMinimumVersion();
+      decl->addAttribute(AvailableAttr::createPlatformVersioned(
+          Impl.SwiftContext, targetPlatform(Impl.SwiftContext.LangOpts), "", "",
+          introduced, {}, {}));
     }
 
   public:
     explicit SwiftDeclConverter(ClangImporter::Implementation &impl,
-                                ImportNameVersion vers)
+                                ImportNameVersion vers,
+                                CArrayProjection currentCArrayProjection)
       : Impl(impl), version(vers), synthesizer(Impl),
-        currentCArrayProjection(impl.VisibleCArrayProjection) { }
+        currentCArrayProjection(currentCArrayProjection) { }
 
     bool hadForwardDeclaration() const {
       return forwardDeclaration;
+    }
+
+    bool needsLegacyCArrayProjection() const {
+      return currentCArrayProjection != CArrayProjection::Legacy
+                && didImportCArrayType;
+    }
+
+    void registerCArrayProjections(Decl *modern, Decl *legacy) {
+      auto addAttrs = [&](ValueDecl *current, CArrayProjection projection,
+                          ValueDecl *counterpart) {
+        current->addAttribute(new (Impl.SwiftContext)
+                                CArrayProjectionAttr(projection, counterpart));
+
+        if (Impl.VisibleCArrayProjection != projection
+                && !isa<AccessorDecl>(current))
+          current->addAttribute(new (Impl.SwiftContext)
+                                  UsableFromInlineAttr(/*implicit=*/true));
+      };
+
+      // In practice, we should only have dual projections for ValueDecls.
+      auto modernVD = cast<ValueDecl>(modern);
+      auto legacyVD = cast_or_null<ValueDecl>(legacy);
+
+      // Mark the modern projection even if there's no legacy projection so we give
+      // it the right availability.
+      addAttrs(modernVD, CArrayProjection::Modern, legacyVD);
+
+      if (!legacyVD)
+        return;
+
+      addAttrs(legacyVD, CArrayProjection::Legacy, modernVD);
+
+      Impl.addAlternateDecl(modernVD, legacyVD);
+
+      // If we imported a stored property or global, we need to create
+      // accessors for the legacy decl to forward to the modern decl.
+      if (auto modernVar = dyn_cast<VarDecl>(modernVD)) {
+        auto legacyVar = cast<VarDecl>(legacyVD);
+        if (modernVar->hasStorage()) {
+          synthesizer.makeLegacyCArrayAccessors(legacyVar->getDeclContext(),
+                                                legacyVar, modernVar);
+        }
+      }
+
+      // If we're using (computed) storage decls, register the accessors too.
+      if (auto modernASD = dyn_cast<AbstractStorageDecl>(modernVD)) {
+        auto legacyASD = cast<AbstractStorageDecl>(legacyVD);
+
+        for (auto modernAD : modernASD->getAllAccessors()) {
+          auto legacyAD = legacyASD->getAccessor(modernAD->getAccessorKind());
+          registerCArrayProjections(modernAD, legacyAD);
+        }
+      }
     }
 
     Decl *VisitDecl(const clang::Decl *decl) {
@@ -2353,9 +2508,12 @@ namespace {
                                        ImportNameVersion nameVersion) -> bool {
             if (!contextIsEnum(newName))
               return true;
-            SwiftDeclConverter converter(Impl, nameVersion);
+            SwiftDeclConverter converter(Impl, nameVersion,
+                                         CArrayProjection::Modern);
             Decl *imported =
                 converter.importOptionConstant(constant, decl, result);
+            ASSERT(!converter.needsLegacyCArrayProjection()
+                      && "can't have C array in enumerator");
             if (!imported)
               return false;
             if (nameVersion == getActiveSwiftVersion())
@@ -2372,9 +2530,12 @@ namespace {
 
           if (canonicalCaseIter == canonicalEnumConstants.end()) {
             // Unavailable declarations get no special treatment.
-            enumeratorDecl =
-                SwiftDeclConverter(Impl, getActiveSwiftVersion())
-                    .importEnumCase(constant, decl, cast<EnumDecl>(result));
+            SwiftDeclConverter converter(Impl, getActiveSwiftVersion(),
+                                         CArrayProjection::Modern);
+            enumeratorDecl = converter.importEnumCase(constant, decl,
+                                                      cast<EnumDecl>(result));
+            ASSERT(!converter.needsLegacyCArrayProjection()
+                      && "can't have C array in enumerator");
           } else {
             // Will initially be nullptr if `canonicalCaseIter` points to a
             // memoized result.
@@ -2386,8 +2547,12 @@ namespace {
             // or extract the memoized result of a previous import (and use it
             // to populate `canonConstant`).
             if (canonConstant) {
-              enumeratorDecl = SwiftDeclConverter(Impl, getActiveSwiftVersion())
-                  .importEnumCase(canonConstant, decl, cast<EnumDecl>(result));
+              SwiftDeclConverter converter(Impl, getActiveSwiftVersion(),
+                                           CArrayProjection::Modern);
+              enumeratorDecl = converter.importEnumCase(canonConstant, decl,
+                                                        cast<EnumDecl>(result));
+              ASSERT(!converter.needsLegacyCArrayProjection()
+                        && "can't have C array in enumerator");
               if (enumeratorDecl) {
                 // Memoize so we end up in the `else` branch next time.
                 canonicalCaseIter->getSecond() =
@@ -2425,10 +2590,13 @@ namespace {
               return true;
             if (!contextIsEnum(newName))
               return true;
-            SwiftDeclConverter converter(Impl, nameVersion);
+            SwiftDeclConverter converter(Impl, nameVersion,
+                                         CArrayProjection::Modern);
             Decl *imported =
                 converter.importEnumCase(constant, decl, cast<EnumDecl>(result),
                                          enumeratorDecl);
+            ASSERT(!converter.needsLegacyCArrayProjection()
+                      && "can't have C array in enumerator");
             if (!imported)
               return false;
             variantDecls.push_back(imported);
@@ -3014,8 +3182,20 @@ namespace {
         members.push_back(vd);
       }
 
+      SmallVector<VarDecl *, 4> legacyMembers;
+      bool needsLegacyMemberwiseCtor = false;
+
       bool hasReferenceableFields = !members.empty();
       for (auto member : members) {
+        auto cArrayAttr = member->getAttrs()
+                              .getAttribute<CArrayProjectionAttr>();
+        if (cArrayAttr && cArrayAttr->getCounterpart()) {
+          legacyMembers.push_back(cast<VarDecl>(cArrayAttr->getCounterpart()));
+          needsLegacyMemberwiseCtor = true;
+        } else {
+          legacyMembers.push_back(member);
+        }
+
         auto nd = cast<clang::NamedDecl>(member->getClangDecl());
         // Bitfields are imported as computed properties with Clang-generated
         // accessors.
@@ -3050,14 +3230,30 @@ namespace {
 
           // Create labeled initializers for unions that take one of the
           // fields, which only initializes the data for that field.
-          auto valueCtor =
-              synthesizer.createValueConstructor(result, member,
-                                                 /*want param names*/ true,
-                                                 /*wantBody=*/true);
+          auto valueCtor = synthesizer.createValueConstructor(
+              result, member,
+              /*want param names*/ true, /*wantBody=*/true,
+              getMaxAccessLevel(CArrayProjection::Modern, cArrayAttr));
 
           if (isNonEscapable)
             markReturnsUnsafeNonescapable(valueCtor);
           ctors.push_back(valueCtor);
+
+          if (cArrayAttr && cArrayAttr->getCounterpart()) {
+            addInlineArrayAvailability(valueCtor);
+
+            auto legacyMember = cast<VarDecl>(cArrayAttr->getCounterpart());
+            auto legacyCtor = synthesizer.createValueConstructor(
+                result, legacyMember,
+                /*want param names*/ true, /*wantBody=*/true,
+                getMaxAccessLevel(CArrayProjection::Legacy, cArrayAttr));
+
+            if (isNonEscapable)
+              markReturnsUnsafeNonescapable(legacyCtor);
+            ctors.push_back(legacyCtor);
+
+            registerCArrayProjections(valueCtor, legacyCtor);
+          }
         }
         // TODO: we have a problem lazily looking up members of an unnamed
         // record, so we add them here. To fix this `translateContext` needs to
@@ -3151,7 +3347,9 @@ namespace {
         auto valueCtor = synthesizer.createValueConstructor(
             result, members,
             /*want param names*/ true,
-            /*want body*/ hasUnreferenceableStorage);
+            /*want body*/ hasUnreferenceableStorage,
+            getMaxAccessLevel(CArrayProjection::Modern,
+                              needsLegacyMemberwiseCtor));
         if (!hasUnreferenceableStorage)
           valueCtor->setIsMemberwiseInitializer(MemberwiseInitKind::Regular);
 
@@ -3159,6 +3357,25 @@ namespace {
           markReturnsUnsafeNonescapable(valueCtor);
 
         ctors.push_back(valueCtor);
+
+        if (needsLegacyMemberwiseCtor) {
+          addInlineArrayAvailability(valueCtor);
+
+          auto legacyCtor = synthesizer.createValueConstructor(
+              result, legacyMembers,
+              /*want param names*/ true,
+              /*want body*/ hasUnreferenceableStorage,
+              getMaxAccessLevel(CArrayProjection::Legacy,
+                                needsLegacyMemberwiseCtor));
+          if (!hasUnreferenceableStorage)
+            legacyCtor->setIsMemberwiseInitializer(MemberwiseInitKind::Regular);
+
+          if (isNonEscapable)
+            markReturnsUnsafeNonescapable(legacyCtor);
+
+          ctors.push_back(legacyCtor);
+          registerCArrayProjections(valueCtor, legacyCtor);
+        }
       }
 
       if (isa<StructDecl>(result)) {
@@ -5347,6 +5564,12 @@ namespace {
 
       // Otherwise, import as an external declaration
       if (!result) {
+        // `InterfaceTypeRequest` will eventually lazily import the type using
+        // `ClangImporter::importVarDeclType()`, so we don't want to fully
+        // import it here. However, we do need to check now whether we need a
+        // second projection for a C array type.
+        willImportType(decl->getType());
+
         result = Impl.createDeclWithClangNode<VarDecl>(
             decl, getAccessLevel(decl), /*IsStatic*/ isStatic, introducer,
             Impl.importSourceLoc(decl->getLocation()), name, dc);
@@ -7341,13 +7564,6 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
     // No other cases yet
   }
 
-  auto &ctx = Impl.SwiftContext;
-  auto Loc = Impl.importSourceLoc(decl->getLocation());
-
-  auto structDecl = Impl.createDeclWithClangNode<StructDecl>(
-      decl, getAccessLevel(decl), Loc, name, Loc, ArrayRef<InheritedEntry>(),
-      nullptr, dc);
-
   // Import the type of the underlying storage
   ImportDiagnosticAdder addImportDiag(Impl, decl, decl->getLocation());
   auto storedUnderlyingType = importTypeIgnoreIUO(
@@ -7378,6 +7594,13 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
 
   bool isBridged =
       !storedUnderlyingType->isEqual(computedPropertyUnderlyingType);
+
+  auto &ctx = Impl.SwiftContext;
+  auto Loc = Impl.importSourceLoc(decl->getLocation());
+
+  auto structDecl = Impl.createDeclWithClangNode<StructDecl>(
+      decl, getAccessLevel(decl), Loc, name, Loc, ArrayRef<InheritedEntry>(),
+      nullptr, dc);
 
   // Determine the set of protocols to which the synthesized
   // type will conform.
@@ -8201,6 +8424,13 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
       continue;
     }
 
+    // If the C array projection doesn't match, this is a different constructor.
+    auto ctorCArrayProjection = CArrayProjection::Modern;
+    if (auto cArrayAttr = ctor->getAttrs().getAttribute<CArrayProjectionAttr>())
+      ctorCArrayProjection = cArrayAttr->getProjection();
+    if (ctorCArrayProjection != currentCArrayProjection)
+      continue;
+
     // If the existing constructor has a less-desirable kind, mark
     // the existing constructor unavailable.
     if (existingConstructorIsWorse(ctor, objcMethod, kind)) {
@@ -8763,10 +8993,13 @@ SwiftDeclConverter::importAccessor(const clang::ObjCMethodDecl *clangAccessor,
                                    AbstractStorageDecl *storage,
                                    AccessorKind accessorKind,
                                    DeclContext *dc) {
-  SwiftDeclConverter converter(Impl, getActiveSwiftVersion());
+  SwiftDeclConverter converter(Impl, getActiveSwiftVersion(),
+                               currentCArrayProjection);
   auto *accessor = cast_or_null<AccessorDecl>(
     converter.importObjCMethodDecl(clangAccessor, dc,
                                    AccessorInfo{storage, accessorKind}));
+  // Handle the dual projection at the level of the storage decl it belongs to.
+  setNeedsLegacyCArrayProjectionIf(converter.needsLegacyCArrayProjection());
   if (!accessor) {
     return nullptr;
   }
@@ -8894,8 +9127,10 @@ std::optional<GenericParamList *> SwiftDeclConverter::importObjCGenericParams(
 void ClangImporter::Implementation::importMirroredProtocolMembers(
     const clang::ObjCContainerDecl *decl, DeclContext *dc,
     std::optional<DeclBaseName> name, SmallVectorImpl<Decl *> &members) {
-  SwiftDeclConverter converter(*this, CurrentVersion);
+  SwiftDeclConverter converter(*this, CurrentVersion, CArrayProjection::Modern);
   converter.importMirroredProtocolMembers(decl, dc, name, members);
+  ASSERT(!converter.needsLegacyCArrayProjection()
+            && "dual C array projection handled by importMirroredDecl()");
 }
 
 void SwiftDeclConverter::importMirroredProtocolMembers(
@@ -9292,6 +9527,8 @@ void SwiftDeclConverter::importInheritedConstructors(
                                       clangSourceMgr,
                                       "importing (inherited)");
 
+    clearNeedsLegacyCArrayProjection();
+
     // If this initializer came from a factory method, inherit
     // it as an initializer.
     if (objcMethod->isClassMethod()) {
@@ -9314,6 +9551,30 @@ void SwiftDeclConverter::importInheritedConstructors(
         // If this is a compatibility stub, mark it as such.
         if (correctSwiftName)
           markAsVariant(newCtor, *correctSwiftName);
+
+        if (needsLegacyCArrayProjection()) {
+          llvm::SaveAndRestore<CArrayProjection>
+              save1(currentCArrayProjection, CArrayProjection::Legacy);
+          llvm::SaveAndRestore<bool> save2(hasComputedAccessLevel, false);
+
+          ConstructorDecl *legacyExisting;
+          auto legacyCtor = importConstructor(objcMethod, classDecl,
+                                              /*implicit=*/true,
+                                              ctor->getInitKind(),
+                                              /*required=*/false,
+                                              ctor->getObjCSelector(),
+                                              importedName,
+                                              objcMethod->parameters(),
+                                              objcMethod->isVariadic(),
+                                              legacyExisting);
+          if (legacyCtor && correctSwiftName)
+            markAsVariant(legacyCtor, *correctSwiftName);
+
+          registerCArrayProjections(newCtor, legacyCtor);
+
+          if (legacyCtor)
+            Impl.importAttributes(objcMethod, legacyCtor, curObjCClass);
+        }
 
         Impl.importAttributes(objcMethod, newCtor, curObjCClass);
         newMembers.push_back(newCtor);
@@ -9347,6 +9608,19 @@ void SwiftDeclConverter::importInheritedConstructors(
     if (auto newCtor =
             importConstructor(objcMethod, classDecl,
                               /*implicit=*/true, myKind, isRequired)) {
+      if (newCtor && needsLegacyCArrayProjection()) {
+        llvm::SaveAndRestore<CArrayProjection>
+            save1(currentCArrayProjection, CArrayProjection::Legacy);
+        llvm::SaveAndRestore<bool> save2(hasComputedAccessLevel, false);
+
+        auto legacyCtor = importConstructor(objcMethod, classDecl,
+                                            /*implicit=*/true, myKind,
+                                            isRequired);
+        registerCArrayProjections(newCtor, legacyCtor);
+
+        Impl.importAttributes(objcMethod, legacyCtor, curObjCClass);
+      }
+
       Impl.importAttributes(objcMethod, newCtor, curObjCClass);
       newMembers.push_back(newCtor);
     }
@@ -10017,6 +10291,16 @@ void ClangImporter::Implementation::importAttributes(
   if (auto func = dyn_cast<AbstractFunctionDecl>(MappedDecl))
     isAsync = func->hasAsync();
 
+  // If the declaration is imported as InlineArray, that limits its
+  // availability.
+  bool hasMinAvailability = false;
+  llvm::VersionTuple minAvailability;
+  if (auto cArrayAttr =
+        MappedDecl->getAttrs().getAttribute<CArrayProjectionAttr>())
+    if (cArrayAttr->getProjection() == CArrayProjection::Modern)
+      minAvailability = SwiftContext.getInlineArrayAvailability()
+                                        .getRawMinimumVersion();
+
   // Scan through Clang attributes and map them onto Swift
   // equivalents.
   bool AnyUnavailable = MappedDecl->isUnavailable();
@@ -10123,6 +10407,12 @@ void ClangImporter::Implementation::importAttributes(
 
       llvm::VersionTuple obsoleted = avail->getObsoleted();
       llvm::VersionTuple introduced = avail->getIntroduced();
+
+      // If there's a minAvailability, apply it to the introduced version now.
+      if (minAvailability) {
+        introduced = std::max(introduced, minAvailability);
+        hasMinAvailability = true;
+      }
 
       const auto &replacement = avail->getReplacement();
 
@@ -10268,6 +10558,13 @@ void ClangImporter::Implementation::importAttributes(
   if (ClangDecl->hasAttr<clang::PureAttr>()) {
     MappedDecl->addAttribute(new (C) EffectsAttr(EffectsKind::ReadOnly));
   }
+
+  // If we have a min availability and haven't applied it yet, do so now.
+  if (minAvailability && !hasMinAvailability) {
+    MappedDecl->addAttribute(AvailableAttr::createPlatformVersioned(
+        SwiftContext, targetPlatform(SwiftContext.LangOpts), "", "",
+        minAvailability, {}, {}));
+  }
 }
 
 static void applyTypeAndNullabilityAPINotes(
@@ -10375,9 +10672,15 @@ ClangImporter::Implementation::importDeclImpl(const clang::NamedDecl *ClangDecl,
   }
 
   if (!Result) {
-    SwiftDeclConverter converter(*this, version);
+    SwiftDeclConverter converter(*this, version, CArrayProjection::Modern);
     Result = converter.Visit(ClangDecl);
     HadForwardDeclaration = converter.hadForwardDeclaration();
+    if (Result && converter.needsLegacyCArrayProjection()) {
+      ASSERT(!isa<TypeDecl>(Result) && "shouldn't need legacy projection of a type");
+      SwiftDeclConverter c2(*this, version, CArrayProjection::Legacy);
+      auto legacyResult = c2.Visit(ClangDecl);
+      converter.registerCArrayProjections(Result, legacyResult);
+    }
   }
   if (!Result && version == CurrentVersion) {
     // If we couldn't import this Objective-C entity, determine
@@ -10714,13 +11017,26 @@ ClangImporter::Implementation::importMirroredDecl(const clang::NamedDecl *decl,
   if (known != ImportedProtocolDecls.end())
     return known->second;
 
-  SwiftDeclConverter converter(*this, version);
+  SwiftDeclConverter converter(*this, version, CArrayProjection::Modern);
   Decl *result;
   if (auto method = dyn_cast<clang::ObjCMethodDecl>(decl)) {
     result =
         converter.importObjCMethodDecl(method, dc, /*accessor*/ std::nullopt);
+
+    if (result && converter.needsLegacyCArrayProjection()) {
+      SwiftDeclConverter c2(*this, version, CArrayProjection::Legacy);
+      auto legacyResult = c2.importObjCMethodDecl(method, dc,
+                                                  /*accessor*/ std::nullopt);
+      converter.registerCArrayProjections(result, legacyResult);
+    }
   } else if (auto prop = dyn_cast<clang::ObjCPropertyDecl>(decl)) {
     result = converter.importObjCPropertyDecl(prop, dc);
+
+    if (result && converter.needsLegacyCArrayProjection()) {
+      SwiftDeclConverter c2(*this, version, CArrayProjection::Legacy);
+      auto legacyResult = c2.importObjCPropertyDecl(prop, dc);
+      converter.registerCArrayProjections(result, legacyResult);
+    }
   } else {
     llvm_unreachable("unexpected mirrored decl");
   }
@@ -11536,8 +11852,11 @@ void ClangImporter::Implementation::importInheritedConstructors(
      const clang::ObjCInterfaceDecl *curObjCClass,
      const ClassDecl *classDecl, SmallVectorImpl<Decl *> &newMembers) {
   if (curObjCClass->getName() != "Protocol") {
-    SwiftDeclConverter converter(*this, CurrentVersion);
+    SwiftDeclConverter converter(*this, CurrentVersion,
+                                 CArrayProjection::Modern);
     converter.importInheritedConstructors(classDecl, newMembers);
+    // Note: dual projections handled in
+    // `SwiftDeclConverter::importInheritedConstructors()`
   }
 }
 

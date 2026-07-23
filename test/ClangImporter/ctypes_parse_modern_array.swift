@@ -1,4 +1,5 @@
-// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated %clang-importer-sdk -verify-ignore-unknown
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated %clang-importer-sdk -verify-ignore-unknown -enable-experimental-feature ModernImportedCArrays -target %target-has-inline-array-triple
+// REQUIRES: swift_feature_ModernImportedCArrays
 
 import ctypes
 
@@ -260,7 +261,7 @@ typealias IntArray4096 = [4096 of Int8]
 @available(anyAppleOS 26, *)
 func testBigArrayInStruct(_ maxSizeTuple: IntTuple4096, _ maxSizeArray: IntArray4096) {
   var structWithBigArray = StructWithBigArray()
-  structWithBigArray.max_size = maxSizeTuple    // no-error
-  structWithBigArray.max_size = maxSizeArray    // expected-error {{cannot assign value of type 'IntArray4096' (aka 'InlineArray<4096, Int8>') to type '(CChar /* ... repeated 4096 times ... */)' (aka '(Int8 /* ... repeated 4096 times ... */)')}}
-  structWithBigArray.max_size_plus_one          // expected-error {{internal}}
+  structWithBigArray.max_size = maxSizeTuple    // expected-error {{cannot assign value of type 'IntTuple4096' (aka '(Int8 /* ... repeated 4096 times ... */)') to type '[4096 of CChar]' (aka 'InlineArray<4096, Int8>')}}
+  structWithBigArray.max_size = maxSizeArray    // no-error
+  _ = structWithBigArray.max_size_plus_one      // no-error
 }

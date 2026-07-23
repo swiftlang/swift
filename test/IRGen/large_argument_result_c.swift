@@ -8,7 +8,7 @@
 // REQUIRES: CPU=arm64 || CPU=arm64e
 
 // CHECK: define swiftcc void @"$s23large_argument_result_c7runTestyySo0A6_thingaF"(ptr {{.*}} %0)
-// CHECK:  [[CALL_ALLOCA:%.*]] = alloca <{ %Ts6UInt64V, %Ts6UInt64V, %Ts6UInt64V
+// CHECK:  [[CALL_ALLOCA:%.*]] = alloca [16 x %Ts6UInt64V]
 // CHECK:  [[TMP_ALLOCA:%.*]] = alloca %TSo11large_thinga, align 8
 // CHECK:  [[TMP_ALLOCA2:%.*]] = alloca %TSo11large_thinga, align 8
 // CHECK:  call void @llvm.memcpy.p0.p0.i64(ptr {{.*}} [[TMP_ALLOCA2]], ptr {{.*}} %0, i64 128, i1 false)

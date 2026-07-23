@@ -9,7 +9,7 @@ import Builtin
 import Swift
 import Foundation
 
-typealias Mantissa = (UInt16, UInt16, UInt16, UInt16, UInt16, UInt16, UInt16, UInt16)
+typealias Mantissa = [8 of UInt16]
 
 // CHECK-LABEL: sil @struct_extract_from_decimal : {{.*}} {
 // CHECK:       bb0([[POINTER:%[^,]+]] :
