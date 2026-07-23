@@ -142,6 +142,17 @@ void IRGenThunk::prepareArguments() {
 
   SILFunctionConventions conv(origTy, IGF.getSILModule());
 
+  // swiftself is the last parameter here (any witness metadata was popped
+  // above), so claim it now so the typed-error claim below lands on the
+  // indirect error slot.
+  bool claimedAsyncContext = false;
+  if (isAsync &&
+      (origTy->getRepresentation() == SILFunctionTypeRepresentation::Thick ||
+       irgen::hasSelfContextParameter(origTy))) {
+    selfValue = original.takeLast();
+    claimedAsyncContext = true;
+  }
+
   if (origTy->hasErrorResult()) {
     typedErrorIndirectErrorSlot = nullptr;
 
@@ -188,7 +199,8 @@ void IRGenThunk::prepareArguments() {
     original.transferInto(params, 1);
   }
 
-  selfValue = original.takeLast();
+  if (!claimedAsyncContext)
+    selfValue = original.takeLast();
 
   // Prepare indirect results, if any.
   SILType directResultType = conv.getSILResultType(expansionContext);
