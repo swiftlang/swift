@@ -1733,6 +1733,7 @@ RValueEmitter::visitMaterializePackExpr(MaterializePackExpr *E, SGFContext C) {
 RValue RValueEmitter::visitArchetypeToSuperExpr(ArchetypeToSuperExpr *E,
                                                 SGFContext C) {
   ManagedValue archetype = SGF.emitRValueAsSingleValue(E->getSubExpr());
+  archetype = SGF.emitMoveOnlyWrapperToCopyableValueIfNeeded(E, archetype);
   auto loweredTy = SGF.getLoweredLoadableType(E->getType());
   if (loweredTy == archetype.getType())
     return RValue(SGF, E, archetype);

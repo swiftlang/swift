@@ -70,3 +70,11 @@ func g2(_ z: borrowing Z) { // expected-error {{'z' is borrowed and cannot be co
 func g3(_ z: borrowing Z) { // expected-error {{'z' is borrowed and cannot be consumed}}
     let _: Z? = z // expected-note {{consumed here}}
 }
+
+/////////////////////////////////////////////////
+// MARK: Borrowed Archetype Casting Conversion //
+////////////////////////////////////////////////
+
+func z1<S: T>(_ s: borrowing S) { // expected-error {{'s' is borrowed and cannot be consumed}}
+  _ = (s as T) // expected-note {{consumed here}}
+}
