@@ -1,8 +1,5 @@
 // RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
-// AddressLowering cannot yet lower a typed-throws @error_indirect result under
-// opaque values, so -emit-sil crashes even though the SILGen output above is
-// valid. FIXME: drop `not --crash` once AddressLowering handles it.
-// RUN: not --crash %target-swift-emit-sil -sil-verify-all -enable-sil-opaque-values %s -o /dev/null
+// RUN: %target-swift-emit-sil -sil-verify-all -enable-sil-opaque-values %s -o /dev/null
 
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s | %FileCheck %s --enable-var-scope
 // RUN: %target-swift-emit-sil -sil-verify-all %s
