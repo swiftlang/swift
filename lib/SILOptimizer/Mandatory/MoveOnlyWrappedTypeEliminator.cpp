@@ -454,10 +454,10 @@ struct SILMoveOnlyWrappedTypeEliminatorPass : SILFunctionTransform {
 
     // Don't rerun on deserialized functions. We lower trivial things earlier
     // during Raw SIL.
-    if (getFunction()->wasDeserializedCanonical())
+    if (getFunction()->isAlreadyCanonical())
       return;
 
-    assert(fn->getModule().getStage() == SILStage::Raw &&
+    assert(fn->getFunctionStage() == SILStage::Raw &&
            "Should only run on Raw SIL");
 
     if (SILMoveOnlyWrappedTypeEliminator(getFunction(), trivialOnly)

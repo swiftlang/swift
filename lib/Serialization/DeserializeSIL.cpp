@@ -732,7 +732,7 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
   // canonical SIL form.
   assert(!forDebugScope || declarationOnly); // debug scopes must always be read
                                              // declaration only
-  switch (SILMod.getStage()) {
+  switch (SILMod.getStageFloor()) {
   case SILStage::Raw:
   case SILStage::Canonical:
     break;
@@ -1050,8 +1050,17 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
   // Mark this function as deserialized. This avoids rerunning diagnostic
   // passes. Certain passes in the mandatory pipeline may not work as expected
   // after arbitrary optimization and lowering.
-  if (!MF->isSIB())
+  if (!MF->isSIB()) {
     fn->setWasDeserializedCanonical();
+    // A .swiftmodule body is serialized only after the mandatory pipeline (it
+    // is Canonical-or-later; raw-only constructs such as [unknown] access are
+    // already resolved). Track that phase per-function so getEffectiveStage()
+    // reports Canonical even while the importing module's floor is still Raw.
+    // This is PHASE; the provenance bit above is separate and NOT fused with it
+    // (the textual [canonical] attribute must not seed stage — it can carry
+    // raw-only constructs). .sib bodies (arbitrary stage) are not seeded.
+    fn->setFunctionStage(SILStage::Canonical);
+  }
 
   fn->setBare(IsBare);
   if (!fn->getDebugScope()) {

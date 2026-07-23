@@ -3369,7 +3369,7 @@ static void runPeepholesAndReg2Mem(SILPassManager *pm, SILModule *silMod,
 void LoadableByAddress::run() {  
   // Set the SIL state before the PassManager has a chance to run
   // verification.
-  getModule()->setStage(SILStage::Lowered);
+  getModule()->commitStage(SILStage::Lowered);
 
   for (auto &F : *getModule())
     runOnFunction(&F);

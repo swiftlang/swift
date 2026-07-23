@@ -243,10 +243,10 @@ class MoveOnlyCheckerPass : public SILFunctionTransform {
     auto *fn = getFunction();
 
     // Don't rerun diagnostics on deserialized functions.
-    if (getFunction()->wasDeserializedCanonical())
+    if (getFunction()->isAlreadyCanonical())
       return;
 
-    assert(fn->getModule().getStage() == SILStage::Raw &&
+    assert(fn->getFunctionStage() == SILStage::Raw &&
            "Should only run on Raw SIL");
 
     // If an earlier pass told use to not emit diagnostics for this function,

@@ -291,6 +291,10 @@ void SILFunction::init(
   // born after the module advances past Raw are reported lowered by the
   // module-stage term in hasLoweredAddresses(), so no creation-time seed is needed.
   this->HasLoweredAddresses = false;
+  // Seeded to Raw; advanced per-function ahead of the module floor by the
+  // pipeline once it commits a function to a further stage. getEffectiveStage()
+  // reconciles this with the module stage.
+  this->FunctionStage = unsigned(SILStage::Raw);
   this->stackProtection = false;
   this->Inlined = false;
   this->Zombie = false;
@@ -311,10 +315,37 @@ bool SILFunction::hasLoweredAddresses() const {
   // - This function was individually lowered by AddressLowering
   // - This function arrived already canonical via deserialization
   // - This is a non-opaque-values build
-  // - Module has committed past Raw SIL stage 
+  // - This function's effective stage has committed past Raw SIL (its own
+  //   per-function stage, or the module floor)
   return HasLoweredAddresses || WasDeserializedCanonical ||
          !getModule().usesOpaqueValues() ||
-         getModule().getStage() != SILStage::Raw;
+         getEffectiveStage() != SILStage::Raw;
+}
+
+SILStage SILFunction::getFunctionStage() const {
+  return SILStage(FunctionStage);
+}
+
+void SILFunction::setFunctionStage(SILStage stage) {
+  assert(stage >= getFunctionStage() && "regressing per-function stage?!");
+  FunctionStage = unsigned(stage);
+}
+
+SILStage SILFunction::getEffectiveStage() const {
+  // The module stage is a conservative floor; report the further-along one.
+  SILStage moduleStage = getModule().getStageFloor();
+  SILStage functionStage = getFunctionStage();
+  return functionStage > moduleStage ? functionStage : moduleStage;
+}
+
+bool SILFunction::isAlreadyCanonical() const {
+  // Union of phase and provenance, for mandatory-pass SKIP checks only: skip a
+  // function that is already past mandatory whether it reached Canonical by its
+  // own per-function progress (locally driven ahead) or arrived that way by
+  // provenance (deserialized, or a textual [canonical] attribute). Note this
+  // deliberately folds provenance; getEffectiveStage() does NOT, so phase
+  // legality checks (the verifier) stay provenance-free.
+  return getFunctionStage() >= SILStage::Canonical || wasDeserializedCanonical();
 }
 
 SILAddressConventions SILAddressConventions::forRawSIL(SILModule &M) {

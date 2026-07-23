@@ -1108,18 +1108,21 @@ void SILCloner<ImplClass>::commonFixUp(SILFunction *F) {
   // Call any cleanup specific to the CRTP extensions.
   asImpl().preFixUp(F);
 
-  // A whole-function clone is in the same lowered-address form as its source.
-  // Copy it so the clone's conventions and verification observe the right form.
+  // A whole-function clone is in the same lowered-address form and pipeline
+  // stage as its source. Copy both so the clone's conventions, stage-keyed
+  // legality, and verification observe the right form.
   // A partial clone (e.g. inlining) instead relies on source and destination
   // already agreeing: AddressLowering runs before any inliner and visits
   // functions bottom-up, so a callee is lowered before its caller is inlined.
-  if (asImpl().isWholeFunctionClone() && !getBuilder().isInsertingIntoGlobal())
+  if (asImpl().isWholeFunctionClone() && !getBuilder().isInsertingIntoGlobal()) {
     getBuilder().getFunction().setHasLoweredAddresses(F->hasLoweredAddresses());
-  else
+    getBuilder().getFunction().setFunctionStage(F->getFunctionStage());
+  } else {
     assert((getBuilder().isInsertingIntoGlobal() ||
             getBuilder().getFunction().hasLoweredAddresses() ==
                 F->hasLoweredAddresses()) &&
            "cloning between functions in different address-lowering forms");
+  }
 
   // If our source function is in ossa form, but the function into which we are
   // cloning is not in ossa, after we clone, eliminate default arguments.

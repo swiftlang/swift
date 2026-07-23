@@ -550,6 +550,14 @@ struct BridgedFunction {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedStringRef getAccessorName() const;
   BRIDGED_INLINE bool hasOwnership() const;
   BRIDGED_INLINE bool hasLoweredAddresses() const;
+  // The function's effective SIL stage (0=Raw, 1=Canonical, 2=Lowered) as a raw
+  // int; SwiftInt because BridgedContext::SILStage is declared later.
+  BRIDGED_INLINE SwiftInt getStage() const;
+  // Mandatory-pass skip predicate: per-function stage >= Canonical OR
+  // deserialized-canonical provenance. Mirrors SILFunction::isAlreadyCanonical
+  // (pure per-function, not the module floor) so the C++ and Swift skip checks
+  // agree once a function is driven Canonical ahead of a still-Raw floor.
+  BRIDGED_INLINE bool isAlreadyCanonical() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType getLoweredFunctionType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType getLoweredFunctionTypeInContext() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedGenericSignature getGenericSignature() const;
@@ -1578,7 +1586,7 @@ struct BridgedContext {
   // Module
 
   BridgedOwnedString getModuleDescription() const;
-  BRIDGED_INLINE SILStage getSILStage() const;
+  BRIDGED_INLINE SILStage getStageFloor() const;
   BRIDGED_INLINE bool moduleIsSerialized() const;
   BRIDGED_INLINE bool usesOpaqueValues() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj getCurrentModuleContext() const;

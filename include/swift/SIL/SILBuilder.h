@@ -1467,7 +1467,7 @@ public:
     ASSERT(!operand->getType().isTrivial(getFunction()) &&
            "Should not be passing trivial values to this api. Use instead "
            "emitCopyValueOperation");
-    ASSERT((getModule().getStage() == SILStage::Raw
+    ASSERT((getModule().getStageFloor() == SILStage::Raw
             || !operand->getType().isMoveOnly())
            && "should not be copying move-only values in canonical SIL");
     return insert(new (getModule())

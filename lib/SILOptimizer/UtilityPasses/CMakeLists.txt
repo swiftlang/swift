@@ -3,6 +3,7 @@ target_sources(swiftSILOptimizer PRIVATE
   AccessPathVerification.cpp
   AccessStorageAnalysisDumper.cpp
   AccessStorageDumper.cpp
+  AdvanceFunctionStage.cpp
   BasicCalleePrinter.cpp
   BasicInstructionPropertyDumper.cpp
   BugReducerTester.cpp

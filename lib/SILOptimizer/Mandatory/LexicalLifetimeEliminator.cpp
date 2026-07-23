@@ -26,7 +26,7 @@ class LexicalLifetimeEliminatorPass : public SILFunctionTransform {
       return;
 
     // If we are already canonical, we do not have any diagnostics to emit.
-    if (fn->wasDeserializedCanonical())
+    if (fn->isAlreadyCanonical())
       return;
 
     // If we have experimental late lexical lifetimes enabled, we do not want to

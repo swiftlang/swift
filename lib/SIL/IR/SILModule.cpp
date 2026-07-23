@@ -109,7 +109,7 @@ class SILModule::SerializationCallback final
 SILModule::SILModule(llvm::PointerUnion<FileUnit *, ModuleDecl *> context,
                      Lowering::TypeConverter &TC, const SILOptions &Options,
                      const IRGenOptions *irgenOptions)
-    : Stage(SILStage::Raw),
+    : StageFloor(SILStage::Raw),
       indexTrieRoot(new IndexTrieNode()), Options(Options),
       irgenOptions(irgenOptions), serialized(false),
       regDeserializationNotificationHandlerForAllFuncOME(false),
@@ -640,7 +640,7 @@ SILModule::lookUpFunctionInWitnessTable(ProtocolConformanceRef C,
   if (!C.isConcrete())
     return {nullptr, nullptr};
 
-  if (getStage() != SILStage::Lowered) {
+  if (!hasCommittedLowered()) {
     SILLinkerVisitor linker(*this, linkingMode);
     linker.processConformance(C);
   }

@@ -1105,7 +1105,7 @@ private:
         continue;
 
       // Don't rerun diagnostics on deserialized functions.
-      if (function.wasDeserializedCanonical())
+      if (function.isAlreadyCanonical())
         continue;
 
       // This is a staging flag. Eventually the ability to turn off static

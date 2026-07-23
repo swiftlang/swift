@@ -1503,7 +1503,7 @@ class ClosureLifetimeFixup : public SILFunctionTransform {
   /// The entry point to the transformation.
   void run() override {
     // Don't rerun diagnostics on deserialized functions.
-    if (getFunction()->wasDeserializedCanonical())
+    if (getFunction()->isAlreadyCanonical())
       return;
 
     // Fixup convert_escape_to_noescape [not_guaranteed] and

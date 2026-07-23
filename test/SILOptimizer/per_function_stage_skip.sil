@@ -1,0 +1,72 @@
+// Validates the per-function-stage skip-check migration (wasDeserializedCanonical
+// -> isAlreadyCanonical): a mandatory pass must skip a function that has reached
+// Canonical stage per-function -- even a LOCAL one driven ahead of the module
+// floor -- exactly as it skips an imported-canonical one. The normal pipeline
+// never produces a local-Canonical-above-a-Raw-floor function (the Raw->Canonical
+// sweep advances every local function in lockstep with the floor), so the
+// test-only `-advance-function-stage` pass manufactures that state.
+//
+// RUN A: advance ONLY @advanced to Canonical, then run a migrated mandatory pass
+// (noreturn-folding). The migrated `isAlreadyCanonical()` skip fires on @advanced
+// (retaining its body), while @control (still Raw) is folded to `unreachable`.
+// Under the OLD `wasDeserializedCanonical()` check @advanced -- which is never
+// deserialized -- would NOT be skipped and WOULD fold; that difference is the
+// discriminator this test proves.
+//
+// RUN: %target-sil-opt -module-name Swift -enable-sil-verify-all \
+// RUN:   -advance-function-stage -advance-function-stage-only-fun=advanced \
+// RUN:   -noreturn-folding %s | %FileCheck %s
+//
+// RUN B (no hook): both functions are Raw, so both fold. This proves the
+// migration is a strict no-op on the normal pipeline; per-function stage is the
+// only discriminator.
+//
+// RUN: %target-sil-opt -module-name Swift -enable-sil-verify-all \
+// RUN:   -noreturn-folding %s | %FileCheck -check-prefix=CHECK-ALL %s
+//
+// `-enable-sil-verify-all` also exercises the migrated per-function verifier on
+// @advanced at Canonical stage (it must not spuriously fail). The Devirtualize
+// pipeline-phase read (Devirtualize.cpp, deliberately NOT migrated -- it reads
+// the module floor) is covered by test/SIL/Serialization/vtable_deserialization.swift
+// and the broad no-op sweep.
+
+import Builtin
+
+enum Never {}
+
+struct Int64 { var value: Builtin.Int64 }
+
+// CHECK-LABEL: sil @advanced :
+// CHECK: apply
+// CHECK-NOT: unreachable
+// CHECK: return
+// CHECK-ALL-LABEL: sil @advanced :
+// CHECK-ALL: apply
+// CHECK-ALL: unreachable
+sil @advanced : $@convention(thin) () -> Int64 {
+bb0:
+  %0 = integer_literal $Builtin.Int32, 3
+  %1 = function_ref @exit : $@convention(thin) (Builtin.Int32) -> Never
+  %2 = apply %1(%0) : $@convention(thin) (Builtin.Int32) -> Never
+  %3 = integer_literal $Builtin.Int64, 7
+  %4 = struct $Int64 (%3 : $Builtin.Int64)
+  return %4 : $Int64
+}
+
+// CHECK-LABEL: sil @control :
+// CHECK: apply
+// CHECK: unreachable
+// CHECK-ALL-LABEL: sil @control :
+// CHECK-ALL: apply
+// CHECK-ALL: unreachable
+sil @control : $@convention(thin) () -> Int64 {
+bb0:
+  %0 = integer_literal $Builtin.Int32, 3
+  %1 = function_ref @exit : $@convention(thin) (Builtin.Int32) -> Never
+  %2 = apply %1(%0) : $@convention(thin) (Builtin.Int32) -> Never
+  %3 = integer_literal $Builtin.Int64, 7
+  %4 = struct $Int64 (%3 : $Builtin.Int64)
+  return %4 : $Int64
+}
+
+sil @exit : $@convention(thin) (Builtin.Int32) -> Never

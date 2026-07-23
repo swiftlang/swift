@@ -391,7 +391,7 @@ bool OwnershipRAUWHelper::hasValidRAUWOwnership(SILValue oldValue,
 
   // If we are in Raw SIL, just bail at this point. We do not support
   // ownership fixups.
-  if (m->getStage() == SILStage::Raw)
+  if (m->getStageFloor() == SILStage::Raw)
     return false;
 
   // OSSA rauw can create copies. Bail out if we have move only values.

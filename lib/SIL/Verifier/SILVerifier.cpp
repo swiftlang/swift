@@ -1553,7 +1553,7 @@ public:
     if (fArg->getType().isAddress())
       checkAddressWalkerCanVisitAllTransitiveUses(fArg);
 
-    if (fArg->getModule().getStage() == SILStage::Lowered ||
+    if (fArg->getFunction()->getEffectiveStage() == SILStage::Lowered ||
         !fArg->getType().isAddress() ||
         !fArg->hasConvention(SILArgumentConvention::Indirect_In_Guaranteed))
       return;
@@ -2898,7 +2898,7 @@ public:
     // is an error; we should have deserialized a body. In raw SIL, including
     // the merge-modules phase, we may not have deserialized the body yet as we
     // may not have run the SILLinker pass.
-    if (F.getModule().getStage() >= SILStage::Canonical) {
+    if (F.getEffectiveStage() >= SILStage::Canonical) {
       if (RefF->isExternalDeclaration()) {
         require(SingleFunction ||
                 !hasSharedVisibility(RefF->getLinkage()) ||
@@ -3021,7 +3021,7 @@ public:
               "Load with unqualified ownership in a qualified function");
       break;
     case LoadOwnershipQualifier::Copy:
-      require(LI->getModule().getStage() == SILStage::Raw ||
+      require(LI->getFunction()->getEffectiveStage() == SILStage::Raw ||
                   !LI->getOperand()->getType().isMoveOnly(),
               "'MoveOnly' types can only be copied in Raw SIL?!");
       [[fallthrough]];
@@ -3055,7 +3055,7 @@ public:
     requireSameType(LBI->getOperand()->getType().getObjectType(),
                     LBI->getType(),
                     "Load operand type and result type mismatch");
-    require(F.getModule().getStage() == SILStage::Raw || !LBI->isUnchecked(),
+    require(F.getEffectiveStage() == SILStage::Raw || !LBI->isUnchecked(),
             "load_borrow's unchecked bit is on");
   }
 
@@ -3113,7 +3113,7 @@ public:
             "extend_lifetime is only valid in functions with qualified "
             "ownership");
     // In Raw SIL, extend_lifetime marks the end of variable scopes.
-    if (F.getModule().getStage() == SILStage::Raw)
+    if (F.getEffectiveStage() == SILStage::Raw)
       return;
 
     require(!I->getOperand()->getType().isTrivial(*I->getFunction()),
@@ -3201,7 +3201,7 @@ public:
 
   template <class AI>
   void checkAccessEnforcement(AI *AccessInst) {
-    if (AccessInst->getModule().getStage() != SILStage::Raw) {
+    if (AccessInst->getFunction()->getEffectiveStage() != SILStage::Raw) {
       require(AccessInst->getEnforcement() != SILAccessEnforcement::Unknown,
               "access must have known enforcement outside raw stage");
     }
@@ -3257,7 +3257,7 @@ public:
       // that we will never get to LoweredSIL and codegen.
       require(BAI->getEnforcement() == SILAccessEnforcement::Static ||
                   BAI->getEnforcement() == SILAccessEnforcement::Signed ||
-                  BAI->getModule().getStage() != SILStage::Lowered,
+                  BAI->getFunction()->getEffectiveStage() != SILStage::Lowered,
               "init accesses cannot use non-static/non-signed enforcement");
       break;
     case SILAccessKind::Read:
@@ -3330,7 +3330,7 @@ public:
       // that we will never get to LoweredSIL and codegen.
       require(
           BUAI->getEnforcement() == SILAccessEnforcement::Static ||
-              BUAI->getModule().getStage() != SILStage::Lowered,
+              BUAI->getFunction()->getEffectiveStage() != SILStage::Lowered,
           "deinit accesses cannot use non-static enforcement in Lowered SIL");
       break;
 
@@ -3459,7 +3459,7 @@ public:
 
   void checkAssignInst(AssignInst *AI) {
     SILValue Src = AI->getSrc(), Dest = AI->getDest();
-    require(AI->getModule().getStage() == SILStage::Raw,
+    require(AI->getFunction()->getEffectiveStage() == SILStage::Raw,
             "assign instruction can only exist in raw SIL");
     require(Src->getType().isObject(), "Can't assign from an address source");
     require(Dest->getType().isAddress(), "Must store to an address dest");
@@ -3506,7 +3506,7 @@ public:
       return;
 
     SILValue Src = AI->getSrc();
-    require(AI->getModule().getStage() == SILStage::Raw,
+    require(AI->getFunction()->getEffectiveStage() == SILStage::Raw,
             "assign_or_init can only exist in raw SIL");
 
     SILValue initFn = AI->getInitializer();
@@ -3662,7 +3662,7 @@ public:
 
   void checkMarkUninitializedInst(MarkUninitializedInst *MU) {
     SILValue Src = MU->getOperand();
-    require(MU->getModule().getStage() == SILStage::Raw,
+    require(MU->getFunction()->getEffectiveStage() == SILStage::Raw,
             "mark_uninitialized instruction can only exist in raw SIL");
     require(Src->getType().isAddress() ||
             Src->getType().getClassOrBoundGenericClass() ||
@@ -3693,7 +3693,7 @@ public:
   }
 
   void checkMarkFunctionEscapeInst(MarkFunctionEscapeInst *MFE) {
-    require(MFE->getModule().getStage() == SILStage::Raw,
+    require(MFE->getFunction()->getEffectiveStage() == SILStage::Raw,
             "mark_function_escape instruction can only exist in raw SIL");
     for (auto Elt : MFE->getElements())
       require(Elt->getType().isAddress(), "MFE must refer to variable addrs");
@@ -3707,7 +3707,7 @@ public:
                     "Store operand type and dest type mismatch");
     require(checkTypeABIAccessible(F, cai->getDest()->getType()),
             "cannot directly copy type with inaccessible ABI");
-    require(cai->getModule().getStage() == SILStage::Raw ||
+    require(cai->getFunction()->getEffectiveStage() == SILStage::Raw ||
                 (cai->isTakeOfSrc() || !cai->getSrc()->getType().isMoveOnly()),
             "'MoveOnly' types can only be copied in Raw SIL?!");
   }
@@ -3726,7 +3726,7 @@ public:
 
   void checkMarkUnresolvedMoveAddrInst(MarkUnresolvedMoveAddrInst *SI) {
     require(F.hasOwnership(), "Only valid in OSSA.");
-    require(F.getModule().getStage() == SILStage::Raw, "Only valid in Raw SIL");
+    require(F.getEffectiveStage() == SILStage::Raw, "Only valid in Raw SIL");
     require(SI->getSrc()->getType().isAddress(), "Src value should be lvalue");
     require(SI->getDest()->getType().isAddress(),
             "Dest address should be lvalue");
@@ -3760,7 +3760,7 @@ public:
     require(!fnConv.useLoweredAddresses() || F.hasOwnership(),
             "copy_value is only valid in functions with qualified "
             "ownership");
-    require(I->getModule().getStage() == SILStage::Raw ||
+    require(I->getFunction()->getEffectiveStage() == SILStage::Raw ||
                 !I->getOperand()->getType().isMoveOnly(),
             "'MoveOnly' types can only be copied in Raw SIL?!");
   }
@@ -3938,7 +3938,7 @@ public:
 
       SILType loweredType =
           structTy.getFieldType(field, F.getModule(), F.getTypeExpansionContext());
-      if (SI->getModule().getStage() != SILStage::Lowered) {
+      if (SI->getFunction()->getEffectiveStage() != SILStage::Lowered) {
         requireSameType((*opi)->getType(), loweredType,
                         "struct operand type does not match field type");
       }
@@ -3961,7 +3961,7 @@ public:
               "EnumInst operand must be an object");
       SILType caseTy = UI->getType().getEnumElementType(
           UI->getElement(), F.getModule(), F.getTypeExpansionContext());
-      if (UI->getModule().getStage() != SILStage::Lowered) {
+      if (UI->getFunction()->getEffectiveStage() != SILStage::Lowered) {
         requireSameType(caseTy, UI->getOperand()->getType(),
                         "EnumInst operand type does not match type of case");
       }
@@ -3983,7 +3983,7 @@ public:
     SILType caseTy = UI->getOperand()->getType().getEnumElementType(
         UI->getElement(), F.getModule(), F.getTypeExpansionContext());
 
-    if (UI->getModule().getStage() != SILStage::Lowered) {
+    if (UI->getFunction()->getEffectiveStage() != SILStage::Lowered) {
       requireSameType(
           caseTy, UI->getType(),
           "InitEnumDataAddrInst result does not match type of enum case");
@@ -4005,7 +4005,7 @@ public:
     SILType caseTy = UI->getOperand()->getType().getEnumElementType(
         UI->getElement(), F.getModule(), F.getTypeExpansionContext());
 
-    if (UI->getModule().getStage() != SILStage::Lowered) {
+    if (UI->getFunction()->getEffectiveStage() != SILStage::Lowered) {
       requireSameType(
           caseTy, UI->getType(),
           "UncheckedEnumData result does not match type of enum case");
@@ -4027,7 +4027,7 @@ public:
     SILType caseTy = UI->getEnum()->getType().getEnumElementType(
         UI->getElement(), F.getModule(), F.getTypeExpansionContext());
 
-    if (UI->getModule().getStage() != SILStage::Lowered) {
+    if (UI->getFunction()->getEffectiveStage() != SILStage::Lowered) {
       requireSameType(caseTy, UI->getType(),
                       "instruction result "
                       "does not match type of enum case");
@@ -4072,7 +4072,7 @@ public:
     require(TI->getElements().size() == ResTy->getNumElements(),
             "Tuple field count mismatch!");
 
-    if (TI->getModule().getStage() != SILStage::Lowered) {
+    if (TI->getFunction()->getEffectiveStage() != SILStage::Lowered) {
       for (size_t i = 0, size = TI->getElements().size(); i < size; ++i) {
         requireSameType(TI->getElement(i)->getType().getASTType(),
                         ResTy.getElementType(i),
@@ -4307,7 +4307,7 @@ public:
     require(EI->getForwardingOwnershipKind() == OwnershipKind::None ||
                 EI->getForwardingOwnershipKind() == OwnershipKind::Guaranteed,
             "invalid forwarding ownership kind on tuple_extract instruction");
-    if (EI->getModule().getStage() != SILStage::Lowered) {
+    if (EI->getFunction()->getEffectiveStage() != SILStage::Lowered) {
       requireSameType(EI->getType().getASTType(),
                       operandTy.getElementType(EI->getFieldIndex()),
                       "type of tuple_extract does not match type of element");
@@ -4343,7 +4343,7 @@ public:
             "Imported structs with ptrauth qualified fields should not be "
             "promoted to a value");
 
-    if (EI->getModule().getStage() != SILStage::Lowered) {
+    if (EI->getFunction()->getEffectiveStage() != SILStage::Lowered) {
       SILType loweredFieldTy = operandTy.getFieldType(
           EI->getField(), F.getModule(), F.getTypeExpansionContext());
       requireSameType(loweredFieldTy, EI->getType(),
@@ -4363,7 +4363,7 @@ public:
 
     require(EI->getFieldIndex() < tupleType->getNumElements(),
             "invalid field index for tuple_element_addr instruction");
-    if (EI->getModule().getStage() != SILStage::Lowered) {
+    if (EI->getFunction()->getEffectiveStage() != SILStage::Lowered) {
       requireSameType(
           EI->getType().getASTType(),
           tupleType.getElementType(EI->getFieldIndex()),
@@ -4398,7 +4398,7 @@ public:
                 "begin_access [signed]/end_access");
       }
     }
-    if (EI->getModule().getStage() != SILStage::Lowered) {
+    if (EI->getFunction()->getEffectiveStage() != SILStage::Lowered) {
       SILType loweredFieldTy = operandTy.getFieldType(
           EI->getField(), F.getModule(), F.getTypeExpansionContext());
       requireSameType(
@@ -4425,7 +4425,7 @@ public:
                 cd->getImplementationContext()->getAsGenericContext(),
             "ref_element_addr field must be a member of the class");
 
-    if (EI->getModule().getStage() != SILStage::Lowered) {
+    if (EI->getFunction()->getEffectiveStage() != SILStage::Lowered) {
       SILType loweredFieldTy = operandTy.getFieldType(
           EI->getField(), F.getModule(), F.getTypeExpansionContext());
       requireSameType(
@@ -4689,7 +4689,8 @@ public:
     SILModule &mod = CMI->getModule();
     bool embedded = mod.getASTContext().LangOpts.hasFeature(Feature::Embedded);
 
-    if (mod.getStage() != SILStage::Lowered && !embedded) {
+    if (CMI->getFunction()->getEffectiveStage() != SILStage::Lowered &&
+        !embedded) {
       requireSameType(
           CMI->getType(), SILType::getPrimitiveObjectType(overrideTy),
           "result type of class_method must match abstracted type of method");
@@ -4721,7 +4722,7 @@ public:
     auto member = CMI->getMember();
     auto overrideTy =
         TC.getConstantOverrideType(F.getTypeExpansionContext(), member);
-    if (CMI->getModule().getStage() != SILStage::Lowered) {
+    if (CMI->getFunction()->getEffectiveStage() != SILStage::Lowered) {
       requireSameType(
           CMI->getType(), SILType::getPrimitiveObjectType(overrideTy),
           "result type of super_method must match abstracted type of method");
@@ -4799,7 +4800,7 @@ public:
     auto member = OMI->getMember();
     auto overrideTy =
         TC.getConstantOverrideType(F.getTypeExpansionContext(), member);
-    if (OMI->getModule().getStage() != SILStage::Lowered) {
+    if (OMI->getFunction()->getEffectiveStage() != SILStage::Lowered) {
       requireSameType(
           OMI->getType(), SILType::getPrimitiveObjectType(overrideTy),
           "result type of super_method must match abstracted type of method");
@@ -5650,7 +5651,7 @@ public:
     // After mandatory passes convert_escape_to_noescape should not have the
     // '[not_guaranteed]' or '[escaped]' attributes.
     if (!SkipConvertEscapeToNoescapeAttributes &&
-        F.getModule().getStage() != SILStage::Raw) {
+        F.getEffectiveStage() != SILStage::Raw) {
       require(ICI->isLifetimeGuaranteed(),
               "convert_escape_to_noescape [not_guaranteed] not "
               "allowed after mandatory passes");
@@ -5688,7 +5689,7 @@ public:
 
     // If the result type is an address, ensure its base address is from a
     // function argument or Builtin.Borrow.
-    if (F.getModule().getStage() >= SILStage::Canonical &&
+    if (F.getEffectiveStage() >= SILStage::Canonical &&
         functionResultType.isAddress()) {
       auto base = AccessBase::compute(RI->getOperand());
       auto root = base ? base.isReference() ? base.getOwnershipReferenceRoot()
@@ -5783,7 +5784,7 @@ public:
 
       // In canonical SIL, select instructions must not cover any enum elements
       // that are unavailable.
-      if (F.getModule().getStage() >= SILStage::Canonical) {
+      if (F.getEffectiveStage() >= SILStage::Canonical) {
         require(elt->isAvailableDuringLowering(),
                 "select_enum dispatches on enum element that is unavailable "
                 "during lowering.");
@@ -5881,7 +5882,7 @@ public:
 
       // In canonical SIL, switch instructions must not cover any enum elements
       // that are unavailable.
-      if (F.getModule().getStage() >= SILStage::Canonical) {
+      if (F.getEffectiveStage() >= SILStage::Canonical) {
         require(elt->isAvailableDuringLowering(),
                 "switch_enum dispatches on enum element that is unavailable "
                 "during lowering.");
@@ -5892,7 +5893,7 @@ public:
         SILType eltArgTy = uTy.getEnumElementType(elt, F.getModule(),
                                                   F.getTypeExpansionContext());
         SILType bbArgTy = dest->getArguments()[0]->getType();
-        if (F.getModule().getStage() != SILStage::Lowered) {
+        if (F.getEffectiveStage() != SILStage::Lowered) {
           // During the lowered stage, a function type might have different
           // signature
           //
@@ -5993,7 +5994,7 @@ public:
 
       // In canonical SIL, switch instructions must not cover any enum elements
       // that are unavailable.
-      if (F.getModule().getStage() >= SILStage::Canonical) {
+      if (F.getEffectiveStage() >= SILStage::Canonical) {
         require(elt->isAvailableDuringLowering(),
                 "switch_enum_addr dispatches on enum element that is "
                 "unavailable during lowering.");
@@ -6182,7 +6183,7 @@ public:
 
   void checkHopToExecutorInst(HopToExecutorInst *HI) {
     auto executor = HI->getTargetExecutor();
-    if (HI->getModule().getStage() == SILStage::Lowered) {
+    if (HI->getFunction()->getEffectiveStage() == SILStage::Lowered) {
       requireOptionalExecutorType(executor,
                                   "hop_to_executor operand in lowered SIL");
     } else {
@@ -6200,7 +6201,7 @@ public:
                            /*allow optional*/ false,
                            /*allow executor*/ false,
                            "extract_executor operand");
-    if (EEI->getModule().getStage() == SILStage::Lowered) {
+    if (EEI->getFunction()->getEffectiveStage() == SILStage::Lowered) {
       require(false,
               "extract_executor instruction should have been lowered away");
     }
@@ -6349,7 +6350,7 @@ public:
     // parameter/result conventions.
     // TODO: Check that derivative function types match excluding
     // parameter/result conventions in lowered SIL.
-    if (F.getModule().getStage() == SILStage::Lowered)
+    if (F.getEffectiveStage() == SILStage::Lowered)
       return;
     if (dfi->hasDerivativeFunctions()) {
       auto jvp = dfi->getJVPFunction();
@@ -6389,7 +6390,7 @@ public:
     // Skip lowered SIL: LoadableByAddress changes parameter/result conventions.
     // TODO: Check that transpose function type matches excluding
     // parameter/result conventions in lowered SIL.
-    if (F.getModule().getStage() == SILStage::Lowered)
+    if (F.getEffectiveStage() == SILStage::Lowered)
       return;
     if (lfi->hasTransposeFunction()) {
       auto transpose = lfi->getTransposeFunction();
@@ -7018,7 +7019,7 @@ public:
 
   void checkMarkUnresolvedNonCopyableValueInst(
       MarkUnresolvedNonCopyableValueInst *i) {
-    require(i->getModule().getStage() == SILStage::Raw,
+    require(i->getFunction()->getEffectiveStage() == SILStage::Raw,
             "Only valid in Raw SIL! Should have been eliminated by /some/ "
             "diagnostic pass");
     if (i->getType().isAddress())
@@ -7027,7 +7028,7 @@ public:
 
   void checkMarkUnresolvedReferenceBindingInst(
       MarkUnresolvedReferenceBindingInst *i) {
-    require(i->getModule().getStage() == SILStage::Raw,
+    require(i->getFunction()->getEffectiveStage() == SILStage::Raw,
             "Only valid in Raw SIL! Should have been eliminated by /some/ "
             "diagnostic pass");
   }
@@ -7072,7 +7073,7 @@ public:
   }
 
   void checkUncheckedOwnershipInst(UncheckedOwnershipInst *uoi) {
-    require(F.getModule().getStage() == SILStage::Raw,
+    require(F.getEffectiveStage() == SILStage::Raw,
             "unchecked_ownership is valid only in raw SIL");
   }
 
@@ -7080,7 +7081,7 @@ public:
     require(apmi->getIntroducer()->mayRequirePackMetadata(*apmi->getFunction()),
             "Introduces instruction of kind which cannot emit on-stack pack "
             "metadata");
-    require(F.getModule().getStage() == SILStage::Lowered,
+    require(F.getEffectiveStage() == SILStage::Lowered,
             "Only supported in lowered SIL");
   }
 
@@ -7089,7 +7090,7 @@ public:
     require(apmi, "Must have instruction operand.");
     require(isa<AllocPackMetadataInst>(apmi),
             "Must have alloc_pack_metadata operand");
-    require(F.getModule().getStage() == SILStage::Lowered,
+    require(F.getEffectiveStage() == SILStage::Lowered,
             "Only supported in lowered SIL");
   }
 
@@ -7791,7 +7792,7 @@ void SILVTable::verify(const SILModule &M) const {
       entry.getMethod().print(os);
     }
 
-    if (M.getStage() != SILStage::Lowered &&
+    if (!M.hasCommittedLowered() &&
         !M.getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
       // Note the direction of the compatibility check: the witness
       // function must be compatible with being used as the requirement
@@ -7895,7 +7896,7 @@ void SILWitnessTable::verify(const SILModule &mod) const {
                SILFunctionTypeRepresentation::WitnessMethod &&
            "Witnesses must have witness_method representation.");
 
-    if (mod.getStage() != SILStage::Lowered &&
+    if (!mod.hasCommittedLowered() &&
         !mod.getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
       // Note the direction of the compatibility check: the witness
       // function must be compatible with being used as the requirement
@@ -7948,7 +7949,7 @@ void SILDefaultWitnessTable::verify(const SILModule &mod) const {
                SILFunctionTypeRepresentation::WitnessMethod &&
            "Default witnesses must have witness_method representation.");
 
-    if (mod.getStage() != SILStage::Lowered &&
+    if (!mod.hasCommittedLowered() &&
         !mod.getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
       // Note the direction of the compatibility check: the witness
       // function must be compatible with being used as the requirement

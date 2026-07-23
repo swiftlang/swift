@@ -446,7 +446,7 @@ void swift::silverifier::verifyFlowSensitiveRules(SILFunction *F) {
           if (isa<ReturnInst>(term) &&
               F->getLoweredFunctionType()->getCoroutineKind() ==
                   SILCoroutineKind::YieldOnce &&
-              F->getModule().getStage() != SILStage::Raw) {
+              F->getEffectiveStage() != SILStage::Raw) {
             require(state.CFG == CFGState::YieldOnceResume,
                     "encountered 'return' before yielding a value in "
                     "yield_once coroutine");
@@ -571,7 +571,7 @@ void swift::silverifier::verifyFlowSensitiveRules(SILFunction *F) {
               // so we can't assert it yet in the raw stage.
             } else if (F->getLoweredFunctionType()->getCoroutineKind() ==
                            SILCoroutineKind::YieldOnce &&
-                       F->getModule().getStage() != SILStage::Raw) {
+                       F->getEffectiveStage() != SILStage::Raw) {
               insertedState.CFG = CFGState::YieldOnceResume;
             }
           }
