@@ -605,29 +605,6 @@ Partition Partition::join(const Partition &fst, Partition &mutableSnd,
   return result;
 }
 
-bool Partition::popHistory(
-    SmallVectorImpl<SILBasicBlock *> &foundJoinedBlocks) {
-  // We only allow for history rewinding if we are not tracking any
-  // sending operands. This is because the history rewinding does not
-  // care about sending. One can either construct a new Partition from
-  // the current Partition using Partition::removeSendingOperandSet or clear
-  // the sending information using Partition::clearSendingOperandState().
-  assert(regionToSendingOpMap.empty() &&
-         "Can only rewind history if not tracking any sending operands");
-
-  if (!history.getHead())
-    return false;
-
-  // Just put in a continue here to ensure that clang-format doesn't do weird
-  // things with the semicolon.
-  while (popHistoryOnce(foundJoinedBlocks))
-    continue;
-
-  // Return if our history head is non-null so our user knows if there are more
-  // things to pop.
-  return history.getHead();
-}
-
 void Partition::print(llvm::raw_ostream &os,
                       std::function<bool(llvm::raw_ostream &, Region)>
                           printRegionIsolation) const {
@@ -927,18 +904,18 @@ void Partition::horizontalUpdate(
   }
 }
 
-bool Partition::popHistoryOnce(
-    SmallVectorImpl<SILBasicBlock *> &foundJoinedBlocks) {
+const IsolationHistory::Node *
+Partition::popHistoryOnce(SmallVectorImpl<SILBasicBlock *> &foundJoinedBlocks) {
   const auto *head = history.pop();
   if (!head)
-    return false;
+    return nullptr;
 
   // When popping, we /always/ want to canonicalize.
   canonicalize();
 
   switch (head->getKind()) {
   case IsolationHistory::Node::SequenceBoundary:
-    return false;
+    break;
 
   case IsolationHistory::Node::AddNewRegionForElement: {
     // We added an element to its own region... so we should remove it and it
@@ -953,13 +930,13 @@ bool Partition::popHistoryOnce(
                            return pair.second == oldRegion;
                          }) &&
            "Should have been last element?!");
-    return true;
+    break;
   }
   case IsolationHistory::Node::RemoveLastElementFromRegion:
     // We removed an element from a region and it was the last element. Just
     // add new.
     trackNewElement(head->getFirstArgAsElement(), false /*update history*/);
-    return true;
+    break;
   case IsolationHistory::Node::RemoveElementFromRegion:
     // We removed an element from a specific region. So, we need to add it
     // back. pushRemoveElementFromRegion stores the surviving sibling at
@@ -968,7 +945,7 @@ bool Partition::popHistoryOnce(
     assignElement(head->getFirstArgAsElement(),
                   head->getAdditionalElementArgs()[0],
                   false /*update history*/);
-    return true;
+    break;
 
   case IsolationHistory::Node::MergeElementRegions: {
     // We merged two regions together. We need to remove all elements from the
@@ -988,7 +965,7 @@ bool Partition::popHistoryOnce(
       merge(e, elementsToExtract[0], false /*update history*/);
     }
 
-    return true;
+    break;
   }
   case IsolationHistory::Node::CFGHistoryJoin:
     // When we have a CFG history join, we cannot simply pop: the joined branch
@@ -996,8 +973,10 @@ bool Partition::popHistoryOnce(
     // history. Signal the predecessor block to the caller so it can recover
     // that exit partition and keep rewinding.
     foundJoinedBlocks.push_back(head->getFirstArgAsBlock());
-    return true;
+    break;
   }
+
+  return head;
 }
 
 //===----------------------------------------------------------------------===//

@@ -1083,34 +1083,22 @@ public:
     return p;
   }
 
-  /// Rewind one PartitionOp worth of history from the partition.
+  /// Pop and undo one history node from this partition, returning the node that
+  /// was popped (its effect on the partition has already been reversed), or
+  /// null when the history is empty. Multiple nodes can make up one PartitionOp
+  /// worth of history; a caller rewinds by calling this in a loop and
+  /// inspecting each returned node (e.g. its kind, flow value, or — for a
+  /// CFGHistoryJoin — its predecessor block).
   ///
-  /// If we rewind through a CFG join, the predecessor block whose exit
-  /// partition was joined in is appended to \p foundJoinedBlocks. A consumer
-  /// that wants to keep rewinding across the join should recover that block's
-  /// exit partition (from RegionAnalysis) and rewind it in turn.
+  /// A popped CFGHistoryJoin appends its predecessor block to
+  /// \p foundJoinedBlocks; the joined branch itself is recovered from that
+  /// block's exit partition.
   ///
-  /// NOTE: This can only be used if one has cleared the sent state using
-  /// Partition::clearSendingOperandState or constructed a new Partiton using
-  /// Partition::removingSendingOperandState(). This is because history
-  /// rewinding doesn't use send information so just to be careful around
-  /// potential invariants being broken, we just require the elimination of the
-  /// send information.
-  ///
-  /// \returns true if there is more history that can be popped.
-  bool popHistory(SmallVectorImpl<SILBasicBlock *> &foundJoinedBlocks);
-
-  /// Pop one history node (a single node; multiple nodes can make up one
-  /// PartitionOp worth of history). Undoes the popped node's effect on the
-  /// partition. Callers that want to inspect the popped node should read
-  /// \c getIsolationHistory().getHead() *before* calling.
-  ///
-  /// Same sending-state precondition as \c popHistory. A popped CFG join
-  /// appends its predecessor block to \p foundJoinedBlocks.
-  ///
-  /// \returns false when the popped node is a SequenceBoundary or the history
-  /// is empty; true otherwise.
-  bool popHistoryOnce(SmallVectorImpl<SILBasicBlock *> &foundJoinedBlocks);
+  /// This can only be used if one is not tracking sending-operand state (see
+  /// \c clearSendingOperandState / \c removingSendingOperandState) — history
+  /// rewinding does not use send information.
+  const IsolationHistoryNode *
+  popHistoryOnce(SmallVectorImpl<SILBasicBlock *> &foundJoinedBlocks);
 
   /// Returns true if this value has any isolation history stored.
   bool hasHistory() const { return bool(history.getHead()); }
