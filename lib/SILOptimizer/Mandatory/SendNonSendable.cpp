@@ -867,48 +867,61 @@ bool IsolationHistoryNoteEmitter::processFrame(Frame frame) {
   }
 
   // The chain continues into the predecessor blocks joined at this frame.
-  // Schedule each, inheriting the walk state as of here.
   //
   // A pendingTargetMerge still set here has no location: it came from a region
   // unification the dataflow join introduced, not a user-written merge (which
   // would have been followed by its SequenceBoundary in this same frame). If we
-  // carried it into every predecessor it would be pinned to the first boundary
-  // of whichever branch we explore first — e.g. the 'else' arm of a diamond,
-  // which never touched the isolated value. Route it only to the predecessor
-  // that actually made the chain isolated (a tracked element shares an isolated
-  // region at that block's exit); the user-written merge there re-anchors it.
+  // explored every predecessor it would be pinned to the first boundary of
+  // whichever branch we happen to walk first — e.g. the 'else' arm of a
+  // diamond, which never touched the isolated value. So while such a merge is
+  // pending, prefer the predecessor(s) where a tracked element is actually
+  // isolated at the block exit — the branch that holds the user-written merge —
+  // and prune the rest. Only when no predecessor has the chain isolated do we
+  // fall back to exploring them all.
+  struct PredExit {
+    SILBasicBlock *block;
+    Partition exit;
+    bool chainIsolated;
+  };
+  SmallVector<PredExit, 4> preds;
+  bool anyIsolated = false;
   for (SILBasicBlock *predBlock : joinedBlocks) {
     if (!visitedBlocks.insert(predBlock).second)
       continue;
     auto predBlockState = inputFunctionInfo->getBlockState(predBlock);
     if (!predBlockState)
       continue;
-    Partition predExit =
+    Partition exit =
         predBlockState.get()->getExitPartition().removingSendingOperandState();
 
-    WalkState childState = state;
-    if (childState.pendingTargetMerge) {
-      bool chainIsolatedInPred = false;
+    bool chainIsolated = false;
+    if (state.pendingTargetMerge) {
       for (Element e : state.tracked) {
-        if (!predExit.isTrackingElement(e))
+        if (!exit.isTrackingElement(e))
           continue;
-        Region region = predExit.getRegion(e);
-        for (auto pair : predExit.range()) {
+        Region region = exit.getRegion(e);
+        for (auto pair : exit.range()) {
           if (pair.second != region)
             continue;
           auto info = inputValueMap.getIsolationRegion(pair.first);
           if (info && !info.isDisconnected()) {
-            chainIsolatedInPred = true;
+            chainIsolated = true;
             break;
           }
         }
-        if (chainIsolatedInPred)
+        if (chainIsolated)
           break;
       }
-      childState.pendingTargetMerge = chainIsolatedInPred;
     }
 
-    worklist.push_back(Frame{std::move(predExit), std::move(childState)});
+    anyIsolated |= chainIsolated;
+    preds.push_back({predBlock, std::move(exit), chainIsolated});
+  }
+
+  for (auto &pred : preds) {
+    if (state.pendingTargetMerge && anyIsolated && !pred.chainIsolated)
+      continue;
+    worklist.push_back(Frame{std::move(pred.exit), state});
   }
   return false;
 }
