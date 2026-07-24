@@ -966,7 +966,8 @@ func switch_one_isolated(_ x: NS, _ n: Int) async {
   default:
     break
   }
-  await transferToMain(y) // expected-warning {{sending 'y' risks causing data races}} expected-note {{sending 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
+  await transferToMain(y) // expected-warning {{sending 'y' risks causing data races}}
+// expected-note @-1 {{sending 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
 }
 
 func switch_two_isolated(_ x: NS, _ n: Int) async {
@@ -979,7 +980,8 @@ func switch_two_isolated(_ x: NS, _ n: Int) async {
   default:
     y = NS()
   }
-  await transferToMain(y) // expected-warning {{sending 'y' risks causing data races}} expected-note {{sending 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
+  await transferToMain(y) // expected-warning {{sending 'y' risks causing data races}}
+// expected-note @-1 {{sending 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
 }
 
 func nested_diamond(_ x: NS, _ a: Bool, _ b: Bool) async {
@@ -993,12 +995,14 @@ func nested_diamond(_ x: NS, _ a: Bool, _ b: Bool) async {
   } else {
     y = NS()
   }
-  await transferToMain(y) // expected-warning {{sending 'y' risks causing data races}} expected-note {{sending 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
+  await transferToMain(y) // expected-warning {{sending 'y' risks causing data races}}
+// expected-note @-1 {{sending 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
 }
 
 func ternary_chain(_ x: NS, _ flag: Bool) async {
   let y = flag ? x : NS() // expected-note {{'y' is connected to 'x' which is accessible to code in the current isolation context}}
-  await transferToMain(y) // expected-warning {{sending 'y' risks causing data races}} expected-note {{sending 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
+  await transferToMain(y) // expected-warning {{sending 'y' risks causing data races}}
+// expected-note @-1 {{sending 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
 }
 
 func while_loop_chain(_ x: NS, _ flag: Bool) async {
@@ -1010,7 +1014,8 @@ func while_loop_chain(_ x: NS, _ flag: Bool) async {
     }
     i += 1
   }
-  await transferToMain(y) // expected-warning {{sending 'y' risks causing data races}} expected-note {{sending 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
+  await transferToMain(y) // expected-warning {{sending 'y' risks causing data races}}
+// expected-note @-1 {{sending 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
 }
 
 func repeat_while_chain(_ x: NS, _ flag: Bool) async {
@@ -1022,7 +1027,8 @@ func repeat_while_chain(_ x: NS, _ flag: Bool) async {
     }
     i += 1
   } while i < 10
-  await transferToMain(y) // expected-warning {{sending 'y' risks causing data races}} expected-note {{sending 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
+  await transferToMain(y) // expected-warning {{sending 'y' risks causing data races}}
+// expected-note @-1 {{sending 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
 }
 
 func nested_loop_chain(_ x: NS, _ n: Int) async {
@@ -1032,7 +1038,8 @@ func nested_loop_chain(_ x: NS, _ n: Int) async {
       y = x // expected-note {{'y' is connected to 'x' which is accessible to code in the current isolation context}}
     }
   }
-  await transferToMain(y) // expected-warning {{sending 'y' risks causing data races}} expected-note {{sending 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
+  await transferToMain(y) // expected-warning {{sending 'y' risks causing data races}}
+// expected-note @-1 {{sending 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
 }
 
 // Two distinct isolated sources, both branches isolate y. Neither branch resets
@@ -1045,7 +1052,8 @@ func two_isolated_sources(_ a: NS, _ b: NS, _ flag: Bool) async {
   } else {
     y = b // expected-note {{'y' is connected to 'a' which is accessible to code in the current isolation context}}
   }
-  await transferToMain(y) // expected-warning {{sending 'y' risks causing data races}} expected-note {{sending 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
+  await transferToMain(y) // expected-warning {{sending 'y' risks causing data races}}
+// expected-note @-1 {{sending 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
 }
 
 func sequential_diamonds(_ x: NS, _ f1: Bool, _ f2: Bool) async {
@@ -1058,17 +1066,20 @@ func sequential_diamonds(_ x: NS, _ f1: Bool, _ f2: Bool) async {
   if f2 {
     _ = y
   }
-  await transferToMain(y) // expected-warning {{sending 'y' risks causing data races}} expected-note {{sending 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
+  await transferToMain(y) // expected-warning {{sending 'y' risks causing data races}}
+// expected-note @-1 {{sending 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
 }
 
 func do_catch_chain(_ x: NS) async throws {
   var y = NS()
   do {
-    y = try makeOrThrow(x) // expected-note {{'y' is connected to 'x' which is accessible to code in the current isolation context}} expected-note {{'makeOrThrow' is connected to 'y'}}
+    y = try makeOrThrow(x) // expected-note {{'y' is connected to 'x' which is accessible to code in the current isolation context}}
+// expected-note @-1 {{'makeOrThrow' is connected to 'y'}}
   } catch {
     y = NS()
   }
-  await transferToMain(y) // expected-warning {{sending 'y' risks causing data races}} expected-note {{sending 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
+  await transferToMain(y) // expected-warning {{sending 'y' risks causing data races}}
+  // expected-note @-1 {{sending 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
 }
 
 func break_in_loop_chain(_ x: NS, _ n: Int) async {
@@ -1077,7 +1088,8 @@ func break_in_loop_chain(_ x: NS, _ n: Int) async {
     y = x // expected-note {{'y' is connected to 'x' which is accessible to code in the current isolation context}}
     break
   }
-  await transferToMain(y) // expected-warning {{sending 'y' risks causing data races}} expected-note {{sending 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
+  await transferToMain(y) // expected-warning {{sending 'y' risks causing data races}}
+  // expected-note @-1 {{sending 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1093,7 +1105,8 @@ func break_in_loop_chain(_ x: NS, _ n: Int) async {
 func send_projection_of_isolated(_ x: NS) async {
   var box = Box1(NS())
   box.ns = x // expected-note {{'box' is connected to 'x' which is accessible to code in the current isolation context}}
-  await transferToMain(box.ns) // expected-warning {{sending 'box.ns' risks causing data races}} expected-note {{sending 'box.ns' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
+  await transferToMain(box.ns) // expected-warning {{sending 'box.ns' risks causing data races}}
+// expected-note @-1 {{sending 'box.ns' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
 }
 
 // FIXME: The write is 'box.b.b.ns = x', but the note collapses the whole access
@@ -1101,7 +1114,8 @@ func send_projection_of_isolated(_ x: NS) async {
 func deep_projection_store(_ x: NS) async {
   var box = Box3(Box2(Box1(NS())))
   box.b.b.ns = x // expected-note {{'box' is connected to 'x' which is accessible to code in the current isolation context}}
-  await transferToMain(box) // expected-warning {{sending 'box' risks causing data races}} expected-note {{sending 'box' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
+  await transferToMain(box) // expected-warning {{sending 'box' risks causing data races}}
+// expected-note @-1 {{sending 'box' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
 }
 
 // FIXME: 'y' is a copy of the actor's stored property, yet we emit only the
@@ -1111,7 +1125,8 @@ actor SlotActor {
   var slot = NS()
   func probe() async {
     let y = slot // expected-note {{value was merged into 'self'-isolated code region here}}
-    await transferToMain(y) // expected-warning {{sending 'y' risks causing data races}} expected-note {{sending 'self'-isolated 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and 'self'-isolated uses}}
+    await transferToMain(y) // expected-warning {{sending 'y' risks causing data races}}
+// expected-note @-1 {{sending 'self'-isolated 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and 'self'-isolated uses}}
   }
 }
 
@@ -1121,5 +1136,6 @@ actor SlotActor {
 func array_append_leak(_ x: NS) async {
   var arr = [NS()] // expected-note {{'_allocateUninitializedArray' is connected to 'arr'}}
   arr.append(x) // expected-note {{'arr' is connected to 'x' which is accessible to code in the current isolation context}}
-  await transferToMain(arr) // expected-warning {{sending 'arr' risks causing data races}} expected-note {{sending 'arr' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
+  await transferToMain(arr) // expected-warning {{sending 'arr' risks causing data races}}
+  // expected-note @-1 {{sending 'arr' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
 }
