@@ -84,38 +84,37 @@ private struct AnalyzedInstructions {
   /// * an apply to the addressor of the global
   /// * a builtin "once" of the global initializer
   var globalInitCalls: Stack<Instruction>
-  var readOnlyApplies: Stack<FullApplySite>
   var loads: Stack<LoadInst>
   var stores: Stack<StoreInst>
   var scopedInsts: Stack<UnaryInstruction>
-  var fullApplies: Stack<FullApplySite>
-  
+
+  // loop blocks that dominate all exiting and latch blocks
+  var dominatingBlocks: BasicBlockSet
+
   /// `true` if the loop has instructions which (may) read from memory, which are not in `Loads` and not in `sideEffects`.
   var hasOtherMemReadingInsts = false
   
   /// `true` if one of the side effects might release.
-  lazy var sideEffectsMayRelease = loopSideEffects.contains(where: { $0.mayRelease })
-  
-  init (_ context: FunctionPassContext) {
+  var sideEffectsMayRelease: Bool { loopSideEffects.contains(where: { $0.mayRelease }) }
+
+  init (in loop: Loop, _ context: FunctionPassContext) {
     self.loopSideEffects = StackWithCount<Instruction>(context)
     self.blockSideEffectBottomMarker = loopSideEffects.top
     
     self.globalInitCalls = Stack<Instruction>(context)
-    self.readOnlyApplies = Stack<FullApplySite>(context)
     self.loads = Stack<LoadInst>(context)
     self.stores = Stack<StoreInst>(context)
     self.scopedInsts = Stack<UnaryInstruction>(context)
-    self.fullApplies = Stack<FullApplySite>(context)
+    self.dominatingBlocks = loop.getBlocksThatDominateAllExitingAndLatchBlocks(context)
   }
   
   mutating func deinitialize() {
-    readOnlyApplies.deinitialize()
     globalInitCalls.deinitialize()
     loopSideEffects.deinitialize()
     loads.deinitialize()
     stores.deinitialize()
     scopedInsts.deinitialize()
-    fullApplies.deinitialize()
+    dominatingBlocks.deinitialize()
   }
   
   /// Mark the start of currently processed block side effects.
@@ -130,27 +129,27 @@ private struct AnalyzedInstructions {
 /// This may split some loads into smaller loads.
 private func analyzeLoopAndSplitLoads(loop: Loop, _ context: FunctionPassContext) -> MovableInstructions {
   var movableInstructions = MovableInstructions()
-  var analyzedInstructions = AnalyzedInstructions(context)
+  var analyzedInstructions = AnalyzedInstructions(in: loop, context)
   defer { analyzedInstructions.deinitialize() }
 
-  analyzeInstructions(in: loop, &analyzedInstructions, &movableInstructions, context)
+  analyzeInstructions(in: loop, &analyzedInstructions, context)
 
   collectHoistableGlobalInitCalls(in: loop, analyzedInstructions, &movableInstructions, context)
 
   collectProjectableAccessPathsAndSplitLoads(in: loop, &analyzedInstructions, &movableInstructions, context)
-  
-  collectMovableInstructions(in: loop, &analyzedInstructions, &movableInstructions, context)
+
+  collectSpeculativelyMovableInstructions(in: loop,  &movableInstructions)
+
+  collectMovableInstructions(in: loop, analyzedInstructions, &movableInstructions, context)
     
   return movableInstructions
 }
 
 /// Analyze instructions inside the `loop`. Compute side effects and populate `analyzedInstructions`.
 ///
-/// - note: Ideally, `movableInstructions` should be fully computed in `collectMovableInstructions`.
 private func analyzeInstructions(
   in loop: Loop,
   _ analyzedInstructions: inout AnalyzedInstructions,
-  _ movableInstructions: inout MovableInstructions,
   _ context: FunctionPassContext
 ) {
   for bb in loop.loopBlocks {
@@ -159,64 +158,43 @@ private func analyzeInstructions(
     for inst in bb.instructions {
       switch inst {
       case is FixLifetimeInst:
-        break // We can ignore the side effects of FixLifetimes
+        continue // We can ignore the side effects of FixLifetimes
       case let loadInst as LoadInst:
         analyzedInstructions.loads.append(loadInst)
-      case let uncheckedOwnershipConversionInst as UncheckedOwnershipConversionInst:
-        analyzedInstructions.analyzeSideEffects(ofInst: uncheckedOwnershipConversionInst)
+        continue // Don't set `hasOtherMemReadingInsts` in `analyzeSideEffects`
       case let storeInst as StoreInst:
         analyzedInstructions.stores.append(storeInst)
-        analyzedInstructions.analyzeSideEffects(ofInst: storeInst)
       case let beginAccessInst as BeginAccessInst:
         analyzedInstructions.scopedInsts.append(beginAccessInst)
-        analyzedInstructions.analyzeSideEffects(ofInst: beginAccessInst)
-      case let beginBorrowInst as BeginBorrowInstruction:
-        analyzedInstructions.analyzeSideEffects(ofInst: beginBorrowInst)
-      case let refElementAddrInst as RefElementAddrInst:
-        movableInstructions.speculativelyHoistable.append(refElementAddrInst)
-      case let condFailInst as CondFailInst:
-        analyzedInstructions.analyzeSideEffects(ofInst: condFailInst)
       case let fullApply as FullApplySite:
-        if fullApply.isSafeReadOnlyApply(context.calleeAnalysis) {
-          analyzedInstructions.readOnlyApplies.append(fullApply)
-        } else if let callee = fullApply.referencedFunction,
-                  callee.isGlobalInitFunction, // Calls to global inits are different because we don't care about side effects which are "after" the call in the loop.
-                  !fullApply.globalInitMayConflictWith(
-                    blockSideEffectSegment: analyzedInstructions.sideEffectsOfCurrentBlock,
-                    context.aliasAnalysis
-                  ) {
-          // Check against side-effects within the same block.
-          // Side-effects in other blocks are checked later (after we
-          // scanned all blocks of the loop) in `collectHoistableGlobalInitCalls`.
+        if let callee = fullApply.referencedFunction,
+           callee.isGlobalInitFunction,
+           // Calls to global inits are different because we don't care about side effects which are "after"
+           // the call in the loop.
+           // Check against side-effects within the same block. Side-effects in other blocks are checked
+           // later (after we scanned all blocks of the loop) in `collectHoistableGlobalInitCalls`.
+           !fullApply.globalInitMayConflictWith(
+              blockSideEffectSegment: analyzedInstructions.sideEffectsOfCurrentBlock,
+              context.aliasAnalysis)
+        {
           analyzedInstructions.globalInitCalls.append(fullApply)
         }
-        
-        analyzedInstructions.fullApplies.append(fullApply)
-        
-        // Check for array semantics and side effects - same as default
-        fallthrough
-      default:
-        switch inst {
-        case let builtinInst as BuiltinInst:
-          switch builtinInst.id {
-          case .Once, .OnceWithContext:
-            if !builtinInst.globalInitMayConflictWith(
-              blockSideEffectSegment: analyzedInstructions.sideEffectsOfCurrentBlock,
-              context.aliasAnalysis
-            ) {
-              analyzedInstructions.globalInitCalls.append(builtinInst)
-            }
-          default: break
+      case let builtinInst as BuiltinInst:
+        switch builtinInst.id {
+        case .Once, .OnceWithContext:
+          if !builtinInst.globalInitMayConflictWith(
+            blockSideEffectSegment: analyzedInstructions.sideEffectsOfCurrentBlock,
+            context.aliasAnalysis
+          ) {
+            analyzedInstructions.globalInitCalls.append(builtinInst)
           }
-        default: break
+        default:
+          break
         }
-        
-        analyzedInstructions.analyzeSideEffects(ofInst: inst)
-        
-        if inst.canBeHoisted(outOf: loop, context) {
-          movableInstructions.hoistUp.append(inst)
-        }
+      default:
+        break
       }
+      analyzedInstructions.analyzeSideEffects(ofInst: inst)
     }
   }
 }
@@ -234,11 +212,12 @@ private func collectHoistableGlobalInitCalls(
     // The effects in the same block have already been checked before
     // adding this global init call to `analyzedInstructions.globalInitCalls` in `analyzeInstructions`.
     if globalInitCall.parentBlock.postDominates(loop.preheader!, context.postDominatorTree),
+       analyzedInstructions.dominatingBlocks.contains(globalInitCall.parentBlock),
        !globalInitCall.globalInitMayConflictWith(
          loopSideEffects: analyzedInstructions.loopSideEffects,
          context.aliasAnalysis,
-         context.postDominatorTree
-       ) {
+         context.postDominatorTree)
+    {
       movableInstructions.hoistUp.append(globalInitCall)
     }
   }
@@ -276,16 +255,38 @@ private func collectProjectableAccessPathsAndSplitLoads(
   }
 }
 
-/// Computes movable instructions using computed analyzed instructions.
+/// Collect movable instructions, even if they are not executed in every loop iteration.
+private func collectSpeculativelyMovableInstructions(in loop: Loop, _ movableInstructions: inout MovableInstructions) {
+  for bb in loop.loopBlocks {
+    for inst in bb.instructions {
+      switch inst {
+      case is LoadInst, is StoreInst:
+        movableInstructions.loadsAndStores.append(inst)
+      case let refElementAddrInst as RefElementAddrInst:
+        movableInstructions.speculativelyHoistable.append(refElementAddrInst)
+      default:
+        break
+      }
+    }
+  }
+}
+
+/// Collect movable instructions. Only includes instructions which are executed in every loop iteration.
 private func collectMovableInstructions(
   in loop: Loop,
-  _ analyzedInstructions: inout AnalyzedInstructions,
+  _ analyzedInstructions: AnalyzedInstructions,
   _ movableInstructions: inout MovableInstructions,
   _ context: FunctionPassContext
 ) {
   var loadInstCounter = 0
   var readOnlyApplyCounter = 0
+  lazy var sideEffectsMayRelease = analyzedInstructions.sideEffectsMayRelease
   for bb in loop.loopBlocks {
+    // Skip blocks which are not executed in every loop iteration
+    guard analyzedInstructions.dominatingBlocks.contains(bb) else {
+      continue
+    }
+
     for inst in bb.instructions {
       switch inst {
       case let fixLifetimeInst as FixLifetimeInst:
@@ -293,8 +294,8 @@ private func collectMovableInstructions(
           continue
         }
         
-        if !analyzedInstructions.sideEffectsMayRelease ||
-            !analyzedInstructions.sideEffectsMayWrite(to: fixLifetimeInst.operand.value, context.aliasAnalysis)
+        if !sideEffectsMayRelease ||
+           !analyzedInstructions.sideEffectsMayWrite(to: fixLifetimeInst.operand.value, context.aliasAnalysis)
         {
           movableInstructions.sinkDown.append(fixLifetimeInst)
         }
@@ -313,8 +314,6 @@ private func collectMovableInstructions(
         }
         
         loadInstCounter += 1
-        
-        movableInstructions.loadsAndStores.append(loadInst)
       case is UncheckedOwnershipConversionInst:
         break // TODO: Add support
       case let storeInst as StoreInst:
@@ -324,7 +323,6 @@ private func collectMovableInstructions(
         case .unqualified, .trivial, .initialize:
           break
         }
-        movableInstructions.loadsAndStores.append(storeInst)
       case let condFailInst as CondFailInst:
         // We can (and must) hoist cond_fail instructions if the operand is
         // invariant. We must hoist them so that we preserve memory safety. A
@@ -340,27 +338,21 @@ private func collectMovableInstructions(
           movableInstructions.scopedInsts.append(beginBorrowInst)
         }
       case let fullApplySite as FullApplySite:
-        guard analyzedInstructions.readOnlyApplies.contains(where: { $0 == fullApplySite }) else {
-          break
-        }
-        
         // Avoid quadratic complexity in corner cases. Usually, this limit will not be exceeded.
         if readOnlyApplyCounter * analyzedInstructions.loopSideEffects.count < 8000,
-           fullApplySite.isSafeReadOnlyApply(
-             for: analyzedInstructions.loopSideEffects,
-             context.aliasAnalysis,
-             context.calleeAnalysis
-           ) {
+           fullApplySite.isSafeReadOnlyApply(for: analyzedInstructions.loopSideEffects, in: loop, context)
+        {
           if let beginApplyInst = fullApplySite as? BeginApplyInst {
             movableInstructions.scopedInsts.append(beginApplyInst)
           } else {
             movableInstructions.hoistUp.append(fullApplySite)
           }
-          
           readOnlyApplyCounter += 1
         }
       default:
-        break
+        if inst.canBeHoisted(outOf: loop, context) {
+          movableInstructions.hoistUp.append(inst)
+        }
       }
     }
   }
@@ -651,13 +643,10 @@ private extension MovableInstructions {
   /// Only hoists instructions in blocks that dominate all exit and latch blocks.
   /// It doesn't hoist instructions speculatively.
   mutating func hoistInstructions(outOf loop: Loop, _ context: FunctionPassContext) -> Bool {
-    let dominatingBlocks = loop.getBlocksThatDominateAllExitingAndLatchBlocks(context)
     var changed = false
 
-    for bb in dominatingBlocks {
-      for inst in bb.instructions where hoistUp.contains(inst) {
-        changed = inst.hoist(outOf: loop, context) || changed
-      }
+    for hoistableInst in hoistUp {
+      changed = hoistableInst.hoist(outOf: loop, context) || changed
     }
 
     return changed
@@ -665,10 +654,9 @@ private extension MovableInstructions {
 
   /// Sink instructions.
   mutating func sinkInstructions(outOf loop: Loop, _ context: FunctionPassContext) -> Bool {
-    let dominatingBlocks = loop.getBlocksThatDominateAllExitingAndLatchBlocks(context)
     var changed = false
 
-    for inst in sinkDown where dominatingBlocks.contains(inst.parentBlock) {
+    for inst in sinkDown {
       changed = inst.sink(outOf: loop, context) || changed
     }
 
@@ -932,17 +920,6 @@ private extension Instruction {
     switch self {
     case is TermInst, is Allocation, is Deallocation:
       return false
-    case is ApplyInst:
-      switch arraySemanticsCallKind {
-      case .getCount, .getCapacity:
-        if canHoistArraySemanticsCall(to: loop.preheader!.terminator, context) {
-          return true
-        }
-      case .arrayPropsIsNativeTypeChecked:
-        return false
-      default:
-        break
-      }
     default:
       break
     }
@@ -1098,29 +1075,31 @@ private extension LoadInst {
 }
 
 private extension FullApplySite {
-  /// Returns `true` if this apply inst could be safely hoisted.
-  func isSafeReadOnlyApply(_ calleeAnalysis: CalleeAnalysis) -> Bool {
-    guard functionConvention.resultsWithError.allSatisfy({ $0.convention == .unowned }) else {
-      return false
-    }
-
-    if let callee = referencedFunction,
-       callee.hasSemanticsAttribute("array.props.isNativeTypeChecked") {
-      return false
-    }
-
-    return !calleeAnalysis.getSideEffects(ofApply: self).memory.write
-  }
-  
   /// Returns `true` if the `sideEffects` contain any memory writes which
   /// may alias with any memory which is read by this `ApplyInst`.
   /// - Note: This function should only be called on a read-only apply!
   func isSafeReadOnlyApply(
     for sideEffects: StackWithCount<Instruction>,
-    _ aliasAnalysis: AliasAnalysis,
-    _ calleeAnalysis: CalleeAnalysis
+    in loop: Loop,
+    _ context: FunctionPassContext
   ) -> Bool {
-    if calleeAnalysis.getSideEffects(ofApply: self).memory == .noEffects {
+    switch arraySemanticsCallKind {
+    case .getCount, .getCapacity:
+      if canHoistArraySemanticsCall(to: loop.preheader!.terminator, context) {
+        return true
+      }
+    default:
+      break
+    }
+    guard functionConvention.resultsWithError.allSatisfy({ $0.convention == .unowned }) else {
+      return false
+    }
+    if let callee = referencedFunction,
+       callee.hasSemanticsAttribute("array.props.isNativeTypeChecked")
+    {
+      return false
+    }
+    if context.calleeAnalysis.getSideEffects(ofApply: self).memory == .noEffects {
       return true
     }
 
@@ -1129,16 +1108,16 @@ private extension FullApplySite {
       switch sideEffect {
       case let storeInst as StoreInst:
         if storeInst.storeOwnership == .assign ||
-           mayRead(fromAddress: storeInst.destination, aliasAnalysis) {
+           mayRead(fromAddress: storeInst.destination, context.aliasAnalysis) {
           return false
         }
       case let copyAddrInst as CopyAddrInst:
         if !copyAddrInst.isInitializationOfDestination ||
-           mayRead(fromAddress: copyAddrInst.destination, aliasAnalysis) {
+           mayRead(fromAddress: copyAddrInst.destination, context.aliasAnalysis) {
           return false
         }
       case let fullApplySite as FullApplySite:
-        if calleeAnalysis.getSideEffects(ofApply: fullApplySite).memory.write {
+        if context.calleeAnalysis.getSideEffects(ofApply: fullApplySite).memory.write {
           return false
         }
       case is CondFailInst, is StrongRetainInst, is UnmanagedRetainValueInst,

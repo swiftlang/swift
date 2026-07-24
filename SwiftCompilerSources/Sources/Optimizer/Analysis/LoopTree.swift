@@ -80,8 +80,8 @@ struct Loop {
     return loopBlock.successors.contains { !contains(block: $0) }
   }
   
-  func getBlocksThatDominateAllExitingAndLatchBlocks(_ context: FunctionPassContext) -> [BasicBlock] {
-    var result: [BasicBlock] = []
+  func getBlocksThatDominateAllExitingAndLatchBlocks(_ context: FunctionPassContext) -> BasicBlockSet {
+    var result = BasicBlockSet(context)
     var cachedExitingAndLatchBlocks = Stack<BasicBlock>(context)
     var workList = BasicBlockWorklist(context)
     defer {
@@ -99,8 +99,8 @@ struct Loop {
         continue
       }
       
-      result.append(block)
-      
+      result.insert(block)
+
       workList.pushIfNotVisited(contentsOf: context.dominatorTree.getChildren(of: block))
     }
     
