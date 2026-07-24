@@ -564,13 +564,13 @@ sil [ossa] @type_dependent_operand_outside_liverange : $@convention(thin) (@in_g
 
 bb0(%0 : $*any P):
   %1 = load [copy] %0
-  %2 = open_existential_ref %1 to $@opened("093C97B4-11DD-11F1-AC30-1A9AD1B1CD90", any P) Self
+  %2 = open_existential_ref %1 to $@opened(1, any P) Self
   cond_br undef, bb1, bb2
 
 bb1:
-  %4 = alloc_stack $@opened("093C97B4-11DD-11F1-AC30-1A9AD1B1CD90", any P) Self
+  %4 = alloc_stack $@opened(1, any P) Self
   store %2 to [init] %4
-  %6 = apply undef<@opened("093C97B4-11DD-11F1-AC30-1A9AD1B1CD90", any P) Self>(%4) : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in τ_0_0) -> ()
+  %6 = apply undef<@opened(1, any P) Self>(%4) : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in τ_0_0) -> ()
   dealloc_stack %4
   br bb3
 

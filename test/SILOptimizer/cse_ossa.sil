@@ -836,17 +836,17 @@ bb0(%0 : $*Airplane):
 // CHECK-LABEL: } // end sil function '_TF2p28trytoflyFPS_7Flyable_T_'
 sil hidden [ossa] @_TF2p28trytoflyFPS_7Flyable_T_ : $@convention(thin) (@in Flyable) -> () {
 bb0(%0 : $*Flyable):
-  %2 = open_existential_addr immutable_access %0 : $*Flyable to $*@opened("D8A4A5D8-4C44-11E5-BA43-AC87A3294C0A", Flyable) Self
-  %3 = witness_method $@opened("D8A4A5D8-4C44-11E5-BA43-AC87A3294C0A", Flyable) Self, #Flyable.fly, %2 : $*@opened("D8A4A5D8-4C44-11E5-BA43-AC87A3294C0A", Flyable) Self : $@convention(witness_method: Flyable) <τ_0_0 where τ_0_0 : Flyable> (@in_guaranteed τ_0_0) -> ()
-  %4 = apply %3<@opened("D8A4A5D8-4C44-11E5-BA43-AC87A3294C0A", Flyable) Self>(%2) : $@convention(witness_method: Flyable) <τ_0_0 where τ_0_0 : Flyable> (@in_guaranteed τ_0_0) -> ()
-  %5 = open_existential_addr immutable_access %0 : $*Flyable to $*@opened("D8A4B49C-4C44-11E5-BA43-AC87A3294C0A", Flyable) Self
-  %6 = witness_method $@opened("D8A4B49C-4C44-11E5-BA43-AC87A3294C0A", Flyable) Self, #Flyable.fly, %5 : $*@opened("D8A4B49C-4C44-11E5-BA43-AC87A3294C0A", Flyable) Self : $@convention(witness_method: Flyable) <τ_0_0 where τ_0_0 : Flyable> (@in_guaranteed τ_0_0) -> ()
-  %7 = apply %6<@opened("D8A4B49C-4C44-11E5-BA43-AC87A3294C0A", Flyable) Self>(%5) : $@convention(witness_method: Flyable) <τ_0_0 where τ_0_0 : Flyable> (@in_guaranteed τ_0_0) -> ()
-  %8 = open_existential_addr immutable_access %0 : $*Flyable to $*@opened("D8A4BCB2-4C44-11E5-BA43-AC87A3294C0A", Flyable) Self
-  %9 = witness_method $@opened("D8A4BCB2-4C44-11E5-BA43-AC87A3294C0A", Flyable) Self, #Flyable.fly, %8 : $*@opened("D8A4BCB2-4C44-11E5-BA43-AC87A3294C0A", Flyable) Self : $@convention(witness_method: Flyable) <τ_0_0 where τ_0_0 : Flyable> (@in_guaranteed τ_0_0) -> ()
-  %10 = apply %9<@opened("D8A4BCB2-4C44-11E5-BA43-AC87A3294C0A", Flyable) Self>(%8) : $@convention(witness_method: Flyable) <τ_0_0 where τ_0_0 : Flyable> (@in_guaranteed τ_0_0) -> ()
-  %11 = witness_method $@opened("D8A4BCB2-4C44-11E5-BA43-AC87A3294C0A", Flyable) Self, #Flyable.fly, %8 : $*@opened("D8A4BCB2-4C44-11E5-BA43-AC87A3294C0A", Flyable) Self : $@convention(witness_method: Flyable) <τ_0_0 where τ_0_0 : Flyable> (@in_guaranteed τ_0_0) -> ()
-  %12 = apply %9<@opened("D8A4BCB2-4C44-11E5-BA43-AC87A3294C0A", Flyable) Self>(%8) : $@convention(witness_method: Flyable) <τ_0_0 where τ_0_0 : Flyable> (@in_guaranteed τ_0_0) -> ()
+  %2 = open_existential_addr immutable_access %0 : $*Flyable to $*@opened(100, Flyable) Self
+  %3 = witness_method $@opened(100, Flyable) Self, #Flyable.fly, %2 : $*@opened(100, Flyable) Self : $@convention(witness_method: Flyable) <τ_0_0 where τ_0_0 : Flyable> (@in_guaranteed τ_0_0) -> ()
+  %4 = apply %3<@opened(100, Flyable) Self>(%2) : $@convention(witness_method: Flyable) <τ_0_0 where τ_0_0 : Flyable> (@in_guaranteed τ_0_0) -> ()
+  %5 = open_existential_addr immutable_access %0 : $*Flyable to $*@opened(200, Flyable) Self
+  %6 = witness_method $@opened(200, Flyable) Self, #Flyable.fly, %5 : $*@opened(200, Flyable) Self : $@convention(witness_method: Flyable) <τ_0_0 where τ_0_0 : Flyable> (@in_guaranteed τ_0_0) -> ()
+  %7 = apply %6<@opened(200, Flyable) Self>(%5) : $@convention(witness_method: Flyable) <τ_0_0 where τ_0_0 : Flyable> (@in_guaranteed τ_0_0) -> ()
+  %8 = open_existential_addr immutable_access %0 : $*Flyable to $*@opened(300, Flyable) Self
+  %9 = witness_method $@opened(300, Flyable) Self, #Flyable.fly, %8 : $*@opened(300, Flyable) Self : $@convention(witness_method: Flyable) <τ_0_0 where τ_0_0 : Flyable> (@in_guaranteed τ_0_0) -> ()
+  %10 = apply %9<@opened(300, Flyable) Self>(%8) : $@convention(witness_method: Flyable) <τ_0_0 where τ_0_0 : Flyable> (@in_guaranteed τ_0_0) -> ()
+  %11 = witness_method $@opened(300, Flyable) Self, #Flyable.fly, %8 : $*@opened(300, Flyable) Self : $@convention(witness_method: Flyable) <τ_0_0 where τ_0_0 : Flyable> (@in_guaranteed τ_0_0) -> ()
+  %12 = apply %9<@opened(300, Flyable) Self>(%8) : $@convention(witness_method: Flyable) <τ_0_0 where τ_0_0 : Flyable> (@in_guaranteed τ_0_0) -> ()
   destroy_addr %0 : $*Flyable
   %13 = tuple ()
   return %13 : $()
@@ -864,12 +864,12 @@ protocol Pingable { func ping() }
 sil hidden [ossa] @CSE_Existential_Simple : $@convention(thin) (@in Pingable) -> () {
 bb0(%0 : $*Pingable):
   debug_value %0 : $*Pingable, expr op_deref // let x
-  %2 = open_existential_addr immutable_access %0 : $*Pingable to $*@opened("1E467EB8-D5C5-11E5-8C0E-A82066121073", Pingable) Self
-  %3 = witness_method $@opened("1E467EB8-D5C5-11E5-8C0E-A82066121073", Pingable) Self, #Pingable.ping, %2 : $*@opened("1E467EB8-D5C5-11E5-8C0E-A82066121073", Pingable) Self : $@convention(witness_method: Pingable) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> ()
-  %4 = apply %3<@opened("1E467EB8-D5C5-11E5-8C0E-A82066121073", Pingable) Self>(%2) : $@convention(witness_method: Pingable) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> ()
-  %5 = open_existential_addr immutable_access %0 : $*Pingable to $*@opened("1E4687DC-D5C5-11E5-8C0E-A82066121073", Pingable) Self
-  %6 = witness_method $@opened("1E4687DC-D5C5-11E5-8C0E-A82066121073", Pingable) Self, #Pingable.ping, %5 : $*@opened("1E4687DC-D5C5-11E5-8C0E-A82066121073", Pingable) Self : $@convention(witness_method: Pingable) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> ()
-  %7 = apply %6<@opened("1E4687DC-D5C5-11E5-8C0E-A82066121073", Pingable) Self>(%5) : $@convention(witness_method: Pingable) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> ()
+  %2 = open_existential_addr immutable_access %0 : $*Pingable to $*@opened(1, Pingable) Self
+  %3 = witness_method $@opened(1, Pingable) Self, #Pingable.ping, %2 : $*@opened(1, Pingable) Self : $@convention(witness_method: Pingable) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> ()
+  %4 = apply %3<@opened(1, Pingable) Self>(%2) : $@convention(witness_method: Pingable) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> ()
+  %5 = open_existential_addr immutable_access %0 : $*Pingable to $*@opened(2, Pingable) Self
+  %6 = witness_method $@opened(2, Pingable) Self, #Pingable.ping, %5 : $*@opened(2, Pingable) Self : $@convention(witness_method: Pingable) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> ()
+  %7 = apply %6<@opened(2, Pingable) Self>(%5) : $@convention(witness_method: Pingable) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> ()
   destroy_addr %0 : $*Pingable
   %9 = tuple ()
   return %9 : $()
@@ -879,30 +879,30 @@ sil hidden [ossa] @CSE_Existential_Calls_With_Control_Flow : $@convention(thin) 
 bb0(%0 : $*Pingable, %1 : $Int):
   debug_value %0 : $*Pingable, expr op_deref // let x
   debug_value %1 : $Int  // let y
-  %4 = open_existential_addr immutable_access %0 : $*Pingable to $*@opened("75F1B81A-D6CB-11E5-9470-A82066121073", Pingable) Self
-  %5 = witness_method $@opened("75F1B81A-D6CB-11E5-9470-A82066121073", Pingable) Self, #Pingable.ping, %4 : $*@opened("75F1B81A-D6CB-11E5-9470-A82066121073", Pingable) Self : $@convention(witness_method: Pingable) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> ()
+  %4 = open_existential_addr immutable_access %0 : $*Pingable to $*@opened(3, Pingable) Self
+  %5 = witness_method $@opened(3, Pingable) Self, #Pingable.ping, %4 : $*@opened(3, Pingable) Self : $@convention(witness_method: Pingable) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> ()
 
-    %6 = apply %5<@opened("75F1B81A-D6CB-11E5-9470-A82066121073", Pingable) Self>(%4) : $@convention(witness_method: Pingable) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> ()
+    %6 = apply %5<@opened(3, Pingable) Self>(%4) : $@convention(witness_method: Pingable) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> ()
   %7 = integer_literal $Builtin.Int64, 3
   %8 = integer_literal $Builtin.Int64, 3
   %9 = builtin "cmp_sgt_Int64"(%8 : $Builtin.Int64, %7 : $Builtin.Int64) : $Builtin.Int1
   cond_br %9, bb1, bb2
 
 bb1:
-  %11 = open_existential_addr immutable_access %0 : $*Pingable to $*@opened("75F1F3AC-D6CB-11E5-9470-A82066121073", Pingable) Self
-  %12 = witness_method $@opened("75F1F3AC-D6CB-11E5-9470-A82066121073", Pingable) Self, #Pingable.ping, %11 : $*@opened("75F1F3AC-D6CB-11E5-9470-A82066121073", Pingable) Self : $@convention(witness_method: Pingable) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> ()
+  %11 = open_existential_addr immutable_access %0 : $*Pingable to $*@opened(4, Pingable) Self
+  %12 = witness_method $@opened(4, Pingable) Self, #Pingable.ping, %11 : $*@opened(4, Pingable) Self : $@convention(witness_method: Pingable) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> ()
 
-    %13 = apply %12<@opened("75F1F3AC-D6CB-11E5-9470-A82066121073", Pingable) Self>(%11) : $@convention(witness_method: Pingable) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> ()
+    %13 = apply %12<@opened(4, Pingable) Self>(%11) : $@convention(witness_method: Pingable) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> ()
   br bb3
 
 bb2:
   br bb3
 
 bb3:
-  %15 = open_existential_addr immutable_access %0 : $*Pingable to $*@opened("75F1F5C8-D6CB-11E5-9470-A82066121073", Pingable) Self
-  %16 = witness_method $@opened("75F1F5C8-D6CB-11E5-9470-A82066121073", Pingable) Self, #Pingable.ping, %15 : $*@opened("75F1F5C8-D6CB-11E5-9470-A82066121073", Pingable) Self : $@convention(witness_method: Pingable) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> ()
+  %15 = open_existential_addr immutable_access %0 : $*Pingable to $*@opened(5, Pingable) Self
+  %16 = witness_method $@opened(5, Pingable) Self, #Pingable.ping, %15 : $*@opened(5, Pingable) Self : $@convention(witness_method: Pingable) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> ()
 
-    %17 = apply %16<@opened("75F1F5C8-D6CB-11E5-9470-A82066121073", Pingable) Self>(%15) : $@convention(witness_method: Pingable) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> ()
+    %17 = apply %16<@opened(5, Pingable) Self>(%15) : $@convention(witness_method: Pingable) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> ()
   destroy_addr %0 : $*Pingable
   %19 = tuple ()
 
@@ -937,11 +937,11 @@ protocol Proto : AnyObject {
 // CHECK-LABEL: } // end sil function 'dont_cse_open_existential_ref'
 sil [ossa] @dont_cse_open_existential_ref : $@convention(thin) (@guaranteed Proto & Ping) -> @owned Ping {
 bb0(%0 : @guaranteed $Proto & Ping):
-  %4 = open_existential_ref %0 : $Proto & Ping to $@opened("1B68354A-4796-11E6-B7DF-B8E856428C60", Proto) Self
-  %5 = witness_method $@opened("1B68354A-4796-11E6-B7DF-B8E856428C60", Proto) Self, #Proto.doThis, %4 : $@opened("1B68354A-4796-11E6-B7DF-B8E856428C60", Proto) Self : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
-  %6 = apply %5<@opened("1B68354A-4796-11E6-B7DF-B8E856428C60", Proto) Self>(%4) : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
-  %9 = open_existential_ref %0 : $Proto & Ping to $@opened("3C038746-BE69-11E7-A5C1-685B35C48C83", Proto & Ping) Self
-  %10 = upcast %9 : $@opened("3C038746-BE69-11E7-A5C1-685B35C48C83", Proto & Ping) Self to $Ping
+  %4 = open_existential_ref %0 : $Proto & Ping to $@opened(6, Proto) Self
+  %5 = witness_method $@opened(6, Proto) Self, #Proto.doThis, %4 : $@opened(6, Proto) Self : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
+  %6 = apply %5<@opened(6, Proto) Self>(%4) : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
+  %9 = open_existential_ref %0 : $Proto & Ping to $@opened(7, Proto & Ping) Self
+  %10 = upcast %9 : $@opened(7, Proto & Ping) Self to $Ping
   %11 = class_method %10 : $Ping, #Ping.ping : (Ping) -> () -> Ping, $@convention(method) (@guaranteed Ping) -> @owned Ping
   %12 = apply %11(%10) : $@convention(method) (@guaranteed Ping) -> @owned Ping
   return %12 : $Ping
@@ -961,12 +961,12 @@ bb0(%0 : @guaranteed $Proto & Ping):
 // CHECK-LABEL: } // end sil function 'cse_open_existential_ref_guaranteed'
 sil [ossa] @cse_open_existential_ref_guaranteed : $@convention(thin) (@guaranteed Proto) -> () {
 bb0(%0 : @guaranteed $Proto):
-  %1 = open_existential_ref %0 : $Proto to $@opened("1B68354A-4796-11E6-B7DF-B8E856428C61", Proto) Self
-  %2 = witness_method $@opened("1B68354A-4796-11E6-B7DF-B8E856428C61", Proto) Self, #Proto.doThis, %1 : $@opened("1B68354A-4796-11E6-B7DF-B8E856428C61", Proto) Self : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
-  %3 = apply %2<@opened("1B68354A-4796-11E6-B7DF-B8E856428C61", Proto) Self>(%1) : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
-  %4 = open_existential_ref %0 : $Proto to $@opened("2C68354A-4796-11E6-B7DF-B8E856428C62", Proto) Self
-  %5 = witness_method $@opened("2C68354A-4796-11E6-B7DF-B8E856428C62", Proto) Self, #Proto.doThat, %4 : $@opened("2C68354A-4796-11E6-B7DF-B8E856428C62", Proto) Self : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
-  %6 = apply %5<@opened("2C68354A-4796-11E6-B7DF-B8E856428C62", Proto) Self>(%4) : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
+  %1 = open_existential_ref %0 : $Proto to $@opened(8, Proto) Self
+  %2 = witness_method $@opened(8, Proto) Self, #Proto.doThis, %1 : $@opened(8, Proto) Self : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
+  %3 = apply %2<@opened(8, Proto) Self>(%1) : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
+  %4 = open_existential_ref %0 : $Proto to $@opened(9, Proto) Self
+  %5 = witness_method $@opened(9, Proto) Self, #Proto.doThat, %4 : $@opened(9, Proto) Self : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
+  %6 = apply %5<@opened(9, Proto) Self>(%4) : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
   %7 = tuple ()
   return %7 : $()
 }
@@ -989,19 +989,19 @@ bb0(%0 : @guaranteed $Proto):
 // CHECK-LABEL: } // end sil function 'cse_open_existential_ref_blockarg'
 sil [ossa] @cse_open_existential_ref_blockarg : $@convention(thin) (@guaranteed Proto, Builtin.Int1) -> () {
 bb0(%0 : @guaranteed $Proto, %f : $Builtin.Int1):
-  %1 = open_existential_ref %0 : $Proto to $@opened("5B68354A-4796-11E6-B7DF-B8E856428C65", Proto) Self
-  %2 = witness_method $@opened("5B68354A-4796-11E6-B7DF-B8E856428C65", Proto) Self, #Proto.doThis, %1 : $@opened("5B68354A-4796-11E6-B7DF-B8E856428C65", Proto) Self : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
-  %3 = apply %2<@opened("5B68354A-4796-11E6-B7DF-B8E856428C65", Proto) Self>(%1) : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
+  %1 = open_existential_ref %0 : $Proto to $@opened(10, Proto) Self
+  %2 = witness_method $@opened(10, Proto) Self, #Proto.doThis, %1 : $@opened(10, Proto) Self : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
+  %3 = apply %2<@opened(10, Proto) Self>(%1) : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
   br bb1
 
 bb1:
-  %8 = open_existential_ref %0 : $Proto to $@opened("6B68354A-4796-11E6-B7DF-B8E856428C66", Proto) Self
-  br bb2(%8 : $@opened("6B68354A-4796-11E6-B7DF-B8E856428C66", Proto) Self)
+  %8 = open_existential_ref %0 : $Proto to $@opened(11, Proto) Self
+  br bb2(%8 : $@opened(11, Proto) Self)
 
-bb2(%9 : @guaranteed $@opened("6B68354A-4796-11E6-B7DF-B8E856428C66", Proto) Self):
+bb2(%9 : @guaranteed $@opened(11, Proto) Self):
   %9b = borrowed %9 from (%0)
-  %10 = witness_method $@opened("6B68354A-4796-11E6-B7DF-B8E856428C66", Proto) Self, #Proto.doThat, %9b : $@opened("6B68354A-4796-11E6-B7DF-B8E856428C66", Proto) Self : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
-  %11 = apply %10<@opened("6B68354A-4796-11E6-B7DF-B8E856428C66", Proto) Self>(%9b) : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
+  %10 = witness_method $@opened(11, Proto) Self, #Proto.doThat, %9b : $@opened(11, Proto) Self : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
+  %11 = apply %10<@opened(11, Proto) Self>(%9b) : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
   %15 = tuple ()
   return %15 : $()
 }
@@ -1017,14 +1017,14 @@ bb2(%9 : @guaranteed $@opened("6B68354A-4796-11E6-B7DF-B8E856428C66", Proto) Sel
 sil [ossa] @dont_cse_open_existential_ref_owned : $@convention(thin) (@owned Proto) -> () {
 bb0(%0 : @owned $Proto):
   %1 = copy_value %0 : $Proto
-  %2 = open_existential_ref %0 : $Proto to $@opened("3B68354A-4796-11E6-B7DF-B8E856428C63", Proto) Self
-  %3 = witness_method $@opened("3B68354A-4796-11E6-B7DF-B8E856428C63", Proto) Self, #Proto.doThis, %2 : $@opened("3B68354A-4796-11E6-B7DF-B8E856428C63", Proto) Self : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
-  %4 = apply %3<@opened("3B68354A-4796-11E6-B7DF-B8E856428C63", Proto) Self>(%2) : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
-  destroy_value %2 : $@opened("3B68354A-4796-11E6-B7DF-B8E856428C63", Proto) Self
-  %6 = open_existential_ref %1 : $Proto to $@opened("4B68354A-4796-11E6-B7DF-B8E856428C64", Proto) Self
-  %7 = witness_method $@opened("4B68354A-4796-11E6-B7DF-B8E856428C64", Proto) Self, #Proto.doThat, %6 : $@opened("4B68354A-4796-11E6-B7DF-B8E856428C64", Proto) Self : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
-  %8 = apply %7<@opened("4B68354A-4796-11E6-B7DF-B8E856428C64", Proto) Self>(%6) : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
-  destroy_value %6 : $@opened("4B68354A-4796-11E6-B7DF-B8E856428C64", Proto) Self
+  %2 = open_existential_ref %0 : $Proto to $@opened(12, Proto) Self
+  %3 = witness_method $@opened(12, Proto) Self, #Proto.doThis, %2 : $@opened(12, Proto) Self : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
+  %4 = apply %3<@opened(12, Proto) Self>(%2) : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
+  destroy_value %2 : $@opened(12, Proto) Self
+  %6 = open_existential_ref %1 : $Proto to $@opened(13, Proto) Self
+  %7 = witness_method $@opened(13, Proto) Self, #Proto.doThat, %6 : $@opened(13, Proto) Self : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
+  %8 = apply %7<@opened(13, Proto) Self>(%6) : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
+  destroy_value %6 : $@opened(13, Proto) Self
   %10 = tuple ()
   return %10 : $()
 }
@@ -1049,12 +1049,12 @@ bb0(%0 : @owned $Proto):
 sil [ossa] @cse_open_existential_ref_identity : $@convention(thin) (@guaranteed Proto) -> () {
 bb0(%0 : @guaranteed $Proto):
   %b = begin_borrow %0
-  %1 = open_existential_ref %b : $Proto to $@opened("7B68354A-4796-11E6-B7DF-B8E856428C67", Proto) Self
-  %2 = copy_value %1 : $@opened("7B68354A-4796-11E6-B7DF-B8E856428C67", Proto) Self
-  %3 = init_existential_ref %2 : $@opened("7B68354A-4796-11E6-B7DF-B8E856428C67", Proto) Self : $@opened("7B68354A-4796-11E6-B7DF-B8E856428C67", Proto) Self, $AnyObject
-  %4 = open_existential_ref %b : $Proto to $@opened("8B68354A-4796-11E6-B7DF-B8E856428C68", Proto) Self
-  %5 = copy_value %4 : $@opened("8B68354A-4796-11E6-B7DF-B8E856428C68", Proto) Self
-  %6 = init_existential_ref %5 : $@opened("8B68354A-4796-11E6-B7DF-B8E856428C68", Proto) Self : $@opened("8B68354A-4796-11E6-B7DF-B8E856428C68", Proto) Self, $AnyObject
+  %1 = open_existential_ref %b : $Proto to $@opened(13, Proto) Self
+  %2 = copy_value %1 : $@opened(13, Proto) Self
+  %3 = init_existential_ref %2 : $@opened(13, Proto) Self : $@opened(13, Proto) Self, $AnyObject
+  %4 = open_existential_ref %b : $Proto to $@opened(14, Proto) Self
+  %5 = copy_value %4 : $@opened(14, Proto) Self
+  %6 = init_existential_ref %5 : $@opened(14, Proto) Self : $@opened(14, Proto) Self, $AnyObject
   end_borrow %b
   destroy_value %3 : $AnyObject
   destroy_value %6 : $AnyObject
@@ -1081,17 +1081,17 @@ bb0(%0 : @guaranteed $Proto):
 // CHECK-LABEL: } // end sil function 'cse_open_existential_ref_copy_value'
 sil [ossa] @cse_open_existential_ref_copy_value : $@convention(thin) (@guaranteed Proto) -> () {
 bb0(%0 : @guaranteed $Proto):
-  %1 = open_existential_ref %0 : $Proto to $@opened("7B68354A-4796-11E6-B7DF-B8E856428C67", Proto) Self
-  %2 = witness_method $@opened("7B68354A-4796-11E6-B7DF-B8E856428C67", Proto) Self, #Proto.doThis, %1 : $@opened("7B68354A-4796-11E6-B7DF-B8E856428C67", Proto) Self : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
-  %3 = apply %2<@opened("7B68354A-4796-11E6-B7DF-B8E856428C67", Proto) Self>(%1) : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
+  %1 = open_existential_ref %0 : $Proto to $@opened(15, Proto) Self
+  %2 = witness_method $@opened(15, Proto) Self, #Proto.doThis, %1 : $@opened(15, Proto) Self : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
+  %3 = apply %2<@opened(15, Proto) Self>(%1) : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
   br bb1
 
 bb1:
-  %5 = open_existential_ref %0 : $Proto to $@opened("8B68354A-4796-11E6-B7DF-B8E856428C68", Proto) Self
-  %6 = copy_value %5 : $@opened("8B68354A-4796-11E6-B7DF-B8E856428C68", Proto) Self
-  %7 = witness_method $@opened("8B68354A-4796-11E6-B7DF-B8E856428C68", Proto) Self, #Proto.doThat, %5 : $@opened("8B68354A-4796-11E6-B7DF-B8E856428C68", Proto) Self : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
-  %8 = apply %7<@opened("8B68354A-4796-11E6-B7DF-B8E856428C68", Proto) Self>(%6) : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
-  destroy_value %6 : $@opened("8B68354A-4796-11E6-B7DF-B8E856428C68", Proto) Self
+  %5 = open_existential_ref %0 : $Proto to $@opened(16, Proto) Self
+  %6 = copy_value %5 : $@opened(16, Proto) Self
+  %7 = witness_method $@opened(16, Proto) Self, #Proto.doThat, %5 : $@opened(16, Proto) Self : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
+  %8 = apply %7<@opened(16, Proto) Self>(%6) : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
+  destroy_value %6 : $@opened(16, Proto) Self
   %10 = tuple ()
   return %10 : $()
 }
@@ -1115,18 +1115,18 @@ bb1:
 // CHECK-LABEL: } // end sil function 'cse_open_existential_ref_blockarg_implicit_borrow'
 sil [ossa] @cse_open_existential_ref_blockarg_implicit_borrow : $@convention(thin) (@guaranteed Proto) -> () {
 bb0(%0 : @guaranteed $Proto):
-  %1 = open_existential_ref %0 : $Proto to $@opened("9B68354A-4796-11E6-B7DF-B8E856428C69", Proto) Self
-  %2 = witness_method $@opened("9B68354A-4796-11E6-B7DF-B8E856428C69", Proto) Self, #Proto.doThis, %1 : $@opened("9B68354A-4796-11E6-B7DF-B8E856428C69", Proto) Self : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
-  %3 = apply %2<@opened("9B68354A-4796-11E6-B7DF-B8E856428C69", Proto) Self>(%1) : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
+  %1 = open_existential_ref %0 : $Proto to $@opened(17, Proto) Self
+  %2 = witness_method $@opened(17, Proto) Self, #Proto.doThis, %1 : $@opened(17, Proto) Self : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
+  %3 = apply %2<@opened(17, Proto) Self>(%1) : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
   br bb1
 
 bb1:
-  %8 = open_existential_ref %0 : $Proto to $@opened("AB68354A-4796-11E6-B7DF-B8E856428C6A", Proto) Self
-  br bb2(%8 : $@opened("AB68354A-4796-11E6-B7DF-B8E856428C6A", Proto) Self)
+  %8 = open_existential_ref %0 : $Proto to $@opened(18, Proto) Self
+  br bb2(%8 : $@opened(18, Proto) Self)
 
-bb2(%9 : @guaranteed $@opened("AB68354A-4796-11E6-B7DF-B8E856428C6A", Proto) Self):
-  %10 = witness_method $@opened("AB68354A-4796-11E6-B7DF-B8E856428C6A", Proto) Self, #Proto.doThat, %9 : $@opened("AB68354A-4796-11E6-B7DF-B8E856428C6A", Proto) Self : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
-  %11 = apply %10<@opened("AB68354A-4796-11E6-B7DF-B8E856428C6A", Proto) Self>(%9) : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
+bb2(%9 : @guaranteed $@opened(18, Proto) Self):
+  %10 = witness_method $@opened(18, Proto) Self, #Proto.doThat, %9 : $@opened(18, Proto) Self : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
+  %11 = apply %10<@opened(18, Proto) Self>(%9) : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
   %15 = tuple ()
   return %15 : $()
 }
@@ -1584,19 +1584,19 @@ protocol P : Identifiable where Self.ID : Q {}
 // The second open_existential_addr must not be eliminated.
 sil [ossa] @test_cse_open_existential_addr : $@convention(thin) (@in_guaranteed any P) -> () {
 bb0(%0 : $*any P):
-  %1 = open_existential_addr immutable_access %0 to $*@opened("00000000-0000-0000-0000-000000000001", any P) Self
+  %1 = open_existential_addr immutable_access %0 to $*@opened(20, any P) Self
   %2 = alloc_stack $any Hashable & Q
-  %3 = witness_method $@opened("00000000-0000-0000-0000-000000000001", any P) Self, #Identifiable.id!getter : <Self where Self : Identifiable> (Self) -> () -> Self.ID, %1 : $*@opened("00000000-0000-0000-0000-000000000001", any P) Self : $@convention(witness_method: Identifiable) <τ_0_0 where τ_0_0 : Identifiable> (@in_guaranteed τ_0_0) -> @out τ_0_0.ID
-  %4 = init_existential_addr %2, $(@opened("00000000-0000-0000-0000-000000000001", any P) Self).ID
-  %5 = apply %3<@opened("00000000-0000-0000-0000-000000000001", any P) Self>(%4, %1) : $@convention(witness_method: Identifiable) <τ_0_0 where τ_0_0 : Identifiable> (@in_guaranteed τ_0_0) -> @out τ_0_0.ID
+  %3 = witness_method $@opened(20, any P) Self, #Identifiable.id!getter : <Self where Self : Identifiable> (Self) -> () -> Self.ID, %1 : $*@opened(20, any P) Self : $@convention(witness_method: Identifiable) <τ_0_0 where τ_0_0 : Identifiable> (@in_guaranteed τ_0_0) -> @out τ_0_0.ID
+  %4 = init_existential_addr %2, $(@opened(20, any P) Self).ID
+  %5 = apply %3<@opened(20, any P) Self>(%4, %1) : $@convention(witness_method: Identifiable) <τ_0_0 where τ_0_0 : Identifiable> (@in_guaranteed τ_0_0) -> @out τ_0_0.ID
   destroy_addr %2
   dealloc_stack %2
 
-  %8 = open_existential_addr immutable_access %0 to $*@opened("00000000-0000-0000-0000-000000000002", any P) Self
+  %8 = open_existential_addr immutable_access %0 to $*@opened(21, any P) Self
   %9 = alloc_stack $any Hashable & Q
-  %10 = witness_method $@opened("00000000-0000-0000-0000-000000000002", any P) Self, #Identifiable.id!getter : <Self where Self : Identifiable> (Self) -> () -> Self.ID, %8 : $*@opened("00000000-0000-0000-0000-000000000002", any P) Self : $@convention(witness_method: Identifiable) <τ_0_0 where τ_0_0 : Identifiable> (@in_guaranteed τ_0_0) -> @out τ_0_0.ID
-  %11 = init_existential_addr %9, $(@opened("00000000-0000-0000-0000-000000000002", any P) Self).ID
-  %12 = apply %10<@opened("00000000-0000-0000-0000-000000000002", any P) Self>(%11, %8) : $@convention(witness_method: Identifiable) <τ_0_0 where τ_0_0 : Identifiable> (@in_guaranteed τ_0_0) -> @out τ_0_0.ID
+  %10 = witness_method $@opened(21, any P) Self, #Identifiable.id!getter : <Self where Self : Identifiable> (Self) -> () -> Self.ID, %8 : $*@opened(21, any P) Self : $@convention(witness_method: Identifiable) <τ_0_0 where τ_0_0 : Identifiable> (@in_guaranteed τ_0_0) -> @out τ_0_0.ID
+  %11 = init_existential_addr %9, $(@opened(21, any P) Self).ID
+  %12 = apply %10<@opened(21, any P) Self>(%11, %8) : $@convention(witness_method: Identifiable) <τ_0_0 where τ_0_0 : Identifiable> (@in_guaranteed τ_0_0) -> @out τ_0_0.ID
   destroy_addr %9
   dealloc_stack %9
 

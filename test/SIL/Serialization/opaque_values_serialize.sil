@@ -38,7 +38,7 @@ bb0(%0 : $T):
 // CHECK-LABEL: } // end sil function 'openExistentialBoxValue'
 sil [serialized] @openExistentialBoxValue : $@convention(thin) (@in Error) -> () {
 bb0(%0 : $Error):
-  %o = open_existential_box_value %0 : $Error to $@opened("2E9EACA6-FD59-11E6-B016-685B3593C495", Error) Self
+  %o = open_existential_box_value %0 : $Error to $@opened(1, Error) Self
   %t = tuple ()
   return %t : $()
 }
@@ -49,7 +49,7 @@ bb0(%0 : $Error):
 // CHECK-LABEL: } // end sil function 'openExistentialValue'
 sil [serialized] @openExistentialValue : $@convention(thin) (@in Foo) -> () {
 bb0(%0 : $Foo):
-  %o = open_existential_value %0 : $Foo to $@opened("2E9EACA6-FD59-11E6-B016-685B3593C496", Foo) Self
+  %o = open_existential_value %0 : $Foo to $@opened(2, Foo) Self
   %t = tuple ()
   return %t : $()
 }
@@ -113,8 +113,8 @@ entry(%tuple_addr : $*(repeat each T)):
   %tuple = load_borrow %tuple_addr : $*(repeat each T)
   %zero = integer_literal $Builtin.Word, 0
   %index = dynamic_pack_index %zero of $Pack{repeat each T}
-  %opened = open_pack_element %index of <each U_1> at <Pack{repeat each T}>, shape $U_1, uuid "00000000-0000-0000-0000-000000000000"
-  %elt = tuple_pack_extract %index of %tuple : $(repeat each T) as $@pack_element("00000000-0000-0000-0000-000000000000") U_1
+  %opened = open_pack_element %index of <each U_1> at <Pack{repeat each T}>, shape $U_1, id 3
+  %elt = tuple_pack_extract %index of %tuple : $(repeat each T) as $@pack_element(3) U_1
   end_borrow %tuple : $(repeat each T)
   %retval = tuple ()
   return %retval : $()

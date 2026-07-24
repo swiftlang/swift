@@ -4123,8 +4123,8 @@ CanTypeWrapper<ElementArchetypeType> ElementArchetypeType::getNew(
       environment, interfaceType, conformsTo, superclass, layout));
 }
 
-UUID ElementArchetypeType::getOpenedElementID() const {
-  return getGenericEnvironment()->getOpenedElementUUID();
+uint64_t ElementArchetypeType::getOpenedElementID() const {
+  return getGenericEnvironment()->getOpenedElementID();
 }
 
 CanExistentialType CanExistentialType::get(CanType constraint) {

@@ -790,13 +790,6 @@ class SILPrinter : public SILInstructionVisitor<SILPrinter> {
   SIMPLE_PRINTER(ActorIsolation)
 #undef SIMPLE_PRINTER
 
-  SILPrinter &operator<<(UUID value) {
-    llvm::SmallString<UUID::StringBufferSize> str;
-    ASTPrinter::getUUIDStringForPrinting(value, str);
-    PrintState.OS << str;
-    return *this;
-  }
-
   SILPrinter &operator<<(SILValuePrinterInfo i) {
     SILColor C(PrintState.OS, SC_Type);
     *this << i.ValueID;
@@ -2891,7 +2884,7 @@ public:
       subs.getGenericSignature()->getSugaredType(
         env->getOpenedElementShapeClass());
     *this << ", shape $" << sugaredShapeClass
-          << ", uuid \"" << env->getOpenedElementUUID() << "\"";
+          << ", id " << env->getOpenedElementID();
   }
   void visitPackElementGetInst(PackElementGetInst *I) {
     *this << Ctx.getID(I->getIndex()) << " of "

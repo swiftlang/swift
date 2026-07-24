@@ -138,7 +138,7 @@ bb0(%0 : @owned $C):
 // CHECK:       } // end sil function 'open_existential_ref'
 sil [ossa] @open_existential_ref : $@convention(thin) (@owned any P) -> () {
 bb0(%0 : @owned $any P):
-  %1 = open_existential_ref %0 to $@opened("01234567-89ab-cdef-0123-000000000001", P) Self
+  %1 = open_existential_ref %0 to $@opened(1, P) Self
   end_lifetime %1
   %r = tuple ()
   return %r

@@ -162,20 +162,20 @@ protocol P {
 // CHECK:         dealloc_stack [[BUF]]
 sil @test6 : $@convention(thin) (@thick any P.Type) -> () {
 bb0(%0 : $@thick any P.Type):
-  %1 = open_existential_metatype %0 to $@thick (@opened("00000000-0000-0000-0000-000000000000", any P) Self).Type
-  %2 = witness_method $@opened("00000000-0000-0000-0000-000000000000", any P) Self, #P.makeBigArc : <Self: P> (Self.Type) -> () -> OneArcGen<Self> : $@convention(witness_method : P) <Self: P> (@thick Self.Type) -> @owned OneArcGen<Self>
-  %3 = apply %2<@opened("00000000-0000-0000-0000-000000000000", any P) Self>(%1) : $@convention(witness_method : P) <Self: P> (@thick Self.Type) -> @owned OneArcGen<Self>
+  %1 = open_existential_metatype %0 to $@thick (@opened(1, any P) Self).Type
+  %2 = witness_method $@opened(1, any P) Self, #P.makeBigArc : <Self: P> (Self.Type) -> () -> OneArcGen<Self> : $@convention(witness_method : P) <Self: P> (@thick Self.Type) -> @owned OneArcGen<Self>
+  %3 = apply %2<@opened(1, any P) Self>(%1) : $@convention(witness_method : P) <Self: P> (@thick Self.Type) -> @owned OneArcGen<Self>
 
   retain_value %3
   retain_value %3
   retain_value %3
   retain_value %3
 
-  %8 = struct $BigArcGen<@opened("00000000-0000-0000-0000-000000000000", any P) Self>(%3, %3, %3, %3, %3)
+  %8 = struct $BigArcGen<@opened(1, any P) Self>(%3, %3, %3, %3, %3)
   %9 = make_borrow %8
-  %10 = struct $Ref<BigArcGen<@opened("00000000-0000-0000-0000-000000000000", any P) Self>> (%9)
+  %10 = struct $Ref<BigArcGen<@opened(1, any P) Self>> (%9)
   %11 = function_ref @takeBorrowBigArcGen : $@convention(thin) <T> (@guaranteed Ref<BigArcGen<T>>) -> ()
-  %12 = apply %11<@opened("00000000-0000-0000-0000-000000000000", any P) Self>(%10) : $@convention(thin) <T> (@guaranteed Ref<BigArcGen<T>>) -> ()
+  %12 = apply %11<@opened(1, any P) Self>(%10) : $@convention(thin) <T> (@guaranteed Ref<BigArcGen<T>>) -> ()
   release_value %8
   %14 = tuple ()
   return %14
@@ -209,9 +209,9 @@ bb0(%0 : $@thick any P.Type, %1 : $Builtin.Int1):
   cond_br %1, bb1, bb3
 
 bb1:
-  %3 = open_existential_metatype %0 to $@thick (@opened("00000001-0000-0000-0000-000000010000", any P) Self).Type
-  %4 = witness_method $@opened("00000001-0000-0000-0000-000000010000", any P) Self, #P.makeBigArc : <Self: P> (Self.Type) -> () -> OneArcGen<Self> : $@convention(witness_method : P) <Self: P> (@thick Self.Type) -> @owned OneArcGen<Self>
-  %5 = apply %4<@opened("00000001-0000-0000-0000-000000010000", any P) Self>(%3) : $@convention(witness_method : P) <Self: P> (@thick Self.Type) -> @owned OneArcGen<Self>
+  %3 = open_existential_metatype %0 to $@thick (@opened(2, any P) Self).Type
+  %4 = witness_method $@opened(2, any P) Self, #P.makeBigArc : <Self: P> (Self.Type) -> () -> OneArcGen<Self> : $@convention(witness_method : P) <Self: P> (@thick Self.Type) -> @owned OneArcGen<Self>
+  %5 = apply %4<@opened(2, any P) Self>(%3) : $@convention(witness_method : P) <Self: P> (@thick Self.Type) -> @owned OneArcGen<Self>
   br bb2
 
 bb2:
@@ -220,11 +220,11 @@ bb2:
   retain_value %5
   retain_value %5
 
-  %10 = struct $BigArcGen<@opened("00000001-0000-0000-0000-000000010000", any P) Self>(%5, %5, %5, %5, %5)
+  %10 = struct $BigArcGen<@opened(2, any P) Self>(%5, %5, %5, %5, %5)
   %11 = make_borrow %10
-  %12 = struct $Ref<BigArcGen<@opened("00000001-0000-0000-0000-000000010000", any P) Self>> (%11)
+  %12 = struct $Ref<BigArcGen<@opened(2, any P) Self>> (%11)
   %13 = function_ref @takeBorrowBigArcGen : $@convention(thin) <T> (@guaranteed Ref<BigArcGen<T>>) -> ()
-  %14 = apply %13<@opened("00000001-0000-0000-0000-000000010000", any P) Self>(%12) : $@convention(thin) <T> (@guaranteed Ref<BigArcGen<T>>) -> ()
+  %14 = apply %13<@opened(2, any P) Self>(%12) : $@convention(thin) <T> (@guaranteed Ref<BigArcGen<T>>) -> ()
   release_value %10
   br bb4
 

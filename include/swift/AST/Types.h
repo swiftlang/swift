@@ -37,7 +37,6 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/InlineBitfield.h"
-#include "swift/Basic/UUID.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/DenseSet.h"
@@ -7544,7 +7543,7 @@ class ElementArchetypeType final : public LocalArchetypeType,
 
 public:
   /// Retrieve the ID number of this opened element.
-  UUID getOpenedElementID() const;
+  uint64_t getOpenedElementID() const;
 
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::ElementArchetype;

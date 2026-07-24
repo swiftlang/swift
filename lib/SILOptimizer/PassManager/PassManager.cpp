@@ -805,7 +805,10 @@ void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
 
     llvm::raw_ostream &os = getSILPrintPassMD5Stream();
     dumpPassInfo("MD5", TransIdx, F, /*skipNewline=*/ true, os);
-    os << " = " << result << "\n";
+
+    llvm::SmallVector<char, 32> hexStr;
+    llvm::MD5::stringifyResult(result, hexStr);
+    os << " = " << StringRef(hexStr.begin(), 32) << "\n";
   }
 
   if (numRepeats > 1)
@@ -1012,7 +1015,10 @@ void SILPassManager::runModulePass(unsigned TransIdx) {
 
     llvm::raw_ostream &os = getSILPrintPassMD5Stream();
     dumpPassInfo("MD5", TransIdx, /*function=*/ nullptr, /*skipNewline=*/ true, os);
-    os << " = " << result << "\n";
+
+    llvm::SmallVector<char, 32> hexStr;
+    llvm::MD5::stringifyResult(result, hexStr);
+    os << " = " << StringRef(hexStr.begin(), 32) << "\n";
   }
 
   // If this pass invalidated anything, print and verify.
@@ -1088,9 +1094,11 @@ void SILPassManager::execute() {
     Mod->print(md5Stream);
     llvm::MD5::MD5Result result;
     md5Stream.final(result);
+    llvm::SmallVector<char, 32> hexStr;
+    llvm::MD5::stringifyResult(result, hexStr);
 
     getSILPrintPassMD5Stream()
-        << "Initial " << StageName << " MD5 = " << result << "\n";
+        << "Initial " << StageName << " MD5 = " << StringRef(hexStr.begin(), 32) << "\n";
   }
 
   // Run the transforms by alternating between function transforms and
