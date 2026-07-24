@@ -304,6 +304,30 @@ void * EMBEDDED_SWIFT_NULLABLE _swift_typedAllocate(
     __swift_size_t size, __swift_size_t alignment, swift_alloc_flags_t flags, __swift_typeid_t typeId);
 
 /**
+ * Deallocates the memory referenced by `ptr` with a given type
+ *
+ * - Parameters:
+ *   - ptr: The pointer to be deallocated. If it is NULL, the operation does
+ *     nothing.
+ *   - alignment: The minimum alignment of the resulting pointer, which must
+ *     be a power of at least as large as `sizeof(void *)`, or be zero to
+ *     indicate that the alignment is not known.
+ *   - size: The number of allocated bytes, which may be -1 if it is not
+ *     known.
+ *   - flags: Flags to control the behavior of the deallocation.
+ *   - typeId: An identifier used by a typed allocator to e.g. place the
+ *     allocation in a particular bucket.
+ *
+ * This function is required when using any Embedded Swift facility that
+ * requires memory allocation from the heap, whether explicitly (e.g., via the
+ * `allocate` operation on unsafe pointers) or implicitly (e.g., creating a
+ * copy-on-write array or an instance of a class type).
+ *
+ * This function can be implemented as a direct call to `free`.
+ */
+void _swift_typedDeallocate(void * EMBEDDED_SWIFT_NONNULL ptr, __swift_size_t size, __swift_size_t alignment, swift_dealloc_flags_t flags, __swift_typeid_t typeId);
+
+/**
  * Writes a sequence of UTF-8 code points to standard output.
  *
  * - Parameters:
