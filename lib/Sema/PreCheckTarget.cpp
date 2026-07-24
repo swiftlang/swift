@@ -2904,6 +2904,20 @@ TypeExpr *TypeChecker::simplifyGenericArgumentTypeExpr(DeclContext *DC,
       return MacroWalking::ArgumentsAndExpansion;
     }
     PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
+      // Fold sequence expressions (e.g. 'P1 & P2') into BinaryExprs so that the
+      // composition / type-sugar folding in walkToExprPost can recognize them.
+      // This mirrors the main PreCheckExpression walker, without it a
+      // parenthesized composition that was parsed as a value expression (such
+      // as a generic argument '(P1 & P2, ...)') does not simplify to a type.
+      if (auto *seqExpr = dyn_cast<SequenceExpr>(expr)) {
+        auto *folded = TypeChecker::foldSequence(seqExpr, DC);
+        folded = folded->walk(*this);
+        if (!folded)
+          return Action::Stop();
+        // Already walked.
+        return Action::SkipNode(folded);
+      }
+
       // Resolve unqualified name references
       if (auto *unresolved = dyn_cast<UnresolvedDeclRefExpr>(expr)) {
         auto *resolved = TypeChecker::resolveDeclRefExpr(unresolved, DC);

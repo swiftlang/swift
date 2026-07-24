@@ -5122,10 +5122,15 @@ public:
 bool isCached() const { return true; }
 };
 
-/// A request to constant-fold an expression node
+/// A request to constant-fold an expression node.
+///
+/// \c emitDiagnostics distinguishes verification (emit diagnostics when the
+/// expression cannot be folded to a literal) from code generation (fold
+/// silently; a caller that also verifies owns the diagnostics). It is part of
+/// the cache key so the two modes don't collide.
 class ConstantFoldExpression
 : public SimpleRequest<ConstantFoldExpression,
-                       Expr *(const Expr *, ASTContext *),
+                       Expr *(const Expr *, ASTContext *, bool),
                        RequestFlags::Cached> {
 public:
 using SimpleRequest::SimpleRequest;
@@ -5134,7 +5139,8 @@ private:
 friend SimpleRequest;
 
 Expr *
-evaluate(Evaluator &evaluator, const Expr *expr, ASTContext *ctx) const;
+evaluate(Evaluator &evaluator, const Expr *expr, ASTContext *ctx,
+         bool emitDiagnostics) const;
 
 public:
 bool isCached() const { return true; }

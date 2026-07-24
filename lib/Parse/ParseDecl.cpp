@@ -9695,20 +9695,6 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(ParseDeclOptions Flags,
   return DCC.fixupParserResult(Status, ED);
 }
 
-static bool isValidEnumRawValueLiteral(Expr *expr) {
-  if (expr == nullptr)
-    return false;
-
-  if (!isa<IntegerLiteralExpr>(expr) &&
-      !isa<FloatLiteralExpr>(expr) &&
-      !isa<StringLiteralExpr>(expr) &&
-      !isa<BooleanLiteralExpr>(expr) &&
-      !isa<NilLiteralExpr>(expr))
-    return false;
-
-  return true;
-}
-
 /// Parse a 'case' of an enum.
 ///
 /// \verbatim
@@ -9822,14 +9808,6 @@ Parser::parseDeclEnumCase(ParseDeclOptions Flags,
       if (RawValueExpr.isNull()) {
         Status.setIsParseError();
         return Status;
-      }
-
-      if (!Context.LangOpts.hasFeature(Feature::LiteralExpressions)) {
-        if (!isValidEnumRawValueLiteral(RawValueExpr.getPtrOrNull())) {
-          diagnose(RawValueExpr.getPtrOrNull()->getLoc(),
-                   diag::nonliteral_enum_case_raw_value);
-          RawValueExpr = nullptr;
-        }
       }
     }
     

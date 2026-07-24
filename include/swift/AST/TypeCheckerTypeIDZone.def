@@ -698,5 +698,5 @@ SWIFT_REQUEST(TypeChecker, DesugarForEachStmtRequest,
               SeparatelyCached, NoLocationInfo)
 
 SWIFT_REQUEST(TypeChecker, ConstantFoldExpression,
-              Expr *(const Expr *, ASTContext *),
+              Expr *(const Expr *, ASTContext *, bool),
               Cached, NoLocationInfo)

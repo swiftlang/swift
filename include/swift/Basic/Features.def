@@ -561,7 +561,7 @@ EXPERIMENTAL_FEATURE(CompileTimeValues, true)
 EXPERIMENTAL_FEATURE(CompileTimeValuesPreview, false)
 
 /// Allow use of literal expressions as literals
-EXPERIMENTAL_FEATURE(LiteralExpressions, true)
+LANGUAGE_FEATURE(LiteralExpressions, 531, "literal expressions")
 
 /// Allow function body macros applied to closures.
 EXPERIMENTAL_FEATURE(ClosureBodyMacro, true)

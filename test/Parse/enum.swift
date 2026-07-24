@@ -237,7 +237,7 @@ enum RawTypeWithRepeatValuesAutoInc3 : String {
 }
 
 enum NonliteralRawValue : Int {
-  case Yeon = 100 + 20 + 3 // expected-error {{raw value for enum case must be a literal}}
+  case Yeon = 100 + 20 + 3
 }
 
 enum RawTypeWithPayload : Int { // expected-error {{'RawTypeWithPayload' declares raw type 'Int', but does not conform to RawRepresentable and conformance could not be synthesized}} expected-note {{declared raw type 'Int' here}} expected-note {{declared raw type 'Int' here}} expected-note {{add stubs for conformance}}
@@ -272,7 +272,7 @@ enum DuplicateMembers4 : Int { // expected-error {{'DuplicateMembers4' declares 
 
 enum DuplicateMembers5 : Int { // expected-error {{'DuplicateMembers5' declares raw type 'Int', but does not conform to RawRepresentable and conformance could not be synthesized}} expected-note {{add stubs for conformance}}
   case Foo = 1 // expected-note {{'Foo' previously declared here}}
-  case Foo = 1 + 1 // expected-error {{invalid redeclaration of 'Foo'}} expected-error {{raw value for enum case must be a literal}}
+  case Foo = 1 + 1 // expected-error {{invalid redeclaration of 'Foo'}}
 }
 
 enum DuplicateMembers6 {

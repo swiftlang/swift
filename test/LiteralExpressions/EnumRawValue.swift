@@ -1,6 +1,5 @@
 // Enum case raw value expressions
-// REQUIRES: swift_feature_LiteralExpressions
-// RUN: %target-swift-frontend -typecheck -dump-ast %s -enable-experimental-feature LiteralExpressions -verify | %FileCheck %s
+// RUN: %target-swift-frontend -typecheck -dump-ast %s -verify | %FileCheck %s
 
 enum E1: Int {
     case a = 2 + 2

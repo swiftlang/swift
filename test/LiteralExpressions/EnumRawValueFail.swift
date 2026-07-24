@@ -1,6 +1,5 @@
 // Enum case raw value expressions
-// REQUIRES: swift_feature_LiteralExpressions
-// RUN: %target-swift-frontend -typecheck %s -enable-experimental-feature LiteralExpressions -verify -verify-ignore-unrelated
+// RUN: %target-swift-frontend -typecheck %s -verify -verify-ignore-unrelated
 
 enum E1: Int {
     case a = 2 + Int.random(in: 0 ..< 10)

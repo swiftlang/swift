@@ -1,9 +1,8 @@
 // Constant globals using @section initialized with literal expressions with simple variable references
-// REQUIRES: swift_feature_LiteralExpressions
 
 // RUN: %empty-directory(%t/deps)
 // RUN: split-file %s %t
-// RUN: %target-swift-frontend -typecheck -dump-ast %t/client.swift -I %t/deps -enable-experimental-feature LiteralExpressions -verify | %FileCheck %s
+// RUN: %target-swift-frontend -typecheck -dump-ast %t/client.swift -I %t/deps -verify | %FileCheck %s
 
 //--- deps/foo.h
 #define MACRO_INT 42
