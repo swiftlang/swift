@@ -496,6 +496,9 @@ extension DropFirstSequence: Sequence {
   public typealias SubSequence = AnySequence<Element>
   
   @inlinable
+  public var underestimatedCount: Int { Swift.max(_assumeNonNegative(_base.underestimatedCount) - _assumeNonNegative(_limit), 0) }
+
+  @inlinable
   @inline(__always)
   public __consuming func makeIterator() -> Iterator {
     var it = _base.makeIterator()
@@ -569,6 +572,9 @@ extension PrefixSequence.Iterator: IteratorProtocol {
 }
 
 extension PrefixSequence: Sequence {
+  @inlinable
+  public var underestimatedCount: Int { Swift.min(_maxLength, _base.underestimatedCount) }
+
   @inlinable
   public __consuming func makeIterator() -> Iterator {
     return Iterator(_base.makeIterator(), maxLength: _maxLength)
