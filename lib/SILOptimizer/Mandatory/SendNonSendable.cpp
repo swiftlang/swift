@@ -547,31 +547,33 @@ private:
   /// \c collectIsolationHistoryNotes.
   Identifier isolatedName;
 
+  /// The mutable state of the chain walk. \c tracked is the set of elements
+  /// known to be in the sent element's chain; the flags and \c isolatedElement
+  /// describe progress toward the isolated source. \c pendingTargetMerge is set
+  /// when the most recently rewound merge reached the isolated source — the
+  /// next SequenceBoundary holds its location. \c intermediateSeen gates
+  /// suppressing a trivial chain.
+  struct WalkState {
+    llvm::SmallSet<Element, 8> tracked;
+    bool pendingTargetMerge = false;
+    bool intermediateSeen = false;
+    Element isolatedElement = Element(0);
+    bool isolatedFound = false;
+  };
+
   /// A saved (partition, walk-state) snapshot on the DFS worklist. When a merge
   /// chain crosses a CFG join the joined branch lives in a predecessor block's
   /// exit partition, so we push a frame per predecessor carrying the walk state
   /// as of the join and explore them depth-first, backtracking on dead ends.
   struct Frame {
     Partition partition;
-    llvm::SmallSet<Element, 8> tracked;
-    bool pendingTargetMerge;
-    bool intermediateSeen;
-    Element isolatedElement;
-    bool isolatedFound;
+    WalkState state;
   };
 
-  /// Current walk state, restored from the frame being processed by
-  /// \c processFrame. \c tracked is the set of elements known to be in the sent
-  /// element's chain; the flags and \c isolatedElement describe progress toward
-  /// the isolated source. \c pendingTargetMerge is set when the most recently
-  /// rewound merge reached the isolated source — the next SequenceBoundary
-  /// holds its location. \c intermediateSeen gates suppressing a trivial chain.
-  /// On success these hold the winning frame's state, which names the chain.
-  llvm::SmallSet<Element, 8> tracked;
-  bool pendingTargetMerge = false;
-  bool intermediateSeen = false;
-  Element isolatedElement = Element(0);
-  bool isolatedFound = false;
+  /// The current walk state. \c processFrame restores this from the frame it is
+  /// given; on success it holds the winning frame's state, which names the
+  /// chain.
+  WalkState state;
 
   /// DFS worklist of frames still to explore, and the set of predecessor blocks
   /// already scheduled so a CFG cycle cannot rewind the same block forever.
@@ -722,11 +724,10 @@ void IsolationHistoryNoteEmitter::collectIsolationHistoryNotes() {
   // Seed the walk state: only the sent element is tracked. popHistoryOnce
   // requires that we not be tracking sending-operand state, so clear it on the
   // send-time partition before seeding the first frame with it.
-  tracked.insert(inputSentElement);
-  isolatedElement = inputSentElement;
-  worklist.push_back(Frame{inputPartition.removingSendingOperandState(), tracked,
-                           pendingTargetMerge, intermediateSeen, isolatedElement,
-                           isolatedFound});
+  state.tracked.insert(inputSentElement);
+  state.isolatedElement = inputSentElement;
+  worklist.push_back(
+      Frame{inputPartition.removingSendingOperandState(), state});
 
   // Explore frames depth-first. processFrame rewinds one frame, updating the
   // walk-state members, and either records originatingLoc (done) or schedules a
@@ -752,8 +753,9 @@ void IsolationHistoryNoteEmitter::collectIsolationHistoryNotes() {
   // VariableNameInferrer falls back to the literal identifier "unknown" when it
   // can't recover a name; that is never useful in a diagnostic, so treat it as
   // no-name.
-  if (isolatedFound) {
-    if (SILValue rep = inputValueMap.maybeGetRepresentative(isolatedElement)) {
+  if (state.isolatedFound) {
+    if (SILValue rep =
+            inputValueMap.maybeGetRepresentative(state.isolatedElement)) {
       auto namePair = VariableNameInferrer::inferNameAndFirstPathComponent(rep);
       if (namePair && namePair->second.isValid() &&
           namePair->first.str() != "unknown")
@@ -761,7 +763,7 @@ void IsolationHistoryNoteEmitter::collectIsolationHistoryNotes() {
     }
   }
 
-  for (Element elt : tracked) {
+  for (Element elt : state.tracked) {
     if (elt == inputSentElement)
       continue;
     SILValue rep = inputValueMap.maybeGetRepresentative(elt);
@@ -797,11 +799,7 @@ bool IsolationHistoryNoteEmitter::processFrame(Frame frame) {
 
   // Restore the walk state captured when this frame was scheduled.
   Partition partition = std::move(frame.partition);
-  tracked = std::move(frame.tracked);
-  pendingTargetMerge = frame.pendingTargetMerge;
-  intermediateSeen = frame.intermediateSeen;
-  isolatedElement = frame.isolatedElement;
-  isolatedFound = frame.isolatedFound;
+  state = std::move(frame.state);
 
   // Predecessor blocks reached at CFG joins while rewinding this frame.
   SmallVector<SILBasicBlock *, 4> joinedBlocks;
@@ -813,9 +811,9 @@ bool IsolationHistoryNoteEmitter::processFrame(Frame frame) {
       ArrayRef<Element> others = node->getAdditionalElementArgs();
 
       // Is any element in this merge already tracked?
-      bool anyTracked = tracked.count(rep);
+      bool anyTracked = state.tracked.count(rep);
       for (Element e : others)
-        anyTracked |= bool(tracked.count(e));
+        anyTracked |= bool(state.tracked.count(e));
       if (!anyTracked)
         break;
 
@@ -828,36 +826,36 @@ bool IsolationHistoryNoteEmitter::processFrame(Frame frame) {
       involved.push_back(rep);
       involved.append(others.begin(), others.end());
       for (Element e : involved) {
-        if (tracked.count(e))
+        if (state.tracked.count(e))
           continue;
         auto info = inputValueMap.getIsolationRegion(e);
         if (!info)
           continue;
         if (!info.isDisconnected()) {
-          pendingTargetMerge = true;
-          if (!isolatedFound) {
-            isolatedFound = true;
-            isolatedElement = e;
+          state.pendingTargetMerge = true;
+          if (!state.isolatedFound) {
+            state.isolatedFound = true;
+            state.isolatedElement = e;
           }
           continue;
         }
-        tracked.insert(e);
-        intermediateSeen = true;
+        state.tracked.insert(e);
+        state.intermediateSeen = true;
       }
       break;
     }
 
     case Node::SequenceBoundary:
-      if (pendingTargetMerge) {
+      if (state.pendingTargetMerge) {
         if (auto loc = node->getHistoryBoundaryLoc()) {
-          if (intermediateSeen)
+          if (state.intermediateSeen)
             originatingLoc = loc;
           // Either way (emitted or suppressed) we've found the chain end; the
-          // walk-state members now hold the winning frame's naming state.
+          // walk state now holds the winning frame's naming state.
           return true;
         }
       }
-      pendingTargetMerge = false;
+      state.pendingTargetMerge = false;
       break;
 
     case Node::CFGHistoryJoin:
@@ -876,10 +874,9 @@ bool IsolationHistoryNoteEmitter::processFrame(Frame frame) {
     auto predState = inputFunctionInfo->getBlockState(predBlock);
     if (!predState)
       continue;
-    worklist.push_back(
-        Frame{predState.get()->getExitPartition().removingSendingOperandState(),
-              tracked, pendingTargetMerge, intermediateSeen, isolatedElement,
-              isolatedFound});
+    worklist.push_back(Frame{
+        predState.get()->getExitPartition().removingSendingOperandState(),
+        state});
   }
   return false;
 }
