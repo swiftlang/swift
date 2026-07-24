@@ -371,8 +371,9 @@ func testClonableExistential(_ v: Clonable, _ vv: Clonable.Type) {
   let _: Clonable! = id(vv.returnSelfIUOStatic(true))
 
   let _ = v.badClonerFn() // expected-error {{member 'badClonerFn' cannot be used on value of type 'any Clonable'; consider using a generic constraint instead}}
+  // expected-note@-1 {{member 'badClonerFn' refrences 'Self', which cannot be resolved on type 'any Clonable'}}
   let _ = v.veryBadClonerFn() // expected-error {{member 'veryBadClonerFn' cannot be used on value of type 'any Clonable'; consider using a generic constraint instead}}
-
+  // expected-note@-1 {{member 'veryBadClonerFn' refrences 'Self', which cannot be resolved on type 'any Clonable'}}
 }
 
 
