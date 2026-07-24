@@ -13,8 +13,6 @@
 #ifndef SILGEN_H
 #define SILGEN_H
 
-#define SWIFT_INCLUDED_IN_SILGEN_SOURCES
-
 #include "ASTVisitor.h"
 #include "Cleanup.h"
 #include "swift/AST/ASTContext.h"
