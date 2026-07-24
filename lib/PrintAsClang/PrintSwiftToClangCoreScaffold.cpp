@@ -23,6 +23,7 @@
 #include "clang/Basic/AddressSpaces.h"
 #include "clang/Basic/TargetInfo.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallVector.h"
 
 using namespace swift;
 
@@ -153,7 +154,7 @@ static void printTypeMetadataResponseType(SwiftToClangInteropContext &ctx,
 void printPrimitiveGenericTypeTraits(raw_ostream &os, ASTContext &astContext,
                                      PrimitiveTypeMapping &typeMapping,
                                      bool isCForwardDefinition) {
-  Type supportedPrimitiveTypes[] = {
+  SmallVector<Type, 16> supportedPrimitiveTypes = {
       astContext.getBoolType(),
 
       // Primitive integer, C integer and Int/UInt mappings.
@@ -168,10 +169,7 @@ void printPrimitiveGenericTypeTraits(raw_ostream &os, ASTContext &astContext,
       // Pointer types.
       // FIXME: support raw pointers?
       astContext.getOpaquePointerType(),
-
-      astContext.getIntType(), astContext.getUIntType()};
-
-  auto primTypesArray = llvm::ArrayRef(supportedPrimitiveTypes);
+  };
 
   // Ensure that `long` and `unsigned long` are treated as valid
   // generic Swift types (`Int` and `UInt`) on platforms
@@ -183,8 +181,32 @@ void printPrimitiveGenericTypeTraits(raw_ostream &os, ASTContext &astContext,
       clangTI.getPtrDiffType(clang::LangAS::Default) == clang::TransferrableTargetInfo::SignedLong;
   bool isInt64Long =
       clangTI.getInt64Type() == clang::TransferrableTargetInfo::SignedLong;
-  if (!(isSwiftIntLong && !isInt64Long))
-    primTypesArray = primTypesArray.drop_back(2);
+  if (isSwiftIntLong && !isInt64Long) {
+    supportedPrimitiveTypes.push_back(astContext.getIntType());
+    supportedPrimitiveTypes.push_back(astContext.getUIntType());
+  }
+
+  // The following Swift types bridge to C++ types that aren't available on
+  // every target. Only emit trait specializations for them when the target
+  // supports the underlying C++ type, so that the generated header remains
+  // compilable everywhere while still supporting these types where possible.
+  auto stdlibModule = astContext.getStdlibModule();
+
+  if (Type unicodeScalar =
+          astContext.getNamedSwiftType(stdlibModule, "CChar32"))
+    supportedPrimitiveTypes.push_back(unicodeScalar);
+
+  if (clangTI.hasInt128Type()) {
+    if (Type int128Ty = astContext.getInt128Type())
+      supportedPrimitiveTypes.push_back(int128Ty);
+    if (Type uint128Ty = astContext.getUInt128Type())
+      supportedPrimitiveTypes.push_back(uint128Ty);
+  }
+
+  if (clangTI.hasFloat16Type()) {
+    if (Type float16 = astContext.getNamedSwiftType(stdlibModule, "Float16"))
+      supportedPrimitiveTypes.push_back(float16);
+  }
 
   // We do not have metadata for primitive types in Embedded Swift.
   // As a result, the following features are not supported with primitive types in this mode:
@@ -194,7 +216,7 @@ void printPrimitiveGenericTypeTraits(raw_ostream &os, ASTContext &astContext,
   // - Metadata source parameter
   bool embedded = astContext.LangOpts.hasFeature(Feature::Embedded);
 
-  for (Type type : primTypesArray) {
+  for (Type type : supportedPrimitiveTypes) {
     auto typeInfo = *typeMapping.getKnownCxxTypeInfo(
         type->getNominalOrBoundGenericNominal());
 
