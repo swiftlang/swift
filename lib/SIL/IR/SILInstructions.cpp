@@ -436,9 +436,11 @@ SILType AllocBoxInst::getAddressType() const {
 }
 
 DebugValueInst::DebugValueInst(
-    SILDebugLocation DebugLoc, SILValue Operand, SILDebugVariable Var,
-    UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo, bool trace, bool prependDeref)
-    : UnaryInstructionBase(DebugLoc, Operand),
+    SILDebugLocation DebugLoc, SILValue Operand, SILModule &M,
+    SILDebugVariable Var,
+    UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo, bool trace,
+    bool prependDeref)
+    : InstructionBaseWithTrailingOperands({Operand}, DebugLoc),
       SILDebugVariableSupplement(Var.DIExpr.getNumElements(),
                                  Var.Type.has_value(), Var.Loc.has_value(),
                                  Var.Scope),
@@ -471,9 +473,9 @@ DebugValueInst *DebugValueInst::create(SILDebugLocation DebugLoc,
   if (prependDeref) {
     Var.DIExpr.eraseElement(Var.DIExpr.element_begin());
   }
-  void *buf = allocateDebugVarCarryingInst<DebugValueInst>(M, Var);
+  void *buf = allocateDebugVarCarryingInst<DebugValueInst>(M, Var, {Operand});
   return ::new (buf)
-    DebugValueInst(DebugLoc, Operand, Var, wasMoved, trace, prependDeref);
+    DebugValueInst(DebugLoc, Operand, M, Var, wasMoved, trace, prependDeref);
 }
 
 void DebugValueInst::prependDeref() {

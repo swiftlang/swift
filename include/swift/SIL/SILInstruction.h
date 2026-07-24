@@ -5735,12 +5735,11 @@ public:
 /// Define the start or update to a symbolic variable value (for loadable
 /// types).
 class DebugValueInst final
-    : public UnaryInstructionBase<SILInstructionKind::DebugValueInst,
-                                  NonValueInstruction>,
-      private SILDebugVariableSupplement,
-      private llvm::TrailingObjects<DebugValueInst, SILType, SILLocation,
-                                    const SILDebugScope *, SILDIExprElement,
-                                    char> {
+    : public InstructionBaseWithTrailingOperands<
+          SILInstructionKind::DebugValueInst, DebugValueInst,
+          NonValueInstruction, SILType, SILLocation, const SILDebugScope *,
+          SILDIExprElement, char>,
+      private SILDebugVariableSupplement {
   friend TrailingObjects;
   friend SILBuilder;
 
@@ -5750,7 +5749,7 @@ class DebugValueInst final
   /// Optional debug basic block holding reconstruction instructions.
   SILBasicBlock *ReconstructionBlock = nullptr;
 
-  DebugValueInst(SILDebugLocation DebugLoc, SILValue Operand,
+  DebugValueInst(SILDebugLocation DebugLoc, SILValue Operand, SILModule &M,
                  SILDebugVariable Var,
                  UsesMoveableValueDebugInfo_t operandWasMoved, bool trace,
                  bool prependDeref);
@@ -5759,11 +5758,18 @@ class DebugValueInst final
                                 UsesMoveableValueDebugInfo_t operandWasMoved,
                                 bool trace);
 
+  using InstructionBaseWithTrailingOperands::numTrailingObjects;
   SIL_DEBUG_VAR_SUPPLEMENT_TRAILING_OBJS_IMPL()
 
-  size_t numTrailingObjects(OverloadToken<char>) const { return 1; }
-
 public:
+  // FIXME: These following 2 functions are temporary, while debug_value
+  // transitions to being a multi-operand instruction.
+  SILValue getOperand() const { return getAllOperands()[0].get(); }
+  void setOperand(SILValue V) { getAllOperands()[0].set(V); }
+
+  ArrayRef<Operand> getTypeDependentOperands() const { return {}; }
+  MutableArrayRef<Operand> getTypeDependentOperands() { return {}; }
+
   /// Sets a bool that states this debug_value is supposed to use the
   void setUsesMoveableValueDebugInfo() {
     sharedUInt8().DebugValueInst.usesMoveableValueDebugInfo =
