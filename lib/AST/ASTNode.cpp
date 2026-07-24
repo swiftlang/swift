@@ -174,11 +174,14 @@ SourceRange swift::getUnexpandedMacroRange(const SourceManager &SM,
             ASTNode::getFromOpaqueValue(info->astNode).getSourceRange();
       bufferID = SM.findBufferContainingLoc(outerRange.Start);
       continue;
+    case GeneratedSourceInfo::SyntheticMacro: {
+      auto parentLoc = info->originalSourceRange.getStart();
+      return SourceRange(parentLoc, parentLoc);
+    }
     case GeneratedSourceInfo::ReplacedFunctionBody:
     case GeneratedSourceInfo::PrettyPrinted:
     case GeneratedSourceInfo::DefaultArgument:
     case GeneratedSourceInfo::AttributeFromClang:
-    case GeneratedSourceInfo::SyntheticMacro:
       return SourceRange();
     }
   }

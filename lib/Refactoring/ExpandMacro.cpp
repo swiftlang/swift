@@ -12,7 +12,13 @@
 
 #include "ContextFinder.h"
 #include "RefactoringActions.h"
+#include "swift/AST/Decl.h"
+#include "swift/AST/Type.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/AST/TypeRepr.h"
+#include "swift/AST/TypeWalker.h"
+#include "swift/AST/Types.h"
+#include "llvm/ADT/SmallVector.h"
 
 using namespace swift::refactoring;
 
@@ -170,6 +176,170 @@ getMacroExpansionBuffers(SourceManager &sourceMgr, ResolvedCursorInfoPtr Info) {
   return {};
 }
 
+static bool hasBeenMacroSynthesized(Decl *decl) {
+  auto loc = decl->getStartLoc();
+  if (loc.isInvalid())
+    return false;
+  auto &SM = decl->getASTContext().SourceMgr;
+  auto bufferID = SM.findBufferContainingLoc(loc);
+  auto SFS = SM.getSourceFilesForBufferID(bufferID);
+  if (SFS.empty())
+    return false;
+  auto *enclosing = SFS[0]->getEnclosingSourceFile();
+  if (!enclosing) 
+    return false;
+  return enclosing->Kind == SourceFileKind::SyntheticMacro;
+}
+
+static void collectProtocolsFromType(
+    Type type, llvm::SmallPtrSetImpl<ProtocolDecl *> &derivedProtocols) {
+  class Walker : public TypeWalker {
+    llvm::SmallPtrSetImpl<ProtocolDecl *> &derivedProtocols;
+
+  public:
+    explicit Walker(llvm::SmallPtrSetImpl<ProtocolDecl *> &derivedProtocols)
+        : derivedProtocols(derivedProtocols) {}
+
+    Action walkToTypePre(Type ty) override {
+      ProtocolDecl *protocol = nullptr;
+      auto *base = ty.getPointer();
+      if (!base)
+        return Action::SkipNode;
+      if (auto *pType = dyn_cast_or_null<ProtocolType>(base))
+        protocol = pType->getDecl();
+      else if (auto *ppType = dyn_cast_or_null<ParameterizedProtocolType>(base))
+        protocol = ppType->getProtocol();
+      if (protocol)
+        derivedProtocols.insert(protocol);
+      return Action::Continue;
+    }
+    Action walkToTypePost(Type ty) override {
+      if (ty.isNull())
+        return Action::SkipNode;
+      return Action::Continue;
+    }
+  };
+
+  auto walker = Walker(derivedProtocols);
+  type.walk(walker);
+}
+
+static bool findProtocolsAndNominal(
+    SourceManager &SM, ResolvedCursorInfoPtr cursorInfo, NominalTypeDecl **ty,
+    llvm::SmallPtrSetImpl<ProtocolDecl *> &derivedProtocols) {
+
+  // We should be somewhere here:
+  // extension T : SomeProtocol, ... { ... }
+  //                   ^
+  // or
+  // (struct|enum|class) T: SomeProtocol, ... { ... }
+  //                          ^
+  // Where `SomeProtocol` can be a regular protocol or a typealias.
+  
+  if (!ty)
+    return false;
+  *ty = nullptr;
+
+  auto *refInfo = dyn_cast<ResolvedValueRefCursorInfo>(cursorInfo);
+  if (!refInfo || !refInfo->isRef())
+    return false;
+
+  Type interfaceTy =
+      refInfo->getValueD()->getInterfaceType()->getCanonicalType();
+  collectProtocolsFromType(interfaceTy, derivedProtocols);
+
+  if (derivedProtocols.empty())
+    return false;
+
+  SourceFile *containingSF = cursorInfo->getSourceFile();
+  if (!containingSF)
+    return false;
+
+  SourceLoc loc = cursorInfo->getLoc();
+
+  auto clauseContainsLoc = [&](InheritedTypes inherited) {
+    for (auto i : inherited.getIndices()) {
+      auto *repr = inherited.getEntry(i).getTypeRepr();
+      if (repr && SM.rangeContainsTokenLoc(repr->getSourceRange(), loc))
+        return true;
+    }
+    return false;
+  };
+
+  ContextFinder Finder(*containingSF, loc, [&](ASTNode N) {
+    auto *D = N.dyn_cast<Decl *>();
+    if (!D)
+      return false;
+    if (auto *ext = dyn_cast<ExtensionDecl>(D))
+      return clauseContainsLoc(InheritedTypes(ext));
+    if (auto *nominal = dyn_cast<NominalTypeDecl>(D))
+      return clauseContainsLoc(InheritedTypes(nominal));
+    return false;
+  });
+
+  Finder.resolve();
+
+  // Get innermost context using reverse
+  for (auto ctx : llvm::reverse(Finder.getContexts())) {
+    auto *D = ctx.dyn_cast<Decl *>();
+    if (auto *ext = dyn_cast_or_null<ExtensionDecl>(D)) {
+      *ty = ext->getExtendedNominal();
+      break;
+    }
+    if (auto *nominal = dyn_cast_or_null<NominalTypeDecl>(D)) {
+      if (!isa<StructDecl>(D) && !isa<ClassDecl>(D) && !isa<EnumDecl>(D))
+        continue;
+      *ty = nominal;
+      break;
+    }
+  }
+  return *ty != nullptr;
+}
+
+static bool expandDerivedConformanceWitnesses(SourceManager &SM,
+                                              ResolvedCursorInfoPtr cursorInfo,
+                                              SourceEditConsumer &editConsumer,
+                                              bool adjustExpansion) {
+  SourceFile *containingSF = cursorInfo->getSourceFile();
+
+  NominalTypeDecl *ty;
+  llvm::SmallPtrSet<ProtocolDecl *, 4> derivedProtocols;
+
+  if (!findProtocolsAndNominal(SM, cursorInfo, &ty, derivedProtocols))
+    return true;
+
+  llvm::SmallSetVector<unsigned int, 2> bufferIDs;
+
+  auto register_protocol = [&](ProtocolDecl *protocol) {
+    llvm::SmallVector<ProtocolConformance *, 2> conformances;
+    ty->lookupConformance(protocol, conformances);
+    for (auto *conformance : conformances) {
+      for (auto *requirement : protocol->getProtocolRequirements()) {
+        if (isa<AssociatedTypeDecl>(requirement))
+          continue;
+        auto *witness = conformance->getWitnessDecl(requirement);
+        if (!witness || !hasBeenMacroSynthesized(witness))
+          continue;
+        bufferIDs.insert(SM.findBufferContainingLoc(witness->getStartLoc()));
+      }
+    }
+  };
+
+  for (auto *derived : derivedProtocols) {
+    register_protocol(derived);
+    for (auto *inherited : derived->getAllInheritedProtocols()) {
+      register_protocol(inherited);
+    }
+  }
+
+  for (auto bufferID : bufferIDs)
+    editConsumer.acceptMacroExpansionBuffer(SM, bufferID, containingSF,
+                                            adjustExpansion,
+                                            /*includeBufferName=*/true);
+
+  return false;
+}
+
 static bool expandMacro(SourceManager &SM, ResolvedCursorInfoPtr cursorInfo,
                         SourceEditConsumer &editConsumer,
                         bool adjustExpansion) {
@@ -210,6 +380,17 @@ bool RefactoringActionExpandMacro::isApplicable(ResolvedCursorInfoPtr Info,
 bool RefactoringActionExpandMacro::performChange() {
   return expandMacro(SM, CursorInfo, EditConsumer, /*adjustExpansion=*/false);
 }
+
+bool RefactoringActionExpandDerivedConformance::isApplicable(ResolvedCursorInfoPtr Info,
+                                                DiagnosticEngine &Diag) {
+  // Never list in available refactorings. Only allow requesting directly.
+  return false;
+}
+
+bool RefactoringActionExpandDerivedConformance::performChange() {
+  return expandDerivedConformanceWitnesses(SM, CursorInfo, EditConsumer, /*adjustExpansion=*/false);
+}
+
 
 bool RefactoringActionInlineMacro::isApplicable(ResolvedCursorInfoPtr Info,
                                                 DiagnosticEngine &Diag) {

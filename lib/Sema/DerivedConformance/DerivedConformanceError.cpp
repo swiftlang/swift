@@ -21,9 +21,12 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/PluginLoader.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/SwiftNameTranslation.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/QuotedString.h"
+#include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
 using namespace swift::objc_translation;
@@ -111,23 +114,54 @@ deriveBridgedNSError_enum_nsErrorDomain(
   return propDecl;
 }
 
+static std::string getBridgedNSErrorMacroArg(DerivedConformance &derived) {
+  auto scope = derived.Nominal->getFormalAccessScope(
+      derived.Nominal->getModuleScopeContext());
+  if (scope.isPublic() || scope.isInternal()) {
+    std::string res;
+    auto os = llvm::raw_string_ostream(res);
+    os << "objectiveC(domain: "
+       << QuotedString(
+              getErrorDomainStringForObjC(derived.Nominal->getSelfEnumDecl()))
+       << ")";
+    os.flush();
+    return res;
+  }
+  return "regular";
+}
+
+static ValueDecl *deriveBridgedNSErrorViaMacro(DerivedConformance &derived,
+                                               ValueDecl *requirement) {
+  auto arg = getBridgedNSErrorMacroArg(derived);
+  std::string macro;
+  auto os = llvm::raw_string_ostream(macro);
+  os << "#_deriveError(" << QuotedString(arg) << ")";
+  os.flush();
+  return deriveRequirementViaMacro(derived, requirement, macro);
+}
+
 ValueDecl *DerivedConformance::deriveBridgedNSError(ValueDecl *requirement) {
   if (!isa<EnumDecl>(Nominal))
     return nullptr;
 
-  if (requirement->getBaseName() == Context.Id_nsErrorDomain) {
-    auto synthesizer = deriveBodyBridgedNSError_enum_nsErrorDomain;
-
-    auto scope = Nominal->getFormalAccessScope(Nominal->getModuleScopeContext());
-    if (scope.isPublic() || scope.isInternal())
-      // PrintAsClang may print this domain, so we should make sure we use the
-      // same string it will.
-      synthesizer = deriveBodyBridgedNSError_printAsObjCEnum_nsErrorDomain;
-
-    return deriveBridgedNSError_enum_nsErrorDomain(*this, synthesizer);
+  if (requirement->getBaseName() != Context.Id_nsErrorDomain) {
+    Context.Diags.diagnose(requirement->getLoc(),
+                           diag::broken_errortype_requirement);
+    return nullptr;
   }
+  auto &pluginLoader = Context.getPluginLoader();
+  auto &entry = pluginLoader.lookupPluginByModuleName(
+      Context.getIdentifier("SwiftMacros"));
+  if (!entry.libraryPath.empty() && !::getenv("DONT_DERIVE_VIA_MACROS"))
+    return deriveBridgedNSErrorViaMacro(*this, requirement);
 
-  Context.Diags.diagnose(requirement->getLoc(),
-                         diag::broken_errortype_requirement);
-  return nullptr;
+  auto synthesizer = deriveBodyBridgedNSError_enum_nsErrorDomain;
+
+  auto scope = Nominal->getFormalAccessScope(Nominal->getModuleScopeContext());
+  if (scope.isPublic() || scope.isInternal())
+    // PrintAsClang may print this domain, so we should make sure we use the
+    // same string it will.
+    synthesizer = deriveBodyBridgedNSError_printAsObjCEnum_nsErrorDomain;
+
+  return deriveBridgedNSError_enum_nsErrorDomain(*this, synthesizer);
 }
