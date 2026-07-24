@@ -529,7 +529,7 @@ EXPERIMENTAL_FEATURE(ImportCxxMembersLazily, true)
 
 /// Import a C++ foreign reference type's primary FRT base as a Swift
 /// superclass.
-EXPERIMENTAL_FEATURE(ForeignReferenceTypeInheritance, true)
+LANGUAGE_FEATURE(ForeignReferenceTypeInheritance, 0, "foreign reference type inheritance hierarchy")
 
 /// `yielding borrow`/`yielding mutate` single-yield coroutine accessors
 // TODO: When this is turned on by default, take care of:
