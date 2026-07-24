@@ -138,11 +138,28 @@ FUNCTION(DeallocObject, Swift, swift_deallocObject, C_CC, AlwaysAvailable,
          EFFECT(RuntimeEffect::Deallocating),
          UNKNOWN_MEMEFFECTS)
 
+// void swift_deallocObjectTyped(HeapObject *obj, size_t size, size_t alignMask, uint64_t typeId);
+FUNCTION(DeallocObjectTyped, Swift, swift_deallocObjectTyped, C_CC, AlwaysAvailable,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy, SizeTy, SizeTy, Int64Ty),
+         ATTRS(NoUnwind),
+         EFFECT(RuntimeEffect::Deallocating),
+         UNKNOWN_MEMEFFECTS)
+
 // void swift_deallocUninitializedObject(HeapObject *obj, size_t size, size_t alignMask);
 FUNCTION(DeallocUninitializedObject, Swift, swift_deallocUninitializedObject,
          C_CC, AlwaysAvailable,
          RETURNS(VoidTy),
          ARGS(RefCountedPtrTy, SizeTy, SizeTy),
+         ATTRS(NoUnwind),
+         EFFECT(RuntimeEffect::Deallocating),
+         UNKNOWN_MEMEFFECTS)
+
+// void swift_deallocUninitializedObjectTyped(HeapObject *obj, size_t size, size_t alignMask, int64_t typeId);
+FUNCTION(DeallocUninitializedObjectTyped, Swift, swift_deallocUninitializedObjectTyped,
+         C_CC, AlwaysAvailable,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy, SizeTy, SizeTy, Int64Ty),
          ATTRS(NoUnwind),
          EFFECT(RuntimeEffect::Deallocating),
          UNKNOWN_MEMEFFECTS)
@@ -155,11 +172,28 @@ FUNCTION(DeallocClassInstance, Swift, swift_deallocClassInstance, C_CC, AlwaysAv
          EFFECT(RuntimeEffect::Deallocating),
          UNKNOWN_MEMEFFECTS)
 
+// void swift_deallocClassInstanceTyped(HeapObject *obj, size_t size, size_t alignMask, int64_t typdId);
+FUNCTION(DeallocClassInstanceTyped, Swift, swift_deallocClassInstanceTyped, C_CC, AlwaysAvailable,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy, SizeTy, SizeTy, Int64Ty),
+         ATTRS(NoUnwind),
+         EFFECT(RuntimeEffect::Deallocating),
+         UNKNOWN_MEMEFFECTS)
+
 // void swift_deallocPartialClassInstance(HeapObject *obj, HeapMetadata *type, size_t size, size_t alignMask);
 FUNCTION(DeallocPartialClassInstance, Swift, swift_deallocPartialClassInstance,
          C_CC, AlwaysAvailable,
          RETURNS(VoidTy),
          ARGS(RefCountedPtrTy, TypeMetadataPtrTy, SizeTy, SizeTy),
+         ATTRS(NoUnwind),
+         EFFECT(RuntimeEffect::Deallocating),
+         UNKNOWN_MEMEFFECTS)
+
+// void swift_deallocPartialClassInstanceTyped(HeapObject *obj, HeapMetadata *type, size_t size, size_t alignMask, int64_t typeId);
+FUNCTION(DeallocPartialClassInstanceTyped, Swift, swift_deallocPartialClassInstanceTyped,
+         C_CC, AlwaysAvailable,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy, TypeMetadataPtrTy, SizeTy, SizeTy, Int64Ty),
          ATTRS(NoUnwind),
          EFFECT(RuntimeEffect::Deallocating),
          UNKNOWN_MEMEFFECTS)
