@@ -14,9 +14,9 @@ Interoperability is off by default. Turning it on tells the Swift compiler to re
 
 If you're using Swift Package Manager, add `.interoperabilityMode(.Cxx)` to the `swiftSettings` of the Swift target that imports your C++ code rather than the C++ library target itself. You write the full `Package.swift` when you expose the module.
 
-For command line users, pass `-cxx-interoperability-mode=default` to `swiftc` when you compile the project.
+Command-line users, pass `-cxx-interoperability-mode=default` to `swiftc` when you compile the project.
 
-If you're using Xcode, select your target and open the Build Settings tab. Search for the C++ and Objective-C Interoperability build setting, and set it to C++ / Objective-C++.
+If you're using Xcode, select your target and open the Build Settings tab. Search for the C++ and Objective-C Interoperability build setting, and set it to C++/Objective-C++.
 
 
 ## Create your C++ class
@@ -29,7 +29,7 @@ If you're using Swift Package Manager, put `Error.hpp` in your C++ target's publ
 2. Check "Also create a header file" if the template doesn't make one. 
 3. Add the file to your app target. If Xcode offers to create a bridging header, decline it.
 
-> Note: This article uses a module map instead. If a bridging header already exists, or you create one by accident, keep it. Deleting the file makes the build fail because Xcode still looks for the bridging header after you remove it.
+> Note: The example in this article uses a module map instead of a bridging header. If a bridging header already exists, or you create one by accident, retain it. Deleting the file makes the build fail because Xcode looks for the bridging header after you remove it.
 
 Define your class in `Error.hpp`, and add `#include <swift/bridging>` at the top. The `<swift/bridging>` header ships with the Swift toolchain and the compiler finds it automatically, with no extra search path to set. The header supplies the bridging macros, including `SWIFT_NAME`, which controls how the class crosses over into Swift.
 
@@ -146,7 +146,7 @@ The module name can't replicate an existing Swift import, type, or the name of y
         }
         ```
 
-        In the target's build settings, add the directory that contains `module.modulemap` to Import Paths (the `SWIFT_INCLUDE_PATHS` build setting), such as `$(SRCROOT)/YourFolderName`. This step is the Xcode equivalent of the command-line `-I` flag. Without it, Swift can't locate the module map that defines `ErrorLib`, and the build fails.
+        In the target's build settings, add the directory that contains `module.modulemap`, such as `$(SRCROOT)/YourFolderName`, to Import Paths (the `SWIFT_INCLUDE_PATHS` build setting). This step is the Xcode equivalent of the command-line `-I` flag. Without it, Swift can't locate the module map that defines `ErrorLib`, and the build fails.
     }
 }
 
