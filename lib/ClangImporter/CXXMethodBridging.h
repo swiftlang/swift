@@ -1,7 +1,9 @@
 #ifndef SWIFT_CXXMETHODBRIDGING_H
 #define SWIFT_CXXMETHODBRIDGING_H
 
+#include "ImporterImpl.h"
 #include "clang/AST/DeclCXX.h"
+#include "clang/Basic/CharInfo.h"
 #include "llvm/ADT/StringRef.h"
 #include <string>
 
@@ -27,7 +29,11 @@ struct CXXMethodBridging {
         nameKind != NameKind::lower && nameKind != NameKind::snake)
       return Kind::unknown;
 
-    if (getClangName().starts_with_insensitive("set")) {
+    // An explicitly annotated method is routed by its shape (param count),
+    // so e.g. `settlementValue()` isn't misrouted as a setter.
+    bool hasSetPrefix = getClangName().starts_with_insensitive("set");
+    if (hasSetPrefix &&
+        (!isExplicitComputedProperty() || method->getNumParams() == 1)) {
       // Setters only have one parameter.
       if (method->getNumParams() != 1)
         return Kind::unknown;
@@ -44,7 +50,8 @@ struct CXXMethodBridging {
     if (method->getReturnType()->isVoidType())
       return Kind::unknown;
 
-    if (getClangName().starts_with_insensitive("get")) {
+    if (getClangName().starts_with_insensitive("get") ||
+        isExplicitComputedProperty()) {
       // Getters cannot take arguments.
       if (method->getNumParams() != 0)
         return Kind::unknown;
@@ -69,8 +76,9 @@ struct CXXMethodBridging {
     if (getClangName().empty())
       return NameKind::unknown;
 
+    // An underscore means snake_case, even alongside uppercase (e.g. `get_http_URL`).
     if (getClangName().contains('_'))
-      return hasUpper ? NameKind::unknown : NameKind::snake;
+      return NameKind::snake;
     if (!hasUpper)
       return NameKind::lower;
 
@@ -84,15 +92,27 @@ struct CXXMethodBridging {
     return method->getName();
   }
 
+  bool isExplicitComputedProperty() {
+    return importer::hasSwiftAttribute(method, {"import_computed_property"});
+  }
+
+  // Used to pair a getter with its setter under the same GetterSetterMap key;
+  // left otherwise untransformed.
+  llvm::StringRef nameWithoutAccessorPrefix() {
+    llvm::StringRef name = getClangName();
+    auto kind = classify();
+    if (kind == Kind::getter)
+      name.consume_front_insensitive("get");
+    else if (kind == Kind::setter)
+      name.consume_front_insensitive("set");
+    return name;
+  }
+
   // This should be handled as snake case. See: rdar://89453010
   std::string importNameAsCamelCaseName() {
-    std::string output;
-    auto kind = classify();
-    if (kind == Kind::getter || kind == Kind::setter) {
-      output = getClangName().drop_front(3).str();
-    } else {
-      output = getClangName().str();
-    }
+    llvm::StringRef strippedName = nameWithoutAccessorPrefix();
+    bool hadPrefix = strippedName.size() != getClangName().size();
+    std::string output = strippedName.str();
 
     if (output.empty())
       return output;
@@ -101,10 +121,20 @@ struct CXXMethodBridging {
     if (classifyNameKind() == NameKind::lower)
       return output;
 
-    // The first character is always lowercase.
-    output.front() = std::tolower(output.front());
-
     if (classifyNameKind() == NameKind::snake) {
+      bool hasUpper = llvm::any_of(
+          output, [](unsigned char ch) { return clang::isUppercase(ch); });
+
+      // C++ interop doesn't rename functions on import, so a snake_case name
+      // is only stripped of its accessor prefix and trailing punctuation --
+      // never camelCased -- except for the pre-existing case below (real
+      // prefix + all-lowercase remainder), which still folds into camelCase.
+      if (!hadPrefix || hasUpper)
+        return llvm::StringRef(output).ltrim('_').str();
+
+      // The first character is always lowercase.
+      output.front() = clang::toLowercase(output.front());
+
       for (std::size_t i = 0; i < output.size(); i++) {
         size_t next = i + 1;
         if (output[i] == '_') {
@@ -121,6 +151,9 @@ struct CXXMethodBridging {
       }
       return output;
     }
+
+    // The first character is always lowercase.
+    output.front() = clang::toLowercase(output.front());
 
     // We already lowercased the first element, so start at one. Look at the
     // current element and the next one. To handle cases like UTF8String, start

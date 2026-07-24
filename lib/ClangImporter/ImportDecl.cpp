@@ -2959,13 +2959,18 @@ namespace {
                             setter->getParameters()->get(0)->getTypeInContext()))
             continue;
 
-          // If the name that we would import this as already exists, then don't
-          // add a computed property, because it will conflict with an existing
-          // name and make both APIs unusable.
+          // Don't add a computed property if its name clashes with an
+          // existing member -- unless that "clash" is just the getter/setter
+          // it's replacing (e.g. a prefix-less annotated getter like
+          // `settlementValue()`, whose raw name equals importedName).
           CXXMethodBridging cxxMethodBridging(
               cast<clang::CXXMethodDecl>(getter->getClangDecl()));
-          if (allMemberNames.contains(
-                  cxxMethodBridging.importNameAsCamelCaseName()))
+          auto importedName = cxxMethodBridging.importNameAsCamelCaseName();
+          bool isOwnAccessorName =
+              cxxMethodBridging.getClangName() == importedName ||
+              (setter && cast<clang::CXXMethodDecl>(setter->getClangDecl())
+                                 ->getName() == importedName);
+          if (allMemberNames.contains(importedName) && !isOwnAccessorName)
             continue;
 
           auto p =
@@ -2973,6 +2978,24 @@ namespace {
           // Add computed properties directly because they won't be found from
           // the clang decl during lazy member lookup.
           result->addMember(p);
+
+          // Deprecate accessors explicitly opted in via SWIFT_COMPUTED_PROPERTY,
+          // steering callers to the synthesized property. Not done for the
+          // global -cxx-interop-getters-setters-as-properties flag, to avoid
+          // flooding existing code with deprecation warnings.
+          auto deprecateTransformedAccessor = [&](FuncDecl *accessor) {
+            if (!accessor || !accessor->getClangDecl() ||
+                !hasComputedPropertyAttr(accessor->getClangDecl()))
+              return;
+            std::string message =
+                ("use the '" + importedName + "' property");
+            accessor->addAttribute(AvailableAttr::createUniversallyDeprecated(
+                Impl.SwiftContext,
+                Impl.SwiftContext.AllocateCopy(StringRef(message)),
+                /*Rename=*/""));
+          };
+          deprecateTransformedAccessor(getter);
+          deprecateTransformedAccessor(setter);
         }
       }
 
@@ -4832,11 +4855,11 @@ namespace {
           auto parent = funcDecl->getParent()->getSelfNominalTypeDecl();
           CXXMethodBridging bridgingInfo(decl);
           if (bridgingInfo.classify() == CXXMethodBridging::Kind::getter) {
-            auto name = bridgingInfo.getClangName().drop_front(3);
+            auto name = bridgingInfo.nameWithoutAccessorPrefix();
             Impl.GetterSetterMap[parent][name].first = funcDecl;
           } else if (bridgingInfo.classify() ==
                      CXXMethodBridging::Kind::setter) {
-            auto name = bridgingInfo.getClangName().drop_front(3);
+            auto name = bridgingInfo.nameWithoutAccessorPrefix();
             Impl.GetterSetterMap[parent][name].second = funcDecl;
           }
         }
