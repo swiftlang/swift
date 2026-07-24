@@ -18,8 +18,11 @@
 #include "TypeChecker.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/PluginLoader.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Feature.h"
+#include "swift/Basic/QuotedString.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
@@ -70,6 +73,23 @@ static ArraySliceType *computeAllCasesType(NominalTypeDecl *enumDecl) {
   return ArraySliceType::get(enumType);
 }
 
+static ValueDecl *deriveCaseIterableViaMacros(DerivedConformance &derived,
+                                              ValueDecl *requirement) {
+  auto &C = requirement->getASTContext();
+  std::string macro = "#_deriveCaseIterable(";
+  auto os = llvm::raw_string_ostream(macro);
+  os << QuotedString(getNominalTypeInfoString(derived)) << ", ";
+
+  if (requirement->getBaseName() == C.Id_allCases) {
+    os << QuotedString("varDef");
+  } else if (requirement->getBaseName() == C.Id_AllCases) {
+    os << QuotedString("typeAlias");
+  }
+  os << ")";
+  os.flush();
+  return deriveRequirementViaMacro(derived, requirement, macro);
+}
+
 static Type deriveCaseIterable_AllCases(DerivedConformance &derived) {
   // enum SomeEnum : CaseIterable {
   //   @derived
@@ -95,7 +115,12 @@ ValueDecl *DerivedConformance::deriveCaseIterable(ValueDecl *requirement) {
     requirement->diagnose(diag::broken_case_iterable_requirement);
     return nullptr;
   }
-
+  auto &pluginLoader = Context.getPluginLoader();
+  auto &entry = pluginLoader.lookupPluginByModuleName(
+      Context.getIdentifier("SwiftMacros"));
+  if (!entry.libraryPath.empty() && !::getenv("DONT_DERIVE_VIA_MACROS"))
+    return deriveCaseIterableViaMacros(*this, requirement);
+  
   // Define the property.
   auto *returnTy = computeAllCasesType(Nominal);
 
@@ -122,12 +147,19 @@ Type DerivedConformance::deriveCaseIterable(AssociatedTypeDecl *assocType) {
   if (!canDeriveConformance(Nominal))
     return nullptr;
 
-  if (assocType->getName() == Context.Id_AllCases) {
-    return deriveCaseIterable_AllCases(*this);
+  if (assocType->getName() != Context.Id_AllCases) {
+    Context.Diags.diagnose(assocType->getLoc(),
+                           diag::broken_case_iterable_requirement);
+    return nullptr;
   }
-
-  Context.Diags.diagnose(assocType->getLoc(),
-                         diag::broken_case_iterable_requirement);
-  return nullptr;
+  auto &pluginLoader = Context.getPluginLoader();
+  auto &entry = pluginLoader.lookupPluginByModuleName(
+      Context.getIdentifier("SwiftMacros"));
+  if (!entry.libraryPath.empty() && !::getenv("DONT_DERIVE_VIA_MACROS")) {
+    auto witness = deriveCaseIterableViaMacros(*this, assocType);
+    return getConformanceContext()->mapTypeIntoEnvironment(
+        witness->getInterfaceType());
+  }
+  
+  return deriveCaseIterable_AllCases(*this);
 }
-
