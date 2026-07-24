@@ -93,7 +93,7 @@ module Test {
 
 //--- test.swift
 // GENERATED-BY: %target-swift-ide-test -print-module -module-to-print=Test -plugin-path %swift-plugin-dir -I %t -source-filename=x > %t/Test-interface.swift && %swift-function-caller-generator Test %t/Test-interface.swift
-// GENERATED-HASH: 02cc53270b917da2e2b202f5f46430c1a1a4a2ba8e283f29dcc7a96f215ea7b7
+// GENERATED-HASH: 51bb8f8be8c0ca00339f66c0019a4458aeb67b12944f910c1ed8416da859b6cd
 import Test
 
 
@@ -101,24 +101,48 @@ func call_test_fooptr(_ len: CInt, _ p: OpaquePointer!) -> OpaquePointer! {
   return unsafe test_fooptr(len, p)
 }
 
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_test_fooptr(_ p: UnsafeRawBufferPointer) -> OpaquePointer! {
+  return unsafe test_fooptr(p)
+}
+
 func call_test_fooptr2(_ len: CInt, _ p: OpaquePointer!) -> OpaquePointer! {
   return unsafe test_fooptr2(len, p)
+}
+
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_test_fooptr2(_ p: UnsafeRawBufferPointer) -> UnsafeRawBufferPointer {
+  return unsafe test_fooptr2(p)
 }
 
 func call_test_fooptr3(_ len: CInt, _ p: OpaquePointer!) -> OpaquePointer! {
   return unsafe test_fooptr3(len, p)
 }
 
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_test_fooptr3(_ p: UnsafeRawBufferPointer) -> UnsafeRawBufferPointer {
+  return unsafe test_fooptr3(p)
+}
+
 func call_test_fooptr4(_ len: CInt, _ p: OpaquePointer!) -> OpaquePointer {
   return unsafe test_fooptr4(len, p)
+}
+
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_test_fooptr4(_ p: UnsafeRawBufferPointer) -> OpaquePointer {
+  return unsafe test_fooptr4(p)
 }
 
 func call_test_fooptr5(_ len: CInt, _ p: OpaquePointer!) -> OpaquePointer {
   return unsafe test_fooptr5(len, p)
 }
 
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_test_fooptr5(_ p: UnsafeRawBufferPointer) -> OpaquePointer {
+  return unsafe test_fooptr5(p)
+}
+
 func call_test_voidptr(_ len: CInt, _ p: UnsafeMutableRawPointer!) -> UnsafeMutableRawPointer! {
   return unsafe test_voidptr(len, p)
+}
+
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_test_voidptr(_ p: UnsafeMutableRawBufferPointer) -> UnsafeMutableRawPointer! {
+  return unsafe test_voidptr(p)
 }
 
 func call_test_charptr(_ len: CInt, _ p: UnsafeMutablePointer<CChar>!) -> UnsafeMutablePointer<CChar>! {
@@ -127,28 +151,4 @@ func call_test_charptr(_ len: CInt, _ p: UnsafeMutablePointer<CChar>!) -> Unsafe
 
 @_alwaysEmitIntoClient @_disfavoredOverload public func call_test_charptr(_ p: UnsafeMutableRawBufferPointer) -> UnsafeMutablePointer<CChar>! {
   return unsafe test_charptr(p)
-}
-
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_test_fooptr(_ p: UnsafeRawBufferPointer) -> OpaquePointer! {
-  return unsafe test_fooptr(p)
-}
-
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_test_fooptr2(_ p: UnsafeRawBufferPointer) -> UnsafeRawBufferPointer {
-  return unsafe test_fooptr2(p)
-}
-
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_test_fooptr3(_ p: UnsafeRawBufferPointer) -> UnsafeRawBufferPointer {
-  return unsafe test_fooptr3(p)
-}
-
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_test_fooptr4(_ p: UnsafeRawBufferPointer) -> OpaquePointer {
-  return unsafe test_fooptr4(p)
-}
-
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_test_fooptr5(_ p: UnsafeRawBufferPointer) -> OpaquePointer {
-  return unsafe test_fooptr5(p)
-}
-
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_test_voidptr(_ p: UnsafeMutableRawBufferPointer) -> UnsafeMutableRawPointer! {
-  return unsafe test_voidptr(p)
 }
