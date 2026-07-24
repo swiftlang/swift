@@ -244,7 +244,7 @@ extension Task where Success == Never, Failure == Never {
   /// Cancellation may be suppressed by an active task cancellation shield
   /// (``withTaskCancellationShield(operation:)-(()->Value)``). 
   /// If cancellation has been suppressed by an active task cancellation shield, 
-  /// reading `isCancelled` on a cancelled task returns false.
+  /// reading `isCancelled` on a cancelled task returns `false`.
   /// 
   /// - SeeAlso: ``checkCancellation()``
   /// - SeeAlso: ``withTaskCancellationShield(operation:)-(()->Value)``
