@@ -23,8 +23,8 @@ sil @use_generic_obj_guaranteed : $@convention(thin) <T> (@guaranteed T) -> ()
 sil [ossa] @fold_owned_direct_cast : $@convention(thin) (@owned Klass) -> @owned Builtin.NativeObject {
 bb0(%0 : @owned $Klass):
   %1 = init_existential_ref %0 : $Klass : $Klass, $AnyObject
-  %2 = open_existential_ref %1 : $AnyObject to $@opened("11111111-1111-1111-1111-111111111111", AnyObject) Self
-  %3 = unchecked_ref_cast %2 : $@opened("11111111-1111-1111-1111-111111111111", AnyObject) Self to $Builtin.NativeObject
+  %2 = open_existential_ref %1 : $AnyObject to $@opened(1, AnyObject) Self
+  %3 = unchecked_ref_cast %2 : $@opened(1, AnyObject) Self to $Builtin.NativeObject
   return %3 : $Builtin.NativeObject
 }
 
@@ -45,13 +45,13 @@ bb0(%0 : @owned $Klass):
 sil [ossa] @fold_owned_borrow_scope_and_direct_cast : $@convention(thin) (@owned Klass) -> @owned Builtin.NativeObject {
 bb0(%0 : @owned $Klass):
   %1 = init_existential_ref %0 : $Klass : $Klass, $AnyObject
-  %2 = open_existential_ref %1 : $AnyObject to $@opened("22222222-2222-2222-2222-222222222222", AnyObject) Self
-  %3 = begin_borrow %2 : $@opened("22222222-2222-2222-2222-222222222222", AnyObject) Self
-  %4 = unchecked_ref_cast %3 : $@opened("22222222-2222-2222-2222-222222222222", AnyObject) Self to $Klass
+  %2 = open_existential_ref %1 : $AnyObject to $@opened(2, AnyObject) Self
+  %3 = begin_borrow %2 : $@opened(2, AnyObject) Self
+  %4 = unchecked_ref_cast %3 : $@opened(2, AnyObject) Self to $Klass
   %5 = function_ref @takeKlass : $@convention(thin) (@guaranteed Klass) -> ()
   %6 = apply %5(%4) : $@convention(thin) (@guaranteed Klass) -> ()
-  end_borrow %3 : $@opened("22222222-2222-2222-2222-222222222222", AnyObject) Self
-  %7 = unchecked_ref_cast %2 : $@opened("22222222-2222-2222-2222-222222222222", AnyObject) Self to $Builtin.NativeObject
+  end_borrow %3 : $@opened(2, AnyObject) Self
+  %7 = unchecked_ref_cast %2 : $@opened(2, AnyObject) Self to $Builtin.NativeObject
   return %7 : $Builtin.NativeObject
 }
 
@@ -78,23 +78,23 @@ bb0(%0 : @owned $Klass):
 sil [ossa] @fold_owned_multiblock_borrow_scope : $@convention(thin) (@owned Klass) -> @owned Builtin.NativeObject {
 bb0(%0 : @owned $Klass):
   %1 = init_existential_ref %0 : $Klass : $Klass, $AnyObject
-  %2 = open_existential_ref %1 : $AnyObject to $@opened("33333333-3333-3333-3333-333333333333", AnyObject) Self
-  %3 = begin_borrow %2 : $@opened("33333333-3333-3333-3333-333333333333", AnyObject) Self
+  %2 = open_existential_ref %1 : $AnyObject to $@opened(3, AnyObject) Self
+  %3 = begin_borrow %2 : $@opened(3, AnyObject) Self
   cond_br undef, bb1, bb2
 
 bb1:
-  %4 = unchecked_ref_cast %3 : $@opened("33333333-3333-3333-3333-333333333333", AnyObject) Self to $Klass
+  %4 = unchecked_ref_cast %3 : $@opened(3, AnyObject) Self to $Klass
   %5 = function_ref @takeKlass : $@convention(thin) (@guaranteed Klass) -> ()
   %6 = apply %5(%4) : $@convention(thin) (@guaranteed Klass) -> ()
-  end_borrow %3 : $@opened("33333333-3333-3333-3333-333333333333", AnyObject) Self
+  end_borrow %3 : $@opened(3, AnyObject) Self
   br bb3
 
 bb2:
-  end_borrow %3 : $@opened("33333333-3333-3333-3333-333333333333", AnyObject) Self
+  end_borrow %3 : $@opened(3, AnyObject) Self
   br bb3
 
 bb3:
-  %7 = unchecked_ref_cast %2 : $@opened("33333333-3333-3333-3333-333333333333", AnyObject) Self to $Builtin.NativeObject
+  %7 = unchecked_ref_cast %2 : $@opened(3, AnyObject) Self to $Builtin.NativeObject
   return %7 : $Builtin.NativeObject
 }
 
@@ -116,16 +116,16 @@ bb3:
 sil [ossa] @fold_guaranteed_existential_partial : $@convention(thin) (@guaranteed Klass) -> () {
 bb0(%0 : @guaranteed $Klass):
   %1 = init_existential_ref %0 : $Klass : $Klass, $AnyObject
-  %2 = open_existential_ref %1 : $AnyObject to $@opened("44444444-4444-4444-4444-444444444444", AnyObject) Self
-  %3 = unchecked_ref_cast %2 : $@opened("44444444-4444-4444-4444-444444444444", AnyObject) Self to $Klass
+  %2 = open_existential_ref %1 : $AnyObject to $@opened(4, AnyObject) Self
+  %3 = unchecked_ref_cast %2 : $@opened(4, AnyObject) Self to $Klass
   %4 = function_ref @takeKlass : $@convention(thin) (@guaranteed Klass) -> ()
   %5 = apply %4(%3) : $@convention(thin) (@guaranteed Klass) -> ()
-  %6 = begin_borrow %2 : $@opened("44444444-4444-4444-4444-444444444444", AnyObject) Self
-  %7 = unchecked_ref_cast %6 : $@opened("44444444-4444-4444-4444-444444444444", AnyObject) Self to $Klass
+  %6 = begin_borrow %2 : $@opened(4, AnyObject) Self
+  %7 = unchecked_ref_cast %6 : $@opened(4, AnyObject) Self to $Klass
   %8 = apply %4(%7) : $@convention(thin) (@guaranteed Klass) -> ()
-  end_borrow %6 : $@opened("44444444-4444-4444-4444-444444444444", AnyObject) Self
+  end_borrow %6 : $@opened(4, AnyObject) Self
   %9 = function_ref @use_generic_obj_guaranteed : $@convention(thin) <T> (@guaranteed T) -> ()
-  apply %9<@opened("44444444-4444-4444-4444-444444444444", AnyObject) Self>(%2) : $@convention(thin) <T> (@guaranteed T) -> ()
+  apply %9<@opened(4, AnyObject) Self>(%2) : $@convention(thin) <T> (@guaranteed T) -> ()
   %r = tuple ()
   return %r : $()
 }
@@ -145,10 +145,10 @@ bb0(%0 : @guaranteed $Klass):
 sil [ossa] @fold_guaranteed_ignoring_type_dependent_operand : $@convention(thin) (@guaranteed Klass) -> () {
 bb0(%0 : @guaranteed $Klass):
   %1 = init_existential_ref %0 : $Klass : $Klass, $AnyObject
-  %2 = open_existential_ref %1 : $AnyObject to $@opened("55555555-5555-5555-5555-555555555555", AnyObject) Self
-  %3 = metatype $@thick (@opened("55555555-5555-5555-5555-555555555555", AnyObject) Self).Type
+  %2 = open_existential_ref %1 : $AnyObject to $@opened(5, AnyObject) Self
+  %3 = metatype $@thick (@opened(5, AnyObject) Self).Type
   fix_lifetime %3
-  %4 = unchecked_ref_cast %2 : $@opened("55555555-5555-5555-5555-555555555555", AnyObject) Self to $Klass
+  %4 = unchecked_ref_cast %2 : $@opened(5, AnyObject) Self to $Klass
   %5 = function_ref @takeKlass : $@convention(thin) (@guaranteed Klass) -> ()
   %6 = apply %5(%4) : $@convention(thin) (@guaranteed Klass) -> ()
   %r = tuple ()
@@ -171,10 +171,10 @@ bb0(%0 : @guaranteed $Klass):
 sil [ossa] @fold_guaranteed_ignoring_type_dependent_cast_operand : $@convention(thin) (@guaranteed Klass, @guaranteed Klass) -> () {
 bb0(%0 : @guaranteed $Klass, %1 : @guaranteed $Klass):
   %2 = init_existential_ref %0 : $Klass : $Klass, $AnyObject
-  %3 = open_existential_ref %2 : $AnyObject to $@opened("BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB", AnyObject) Self
-  %4 = unchecked_ref_cast %1 : $Klass to $@opened("BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB", AnyObject) Self
+  %3 = open_existential_ref %2 : $AnyObject to $@opened(6, AnyObject) Self
+  %4 = unchecked_ref_cast %1 : $Klass to $@opened(6, AnyObject) Self
   fix_lifetime %4
-  %5 = unchecked_ref_cast %3 : $@opened("BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB", AnyObject) Self to $Klass
+  %5 = unchecked_ref_cast %3 : $@opened(6, AnyObject) Self to $Klass
   %6 = function_ref @takeKlass : $@convention(thin) (@guaranteed Klass) -> ()
   %7 = apply %6(%5) : $@convention(thin) (@guaranteed Klass) -> ()
   %r = tuple ()
@@ -193,8 +193,8 @@ bb0(%0 : @guaranteed $Klass, %1 : @guaranteed $Klass):
 sil @fold_non_ossa : $@convention(thin) (@owned Klass) -> @owned Builtin.NativeObject {
 bb0(%0 : $Klass):
   %1 = init_existential_ref %0 : $Klass : $Klass, $AnyObject
-  %2 = open_existential_ref %1 : $AnyObject to $@opened("66666666-6666-6666-6666-666666666666", AnyObject) Self
-  %3 = unchecked_ref_cast %2 : $@opened("66666666-6666-6666-6666-666666666666", AnyObject) Self to $Builtin.NativeObject
+  %2 = open_existential_ref %1 : $AnyObject to $@opened(7, AnyObject) Self
+  %3 = unchecked_ref_cast %2 : $@opened(7, AnyObject) Self to $Builtin.NativeObject
   return %3 : $Builtin.NativeObject
 }
 
@@ -208,10 +208,10 @@ bb0(%0 : $Klass):
 sil [ossa] @dont_fold_owned_apply_use : $@convention(thin) (@owned Klass) -> () {
 bb0(%0 : @owned $Klass):
   %1 = init_existential_ref %0 : $Klass : $Klass, $AnyObject
-  %2 = open_existential_ref %1 : $AnyObject to $@opened("77777777-7777-7777-7777-777777777777", AnyObject) Self
+  %2 = open_existential_ref %1 : $AnyObject to $@opened(8, AnyObject) Self
   %f = function_ref @use_generic_obj_guaranteed : $@convention(thin) <T> (@guaranteed T) -> ()
-  apply %f<@opened("77777777-7777-7777-7777-777777777777", AnyObject) Self>(%2) : $@convention(thin) <T> (@guaranteed T) -> ()
-  destroy_value %2 : $@opened("77777777-7777-7777-7777-777777777777", AnyObject) Self
+  apply %f<@opened(8, AnyObject) Self>(%2) : $@convention(thin) <T> (@guaranteed T) -> ()
+  destroy_value %2 : $@opened(8, AnyObject) Self
   %x = tuple ()
   return %x : $()
 }
@@ -227,12 +227,12 @@ bb0(%0 : @owned $Klass):
 sil [ossa] @dont_fold_owned_noncast_use_in_borrow_scope : $@convention(thin) (@owned Klass) -> () {
 bb0(%0 : @owned $Klass):
   %1 = init_existential_ref %0 : $Klass : $Klass, $AnyObject
-  %2 = open_existential_ref %1 : $AnyObject to $@opened("88888888-8888-8888-8888-888888888888", AnyObject) Self
-  %3 = begin_borrow %2 : $@opened("88888888-8888-8888-8888-888888888888", AnyObject) Self
+  %2 = open_existential_ref %1 : $AnyObject to $@opened(9, AnyObject) Self
+  %3 = begin_borrow %2 : $@opened(9, AnyObject) Self
   %f = function_ref @use_generic_obj_guaranteed : $@convention(thin) <T> (@guaranteed T) -> ()
-  apply %f<@opened("88888888-8888-8888-8888-888888888888", AnyObject) Self>(%3) : $@convention(thin) <T> (@guaranteed T) -> ()
-  end_borrow %3 : $@opened("88888888-8888-8888-8888-888888888888", AnyObject) Self
-  destroy_value %2 : $@opened("88888888-8888-8888-8888-888888888888", AnyObject) Self
+  apply %f<@opened(9, AnyObject) Self>(%3) : $@convention(thin) <T> (@guaranteed T) -> ()
+  end_borrow %3 : $@opened(9, AnyObject) Self
+  destroy_value %2 : $@opened(9, AnyObject) Self
   %x = tuple ()
   return %x : $()
 }
@@ -254,8 +254,8 @@ bb0(%0 : @owned $Klass):
   %1 = init_existential_ref %0 : $Klass : $Klass, $AnyObject
   %f = function_ref @use_generic_obj_guaranteed : $@convention(thin) <T> (@guaranteed T) -> ()
   apply %f<AnyObject>(%1) : $@convention(thin) <T> (@guaranteed T) -> ()
-  %2 = open_existential_ref %1 : $AnyObject to $@opened("99999999-9999-9999-9999-999999999999", AnyObject) Self
-  %3 = unchecked_ref_cast %2 : $@opened("99999999-9999-9999-9999-999999999999", AnyObject) Self to $Builtin.NativeObject
+  %2 = open_existential_ref %1 : $AnyObject to $@opened(10, AnyObject) Self
+  %3 = unchecked_ref_cast %2 : $@opened(10, AnyObject) Self to $Builtin.NativeObject
   return %3 : $Builtin.NativeObject
 }
 
@@ -266,8 +266,8 @@ bb0(%0 : @owned $Klass):
 // CHECK-LABEL: } // end sil function 'dont_fold_non_init_existential_source'
 sil [ossa] @dont_fold_non_init_existential_source : $@convention(thin) (@guaranteed AnyObject) -> () {
 bb0(%0 : @guaranteed $AnyObject):
-  %1 = open_existential_ref %0 : $AnyObject to $@opened("AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA", AnyObject) Self
-  %2 = unchecked_ref_cast %1 : $@opened("AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA", AnyObject) Self to $Klass
+  %1 = open_existential_ref %0 : $AnyObject to $@opened(11, AnyObject) Self
+  %2 = unchecked_ref_cast %1 : $@opened(11, AnyObject) Self to $Klass
   %3 = function_ref @takeKlass : $@convention(thin) (@guaranteed Klass) -> ()
   %4 = apply %3(%2) : $@convention(thin) (@guaranteed Klass) -> ()
   %r = tuple ()
