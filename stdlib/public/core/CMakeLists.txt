@@ -88,6 +88,19 @@ split_embedded_sources(
   EMBEDDED ErrorType.swift
   EMBEDDED Exclusivity.swift
   EMBEDDED ExistentialCollection.swift
+    NORMAL FilePath/FilePath.swift
+    NORMAL FilePath/FilePathAnchor.swift
+    NORMAL FilePath/FilePathCodeUnits.swift
+    NORMAL FilePath/FilePathComponent.swift
+    NORMAL FilePath/FilePathComponentView.swift
+    NORMAL FilePath/FilePathDarwin.swift
+    NORMAL FilePath/FilePathDecomposition.swift
+    NORMAL FilePath/FilePathInternals.swift
+    NORMAL FilePath/FilePathParsing.swift
+    NORMAL FilePath/FilePathResolve.swift
+    NORMAL FilePath/FilePathStringBridging.swift
+    NORMAL FilePath/FilePathSystemString.swift
+    NORMAL FilePath/FilePathWindows.swift
   EMBEDDED Filter.swift
   EMBEDDED FlatMap.swift
   EMBEDDED Flatten.swift
@@ -317,6 +330,30 @@ endif()
 # Freestanding and Linux/Android builds both have failures to resolve.
 if(NOT BOOTSTRAPPING_MODE STREQUAL "OFF" AND NOT SWIFT_FREESTANDING_FLAVOR AND NOT SWIFT_HOST_VARIANT_SDK STREQUAL "ANDROID")
   list(APPEND SWIFTLIB_SOURCES ObjectIdentifier+DebugDescription.swift)
+endif()
+
+# FilePath models only Darwin, Linux, and Windows path syntax (see the
+# platform #if chain in FilePath/FilePathParsing.swift, which #errors on
+# anything else). Keep its sources out of the regular stdlib on every other
+# SDK so they are never compiled there. Folding in additional POSIX
+# platforms (Android, the BSDs, WASI) is deferred; see that file's TODO.
+if(NOT (SWIFT_PRIMARY_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS
+        OR SWIFT_PRIMARY_VARIANT_SDK STREQUAL "LINUX"
+        OR SWIFT_PRIMARY_VARIANT_SDK STREQUAL "WINDOWS"))
+  list(REMOVE_ITEM SWIFTLIB_SOURCES
+    FilePath/FilePath.swift
+    FilePath/FilePathAnchor.swift
+    FilePath/FilePathCodeUnits.swift
+    FilePath/FilePathComponent.swift
+    FilePath/FilePathComponentView.swift
+    FilePath/FilePathDarwin.swift
+    FilePath/FilePathDecomposition.swift
+    FilePath/FilePathInternals.swift
+    FilePath/FilePathParsing.swift
+    FilePath/FilePathResolve.swift
+    FilePath/FilePathStringBridging.swift
+    FilePath/FilePathSystemString.swift
+    FilePath/FilePathWindows.swift)
 endif()
 
 list(APPEND SWIFTLIB_EMBEDDED_SOURCES
