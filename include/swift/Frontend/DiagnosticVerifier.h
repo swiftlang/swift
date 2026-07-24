@@ -25,6 +25,7 @@
 #include "llvm/Support/SourceMgr.h"
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/Basic/LLVM.h"
+#include <optional>
 
 namespace {
 struct ExpectedDiagnosticInfo;
@@ -213,7 +214,72 @@ private:
   std::string renderFixits(ArrayRef<CapturedFixItInfo> ActualFixIts,
                            unsigned BufferID, unsigned DiagnosticLineNo) const;
 
-  llvm::DenseMap<SourceLoc, unsigned> Expansions;
+  public:
+  /// Tracks the set of macro-expansion buffers produced at a single source
+  /// location. A location can drive several sibling expansions (e.g. multiple
+  /// peer macros on one declaration); their buffers are ordered by the source
+  /// location of the attached-macro attribute that produced each, so that each
+  /// expansion has a stable "expansion index" matching source order. The
+  /// verifier numbers 'expected-expansion' directives at a location in source
+  /// order and matches directive #k to expansion index #k.
+  class ExpansionContext {
+    /// Each produced sibling expansion as (sortKey, bufferID), kept sorted so
+    /// the expansion index matches the source order of the macros that produced
+    /// the siblings. sortKey is the source-location pointer of the generating
+    /// attached-macro attribute; SourceManager orders locations by pointer (see
+    /// isBeforeInBuffer), so an earlier attribute sorts first. Ties (e.g. no
+    /// attribute) fall back to buffer-ID order.
+    SmallVector<std::pair<uintptr_t, unsigned>, 2> buffers;
+    /// Number of directives already routed to a buffer during verification.
+    size_t verifiedCount = 0;
+    /// Number of directives already routed to a buffer during parsing.
+    size_t parsedCount = 0;
+
+  public:
+    ExpansionContext() = default;
+
+    void addBuffer(unsigned ID, uintptr_t sortKey) {
+      assert(verifiedCount == 0 && parsedCount == 0 &&
+             "added buffer after routing began");
+      for (const auto &Buffer : buffers)
+        if (Buffer.second == ID)
+          return;
+      buffers.emplace_back(sortKey, ID);
+      llvm::sort(buffers);
+    }
+
+    size_t expansionIndex(unsigned ID) const {
+      for (size_t I = 0, E = buffers.size(); I != E; ++I)
+        if (buffers[I].second == ID)
+          return I;
+      llvm_unreachable("buffer not in expansion context");
+    }
+
+    // The buffer for the next 'expected-expansion' directive at this location
+    // during verification, in source order. Returns std::nullopt once every
+    // produced expansion has been claimed, so surplus directives are reported
+    // as "expected expansion not produced" rather than running off the end of
+    // the buffer list.
+    std::optional<unsigned> nextBuffer() {
+      if (verifiedCount >= buffers.size())
+        return std::nullopt;
+      return buffers[verifiedCount++].second;
+    }
+
+    // The buffer for the next 'expected-expansion' directive at this location
+    // during parsing, in source order. Because directives are numbered in the
+    // same order the verifier assigns expansion indices, this binds each
+    // block's '#name@N' markers to the specific sibling expansion that block
+    // targets. Returns std::nullopt when the directive has no corresponding
+    // produced expansion (the "not produced" case is diagnosed separately).
+    std::optional<unsigned> nextParseBuffer() {
+      if (parsedCount >= buffers.size())
+        return std::nullopt;
+      return buffers[parsedCount++].second;
+    }
+  };
+  private:
+  llvm::DenseMap<SourceLoc, ExpansionContext> Expansions;
 
   struct MarkerLocation {
     unsigned BufferID;
@@ -241,9 +307,10 @@ private:
   /// Handle location marker definitions found inside an expected-expansion
   /// block whose interior text is \p BlockText. A plain "// #name" is banned;
   /// an expansion-relative "// #name@N" is bound to line N of the expansion
-  /// buffer \p ExpansionBufferID (0 if the expansion was not produced).
-  void processExpansionMarkerDefinitions(StringRef BlockText,
-                                         unsigned ExpansionBufferID);
+  /// buffer \p ExpansionBufferID.
+  void
+  processExpansionMarkerDefinitions(StringRef BlockText,
+                                    std::optional<unsigned> ExpansionBufferID);
 
   /// Resolve '@#marker' references in \p Diags (and their children) whose
   /// resolution was deferred because the marker is a '// #name@N' whose

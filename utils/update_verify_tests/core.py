@@ -635,6 +635,7 @@ def add_diag(
     orig_lines,
     prefix,
     nested_context,
+    insert_after=None,
 ):
     if nested_context:
         prev_line = None
@@ -650,7 +651,19 @@ def add_diag(
         line_n = orig_line_n_to_new_line_n(orig_target_line_n, orig_lines)
         target = lines[line_n - 1]
 
-        prev_line, total_offset, new_line_n = infer_line_context(target, line_n)
+        if insert_after is not None:
+            # Place the new directive immediately after `insert_after` rather
+            # than stacking it above the other diagnostics targeting this line.
+            # Used for a synthesized sibling expansion, which has a higher
+            # expansion index than every pre-existing sibling and so must be
+            # laid out below them for source order to match index order.
+            prev_line = insert_after
+            new_line_n = insert_after.line_n + 1
+            total_offset = target.line_n - new_line_n
+        else:
+            prev_line, total_offset, new_line_n = infer_line_context(
+                target, line_n
+            )
     indent = get_indent(prev_line.content)
     new_line = Line(indent + "{{DIAG}}\n", new_line_n)
     add_line(new_line, lines)
@@ -1159,16 +1172,74 @@ def update_lines(
                 diag.had_absolute_line_in_source
             )
 
-    diag_errors.sort(reverse=True, key=lambda diag_error: diag_error.line)
+    # Process bottom-to-top so inserting directives above a target line does
+    # not shift the not-yet-processed targets below it. Within a single line,
+    # break ties by expansion index (also descending): sibling expansions that
+    # need to be synthesized are each inserted just above the shared target, so
+    # the last one processed ends up highest. Feeding them highest-index-first
+    # therefore lays them out in ascending index order, matching the order the
+    # verifier assigns expansion indices to `expected-expansion` directives.
+    def _sort_key(diag_error):
+        index = getattr(diag_error, "expansion_index", None)
+        return (diag_error.line, index if index is not None else -1)
+
+    diag_errors.sort(reverse=True, key=_sort_key)
+
+    # Snapshot the sibling expected-expansion directives already present at
+    # each expansion target line, in source order, before synthesizing any new
+    # ones. The verifier's expansion index is positional in this order, so
+    # capturing it up front keeps index->directive routing stable even as we
+    # add missing siblings during this pass. `synthesized_expansions` records
+    # siblings we create here, keyed by (target line, index), so a later nested
+    # diag for a different index at the same location reuses or extends the set
+    # instead of mis-filing into an existing sibling.
+    preexisting_expansions = {}
+    synthesized_expansions = {}
+    for diag_error in diag_errors:
+        if (
+            isinstance(diag_error, NestedDiag)
+            and diag_error.expansion_index is not None
+            and diag_error.line not in preexisting_expansions
+        ):
+            preexisting_expansions[diag_error.line] = find_other_targeting(
+                lines, orig_lines, bool(nested_context), diag_error, prefix
+            )
+
     for diag_error in diag_errors:
         if not isinstance(diag_error, ExtraDiag) and not isinstance(
             diag_error, NestedDiag
         ):
             continue
-        other_diags = find_other_targeting(
-            lines, orig_lines, bool(nested_context), diag_error, prefix
+        expansion_index = getattr(diag_error, "expansion_index", None)
+        is_indexed_expansion = (
+            isinstance(diag_error, NestedDiag) and expansion_index is not None
         )
-        diag = other_diags[0] if other_diags else None
+        sibling_anchor = None
+        if is_indexed_expansion and expansion_index is not None:
+            # Route the nested diag to the specific sibling expansion the
+            # verifier reported by its expansion index. Indices below the count
+            # of pre-existing siblings map positionally onto them; higher
+            # indices belong to siblings we synthesize during this pass.
+            preexisting = preexisting_expansions.get(diag_error.line, [])
+            if expansion_index < len(preexisting):
+                diag = preexisting[expansion_index]
+            else:
+                diag = synthesized_expansions.get(
+                    (diag_error.line, expansion_index)
+                )
+                # A synthesized sibling has a higher index than every
+                # pre-existing sibling, so it must be laid out after them for
+                # source order to match expansion-index order. Anchor it below
+                # the last pre-existing sibling instead of stacking it above.
+                # Siblings are processed highest-index-first, so anchoring each
+                # to the same line still lays them out in ascending order.
+                if preexisting:
+                    sibling_anchor = preexisting[-1].line
+        else:
+            other_diags = find_other_targeting(
+                lines, orig_lines, bool(nested_context), diag_error, prefix
+            )
+            diag = other_diags[0] if other_diags else None
         if diag:
             diag.increment_count()
         else:
@@ -1181,7 +1252,12 @@ def update_lines(
                 orig_lines,
                 diag_error.prefix,
                 nested_context,
+                insert_after=sibling_anchor,
             )
+            if is_indexed_expansion:
+                synthesized_expansions[
+                    (diag_error.line, expansion_index)
+                ] = diag
         if isinstance(diag_error, NestedDiag):
             if not diag.closer:
                 whitespace = (
@@ -1429,7 +1505,14 @@ def update_test_file(filename, diag_errors, prefix, updated_test_files):
             if expansion_context:
                 diag.parent = expansion_context[-1]
             else:
-                diag.set_target(lines[diag.absolute_target() - 1])
+                target_idx = diag.absolute_target() - 1
+                if 0 <= target_idx < len(lines):
+                    diag.set_target(lines[target_idx])
+                # Otherwise the directive points outside the file (e.g. the code
+                # it targeted was deleted, leaving the offset dangling past the
+                # end). Leave it targetless: the verifier reports its expansion
+                # as "not produced", so it is dropped as a dead directive rather
+                # than crashing here on an out-of-range line index.
             if diag.category == "expansion":
                 expansion_context.append(diag)
             elif diag.category == "closing":
@@ -1530,12 +1613,18 @@ diag_error_re4 = re.compile(
 
 """
 ex:
-test.swift:12:14: note: in expansion from here
+test.swift:12:14: note: in expansion 0 from here
 func foo() {}
              ^
+
+The trailing integer is the index of the expansion among all expansions that
+share this source location, in the order their `expected-expansion` directives
+appear in the source (see DiagnosticVerifier's ExpansionContext). It routes a
+nested diagnostic to the correct sibling expansion when several expansions are
+attached at the same location (e.g. multiple peer macros on one declaration).
 """
 diag_expansion_note_re = re.compile(
-    r"(\S+):(\d+):(\d+): note: in expansion from here"
+    r"(\S+):(\d+):(\d+): note: in expansion (\d+) from here"
 )
 
 """
@@ -1739,13 +1828,14 @@ class StripChildrenBlock:
 
 
 class NestedDiag:
-    def __init__(self, file, line, col, nested):
+    def __init__(self, file, line, col, nested, expansion_index):
         self.file = file
         self.line = line
         self.col = col
         self.category = "expansion"
         self.content = None
         self.nested = nested
+        self.expansion_index = expansion_index
         self.prefix = ""
 
     def __str__(self):
@@ -1999,7 +2089,13 @@ def check_expectations(tool_output, prefix):
                 nested_note_lines = tool_output[i : i + 3]
                 dprint(f"nested note lines: {nested_note_lines}")
                 curr = [
-                    NestedDiag(m.group(1), int(m.group(2)), int(m.group(3)), e)
+                    NestedDiag(
+                        m.group(1),
+                        int(m.group(2)),
+                        int(m.group(3)),
+                        e,
+                        int(m.group(4)),
+                    )
                     for e in curr
                 ]
                 i += len(nested_note_lines)
