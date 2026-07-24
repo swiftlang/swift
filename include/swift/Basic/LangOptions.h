@@ -1043,9 +1043,13 @@ namespace swift {
     /// debugging
     unsigned ShuffleDisjunctionChoicesSeed = 0;
 
-    /// If true, we will crash if the constraint solver found a valid solution
-    /// in diagnostic mode.
-    bool CrashOnValidSalvage = false;
+    /// If true, we will emit a fallback diagnostic if the constraint solver
+    /// finds a valid solution in diagnostic mode.
+    bool DiagnoseValidSalvage = false;
+
+    /// If true, trigger an assertion failure whenever we emit the fallback
+    /// diagnostic.
+    bool CrashFailDiagnostic = false;
 
     /// Triggers llvm fatal error if the typechecker tries to typecheck a decl
     /// or an identifier reference with any of the provided prefix names. This
