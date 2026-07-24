@@ -36,13 +36,13 @@ struct SomeStruct {
 // CHECK-NOT: alloc_stack $any SomeProtocol
 // CHECK-NOT: copy_addr
 // CHECK: init_existential_addr %{{.*}} : $*any SomeProtocol, $SomeInstance
-// CHECK: [[OPEN1:%.*]] = open_existential_addr immutable_access %0 : $*any SomeProtocol to $*@opened("6419340C-0B14-11EA-9897-ACDE48001122", any SomeProtocol) Self
-// CHECK: apply %{{.*}}<@opened("6419340C-0B14-11EA-9897-ACDE48001122", any SomeProtocol) Self>([[OPEN1]]) : $@convention(witness_method: SomeProtocol) <τ_0_0 where τ_0_0 : SomeProtocol> (@in_guaranteed τ_0_0) -> ()
+// CHECK: [[OPEN1:%.*]] = open_existential_addr immutable_access %0 : $*any SomeProtocol to $*@opened(1, any SomeProtocol) Self
+// CHECK: apply %{{.*}}<@opened(1, any SomeProtocol) Self>([[OPEN1]]) : $@convention(witness_method: SomeProtocol) <τ_0_0 where τ_0_0 : SomeProtocol> (@in_guaranteed τ_0_0) -> ()
 // CHECK-NOT: destroy_addr
 // CHECK-NOT: alloc_stack $any SomeProtocol
 // CHECK-NOT: copy_addr
-// CHECK: [[OPEN2:%.*]] = open_existential_addr immutable_access %{{.*}} : $*any SomeProtocol to $*@opened("6419340C-0B14-11EA-9897-ACDE48001123", any SomeProtocol) Self
-// CHECK: apply %{{.*}}<@opened("6419340C-0B14-11EA-9897-ACDE48001123", any SomeProtocol) Self>([[OPEN2]]) : $@convention(witness_method: SomeProtocol) <τ_0_0 where τ_0_0 : SomeProtocol> (@in_guaranteed τ_0_0) -> ()
+// CHECK: [[OPEN2:%.*]] = open_existential_addr immutable_access %{{.*}} : $*any SomeProtocol to $*@opened(2, any SomeProtocol) Self
+// CHECK: apply %{{.*}}<@opened(2, any SomeProtocol) Self>([[OPEN2]]) : $@convention(witness_method: SomeProtocol) <τ_0_0 where τ_0_0 : SomeProtocol> (@in_guaranteed τ_0_0) -> ()
 // CHECK-NOT: destroy_addr
 // CHECK-LABEL: } // end sil function 'testTempRvalueEscapeAnalysisUpdate'
 sil @testTempRvalueEscapeAnalysisUpdate : $@convention(thin) (@in_guaranteed SomeProtocol, @guaranteed SomeClass) -> () {
@@ -69,9 +69,9 @@ bb0(%0 : $*SomeProtocol, %1 : $SomeClass):
   %stkAdr1 = alloc_stack $SomeProtocol
   copy_addr %0 to [init] %stkAdr1 : $*SomeProtocol
   %instanceAdr = init_existential_addr %indirectLocalPropAdr : $*SomeProtocol, $SomeInstance
-  %openadr1 = open_existential_addr immutable_access %stkAdr1 : $*SomeProtocol to $*@opened("6419340C-0B14-11EA-9897-ACDE48001122", SomeProtocol) Self
-  %witness1 = witness_method $@opened("6419340C-0B14-11EA-9897-ACDE48001122", SomeProtocol) Self, #SomeProtocol.foo : <Self where Self : SomeProtocol> (Self) -> () -> (), %openadr1 : $*@opened("6419340C-0B14-11EA-9897-ACDE48001122", SomeProtocol) Self : $@convention(witness_method: SomeProtocol) <τ_0_0 where τ_0_0 : SomeProtocol> (@in_guaranteed τ_0_0) -> ()
-  %call1 = apply %witness1<@opened("6419340C-0B14-11EA-9897-ACDE48001122", SomeProtocol) Self>(%openadr1) : $@convention(witness_method: SomeProtocol) <τ_0_0 where τ_0_0 : SomeProtocol> (@in_guaranteed τ_0_0) -> ()
+  %openadr1 = open_existential_addr immutable_access %stkAdr1 : $*SomeProtocol to $*@opened(1, SomeProtocol) Self
+  %witness1 = witness_method $@opened(1, SomeProtocol) Self, #SomeProtocol.foo : <Self where Self : SomeProtocol> (Self) -> () -> (), %openadr1 : $*@opened(1, SomeProtocol) Self : $@convention(witness_method: SomeProtocol) <τ_0_0 where τ_0_0 : SomeProtocol> (@in_guaranteed τ_0_0) -> ()
+  %call1 = apply %witness1<@opened(1, SomeProtocol) Self>(%openadr1) : $@convention(witness_method: SomeProtocol) <τ_0_0 where τ_0_0 : SomeProtocol> (@in_guaranteed τ_0_0) -> ()
   destroy_addr %stkAdr1 : $*SomeProtocol
 
   // TempRValue optimization kicks in here. The open_existential_addr
@@ -79,9 +79,9 @@ bb0(%0 : $*SomeProtocol, %1 : $SomeClass):
   // location.
   %stkAdr2 = alloc_stack $SomeProtocol
   copy_addr %propAdr1 to [init] %stkAdr2 : $*SomeProtocol
-  %openadr2 = open_existential_addr immutable_access %stkAdr2 : $*SomeProtocol to $*@opened("6419340C-0B14-11EA-9897-ACDE48001123", SomeProtocol) Self
-  %witness2 = witness_method $@opened("6419340C-0B14-11EA-9897-ACDE48001123", SomeProtocol) Self, #SomeProtocol.foo : <Self where Self : SomeProtocol> (Self) -> () -> (), %openadr2 : $*@opened("6419340C-0B14-11EA-9897-ACDE48001123", SomeProtocol) Self : $@convention(witness_method: SomeProtocol) <τ_0_0 where τ_0_0 : SomeProtocol> (@in_guaranteed τ_0_0) -> ()
-  %call2 = apply %witness2<@opened("6419340C-0B14-11EA-9897-ACDE48001123", SomeProtocol) Self>(%openadr2) : $@convention(witness_method: SomeProtocol) <τ_0_0 where τ_0_0 : SomeProtocol> (@in_guaranteed τ_0_0) -> ()
+  %openadr2 = open_existential_addr immutable_access %stkAdr2 : $*SomeProtocol to $*@opened(2, SomeProtocol) Self
+  %witness2 = witness_method $@opened(2, SomeProtocol) Self, #SomeProtocol.foo : <Self where Self : SomeProtocol> (Self) -> () -> (), %openadr2 : $*@opened(2, SomeProtocol) Self : $@convention(witness_method: SomeProtocol) <τ_0_0 where τ_0_0 : SomeProtocol> (@in_guaranteed τ_0_0) -> ()
+  %call2 = apply %witness2<@opened(2, SomeProtocol) Self>(%openadr2) : $@convention(witness_method: SomeProtocol) <τ_0_0 where τ_0_0 : SomeProtocol> (@in_guaranteed τ_0_0) -> ()
   destroy_addr %stkAdr2 : $*SomeProtocol
 
   dealloc_stack %stkAdr2 : $*SomeProtocol

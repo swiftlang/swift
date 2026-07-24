@@ -640,8 +640,8 @@ public:
   /// Currently there are two kinds of type dependent operands:
   ///
   /// 1. for opened archetypes:
-  ///     %o = open_existential_addr %0 : $*P to $*@opened("UUID") P
-  ///     %w = witness_method $@opened("UUID") P, ... // type-defs: %o
+  ///     %o = open_existential_addr %0 : $*P to $*@opened(id, Self) P
+  ///     %w = witness_method $@opened(ID, Self) P, ... // type-defs: %o
   ///
   /// 2. for the dynamic self argument:
   ///     sil @foo : $@convention(method) (@thick X.Type) {

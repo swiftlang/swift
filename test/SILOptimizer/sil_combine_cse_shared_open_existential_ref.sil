@@ -161,31 +161,31 @@ bb0(%88 : @owned $View, %77 : @owned $Bar):
   %89 = init_existential_ref %88 : $View : $View, $any Designable
   %90 = begin_borrow [lexical] %89
   %91 = begin_borrow [lexical] %77
-  %94 = open_existential_ref %90 to $@opened("5AA778F6-7F99-11F1-B981-5BD94FC553CE", any Designable) Self
-  %95 = witness_method $@opened("5AA778F6-7F99-11F1-B981-5BD94FC553CE", any Designable) Self, #Designable.predefinedGradient!getter, %94 : $@opened("5AA778F6-7F99-11F1-B981-5BD94FC553CE", any Designable) Self : $@convention(witness_method: Designable) <τ_0_0 where τ_0_0 : Designable> (@guaranteed τ_0_0) -> Optional<GradientType>
-  %96 = apply %95<@opened("5AA778F6-7F99-11F1-B981-5BD94FC553CE", any Designable) Self>(%94) : $@convention(witness_method: Designable) <τ_0_0 where τ_0_0 : Designable> (@guaranteed τ_0_0) -> Optional<GradientType>
+  %94 = open_existential_ref %90 to $@opened(1, any Designable) Self
+  %95 = witness_method $@opened(1, any Designable) Self, #Designable.predefinedGradient!getter, %94 : $@opened(1, any Designable) Self : $@convention(witness_method: Designable) <τ_0_0 where τ_0_0 : Designable> (@guaranteed τ_0_0) -> Optional<GradientType>
+  %96 = apply %95<@opened(1, any Designable) Self>(%94) : $@convention(witness_method: Designable) <τ_0_0 where τ_0_0 : Designable> (@guaranteed τ_0_0) -> Optional<GradientType>
   %97 = upcast %91 to $Base
   %100 = ref_element_addr %97, #Base.predefinedGradient
   %101 = begin_access [modify] [dynamic] [no_nested_conflict] %100
   store %96 to [trivial] %101
   end_access %101
-  %94b = open_existential_ref %90 to $@opened("5AA778F6-7F99-11F1-B981-5BD94FC553CF", any Designable) Self
-  %104 = witness_method $@opened("5AA778F6-7F99-11F1-B981-5BD94FC553CF", any Designable) Self, #Designable.startColor!getter, %94b : $@opened("5AA778F6-7F99-11F1-B981-5BD94FC553CF", any Designable) Self : $@convention(witness_method: Designable) <τ_0_0 where τ_0_0 : Designable> (@guaranteed τ_0_0) -> Optional<Int>
-  %105 = apply %104<@opened("5AA778F6-7F99-11F1-B981-5BD94FC553CF", any Designable) Self>(%94b) : $@convention(witness_method: Designable) <τ_0_0 where τ_0_0 : Designable> (@guaranteed τ_0_0) -> Optional<Int>
+  %94b = open_existential_ref %90 to $@opened(2, any Designable) Self
+  %104 = witness_method $@opened(2, any Designable) Self, #Designable.startColor!getter, %94b : $@opened(2, any Designable) Self : $@convention(witness_method: Designable) <τ_0_0 where τ_0_0 : Designable> (@guaranteed τ_0_0) -> Optional<Int>
+  %105 = apply %104<@opened(2, any Designable) Self>(%94b) : $@convention(witness_method: Designable) <τ_0_0 where τ_0_0 : Designable> (@guaranteed τ_0_0) -> Optional<Int>
   %108 = ref_element_addr %91, #Bar.startColor
   %109 = begin_access [modify] [dynamic] [no_nested_conflict] %108
   store %105 to [trivial] %109
   end_access %109
-  %94c = open_existential_ref %90 to $@opened("5AA778F6-7F99-11F1-B981-5BD94FC553D0", any Designable) Self
-  %112 = witness_method $@opened("5AA778F6-7F99-11F1-B981-5BD94FC553D0", any Designable) Self, #Designable.endColor!getter, %94c : $@opened("5AA778F6-7F99-11F1-B981-5BD94FC553D0", any Designable) Self : $@convention(witness_method: Designable) <τ_0_0 where τ_0_0 : Designable> (@guaranteed τ_0_0) -> Optional<Int>
-  %113 = apply %112<@opened("5AA778F6-7F99-11F1-B981-5BD94FC553D0", any Designable) Self>(%94c) : $@convention(witness_method: Designable) <τ_0_0 where τ_0_0 : Designable> (@guaranteed τ_0_0) -> Optional<Int>
+  %94c = open_existential_ref %90 to $@opened(3, any Designable) Self
+  %112 = witness_method $@opened(3, any Designable) Self, #Designable.endColor!getter, %94c : $@opened(3, any Designable) Self : $@convention(witness_method: Designable) <τ_0_0 where τ_0_0 : Designable> (@guaranteed τ_0_0) -> Optional<Int>
+  %113 = apply %112<@opened(3, any Designable) Self>(%94c) : $@convention(witness_method: Designable) <τ_0_0 where τ_0_0 : Designable> (@guaranteed τ_0_0) -> Optional<Int>
   %116 = ref_element_addr %91, #Bar.endColor
   %117 = begin_access [modify] [dynamic] [no_nested_conflict] %116
   store %113 to [trivial] %117
   end_access %117
-  %94d = open_existential_ref %90 to $@opened("5AA778F6-7F99-11F1-B981-5BD94FC553D1", any Designable) Self
-  %120 = witness_method $@opened("5AA778F6-7F99-11F1-B981-5BD94FC553D1", any Designable) Self, #Designable.startPoint!getter, %94d : $@opened("5AA778F6-7F99-11F1-B981-5BD94FC553D1", any Designable) Self : $@convention(witness_method: Designable) <τ_0_0 where τ_0_0 : Designable> (@guaranteed τ_0_0) -> GradientStartPoint
-  %121 = apply %120<@opened("5AA778F6-7F99-11F1-B981-5BD94FC553D1", any Designable) Self>(%94d) : $@convention(witness_method: Designable) <τ_0_0 where τ_0_0 : Designable> (@guaranteed τ_0_0) -> GradientStartPoint
+  %94d = open_existential_ref %90 to $@opened(4, any Designable) Self
+  %120 = witness_method $@opened(4, any Designable) Self, #Designable.startPoint!getter, %94d : $@opened(4, any Designable) Self : $@convention(witness_method: Designable) <τ_0_0 where τ_0_0 : Designable> (@guaranteed τ_0_0) -> GradientStartPoint
+  %121 = apply %120<@opened(4, any Designable) Self>(%94d) : $@convention(witness_method: Designable) <τ_0_0 where τ_0_0 : Designable> (@guaranteed τ_0_0) -> GradientStartPoint
   %124 = ref_element_addr %91, #Bar.startPoint
   %125 = begin_access [modify] [dynamic] [no_nested_conflict] %124
   store %121 to [trivial] %125
@@ -241,11 +241,11 @@ sil @genericConsume : $@convention(thin) <T where T : Taggable> (@owned T) -> ()
 sil [ossa] @siblingGenericApplies : $@convention(thin) (@owned LeafNode) -> () {
 bb0(%0 : @owned $LeafNode):
   %4 = init_existential_ref %0 : $LeafNode : $LeafNode, $any Taggable
-  %5 = open_existential_ref %4 to $@opened("11111111-1111-1111-1111-111111111111", any Taggable) Self
+  %5 = open_existential_ref %4 to $@opened(5, any Taggable) Self
   %6 = function_ref @genericTake : $@convention(thin) <τ_0_0 where τ_0_0 : Taggable> (@guaranteed τ_0_0) -> ()
-  %7 = apply %6<@opened("11111111-1111-1111-1111-111111111111", any Taggable) Self>(%5) : $@convention(thin) <τ_0_0 where τ_0_0 : Taggable> (@guaranteed τ_0_0) -> ()
+  %7 = apply %6<@opened(5, any Taggable) Self>(%5) : $@convention(thin) <τ_0_0 where τ_0_0 : Taggable> (@guaranteed τ_0_0) -> ()
   %9 = function_ref @genericPush : $@convention(thin) <τ_0_0 where τ_0_0 : Taggable> (@guaranteed τ_0_0) -> ()
-  %10 = apply %9<@opened("11111111-1111-1111-1111-111111111111", any Taggable) Self>(%5) : $@convention(thin) <τ_0_0 where τ_0_0 : Taggable> (@guaranteed τ_0_0) -> ()
+  %10 = apply %9<@opened(5, any Taggable) Self>(%5) : $@convention(thin) <τ_0_0 where τ_0_0 : Taggable> (@guaranteed τ_0_0) -> ()
   destroy_value %5
   %14 = tuple ()
   return %14 : $()
@@ -282,11 +282,11 @@ bb0(%0 : @owned $LeafNode):
 sil [ossa] @mixedOwnershipSiblingApplies : $@convention(thin) (@owned LeafNode) -> () {
 bb0(%0 : @owned $LeafNode):
   %4 = init_existential_ref %0 : $LeafNode : $LeafNode, $any Taggable
-  %5 = open_existential_ref %4 to $@opened("22222222-2222-2222-2222-222222222222", any Taggable) Self
+  %5 = open_existential_ref %4 to $@opened(6, any Taggable) Self
   %6 = function_ref @genericTake : $@convention(thin) <τ_0_0 where τ_0_0 : Taggable> (@guaranteed τ_0_0) -> ()
-  %7 = apply %6<@opened("22222222-2222-2222-2222-222222222222", any Taggable) Self>(%5) : $@convention(thin) <τ_0_0 where τ_0_0 : Taggable> (@guaranteed τ_0_0) -> ()
+  %7 = apply %6<@opened(6, any Taggable) Self>(%5) : $@convention(thin) <τ_0_0 where τ_0_0 : Taggable> (@guaranteed τ_0_0) -> ()
   %9 = function_ref @genericConsume : $@convention(thin) <τ_0_0 where τ_0_0 : Taggable> (@owned τ_0_0) -> ()
-  %10 = apply %9<@opened("22222222-2222-2222-2222-222222222222", any Taggable) Self>(%5) : $@convention(thin) <τ_0_0 where τ_0_0 : Taggable> (@owned τ_0_0) -> ()
+  %10 = apply %9<@opened(6, any Taggable) Self>(%5) : $@convention(thin) <τ_0_0 where τ_0_0 : Taggable> (@owned τ_0_0) -> ()
   %14 = tuple ()
   return %14 : $()
 }
@@ -360,17 +360,17 @@ bb0(%0 : @owned $Foo):
   %4 = init_existential_ref %0 : $Foo : $Foo, $any Identifiable2 & Updatable2
   %5 = begin_borrow [lexical] %4 : $any Identifiable2 & Updatable2
 
-  %6 = open_existential_ref %5 : $any Identifiable2 & Updatable2 to $@opened("33333333-3333-3333-3333-333333333333", any Identifiable2 & Updatable2) Self
-  %7 = witness_method $@opened("33333333-3333-3333-3333-333333333333", any Identifiable2 & Updatable2) Self, #Updatable2.update, %6 : $@opened("33333333-3333-3333-3333-333333333333", any Identifiable2 & Updatable2) Self : $@convention(witness_method: Updatable2) <τ_0_0 where τ_0_0 : Updatable2> (@guaranteed τ_0_0) -> ()
-  %10 = apply %7<@opened("33333333-3333-3333-3333-333333333333", any Identifiable2 & Updatable2) Self>(%6) : $@convention(witness_method: Updatable2) <τ_0_0 where τ_0_0 : Updatable2> (@guaranteed τ_0_0) -> ()
+  %6 = open_existential_ref %5 : $any Identifiable2 & Updatable2 to $@opened(7, any Identifiable2 & Updatable2) Self
+  %7 = witness_method $@opened(7, any Identifiable2 & Updatable2) Self, #Updatable2.update, %6 : $@opened(7, any Identifiable2 & Updatable2) Self : $@convention(witness_method: Updatable2) <τ_0_0 where τ_0_0 : Updatable2> (@guaranteed τ_0_0) -> ()
+  %10 = apply %7<@opened(7, any Identifiable2 & Updatable2) Self>(%6) : $@convention(witness_method: Updatable2) <τ_0_0 where τ_0_0 : Updatable2> (@guaranteed τ_0_0) -> ()
 
-  %11 = open_existential_ref %5 : $any Identifiable2 & Updatable2 to $@opened("44444444-4444-4444-4444-444444444444", any Identifiable2 & Updatable2) Self
-  %12 = alloc_stack $@opened("44444444-4444-4444-4444-444444444444", any Identifiable2 & Updatable2) Self
-  %13 = store_borrow %11 to %12 : $*@opened("44444444-4444-4444-4444-444444444444", any Identifiable2 & Updatable2) Self
-  %14 = witness_method $@opened("44444444-4444-4444-4444-444444444444", any Identifiable2 & Updatable2) Self, #Identifiable2.identify, %11 : $@opened("44444444-4444-4444-4444-444444444444", any Identifiable2 & Updatable2) Self : $@convention(witness_method: Identifiable2) <τ_0_0 where τ_0_0 : Identifiable2> (@in_guaranteed τ_0_0) -> ()
-  %15 = apply %14<@opened("44444444-4444-4444-4444-444444444444", any Identifiable2 & Updatable2) Self>(%13) : $@convention(witness_method: Identifiable2) <τ_0_0 where τ_0_0 : Identifiable2> (@in_guaranteed τ_0_0) -> ()
-  end_borrow %13 : $*@opened("44444444-4444-4444-4444-444444444444", any Identifiable2 & Updatable2) Self
-  dealloc_stack %12 : $*@opened("44444444-4444-4444-4444-444444444444", any Identifiable2 & Updatable2) Self
+  %11 = open_existential_ref %5 : $any Identifiable2 & Updatable2 to $@opened(8, any Identifiable2 & Updatable2) Self
+  %12 = alloc_stack $@opened(8, any Identifiable2 & Updatable2) Self
+  %13 = store_borrow %11 to %12 : $*@opened(8, any Identifiable2 & Updatable2) Self
+  %14 = witness_method $@opened(8, any Identifiable2 & Updatable2) Self, #Identifiable2.identify, %11 : $@opened(8, any Identifiable2 & Updatable2) Self : $@convention(witness_method: Identifiable2) <τ_0_0 where τ_0_0 : Identifiable2> (@in_guaranteed τ_0_0) -> ()
+  %15 = apply %14<@opened(8, any Identifiable2 & Updatable2) Self>(%13) : $@convention(witness_method: Identifiable2) <τ_0_0 where τ_0_0 : Identifiable2> (@in_guaranteed τ_0_0) -> ()
+  end_borrow %13 : $*@opened(8, any Identifiable2 & Updatable2) Self
+  dealloc_stack %12 : $*@opened(8, any Identifiable2 & Updatable2) Self
 
   end_borrow %5 : $any Identifiable2 & Updatable2
   destroy_value %4 : $any Identifiable2 & Updatable2

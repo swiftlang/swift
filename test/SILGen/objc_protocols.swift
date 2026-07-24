@@ -236,7 +236,7 @@ func testInitializableExistential(_ im: Initializable.Type, i: Int) -> Initializ
   // CHECK:   [[I2_BOX:%[0-9]+]] = alloc_box ${ var any Initializable }
   // CHECK:   [[I2_LIFETIME:%[0-9]+]] = begin_borrow [lexical] [var_decl] [[I2_BOX]]
   // CHECK:   [[PB:%.*]] = project_box [[I2_LIFETIME]]
-  // CHECK:   [[ARCHETYPE_META:%[0-9]+]] = open_existential_metatype [[META]] : $@thick any Initializable.Type to $@thick (@opened([[N:".*"]], any Initializable) Self).Type
+  // CHECK:   [[ARCHETYPE_META:%[0-9]+]] = open_existential_metatype [[META]] : $@thick any Initializable.Type to $@thick (@opened([[N:.*]], any Initializable) Self).Type
   // CHECK:   [[ARCHETYPE_META_OBJC:%[0-9]+]] = thick_to_objc_metatype [[ARCHETYPE_META]] : $@thick (@opened([[N]], any Initializable) Self).Type to $@objc_metatype (@opened([[N]], any Initializable) Self).Type
   // CHECK:   [[I2_ALLOC:%[0-9]+]] = alloc_ref_dynamic [objc] [[ARCHETYPE_META_OBJC]] : $@objc_metatype (@opened([[N]], any Initializable) Self).Type, $@opened([[N]], any Initializable) Self
   // CHECK:   [[INIT_WITNESS:%[0-9]+]] = objc_method [[I2_ALLOC]] : $@opened([[N]], any Initializable) Self, #Initializable.init!initializer.foreign : {{.*}}
@@ -305,8 +305,8 @@ public protocol DangerousEscaper {
 // CHECK:  destroy_addr [[BLOCK_ADDR]] : $*@callee_guaranteed () -> ()
 // CHECK:  dealloc_stack [[BLOCK]] : $*@block_storage @callee_guaranteed () -> ()
 // CHECK:  destroy_value [[CLOSURE_COPY1]] : $@callee_guaranteed () -> ()
-// CHECK:  [[METH:%.*]] = objc_method [[OE]] : $@opened("{{.*}}", any DangerousEscaper) Self, #DangerousEscaper.malicious!foreign
-// CHECK:  apply [[METH]]<@opened("{{.*}}", any DangerousEscaper) Self>([[BLOCK_CLOSURE_COPY]], [[OE]]) : $@convention(objc_method) <τ_0_0 where τ_0_0 : DangerousEscaper> (@convention(block) @noescape () -> (), τ_0_0) -> ()
+// CHECK:  [[METH:%.*]] = objc_method [[OE]] : $@opened({{.*}}, any DangerousEscaper) Self, #DangerousEscaper.malicious!foreign
+// CHECK:  apply [[METH]]<@opened({{.*}}, any DangerousEscaper) Self>([[BLOCK_CLOSURE_COPY]], [[OE]]) : $@convention(objc_method) <τ_0_0 where τ_0_0 : DangerousEscaper> (@convention(block) @noescape () -> (), τ_0_0) -> ()
 // CHECK:  destroy_value [[BLOCK_CLOSURE_COPY]] : $@convention(block) @noescape () -> ()
 // CHECK:  return {{.*}} : $()
 

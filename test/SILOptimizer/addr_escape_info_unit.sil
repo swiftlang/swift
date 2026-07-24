@@ -783,7 +783,7 @@ bb0(%0 : $Builtin.Word):
 // CHECK-LABEL: Address escape information for test_existentials:
 // CHECK:      pair 0 - 1
 // CHECK-NEXT:   %2 = init_existential_addr %1 : $*any P, $Int
-// CHECK-NEXT:   %4 = open_existential_addr immutable_access %1 : $*any P to $*@opened("D2149896-0C4D-11EE-92B7-0EA13E3AABB3", any P) Self
+// CHECK-NEXT:   %4 = open_existential_addr immutable_access %1 : $*any P to $*@opened(1, any P) Self
 // CHECK-NEXT: may alias
 // CHECK:      End function test_existentials
 sil @test_existentials : $@convention(thin) (Int) -> () {
@@ -792,9 +792,9 @@ bb0(%0 : $Int):
   %1 = alloc_stack $P
   %2 = init_existential_addr %1 : $*P, $Int
   store %0 to %2 : $*Int
-  %4 = open_existential_addr immutable_access %1 : $*any P to $*@opened("D2149896-0C4D-11EE-92B7-0EA13E3AABB3", any P) Self
+  %4 = open_existential_addr immutable_access %1 : $*any P to $*@opened(1, any P) Self
   fix_lifetime %2 : $*Int
-  fix_lifetime %4 : $*@opened("D2149896-0C4D-11EE-92B7-0EA13E3AABB3", any P) Self
+  fix_lifetime %4 : $*@opened(1, any P) Self
   dealloc_stack %1 : $*P
   %r = tuple ()
   return %r : $()

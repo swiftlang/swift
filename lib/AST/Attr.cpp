@@ -272,7 +272,7 @@ void OpenedTypeAttr::printImpl(ASTPrinter &printer,
                                const PrintOptions &options) const {
   printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
   printer.printAttrName("@opened");
-  printer << "(\"" << getUUID() << "\"";
+  printer << "(" << getID();
   if (auto constraintType = getConstraintType()) {
     printer << ", ";
     constraintType->print(printer, options);
@@ -285,7 +285,7 @@ void PackElementTypeAttr::printImpl(ASTPrinter &printer,
                                     const PrintOptions &options) const {
   printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
   printer.printAttrName("@pack_element");
-  printer << "(\"" << getUUID() << "\")";
+  printer << "(" << getID() << ")";
   printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
 }
 

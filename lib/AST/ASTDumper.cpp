@@ -6573,8 +6573,8 @@ namespace {
       printArchetypeCommon(T, "existential_archetype_type", label);
 
       auto *env = T->getGenericEnvironment();
-      printFieldQuoted(env->getOpenedExistentialUUID(),
-                       Label::always("opened_existential_id"));
+      printField(std::to_string(env->getOpenedExistentialID()),
+                 Label::always("opened_existential_id"));
 
       printArchetypeCommonRec(T);
       printRec(env->getOpenedExistentialType(),
@@ -6608,8 +6608,8 @@ namespace {
     }
     void visitElementArchetypeType(ElementArchetypeType *T, Label label) {
       printArchetypeCommon(T, "element_archetype_type", label);
-      printFieldQuoted(T->getOpenedElementID(),
-                       Label::always("opened_element_id"));
+      printField(std::to_string(T->getOpenedElementID()),
+                 Label::always("opened_element_id"));
       printFoot();
     }
 

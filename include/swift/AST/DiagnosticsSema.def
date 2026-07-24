@@ -6889,7 +6889,7 @@ ERROR(illegal_sil_type,none,
 ERROR(sil_box_arg_mismatch,none,
       "SIL box type has wrong number of generic arguments for layout", ())
 ERROR(sil_pack_element_uuid_not_found,none,
-      "open_pack_element instruction not found for '@pack_element' type UUID; "
+      "open_pack_element instruction not found for '@pack_element' type ID; "
       "possible forward reference?", ())
 // SIL Metatypes
 ERROR(sil_metatype_without_repr,none,

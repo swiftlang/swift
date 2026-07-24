@@ -115,7 +115,7 @@ bb0(%0 : $*Builtin.Int64, %1 : $B):
 sil @mark_dependence_base2 : $@convention(thin) (@inout Builtin.Int64, @owned B) -> () {
 bb0(%0 : $*Builtin.Int64, %1 : $B):
   %2 = init_existential_ref %1 : $B : $B, $AnyObject
-  %3 = open_existential_ref %2 to $@opened("B674783A-EF08-11E7-97D6-8C85900CB088", AnyObject) Self
+  %3 = open_existential_ref %2 to $@opened(1, AnyObject) Self
   mark_dependence_addr %0 on %3
   %5 = tuple ()
   return %5

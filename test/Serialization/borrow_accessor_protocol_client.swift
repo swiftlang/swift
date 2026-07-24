@@ -14,9 +14,9 @@ public func use(_ s: borrowing NC) {
 
 // CHECK: sil [ossa] @$s31borrow_accessor_protocol_client3fooyy0a1_b1_C01P_pF :
 // CHECK: bb0([[REG0:%.*]] : $*any P):
-// CHECK:   [[REG2:%.*]] = open_existential_addr immutable_access [[REG0]] to $*@opened("{{.*}}", any P) Self
-// CHECK:   [[REG3:%.*]] = witness_method $@opened("{{.*}}", any P) Self, #P.id!borrow : <Self where Self : borrow_accessor_protocol.P> (Self) -> () -> borrow_accessor_protocol.NonTrivial, [[REG2:%.*]] : $*@opened("{{.*}}", any P) Self : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @guaranteed_address NonTrivial
-// CHECK:   [[REG4:%.*]] = apply [[REG3]]<@opened("{{.*}}", any P) Self>([[REG2]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @guaranteed_address NonTrivial
+// CHECK:   [[REG2:%.*]] = open_existential_addr immutable_access [[REG0]] to $*@opened({{.*}}, any P) Self
+// CHECK:   [[REG3:%.*]] = witness_method $@opened({{.*}}, any P) Self, #P.id!borrow : <Self where Self : borrow_accessor_protocol.P> (Self) -> () -> borrow_accessor_protocol.NonTrivial, [[REG2:%.*]] : $*@opened({{.*}}, any P) Self : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @guaranteed_address NonTrivial
+// CHECK:   [[REG4:%.*]] = apply [[REG3]]<@opened({{.*}}, any P) Self>([[REG2]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @guaranteed_address NonTrivial
 // CHECK: }
 public func foo(_ p: P) {
   use(p.id)
@@ -64,9 +64,9 @@ public func mutate(_ s: inout NonTrivial) {
 // CHECK: sil [ossa] @$s31borrow_accessor_protocol_client3baryy0a1_b1_C01P_pzF :
 // CHECK: bb0([[REG0:%.*]] : $*any P):
 // CHECK:   [[REG2:%.*]] = begin_access [modify] [unknown] [[REG0]]
-// CHECK:   [[REG3:%.*]] = open_existential_addr mutable_access [[REG2]] to $*@opened("{{.*}}", any P) Self
-// CHECK:   [[REG4:%.*]] = witness_method $@opened("{{.*}}", any P) Self, #P.id!mutate : <Self where Self : borrow_accessor_protocol.P> (inout Self) -> () -> borrow_accessor_protocol.NonTrivial, [[REG3:%.*]] : $*@opened("{{.*}}", any P) Self : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@inout τ_0_0) -> @inout NonTrivial
-// CHECK:   [[REG5:%.*]] = apply [[REG4]]<@opened("{{.*}}", any P) Self>([[REG3]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@inout τ_0_0) -> @inout NonTrivial
+// CHECK:   [[REG3:%.*]] = open_existential_addr mutable_access [[REG2]] to $*@opened({{.*}}, any P) Self
+// CHECK:   [[REG4:%.*]] = witness_method $@opened({{.*}}, any P) Self, #P.id!mutate : <Self where Self : borrow_accessor_protocol.P> (inout Self) -> () -> borrow_accessor_protocol.NonTrivial, [[REG3:%.*]] : $*@opened({{.*}}, any P) Self : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@inout τ_0_0) -> @inout NonTrivial
+// CHECK:   [[REG5:%.*]] = apply [[REG4]]<@opened({{.*}}, any P) Self>([[REG3]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@inout τ_0_0) -> @inout NonTrivial
 // CHECK:   [[REG6:%.*]] = function_ref @$s31borrow_accessor_protocol_client6mutateyy0a1_b1_C010NonTrivialVzF : $@convention(thin) (@inout NonTrivial) -> ()
 // CHECK:   [[REG7:%.*]] = apply [[REG6]]([[REG5]]) : $@convention(thin) (@inout NonTrivial) -> ()
 // CHECK:   end_access [[REG2]]
@@ -129,10 +129,10 @@ public func bar(_ s4: inout S4) {
 
 // CHECK: sil [ossa] @$s31borrow_accessor_protocol_client3fooyy0a1_b1_C01Q_pF : $@convention(thin) (@in_guaranteed any Q) -> () {
 // CHECK: bb0([[REG0:%.*]] : $*any Q):
-// CHECK:   [[REG2:%.*]] = open_existential_addr immutable_access [[REG0]] to $*@opened("{{.*}}", any Q) Self
+// CHECK:   [[REG2:%.*]] = open_existential_addr immutable_access [[REG0]] to $*@opened({{.*}}, any Q) Self
 // CHECK:   [[REG3:%.*]] = alloc_stack $NonTrivial
-// CHECK:   [[REG4:%.*]] = witness_method $@opened("{{.*}}", any Q) Self, #Q.id!getter : <Self where Self : borrow_accessor_protocol.Q> (Self) -> () -> borrow_accessor_protocol.NonTrivial, [[REG2:%.*]] : $*@opened("{{.*}}", any Q) Self : $@convention(witness_method: Q) <τ_0_0 where τ_0_0 : Q> (@in_guaranteed τ_0_0) -> @out NonTrivial
-// CHECK:   [[REG5:%.*]] = apply [[REG4]]<@opened("{{.*}}", any Q) Self>([[REG3]], [[REG2]]) : $@convention(witness_method: Q) <τ_0_0 where τ_0_0 : Q> (@in_guaranteed τ_0_0) -> @out NonTrivial
+// CHECK:   [[REG4:%.*]] = witness_method $@opened({{.*}}, any Q) Self, #Q.id!getter : <Self where Self : borrow_accessor_protocol.Q> (Self) -> () -> borrow_accessor_protocol.NonTrivial, [[REG2:%.*]] : $*@opened({{.*}}, any Q) Self : $@convention(witness_method: Q) <τ_0_0 where τ_0_0 : Q> (@in_guaranteed τ_0_0) -> @out NonTrivial
+// CHECK:   [[REG5:%.*]] = apply [[REG4]]<@opened({{.*}}, any Q) Self>([[REG3]], [[REG2]]) : $@convention(witness_method: Q) <τ_0_0 where τ_0_0 : Q> (@in_guaranteed τ_0_0) -> @out NonTrivial
 // CHECK: }
 public func foo(_ q: Q) {
   use(q.id)
@@ -159,9 +159,9 @@ public func foo(_ s6: S6) {
 // CHECK: sil [ossa] @$s31borrow_accessor_protocol_client3baryy0a1_b1_C01Q_pzF : $@convention(thin) (@inout any Q) -> () {
 // CHECK: bb0([[REG0:%.*]] : $*any Q):
 // CHECK:   [[REG2:%.*]] = begin_access [modify] [unknown] [[REG0]]
-// CHECK:   [[REG3:%.*]] = open_existential_addr mutable_access [[REG2]] to $*@opened("{{.*}}", any Q) Self
-// CHECK:   [[REG4:%.*]] = witness_method $@opened("{{.*}}", any Q) Self, #Q.id!modify : <Self where Self : borrow_accessor_protocol.Q> (inout Self) -> () -> (), [[REG3:%.*]] : $*@opened("{{.*}}", any Q) Self : $@yield_once @convention(witness_method: Q) <τ_0_0 where τ_0_0 : Q> (@inout τ_0_0) -> @yields @inout NonTrivial
-// CHECK:   ([[REG5]], [[REG6]]) = begin_apply [[REG4]]<@opened("{{.*}}", any Q) Self>([[REG3]]) : $@yield_once @convention(witness_method: Q) <τ_0_0 where τ_0_0 : Q> (@inout τ_0_0) -> @yields @inout NonTrivial
+// CHECK:   [[REG3:%.*]] = open_existential_addr mutable_access [[REG2]] to $*@opened({{.*}}, any Q) Self
+// CHECK:   [[REG4:%.*]] = witness_method $@opened({{.*}}, any Q) Self, #Q.id!modify : <Self where Self : borrow_accessor_protocol.Q> (inout Self) -> () -> (), [[REG3:%.*]] : $*@opened({{.*}}, any Q) Self : $@yield_once @convention(witness_method: Q) <τ_0_0 where τ_0_0 : Q> (@inout τ_0_0) -> @yields @inout NonTrivial
+// CHECK:   ([[REG5]], [[REG6]]) = begin_apply [[REG4]]<@opened({{.*}}, any Q) Self>([[REG3]]) : $@yield_once @convention(witness_method: Q) <τ_0_0 where τ_0_0 : Q> (@inout τ_0_0) -> @yields @inout NonTrivial
 // CHECK:   [[REG7:%.*]] = function_ref @$s31borrow_accessor_protocol_client6mutateyy0a1_b1_C010NonTrivialVzF : $@convention(thin) (@inout NonTrivial) -> ()
 // CHECK:   [[REG8:%.*]] = apply [[REG7]]([[REG5]]) : $@convention(thin) (@inout NonTrivial) -> ()
 // CHECK:   [[REG9:%.*]] = end_apply [[REG6]] as $()
@@ -199,9 +199,9 @@ public func bar(_ s6: inout S6) {
 // CHECK:   [[REG1:%.*]] = copyable_to_moveonlywrapper_addr [[REG0]]
 // CHECK:   [[REG3:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[REG1]]
 // CHECK:   [[REG4:%.*]] = moveonlywrapper_to_copyable_addr [[REG3]]
-// CHECK:   [[REG5:%.*]] = open_existential_addr immutable_access [[REG4]] to $*@opened("{{.*}}", any NCP) Self
-// CHECK:   [[REG6:%.*]] = witness_method $@opened("{{.*}}", any NCP) Self, #NCP.id!borrow : <Self where Self : borrow_accessor_protocol.NCP, Self : ~Copyable> (Self) -> () -> borrow_accessor_protocol.NC, [[REG5:%.*]] : $*@opened("{{.*}}", any NCP) Self : $@convention(witness_method: NCP) <τ_0_0 where τ_0_0 : NCP, τ_0_0 : ~Copyable> (@in_guaranteed τ_0_0) -> @guaranteed_address NC
-// CHECK:   [[REG7:%.*]] = apply [[REG6]]<@opened("{{.*}}", any NCP) Self>([[REG5]]) : $@convention(witness_method: NCP) <τ_0_0 where τ_0_0 : NCP, τ_0_0 : ~Copyable> (@in_guaranteed τ_0_0) -> @guaranteed_address NC
+// CHECK:   [[REG5:%.*]] = open_existential_addr immutable_access [[REG4]] to $*@opened({{.*}}, any NCP) Self
+// CHECK:   [[REG6:%.*]] = witness_method $@opened({{.*}}, any NCP) Self, #NCP.id!borrow : <Self where Self : borrow_accessor_protocol.NCP, Self : ~Copyable> (Self) -> () -> borrow_accessor_protocol.NC, [[REG5:%.*]] : $*@opened({{.*}}, any NCP) Self : $@convention(witness_method: NCP) <τ_0_0 where τ_0_0 : NCP, τ_0_0 : ~Copyable> (@in_guaranteed τ_0_0) -> @guaranteed_address NC
+// CHECK:   [[REG7:%.*]] = apply [[REG6]]<@opened({{.*}}, any NCP) Self>([[REG5]]) : $@convention(witness_method: NCP) <τ_0_0 where τ_0_0 : NCP, τ_0_0 : ~Copyable> (@in_guaranteed τ_0_0) -> @guaranteed_address NC
 // CHECK: }
 public func foo(_ p: borrowing NCP) {
   use(p.id)

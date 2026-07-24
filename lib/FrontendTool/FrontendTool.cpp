@@ -49,7 +49,6 @@
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/SupportedFeatures.h"
 #include "swift/Basic/TargetInfo.h"
-#include "swift/Basic/UUID.h"
 #include "swift/Basic/Version.h"
 #include "swift/Bridging/ASTGen.h"
 #include "swift/ConstExtract/ConstExtract.h"
