@@ -1108,6 +1108,13 @@ bool BridgedGlobalVar::isPossiblyUsedExternally() const {
   return getGlobal()->isPossiblyUsedExternally();
 }
 
+bool BridgedGlobalVar::isWeaklyImported() const {
+  swift::SILGlobalVariable *global = getGlobal();
+  if (swift::VarDecl *decl = global->getDecl())
+    return decl->isWeakImported(global->getModule().getSwiftModule());
+  return false;
+}
+
 OptionalBridgedInstruction BridgedGlobalVar::getFirstStaticInitInst() const {
   if (getGlobal()->begin() == getGlobal()->end()) {
     return {nullptr};

@@ -1198,6 +1198,15 @@ private extension ScopedInstruction {
     case is BeginApplyInst:
       return true // Has already been checked with other full applies.
     case let loadBorrowInst as LoadBorrowInst:
+      // Hoisting a scoped instruction is speculative: `hoistWithSinkScopedInstructions` also hoists
+      // instructions from blocks which do not dominate the loop exits, i.e. which are only
+      // conditionally executed. The address of a weakly-imported global is null if the symbol is
+      // unavailable at runtime. Therefore a load from it - which is guarded by an `#available`
+      // check in the source - must not be executed speculatively.
+      // See https://github.com/swiftlang/swift/issues/90916
+      if loadBorrowInst.loadsFromWeaklyImportedGlobal {
+        return false
+      }
       return !analyzedInstructions.sideEffectsMayWrite(to: loadBorrowInst.address, outsideOf: scope, context)
 
     case let beginAccess as BeginAccessInst:
@@ -1218,6 +1227,22 @@ private extension ScopedInstruction {
     default:
       return false
     }
+  }
+}
+
+private extension LoadBorrowInst {
+  /// True if this load's address is rooted in a weakly-imported global variable.
+  ///
+  /// Such an address is null at runtime if the weakly-linked symbol is unavailable
+  /// (e.g. an availability-gated global constant, running on an OS version older than
+  /// the constant's introduction). A load from it traps and therefore must not be
+  /// executed speculatively - it is only safe where the programmer put it: behind
+  /// the `#available` check.
+  var loadsFromWeaklyImportedGlobal: Bool {
+    if case .global(let global) = address.accessBase {
+      return global.isWeaklyImported
+    }
+    return false
   }
 }
 
