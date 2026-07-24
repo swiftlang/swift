@@ -229,8 +229,6 @@ func activeEnumAddr(_ e: IndirectEnum<Float>, _ x: Float) -> Float {
 
 @differentiable(reverse)
 func generic<T: Differentiable & FloatingPoint>(_ x: T) -> T {
-  // expected-error @+2 {{expression is not differentiable}}
-  // expected-note @+1 {{member is not differentiable because the corresponding protocol requirement is not '@differentiable'}}
   return x + 1
 }
 

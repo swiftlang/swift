@@ -5529,14 +5529,14 @@ SILDeserializer::readDifferentiabilityWitness(DeclID DId) {
   (void)kind;
 
   DeclID originalNameId, jvpNameId, vjpNameId;
-  unsigned rawLinkage, isDeclaration, isSerialized, rawDiffKind,
+  unsigned rawLinkage, isDeclaration, isSerialized, isDefault, rawDiffKind,
       numParameterIndices, numResultIndices;
   GenericSignatureID derivativeGenSigID;
   ArrayRef<uint64_t> rawParameterAndResultIndices;
 
   DifferentiabilityWitnessLayout::readRecord(
       scratch, originalNameId, rawLinkage, isDeclaration, isSerialized,
-      rawDiffKind, derivativeGenSigID, jvpNameId, vjpNameId,
+      isDefault, rawDiffKind, derivativeGenSigID, jvpNameId, vjpNameId,
       numParameterIndices, numResultIndices, rawParameterAndResultIndices);
 
   if (isDeclaration) {
@@ -5595,7 +5595,7 @@ SILDeserializer::readDifferentiabilityWitness(DeclID DId) {
   if (!diffWitness)
     diffWitness = SILDifferentiabilityWitness::createDeclaration(
         SILMod, linkage, original, *diffKind, parameterIndices, resultIndices,
-        derivativeGenSig);
+        derivativeGenSig, isDefault);
 
   // If the current differentiability witness is merely a declaration, and the
   // deserialized witness is a definition, upgrade the current differentiability

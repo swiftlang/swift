@@ -83,7 +83,7 @@ SWIFT_REQUEST(TypeChecker, DifferentiableAttributeTypeCheckRequest,
               IndexSubset *(DifferentiableAttr *),
               SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, DerivativeAttrOriginalDeclRequest,
-              AbstractFunctionDecl *(DerivativeAttr *),
+              llvm::TinyPtrVector<AbstractFunctionDecl *>(DerivativeAttr *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, TypeEraserHasViableInitRequest,
               bool(TypeEraserAttr *, ProtocolDecl *),

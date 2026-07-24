@@ -4824,6 +4824,9 @@ void SILDifferentiabilityWitness::print(llvm::raw_ostream &OS,
   // ([serialized])?
   if (isSerialized())
     OS << "[serialized] ";
+  // ([default])?
+  if (isDefault())
+    OS << "[default] ";
   // Kind
   OS << '[';
   switch (getKind()) {

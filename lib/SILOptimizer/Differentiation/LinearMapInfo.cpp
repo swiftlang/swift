@@ -16,12 +16,14 @@
 
 #define DEBUG_TYPE "differentiation"
 
-#include "swift/SIL/ApplySite.h"
 #include "swift/SILOptimizer/Differentiation/LinearMapInfo.h"
+#include "swift/SIL/ApplySite.h"
+#include "swift/SILOptimizer/Analysis/ArraySemantic.h"
 #include "swift/SILOptimizer/Differentiation/ADContext.h"
 
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/SIL/LoopInfo.h"
