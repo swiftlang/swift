@@ -7211,6 +7211,9 @@ ERROR(borrowed_on_objc_protocol_requirement,none,
       "%kindonly0 cannot be '@_borrowed' if it is an '@objc' protocol "
       "requirement",
       (const AbstractStorageDecl *))
+ERROR(objc_borrowing_accessor,none,
+      "'borrow' and 'yielding borrow' accessors are not supported in "
+      "Objective-C", ())
 ERROR(borrowed_with_effect,none,
       "%kindonly0 cannot be '@_borrowed' if it is 'async' or 'throws'",
       (const AccessorDecl *))
