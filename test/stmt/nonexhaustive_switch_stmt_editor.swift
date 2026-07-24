@@ -9,9 +9,8 @@ public enum NonExhaustive {
 @inlinable
 public func testNonExhaustive(_ value: NonExhaustive) {
   switch value { // expected-error {{switch must be exhaustive}}
-  // expected-note@-1 {{add missing case: '.b'}}
-  // expected-note@-2 {{handle unknown values using "@unknown default"}}
-  // expected-note@-3 {{add missing cases}}
+  // expected-note@-1 {{handle unknown values using "@unknown default"}}
+  // expected-note@-2 {{add missing cases: '.b', '@unknown default'}}
   case .a: break
   }
 
@@ -24,10 +23,8 @@ public func testNonExhaustive(_ value: NonExhaustive) {
 
   switch value {
   // expected-error@-1 {{switch must be exhaustive}}
-  // expected-note@-2 {{add missing case: '.a'}} {{+6:3-3=case .a:\n<#code#>\n}}
-  // expected-note@-3 {{add missing case: '.b'}} {{+6:3-3=case .b:\n<#code#>\n}}
-  // expected-note@-4 {{handle unknown values using "@unknown default"}} {{+6:3-3=@unknown default:\n<#fatalError()#>\n}}
-  // expected-note@-5 {{add missing cases}} {{+6:3-3=case .a:\n<#code#>\ncase .b:\n<#code#>\n@unknown default:\n<#fatalError()#>\n}}
+  // expected-note@-2 {{handle unknown values using "@unknown default"}} {{+4:3-3=@unknown default:\n<#fatalError()#>\n}}
+  // expected-note@-3 {{add missing cases: '.a', '.b', '@unknown default'}} {{+4:3-3=case .a:\n<#code#>\ncase .b:\n<#code#>\n@unknown default:\n<#fatalError()#>\n}}
   }
 
   switch value {
