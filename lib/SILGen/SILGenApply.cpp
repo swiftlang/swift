@@ -6559,6 +6559,12 @@ SILValue SILGenFunction::emitApplyWithRethrow(SILLocation loc, SILValue fn,
     // can end up here. Since the callee cannot actually throw, emit
     // an unreachable in the error branch.
     ASSERT(silFnType->getErrorResult().getInterfaceType()->isNever());
+    // If direct, the block still needs to have a dummy Never error arg.
+    if (!fnConv.hasIndirectSILErrorResults()) {
+      errorBB->createPhiArgument(
+          fnConv.getSILErrorType(getTypeExpansionContext()),
+          OwnershipKind::Owned);
+    }
     B.emitBlock(errorBB);
     B.createUnreachable(loc);
   } else {
