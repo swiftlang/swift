@@ -135,3 +135,27 @@ TEST(Demangle, WordsArraySavedAcrossNestedDemangle) {
   ASSERT_EQ(argStruct->getKind(), Node::Kind::Structure);
   EXPECT_EQ(argStruct->getChild(1)->getText(), "OtherType");
 }
+
+// Test that DemangleInitRAII saves and restores IsOldFunctionTypeMangling
+// across demangle calls on the same Demangler.
+TEST(Demangle, OldFunctionTypeManglingFlagSavedAcrossDemangle) {
+  // A modern-mangled function type carrying argument labels (a:b:):
+  //   M.f(a: Int, b: Int) -> ()
+  static const char funcType[] = "1M1f1a1bS2i_SitF";
+
+  // Reference tree from a pristine Demangler (flag defaults to false).
+  Demangler fresh;
+  auto expected = fresh.demangleType(funcType);
+  ASSERT_NE(expected, nullptr);
+
+  Demangler dem;
+  // Demangle a Swift-4 ("_T…") symbol first; this sets
+  // IsOldFunctionTypeMangling = true for that job.
+  dem.demangleSymbol("_T0");
+  // The flag must not leak into this modern demangle.
+  auto result = dem.demangleType(funcType);
+  ASSERT_NE(result, nullptr);
+  EXPECT_TRUE(result->isDeepEqualTo(expected))
+      << "IsOldFunctionTypeMangling leaked across DemangleInitRAII";
+}
+
