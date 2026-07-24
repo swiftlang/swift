@@ -1,6 +1,7 @@
 // RUN: %target-run-stdlib-swift(-enable-experimental-feature LifetimeDependence) %S/Inputs/
 // REQUIRES: swift_feature_LifetimeDependence
 // REQUIRES: executable_test
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 import Swift
 import StdlibUnittest

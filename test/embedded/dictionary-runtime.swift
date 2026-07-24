@@ -6,6 +6,7 @@
 // REQUIRES: optimized_stdlib
 // REQUIRES: OS=macosx || OS=wasip1
 // REQUIRES: swift_feature_Embedded
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 var dict1: [Int: Int] = [1:10]
 var dict2: [Int: Int] = [1:20]

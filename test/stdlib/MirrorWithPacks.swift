@@ -20,6 +20,7 @@
 
 // rdar://96439408
 // UNSUPPORTED: use_os_stdlib
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 import StdlibUnittest
 

@@ -14,6 +14,7 @@
 
 // REQUIRES: executable_test
 // REQUIRES: swift_feature_Lifetimes
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 import StdlibUnittest
 

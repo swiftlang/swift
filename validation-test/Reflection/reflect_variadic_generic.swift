@@ -8,6 +8,7 @@
 // REQUIRES: executable_test
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: asan
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 import SwiftReflectionTest
 

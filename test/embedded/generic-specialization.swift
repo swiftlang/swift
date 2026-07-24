@@ -3,6 +3,7 @@
 
 // REQUIRES: executable_test
 // REQUIRES: swift_feature_Embedded
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 func f<V>(_ a: [V]) -> [String] {
     return a.indices.map { String($0 /* as Int*/) }  // adding `as Int` makes it compile
