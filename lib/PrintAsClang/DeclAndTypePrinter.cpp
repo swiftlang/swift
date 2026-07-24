@@ -607,10 +607,18 @@ private:
             auto objectTypeDecl = objectType->getNominalOrBoundGenericNominal();
             assert(objectTypeDecl != nullptr || paramType->isOptional());
 
-            if (objectTypeDecl &&
-                (owningPrinter.typeMapping.getKnownCxxTypeInfo(
-                     objectTypeDecl) ||
-                 isClangPOD(objectTypeDecl))) {
+            std::optional<PrimitiveTypeMapping::ClangTypeInfo>
+                knownCxxTypeInfo =
+                    objectTypeDecl
+                        ? owningPrinter.typeMapping.getKnownCxxTypeInfo(
+                              objectTypeDecl)
+                        : std::nullopt;
+            bool resultIsSwiftOptional =
+                optKind != OTK_None &&
+                !(knownCxxTypeInfo && knownCxxTypeInfo->canBeNullable);
+
+            if (objectTypeDecl && !resultIsSwiftOptional &&
+                (knownCxxTypeInfo || isClangPOD(objectTypeDecl))) {
               outOfLineOS << "    " << types[paramType] << " result;\n";
               outOfLineOS << "    "
                              "memcpy(&result, payloadFromDestruction, "
