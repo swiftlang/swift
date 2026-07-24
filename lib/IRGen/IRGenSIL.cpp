@@ -6487,22 +6487,14 @@ IRGenSILFunction::visitDereferenceBorrowAddrInst(DereferenceBorrowAddrInst *i) {
       swift::StrongCopy##Name##ValueInst *i) {                                 \
     Explosion in = getLoweredExplosion(i->getOperand());                       \
     auto silTy = i->getOperand()->getType();                                   \
-    auto ty = cast<Name##StorageType>(silTy.getASTType());                     \
-    auto isOptional = bool(ty.getReferentType()->getOptionalObjectType());     \
     auto &ti = getReferentTypeInfo(*this, silTy);                              \
     ti.strongRetain##Name(*this, in, irgen::Atomicity::Atomic);                \
     /* Semantically we are just passing through the input parameter but as a   \
      */                                                                        \
     /* strong reference... at LLVM IR level these type differences don't */    \
-    /* matter. So just set the lowered explosion appropriately. */             \
+    /* matter. A loadable optional reference is a nullable pointer, so its */  \
+    /* representation already matches the referent; just forward it. */        \
     Explosion output = getLoweredExplosion(i->getOperand());                   \
-    if (isOptional) {                                                          \
-      auto values = output.claimAll();                                         \
-      output.reset();                                                          \
-      for (auto value : values) {                                              \
-        output.add(Builder.CreatePtrToInt(value, IGM.IntPtrTy));               \
-      }                                                                        \
-    }                                                                          \
     setLoweredExplosion(i, output);                                            \
   }
 #define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
@@ -6513,8 +6505,6 @@ IRGenSILFunction::visitDereferenceBorrowAddrInst(DereferenceBorrowAddrInst *i) {
       swift::StrongCopy##Name##ValueInst *i) {                                 \
     Explosion in = getLoweredExplosion(i->getOperand());                       \
     auto silTy = i->getOperand()->getType();                                   \
-    auto ty = cast<Name##StorageType>(silTy.getASTType());                     \
-    auto isOptional = bool(ty.getReferentType()->getOptionalObjectType());     \
     auto &ti = getReferentTypeInfo(*this, silTy);                              \
     /* Since we are unchecked, we just use strong retain here. We do not       \
      * perform any checks */                                                   \
@@ -6522,15 +6512,9 @@ IRGenSILFunction::visitDereferenceBorrowAddrInst(DereferenceBorrowAddrInst *i) {
     /* Semantically we are just passing through the input parameter but as a   \
      */                                                                        \
     /* strong reference... at LLVM IR level these type differences don't */    \
-    /* matter. So just set the lowered explosion appropriately. */             \
+    /* matter. A loadable optional reference is a nullable pointer, so its */  \
+    /* representation already matches the referent; just forward it. */        \
     Explosion output = getLoweredExplosion(i->getOperand());                   \
-    if (isOptional) {                                                          \
-      auto values = output.claimAll();                                         \
-      output.reset();                                                          \
-      for (auto value : values) {                                              \
-        output.add(Builder.CreatePtrToInt(value, IGM.IntPtrTy));               \
-      }                                                                        \
-    }                                                                          \
     setLoweredExplosion(i, output);                                            \
   }
 #include "swift/AST/ReferenceStorage.def"

@@ -59,11 +59,6 @@ class HeapTypeInfo
     : public SingleScalarTypeInfoWithTypeLayout<Impl, ReferenceTypeInfo> {
   using super = SingleScalarTypeInfoWithTypeLayout<Impl, ReferenceTypeInfo>;
 
-  llvm::Type *getOptionalIntType() const {
-    return llvm::IntegerType::get(this->getStorageType()->getContext(),
-                                  this->getFixedSize().getValueInBits());
-  }
-
 protected:
   using super::asDerived;
 public:
@@ -152,39 +147,29 @@ public:
     llvm::Value *value = IGF.emit##Name##LoadStrong(src, \
                                           this->getStorageType(), \
                                           asDerived().getReferenceCounting()); \
-    if (isOptional) { \
-      out.add(IGF.Builder.CreatePtrToInt(value, getOptionalIntType())); \
-    } else { \
-      out.add(value); \
-    } \
+    /* A loadable optional reference is a nullable pointer (.none == null), */ \
+    /* so its representation is the pointer itself. */ \
+    (void)isOptional; \
+    out.add(value); \
   } \
   void name##TakeStrong(IRGenFunction &IGF, Address src, \
                          Explosion &out, bool isOptional) const override { \
     llvm::Value *value = IGF.emit##Name##TakeStrong(src, \
                                           this->getStorageType(), \
                                           asDerived().getReferenceCounting()); \
-    if (isOptional) { \
-      out.add(IGF.Builder.CreatePtrToInt(value, getOptionalIntType())); \
-    } else { \
-      out.add(value); \
-    } \
+    (void)isOptional; \
+    out.add(value); \
   } \
   void name##Init(IRGenFunction &IGF, Explosion &in, \
                   Address dest, bool isOptional) const override { \
     llvm::Value *value = in.claimNext(); \
-    if (isOptional) { \
-      assert(value->getType() == getOptionalIntType()); \
-      value = IGF.Builder.CreateIntToPtr(value, this->getStorageType()); \
-    } \
+    (void)isOptional; \
     IGF.emit##Name##Init(value, dest, asDerived().getReferenceCounting()); \
   } \
   void name##Assign(IRGenFunction &IGF, Explosion &in, \
                     Address dest, bool isOptional) const override { \
     llvm::Value *value = in.claimNext(); \
-    if (isOptional) { \
-      assert(value->getType() == getOptionalIntType()); \
-      value = IGF.Builder.CreateIntToPtr(value, this->getStorageType()); \
-    } \
+    (void)isOptional; \
     IGF.emit##Name##Assign(value, dest, asDerived().getReferenceCounting()); \
   }
 #define ALWAYS_LOADABLE_CHECKED_REF_STORAGE_HELPER(Name, name)                 \

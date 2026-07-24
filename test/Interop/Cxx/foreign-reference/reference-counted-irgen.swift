@@ -48,20 +48,18 @@ public func getNullable(wantNullptr: Bool) -> GlobalCountNullableInit? {
     return result
 }
 
-// CHECK:      define {{.*}}swiftcc i{{.*}} @"$s4main11getNullable11wantNullptrSo011GlobalCountC4InitVSgSb_tF"(i1 %0)
+// CHECK:      define {{.*}}swiftcc ptr @"$s4main11getNullable11wantNullptrSo011GlobalCountC4InitVSgSb_tF"(i1 %0)
 // CHECK-NEXT: entry:
 // CHECK:        %1 = call ptr @{{_ZN23GlobalCountNullableInit6createEb|"\?create\@GlobalCountNullableInit\@\@SAPEAU1\@_N\@Z"}}
-// CHECK-NEXT:   %2 = ptrtoint ptr %1 to i{{.*}}
-// CHECK-NEXT:   %3 = inttoptr i{{.*}} %2 to ptr
-// CHECK-NEXT:   %4 = icmp ne ptr %3, null
-// CHECK-NEXT:   br i1 %4, label %lifetime.nonnull-value, label %lifetime.cont
+// CHECK-NEXT:   %2 = icmp ne ptr %1, null
+// CHECK-NEXT:   br i1 %2, label %lifetime.nonnull-value, label %lifetime.cont
 
 // CHECK:      lifetime.nonnull-value:
-// CHECK-NEXT:   call void @{{_Z20GCRetainNullableInitP23GlobalCountNullableInit|"\?GCRetainNullableInit\@\@YAXPEAUGlobalCountNullableInit\@\@\@Z"}}(ptr %3)
+// CHECK-NEXT:   call void @{{_Z20GCRetainNullableInitP23GlobalCountNullableInit|"\?GCRetainNullableInit\@\@YAXPEAUGlobalCountNullableInit\@\@\@Z"}}(ptr %1)
 // CHECK-NEXT:   br label %lifetime.cont
 
 // CHECK:      lifetime.cont:
-// CHECK:          ret i{{.*}} %2
+// CHECK:          ret ptr %1
 // CHECK-NEXT: }
 
 

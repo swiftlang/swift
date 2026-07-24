@@ -50,16 +50,14 @@ entry(%c : $Optional<Int>):
   return %i : $Optional<Int>
 }
 
-// CHECK-i386-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i32 @bitcast_ref(ptr %0) {{.*}} {
+// CHECK-i386-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc ptr @bitcast_ref(ptr %0) {{.*}} {
 // CHECK-i386-NEXT:  entry:
-// CHECK-i386-NEXT:    [[VALUE:%.*]] = ptrtoint ptr %0 to i32
-// CHECK-i386-NEXT:    ret i32 [[VALUE]]
+// CHECK-i386-NEXT:    ret ptr %0
 // CHECK-i386-NEXT:  }
 
-// CHECK-x86_64-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i64 @bitcast_ref(ptr %0) {{.*}} {
+// CHECK-x86_64-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc ptr @bitcast_ref(ptr %0) {{.*}} {
 // CHECK-x86_64-NEXT:  entry:
-// CHECK-x86_64-NEXT:    [[VALUE:%.*]] = ptrtoint ptr %0 to i64
-// CHECK-x86_64-NEXT:    ret i64 [[VALUE]]
+// CHECK-x86_64-NEXT:    ret ptr %0
 // CHECK-x86_64-NEXT:  }
 sil @bitcast_ref: $@convention(thin) (C) -> Optional<C> {
 entry(%c : $C):
@@ -67,14 +65,14 @@ entry(%c : $C):
   return %o : $Optional<C>
 }
 
-// CHECK-i386-LABEL:  define hidden swiftcc i32 @bitcast_ref_optional(i32 %0) {{.*}} {
+// CHECK-i386-LABEL:  define hidden swiftcc ptr @bitcast_ref_optional(ptr %0) {{.*}} {
 // CHECK-i386-NEXT: entry:
-// CHECK-i386-NEXT: ret i32 %0
+// CHECK-i386-NEXT: ret ptr %0
 // CHECK-i386-NEXT: }
 
-// CHECK-x86_64-LABEL:  define hidden swiftcc i64 @bitcast_ref_optional(i64 %0) {{.*}} {
+// CHECK-x86_64-LABEL:  define hidden swiftcc ptr @bitcast_ref_optional(ptr %0) {{.*}} {
 // CHECK-x86_64-NEXT: entry:
-// CHECK-x86_64-NEXT: ret i64 %0
+// CHECK-x86_64-NEXT: ret ptr %0
 // CHECK-x86_64-NEXT: }
 sil hidden @bitcast_ref_optional : $@convention(thin) (@owned Optional<C>) -> @owned Optional<C> {
 bb0(%0 : $Optional<C>):
@@ -124,48 +122,46 @@ bb0(%0 : $*U, %1 : $*T):
   return %r : $()
 }
 
-// CHECK-i386-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i32 @unchecked_ref_cast_class_optional
-// CHECK-i386: ptrtoint ptr %0 to i32
-// CHECK-i386-NEXT: ret i32
+// CHECK-i386-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc ptr @unchecked_ref_cast_class_optional
+// CHECK-i386: ret ptr %0
 
-// CHECK-x86_64-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i64 @unchecked_ref_cast_class_optional
-// CHECK-x86_64: ptrtoint ptr %0 to i64
-// CHECK-x86_64-NEXT: ret i64
+// CHECK-x86_64-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc ptr @unchecked_ref_cast_class_optional
+// CHECK-x86_64: ret ptr %0
 sil @unchecked_ref_cast_class_optional : $@convention(thin) (@owned A) -> @owned Optional<AnyObject> {
 bb0(%0 : $A):
   %2 = unchecked_ref_cast %0 : $A to $Optional<AnyObject>
   return %2 : $Optional<AnyObject>
 }
 
-// CHECK-i386-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i32 @unchecked_ref_cast_optional_optional
-// CHECK-i386: ret i32 %0
+// CHECK-i386-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc ptr @unchecked_ref_cast_optional_optional
+// CHECK-i386: ret ptr %0
 
-// CHECK-x86_64-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i64 @unchecked_ref_cast_optional_optional
-// CHECK-x86_64: ret i64 %0
+// CHECK-x86_64-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc ptr @unchecked_ref_cast_optional_optional
+// CHECK-x86_64: ret ptr %0
 sil @unchecked_ref_cast_optional_optional : $@convention(thin) (@owned Optional<A>) -> @owned Optional<AnyObject> {
 bb0(%0 : $Optional<A>):
   %2 = unchecked_ref_cast %0 : $Optional<A> to $Optional<AnyObject>
   return %2 : $Optional<AnyObject>
 }
 
-// CHECK-i386-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i32 @unchecked_ref_cast_proto_optional
-// CHECK-i386: ptrtoint ptr %0 to i32
-// CHECK-i386-NEXT: ret i32
+// CHECK-i386-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc ptr @unchecked_ref_cast_proto_optional
+// CHECK-i386: ret ptr %0
 
-// CHECK-x86_64-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i64 @unchecked_ref_cast_proto_optional
-// CHECK-x86_64: ptrtoint ptr %0 to i64
-// CHECK-x86_64-NEXT: ret i64
+// CHECK-x86_64-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc ptr @unchecked_ref_cast_proto_optional
+// CHECK-x86_64: ret ptr %0
 sil @unchecked_ref_cast_proto_optional : $@convention(thin) (@owned CP) -> @owned Optional<AnyObject> {
 bb0(%0 : $CP):
   %2 = unchecked_ref_cast %0 : $CP to $Optional<AnyObject>
   return %2 : $Optional<AnyObject>
 }
 
-// CHECK-i386-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i32 @unchecked_ref_cast_optionalproto_optional
-// CHECK-i386: ret i32 %0
+// CHECK-i386-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc ptr @unchecked_ref_cast_optionalproto_optional
+// CHECK-i386: [[VALUE:%.*]] = inttoptr i32 %0 to ptr
+// CHECK-i386: ret ptr [[VALUE]]
 
-// CHECK-x86_64-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i64 @unchecked_ref_cast_optionalproto_optional
-// CHECK-x86_64: ret i64 %0
+// CHECK-x86_64-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc ptr @unchecked_ref_cast_optionalproto_optional
+// CHECK-x86_64: [[VALUE:%.*]] = inttoptr i64 %0 to ptr
+// CHECK-x86_64: ret ptr [[VALUE]]
 sil @unchecked_ref_cast_optionalproto_optional : $@convention(thin) (@owned Optional<CP>) -> @owned Optional<AnyObject> {
 bb0(%0 : $Optional<CP>):
   %2 = unchecked_ref_cast %0 : $Optional<CP> to $Optional<AnyObject>

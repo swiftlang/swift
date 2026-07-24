@@ -36,14 +36,11 @@ bb0(%0 : $*A, %1 : $Optional<C>):
   %4 = tuple ()
   return %4 : $()
 }
-// CHECK:    define{{( dllexport)?}}{{( protected)?}} swiftcc void @test_weak_load_store(ptr dereferenceable({{.*}}) %0, i64 %1) {{.*}} {
+// CHECK:    define{{( dllexport)?}}{{( protected)?}} swiftcc void @test_weak_load_store(ptr dereferenceable({{.*}}) %0, ptr %1) {{.*}} {
 // CHECK:      [[X:%.*]] = getelementptr inbounds{{.*}} [[A:%T4weak1AV]], ptr %0, i32 0, i32 0
 // CHECK-NEXT: [[T0:%.*]] = call ptr @swift_weakLoadStrong(ptr [[X]])
-// CHECK-NEXT: %3 = ptrtoint  ptr %2 to i64
-// CHECK-NEXT: %4 = inttoptr
-// CHECK-NEXT: call ptr @swift_weakAssign(ptr returned [[X]], ptr %4)
-// CHECK-NEXT: %6 = inttoptr i64 %3 to ptr
-// CHECK-NEXT: call void @swift_release(ptr %6)
+// CHECK-NEXT: call ptr @swift_weakAssign(ptr returned [[X]], ptr %1)
+// CHECK-NEXT: call void @swift_release(ptr [[T0]])
 // CHECK-NEXT: ret void
 
 struct B {
