@@ -207,7 +207,7 @@ func use_initializable_archetype<T: Initializable>(_ t: T, i: Int) {
 // CHECK: sil hidden [ossa] @$s9protocols29use_initializable_existential{{[_0-9a-zA-Z]*}}F
 func use_initializable_existential(_ im: Initializable.Type, i: Int) {
 // CHECK: bb0([[IM:%[0-9]+]] : $@thick any Initializable.Type, [[I:%[0-9]+]] : $Int):
-// CHECK:   [[ARCHETYPE_META:%[0-9]+]] = open_existential_metatype [[IM]] : $@thick any Initializable.Type to $@thick (@opened([[N:".*"]], any Initializable) Self).Type
+// CHECK:   [[ARCHETYPE_META:%[0-9]+]] = open_existential_metatype [[IM]] : $@thick any Initializable.Type to $@thick (@opened([[N:.*]], any Initializable) Self).Type
 // CHECK:   [[TEMP_VALUE:%[0-9]+]] = alloc_stack $any Initializable
 // CHECK:   [[INIT_WITNESS:%[0-9]+]] = witness_method $@opened([[N]], any Initializable) Self, #Initializable.init!allocator : {{.*}}, [[ARCHETYPE_META]]{{.*}} : $@convention(witness_method: Initializable) <τ_0_0 where τ_0_0 : Initializable> (Int, @thick τ_0_0.Type) -> @out τ_0_0
 // CHECK:   [[TEMP_ADDR:%[0-9]+]] = init_existential_addr [[TEMP_VALUE]] : $*any Initializable, $@opened([[N]], any Initializable) Self
@@ -392,7 +392,7 @@ public func test(_ p: Proto) {
 
 // CHECK-LABEL: sil [ossa] @$s9protocols4testyyAA5Proto_pF : $@convention(thin) (@in_guaranteed any Proto) -> ()
 // CHECK: [[OPEN:%.*]] = open_existential_addr immutable_access
-// CHECK: [[MAT:%.*]] = witness_method $@opened("{{.*}}", any Proto) Self, #Proto.val!modify
+// CHECK: [[MAT:%.*]] = witness_method $@opened({{.*}}, any Proto) Self, #Proto.val!modify
 // CHECK: ([[BUF:%.*]], [[TOKEN:%.*]]) = begin_apply [[MAT]]
 // CHECK: end_apply [[TOKEN]]
 // CHECK: return
@@ -406,8 +406,8 @@ protocol SelfReturningSubscript {
 public func testSelfReturningSubscript() {
   // CHECK-LABEL: sil private [ossa] @$s9protocols26testSelfReturningSubscriptyyFAA0cdE0_pAaC_pXEfU_
   // CHECK: [[OPEN:%.*]] = open_existential_addr immutable_access
-  // CHECK: [[WIT_M:%.*]] = witness_method $@opened("{{.*}}", any SelfReturningSubscript) Self, #SelfReturningSubscript.subscript!getter
-  // CHECK: apply [[WIT_M]]<@opened("{{.*}}", any SelfReturningSubscript) Self>({{%.*}}, {{%.*}}, [[OPEN]])
+  // CHECK: [[WIT_M:%.*]] = witness_method $@opened({{.*}}, any SelfReturningSubscript) Self, #SelfReturningSubscript.subscript!getter
+  // CHECK: apply [[WIT_M]]<@opened({{.*}}, any SelfReturningSubscript) Self>({{%.*}}, {{%.*}}, [[OPEN]])
   _ = [String: SelfReturningSubscript]().mapValues { $0[2] }
 }
 

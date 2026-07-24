@@ -826,15 +826,15 @@ protocol NonmutatingProtocol {
 // CHECK-NEXT:   apply [[GETTER]]([[C_FIELD_BOX]], [[C_BORROW]]) : $@convention(method) (@guaranteed ReferenceType) -> @out any NonmutatingProtocol
 // CHECK-NEXT:   end_borrow [[C_BORROW]]
 
-// CHECK-NEXT:   [[C_FIELD_PAYLOAD:%.*]] = open_existential_addr immutable_access [[C_FIELD_BOX]] : $*any NonmutatingProtocol to $*@opened("{{.*}}", any NonmutatingProtocol) Self
-// CHECK-NEXT:   [[C_FIELD_COPY:%.*]] = alloc_stack $@opened("{{.*}}", any NonmutatingProtocol) Self
-// CHECK-NEXT:   copy_addr [[C_FIELD_PAYLOAD]] to [init] [[C_FIELD_COPY]] : $*@opened("{{.*}}", any NonmutatingProtocol) Self
+// CHECK-NEXT:   [[C_FIELD_PAYLOAD:%.*]] = open_existential_addr immutable_access [[C_FIELD_BOX]] : $*any NonmutatingProtocol to $*@opened({{.*}}, any NonmutatingProtocol) Self
+// CHECK-NEXT:   [[C_FIELD_COPY:%.*]] = alloc_stack $@opened({{.*}}, any NonmutatingProtocol) Self
+// CHECK-NEXT:   copy_addr [[C_FIELD_PAYLOAD]] to [init] [[C_FIELD_COPY]] : $*@opened({{.*}}, any NonmutatingProtocol) Self
 // CHECK-NEXT:   destroy_value [[C]] : $ReferenceType
-// CHECK-NEXT:   [[GETTER:%.*]] = witness_method $@opened("{{.*}}", any NonmutatingProtocol) Self, #NonmutatingProtocol.x!getter : <Self where Self : NonmutatingProtocol> (Self) -> () -> Int, [[C_FIELD_PAYLOAD]] : $*@opened("{{.*}}", any NonmutatingProtocol) Self : $@convention(witness_method: NonmutatingProtocol) <τ_0_0 where τ_0_0 : NonmutatingProtocol> (@in_guaranteed τ_0_0) -> Int
-// CHECK-NEXT:   [[RESULT_VALUE:%.*]] = apply [[GETTER]]<@opened("{{.*}}", any NonmutatingProtocol) Self>([[C_FIELD_COPY]]) : $@convention(witness_method: NonmutatingProtocol) <τ_0_0 where τ_0_0 : NonmutatingProtocol> (@in_guaranteed τ_0_0) -> Int
+// CHECK-NEXT:   [[GETTER:%.*]] = witness_method $@opened({{.*}}, any NonmutatingProtocol) Self, #NonmutatingProtocol.x!getter : <Self where Self : NonmutatingProtocol> (Self) -> () -> Int, [[C_FIELD_PAYLOAD]] : $*@opened({{.*}}, any NonmutatingProtocol) Self : $@convention(witness_method: NonmutatingProtocol) <τ_0_0 where τ_0_0 : NonmutatingProtocol> (@in_guaranteed τ_0_0) -> Int
+// CHECK-NEXT:   [[RESULT_VALUE:%.*]] = apply [[GETTER]]<@opened({{.*}}, any NonmutatingProtocol) Self>([[C_FIELD_COPY]]) : $@convention(witness_method: NonmutatingProtocol) <τ_0_0 where τ_0_0 : NonmutatingProtocol> (@in_guaranteed τ_0_0) -> Int
 // CHECK-NEXT:   ignored_use
-// CHECK-NEXT:   destroy_addr [[C_FIELD_COPY]] : $*@opened("{{.*}}", any NonmutatingProtocol) Self
-// CHECK-NEXT:   dealloc_stack [[C_FIELD_COPY]] : $*@opened("{{.*}}", any NonmutatingProtocol) Self
+// CHECK-NEXT:   destroy_addr [[C_FIELD_COPY]] : $*@opened({{.*}}, any NonmutatingProtocol) Self
+// CHECK-NEXT:   dealloc_stack [[C_FIELD_COPY]] : $*@opened({{.*}}, any NonmutatingProtocol) Self
 // CHECK-NEXT:   destroy_addr [[C_FIELD_BOX]] : $*any NonmutatingProtocol
 // CHECK-NEXT:   dealloc_stack [[C_FIELD_BOX]] : $*any NonmutatingProtocol
 // CHECK-NEXT:   tuple ()

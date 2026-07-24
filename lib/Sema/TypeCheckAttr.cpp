@@ -52,6 +52,7 @@
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceLoc.h"
+#include "swift/Basic/UUID.h"  // for COM
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/ParseDeclName.h"
 #include "swift/Sema/IDETypeChecking.h"
@@ -2522,6 +2523,8 @@ void AttributeChecker::visitCOMAttr(COMAttr *attr) {
       attr->setInvalid();
       return;
     }
+
+    // FIXME: Replace this usage of UUID::fromString() with something self-contained.
 
     if (!UUID::fromString(attr->IID.str().c_str())) {
       diagnose(attr->getLocation(), diag::attr_com_invalid_guid, attr->IID);

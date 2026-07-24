@@ -284,7 +284,8 @@ bool swift::canDuplicateLoopInstruction(SILLoop *L, SILInstruction *I, DeadEndBl
     return true;
   }
 
-  // We can't have a phi of two openexistential instructions of different UUID.
+  // We can't have a phi of two open existential instructions from different
+  // environments.
   if (isa<OpenExistentialAddrInst>(I) || isa<OpenExistentialRefInst>(I) ||
       isa<OpenExistentialMetatypeInst>(I) || isa<OpenExistentialValueInst>(I) ||
       isa<OpenExistentialBoxInst>(I) || isa<OpenExistentialBoxValueInst>(I) ||

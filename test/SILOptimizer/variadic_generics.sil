@@ -72,15 +72,15 @@ bb0(%i: $Builtin.Word):
 sil [ossa] [heuristic_always_inline] @tuple_pack_element : $<each T> (Builtin.Word, @inout (repeat each T)) -> () {
 bb0(%i: $Builtin.Word, %tuple : $*(repeat each T)):
   %index = dynamic_pack_index %i of $Pack{repeat each T}
-  %tok = open_pack_element %index of <each Z> at <Pack{repeat each T}>, shape $Z, uuid "01234567-89AB-CDEF-0123-000000000000"
-  %0 = tuple_pack_element_addr %index of %tuple : $*(repeat each T) as $*@pack_element("01234567-89AB-CDEF-0123-000000000000") Z
+  %tok = open_pack_element %index of <each Z> at <Pack{repeat each T}>, shape $Z, id 1
+  %0 = tuple_pack_element_addr %index of %tuple : $*(repeat each T) as $*@pack_element(1) Z
   %ret = tuple ()
   return %ret : $()
 }
 
 // CHECK-LABEL: sil @test_tuple_pack_element_1
 // CHECK:         [[INDEX:%.*]] = dynamic_pack_index %0 of $Pack{repeat each U}
-// CHECK:         open_pack_element [[INDEX]] of <each Z> at <Pack{repeat each U}>, shape $each Z, uuid [[UUID:".*"]]
+// CHECK:         open_pack_element [[INDEX]] of <each Z> at <Pack{repeat each U}>, shape $each Z, id [[UUID:[0-9]+]]
 // CHECK:         tuple_pack_element_addr [[INDEX]] of %1 : $*(repeat each U) as $*@pack_element([[UUID]]) each Z
 sil @test_tuple_pack_element_1 : $<each U> (Builtin.Word, @inout (repeat each U)) -> () {
 bb0(%i: $Builtin.Word, %tuple : $*(repeat each U)):
@@ -108,9 +108,9 @@ bb0:
 sil [ossa] [heuristic_always_inline] @scalar_open_pack_element : $<each T> () -> () {
 bb0:
   %index = scalar_pack_index 0 of $Pack{Int, repeat each T}
-  %tok = open_pack_element %index of <each Z> at <Pack{Int, repeat each T}>, shape $Z, uuid "01234567-89AB-CDEF-0123-000000000010"
-  %slot = alloc_stack $@pack_element("01234567-89AB-CDEF-0123-000000000010") Z
-  dealloc_stack %slot : $*@pack_element("01234567-89AB-CDEF-0123-000000000010") Z
+  %tok = open_pack_element %index of <each Z> at <Pack{Int, repeat each T}>, shape $Z, id 2
+  %slot = alloc_stack $@pack_element(2) Z
+  dealloc_stack %slot : $*@pack_element(2) Z
   %ret = tuple ()
   return %ret : $()
 }
@@ -131,9 +131,9 @@ bb0:
   %zero = integer_literal $Builtin.Word, 0
   %inner = dynamic_pack_index %zero of $Pack{repeat each T}
   %index = pack_pack_index 1, %inner of $Pack{Int, repeat each T}
-  %tok = open_pack_element %index of <each Z> at <Pack{Int, repeat each T}>, shape $Z, uuid "01234567-89AB-CDEF-0123-000000000011"
-  %slot = alloc_stack $@pack_element("01234567-89AB-CDEF-0123-000000000011") Z
-  dealloc_stack %slot : $*@pack_element("01234567-89AB-CDEF-0123-000000000011") Z
+  %tok = open_pack_element %index of <each Z> at <Pack{Int, repeat each T}>, shape $Z, id 3
+  %slot = alloc_stack $@pack_element(3) Z
+  dealloc_stack %slot : $*@pack_element(3) Z
   %ret = tuple ()
   return %ret : $()
 }
@@ -151,7 +151,7 @@ bb0:
 
 // CHECK-LABEL: sil @test_dynamic_open_pack_element_runtime
 // CHECK:         [[INDEX:%.*]] = dynamic_pack_index %0 of $Pack{Int, Float}
-// CHECK:         open_pack_element [[INDEX]] of <each Z> at <Pack{Int, Float}>, shape $each Z, uuid
+// CHECK:         open_pack_element [[INDEX]] of <each Z> at <Pack{Int, Float}>, shape $each Z, id
 sil @test_dynamic_open_pack_element_runtime : $(Builtin.Word) -> () {
 bb0(%i : $Builtin.Word):
   %tuple = alloc_stack $(Int, Float)
@@ -166,9 +166,9 @@ sil [ossa] [heuristic_always_inline] @dynamic_literal_open_pack_element : $<each
 bb0:
   %two = integer_literal $Builtin.Word, 2
   %index = dynamic_pack_index %two of $Pack{repeat each T}
-  %tok = open_pack_element %index of <each Z> at <Pack{repeat each T}>, shape $Z, uuid "01234567-89AB-CDEF-0123-000000000012"
-  %slot = alloc_stack $@pack_element("01234567-89AB-CDEF-0123-000000000012") Z
-  dealloc_stack %slot : $*@pack_element("01234567-89AB-CDEF-0123-000000000012") Z
+  %tok = open_pack_element %index of <each Z> at <Pack{repeat each T}>, shape $Z, id 4
+  %slot = alloc_stack $@pack_element(4) Z
+  dealloc_stack %slot : $*@pack_element(4) Z
   %ret = tuple ()
   return %ret : $()
 }

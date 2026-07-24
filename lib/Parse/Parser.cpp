@@ -1024,7 +1024,7 @@ bool Parser::parseMatchingToken(tok K, SourceLoc &TokLoc, DiagRef ErrorDiag,
 }
 
 bool Parser::parseUnsignedInteger(unsigned &Result, SourceLoc &Loc,
-                                  DiagRef D) {
+                                  DiagRef D, bool justChecking) {
   auto IntTok = Tok;
   if (parseToken(tok::integer_literal, Loc, D))
     return true;

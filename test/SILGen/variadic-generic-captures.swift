@@ -9,10 +9,10 @@ func noEscape(_ fn: () -> ()) {
 // CHECK: [[TUPLE:%.*]] = alloc_stack $(repeat each T)
 
 // CHECK: [[IDX:%.*]] = dynamic_pack_index %8 of $Pack{repeat each T}
-// CHECK: open_pack_element [[IDX]] of <each T> at <Pack{repeat each T}>, shape $each T, uuid "[[UUID:.*]]"
-// CHECK: [[PACK_ELT:%.*]] = pack_element_get [[IDX]] of %0 : $*Pack{repeat each T} as $*@pack_element("[[UUID]]") each T
-// CHECK: [[TUPLE_ADDR:%.*]] = tuple_pack_element_addr [[IDX]] of [[TUPLE]] : $*(repeat each T) as $*@pack_element("[[UUID]]") each T
-// CHECK: copy_addr [[PACK_ELT]] to [init] [[TUPLE_ADDR]] : $*@pack_element("[[UUID]]") each T
+// CHECK: open_pack_element [[IDX]] of <each T> at <Pack{repeat each T}>, shape $each T, id [[UUID:[0-9]+]]
+// CHECK: [[PACK_ELT:%.*]] = pack_element_get [[IDX]] of %0 : $*Pack{repeat each T} as $*@pack_element([[UUID]]) each T
+// CHECK: [[TUPLE_ADDR:%.*]] = tuple_pack_element_addr [[IDX]] of [[TUPLE]] : $*(repeat each T) as $*@pack_element([[UUID]]) each T
+// CHECK: copy_addr [[PACK_ELT]] to [init] [[TUPLE_ADDR]] : $*@pack_element([[UUID]]) each T
 
 func formNoEscapeClosure<each T>(x: repeat each T) {
   noEscape {
@@ -25,9 +25,9 @@ func formNoEscapeClosure<each T>(x: repeat each T) {
 // CHECK: [[PACK:%.*]] = alloc_pack $Pack{repeat each T}
 
 // CHECK: [[IDX:%.*]] = dynamic_pack_index {{%.*}} of $Pack{repeat each T}
-// CHECK: open_pack_element [[IDX]] of <each T> at <Pack{repeat each T}>, shape $each T, uuid "[[UUID:.*]]"
-// CHECK: [[TUPLE_ELT:%.*]] = tuple_pack_element_addr [[IDX]] of %0 : $*(repeat each T) as $*@pack_element("[[UUID]]") each T
-// CHECK: pack_element_set [[TUPLE_ELT]] : $*@pack_element("[[UUID]]") each T into [[IDX]] of [[PACK]] : $*Pack{repeat each T}
+// CHECK: open_pack_element [[IDX]] of <each T> at <Pack{repeat each T}>, shape $each T, id [[UUID:[0-9]+]]
+// CHECK: [[TUPLE_ELT:%.*]] = tuple_pack_element_addr [[IDX]] of %0 : $*(repeat each T) as $*@pack_element([[UUID]]) each T
+// CHECK: pack_element_set [[TUPLE_ELT]] : $*@pack_element([[UUID]]) each T into [[IDX]] of [[PACK]] : $*Pack{repeat each T}
 
 func formEscapingClosure<each T>(x: repeat each T) -> () -> () {
   return {

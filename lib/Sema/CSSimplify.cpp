@@ -3995,8 +3995,8 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
   if (auto opened1 = type1->getAs<ExistentialArchetypeType>()) {
     auto opened2 = type2->castTo<ExistentialArchetypeType>();
     assert(opened1->getInterfaceType()->isEqual(opened2->getInterfaceType()) &&
-           opened1->getGenericEnvironment()->getOpenedExistentialUUID() ==
-               opened2->getGenericEnvironment()->getOpenedExistentialUUID());
+           opened1->getGenericEnvironment()->getOpenedExistentialID() ==
+               opened2->getGenericEnvironment()->getOpenedExistentialID());
 
     auto args1 = opened1->getGenericEnvironment()
                      ->getOuterSubstitutions()
@@ -8068,11 +8068,11 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case TypeKind::ExistentialArchetype: {
       auto opened1 = cast<ExistentialArchetypeType>(desugar1);
       auto opened2 = cast<ExistentialArchetypeType>(desugar2);
-      // If they have the same interface type and UUID, two ExistentialArchetypeTypes
+      // If they have the same interface type and ID, two ExistentialArchetypeTypes
       // match if their generic arguments do as well.
       if (opened1->getInterfaceType()->isEqual(opened2->getInterfaceType()) &&
-          opened1->getGenericEnvironment()->getOpenedExistentialUUID() ==
-              opened2->getGenericEnvironment()->getOpenedExistentialUUID()) {
+          opened1->getGenericEnvironment()->getOpenedExistentialID() ==
+              opened2->getGenericEnvironment()->getOpenedExistentialID()) {
         conversionsOrFixes.push_back(ConversionRestrictionKind::DeepEquality);
       }
       break;

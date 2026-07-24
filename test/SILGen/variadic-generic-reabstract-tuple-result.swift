@@ -181,7 +181,7 @@ func test9<each T>() -> Use<repeat each T> {
 // CHECK-NEXT:     cond_br [[IDX_EQ_LEN]], bb3, bb2
 // CHECK:       bb2:
 // CHECK-NEXT:    [[EXPANSION_INDEX:%.*]] = dynamic_pack_index [[IDX]] of $Pack{repeat each T}
-// CHECK-NEXT:    open_pack_element [[EXPANSION_INDEX]] of <each T> at <Pack{repeat each T}>, shape $each T, uuid [[UUID:".*"]]
+// CHECK-NEXT:    open_pack_element [[EXPANSION_INDEX]] of <each T> at <Pack{repeat each T}>, shape $each T, id [[UUID:[0-9]+]]
 // CHECK-NEXT:    [[ELT_INDEX:%.*]] = pack_pack_index 1, [[EXPANSION_INDEX]] of $Pack{String, repeat each T, Int}
 // CHECK-NEXT:    [[DEST_ELT_ADDR:%.*]] = pack_element_get [[EXPANSION_INDEX]] of %0 : $*Pack{repeat each T} as $*@pack_element([[UUID]]) each T
 // CHECK-NEXT:    pack_element_set [[DEST_ELT_ADDR]] : $*@pack_element([[UUID]]) each T into [[ELT_INDEX]] of [[PACK]] : $*Pack{String, repeat each T, Int}
@@ -238,7 +238,7 @@ func test10<each T>() -> Use<repeat each T> {
 // CHECK-NEXT:     cond_br [[IDX_EQ_LEN]], bb3, bb2
 // CHECK:       bb2:
 // CHECK-NEXT:    [[EXPANSION_INDEX:%.*]] = dynamic_pack_index [[IDX]] of $Pack{repeat each T}
-// CHECK-NEXT:    open_pack_element [[EXPANSION_INDEX]] of <each T> at <Pack{repeat each T}>, shape $each T, uuid [[UUID:".*"]]
+// CHECK-NEXT:    open_pack_element [[EXPANSION_INDEX]] of <each T> at <Pack{repeat each T}>, shape $each T, id [[UUID:[0-9]+]]
 // CHECK-NEXT:    [[TUPLE_ELT_INDEX:%.*]] = pack_pack_index 1, [[EXPANSION_INDEX]] of $Pack{String, repeat each T, Int}
 // CHECK-NEXT:    [[SRC_ELT_ADDR:%.*]] = tuple_pack_element_addr [[TUPLE_ELT_INDEX]] of [[TUPLE_TEMP]] : $*(String, repeat each T, Int) as $*@pack_element([[UUID]]) each T
 // CHECK-NEXT:    [[DEST_ELT_ADDR:%.*]] = pack_element_get [[EXPANSION_INDEX]] of %0 : $*Pack{repeat each T} as $*@pack_element([[UUID]]) each T
@@ -281,7 +281,7 @@ func test11<each T>() -> Use<repeat each T> {
 // CHECK-NEXT:     cond_br [[IDX_EQ_LEN]], bb3, bb2
 // CHECK:       bb2:
 // CHECK-NEXT:    [[EXPANSION_INDEX:%.*]] = dynamic_pack_index [[IDX]] of $Pack{repeat (each T) -> Bool}
-// CHECK-NEXT:    open_pack_element [[EXPANSION_INDEX]] of <each T> at <Pack{repeat each T}>, shape $each T, uuid [[UUID:".*"]]
+// CHECK-NEXT:    open_pack_element [[EXPANSION_INDEX]] of <each T> at <Pack{repeat each T}>, shape $each T, id [[UUID:[0-9]+]]
 // CHECK-NEXT:    [[PACK_ELT_INDEX:%.*]] = pack_pack_index 1, [[EXPANSION_INDEX]] of $Pack{String, repeat (each T) -> Bool, Int}
 // CHECK-NEXT:    [[TEMP_ELT_ADDR:%.*]] = tuple_pack_element_addr [[EXPANSION_INDEX]] of [[EXPANSION_TEMP]] : $*(repeat @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <each T, Bool>) as $*@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <@pack_element([[UUID]]) each T, Bool>
 // CHECK-NEXT:    pack_element_set [[TEMP_ELT_ADDR]] : $*@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <@pack_element([[UUID]]) each T, Bool> into [[PACK_ELT_INDEX]] of [[PACK]] :
@@ -308,7 +308,7 @@ func test11<each T>() -> Use<repeat each T> {
 // CHECK:       bb5:
 //   FIXME: the pack type on this seems to be a lowered type
 // CHECK-NEXT:    [[EXPANSION_INDEX:%.*]] = dynamic_pack_index [[IDX]] of
-// CHECK-NEXT:    open_pack_element [[EXPANSION_INDEX]] of <each T> at <Pack{repeat each T}>, shape $each T, uuid [[UUID:".*"]]
+// CHECK-NEXT:    open_pack_element [[EXPANSION_INDEX]] of <each T> at <Pack{repeat each T}>, shape $each T, id [[UUID:[0-9]+]]
 // CHECK-NEXT:    [[SRC_ELT_ADDR:%.*]] = tuple_pack_element_addr [[EXPANSION_INDEX]] of [[EXPANSION_TEMP]] : $*(repeat @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <each T, Bool>) as $*@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <@pack_element([[UUID]]) each T, Bool>
 //     - Load the function value and apply the thunking conversion.
 // CHECK-NEXT:    [[ELT:%.*]] = load [take] [[SRC_ELT_ADDR]] :

@@ -988,13 +988,13 @@ bb0(%0 : @owned $P):
   %3 = copy_value %0 : $P
   store %3 to [init] %2 : $*P
   %b = begin_borrow %0 : $P
-  %8 = open_existential_value %b : $P to $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self
-  %9 = witness_method $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self, #P.foo, %8 : $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+  %8 = open_existential_value %b : $P to $@opened(1, P) Self
+  %9 = witness_method $@opened(1, P) Self, #P.foo, %8 : $@opened(1, P) Self : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
   // Test that we can handle owned value of type opened archetype.
-  %10 = copy_value %8 : $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self
+  %10 = copy_value %8 : $@opened(1, P) Self
   end_borrow %b : $P
-  %11 = apply %9<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self>(%10) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
-  destroy_value %10 : $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self
+  %11 = apply %9<@opened(1, P) Self>(%10) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+  destroy_value %10 : $@opened(1, P) Self
   destroy_addr %2 : $*P
   dealloc_stack %2 : $*P
   destroy_value %0 : $P
@@ -1007,18 +1007,18 @@ bb0(%0 : @owned $P):
 // CHECK:   [[ALLOCP:%.*]] = alloc_stack $any P, var, name "q"
 // CHECK:   debug_value %0 : $*any P, var, name "q"
 // CHECK:   copy_addr %0 to [init] [[ALLOCP]] : $*any P
-// CHECK:   [[OPEN:%.*]] = open_existential_addr immutable_access %0 : $*any P to $*@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", any P) Self
-// CHECK:   [[OPTIONAL:%.*]] = alloc_stack $Optional<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", any P) Self>
-// CHECK:   witness_method $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", any P) Self, #P.foo : <Self where Self : P> (Self) -> () -> (), [[OPEN]] : $*@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", any P) Self : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
-// CHECK:   [[INIT:%.*]] = init_enum_data_addr [[OPTIONAL]] : $*Optional<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", any P) Self>, #Optional.some!enumelt
-// CHECK:   copy_addr [[OPEN]] to [init] [[INIT]] : $*@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", any P) Self
-// CHECK:   inject_enum_addr [[OPTIONAL]] : $*Optional<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", any P) Self>, #Optional.some!enumelt
-// CHECK:   [[DATA:%.*]] = unchecked_inplace_enum_data_addr [[OPTIONAL]] : $*Optional<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", any P) Self>, #Optional.some!enumelt
-// CHECK:   apply %{{.*}}<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", any P) Self>([[DATA]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
-// CHECK:   destroy_addr [[DATA:%[^,]+]] : $*@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", any P) Self
+// CHECK:   [[OPEN:%.*]] = open_existential_addr immutable_access %0 : $*any P to $*@opened(2, any P) Self
+// CHECK:   [[OPTIONAL:%.*]] = alloc_stack $Optional<@opened(2, any P) Self>
+// CHECK:   witness_method $@opened(2, any P) Self, #P.foo : <Self where Self : P> (Self) -> () -> (), [[OPEN]] : $*@opened(2, any P) Self : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+// CHECK:   [[INIT:%.*]] = init_enum_data_addr [[OPTIONAL]] : $*Optional<@opened(2, any P) Self>, #Optional.some!enumelt
+// CHECK:   copy_addr [[OPEN]] to [init] [[INIT]] : $*@opened(2, any P) Self
+// CHECK:   inject_enum_addr [[OPTIONAL]] : $*Optional<@opened(2, any P) Self>, #Optional.some!enumelt
+// CHECK:   [[DATA:%.*]] = unchecked_inplace_enum_data_addr [[OPTIONAL]] : $*Optional<@opened(2, any P) Self>, #Optional.some!enumelt
+// CHECK:   apply %{{.*}}<@opened(2, any P) Self>([[DATA]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+// CHECK:   destroy_addr [[DATA:%[^,]+]] : $*@opened(2, any P) Self
 // CHECK:   destroy_addr [[ALLOCP]] : $*any P
 // CHECK:   destroy_addr %0 : $*any P
-// CHECK:   dealloc_stack [[OPTIONAL]] : $*Optional<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", any P) Self>
+// CHECK:   dealloc_stack [[OPTIONAL]] : $*Optional<@opened(2, any P) Self>
 // CHECK:   dealloc_stack [[ALLOCP]] : $*any P
 // CHECK-LABEL: } // end sil function 'f161_testOpenedArchetype'
 sil [ossa] @f161_testOpenedArchetype : $@convention(thin) (@in P) -> () {
@@ -1027,15 +1027,15 @@ bb0(%0 : @owned $P):
   %3 = copy_value %0 : $P
   store %3 to [init] %2 : $*P
   %b = begin_borrow %0 : $P
-  %8 = open_existential_value %b : $P to $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self
-  %9 = witness_method $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self, #P.foo, %8 : $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
-  %cpy = copy_value %8 : $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self
+  %8 = open_existential_value %b : $P to $@opened(2, P) Self
+  %9 = witness_method $@opened(2, P) Self, #P.foo, %8 : $@opened(2, P) Self : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+  %cpy = copy_value %8 : $@opened(2, P) Self
   end_borrow %b : $P
   // This optional is an aggregate that contains an opened existential. Make sure it is allocated after open_existential_addr.
-  %opt = enum $Optional<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self>, #Optional.some!enumelt, %cpy : $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self
-  %some = unchecked_enum_data %opt : $Optional<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self>, #Optional.some!enumelt
-  %11 = apply %9<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self>(%some) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
-  destroy_value %some : $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self
+  %opt = enum $Optional<@opened(2, P) Self>, #Optional.some!enumelt, %cpy : $@opened(2, P) Self
+  %some = unchecked_enum_data %opt : $Optional<@opened(2, P) Self>, #Optional.some!enumelt
+  %11 = apply %9<@opened(2, P) Self>(%some) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+  destroy_value %some : $@opened(2, P) Self
   destroy_addr %2 : $*P
   dealloc_stack %2 : $*P
   destroy_value %0 : $P
@@ -1044,9 +1044,9 @@ bb0(%0 : @owned $P):
 }
 
 // CHECK-LABEL: sil [ossa] @f162_testOpenedArchetype :
-// CHECK:  [[STK:%.*]] = alloc_stack $Optional<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", any P) Self>
+// CHECK:  [[STK:%.*]] = alloc_stack $Optional<@opened(2, any P) Self>
 // CHECK: bb6:
-// CHECK:   dealloc_stack [[STK]] : $*Optional<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", any P) Self>
+// CHECK:   dealloc_stack [[STK]] : $*Optional<@opened(2, any P) Self>
 // CHECK:   br bb7
 // CHECK-LABEL: } // end sil function 'f162_testOpenedArchetype'
 sil [ossa] @f162_testOpenedArchetype : $@convention(thin) (@in P) -> () {
@@ -1058,14 +1058,14 @@ bb1:
   %3 = copy_value %0 : $P
   store %3 to [init] %2 : $*P
   %5 = begin_borrow %0 : $P
-  %6 = open_existential_value %5 : $P to $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self
-  %7 = witness_method $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self, #P.foo : <Self where Self : P> (Self) -> () -> (), %6 : $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
-  %8 = copy_value %6 : $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self
+  %6 = open_existential_value %5 : $P to $@opened(2, P) Self
+  %7 = witness_method $@opened(2, P) Self, #P.foo : <Self where Self : P> (Self) -> () -> (), %6 : $@opened(2, P) Self : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+  %8 = copy_value %6 : $@opened(2, P) Self
   end_borrow %5 : $P
-  %10 = enum $Optional<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self>, #Optional.some!enumelt, %8 : $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self
-  %11 = unchecked_enum_data %10 : $Optional<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self>, #Optional.some!enumelt
-  %12 = apply %7<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self>(%11) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
-  destroy_value %11 : $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self
+  %10 = enum $Optional<@opened(2, P) Self>, #Optional.some!enumelt, %8 : $@opened(2, P) Self
+  %11 = unchecked_enum_data %10 : $Optional<@opened(2, P) Self>, #Optional.some!enumelt
+  %12 = apply %7<@opened(2, P) Self>(%11) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+  destroy_value %11 : $@opened(2, P) Self
   destroy_addr %2 : $*P
   dealloc_stack %2 : $*P
   cond_br undef, bb2, bb3
@@ -1105,9 +1105,9 @@ bb7:
 sil [ossa] @f163_testOpenedArchetype : $@convention(c) (@owned any Error) -> () {
 block(%instance : @owned $any Error):
   %borrow = begin_borrow [lexical] %instance : $any Error
-  %an_error = open_existential_box_value %borrow : $any Error to $@opened("55625EBA-9384-11ED-A0B0-32F16C24A34F", any Error) Self
-  %an_owned_error = copy_value %an_error : $@opened("55625EBA-9384-11ED-A0B0-32F16C24A34F", any Error) Self
-  %any = init_existential_value %an_owned_error : $@opened("55625EBA-9384-11ED-A0B0-32F16C24A34F", any Error) Self, $@opened("55625EBA-9384-11ED-A0B0-32F16C24A34F", any Error) Self, $Any
+  %an_error = open_existential_box_value %borrow : $any Error to $@opened(3, any Error) Self
+  %an_owned_error = copy_value %an_error : $@opened(3, any Error) Self
+  %any = init_existential_value %an_owned_error : $@opened(3, any Error) Self, $@opened(3, any Error) Self, $Any
   %some_any = enum $Optional<Any>, #Optional.some!enumelt, %any : $Any
   apply undef<Any>(%some_any) : $@convention(thin) <T> (@in Optional<T>) -> ()
   end_borrow %borrow : $any Error
@@ -1126,12 +1126,12 @@ block(%instance : @owned $any Error):
 // CHECK-LABEL: } // end sil function 'f164_testOpenedArchetype2'
 sil [ossa] @f164_testOpenedArchetype2 : $@convention(thin) (@guaranteed any Error) -> () {
 bb0(%error_exi : @guaranteed $any Error):
-  %error_concr = open_existential_box_value %error_exi : $any Error to $@opened("F616C4D8-268F-11EE-998B-32F16C24A34D", any Error) Self
-  %stack = alloc_stack $@opened("F616C4D8-268F-11EE-998B-32F16C24A34D", any Error) Self
-  %error_copy = copy_value %error_concr : $@opened("F616C4D8-268F-11EE-998B-32F16C24A34D", any Error) Self
-  store %error_copy to [init] %stack : $*@opened("F616C4D8-268F-11EE-998B-32F16C24A34D", any Error) Self
-  destroy_addr %stack : $*@opened("F616C4D8-268F-11EE-998B-32F16C24A34D", any Error) Self
-  dealloc_stack %stack : $*@opened("F616C4D8-268F-11EE-998B-32F16C24A34D", any Error) Self
+  %error_concr = open_existential_box_value %error_exi : $any Error to $@opened(4, any Error) Self
+  %stack = alloc_stack $@opened(4, any Error) Self
+  %error_copy = copy_value %error_concr : $@opened(4, any Error) Self
+  store %error_copy to [init] %stack : $*@opened(4, any Error) Self
+  destroy_addr %stack : $*@opened(4, any Error) Self
+  dealloc_stack %stack : $*@opened(4, any Error) Self
   %tuple = tuple ()
   return %tuple : $()
 }
@@ -1159,18 +1159,18 @@ sil [ossa] @f165_testOpenedArchetypsDominance : $@convention(thin) <T> () -> () 
   %O_1 = apply %get<T>() : $@convention(thin) <T> () -> (@out T)
   %O_2 = apply %get<T>() : $@convention(thin) <T> () -> (@out T)
   %O = tuple (%O_1 : $T, %O_2 : $T)
-  %ope = open_existential_ref %exi : $P & C to $@opened("00000000-0000-0000-0000-000000000000", P & C) Self
+  %ope = open_existential_ref %exi : $P & C to $@opened(5, P & C) Self
   cond_br undef, left, right
 
 left:
-  %ope2 = open_existential_ref %exi2 : $P & C to $@opened("00000000-0000-0000-0000-000000000001", P & C) Self
-  %U = struct $Box2<(T, T), @opened("00000000-0000-0000-0000-000000000000", P & C) Self> (%O : $(T, T), %ope : $@opened("00000000-0000-0000-0000-000000000000", P & C) Self)
-  %U2 = struct $Box2<Box2<(T, T), @opened("00000000-0000-0000-0000-000000000000", P & C) Self>, @opened("00000000-0000-0000-0000-000000000001", P & C) Self> (%U : $Box2<(T, T), @opened("00000000-0000-0000-0000-000000000000", P & C) Self> , %ope2 : $@opened("00000000-0000-0000-0000-000000000001", P & C) Self)
-  destroy_value %U2 : $Box2<Box2<(T, T), @opened("00000000-0000-0000-0000-000000000000", P & C) Self>, @opened("00000000-0000-0000-0000-000000000001", P & C) Self>
+  %ope2 = open_existential_ref %exi2 : $P & C to $@opened(6, P & C) Self
+  %U = struct $Box2<(T, T), @opened(5, P & C) Self> (%O : $(T, T), %ope : $@opened(5, P & C) Self)
+  %U2 = struct $Box2<Box2<(T, T), @opened(5, P & C) Self>, @opened(6, P & C) Self> (%U : $Box2<(T, T), @opened(5, P & C) Self> , %ope2 : $@opened(6, P & C) Self)
+  destroy_value %U2 : $Box2<Box2<(T, T), @opened(5, P & C) Self>, @opened(6, P & C) Self>
   br exit
 right:
   destroy_value %exi2 : $any P & C
-  destroy_value %ope : $@opened("00000000-0000-0000-0000-000000000000", P & C) Self
+  destroy_value %ope : $@opened(5, P & C) Self
   destroy_value %O : $(T, T)
   br exit
 exit:
@@ -2925,8 +2925,8 @@ bb0(%0 : @noImplicitCopy @guaranteed $T):
 // CHECK:       bb0([[PACK:%[^,]+]] : 
 // CHECK-SAME:      [[RAW_INDEX:%[^,]+]] :
 // CHECK:         [[INDEX:%[^,]+]] = dynamic_pack_index [[RAW_INDEX]]
-// CHECK:         open_pack_element [[INDEX]] {{.*}}, uuid "00000000-0000-0000-0000-000000000003" 
-// CHECK:         [[STACK:%[^,]+]] = alloc_stack $@pack_element("00000000-0000-0000-0000-000000000003")
+// CHECK:         open_pack_element [[INDEX]] {{.*}}, id 10
+// CHECK:         [[STACK:%[^,]+]] = alloc_stack $@pack_element(10)
 // CHECK:         [[ELEMENT_ADDR:%[^,]+]] = pack_element_get [[INDEX]] of [[PACK]]
 // CHECK:         copy_addr [[ELEMENT_ADDR]] to [init] [[STACK]]
 // CHECK:         destroy_addr [[STACK]]
@@ -2935,10 +2935,10 @@ bb0(%0 : @noImplicitCopy @guaranteed $T):
 sil [ossa] @test_open_pack_element_dominance : $@convention(thin) <each T> (@pack_guaranteed Pack{repeat each T}, Builtin.Word) -> () {
 bb0(%pack : $*Pack{repeat each T}, %raw_index : $Builtin.Word):
   %index = dynamic_pack_index %raw_index of $Pack{repeat each T}
-  open_pack_element %index of <each T> at <Pack{repeat each T}>, shape $each T, uuid "00000000-0000-0000-0000-000000000003"
-  %element_addr = pack_element_get %index of %pack : $*Pack{repeat each T} as $*@pack_element("00000000-0000-0000-0000-000000000003") each T
-  %element = load [copy] %element_addr : $*@pack_element("00000000-0000-0000-0000-000000000003") each T
-  destroy_value %element : $@pack_element("00000000-0000-0000-0000-000000000003") each T
+  open_pack_element %index of <each T> at <Pack{repeat each T}>, shape $each T, id 10
+  %element_addr = pack_element_get %index of %pack : $*Pack{repeat each T} as $*@pack_element(10) each T
+  %element = load [copy] %element_addr : $*@pack_element(10) each T
+  destroy_value %element : $@pack_element(10) each T
   %retval = tuple ()
   return %retval : $()
 }
@@ -3187,7 +3187,7 @@ exit:
 // CHECK-LABEL: sil [ossa] @test_tuple_pack_extract : {{.*}} {
 // CHECK:       bb0([[TUPLE_PACK_ADDR:%[^,]+]] :
 // CHECK:         [[INDEX:%[^,]+]] = dynamic_pack_index
-// CHECK:         open_pack_element [[INDEX]] of <each U_1> at <Pack{repeat each T}>, shape $each U_1, uuid [[UUID:".*"]]
+// CHECK:         open_pack_element [[INDEX]] of <each U_1> at <Pack{repeat each T}>, shape $each U_1, id [[UUID:[0-9]+]]
 // CHECK:         [[BORROW:%[^,]+]] = function_ref @borrowT
 // CHECK:         [[ELEMENT_ADDR:%[^,]+]] = tuple_pack_element_addr [[INDEX]] of [[TUPLE_PACK_ADDR]] : {{.*}} as $*@pack_element([[UUID]]) each U_1
 // CHECK:         apply [[BORROW]]<@pack_element([[UUID]]) each U_1>([[ELEMENT_ADDR]])
@@ -3197,10 +3197,10 @@ entry(%tuple_addr : $*(repeat each T)):
   %tuple = load_borrow %tuple_addr : $*(repeat each T)
   %zero = integer_literal $Builtin.Word, 0
   %index = dynamic_pack_index %zero of $Pack{repeat each T}
-  %opened = open_pack_element %index of <each U_1> at <Pack{repeat each T}>, shape $U_1, uuid "00000000-0000-0000-0000-000000000002"
-  %elt = tuple_pack_extract %index of %tuple : $(repeat each T) as $@pack_element("00000000-0000-0000-0000-000000000002") U_1
+  %opened = open_pack_element %index of <each U_1> at <Pack{repeat each T}>, shape $U_1, id 20
+  %elt = tuple_pack_extract %index of %tuple : $(repeat each T) as $@pack_element(20) U_1
   %borrow = function_ref @borrowT : $@convention(thin) <T> (@in_guaranteed T) -> ()
-  apply %borrow<@pack_element("00000000-0000-0000-0000-000000000002") U_1>(%elt) : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  apply %borrow<@pack_element(20) U_1>(%elt) : $@convention(thin) <T> (@in_guaranteed T) -> ()
   end_borrow %tuple : $(repeat each T)
   %retval = tuple ()
   return %retval : $()

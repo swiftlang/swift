@@ -439,6 +439,7 @@ public:
   }
 
   void remapRootOpenedType(CanExistentialArchetypeType archetypeTy) {
+    auto &ctx = archetypeTy->getASTContext();
     auto *origEnv = archetypeTy->getGenericEnvironment();
 
     auto genericSig = origEnv->getGenericSignature();
@@ -447,7 +448,7 @@ public:
 
     auto *newEnv = GenericEnvironment::forOpenedExistential(
         genericSig, existentialTy, getOpSubstitutionMap(subMap),
-        UUID::fromTime());
+        ctx.getNextGenericEnvironmentID());
 
     registerLocalArchetypeRemapping(origEnv, newEnv);
   }
@@ -3370,9 +3371,10 @@ void SILCloner<ImplClass>::visitOpenPackElementInst(
   auto openedShapeClass = origEnv->getOpenedElementShapeClass();
 
   // Build the new environment.
+  auto &ctx = getBuilder().getASTContext();
   auto newEnv =
     GenericEnvironment::forOpenedElement(origEnv->getGenericSignature(),
-                                         UUID::fromTime(),
+                                         ctx.getNextGenericEnvironmentID(),
                                          openedShapeClass,
                                          newContextSubs);
 

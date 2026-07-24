@@ -54,7 +54,7 @@ entry(%0 : @owned $C, %1 : @owned $C):
 //
 // CHECK-LABEL: begin running test 1 of 2 on tuplePackExtractTest: forwarding_def_use_test with: %tuple
 // CHECK: USE: operand #0 of   end_borrow %1 : $(repeat each T)
-// CHECK: USE: operand #0 of   %{{.*}} = copy_value %{{.*}} : $@pack_element("00000000-0000-0000-0000-000000000002") each U_1
+// CHECK: USE: operand #0 of   %{{.*}} = copy_value %{{.*}} : $@pack_element(1) each U_1
 // CHECK-LABEL: end running test 1 of 2 on tuplePackExtractTest: forwarding_def_use_test with: %tuple
 //
 // CHECK-LABEL: begin running test 2 of 2 on tuplePackExtractTest: forwarding_use_def_test with: %final
@@ -65,15 +65,15 @@ entry(%tuple_addr : $*(repeat each T)):
   %tuple = load_borrow %tuple_addr : $*(repeat each T)
   %zero = integer_literal $Builtin.Word, 0
   %index = dynamic_pack_index %zero of $Pack{repeat each T}
-  %opened = open_pack_element %index of <each U_1> at <Pack{repeat each T}>, shape $U_1, uuid "00000000-0000-0000-0000-000000000002"
-  %final = tuple_pack_extract %index of %tuple : $(repeat each T) as $@pack_element("00000000-0000-0000-0000-000000000002") U_1
+  %opened = open_pack_element %index of <each U_1> at <Pack{repeat each T}>, shape $U_1, id 1
+  %final = tuple_pack_extract %index of %tuple : $(repeat each T) as $@pack_element(1) U_1
 
   specify_test "forwarding_def_use_test %tuple"
   specify_test "forwarding_use_def_test %final"
 
-  %copy = copy_value %final : $@pack_element("00000000-0000-0000-0000-000000000002") U_1
+  %copy = copy_value %final : $@pack_element(1) U_1
   end_borrow %tuple : $(repeat each T)
-  destroy_value %copy : $@pack_element("00000000-0000-0000-0000-000000000002") U_1
+  destroy_value %copy : $@pack_element(1) U_1
   %retval = tuple ()
   return %retval : $()
 }

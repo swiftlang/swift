@@ -966,12 +966,12 @@ func _bridgeAnythingToObjectiveC<T>(_ x: T) -> AnyObject
 // CHECK-objc: bb0([[ARG:%.*]] : @guaranteed $Any):
 // CHECK-objc: [[SRC:%.*]] = copy_value [[ARG]] : $Any
 // CHECK-objc: [[BORROW:%.*]] = begin_borrow [[SRC]] : $Any
-// CHECK-objc: [[OPEN:%.*]] = open_existential_value [[BORROW]] : $Any to $@opened("{{.*}}", Any) Self
-// CHECK-objc: [[COPY:%.*]] = copy_value [[OPEN]] : $@opened("{{.*}}", Any) Self
+// CHECK-objc: [[OPEN:%.*]] = open_existential_value [[BORROW]] : $Any to $@opened({{.*}}, Any) Self
+// CHECK-objc: [[COPY:%.*]] = copy_value [[OPEN]] : $@opened({{.*}}, Any) Self
 // CHECK-objc: end_borrow [[BORROW]] : $Any
 // CHECK-objc: [[F:%.*]] = function_ref @_bridgeAnythingToObjectiveC : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> @owned AnyObject
-// CHECK-objc: [[RET:%.*]] = apply [[F]]<@opened("{{.*}}", Any) Self>([[COPY]]) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> @owned AnyObject
-// CHECK-objc: destroy_value [[COPY]] : $@opened("{{.*}}", Any) Self
+// CHECK-objc: [[RET:%.*]] = apply [[F]]<@opened({{.*}}, Any) Self>([[COPY]]) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> @owned AnyObject
+// CHECK-objc: destroy_value [[COPY]] : $@opened({{.*}}, Any) Self
 // CHECK-objc: destroy_value [[SRC]] : $Any
 // CHECK-objc: return [[RET]] : $AnyObject
 // CHECK-objc-LABEL: } // end sil function '$ss14f470_nativeToC7fromAnyyXlyp_tF'
@@ -986,9 +986,9 @@ func f470_nativeToC(fromAny any: Any) -> AnyObject {
 // ---
 // CHECK-LABEL: sil hidden [ossa] [opaque] @$ss13f480_getError04someC0yps0C0_p_tF : $@convention(thin) (@guaranteed any Error) -> @out Any {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $any Error):
-// CHECK: [[VAL:%.*]] = open_existential_box_value [[ARG]] : $any Error to $@opened("{{.*}}", any Error) Self
-// CHECK: [[COPY:%.*]] = copy_value [[VAL]] : $@opened("{{.*}}", any Error) Self
-// CHECK: [[ANY:%.*]] = init_existential_value [[COPY]] : $@opened("{{.*}}", any Error) Self, $@opened("{{.*}}", any Error) Self, $Any
+// CHECK: [[VAL:%.*]] = open_existential_box_value [[ARG]] : $any Error to $@opened({{.*}}, any Error) Self
+// CHECK: [[COPY:%.*]] = copy_value [[VAL]] : $@opened({{.*}}, any Error) Self
+// CHECK: [[ANY:%.*]] = init_existential_value [[COPY]] : $@opened({{.*}}, any Error) Self, $@opened({{.*}}, any Error) Self, $Any
 // CHECK-NOT: destroy_value [[ARG]] : $any Error
 // CHECK: return [[ANY]] : $Any
 // CHECK-LABEL: } // end sil function '$ss13f480_getError04someC0yps0C0_p_tF'
@@ -1004,9 +1004,9 @@ func f480_getError(someError: Error) -> Any {
 // CHECK: switch_enum [[COPY]] : $Optional<any ConvertibleToP>, case #Optional.some!enumelt: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: {{bb[0-9]+}}
 // CHECK: [[SOME_BB]]([[DATA:%.*]] : @owned $any ConvertibleToP):
 // CHECK: [[BORROW_DATA:%.*]] = begin_borrow [[DATA]] : $any ConvertibleToP
-// CHECK: [[VAL:%.*]] = open_existential_value [[BORROW_DATA]] : $any ConvertibleToP to $@opened("{{.*}}", any ConvertibleToP) Self
-// CHECK: [[WT:%.*]] = witness_method $@opened("{{.*}}", any ConvertibleToP) Self, #ConvertibleToP.asP : <Self where Self : ConvertibleToP> (Self) -> () -> any P, [[VAL]] : $@opened("{{.*}}", any ConvertibleToP) Self : $@convention(witness_method: ConvertibleToP) <τ_0_0 where τ_0_0 : ConvertibleToP> (@in_guaranteed τ_0_0) -> @out any P
-// CHECK: [[AS_P:%.*]] = apply [[WT]]<@opened("{{.*}}", any ConvertibleToP) Self>([[VAL]]) : $@convention(witness_method: ConvertibleToP) <τ_0_0 where τ_0_0 : ConvertibleToP> (@in_guaranteed τ_0_0) -> @out any P
+// CHECK: [[VAL:%.*]] = open_existential_value [[BORROW_DATA]] : $any ConvertibleToP to $@opened({{.*}}, any ConvertibleToP) Self
+// CHECK: [[WT:%.*]] = witness_method $@opened({{.*}}, any ConvertibleToP) Self, #ConvertibleToP.asP : <Self where Self : ConvertibleToP> (Self) -> () -> any P, [[VAL]] : $@opened({{.*}}, any ConvertibleToP) Self : $@convention(witness_method: ConvertibleToP) <τ_0_0 where τ_0_0 : ConvertibleToP> (@in_guaranteed τ_0_0) -> @out any P
+// CHECK: [[AS_P:%.*]] = apply [[WT]]<@opened({{.*}}, any ConvertibleToP) Self>([[VAL]]) : $@convention(witness_method: ConvertibleToP) <τ_0_0 where τ_0_0 : ConvertibleToP> (@in_guaranteed τ_0_0) -> @out any P
 // CHECK: [[ENUM:%.*]] = enum $Optional<any P>, #Optional.some!enumelt, [[AS_P]] : $any P
 // CHECK: destroy_value [[DATA]] : $any ConvertibleToP
 // CHECK: br {{bb[0-9]+}}([[ENUM]] : $Optional<any P>)
@@ -1086,16 +1086,16 @@ public func f530_assignToVar() {
 // ---
 // CHECK-LABEL: sil [ossa] [opaque] @$ss16f540_takeDecoder4fromBi1_s0C0_p_tKF : $@convention(thin) (@in_guaranteed any Decoder) -> (Builtin.Int1, @error any Error) {
 // CHECK: bb0(%0 : @guaranteed $any Decoder):
-// CHECK:  [[OPENED:%.*]] = open_existential_value %0 : $any Decoder to $@opened("{{.*}}", any Decoder) Self
-// CHECK:  [[WT:%.*]] = witness_method $@opened("{{.*}}", any Decoder) Self, #Decoder.unkeyedContainer : <Self where Self : Decoder> (Self) -> () throws -> any UnkeyedDecodingContainer, [[OPENED]] : $@opened("{{.*}}", any Decoder) Self : $@convention(witness_method: Decoder) <τ_0_0 where τ_0_0 : Decoder> (@in_guaranteed τ_0_0) -> (@out any UnkeyedDecodingContainer, @error any Error)
-// CHECK:  try_apply [[WT]]<@opened("{{.*}}", any Decoder) Self>([[OPENED]]) : $@convention(witness_method: Decoder) <τ_0_0 where τ_0_0 : Decoder> (@in_guaranteed τ_0_0) -> (@out any UnkeyedDecodingContainer, @error any Error), normal [[NORMAL_BB:bb[0-9]+]], error {{bb[0-9]+}}
+// CHECK:  [[OPENED:%.*]] = open_existential_value %0 : $any Decoder to $@opened({{.*}}, any Decoder) Self
+// CHECK:  [[WT:%.*]] = witness_method $@opened({{.*}}, any Decoder) Self, #Decoder.unkeyedContainer : <Self where Self : Decoder> (Self) -> () throws -> any UnkeyedDecodingContainer, [[OPENED]] : $@opened({{.*}}, any Decoder) Self : $@convention(witness_method: Decoder) <τ_0_0 where τ_0_0 : Decoder> (@in_guaranteed τ_0_0) -> (@out any UnkeyedDecodingContainer, @error any Error)
+// CHECK:  try_apply [[WT]]<@opened({{.*}}, any Decoder) Self>([[OPENED]]) : $@convention(witness_method: Decoder) <τ_0_0 where τ_0_0 : Decoder> (@in_guaranteed τ_0_0) -> (@out any UnkeyedDecodingContainer, @error any Error), normal [[NORMAL_BB:bb[0-9]+]], error {{bb[0-9]+}}
 //
 // CHECK: [[NORMAL_BB]]([[RET1:%.*]] : @owned $any UnkeyedDecodingContainer):
 // CHECK:  [[CONTAINER:%.*]] = move_value [lexical] [var_decl] [[RET1]] : $any UnkeyedDecodingContainer
 // CHECK:  [[BORROW2:%.*]] = begin_borrow [[CONTAINER]] : $any UnkeyedDecodingContainer
-// CHECK:  [[OPENED2:%.*]] = open_existential_value [[BORROW2]] : $any UnkeyedDecodingContainer to $@opened("{{.*}}", any UnkeyedDecodingContainer) Self
-// CHECK:  [[WT2:%.*]] = witness_method $@opened("{{.*}}", any UnkeyedDecodingContainer) Self, #UnkeyedDecodingContainer.isAtEnd!getter : <Self where Self : UnkeyedDecodingContainer> (Self) -> () -> Builtin.Int1, [[OPENED2]] : $@opened("{{.*}}", any UnkeyedDecodingContainer) Self : $@convention(witness_method: UnkeyedDecodingContainer) <τ_0_0 where τ_0_0 : UnkeyedDecodingContainer> (@in_guaranteed τ_0_0) -> Builtin.Int1
-// CHECK:  [[RET2:%.*]] = apply [[WT2]]<@opened("{{.*}}", any UnkeyedDecodingContainer) Self>([[OPENED2]]) : $@convention(witness_method: UnkeyedDecodingContainer) <τ_0_0 where τ_0_0 : UnkeyedDecodingContainer> (@in_guaranteed τ_0_0) -> Builtin.Int1
+// CHECK:  [[OPENED2:%.*]] = open_existential_value [[BORROW2]] : $any UnkeyedDecodingContainer to $@opened({{.*}}, any UnkeyedDecodingContainer) Self
+// CHECK:  [[WT2:%.*]] = witness_method $@opened({{.*}}, any UnkeyedDecodingContainer) Self, #UnkeyedDecodingContainer.isAtEnd!getter : <Self where Self : UnkeyedDecodingContainer> (Self) -> () -> Builtin.Int1, [[OPENED2]] : $@opened({{.*}}, any UnkeyedDecodingContainer) Self : $@convention(witness_method: UnkeyedDecodingContainer) <τ_0_0 where τ_0_0 : UnkeyedDecodingContainer> (@in_guaranteed τ_0_0) -> Builtin.Int1
+// CHECK:  [[RET2:%.*]] = apply [[WT2]]<@opened({{.*}}, any UnkeyedDecodingContainer) Self>([[OPENED2]]) : $@convention(witness_method: UnkeyedDecodingContainer) <τ_0_0 where τ_0_0 : UnkeyedDecodingContainer> (@in_guaranteed τ_0_0) -> Builtin.Int1
 // CHECK:  end_borrow [[BORROW2]] : $any UnkeyedDecodingContainer
 // CHECK:  destroy_value [[CONTAINER]] : $any UnkeyedDecodingContainer
 // CHECK-NOT:  destroy_value %0 : $any Decoder

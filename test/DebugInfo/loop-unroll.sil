@@ -29,8 +29,8 @@ bb0:
 
 bb1(%4 : $Builtin.Word):
   %index = dynamic_pack_index %4 of $Pack{A, A}
-  %opened = open_pack_element %index of <each Z> at <Pack{A, A}>, shape $each Z, uuid "A8C5CF80-5AAD-11F1-A304-929C59BC796A"
-  %alloca = alloc_stack $@pack_element("A8C5CF80-5AAD-11F1-A304-929C59BC796A") each Z, var, name "x", scope 1
+  %opened = open_pack_element %index of <each Z> at <Pack{A, A}>, shape $each Z, id 1
+  %alloca = alloc_stack $@pack_element(1) each Z, var, name "x", scope 1
   dealloc_stack %alloca
   %5 = builtin "sadd_with_overflow_Word"(%4 : $Builtin.Word, %1 : $Builtin.Word, %3 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1)
   %6 = tuple_extract %5 : $(Builtin.Word, Builtin.Int1), 0
@@ -64,7 +64,7 @@ bb0:
 
 bb1(%4 : $Builtin.Word):
   %index = dynamic_pack_index %4 of $Pack{A, A}
-  %opened = open_pack_element %index of <each Z> at <Pack{A, A}>, shape $each Z, uuid "A8C5CF80-5AAD-11F1-A304-929C59BC796B"
+  %opened = open_pack_element %index of <each Z> at <Pack{A, A}>, shape $each Z, id 2
   %alloca = alloc_stack $A, var, name "x", scope 2
   dealloc_stack %alloca
   %5 = builtin "sadd_with_overflow_Word"(%4 : $Builtin.Word, %1 : $Builtin.Word, %3 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1)
@@ -97,11 +97,11 @@ bb0(%idx : $Builtin.Word):
  %3 = integer_literal $Builtin.Int1, 1
  %pack = alloc_pack $Pack{A, A}
  %index = dynamic_pack_index %idx of $Pack{A, A}
- %opened = open_pack_element %index of <each Z> at <Pack{A, A}>, shape $each Z, uuid "A8C5CF80-5AAD-11F1-A304-929C59BC796C"
+ %opened = open_pack_element %index of <each Z> at <Pack{A, A}>, shape $each Z, id 3
  br bb1(%0 : $Builtin.Word)
 
 bb1(%4 : $Builtin.Word):
-  %alloca = alloc_stack $@pack_element("A8C5CF80-5AAD-11F1-A304-929C59BC796C") each Z, var, name "x", scope 3
+  %alloca = alloc_stack $@pack_element(3) each Z, var, name "x", scope 3
   dealloc_stack %alloca
   %5 = builtin "sadd_with_overflow_Word"(%4 : $Builtin.Word, %1 : $Builtin.Word, %3 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1)
   %6 = tuple_extract %5 : $(Builtin.Word, Builtin.Int1), 0

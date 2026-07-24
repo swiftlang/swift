@@ -1803,12 +1803,13 @@ Expected<GenericEnvironment *> ModuleFile::getGenericEnvironmentChecked(
         genericSigOrError.get(),
         existentialOrShapeTypeOrError.get(),
         contextSubsOrError.get(),
-        UUID::fromTime());
+        getContext().getNextGenericEnvironmentID());
     break;
 
   case GenericEnvironmentKind::OpenedElement:
     genericEnv = GenericEnvironment::forOpenedElement(
-        genericSigOrError.get(), UUID::fromTime(),
+        genericSigOrError.get(),
+        getContext().getNextGenericEnvironmentID(),
         cast<GenericTypeParamType>(
           existentialOrShapeTypeOrError.get()->getCanonicalType()),
         contextSubsOrError.get());

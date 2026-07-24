@@ -5452,9 +5452,9 @@ bb0(%0 : $SP2):
   %1 = alloc_stack [lexical] $any P2
   %3 = init_existential_addr %1, $SP2
   store %0 to [trivial] %3
-  %6 = open_existential_addr immutable_access %1 to $*@opened("80B3AD40-58F1-11F1-8742-0EA13E3AABB3", any P2) Self
-  %19 = witness_method $@opened("80B3AD40-58F1-11F1-8742-0EA13E3AABB3", any P2) Self, #P2.bar : <Self where Self : P2> (Self) -> () -> (), %6 : $*@opened("80B3AD40-58F1-11F1-8742-0EA13E3AABB3", any P2) Self : $@convention(witness_method: P2) (@in_guaranteed @opened("80B3AD40-58F1-11F1-8742-0EA13E3AABB3", any P2) Self) -> ()
-  %20 = apply %19(undef) : $@convention(witness_method: P2) (@in_guaranteed @opened("80B3AD40-58F1-11F1-8742-0EA13E3AABB3", any P2) Self) -> ()
+  %6 = open_existential_addr immutable_access %1 to $*@opened(1, any P2) Self
+  %19 = witness_method $@opened(1, any P2) Self, #P2.bar : <Self where Self : P2> (Self) -> () -> (), %6 : $*@opened(1, any P2) Self : $@convention(witness_method: P2) (@in_guaranteed @opened(1, any P2) Self) -> ()
+  %20 = apply %19(undef) : $@convention(witness_method: P2) (@in_guaranteed @opened(1, any P2) Self) -> ()
   destroy_addr %1
   dealloc_stack %1
   %25 = tuple ()
@@ -5499,7 +5499,7 @@ bb0(%0 : @owned $D):
   %1 = alloc_stack [lexical] $any P
   %2 = init_existential_addr %1, $D
   store %0 to [init] %2
-  %4 = open_existential_addr immutable_access %1 to $*@opened("592F4C30-5E4F-11F1-B22D-0EA13E3AABB3", any P) Self
+  %4 = open_existential_addr immutable_access %1 to $*@opened(2, any P) Self
   %5 = unchecked_addr_cast %4 to $*C
   %6 = load_borrow %5
   %7 = apply undef(%6) : $@convention(method) (@guaranteed C) -> ()

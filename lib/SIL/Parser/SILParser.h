@@ -62,11 +62,10 @@ private:
   llvm::DenseMap<Identifier, SILBasicBlock *> BlocksByName;
   llvm::DenseMap<SILBasicBlock *, Located<Identifier>> UndefinedBlocks;
 
-  /// The set of opened packs in the function, indexed by UUID.
-  /// Note that we don't currently support parsing references to
-  /// opened packs prior to their instruction, although this is
-  /// theoretically possible if basic blocks are not sorted in
-  /// dominance order.
+  /// The set of opened packs in the function, indexed by environment ID.
+  /// Note that we don't currently support parsing references to opened
+  /// packs prior to their instruction, although this is theoretically
+  /// possible if basic blocks are not sorted in dominance order.
   SILTypeResolutionContext::OpenedPackElementsMap OpenedPackElements;
 
   /// Data structures used to perform name lookup for local values.
