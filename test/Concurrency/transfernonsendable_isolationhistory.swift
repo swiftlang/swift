@@ -428,14 +428,9 @@ func loop_with_inner_diamond(_ x: NS, _ count: Int, _ flag: Bool) async {
   var y = NS()
   for _ in 0..<count {
     if flag {
-      y = x
+      y = x // expected-note {{'y' is connected to 'x' which is accessible to code in the current isolation context}}
     } else {
-      // FIXME: The chain note is anchored on this 'else' reassignment rather
-      // than the 'y = x' merge above. The join-merge routing that anchors the
-      // acyclic diamonds correctly cannot disambiguate here: the loop fixpoint
-      // leaves y isolated at *both* branch exits, so both predecessors look
-      // equally responsible. The note text is still correct.
-      y = NS() // expected-note {{'y' is connected to 'x' which is accessible to code in the current isolation context}}
+      y = NS()
     }
   }
   await transferToMain(y) // expected-warning {{sending 'y' risks causing data races}}

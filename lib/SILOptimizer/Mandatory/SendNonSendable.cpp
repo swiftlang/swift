@@ -874,54 +874,75 @@ bool IsolationHistoryNoteEmitter::processFrame(Frame frame) {
   // explored every predecessor it would be pinned to the first boundary of
   // whichever branch we happen to walk first — e.g. the 'else' arm of a
   // diamond, which never touched the isolated value. So while such a merge is
-  // pending, prefer the predecessor(s) where a tracked element is actually
-  // isolated at the block exit — the branch that holds the user-written merge —
-  // and prune the rest. Only when no predecessor has the chain isolated do we
-  // fall back to exploring them all.
+  // pending, find the branch responsible for the isolation and prune the rest.
+  //
+  // The signal is a *discriminating* element: one that is isolated at some
+  // predecessor's exit but merely disconnected at another's. Its isolation was
+  // introduced on the branch(es) where it is isolated, so the predecessors
+  // where it is disconnected did not cause it and are pruned. (Elements that
+  // are isolated everywhere, or absent, or disconnected everywhere — e.g.
+  // block- local temporaries — do not distinguish the branches and are
+  // ignored.)
   struct PredExit {
     SILBasicBlock *block;
     Partition exit;
-    bool chainIsolated;
   };
   SmallVector<PredExit, 4> preds;
-  bool anyIsolated = false;
   for (SILBasicBlock *predBlock : joinedBlocks) {
     if (!visitedBlocks.insert(predBlock).second)
       continue;
     auto predBlockState = inputFunctionInfo->getBlockState(predBlock);
     if (!predBlockState)
       continue;
-    Partition exit =
-        predBlockState.get()->getExitPartition().removingSendingOperandState();
+    preds.push_back({predBlock, predBlockState.get()
+                                    ->getExitPartition()
+                                    .removingSendingOperandState()});
+  }
 
-    bool chainIsolated = false;
-    if (state.pendingTargetMerge) {
-      for (Element e : state.tracked) {
-        if (!exit.isTrackingElement(e))
+  SmallVector<bool, 4> resets(preds.size(), false);
+  if (state.pendingTargetMerge) {
+    for (Element e : state.tracked) {
+      // Classify e at each predecessor exit: isolated, or present-but-
+      // disconnected. (Absent predecessors are left out — they say nothing.)
+      SmallVector<bool, 4> isolatedInPred(preds.size(), false);
+      SmallVector<bool, 4> disconnectedInPred(preds.size(), false);
+      bool anyIsolated = false;
+      for (unsigned i = 0, n = preds.size(); i != n; ++i) {
+        if (!preds[i].exit.isTrackingElement(e))
           continue;
-        Region region = exit.getRegion(e);
-        for (auto pair : exit.range()) {
+        bool isolatedHere = false;
+        Region region = preds[i].exit.getRegion(e);
+        for (auto pair : preds[i].exit.range()) {
           if (pair.second != region)
             continue;
           auto info = inputValueMap.getIsolationRegion(pair.first);
           if (info && !info.isDisconnected()) {
-            chainIsolated = true;
+            isolatedHere = true;
             break;
           }
         }
-        if (chainIsolated)
-          break;
+        isolatedInPred[i] = isolatedHere;
+        disconnectedInPred[i] = !isolatedHere;
+        anyIsolated |= isolatedHere;
       }
-    }
 
-    anyIsolated |= chainIsolated;
-    preds.push_back({predBlock, std::move(exit), chainIsolated});
+      // e discriminates only if it is isolated somewhere; then the branches
+      // where it is disconnected are the ones that reset it.
+      if (anyIsolated)
+        for (unsigned i = 0, n = preds.size(); i != n; ++i)
+          if (disconnectedInPred[i])
+            resets[i] = true;
+    }
   }
 
-  for (auto &pred : preds) {
-    if (state.pendingTargetMerge && anyIsolated && !pred.chainIsolated)
+  bool anyResponsible = false;
+  for (bool reset : resets)
+    anyResponsible |= !reset;
+
+  for (unsigned i = 0, n = preds.size(); i != n; ++i) {
+    if (state.pendingTargetMerge && anyResponsible && resets[i])
       continue;
-    worklist.push_back(Frame{std::move(pred.exit), state});
+    worklist.push_back(Frame{std::move(preds[i].exit), state});
   }
   return false;
 }
