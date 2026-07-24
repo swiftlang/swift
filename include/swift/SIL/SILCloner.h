@@ -540,8 +540,12 @@ protected:
     asImpl().visit(BB->getTerminator());
   }
 
-  /// Clone a debug-only reconstruction block.
-  void cloneDebugBasicBlock(SILBasicBlock *SrcBB, SILBasicBlock *NewBB);
+  /// Clone a debug reconstruction block. By default, this uses a
+  /// DebugBasicBlockCloner.
+  void cloneDebugReconstructionBlock(SILBasicBlock *SrcBB, SILBasicBlock *NewBB);
+
+  /// Clone a debug reconstruction block using this cloner's visit methods.
+  void cloneDebugReconstructionBlockContent(SILBasicBlock *SrcBB, SILBasicBlock *NewBB);
 
   // CFG cloning requires cloneFunction() or cloneReachableBlocks().
   void visitSILBasicBlock(SILFunction *F) = delete;
@@ -701,8 +705,6 @@ protected:
 private:
   /// MARK: SILCloner implementation details hidden from CRTP extensions.
 
-  friend class DebugBasicBlockCloner;
-
   void clonePhiArgs(SILBasicBlock *oldBB);
 
   void visitBlocksDepthFirst(SILBasicBlock *StartBB);
@@ -712,25 +714,18 @@ private:
   void commonFixUp(SILFunction *F);
 };
 
-/// A minimal cloner for debug-only reconstruction blocks.
-/// Uses the base SILCloner machinery (ValueMap, BBMap, clonePhiArgs).
+/// A minimal cloner for debug reconstruction blocks.
 class DebugBasicBlockCloner : public SILCloner<DebugBasicBlockCloner> {
-  friend class SILCloner<DebugBasicBlockCloner>;
   friend class SILInstructionVisitor<DebugBasicBlockCloner>;
 public:
+  using SILCloner::cloneDebugReconstructionBlockContent;
+
   explicit DebugBasicBlockCloner(SILFunction &F)
       : SILCloner<DebugBasicBlockCloner>(F) {}
   DebugBasicBlockCloner(SILFunction &F,
                         const SubstitutionMapWithLocalArchetypes &Subs)
       : SILCloner<DebugBasicBlockCloner>(F) {
     Functor = Subs;
-  }
-  void clone(SILBasicBlock *SrcBB, SILBasicBlock *NewBB) {
-    Builder.setInsertionPoint(NewBB);
-    BBMap[SrcBB] = NewBB;
-    clonePhiArgs(SrcBB);
-    visitInstructionsInBlock(SrcBB);
-    visit(SrcBB->getTerminator());
   }
 };
 
@@ -1002,12 +997,22 @@ void SILCloner<ImplClass>::clonePhiArgs(SILBasicBlock *oldBB) {
 }
 
 template <typename ImplClass>
-void SILCloner<ImplClass>::cloneDebugBasicBlock(SILBasicBlock *SrcBB,
+void SILCloner<ImplClass>::cloneDebugReconstructionBlock(SILBasicBlock *SrcBB,
                                                 SILBasicBlock *NewBB) {
   // By default, this uses its own cloner, as the debug basic block should
-  // be left untouched by transformations.
+  // be left untouched by most transformations.
   DebugBasicBlockCloner cloner(*NewBB->getParent(), Functor);
-  cloner.clone(SrcBB, NewBB);
+  cloner.cloneDebugReconstructionBlockContent(SrcBB, NewBB);
+}
+
+template <typename ImplClass>
+void SILCloner<ImplClass>::cloneDebugReconstructionBlockContent(SILBasicBlock *SrcBB,
+                                                        SILBasicBlock *NewBB) {
+  SavedInsertionPointRAII savedIP(getBuilder(), NewBB);
+  BBMap[SrcBB] = NewBB;
+  clonePhiArgs(SrcBB);
+  asImpl().visitInstructionsInBlock(SrcBB);
+  asImpl().visit(SrcBB->getTerminator());
 }
 
 // This private helper visits BBs in depth-first preorder (only processing
@@ -1820,7 +1825,7 @@ SILCloner<ImplClass>::visitDebugValueInst(DebugValueInst *Inst) {
     SILBasicBlock *NewDebugBB =
         NewInst->getFunction()->createEmptyDebugReconstructionBlock();
     NewInst->setDebugReconstructionBlock(NewDebugBB);
-    asImpl().cloneDebugBasicBlock(SrcDebugBB, NewDebugBB);
+    asImpl().cloneDebugReconstructionBlock(SrcDebugBB, NewDebugBB);
     
     // Type substitutions may map an address-only (generic) type to something
     // else, in which case, the op_deref must be converted to a load.
