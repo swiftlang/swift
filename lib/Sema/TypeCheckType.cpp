@@ -3162,7 +3162,7 @@ static Type rebuildWithDynamicSelf(ASTContext &Context, Type ty) {
   }
 }
 
-/// In SIL, handle '@opened(UUID, constraintType) interfaceType',
+/// In SIL, handle '@opened(ID, constraintType) interfaceType',
 /// which creates an opened archetype.
 NeverNullType
 TypeResolver::resolveOpenedExistentialArchetype(
@@ -3214,7 +3214,7 @@ TypeResolver::resolveOpenedExistentialArchetype(
     // into a new opened generic environment.
     auto *env = GenericEnvironment::forOpenedExistential(
         constraintType->getCanonicalType(),
-        openedAttr->getUUID());
+        openedAttr->getID());
 
     // Rewrite the interface type into one with the correct depth.
     interfaceType = Type(interfaceType).subst(
@@ -3230,7 +3230,7 @@ TypeResolver::resolveOpenedExistentialArchetype(
   return archetypeType;
 }
 
-/// In SIL, handle '@pack_element(UUID) interfaceType',
+/// In SIL, handle '@pack_element(ID) interfaceType',
 /// which creates an opened archetype.
 NeverNullType
 TypeResolver::resolvePackElementArchetype(
@@ -3243,7 +3243,7 @@ TypeResolver::resolvePackElementArchetype(
 
   const SILTypeResolutionContext::OpenedPackElement *entry = nullptr;
   if (const auto *openedPacksMap = silContext->OpenedPackElements) {
-    auto it = openedPacksMap->find(attr->getUUID());
+    auto it = openedPacksMap->find(attr->getID());
     if (it != openedPacksMap->end()) {
       entry = &it->second;
     }

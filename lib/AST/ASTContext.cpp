@@ -551,6 +551,8 @@ struct ASTContext::Implementation {
   /// Local and closure discriminators per context.
   llvm::DenseMap<const DeclContext *, unsigned> NextDiscriminator;
 
+  uint64_t NextGenericEnvironmentID = 0;
+
   /// Cached generic signatures for generic builtin types.
   static const unsigned NumBuiltinGenericTypes
     = unsigned(TypeKind::Last_BuiltinGenericType)
@@ -566,7 +568,7 @@ struct ASTContext::Implementation {
                MetatypeRepresentation::Last_MetatypeRepresentation) + 1,
                "Use std::pair for MetatypeTypes and ExistentialMetatypeTypes.");
 
-    using OpenedExistentialKey = std::pair<SubstitutionMap, UUID>;
+    using OpenedExistentialKey = std::pair<SubstitutionMap, uint64_t>;
 
     llvm::DenseMap<Type, ErrorType *> ErrorTypesWithOriginal;
     llvm::FoldingSet<TypeAliasType> TypeAliasTypes;
@@ -670,7 +672,7 @@ struct ASTContext::Implementation {
   llvm::FoldingSet<BuiltinVectorType> BuiltinVectorTypes;
   llvm::FoldingSet<DeclName::CompoundDeclName> CompoundNames;
   llvm::FoldingSet<DeclNameRef::SelectiveDeclNameRef> SelectiveNameRefs;
-  llvm::DenseMap<UUID, GenericEnvironment *> OpenedElementEnvironments;
+  llvm::DenseMap<uint64_t, GenericEnvironment *> OpenedElementEnvironments;
   llvm::FoldingSet<IndexSubset> IndexSubsets;
   llvm::FoldingSet<AutoDiffDerivativeFunctionIdentifier>
       AutoDiffDerivativeFunctionIdentifiers;
@@ -2481,6 +2483,10 @@ void ASTContext::setMaxAssignedDiscriminator(
 
   assert(discriminator >= getImpl().NextDiscriminator[dc]);
   getImpl().NextDiscriminator[dc] = discriminator;
+}
+
+uint64_t ASTContext::getNextGenericEnvironmentID() {
+  return ++getImpl().NextGenericEnvironmentID;
 }
 
 void ASTContext::verifyAllLoadedModules() const {
@@ -6045,7 +6051,7 @@ CanExistentialArchetypeType ExistentialArchetypeType::get(CanType existential) {
 
   auto *genericEnv = GenericEnvironment::forOpenedExistential(
       existentialSig.OpenedSig, existentialSig.Shape,
-      existentialSig.Generalization, UUID::fromTime());
+      existentialSig.Generalization, ctx.getNextGenericEnvironmentID());
 
   return cast<ExistentialArchetypeType>(
     genericEnv->mapTypeIntoEnvironment(existentialSig.SelfType)
@@ -6354,19 +6360,19 @@ GenericEnvironment *GenericEnvironment::forOpaqueType(
 
 /// Create a new generic environment for an opened archetype.
 GenericEnvironment *
-GenericEnvironment::forOpenedExistential(Type existential, UUID uuid) {
+GenericEnvironment::forOpenedExistential(Type existential, uint64_t id) {
   auto &ctx = existential->getASTContext();
   auto existentialSig = ctx.getOpenedExistentialSignature(existential);
   return forOpenedExistential(existentialSig.OpenedSig,
                               existentialSig.Shape,
-                              existentialSig.Generalization, uuid);
+                              existentialSig.Generalization, id);
 }
 
 /// Create a new generic environment for an opened archetype.
 GenericEnvironment *
 GenericEnvironment::forOpenedExistential(
     GenericSignature signature, Type existential,
-    SubstitutionMap subs, UUID uuid) {
+    SubstitutionMap subs, uint64_t id) {
   assert(existential->isExistentialType());
 
   // TODO: We could attempt to preserve type sugar in the substitution map.
@@ -6385,7 +6391,7 @@ GenericEnvironment::forOpenedExistential(
 
   auto arena = getArena(properties);
 
-  auto key = std::make_pair(subs, uuid);
+  auto key = std::make_pair(subs, id);
 
   auto &environments =
       ctx.getImpl().getArena(arena).OpenedExistentialEnvironments;
@@ -6396,7 +6402,7 @@ GenericEnvironment::forOpenedExistential(
     assert(existingEnv->getOpenedExistentialType()->isEqual(existential));
     assert(existingEnv->getGenericSignature().getPointer() == signature.getPointer());
     assert(existingEnv->getOuterSubstitutions() == subs);
-    assert(existingEnv->getOpenedExistentialUUID() == uuid);
+    assert(existingEnv->getOpenedExistentialID() == id);
 
     return existingEnv;
   }
@@ -6410,9 +6416,13 @@ GenericEnvironment::forOpenedExistential(
       1, 0, 1, 0, numGenericParams);
   void *mem = ctx.Allocate(bytes, alignof(GenericEnvironment));
   auto *genericEnv =
-      new (mem) GenericEnvironment(signature, existential, subs, uuid);
+      new (mem) GenericEnvironment(signature, existential, subs, id);
 
   environments[key] = genericEnv;
+
+  // Make sure we don't reuse IDs when parsing textual SIL and so on.
+  ctx.getImpl().NextGenericEnvironmentID
+      = std::max(ctx.getImpl().NextGenericEnvironmentID, id);
 
   return genericEnv;
 }
@@ -6420,20 +6430,20 @@ GenericEnvironment::forOpenedExistential(
 /// Create a new generic environment for an element archetype.
 GenericEnvironment *
 GenericEnvironment::forOpenedElement(GenericSignature signature,
-                                     UUID uuid,
+                                     uint64_t id,
                                      CanGenericTypeParamType shapeClass,
                                      SubstitutionMap outerSubs) {
   auto &ctx = signature->getASTContext();
 
   auto &openedElementEnvironments =
       ctx.getImpl().OpenedElementEnvironments;
-  auto found = openedElementEnvironments.find(uuid);
+  auto found = openedElementEnvironments.find(id);
 
   if (found != openedElementEnvironments.end()) {
     auto *existingEnv = found->second;
     assert(existingEnv->getGenericSignature().getPointer() == signature.getPointer());
     assert(existingEnv->getOpenedElementShapeClass()->isEqual(shapeClass));
-    assert(existingEnv->getOpenedElementUUID() == uuid);
+    assert(existingEnv->getOpenedElementID() == id);
 
     return existingEnv;
   }
@@ -6449,10 +6459,14 @@ GenericEnvironment::forOpenedElement(GenericSignature signature,
       1, 0, 0, 1, numGenericParams + numOpenedParams);
   void *mem = ctx.Allocate(bytes, alignof(GenericEnvironment));
   auto *genericEnv = new (mem) GenericEnvironment(signature,
-                                                  uuid, shapeClass,
+                                                  id, shapeClass,
                                                   outerSubs);
 
-  openedElementEnvironments[uuid] = genericEnv;
+  openedElementEnvironments[id] = genericEnv;
+
+  // Make sure we don't reuse IDs when parsing textual SIL and so on.
+  ctx.getImpl().NextGenericEnvironmentID
+      = std::max(ctx.getImpl().NextGenericEnvironmentID, id);
 
   return genericEnv;
 }

@@ -3453,11 +3453,12 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       return true;
     }
 
-    // Parse the UUID for the opening.
-    UUID uuid;
+    // Parse the ID for the opening.
+    unsigned id;
+    SourceLoc idLoc;
     if (!P.consumeIf(tok::comma) ||
-        parseVerbatim("uuid") ||
-        P.parseUUIDString(uuid, diag::sil_expected_uuid))
+        parseVerbatim("id") ||
+        P.parseUnsignedInteger(id, idLoc, diag::sil_expected_uuid))
       return true;
 
     // Build the opened-element signature, which adds the parameters for
@@ -3467,12 +3468,12 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
         openedGenericsSig.getCanonicalSignature(), shapeParam);
 
     auto openedEnv = GenericEnvironment::forOpenedElement(openedElementSig,
-                         uuid, shapeParam, openedSubMap);
+                         id, shapeParam, openedSubMap);
 
     auto openInst = B.createOpenPackElement(InstLoc, Val, openedEnv);
     ResultVal = openInst;
 
-    auto &entry = OpenedPackElements[uuid];
+    auto &entry = OpenedPackElements[id];
     if (entry.DefinitionPoint.isValid()) {
       P.diagnose(OpcodeLoc, diag::multiple_open_pack_element);
       P.diagnose(entry.DefinitionPoint, diag::sil_previous_instruction);
@@ -6526,13 +6527,9 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
         return true;
 
       // Lower the type at the abstraction level of the existential.
-      auto archetype =
-          ExistentialArchetypeType::get(Val->getType().getASTType())
-              ->getCanonicalType();
-
       auto &F = B.getFunction();
       SILType LoweredTy =
-          F.getLoweredType(Lowering::AbstractionPattern(archetype), Ty)
+          F.getLoweredType(Lowering::AbstractionPattern::getOpaque(), Ty)
               .getAddressType();
 
       // Collect conformances for the type.

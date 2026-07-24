@@ -104,7 +104,6 @@ def main():
         return
 
     new_args += [
-      '-Xllvm', '-print-no-uuids',
       '-Xllvm', '-sil-print-pass-md5=' + output_file + '.log']
 
     if EMIT_IR:

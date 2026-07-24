@@ -941,11 +941,13 @@ ConstraintSystem::getPackExpansionEnvironment(PackExpansionExpr *expr) const {
 
 GenericEnvironment *ConstraintSystem::createPackExpansionEnvironment(
     PackExpansionExpr *expr, CanGenericTypeParamType shapeParam) {
+  auto &ctx = getASTContext();
   auto *contextEnv = DC->getGenericEnvironmentOfContext();
-  auto elementSig = getASTContext().getOpenedElementSignature(
+  auto elementSig = ctx.getOpenedElementSignature(
       contextEnv->getGenericSignature().getCanonicalSignature(), shapeParam);
   auto contextSubs = contextEnv->getForwardingSubstitutionMap();
-  auto *env = GenericEnvironment::forOpenedElement(elementSig, UUID::fromTime(),
+  auto *env = GenericEnvironment::forOpenedElement(elementSig,
+                                                   ctx.getNextGenericEnvironmentID(),
                                                    shapeParam, contextSubs);
   recordPackExpansionEnvironment(expr, env);
   return env;

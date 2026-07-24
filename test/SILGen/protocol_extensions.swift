@@ -502,18 +502,18 @@ extension P1 {
 // CHECK-LABEL: sil hidden [ossa] @$s19protocol_extensions17testExistentials1{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0([[P:%[0-9]+]] : $*any P1, [[B:%[0-9]+]] : $Bool, [[I:%[0-9]+]] : $Int64):
 func testExistentials1(_ p1: P1, b: Bool, i: Int64) {
-  // CHECK: [[POPENED:%[0-9]+]] = open_existential_addr immutable_access [[P]] : $*any P1 to $*@opened([[UUID:".*"]], any P1) Self
+  // CHECK: [[POPENED:%[0-9]+]] = open_existential_addr immutable_access [[P]] : $*any P1 to $*@opened([[UUID:.*]], any P1) Self
   // CHECK: [[F1:%[0-9]+]] = function_ref @$s19protocol_extensions2P1PAAE2f1{{[_0-9a-zA-Z]*}}F
   // CHECK: apply [[F1]]<@opened([[UUID]], any P1) Self>([[POPENED]]) : $@convention(method) <τ_0_0 where τ_0_0 : P1> (@in_guaranteed τ_0_0) -> ()
   p1.f1()
 
-  // CHECK: [[POPENED:%[0-9]+]] = open_existential_addr immutable_access [[P]] : $*any P1 to $*@opened([[UUID:".*"]], any P1) Self
+  // CHECK: [[POPENED:%[0-9]+]] = open_existential_addr immutable_access [[P]] : $*any P1 to $*@opened([[UUID:.*]], any P1) Self
   // CHECK: [[GETTER:%[0-9]+]] = function_ref @$s19protocol_extensions2P1PAAEySbs5Int64Vcig
   // CHECK: apply [[GETTER]]<@opened([[UUID]], any P1) Self>([[I]], [[POPENED]]) : $@convention(method) <τ_0_0 where τ_0_0 : P1> (Int64, @in_guaranteed τ_0_0) -> Bool
   // CHECK: store{{.*}} : $*Bool
   var b2 = p1[i]
 
-  // CHECK: [[POPENED:%[0-9]+]] = open_existential_addr immutable_access [[P]] : $*any P1 to $*@opened([[UUID:".*"]], any P1) Self
+  // CHECK: [[POPENED:%[0-9]+]] = open_existential_addr immutable_access [[P]] : $*any P1 to $*@opened([[UUID:.*]], any P1) Self
   // CHECK: [[GETTER:%[0-9]+]] = function_ref @$s19protocol_extensions2P1PAAE4propSbvg
   // CHECK: apply [[GETTER]]<@opened([[UUID]], any P1) Self>([[POPENED]]) : $@convention(method) <τ_0_0 where τ_0_0 : P1> (@in_guaranteed τ_0_0) -> Bool
   // CHECK: store{{.*}} : $*Bool
@@ -526,9 +526,9 @@ func testExistentials2(_ p1: P1) {
   // CHECK: [[P1A:%[0-9]+]] = alloc_box ${ var any P1 }
   // CHECK: [[P1AL:%[0-9]+]] = begin_borrow [lexical] [var_decl] [[P1A]]
   // CHECK: [[PB:%.*]] = project_box [[P1AL]]
-  // CHECK: [[POPENED:%[0-9]+]] = open_existential_addr immutable_access [[P]] : $*any P1 to $*@opened([[UUID:".*"]], any P1) Self
+  // CHECK: [[POPENED:%[0-9]+]] = open_existential_addr immutable_access [[P]] : $*any P1 to $*@opened([[UUID:.*]], any P1) Self
   // CHECK: [[FN:%[0-9]+]] = function_ref @$s19protocol_extensions2P1PAAE11returnsSelf{{[_0-9a-zA-Z]*}}F
-  // CHECK: [[P1AINIT:%[0-9]+]] = init_existential_addr [[PB]] : $*any P1, $@opened([[UUID2:".*"]], any P1) Self
+  // CHECK: [[P1AINIT:%[0-9]+]] = init_existential_addr [[PB]] : $*any P1, $@opened([[UUID2:.*]], any P1) Self
   // CHECK: apply [[FN]]<@opened([[UUID]], any P1) Self>([[P1AINIT]], [[POPENED]]) : $@convention(method) <τ_0_0 where τ_0_0 : P1> (@in_guaranteed τ_0_0) -> @out τ_0_0
   var p1a: P1 = p1.returnsSelf()
 }
@@ -536,13 +536,13 @@ func testExistentials2(_ p1: P1) {
 // CHECK-LABEL: sil hidden [ossa] @$s19protocol_extensions23testExistentialsGetters{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0([[P:%[0-9]+]] : $*any P1):
 func testExistentialsGetters(_ p1: P1) {
-  // CHECK: [[POPENED:%[0-9]+]] = open_existential_addr immutable_access [[P]] : $*any P1 to $*@opened([[UUID:".*"]], any P1) Self
+  // CHECK: [[POPENED:%[0-9]+]] = open_existential_addr immutable_access [[P]] : $*any P1 to $*@opened([[UUID:.*]], any P1) Self
   // CHECK: [[FN:%[0-9]+]] = function_ref @$s19protocol_extensions2P1PAAE5prop2Sbvg
   // CHECK: [[B:%[0-9]+]] = apply [[FN]]<@opened([[UUID]], any P1) Self>([[POPENED]]) : $@convention(method) <τ_0_0 where τ_0_0 : P1> (@in_guaranteed τ_0_0) -> Bool
   // CHECK: [[MV_B:%.*]] = move_value [var_decl] [[B]] : $Bool
   let b: Bool = p1.prop2
 
-  // CHECK: [[POPENED:%[0-9]+]] = open_existential_addr immutable_access [[P]] : $*any P1 to $*@opened([[UUID:".*"]], any P1) Self
+  // CHECK: [[POPENED:%[0-9]+]] = open_existential_addr immutable_access [[P]] : $*any P1 to $*@opened([[UUID:.*]], any P1) Self
   // CHECK: [[GETTER:%[0-9]+]] = function_ref @$s19protocol_extensions2P1PAAEyS2bcig
   // CHECK: apply [[GETTER]]<@opened([[UUID]], any P1) Self>([[MV_B]], [[POPENED]]) : $@convention(method) <τ_0_0 where τ_0_0 : P1> (Bool, @in_guaranteed τ_0_0) -> Bool
   let b2: Bool = p1[b]
@@ -557,14 +557,14 @@ func testExistentialSetters(_ p1: P1, b: Bool) {
   // CHECK: [[PBP:%[0-9]+]] = project_box [[PLIFETIME]]
   // CHECK-NEXT: copy_addr [[P]] to [init] [[PBP]] : $*any P1
   // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[PBP]]
-  // CHECK: [[POPENED:%[0-9]+]] = open_existential_addr mutable_access [[WRITE]] : $*any P1 to $*@opened([[UUID:".*"]], any P1) Self
+  // CHECK: [[POPENED:%[0-9]+]] = open_existential_addr mutable_access [[WRITE]] : $*any P1 to $*@opened([[UUID:.*]], any P1) Self
   // CHECK: [[GETTER:%[0-9]+]] = function_ref @$s19protocol_extensions2P1PAAE5prop2Sbvs
   // CHECK: apply [[GETTER]]<@opened([[UUID]], any P1) Self>([[B]], [[POPENED]]) : $@convention(method) <τ_0_0 where τ_0_0 : P1> (Bool, @inout τ_0_0) -> ()
   // CHECK-NOT: deinit_existential_addr
   p1.prop2 = b
 
   // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[PBP]]
-  // CHECK: [[POPENED:%[0-9]+]] = open_existential_addr mutable_access [[WRITE]] : $*any P1 to $*@opened([[UUID:".*"]], any P1) Self
+  // CHECK: [[POPENED:%[0-9]+]] = open_existential_addr mutable_access [[WRITE]] : $*any P1 to $*@opened([[UUID:.*]], any P1) Self
   // CHECK: [[SUBSETTER:%[0-9]+]] = function_ref @$s19protocol_extensions2P1PAAEyS2bcis
   // CHECK: apply [[SUBSETTER]]<@opened([[UUID]], any P1) Self>([[B]], [[B]], [[POPENED]]) : $@convention(method) <τ_0_0 where τ_0_0 : P1> (Bool, Bool, @inout τ_0_0) -> ()
   // CHECK-NOT: deinit_existential_addr [[PB]] : $*any P1
@@ -594,7 +594,7 @@ func testLogicalExistentialSetters(_ hasAP1: HasAP1, _ b: Bool) {
   // CHECK: [[P1_COPY:%[0-9]+]] = alloc_stack $any P1
   // CHECK: [[SOMEP1_GETTER:%[0-9]+]] = function_ref @$s19protocol_extensions6HasAP1V6someP1AA0F0_pvg : $@convention(method) (@in_guaranteed HasAP1) -> @out any P1
   // CHECK: [[RESULT:%[0-9]+]] = apply [[SOMEP1_GETTER]]([[P1_COPY]], [[WRITE]]) : $@convention(method) (@in_guaranteed HasAP1) -> @out any P1
-  // CHECK: [[P1_OPENED:%[0-9]+]] = open_existential_addr mutable_access [[P1_COPY]] : $*any P1 to $*@opened([[UUID:".*"]], any P1) Self
+  // CHECK: [[P1_OPENED:%[0-9]+]] = open_existential_addr mutable_access [[P1_COPY]] : $*any P1 to $*@opened([[UUID:.*]], any P1) Self
   // CHECK: [[PROP2_SETTER:%[0-9]+]] = function_ref @$s19protocol_extensions2P1PAAE5prop2Sbvs : $@convention(method) <τ_0_0 where τ_0_0 : P1> (Bool, @inout τ_0_0) -> ()
   // CHECK: apply [[PROP2_SETTER]]<@opened([[UUID]], any P1) Self>([[B]], [[P1_OPENED]]) : $@convention(method) <τ_0_0 where τ_0_0 : P1> (Bool, @inout τ_0_0) -> ()
   // CHECK: [[SOMEP1_SETTER:%[0-9]+]] = function_ref @$s19protocol_extensions6HasAP1V6someP1AA0F0_pvs : $@convention(method) (@in any P1, @inout HasAP1) -> ()

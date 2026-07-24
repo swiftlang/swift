@@ -4329,7 +4329,7 @@ pack type. The value of the instruction has type `Builtin.Word`.
 ### open_pack_element
 
 ```
-sil-instruction ::= 'open_pack_element' sil-value 'of' generic-parameter-list+ 'at' sil-apply-substitution-list ',' 'shape' sil-type ',' 'uuid' string-literal
+sil-instruction ::= 'open_pack_element' sil-value 'of' generic-parameter-list+ 'at' sil-apply-substitution-list ',' 'shape' sil-type ',' 'id' integer
 ```
 
 Binds one or more opened pack element archetypes in the local type
@@ -4343,12 +4343,11 @@ The `shape` type operand is resolved in the context of the
 generalization signature. It must name a pack parameter. Archetypes will
 be bound for all pack parameters with the same shape as this parameter.
 
-The `uuid` operand must be an RFC 4122 UUID string, which is composed of
-32 hex digits separated by hyphens in the pattern `8-4-4-4-12`. There
-must not be any other `open_pack_element` instruction with this UUID in
-the SIL function. Opened pack element archetypes are identified by this
-UUID and are different from any other opened pack element archetypes in
-the function, even if the operands otherwise match exactly.
+The `id` operand must be an unsigned integer. There must not be any other
+`open_pack_element` instruction with this ID in the SIL module. Opened
+pack element archetypes are identified by this ID and are different from
+any other opened pack element archetypes anywhere else, even if the
+operands otherwise match exactly.
 
 The value operand is the pack index and must be the result of a pack
 indexing instruction.

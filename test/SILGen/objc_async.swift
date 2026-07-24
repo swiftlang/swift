@@ -376,7 +376,7 @@ extension SlowServer: @retroactive FailableFloatLoader {
 // CHECK: [[SLOWSERVER_ANYOBJECT_M_B:%.*]] = begin_borrow [[SLOWSERVER_ANYOBJECT_M]]
 // CHECK: [[SLOWSERVER_ANYOBJECT_M_B_O:%.*]] = open_existential_ref [[SLOWSERVER_ANYOBJECT_M_B]]
 // CHECK: [[SLOWSERVER_ANYOBJECT_M_B_O_C:%.*]] = copy_value [[SLOWSERVER_ANYOBJECT_M_B_O]]
-// CHECK: [[METHOD:%.*]] = objc_method [[SLOWSERVER_ANYOBJECT_M_B_O_C]] : $@opened("{{.*}}", AnyObject) Self, #SlowServer.start!foreign : (SlowServer) -> (NSDate?) async -> (), $@convention(objc_method) (Optional<NSDate>, @convention(block) @Sendable () -> (), @opened("{{.*}}", AnyObject) Self) -> ()
+// CHECK: [[METHOD:%.*]] = objc_method [[SLOWSERVER_ANYOBJECT_M_B_O_C]] : $@opened({{.*}}, AnyObject) Self, #SlowServer.start!foreign : (SlowServer) -> (NSDate?) async -> (), $@convention(objc_method) (Optional<NSDate>, @convention(block) @Sendable () -> (), @opened({{.*}}, AnyObject) Self) -> ()
 // CHECK: [[CONT:%.*]] = get_async_continuation_addr ()
 // CHECK: [[UNSAFE_CONT:%.*]] = struct $UnsafeContinuation<(), Never> ([[CONT]] : $Builtin.RawUnsafeContinuation)
 // CHECK: [[BLOCK:%.*]] = alloc_stack $@block_storage Any
@@ -386,7 +386,7 @@ extension SlowServer: @retroactive FailableFloatLoader {
 // CHECK: merge_isolation_region [[BLOCK]] : $*@block_storage Any,
 // CHECK: [[CONT_HANDLER:%.*]] = function_ref @$sIeyBh_ytTz_ : $@convention(c) @Sendable (@inout_aliasable @block_storage Any) -> ()
 // CHECK: [[INIT_BLOCK_STORAGE_HEADER:%.*]] = init_block_storage_header [[BLOCK]] : $*@block_storage Any, invoke [[CONT_HANDLER]]
-// CHECK: merge_isolation_region [[SLOWSERVER_ANYOBJECT_M_B_O_C]] : $@opened("{{.*}}", AnyObject) Self, [[BLOCK]]
+// CHECK: merge_isolation_region [[SLOWSERVER_ANYOBJECT_M_B_O_C]] : $@opened({{.*}}, AnyObject) Self, [[BLOCK]]
 // CHECK: apply [[METHOD]]({{%.*}}, [[INIT_BLOCK_STORAGE_HEADER]], [[SLOWSERVER_ANYOBJECT_M_B_O_C]])
 // CHECK: await_async_continuation [[CONT]] : $Builtin.RawUnsafeContinuation, resume bb1
 // CHECK: } // end sil function '$s10objc_async13testAnyObjectyySo10SlowServerCYaF'

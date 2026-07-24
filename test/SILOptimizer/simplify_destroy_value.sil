@@ -260,7 +260,7 @@ bb0(%0 : @owned $C):
 // CHECK:       } // end sil function 'remove_open_existential_ref'
 sil [ossa] @remove_open_existential_ref : $@convention(thin) (@owned any P) -> () {
 bb0(%0 : @owned $any P):
-  %1 = open_existential_ref %0 to $@opened("01234567-89ab-cdef-0123-111111111111", P) Self
+  %1 = open_existential_ref %0 to $@opened(1, P) Self
   destroy_value %1
   %r = tuple ()
   return %r
