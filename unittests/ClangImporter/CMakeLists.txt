@@ -3,6 +3,8 @@ configure_file(${SWIFT_SOURCE_DIR}/stdlib/public/Cxx/libstdcxx/libstdcxx.modulem
 
 add_swift_unittest(SwiftClangImporterTests
   ClangImporterTests.cpp
+  CxxInteropTestHarness.cpp
+  CxxDirectViewTests.cpp
 )
 
 target_link_libraries(SwiftClangImporterTests
@@ -11,4 +13,10 @@ target_link_libraries(SwiftClangImporterTests
     swiftSema
     swiftParse
     swiftAST
+    swiftSIL
+    swiftSerialization
 )
+
+target_compile_definitions(SwiftClangImporterTests PRIVATE
+  SWIFTLIB_DIR=\"${SWIFTLIB_DIR}\")
+
