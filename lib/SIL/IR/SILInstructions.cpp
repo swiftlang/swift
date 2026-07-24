@@ -605,7 +605,8 @@ void DebugValueInst::cloneReconstructionBlockFrom(DebugValueInst *src) {
     return;
   auto *newBB = getFunction()->createEmptyDebugReconstructionBlock();
   setDebugReconstructionBlock(newBB);
-  DebugBasicBlockCloner(*getFunction()).clone(srcBB, newBB);
+  DebugBasicBlockCloner(*getFunction())
+    .cloneDebugReconstructionBlockContent(srcBB, newBB);
 }
 
 void DebugValueInst::killOperand(SILType operandType) {
