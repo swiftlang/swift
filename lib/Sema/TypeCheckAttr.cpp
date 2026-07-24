@@ -1584,7 +1584,10 @@ void AttributeChecker::visitObjCAttr(ObjCAttr *attr) {
     else if (attr->hasName() && EED->getParentCase()->getElements().size() > 1)
       error = diag::objc_enum_case_multi;
   } else if (auto *func = dyn_cast<FuncDecl>(D)) {
-    if (!checkObjCDeclContext(D))
+    // A top-level function may be @objc (SE-0495): it is exposed as a
+    // C-callable entry point that accepts Objective-C types, rather than an
+    // Objective-C method.
+    if (!checkObjCDeclContext(D) && !func->isObjCGlobalFunction())
       error = diag::invalid_objc_decl_context;
     else if (auto accessor = dyn_cast<AccessorDecl>(func))
       if (!accessor->isGetterOrSetter()) {
@@ -1626,8 +1629,9 @@ void AttributeChecker::visitObjCAttr(ObjCAttr *attr) {
   if (auto objcName = attr->getName()) {
     if (isa<ClassDecl>(D) || isa<ProtocolDecl>(D) || isa<VarDecl>(D)
         || isa<EnumDecl>(D) || isa<EnumElementDecl>(D)
-        || isa<ExtensionDecl>(D)) {
-      // Types and properties can only have nullary
+        || isa<ExtensionDecl>(D)
+        || (isa<FuncDecl>(D) && cast<FuncDecl>(D)->isObjCGlobalFunction())) {
+      // Types, properties, and top-level functions can only have nullary
       // names. Complain and recover by chopping off everything
       // after the first name.
       if (objcName->getNumArgs() > 0) {
