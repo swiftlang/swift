@@ -129,9 +129,6 @@ private struct AnalyzedInstructions {
 ///
 /// This may split some loads into smaller loads.
 private func analyzeLoopAndSplitLoads(loop: Loop, _ context: FunctionPassContext) -> MovableInstructions {
-  // TODO: Remove once uses lowered OSSA.
-  loop.splitCriticalExitingAndBackEdges(context)
-
   var movableInstructions = MovableInstructions()
   var analyzedInstructions = AnalyzedInstructions(context)
   defer { analyzedInstructions.deinitialize() }
