@@ -41,6 +41,8 @@ struct Pair  {
 // globalArray
 sil_global @globalArray : $Storage
 
+sil_global public_external [let] @gg : $AnyObject
+
 // CHECK-LABEL: @memset
 
 // CHECK: bb0
@@ -1158,8 +1160,6 @@ struct State {
 // CHECK:     [[PRELOADADR:%.*]] = tuple_element_addr %{{.*}} : $*(Int64, Int64, Int64), 1
 // CHECK:     [[PRELOAD:%.*]] = load [[PRELOADADR]] : $*Int64
 // ...Split element 0
-// CHECK:     [[ELT0:%.*]] = load [[HOISTADR]] : $*Int64
-// CHECK:     [[HOISTVAL:%.*]] = struct_extract [[ELT0]] : $Int64, #Int64._value
 // CHECK:     [[HOISTADR2:%.*]] = tuple_element_addr %{{.*}} : $*(Int64, Int64, Int64), 0
 // CHECK:     [[ELT0B:%.*]] = load [[HOISTADR2]] : $*Int64
 // ...Split element 2
@@ -1168,6 +1168,8 @@ struct State {
 // ...Split State.singlevalue
 // CHECK:     [[SINGLEADR:%.*]] = struct_element_addr %{{.*}} : $*State, #State.singleValue
 // CHECK:     [[SINGLEVAL:%.*]] = load [[SINGLEADR]] : $*Int64
+// CHECK:     [[ELT0:%.*]] = load [[HOISTADR]] : $*Int64
+// CHECK:     [[HOISTVAL:%.*]] = struct_extract [[ELT0]] : $Int64, #Int64._value
 // ...Hoisted element 0
 // CHECK:     br bb1([[PRELOAD]] : $Int64)
 // ...Loop
@@ -1432,9 +1434,9 @@ bb3:
 // CHECK: bb0(%0 : $Int64, %1 : $Int64, %2 : $Builtin.RawPointer):
 // CHECK: [[ELT_1:%.*]] = tuple_element_addr %3 : $*(Int64, (Int64, Int64)), 1
 // CHECK: [[V1:%.*]] = load %4 : $*(Int64, Int64)
+// CHECK: [[ELT_0:%.*]] = tuple_element_addr %3 : $*(Int64, (Int64, Int64)), 0
 // CHECK: [[ARG0:%.*]] = tuple (%0 : $Int64, %0 : $Int64)
 // CHECK: [[ARG1:%.*]] = tuple (%1 : $Int64, %1 : $Int64)
-// CHECK: [[ELT_0:%.*]] = tuple_element_addr %3 : $*(Int64, (Int64, Int64)), 0
 // CHECK: [[ARG0_0:%.*]] = tuple_extract [[ARG0]] : $(Int64, Int64), 0
 // CHECK:   br bb1([[V1]] : $(Int64, Int64))
 // CHECK: bb1([[PHI:%.*]] : $(Int64, Int64)):
@@ -2456,3 +2458,34 @@ bb3:
   return %r : $()
 }
 
+// CHECK-LABEL: sil [ossa] @dont_speculatively_hoist_load_borrow :
+// CHECK:       bb2:
+// CHECK-NEXT:    load_borrow
+// CHECK-LABEL: } // end sil function 'dont_speculatively_hoist_load_borrow'
+sil [ossa] @dont_speculatively_hoist_load_borrow : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @gg : $*AnyObject
+  br bb1
+
+bb1:
+  cond_br undef, bb2, bb3
+
+bb2:
+  %3 = load_borrow %0
+  fix_lifetime %3
+  end_borrow %3
+  br bb4
+
+bb3:
+  br bb4
+
+bb4:
+  cond_br undef, bb5, bb6
+
+bb5:
+  br bb1
+
+bb6:
+  %r = tuple ()
+  return %r 
+}
