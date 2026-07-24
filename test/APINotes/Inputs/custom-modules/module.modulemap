@@ -4,3 +4,6 @@ module APINotesTest {
 module ObsoletedAPINotesTest {
   header "ObsoletedAPINotesTest.h"
 }
+module InvalidMacroNames {
+  header "InvalidMacroNames.h"
+}
