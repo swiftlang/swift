@@ -1079,3 +1079,47 @@ func break_in_loop_chain(_ x: NS, _ n: Int) async {
   }
   await transferToMain(y) // expected-warning {{sending 'y' risks causing data races}} expected-note {{sending 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
 }
+
+////////////////////////////////////////////////////////////////////////////////
+// KNOWN-BAD DIAGNOSTICS (characterization). These pin current behavior where the
+// chain walker loses information: an internal/runtime name leaks into the chain,
+// a projection collapses to its base, the note names something other than the
+// value actually sent, or we fall back to a nameless generic note. They should
+// be *fixed* later; each FIXME says what the note ought to say.
+////////////////////////////////////////////////////////////////////////////////
+
+// FIXME: The sent value is 'box.ns', but the chain note names the container
+// 'box'. It should say 'box.ns' (or at least agree with the sending note).
+func send_projection_of_isolated(_ x: NS) async {
+  var box = Box1(NS())
+  box.ns = x // expected-note {{'box' is connected to 'x' which is accessible to code in the current isolation context}}
+  await transferToMain(box.ns) // expected-warning {{sending 'box.ns' risks causing data races}} expected-note {{sending 'box.ns' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
+}
+
+// FIXME: The write is 'box.b.b.ns = x', but the note collapses the whole access
+// path to the base 'box'. It loses which field flowed the isolated value in.
+func deep_projection_store(_ x: NS) async {
+  var box = Box3(Box2(Box1(NS())))
+  box.b.b.ns = x // expected-note {{'box' is connected to 'x' which is accessible to code in the current isolation context}}
+  await transferToMain(box) // expected-warning {{sending 'box' risks causing data races}} expected-note {{sending 'box' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
+}
+
+// FIXME: 'y' is a copy of the actor's stored property, yet we emit only the
+// nameless generic "value was merged … here" note. It should name the chain,
+// e.g. "'y' is connected to 'slot'".
+actor SlotActor {
+  var slot = NS()
+  func probe() async {
+    let y = slot // expected-note {{value was merged into 'self'-isolated code region here}}
+    await transferToMain(y) // expected-warning {{sending 'y' risks causing data races}} expected-note {{sending 'self'-isolated 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and 'self'-isolated uses}}
+  }
+}
+
+// FIXME: The array-literal lowering leaks the compiler-internal
+// '_allocateUninitializedArray' as a chain step. An internal runtime name
+// should never appear in a user-facing note.
+func array_append_leak(_ x: NS) async {
+  var arr = [NS()] // expected-note {{'_allocateUninitializedArray' is connected to 'arr'}}
+  arr.append(x) // expected-note {{'arr' is connected to 'x' which is accessible to code in the current isolation context}}
+  await transferToMain(arr) // expected-warning {{sending 'arr' risks causing data races}} expected-note {{sending 'arr' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
+}
