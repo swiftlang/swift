@@ -2697,13 +2697,16 @@ public:
     REGIONBASEDISOLATION_LOG(llvm::dbgs()
                              << "Translating Isolated Partial Apply!\n");
 
-    // For each argument operand.
+    // First, require all tracked operands.
     for (auto &op : applySite.getArgumentOperands()) {
-      // See if we tracked it.
       if (auto lookupResult = tryToTrackValue(op.get())) {
-        // If we are tracking it, sent it and if it is actor derived, mark
-        // our partial apply as actor derived.
         builder.addRequire(*lookupResult);
+      }
+    }
+
+    // Next, send all tracked operands.
+    for (auto &op : applySite.getArgumentOperands()) {
+      if (auto lookupResult = tryToTrackValue(op.get())) {
         builder.addSend(lookupResult->value, &op);
       }
     }
