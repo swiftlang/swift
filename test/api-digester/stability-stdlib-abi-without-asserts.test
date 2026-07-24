@@ -788,4 +788,7 @@ Func _hashValue(for:) has generic signature change from <H where H : Swift.Hasha
 Func _hashValue(for:) has parameter 0 changing from Default to Shared
 Func _hashValue(for:) is now with @_preInverseGenerics
 
+// SE-NNNN: CommandLine.executablePath
+Func _NSGetExecutablePath(_:_:) is a new API without '@available'
+
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)

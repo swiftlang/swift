@@ -1343,3 +1343,5 @@ Added: _swift_retainReturningCount
 Added: _$sSS9UTF16ViewV13_copyContents12initializingAB8IteratorV_SitSrys6UInt16VG_tF
 Added: _$sSs9UTF16ViewV13_copyContents12initializings16IndexingIteratorVyABG_SitSrys6UInt16VG_tF
 
+// SE-0513: CommandLine.executablePath
+Added: _$ss11CommandLineO14executablePathSSSgvpZMV
