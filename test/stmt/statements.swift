@@ -498,9 +498,7 @@ func r25178926(_ a : Type) {
   }
 
   switch a { // expected-error {{switch must be exhaustive}}
-  // expected-note@-1 {{missing case: '.Foo'}}
-  // expected-note@-2 {{missing case: '.Bar'}}
-  // expected-note@-3 {{add missing cases}}
+  // expected-note@-1 {{add missing cases: '.Foo', '.Bar'}}
   case .Foo where 1 != 100, .Bar where 1 != 100:
     break
   }
