@@ -2,9 +2,6 @@
 // REQUIRES: objc_interop
 // REQUIRES: OS=macosx
 
-// Too complex with Xcode 16.2 SDK
-// REQUIRES: rdar141262107
-
 import SwiftUI
 
 enum E {
