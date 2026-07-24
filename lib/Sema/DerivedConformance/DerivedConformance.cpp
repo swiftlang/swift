@@ -994,6 +994,7 @@ bool swift::memberwiseAccessorsRequireActorIsolation(NominalTypeDecl *nominal) {
   return false;
 }
 
+
 /// Provides the location to use when plumbing the synthesized macro expansion
 /// with its parent context for name lookup.
 static SourceLoc getValidParentLocForDerivation(DerivedConformance &derived,
@@ -1037,8 +1038,7 @@ handleASTNodeForDerivation(ASTContext &C, DerivedConformance &derived,
   auto *decl = node.dyn_cast<Decl *>();
   if (!decl)
     return nullptr;
-
-  // No particular set up needed and definitely not a witness, we can skip it.
+  
   if (isa<PatternBindingDecl>(decl))
     return nullptr;
 
@@ -1050,23 +1050,14 @@ handleASTNodeForDerivation(ASTContext &C, DerivedConformance &derived,
   if (auto *fDecl = dyn_cast<AbstractFunctionDecl>(vDecl)) {
     if (addNonIsolated)
       addNonIsolatedToSynthesized(derived, fDecl);
-
-    // FIXME: This call is needed when building the stdlib, otherwise causing
-    // some linking errors on the witnesses. Will eventually get rid of it so
-    // that the body is synthesized only if needed.
-    (void)fDecl->getMacroExpandedBody();
   } else if (auto *varDecl = dyn_cast<VarDecl>(vDecl)) {
     // In all derivation cases for the moment, the getter of a
     // derived var decl should be immutable computed, so the default
     // value of this flag is true
     if (getterShouldBeImmutableComputed)
       varDecl->setImplInfo(StorageImplInfo::getImmutableComputed());
-
-    // If it has a getter, then set it up properly
-    if (auto *getter = varDecl->getAccessor(AccessorKind::Get)) {
-      getter->setImplicit();
-      getter->setSynthesized();
-    }
+    else 
+      varDecl->getImplInfo();
   }
 
   return vDecl;
@@ -1105,9 +1096,10 @@ ValueDecl *swift::deriveRequirementViaMacro(DerivedConformance &derived,
     auto mDecl = dyn_cast<MacroExpansionDecl>(decl);
     if (!mDecl)
       continue;
-   
-    ASSERT(!expansion && "Expected a single macro expansion decl in the code buffer.");
-    
+
+    ASSERT(!expansion &&
+           "Expected a single macro expansion decl in the code buffer.");
+
     expansion = mDecl;
   }
   ASSERT(expansion);
@@ -1119,20 +1111,36 @@ ValueDecl *swift::deriveRequirementViaMacro(DerivedConformance &derived,
     auto *vDecl = handleASTNodeForDerivation(C, derived, node);
     if (!vDecl)
       return;
-    
+
     ASSERT(!witness && "Expected a single ValueDecl * from the expansion of "
-            "the synthesized macro decl.");
-    
+                       "the synthesized macro decl.");
+
     witness = vDecl;
   });
   ASSERT(witness && "Expected a witness but got NULL");
+
+  AccessLevel access = derived.Nominal->getFormalAccess();
+  if (access == AccessLevel::Private)
+    access = AccessLevel::FilePrivate;
+  witness->overwriteAccess(access);
+
+  expansion->forEachExpandedNode([&](ASTNode node) {
+    auto *decl = node.dyn_cast<Decl*>();
+    if (!decl) return;
+    auto *vDecl = dyn_cast<ValueDecl>(decl);
+    if (!vDecl) return;
+    derived.addMemberToConformanceContext(vDecl, nullptr);
+  });
 
   return witness;
 }
 
 /// Prints a string containing swift syntax describing the case \p  decl with
 /// relevant information to \p out.
-static void printEnumCaseInfo(llvm::raw_ostream &out, const EnumElementDecl *decl) {
+static void printEnumCaseInfo(llvm::raw_ostream &out,
+                              const EnumElementDecl *decl) {
+  bool markReachable = !decl->isUnreachableAtRuntime() ||
+                       decl->getParentEnum()->isUnreachableAtRuntime();
   out << "EnumCaseInfo(name: " << QuotedString(decl->getNameStr())
       << ", associatedValueLabels: [";
   llvm::interleaveComma(decl->getName().getArgumentNames(), out,
@@ -1143,46 +1151,45 @@ static void printEnumCaseInfo(llvm::raw_ostream &out, const EnumElementDecl *dec
                             printAsQuotedString(out, name.str());
                           }
                         });
-  out << "])";
+  out << "], isReachable: " << (markReachable ? "true" : "false") << ")";
 }
 
 /// Prints a string containing swift syntax describing the enum \p
 /// decl with relevant information to \p out.
 static void printEnumTypeKind(llvm::raw_ostream &out, EnumDecl *decl) {
-  out << "enumLike(EnumTypeInfo(isObjC: "
-      << (decl->isObjC() ? "true" : "false")
+  out << "enumLike(EnumTypeInfo(isObjC: " << (decl->isObjC() ? "true" : "false")
       << ", cases: [";
-  llvm::interleaveComma(decl->getAllElements(), out,
-                        [&](const EnumElementDecl *elem) {
-                          printEnumCaseInfo(out, elem);
-                        });
+  llvm::interleaveComma(
+      decl->getAllElements(), out,
+      [&](const EnumElementDecl *elem) { printEnumCaseInfo(out, elem); });
   out << "]))";
 }
 
 /// Prints a string containing swift syntax describing the stored property \p
 /// decl with relevant information to \p out.
-static void printStoredProperty(llvm::raw_ostream &out,
-                                const VarDecl *decl) {
+static void printStoredProperty(llvm::raw_ostream &out, const VarDecl *decl) {
   bool isVar = decl->getIntroducer() == VarDecl::Introducer::Var;
   out << "StoredProperty(name: " << QuotedString(decl->getNameStr())
       << ", typeName: " << QuotedString(decl->getTypeInContext().getString())
-      << ", isVar: "    << (isVar ? "true" : "false")
-      << ", isStatic: " << (decl->isStatic() ? "true" : "false") << ")";
+      << ", isVar: " << (isVar ? "true" : "false")
+      << ", isStatic: " << (decl->isStatic() ? "true" : "false")
+      << ", isUserAccessible: " << (decl->isUserAccessible() ? "true" : "false")
+      << ")";
 }
 
 /// Prints a string containing swift syntax describing struct \p decl with
 /// relevant information to \p out.
 static void printStructTypeKind(llvm::raw_ostream &out, StructDecl *decl) {
   out << "structLike(StructTypeInfo(properties: [";
-  llvm::interleaveComma(decl->getStoredProperties(), out,
-                        [&](const VarDecl *prop) {
-                          printStoredProperty(out, prop);
-                        });
+  llvm::interleaveComma(
+      decl->getStoredProperties(), out,
+      [&](const VarDecl *prop) { printStoredProperty(out, prop); });
   out << "]))";
 }
 
 /// Prints a string containing swift syntax describing \p decl with relevant
-/// information to \p out. For the moment, only struct and enum types are supported.
+/// information to \p out. For the moment, only struct and enum types are
+/// supported.
 static void printNominalTypeKind(llvm::raw_ostream &out,
                                  NominalTypeDecl *decl) {
   if (auto *enumDecl = dyn_cast<EnumDecl>(decl)) {
@@ -1209,4 +1216,19 @@ std::string swift::getNominalTypeInfoString(DerivedConformance &derived) {
   printNominalTypeKind(out, derived.Nominal);
   out << ", isUnsafe: " << (isUnsafe ? "true" : "false") << ")";
   return res;
+}
+
+bool swift::hasBeenMacroSynthesized(Decl *decl) {
+  auto loc = decl->getStartLoc();
+  if (loc.isInvalid())
+    return false;
+  auto &SM = decl->getASTContext().SourceMgr;
+  auto bufferID = SM.findBufferContainingLoc(loc);
+  auto SFS = SM.getSourceFilesForBufferID(bufferID);
+  if (SFS.empty())
+    return false;
+  auto *enclosing = SFS[0]->getEnclosingSourceFile();
+  if (!enclosing) 
+    return false;
+  return enclosing->Kind == SourceFileKind::SyntheticMacro;
 }
