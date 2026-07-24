@@ -110,20 +110,6 @@ struct Loop {
   func contains(block: BasicBlock) -> Bool {
     return bridged.contains(block.bridged)
   }
-  
-  func splitCriticalExitingAndBackEdges(_ context: FunctionPassContext) {
-    for exitingOrLatchBlock in exitingAndLatchBlocks {
-      for (index, succesor) in exitingOrLatchBlock.successors.enumerated() where !contains(block: succesor) {
-        splitCriticalEdge(
-          from: exitingOrLatchBlock.terminator.parentBlock,
-          toEdgeIndex: index,
-          dominatorTree: context.dominatorTree,
-          loopTree: context.loopTree,
-          context
-        )
-      }
-    }
-  }
 }
 
 struct TopLevelLoopArray: BridgedRandomAccessCollection {
