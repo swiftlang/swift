@@ -65,14 +65,11 @@ public func mutate(_ s: inout NonTrivial) {
 // CHECK: bb0([[REG0:%.*]] : $*any P):
 // CHECK:   [[REG2:%.*]] = begin_access [modify] [unknown] [[REG0]]
 // CHECK:   [[REG3:%.*]] = open_existential_addr mutable_access [[REG2]] to $*@opened("{{.*}}", any P) Self
-// CHECK:   [[REG4:%.*]] = alloc_stack $NonTrivial
-// CHECK:   [[REG5:%.*]] = witness_method $@opened("{{.*}}", any P) Self, #P.id!borrow : <Self where Self : borrow_accessor_protocol.P> (Self) -> () -> borrow_accessor_protocol.NonTrivial, [[REG3:%.*]] : $*@opened("{{.*}}", any P) Self : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @guaranteed_address NonTrivial
-// CHECK:   [[REG6:%.*]] = apply [[REG5]]<@opened("{{.*}}", any P) Self>([[REG3]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @guaranteed_address NonTrivial
-// CHECK:   copy_addr [[REG6]] to [init] [[REG4]]
-// CHECK:   [[REG8:%.*]] = function_ref @$s31borrow_accessor_protocol_client6mutateyy0a1_b1_C010NonTrivialVzF : $@convention(thin) (@inout NonTrivial) -> ()
-// CHECK:   [[REG9:%.*]] = apply [[REG8]]([[REG4]]) : $@convention(thin) (@inout NonTrivial) -> ()
-// CHECK:   [[REG10:%.*]] = witness_method $@opened("{{.*}}", any P) Self, #P.id!mutate : <Self where Self : borrow_accessor_protocol.P> (inout Self) -> () -> borrow_accessor_protocol.NonTrivial, [[REG3:%.*]] : $*@opened("{{.*}}", any P) Self : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@inout τ_0_0) -> @inout NonTrivial
-// CHECK:   [[REG11:%.*]] = apply [[REG10]]<@opened("{{.*}}", any P) Self>([[REG3]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@inout τ_0_0) -> @inout NonTrivial
+// CHECK:   [[REG4:%.*]] = witness_method $@opened("{{.*}}", any P) Self, #P.id!mutate : <Self where Self : borrow_accessor_protocol.P> (inout Self) -> () -> borrow_accessor_protocol.NonTrivial, [[REG3:%.*]] : $*@opened("{{.*}}", any P) Self : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@inout τ_0_0) -> @inout NonTrivial
+// CHECK:   [[REG5:%.*]] = apply [[REG4]]<@opened("{{.*}}", any P) Self>([[REG3]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@inout τ_0_0) -> @inout NonTrivial
+// CHECK:   [[REG6:%.*]] = function_ref @$s31borrow_accessor_protocol_client6mutateyy0a1_b1_C010NonTrivialVzF : $@convention(thin) (@inout NonTrivial) -> ()
+// CHECK:   [[REG7:%.*]] = apply [[REG6]]([[REG5]]) : $@convention(thin) (@inout NonTrivial) -> ()
+// CHECK:   end_access [[REG2]]
 // CHECK: }
 public func bar(_ p: inout P) {
   mutate(&p.id)
@@ -81,12 +78,11 @@ public func bar(_ p: inout P) {
 // CHECK: sil [ossa] @$s31borrow_accessor_protocol_client3baryy0a1_b1_C02S1VzF :
 // CHECK: bb0([[REG0:%.*]] : $*S1):
 // CHECK:   [[REG2:%.*]] = begin_access [modify] [unknown] [[REG0]]
-// CHECK:   [[REG3:%.*]] = alloc_stack $NonTrivial
-// CHECK:   [[REG4:%.*]] = function_ref @$s24borrow_accessor_protocol2S1V2idAA10NonTrivialVvb : $@convention(method) (@in_guaranteed S1) -> @guaranteed_address NonTrivial
-// CHECK:   [[REG5:%.*]] = apply [[REG4]]([[REG2]]) : $@convention(method) (@in_guaranteed S1) -> @guaranteed_address NonTrivial
-// CHECK:   copy_addr [[REG5]] to [init] [[REG3]]
-// CHECK:   [[REG7:%.*]] = function_ref @$s31borrow_accessor_protocol_client6mutateyy0a1_b1_C010NonTrivialVzF : $@convention(thin) (@inout NonTrivial) -> ()
-// CHECK:   [[REG8:%.*]] = apply [[REG7]]([[REG3]]) : $@convention(thin) (@inout NonTrivial) -> ()
+// CHECK:   [[REG3:%.*]] = function_ref @$s24borrow_accessor_protocol2S1V2idAA10NonTrivialVvz : $@convention(method) (@inout S1) -> @inout NonTrivial
+// CHECK:   [[REG4:%.*]] = apply [[REG3]]([[REG2]]) : $@convention(method) (@inout S1) -> @inout NonTrivial
+// CHECK:   [[REG5:%.*]] = function_ref @$s31borrow_accessor_protocol_client6mutateyy0a1_b1_C010NonTrivialVzF : $@convention(thin) (@inout NonTrivial) -> ()
+// CHECK:   [[REG6:%.*]] = apply [[REG5]]([[REG4]]) : $@convention(thin) (@inout NonTrivial) -> ()
+// CHECK:   end_access [[REG2]]
 // CHECK: }
 public func bar(_ s1: inout S1) {
   mutate(&s1.id)
@@ -178,15 +174,11 @@ public func bar(_ q: inout Q) {
 // CHECK: sil [ossa] @$s31borrow_accessor_protocol_client3baryy0a1_b1_C02S5VzF : $@convention(thin) (@inout S5) -> () {
 // CHECK: bb0([[REG0:%.*]] : $*S5):
 // CHECK:   [[REG2:%.*]] = begin_access [modify] [unknown] [[REG0]]
-// CHECK:   [[REG3:%.*]] = alloc_stack $NonTrivial
-// CHECK:   [[REG4:%.*]] = function_ref @$s24borrow_accessor_protocol2S5V2idAA10NonTrivialVvb : $@convention(method) (@in_guaranteed S5) -> @guaranteed_address NonTrivial
-// CHECK:   [[REG5:%.*]] = apply [[REG4]]([[REG2]]) : $@convention(method) (@in_guaranteed S5) -> @guaranteed_address NonTrivial
-// CHECK:   copy_addr [[REG5]] to [init] [[REG3]]
-// CHECK:   [[REG7:%.*]] = function_ref @$s31borrow_accessor_protocol_client6mutateyy0a1_b1_C010NonTrivialVzF : $@convention(thin) (@inout NonTrivial) -> ()
-// CHECK:   [[REG8:%.*]] = apply [[REG7]]([[REG3]]) : $@convention(thin) (@inout NonTrivial) -> ()
-// CHECK:   [[REG9:%.*]] = function_ref @$s24borrow_accessor_protocol2S5V2idAA10NonTrivialVvz : $@convention(method) (@inout S5) -> @inout NonTrivial
-// CHECK:   [[REG10:%.*]] = apply [[REG9]]([[REG2]]) : $@convention(method) (@inout S5) -> @inout NonTrivial
-// CHECK:   copy_addr [take] [[REG3]] to [[REG10]]
+// CHECK:   [[REG3:%.*]] = function_ref @$s24borrow_accessor_protocol2S5V2idAA10NonTrivialVvz : $@convention(method) (@inout S5) -> @inout NonTrivial
+// CHECK:   [[REG4:%.*]] = apply [[REG3]]([[REG2]]) : $@convention(method) (@inout S5) -> @inout NonTrivial
+// CHECK:   [[REG5:%.*]] = function_ref @$s31borrow_accessor_protocol_client6mutateyy0a1_b1_C010NonTrivialVzF : $@convention(thin) (@inout NonTrivial) -> ()
+// CHECK:   [[REG6:%.*]] = apply [[REG5]]([[REG4]]) : $@convention(thin) (@inout NonTrivial) -> ()
+// CHECK:   end_access [[REG2]]
 // CHECK: }
 public func bar(_ s5: inout S5) {
   mutate(&s5.id)
