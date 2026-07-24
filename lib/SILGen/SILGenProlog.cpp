@@ -1221,6 +1221,7 @@ static void emitCaptureArguments(SILGenFunction &SGF,
                                  GenericSignature origGenericSig,
                                  CapturedValue capture,
                                  uint16_t ArgNo) {
+  auto closureInfo = SGF.TypeContext ? &*SGF.TypeContext : nullptr;
   if (auto *expr = capture.getPackElement()) {
     SILLocation Loc(expr);
     Loc.markAsPrologue();
@@ -1234,7 +1235,8 @@ static void emitCaptureArguments(SILGenFunction &SGF,
     SILValue arg;
 
     auto expansion = SGF.getTypeExpansionContext();
-    auto captureKind = SGF.SGM.Types.getDeclCaptureKind(capture, expansion);
+    auto captureKind =
+        SGF.SGM.Types.getDeclCaptureKind(capture, expansion, closureInfo);
     switch (captureKind) {
     case CaptureKind::Constant:
     case CaptureKind::StorageAddress:
@@ -1252,6 +1254,7 @@ static void emitCaptureArguments(SILGenFunction &SGF,
       break;
     }
 
+    case CaptureKind::Consuming:
     case CaptureKind::ImmutableBox:
     case CaptureKind::Box:
       llvm_unreachable("should be impossible");
@@ -1318,7 +1321,8 @@ static void emitCaptureArguments(SILGenFunction &SGF,
   SILFunctionArgument *box = nullptr;
 
   auto expansion = SGF.getTypeExpansionContext();
-  auto captureKind = SGF.SGM.Types.getDeclCaptureKind(capture, expansion);
+  auto captureKind =
+      SGF.SGM.Types.getDeclCaptureKind(capture, expansion, closureInfo);
   SILAccessEnforcement enforcement;
   switch (captureKind) {
   case CaptureKind::Constant: {
@@ -1364,6 +1368,32 @@ static void emitCaptureArguments(SILGenFunction &SGF,
           Loc, val,
           MarkUnresolvedNonCopyableValueInst::CheckKind::NoConsumeOrAssign);
     }
+
+    arg = val.getValue();
+    enforcement = SILAccessEnforcement::Unknown;
+    break;
+  }
+
+  case CaptureKind::Consuming: {
+    assert(!isPack);
+
+    auto *fArg = SGF.F.begin()->createFunctionArgument(ty, VD);
+    fArg->setClosureCapture(true);
+    ManagedValue val = SGF.emitManagedRValueWithCleanup(fArg);
+
+    // Sema treats the captured decl as an lvalue since it's `Var`-introduced;
+    // materialize an address for it, moving (not copying) the incoming
+    // owned value in, since it can't be copied.
+    auto addr = SGF.emitTemporary(Loc, lowering);
+    SGF.B.emitStoreValueOperation(Loc, val.forward(SGF), addr->getAddress(),
+                                  StoreOwnershipQualifier::Init);
+    addr->finishInitialization(SGF);
+    val = addr->getManagedAddress();
+
+    val = val.ensurePlusOne(SGF, Loc);
+    val = SGF.B.createMarkUnresolvedNonCopyableValueInst(
+        Loc, val,
+        MarkUnresolvedNonCopyableValueInst::CheckKind::ConsumableAndAssignable);
 
     arg = val.getValue();
     enforcement = SILAccessEnforcement::Unknown;
