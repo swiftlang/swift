@@ -67,8 +67,8 @@ bool clangModuleExports(const clang::Module *ClangParent, const clang::Module *C
   if (ClangParent == CM) return true;
 
   for (auto ClangExport : ClangParent->Exports) {
-    auto *ExportedModule = ClangExport.getPointer();
-    if (ClangExport.getInt()) {
+    clang::Module *ExportedModule = ClangExport.first;
+    if (ClangExport.second) {
       if (!ExportedModule && CM->isSubModuleOf(ClangParent)) {
         return true;
       } else if (ExportedModule && CM->isSubModuleOf(ExportedModule)) {

@@ -155,7 +155,7 @@ if(SWIFT_FORCE_OPTIMIZED_TYPECHECKER)
 endif()
 target_link_libraries(swiftAST INTERFACE
   clangCodeGen
-  clangIndex
+  clangUnifiedSymbolResolution
   clangFormat
   clangToolingCore
   clangFrontendTool

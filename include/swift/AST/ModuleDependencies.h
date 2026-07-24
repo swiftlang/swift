@@ -1076,6 +1076,13 @@ class SwiftDependencyScanningService {
   std::optional<clang::dependencies::DependencyScanningService>
       ClangScanningService;
 
+  /// Factory that produces the base file system used by each Clang dependency
+  /// scanning worker. Installed as \c DependencyScanningServiceOptions::MakeVFS
+  /// on \c ClangScanningService. Must be thread-safe as it is invoked
+  /// concurrently by multiple workers.
+  std::function<llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>()>
+      ClangScanningFSFactory;
+
   /// Shared state mutual-exclusivity lock
   mutable llvm::sys::SmartMutex<true> ScanningServiceGlobalLock;
 
@@ -1086,6 +1093,15 @@ public:
   SwiftDependencyScanningService &
   operator=(const SwiftDependencyScanningService &) = delete;
   virtual ~SwiftDependencyScanningService() {}
+
+  /// Install the factory used to create the base file system for each Clang
+  /// dependency scanning worker and (re)create the underlying Clang scanning
+  /// service so that it picks the factory up. Since the Clang scanning service
+  /// now owns the VFS factory (see \c DependencyScanningServiceOptions::MakeVFS)
+  /// rather than each individual scanning tool, this must be called before any
+  /// worker is created.
+  void setClangScanningFSFactory(
+      std::function<llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>()> factory);
 
   /// Setup caching service.
   bool setupCachingDependencyScanningService(CompilerInstance &Instance);

@@ -147,7 +147,13 @@ swift::getIRTargetOptions(const IRGenOptions &Opts, ASTContext &Ctx,
   TargetOptions TargetOpts;
 
   // Linker support for this is not widespread enough.
-  TargetOpts.SupportIndirectSymViaGOTPCRel_AArch64_ELF = false;
+  //
+  // FIXME: The downstream 'llvm::TargetOptions' field this depends on
+  // (added by llvm.org/pr78003 / swiftlang/llvm-project#9339) is not present
+  // on the current llvm-project branch, so there is currently no way to
+  // disable indirect symbol replacement with GOTPCREL for AArch64/ELF.
+  // Restore this once that patch is forward-ported.
+  // TargetOpts.SupportIndirectSymViaGOTPCRel_AArch64_ELF = false;
 
   // Explicitly request debugger tuning for LLDB which is the default
   // on Darwin platforms but not on others.
@@ -389,7 +395,12 @@ void swift::performLLVMOptimizations(
     PTO.MergeFunctions = !Opts.DisableLLVMMergeFunctions;
     // Splitting trades code size to enhance memory locality, avoid in -Osize.
     DoHotColdSplit = Opts.EnableHotColdSplit && !Opts.optimizeForSize();
-    level = llvm::OptimizationLevel::Os;
+    // The dedicated Os/Oz size-optimization pipelines were removed upstream in
+    // favor of running the O2 pipeline together with the optsize/minsize
+    // function attributes. Swift already attaches those attributes based on the
+    // optimization mode (see IRGenModule::constructInitialFnAttributes), so the
+    // size preference is preserved at the function level.
+    level = llvm::OptimizationLevel::O2;
   } else {
     level = llvm::OptimizationLevel::O0;
   }
@@ -874,6 +885,15 @@ bool swift::performLLVM(const IRGenOptions &Opts, DiagnosticEngine &Diags,
   auto res = compileAndWriteLLVM(Module, TargetMachine, Opts, Stats, Diags,
                                  *OutputFile, DiagMutex,
                                  CASIDFile ? CASIDFile.get() : nullptr);
+
+  // The backend has finished emitting all optimization remarks into the main
+  // remark streamer, if any. Finalize it now: this flushes the remark string
+  // table to the end of the remarks file and deregisters the streamer from the
+  // context. It must happen before the streamer (owned by the context) is
+  // destroyed, both to produce a valid remarks file and to satisfy the
+  // RemarkStreamer destructor's assertion that its serializer was released.
+  if (Ctxt.getMainRemarkStreamer())
+    llvm::finalizeLLVMOptimizationRemarks(Ctxt);
 
   Ctxt.setDiagnosticHandler(std::move(OldDiagnosticHandler));
 
@@ -1383,8 +1403,8 @@ static void initLLVMModule(IRGenModule &IGM, SILModule &SIL, std::optional<unsig
 
       const auto format = SILOpts.OptRecordFormat;
       llvm::Expected<std::unique_ptr<llvm::remarks::RemarkSerializer>>
-        remarkSerializerOrErr = llvm::remarks::createRemarkSerializer(
-          format, llvm::remarks::SerializerMode::Separate, *file);
+        remarkSerializerOrErr =
+            llvm::remarks::createRemarkSerializer(format, *file);
       if (llvm::Error err = remarkSerializerOrErr.takeError()) {
         diagEngine.diagnose(SourceLoc(), diag::error_creating_remark_serializer,
                             toString(std::move(err)));

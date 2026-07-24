@@ -757,8 +757,8 @@
         "rebranch": {
             "aliases": ["rebranch", "stable/23.x"],
             "repos": {
-                "llvm-project": "stable/23.x",
-                "swift-llvm-bindings": "stable/23.x",
+                "llvm-project": "stable/20260609",
+                "swift-llvm-bindings": "stable/20260609",
                 "swift": "rebranch",
                 "cmark": "gfm",
                 "llbuild": "main",

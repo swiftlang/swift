@@ -144,7 +144,7 @@ importer::getClangDeclContextType(const clang::DeclContext *dc) {
   }
 
   if (auto tag = dyn_cast<clang::TagDecl>(dc)) {
-    return ctx.getTagDeclType(tag);
+    return ctx.getCanonicalTagType(tag);
   }
 
   return clang::QualType();
