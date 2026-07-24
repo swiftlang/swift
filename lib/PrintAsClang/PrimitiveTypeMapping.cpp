@@ -89,8 +89,28 @@ void PrimitiveTypeMapping::initialize(ASTContext &ctx) {
   MAP(CChar16, "char16_t", false);
   MAP(CChar32, "char32_t", false);
 
-  // Set after CChar32 to prefer char32_t for the shared underlying
-  // Unicode.Scalar. char32_t is stable across platforms.
+  // Map Unicode.Scalar to char32_t.
+  //
+  // char32_t is a superset of Unicode.Scalar value-wise (it can hold invalid
+  // Unicode scalars) so this is sound in return position but not in argument
+  // position.
+  //
+  // Can't reuse MAP macro or addMappedType here because unlike other primitive
+  // types getting Unicode.Scalar requires a qualified lookup inside Unicode.
+  if (auto *unicodeEnum = dyn_cast_or_null<EnumDecl>(findTypeInModuleByName(
+          ctx, ctx.StdlibModuleName, ctx.getIdentifier("Unicode")))) {
+    for (auto *result :
+         unicodeEnum->lookupDirect(ctx.getIdentifier("Scalar"))) {
+      if (auto *scalarDecl = dyn_cast<StructDecl>(result)) {
+        mappedTypeNames[scalarDecl] = {"char32_t",
+                                       std::optional<StringRef>("char32_t"),
+                                       std::optional<StringRef>("char32_t"),
+                                       /*canBeNullable=*/false};
+        break;
+      }
+    }
+  }
+
   MAP(CWideChar, "wchar_t", false);
 
   MAP(CSignedChar, "signed char", false);
