@@ -3297,6 +3297,7 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
     $TestingDefines["SWIFT_BUILD_LIBEXEC"] = "YES"
     # Keep %host-build-swift on the same platform SDK that Stage2 uses.
     $TestingDefines["SWIFT_HOST_SDKROOT"] = $SwiftSDK
+    $Targets = @()
     if ($TestLLVM) { $Targets += @("check-llvm") }
     if ($TestClang) { $Targets += @("check-clang") }
     if ($TestLLD) { $Targets += @("check-lld") }
