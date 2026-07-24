@@ -2199,6 +2199,21 @@ ERROR(cdecl_incompatible_with_objc,none,
       "cannot apply both '@c' and '@objc' to %kindonly0",
       (const Decl *))
 
+// @cxx
+ERROR(cxx_attr_requires_cxx_interop,none,
+      "'%0' requires C++ interoperability; enable it with "
+      "'-cxx-interoperability-mode=default' or "
+      "'-enable-experimental-cxx-interop'", (StringRef))
+ERROR(cxx_incompatible_with_objc,none,
+      "cannot apply both '@cxx' and '@objc' to %kindonly0",
+      (const Decl *))
+ERROR(cxx_incompatible_with_cdecl,none,
+      "cannot apply both '@cxx' and '%0' to %kindonly1",
+      (DeclAttribute, const Decl *))
+ERROR(cxx_attr_requires_implementation,none,
+      "'@cxx' must be combined with '@implementation'",
+      ())
+
 // @used and @section
 ERROR(section_empty_name,none,
       "'@section' section name cannot be empty", ())

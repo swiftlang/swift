@@ -4944,13 +4944,15 @@ StringRef ValueDecl::getCDeclName() const {
   if (!abiRole.providesAPI() && abiRole.getCounterpart())
     return abiRole.getCounterpart()->getCDeclName();
 
-  // Handle explicit cdecl attributes.
-  if (auto cdeclAttr = getAttrs().getAttribute<CDeclAttr>()) {
-    if (!cdeclAttr->Name.empty())
-      return cdeclAttr->Name;
-    else
-      return getBaseIdentifier().str();
-  }
+  // Handle explicit @c/@_cdecl and @cxx attributes. Both store an optional
+  // explicit name and fall back to the base identifier when it is empty.
+  auto nameOrBaseIdentifier = [&](StringRef name) -> StringRef {
+    return name.empty() ? getBaseIdentifier().str() : name;
+  };
+  if (auto cdeclAttr = getAttrs().getAttribute<CDeclAttr>())
+    return nameOrBaseIdentifier(cdeclAttr->Name);
+  if (auto cxxAttr = getAttrs().getAttribute<CxxDeclAttr>())
+    return nameOrBaseIdentifier(cxxAttr->Name);
 
   return "";
 }
