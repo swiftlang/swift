@@ -1002,6 +1002,9 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
                                          lookupOptions, corrections);
     }
 
+    // Claim any notes as children to the error.
+    CompoundDiagnosticTransaction transaction(Context.Diags);
+
     if (auto typo = corrections.claimUniqueCorrection()) {
       auto diag = Context.Diags.diagnose(
           Loc, diag::cannot_find_in_scope_corrected, Name, Name.isOperator(),
