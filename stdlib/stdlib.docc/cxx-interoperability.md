@@ -5,6 +5,10 @@ Work with standard C++ types.
 
 ## Topics
 
+### Essentials
+
+- <doc:enabling-c++-interoperability-in-your-project>
+
 ### Boolean Values
 
 - ``Cxx/CxxConvertibleToBool``
