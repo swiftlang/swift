@@ -1,0 +1,14 @@
+// RUN: %target-typecheck-verify-swift
+// REQUIRES: OS=windows-msvc
+
+import WinSDK
+
+let _: DWORD = HANDLE_FLAG_INHERIT
+let _: DWORD = INFINITE
+let _: DWORD = INVALID_FILE_ATTRIBUTES
+let _: UINT = QS_MOUSE
+let _: DWORD = STARTF_USESTDHANDLES
+let _: DWORD = STD_ERROR_HANDLE
+let _: DWORD = STD_INPUT_HANDLE
+let _: DWORD = STD_OUTPUT_HANDLE
+let _: Int32 = CW_USEDEFAULT
