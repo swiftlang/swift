@@ -1,13 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-/// By default, the `@unsafe` attribute that ClangImporter attaches is implicit
-/// and hidden, so it is not printed.
-// RUN: %target-swift-synthesize-interface -module-name CxxUnions -I %t/Inputs -cxx-interoperability-mode=default | %FileCheck %s --implicit-check-not=@unsafe
-
-/// With -strict-memory-safety, unsafe declarations (e.g. C++ union field
-/// accessors) are marked `@unsafe`.
-// RUN: %target-swift-synthesize-interface -module-name CxxUnions -I %t/Inputs -cxx-interoperability-mode=default -strict-memory-safety | %FileCheck %s --check-prefix=UNSAFE
+// RUN: %target-swift-synthesize-interface -module-name CxxUnions -I %t/Inputs -cxx-interoperability-mode=default | %FileCheck %s
 
 //--- Inputs/module.modulemap
 module CxxUnions {
@@ -24,9 +18,5 @@ union Value {
 };
 
 // CHECK: public struct Value {
-// CHECK:     public var number: CInt
-// CHECK:     public var decimal: CFloat
-
-// UNSAFE: public struct Value {
-// UNSAFE:     @unsafe public var number: CInt
-// UNSAFE:     @unsafe public var decimal: CFloat
+// CHECK:     @unsafe public var number: CInt
+// CHECK:     @unsafe public var decimal: CFloat

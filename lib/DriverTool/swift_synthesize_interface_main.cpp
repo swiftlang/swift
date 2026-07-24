@@ -399,13 +399,7 @@ int swift_synthesize_interface_main(ArrayRef<const char *> Args,
       printOpts.PrintAccess = true;
   }
 
-  // Under strict memory safety, print @unsafe even though the attribute is
-  // normally implicit and hidden.
-  if (Invocation.getLangOptions().hasFeature(Feature::StrictMemorySafety,
-                                             /*allowMigration=*/true)) {
-    printOpts.AlwaysIncludeAttrList.push_back(DeclAttrKind::Unsafe);
-    printOpts.AlwaysIncludeAttrList.push_back(DeclAttrKind::Safe);
-  }
+  printOpts.AlwaysIncludeAttrList.push_back(DeclAttrKind::Unsafe);
 
   swift::OptionSet<swift::ide::ModuleTraversal> traversalOpts = std::nullopt;
   if (ParsedArgs.hasArg(OPT_include_submodules)) {
