@@ -21,7 +21,7 @@ public struct UsesStructsStruct {
     public let x: StructSeveralI64
 }
 
-// CHECK:      SWIFT_INLINE_THUNK Structs::StructSeveralI64 passThroughStructSeveralI64(const Structs::StructSeveralI64& y) const SWIFT_SYMBOL("s:11UsesStructs0aB6StructV011passThroughC10SeveralI64y0B00cfG0VAGF");
+// CHECK:      SWIFT_INLINE_THUNK Structs::StructSeveralI64 passThroughStructSeveralI64(const Structs::StructSeveralI64& SWIFT_NOESCAPE y) const SWIFT_SYMBOL("s:11UsesStructs0aB6StructV011passThroughC10SeveralI64y0B00cfG0VAGF");
 // CHECK-NEXT: SWIFT_INLINE_THUNK Structs::StructSeveralI64 getX() const SWIFT_SYMBOL("s:11UsesStructs0aB6StructV1x0B00C10SeveralI64Vvp");
 
 
@@ -37,24 +37,24 @@ public func passThroughStructSmallDirect(_ x: SmallStructDirectPassing) -> Small
     return x
 }
 
-// CHECK:      SWIFT_INLINE_THUNK void inoutStructSeveralI64(Structs::StructSeveralI64& s) noexcept SWIFT_SYMBOL("s:11UsesStructs21inoutStructSeveralI64yy0B00deF0VzF") {
+// CHECK:      SWIFT_INLINE_THUNK void inoutStructSeveralI64(Structs::StructSeveralI64& SWIFT_NOESCAPE s) noexcept SWIFT_SYMBOL("s:11UsesStructs21inoutStructSeveralI64yy0B00deF0VzF") {
 // CHECK-NEXT:   _impl::$s11UsesStructs21inoutStructSeveralI64yy0B00deF0VzF(Structs::_impl::_impl_StructSeveralI64::getOpaquePointer(s));
 // CHECK-NEXT: }
 
 
-// CHECK:      SWIFT_INLINE_THUNK Structs::StructSeveralI64 passThroughStructSeveralI64(const Structs::StructSeveralI64& x) noexcept SWIFT_SYMBOL("s:11UsesStructs27passThroughStructSeveralI64y0B00efG0VAEF") SWIFT_WARN_UNUSED_RESULT {
+// CHECK:      SWIFT_INLINE_THUNK Structs::StructSeveralI64 passThroughStructSeveralI64(const Structs::StructSeveralI64& SWIFT_NOESCAPE x) noexcept SWIFT_SYMBOL("s:11UsesStructs27passThroughStructSeveralI64y0B00efG0VAEF") SWIFT_WARN_UNUSED_RESULT {
 // CHECK-NEXT:  return Structs::_impl::_impl_StructSeveralI64::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
 // CHECK-NEXT:    _impl::$s11UsesStructs27passThroughStructSeveralI64y0B00efG0VAEF(result, Structs::_impl::_impl_StructSeveralI64::getOpaquePointer(x));
 // CHECK-NEXT:  });
 // CHECK-NEXT: }
 
-// CHECK:      SWIFT_INLINE_THUNK Structs::SmallStructDirectPassing passThroughStructSmallDirect(const Structs::SmallStructDirectPassing& x) noexcept SWIFT_SYMBOL("s:11UsesStructs28passThroughStructSmallDirecty0B00feG7PassingVAEF") SWIFT_WARN_UNUSED_RESULT {
+// CHECK:      SWIFT_INLINE_THUNK Structs::SmallStructDirectPassing passThroughStructSmallDirect(const Structs::SmallStructDirectPassing& SWIFT_NOESCAPE x) noexcept SWIFT_SYMBOL("s:11UsesStructs28passThroughStructSmallDirecty0B00feG7PassingVAEF") SWIFT_WARN_UNUSED_RESULT {
 // CHECK-NEXT:  return Structs::_impl::_impl_SmallStructDirectPassing::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
 // CHECK-NEXT:    UsesStructs::_impl::swift_interop_returnDirect_UsesStructs_uint32_t_0_4(result, UsesStructs::_impl::$s11UsesStructs28passThroughStructSmallDirecty0B00feG7PassingVAEF(UsesStructs::_impl::swift_interop_passDirect_UsesStructs_uint32_t_0_4(Structs::_impl::_impl_SmallStructDirectPassing::getOpaquePointer(x))));
 // CHECK-NEXT:  });
 // CHECK-NEXT: }
 
-// CHECK: SWIFT_INLINE_THUNK Structs::StructSeveralI64 UsesStructsStruct::passThroughStructSeveralI64(const Structs::StructSeveralI64& y) const {
+// CHECK: SWIFT_INLINE_THUNK Structs::StructSeveralI64 UsesStructsStruct::passThroughStructSeveralI64(const Structs::StructSeveralI64& SWIFT_NOESCAPE y) const {
 // CHECK-NEXT: return Structs::_impl::_impl_StructSeveralI64::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
 // CHECK-NEXT:   UsesStructs::_impl::$s11UsesStructs0aB6StructV011passThroughC10SeveralI64y0B00cfG0VAGF(result, Structs::_impl::_impl_StructSeveralI64::getOpaquePointer(y), _getOpaquePointer());
 // CHECK-NEXT: });

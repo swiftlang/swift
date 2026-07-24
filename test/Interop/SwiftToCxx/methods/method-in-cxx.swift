@@ -110,7 +110,7 @@ public final class PassStructInClassMethod {
 // CHECK-NEXT: SWIFT_INLINE_THUNK LargeStruct doubled() const SWIFT_SYMBOL("s:7Methods11LargeStructV7doubledACyF");
 // CHECK-NEXT: SWIFT_INLINE_THUNK void dump() const SWIFT_SYMBOL("s:7Methods11LargeStructV4dumpyyF");
 // CHECK-NEXT: SWIFT_INLINE_THUNK LargeStruct scaled(swift::Int x, swift::Int y) const SWIFT_SYMBOL("s:7Methods11LargeStructV6scaledyACSi_SitF");
-// CHECK-NEXT: SWIFT_INLINE_THUNK LargeStruct added(const LargeStruct& x) const SWIFT_SYMBOL("s:7Methods11LargeStructV5addedyA2CF");
+// CHECK-NEXT: SWIFT_INLINE_THUNK LargeStruct added(const LargeStruct& SWIFT_NOESCAPE x) const SWIFT_SYMBOL("s:7Methods11LargeStructV5addedyA2CF");
 // CHECK-NEXT: static SWIFT_INLINE_THUNK void staticMethod() SWIFT_SYMBOL("s:7Methods11LargeStructV12staticMethodyyFZ");
 // CHECK-NEXT: private
 
@@ -193,7 +193,7 @@ public func createPassStructInClassMethod() -> PassStructInClassMethod {
 // CHECK-NEXT:   _impl::$s7Methods11LargeStructV6scaledyACSi_SitF(result, x, y, _getOpaquePointer());
 // CHECK-NEXT: });
 // CHECK-NEXT: }
-// CHECK-NEXT: SWIFT_INLINE_THUNK LargeStruct LargeStruct::added(const LargeStruct& x) const {
+// CHECK-NEXT: SWIFT_INLINE_THUNK LargeStruct LargeStruct::added(const LargeStruct& SWIFT_NOESCAPE x) const {
 // CHECK-NEXT: return Methods::_impl::_impl_LargeStruct::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
 // CHECK-NEXT:   _impl::$s7Methods11LargeStructV5addedyA2CF(result, Methods::_impl::_impl_LargeStruct::getOpaquePointer(x), _getOpaquePointer());
 // CHECK-NEXT: });
@@ -207,6 +207,6 @@ public func createPassStructInClassMethod() -> PassStructInClassMethod {
 // CHECK-NEXT:   _impl::$s7Methods23PassStructInClassMethodC03retC0yAA05LargeC0VSiF(result, x, ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
 // CHECK-NEXT: });
 // CHECK-NEXT: }
-// CHECK-NEXT: SWIFT_INLINE_THUNK void PassStructInClassMethod::updateStruct(swift::Int x, const LargeStruct& y) {
+// CHECK-NEXT: SWIFT_INLINE_THUNK void PassStructInClassMethod::updateStruct(swift::Int x, const LargeStruct& SWIFT_NOESCAPE y) {
 // CHECK-NEXT: _impl::$s7Methods23PassStructInClassMethodC06updateC0yySi_AA05LargeC0VtF(x, Methods::_impl::_impl_LargeStruct::getOpaquePointer(y), ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
 // CHECK-NEXT: }

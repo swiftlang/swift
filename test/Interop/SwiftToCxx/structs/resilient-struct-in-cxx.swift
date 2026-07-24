@@ -232,11 +232,11 @@ public func mutateSmall(_ x: inout FirstSmallStruct) {
 // CHECK-NEXT:   });
 // CHECK-NEXT: }
 
-// CHECK:      SWIFT_INLINE_THUNK void mutateSmall(FirstSmallStruct& x) noexcept SWIFT_SYMBOL({{.*}}) {
+// CHECK:      SWIFT_INLINE_THUNK void mutateSmall(FirstSmallStruct& SWIFT_NOESCAPE x) noexcept SWIFT_SYMBOL({{.*}}) {
 // CHECK-NEXT:   Structs::_impl::$s7Structs11mutateSmallyyAA05FirstC6StructVzF(Structs::_impl::_impl_FirstSmallStruct::getOpaquePointer(x));
 // CHECK-NEXT: }
 
-// CHECK:      SWIFT_INLINE_THUNK void printSmallAndLarge(const FirstSmallStruct& x, const LargeStruct& y) noexcept SWIFT_SYMBOL({{.*}}) {
+// CHECK:      SWIFT_INLINE_THUNK void printSmallAndLarge(const FirstSmallStruct& SWIFT_NOESCAPE x, const LargeStruct& SWIFT_NOESCAPE y) noexcept SWIFT_SYMBOL({{.*}}) {
 // CHECK-NEXT:   Structs::_impl::$s7Structs18printSmallAndLargeyyAA05FirstC6StructV_AA0eG0VtF(Structs::_impl::_impl_FirstSmallStruct::getOpaquePointer(x), Structs::_impl::_impl_LargeStruct::getOpaquePointer(y));
 // CHECK-NEXT: }
 
