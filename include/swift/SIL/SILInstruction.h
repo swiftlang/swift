@@ -34,6 +34,7 @@
 #include "swift/Basic/TaggedUnion.h"
 #include "swift/SIL/Consumption.h"
 #include "swift/SIL/SILAllocated.h"
+#include "swift/SIL/SILTypeProperties.h"
 #include "swift/SIL/SILArgumentArrayRef.h"
 #include "swift/SIL/SILDebugInfoExpression.h"
 #include "swift/SIL/SILDebugVariable.h"
@@ -2051,10 +2052,6 @@ enum HasDynamicLifetime_t : bool {
   HasDynamicLifetime = true,
 };
 
-enum IsLexical_t : bool {
-  IsNotLexical = false,
-  IsLexical = true,
-};
 
 enum HasPointerEscape_t : bool {
   DoesNotHavePointerEscape = false,

@@ -33,6 +33,7 @@ class IRGenOptions;
 class ModuleDecl;
 class NominalTypeDecl;
 class ParamDecl;
+class AbstractTypeLayout;
 
 class IRABIDetailsProviderImpl;
 
@@ -213,6 +214,10 @@ public:
   /// is not a fixed layout type.
   std::optional<SizeAndAlignment>
   getTypeSizeAlignment(const NominalTypeDecl *TD);
+
+  /// Produce an AbstractTypeLayout for the given nominal type declaration.
+  /// Returns nullptr if the type does not support hidden ABI info.
+  AbstractTypeLayout *getAbstractTypeLayout(const NominalTypeDecl *TD);
 
   /// An representation of a single type, or a C struct with multiple members
   /// with specified types. The C struct is expected to be passed via swiftcc

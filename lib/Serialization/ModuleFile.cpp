@@ -103,6 +103,13 @@ bool areCompatible(const llvm::Triple &moduleTarget,
 } // namespace serialization
 } // namespace swift
 
+void ModuleFile::populateHiddenTypeFallbackMap(std::shared_ptr<const ModuleFileSharedCore> core) {
+  auto fallbackData = core->HiddenTypeFallbackTableData;
+  for (unsigned i = 0; i + 1 < fallbackData.size(); i += 2)
+    HiddenTypeFallbackMap[static_cast<uint32_t>(fallbackData[i])] =
+        static_cast<uint32_t>(fallbackData[i + 1]);
+}
+
 ModuleFile::ModuleFile(std::shared_ptr<const ModuleFileSharedCore> core)
     : Core(core) {
   assert(!core->hasError());
@@ -133,6 +140,21 @@ ModuleFile::ModuleFile(std::shared_ptr<const ModuleFileSharedCore> core)
   allocateBuffer(GenericEnvironments, core->GenericEnvironments);
   allocateBuffer(SubstitutionMaps, core->SubstitutionMaps);
   allocateBuffer(Identifiers, core->Identifiers);
+  allocateBuffer(HiddenTypeLayoutInfoDecls, core->HiddenTypeLayoutInfoDecls);
+
+  populateHiddenTypeFallbackMap(core);
+}
+
+llvm::Error ModuleFile::getHiddenTypeLayoutInfoDecls(
+    SmallVectorImpl<HiddenTypeLayoutInfoDecl *> &results) {
+  for (unsigned index = 0, end = HiddenTypeLayoutInfoDecls.size();
+       index != end; ++index) {
+    auto decl = getHiddenTypeLayoutInfoDecl(index + 1);
+    if (!decl)
+      return decl.takeError();
+    results.push_back(decl.get());
+  }
+  return llvm::Error::success();
 }
 
 bool ModuleFile::allowCompilerErrors() const {
@@ -268,9 +290,6 @@ Status ModuleFile::associateWithFileContext(FileUnit *file, SourceLoc diagLoc,
   ModuleDecl *M = file->getParentModule();
 
   // Propagate any deserialized hidden-type layouts onto the AST.
-  for (auto &entry : Core->HiddenTypeLayouts)
-    M->recordHiddenTypeLayout(entry.getKey(), entry.getValue());
-
   // The real (on-disk) name of the module should be checked here as that's the
   // actually loaded module. In case module aliasing is used when building the main
   // module, e.g. -module-name MyModule -module-alias Foo=Bar, the loaded module

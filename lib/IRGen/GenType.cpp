@@ -15,6 +15,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/ABI/MetadataValues.h"
+#include "GenStruct.h"
+#include "swift/AST/AbstractLayout.h"
 #include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -137,15 +139,20 @@ bool TypeInfo::isKnownEmpty(ResilienceExpansion expansion) const {
 const NativeConventionSchema &
 TypeInfo::nativeReturnValueSchema(IRGenModule &IGM) const {
   if (nativeReturnSchema == nullptr)
-    nativeReturnSchema = new NativeConventionSchema(IGM, this, true);
+    nativeReturnSchema = createNativeConventionSchema(IGM, true);
   return *nativeReturnSchema;
 }
 
 const NativeConventionSchema &
 TypeInfo::nativeParameterValueSchema(IRGenModule &IGM) const {
   if (nativeParameterSchema == nullptr)
-    nativeParameterSchema = new NativeConventionSchema(IGM, this, false);
+    nativeParameterSchema = createNativeConventionSchema(IGM, false);
   return *nativeParameterSchema;
+}
+
+NativeConventionSchema *
+TypeInfo::createNativeConventionSchema(IRGenModule &IGM, bool isResult) const {
+  return new NativeConventionSchema(IGM, this, isResult);
 }
 
 /// Copy a value from one object to a new object, directly taking
@@ -1139,7 +1146,7 @@ namespace {
   /// A TypeInfo implementation for opaque storage. Swift will preserve any
   /// data stored into this arbitrarily sized and aligned field, but doesn't
   /// know anything about the data.
-  class OpaqueStorageTypeInfo final :
+  class OpaqueStorageTypeInfo :
     public ScalarTypeInfo<OpaqueStorageTypeInfo, LoadableTypeInfo>
   {
     std::vector<llvm::IntegerType *> ScalarTypes;
@@ -1432,45 +1439,111 @@ namespace {
     }
   };
 
-  /// A TypeInfo for a HiddenType placeholder. The placeholder stands in for a
-  /// real C-imported type whose identity has been elided from the importing
-  /// Layout is recovered from the defining module's HiddenTypeLayouts table.
-  ///
-  /// Address-only: clients lack the clang::RecordDecl required to derive a
-  /// correct register-passing schema for the hidden field, so values are
-  /// always passed indirectly. 
-  class TrivialHiddenTypeInfo final
-      : public IndirectTypeInfo<TrivialHiddenTypeInfo, FixedTypeInfo> {
+  /// Loadable opaque TypeInfo for a trivial hidden type. The type is represented
+  /// as opaque fixed-size storage with no spare bits, but remains loadable so a
+  /// visible containing Swift type does not degrade to address-only solely
+  /// because the declaration is hidden.
+  class LoadableTrivialHiddenTypeInfo final
+      : public OpaqueStorageTypeInfo {
+    std::vector<NativeConventionComponent> NativeComponents;
+    bool NativeParameterRequiresIndirect;
+    bool NativeResultRequiresIndirect;
+
+    static llvm::Type *
+    getLLVMTypeForNativeConventionDescriptor(
+        IRGenModule &IGM, NativeConventionLLVMTypeKind kind,
+        uint64_t payload,
+        NativeConventionLLVMTypeKind vectorElementKind =
+            NativeConventionLLVMTypeKind::Integer,
+        uint64_t vectorElementPayload = 0) {
+      switch (kind) {
+      case NativeConventionLLVMTypeKind::Integer:
+        return llvm::IntegerType::get(IGM.getLLVMContext(), payload);
+      case NativeConventionLLVMTypeKind::Pointer:
+        return llvm::PointerType::get(IGM.getLLVMContext(), payload);
+      case NativeConventionLLVMTypeKind::Half:
+        return llvm::Type::getHalfTy(IGM.getLLVMContext());
+      case NativeConventionLLVMTypeKind::Float:
+        return llvm::Type::getFloatTy(IGM.getLLVMContext());
+      case NativeConventionLLVMTypeKind::Double:
+        return llvm::Type::getDoubleTy(IGM.getLLVMContext());
+      case NativeConventionLLVMTypeKind::FP128:
+        return llvm::Type::getFP128Ty(IGM.getLLVMContext());
+      case NativeConventionLLVMTypeKind::PPCFP128:
+        return llvm::Type::getPPC_FP128Ty(IGM.getLLVMContext());
+      case NativeConventionLLVMTypeKind::X86FP80:
+        return llvm::Type::getX86_FP80Ty(IGM.getLLVMContext());
+      case NativeConventionLLVMTypeKind::FixedVector: {
+        auto *elementType = getLLVMTypeForNativeConventionDescriptor(
+            IGM, vectorElementKind, vectorElementPayload);
+        return llvm::FixedVectorType::get(elementType,
+                                          static_cast<unsigned>(payload));
+      }
+      }
+      llvm_unreachable("unsupported native convention component type");
+    }
+
+    NativeConventionSchema *
+    createNativeConventionSchema(IRGenModule &IGM,
+                                 bool isResult) const override {
+      if (NativeComponents.empty() && !getFixedSize().isZero())
+        return OpaqueStorageTypeInfo::createNativeConventionSchema(IGM,
+                                                                   isResult);
+
+      SmallVector<SwiftAggLowering::FinishedComponent, 4> components;
+      for (auto component : NativeComponents) {
+        auto *type = getLLVMTypeForNativeConventionDescriptor(
+            IGM, component.typeKind, component.typePayload,
+            component.vectorElementKind, component.vectorElementPayload);
+        components.push_back({
+            clang::CharUnits::fromQuantity(component.begin),
+            clang::CharUnits::fromQuantity(component.end),
+            type,
+        });
+      }
+
+      return new NativeConventionSchema(
+          IGM, components,
+          isResult ? NativeResultRequiresIndirect
+                   : NativeParameterRequiresIndirect);
+    }
+
   public:
-    TrivialHiddenTypeInfo(llvm::Type *storage, Size size, Alignment align)
-      : IndirectTypeInfo(storage, size,
-                         SpareBitVector::getConstant(size.getValueInBits(),
-                                                     false),
-                         align,
-                         IsTriviallyDestroyable, IsBitwiseTakableAndBorrowable,
-                         IsCopyable,
-                         IsFixedSize, IsABIAccessible) {}
+    void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
+                          Size offset) const override {
+      if (NativeComponents.empty() && !getFixedSize().isZero()) {
+        OpaqueStorageTypeInfo::addToAggLowering(IGM, lowering, offset);
+        return;
+      }
 
-    void assignWithCopy(IRGenFunction &IGF, Address dest, Address src,
-                        SILType T, bool isOutlined) const override {
-      IGF.emitMemCpy(dest, src, getFixedSize());
-    }
-    void initializeWithCopy(IRGenFunction &IGF, Address dest, Address src,
-                            SILType T, bool isOutlined) const override {
-      IGF.emitMemCpy(dest, src, getFixedSize());
-    }
-    void destroy(IRGenFunction &IGF, Address addr, SILType T,
-                 bool isOutlined) const override {
-      // Trivial destructor under the plain-C assumption.
+      for (auto component : NativeComponents) {
+        auto *type = getLLVMTypeForNativeConventionDescriptor(
+            IGM, component.typeKind, component.typePayload,
+            component.vectorElementKind, component.vectorElementPayload);
+        lowering.addTypedData(
+            type,
+            offset.asCharUnits() +
+                clang::CharUnits::fromQuantity(component.begin),
+            offset.asCharUnits() +
+                clang::CharUnits::fromQuantity(component.end));
+      }
     }
 
-    TypeLayoutEntry *
-    buildTypeLayoutEntry(IRGenModule &IGM, SILType T,
-                         bool useStructLayouts) const override {
-      if (!useStructLayouts)
-        return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
-      return IGM.typeLayoutCache.getOrCreateScalarEntry(
-          *this, T, ScalarKind::TriviallyDestroyable);
+    LoadableTrivialHiddenTypeInfo(
+        llvm::ArrayType *storage,
+        std::vector<llvm::IntegerType *> &&scalarTypes,
+        Size size, Alignment align,
+        ArrayRef<NativeConventionComponent> nativeComponents,
+        bool nativeParameterRequiresIndirect,
+        bool nativeResultRequiresIndirect)
+        : OpaqueStorageTypeInfo(
+              storage, std::move(scalarTypes), size,
+              SpareBitVector::getConstant(size.getValueInBits(), false),
+              align),
+          NativeParameterRequiresIndirect(nativeParameterRequiresIndirect),
+          NativeResultRequiresIndirect(nativeResultRequiresIndirect) {
+      NativeComponents.assign(nativeComponents.begin(),
+                              nativeComponents.end());
     }
 
     unsigned getFixedExtraInhabitantCount(IRGenModule &) const override {
@@ -1481,6 +1554,37 @@ namespace {
     }
   };
 } // end anonymous namespace
+
+static const TypeInfo *
+createLoadableTrivialHiddenTypeInfo(
+    IRGenModule &IGM,
+    const LoadableTrivialHiddenTypeAbstractLayout &layout) {
+  auto size = Size(layout.size);
+  auto align = Alignment(layout.alignment);
+  auto *storageType = llvm::ArrayType::get(IGM.Int8Ty, size.getValue());
+
+  std::vector<llvm::IntegerType *> scalarTypes;
+  Size chunkSize = size;
+  auto maxChunkSize = Size(llvm::IntegerType::MAX_INT_BITS / 8);
+  while (chunkSize) {
+    if (chunkSize > maxChunkSize) {
+      auto *intType = llvm::IntegerType::get(
+          IGM.getLLVMContext(), maxChunkSize.getValueInBits());
+      scalarTypes.push_back(intType);
+      chunkSize -= maxChunkSize;
+      continue;
+    }
+    auto *intType = llvm::IntegerType::get(IGM.getLLVMContext(),
+                                           chunkSize.getValueInBits());
+    scalarTypes.push_back(intType);
+    chunkSize = Size(0);
+  }
+
+  return new LoadableTrivialHiddenTypeInfo(
+      storageType, std::move(scalarTypes), size, align,
+      layout.nativeComponents, layout.nativeParameterRequiresIndirect,
+      layout.nativeResultRequiresIndirect);
+}
 
 /// Constructs a type info which performs simple loads and stores of
 /// the given IR type.
@@ -2450,24 +2554,28 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
                      " arbitrary type positions");
   case TypeKind::SILToken:
     llvm_unreachable("should not be asking for representation of a SILToken");
+  case TypeKind::HiddenTypeLayoutInfo:
+    return convertHiddenTypeLayoutInfoType(
+        cast<HiddenTypeLayoutInfoType>(ty));
   case TypeKind::Integer:
     llvm_unreachable("should not be asking for the type info an IntegerType");
-  case TypeKind::Hidden: {
-    auto hidden = cast<HiddenType>(ty);
-    auto *defining = hidden->getDefiningModule();
-    assert(defining &&
-           "HiddenType must carry a defining module after deserialization");
-    auto layout = defining->lookupHiddenTypeLayout(hidden->getMangledName());
-    assert(layout &&
-           "no HIDDEN_TYPE_LAYOUTS_BLOCK entry for this mangled name");
-
-    auto *storage = llvm::ArrayType::get(IGM.Int8Ty, layout->size);
-    return new TrivialHiddenTypeInfo(storage, Size(layout->size),
-                              Alignment(layout->alignment));
-  }
   }
   }
   llvm_unreachable("bad type kind");
+}
+
+const TypeInfo *
+TypeConverter::convertHiddenTypeLayoutInfoType(HiddenTypeLayoutInfoType *T) {
+  auto *layout = T->getDecl()->getAbstractLayout();
+  assert(layout && "HiddenTypeLayoutInfoType should have abstract layout");
+
+  switch (layout->getKind()) {
+  case AbstractTypeLayout::Kind::LoadableTrivialHiddenType:
+    return createLoadableTrivialHiddenTypeInfo(
+        IGM, *static_cast<LoadableTrivialHiddenTypeAbstractLayout *>(layout));
+  }
+
+  llvm_unreachable("unsupported abstract layout kind");
 }
 
 /// Convert an inout type.  This is always just a bare pointer.
@@ -3134,6 +3242,18 @@ bool irgen::tryEmitDestroyUsingDeinit(IRGenFunction &IGF, Address address,
 
 IsABIAccessible_t irgen::isTypeABIAccessibleIfFixedSize(IRGenModule &IGM,
                                                         CanType ty) {
+
+  if (auto hidden = dyn_cast<HiddenTypeLayoutInfoType>(ty)) {
+    // We replicate the logic below for visible types with hidden types
+    auto *layout = hidden->getDecl()->getAbstractLayout();
+
+    switch (layout->getKind()) {
+    case AbstractTypeLayout::Kind::LoadableTrivialHiddenType:
+      return IsABIAccessible;
+    }
+
+    llvm_unreachable("Unhandled abstract layout kind");
+  }
 
   // Copyable types currently are always ABI-accessible if they're fixed size.
   if (ty->isCopyable())

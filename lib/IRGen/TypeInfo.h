@@ -38,6 +38,8 @@ namespace llvm {
 }
 
 namespace swift {
+  class AbstractTypeLayout;
+  class ASTContext;
   enum IsInitialization_t : bool;
   enum IsTake_t : bool;
   class SILType;
@@ -197,6 +199,10 @@ private:
 
   mutable NativeConventionSchema *nativeReturnSchema = nullptr;
   mutable NativeConventionSchema *nativeParameterSchema = nullptr;
+
+protected:
+  virtual NativeConventionSchema *
+  createNativeConventionSchema(IRGenModule &IGM, bool isResult) const;
 
 public:
   virtual ~TypeInfo();
@@ -629,6 +635,15 @@ public:
 
   void callOutlinedRelease(IRGenFunction &IGF, Address addr, SILType T,
                            Atomicity atomicity) const;
+
+  /// Produce an AbstractTypeLayout capturing the ABI layout of this TypeInfo,
+  /// suitable for serialization into a swiftmodule so that client modules
+  /// can reconstruct a TypeInfo without seeing the full type definition.
+  /// Returns nullptr if conversion is not supported for this TypeInfo.
+  virtual AbstractTypeLayout *
+  getAbstractTypeLayout(IRGenModule &IGM, ASTContext &ctx) const {
+    return nullptr;
+  }
 };
 
 } // end namespace irgen

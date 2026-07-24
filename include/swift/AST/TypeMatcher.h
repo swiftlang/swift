@@ -114,7 +114,6 @@ private:
     TRIVIAL_CASE(BuiltinUnboundGenericType)
     TRIVIAL_CASE(BuiltinGenericType)
     TRIVIAL_CASE(IntegerType)
-    TRIVIAL_CASE(HiddenType)
 #define SINGLETON_TYPE(SHORT_ID, ID) TRIVIAL_CASE(ID##Type)
 #include "swift/AST/TypeNodes.def"
 
@@ -414,6 +413,12 @@ private:
     TRIVIAL_CASE(SILBlockStorageType)
     TRIVIAL_CASE(SILBoxType)
     TRIVIAL_CASE(SILMoveOnlyWrappedType)
+
+    bool visitHiddenTypeLayoutInfoType(CanHiddenTypeLayoutInfoType first,
+                                       Type secondType,
+                                       Type sugaredFirstType) {
+      llvm_unreachable("Should never reach here");
+    }
 
     bool visitProtocolCompositionType(CanProtocolCompositionType firstProtocolComposition,
                                       Type secondType,

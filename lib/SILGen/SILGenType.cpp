@@ -1512,6 +1512,9 @@ public:
   void visitAssociatedTypeDecl(AssociatedTypeDecl *d) {}
   void visitModuleDecl(ModuleDecl *md) {}
   void visitMissingMemberDecl(MissingMemberDecl *) {}
+  void visitHiddenTypeLayoutInfoDecl(HiddenTypeLayoutInfoDecl *) {
+    llvm_unreachable("hidden type layout decls themselves do not produce SIL, they inform the SIL to generate for other decls");
+  }
   void visitNominalTypeDecl(NominalTypeDecl *ntd) {
     SILGenType(SGM, ntd).emitType();
   }
@@ -1682,6 +1685,9 @@ public:
   void visitAssociatedTypeDecl(AssociatedTypeDecl *d) {}
   void visitModuleDecl(ModuleDecl *md) {}
   void visitMissingMemberDecl(MissingMemberDecl *) {}
+  void visitHiddenTypeLayoutInfoDecl(HiddenTypeLayoutInfoDecl *) {
+    llvm_unreachable("hidden type layout decls themselves do not produce SIL, they inform the SIL to generate for other decls");
+  }
   void visitNominalTypeDecl(NominalTypeDecl *ntd) {
     SILGenType(SGM, ntd).emitType();
   }
