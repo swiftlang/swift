@@ -13,6 +13,8 @@
 #include "swift/Sema/IDETypeChecking.h"
 #include "ReadyForTypeCheckingCallback.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ASTWalker.h"
+#include "swift/AST/ActorIsolation.h"
 #include "swift/AST/ASTDemangler.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Attr.h"
@@ -1038,6 +1040,209 @@ swift::getShorthandShadows(LabeledConditionalStmt *CondStmt, DeclContext *DC) {
   }
   return Result;
 }
+
+//===--------------------------------------------------------------------------===//
+// Isolation collection
+//===--------------------------------------------------------------------------===//
+
+/// Walks a SourceFile and records actor isolation info. Currently only supports
+/// explicit ClosureExprs. Closures whose isolation is written in the signature
+/// are skipped.
+class InferredIsolationCollector : public SourceEntityWalker {
+  SourceManager &SM;
+  unsigned BufferId;
+
+  /// The range in which isolation info is to be collected. An invalid range
+  /// means the whole file.
+  SourceRange TotalRange;
+
+  /// The output vector for InferredIsolationInfo emitted during traversal.
+  std::vector<InferredIsolationInfo> &Results;
+
+  /// Buffer in which all printed isolation strings are stored, null-terminated
+  /// and deduplicated.
+  llvm::raw_ostream &OS;
+
+  /// Map from a printed string to its offset in \c OS. Used for deduplicating
+  /// both isolation strings and kind labels.
+  llvm::StringMap<uint32_t> StringOffsets;
+
+  /// Returns the (offset, length) of \p S within \c OS, printing it first if
+  /// it isn't already present.
+  std::pair<uint32_t, uint32_t> getBufferRangeForString(StringRef S) {
+    auto It = StringOffsets.find(S);
+    if (It == StringOffsets.end()) {
+      StringOffsets[S] = OS.tell();
+      OS << S << '\0';
+    }
+    return {StringOffsets[S], S.size()};
+  }
+
+  /// Whether the given range overlaps the total range in which we collect
+  /// isolation info.
+  bool overlapsTotalRange(SourceRange Range) {
+    return TotalRange.isInvalid() || Range.overlaps(TotalRange);
+  }
+
+  /// Render an isolation in the spelling you'd write in source, suitable for
+  /// an inline IDE badge. Examples: "@MainActor", "@SomeGlobalActor",
+  /// "nonisolated", "nonisolated(unsafe)", "nonisolated(nonsending)",
+  /// "actor-isolated", "@isolated(any)".
+  // TODO: what should be responsible for this formatting?
+  static void printSourceStyle(const ActorIsolation &isolation,
+                               llvm::raw_ostream &Out) {
+    switch (isolation.getKind()) {
+    case ActorIsolation::Unspecified:
+      // TODO: how to handle 'unspecified'?
+      // We currently skip it during the walk so should not hit it here, but
+      // what should we return? Empty string? Pass it through and let clients
+      // decide?
+      Out << "";
+      return;
+    case ActorIsolation::ActorInstance:
+      Out << "actor-isolated";
+      return;
+    case ActorIsolation::Nonisolated:
+      Out << "nonisolated";
+      return;
+    case ActorIsolation::NonisolatedConcurrent:
+      Out << "@concurrent";
+      return;
+    case ActorIsolation::NonisolatedNonsending:
+      Out << "nonisolated(nonsending)";
+      return;
+    case ActorIsolation::NonisolatedUnsafe:
+      Out << "nonisolated(unsafe)";
+      return;
+    case ActorIsolation::GlobalActor: {
+      if (isolation.isMainActor()) {
+        Out << "@MainActor";
+      } else {
+        Out << "@" << isolation.getGlobalActor().getString();
+      }
+      return;
+    case ActorIsolation::Erased:
+      Out << "@isolated(any)";
+      return;
+    }
+    }
+    llvm_unreachable("covered switch");
+  }
+
+  std::pair<uint32_t, uint32_t> printIsolation(const ActorIsolation &iso) {
+    SmallString<64> Buf;
+    {
+      llvm::raw_svector_ostream Out(Buf);
+      printSourceStyle(iso, Out);
+    }
+    return getBufferRangeForString(Buf.str());
+  }
+
+  /// Record one inferred-isolation entry. \p Anchor must be valid and in this
+  /// source file's buffer.
+  void record(SourceLoc Anchor, unsigned Length,
+              const ActorIsolation &Isolation, StringRef Kind) {
+    if (Anchor.isInvalid())
+      return;
+    if (SM.findBufferContainingLoc(Anchor) != BufferId)
+      return;
+
+    unsigned offset = SM.getLocOffsetInBuffer(Anchor, BufferId);
+    auto isolationBufferRange = printIsolation(Isolation);
+    auto kindBufferRange = getBufferRangeForString(Kind);
+
+    InferredIsolationInfo Info;
+    Info.Offset = offset;
+    Info.Length = Length;
+    Info.IsolationOffset = isolationBufferRange.first;
+    Info.IsolationLength = isolationBufferRange.second;
+    Info.KindOffset = kindBufferRange.first;
+    Info.KindLength = kindBufferRange.second;
+    // TODO: the var type collector analog constructs this inline...
+    // is one way better than another?
+    Results.push_back(Info);
+  }
+
+public:
+  InferredIsolationCollector(SourceFile &SF, SourceRange Range,
+                             std::vector<InferredIsolationInfo> &Results,
+                             llvm::raw_ostream &OS)
+      : SM(SF.getASTContext().SourceMgr), BufferId(SF.getBufferID()),
+        TotalRange(Range), Results(Results), OS(OS) {}
+
+  bool walkToExprPre(Expr *E) override {
+    // Skip the subtree if it's outside the requested range.
+    if (!overlapsTotalRange(E->getSourceRange()))
+      return false;
+
+    auto *Closure = dyn_cast<ClosureExpr>(E);
+    if (!Closure)
+      return true;
+
+    if (Closure->isImplicit())
+      return true;
+
+    auto Isolation = Closure->getActorIsolation();
+    if (Isolation.isUnspecified())
+      return true;
+
+    // If the closure signature has an explicit isolation attribute in
+    // its signature, exclude it.
+    // TODO: what is the best way to robustly detect this case?
+    // Should we pass it through regardless of whether it's "implicit"?
+    if (Closure->getInLoc().isValid()) {
+      const auto &Attrs = Closure->getAttrs();
+
+      // Found an explicit @concurrent attribute, so skip this closure.
+      if (Attrs.hasAttribute<ConcurrentAttr>())
+        return true;
+
+      // Check for an explicit global actor attribute.
+      if (auto result = evaluateOrDefault(Closure->getASTContext().evaluator,
+                                          GlobalActorAttributeRequest{Closure},
+                                          std::nullopt)) {
+        // If we found a nominal, then this closure has an explicit global actor
+        // annotation, so we can skip it.
+        if (result->second)
+          return true;
+      }
+    }
+
+    // TODO: should we report the full source range here or infer an "anchor"?
+    // Clients would need to figure out where the right placement is for
+    // closures.
+    const auto closureCharSourceRange =
+        Lexer::getCharSourceRangeFromSourceRange(SM, Closure->getSourceRange());
+
+    record(closureCharSourceRange.getStart(),
+           closureCharSourceRange.getByteLength(), Isolation, "closure");
+    return true;
+  }
+
+  bool walkToDeclPre(Decl *D, CharSourceRange DeclNameRange) override {
+    // Skip this node and subtree if outside the range.
+    return overlapsTotalRange(D->getSourceRange());
+  }
+
+  bool walkToStmtPre(Stmt *S) override {
+    // Skip this node and subtree if outside the range.
+    return overlapsTotalRange(S->getSourceRange());
+  }
+
+  bool walkToPatternPre(Pattern *P) override {
+    // Skip this node and subtree if outside the range.
+    return overlapsTotalRange(P->getSourceRange());
+  }
+};
+
+void swift::collectInferredIsolations(
+    SourceFile &SF, SourceRange Range,
+    std::vector<InferredIsolationInfo> &IsolationInfos, llvm::raw_ostream &OS) {
+  InferredIsolationCollector Walker(SF, Range, IsolationInfos, OS);
+  Walker.walk(SF);
+}
+
+//===--------------------------------------------------------------------------===//
 
 void ReadyForTypeCheckingCallback::doneParsing(SourceFile *SrcFile) {
   // Import resolution will have already been done by IDEInspectionInstance,

@@ -112,6 +112,7 @@ enum class ActionType {
   PrintTypeInterface,
   PrintIndexedSymbols,
   PrintExpressionTypes,
+  PrintInferredIsolation,
   TestCreateCompilerInvocation,
   CompilerInvocationFromModule,
   GenerateModuleAPIDescription,
@@ -253,6 +254,10 @@ Action(llvm::cl::desc("Mode:"), llvm::cl::init(ActionType::None),
            clEnumValN(ActionType::PrintExpressionTypes,
                       "print-expr-type",
                       "Print types for all expressions in the file"),
+           clEnumValN(ActionType::PrintInferredIsolation,
+                      "print-inferred-isolation",
+                      "Print inferred actor isolation for every closure in "
+                      "the file"),
            clEnumValN(ActionType::ConformingMethodList,
 	                    "conforming-methods",
                       "Perform conforming method analysis for expression"),
@@ -2890,6 +2895,62 @@ static int doPrintExpressionTypes(const CompilerInvocation &InitInvok,
   return EXIT_SUCCESS;
 }
 
+static int doPrintInferredIsolation(const CompilerInvocation &InitInvok,
+                                    StringRef SourceFilename) {
+  CompilerInvocation Invocation(InitInvok);
+  Invocation.getFrontendOptions().InputsAndOutputs.addPrimaryInputFile(
+      SourceFilename);
+  CompilerInstance CI;
+
+  PrintingDiagnosticConsumer PrintDiags;
+  CI.addDiagnosticConsumer(&PrintDiags);
+  std::string InstanceSetupError;
+  if (CI.setup(Invocation, InstanceSetupError)) {
+    llvm::errs() << InstanceSetupError << '\n';
+    return EXIT_FAILURE;
+  }
+  registerIDERequestFunctions(CI.getASTContext().evaluator);
+  CI.performSema();
+
+  std::vector<InferredIsolationInfo> Infos;
+  llvm::SmallString<256> StrBuffer;
+  llvm::raw_svector_ostream OS(StrBuffer);
+  SourceFile &SF = *CI.getPrimarySourceFile();
+  auto Source =
+      SF.getASTContext().SourceMgr.getRangeForBuffer(SF.getBufferID()).str();
+
+  collectInferredIsolations(SF, SourceRange(), Infos, OS);
+
+  std::vector<std::pair<unsigned, std::string>> SortedTags;
+  for (auto &R : Infos) {
+    auto iso = StrBuffer.str().substr(R.IsolationOffset, R.IsolationLength);
+    auto kind = StrBuffer.str().substr(R.KindOffset, R.KindLength);
+    SortedTags.push_back(
+        {R.Offset, (llvm::Twine("<inferred-isolation kind=\"") + kind +
+                    "\" isolation=\"" + iso + "\">")
+                       .str()});
+    SortedTags.push_back({R.Offset + R.Length, "</inferred-isolation>"});
+  }
+  std::stable_sort(SortedTags.begin(), SortedTags.end(),
+                   [](std::pair<unsigned, std::string> T1,
+                      std::pair<unsigned, std::string> T2) {
+                     return T1.first < T2.first;
+                   });
+
+  ArrayRef<std::pair<unsigned, std::string>> SortedTagsRef = SortedTags;
+  unsigned Cur = 0;
+  do {
+    while (!SortedTagsRef.empty() && SortedTagsRef.front().first == Cur) {
+      llvm::outs() << SortedTagsRef.front().second;
+      SortedTagsRef = SortedTagsRef.drop_front();
+    }
+    auto Start = Cur;
+    Cur = SortedTagsRef.empty() ? Source.size() : SortedTagsRef.front().first;
+    llvm::outs() << Source.substr(Start, Cur - Start);
+  } while (!SortedTagsRef.empty());
+  return EXIT_SUCCESS;
+}
+
 static int doPrintLocalTypes(const CompilerInvocation &InitInvok,
                              const std::vector<std::string> ModulesToPrint,
                              const PrintOptions &PO) {
@@ -4955,6 +5016,10 @@ int main(int argc, char *argv[]) {
   case ActionType::PrintExpressionTypes:
     ExitCode = doPrintExpressionTypes(InitInvok,
                                       options::SourceFilename);
+    break;
+
+  case ActionType::PrintInferredIsolation:
+    ExitCode = doPrintInferredIsolation(InitInvok, options::SourceFilename);
     break;
 
 
