@@ -60,7 +60,6 @@ private struct MovableInstructions {
   var speculativelyHoistable: [Instruction] = []
   var loadsAndStores: [Instruction] = []
   var hoistUp: [Instruction] = []
-  var sinkDown: [Instruction] = []
   var scopedInsts: [ScopedInstruction] = []
 }
 
@@ -94,9 +93,6 @@ private struct AnalyzedInstructions {
   /// `true` if the loop has instructions which (may) read from memory, which are not in `Loads` and not in `sideEffects`.
   var hasOtherMemReadingInsts = false
   
-  /// `true` if one of the side effects might release.
-  var sideEffectsMayRelease: Bool { loopSideEffects.contains(where: { $0.mayRelease }) }
-
   init (in loop: Loop, _ context: FunctionPassContext) {
     self.loopSideEffects = StackWithCount<Instruction>(context)
     self.blockSideEffectBottomMarker = loopSideEffects.top
@@ -280,7 +276,6 @@ private func collectMovableInstructions(
 ) {
   var loadInstCounter = 0
   var readOnlyApplyCounter = 0
-  lazy var sideEffectsMayRelease = analyzedInstructions.sideEffectsMayRelease
   for bb in loop.loopBlocks {
     // Skip blocks which are not executed in every loop iteration
     guard analyzedInstructions.dominatingBlocks.contains(bb) else {
@@ -289,16 +284,6 @@ private func collectMovableInstructions(
 
     for inst in bb.instructions {
       switch inst {
-      case let fixLifetimeInst as FixLifetimeInst:
-        guard fixLifetimeInst.parentBlock.dominates(loop.preheader!, context.dominatorTree) else {
-          continue
-        }
-        
-        if !sideEffectsMayRelease ||
-           !analyzedInstructions.sideEffectsMayWrite(to: fixLifetimeInst.operand.value, context.aliasAnalysis)
-        {
-          movableInstructions.sinkDown.append(fixLifetimeInst)
-        }
       case let loadInst as LoadInst:
         // Avoid quadratic complexity in corner cases. Usually, this limit will not be exceeded.
         if loadInstCounter * analyzedInstructions.loopSideEffects.count < 8000,
@@ -375,7 +360,6 @@ private func optimizeLoop(
   changed = movableInstructions.speculativelyHoistInstructions(outOf: loop, context)  || changed
   changed = movableInstructions.hoistAndSinkLoadsAndStores(outOf: loop, context)      || changed
   changed = movableInstructions.hoistInstructions(outOf: loop, context)               || changed
-  changed = movableInstructions.sinkInstructions(outOf: loop, context)                || changed
   changed = movableInstructions.hoistWithSinkScopedInstructions(outOf: loop, context) || changed
 
   return changed
@@ -647,17 +631,6 @@ private extension MovableInstructions {
 
     for hoistableInst in hoistUp {
       changed = hoistableInst.hoist(outOf: loop, context) || changed
-    }
-
-    return changed
-  }
-
-  /// Sink instructions.
-  mutating func sinkInstructions(outOf loop: Loop, _ context: FunctionPassContext) -> Bool {
-    var changed = false
-
-    for inst in sinkDown {
-      changed = inst.sink(outOf: loop, context) || changed
     }
 
     return changed
