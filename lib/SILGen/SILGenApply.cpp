@@ -7801,7 +7801,7 @@ static void collectFakeIndexParameters(SILGenFunction &SGF,
   // Use conventions that will produce a +1 value.
   auto &tl = SGF.getTypeLowering(substType);
   ParameterConvention convention;
-  if (tl.isAddressOnly()) {
+  if (tl.getRecursiveProperties().isAddressOnly()) {
     convention = ParameterConvention::Indirect_In;
   } else if (tl.isTrivial()) {
     convention = ParameterConvention::Direct_Unowned;

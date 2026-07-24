@@ -80,7 +80,7 @@ ManagedValue SILGenFunction::emitManagedCopy(SILLocation loc, SILValue v,
     return ManagedValue::forRValueWithoutOwnership(v);
   if (v->getType().isObject() && v->getOwnershipKind() == OwnershipKind::None)
     return ManagedValue::forObjectRValueWithoutOwnership(v);
-  assert((!lowering.isAddressOnly() || !silConv.useLoweredAddresses()) &&
+  assert(lowering.isLoadableOrOpaque(F) &&
          "cannot retain an unloadable type");
 
   v = lowering.emitCopyValue(B, loc, v);
@@ -102,7 +102,7 @@ SILGenFunction::emitManagedFormalEvaluationCopy(SILLocation loc, SILValue v,
     return ManagedValue::forRValueWithoutOwnership(v);
   if (v->getType().isObject() && v->getOwnershipKind() == OwnershipKind::None)
     return ManagedValue::forObjectRValueWithoutOwnership(v);
-  assert((!lowering.isAddressOnly() || !silConv.useLoweredAddresses()) &&
+  assert(lowering.isLoadableOrOpaque(F) &&
          "cannot retain an unloadable type");
 
   v = lowering.emitCopyValue(B, loc, v);
@@ -122,7 +122,7 @@ ManagedValue SILGenFunction::emitManagedLoadCopy(SILLocation loc, SILValue v,
     return ManagedValue::forRValueWithoutOwnership(v);
   if (v->getOwnershipKind() == OwnershipKind::None)
     return ManagedValue::forObjectRValueWithoutOwnership(v);
-  assert((!lowering.isAddressOnly() || !silConv.useLoweredAddresses()) &&
+  assert(lowering.isLoadableOrOpaque(F) &&
          "cannot retain an unloadable type");
   return emitManagedRValueWithCleanup(v, lowering);
 }
@@ -142,7 +142,7 @@ SILGenFunction::emitManagedLoadBorrow(SILLocation loc, SILValue v,
     return ManagedValue::forObjectRValueWithoutOwnership(v);
   }
 
-  assert((!lowering.isAddressOnly() || !silConv.useLoweredAddresses()) &&
+  assert(lowering.isLoadableOrOpaque(F) &&
          "cannot retain an unloadable type");
   auto *lbi = B.createLoadBorrow(loc, v);
   return emitManagedBorrowedRValueWithCleanup(v, lbi, lowering);
@@ -161,7 +161,7 @@ ManagedValue SILGenFunction::emitManagedStoreBorrow(
     lowering.emitStore(B, loc, v, addr, StoreOwnershipQualifier::Trivial);
     return ManagedValue::forTrivialAddressRValue(addr);
   }
-  assert((!lowering.isAddressOnly() || !silConv.useLoweredAddresses()) &&
+  assert(lowering.isLoadableOrOpaque(F) &&
          "cannot retain an unloadable type");
   auto *sbi = B.createStoreBorrow(loc, v, addr);
   Cleanups.pushCleanup<EndBorrowCleanup>(sbi);
@@ -1209,7 +1209,7 @@ SILGenFunction::ForceTryEmission::ForceTryEmission(SILGenFunction &SGF,
 
   SILValue indirectError;
   auto &errorTL = SGF.getTypeLowering(loc->getThrownError());
-  if (!errorTL.isAddress()) {
+  if (errorTL.isLoadableOrOpaque(SGF.F)) {
     (void) catchBB->createPhiArgument(errorTL.getLoweredType(),
                                       OwnershipKind::Owned);
   } else {
@@ -1322,8 +1322,8 @@ RValue RValueEmitter::visitOptionalTryExpr(OptionalTryExpr *E, SGFContext C) {
 
   // Form the optional using address operations if the type is address-only or
   // if we already have an address to use.
-  bool isByAddress = ((usingProvidedContext || optTL.isAddressOnly()) &&
-      SGF.silConv.useLoweredAddresses());
+  bool isByAddress = SGF.silConv.useLoweredAddresses() &&
+                     (usingProvidedContext || !optTL.isLoadableOrOpaque(SGF.F));
 
   TemporaryInitializationPtr optTemp;
   if (!isByAddress) {
@@ -1346,13 +1346,6 @@ RValue RValueEmitter::visitOptionalTryExpr(OptionalTryExpr *E, SGFContext C) {
 
   // Set up a "catch" block for when an error occurs.
   SILBasicBlock *catchBB = SGF.createBasicBlock(FunctionSection::Postmatter);
-
-  // FIXME: opaque values
-  auto &errorTL = SGF.getTypeLowering(E->getThrownError());
-  if (!errorTL.isAddressOnly()) {
-    (void) catchBB->createPhiArgument(errorTL.getLoweredType(),
-                                      OwnershipKind::Owned);
-  }
 
   FullExpr localCleanups(SGF.Cleanups, E);
 
@@ -1419,9 +1412,6 @@ RValue RValueEmitter::visitOptionalTryExpr(OptionalTryExpr *E, SGFContext C) {
   SGF.B.emitBlock(catchBB);
   FullExpr catchCleanups(SGF.Cleanups, E);
 
-  // Consume the thrown error.
-  if (!errorTL.isAddressOnly())
-    (void) SGF.emitManagedRValueWithCleanup(catchBB->getArgument(0));
   catchCleanups.pop();
 
   if (isByAddress) {
@@ -3155,7 +3145,7 @@ static SILValue emitMetatypeOfDelegatingInitExclusivelyBorrowedSelf(
 /// of the returned value.
 static ManagedValue emitMetatypeOperand(SILGenFunction &SGF, Expr *baseExpr) {
   if (auto *load = dyn_cast<LoadExpr>(baseExpr)) {
-    auto accessKind = SGF.getTypeLowering(load->getType()).isAddressOnly()
+    auto accessKind = SGF.getTypeLowering(load->getType()).isAddress()
                           ? SGFAccessKind::BorrowedAddressRead
                           : SGFAccessKind::BorrowedObjectRead;
     LValue lv = SGF.emitLValue(load->getSubExpr(), accessKind);
@@ -5493,7 +5483,7 @@ static ManagedValue flattenOptional(SILGenFunction &SGF, SILLocation loc,
 
   SILValue contBBArg;
   TemporaryInitializationPtr addrOnlyResultBuf;
-  if (resultTL.isAddressOnly()) {
+  if (!resultTL.isLoadableOrOpaque(SGF.F)) {
     addrOnlyResultBuf = SGF.emitTemporary(loc, resultTL);
   } else {
     contBBArg = contBB->createPhiArgument(resultTy, OwnershipKind::Owned);
@@ -5503,7 +5493,7 @@ static ManagedValue flattenOptional(SILGenFunction &SGF, SILLocation loc,
 
   SEB.addOptionalSomeCase(
       isPresentBB, contBB, [&](ManagedValue input, SwitchCaseFullExpr &&scope) {
-        if (resultTL.isAddressOnly()) {
+        if (!resultTL.isLoadableOrOpaque(SGF.F)) {
           SILValue addr =
               addrOnlyResultBuf->getAddressForInPlaceInitialization(SGF, loc);
           auto *someDecl = SGF.getASTContext().getOptionalSomeDecl();
@@ -5519,7 +5509,7 @@ static ManagedValue flattenOptional(SILGenFunction &SGF, SILLocation loc,
   SEB.addOptionalNoneCase(
       isNotPresentBB, contBB,
       [&](ManagedValue input, SwitchCaseFullExpr &&scope) {
-        if (resultTL.isAddressOnly()) {
+        if (!resultTL.isLoadableOrOpaque(SGF.F)) {
           SILValue addr =
               addrOnlyResultBuf->getAddressForInPlaceInitialization(SGF, loc);
           SGF.emitInjectOptionalNothingInto(loc, addr, resultTL);
@@ -5534,7 +5524,7 @@ static ManagedValue flattenOptional(SILGenFunction &SGF, SILLocation loc,
 
   // Continue.
   SGF.B.emitBlock(contBB);
-  if (resultTL.isAddressOnly()) {
+  if (!resultTL.isLoadableOrOpaque(SGF.F)) {
     addrOnlyResultBuf->finishInitialization(SGF);
     return addrOnlyResultBuf->getManagedAddress();
   }
@@ -6409,8 +6399,8 @@ void SILGenFunction::emitOptionalEvaluation(SILLocation loc, Type optType,
 
   // Form the optional using address operations if the type is address-only or
   // if we already have an address to use.
-  bool isByAddress = ((usingProvidedContext || optTL.isAddressOnly()) &&
-                      silConv.useLoweredAddresses());
+  bool isByAddress = silConv.useLoweredAddresses() &&
+                     (usingProvidedContext || !optTL.isLoadableOrOpaque(F));
 
   TemporaryInitializationPtr optTemp;
   if (!isByAddress) {

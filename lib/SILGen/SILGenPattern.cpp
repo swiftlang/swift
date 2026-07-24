@@ -1893,7 +1893,7 @@ emitCastOperand(SILGenFunction &SGF, SILLocation loc,
   // We know that we must have a loadable type at this point since address only
   // types do not need reabstraction and are addresses. So we should have exited
   // above already.
-  assert(src.getType().isLoadable(SGF.F) &&
+  assert(src.getType().isLoadableOrOpaque(SGF.F) &&
          "Should have a loadable value at this point");
 
   // Since our finalValue is loadable, we could not have had a take_on_success
