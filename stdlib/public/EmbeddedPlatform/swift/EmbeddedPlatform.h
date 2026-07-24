@@ -230,12 +230,7 @@ typedef enum EMBEDDED_SWIFT_OPTION_SET: __swift_options_t {
   /**
    * Diagnose mutex misuse when the platform can do so cheaply.
    */
-  SWIFT_MUTEX_CHECKED EMBEDDED_SWIFT_NAME(checked) = 0x01,
-
-  /**
-   * Allow the same execution context to acquire the mutex recursively.
-   */
-  SWIFT_MUTEX_RECURSIVE EMBEDDED_SWIFT_NAME(recursive) = 0x02
+  SWIFT_MUTEX_CHECKED EMBEDDED_SWIFT_NAME(checked) = 0x01
 } swift_mutex_flags_t EMBEDDED_SWIFT_NAME(SwiftMutexFlags);
 
 /**
@@ -509,6 +504,51 @@ void _swift_mutex_unlock(void * EMBEDDED_SWIFT_NONNULL mutex);
  * - Returns: Nonzero if the mutex was acquired, or zero if it was not acquired.
  */
 __swift_ptrdiff_t _swift_mutex_tryLock(void * EMBEDDED_SWIFT_NONNULL mutex);
+
+/**
+ * Initializes a recursive mutex, i.e., one that can be acquired more than
+ * once by the same execution context without deadlocking.
+ *
+ * - Parameters:
+ *   - mutex: Opaque caller-owned mutex storage initialized by this function
+ *     and later passed to the other `_swift_mutexRecursive_*` functions. The
+ *     contents are private to the platform implementation. The storage is at
+ *     least EMBEDDED_SWIFT_MUTEX_NUM_WORDS pointer-sized words and has
+ *     pointer alignment.
+ *   - flags: Flags controlling mutex behavior.
+ *
+ * This function is required when using Synchronization.Mutex with a
+ * recursive locking policy.
+ */
+void _swift_mutexRecursive_init(void * EMBEDDED_SWIFT_NONNULL mutex,
+                                swift_mutex_flags_t flags);
+
+/**
+ * Destroys a recursive mutex initialized by `_swift_mutexRecursive_init`.
+ *
+ * - Parameters:
+ *   - mutex: The mutex to destroy. Must not be locked.
+ */
+void _swift_mutexRecursive_destroy(void * EMBEDDED_SWIFT_NONNULL mutex);
+
+/**
+ * Acquires a recursive mutex, blocking or spinning until ownership is
+ * obtained. If the current execution context already holds the mutex, this
+ * increments its recursion count instead of deadlocking.
+ *
+ * - Parameters:
+ *   - mutex: The mutex to acquire.
+ */
+void _swift_mutexRecursive_lock(void * EMBEDDED_SWIFT_NONNULL mutex);
+
+/**
+ * Releases one level of recursive ownership of a mutex held by the current
+ * execution context.
+ *
+ * - Parameters:
+ *   - mutex: The mutex to release.
+ */
+void _swift_mutexRecursive_unlock(void * EMBEDDED_SWIFT_NONNULL mutex);
 
 /**
  * Initializes a reserved TLS key. `key` is one of the numeric reserved keys
