@@ -722,6 +722,10 @@ class BuildScriptInvocation(object):
                             is_enabled=self.args.build_wasistdlib)
         builder.add_product(products.WASIThreadsStdlib,
                             is_enabled=self.args.build_wasistdlib)
+        builder.add_product(
+            products.WASIP2Stdlib,
+            is_enabled=self.args.build_wasistdlib
+            and bool(self.args.wasi_libc_component_tools_path))
         builder.add_product(products.WASISwiftSDK,
                             is_enabled=self.args.build_wasistdlib)
 
