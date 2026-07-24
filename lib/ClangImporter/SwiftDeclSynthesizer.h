@@ -50,6 +50,10 @@ enum class ValueConstructorFlags {
   /// If present, a synthesized AST body should be attached (otherwise the
   /// implementation will be synthesized by SILGen).
   WantBody = 0x02,
+
+  /// If present, \c self should be zero-initialized before the properties are
+  /// set (used when a member has no legacy projection).
+  WantZeroInitPrologue = 0x04,
 };
 using ValueConstructorOptions = OptionSet<ValueConstructorFlags>;
 
@@ -143,7 +147,9 @@ public:
   /// Create a constructor that initializes a struct from its members.
   ConstructorDecl *createValueConstructor(NominalTypeDecl *structDecl,
                                           ArrayRef<VarDecl *> members,
-                                          ValueConstructorOptions options);
+                                          ValueConstructorOptions options,
+                                          AccessLevel maxAccess =
+                                              AccessLevel::Open);
 
   /// Create a rawValue-ed constructor that bridges to its underlying storage.
   ConstructorDecl *createRawValueBridgingConstructor(
@@ -248,6 +254,11 @@ public:
                              ArrayRef<VarDecl *> members,
                              NominalTypeDecl *importedStructDecl,
                              VarDecl *importedFieldDecl);
+
+  std::pair<AccessorDecl *, AccessorDecl *>
+  makeLegacyCArrayAccessors(DeclContext *dc,
+                            VarDecl *legacyDecl,
+                            VarDecl *modernDecl);
 
   /// Build the init(rawValue:) initializer for an imported NS_ENUM.
   ///
