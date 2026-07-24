@@ -1,6 +1,5 @@
-// RUN: %target-typecheck-verify-swift -Xcc -fmodule-map-file=%S/Inputs/objc_implementation_private.modulemap -enable-experimental-feature ObjCImplementation -target %target-stable-abi-triple
+// RUN: %target-typecheck-verify-swift -Xcc -fmodule-map-file=%S/Inputs/objc_implementation_private.modulemap -target %target-stable-abi-triple
 // REQUIRES: objc_interop
-// REQUIRES: swift_feature_ObjCImplementation
 // REQUIRES: OS=macosx
 
 import objc_implementation_internal

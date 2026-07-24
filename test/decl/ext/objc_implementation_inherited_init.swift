@@ -1,6 +1,5 @@
-// RUN: %target-swift-frontend -emit-silgen -verify -import-objc-header %S/Inputs/objc_implementation_inherited_init.h -enable-experimental-feature ObjCImplementation -target %target-stable-abi-triple -Xcc -Wno-nullability-completeness %s
+// RUN: %target-swift-frontend -emit-silgen -verify -import-objc-header %S/Inputs/objc_implementation_inherited_init.h -target %target-stable-abi-triple -Xcc -Wno-nullability-completeness %s
 // REQUIRES: objc_interop
-// REQUIRES: swift_feature_ObjCImplementation
 
 // Declaring a designated initializer suppresses inheritance of NSObject's
 // 'init()', which the compiler turns into a trapping stub. Objective-C callers
