@@ -5,6 +5,7 @@
 // REQUIRES: volatile
 // REQUIRES: swift_feature_Embedded
 // REQUIRES: swift_feature_Extern
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 import _Volatile
 

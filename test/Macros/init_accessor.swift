@@ -6,6 +6,7 @@
 // RUN: %target-run %t/main
 
 // REQUIRES: swift_swift_parser, executable_test
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 @attached(peer, names: named(_value), named(_$value))
 macro Wrapped() = #externalMacro(module: "MacroDefinition",

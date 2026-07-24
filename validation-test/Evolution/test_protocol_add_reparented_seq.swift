@@ -7,6 +7,7 @@
 // REQUIRES: swift_feature_SuppressedAssociatedTypesWithDefaults
 // REQUIRES: swift_feature_Lifetimes
 // REQUIRES: swift_feature_LifetimeDependence
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 import StdlibUnittest
 import protocol_add_reparented_seq

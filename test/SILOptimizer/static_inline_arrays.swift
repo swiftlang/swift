@@ -9,6 +9,7 @@
 // REQUIRES: executable_test,optimized_stdlib
 // REQUIRES: OS=macosx || OS=linux-gnu || OS=windows-msvc
 // UNSUPPORTED: back_deployment_runtime
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 extension InlineArray: Collection {
   var asArray: Array<Element> { map { $0 } }

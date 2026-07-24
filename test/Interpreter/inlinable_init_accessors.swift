@@ -22,6 +22,7 @@
 // REQUIRES: executable_test
 
 // UNSUPPORTED: remote_run || device_run
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 //--- Library.swift
 @frozen

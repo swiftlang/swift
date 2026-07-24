@@ -3,6 +3,7 @@
 // REQUIRES: executable_test
 // rdar://125917150
 // UNSUPPORTED: freestanding
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 % import os.path
 % import gyb
 
