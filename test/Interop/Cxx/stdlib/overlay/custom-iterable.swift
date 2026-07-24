@@ -9,7 +9,7 @@
 import StdlibUnittest
 import CustomIterable
 
-var CxxIterableTestSuite = TestSuite("CxxSequence")
+var CxxIterableTestSuite = TestSuite("CxxIterable")
 
 CxxIterableTestSuite.test("SimpleNonCopyableSequence as Swift.Iterable") {
   guard #available(SwiftStdlib 6.4, *) else { return }
