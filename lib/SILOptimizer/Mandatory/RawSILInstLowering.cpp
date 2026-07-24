@@ -484,7 +484,7 @@ class RawSILInstLowering : public SILFunctionTransform {
   void run() override {
     // Do not try to relower raw instructions in canonical SIL. There won't be
     // any there.
-    if (getFunction()->wasDeserializedCanonical()) {
+    if (getFunction()->isAlreadyCanonical()) {
       return;
     }
 

@@ -586,10 +586,10 @@ class ConsumeOperatorCopyableValuesCheckerPass : public SILFunctionTransform {
     auto *fn = getFunction();
 
     // Don't rerun diagnostics on deserialized functions.
-    if (fn->wasDeserializedCanonical())
+    if (fn->isAlreadyCanonical())
       return;
 
-    assert(fn->getModule().getStage() == SILStage::Raw &&
+    assert(fn->getFunctionStage() == SILStage::Raw &&
            "Should only run on Raw SIL");
 
     LLVM_DEBUG(llvm::dbgs() << "*** Checking moved values in fn: "

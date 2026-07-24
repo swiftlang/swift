@@ -257,7 +257,7 @@ class EmitDFDiagnostics : public SILFunctionTransform {
   /// The entry point to the transformation.
   void run() override {
     // Don't rerun diagnostics on deserialized functions.
-    if (getFunction()->wasDeserializedCanonical())
+    if (getFunction()->isAlreadyCanonical())
       return;
 
     SILModule &M = getFunction()->getModule();

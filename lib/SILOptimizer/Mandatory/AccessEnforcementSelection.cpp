@@ -646,7 +646,7 @@ processFunction(SILFunction *F) {
 
   // Deserialized functions, which have been mandatory inlined, no longer meet
   // the structural requirements on access markers required by this pass.
-  if (F->wasDeserializedCanonical())
+  if (F->isAlreadyCanonical())
     return;
 
   // Perform an RPO walk so that boxes are always processed before their access.

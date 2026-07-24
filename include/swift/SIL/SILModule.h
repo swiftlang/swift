@@ -338,8 +338,10 @@ private:
   llvm::DenseMap<std::pair<Decl *, VarDecl *>, unsigned> fieldIndices;
   llvm::DenseMap<EnumElementDecl *, unsigned> enumCaseIndices;
 
-  /// The stage of processing this module is at.
-  SILStage Stage;
+  /// The module's stage floor: a conservative lower bound on the stage of every
+  /// function. This is a module-wide commitment, not a per-function phase (which
+  /// is SILFunction::getFunctionStage()).
+  SILStage StageFloor;
 
   /// The set of deserialization notification handlers.
   DeserializationNotificationHandlerSet deserializationNotificationHandlers;
@@ -966,13 +968,35 @@ public:
       const ClassDecl *decl, SILLinkage linkage,
       ArrayRef<SILDefaultOverrideTable::Entry> entries);
 
-  /// Return the stage of processing this module is at.
-  SILStage getStage() const { return Stage; }
+  /// Return the module's stage floor: a conservative lower bound on the stage
+  /// of every function. Per-function progress is tracked by
+  /// SILFunction::getEffectiveStage(), which reconciles a function's own stage
+  /// against this floor via max(). Prefer getEffectiveStage() for per-function
+  /// phase/legality queries; read the floor only for genuinely module-wide
+  /// questions (the Lowered cutoff for deserialization/linking, the textual
+  /// header). Prefer the hasCommitted* helpers below over comparing the floor.
+  SILStage getStageFloor() const { return StageFloor; }
 
-  /// Advance the module to a further stage of processing.
-  void setStage(SILStage s) {
-    assert(s >= Stage && "regressing stage?!");
-    Stage = s;
+  /// True once the whole module has committed to at least Canonical (the
+  /// mandatory phase is complete module-wide). This is the module-wide analogue
+  /// of a function's isAlreadyCanonical(); it does not imply any specific
+  /// function has been diagnosed.
+  bool hasCommittedCanonical() const {
+    return StageFloor >= SILStage::Canonical;
+  }
+
+  /// True once the whole module has committed to Lowered (LoadableByAddress has
+  /// rewritten function types module-wide, so canonical bodies can no longer be
+  /// deserialized or linked in).
+  bool hasCommittedLowered() const { return StageFloor == SILStage::Lowered; }
+
+  /// Commit the module's stage floor forward to at least \p s (module-wide).
+  /// Monotonic. Used at the two genuine module-wide commit points: Canonical
+  /// (after the mandatory pipeline / the demanded closure is driven) and Lowered
+  /// (after LoadableByAddress).
+  void commitStage(SILStage s) {
+    assert(s >= StageFloor && "regressing stage floor?!");
+    StageFloor = s;
   }
 
   /// True if -enable-sil-opaque-values was passed. Address-only types are
@@ -1170,7 +1194,7 @@ void verificationFailure(
     llvm::function_ref<void(SILPrintContext &ctx)> extraContext);
 
 inline bool SILOptions::supportsLexicalLifetimes(const SILModule &mod) const {
-  switch (mod.getStage()) {
+  switch (mod.getStageFloor()) {
   case SILStage::Raw:
     // In raw SIL, lexical markers are used for diagnostics and are always
     // present.

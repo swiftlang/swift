@@ -1264,7 +1264,7 @@ class FlowIsolation : public SILFunctionTransform {
     SILFunction *fn = getFunction();
 
     // Don't rerun diagnostics on deserialized functions.
-    if (fn->wasDeserializedCanonical())
+    if (fn->isAlreadyCanonical())
       return;
 
     // Do not run on thunks. We trust those and there isn't a benefit to the

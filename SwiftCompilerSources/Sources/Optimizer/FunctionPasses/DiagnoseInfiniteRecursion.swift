@@ -40,8 +40,8 @@ import SIL
 let diagnoseInfiniteRecursion = FunctionPass(name: "diagnose-infinite-recursion") {
   (function: Function, context: FunctionPassContext) in
 
-  // Don't rerun diagnostics on deserialized functions.
-  if function.wasDeserializedCanonical {
+  // Don't rerun diagnostics on functions already past mandatory.
+  if function.isAlreadyCanonical {
     return
   }
 

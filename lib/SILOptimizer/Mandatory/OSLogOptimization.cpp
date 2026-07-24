@@ -1465,7 +1465,7 @@ class OSLogOptimization : public SILFunctionTransform {
     unsigned assertConfig = getOptions().AssertConfig;
 
     // Don't rerun optimization on deserialized functions or stdlib functions.
-    if (fun.wasDeserializedCanonical()) {
+    if (fun.isAlreadyCanonical()) {
       return;
     }
 

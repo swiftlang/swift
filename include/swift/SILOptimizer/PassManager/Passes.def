@@ -242,6 +242,8 @@ LEGACY_PASS(CapturePromotion, "capture-promotion",
 
 LEGACY_PASS(ClosureLifetimeFixup, "closure-lifetime-fixup",
      "Closure Lifetime Fixup")
+LEGACY_PASS(AdvanceFunctionStage, "advance-function-stage",
+     "Test-only: advance a function's per-function SIL stage to Canonical")
 LEGACY_PASS(CodeSinking, "code-sinking",
      "Code Sinking")
 LEGACY_PASS(ComputeDominanceInfo, "compute-dominance-info",

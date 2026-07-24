@@ -1651,7 +1651,7 @@ class CapturePromotionPass : public SILModuleTransform {
   void run() override {
     SmallVector<SILFunction *, 8> worklist;
     for (auto &f : *getModule()) {
-      if (f.wasDeserializedCanonical() || !f.hasOwnership())
+      if (f.isAlreadyCanonical() || !f.hasOwnership())
         continue;
 
       processFunction(&f, worklist);
