@@ -37,7 +37,6 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
-#include "swift/Basic/Range.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "llvm/ADT/SmallString.h"
@@ -209,11 +208,12 @@ enum class ImplicitConstructorKind {
   Memberwise,
 };
 
-/// Compute the interface type of the parameter that a memberwise
-/// initializer would have for the given property.
-static Type getMemberwiseParamInterfaceType(VarDecl *var,
-                                            bool &isAutoClosure) {
+static ParamDecl *createMemberwiseInitParameter(DeclContext *DC,
+                                                SourceLoc paramLoc,
+                                                VarDecl *var) {
+  auto &ctx = var->getASTContext();
   auto varInterfaceType = var->getValueInterfaceType();
+  bool isAutoClosure = false;
 
   if (var->getAttrs().hasAttribute<LazyAttr>()) {
     // If var is a lazy property, its value is provided for the underlying
@@ -253,17 +253,6 @@ static Type getMemberwiseParamInterfaceType(VarDecl *var,
       varInterfaceType = FunctionType::get({}, varInterfaceType, extInfo);
     }
   }
-
-  return varInterfaceType;
-}
-
-static ParamDecl *createMemberwiseInitParameter(DeclContext *DC,
-                                                SourceLoc paramLoc,
-                                                VarDecl *var) {
-  auto &ctx = var->getASTContext();
-  bool isAutoClosure = false;
-  auto varInterfaceType = getMemberwiseParamInterfaceType(var, isAutoClosure);
-  Type resultBuilderType = var->getResultBuilderType();
 
   // Create the parameter.
   auto *arg = new (ctx) ParamDecl(SourceLoc(), paramLoc, var->getName(),
@@ -598,15 +587,15 @@ static bool isInMainBody(ValueDecl *member, NominalTypeDecl *ty) {
 }
 
 /// True if an explicit initializer declared in an unconstrained extension of
-/// \p decl within the same source file has the given argument labels and
-/// parameter types. Such an initializer would be a redeclaration of a
-/// synthesized initializer with that signature, so it takes the synthesized
-/// initializer's place instead.
-static bool hasExtensionInitMatching(NominalTypeDecl *decl,
-                                     ArrayRef<Identifier> argumentLabels,
-                                     ArrayRef<Type> paramTypes) {
+/// \p decl within the same source file would conflict with the initializer
+/// that would be implicitly synthesized. Such an initializer takes the
+/// synthesized initializer's place instead.
+static bool hasExtensionInitMatching(
+    NominalTypeDecl *decl, ImplicitConstructorKind ICK,
+    std::optional<MemberwiseInitKind> memberwiseKind) {
   auto *sourceFile = decl->getParentSourceFile();
 
+  SmallVector<ConstructorDecl *, 2> candidates;
   for (auto *member : decl->lookupDirect(DeclBaseName::createConstructor())) {
     if (member->isImplicit())
       continue;
@@ -630,35 +619,22 @@ static bool hasExtensionInitMatching(NominalTypeDecl *decl,
     if (!ABIRoleInfo(member).providesAPI())
       continue;
 
-    auto *ctor = cast<ConstructorDecl>(member);
-    if (ctor->getName().getArgumentNames() != argumentLabels)
-      continue;
+    candidates.push_back(cast<ConstructorDecl>(member));
+  }
+  if (candidates.empty())
+    return false;
 
-    auto *methodTy = ctor->getMethodInterfaceType()->getAs<AnyFunctionType>();
-    if (!methodTy)
-      continue;
-
-    auto params = methodTy->getParams();
-    if (params.size() != paramTypes.size())
-      continue;
-
-    auto matches = [&]() -> bool {
-      for (auto i : indices(params)) {
-        // inout and variadic parameters change the signature enough that
-        // the initializer is a valid overload of the synthesized one.
-        if (params[i].isInOut() || params[i].isVariadic())
-          return false;
-
-        if (params[i].getPlainType()->getCanonicalType() !=
-            paramTypes[i]->getCanonicalType())
-          return false;
-      }
-      return true;
-    };
-    if (matches())
+  // Compare the candidates against the initializer that would be synthesized
+  // using the same rules as redeclaration checking.
+  auto &ctx = decl->getASTContext();
+  auto *synthesized = createImplicitConstructor(decl, ICK, memberwiseKind, ctx);
+  for (auto *ctor : candidates) {
+    if (conflicting(ctx, ctor->getOverloadSignature(),
+                    ctor->getOverloadSignatureType(),
+                    synthesized->getOverloadSignature(),
+                    synthesized->getOverloadSignatureType()))
       return true;
   }
-
   return false;
 }
 
@@ -1601,21 +1577,12 @@ bool HasMemberwiseInitRequest::evaluate(Evaluator &evaluator, StructDecl *decl,
       return false;
   }
 
-  // If an explicit initializer declared in a same-file extension has the
-  // signature the memberwise initializer would have, it takes the place of
-  // the memberwise initializer rather than conflicting with it.
-  {
-    SmallVector<Identifier, 8> argumentLabels;
-    SmallVector<Type, 8> paramTypes;
-    for (auto *var : decl->getMemberwiseInitProperties(initKind)) {
-      argumentLabels.push_back(var->getName());
-      bool isAutoClosure = false;
-      paramTypes.push_back(getMemberwiseParamInterfaceType(var, isAutoClosure));
-    }
-    if (!argumentLabels.empty() &&
-        hasExtensionInitMatching(decl, argumentLabels, paramTypes))
-      return false;
-  }
+  // If an explicit initializer declared in a same-file extension would
+  // conflict with the memberwise initializer, it takes the memberwise
+  // initializer's place.
+  if (hasExtensionInitMatching(decl, ImplicitConstructorKind::Memberwise,
+                               initKind))
+    return false;
 
   std::multimap<VarDecl *, VarDecl *> initializedViaAccessor;
   decl->collectPropertiesInitializableByInitAccessors(initializedViaAccessor);
@@ -1844,12 +1811,12 @@ HasDefaultInitRequest::evaluate(Evaluator &evaluator,
   if (hasUserDefinedDesignatedInit(evaluator, decl))
     return false;
 
-  // If an explicit zero-argument initializer is declared in a same-file
-  // extension of a struct, it takes the place of the default initializer
-  // rather than conflicting with it.
+  // If an explicit initializer declared in a same-file extension of a struct
+  // would conflict with the default initializer, it takes the default
+  // initializer's place.
   if (isa<StructDecl>(decl) &&
-      hasExtensionInitMatching(decl, /*argumentLabels=*/{},
-                               /*paramTypes=*/{}))
+      hasExtensionInitMatching(decl, ImplicitConstructorKind::Default,
+                               /*memberwiseKind=*/std::nullopt))
     return false;
 
   // Regardless of whether all of the properties are initialized or

@@ -86,6 +86,18 @@ func useGeneric() {
   let _ = Constrained(value: "hi")
 }
 
+// An async initializer does not conflict with the synthesized initializer,
+// so both coexist as overloads.
+struct AsyncOverload {}
+
+extension AsyncOverload {
+  init() async {}
+}
+
+func useAsyncOverload() {
+  let _ = AsyncOverload()
+}
+
 // A failable or throwing initializer still takes the synthesized
 // initializer's place, since it would still conflict.
 struct FailableThrowingEmpty {}
