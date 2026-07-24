@@ -268,7 +268,8 @@ extension Task where Success == Never, Failure == Never {
   ///
   /// Cancellation may be suppressed by an active task cancellation shield
   /// (``withTaskCancellationShield(operation:)-(()->Value)``), which may cause `checkCancellation()`
-  /// not to throw even though the task has been cancelled externally.
+  /// If cancellation has been suppressed by an active task cancellation shield,
+  /// calling `checkCancellation()` on a cancelled task doesn't throw an error.
   ///
   /// - SeeAlso: ``Task/isCancelled-type.property``
   /// - SeeAlso: ``withTaskCancellationShield(operation:)-(()->Value)``
