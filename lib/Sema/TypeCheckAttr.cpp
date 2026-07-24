@@ -1746,27 +1746,6 @@ void AttributeChecker::visitNonObjCAttr(NonObjCAttr *attr) {
   }
 }
 
-static bool hasObjCImplementationFeature(Decl *D, ObjCImplementationAttr *attr,
-                                         Feature requiredFeature) {
-  auto &ctx = D->getASTContext();
-
-  if (ctx.LangOpts.hasFeature(requiredFeature))
-    return true;
-
-  // Allow the use of @_objcImplementation *without* Feature::ObjCImplementation
-  // as long as you're using the early adopter syntax. (Avoids breaking existing
-  // adopters.)
-  if (requiredFeature == Feature::ObjCImplementation && attr->isEarlyAdopter())
-    return true;
-
-  // Either you're using Feature::ObjCImplementation without the early adopter
-  // syntax, or you're using Feature::CImplementation. Either way, no go.
-  ctx.Diags.diagnose(attr->getLocation(), diag::requires_experimental_feature,
-                     attr->getAttrName(), attr->isDeclModifier(),
-                     requiredFeature.getName());
-  return false;
-}
-
 static SourceRange getArgListRange(ASTContext &Ctx, DeclAttribute *attr) {
   // attr->getRange() covers the attr name and argument list; adjust it to
   // exclude the first token.
@@ -1805,9 +1784,6 @@ visitObjCImplementationAttr(ObjCImplementationAttr *attr) {
   }
 
   if (auto ED = dyn_cast<ExtensionDecl>(D)) {
-    if (!hasObjCImplementationFeature(D, attr, Feature::ObjCImplementation))
-      return;
-
     auto objcLangAttr = dyn_cast<ObjCAttr>(langAttr);
     assert(objcLangAttr && "extension with @_cdecl or another lang attr???");
 
