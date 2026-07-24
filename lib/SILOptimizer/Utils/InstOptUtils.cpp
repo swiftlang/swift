@@ -39,6 +39,7 @@
 #include "swift/SILOptimizer/Analysis/DestructorAnalysis.h"
 #include "swift/SILOptimizer/OptimizerBridging.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
+#include "swift/SILOptimizer/Utils/ConstantFolding.h"
 #include "swift/SILOptimizer/Utils/DebugOptUtils.h"
 #include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "swift/SILOptimizer/Utils/ValueLifetime.h"
@@ -1986,6 +1987,39 @@ static void salvageBinaryInst(SingleValueInstruction *SVI) {
   }
 }
 
+/// Salvage a checked truncation from Builtin.IntLiteral by constant folding
+/// the builtin and cloning the result into debug reconstruction blocks.
+/// These builtins create branches at IRGen which are not supported in debug BBs.
+static void salvageCheckedTruncFromLiteral(BuiltinInst *builtin) {
+  // Constant fold the builtin. This produces a tuple (result, overflow) of
+  // integer literals inserted before the builtin. Returns nullptr on overflow
+  // or if the operand is not a constant.
+  std::optional<bool> ResultsInError;
+  SILValue folded = constantFoldBuiltin(builtin, ResultsInError);
+  if (!folded)
+    return;
+
+  auto *tupleFolded = cast<SingleValueInstruction>(folded);
+
+  // Redirect debug uses from the builtin to the folded tuple, then salvage
+  // the tuple as a binary instruction (both operands are integer literals).
+  SmallVector<Operand *, 4> debugUses(getDebugUses(builtin));
+  for (Operand *U : debugUses)
+    U->set(folded);
+
+  salvageBinaryInst(tupleFolded);
+
+  // Erase the temporary folded instructions from the real function.
+  SmallVector<SingleValueInstruction *, 2> tupleOperands;
+  for (auto &op : tupleFolded->getAllOperands())
+    if (auto *inst = dyn_cast<SingleValueInstruction>(op.get()))
+      tupleOperands.push_back(inst);
+  tupleFolded->eraseFromParent();
+  for (auto *inst : tupleOperands)
+    if (inst->use_empty())
+      inst->eraseFromParent();
+}
+
 /// Salvage debug info for identity-like instructions (copy_value, move_value).
 /// Just repoints debug uses to the operand.
 static void salvageIdentityInst(SingleValueInstruction *SVI) {
@@ -2308,11 +2342,7 @@ void swift::salvageDebugInfo(SILInstruction *I) {
            info.ID == BuiltinValueKind::UToUCheckedTrunc ||
            info.ID == BuiltinValueKind::SToUCheckedTrunc) &&
           info.Types[0]->is<BuiltinIntegerLiteralType>())
-        // This special case creates a branch at IRGen, which is not supported
-        // for debug reconstruction blocks.
-        // As this is for integer literals only, we should be able to salvage
-        // it to a constant, but for now, skip.
-        return;
+        return salvageCheckedTruncFromLiteral(builtin);
 
       // assumeNonNegative and assumeAlignment just returns its first operand
       if (info.ID == BuiltinValueKind::AssumeNonNegative ||
