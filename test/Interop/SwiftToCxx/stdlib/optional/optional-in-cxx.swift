@@ -79,7 +79,7 @@ public func resetOpt<T>(_ val: inout Optional<T>) {
 // CHECK-NEXT: }
 
 
-// CHECK: SWIFT_INLINE_THUNK void takeCIntOpt(const swift::Optional<int>& val) noexcept SWIFT_SYMBOL("s:11UseOptional11takeCIntOptyys5Int32VSgF") {
+// CHECK: SWIFT_INLINE_THUNK void takeCIntOpt(const swift::Optional<int>& SWIFT_NOESCAPE val) noexcept SWIFT_SYMBOL("s:11UseOptional11takeCIntOptyys5Int32VSgF") {
 // CHECK-NEXT:  UseOptional::_impl::$s11UseOptional11takeCIntOptyys5Int32VSgF(UseOptional::_impl::swift_interop_passDirect_UseOptional_[[CINTENC]](swift::_impl::_impl_Optional<int>::getOpaquePointer(val)));
 // CHECK-NEXT: }
 
@@ -89,6 +89,6 @@ public func resetOpt<T>(_ val: inout Optional<T>) {
 // CHECK-NEXT: }
 
 
-// CHECK: SWIFT_INLINE_THUNK void takeSmallStructOpt(const swift::Optional<SmallStruct>& val) noexcept SWIFT_SYMBOL("s:11UseOptional18takeSmallStructOptyyAA0dE0VSgF") {
+// CHECK: SWIFT_INLINE_THUNK void takeSmallStructOpt(const swift::Optional<SmallStruct>& SWIFT_NOESCAPE val) noexcept SWIFT_SYMBOL("s:11UseOptional18takeSmallStructOptyyAA0dE0VSgF") {
 // CHECK-NEXT:  UseOptional::_impl::$s11UseOptional18takeSmallStructOptyyAA0dE0VSgF(UseOptional::_impl::swift_interop_passDirect_UseOptional_uint32_t_0_4(swift::_impl::_impl_Optional<SmallStruct>::getOpaquePointer(val)));
 // CHECK-NEXT: }

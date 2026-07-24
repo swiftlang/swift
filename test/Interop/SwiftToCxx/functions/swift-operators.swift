@@ -46,7 +46,7 @@ public func -(lhs: IntBox, rhs: IntBox) -> CInt {
   return lhs.x - rhs.x
 }
 
-// CHECK: SWIFT_INLINE_THUNK int operator-(const IntBox& lhs, const IntBox& rhs) noexcept SWIFT_SYMBOL("s:9Operators1soiys5Int32VAA6IntBoxV_AFtF") SWIFT_WARN_UNUSED_RESULT {
+// CHECK: SWIFT_INLINE_THUNK int operator-(const IntBox& SWIFT_NOESCAPE lhs, const IntBox& SWIFT_NOESCAPE rhs) noexcept SWIFT_SYMBOL("s:9Operators1soiys5Int32VAA6IntBoxV_AFtF") SWIFT_WARN_UNUSED_RESULT {
 // CHECK-NEXT:   return Operators::_impl::$s9Operators1soiys5Int32VAA6IntBoxV_AFtF(Operators::_impl::swift_interop_passDirect_Operators_uint32_t_0_4(Operators::_impl::_impl_IntBox::getOpaquePointer(lhs)), Operators::_impl::swift_interop_passDirect_Operators_uint32_t_0_4(Operators::_impl::_impl_IntBox::getOpaquePointer(rhs)));
 // CHECK-NEXT: }
 
@@ -54,7 +54,7 @@ public func ==(lhs: IntBox, rhs: IntBox) -> Bool {
   return lhs.x == rhs.x
 }
 
-// CHECK: SWIFT_INLINE_THUNK bool operator==(const IntBox& lhs, const IntBox& rhs) noexcept SWIFT_SYMBOL("s:9Operators2eeoiySbAA6IntBoxV_ADtF") SWIFT_WARN_UNUSED_RESULT {
+// CHECK: SWIFT_INLINE_THUNK bool operator==(const IntBox& SWIFT_NOESCAPE lhs, const IntBox& SWIFT_NOESCAPE rhs) noexcept SWIFT_SYMBOL("s:9Operators2eeoiySbAA6IntBoxV_ADtF") SWIFT_WARN_UNUSED_RESULT {
 // CHECK-NEXT:   return Operators::_impl::$s9Operators2eeoiySbAA6IntBoxV_ADtF(Operators::_impl::swift_interop_passDirect_Operators_uint32_t_0_4(Operators::_impl::_impl_IntBox::getOpaquePointer(lhs)), Operators::_impl::swift_interop_passDirect_Operators_uint32_t_0_4(Operators::_impl::_impl_IntBox::getOpaquePointer(rhs)));
 // CHECK-NEXT: }
 

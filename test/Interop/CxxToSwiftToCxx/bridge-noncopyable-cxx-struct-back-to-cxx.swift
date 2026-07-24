@@ -43,10 +43,10 @@ public func returnNonCopyable() -> NonCopyable { return NonCopyable() }
 // CHECK: SWIFT_INLINE_THUNK NonCopyableNonTrivial returnNonCopyableNonTrivial() noexcept {{.*}}{
 public func returnNonCopyableNonTrivial() -> NonCopyableNonTrivial { return NonCopyableNonTrivial() }
 
-// CHECK: SWIFT_INLINE_THUNK void takeNonCopyable(const NonCopyable& x) noexcept {{.*}}{
+// CHECK: SWIFT_INLINE_THUNK void takeNonCopyable(const NonCopyable& SWIFT_NOESCAPE x) noexcept {{.*}}{
 public func takeNonCopyable(_ x: borrowing NonCopyable) {}
 
-// CHECK: SWIFT_INLINE_THUNK void takeNonCopyableNonTrivial(const NonCopyableNonTrivial& x) noexcept {{.*}}{
+// CHECK: SWIFT_INLINE_THUNK void takeNonCopyableNonTrivial(const NonCopyableNonTrivial& SWIFT_NOESCAPE x) noexcept {{.*}}{
 public func takeNonCopyableNonTrivial(_ x: borrowing NonCopyableNonTrivial) {}
 
 // Not yet supported.

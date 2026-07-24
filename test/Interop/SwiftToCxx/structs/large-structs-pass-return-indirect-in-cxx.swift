@@ -31,19 +31,19 @@ public func inoutStructSeveralI64(_ s: inout StructSeveralI64) {
     s.x5 = -5
 }
 
-// CHECK:      SWIFT_INLINE_THUNK void inoutStructSeveralI64(StructSeveralI64& s) noexcept SWIFT_SYMBOL("s:7Structs21inoutStructSeveralI64yyAA0cdE0VzF") {
+// CHECK:      SWIFT_INLINE_THUNK void inoutStructSeveralI64(StructSeveralI64& SWIFT_NOESCAPE s) noexcept SWIFT_SYMBOL("s:7Structs21inoutStructSeveralI64yyAA0cdE0VzF") {
 // CHECK-NEXT:   Structs::_impl::$s7Structs21inoutStructSeveralI64yyAA0cdE0VzF(Structs::_impl::_impl_StructSeveralI64::getOpaquePointer(s));
 // CHECK-NEXT: }
 
 
-// CHECK: SWIFT_INLINE_THUNK StructSeveralI64 passThroughStructSeveralI64(int64_t i, const StructSeveralI64& x, float j) noexcept SWIFT_SYMBOL("s:7Structs27passThroughStructSeveralI641i_1jAA0deF0Vs5Int64V_AFSftF") SWIFT_WARN_UNUSED_RESULT {
+// CHECK: SWIFT_INLINE_THUNK StructSeveralI64 passThroughStructSeveralI64(int64_t i, const StructSeveralI64& SWIFT_NOESCAPE x, float j) noexcept SWIFT_SYMBOL("s:7Structs27passThroughStructSeveralI641i_1jAA0deF0Vs5Int64V_AFSftF") SWIFT_WARN_UNUSED_RESULT {
 // CHECK-NEXT:  return Structs::_impl::_impl_StructSeveralI64::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
 // CHECK-NEXT:    Structs::_impl::$s7Structs27passThroughStructSeveralI641i_1jAA0deF0Vs5Int64V_AFSftF(result, i, Structs::_impl::_impl_StructSeveralI64::getOpaquePointer(x), j);
 // CHECK-NEXT:  });
 // CHECK-NEXT: }
 
 
-// CHECK: SWIFT_INLINE_THUNK void printStructSeveralI64(const StructSeveralI64& x) noexcept SWIFT_SYMBOL("s:7Structs21printStructSeveralI64yyAA0cdE0VF") {
+// CHECK: SWIFT_INLINE_THUNK void printStructSeveralI64(const StructSeveralI64& SWIFT_NOESCAPE x) noexcept SWIFT_SYMBOL("s:7Structs21printStructSeveralI64yyAA0cdE0VF") {
 // CHECK-NEXT:  Structs::_impl::$s7Structs21printStructSeveralI64yyAA0cdE0VF(Structs::_impl::_impl_StructSeveralI64::getOpaquePointer(x));
 // CHECK-NEXT: }
 
