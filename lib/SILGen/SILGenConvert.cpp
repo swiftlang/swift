@@ -53,6 +53,7 @@ SILGenFunction::emitInjectOptional(SILLocation loc,
   // TODO: honor +0 contexts?
   if (optTL.isLoadable() || !silConv.useLoweredAddresses()) {
     ManagedValue objectResult = generator(SGFContext());
+    objectResult = emitMoveOnlyWrapperToCopyableValueIfNeeded(loc, objectResult);
     return B.createEnum(loc, objectResult, someDecl, optTy);
   }
 
@@ -134,6 +135,8 @@ getOptionalSomeValue(SILLocation loc, ManagedValue value,
 
   assert(formalOptType.getOptionalObjectType());
   auto someDecl = getASTContext().getOptionalSomeDecl();
+
+  value = emitMoveOnlyWrapperToCopyableValueIfNeeded(loc, value);
 
   return B.createEnum(loc, value, someDecl, optTL.getLoweredType());
 }
@@ -811,6 +814,13 @@ ManagedValue SILGenFunction::emitExistentialErasure(
     assert(existentialTL.isLoadable());
 
     ManagedValue sub = F(SGFContext());
+
+    // The moveOnly wrapper only appears in SIL, not in the formal type, so
+    // unwrap the value before erasing it or the verifier will reject the
+    // init_existential_ref as being at the wrong abstraction level.
+    // SeeAlso: https://github.com/swiftlang/swift/issues/86458
+    sub = emitMoveOnlyWrapperToCopyableValueIfNeeded(loc, sub);
+
     return B.createInitExistentialRef(loc, existentialTL.getLoweredType(),
                                       concreteFormalType, sub, conformances);
   }
