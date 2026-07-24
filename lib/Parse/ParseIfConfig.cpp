@@ -573,6 +573,10 @@ public:
     if (Name.empty())
       return false;
 
+    if (LangOptions::isCOMInteropModelConditionalCompilationFlag(Name))
+      return Name ==
+             Ctx.LangOpts.getCOMInteropModelConditionalCompilationFlag();
+
     if (Name.starts_with("$") && Ctx.LangOpts.hasFeature(Name.drop_front()))
       return true;
 
