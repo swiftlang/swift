@@ -1316,9 +1316,12 @@ Added: _$ss11_RigidArrayVMn
 Added: _$ss11_RigidArrayVsRi_zrlE6_countSivM
 Added: _$ss11_RigidArrayVsRi_zrlE6_countSivg
 Added: _$ss11_RigidArrayVsRi_zrlE6_countSivs
-Added: _$ss11_RigidArrayVsRi_zrlE8_storageSryxGvM
-Added: _$ss11_RigidArrayVsRi_zrlE8_storageSryxGvg
-Added: _$ss11_RigidArrayVsRi_zrlE8_storageSryxGvs
+Added: _$ss11_RigidArrayVsRi_zrlE4_ptrSpyxGvM
+Added: _$ss11_RigidArrayVsRi_zrlE4_ptrSpyxGvg
+Added: _$ss11_RigidArrayVsRi_zrlE4_ptrSpyxGvs
+Added: _$ss11_RigidArrayVsRi_zrlE9_capacitySivM
+Added: _$ss11_RigidArrayVsRi_zrlE9_capacitySivg
+Added: _$ss11_RigidArrayVsRi_zrlE9_capacitySivs
 Added: _$ss11_RigidArrayVsSHRzRi_zrlE9hashValueSivg
 Added: _$ss11_RigidArrayVyxGSHsSHRzRi_zrlMc
 Added: _$ss11_RigidArrayVyxGSQsSQRzRi_zrlMc
@@ -1342,4 +1345,3 @@ Added: _swift_retainReturningCount
 // String.UTF16View / Substring.UTF16View bulk _copyContents
 Added: _$sSS9UTF16ViewV13_copyContents12initializingAB8IteratorV_SitSrys6UInt16VG_tF
 Added: _$sSs9UTF16ViewV13_copyContents12initializings16IndexingIteratorVyABG_SitSrys6UInt16VG_tF
-
