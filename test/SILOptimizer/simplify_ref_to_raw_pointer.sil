@@ -1,0 +1,35 @@
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -onone-simplification -simplify-instruction=ref_to_raw_pointer | %FileCheck %s
+
+import Builtin
+import Swift
+
+class Base {}
+class Derived : Base {}
+
+// Look through an `init_existential_ref` to the underlying reference.
+// CHECK-LABEL: sil [ossa] @look_through_init_existential_ref :
+// CHECK:       bb0(%0 : @guaranteed $Base):
+// CHECK-NOT:     init_existential_ref
+// CHECK:         [[R:%.*]] = ref_to_raw_pointer %0 : $Base to $Builtin.RawPointer
+// CHECK:         return [[R]]
+// CHECK:       } // end sil function 'look_through_init_existential_ref'
+sil [ossa] @look_through_init_existential_ref : $@convention(thin) (@guaranteed Base) -> Builtin.RawPointer {
+bb0(%0 : @guaranteed $Base):
+  %1 = init_existential_ref %0 : $Base : $Base, $AnyObject
+  %2 = ref_to_raw_pointer %1 : $AnyObject to $Builtin.RawPointer
+  return %2 : $Builtin.RawPointer
+}
+
+// Look through an `upcast` to the derived reference.
+// CHECK-LABEL: sil [ossa] @look_through_upcast :
+// CHECK:       bb0(%0 : @guaranteed $Derived):
+// CHECK-NOT:     upcast
+// CHECK:         [[R:%.*]] = ref_to_raw_pointer %0 : $Derived to $Builtin.RawPointer
+// CHECK:         return [[R]]
+// CHECK:       } // end sil function 'look_through_upcast'
+sil [ossa] @look_through_upcast : $@convention(thin) (@guaranteed Derived) -> Builtin.RawPointer {
+bb0(%0 : @guaranteed $Derived):
+  %1 = upcast %0 : $Derived to $Base
+  %2 = ref_to_raw_pointer %1 : $Base to $Builtin.RawPointer
+  return %2 : $Builtin.RawPointer
+}

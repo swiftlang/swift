@@ -935,14 +935,14 @@ private extension EnumInst {
 
   var isOptionalSome: Bool {
     assert(self.type.isOptional)
-    assert(self.caseIndex == Builder.optionalNoneCaseIndex || self.caseIndex == Builder.optionalSomeCaseIndex)
-    return self.caseIndex == Builder.optionalSomeCaseIndex
+    assert(self.caseIndex == EnumDecl.optionalNoneCaseIndex || self.caseIndex == EnumDecl.optionalSomeCaseIndex)
+    return self.caseIndex == EnumDecl.optionalSomeCaseIndex
   }
 
   var isOptionalNone: Bool {
     assert(self.type.isOptional)
-    assert(self.caseIndex == Builder.optionalNoneCaseIndex || self.caseIndex == Builder.optionalSomeCaseIndex)
-    return self.caseIndex == Builder.optionalNoneCaseIndex
+    assert(self.caseIndex == EnumDecl.optionalNoneCaseIndex || self.caseIndex == EnumDecl.optionalSomeCaseIndex)
+    return self.caseIndex == EnumDecl.optionalNoneCaseIndex
   }
 }
 
@@ -1120,7 +1120,7 @@ private func getSuccessorForOptionalSome(arg: Argument) -> BasicBlock? {
     return nil
   }
 
-  return sei.getUniqueSuccessor(forCaseIndex: Builder.optionalSomeCaseIndex)!
+  return sei.getUniqueSuccessor(forCaseIndex: EnumDecl.optionalSomeCaseIndex)!
 }
 
 // If the pullback's basic block has an argument which is a payload tuple of the
