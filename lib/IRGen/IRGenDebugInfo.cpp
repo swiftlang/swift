@@ -3611,17 +3611,13 @@ IRGenDebugInfoImpl::emitFunction(const SILDebugScope *DS, llvm::Function *Fn,
       /*IsLocalToUnit=*/Fn ? Fn->hasInternalLinkage() : true,
       /*IsDefinition=*/true, /*IsOptimized=*/Opts.shouldOptimize());
 
-  // When the function is a method, we want a DW_AT_declaration there.
+  // When the function is scoped inside an ODR-uniqued type, we want a
+  // DW_AT_declaration there.
   // Because there's no good way to cross the CU boundary to insert a nested
   // DISubprogram definition in one CU into a type defined in another CU when
   // doing LTO builds.
-  if (llvm::isa<llvm::DICompositeType>(Scope) &&
-      (Rep == SILFunctionTypeRepresentation::Method ||
-       Rep == SILFunctionTypeRepresentation::ObjCMethod ||
-       Rep == SILFunctionTypeRepresentation::WitnessMethod ||
-       Rep == SILFunctionTypeRepresentation::CXXMethod ||
-       Rep == SILFunctionTypeRepresentation::CFunctionPointer ||
-       Rep == SILFunctionTypeRepresentation::Thin)) {
+  if (auto *CT = llvm::dyn_cast<llvm::DICompositeType>(Scope);
+      CT && CT->getRawIdentifier()) {
     llvm::DISubprogram::DISPFlags SPFlags = llvm::DISubprogram::toSPFlags(
         /*IsLocalToUnit=*/Fn ? Fn->hasInternalLinkage() : true,
         /*IsDefinition=*/false, /*IsOptimized=*/Opts.shouldOptimize());
