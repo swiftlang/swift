@@ -1148,15 +1148,15 @@ recur:
   }
 }
 
-int Demangler::demangleNatural() {
+long Demangler::demangleNatural() {
   if (!isDigit(peekChar()))
     return -1000;
-  int num = 0;
+  long num = 0;
   while (true) {
     char c = peekChar();
     if (!isDigit(c))
       return num;
-    int newNum = (10 * num) + (c - '0');
+    long newNum = (10 * num) + (c - '0');
     if (newNum < num)
       return -1000;
     num = newNum;
@@ -1164,17 +1164,17 @@ int Demangler::demangleNatural() {
   }
 }
 
-int Demangler::demangleIndex() {
+long Demangler::demangleIndex() {
   if (nextIf('_'))
     return 0;
-  int num = demangleNatural();
+  long num = demangleNatural();
   if (num >= 0 && nextIf('_'))
     return num + 1;
   return -1000;
 }
 
 NodePointer Demangler::demangleIndexAsNode() {
-  int Idx = demangleIndex();
+  long Idx = demangleIndex();
   if (Idx >= 0)
     return createNode(Node::Kind::Number, Idx);
   return nullptr;
