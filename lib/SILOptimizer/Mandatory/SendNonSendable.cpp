@@ -868,15 +868,47 @@ bool IsolationHistoryNoteEmitter::processFrame(Frame frame) {
 
   // The chain continues into the predecessor blocks joined at this frame.
   // Schedule each, inheriting the walk state as of here.
+  //
+  // A pendingTargetMerge still set here has no location: it came from a region
+  // unification the dataflow join introduced, not a user-written merge (which
+  // would have been followed by its SequenceBoundary in this same frame). If we
+  // carried it into every predecessor it would be pinned to the first boundary
+  // of whichever branch we explore first — e.g. the 'else' arm of a diamond,
+  // which never touched the isolated value. Route it only to the predecessor
+  // that actually made the chain isolated (a tracked element shares an isolated
+  // region at that block's exit); the user-written merge there re-anchors it.
   for (SILBasicBlock *predBlock : joinedBlocks) {
     if (!visitedBlocks.insert(predBlock).second)
       continue;
-    auto predState = inputFunctionInfo->getBlockState(predBlock);
-    if (!predState)
+    auto predBlockState = inputFunctionInfo->getBlockState(predBlock);
+    if (!predBlockState)
       continue;
-    worklist.push_back(Frame{
-        predState.get()->getExitPartition().removingSendingOperandState(),
-        state});
+    Partition predExit =
+        predBlockState.get()->getExitPartition().removingSendingOperandState();
+
+    WalkState childState = state;
+    if (childState.pendingTargetMerge) {
+      bool chainIsolatedInPred = false;
+      for (Element e : state.tracked) {
+        if (!predExit.isTrackingElement(e))
+          continue;
+        Region region = predExit.getRegion(e);
+        for (auto pair : predExit.range()) {
+          if (pair.second != region)
+            continue;
+          auto info = inputValueMap.getIsolationRegion(pair.first);
+          if (info && !info.isDisconnected()) {
+            chainIsolatedInPred = true;
+            break;
+          }
+        }
+        if (chainIsolatedInPred)
+          break;
+      }
+      childState.pendingTargetMerge = chainIsolatedInPred;
+    }
+
+    worklist.push_back(Frame{std::move(predExit), std::move(childState)});
   }
   return false;
 }

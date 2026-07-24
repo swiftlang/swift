@@ -179,9 +179,9 @@ func var_reassign_chain(_ x: NS, _ flag: Bool) async {
 ////////////////////////////////////////////////////////////////////////////////
 
 func diamond_then_branch_only(_ x: NS, _ flag: Bool) async {
-  var y = NS() // expected-note {{'y' is connected to 'x' which is accessible to code in the current isolation context}}
+  var y = NS()
   if flag {
-    y = x
+    y = x // expected-note {{'y' is connected to 'x' which is accessible to code in the current isolation context}}
   } else {
     // No merge here — y stays disconnected along this path.
   }
@@ -233,9 +233,9 @@ func diamond_mixed_then_isolated(_ x: NS, _ flag: Bool) async {
 func diamond_mixed_else_isolated(_ x: NS, _ flag: Bool) async {
   var y = NS()
   if flag {
-    y = x
+    y = x // expected-note {{'y' is connected to 'x' which is accessible to code in the current isolation context}}
   } else {
-    y = NS() // expected-note {{'y' is connected to 'x' which is accessible to code in the current isolation context}}
+    y = NS()
   }
   await transferToMain(y) // expected-warning {{sending 'y' risks causing data races}}
   // expected-note @-1 {{sending 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
@@ -251,9 +251,9 @@ func diamond_mixed_else_isolated(_ x: NS, _ flag: Bool) async {
 func diamond_let_then_isolated(_ x: NS, _ flag: Bool) async {
   let y: NS
   if flag {
-    y = x
+    y = x // expected-note {{'y' is connected to 'x' which is accessible to code in the current isolation context}}
   } else {
-    y = NS() // expected-note {{'y' is connected to 'x' which is accessible to code in the current isolation context}}
+    y = NS()
   }
   await transferToMain(y) // expected-warning {{sending 'y' risks causing data races}}
   // expected-note @-1 {{sending 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
@@ -431,8 +431,10 @@ func loop_with_inner_diamond(_ x: NS, _ count: Int, _ flag: Bool) async {
       y = x
     } else {
       // FIXME: The chain note is anchored on this 'else' reassignment rather
-      // than the 'y = x' merge above — the rewind's first-explored predecessor
-      // at the diamond join is this branch. The note text is still correct.
+      // than the 'y = x' merge above. The join-merge routing that anchors the
+      // acyclic diamonds correctly cannot disambiguate here: the loop fixpoint
+      // leaves y isolated at *both* branch exits, so both predecessors look
+      // equally responsible. The note text is still correct.
       y = NS() // expected-note {{'y' is connected to 'x' which is accessible to code in the current isolation context}}
     }
   }
