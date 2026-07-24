@@ -242,9 +242,10 @@ extension Task where Success == Never, Failure == Never {
   /// ### Interaction with Task Cancellation Shields
   ///
   /// Cancellation may be suppressed by an active task cancellation shield
-  /// (``withTaskCancellationShield(operation:)-(()->Value)``), which may cause `isCancelled`
-  /// to return `false` even though the task has been cancelled externally.
-  ///
+  /// (``withTaskCancellationShield(operation:)-(()->Value)``). 
+  /// If cancellation has been suppressed by an active task cancellation shield, 
+  /// reading `isCancelled` on a cancelled task returns `false`.
+  /// 
   /// - SeeAlso: ``checkCancellation()``
   /// - SeeAlso: ``withTaskCancellationShield(operation:)-(()->Value)``
   public static var isCancelled: Bool {
@@ -264,7 +265,15 @@ extension Task where Success == Never, Failure == Never {
   ///
   /// The error is always an instance of `CancellationError`.
   ///
-  /// - SeeAlso: `isCancelled()`
+  /// ### Interaction with Task Cancellation Shields
+  ///
+  /// Cancellation may be suppressed by an active task cancellation shield
+  /// (``withTaskCancellationShield(operation:)-(()->Value)``).
+  /// If cancellation has been suppressed by an active task cancellation shield,
+  /// calling `checkCancellation()` on a cancelled task doesn't throw an error.
+  ///
+  /// - SeeAlso: ``Task/isCancelled-type.property``
+  /// - SeeAlso: ``withTaskCancellationShield(operation:)-(()->Value)``
   @_unavailableInEmbedded
   public static func checkCancellation() throws {
     if Task<Never, Never>.isCancelled {
@@ -275,7 +284,7 @@ extension Task where Success == Never, Failure == Never {
 
 /// An error that indicates a task was canceled.
 ///
-/// This error is also thrown automatically by `Task.checkCancellation()`,
+/// This error is also thrown automatically by ``checkCancellation()``,
 /// if the current task has been canceled.
 @available(SwiftStdlib 5.1, *)
 public struct CancellationError: Error {
