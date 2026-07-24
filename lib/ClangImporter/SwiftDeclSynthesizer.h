@@ -128,7 +128,9 @@ public:
   ConstructorDecl *createValueConstructor(NominalTypeDecl *structDecl,
                                           ArrayRef<VarDecl *> members,
                                           bool wantCtorParamNames,
-                                          bool wantBody);
+                                          bool wantBody,
+                                          AccessLevel maxAccess =
+                                              AccessLevel::Open);
 
   /// Create a rawValue-ed constructor that bridges to its underlying storage.
   ConstructorDecl *createRawValueBridgingConstructor(StructDecl *structDecl,
@@ -237,6 +239,11 @@ public:
                              ArrayRef<VarDecl *> members,
                              NominalTypeDecl *importedStructDecl,
                              VarDecl *importedFieldDecl);
+
+  std::pair<AccessorDecl *, AccessorDecl *>
+  makeLegacyCArrayAccessors(DeclContext *dc,
+                            VarDecl *legacyDecl,
+                            VarDecl *modernDecl);
 
   /// Build the init(rawValue:) initializer for an imported NS_ENUM.
   ///
