@@ -184,6 +184,12 @@ protected:
     return Sty;
   }
 
+  /// This cloner's visit methods are needed to clone debug reconstruction
+  /// block content, for its folding of upcast.
+  void cloneDebugReconstructionBlock(SILBasicBlock *SrcBB, SILBasicBlock *NewBB) {
+    this->cloneDebugReconstructionBlockContent(SrcBB, NewBB);
+  }
+
   void visitApplyInst(ApplyInst *Inst) {
     ApplySiteCloningHelper Helper(ApplySite(Inst), *this);
     ApplyInst *N =
