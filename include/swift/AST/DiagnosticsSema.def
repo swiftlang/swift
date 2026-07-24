@@ -6504,6 +6504,14 @@ ERROR(global_actor_arg,none,
       (Type))
 ERROR(global_actor_non_final_class,none,
       "non-final class %0 cannot be a global actor", (DeclName))
+ERROR(global_actor_on_non_protocol_inheritance,none,
+      "global actor %0 cannot apply to %select{superclass|raw type}1 %2",
+      (Type, bool, Type))
+NOTE(global_actor_on_non_protocol_inheritance_explanation,none,
+     "inheritance from a %select{superclass|raw type}0 cannot be isolated",
+     (bool))
+NOTE(global_actor_on_non_protocol_inheritance_remove,none,
+     "remove %0", (Type))
 
 GROUPED_WARNING(global_actor_shared_non_let_witness,
                 UnstableGlobalActorShared,none,

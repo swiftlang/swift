@@ -353,3 +353,36 @@ class ComputedGetSetWitness: HasMutableVar {
     set { }
   }
 }
+
+// ----------------------------------------------------------------------------
+// Global actor annotations are only meaningful on protocol conformances;
+// they have no effect on a class base type or an enum's raw type.
+// ----------------------------------------------------------------------------
+
+class PlainBase {}
+
+class RejectSuperclassAnnotation: @MainActor PlainBase {}
+// expected-error@-1{{global actor 'MainActor' cannot apply to superclass 'PlainBase'}}
+// expected-note@-2{{inheritance from a superclass cannot be isolated}}
+// expected-note@-3{{remove 'MainActor'}}
+
+class RejectSuperclassAnnotationCustomActor: @SomeGlobalActor PlainBase {}
+// expected-error@-1{{global actor 'SomeGlobalActor' cannot apply to superclass 'PlainBase'}}
+// expected-note@-2{{inheritance from a superclass cannot be isolated}}
+// expected-note@-3{{remove 'SomeGlobalActor'}}
+
+// The protocol conformance is still fine; only the superclass annotation
+// is rejected.
+class RejectSuperclassAnnotationWithConformance: @MainActor PlainBase, P {
+  // expected-error@-1{{global actor 'MainActor' cannot apply to superclass 'PlainBase'}}
+  // expected-note@-2{{inheritance from a superclass cannot be isolated}}
+  // expected-note@-3{{remove 'MainActor'}}
+  nonisolated func f() { }
+}
+
+enum RejectRawTypeAnnotation: @MainActor Int {
+// expected-error@-1{{global actor 'MainActor' cannot apply to raw type 'Int'}}
+// expected-note@-2{{inheritance from a raw type cannot be isolated}}
+// expected-note@-3{{remove 'MainActor'}}
+  case a
+}
