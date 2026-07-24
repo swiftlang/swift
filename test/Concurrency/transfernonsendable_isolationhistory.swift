@@ -950,3 +950,132 @@ func per_arg_loc_coroutine(_ x: NS) async {
   await transferToMain(y) // expected-warning {{sending 'y' risks causing data races}}
   // expected-note @-1 {{sending 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
 }
+
+////////////////////////////////////////////////////////////////////////////////
+// Additional control-flow coverage: switches, nested/ternary diamonds, while/
+// repeat/nested loops, guard, do/catch, break, and multiple isolated sources.
+////////////////////////////////////////////////////////////////////////////////
+
+func switch_one_isolated(_ x: NS, _ n: Int) async {
+  var y = NS()
+  switch n {
+  case 0:
+    y = x // expected-note {{'y' is connected to 'x' which is accessible to code in the current isolation context}}
+  case 1:
+    y = NS()
+  default:
+    break
+  }
+  await transferToMain(y) // expected-warning {{sending 'y' risks causing data races}} expected-note {{sending 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
+}
+
+func switch_two_isolated(_ x: NS, _ n: Int) async {
+  var y = NS()
+  switch n {
+  case 0:
+    y = x
+  case 1:
+    y = x // expected-note {{'y' is connected to 'x' which is accessible to code in the current isolation context}}
+  default:
+    y = NS()
+  }
+  await transferToMain(y) // expected-warning {{sending 'y' risks causing data races}} expected-note {{sending 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
+}
+
+func nested_diamond(_ x: NS, _ a: Bool, _ b: Bool) async {
+  var y = NS()
+  if a {
+    if b {
+      y = x // expected-note {{'y' is connected to 'x' which is accessible to code in the current isolation context}}
+    } else {
+      y = NS()
+    }
+  } else {
+    y = NS()
+  }
+  await transferToMain(y) // expected-warning {{sending 'y' risks causing data races}} expected-note {{sending 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
+}
+
+func ternary_chain(_ x: NS, _ flag: Bool) async {
+  let y = flag ? x : NS() // expected-note {{'y' is connected to 'x' which is accessible to code in the current isolation context}}
+  await transferToMain(y) // expected-warning {{sending 'y' risks causing data races}} expected-note {{sending 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
+}
+
+func while_loop_chain(_ x: NS, _ flag: Bool) async {
+  var y = NS()
+  var i = 0
+  while i < 10 {
+    if flag {
+      y = x // expected-note {{'y' is connected to 'x' which is accessible to code in the current isolation context}}
+    }
+    i += 1
+  }
+  await transferToMain(y) // expected-warning {{sending 'y' risks causing data races}} expected-note {{sending 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
+}
+
+func repeat_while_chain(_ x: NS, _ flag: Bool) async {
+  var y = NS()
+  var i = 0
+  repeat {
+    if flag {
+      y = x // expected-note {{'y' is connected to 'x' which is accessible to code in the current isolation context}}
+    }
+    i += 1
+  } while i < 10
+  await transferToMain(y) // expected-warning {{sending 'y' risks causing data races}} expected-note {{sending 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
+}
+
+func nested_loop_chain(_ x: NS, _ n: Int) async {
+  var y = NS()
+  for _ in 0..<n {
+    for _ in 0..<n {
+      y = x // expected-note {{'y' is connected to 'x' which is accessible to code in the current isolation context}}
+    }
+  }
+  await transferToMain(y) // expected-warning {{sending 'y' risks causing data races}} expected-note {{sending 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
+}
+
+// Two distinct isolated sources, both branches isolate y. Neither branch resets
+// the isolation, so the discriminating-element rule cannot prefer one; the walk
+// falls back to first-explored (names 'a', anchored on the else arm).
+func two_isolated_sources(_ a: NS, _ b: NS, _ flag: Bool) async {
+  var y = NS()
+  if flag {
+    y = a
+  } else {
+    y = b // expected-note {{'y' is connected to 'a' which is accessible to code in the current isolation context}}
+  }
+  await transferToMain(y) // expected-warning {{sending 'y' risks causing data races}} expected-note {{sending 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
+}
+
+func sequential_diamonds(_ x: NS, _ f1: Bool, _ f2: Bool) async {
+  var y = NS()
+  if f1 {
+    y = x // expected-note {{'y' is connected to 'x' which is accessible to code in the current isolation context}}
+  } else {
+    y = NS()
+  }
+  if f2 {
+    _ = y
+  }
+  await transferToMain(y) // expected-warning {{sending 'y' risks causing data races}} expected-note {{sending 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
+}
+
+func do_catch_chain(_ x: NS) async throws {
+  var y = NS()
+  do {
+    y = try makeOrThrow(x) // expected-note {{'y' is connected to 'x' which is accessible to code in the current isolation context}} expected-note {{'makeOrThrow' is connected to 'y'}}
+  } catch {
+    y = NS()
+  }
+  await transferToMain(y) // expected-warning {{sending 'y' risks causing data races}} expected-note {{sending 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
+}
+
+func break_in_loop_chain(_ x: NS, _ n: Int) async {
+  var y = NS()
+  for _ in 0..<n {
+    y = x // expected-note {{'y' is connected to 'x' which is accessible to code in the current isolation context}}
+    break
+  }
+  await transferToMain(y) // expected-warning {{sending 'y' risks causing data races}} expected-note {{sending 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
+}
