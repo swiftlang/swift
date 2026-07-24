@@ -39,3 +39,20 @@ m.state = .running
 // CHECK: new state=complete
 // CHECK: old state=running
 m.state = .complete
+
+// The macro wraps `didSet`/`willSet` bodies in a synthesized
+// `#sourceLocation(file: "/absolute/path.swift", ...)` directive. Verify that
+// `#fileID` evaluated inside such a body still produces the short
+// `Module/file.swift` form rather than the absolute path.
+@Observable
+public class FileIDModel {
+  public var value = 0 {
+    didSet {
+      print("fileID=\(#fileID)")
+    }
+  }
+}
+
+let f = FileIDModel()
+// CHECK: fileID=main/ObservableDidSetWillSet.swift
+f.value = 1
