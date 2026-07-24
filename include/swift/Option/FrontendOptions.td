@@ -471,11 +471,17 @@ def solver_shuffle_disjunctions_EQ : Joined<["-"], "solver-shuffle-disjunctions=
 def solver_shuffle_choices_EQ : Joined<["-"], "solver-shuffle-choices=">,
   HelpText<"Random seed for shuffling disjunction choices. For debugging solver performance">;
 
-def solver_enable_crash_on_valid_salvage : Flag<["-"], "solver-enable-crash-on-valid-salvage">,
+def solver_enable_diagnose_valid_salvage : Flag<["-"], "solver-enable-diagnose-valid-salvage">,
   HelpText<"Reject valid solutions in diagnostic mode">;
 
-def solver_disable_crash_on_valid_salvage : Flag<["-"], "solver-disable-crash-on-valid-salvage">,
+def solver_disable_diagnose_valid_salvage : Flag<["-"], "solver-disable-diagnose-valid-salvage">,
   HelpText<"Accept valid solutions in diagnostic mode">;
+
+def solver_enable_crash_fail_diagnostic : Flag<["-"], "solver-enable-crash-fail-diagnostic">,
+  HelpText<"Trigger assertion failure on 'failed to produce diagnostic for expression'">;
+
+def solver_disable_crash_fail_diagnostic : Flag<["-"], "solver-disable-crash-fail-diagnostic">,
+  HelpText<"Do not trigger assertion failure on 'failed to produce diagnostic for expression'">;
 
 def solver_enable_transitive_conformance : Flag<["-"], "solver-enable-transitive-conformance">,
   HelpText<"Enable transitive conformance constraint optimization">;

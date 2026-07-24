@@ -1,5 +1,5 @@
 // {"kind":"typecheck","original":"456e5f49","signature":"(anonymous namespace)::ExprRewriter::coerceToType(swift::Expr*, swift::Type, swift::constraints::ConstraintLocatorBuilder)","signatureNext":"ExprRewriter::visitUnresolvedMemberChainResultExpr"}
-// RUN: not --crash %target-swift-frontend -typecheck %s
+// RUN: not %target-swift-frontend -typecheck %s
 protocol a {
   associatedtype b
 }

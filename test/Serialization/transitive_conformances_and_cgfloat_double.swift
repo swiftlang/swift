@@ -1,4 +1,8 @@
-// RUN: %target-swift-frontend -emit-module %s -o %t -solver-enable-crash-on-valid-salvage -solver-disable-transitive-conformance
+// RUN: %target-swift-frontend -emit-module %s -o %t -solver-disable-transitive-conformance
+// RUN: %target-typecheck-verify-swift -solver-enable-transitive-conformance
+
+// FIXME: Removing -solver-enable-transitive-conformance and the associated
+// optimization will fix the salvage issue.
 
 // REQUIRES: objc_interop
 
@@ -21,7 +25,7 @@ struct Proxy: P {
 }
 
 struct Test {
-  @Builder var proxy: some P {
+  @Builder var proxy: some P {  // expected-error {{failed to produce diagnostic for expression; please submit a bug report}}
     Proxy { point in
       if let point {
         let _: SIMD2<Double>? = SIMD2(point, point)
