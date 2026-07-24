@@ -56,13 +56,14 @@ _Static_assert(_Alignof(swift_darwin_mutex_t) <= _Alignof(void *),
 
 // The `_swift_mutexRecursive_*` family is backed directly by a
 // `pthread_mutex_t`, constructed in place in the caller-owned storage.
-_Static_assert(sizeof(pthread_mutex_t) <= EMBEDDED_SWIFT_MUTEX_NUM_WORDS * sizeof(void *),
+_Static_assert(sizeof(pthread_mutex_t) <= EMBEDDED_SWIFT_MUTEX_RECURSIVE_NUM_WORDS * sizeof(void *),
                "pthread_mutex_t does not fit in the Embedded Swift Platform "
-               "mutex storage (EMBEDDED_SWIFT_MUTEX_NUM_WORDS pointer-sized "
+               "recursive mutex storage "
+               "(EMBEDDED_SWIFT_MUTEX_RECURSIVE_NUM_WORDS pointer-sized "
                "words)");
 _Static_assert(_Alignof(pthread_mutex_t) <= _Alignof(void *),
                "pthread_mutex_t requires stronger alignment than the "
-               "Embedded Swift Platform mutex storage provides");
+               "Embedded Swift Platform recursive mutex storage provides");
 
 static void trap_if(int failed) {
   if (failed) {

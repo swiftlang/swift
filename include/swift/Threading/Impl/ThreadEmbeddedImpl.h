@@ -94,7 +94,9 @@ inline void mutex_unsafe_unlock(mutex_handle &handle) {
   _swift_mutex_unlock(&handle);
 }
 
-using recursive_mutex_handle = mutex_handle;
+struct recursive_mutex_handle {
+  uintptr_t storage[EMBEDDED_SWIFT_MUTEX_RECURSIVE_NUM_WORDS] = {};
+};
 
 inline void recursive_mutex_init(recursive_mutex_handle &handle,
                                  bool checked = false) {

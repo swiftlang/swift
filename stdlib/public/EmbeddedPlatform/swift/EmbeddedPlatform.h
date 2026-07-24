@@ -135,8 +135,9 @@ extern "C" {
 #endif
 
 /**
- * The number of pointer-size words that will be used to store a Mutex (as
- * provided by the Synchronization library).
+ * The number of pointer-size words that will be used to store a non-recursive
+ * Mutex (as provided by the Synchronization library), i.e., one backed by the
+ * `_swift_mutex_*` functions.
  *
  * This needs to be large enough to accommodate any implementation of Mutex that
  * can be implemented for that given platform (e.g., via the `_swift_mutex_*`
@@ -151,6 +152,26 @@ extern "C" {
 #define EMBEDDED_SWIFT_MUTEX_NUM_WORDS (__swift_ptrdiff_t)12
 #else
 #define EMBEDDED_SWIFT_MUTEX_NUM_WORDS (__swift_ptrdiff_t)8
+#endif
+#endif
+
+/**
+ * The number of pointer-size words that will be used to store a recursive
+ * Mutex, i.e., one backed by the `_swift_mutexRecursive_*` functions.
+ *
+ * This is tracked separately from EMBEDDED_SWIFT_MUTEX_NUM_WORDS because a
+ * platform's recursive mutex implementation need not have the same size as
+ * its non-recursive one. It can be defined externally (via `-D` on the
+ * command line for Clang, `-Xcc -D` for Swift) to a different value, but that
+ * value must be consistent throughout the build to prevent ABI mismatches.
+ */
+#ifndef EMBEDDED_SWIFT_MUTEX_RECURSIVE_NUM_WORDS
+#if defined(__APPLE__) && __SIZEOF_POINTER__ == 4
+// On 32-bit Apple targets (e.g., watchOS armv7k / arm64_32) `pthread_mutex_t`
+// is 40 bytes, which doesn't fit in 8 four-byte words.
+#define EMBEDDED_SWIFT_MUTEX_RECURSIVE_NUM_WORDS (__swift_ptrdiff_t)12
+#else
+#define EMBEDDED_SWIFT_MUTEX_RECURSIVE_NUM_WORDS (__swift_ptrdiff_t)8
 #endif
 #endif
 
@@ -513,8 +534,8 @@ __swift_ptrdiff_t _swift_mutex_tryLock(void * EMBEDDED_SWIFT_NONNULL mutex);
  *   - mutex: Opaque caller-owned mutex storage initialized by this function
  *     and later passed to the other `_swift_mutexRecursive_*` functions. The
  *     contents are private to the platform implementation. The storage is at
- *     least EMBEDDED_SWIFT_MUTEX_NUM_WORDS pointer-sized words and has
- *     pointer alignment.
+ *     least EMBEDDED_SWIFT_MUTEX_RECURSIVE_NUM_WORDS pointer-sized words and
+ *     has pointer alignment.
  *   - flags: Flags controlling mutex behavior.
  *
  * This function is required when using Synchronization.Mutex with a

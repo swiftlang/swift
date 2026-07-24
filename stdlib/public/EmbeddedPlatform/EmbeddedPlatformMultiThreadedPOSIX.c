@@ -38,6 +38,12 @@ _Static_assert(sizeof(pthread_mutex_t) <= EMBEDDED_SWIFT_MUTEX_NUM_WORDS * sizeo
 _Static_assert(_Alignof(pthread_mutex_t) <= _Alignof(void *),
                "pthread_mutex_t requires stronger alignment than the Embedded "
                "Swift Platform mutex storage provides");
+_Static_assert(sizeof(pthread_mutex_t) <= EMBEDDED_SWIFT_MUTEX_RECURSIVE_NUM_WORDS * sizeof(void *),
+               "pthread_mutex_t does not fit in the Embedded Swift Platform "
+               "recursive mutex storage (8 pointer-sized words)");
+_Static_assert(_Alignof(pthread_mutex_t) <= _Alignof(void *),
+               "pthread_mutex_t requires stronger alignment than the Embedded "
+               "Swift Platform recursive mutex storage provides");
 #endif
 
 static void trap_if(int failed) {
