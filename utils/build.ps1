@@ -71,10 +71,6 @@ Include debug information in the builds. Useful for debugging the toolchain
 itself.
 Note: This significantly increases build time and disk usage.
 
-.PARAMETER DebugFormat
-The debug information format for. Valid values: dwarf, codeview.
-Default: codeview
-
 .PARAMETER Android
 Build Android SDKs. Requires Android NDK to be available.
 
@@ -176,8 +172,6 @@ param
 
   # Debug Information
   [switch] $DebugInfo,
-  [ValidateSet("codeview", "dwarf")]
-  [string] $DebugFormat = "codeview",
 
   # Android SDK Options
   [switch] $Android = $false,
@@ -291,14 +285,7 @@ $KnownPlatforms = @{
     BinaryDir = "bin64a";
     Cache = @{};
     LinkModes = $WindowsSDKLinkModes;
-    DebugFormat = $DebugFormat;
-    SwiftLinkerFlags = { param([string] $Format)
-      if ($Format -eq "dwarf") {
-        @("-use-ld=lld-link", "-Xlinker", "/DEBUG:DWARF")
-      } else {
-        @("-Xlinker", "/DEBUG")
-      }
-    };
+    DebugFormat = "codeview";
   };
 
   WindowsX64 = @{
@@ -313,14 +300,7 @@ $KnownPlatforms = @{
     BinaryDir = "bin64";
     Cache = @{};
     LinkModes = $WindowsSDKLinkModes;
-    DebugFormat = $DebugFormat;
-    SwiftLinkerFlags = { param([string] $Format)
-      if ($Format -eq "dwarf") {
-        @("-use-ld=lld-link", "-Xlinker", "/DEBUG:DWARF")
-      } else {
-        @("-Xlinker", "/DEBUG")
-      }
-    };
+    DebugFormat = "codeview";
   };
 
   WindowsX86  = @{
@@ -335,14 +315,7 @@ $KnownPlatforms = @{
     BinaryDir = "bin32";
     Cache = @{};
     LinkModes = $WindowsSDKLinkModes;
-    DebugFormat = $DebugFormat;
-    SwiftLinkerFlags = { param([string] $Format)
-      if ($Format -eq "dwarf") {
-        @("-use-ld=lld-link", "-Xlinker", "/DEBUG:DWARF")
-      } else {
-        @("-Xlinker", "/DEBUG")
-      }
-    };
+    DebugFormat = "codeview";
   };
 
   AndroidARMv7 = @{
@@ -358,10 +331,6 @@ $KnownPlatforms = @{
     Cache = @{};
     LinkModes = $AndroidSDKLinkModes;
     DebugFormat = "dwarf";
-    SwiftLinkerFlags = { param([string] $Format)
-      if ($Format -ne "dwarf") { throw "Android targets only support DWARF debug info, got '$Format'" }
-      @()
-    };
   };
 
   AndroidARM64 = @{
@@ -377,10 +346,6 @@ $KnownPlatforms = @{
     Cache = @{};
     LinkModes = $AndroidSDKLinkModes;
     DebugFormat = "dwarf";
-    SwiftLinkerFlags = { param([string] $Format)
-      if ($Format -ne "dwarf") { throw "Android targets only support DWARF debug info, got '$Format'" }
-      @()
-    };
   };
 
   AndroidX86 = @{
@@ -396,10 +361,6 @@ $KnownPlatforms = @{
     Cache = @{};
     LinkModes = $AndroidSDKLinkModes;
     DebugFormat = "dwarf";
-    SwiftLinkerFlags = { param([string] $Format)
-      if ($Format -ne "dwarf") { throw "Android targets only support DWARF debug info, got '$Format'" }
-      @()
-    };
   };
 
   AndroidX64 = @{
@@ -415,10 +376,6 @@ $KnownPlatforms = @{
     Cache = @{};
     LinkModes = $AndroidSDKLinkModes;
     DebugFormat = "dwarf";
-    SwiftLinkerFlags = { param([string] $Format)
-      if ($Format -ne "dwarf") { throw "Android targets only support DWARF debug info, got '$Format'" }
-      @()
-    };
   };
 }
 
@@ -1920,9 +1877,10 @@ $Compilers = @{
       Flags             = @()
       DebugFlags        = { param([string] $Format)
         if ($Format -eq "dwarf") {
-          return @("-g", "-debug-info-format=dwarf") + $(& $BuildPlatform.SwiftLinkerFlags $Format)
+          @("-g", "-debug-info-format=dwarf")
+        } else {
+          @("-g", "-debug-info-format=codeview", "-Xlinker", "/DEBUG")
         }
-        return @("-g", "-debug-info-format=codeview") + $(& $BuildPlatform.SwiftLinkerFlags $Format)
       }
       AssumeFunctional  = $false
     }
@@ -1975,9 +1933,10 @@ $Compilers = @{
       Flags             = @()
       DebugFlags        = { param([string] $Format)
         if ($Format -eq "dwarf") {
-          return @("-g", "-debug-info-format=dwarf") + $(& $BuildPlatform.SwiftLinkerFlags $Format)
+          @("-g", "-debug-info-format=dwarf")
+        } else {
+          @("-g", "-debug-info-format=codeview", "-Xlinker", "/DEBUG")
         }
-        return @("-g", "-debug-info-format=codeview") + $(& $BuildPlatform.SwiftLinkerFlags $Format)
       }
       AssumeFunctional  = $true
     }
@@ -2029,11 +1988,11 @@ $Compilers = @{
       DriverStyle       = [DriverStyle]::Swift
       Flags             = @()
       DebugFlags        = { param([string] $Format)
-        if ($Format -eq $null) { return @("-gnone") }
         if ($Format -eq "dwarf") {
-          return @("-g", "-debug-info-format=dwarf") + $(& $BuildPlatform.SwiftLinkerFlags $Format)
+          @("-g", "-debug-info-format=dwarf")
+        } else {
+          @("-g", "-debug-info-format=codeview", "-Xlinker", "/DEBUG")
         }
-        return @("-g", "-debug-info-format=codeview") + $(& $BuildPlatform.SwiftLinkerFlags $Format)
       }
       AssumeFunctional  = $true
     }
@@ -2121,8 +2080,6 @@ function Build-CMakeProject {
     $UseC = $CCompiler -ne $null
     $UseCXX = $CXXCompiler -ne $null
     $UseSwift = $SwiftCompiler -ne $null
-    $UseMSVC = ($UseC -and $CCompiler.DriverStyle -eq [DriverStyle]::CL) -or ($UseCXX -and $CXXCompiler.DriverStyle -eq [DriverStyle]::CL)
-
     $PlatformDebugFormat = $Platform.DebugFormat
 
     # Starting with CMake 3.30, CMake propagates linker flags to Swift.
@@ -2293,7 +2250,6 @@ function Build-CMakeProject {
           }
           if ($DebugInfo) {
             Add-FlagsDefine $Defines CMAKE_Swift_FLAGS $(& $SwiftCompiler.DebugFlags $PlatformDebugFormat)
-            Add-FlagsDefine $Defines CMAKE_Swift_FLAGS $(& $Platform.SwiftLinkerFlags $PlatformDebugFormat)
           } else {
             Add-FlagsDefine $Defines CMAKE_Swift_FLAGS @("-gnone")
           }
@@ -2327,16 +2283,7 @@ function Build-CMakeProject {
             # is no need to set them explicitly above.
             Add-KeyValueIfNew $Defines CMAKE_MSVC_DEBUG_INFORMATION_FORMAT Embedded
             Add-KeyValueIfNew $Defines CMAKE_POLICY_DEFAULT_CMP0141 NEW
-
             Add-LinkerFlagsDefine $Defines @("/DEBUG")
-
-            # The linker flags are shared across every language, and `/IGNORE:longsections` is an
-            # `lld-link.exe` argument, not `link.exe`, so this can only be enabled when we use
-            # `lld-link.exe` for linking.
-            # TODO: Investigate supporting fission with PE/COFF, this should avoid this warning.
-            if ($PlatformDebugFormat -eq "dwarf" -and -not $UseMSVC) {
-              Add-LinkerFlagsDefine $Defines @("/IGNORE:longsections")
-            }
           }
         }
       }
@@ -2601,7 +2548,7 @@ function Build-SPMProject {
       "-c", $Configuration
     )
     if ($DebugInfo) {
-      if ($Platform.OS -eq [OS]::Windows -and $DebugFormat -eq "codeview") {
+      if ($Platform.OS -eq [OS]::Windows) {
         $Arguments += @("-debug-info-format", "codeview")
       } else {
         $Arguments += @("-debug-info-format", "dwarf")
