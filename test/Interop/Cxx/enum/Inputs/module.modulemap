@@ -23,11 +23,6 @@ module CenumsNSOptions {
   requires cplusplus
 }
 
-module CFOptionsTypedefAlias {
-  header "cf-options-typedef-alias.h"
-  requires cplusplus
-}
-
 module TypedUntypedEnums {
   header "typed-untyped-enums.h"
   requires cplusplus
