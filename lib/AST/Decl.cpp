@@ -2659,6 +2659,17 @@ VarDecl *PatternBindingInitializer::getInitializedLazyVar() const {
     if (auto var = binding->getSingleVar()) {
       if (var->getAttrs().hasAttribute<LazyAttr>())
         return var;
+      
+      // Check if a macro subsumes an initializer lazily
+      bool macroSubsumesInitializerLazily = false;
+      namelookup::forEachPotentialAttachedMacro(var, MacroRole::Accessor,
+        [&](MacroDecl *macro, const MacroRoleAttr *attr) {
+        if (attr->isInitializerContextLazy()) {
+          macroSubsumesInitializerLazily = true;
+        }
+      });
+      if (macroSubsumesInitializerLazily)
+        return var;
     }
   }
   return nullptr;

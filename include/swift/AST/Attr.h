@@ -3382,17 +3382,27 @@ class MacroRoleAttr final
 
   MacroSyntax syntax;
   MacroRole role;
+  std::optional<MacroInitializerContextKind> initializerContext;
   unsigned numNames;
   unsigned numConformances;
   SourceLoc lParenLoc, rParenLoc;
 
   MacroRoleAttr(SourceLoc atLoc, SourceRange range, MacroSyntax syntax,
                 SourceLoc lParenLoc, MacroRole role,
+                std::optional<MacroInitializerContextKind> initializerContext,
                 ArrayRef<MacroIntroducedDeclName> names,
                 ArrayRef<Expr *> conformances, SourceLoc rParenLoc,
                 bool implicit);
 
 public:
+  static MacroRoleAttr *create(ASTContext &ctx, SourceLoc atLoc,
+                               SourceRange range, MacroSyntax syntax,
+                               SourceLoc lParenLoc, MacroRole role,
+                               std::optional<MacroInitializerContextKind> initializerContext,
+                               ArrayRef<MacroIntroducedDeclName> names,
+                               ArrayRef<Expr *> conformances,
+                               SourceLoc rParenLoc, bool implicit);
+
   static MacroRoleAttr *create(ASTContext &ctx, SourceLoc atLoc,
                                SourceRange range, MacroSyntax syntax,
                                SourceLoc lParenLoc, MacroRole role,
@@ -3417,6 +3427,9 @@ public:
   ArrayRef<Expr *> getConformances() const;
   MutableArrayRef<Expr *> getConformances();
   bool hasNameKind(MacroIntroducedDeclNameKind kind) const;
+  bool isInitializerContextLazy() const {
+    return initializerContext == MacroInitializerContextKind::Lazy;
+  };
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::MacroRole;

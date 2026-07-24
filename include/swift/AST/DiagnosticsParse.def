@@ -2118,6 +2118,11 @@ ERROR(macro_role_syntax_mismatch,PointsToFirstBadToken,
 ERROR(macro_attribute_unknown_label,PointsToFirstBadToken,
       "'@%select{freestanding|attached}0' has no argument with label %1",
       (bool, Identifier))
+ERROR(macro_attribute_unsupported_label,PointsToFirstBadToken,
+      "%0 is only supported for %1 macros, not for macro role '%2'",
+      (Identifier, StringRef, StringRef))
+ERROR(macro_attribute_initializer_unknown_argument,PointsToFirstBadToken,
+      "initializer argument should be 'lazy' or 'eager'", ())
 ERROR(macro_attribute_duplicate_label,PointsToFirstBadToken,
       "'@%select{freestanding|attached}0' already has an argument with "
       "label %1", (bool, StringRef))
