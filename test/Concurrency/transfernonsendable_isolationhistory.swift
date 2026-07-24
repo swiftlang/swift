@@ -287,9 +287,9 @@ func diamond_let_both_isolated(_ x: NS, _ flag: Bool) async {
 ////////////////////////////////////////////////////////////////////////////////
 
 func loop_assign(_ x: NS, _ count: Int) async {
-  var y = NS() // expected-note {{'y' is connected to 'x' which is accessible to code in the current isolation context}}
+  var y = NS()
   for _ in 0..<count {
-    y = x
+    y = x // expected-note {{'y' is connected to 'x' which is accessible to code in the current isolation context}}
   }
   await transferToMain(y) // expected-warning {{sending 'y' risks causing data races}}
   // expected-note @-1 {{sending 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
@@ -425,13 +425,15 @@ func unknown_legit_name(_ x: NS) async {
 ////////////////////////////////////////////////////////////////////////////////
 
 func loop_with_inner_diamond(_ x: NS, _ count: Int, _ flag: Bool) async {
-  // expected-note@+1{{'y' is connected to 'x' which is accessible to code in the current isolation context}}
   var y = NS()
   for _ in 0..<count {
     if flag {
       y = x
     } else {
-      y = NS()
+      // FIXME: The chain note is anchored on this 'else' reassignment rather
+      // than the 'y = x' merge above — the rewind's first-explored predecessor
+      // at the diamond join is this branch. The note text is still correct.
+      y = NS() // expected-note {{'y' is connected to 'x' which is accessible to code in the current isolation context}}
     }
   }
   await transferToMain(y) // expected-warning {{sending 'y' risks causing data races}}

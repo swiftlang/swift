@@ -481,10 +481,11 @@ class IsolationHistoryNoteEmitter {
 public:
   /// Single-use entry point. Constructs an internal emitter from the inputs
   /// and emits any isolation-history notes that apply.
-  static void emit(SILFunction *fn, RegionAnalysisValueMap &valueMap,
-                   Element sentElement, Partition &&partition,
+  static void emit(SILFunction *fn, RegionAnalysisFunctionInfo *functionInfo,
+                   RegionAnalysisValueMap &valueMap, Element sentElement,
+                   Partition &&partition,
                    SILDynamicMergedIsolationInfo regionInfo) {
-    IsolationHistoryNoteEmitter emitter(fn, valueMap, sentElement,
+    IsolationHistoryNoteEmitter emitter(fn, functionInfo, valueMap, sentElement,
                                         std::move(partition), regionInfo);
     emitter.emitHelper();
   }
@@ -512,6 +513,10 @@ private:
   /// The region analysis value map; used to look up element isolation state
   /// and to recover representative SILValues for name inference.
   RegionAnalysisValueMap &inputValueMap;
+
+  /// The region analysis for this function; used to recover a predecessor
+  /// block's exit partition when following a CFG history join.
+  RegionAnalysisFunctionInfo *inputFunctionInfo;
 
   /// The element whose path into the isolated region we are explaining.
   Element inputSentElement;
@@ -542,11 +547,14 @@ private:
   /// \c collectIsolationHistoryNotes.
   Identifier isolatedName;
 
-  IsolationHistoryNoteEmitter(SILFunction *fn, RegionAnalysisValueMap &valueMap,
+  IsolationHistoryNoteEmitter(SILFunction *fn,
+                              RegionAnalysisFunctionInfo *functionInfo,
+                              RegionAnalysisValueMap &valueMap,
                               Element sentElement, Partition &&partition,
                               SILDynamicMergedIsolationInfo regionInfo)
-      : inputFn(fn), inputValueMap(valueMap), inputSentElement(sentElement),
-        inputPartition(std::move(partition)), inputRegionInfo(regionInfo) {}
+      : inputFn(fn), inputValueMap(valueMap), inputFunctionInfo(functionInfo),
+        inputSentElement(sentElement), inputPartition(std::move(partition)),
+        inputRegionInfo(regionInfo) {}
 
   void emitHelper() {
     if (!shouldEmit())
@@ -593,6 +601,7 @@ private:
   }
 
   void collectIsolationHistoryNotes();
+  void collectIsolationHistoryNotesFromPartition(Partition &p);  
 
   /// Returns true when isolation-history emission is on for this function and
   /// the sent element is "disconnected" (i.e., it became isolated by being
@@ -637,14 +646,15 @@ private:
 
 } // namespace
 
-/// Walk the isolation history DAG looking for the merge that brought
-/// \c inputSentElement's region into the isolated region. We follow the chain
-/// of merges transitively: starting with a tracking set containing only
-/// \c inputSentElement, each time we see a MergeElementRegions involving any
-/// tracked element, we examine the other elements involved. If any of them is
-/// itself isolated (per \c inputValueMap), that merge is the answer. Otherwise
-/// the others are also disconnected values that became isolated transitively,
-/// so we add them to the tracking set and keep walking.
+/// Find the merge that brought \c inputSentElement's region into the isolated
+/// region by *rewinding* the send-time partition one history node at a time
+/// (\c Partition::popHistoryOnce), undoing each node's effect as we go.
+/// Starting with a tracking set containing only \c inputSentElement, each
+/// MergeElementRegions we rewind past that involves a tracked element is
+/// examined: if any other element in it is itself isolated (per
+/// \c inputValueMap) that merge is the answer; otherwise the others are
+/// disconnected values that became isolated transitively, so we track them and
+/// keep rewinding.
 ///
 /// On exit, populates the output members:
 ///   - \c originatingLoc: source location of the originating merge, or empty
@@ -655,6 +665,10 @@ private:
 ///   - \c isolatedName: the user-visible name of the isolated source, if one
 ///     could be recovered.
 ///
+/// Names come from the element's equivalence-class representative
+/// (\c maybeGetRepresentative). Using the more specific value stamped on the
+/// merge node is a planned refinement.
+///
 /// If the chain has no intermediate disconnected steps — i.e.,
 /// \c inputSentElement is merged directly with an already-isolated element —
 /// \c originatingLoc is left empty. In that case the user is conceptually
@@ -662,78 +676,103 @@ private:
 /// task-isolated), so a "value was merged … here" note pointing at the same
 /// call site adds no information.
 ///
-/// CFGHistoryJoin nodes introduce branches in the DAG. We push the joined
-/// branch onto a worklist and continue along the parent path; if neither path
-/// finds an answer \c originatingLoc remains empty.
+/// When rewinding reaches a CFGHistoryJoin the chain may continue in a
+/// predecessor block, whose history lives in that block's exit partition. We
+/// push a new frame for each such predecessor carrying the walk state as of the
+/// join, and explore frames depth-first so a dead-end predecessor path simply
+/// backtracks to the next frame.
 void IsolationHistoryNoteEmitter::collectIsolationHistoryNotes() {
   using Node = IsolationHistory::Node;
 
+  // A partition to rewind plus the walk state carried into it. Rewinding cannot
+  // cross a CFG join within a single partition (the joined branch lives in a
+  // predecessor block's exit partition), so at a join we spawn a frame per
+  // predecessor that inherits the state as of the join.
+  struct Frame {
+    Partition partition;
+    llvm::SmallSet<Element, 8> tracked;
+    bool pendingTargetMerge;
+    bool intermediateSeen;
+    Element isolatedElement;
+    bool isolatedFound;
+  };
+
+  // popHistoryOnce requires that we not be tracking sending-operand state, so
+  // clear it on the send-time partition before seeding.
+  Frame seed{inputPartition.removingSendingOperandState(),
+             {},
+             /*pendingTargetMerge=*/false,
+             /*intermediateSeen=*/false,
+             /*isolatedElement=*/inputSentElement,
+             /*isolatedFound=*/false};
+  seed.tracked.insert(inputSentElement);
+
+  SmallVector<Frame, 8> worklist;
+  worklist.push_back(std::move(seed));
+
+  // Blocks whose exit partition we have already scheduled, so a CFG cycle does
+  // not make us rewind the same block forever.
+  llvm::SmallPtrSet<SILBasicBlock *, 8> visitedBlocks;
+
+  // The winning frame's naming state, captured when we record originatingLoc.
   llvm::SmallSet<Element, 8> tracked;
-  tracked.insert(inputSentElement);
-
-  // Work list of nodes to try if the current path finds nothing. Each entry
-  // is the head of an alternative path to explore.
-  SmallVector<const Node *, 4> worklist;
-  worklist.push_back(inputPartition.getIsolationHistory().getHead());
-
-  // Set to true when the most recently seen MergeElementRegions involved an
-  // already-tracked element being merged with something that is itself
-  // isolated. The next SequenceBoundary we encounter holds the source location
-  // for that merge.
-  bool pendingTargetMerge = false;
-
-  // True once we've followed at least one chain link through a disconnected
-  // intermediate. If we find the target merge before this is true the chain
-  // is trivial and we suppress the originating note.
-  bool intermediateSeen = false;
-
-  // The first isolated element we encounter. Used to attribute a name to the
-  // originating note ("y is connected to x …").
   Element isolatedElement = inputSentElement;
   bool isolatedFound = false;
 
   while (!worklist.empty() && !originatingLoc) {
-    const auto *node = worklist.pop_back_val();
+    Frame frame = std::move(worklist.back());
+    worklist.pop_back();
 
-    for (; node; node = node->getNext()) {
+    bool pendingTargetMerge = frame.pendingTargetMerge;
+    bool intermediateSeen = frame.intermediateSeen;
+    Element frameIsolatedElement = frame.isolatedElement;
+    bool frameIsolatedFound = frame.isolatedFound;
+
+    // Predecessor blocks reached at CFG joins while rewinding this frame.
+    SmallVector<SILBasicBlock *, 4> joinedBlocks;
+
+    // True once we rewind past the SequenceBoundary of the merge that reached
+    // the isolated source — the chain has ended (whether or not we emit).
+    bool foundChainEnd = false;
+
+    while (const Node *node = frame.partition.popHistoryOnce(joinedBlocks)) {
       switch (node->getKind()) {
       case Node::MergeElementRegions: {
         Element rep = node->getFirstArgAsElement();
         ArrayRef<Element> others = node->getAdditionalElementArgs();
 
-        // Is any tracked element involved in this merge?
-        bool repIsTracked = tracked.count(rep);
-        bool anyOtherTracked =
-            llvm::any_of(others, [&](Element e) { return tracked.count(e); });
-        if (!repIsTracked && !anyOtherTracked)
+        // Is any element in this merge already tracked?
+        bool anyTracked = frame.tracked.count(rep);
+        for (Element e : others)
+          anyTracked |= bool(frame.tracked.count(e));
+        if (!anyTracked)
           break;
 
-        // Helper: classify a non-tracked element as either the merge target
-        // (isolated) or another disconnected sibling to track. If the element
-        // has no value-map entry (which can legitimately happen when an
-        // element was tracked transiently in history but no longer in the
-        // map), ignore it.
-        auto consider = [&](Element e) {
-          if (tracked.count(e))
-            return;
+        // Classify every not-yet-tracked element in the merge. An isolated
+        // element is the merge target that ends the chain; a disconnected one
+        // is another intermediate we keep following. Elements with no value-map
+        // entry (tracked transiently in history but no longer in the map) are
+        // ignored.
+        SmallVector<Element, 8> involved;
+        involved.push_back(rep);
+        involved.append(others.begin(), others.end());
+        for (Element e : involved) {
+          if (frame.tracked.count(e))
+            continue;
           auto info = inputValueMap.getIsolationRegion(e);
           if (!info)
-            return;
+            continue;
           if (!info.isDisconnected()) {
             pendingTargetMerge = true;
-            if (!isolatedFound) {
-              isolatedFound = true;
-              isolatedElement = e;
+            if (!frameIsolatedFound) {
+              frameIsolatedFound = true;
+              frameIsolatedElement = e;
             }
-          } else {
-            tracked.insert(e);
-            intermediateSeen = true;
+            continue;
           }
-        };
-
-        consider(rep);
-        for (Element e : others)
-          consider(e);
+          frame.tracked.insert(e);
+          intermediateSeen = true;
+        }
         break;
       }
 
@@ -742,9 +781,8 @@ void IsolationHistoryNoteEmitter::collectIsolationHistoryNotes() {
           if (auto loc = node->getHistoryBoundaryLoc()) {
             if (intermediateSeen)
               originatingLoc = loc;
-            // Either way (suppressed or not), we've found the chain end.
-            worklist.clear();
-            node = nullptr;
+            // Either way (emitted or suppressed) we've found the chain end.
+            foundChainEnd = true;
             break;
           }
         }
@@ -752,20 +790,43 @@ void IsolationHistoryNoteEmitter::collectIsolationHistoryNotes() {
         break;
 
       case Node::CFGHistoryJoin:
-        // The joined branch now lives in a predecessor block's exit partition
-        // (node->getFirstArgAsBlock()) rather than an inline history node.
-        // Recovering and walking it is deferred; for now we do not follow
-        // joins.
-        break;
-
       case Node::AddNewRegionForElement:
       case Node::RemoveLastElementFromRegion:
       case Node::RemoveElementFromRegion:
         break;
       }
 
-      if (!node)
+      if (foundChainEnd)
         break;
+    }
+
+    // Finding the chain end ends the whole search — a trivial chain suppresses
+    // the note, a real one has already set originatingLoc.
+    if (foundChainEnd) {
+      if (originatingLoc) {
+        tracked = std::move(frame.tracked);
+        isolatedElement = frameIsolatedElement;
+        isolatedFound = frameIsolatedFound;
+      }
+      break;
+    }
+
+    // The chain continues into the predecessor blocks joined at this frame.
+    // Schedule each, inheriting the walk state as of here.
+    for (SILBasicBlock *predBlock : joinedBlocks) {
+      if (!visitedBlocks.insert(predBlock).second)
+        continue;
+      auto predState = inputFunctionInfo->getBlockState(predBlock);
+      if (!predState)
+        continue;
+      Frame next{
+          predState.get()->getExitPartition().removingSendingOperandState(),
+          frame.tracked,
+          pendingTargetMerge,
+          intermediateSeen,
+          frameIsolatedElement,
+          frameIsolatedFound};
+      worklist.push_back(std::move(next));
     }
   }
 
@@ -774,49 +835,44 @@ void IsolationHistoryNoteEmitter::collectIsolationHistoryNotes() {
 
   // Build the named-step list. For each tracked element other than the sent
   // element, infer a user name + the source location of its declaration.
-  // Sort by source location so chainSteps[0] is closest to the send (newest)
-  // and chainSteps.back() is closest to the isolated source (oldest).
   llvm::SmallDenseSet<const void *, 4> seenLocs;
-
-  auto inferStepFor = [&](Element elt) -> std::optional<ChainStep> {
-    SILValue rep = inputValueMap.maybeGetRepresentative(elt);
-    if (!rep)
-      return {};
-    auto namePair = VariableNameInferrer::inferNameAndFirstPathComponent(rep);
-    if (!namePair)
-      return {};
-    if (!namePair->second.isValid())
-      return {};
-    // VariableNameInferrer falls back to the literal identifier "unknown" when
-    // it can't recover a name. That's never useful in a diagnostic; treat it
-    // as no-name.
-    if (namePair->first.str() == "unknown")
-      return {};
-    return ChainStep{namePair->second, namePair->first, elt};
-  };
 
   // Look up the isolated source's user-visible name, if any. We do this first
   // so we can skip chain steps whose name coincides with it (those are aliases
   // of the isolated source rather than independent links in the chain).
+  //
+  // VariableNameInferrer falls back to the literal identifier "unknown" when it
+  // can't recover a name; that is never useful in a diagnostic, so treat it as
+  // no-name.
   if (isolatedFound) {
-    if (auto step = inferStepFor(isolatedElement))
-      isolatedName = step->name;
+    if (SILValue rep = inputValueMap.maybeGetRepresentative(isolatedElement)) {
+      auto namePair = VariableNameInferrer::inferNameAndFirstPathComponent(rep);
+      if (namePair && namePair->second.isValid() &&
+          namePair->first.str() != "unknown")
+        isolatedName = namePair->first;
+    }
   }
 
   for (Element elt : tracked) {
     if (elt == inputSentElement)
       continue;
-    auto step = inferStepFor(elt);
-    if (!step)
+    SILValue rep = inputValueMap.maybeGetRepresentative(elt);
+    if (!rep)
       continue;
-    // Skip elements whose inferred name matches the isolated source — these
-    // are aliases produced by copies along the chain that the name inferrer
+    auto namePair = VariableNameInferrer::inferNameAndFirstPathComponent(rep);
+    if (!namePair || !namePair->second.isValid() ||
+        namePair->first.str() == "unknown")
+      continue;
+    Identifier name = namePair->first;
+    SourceLoc declLoc = namePair->second;
+    // Skip elements whose inferred name matches the isolated source — these are
+    // aliases produced by copies along the chain that the name inferrer
     // collapses back to the original.
-    if (!isolatedName.empty() && step->name == isolatedName)
+    if (!isolatedName.empty() && name == isolatedName)
       continue;
-    if (!seenLocs.insert(step->declLoc.getOpaquePointerValue()).second)
+    if (!seenLocs.insert(declLoc.getOpaquePointerValue()).second)
       continue;
-    chainSteps.push_back(*step);
+    chainSteps.push_back(ChainStep{declLoc, name, elt});
   }
 
   // Sort newest-first (highest source position first) so that chainSteps[0]
@@ -2635,6 +2691,10 @@ class SentNeverSendableDiagnosticEmitter {
   /// The partition at the point of the error.
   Partition partition;
 
+  /// The region analysis for this function; forwarded to the isolation-history
+  /// note emitter so it can recover predecessor exit partitions across joins.
+  RegionAnalysisFunctionInfo *info;
+
   using SentNeverSendableError = PartitionOpError::SentNeverSendableError;
 
 public:
@@ -2644,7 +2704,8 @@ public:
         diagnosticEmitter(error.op->getSourceOp(),
                           valueMap.getRepresentative(error.sentElement),
                           error.isolationRegionInfo),
-        sentElement(error.sentElement), partition(std::move(error.partition)) {}
+        sentElement(error.sentElement), partition(std::move(error.partition)),
+        info(info) {}
 
   /// Gathers diagnostics. Returns false if we emitted a "I don't understand
   /// error". If we emit such an error, we should bail without emitting any
@@ -2686,8 +2747,9 @@ private:
 
 void SentNeverSendableDiagnosticEmitter::emitIsolationHistoryNoteIfNeeded() {
   IsolationHistoryNoteEmitter::emit(
-      diagnosticEmitter.getOperand()->getFunction(), valueMap, sentElement,
-      std::move(partition), diagnosticEmitter.getIsolationRegionInfo());
+      diagnosticEmitter.getOperand()->getFunction(), info, valueMap,
+      sentElement, std::move(partition),
+      diagnosticEmitter.getIsolationRegionInfo());
 }
 
 bool SentNeverSendableDiagnosticEmitter::initForSendingPartialApply(
