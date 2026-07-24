@@ -1,0 +1,51 @@
+// RUN: not --crash %target-sil-opt -enable-sil-verify-all -module-name=Test %s 2>&1 | %FileCheck %s
+
+// REQUIRES: asserts
+
+// Regression test for a crash in SILVTable::verify where a vtable entry whose
+// implementation is ABI-incompatible with the base slot caused the frontend to
+// abort with "LLVM ERROR: Must have a construct to emit for" instead of
+// emitting the ABI-mismatch diagnostic. The verifier constructed a temporary
+// SILVerifier for the ABI check without installing a VerifierErrorEmitterGuard;
+// when _require failed, emitError had no anchor construct and hit
+// report_fatal_error.
+
+// CHECK: SIL verification failed: vtable entry for #Base.foo{{.*}}must be ABI-compatible
+// CHECK: Differing parameter convention.
+// CHECK-NOT: Must have a construct to emit for
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+class Payload {}
+
+public class Base {
+  func foo(p: Payload)
+}
+
+public class Derived : Base {
+  override func foo(p: Payload)
+}
+
+// Base.foo(p:) — the base slot expects @guaranteed Payload.
+sil @$s4Test4BaseC3foo1pyAA7PayloadC_tF : $@convention(method) (@guaranteed Payload, @guaranteed Base) -> ()
+
+// Derived.foo(p:) — the implementation takes @owned Payload, mismatching the
+// base slot's @guaranteed convention. This is what trips
+// requireABICompatibleFunctionTypes from SILVTable::verify.
+sil @$s4Test7DerivedC3foo1pyAA7PayloadC_tF : $@convention(method) (@owned Payload, @guaranteed Derived) -> () {
+bb0(%0 : $Payload, %1 : $Derived):
+  strong_release %0 : $Payload
+  %r = tuple ()
+  return %r : $()
+}
+
+sil_vtable Base {
+  #Base.foo: (Base) -> (Payload) -> () : @$s4Test4BaseC3foo1pyAA7PayloadC_tF
+}
+
+sil_vtable Derived {
+  #Base.foo: (Base) -> (Payload) -> () : @$s4Test7DerivedC3foo1pyAA7PayloadC_tF [override]
+}
