@@ -81,10 +81,10 @@ import Swift
 // -- fixed-layout nongeneric descriptor
 //    FIXME: Strings should be unnamed_addr. rdar://problem/22674524
 // CHECK: [[ROOTNONGENERIC_NAME:@.*]] = private constant [15 x i8] c"RootNonGeneric\00"
-// CHECK: @"$s15generic_classes14RootNonGenericCMn" = hidden constant <{ {{.*}} %swift.method_descriptor }> <{
-// --       flags: class, unique, has vtable
-// CHECK-DIRECT-SAME:   <i32 0x8000_0050>
-// CHECK-INDIRECT-SAME:   <i32 0x8001_0050>
+// CHECK: @"$s15generic_classes14RootNonGenericCMn" = hidden constant <{ {{.*}} %swift.method_descriptor{{.*}} }> <{
+// --       flags: class, unique, has vtable, has singleton metadata pointer
+// CHECK-DIRECT-SAME:   <i32 0x8008_0050>
+// CHECK-INDIRECT-SAME:   <i32 0x8009_0050>
 // --       name
 // CHECK-SAME:   ptr [[ROOTNONGENERIC_NAME]]
 // --       num fields
