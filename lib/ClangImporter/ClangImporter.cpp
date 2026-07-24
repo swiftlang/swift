@@ -8448,6 +8448,89 @@ bool importer::isViewType(const clang::CXXRecordDecl *decl) {
   return !hasOwnedValueAttr(decl) && hasPointerInSubobjects(decl);
 }
 
+/// Whether \p type is "self-contained" for the purpose of direct-view
+/// inference: it is escapable (SWIFT_ESCAPABLE), or it is a record explicitly
+/// annotated SWIFT_SELF_CONTAINED (import_owned). Incomplete/forward-declared
+/// records are never self-contained, and a record explicitly marked unsafe is
+/// never treated as self-contained.
+static bool isSelfContainedForDirectView(const clang::Type *type,
+                                         Evaluator &eval) {
+  type = type->getUnqualifiedDesugaredType();
+
+  if (evaluateOrDefault(eval, ClangTypeEscapability({type, nullptr}),
+                        CxxEscapability::Unknown) == CxxEscapability::Escapable)
+    return true;
+
+  if (const auto *recordType = type->getAs<clang::RecordType>()) {
+    if (auto *definition = recordType->getDecl()->getDefinition())
+      return importer::hasOwnedValueAttr(definition) &&
+             !importer::hasSwiftAttribute(definition, {"unsafe"});
+  }
+
+  return false;
+}
+
+static bool
+isDirectViewTypeImpl(const clang::Type *type, Evaluator &eval,
+                     llvm::SmallDenseSet<const clang::Decl *, 4> &seen) {
+  type = type->getUnqualifiedDesugaredType();
+
+  // (A) A pointer or reference is a direct view if its pointee is
+  // self-contained. Member/block/ObjC-object pointers are not "pointers
+  // into a buffer of self-contained objects".
+  if (type->isPointerType() || type->isReferenceType()) {
+    clang::QualType pointee = type->getPointeeType();
+    if (pointee->isFunctionType())
+      return false;
+    return isSelfContainedForDirectView(pointee.getTypePtr(), eval);
+  }
+
+  // (B) A record is a direct view if every field and base is either
+  // self-contained or itself a direct view.
+  if (const auto *recordType = type->getAs<clang::RecordType>()) {
+    auto *recordDecl = recordType->getDecl()->getDefinition();
+    if (!recordDecl)
+      return false;
+    if (importer::hasSwiftAttribute(recordDecl, {"unsafe"}))
+      return false;
+    if (!seen.insert(recordDecl).second)
+      return true;
+
+    auto isSelfContainedOrDirectView = [&](clang::QualType t) {
+      const clang::Type *ty = t.getTypePtr();
+      return isSelfContainedForDirectView(ty, eval) ||
+             isDirectViewTypeImpl(ty, eval, seen);
+    };
+
+    if (const auto *cxxRecordDecl =
+            dyn_cast<clang::CXXRecordDecl>(recordDecl)) {
+      for (auto base : cxxRecordDecl->bases())
+        if (!isSelfContainedOrDirectView(base.getType()))
+          return false;
+    }
+    for (auto *field : recordDecl->fields())
+      if (!isSelfContainedOrDirectView(field->getType()))
+        return false;
+    return true;
+  }
+
+  // (C) Anything else is not itself a direct view.
+  return false;
+}
+
+bool importer::isDirectViewType(const clang::Type *type, Evaluator &eval) {
+  llvm::SmallDenseSet<const clang::Decl *, 4> seen;
+  return isDirectViewTypeImpl(type, eval, seen);
+}
+
+bool importer::isDirectViewType(const clang::Decl *decl, ASTContext &swiftCtx) {
+  if (const auto *typeDecl = dyn_cast<clang::TypeDecl>(decl)) {
+    clang::QualType type = typeDecl->getASTContext().getTypeDeclType(typeDecl);
+    return isDirectViewType(type.getTypePtr(), swiftCtx.evaluator);
+  }
+  return false;
+}
+
 const clang::CXXConstructorDecl *
 importer::findCopyConstructor(const clang::CXXRecordDecl *decl) {
   for (auto ctor : decl->ctors()) {
@@ -9095,12 +9178,24 @@ ExplicitSafety ClangDeclExplicitSafety::evaluate(
       continue;
     }
 
-    // Escapability annotations imply that the declaration is safe
-    if (evaluateOrDefault(
-            evaluator,
-            ClangTypeEscapability({recordDecl->getTypeForDecl(), nullptr}),
-            CxxEscapability::Unknown) != CxxEscapability::Unknown)
+    // Escapability tells us how to treat this record's safety.
+    switch (evaluateOrDefault(
+        evaluator,
+        ClangTypeEscapability({recordDecl->getTypeForDecl(), nullptr}),
+        CxxEscapability::Unknown)) {
+    case CxxEscapability::Escapable:
+      // A self-contained (escapable) type is safe.
       continue;
+    case CxxEscapability::NonEscapable:
+      // A non-escapable "view" is safe only if it is a *direct* view. Views
+      // with more complex lifetime dependencies are imported as unsafe.
+      if (importer::isDirectViewType(recordDecl->getTypeForDecl(), evaluator))
+        continue;
+      return ExplicitSafety::Unsafe;
+    case CxxEscapability::Unknown:
+      // Fall through to the field/base and template-argument checks below.
+      break;
+    }
 
     // A template class is unsafe if any of its type arguments are unsafe.
     // Note that this does not rely on the record being defined.

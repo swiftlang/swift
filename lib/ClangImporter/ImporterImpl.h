@@ -2291,6 +2291,13 @@ getCxxValueSemanticsKind(const clang::Type *type,
 
 bool isViewType(const clang::CXXRecordDecl *decl);
 
+/// Determine whether \p type is a "direct view": a pointer or reference to a
+/// self-contained pointee, or a record (including a class template
+/// specialization) whose every field and base is either self-contained or
+/// itself a direct view.
+bool isDirectViewType(const clang::Type *type, Evaluator &eval);
+bool isDirectViewType(const clang::Decl *decl, ASTContext &swiftCtx);
+
 inline const clang::Type *desugarIfElaborated(const clang::Type *type) {
   if (auto elaborated = dyn_cast<clang::ElaboratedType>(type))
     return elaborated->desugar().getTypePtr();
