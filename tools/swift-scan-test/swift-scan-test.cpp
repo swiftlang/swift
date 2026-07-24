@@ -39,6 +39,7 @@ enum Actions {
   scan_dependency,
   get_chained_bridging_header,
   create_casfs,
+  list_supported_arguments,
 };
 
 llvm::cl::OptionCategory Category("swift-scan-test Options");
@@ -73,7 +74,9 @@ llvm::cl::opt<Actions>
                             clEnumVal(scan_dependency, "scan dependency"),
                             clEnumVal(get_chained_bridging_header,
                                       "get cached bridging header"),
-                            clEnumVal(create_casfs, "create CASFS root")),
+                            clEnumVal(create_casfs, "create CASFS root"),
+                            clEnumVal(list_supported_arguments,
+                                      "list supported compiler arguments")),
            llvm::cl::cat(Category));
 llvm::cl::list<std::string>
     SwiftCommands(llvm::cl::Positional, llvm::cl::desc("<swift-frontend args>"),
@@ -246,6 +249,17 @@ static int action_create_casfs(swiftscan_cas_t cas,
   return EXIT_SUCCESS;
 }
 
+static int action_list_supported_arguments(llvm::raw_ostream &os) {
+  auto supported = swiftscan_compiler_supported_arguments_query();
+  if (!supported)
+    return 1;
+  for (size_t i = 0; i < supported->count; ++i) {
+    os << toString(supported->strings[i]) << "\n";
+  }
+  swiftscan_string_set_dispose(supported);
+  return 0;
+}
+
 static int action_scan_dependency(swiftscan_scanner_t scanner,
                                   std::vector<const char *> &Args,
                                   StringRef WorkingDirectory,
@@ -338,6 +352,10 @@ int main(int argc, char *argv[]) {
   llvm::cl::HideUnrelatedOptions(Category);
   llvm::cl::ParseCommandLineOptions(argc, argv,
                                     "Test libSwiftScan interfaces\n");
+
+  // Handle actions that don't require CAS or scanner setup.
+  if (Action == list_supported_arguments)
+    return action_list_supported_arguments(llvm::outs());
 
   // Create CAS.
   auto option = swiftscan_cas_options_create();
