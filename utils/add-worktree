@@ -1,0 +1,261 @@
+#!/usr/bin/env python3
+
+# This source file is part of the Swift.org open source project
+#
+# Copyright (c) 2026 Apple Inc. and the Swift project authors
+# Licensed under Apache License v2.0 with Runtime Library Exception
+#
+# See https://swift.org/LICENSE.txt for license information
+# See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+
+import argparse
+import sys
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+from build_swift.build_swift.constants import SWIFT_SOURCE_ROOT
+
+from update_checkout.update_checkout.cli_arguments import CliArguments
+from update_checkout.update_checkout.git_command import Git, iter_git_repositories
+from update_checkout.update_checkout.parallel_runner import ParallelRunner
+from update_checkout.update_checkout.runner_arguments import RunnerArguments
+from update_checkout.update_checkout.update_checkout import (
+    SkippedReason,
+    should_skip_repo,
+    check_missing_clones,
+    get_scheme_map,
+    load_config,
+    output_prefix,
+    update_all_repositories,
+)
+
+
+@dataclass
+class AddWorktreeRunnerArguments(RunnerArguments):
+    worktree_dir: Path
+
+
+class AddWorktreeCliArguments(argparse.Namespace):
+    worktree_dir: Path
+    source_root: Path
+    scheme: Optional[str]
+    configs: List[str]
+    n_processes: int
+    verbose: bool
+    # add-worktree has no --skip-repository flag, but update-checkout's shared
+    # repo-skipping helpers read this, so default it to empty.
+    skip_repository_list: List[str] = []
+
+    @staticmethod
+    def parse_args() -> "AddWorktreeCliArguments":
+        parser = argparse.ArgumentParser(
+            formatter_class=argparse.RawDescriptionHelpFormatter,
+            description="Create a set of Git worktrees for the Swift project.",
+        )
+        parser.add_argument(
+            "worktree_dir",
+            help="The directory in which to create the worktrees.",
+            type=Path,
+        )
+        parser.add_argument(
+            "--source-root",
+            help="The root directory of the primary checkout to create worktrees "
+            "from.",
+            default=SWIFT_SOURCE_ROOT,
+            type=Path,
+        )
+        parser.add_argument(
+            "--scheme",
+            help="Switch the worktrees to the specified branch-scheme.",
+            metavar="BRANCH-SCHEME",
+        )
+        parser.add_argument(
+            "--config",
+            help="""The update-checkout configuration file to use when '--scheme'
+            is passed. Can be specified multiple times, each config will be merged
+            together with a 'last-wins' strategy.""",
+            action="append",
+            default=[],
+            dest="configs",
+        )
+        parser.add_argument(
+            "-j",
+            "--jobs",
+            type=int,
+            help="Number of threads to run at once.",
+            default=0,
+            dest="n_processes",
+        )
+        parser.add_argument(
+            "-v",
+            "--verbose",
+            help="Increases the script's verbosity.",
+            action="store_true",
+        )
+
+        return parser.parse_args(namespace=AddWorktreeCliArguments())
+
+
+def create_worktree(pool_args: AddWorktreeRunnerArguments):
+    """Creates a detached worktree for a single repository.
+
+    Args:
+        pool_args (AddWorktreeRunnerArguments): arguments for the repository to process.
+    """
+
+    repo_name = pool_args.repo_name
+    prefix = output_prefix(repo_name)
+    primary_repo_path = pool_args.source_root.joinpath(repo_name)
+    worktree_repo_path = pool_args.worktree_dir.joinpath(repo_name)
+
+    if worktree_repo_path.exists():
+        if pool_args.verbose:
+            print(f"{prefix}Worktree already exists at '{worktree_repo_path}'")
+        return
+
+    Git.run(
+        primary_repo_path,
+        ["worktree", "add", "--detach", str(worktree_repo_path)],
+        echo=pool_args.verbose,
+        prefix=prefix,
+    )
+
+
+def create_worktrees(args: AddWorktreeCliArguments, repo_names: List[str]) -> int:
+    """Creates a detached worktree for each of the named repositories.
+
+    Args:
+        args (AddWorktreeCliArguments): the parsed command-line arguments.
+        repo_names (List[str]): names of the source-root repositories to create
+            worktrees for.
+
+    Returns:
+        int: the number of repositories that failed to create a worktree.
+    """
+
+    if not repo_names:
+        print(f"No repositories to create worktrees for in '{args.source_root}'.")
+        return 1
+
+    pool_args = [
+        AddWorktreeRunnerArguments(
+            repo_name=repo_name,
+            output_prefix="Creating a worktree for",
+            source_root=args.source_root,
+            verbose=args.verbose,
+            worktree_dir=args.worktree_dir,
+        )
+        for repo_name in repo_names
+    ]
+
+    results = ParallelRunner(create_worktree, pool_args, args.n_processes).run()
+    return ParallelRunner.check_results(results, "WORKTREE")
+
+
+def scheme_repo_names(
+    args: AddWorktreeCliArguments, config: Dict[str, Any], scheme_name: str
+) -> Optional[List[str]]:
+    """Returns the source-root repositories that belong to a branch-scheme.
+
+    If a scheme repository is missing from the source root, an error is printed
+    and None is returned, since the resulting worktree tree would be incomplete
+    for that scheme.
+
+    Args:
+        args (AddWorktreeCliArguments): the parsed command-line arguments.
+        config (Dict[str, Any]): the merged update-checkout configuration.
+        scheme_name (str): name of the branch-scheme.
+
+    Returns:
+        List[str] | None: the repository names to create worktrees for, or None
+            if a required repository is missing from the source root.
+    """
+
+    scheme_map = get_scheme_map(config, scheme_name)
+
+    missing = check_missing_clones(args, config, scheme_map)
+    if missing:
+        for repo_name in missing:
+            print(
+                f"Repository '{repo_name}' from the '{scheme_name}' branch-scheme "
+                f"is missing from '{args.source_root}'; clone it first."
+            )
+        return None
+
+    return [
+        repo_name
+        for repo_name in scheme_map
+        if not should_skip_repo(args, config, repo_name)
+    ]
+
+
+def update_worktrees_to_scheme(
+    args: AddWorktreeCliArguments, config: Dict[str, Any], scheme_name: str
+) -> int:
+    """Switches the worktrees to a branch-scheme by invoking update-checkout.
+
+    Args:
+        args (AddWorktreeCliArguments): the parsed command-line arguments.
+        config (Dict[str, Any]): the merged update-checkout configuration.
+        scheme_name (str): name of the branch-scheme to switch to.
+
+    Returns:
+        int: the number of repositories that failed to update.
+    """
+
+    scheme_map = get_scheme_map(config, scheme_name)
+
+    # update_all_repositories expects a populated update-checkout argument
+    # namespace. Only the fields it reads are set here.
+    update_args = CliArguments()
+    update_args.source_root = args.worktree_dir
+    update_args.skip_repository_list = []
+    update_args.match_timestamp = False
+    update_args.tag = None
+    update_args.reset_to_remote = False
+    update_args.clean = False
+    update_args.stash = False
+    update_args.skip_history = False
+    update_args.partial_clone = False
+    update_args.verbose = args.verbose
+    update_args.n_processes = args.n_processes
+
+    skipped_repositories, results = update_all_repositories(
+        update_args, config, scheme_name, scheme_map, {}
+    )
+    SkippedReason.print_skipped_repositories(skipped_repositories, "update")
+    return ParallelRunner.check_results(results, "UPDATE")
+
+
+def main() -> int:
+    args = AddWorktreeCliArguments.parse_args()
+    args.source_root = args.source_root.resolve()
+    args.worktree_dir = args.worktree_dir.resolve()
+    args.worktree_dir.mkdir(parents=True, exist_ok=True)
+
+    # The config selects which repositories belong to the scheme and resolves
+    # their remotes, so load it only when a scheme switch is requested.
+    if args.scheme:
+        config = load_config(args.configs)
+        repo_names = scheme_repo_names(args, config, args.scheme)
+        if repo_names is None:
+            print("add-worktree failed, fix errors and try again")
+            return 1
+    else:
+        repo_names = [path.name for path in iter_git_repositories(args.source_root)]
+
+    fail_count = create_worktrees(args, repo_names)
+
+    if fail_count == 0 and args.scheme:
+        fail_count += update_worktrees_to_scheme(args, config, args.scheme)
+
+    if fail_count > 0:
+        print("add-worktree failed, fix errors and try again")
+    else:
+        print("add-worktree succeeded")
+    return fail_count
+
+
+if __name__ == "__main__":
+    sys.exit(main())
