@@ -1876,7 +1876,7 @@ $Compilers = @{
     C = @{
       Executable        = "cl.exe"
       DriverStyle       = [DriverStyle]::CL
-      Flags             = @("/GS-", "/Gw", "/Gy", "/Oy", "/Oi", "/Zc:inline", "/Zc:preprocessor")
+      Flags             = @("/GS-", "/Gw", "/Gy", "/Oy", "/Oi", "/Zc:inline", "/Zc:preprocessor", "/source-charset:utf-8")
       DebugFlags        = { param([string] $Format)
         @()
       }
@@ -1885,7 +1885,7 @@ $Compilers = @{
     CXX = @{
       Executable        = "cl.exe"
       DriverStyle       = [DriverStyle]::CL
-      Flags             = @("/GS-", "/Gw", "/Gy", "/Oy", "/Oi", "/Zc:inline", "/Zc:preprocessor", "/Zc:__cplusplus")
+      Flags             = @("/GS-", "/Gw", "/Gy", "/Oy", "/Oi", "/Zc:inline", "/Zc:preprocessor", "/Zc:__cplusplus", "/source-charset:utf-8")
       DebugFlags        = { param([string] $Format)
         @()
       }
@@ -2680,6 +2680,17 @@ function Get-CMarkBinaryCache([Hashtable] $Platform) {
 }
 
 function Build-CMark([Hashtable] $Platform) {
+  $Defines = @{
+    BUILD_SHARED_LIBS = "YES";
+    BUILD_TESTING = "NO";
+    CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS_SKIP = "YES";
+  }
+
+  if ($Compilers.Host.C.DriverStyle -eq [DriverStyle]::CL) {
+    $Defines["CMAKE_C_FLAGS"] = @("/execution-charset:utf-8")
+    $Defines["CMAKE_CXX_FLAGS"] = @("/execution-charset:utf-8")
+  }
+
   Build-CMakeProject `
     -Src $SourceCache\cmark `
     -Bin (Get-CMarkBinaryCache $Platform) `
@@ -2687,11 +2698,7 @@ function Build-CMark([Hashtable] $Platform) {
     -Platform $Platform `
     -CCompiler $Compilers.Host.C `
     -CXXCompiler $Compilers.Host.CXX `
-    -Defines @{
-      BUILD_SHARED_LIBS = "YES";
-      BUILD_TESTING = "NO";
-      CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS_SKIP = "YES";
-    }
+    -Defines $Defines
 }
 
 function Copy-CMarkRuntimeToToolchain([Hashtable] $Platform, [string] $ToolchainRoot) {
