@@ -1761,6 +1761,26 @@ static ManagedValue emitAnyClosureExpr(SILGenFunction &SGF, Expr *e,
   }
 }
 
+/// Lower a type to SIL, preserving Clang type info that would otherwise be
+/// lost during canonical type computation. getCanonicalType() drops
+/// ClangTypeInfo when UseClangFunctionTypes is off, which causes C function
+/// pointer types with const-ref parameters to lose their conventions.
+static SILType getLoweredTypePreservingClangTypeInfo(SILGenFunction &SGF,
+                                                     Type ty) {
+  if (auto funcTy = ty->lookThroughSingleOptionalType()
+                        ->getAs<AnyFunctionType>()) {
+    if (!funcTy->getClangTypeInfo().empty() &&
+        funcTy->getRepresentation() ==
+            FunctionTypeRepresentation::CFunctionPointer) {
+      auto canTy = ty->getCanonicalType();
+      AbstractionPattern origPattern(canTy,
+                                     funcTy->getClangTypeInfo().getType());
+      return SGF.getLoweredType(origPattern, canTy);
+    }
+  }
+  return SGF.getLoweredType(ty);
+}
+
 static ManagedValue
 convertCFunctionSignature(SILGenFunction &SGF, FunctionConversionExpr *e,
                           SILType loweredResultTy, SGFContext C,
@@ -1773,8 +1793,9 @@ convertCFunctionSignature(SILGenFunction &SGF, FunctionConversionExpr *e,
       loweredDestTy = objTy;
     else
       loweredDestTy = loweredDestOptTy;
-  } else
-    loweredDestTy = SGF.getLoweredType(destTy);
+  } else {
+    loweredDestTy = getLoweredTypePreservingClangTypeInfo(SGF, destTy);
+  }
 
   ManagedValue result;
 
@@ -1860,6 +1881,19 @@ static ManagedValue emitCFunctionPointer(SILGenFunction &SGF,
         auto origParamType = conv.getBridgingOriginalInputType();
         if (origParamType.isClangType())
           destFnType = origParamType.getClangType();
+      }
+    }
+    // When there is no conversion context (e.g., assigning a closure to a
+    // struct member), extract the Clang type from the FunctionConversionExpr's
+    // destination type. The imported @convention(c) FunctionType preserves
+    // the original Clang type (including const-ref parameter types that were
+    // stripped from the Swift representation) in its ClangTypeInfo.
+    if (!destFnType) {
+      if (auto funcTy =
+              conversionExpr->getType()->getAs<FunctionType>()) {
+        if (auto clangTypeInfo = funcTy->getClangTypeInfo();
+            !clangTypeInfo.empty())
+          destFnType = clangTypeInfo.getType();
       }
     }
     (void)emitAnyClosureExpr(
@@ -5811,7 +5845,9 @@ RValue RValueEmitter::visitInjectIntoOptionalExpr(InjectIntoOptionalExpr *E,
   };
 
   auto result =
-    SGF.emitOptionalSome(E, SGF.getLoweredType(E->getType()), helper, C);
+    SGF.emitOptionalSome(E,
+                         getLoweredTypePreservingClangTypeInfo(SGF, E->getType()),
+                         helper, C);
   return RValue(SGF, E, result);
 }
 
