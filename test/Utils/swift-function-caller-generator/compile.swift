@@ -107,19 +107,23 @@ public func call_qux(_ func: inout Swift::MutableSpan<Swift::CInt>) {
 
 #endif
 #endif
-  public func call_pub(_ self: S, _ x: Swift::Int) -> Swift::Int {
-  return self.pub(x)
+public extension S {
+  func call_pub(_ x: Swift::Int) -> Swift::Int {
+    return pub(x)
+  }
 }
 
-  public func call_pub(_ self: C, _ x: Swift::Int) -> Swift::Int {
-  return self.pub(x)
-}
-func call_ope(_ self: C, _ x: Swift::Int) -> Swift::Int {
-  return self.ope(x)
-}
-public func call_clas(x: Swift::Int) -> Swift::Int {
-  return C.clas(x: x)
-}
-func call_clas2(x: Swift::Int) -> Swift::Int {
-  return C.clas2(x: x)
+public extension C {
+  func call_pub(_ x: Swift::Int) -> Swift::Int {
+    return pub(x)
+  }
+  func call_ope(_ x: Swift::Int) -> Swift::Int {
+    return ope(x)
+  }
+  func call_clas(x: Swift::Int) -> Swift::Int {
+    return C.clas(x: x)
+  }
+  func call_clas2(x: Swift::Int) -> Swift::Int {
+    return C.clas2(x: x)
+  }
 }

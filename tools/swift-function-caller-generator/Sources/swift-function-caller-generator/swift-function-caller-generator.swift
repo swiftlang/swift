@@ -35,6 +35,14 @@ import CRT
 import WinSDK
 #endif
 
+protocol Named {
+  var name: TokenSyntax { get }
+}
+extension ClassDeclSyntax: Named {
+}
+extension StructDeclSyntax: Named {
+}
+
 @main
 class SwiftMacroTestGen: SyntaxVisitor {
   static func main() {
@@ -71,41 +79,33 @@ class SwiftMacroTestGen: SyntaxVisitor {
       return .skipChildren
     }
     let surroundingType = getParentType(res)
-    let isMutating = res.modifiers.contains(where: {
-      $0.name.tokenKind == .keyword(.mutating)
-    })
-    let selfParam = surroundingType.map { type in res.isClassMethod ? type.with(\.trailingTrivia, "") : TokenSyntax("self") }
+    let selfParam = surroundingType.flatMap { type in res.isClassMethod ? type.with(\.trailingTrivia, "") : nil }
     res = createFunctionSignature(res)
     res =
       res
       .with(\.body, createBody(res, selfParam: selfParam))
       .with(\.name, "call_\(res.name.withoutBackticks)")
       .with(\.leadingTrivia, res.leadingTrivia.withoutComments)
-    if let surroundingType {
-      if !res.isClassMethod {
-        res =
-          res
-          .with(
-            \.signature.parameterClause.parameters,
-            addSelfParam(
-              res.signature.parameterClause.parameters, surroundingType, selfParam!,
-              isMutating: isMutating)
-          )
-      }
+    if surroundingType != nil {
       res =
         res
-        .with(\.leadingTrivia, "\n")
         .with(
           \.modifiers,
           res.modifiers.filter { modifier in
             switch modifier.name.tokenKind {
-            case .keyword(.mutating), .keyword(.open), .keyword(.class), .keyword(.final):
+            case .keyword(.open), .keyword(.class), .keyword(.final), .keyword(.public):
               false
             default:
               true
             }
           }
         )
+      let origIndent = node.firstToken(viewMode: .sourceAccurate)!.indentationOfLine
+      res = res
+        .with(\.leadingTrivia, "")
+        .indented(
+          by: origIndent,
+          indentFirstLine: true)
     }
     print(res)
     return .skipChildren
@@ -127,17 +127,56 @@ class SwiftMacroTestGen: SyntaxVisitor {
     return .skipChildren
   }
 
-  override func visit(_ node: ClassDeclSyntax) -> SyntaxVisitorContinueKind {
-    if node.attributes.contains(where: { $0.isUnavailable }) {
+  class HasCallableFunction: SyntaxVisitor {
+    var hasCallableFunction = false
+    override func visit(_ node: FunctionDeclSyntax) -> SyntaxVisitorContinueKind {
+      if !node.attributes.contains(where: { $0.isUnavailable }) {
+        hasCallableFunction = true
+      }
       return .skipChildren
     }
+  }
+  func shouldVisit(_ node: DeclGroupSyntax) -> Bool {
+    guard !node.attributes.contains(where: { $0.isUnavailable }) else {
+      return false
+    }
+    let walker = HasCallableFunction(viewMode: .all)
+    walker.walk(node.memberBlock)
+    return walker.hasCallableFunction
+  }
+
+  func visitPreImpl(_ node: DeclGroupSyntax & Named) -> SyntaxVisitorContinueKind {
+    guard shouldVisit(node) else {
+      return .skipChildren
+    }
+    let keyword: TokenSyntax = .keyword(
+      .extension, leadingTrivia: Trivia(), trailingTrivia: node.introducer.trailingTrivia)
+    let attributes = node.attributes.filter({ !$0.trimmed.description.starts(with: "@_") })
+    let e = ExtensionDeclSyntax(
+      leadingTrivia: .newline, attributes: attributes.with(\.leadingTrivia, Trivia()),
+      modifiers: node.modifiers.with(\.leadingTrivia, Trivia()), extensionKeyword: keyword,
+      extendedType: IdentifierTypeSyntax(name: node.name),
+      memberBlock: MemberBlockSyntax(stringLiteral: "{"))
+    print(e)
     return .visitChildren
   }
-  override func visit(_ node: StructDeclSyntax) -> SyntaxVisitorContinueKind {
-    if node.attributes.contains(where: { $0.isUnavailable }) {
-      return .skipChildren
+  func visitPostImpl(_ node: DeclGroupSyntax & Named) {
+    if shouldVisit(node) {
+      print("}")
     }
-    return .visitChildren
+  }
+
+  override func visit(_ node: ClassDeclSyntax) -> SyntaxVisitorContinueKind {
+    visitPreImpl(node)
+  }
+  override func visitPost(_ node: ClassDeclSyntax) {
+    visitPostImpl(node)
+  }
+  override func visit(_ node: StructDeclSyntax) -> SyntaxVisitorContinueKind {
+    visitPreImpl(node)
+  }
+  override func visitPost(_ node: StructDeclSyntax) {
+    visitPostImpl(node)
   }
 
   func createFunctionSignature(_ f: FunctionDeclSyntax) -> FunctionDeclSyntax {

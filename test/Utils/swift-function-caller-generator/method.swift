@@ -20,16 +20,20 @@ class Bar {
 import Test
 
 
-func call_nonMutating(_ self: Foo) -> Int {
-  return self.nonMutating()
-}
-func call_mutatingMethod(_ self: inout Foo, x: Int) {
-  return self.mutatingMethod(x: x)
+extension Foo {
+  func call_nonMutating() -> Int {
+    return nonMutating()
+  }
+  mutating func call_mutatingMethod(x: Int) {
+    return mutatingMethod(x: x)
+  }
+  func call_unsafeMethod(p: UnsafeMutablePointer<Int>) {
+    return unsafe unsafeMethod(p: p)
+  }
 }
 
-func call_unsafeMethod(_ self: Foo, p: UnsafeMutablePointer<Int>) {
-  return unsafe self.unsafeMethod(p: p)
-}
-func call_classFunction(x: Int) -> Int {
-  return Bar.classFunction(x: x)
+extension Bar {
+  func call_classFunction(x: Int) -> Int {
+    return Bar.classFunction(x: x)
+  }
 }
