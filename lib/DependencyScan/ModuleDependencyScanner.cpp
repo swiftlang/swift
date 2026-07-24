@@ -196,12 +196,21 @@ static std::vector<std::string> inputSpecificClangScannerCommand(
 static llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>
 getClangScanningFS(SwiftDependencyScanningService &service,
                    std::shared_ptr<llvm::cas::ObjectStore> cas,
-                   ASTContext &ctx) {
+                   std::shared_ptr<llvm::cas::ActionCache> cache,
+                   const CompilerInvocation &invocation, ASTContext &ctx) {
   auto *importer = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
+  // Create the file system that the swift frontend uses. Creating a new one
+  // for each clang worker since the workers run concurrently.
+  std::optional<std::string> CASIDForPCH;
+  // We don't need to emit diagnostics, errors would have been emitted earlier
+  // when the frontend first created the file system.
+  DiagnosticEngine Diags(ctx.SourceMgr);
+//  auto FS = llvm::vfs::createPhysicalFileSystem();
+  auto FS = invocation.createVirtualFileSystemOverlays(
+      llvm::vfs::createPhysicalFileSystem(), cas, cache, CASIDForPCH, Diags);
   // Dependency scanner needs to create its own file system per worker.
   auto fs = ClangImporter::computeClangImporterFileSystem(
-      ctx, importer->getClangFileMapping(),
-      llvm::vfs::createPhysicalFileSystem(), true,
+      ctx, importer->getClangFileMapping(), std::move(FS), true,
       [&](StringRef str) { return service.save(str); });
 
   if (cas)
@@ -221,9 +230,10 @@ ModuleDependencyScanningWorker::ModuleDependencyScanningWorker(
     : workerCompilerInvocation(
           std::make_unique<CompilerInvocation>(ScanCompilerInvocation)),
       workerSourceMgr(ScanASTContext.SourceMgr.getFileSystem()),
-      clangScanningTool(
-          *globalScanningService.ClangScanningService,
-          getClangScanningFS(globalScanningService, CAS, ScanASTContext)),
+      clangScanningTool(*globalScanningService.ClangScanningService,
+                        getClangScanningFS(globalScanningService, CAS,
+                                           ActionCache, ScanCompilerInvocation,
+                                           ScanASTContext)),
       CAS(CAS), ActionCache(ActionCache),
       diagnosticReporter(DiagnosticReporter),
       ShareClangCompilerInstance(ShareClangCompilerInstance) {
