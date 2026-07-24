@@ -2197,9 +2197,10 @@ namespace {
           .isReference();
     }
 
-    void markReturnsUnsafeNonescapable(AbstractFunctionDecl *fd) {
-      fd->addAttribute(new (Impl.SwiftContext) UnsafeAttr(/*Implicit=*/true));
-
+    // Cache an immortal lifetime dependence for the non-escapable result of
+    // `fd`. This also prevents the implicit single-parameter
+    // lifetime-dependence inference from running for it.
+    void cacheImmortalLifetime(AbstractFunctionDecl *fd) {
       unsigned resultIndex = fd->getParameters()->size();
       if (fd->isInstanceMethod()) {
         ++resultIndex;
@@ -2212,6 +2213,11 @@ namespace {
       Impl.SwiftContext.evaluator.cacheOutput(
           LifetimeDependenceInfoRequest{fd},
           Impl.SwiftContext.AllocateCopy(lifetimeDependencies));
+    }
+
+    void markReturnsUnsafeNonescapable(AbstractFunctionDecl *fd) {
+      fd->addAttribute(new (Impl.SwiftContext) UnsafeAttr(/*Implicit=*/true));
+      cacheImmortalLifetime(fd);
     }
 
     bool
@@ -4492,10 +4498,23 @@ namespace {
         if (importedAsClass(ty, forSelf))
           hasSkippedLifetimeAnnotation = true;
         paramHasAnnotation[idx] = true;
-        if (isEscapable(ty))
+        // 'self' and lvalue references borrow the referent's storage.
+        if (forSelf || ty->isLValueReferenceType())
           scopedLifetimeParamIndicesForReturn[idx] = true;
-        else
+        // An rvalue reference is imported as 'consuming'; its storage is not
+        // guaranteed to outlive the call, so we cannot form a scoped
+        // dependency on it, nor can the result inherit its lifetime as if it
+        // were passed by value. Import the API as @unsafe.
+        else if (ty->isRValueReferenceType())
+          hasSkippedLifetimeAnnotation = true;
+        // A non-escapable passed by value: the result inherits its lifetime.
+        else if (!isEscapable(ty))
           inheritLifetimeParamIndicesForReturn[idx] = true;
+        // An escapable/unknown value or pointer passed by value has no
+        // borrowable storage, so we cannot form a scoped lifetime dependency.
+        // Import the API as @unsafe.
+        else
+          hasSkippedLifetimeAnnotation = true;
       };
       auto processLifetimeCaptureBy =
           [&](const clang::LifetimeCaptureByAttr *attr, unsigned idx,
@@ -4587,18 +4606,28 @@ namespace {
                 CxxEscapability::Unknown) == CxxEscapability::NonEscapable)
           lifetimeDependencies.push_back(immortalLifetime);
       }
-      if (lifetimeDependencies.empty()) {
-        if (isNonEscapableAnnotatedType(retType.getTypePtr())) {
-          Impl.addImportDiagnostic(
-              decl,
-              Diagnostic(diag::return_nonescapable_without_lifetimebound,
-                         Impl.SwiftContext.AllocateCopy(retType.getAsString())),
-              decl->getLocation());
-        }
-      } else {
+      bool resultIsNonEscapable =
+          isNonEscapableAnnotatedType(retType.getTypePtr());
+      if (auto *ctordecl = dyn_cast<clang::CXXConstructorDecl>(decl))
+        resultIsNonEscapable = isNonEscapableAnnotatedType(
+            ctordecl->getParent()->getTypeForDecl());
+
+      if (!lifetimeDependencies.empty()) {
         Impl.SwiftContext.evaluator.cacheOutput(
             LifetimeDependenceInfoRequest{result},
             Impl.SwiftContext.AllocateCopy(lifetimeDependencies));
+      } else if (hasSkippedLifetimeAnnotation && resultIsNonEscapable) {
+        // We skipped a lifetime annotation we could not faithfully represent
+        // The API is imported @unsafe (below); give the non-escapable result an
+        // immortal lifetime so the implicit single-parameter inference does not
+        // synthesize a scoped dependency that would be invalid.
+        cacheImmortalLifetime(result);
+      } else if (resultIsNonEscapable) {
+        Impl.addImportDiagnostic(
+            decl,
+            Diagnostic(diag::return_nonescapable_without_lifetimebound,
+                       Impl.SwiftContext.AllocateCopy(retType.getAsString())),
+            decl->getLocation());
       }
 
       if (hasSkippedLifetimeAnnotation) {
