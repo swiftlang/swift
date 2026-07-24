@@ -715,3 +715,46 @@ func testSwitchExpr(e: E) -> Int { // expected-note 2 {{add '@available' attribu
     0
   }
 }
+
+struct HasPropertiesWithAvailabilityRestrictions {
+  @available(DynamicDomain) // expected-error {{stored properties cannot be marked potentially unavailable with '@available'}}
+  var potentiallyUnavailable: Int = 0
+
+  @available(DynamicDomain, unavailable) // expected-error {{stored properties cannot be marked unavailable with '@available'}}
+  var unavailable: Int = 0
+
+  @available(DynamicDomain) // OK
+  var potentiallyUnavailableComputed: Int {
+    get { 0 }
+    set { _ = newValue }
+  }
+
+  @available(DynamicDomain, unavailable) // OK
+  var unavailableComputed: Int {
+    get { 0 }
+    set { _ = newValue }
+  }
+
+  @available(DynamicDomain) // expected-error {{computed property with initial value cannot be marked potentially unavailable with '@available'}}
+  public var potentiallyUnavailableComputedWithInitialValue: Int? {
+    init { _ = newValue }
+    get { 0 }
+  }
+
+  @available(DynamicDomain, unavailable) // expected-error {{computed property with initial value cannot be marked unavailable with '@available'}}
+  public var unavailableComputedWithInitialValue: Int? {
+    init { _ = newValue }
+    get { 0 }
+  }
+
+  init() { fatalError() } // To suppress memberwise initializer
+}
+
+enum HasAssociatedValueCasesWithAvailabilityRestrictions {
+  @available(DynamicDomain) // expected-error {{enum cases with associated values cannot be marked potentially unavailable with '@available'}}
+  case potentiallyUnavailable(Int)
+
+  // FIXME: [availability] This should be rejected
+  @available(DynamicDomain, unavailable)
+  case unavailable(Int)
+}

@@ -442,6 +442,16 @@ namespace swift {
     /// until the next major language version.
     InFlightDiagnostic &warnUntilLanguageMode(LanguageMode mode);
 
+    /// Conditionally limit the diagnostic behavior to warning until the
+    /// specified language mode. If \p mode is \c std::nullopt, no limit is
+    /// imposed.
+    InFlightDiagnostic &
+    warnUntilLanguageMode(std::optional<LanguageMode> mode) {
+      if (!mode)
+        return *this;
+      return warnUntilLanguageMode(*mode);
+    }
+
     /// Limit the diagnostic behavior to warning if the context is a
     /// swiftinterface.
     ///
