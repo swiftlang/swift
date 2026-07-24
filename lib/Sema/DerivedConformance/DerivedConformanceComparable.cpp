@@ -24,10 +24,13 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/PluginLoader.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/Feature.h"
+#include "swift/Basic/QuotedString.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/raw_ostream.h"
@@ -273,6 +276,22 @@ DerivedConformance::canDeriveComparable(DeclContext *context, EnumDecl *enumerat
   return allAssociatedValuesConformToProtocol(context, enumeration, comparable) && !enumeration->hasRawType();
 }
 
+static ValueDecl *deriveComparableViaMacros(DerivedConformance &derived,
+                                            ValueDecl *requirement) {
+  // Build the necessary decl.
+  auto enumeration = dyn_cast<EnumDecl>(derived.Nominal);
+  assert(enumeration);
+  auto *parentDC = derived.getConformanceContext();
+
+  std::string macro;
+ auto out = llvm::raw_string_ostream(macro);
+ out << "#_deriveComparable(" << QuotedString(getEnumTypeInfoString(enumeration))
+     << ", isResilient: "
+     << (parentDC->getParentModule()->isResilient() ? "true" : "false") << ")";
+ out.flush();
+ return deriveRequirementViaMacro(derived, requirement, macro);
+}
+
 ValueDecl *DerivedConformance::deriveComparable(ValueDecl *requirement) {
   if (checkAndDiagnoseDisallowedContext(requirement)) {
     return nullptr;
@@ -281,7 +300,13 @@ ValueDecl *DerivedConformance::deriveComparable(ValueDecl *requirement) {
     requirement->diagnose(diag::broken_comparable_requirement);
     return nullptr;
   }
-  
+
+  auto &pluginLoader = Context.getPluginLoader();
+  auto &entry = pluginLoader.lookupPluginByModuleName(
+      Context.getIdentifier("SwiftMacros"));
+  if (!entry.libraryPath.empty() && !::getenv("DONT_DERIVE_VIA_MACROS"))
+    return deriveComparableViaMacros(*this, requirement);
+
   // Build the necessary decl.
   auto enumeration = dyn_cast<EnumDecl>(this->Nominal);
   assert(enumeration);

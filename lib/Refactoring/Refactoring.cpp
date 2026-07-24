@@ -202,13 +202,14 @@ refactorSwiftModule(ModuleDecl *M, RefactoringOptions Opts,
 
   switch (Opts.Kind) {
 #define SEMANTIC_REFACTORING(KIND, NAME, ID)                                   \
-case RefactoringKind::KIND: {                                                  \
-      RefactoringAction##KIND Action(M, Opts, EditConsumer, DiagConsumer);     \
-      if (RefactoringKind::KIND == RefactoringKind::LocalRename ||             \
-          RefactoringKind::KIND == RefactoringKind::ExpandMacro ||             \
-          Action.isApplicable())                                               \
-        return Action.performChange();                                         \
-      return true;                                                             \
+  case RefactoringKind::KIND: {                                                \
+    RefactoringAction##KIND Action(M, Opts, EditConsumer, DiagConsumer);       \
+    if (RefactoringKind::KIND == RefactoringKind::LocalRename ||               \
+        RefactoringKind::KIND == RefactoringKind::ExpandDerivedConformance ||  \
+        RefactoringKind::KIND == RefactoringKind::ExpandMacro ||               \
+        Action.isApplicable())                                                 \
+      return Action.performChange();                                           \
+    return true;                                                               \
   }
 #include "swift/Refactoring/RefactoringKinds.def"
     case RefactoringKind::LocalRename:
