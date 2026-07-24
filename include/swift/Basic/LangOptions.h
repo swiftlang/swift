@@ -343,6 +343,15 @@ namespace swift {
     };
     std::optional<COMInteropModel> COMModel = std::nullopt;
 
+    /// Return the compiler-owned conditional-compilation identifier for the
+    /// selected COM interop model, or an empty string when COM interop is
+    /// disabled.
+    StringRef getCOMInteropModelConditionalCompilationFlag() const;
+
+    /// Whether \p Name is reserved for a COM interop model's
+    /// conditional-compilation identifier.
+    static bool isCOMInteropModelConditionalCompilationFlag(StringRef Name);
+
     /// Enable C++ interop code generation and build configuration
     /// options. Disabled by default because there is no way to control the
     /// language mode of clang on a per-header or even per-module basis. Also
