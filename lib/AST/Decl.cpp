@@ -7430,6 +7430,17 @@ ReferenceCounting ClassDecl::getObjectModel() const {
   return ReferenceCounting::Native;
 }
 
+bool ClassDecl::isCOMObject() const {
+  // COM is only in play when the experimental interop is enabled; keep the
+  // common case free and never touch the evaluator cache for it.
+  if (!getASTContext().LangOpts.EnableCOMInterop)
+    return false;
+
+  auto *mutableThis = const_cast<ClassDecl *>(this);
+  return evaluateOrDefault(getASTContext().evaluator,
+                           IsCOMObjectRequest{mutableThis}, false);
+}
+
 EnumCaseDecl *EnumCaseDecl::create(SourceLoc CaseLoc,
                                    ArrayRef<EnumElementDecl *> Elements,
                                    DeclContext *DC) {
