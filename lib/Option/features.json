@@ -43,6 +43,9 @@
       "name": "compilation-caching"
     },
     {
+      "name": "dependency-scan-cas-sandbox"
+    },
+    {
        "name": "emit-package-module-interface-path"
     },
     {

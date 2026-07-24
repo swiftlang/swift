@@ -2400,6 +2400,18 @@ def cas_plugin_option: Separate<["-"], "cas-plugin-option">,
   Flags<[FrontendOption, NewDriverOnlyOption, CacheInvariant]>,
   HelpText<"Option pass to CAS Plugin">, MetaVarName<"<name>=<option>">;
 
+def scanner_cas_fs
+    : Separate<["-"], "scanner-cas-fs">,
+      Flags<[FrontendOption, NewDriverOnlyOption, CacheInvariant]>,
+      HelpText<"Configure the filesystem to read from the provided CAS tree "
+               "during dep-scanning">;
+
+def cas_fs_escape
+    : Separate<["-"], "cas-fs-escape">,
+      Flags<[FrontendOption, NewDriverOnlyOption, CacheInvariant]>,
+      HelpText<"Path for using the underlying file system instead of CASFS">,
+      MetaVarName<"<path>">;
+
 def clang_scanner_module_cache_path : Separate<["-"], "clang-scanner-module-cache-path">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath, CacheInvariant]>,
   HelpText<"Specifies the Clang dependency scanner module cache path">;
