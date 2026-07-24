@@ -2581,11 +2581,6 @@ function(add_swift_target_library name)
         list(APPEND swiftlib_link_flags_all "-Wl,-z,max-page-size=16384")
       endif()
 
-      # This is a Android-specific hack till we transition the stdlib fully to versioned triples.
-      if(sdk STREQUAL "ANDROID" AND name STREQUAL "swiftSwiftReflectionTest")
-        list(APPEND swiftlib_swift_compile_flags_all "-target" "${SWIFT_SDK_ANDROID_ARCH_${arch}_TRIPLE}${SWIFT_ANDROID_API_LEVEL}")
-      endif()
-
       if (SWIFTLIB_BACK_DEPLOYMENT_LIBRARY)
         set(back_deployment_library_option BACK_DEPLOYMENT_LIBRARY ${SWIFTLIB_BACK_DEPLOYMENT_LIBRARY})
       else()
