@@ -608,6 +608,7 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   P.addEarlyCodeMotion();
   P.addReleaseHoisting();
   P.addARCSequenceOpts();
+  P.addEagerMaterialization();
   P.addTempRValueElimination();
 
   P.addSimplifyCFG();

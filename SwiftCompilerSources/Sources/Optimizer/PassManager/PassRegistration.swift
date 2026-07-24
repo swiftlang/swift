@@ -122,6 +122,7 @@ private func registerSwiftPasses() {
   registerPass(loopInvariantCodeMotionPass, { loopInvariantCodeMotionPass.run($0) })
   registerPass(killInvalidDebugValuesPass, { killInvalidDebugValuesPass.run($0) })
   registerPass(packSpecialization, { packSpecialization.run($0) })
+  registerPass(eagerMaterialization, { eagerMaterialization.run($0) })
 
   // Instruction passes
   registerForSILCombine(BeginBorrowInst.self,      { run(BeginBorrowInst.self, $0) })

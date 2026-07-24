@@ -27,6 +27,7 @@ swift_compiler_sources(Optimizer
   DeinitDevirtualizer.swift
   DestroyHoisting.swift
   DiagnoseInfiniteRecursion.swift
+  EagerMaterialization.swift
   EmbeddedWitnessCallSpecialization.swift
   InitializeStaticGlobals.swift
   KillInvalidDebugValues.swift

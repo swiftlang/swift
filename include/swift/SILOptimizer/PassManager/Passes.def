@@ -156,6 +156,8 @@ PASS(DeadObjectElimination, "dead-object-elimination",
      "Removes dead object, stack and array allocations")
 PASS(MandatoryDeadObjectElimination, "mandatory-dead-object-elimination",
      "Removes dead stack allocations")
+PASS(EagerMaterialization, "eager-materialization",
+     "Eagerly stack-allocate values so copies stored in loops can be eliminated")
 
 PASS(ClosureSpecialization, "closure-specialization",
      "Specialize functions with closure arguments")
