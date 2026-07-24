@@ -235,14 +235,14 @@ bb0(%x : @guaranteed $NonSendableKlass, %cond : $Builtin.Int1):
 
   %mk = function_ref @makeFresh : $@convention(thin) () -> @owned NonSendableKlass
   %r0 = apply %mk() : $@convention(thin) () -> @owned NonSendableKlass
-  %y = move_value [lexical] [var_decl] %r0 : $NonSendableKlass // expected-note {{'y' is connected to 'x' which is accessible to code in the current isolation context}}
+  %y = move_value [lexical] [var_decl] %r0 : $NonSendableKlass
   debug_value %y : $NonSendableKlass, let, name "y"
   cond_br %cond, bb_merge, bb_no_merge
 
 bb_merge:
   %yb = begin_borrow %y : $NonSendableKlass
   %f2 = function_ref @mergeTwo : $@convention(thin) (@guaranteed NonSendableKlass, @guaranteed NonSendableKlass) -> @owned NonSendableKlass
-  %rm = apply %f2(%x, %yb) : $@convention(thin) (@guaranteed NonSendableKlass, @guaranteed NonSendableKlass) -> @owned NonSendableKlass
+  %rm = apply %f2(%x, %yb) : $@convention(thin) (@guaranteed NonSendableKlass, @guaranteed NonSendableKlass) -> @owned NonSendableKlass // expected-note {{'y' is connected to 'x' which is accessible to code in the current isolation context}}
   end_borrow %yb : $NonSendableKlass
   destroy_value %rm : $NonSendableKlass
   br bb_join
