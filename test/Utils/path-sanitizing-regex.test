@@ -1,0 +1,25 @@
+# Tests for the --sanitize-regex option shared by PathSanitizingFileCheck and
+# PathSanitizingDiff. Unlike --sanitize, its SOURCE is treated as a regular
+# expression used verbatim (no path normalization, escaping, or slash-compat
+# substitution).
+
+# RUN: %empty-directory(%t)
+
+# A --sanitize-regex rewrites text matching the regex; the source is used as a
+# regex (here [0-9]+), not as a literal string. --dry-run prints the result.
+# RUN: printf 'value = 12345\n' | %{python} %utils/PathSanitizingFileCheck --sanitize-regex 'NUM=[0-9]+' --dry-run | %raw-FileCheck --check-prefix=REGEX %s
+# REGEX: value = NUM
+
+# The replacement may reference regex capture groups.
+# RUN: printf 'id: abc-999\n' | %{python} %utils/PathSanitizingFileCheck --sanitize-regex 'id: \1-N=id: ([a-z]+)-[0-9]+' --dry-run | %raw-FileCheck --check-prefix=BACKREF %s
+# BACKREF: id: abc-N
+
+# --sanitize-regex composes with a literal --sanitize; literal paths are
+# replaced first, then the regex is applied to the result.
+# RUN: printf 'hash 0xDEADBEEF in /some/build/dir\n' | %{python} %utils/PathSanitizingFileCheck --sanitize BUILD=/some/build/dir --sanitize-regex 'HASH=0x[0-9A-Fa-f]+' --dry-run | %raw-FileCheck --check-prefix=COMBINED %s
+# COMBINED: hash HASH in BUILD
+
+# PathSanitizingDiff applies the same regex sanitization before diffing against
+# the reference file, so a sanitized mismatch becomes a match.
+# RUN: printf 'value = num\n' > %t/expected.txt
+# RUN: printf 'value = 98765\n' | %{python} %utils/PathSanitizingDiff --sanitize-regex 'num=[0-9]+' %t/expected.txt
