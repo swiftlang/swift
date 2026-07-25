@@ -94,26 +94,26 @@ inline void mutex_unsafe_unlock(mutex_handle &handle) {
   _swift_mutex_unlock(&handle);
 }
 
-using recursive_mutex_handle = mutex_handle;
+struct recursive_mutex_handle {
+  uintptr_t storage[EMBEDDED_SWIFT_MUTEX_RECURSIVE_NUM_WORDS] = {};
+};
 
 inline void recursive_mutex_init(recursive_mutex_handle &handle,
                                  bool checked = false) {
-  _swift_mutex_init(&handle,
-                    static_cast<swift_mutex_flags_t>(
-                        SWIFT_MUTEX_RECURSIVE |
-                        (checked ? SWIFT_MUTEX_CHECKED : SWIFT_MUTEX_NONE)));
+  _swift_mutexRecursive_init(
+      &handle, checked ? SWIFT_MUTEX_CHECKED : SWIFT_MUTEX_NONE);
 }
 
 inline void recursive_mutex_destroy(recursive_mutex_handle &handle) {
-  _swift_mutex_destroy(&handle);
+  _swift_mutexRecursive_destroy(&handle);
 }
 
 inline void recursive_mutex_lock(recursive_mutex_handle &handle) {
-  _swift_mutex_lock(&handle);
+  _swift_mutexRecursive_lock(&handle);
 }
 
 inline void recursive_mutex_unlock(recursive_mutex_handle &handle) {
-  _swift_mutex_unlock(&handle);
+  _swift_mutexRecursive_unlock(&handle);
 }
 
 inline void once_impl(once_t &predicate, void (*fn)(void *), void *ctx) {
