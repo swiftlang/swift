@@ -265,6 +265,13 @@ TypeInfo::TypeInfo(
   Bits = representation.bits;
 }
 
+void TypeInfo::assertNotDeserialized(const char *operation) const {
+  if (CreatedFromSerializableHiddenTypeInfoRepresentation)
+    llvm::report_fatal_error(
+        llvm::Twine(operation) +
+        " requires AST information unavailable to a reconstructed TypeInfo");
+}
+
 std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
 TypeInfo::createSerializableHiddenTypeInfoRepresentation() const {
   auto representation =

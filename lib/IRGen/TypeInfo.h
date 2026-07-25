@@ -124,6 +124,8 @@ protected:
 
   bool CreatedFromSerializableHiddenTypeInfoRepresentation;
 
+  void assertNotDeserialized(const char *operation) const;
+
   /// Change the minimum alignment of a stored value of this type.
   void setStorageAlignment(Alignment alignment) {
     auto Prev = Bits.TypeInfo.AlignmentShift;

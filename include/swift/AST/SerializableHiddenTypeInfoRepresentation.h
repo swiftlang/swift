@@ -79,6 +79,9 @@ public:
   uint32_t explosionSize = 0;
 };
 
+class SerializableLoadableStructTypeInfoRepresentation
+    : public SerializableLoadableRecordTypeInfoRepresentation {};
+
 } // namespace swift
 
 #endif // SWIFT_AST_SERIALIZABLEHIDDENTYPEINFOREPRESENTATION_H

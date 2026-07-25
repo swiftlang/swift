@@ -158,11 +158,29 @@ namespace {
       super::setSubclassKind((unsigned) kind);
     }
 
+    StructTypeInfoBase(
+        StructTypeInfoKind kind, ArrayRef<FieldInfoType> fields,
+        IRGenModule &IGM,
+        const SerializableLoadableStructTypeInfoRepresentation &representation)
+        : super(fields, IGM, representation) {
+      super::setSubclassKind((unsigned) kind);
+    }
+
+    void populateSerializableHiddenTypeInfoRepresentation(
+        SerializableLoadableStructTypeInfoRepresentation &representation) const {
+      super::populateSerializableHiddenTypeInfoRepresentation(representation);
+    }
+
     using super::asImpl;
+    using super::assertNotDeserialized;
 
   public:
 
     const FieldInfoType &getFieldInfo(VarDecl *field) const {
+      // TypeInfo derived from a hidden representation does not support
+      // AST based operations.
+      assertNotDeserialized("StructTypeInfoBase::getFieldInfo");
+
       // FIXME: cache the physical field index in the VarDecl.
       for (auto &fieldInfo : asImpl().getFields()) {
         if (fieldInfo.Field == field)
@@ -191,6 +209,8 @@ namespace {
     /// single field.
     Address projectFieldAddress(IRGenFunction &IGF, Address addr, SILType T,
                                 const FieldInfoType &field) const {
+      // We can't access field.Field with deserialized TypeInfo.
+      assertNotDeserialized("StructTypeInfoBase::projectFieldAddress");
       return asImpl().projectFieldAddress(IGF, addr, T, field.Field);
     }
 
@@ -298,6 +318,9 @@ namespace {
 
     void destroy(IRGenFunction &IGF, Address address, SILType T,
                  bool isOutlined) const override {
+      // The code below checks the AST to call a deinit method
+      // which we don't support from hidden representations yet
+      assertNotDeserialized("StructTypeInfoBase::destroy");
 
       // If the struct has a deinit declared, then call it to destroy the
       // value.
@@ -347,6 +370,8 @@ namespace {
             }
           };
 
+          // We can't access field.Field without AST backed TypeInfo
+          assertNotDeserialized("StructTypeInfoBase::verify");
           FindOffsetOfFieldOffsetVector scanner(IGF.IGM, field.Field);
           scanner.layout();
 
