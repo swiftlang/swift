@@ -61,6 +61,7 @@ protected:
       const SerializableLoadableTypeInfoRepresentation &representation);
 
   void populateSerializableHiddenTypeInfoRepresentation(
+      IRGenModule &IGM,
       SerializableLoadableTypeInfoRepresentation &representation) const;
 
   LoadableTypeInfo(llvm::Type *type, Size size,
@@ -100,7 +101,7 @@ public:
   static bool isLoadable() { return true; }
 
   std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
-  createSerializableHiddenTypeInfoRepresentation() const override;
+  createSerializableHiddenTypeInfoRepresentation(IRGenModule &IGM) const override;
 
   /// Return the number of elements in an explosion of this type.
   virtual unsigned getExplosionSize() const = 0;

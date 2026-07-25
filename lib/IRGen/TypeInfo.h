@@ -120,6 +120,7 @@ protected:
            const SerializableHiddenTypeInfoRepresentation &representation);
 
   void populateSerializableHiddenTypeInfoRepresentation(
+      IRGenModule &IGM,
       SerializableHiddenTypeInfoRepresentation &representation) const;
 
   bool CreatedFromSerializableHiddenTypeInfoRepresentation;
@@ -159,7 +160,7 @@ public:
   virtual ~TypeInfo();
 
   virtual std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
-  createSerializableHiddenTypeInfoRepresentation() const;
+  createSerializableHiddenTypeInfoRepresentation(IRGenModule &IGM) const;
 
   /// Unsafely cast this to the given subtype.
   template <class T> const T &as() const {

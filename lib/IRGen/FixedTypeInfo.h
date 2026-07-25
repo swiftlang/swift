@@ -44,6 +44,7 @@ protected:
                 const SerializableFixedTypeInfoRepresentation &representation);
 
   void populateSerializableHiddenTypeInfoRepresentation(
+      IRGenModule &IGM,
       SerializableFixedTypeInfoRepresentation &representation) const;
 
   FixedTypeInfo(llvm::Type *type, Size size,
@@ -84,7 +85,7 @@ public:
   static bool isFixed() { return true; }
 
   std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
-  createSerializableHiddenTypeInfoRepresentation() const override;
+  createSerializableHiddenTypeInfoRepresentation(IRGenModule &IGM) const override;
 
   /// Whether this type is known to be empty.
   bool isKnownEmpty(ResilienceExpansion expansion) const {

@@ -167,8 +167,10 @@ namespace {
     }
 
     void populateSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &IGM,
         SerializableLoadableStructTypeInfoRepresentation &representation) const {
-      super::populateSerializableHiddenTypeInfoRepresentation(representation);
+      super::populateSerializableHiddenTypeInfoRepresentation(IGM,
+                                                               representation);
     }
 
     using super::asImpl;
@@ -412,11 +414,46 @@ namespace {
   class LoadableClangRecordTypeInfo final
       : public StructTypeInfoBase<LoadableClangRecordTypeInfo, LoadableTypeInfo,
                                   ClangFieldInfo> {
-    const clang::RecordDecl *ClangDecl;
     bool HasReferenceField;
+    std::vector<SwiftAggLowering::StorageEntry> AggLoweringInputs;
+
+    static std::vector<SwiftAggLowering::StorageEntry>
+    computeAggLoweringInputs(IRGenModule &IGM,
+                             const clang::RecordDecl *clangDecl) {
+      assert(clangDecl && "decomposing Clang TypeInfo without a Clang decl");
+      std::vector<SwiftAggLowering::StorageEntry> inputs;
+      SwiftAggLowering decomposer(IGM.getClangCGM());
+      auto appendInput = [&](const SwiftAggLowering::StorageEntry &entry) {
+        inputs.push_back(entry);
+      };
+
+      decomposer.decomposeTypedData(clangDecl, clang::CharUnits::Zero(),
+                                    appendInput);
+      return inputs;
+    }
+
+    void populateSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &IGM,
+        SerializableLoadableClangRecordTypeInfoRepresentation
+            &representation) const {
+      StructTypeInfoBase::populateSerializableHiddenTypeInfoRepresentation(
+          IGM, representation);
+      representation.hasReferenceField = HasReferenceField;
+
+      representation.aggLoweringInputs.clear();
+      for (const auto &entry : AggLoweringInputs) {
+        SerializableAggLoweringInputRepresentation input;
+        input.begin = entry.Begin.getQuantity();
+        input.end = entry.End.getQuantity();
+        if (entry.Type)
+          input.type = serializeLLVMType(entry.Type);
+        representation.aggLoweringInputs.push_back(std::move(input));
+      }
+    }
 
   public:
     LoadableClangRecordTypeInfo(ArrayRef<ClangFieldInfo> fields,
+                                IRGenModule &IGM,
                                 unsigned explosionSize, llvm::Type *storageType,
                                 Size size, SpareBitVector &&spareBits,
                                 Alignment align,
@@ -429,7 +466,36 @@ namespace {
                              storageType, size, std::move(spareBits), align,
                              isTriviallyDestroyable, isCopyable, IsFixedSize,
                              IsABIAccessible),
-          ClangDecl(clangDecl), HasReferenceField(hasReferenceField) {}
+          HasReferenceField(hasReferenceField),
+          AggLoweringInputs(computeAggLoweringInputs(IGM, clangDecl)) {}
+
+    LoadableClangRecordTypeInfo(
+        ArrayRef<ClangFieldInfo> fields, IRGenModule &IGM,
+        const SerializableLoadableClangRecordTypeInfoRepresentation
+            &representation)
+        : StructTypeInfoBase(
+              StructTypeInfoKind::LoadableClangRecordTypeInfo, fields, IGM,
+              static_cast<const SerializableLoadableStructTypeInfoRepresentation
+                              &>(representation)),
+          HasReferenceField(representation.hasReferenceField) {
+      AggLoweringInputs.reserve(representation.aggLoweringInputs.size());
+      for (const auto &input : representation.aggLoweringInputs) {
+        AggLoweringInputs.push_back({
+            clang::CharUnits::fromQuantity(input.begin),
+            clang::CharUnits::fromQuantity(input.end),
+            input.type ? deserializeLLVMType(IGM, input.type) : nullptr,
+        });
+      }
+    }
+
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+    createSerializableHiddenTypeInfoRepresentation(
+        IRGenModule &IGM) const override {
+      auto representation = std::make_unique<
+          SerializableLoadableClangRecordTypeInfoRepresentation>();
+      populateSerializableHiddenTypeInfoRepresentation(IGM, *representation);
+      return representation;
+    }
 
     TypeLayoutEntry
     *buildTypeLayoutEntry(IRGenModule &IGM,
@@ -471,9 +537,16 @@ namespace {
       LoadableClangRecordTypeInfo::initialize(IGF, params, addr, isOutlined);
     }
 
-    void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
+    void addToAggLowering(IRGenModule &, SwiftAggLowering &lowering,
                           Size offset) const override {
-      lowering.addTypedData(ClangDecl, offset.asCharUnits());
+      for (const auto &input : AggLoweringInputs) {
+        auto begin = offset.asCharUnits() + input.Begin;
+        auto end = offset.asCharUnits() + input.End;
+        if (input.Type)
+          lowering.addTypedData(input.Type, begin, end);
+        else
+          lowering.addOpaqueData(begin, end);
+      }
     }
 
     std::nullopt_t getNonFixedOffsets(IRGenFunction &IGF) const {
@@ -1463,7 +1536,7 @@ public:
           ClangDecl);
     }
     return LoadableClangRecordTypeInfo::create(
-        FieldInfos, NextExplosionIndex, llvmType, TotalStride,
+        FieldInfos, IGM, NextExplosionIndex, llvmType, TotalStride,
         std::move(SpareBits), TotalAlignment,
         (SwiftDecl &&
          (SwiftDecl->hasValueTypeDestructor() || hasReferenceField))

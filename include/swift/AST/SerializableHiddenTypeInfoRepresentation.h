@@ -82,6 +82,19 @@ public:
 class SerializableLoadableStructTypeInfoRepresentation
     : public SerializableLoadableRecordTypeInfoRepresentation {};
 
+struct SerializableAggLoweringInputRepresentation {
+  uint64_t begin = 0;
+  uint64_t end = 0;
+  std::unique_ptr<SerializableLLVMTypeRepresentation> type;
+};
+
+class SerializableLoadableClangRecordTypeInfoRepresentation final
+    : public SerializableLoadableStructTypeInfoRepresentation {
+public:
+  bool hasReferenceField = false;
+  std::vector<SerializableAggLoweringInputRepresentation> aggLoweringInputs;
+};
+
 } // namespace swift
 
 #endif // SWIFT_AST_SERIALIZABLEHIDDENTYPEINFOREPRESENTATION_H

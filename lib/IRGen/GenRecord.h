@@ -137,16 +137,18 @@ protected:
   const Impl &asImpl() const { return *static_cast<const Impl*>(this); }
 
   void populateSerializableRecordTypeInfoRepresentation(
+      IRGenModule &IGM, 
       SerializableLoadableRecordTypeInfoRepresentation &representation) const {
-    Base::populateSerializableHiddenTypeInfoRepresentation(representation);
+    Base::populateSerializableHiddenTypeInfoRepresentation(IGM, representation);
     representation.fieldsAreABIAccessible = areFieldsABIAccessible();
     representation.fields.clear();
     representation.fields.reserve(NumFields);
 
     for (const auto &field : getFields()) {
       SerializableRecordFieldRepresentation fieldRepresentation;
-      fieldRepresentation.typeInfo =
-          field.getTypeInfo().createSerializableHiddenTypeInfoRepresentation();
+      fieldRepresentation.typeInfo = field.getTypeInfo()
+                                         .createSerializableHiddenTypeInfoRepresentation(
+                                             IGM);
       fieldRepresentation.layout = field.getLayoutStorage();
       auto projectionRange = field.getProjectionRange();
       fieldRepresentation.storage.Begin = projectionRange.first;
@@ -832,8 +834,10 @@ protected:
       ExplosionSize(explosionSize) {}
 
   void populateSerializableHiddenTypeInfoRepresentation(
+      IRGenModule &IGM,
       SerializableLoadableRecordTypeInfoRepresentation &representation) const {
-    super::populateSerializableRecordTypeInfoRepresentation(representation);
+    super::populateSerializableRecordTypeInfoRepresentation(IGM,
+                                                             representation);
     representation.explosionSize = ExplosionSize;
   }
 
@@ -899,10 +903,10 @@ public:
   using super::getFields;
 
   std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
-  createSerializableHiddenTypeInfoRepresentation() const override {
+  createSerializableHiddenTypeInfoRepresentation(IRGenModule &IGM) const override {
     auto representation =
         std::make_unique<SerializableLoadableRecordTypeInfoRepresentation>();
-    populateSerializableHiddenTypeInfoRepresentation(*representation);
+    populateSerializableHiddenTypeInfoRepresentation(IGM, *representation);
     return representation;
   }
 

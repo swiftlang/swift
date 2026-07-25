@@ -273,14 +273,16 @@ void TypeInfo::assertNotDeserialized(const char *operation) const {
 }
 
 std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
-TypeInfo::createSerializableHiddenTypeInfoRepresentation() const {
+TypeInfo::createSerializableHiddenTypeInfoRepresentation(
+    IRGenModule &IGM) const {
   auto representation =
       std::make_unique<SerializableHiddenTypeInfoRepresentation>();
-  populateSerializableHiddenTypeInfoRepresentation(*representation);
+  populateSerializableHiddenTypeInfoRepresentation(IGM, *representation);
   return representation;
 }
 
 void TypeInfo::populateSerializableHiddenTypeInfoRepresentation(
+    IRGenModule &IGM,
     SerializableHiddenTypeInfoRepresentation &representation) const {
   representation.storageType = serializeLLVMType(getStorageType());
   representation.bits = Bits;
@@ -298,17 +300,20 @@ FixedTypeInfo::FixedTypeInfo(
 }
 
 void FixedTypeInfo::populateSerializableHiddenTypeInfoRepresentation(
+    IRGenModule &IGM,
     SerializableFixedTypeInfoRepresentation &representation) const {
-  TypeInfo::populateSerializableHiddenTypeInfoRepresentation(representation);
+  TypeInfo::populateSerializableHiddenTypeInfoRepresentation(IGM,
+                                                              representation);
   representation.size = getFixedSize().getValue();
   representation.spareBits = getSpareBits();
 }
 
 std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
-FixedTypeInfo::createSerializableHiddenTypeInfoRepresentation() const {
+FixedTypeInfo::createSerializableHiddenTypeInfoRepresentation(
+    IRGenModule &IGM) const {
   auto representation =
       std::make_unique<SerializableFixedTypeInfoRepresentation>();
-  populateSerializableHiddenTypeInfoRepresentation(*representation);
+  populateSerializableHiddenTypeInfoRepresentation(IGM, *representation);
   return representation;
 }
 
@@ -326,16 +331,18 @@ LoadableTypeInfo::LoadableTypeInfo(
 }
 
 void LoadableTypeInfo::populateSerializableHiddenTypeInfoRepresentation(
+    IRGenModule &IGM,
     SerializableLoadableTypeInfoRepresentation &representation) const {
   FixedTypeInfo::populateSerializableHiddenTypeInfoRepresentation(
-      representation);
+      IGM, representation);
 }
 
 std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
-LoadableTypeInfo::createSerializableHiddenTypeInfoRepresentation() const {
+LoadableTypeInfo::createSerializableHiddenTypeInfoRepresentation(
+    IRGenModule &IGM) const {
   auto representation =
       std::make_unique<SerializableLoadableTypeInfoRepresentation>();
-  populateSerializableHiddenTypeInfoRepresentation(*representation);
+  populateSerializableHiddenTypeInfoRepresentation(IGM, *representation);
   return representation;
 }
 
