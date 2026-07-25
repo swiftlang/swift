@@ -38,6 +38,7 @@ import WinSDK
 @main
 class SwiftMacroTestGen: SyntaxVisitor {
   var classDecls: [String: ClassDeclSyntax] = [:]
+  var curClass: String? = nil
 
   static func main() {
     if CommandLine.argc < 2 {
@@ -73,7 +74,16 @@ class SwiftMacroTestGen: SyntaxVisitor {
       return .skipChildren
     }
     let surroundingType = getParentType(res)?.trimmed
-    let selfParam = surroundingType.flatMap { type in res.isClassMethod ? type.with(\.trailingTrivia, "") : nil }
+    let isClass = surroundingType != nil && classDecls.keys.contains(surroundingType!.text)
+    let selfParam = surroundingType.flatMap { type in
+      if res.isClassMethod {
+        return type.with(\.trailingTrivia, "")
+      }
+      if isClass, type.text != curClass {
+        return .keyword(.super)
+      }
+      return nil
+    }
     res = createFunctionSignature(res)
     res =
       res
@@ -81,7 +91,8 @@ class SwiftMacroTestGen: SyntaxVisitor {
       .with(\.name, "call_\(res.name.withoutBackticks)")
       .with(\.leadingTrivia, res.leadingTrivia.withoutComments)
     if let surroundingType {
-      res.name = "\(res.name)_\(surroundingType)"
+      let superKw = selfParam?.text == "super" ? "_super" : ""
+      res.name = "\(res.name)_\(surroundingType)\(raw: superKw)"
       res =
         res
         .with(
@@ -98,7 +109,7 @@ class SwiftMacroTestGen: SyntaxVisitor {
         )
       let origIndent = node.firstToken(viewMode: .sourceAccurate)!.indentationOfLine
       res = res.with(\.leadingTrivia, "")
-      if classDecls.keys.contains(surroundingType.text) {
+      if isClass {
         // filter out "final" above so that we can add it back unconditionally
         res.modifiers.append(DeclModifierSyntax(name: .keyword(.final), trailingTrivia: .space))
       }
@@ -169,10 +180,17 @@ class SwiftMacroTestGen: SyntaxVisitor {
     let ret = visitPreImpl(node, type: IdentifierTypeSyntax(name: node.name))
     if ret == .visitChildren {
       classDecls[node.name.trimmed.text] = node
+      curClass = node.name.trimmed.text
     }
     return ret
   }
   override func visitPost(_ node: ClassDeclSyntax) {
+    if let parentName = node.inheritanceClause?.inheritedTypes.first,
+      let parentClass = classDecls[parentName.type.trimmed.description]
+    {
+      walk(parentClass.memberBlock)
+    }
+    curClass = nil
     visitPostImpl(node)
   }
   override func visit(_ node: StructDeclSyntax) -> SyntaxVisitorContinueKind {

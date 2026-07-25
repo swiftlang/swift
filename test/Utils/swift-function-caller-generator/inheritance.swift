@@ -51,11 +51,26 @@ extension DerivedClass {
   final func call_derivedOnly_DerivedClass() -> Int {
     return derivedOnly()
   }
+  final func call_nonFinalShared_BaseClass_super(x: Int) -> Int {
+    return super.nonFinalShared(x: x)
+  }
+  final func call_finalBaseOnly_BaseClass_super() -> Int {
+    return super.finalBaseOnly()
+  }
+  final func call_baseOnly_BaseClass_super() -> Int {
+    return super.baseOnly()
+  }
 }
 
 extension LeafClass {
   final func call_nonFinalShared_LeafClass(x: Int) -> Int {
     return nonFinalShared(x: x)
+  }
+  final func call_nonFinalShared_DerivedClass_super(x: Int) -> Int {
+    return super.nonFinalShared(x: x)
+  }
+  final func call_derivedOnly_DerivedClass_super() -> Int {
+    return super.derivedOnly()
   }
 }
 

@@ -62,12 +62,30 @@ extension Derived {
   final func call_derivedOnly_Derived() -> CInt {
     return derivedOnly()
   }
+  final func call_shared_Base_super() -> CInt {
+    return super.shared()
+  }
+  final func call_baseOnly_Base_super() -> CInt {
+    return super.baseOnly()
+  }
+  final func call_nonVirtualShared_Base_super() -> CInt {
+    return super.nonVirtualShared()
+  }
 }
 
 @available(macOS 13.3.0, *)
 extension LeafDerived {
   final func call_shared_LeafDerived() -> CInt {
     return shared()
+  }
+  final func call_shared_Derived_super() -> CInt {
+    return super.shared()
+  }
+  final func call_nonVirtualShared_Derived_super() -> CInt {
+    return super.nonVirtualShared()
+  }
+  final func call_derivedOnly_Derived_super() -> CInt {
+    return super.derivedOnly()
   }
 }
 //--- module.modulemap
