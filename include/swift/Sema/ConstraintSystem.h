@@ -4086,6 +4086,9 @@ public:
     return ResolvedOverloads;
   }
 
+  /// Emit a fallback diagnostic.
+  void produceFallbackDiagnostic(SourceLoc loc) const;
+
   /// If we aren't certain that we've emitted a diagnostic, emit a fallback
   /// diagnostic.
   void maybeProduceFallbackDiagnostic(SourceLoc loc) const;
