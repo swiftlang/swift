@@ -2618,16 +2618,26 @@ Identifier ImportedName::getBaseIdentifier(ASTContext &ctx) const {
 }
 
 Identifier
-NameImporter::importMacroName(const clang::IdentifierInfo *clangIdentifier,
-                              const clang::MacroInfo *macro) {
+NameImporter::importMacroName(const clang::IdentifierInfo *II,
+                              const clang::MacroInfo *MI,
+                              const clang::Module *M) {
   // If we're supposed to ignore this macro, return an empty identifier.
-  if (::shouldIgnoreMacro(clangIdentifier->getName(), macro,
-                          getClangPreprocessor()))
+  if (::shouldIgnoreMacro(II->getName(), MI, getClangPreprocessor()))
     return Identifier();
 
-  // No transformation is applied to the name.
-  StringRef name = clangIdentifier->getName();
-  return swiftCtx.getIdentifier(name);
+  // Honor an APINotes 'SwiftName:' override, if one applies. A macro constant
+  // can only be renamed to a simple identifier, so reject function, operator,
+  // and member names, which are meaningless here.
+  if (auto notes = getClangSema().ProcessAPINotes(M, II, MI->getDefinitionLoc())) {
+    if (!notes->SwiftName.empty()) {
+      ParsedDeclName ident = parseDeclName(notes->SwiftName);
+      if (ident && !ident.isOperator() && !ident.IsFunctionName && !ident.isMember())
+        return swiftCtx.getIdentifier(ident.BaseName);
+    }
+  }
+
+  // Otherwise, no transformation is applied to the name.
+  return swiftCtx.getIdentifier(II->getName());
 }
 
 ImportedName NameImporter::importName(const clang::NamedDecl *decl,
