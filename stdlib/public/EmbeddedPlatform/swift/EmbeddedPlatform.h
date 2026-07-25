@@ -135,8 +135,9 @@ extern "C" {
 #endif
 
 /**
- * The number of pointer-size words that will be used to store a Mutex (as
- * provided by the Synchronization library).
+ * The number of pointer-size words that will be used to store a non-recursive
+ * Mutex (as provided by the Synchronization library), i.e., one backed by the
+ * `_swift_mutex_*` functions.
  *
  * This needs to be large enough to accommodate any implementation of Mutex that
  * can be implemented for that given platform (e.g., via the `_swift_mutex_*`
@@ -151,6 +152,26 @@ extern "C" {
 #define EMBEDDED_SWIFT_MUTEX_NUM_WORDS (__swift_ptrdiff_t)12
 #else
 #define EMBEDDED_SWIFT_MUTEX_NUM_WORDS (__swift_ptrdiff_t)8
+#endif
+#endif
+
+/**
+ * The number of pointer-size words that will be used to store a recursive
+ * Mutex, i.e., one backed by the `_swift_mutexRecursive_*` functions.
+ *
+ * This is tracked separately from EMBEDDED_SWIFT_MUTEX_NUM_WORDS because a
+ * platform's recursive mutex implementation need not have the same size as
+ * its non-recursive one. It can be defined externally (via `-D` on the
+ * command line for Clang, `-Xcc -D` for Swift) to a different value, but that
+ * value must be consistent throughout the build to prevent ABI mismatches.
+ */
+#ifndef EMBEDDED_SWIFT_MUTEX_RECURSIVE_NUM_WORDS
+#if defined(__APPLE__) && __SIZEOF_POINTER__ == 4
+// On 32-bit Apple targets (e.g., watchOS armv7k / arm64_32) `pthread_mutex_t`
+// is 40 bytes, which doesn't fit in 8 four-byte words.
+#define EMBEDDED_SWIFT_MUTEX_RECURSIVE_NUM_WORDS (__swift_ptrdiff_t)12
+#else
+#define EMBEDDED_SWIFT_MUTEX_RECURSIVE_NUM_WORDS (__swift_ptrdiff_t)8
 #endif
 #endif
 
@@ -230,12 +251,7 @@ typedef enum EMBEDDED_SWIFT_OPTION_SET: __swift_options_t {
   /**
    * Diagnose mutex misuse when the platform can do so cheaply.
    */
-  SWIFT_MUTEX_CHECKED EMBEDDED_SWIFT_NAME(checked) = 0x01,
-
-  /**
-   * Allow the same execution context to acquire the mutex recursively.
-   */
-  SWIFT_MUTEX_RECURSIVE EMBEDDED_SWIFT_NAME(recursive) = 0x02
+  SWIFT_MUTEX_CHECKED EMBEDDED_SWIFT_NAME(checked) = 0x01
 } swift_mutex_flags_t EMBEDDED_SWIFT_NAME(SwiftMutexFlags);
 
 /**
@@ -509,6 +525,51 @@ void _swift_mutex_unlock(void * EMBEDDED_SWIFT_NONNULL mutex);
  * - Returns: Nonzero if the mutex was acquired, or zero if it was not acquired.
  */
 __swift_ptrdiff_t _swift_mutex_tryLock(void * EMBEDDED_SWIFT_NONNULL mutex);
+
+/**
+ * Initializes a recursive mutex, i.e., one that can be acquired more than
+ * once by the same execution context without deadlocking.
+ *
+ * - Parameters:
+ *   - mutex: Opaque caller-owned mutex storage initialized by this function
+ *     and later passed to the other `_swift_mutexRecursive_*` functions. The
+ *     contents are private to the platform implementation. The storage is at
+ *     least EMBEDDED_SWIFT_MUTEX_RECURSIVE_NUM_WORDS pointer-sized words and
+ *     has pointer alignment.
+ *   - flags: Flags controlling mutex behavior.
+ *
+ * This function is required when using Synchronization.Mutex with a
+ * recursive locking policy.
+ */
+void _swift_mutexRecursive_init(void * EMBEDDED_SWIFT_NONNULL mutex,
+                                swift_mutex_flags_t flags);
+
+/**
+ * Destroys a recursive mutex initialized by `_swift_mutexRecursive_init`.
+ *
+ * - Parameters:
+ *   - mutex: The mutex to destroy. Must not be locked.
+ */
+void _swift_mutexRecursive_destroy(void * EMBEDDED_SWIFT_NONNULL mutex);
+
+/**
+ * Acquires a recursive mutex, blocking or spinning until ownership is
+ * obtained. If the current execution context already holds the mutex, this
+ * increments its recursion count instead of deadlocking.
+ *
+ * - Parameters:
+ *   - mutex: The mutex to acquire.
+ */
+void _swift_mutexRecursive_lock(void * EMBEDDED_SWIFT_NONNULL mutex);
+
+/**
+ * Releases one level of recursive ownership of a mutex held by the current
+ * execution context.
+ *
+ * - Parameters:
+ *   - mutex: The mutex to release.
+ */
+void _swift_mutexRecursive_unlock(void * EMBEDDED_SWIFT_NONNULL mutex);
 
 /**
  * Initializes a reserved TLS key. `key` is one of the numeric reserved keys
