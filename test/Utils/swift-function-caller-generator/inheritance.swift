@@ -3,14 +3,6 @@
 // RUN: %swift-function-caller-generator Test %t/test.swift > %t/out.swift
 // RUN: %diff %t/out.swift %t/out.swift.expected
 
-// When a base type declares a function that a derived type does not, a caller
-// is still emitted for calling that (inherited) method on the derived type.
-// When the function is declared in both with the same signature, an additional
-// caller is emitted that invokes the base implementation via `super` from an
-// extension of the derived type. This is transitive along the inheritance
-// chain. `super` is only valid in a class, so struct types only get the
-// inherited-method callers.
-
 //--- test.swift
 class BaseClass {
   func nonFinalShared(x: Int) -> Int
