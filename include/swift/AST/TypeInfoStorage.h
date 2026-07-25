@@ -27,6 +27,65 @@ class TypeInfo;
 /// store vectors of spare bits.
 using SpareBitVector = ClusteredBitVector;
 
+enum class ElementLayoutKind {
+  /// The element is known to require no storage in the aggregate.
+  /// Its offset in the aggregate is always statically zero.
+  Empty,
+
+  /// The element is known to require no storage in the aggregate.
+  /// But it has an offset in the aggregate. This is to support getting the
+  /// offset of tail allocated storage using MemoryLayout<>.offset(of:).
+  EmptyTailAllocatedCType,
+
+  /// The element can be positioned at a fixed offset within the
+  /// aggregate.
+  Fixed,
+
+  /// The element cannot be positioned at a fixed offset within the
+  /// aggregate.
+  NonFixed,
+
+  /// The element is an object lacking a fixed size but located at
+  /// offset zero.  This is necessary because LLVM forbids even a
+  /// 'gep 0' on an unsized type.
+  InitialNonFixedSize
+
+  // IncompleteKind comes here
+};
+
+struct ElementLayoutStorage {
+  /// The offset in bytes from the start of the struct.
+  unsigned ByteOffset;
+
+  /// The offset in bytes from the start of the struct, except EmptyFields are
+  /// placed at the current byte offset instead of 0. For the purpose of the
+  /// final layout empty fields are placed at offset 0, that however creates a
+  /// whole slew of special cases to deal with. Instead of dealing with these
+  /// special cases during layout, we pretend that empty fields are placed
+  /// just like any other field at the current offset.
+  unsigned ByteOffsetForLayout;
+
+  /// The index of this element, either in the LLVM struct (if fixed)
+  /// or in the non-fixed elements array (if non-fixed).
+  unsigned Index : 28;
+
+  /// Whether this element is known to be trivially destructible in the local
+  /// resilience domain.
+  unsigned IsTriviallyDestroyable : 1;
+
+  /// The kind of layout performed for this element.
+  unsigned TheKind : 3;
+
+  ElementLayoutStorage()
+      : TheKind(unsigned(ElementLayoutKind::InitialNonFixedSize) + 1) {}
+};
+
+struct RecordFieldStorage {
+  /// The range of explosion indexes for this element.
+  unsigned Begin;
+  unsigned End;
+};
+
 enum class SpecialTypeInfoKind : uint8_t {
   Unimplemented,
 

@@ -65,6 +65,20 @@ public:
 class SerializableLoadableTypeInfoRepresentation
     : public SerializableFixedTypeInfoRepresentation {};
 
+struct SerializableRecordFieldRepresentation {
+  std::unique_ptr<SerializableHiddenTypeInfoRepresentation> typeInfo;
+  irgen::ElementLayoutStorage layout;
+  irgen::RecordFieldStorage storage;
+};
+
+class SerializableLoadableRecordTypeInfoRepresentation
+    : public SerializableLoadableTypeInfoRepresentation {
+public:
+  std::vector<SerializableRecordFieldRepresentation> fields;
+  bool fieldsAreABIAccessible = false;
+  uint32_t explosionSize = 0;
+};
+
 } // namespace swift
 
 #endif // SWIFT_AST_SERIALIZABLEHIDDENTYPEINFOREPRESENTATION_H
