@@ -9,6 +9,7 @@
 // REQUIRES: swift_feature_Embedded
 // REQUIRES: OS=macosx
 // REQUIRES: concurrency
+// REQUIRES: optimized_stdlib
 
 import _Concurrency
 
