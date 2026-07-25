@@ -13,6 +13,7 @@
 #ifndef SWIFT_AST_TYPEINFOSTORAGE_H
 #define SWIFT_AST_TYPEINFOSTORAGE_H
 
+#include "swift/Basic/ClusteredBitVector.h"
 #include "swift/Basic/InlineBitfield.h"
 #include <cstdint>
 
@@ -21,6 +22,10 @@ namespace irgen {
 
 class FixedTypeInfo;
 class TypeInfo;
+
+/// In IRGen, we use Swift's ClusteredBitVector data structure to
+/// store vectors of spare bits.
+using SpareBitVector = ClusteredBitVector;
 
 enum class SpecialTypeInfoKind : uint8_t {
   Unimplemented,

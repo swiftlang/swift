@@ -43,6 +43,7 @@ namespace swift {
   enum IsInitialization_t : bool;
   enum IsTake_t : bool;
   struct SerializableLLVMTypeRepresentation;
+  class SerializableFixedTypeInfoRepresentation;
   class SerializableHiddenTypeInfoRepresentation;
   class SILType;
 

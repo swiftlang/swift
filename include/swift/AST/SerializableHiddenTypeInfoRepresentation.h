@@ -55,6 +55,13 @@ public:
   virtual ~SerializableHiddenTypeInfoRepresentation() = default;
 };
 
+class SerializableFixedTypeInfoRepresentation
+    : public SerializableHiddenTypeInfoRepresentation {
+public:
+  uint32_t size = 0;
+  irgen::SpareBitVector spareBits;
+};
+
 } // namespace swift
 
 #endif // SWIFT_AST_SERIALIZABLEHIDDENTYPEINFOREPRESENTATION_H

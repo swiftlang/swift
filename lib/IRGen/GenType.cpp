@@ -279,6 +279,32 @@ void TypeInfo::populateSerializableHiddenTypeInfoRepresentation(
   representation.bits = Bits;
 }
 
+FixedTypeInfo::FixedTypeInfo(
+    IRGenModule &IGM,
+    const SerializableFixedTypeInfoRepresentation &representation)
+    : TypeInfo(IGM, representation),
+      SpareBits(representation.spareBits) {
+  setSpecialTypeInfoKind(SpecialTypeInfoKind::Fixed);
+  assert(SpareBits.size() == representation.size * uint32_t(8));
+  Bits.FixedTypeInfo.Size = representation.size;
+  assert(Bits.FixedTypeInfo.Size == representation.size && "truncation");
+}
+
+void FixedTypeInfo::populateSerializableHiddenTypeInfoRepresentation(
+    SerializableFixedTypeInfoRepresentation &representation) const {
+  TypeInfo::populateSerializableHiddenTypeInfoRepresentation(representation);
+  representation.size = getFixedSize().getValue();
+  representation.spareBits = getSpareBits();
+}
+
+std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+FixedTypeInfo::createSerializableHiddenTypeInfoRepresentation() const {
+  auto representation =
+      std::make_unique<SerializableFixedTypeInfoRepresentation>();
+  populateSerializableHiddenTypeInfoRepresentation(*representation);
+  return representation;
+}
+
 Address TypeInfo::getAddressForPointer(llvm::Value *ptr) const {
   return Address(ptr, getStorageType(), getBestKnownAlignment());
 }

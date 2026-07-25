@@ -40,6 +40,12 @@ private:
   SpareBitVector SpareBits;
   
 protected:
+  FixedTypeInfo(IRGenModule &IGM,
+                const SerializableFixedTypeInfoRepresentation &representation);
+
+  void populateSerializableHiddenTypeInfoRepresentation(
+      SerializableFixedTypeInfoRepresentation &representation) const;
+
   FixedTypeInfo(llvm::Type *type, Size size,
                 const SpareBitVector &spareBits,
                 Alignment align, IsTriviallyDestroyable_t pod,
@@ -76,6 +82,9 @@ protected:
 public:
   // This is useful for metaprogramming.
   static bool isFixed() { return true; }
+
+  std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+  createSerializableHiddenTypeInfoRepresentation() const override;
 
   /// Whether this type is known to be empty.
   bool isKnownEmpty(ResilienceExpansion expansion) const {
