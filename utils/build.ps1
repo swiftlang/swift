@@ -2548,11 +2548,7 @@ function Build-SPMProject {
       "-c", $Configuration
     )
     if ($DebugInfo) {
-      if ($Platform.DebugFormat -eq "codeview") {
-        $Arguments += @("-debug-info-format", "codeview")
-      } else {
-        $Arguments += @("-debug-info-format", "dwarf")
-      }
+      $Arguments += @("-debug-info-format", $Platform.DebugFormat)
     } else {
       $Arguments += @("-debug-info-format", "none")
     }
