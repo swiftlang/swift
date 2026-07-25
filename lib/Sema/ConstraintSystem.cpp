@@ -2044,6 +2044,13 @@ OverloadChoice::getIUOReferenceKind(ConstraintSystem &cs,
   return IUOReferenceKind::ReturnValue;
 }
 
+bool Solution::isValidSolution() const {
+  return (Fixes.empty() &&
+          FixedScore.Data[SK_Unavailable] == 0 &&
+          FixedScore.Data[SK_Hole] == 0 &&
+          FixedScore.Data[SK_Fix] == 0);
+}
+
 SolutionResult ConstraintSystem::salvage() {
   if (isDebugMode()) {
     llvm::errs() << "---Attempting to salvage and emit diagnostics---\n";
@@ -2085,19 +2092,12 @@ SolutionResult ConstraintSystem::salvage() {
         viable[0] = std::move(viable[*best]);
       viable.erase(viable.begin() + 1, viable.end());
 
-      if (getASTContext().TypeCheckerOpts.CrashOnValidSalvage) {
-        auto &solution = viable[0];
-        if (solution.Fixes.empty() &&
-            diagnosticTransaction == nullptr &&
-            !getASTContext().LangOpts.DisableAvailabilityChecking &&
-            solution.getFixedScore().Data[SK_Unavailable] == 0 &&
-            solution.getFixedScore().Data[SK_Hole] == 0 &&
-            solution.getFixedScore().Data[SK_Fix] == 0) {
-          ABORT([&](auto &out) {
-            out << "Found valid solution in salvage()\n\n";
-            solution.dump(out, 0);
-          });
-        }
+      // We should not have found a valid solution in salvage().
+      if (getASTContext().TypeCheckerOpts.DiagnoseValidSalvage &&
+          diagnosticTransaction == nullptr &&
+          !getASTContext().LangOpts.DisableAvailabilityChecking &&
+          viable[0].isValidSolution()) {
+        return SolutionResult::forUndiagnosedError();
       }
 
       return SolutionResult::forSolved(std::move(viable[0]));
@@ -4765,7 +4765,7 @@ void ConstraintSystem::diagnoseFailureFor(SyntacticElementTarget target) {
   // If constraint system is in invalid state always produce
   // a fallback diagnostic that asks to file a bug.
   if (inInvalidState()) {
-    DE.diagnose(target.getLoc(), diag::failed_to_produce_diagnostic);
+    produceFallbackDiagnostic(target.getLoc());
     return;
   }
 
@@ -4804,9 +4804,7 @@ void ConstraintSystem::diagnoseFailureFor(SyntacticElementTarget target) {
   }
 
   // Emit a poor fallback message.
-  auto diag = DE.diagnose(target.getLoc(), diag::failed_to_produce_diagnostic);
-  if (auto *expr = target.getAsExpr())
-    diag.highlight(expr->getSourceRange());
+  produceFallbackDiagnostic(target.getLoc());
 }
 
 bool ConstraintSystem::isDeclUnavailable(const Decl *D,
@@ -4841,6 +4839,15 @@ bool ConstraintSystem::isConformanceUnavailable(ProtocolConformanceRef conforman
   return isDeclUnavailable(ext, locator);
 }
 
+void ConstraintSystem::produceFallbackDiagnostic(SourceLoc loc) const {
+  auto &ctx = getASTContext();
+  if (ctx.TypeCheckerOpts.CrashFailDiagnostic) {
+    ABORT("Failed to produce a diagnostic, and "
+          "-solver-enable-crash-fail-diagnostic was enabled");
+  }
+  ctx.Diags.diagnose(loc, diag::failed_to_produce_diagnostic);
+}
+
 /// If we aren't certain that we've emitted a diagnostic, emit a fallback
 /// diagnostic.
 void ConstraintSystem::maybeProduceFallbackDiagnostic(SourceLoc loc) const {
@@ -4855,7 +4862,7 @@ void ConstraintSystem::maybeProduceFallbackDiagnostic(SourceLoc loc) const {
       (diagnosticTransaction && diagnosticTransaction->hasErrors()))
     return;
 
-  ctx.Diags.diagnose(loc, diag::failed_to_produce_diagnostic);
+  produceFallbackDiagnostic(loc);
 }
 
 SourceLoc constraints::getLoc(ASTNode anchor) {

@@ -2145,10 +2145,15 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
   if (Args.getLastArg(OPT_solver_disable_splitter))
     Opts.SolverDisableSplitter = true;
 
-  Opts.CrashOnValidSalvage =
-      Args.hasFlag(OPT_solver_enable_crash_on_valid_salvage,
-                   OPT_solver_disable_crash_on_valid_salvage,
-                   Opts.CrashOnValidSalvage);
+  Opts.DiagnoseValidSalvage =
+      Args.hasFlag(OPT_solver_enable_diagnose_valid_salvage,
+                   OPT_solver_disable_diagnose_valid_salvage,
+                   Opts.DiagnoseValidSalvage);
+
+  Opts.CrashFailDiagnostic =
+      Args.hasFlag(OPT_solver_enable_crash_fail_diagnostic,
+                   OPT_solver_disable_crash_fail_diagnostic,
+                   Opts.CrashFailDiagnostic);
 
   Opts.SolverEnableTransitiveConformance =
       Args.hasFlag(OPT_solver_enable_transitive_conformance,
