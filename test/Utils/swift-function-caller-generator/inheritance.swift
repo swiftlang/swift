@@ -11,12 +11,12 @@ class BaseClass {
 }
 
 class DerivedClass : BaseClass {
-  func nonFinalShared(x: Int) -> Int
+  override func nonFinalShared(x: Int) -> Int
   func derivedOnly() -> Int
 }
 
 class LeafClass : DerivedClass {
-  func nonFinalShared(x: Int) -> Int
+  override func nonFinalShared(x: Int) -> Int
 }
 
 struct BaseStruct {
@@ -45,7 +45,7 @@ extension BaseClass {
 }
 
 extension DerivedClass {
-  func call_nonFinalShared(x: Int) -> Int {
+  func call_nonFinalShared_DerivedClass(x: Int) -> Int {
     return nonFinalShared(x: x)
   }
   func call_derivedOnly() -> Int {
@@ -54,7 +54,7 @@ extension DerivedClass {
 }
 
 extension LeafClass {
-  func call_nonFinalShared(x: Int) -> Int {
+  func call_nonFinalShared_LeafClass(x: Int) -> Int {
     return nonFinalShared(x: x)
   }
 }

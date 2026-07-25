@@ -70,7 +70,7 @@ class SwiftMacroTestGen: SyntaxVisitor {
     if res.attributes.contains(where: { $0.isUnavailable }) {
       return .skipChildren
     }
-    let surroundingType = getParentType(res)
+    let surroundingType = getParentType(res)?.trimmed
     let selfParam = surroundingType.flatMap { type in res.isClassMethod ? type.with(\.trailingTrivia, "") : nil }
     res = createFunctionSignature(res)
     res =
@@ -78,14 +78,18 @@ class SwiftMacroTestGen: SyntaxVisitor {
       .with(\.body, createBody(res, selfParam: selfParam))
       .with(\.name, "call_\(res.name.withoutBackticks)")
       .with(\.leadingTrivia, res.leadingTrivia.withoutComments)
-    if surroundingType != nil {
+    if let surroundingType {
+      if res.modifiers.contains(where: { $0.name.tokenKind == .keyword(.override) }) {
+        res.name = "\(res.name)_\(surroundingType)"
+      }
       res =
         res
         .with(
           \.modifiers,
           res.modifiers.filter { modifier in
             switch modifier.name.tokenKind {
-            case .keyword(.open), .keyword(.class), .keyword(.final), .keyword(.public):
+            case .keyword(.open), .keyword(.class), .keyword(.final), .keyword(.public),
+              .keyword(.override):
               false
             default:
               true

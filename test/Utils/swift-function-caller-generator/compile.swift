@@ -65,6 +65,15 @@ public struct Sunavailable {
   public func munavailable(x: Int) -> Int { return x }
 }
 
+public class Base {
+  public func foo() {}
+  public func bar() {}
+}
+public class Derived: Base {
+  override public func foo() {}
+  public override func bar() {}
+}
+
 //--- out.expected
 import Test
 
@@ -125,5 +134,23 @@ public extension C {
   }
   func call_clas2(x: Swift::Int) -> Swift::Int {
     return C.clas2(x: x)
+  }
+}
+
+public extension Base {
+  func call_foo() {
+    return foo()
+  }
+  func call_bar() {
+    return bar()
+  }
+}
+
+public extension Derived {
+  func call_foo_Derived() {
+    return foo()
+  }
+  func call_bar_Derived() {
+    return bar()
   }
 }
