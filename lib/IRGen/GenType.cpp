@@ -305,6 +305,33 @@ FixedTypeInfo::createSerializableHiddenTypeInfoRepresentation() const {
   return representation;
 }
 
+LoadableTypeInfo::LoadableTypeInfo(
+    IRGenModule &IGM,
+    const SerializableLoadableTypeInfoRepresentation &representation)
+    : FixedTypeInfo(IGM, representation) {
+  setSpecialTypeInfoKind(SpecialTypeInfoKind::Loadable);
+  // All currently implemented LoadableTypeInfo are bitwise loadable and takable,
+  // so assert we haven't introduced a method to create one which is not
+  // via deserialization.
+  assert(isBitwiseTakable(ResilienceExpansion::Maximal));
+  assert(isBitwiseBorrowable(ResilienceExpansion::Maximal));
+  assert(isLoadable());
+}
+
+void LoadableTypeInfo::populateSerializableHiddenTypeInfoRepresentation(
+    SerializableLoadableTypeInfoRepresentation &representation) const {
+  FixedTypeInfo::populateSerializableHiddenTypeInfoRepresentation(
+      representation);
+}
+
+std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+LoadableTypeInfo::createSerializableHiddenTypeInfoRepresentation() const {
+  auto representation =
+      std::make_unique<SerializableLoadableTypeInfoRepresentation>();
+  populateSerializableHiddenTypeInfoRepresentation(*representation);
+  return representation;
+}
+
 Address TypeInfo::getAddressForPointer(llvm::Value *ptr) const {
   return Address(ptr, getStorageType(), getBestKnownAlignment());
 }

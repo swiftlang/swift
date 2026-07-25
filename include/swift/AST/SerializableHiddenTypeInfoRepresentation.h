@@ -62,6 +62,9 @@ public:
   irgen::SpareBitVector spareBits;
 };
 
+class SerializableLoadableTypeInfoRepresentation
+    : public SerializableFixedTypeInfoRepresentation {};
+
 } // namespace swift
 
 #endif // SWIFT_AST_SERIALIZABLEHIDDENTYPEINFOREPRESENTATION_H

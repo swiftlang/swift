@@ -45,6 +45,7 @@ namespace swift {
   struct SerializableLLVMTypeRepresentation;
   class SerializableFixedTypeInfoRepresentation;
   class SerializableHiddenTypeInfoRepresentation;
+  class SerializableLoadableTypeInfoRepresentation;
   class SILType;
 
 namespace irgen {
