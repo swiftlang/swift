@@ -21,8 +21,14 @@
 #include "swift/Basic/Unreachable.h"
 #include <atomic>
 #include <cstdarg>
-#include <functional>
 #include <stdint.h>
+
+// std::function is not available in freestanding mode with some standard
+// library implementations (e.g. libstdc++), so withCurrentBacktrace below
+// is unavailable there too; it's only used by the non-embedded runtime.
+#if __STDC_HOSTED__
+#include <functional>
+#endif
 
 #ifdef SWIFT_HAVE_CRASHREPORTERCLIENT
 
@@ -171,8 +177,10 @@ void swift_abortAllocationFailure(size_t size, size_t alignMask);
 void dumpStackTraceEntry(unsigned index, void *framePC,
                          bool shortOutput = false);
 
+#if __STDC_HOSTED__
 SWIFT_RUNTIME_ATTRIBUTE_NOINLINE
 bool withCurrentBacktrace(std::function<void(void **, int)> call);
+#endif
 
 SWIFT_RUNTIME_ATTRIBUTE_NOINLINE
 void printCurrentBacktrace(unsigned framesToSkip = 1);
