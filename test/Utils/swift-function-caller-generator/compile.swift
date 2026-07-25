@@ -117,40 +117,40 @@ public func call_qux(_ func: inout Swift::MutableSpan<Swift::CInt>) {
 #endif
 #endif
 public extension S {
-  func call_pub(_ x: Swift::Int) -> Swift::Int {
+  func call_pub_S(_ x: Swift::Int) -> Swift::Int {
     return pub(x)
   }
 }
 
 public extension C {
-  func call_pub(_ x: Swift::Int) -> Swift::Int {
+  final func call_pub_C(_ x: Swift::Int) -> Swift::Int {
     return pub(x)
   }
-  func call_ope(_ x: Swift::Int) -> Swift::Int {
+  final func call_ope_C(_ x: Swift::Int) -> Swift::Int {
     return ope(x)
   }
-  func call_clas(x: Swift::Int) -> Swift::Int {
+  final func call_clas_C(x: Swift::Int) -> Swift::Int {
     return C.clas(x: x)
   }
-  func call_clas2(x: Swift::Int) -> Swift::Int {
+  final func call_clas2_C(x: Swift::Int) -> Swift::Int {
     return C.clas2(x: x)
   }
 }
 
 public extension Base {
-  func call_foo() {
+  final func call_foo_Base() {
     return foo()
   }
-  func call_bar() {
+  final func call_bar_Base() {
     return bar()
   }
 }
 
 public extension Derived {
-  func call_foo_Derived() {
+  final func call_foo_Derived() {
     return foo()
   }
-  func call_bar_Derived() {
+  final func call_bar_Derived() {
     return bar()
   }
 }

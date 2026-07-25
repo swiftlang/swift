@@ -27,28 +27,28 @@ import Test
 
 
 extension Foo {
-  func call_nonMutating() -> Int {
+  func call_nonMutating_Foo() -> Int {
     return nonMutating()
   }
-  mutating func call_mutatingMethod(x: Int) {
+  mutating func call_mutatingMethod_Foo(x: Int) {
     return mutatingMethod(x: x)
   }
-  func call_unsafeMethod(p: UnsafeMutablePointer<Int>) {
+  func call_unsafeMethod_Foo(p: UnsafeMutablePointer<Int>) {
     return unsafe unsafeMethod(p: p)
   }
 }
 
 extension Bar {
-  func call_classFunction(x: Int) -> Int {
+  final func call_classFunction_Bar(x: Int) -> Int {
     return Bar.classFunction(x: x)
   }
 }
 
 extension Foo {
-  func call_extensionMethod(x: Int) -> Int {
+  func call_extensionMethod_Foo(x: Int) -> Int {
     return extensionMethod(x: x)
   }
-  mutating func call_mutatingExtensionMethod(p: UnsafeMutablePointer<Int>) {
+  mutating func call_mutatingExtensionMethod_Foo(p: UnsafeMutablePointer<Int>) {
     return unsafe mutatingExtensionMethod(p: p)
   }
 }

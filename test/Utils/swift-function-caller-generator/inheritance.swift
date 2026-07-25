@@ -33,43 +33,43 @@ import Test
 
 
 extension BaseClass {
-  func call_nonFinalShared(x: Int) -> Int {
+  final func call_nonFinalShared_BaseClass(x: Int) -> Int {
     return nonFinalShared(x: x)
   }
-  func call_finalBaseOnly() -> Int {
+  final func call_finalBaseOnly_BaseClass() -> Int {
     return finalBaseOnly()
   }
-  func call_baseOnly() -> Int {
+  final func call_baseOnly_BaseClass() -> Int {
     return baseOnly()
   }
 }
 
 extension DerivedClass {
-  func call_nonFinalShared_DerivedClass(x: Int) -> Int {
+  final func call_nonFinalShared_DerivedClass(x: Int) -> Int {
     return nonFinalShared(x: x)
   }
-  func call_derivedOnly() -> Int {
+  final func call_derivedOnly_DerivedClass() -> Int {
     return derivedOnly()
   }
 }
 
 extension LeafClass {
-  func call_nonFinalShared_LeafClass(x: Int) -> Int {
+  final func call_nonFinalShared_LeafClass(x: Int) -> Int {
     return nonFinalShared(x: x)
   }
 }
 
 extension BaseStruct {
-  func call_structShared() -> Int {
+  func call_structShared_BaseStruct() -> Int {
     return structShared()
   }
-  func call_structBaseOnly() -> Int {
+  func call_structBaseOnly_BaseStruct() -> Int {
     return structBaseOnly()
   }
 }
 
 extension DerivedStruct {
-  func call_structShared() -> Int {
+  func call_structShared_DerivedStruct() -> Int {
     return structShared()
   }
 }

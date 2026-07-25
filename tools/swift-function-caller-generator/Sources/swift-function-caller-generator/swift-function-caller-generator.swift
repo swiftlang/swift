@@ -37,6 +37,8 @@ import WinSDK
 
 @main
 class SwiftMacroTestGen: SyntaxVisitor {
+  var classDecls: [String: ClassDeclSyntax] = [:]
+
   static func main() {
     if CommandLine.argc < 2 {
       printError("missing module name (passed 0 arguments, expected 2)")
@@ -79,9 +81,7 @@ class SwiftMacroTestGen: SyntaxVisitor {
       .with(\.name, "call_\(res.name.withoutBackticks)")
       .with(\.leadingTrivia, res.leadingTrivia.withoutComments)
     if let surroundingType {
-      if res.modifiers.contains(where: { $0.name.tokenKind == .keyword(.override) }) {
-        res.name = "\(res.name)_\(surroundingType)"
-      }
+      res.name = "\(res.name)_\(surroundingType)"
       res =
         res
         .with(
@@ -97,11 +97,12 @@ class SwiftMacroTestGen: SyntaxVisitor {
           }
         )
       let origIndent = node.firstToken(viewMode: .sourceAccurate)!.indentationOfLine
-      res = res
-        .with(\.leadingTrivia, "")
-        .indented(
-          by: origIndent,
-          indentFirstLine: true)
+      res = res.with(\.leadingTrivia, "")
+      if classDecls.keys.contains(surroundingType.text) {
+        // filter out "final" above so that we can add it back unconditionally
+        res.modifiers.append(DeclModifierSyntax(name: .keyword(.final), trailingTrivia: .space))
+      }
+      res = res.indented(by: origIndent, indentFirstLine: true)
     }
     print(res)
     return .skipChildren
@@ -148,8 +149,10 @@ class SwiftMacroTestGen: SyntaxVisitor {
     let keyword: TokenSyntax = .keyword(
       .extension, leadingTrivia: Trivia(), trailingTrivia: node.introducer.trailingTrivia)
     let attributes = node.attributes.filter({ !$0.trimmed.description.starts(with: "@_") })
+      .with(\.leadingTrivia, Trivia())
+      .with(\.trailingTrivia, .newline)
     let e = ExtensionDeclSyntax(
-      leadingTrivia: .newline, attributes: attributes.with(\.leadingTrivia, Trivia()),
+      leadingTrivia: .newline, attributes: attributes,
       modifiers: node.modifiers.with(\.leadingTrivia, Trivia()), extensionKeyword: keyword,
       extendedType: type,
       memberBlock: MemberBlockSyntax(stringLiteral: "{"))
@@ -163,7 +166,11 @@ class SwiftMacroTestGen: SyntaxVisitor {
   }
 
   override func visit(_ node: ClassDeclSyntax) -> SyntaxVisitorContinueKind {
-    visitPreImpl(node, type: IdentifierTypeSyntax(name: node.name))
+    let ret = visitPreImpl(node, type: IdentifierTypeSyntax(name: node.name))
+    if ret == .visitChildren {
+      classDecls[node.name.trimmed.text] = node
+    }
+    return ret
   }
   override func visitPost(_ node: ClassDeclSyntax) {
     visitPostImpl(node)
