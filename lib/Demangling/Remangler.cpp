@@ -3323,6 +3323,36 @@ ManglingError Remangler::mangleThinFunctionType(Node *node, unsigned depth) {
   return ManglingError::Success;
 }
 
+ManglingError Remangler::mangleHiddenTypeLayoutInfo(Node *node,
+                                                    unsigned depth) {
+  if (node->getNumChildren() < 1 ||
+      node->getChild(0)->getKind() != Node::Kind::Identifier)
+    return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
+
+  Node *parent = nullptr;
+  for (unsigned i = 1, e = node->getNumChildren(); i != e; ++i) {
+    Node *child = node->getChild(i);
+    switch (child->getKind()) {
+    case Node::Kind::Type:
+      if (parent)
+        return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
+      parent = child;
+      break;
+    default:
+      return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
+    }
+  }
+
+  if (parent)
+    RETURN_IF_ERROR(mangle(parent, depth + 1));
+
+  RETURN_IF_ERROR(mangleIdentifier(node->getChild(0), depth + 1));
+
+  char flag = parent ? ('p') : ('n');
+  Buffer << "XH" << flag;
+  return ManglingError::Success;
+}
+
 ManglingError Remangler::mangleTupleElement(Node *node, unsigned depth) {
   return mangleChildNodesReversed(node, depth + 1); // tuple type, element name?
 }

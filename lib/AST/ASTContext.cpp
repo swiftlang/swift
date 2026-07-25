@@ -577,6 +577,7 @@ struct ASTContext::Implementation {
     llvm::FoldingSet<PackType> PackTypes;
     llvm::FoldingSet<PackExpansionType> PackExpansionTypes;
     llvm::FoldingSet<PackElementType> PackElementTypes;
+    llvm::FoldingSet<HiddenTypeLayoutInfoType> HiddenTypeLayoutInfoTypes;
     llvm::DenseMap<llvm::PointerIntPair<TypeBase*, 3, unsigned>,
                    MetatypeType*> MetatypeTypes;
     llvm::DenseMap<llvm::PointerIntPair<TypeBase*, 3, unsigned>,
@@ -665,8 +666,6 @@ struct ASTContext::Implementation {
   llvm::DenseMap<CanType, SILMoveOnlyWrappedType *> SILMoveOnlyWrappedTypes;
   llvm::FoldingSet<SILBoxType> SILBoxTypes;
   llvm::FoldingSet<IntegerType> IntegerTypes;
-  llvm::FoldingSet<HiddenType> HiddenTypes;
-  llvm::DenseMap<CanType, StringRef> TypesToHideWhenEmittingModule;
   llvm::DenseMap<BuiltinIntegerWidth, BuiltinIntegerType*> BuiltinIntegerTypes;
   llvm::DenseMap<unsigned, BuiltinUnboundGenericType*> BuiltinUnboundGenericTypes;
   llvm::FoldingSet<BuiltinVectorType> BuiltinVectorTypes;
@@ -3577,6 +3576,7 @@ void ASTContext::Implementation::Arena::dump(llvm::raw_ostream &os) const {
     SIZE(PackTypes);
     SIZE(PackExpansionTypes);
     SIZE(PackElementTypes);
+    SIZE(HiddenTypeLayoutInfoTypes);
     SIZE_AND_BYTES(MetatypeTypes);
     SIZE_AND_BYTES(ExistentialMetatypeTypes);
     SIZE_AND_BYTES(ArraySliceTypes);
@@ -3838,6 +3838,26 @@ void ErrorUnionType::Profile(llvm::FoldingSetNodeID &id, ArrayRef<Type> terms) {
   }
 }
 
+Type HiddenTypeLayoutInfoType::get(HiddenTypeLayoutInfoDecl *decl,
+                                   Type parent,
+                                   const ASTContext &ctx) {
+  RecursiveTypeProperties properties;
+  auto arena = getArena(properties);
+
+  llvm::FoldingSetNodeID ID;
+  HiddenTypeLayoutInfoType::Profile(ID, decl, parent);
+
+  void *insertPos = nullptr;
+  auto &types = ctx.getImpl().getArena(arena).HiddenTypeLayoutInfoTypes;
+  if (auto result = types.FindNodeOrInsertPos(ID, insertPos))
+    return result;
+
+  auto *result =
+      new (ctx, arena) HiddenTypeLayoutInfoType(decl, parent, ctx, properties);
+  types.InsertNode(result, insertPos);
+  return result;
+}
+
 Type ErrorUnionType::get(const ASTContext &ctx, ArrayRef<Type> terms) {
   // Peep-hole the simple cases. Error union types are always synthesized by
   // the type checker and never written explicitly, so we have no use for
@@ -3925,48 +3945,6 @@ IntegerType *IntegerType::get(StringRef value, bool isNegative,
 
   ctx.getImpl().IntegerTypes.InsertNode(intType, insertPos);
   return intType;
-}
-
-HiddenType *HiddenType::get(const ASTContext &ctx, StringRef mangledName,
-                            ModuleDecl *definingModule) {
-  llvm::FoldingSetNodeID id;
-  HiddenType::Profile(id, mangledName, definingModule);
-
-  void *insertPos;
-  if (auto *hidden =
-          ctx.getImpl().HiddenTypes.FindNodeOrInsertPos(id, insertPos)) {
-    return hidden;
-  }
-
-  auto nameCopy = ctx.AllocateCopy(mangledName);
-
-  auto *hidden = new (ctx, AllocationArena::Permanent)
-      HiddenType(nameCopy, definingModule, ctx);
-
-  ctx.getImpl().HiddenTypes.InsertNode(hidden, insertPos);
-  return hidden;
-}
-
-void ASTContext::recordTypeToHideWhenEmittingModule(CanType type,
-                                                    StringRef mangledName) {
-  // Allocate a stable copy so the StringRef survives even if the caller's
-  // storage for the mangled name is later moved or freed.
-  auto nameCopy = AllocateCopy(mangledName);
-  auto result =
-      getImpl().TypesToHideWhenEmittingModule.try_emplace(type, nameCopy);
-  if (!result.second) {
-    ASSERT(result.first->second == nameCopy &&
-           "conflicting hide-on-emit mangled names for the same type");
-  }
-}
-
-std::optional<StringRef>
-ASTContext::lookupTypeToHideWhenEmittingModule(CanType type) const {
-  auto &map = getImpl().TypesToHideWhenEmittingModule;
-  auto it = map.find(type);
-  if (it == map.end())
-    return std::nullopt;
-  return it->second;
 }
 
 BuiltinIntegerType *BuiltinIntegerType::get(BuiltinIntegerWidth BitWidth,

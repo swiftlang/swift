@@ -1427,6 +1427,29 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
       appendOperator("Xe");
       return;
 
+    case TypeKind::HiddenTypeLayoutInfo: {
+      auto *hidden = cast<HiddenTypeLayoutInfoType>(tybase);
+
+      Type parent = hidden->getParent();
+      if (parent) {
+        if (parent->hasArchetype())
+          parent = parent->mapTypeOutOfEnvironment();
+        appendType(parent, sig, forDecl);
+      }
+
+      auto mangledName =
+          StringRef(hidden->getDecl()->getAbstractLayout()->mangledName);
+      if (mangledName.starts_with("$"))
+        mangledName = mangledName.drop_front(1);
+      appendIdentifier(mangledName);
+
+      char flag = parent ? ('p')
+                         : ('n');
+      char op[] = {'X', 'H', flag};
+      appendOperator(StringRef(op, sizeof(op)));
+      return;
+    }
+
       // We don't care about these types being a bit verbose because we
       // don't expect them to come up that often in API names.
     case TypeKind::BuiltinFloat:
@@ -1902,19 +1925,6 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
       return;
     }
 
-    case TypeKind::Hidden: {
-      // A HiddenType is a placeholder for a real type whose mangled name is
-      // carried in the HiddenType itself. Emit that mangled name so that the
-      // surrounding symbol mangles as if the real type had been used.
-      // The stored name is a complete symbol starting with "$s"; strip the
-      // prefix since we are already mangling inside a larger symbol.
-      auto hidden = cast<HiddenType>(tybase);
-      StringRef name = hidden->getMangledName();
-      if (name.starts_with(MANGLING_PREFIX_STR))
-        name = name.drop_front(StringRef(MANGLING_PREFIX_STR).size());
-      Buffer << name;
-      return;
-    }
   }
   llvm_unreachable("bad type kind");
 }
@@ -5541,6 +5551,8 @@ ASTMangler::BaseEntitySignature::BaseEntitySignature(const Decl *decl)
     case DeclKind::MacroExpansion:
     case DeclKind::Using:
       break;
+    case DeclKind::HiddenTypeLayoutInfo:
+      llvm_unreachable("not implemented yet");
     };
   }
 }

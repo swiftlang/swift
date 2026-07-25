@@ -163,7 +163,6 @@ private:
   NO_PRESERVABLE_STRUCTURE(PackExpansion)
   NO_PRESERVABLE_STRUCTURE(PackElement)
   NO_PRESERVABLE_STRUCTURE(Integer)
-  NO_PRESERVABLE_STRUCTURE(Hidden)
 #undef NO_PRESERVABLE_STRUCTURE
 
   // These types simply shouldn't appear in types that we generalize at all.
@@ -174,6 +173,7 @@ private:
   INVALID_TO_GENERALIZE(DynamicSelf)
   INVALID_TO_GENERALIZE(Error)
   INVALID_TO_GENERALIZE(GenericFunction)
+  INVALID_TO_GENERALIZE(HiddenTypeLayoutInfo)
   INVALID_TO_GENERALIZE(InOut)
   INVALID_TO_GENERALIZE(LValue)
   INVALID_TO_GENERALIZE(ReferenceStorage)

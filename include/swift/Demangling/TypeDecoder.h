@@ -790,6 +790,9 @@ protected:
 
       return Builder.createBoundGenericType(typeDecl, args, parent);
     }
+    case NodeKind::HiddenTypeLayoutInfo:
+      return MAKE_NODE_TYPE_ERROR0(Node,
+                                   "hidden layout types cannot be decoded");
     case NodeKind::BoundGenericProtocol: {
       // This is a special case. When you write a protocol typealias with a
       // concrete type base, for example:

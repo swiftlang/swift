@@ -23,7 +23,7 @@
 // 2b. Writer's view (SIL level): emit Library's SILGen and confirm the stored
 //     property types reference the real imported types ($sSo7Wrappera /
 //     $sSo10BigWrappera). If the substitution had mutated the AST, SILGen
-//     would either fail or emit HiddenType references here.
+//     would either fail or emit hidden layout fallback references here.
 // RUN: %target-swift-frontend \
 // RUN:   -internal-import-bridging-header %t/Utility.h \
 // RUN:   -enable-experimental-feature AbstractStoredPropertyLayout \
@@ -31,8 +31,8 @@
 // RUN:   %t/Library.swift | %FileCheck --check-prefix=SIL %s
 
 // 3. Reader's view: print Library from a context that imports it without the
-//    bridging header. Stored properties of public types must appear as
-//    @_hidden("...") with the mangled name of the original Clang type.
+//    bridging header. Hidden stored properties are omitted from the public
+//    module view; the fallback layout is carried by hidden layout records.
 // RUN: %target-swift-ide-test -print-module -module-to-print Library \
 // RUN:   -I %t -source-filename=%t/Client.swift \
 // RUN:   | %FileCheck --check-prefix=READER %s
@@ -81,14 +81,12 @@ import Library
 // SIL-DAG: $sSo7Wrappera
 // SIL-DAG: $sSo10BigWrappera
 
-// Reader's view: the printed module shows the substituted placeholders for
-// the hidden stored properties, anchored to the correct containing struct.
+// Reader's view: the printed module exposes the public API without leaking
+// hidden placeholders for private Clang-backed stored properties.
+// READER-NOT: @_hidden
 // READER:      struct S {
-// READER-NEXT:   var w: @_hidden("$sSo7Wrappera")
 // READER-NEXT:   init(value: Int32)
 // READER-NEXT: }
 // READER:      struct S2 {
-// READER-NEXT:   var a: @_hidden("$sSo7Wrappera")
-// READER-NEXT:   var b: @_hidden("$sSo10BigWrappera")
 // READER-NEXT:   init()
 // READER-NEXT: }

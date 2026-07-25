@@ -272,6 +272,9 @@ public:
   void visitModuleDecl(ModuleDecl *d) { }
   void visitMissingMemberDecl(MissingMemberDecl *d) {}
   void visitUsingDecl(UsingDecl *) {}
+  void visitHiddenTypeLayoutInfoDecl(HiddenTypeLayoutInfoDecl *) {
+    llvm_unreachable("hidden type layout decls themselves do not produce SIL, they inform the SIL to generate for other decls");
+  }
 
   // Emitted as part of its storage.
   void visitAccessorDecl(AccessorDecl *ad) {}

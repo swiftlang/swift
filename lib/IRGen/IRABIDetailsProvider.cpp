@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/IRGen/IRABIDetailsProvider.h"
+#include "swift/AST/AbstractLayout.h"
 #include "Callee.h"
 #include "FixedTypeInfo.h"
 #include "GenEnum.h"
@@ -26,6 +27,8 @@
 //        updated to take a different approach.
 #include "../SILGen/SILGen.h"
 
+#include "IRGenMangler.h"
+
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/ParameterList.h"
@@ -33,11 +36,14 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/SILFunctionBuilder.h"
+#include "swift/SIL/TypeLowering.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/Subsystems.h"
 #include "clang/CodeGen/ModuleBuilder.h"
 #include "clang/CodeGen/SwiftCallingConv.h"
+#include "llvm/ADT/Twine.h"
 #include "llvm/IR/DerivedTypes.h"
+#include "llvm/Support/ErrorHandling.h"
 #include <optional>
 
 using namespace swift;
@@ -102,6 +108,32 @@ public:
     return IRABIDetailsProvider::SizeAndAlignment{
         fixedTI->getFixedSize().getValue(),
         fixedTI->getFixedAlignment().getValue()};
+  }
+
+  AbstractTypeLayout *
+  getAbstractTypeLayoutForDecl(const NominalTypeDecl *TD) {
+    auto &ctx = TD->getASTContext();
+    IRGenMangler mangler(ctx);
+
+    if (auto *structDecl = dyn_cast<StructDecl>(TD)) {
+      assert(structDecl->canBeCopyable() &&
+             "move-only hidden structs are not supported yet");
+    }
+
+    auto *TI = &IGM.getTypeInfoForUnlowered(TD->getDeclaredTypeInContext());
+    auto *layout = TI->getAbstractTypeLayout(IGM, ctx);
+    if (!layout) {
+      llvm::report_fatal_error(
+          llvm::Twine("failed to compute abstract type layout for '") +
+          TD->getName().str() + "'");
+    }
+
+    layout->mangledName = mangler.mangleMangledTypeName(TD->getDeclaredType());
+
+    auto props = typeConverter.getTypeProperties(
+        TD->getDeclaredTypeInContext(), TypeExpansionContext::minimal());
+    layout->typeProperties = props;
+    return layout;
   }
 
   IRABIDetailsProvider::FunctionABISignature
@@ -473,6 +505,11 @@ IRABIDetailsProvider::~IRABIDetailsProvider() {}
 std::optional<IRABIDetailsProvider::SizeAndAlignment>
 IRABIDetailsProvider::getTypeSizeAlignment(const NominalTypeDecl *TD) {
   return impl->getTypeSizeAlignment(TD);
+}
+
+AbstractTypeLayout *
+IRABIDetailsProvider::getAbstractTypeLayout(const NominalTypeDecl *TD) {
+  return impl->getAbstractTypeLayoutForDecl(TD);
 }
 
 std::optional<LoweredFunctionSignature>

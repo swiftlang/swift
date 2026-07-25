@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "libsil"
 
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/AbstractLayout.h"
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/ConformanceLookup.h"
@@ -360,7 +361,6 @@ namespace {
     IMPL(AnyMetatype, Trivial)
     IMPL(Module, Trivial)
     IMPL(Integer, Trivial)
-    IMPL(Hidden, Trivial)
 
 #undef IMPL
 
@@ -644,6 +644,12 @@ namespace {
                          IsTypeExpansionSensitive_t isSensitive) {
       return asImpl().handleTrivial(type,
                                     getTrivialSILTypeProperties(isSensitive));
+    }
+
+    RetTy visitHiddenTypeLayoutInfoType(CanHiddenTypeLayoutInfoType type,
+                                AbstractionPattern origType,
+                                IsTypeExpansionSensitive_t isSensitive) {
+      llvm_unreachable("must be implemented by derived class");
     }
 
     // Dependent types can be lowered according to their corresponding
@@ -1014,6 +1020,17 @@ namespace {
       // Consult the type properties.
       auto props = TC.getTypeProperties(origType, type, Expansion);
       return handleClassificationFromLowering(type, props, isSensitive);
+    }
+
+    SILTypeProperties
+    visitHiddenTypeLayoutInfoType(CanHiddenTypeLayoutInfoType type,
+                                  AbstractionPattern origType,
+                                  IsTypeExpansionSensitive_t isSensitive) {
+      auto *layout = type->getDecl()->getAbstractLayout();
+      assert(layout && "HiddenTypeLayoutInfoType should have abstract layout");
+
+      return mergeIsTypeExpansionSensitive(isSensitive,
+                                           layout->typeProperties);
     }
 
   private:
@@ -2593,15 +2610,6 @@ namespace {
         return handleAddressOnly(structType, properties);
       }
 
-      // Force address-only when the struct has hidden stored properties from
-      // an internal bridging header.
-      if (D->getAttrs().hasAttribute<HasHiddenStoredPropertiesAttr>()) {
-        properties.setAddressOnly();
-        properties.setNonTrivial();
-        properties.setLexical(IsLexical);
-        return handleAddressOnly(structType, properties);
-      }
-
       if (D->isCxxNonTrivial()) {
         properties.setDefinitelyAddressableForDependencies();
         properties.setAddressOnly();
@@ -2729,6 +2737,25 @@ namespace {
       }
       return handleAggregateByProperties<LoadableStructTypeLowering>(structType,
                                                                     properties);
+    }
+
+    TypeLowering *
+    visitHiddenTypeLayoutInfoType(CanHiddenTypeLayoutInfoType type,
+                                  AbstractionPattern origType,
+                                  IsTypeExpansionSensitive_t isSensitive) {
+      auto *layout = type->getDecl()->getAbstractLayout();
+      assert(layout && "HiddenTypeLayoutInfoType should have abstract layout");
+
+      if (layout->getKind() ==
+              AbstractTypeLayout::Kind::LoadableTrivialHiddenType) {
+        auto properties = mergeIsTypeExpansionSensitive(
+            isSensitive, layout->typeProperties);
+        if (layout->typeProperties.isTrivial())
+          return handleTrivial(type, properties);
+        return new (TC) MiscNontrivialTypeLowering(type, properties, Expansion);
+      }
+
+      llvm_unreachable("unhandled abstract layout kind");
     }
 
     // WARNING: when the specification of trivial types changes, also update
@@ -3456,11 +3483,6 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
           if (isa<SILPackType>(ty) || isa<PackExpansionType>(ty))
             return true;
 
-          // A HiddenType placeholder is a leaf with no inner structure to
-          // walk
-          if (isa<HiddenType>(ty))
-            return true;
-
           auto *nominal = ty.getAnyNominal();
           // Only pack-related non-nominal aggregates may be responsible for
           // non-conformance; walk into the rest.
@@ -3509,12 +3531,6 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
           if (isa<ErrorType>(ty))
             return false;
 
-          // A HiddenType placeholder stands in for a C-imported type whose
-          // identity has been elided from the client's view. It can be
-          // trivial without explicit conformance to BitwiseCopyable.
-          if (isa<HiddenType>(ty))
-            return false;
-
           // These show up in the context of non-conforming variadic generics
           // which may lack a conformance (case (7)).
           if (isa<SILPackType>(ty) || isa<PackExpansionType>(ty))
@@ -3537,6 +3553,12 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
             // top-level -> justified to be trivial and non-conformant  -> false
             // leaf      -> must not be responsible for non-conformance -> true
             return !isTopLevel;
+          }
+
+          if (isa<HiddenTypeLayoutInfoType>(ty)) {
+            // HiddenTypes are not automatically provided a synthesized BitwiseCopyable
+            // conformance, so it is expected that they lack the conformance even if trivial.
+            return false;
           }
 
           // ReferenceStorageTypes with unmanaged ownership do not themselves

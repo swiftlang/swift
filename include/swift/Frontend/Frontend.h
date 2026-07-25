@@ -18,7 +18,6 @@
 #ifndef SWIFT_FRONTEND_H
 #define SWIFT_FRONTEND_H
 
-#include "swift/AST/AbstractLayout.h"
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/IRGenOptions.h"
@@ -58,6 +57,7 @@
 #include "llvm/TargetParser/Host.h"
 
 #include <memory>
+#include <string>
 
 namespace swift {
 
@@ -70,21 +70,6 @@ class StructDecl;
 namespace Lowering {
 class TypeConverter;
 }
-
-struct AbstractFieldLayout {
-  uint64_t offset;
-  llvm::StringRef name;
-  AbstractTypeLayout typeLayout;
-};
-
-struct AbstractStructLayout {
-  AbstractTypeLayout typeLayout;
-  llvm::SmallVector<AbstractFieldLayout, 4> fields;
-};
-
-std::optional<AbstractStructLayout>
-computeAbstractStructLayout(const StructDecl *decl,
-                            const IRGenOptions &irgenOpts);
 
 struct ModuleBuffers {
   std::unique_ptr<llvm::MemoryBuffer> ModuleBuffer;

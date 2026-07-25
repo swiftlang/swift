@@ -156,6 +156,11 @@ struct DistributedThunkDiffChecker
     : CanTypeDifferenceVisitor<DistributedThunkDiffChecker> {
   using SuperTy = CanTypeDifferenceVisitor<DistributedThunkDiffChecker>;
 
+  bool visitHiddenTypeLayoutInfoType(CanHiddenTypeLayoutInfoType type1,
+                             CanHiddenTypeLayoutInfoType type2) {
+    llvm_unreachable("hidden types should never reach here");
+  }
+
   bool visitSILFunctionTypeComponents(CanSILFunctionType type1,
                                       CanSILFunctionType type2) {
     // If they do not both have a self param. Just delegate to our parent.

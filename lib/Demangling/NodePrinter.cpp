@@ -277,6 +277,7 @@ bool NodePrinter::isSimpleType(NodePointer Node) {
   case Node::Kind::SILBoxTypeWithLayout:
   case Node::Kind::Structure:
   case Node::Kind::OtherNominalType:
+  case Node::Kind::HiddenTypeLayoutInfo:
   case Node::Kind::TupleElementName:
   case Node::Kind::TypeAlias:
   case Node::Kind::TypeList:
@@ -1691,6 +1692,37 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
   case Node::Kind::OtherNominalType:
     return printEntity(Node, depth, asPrefixContext, TypePrinting::NoType,
                        /*hasName*/ true);
+  case Node::Kind::HiddenTypeLayoutInfo: {
+    Printer << "hidden type layout for ";
+    StringRef baseName = Node->getChild(0)->getText();
+    std::string mangledName;
+    if (baseName.starts_with("s") || baseName.starts_with("e")) {
+      mangledName = "$";
+      mangledName += baseName.str();
+    } else {
+      mangledName = "$s";
+      mangledName += baseName.str();
+    }
+    std::string demangledName = demangleSymbolAsString(mangledName);
+    if (demangledName == mangledName)
+      Printer << baseName;
+    else
+      Printer << demangledName;
+
+    NodePointer parent = nullptr;
+    for (unsigned i = 1, e = Node->getNumChildren(); i != e; ++i) {
+      NodePointer child = Node->getChild(i);
+      if (child->getKind() == Node::Kind::Type)
+        parent = child;
+    }
+
+    if (parent) {
+      Printer << " parent: ";
+      print(parent, depth + 1);
+    }
+
+    return nullptr;
+  }
   case Node::Kind::LocalDeclName:
     print(Node->getChild(1), depth + 1);
     if (Options.DisplayLocalNameContexts)

@@ -17,6 +17,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/AttrKind.h"
+#include "swift/AST/AbstractLayout.h"
 #include "swift/AST/AutoDiff.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DiagnosticsSema.h"
@@ -3558,8 +3559,11 @@ class DeclDeserializer {
   llvm::Error finishRecursiveAttrs();
 
 public:
-  DeclDeserializer(ModuleFile &MF, Serialized<Decl *> &declOrOffset)
-      : MF(MF), ctx(MF.getContext()), declOrOffset(declOrOffset) {}
+  DeclID thisDeclID;
+  DeclDeserializer(ModuleFile &MF, Serialized<Decl *> &declOrOffset,
+                   DeclID declID)
+      : MF(MF), ctx(MF.getContext()), declOrOffset(declOrOffset),
+        thisDeclID(declID) {}
 
   ~DeclDeserializer() {
     if (!declOrOffset.isComplete()) {
@@ -5781,7 +5785,7 @@ ModuleFile::getDeclChecked(
       return std::move(error);
 
     Expected<Decl *> deserialized =
-      DeclDeserializer(*this, declOrOffset).getDeclCheckedImpl(
+      DeclDeserializer(*this, declOrOffset, DID).getDeclCheckedImpl(
         matchAttributes);
     if (!deserialized)
       return deserialized;
@@ -5810,6 +5814,103 @@ ModuleFile::getDeclChecked(
     });
 
   return declOrOffset;
+}
+
+llvm::Expected<HiddenTypeLayoutInfoDecl *>
+ModuleFile::getHiddenTypeLayoutInfoDecl(DeclID DID) {
+  using namespace decls_block;
+
+  if (DID == 0)
+    return nullptr;
+
+  assert(DID <= HiddenTypeLayoutInfoDecls.size() &&
+         "invalid hidden type layout decl ID");
+  auto &declOrOffset = HiddenTypeLayoutInfoDecls[DID-1];
+
+  if (declOrOffset.isComplete())
+    return cast<HiddenTypeLayoutInfoDecl>(declOrOffset.get());
+
+  BCOffsetRAII restoreOffset(DeclTypeCursor);
+
+  if (auto error =
+          diagnoseFatalIfNotSuccess(DeclTypeCursor.JumpToBit(declOrOffset)))
+    return std::move(error);
+
+  SmallVector<uint64_t, 8> scratch;
+  StringRef blobData;
+  llvm::BitstreamEntry entry =
+      fatalIfUnexpected(DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
+  if (entry.Kind != llvm::BitstreamEntry::Record)
+    return diagnoseFatal();
+
+  unsigned recordID = fatalIfUnexpected(
+      DeclTypeCursor.readRecord(entry.ID, scratch, &blobData));
+
+  ASTContext &ctx = getContext();
+  DeclContext *DC = getAssociatedModule();
+
+  switch (recordID) {
+  case HIDDEN_LOADABLE_TRIVIAL_TYPE: {
+    uint8_t rawKind;
+    uint16_t silTypePropertiesFlags;
+    IdentifierID mangledNameID;
+    DeclID parentDeclID;
+    uint64_t size;
+    uint64_t alignment;
+    uint64_t stride;
+    bool bitwiseCopyable;
+    bool nativeParameterRequiresIndirect;
+    bool nativeResultRequiresIndirect;
+    ArrayRef<uint64_t> nativeComponentData;
+
+    LoadableTrivialHiddenTypeLayoutDescriptorLayout::readRecord(
+        scratch, rawKind, silTypePropertiesFlags, mangledNameID, parentDeclID,
+        size, alignment, stride, bitwiseCopyable,
+        nativeParameterRequiresIndirect, nativeResultRequiresIndirect,
+        nativeComponentData);
+
+    auto kind = static_cast<AbstractTypeLayout::Kind>(rawKind);
+    assert(kind == AbstractTypeLayout::Kind::LoadableTrivialHiddenType);
+    (void)kind;
+
+    auto *decl = HiddenTypeLayoutInfoDecl::create(ctx, DC);
+    auto *layout = new (ctx) LoadableTrivialHiddenTypeAbstractLayout(
+        size, alignment, stride, bitwiseCopyable);
+    layout->mangledName = getIdentifier(mangledNameID).str();
+    layout->typeProperties =
+        SILTypeProperties::fromRawFlags(silTypePropertiesFlags);
+    layout->nativeParameterRequiresIndirect =
+        nativeParameterRequiresIndirect;
+    layout->nativeResultRequiresIndirect = nativeResultRequiresIndirect;
+    assert(nativeComponentData.size() % 6 == 0);
+    for (unsigned index = 0, end = nativeComponentData.size(); index != end;
+         index += 6) {
+      layout->nativeComponents.push_back({
+          nativeComponentData[index],
+          nativeComponentData[index + 1],
+          static_cast<NativeConventionLLVMTypeKind>(
+              nativeComponentData[index + 2]),
+          nativeComponentData[index + 3],
+          static_cast<NativeConventionLLVMTypeKind>(
+              nativeComponentData[index + 4]),
+          nativeComponentData[index + 5],
+      });
+    }
+    decl->setAbstractLayout(layout);
+    if (parentDeclID) {
+      auto parentDecl = getDeclChecked(parentDeclID);
+      if (!parentDecl)
+        return parentDecl.takeError();
+      decl->setParentDecl(cast<TypeDecl>(parentDecl.get()));
+    }
+
+    declOrOffset = decl;
+    return decl;
+  }
+
+  default:
+    return diagnoseFatal();
+  }
 }
 
 static std::optional<AvailabilityDomainKind>
@@ -6958,10 +7059,29 @@ DeclDeserializer::getDeclCheckedImpl(
     uint32_t pathLen;
     decls_block::XRefLayout::readRecord(scratch, baseModuleID, pathLen);
     auto resolved = MF.resolveCrossReference(baseModuleID, pathLen);
-    if (!resolved)
-      return resolved;
-    declOrOffset = resolved.get();
-    break;
+    if (resolved) {
+      declOrOffset = resolved.get();
+      break;
+    }
+
+    auto &langOpts = MF.getContext().LangOpts;
+    if (langOpts.hasFeature(
+            Feature::SerializeAbstractTypeLayoutForHiddenTypes) ||
+        langOpts.hasFeature(Feature::AbstractStoredPropertyLayout)) {
+      auto fallbackIt = MF.HiddenTypeFallbackMap.find(thisDeclID);
+      if (fallbackIt != MF.HiddenTypeFallbackMap.end()) {
+        llvm::consumeError(resolved.takeError());
+        auto localDecl =
+            MF.getHiddenTypeLayoutInfoDecl(fallbackIt->second);
+        if (localDecl) {
+          declOrOffset = localDecl.get();
+          break;
+        }
+        return localDecl.takeError();
+      }
+    }
+
+    return resolved;
   }
 
   default:
@@ -7358,12 +7478,16 @@ Expected<Type> DESERIALIZE_TYPE(NOMINAL_TYPE)(
   if (!parentTy)
     return parentTy.takeError();
 
-  auto nominalOrError = MF.getDeclChecked(declID);
-  if (!nominalOrError)
-    return nominalOrError.takeError();
+  auto declOrError = MF.getDeclChecked(declID);
+  if (!declOrError)
+    return declOrError.takeError();
+
+  if (auto *hiddenDecl = dyn_cast<HiddenTypeLayoutInfoDecl>(declOrError.get())) {
+    return HiddenTypeLayoutInfoType::get(hiddenDecl, parentTy.get(), MF.getContext());
+  }
 
   // Look through compatibility aliases.
-  if (auto *alias = dyn_cast<TypeAliasDecl>(nominalOrError.get())) {
+  if (auto *alias = dyn_cast<TypeAliasDecl>(declOrError.get())) {
     // Reminder: TypeBase::getAs will look through sugar. But we don't want to
     // do that here, so we do isa<> checks on the TypeBase itself instead of
     // using the Type wrapper.
@@ -7382,15 +7506,15 @@ Expected<Type> DESERIALIZE_TYPE(NOMINAL_TYPE)(
     // We only want to use the type we found if it's a simple non-generic
     // nominal type.
     if (auto simpleNominalTy = dyn_cast_or_null<NominalType>(underlyingTy)) {
-      nominalOrError = simpleNominalTy->getDecl();
-      (void)!nominalOrError; // "Check" the llvm::Expected<> value.
+      declOrError = simpleNominalTy->getDecl();
+      (void)!declOrError; // "Check" the llvm::Expected<> value.
     }
   }
 
-  auto nominal = dyn_cast<NominalTypeDecl>(nominalOrError.get());
+  auto nominal = dyn_cast<NominalTypeDecl>(declOrError.get());
   if (!nominal) {
-    XRefTracePath tinyTrace{*nominalOrError.get()->getModuleContext()};
-    const DeclName fullName = cast<ValueDecl>(nominalOrError.get())->getName();
+    XRefTracePath tinyTrace{*declOrError.get()->getModuleContext()};
+    const DeclName fullName = cast<ValueDecl>(declOrError.get())->getName();
     tinyTrace.addValue(fullName.getBaseIdentifier());
     return llvm::make_error<XRefError>("declaration is not a nominal type",
                                        tinyTrace, fullName);
@@ -8419,15 +8543,6 @@ Expected<Type> DESERIALIZE_TYPE(INTEGER_TYPE)(ModuleFile &MF,
   return IntegerType::get(blobData, isNegative, ctx);
 }
 
-Expected<Type> DESERIALIZE_TYPE(HIDDEN_TYPE)(ModuleFile &MF,
-                                             SmallVectorImpl<uint64_t> &scratch,
-                                             StringRef blobData) {
-  auto &ctx = MF.getContext();
-
-  decls_block::HiddenTypeLayout::readRecord(scratch);
-
-  return HiddenType::get(ctx, blobData, MF.getAssociatedModule());
-}
 } // namespace decls_block
 } // namespace serialization
 }

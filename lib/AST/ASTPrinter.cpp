@@ -3445,6 +3445,10 @@ void PrintAST::visitUsingDecl(UsingDecl *decl) {
   }
 }
 
+void PrintAST::visitHiddenTypeLayoutInfoDecl(HiddenTypeLayoutInfoDecl *decl) {
+  Printer << "/* hidden type layout */";
+}
+
 void PrintAST::printExtendedTypeName(TypeLoc ExtendedTypeLoc) {
   PrintOptions::OverrideScope scope(Options);
   OVERRIDE_PRINT_OPTION(scope, FullyQualifiedTypesIfAmbiguous,
@@ -6704,6 +6708,11 @@ public:
     }
   }
 
+  void visitHiddenTypeLayoutInfoType(HiddenTypeLayoutInfoType *T,
+                             NonRecursivePrintOptions nrOptions) {
+    Printer << "<<hidden layout type>>";
+  }
+
   void visitErrorUnionType(ErrorUnionType *T,
                            NonRecursivePrintOptions nrOptions) {
     Printer << "error_union(";
@@ -8284,9 +8293,6 @@ public:
     Printer << T->getDigitsText();
   }
 
-  void visitHiddenType(HiddenType *T, NonRecursivePrintOptions nrOptions) {
-    Printer << "@_hidden(\"" << T->getMangledName() << "\")";
-  }
 };
 } // unnamed namespace
 

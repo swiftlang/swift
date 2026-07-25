@@ -3078,6 +3078,11 @@ namespace {
       printRec(MED->getArgs(), Label::optional("args"));
       printFoot();
     }
+
+    void visitHiddenTypeLayoutInfoDecl(HiddenTypeLayoutInfoDecl *HTLD, Label label) {
+      printCommon(HTLD, "hidden_type_layout_info_decl", label);
+      printFoot();
+    }
   };
 } // end anonymous namespace
 
@@ -6269,6 +6274,8 @@ namespace {
       printFoot();
     }
 
+    TRIVIAL_TYPE_PRINTER(HiddenTypeLayoutInfo, hidden_type_layout_info)
+
     void visitPlaceholderType(PlaceholderType *T, Label label) {
       printCommon("placeholder_type", label);
       auto originator = T->getOriginator();
@@ -6945,13 +6952,6 @@ namespace {
       printFlag(T->isNegative(), "is_negative");
       printFieldQuoted(T->getValue(), Label::always("value"), LiteralValueColor);
       printFieldQuoted(T->getDigitsText(), Label::always("text"), IdentifierColor);
-      printFoot();
-    }
-
-    void visitHiddenType(HiddenType *T, Label label) {
-      printCommon("hidden_type", label);
-      printFieldQuoted(T->getMangledName(), Label::always("mangled_name"),
-                       IdentifierColor);
       printFoot();
     }
 

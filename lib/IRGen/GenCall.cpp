@@ -972,6 +972,12 @@ NativeConventionSchema::NativeConventionSchema(IRGenModule &IGM,
   }
 }
 
+NativeConventionSchema::NativeConventionSchema(
+    IRGenModule &IGM, ArrayRef<FinishedComponent> components,
+    bool requiresIndirect)
+    : Lowering(IGM.ClangCodeGen->CGM(), components),
+      RequiresIndirect(requiresIndirect) {}
+
 llvm::Type *NativeConventionSchema::getExpandedType(IRGenModule &IGM) const {
   if (empty())
     return IGM.VoidTy;

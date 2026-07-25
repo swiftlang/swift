@@ -158,6 +158,10 @@ public:
 
   void visitMissingMemberDecl(MissingMemberDecl *placeholder) {}
 
+  void visitHiddenTypeLayoutInfoDecl(HiddenTypeLayoutInfoDecl *) {
+      llvm_unreachable("hidden type layout decls themselves do not produce IR, they inform the IR to generate for other decls");
+  }
+
   void visitFuncDecl(FuncDecl *method) {
     if (!requiresObjCMethodDescriptor(method)) return;
 
@@ -359,6 +363,10 @@ public:
   }
 
   void visitMissingMemberDecl(MissingMemberDecl *placeholder) {}
+
+  void visitHiddenTypeLayoutInfoDecl(HiddenTypeLayoutInfoDecl *) {
+      llvm_unreachable("hidden type layout decls themselves do not produce IR, they inform the IR to generate for other decls");
+  }
 
   void visitAbstractFunctionDecl(AbstractFunctionDecl *method) {
     if (isa<AccessorDecl>(method)) {
@@ -2739,6 +2747,9 @@ void IRGenModule::emitGlobalDecl(Decl *D) {
 
   case DeclKind::Using:
     return;
+
+  case DeclKind::HiddenTypeLayoutInfo:
+    llvm_unreachable("hidden type layout decls themselves do not produce IR, they inform the IR to generate for other decls");
   }
 
   llvm_unreachable("bad decl kind!");
@@ -5982,6 +5993,9 @@ void IRGenModule::emitNestedTypeDecls(DeclRange members) {
 
     case DeclKind::Missing:
       llvm_unreachable("missing decl in IRGen");
+
+    case DeclKind::HiddenTypeLayoutInfo:
+      llvm_unreachable("Hidden layout decls will never be nested types or require IR emission directly");
 
     case DeclKind::Macro:
       continue;

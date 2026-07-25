@@ -410,6 +410,11 @@ Remangler::mangleGenericSpecializationInResilienceDomain(Node *node,
   return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
+ManglingError Remangler::mangleHiddenTypeLayoutInfo(Node *node,
+                                                    unsigned depth) {
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
+}
+
 ManglingError Remangler::mangleInlinedGenericFunction(Node *node,
                                                       unsigned depth) {
   return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);

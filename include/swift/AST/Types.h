@@ -93,6 +93,7 @@ class TypeAliasDecl;
 class TypeDecl;
 class NominalTypeDecl;
 class GenericTypeDecl;
+class HiddenTypeLayoutInfoDecl;
 enum class EffectKind : uint8_t;
 class EnumDecl;
 class EnumElementDecl;
@@ -1751,6 +1752,44 @@ public:
   bool isBitwiseCopyable() const;
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinType, Type)
+
+/// HiddenTypeLayoutInfoType - Represents a type whose actual definition is
+/// hidden (e.g., from an @_implementationOnly import) but whose layout
+/// information is available for code generation purposes.
+class HiddenTypeLayoutInfoType final : public TypeBase,
+                                       public llvm::FoldingSetNode {
+  friend class ASTContext;
+
+  HiddenTypeLayoutInfoDecl *Decl;
+  Type Parent;
+
+  HiddenTypeLayoutInfoType(HiddenTypeLayoutInfoDecl *decl,
+                           Type Parent, const ASTContext &ctx,
+                           RecursiveTypeProperties properties)
+      : TypeBase(TypeKind::HiddenTypeLayoutInfo, &ctx, properties),
+        Decl(decl), Parent(Parent) {}
+
+public:
+  HiddenTypeLayoutInfoDecl *getDecl() const { return Decl; }
+  Type getParent() const { return Parent; }
+
+  static Type get(HiddenTypeLayoutInfoDecl *decl, Type Parent,
+                  const ASTContext &ctx);
+
+  void Profile(llvm::FoldingSetNodeID &ID) const {
+    Profile(ID, getDecl(), getParent());
+  }
+  static void Profile(llvm::FoldingSetNodeID &ID,
+                      HiddenTypeLayoutInfoDecl *decl, Type Parent) {
+    ID.AddPointer(decl);
+    ID.AddPointer(Parent.getPointer());
+  }
+
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::HiddenTypeLayoutInfo;
+  }
+};
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(HiddenTypeLayoutInfoType, Type)
 
 /// BuiltinUnboundGenericType - the base declaration of a generic builtin type
 /// that has not yet had generic parameters applied.
@@ -8388,52 +8427,6 @@ public:
   const ASTContext &getASTContext() { return Context; }
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(IntegerType, Type)
-
-/// A placeholder type for a stored-property field whose real type has been
-/// elided from a serialized module because it was imported via an internal
-/// bridging header. The type carries the mangled name of the original type,
-/// which is used for deduplication and (eventually) for recovering the real
-/// type when the client has access to the defining header.
-///
-/// HiddenType is never produced by type-checking user code. It is synthesized
-/// only on the serialization path and consumed by deserialization and IRGen.
-///
-/// Each HiddenType also carries the ModuleDecl it was emitted from (the
-/// "defining module"). That module's HiddenTypeLayouts table holds the
-/// AbstractTypeLayout entry that backs this placeholder; IRGen resolves the
-/// layout via that module.
-class HiddenType final : public TypeBase, public llvm::FoldingSetNode {
-  friend class ASTContext;
-
-  StringRef MangledName;
-  ModuleDecl *DefiningModule;
-
-  HiddenType(StringRef mangledName, ModuleDecl *definingModule,
-             const ASTContext &ctx)
-      : TypeBase(TypeKind::Hidden, &ctx, RecursiveTypeProperties()),
-        MangledName(mangledName), DefiningModule(definingModule) {}
-
-public:
-  static HiddenType *get(const ASTContext &ctx, StringRef mangledName,
-                         ModuleDecl *definingModule);
-
-  StringRef getMangledName() const { return MangledName; }
-  ModuleDecl *getDefiningModule() const { return DefiningModule; }
-
-  void Profile(llvm::FoldingSetNodeID &ID) {
-    Profile(ID, getMangledName(), getDefiningModule());
-  }
-  static void Profile(llvm::FoldingSetNodeID &ID, StringRef mangledName,
-                      ModuleDecl *definingModule) {
-    ID.AddString(mangledName);
-    ID.AddPointer(definingModule);
-  }
-
-  static bool classof(const TypeBase *T) {
-    return T->getKind() == TypeKind::Hidden;
-  }
-};
-DEFINE_EMPTY_CAN_TYPE_WRAPPER(HiddenType, Type)
 
 /// getASTContext - Return the ASTContext that this type belongs to.
 inline ASTContext &TypeBase::getASTContext() const {

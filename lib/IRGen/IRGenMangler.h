@@ -139,6 +139,12 @@ public:
     return mangleTypeSymbol(type, witnessTableOp);
   }
 
+  std::string mangleMangledTypeName(Type type) {
+    beginMangling();
+    appendType(type, nullptr);
+    return finalize();
+  }
+
   std::string mangleTypeMetadataAccessFunction(Type type) {
     return mangleTypeSymbol(type, "Ma");
   }

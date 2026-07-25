@@ -117,10 +117,12 @@ case TypeKind::Id:
     case TypeKind::Module:
     case TypeKind::BuiltinTuple:
     case TypeKind::Integer:
-    case TypeKind::Hidden:
     case TypeKind::Join:
     case TypeKind::Meet:
       return t;
+
+    case TypeKind::HiddenTypeLayoutInfo:
+      llvm_unreachable("not implemented yet");
 
     // BuiltinGenericType subclasses
     case TypeKind::BuiltinBorrow:
