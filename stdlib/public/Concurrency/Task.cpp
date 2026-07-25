@@ -32,6 +32,7 @@
 #include "swift/ABI/TaskOptions.h"
 #include "swift/Basic/Casting.h"
 #include "swift/Basic/Lazy.h"
+#include "swift/Runtime/Casting.h"
 #include "swift/Runtime/Concurrency.h"
 #include "swift/Runtime/EnvironmentVariables.h"
 #include "swift/Runtime/HeapObject.h"
@@ -39,7 +40,13 @@
 #include "swift/Threading/Mutex.h"
 #include <atomic>
 #include <new>
+
+// <unordered_set> cannot be included at all under -ffreestanding (its own
+// header hard-errors), and its only use below (ActiveContinuations) is
+// already hosted-only.
+#if !SWIFT_CONCURRENCY_EMBEDDED
 #include <unordered_set>
+#endif
 
 #if SWIFT_CONCURRENCY_ENABLE_DISPATCH
 #include <dispatch/dispatch.h>

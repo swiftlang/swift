@@ -89,10 +89,15 @@ inline bool cond_wait(cond_handle &handle,
                       std::chrono::duration<Rep, Period> duration) {
   return true;
 }
+// std::chrono::system_clock is a hosted-only facility (it represents
+// wall-clock time, which requires OS support); this overload only exists to
+// back ConditionVariable::waitUntil, which is itself hosted-only.
+#if __STDC_HOSTED__
 inline bool cond_wait(cond_handle &handle,
                       std::chrono::system_clock::time_point deadline) {
   return true;
 }
+#endif
 
 // .. Once ...................................................................
 

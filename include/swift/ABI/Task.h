@@ -19,8 +19,15 @@
 
 #include "swift/ABI/Executor.h"
 #include "swift/ABI/HeapObject.h"
-#include "swift/ABI/Metadata.h"
 #include "swift/ABI/MetadataValues.h"
+// The full Metadata.h is only needed for ResultTypeInfo's non-embedded
+// representation below, which calls value witness methods on Metadata.
+// Everywhere else in this header, Metadata/HeapMetadata are used as opaque
+// pointers, satisfied by the forward declarations in MetadataValues.h and
+// HeapObject.h.
+#if !SWIFT_CONCURRENCY_EMBEDDED
+#include "swift/ABI/Metadata.h"
+#endif
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/VoucherShims.h"
 #include "swift/Basic/STLExtras.h"

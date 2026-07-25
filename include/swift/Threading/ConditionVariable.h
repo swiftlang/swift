@@ -99,6 +99,11 @@ public:
   /// After this method returns, the associated mutex will be locked.
   ///
   /// Precondition: ConditionVariable locked by this thread.
+  ///
+  /// std::chrono::system_clock is a hosted-only facility (it represents
+  /// wall-clock time, which requires OS support), so this API is
+  /// unavailable in freestanding/embedded builds.
+#if __STDC_HOSTED__
   template <class Rep, class Period>
   bool waitUntil(std::chrono::time_point<std::chrono::system_clock,
                  std::chrono::duration<Rep, Period>> deadline) {
@@ -106,6 +111,7 @@ public:
       std::chrono::system_clock::duration>(deadline);
     return threading_impl::cond_wait(Handle, sysdeadline);
   }
+#endif
 
   /// Acquires lock before calling the supplied critical section and releases
   /// lock on return from critical section.
