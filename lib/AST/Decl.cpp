@@ -1056,6 +1056,14 @@ bool Decl::isInMacroExpansionInContext() const {
   return swift::isMacroExpansionInContext(getStartLoc(), parentSF);
 }
 
+Decl *Decl::getMacroExpansionOriginatingDecl() const {
+  SourceLoc loc = getLoc();
+  auto *sf = getModuleContext()->getSourceFileContainingLocation(loc);
+  if (!sf || sf->Kind != SourceFileKind::MacroExpansion)
+    return nullptr;
+  return sf->getMacroExpansion().dyn_cast<Decl *>();
+}
+
 bool Decl::isInMacroExpansionFromClangHeader() const {
   SourceLoc declLoc = getLoc();
   if (declLoc.isInvalid())
@@ -3557,6 +3565,8 @@ static AccessStrategy getOpaqueReadWriteAccessStrategy(
     return AccessStrategy::getAccessor(AccessorKind::YieldingMutate, dispatch);
   if (storage->requiresOpaqueModifyCoroutine())
     return AccessStrategy::getAccessor(AccessorKind::Modify, dispatch);
+  if (storage->requiresOpaqueMutateAccessor())
+    return AccessStrategy::getAccessor(AccessorKind::Mutate, dispatch);
   return AccessStrategy::getMaterializeToTemporary(
       getOpaqueReadAccessStrategy(storage, dispatch, nullptr,
                                   ResilienceExpansion::Minimal, location,
@@ -6803,13 +6813,6 @@ void NominalTypeDecl::synthesizeSemanticMembersIfNeeded(DeclName member) {
   auto baseName = member.getBaseName();
   auto &Context = getASTContext();
 
-  // For a distributed actor `id` and `actorSystem` can be synthesized without
-  // causing cycles so do them above the cycle guard.
-  if (member.isSimpleName(Context.Id_id))
-    (void)getDistributedActorIDProperty();
-  if (member.isSimpleName(Context.Id_actorSystem))
-    (void)getDistributedActorSystemProperty();
-
   // Silently break cycles here because we can't be sure when and where a
   // request to synthesize will come from yet.
   // FIXME: rdar://56844567
@@ -7425,6 +7428,17 @@ ReferenceCounting ClassDecl::getObjectModel() const {
     return ReferenceCounting::ObjC;
 
   return ReferenceCounting::Native;
+}
+
+bool ClassDecl::isCOMObject() const {
+  // COM is only in play when the experimental interop is enabled; keep the
+  // common case free and never touch the evaluator cache for it.
+  if (!getASTContext().LangOpts.EnableCOMInterop)
+    return false;
+
+  auto *mutableThis = const_cast<ClassDecl *>(this);
+  return evaluateOrDefault(getASTContext().evaluator,
+                           IsCOMObjectRequest{mutableThis}, false);
 }
 
 EnumCaseDecl *EnumCaseDecl::create(SourceLoc CaseLoc,

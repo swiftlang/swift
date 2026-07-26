@@ -645,6 +645,9 @@ EXPERIMENTAL_FEATURE(AbstractStoredPropertyLayout, false)
 /// Allow use of macros to derive various conformances
 EXPERIMENTAL_FEATURE(DeriveConformancesViaMacros, false)
 
+/// Allow `self` to be mutated or consumed inside of non-`Copyable` type `deinit`s.
+EXPERIMENTAL_FEATURE(MutateAndConsumeInDeinit, true)
+
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE

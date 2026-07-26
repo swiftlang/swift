@@ -1,0 +1,67 @@
+{
+  "CanonicalName": "xros1.0",
+  "Version": "1.0",
+  "IsBaseSDK": "YES",
+  "DisplayName": "Mock SDK",
+  "MinimalDisplayName": "Mock",
+  "SupportedTargets": {
+    "macosx": {
+      "Archs": ["arm64", "arm64e", "x86_64"], "LLVMTargetTripleVendor": "apple", "LLVMTargetTripleSys": "macosx", "LLVMTargetTripleEnvironment": "",
+      "MinimumDeploymentTarget": "10.9", "MaximumDeploymentTarget": "26.0.99",
+      "DefaultDeploymentTarget": "26.0", "RecommendedDeploymentTarget": "26.0"
+    },
+    "iphoneos": {
+      "Archs": ["arm64", "arm64e"], "LLVMTargetTripleVendor": "apple", "LLVMTargetTripleSys": "ios", "LLVMTargetTripleEnvironment": "",
+      "MinimumDeploymentTarget": "9.0", "MaximumDeploymentTarget": "26.0.99",
+      "DefaultDeploymentTarget": "26.0", "RecommendedDeploymentTarget": "26.0"
+    },
+    "iphonesimulator": {
+      "Archs": ["arm64", "x86_64"], "LLVMTargetTripleVendor": "apple", "LLVMTargetTripleSys": "ios", "LLVMTargetTripleEnvironment": "simulator",
+      "MinimumDeploymentTarget": "9.0", "MaximumDeploymentTarget": "26.0.99",
+      "DefaultDeploymentTarget": "26.0", "RecommendedDeploymentTarget": "26.0"
+    },
+    "appletvos": {
+      "Archs": ["arm64"], "LLVMTargetTripleVendor": "apple", "LLVMTargetTripleSys": "tvos", "LLVMTargetTripleEnvironment": "",
+      "MinimumDeploymentTarget": "9.0", "MaximumDeploymentTarget": "26.0.99",
+      "DefaultDeploymentTarget": "26.0", "RecommendedDeploymentTarget": "26.0"
+    },
+    "appletvsimulator": {
+      "Archs": ["arm64", "x86_64"], "LLVMTargetTripleVendor": "apple", "LLVMTargetTripleSys": "tvos", "LLVMTargetTripleEnvironment": "simulator",
+      "MinimumDeploymentTarget": "9.0", "MaximumDeploymentTarget": "26.0.99",
+      "DefaultDeploymentTarget": "26.0", "RecommendedDeploymentTarget": "26.0"
+    },
+    "watchos": {
+      "Archs": ["arm64_32", "arm64"], "LLVMTargetTripleVendor": "apple", "LLVMTargetTripleSys": "watchos", "LLVMTargetTripleEnvironment": "",
+      "MinimumDeploymentTarget": "2.0", "MaximumDeploymentTarget": "26.0.99",
+      "DefaultDeploymentTarget": "26.0", "RecommendedDeploymentTarget": "26.0"
+    },
+    "watchsimulator": {
+      "Archs": ["arm64", "x86_64"], "LLVMTargetTripleVendor": "apple", "LLVMTargetTripleSys": "watchos", "LLVMTargetTripleEnvironment": "simulator",
+      "MinimumDeploymentTarget": "2.0", "MaximumDeploymentTarget": "26.0.99",
+      "DefaultDeploymentTarget": "26.0", "RecommendedDeploymentTarget": "26.0"
+    },
+    "xros": {
+      "Archs": ["arm64", "arm64e", "x86_64"], "LLVMTargetTripleVendor": "apple", "LLVMTargetTripleSys": "xros", "LLVMTargetTripleEnvironment": "",
+      "MinimumDeploymentTarget": "1.0", "MaximumDeploymentTarget": "26.0.99",
+      "DefaultDeploymentTarget": "1.0", "RecommendedDeploymentTarget": "1.0"
+    },
+    "xrsimulator": {
+      "Archs": ["arm64", "x86_64"], "LLVMTargetTripleVendor": "apple", "LLVMTargetTripleSys": "xros", "LLVMTargetTripleEnvironment": "simulator",
+      "MinimumDeploymentTarget": "1.0", "MaximumDeploymentTarget": "26.0.99",
+      "DefaultDeploymentTarget": "1.0", "RecommendedDeploymentTarget": "1.0"
+    },
+    "driverkit": {
+      "Archs": ["arm64", "arm64e", "x86_64"], "LLVMTargetTripleVendor": "apple", "LLVMTargetTripleSys": "driverkit", "LLVMTargetTripleEnvironment": "",
+      "MinimumDeploymentTarget": "19.0", "MaximumDeploymentTarget": "26.0.99",
+      "DefaultDeploymentTarget": "26.0", "RecommendedDeploymentTarget": "26.0"
+    }
+  },
+  "VersionMap": {
+    "visionOS_iOS": {"1.0": "17.1", "1.1": "17.4", "1.2": "17.5", "2.0": "18.0", "2.1": "18.1", "2.2": "18.2", "2.3": "18.3", "2.4": "18.4", "2.5": "18.5", "2.6": "18.6", "26.0": "26.0"},
+    "iOS_visionOS": {"17.1": "1.0", "17.4": "1.1", "17.5": "1.2", "18.0": "2.0", "18.1": "2.1", "18.2": "2.2", "18.3": "2.3", "18.4": "2.4", "18.5": "2.5", "18.6": "2.6", "26.0": "26.0"},
+    "xrOS_iOS": {"1.0": "17.1", "1.1": "17.4", "1.2": "17.5", "2.0": "18.0", "2.1": "18.1", "2.2": "18.2", "2.3": "18.3", "2.4": "18.4", "2.5": "18.5", "2.6": "18.6", "26.0": "26.0"},
+    "iOS_xrOS": {"17.1": "1.0", "17.4": "1.1", "17.5": "1.2", "18.0": "2.0", "18.1": "2.1", "18.2": "2.2", "18.3": "2.3", "18.4": "2.4", "18.5": "2.5", "18.6": "2.6", "26.0": "26.0"}
+  },
+  "DefaultDeploymentTarget": "26.0",
+  "MaximumDeploymentTarget": "26.0.99"
+}

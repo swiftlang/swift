@@ -140,14 +140,14 @@ Type GenericEnvironment::getOpenedExistentialType() const {
   return getTrailingObjects<ExistentialEnvironmentData>()->existential;
 }
 
-UUID GenericEnvironment::getOpenedExistentialUUID() const {
+uint64_t GenericEnvironment::getOpenedExistentialID() const {
   assert(getKind() == Kind::Existential);
-  return getTrailingObjects<ExistentialEnvironmentData>()->uuid;
+  return getTrailingObjects<ExistentialEnvironmentData>()->id;
 }
 
-UUID GenericEnvironment::getOpenedElementUUID() const {
+uint64_t GenericEnvironment::getOpenedElementID() const {
   assert(getKind() == Kind::Element);
-  return getTrailingObjects<ElementEnvironmentData>()->uuid;
+  return getTrailingObjects<ElementEnvironmentData>()->id;
 }
 
 void GenericEnvironment::forEachPackElementArchetype(
@@ -212,12 +212,12 @@ GenericEnvironment::GenericEnvironment(GenericSignature sig)
 
 GenericEnvironment::GenericEnvironment(
     GenericSignature sig,
-    Type existential, SubstitutionMap subs, UUID uuid)
+    Type existential, SubstitutionMap subs, uint64_t id)
   : sig(sig), kind(Kind::Existential), canonical(subs.isCanonical()) {
   ASSERT(canonical);
   *getTrailingObjects<SubstitutionMap>() = subs;
   new (getTrailingObjects<ExistentialEnvironmentData>())
-    ExistentialEnvironmentData{ existential, uuid };
+    ExistentialEnvironmentData{ existential, id };
 
   // Clear out the memory that holds the context types.
   std::uninitialized_fill(getContextTypes().begin(), getContextTypes().end(),
@@ -237,14 +237,14 @@ GenericEnvironment::GenericEnvironment(
 }
 
 GenericEnvironment::GenericEnvironment(GenericSignature sig,
-                                       UUID uuid,
+                                       uint64_t id,
                                        CanGenericTypeParamType shapeClass,
                                        SubstitutionMap outerSubs)
   : sig(sig), kind(Kind::Element), canonical(true) {
   // FIXME: ASSERT(outerSubs.isCanonical());
   *getTrailingObjects<SubstitutionMap>() = outerSubs;
   new (getTrailingObjects<ElementEnvironmentData>())
-    ElementEnvironmentData{uuid, shapeClass};
+    ElementEnvironmentData{id, shapeClass};
 
   // Clear out the memory that holds the context types.
   std::uninitialized_fill(getContextTypes().begin(), getContextTypes().end(),
@@ -774,7 +774,7 @@ OpenedElementContext::createForContextualExpansion(ASTContext &ctx,
   auto elementSig = ctx.getOpenedElementSignature(
       genericSig, countType);
   auto *elementEnv = GenericEnvironment::forOpenedElement(
-      elementSig, UUID::fromTime(), countType, subMap);
+      elementSig, ctx.getNextGenericEnvironmentID(), countType, subMap);
 
   return {elementEnv, elementSig};
 }

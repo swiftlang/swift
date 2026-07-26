@@ -73,10 +73,10 @@ sil [ossa] @replace_archetype : $@convention(thin) () -> (@out any P, @error any
 bb0(%0 : $*any P):
   %1 = metatype $@thick S.Type
   %2 = init_existential_metatype %1, $@thick any P.Type
-  %4 = open_existential_metatype %2 to $@thick (@opened("0FC03D78-E9DB-11EF-B47C-0EA13E3AABB3", any P) Self).Type
+  %4 = open_existential_metatype %2 to $@thick (@opened(1, any P) Self).Type
   %6 = function_ref @createit : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@thick τ_0_0.Type) -> (@out τ_0_0, @error any Error)
-  %7 = init_existential_addr %0, $@opened("0FC03D78-E9DB-11EF-B47C-0EA13E3AABB3", any P) Self
-  try_apply %6<@opened("0FC03D78-E9DB-11EF-B47C-0EA13E3AABB3", any P) Self>(%7, %4) : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@thick τ_0_0.Type) -> (@out τ_0_0, @error any Error), normal bb1, error bb2
+  %7 = init_existential_addr %0, $@opened(1, any P) Self
+  try_apply %6<@opened(1, any P) Self>(%7, %4) : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@thick τ_0_0.Type) -> (@out τ_0_0, @error any Error), normal bb1, error bb2
 
 bb1(%8 : $()):
   return %8 : $()
@@ -92,11 +92,11 @@ sil [ossa] @dont_replace_returned_embedded_archetype : $@convention(thin) () -> 
 bb0:
   %1 = metatype $@thick S.Type
   %2 = init_existential_metatype %1, $@thick any P.Type
-  %4 = open_existential_metatype %2 to $@thick (@opened("0FC03D78-E9DB-11EF-B47C-0EA13E3AABB3", any P) Self).Type
+  %4 = open_existential_metatype %2 to $@thick (@opened(2, any P) Self).Type
   %6 = function_ref @returnGenS : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@thick τ_0_0.Type) -> (GenS<τ_0_0>, @error any Error)
-  try_apply %6<@opened("0FC03D78-E9DB-11EF-B47C-0EA13E3AABB3", any P) Self>(%4) : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@thick τ_0_0.Type) -> (GenS<τ_0_0>, @error any Error), normal bb1, error bb2
+  try_apply %6<@opened(2, any P) Self>(%4) : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@thick τ_0_0.Type) -> (GenS<τ_0_0>, @error any Error), normal bb1, error bb2
 
-bb1(%8 : $GenS<@opened("0FC03D78-E9DB-11EF-B47C-0EA13E3AABB3", any P) Self>):
+bb1(%8 : $GenS<@opened(2, any P) Self>):
   %9 = tuple ()
   return %9 : $()
 
@@ -111,14 +111,14 @@ sil [ossa] @dont_replace_thrown_embedded_archetype : $@convention(thin) () -> ((
 bb0:
   %1 = metatype $@thick S.Type
   %2 = init_existential_metatype %1, $@thick any P.Type
-  %4 = open_existential_metatype %2 to $@thick (@opened("0FC03D78-E9DB-11EF-B47C-0EA13E3AABB3", any P) Self).Type
+  %4 = open_existential_metatype %2 to $@thick (@opened(3, any P) Self).Type
   %6 = function_ref @throwGenError : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@thick τ_0_0.Type) -> ((), @error GenError<τ_0_0>)
-  try_apply %6<@opened("0FC03D78-E9DB-11EF-B47C-0EA13E3AABB3", any P) Self>(%4) : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@thick τ_0_0.Type) -> ((), @error GenError<τ_0_0>), normal bb1, error bb2
+  try_apply %6<@opened(3, any P) Self>(%4) : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@thick τ_0_0.Type) -> ((), @error GenError<τ_0_0>), normal bb1, error bb2
 
 bb1(%8 : $()):
   return %8 : $()
 
-bb2(%10 : $GenError<@opened("0FC03D78-E9DB-11EF-B47C-0EA13E3AABB3", any P) Self>):
+bb2(%10 : $GenError<@opened(3, any P) Self>):
   unreachable
 }
 
@@ -139,12 +139,12 @@ sil [ossa] @propagate_class_existential : $@convention(thin) () -> () {
 bb0:
   %0 = metatype $@thick C.Type
   %1 = init_existential_metatype %0, $@thick any CP.Type
-  %2 = open_existential_metatype %1 to $@thick (@opened("A3FC8EAA-2207-11F1-A49D-0EA13E3AABB3", any CP) Self).Type
+  %2 = open_existential_metatype %1 to $@thick (@opened(4, any CP) Self).Type
   %3 = alloc_ref $C
   %4 = end_init_let_ref %3
-  %5 = unchecked_ref_cast %4 to $@opened("A3FC8EAA-2207-11F1-A49D-0EA13E3AABB3", any CP) Self
+  %5 = unchecked_ref_cast %4 to $@opened(4, any CP) Self
   %6 = function_ref @callee_guaranteed : $@convention(thin) <τ_0_0 where τ_0_0 : CP> (@guaranteed τ_0_0) -> (Int, @error any Error)
-  try_apply %6<@opened("A3FC8EAA-2207-11F1-A49D-0EA13E3AABB3", any CP) Self>(%5) : $@convention(thin) <τ_0_0 where τ_0_0 : CP> (@guaranteed τ_0_0) -> (Int, @error any Error), normal bb1, error bb2
+  try_apply %6<@opened(4, any CP) Self>(%5) : $@convention(thin) <τ_0_0 where τ_0_0 : CP> (@guaranteed τ_0_0) -> (Int, @error any Error), normal bb1, error bb2
 
 bb1(%8: $Int):
   br bb3

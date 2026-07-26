@@ -593,6 +593,7 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   // Optimize copies created during RLE.
   P.addSemanticARCOpts();
   P.addCopyToBorrowOptimization();
+  P.addCopySinking();
 
   P.addCOWOpts();
   P.addPerformanceConstantPropagation();

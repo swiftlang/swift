@@ -25,12 +25,12 @@ final class C: P {}
 // CHECK-LABEL: sil @$s37sil_combine_concrete_existential_ossa14testReturnSelfAA1P_pyF : $@convention(thin) () -> @owned any P {
 // CHECK: [[EI:%.*]] = end_init_let_ref %0
 // CHECK: [[E1:%.*]] = init_existential_ref [[EI]] : $C : $C, $any P
-// CHECK: [[O1:%.*]] = open_existential_ref [[E1]] : $any P to $@opened("{{.*}}", any P) Self
+// CHECK: [[O1:%.*]] = open_existential_ref [[E1]] : $any P to $@opened({{.*}}, any P) Self
 // CHECK: [[F1:%.*]] = function_ref @$s37sil_combine_concrete_existential_ossa1PPAAE10returnSelfxyF : $@convention(method) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> @owned τ_0_0
-// CHECK: [[C1:%.*]] = apply [[F1]]<@opened("{{.*}}", any P) Self>([[O1]]) : $@convention(method) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> @owned τ_0_0
-// CHECK: [[E2:%.*]] = init_existential_ref [[C1]] : $@opened("{{.*}}", any P) Self : $@opened("{{.*}}", any P) Self, $any P
-// CHECK: [[O2:%.*]] = open_existential_ref [[E2]] : $any P to $@opened("{{.*}}", any P) Self
-// CHECK: apply [[F1]]<@opened("{{.*}}", any P) Self>([[O2]]) : $@convention(method) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> @owned τ_0_0
+// CHECK: [[C1:%.*]] = apply [[F1]]<@opened({{.*}}, any P) Self>([[O1]]) : $@convention(method) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> @owned τ_0_0
+// CHECK: [[E2:%.*]] = init_existential_ref [[C1]] : $@opened({{.*}}, any P) Self : $@opened({{.*}}, any P) Self, $any P
+// CHECK: [[O2:%.*]] = open_existential_ref [[E2]] : $any P to $@opened({{.*}}, any P) Self
+// CHECK: apply [[F1]]<@opened({{.*}}, any P) Self>([[O2]]) : $@convention(method) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> @owned τ_0_0
 // CHECK-LABEL: } // end sil function '$s37sil_combine_concrete_existential_ossa14testReturnSelfAA1P_pyF'
 public func testReturnSelf() -> P {
   let p: P = C()
@@ -60,11 +60,11 @@ final class CC: PP {
 // CHECK-LABEL: sil @$s37sil_combine_concrete_existential_ossa29testWitnessReturnOptionalSelfAA2PP_pSgyF : $@convention(thin) () -> @owned Optional<any PP> {
 // CHECK: [[EI:%.*]] = end_init_let_ref %0
 // CHECK: [[E1:%.*]] = init_existential_ref [[EI]] : $CC : $CC, $any PP
-// CHECK: [[O1:%.*]] = open_existential_ref [[E1]] : $any PP to $@opened("{{.*}}", any PP) Self
-// CHECK: [[E2:%.*]] = init_existential_ref %{{.*}} : $@opened("{{.*}}", any PP) Self : $@opened("{{.*}}", any PP) Self, $any PP
-// CHECK: [[O2:%.*]] = open_existential_ref [[E2]] : $any PP to $@opened("{{.*}}", any PP) Self
-// CHECK: [[U1:%.*]] = unchecked_ref_cast [[EI]] : $CC to $@opened("{{.*}}", any PP) Self
-// CHECK: [[E3:%.*]] = init_existential_ref [[U1]] : $@opened("{{.*}}", any PP) Self : $@opened("{{.*}}", any PP) Self, $any PP
+// CHECK: [[O1:%.*]] = open_existential_ref [[E1]] : $any PP to $@opened({{.*}}, any PP) Self
+// CHECK: [[E2:%.*]] = init_existential_ref %{{.*}} : $@opened({{.*}}, any PP) Self : $@opened({{.*}}, any PP) Self, $any PP
+// CHECK: [[O2:%.*]] = open_existential_ref [[E2]] : $any PP to $@opened({{.*}}, any PP) Self
+// CHECK: [[U1:%.*]] = unchecked_ref_cast [[EI]] : $CC to $@opened({{.*}}, any PP) Self
+// CHECK: [[E3:%.*]] = init_existential_ref [[U1]] : $@opened({{.*}}, any PP) Self : $@opened({{.*}}, any PP) Self, $any PP
 // CHECK: [[E:%.*]] = enum $Optional<any PP>, #Optional.some!enumelt, [[E3]] : $any PP
 // CHECK: return [[E]] : $Optional<any PP>
 // CHECK-LABEL: } // end sil function '$s37sil_combine_concrete_existential_ossa29testWitnessReturnOptionalSelfAA2PP_pSgyF'
@@ -100,11 +100,11 @@ struct SS: PPP {
 
 // The first apply has been devirtualized and inlined. The second remains unspecialized.
 // CHECK-LABEL: sil @$s37sil_combine_concrete_existential_ossa37testWitnessReturnOptionalIndirectSelfyyF : $@convention(thin) () -> () {
-// CHECK: [[O1:%.*]] = open_existential_addr immutable_access %{{.*}} : $*any PPP to $*@opened("{{.*}}", any PPP) Self
-// CHECK: switch_enum_addr %{{.*}} : $*Optional<@opened("{{.*}}", any PPP) Self>, case #Optional.some!enumelt: bb{{.*}}, case #Optional.none!enumelt: bb{{.*}}
-// CHECK: [[O2:%.*]] = open_existential_addr immutable_access %{{.*}} : $*any PPP to $*@opened("{{.*}}", any PPP) Self
-// CHECK: [[W:%.*]] = witness_method $@opened("{{.*}}", any PPP) Self, #PPP.returnsOptionalIndirect : <Self where Self : PPP> (Self) -> () -> Self?, [[O1]] : $*@opened("{{.*}}", any PPP) Self : $@convention(witness_method: PPP) <τ_0_0 where τ_0_0 : PPP> (@in_guaranteed τ_0_0) -> @out Optional<τ_0_0>
-// CHECK: apply [[W]]<@opened("{{.*}}", any PPP) Self>(%{{.*}}, [[O2]]) : $@convention(witness_method: PPP) <τ_0_0 where τ_0_0 : PPP> (@in_guaranteed τ_0_0) -> @out Optional<τ_0_0>
+// CHECK: [[O1:%.*]] = open_existential_addr immutable_access %{{.*}} : $*any PPP to $*@opened({{.*}}, any PPP) Self
+// CHECK: switch_enum_addr %{{.*}} : $*Optional<@opened({{.*}}, any PPP) Self>, case #Optional.some!enumelt: bb{{.*}}, case #Optional.none!enumelt: bb{{.*}}
+// CHECK: [[O2:%.*]] = open_existential_addr immutable_access %{{.*}} : $*any PPP to $*@opened({{.*}}, any PPP) Self
+// CHECK: [[W:%.*]] = witness_method $@opened({{.*}}, any PPP) Self, #PPP.returnsOptionalIndirect : <Self where Self : PPP> (Self) -> () -> Self?, [[O1]] : $*@opened({{.*}}, any PPP) Self : $@convention(witness_method: PPP) <τ_0_0 where τ_0_0 : PPP> (@in_guaranteed τ_0_0) -> @out Optional<τ_0_0>
+// CHECK: apply [[W]]<@opened({{.*}}, any PPP) Self>(%{{.*}}, [[O2]]) : $@convention(witness_method: PPP) <τ_0_0 where τ_0_0 : PPP> (@in_guaranteed τ_0_0) -> @out Optional<τ_0_0>
 // CHECK-LABEL: } // end sil function '$s37sil_combine_concrete_existential_ossa37testWitnessReturnOptionalIndirectSelfyyF'
 public func testWitnessReturnOptionalIndirectSelf() {
   let p: PPP = S()

@@ -790,13 +790,6 @@ class SILPrinter : public SILInstructionVisitor<SILPrinter> {
   SIMPLE_PRINTER(ActorIsolation)
 #undef SIMPLE_PRINTER
 
-  SILPrinter &operator<<(UUID value) {
-    llvm::SmallString<UUID::StringBufferSize> str;
-    ASTPrinter::getUUIDStringForPrinting(value, str);
-    PrintState.OS << str;
-    return *this;
-  }
-
   SILPrinter &operator<<(SILValuePrinterInfo i) {
     SILColor C(PrintState.OS, SC_Type);
     *this << i.ValueID;
@@ -2892,7 +2885,7 @@ public:
       subs.getGenericSignature()->getSugaredType(
         env->getOpenedElementShapeClass());
     *this << ", shape $" << sugaredShapeClass
-          << ", uuid \"" << env->getOpenedElementUUID() << "\"";
+          << ", id " << env->getOpenedElementID();
   }
   void visitPackElementGetInst(PackElementGetInst *I) {
     *this << Ctx.getID(I->getIndex()) << " of "
@@ -3979,6 +3972,11 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   // form, print [ossa].
   if (!isExternalDeclaration() && hasOwnership())
     OS << "[ossa] ";
+
+  // If this function is not yet address-lowered in an opaque values build,
+  // indicate this with [opaque].
+  if (!hasLoweredAddresses())
+    OS << "[opaque] ";
 
   if (needsStackProtection())
     OS << "[stack_protection] ";

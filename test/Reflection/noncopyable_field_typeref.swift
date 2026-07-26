@@ -9,6 +9,7 @@
 // rdar://100805115
 // UNSUPPORTED: CPU=arm64e
 // UNSUPPORTED: CPU=armv7k && OS=watchos
+// XFAIL: OS=linux-android, OS=linux-androideabi
 
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -target %module-target-future %s -parse-as-library -emit-module -emit-library -module-name NoncopyableFields -o %t/%target-library-name(NoncopyableFields)

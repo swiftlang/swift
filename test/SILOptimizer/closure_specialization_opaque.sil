@@ -21,7 +21,7 @@ bb0(%0 : $*TestView, %1 : @owned $@callee_owned (@inout TestView) ->()):
 
 // Test that ClosureSpecializer can handle captured @in args, in addition to direct args.
 //
-// CHECK-LABEL: sil [ossa] @testSpecializeThunk : $@convention(thin) (@inout TestView, TestRange, @in TestSlice) -> () {
+// CHECK-LABEL: sil [ossa] [opaque] @testSpecializeThunk : $@convention(thin) (@inout TestView, TestRange, @in TestSlice) -> () {
 // CHECK: bb0(%0 : $*TestView, %1 : $TestRange, %2 : $TestSlice):
 // CHECK:   [[CLOSURE:%.*]] = function_ref @closure : $@convention(thin) (@inout TestView, TestRange, @in TestSlice) -> ()
 // CHECK:   [[THUNK:%.*]] = function_ref @thunk : $@convention(thin) (@inout TestView, @owned @callee_owned (@inout TestView) -> ()) -> ()

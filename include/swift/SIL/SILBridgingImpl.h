@@ -685,6 +685,16 @@ void BridgedArgument::setReborrow(bool reborrow) const {
   getArgument()->setReborrow(reborrow);
 }
 
+void BridgedArgument::setOwnership(BridgedValue::Ownership ownership) const {
+  auto *arg = getArgument();
+  switch (ownership) {
+    case BridgedValue::Ownership::Unowned:    arg->setOwnershipKind(swift::OwnershipKind::Unowned);    break;
+    case BridgedValue::Ownership::Owned:      arg->setOwnershipKind(swift::OwnershipKind::Owned);      break;
+    case BridgedValue::Ownership::Guaranteed: arg->setOwnershipKind(swift::OwnershipKind::Guaranteed); break;
+    case BridgedValue::Ownership::None:       arg->setOwnershipKind(swift::OwnershipKind::None);       break;
+  }
+}
+
 bool BridgedArgument::FunctionArgument_isLexical() const {
   return llvm::cast<swift::SILFunctionArgument>(getArgument())->getLifetime().isLexical();
 }
@@ -814,7 +824,7 @@ bool BridgedFunction::isImplicit() const {
 
 bool BridgedFunction::hasOwnership() const { return getFunction()->hasOwnership(); }
 
-bool BridgedFunction::hasLoweredAddresses() const { return getFunction()->getModule().useLoweredAddresses(); }
+bool BridgedFunction::hasLoweredAddresses() const { return getFunction()->hasLoweredAddresses(); }
 
 BridgedCanType BridgedFunction::getLoweredFunctionType() const {
   return getFunction()->getLoweredFunctionType();
@@ -1553,7 +1563,7 @@ SwiftInt BridgedInstruction::ObjectInst_getNumBaseElements() const {
 }
 
 SwiftInt BridgedInstruction::PartialApply_getCalleeArgIndexOfFirstAppliedArg() const {
-  return swift::ApplySite(unbridged()).getCalleeArgIndexOfFirstAppliedArg();
+  return swift::ApplySite(unbridged()).getSubstCalleeArgIndexOfFirstAppliedArg();
 }
 
 bool BridgedInstruction::PartialApplyInst_isOnStack() const {
@@ -1660,9 +1670,40 @@ SwiftInt BridgedInstruction::SwitchEnumInst_getCaseIndex(SwiftInt idx) const {
   return seInst->getModule().getCaseIndex(seInst->getCase(idx).first);
 }
 
+SwiftInt BridgedInstruction::SwitchEnumInst_getUniqueCaseForDefault() const {
+  auto *seInst = getAs<swift::SwitchEnumInst>();
+  if (auto caseDecl = seInst->getUniqueCaseForDefault())
+    return seInst->getModule().getCaseIndex(caseDecl.get());
+  return -1;
+}
+
 OptionalBridgedBasicBlock
 BridgedInstruction::SwitchEnumInst_getSuccessorForDefault() const {
   auto *seInst = getAs<swift::SwitchEnumInst>();
+  if (seInst->hasDefault())
+    return {seInst->getDefaultBB()};
+  return {nullptr};
+}
+
+SwiftInt BridgedInstruction::SwitchEnumAddrInst_getNumCases() const {
+  return getAs<swift::SwitchEnumAddrInst>()->getNumCases();
+}
+
+SwiftInt BridgedInstruction::SwitchEnumAddrInst_getCaseIndex(SwiftInt idx) const {
+  auto *seInst = getAs<swift::SwitchEnumAddrInst>();
+  return seInst->getModule().getCaseIndex(seInst->getCase(idx).first);
+}
+
+SwiftInt BridgedInstruction::SwitchEnumAddrInst_getUniqueCaseForDefault() const {
+  auto *seInst = getAs<swift::SwitchEnumAddrInst>();
+  if (auto caseDecl = seInst->getUniqueCaseForDefault())
+    return seInst->getModule().getCaseIndex(caseDecl.get());
+  return -1;
+}
+
+OptionalBridgedBasicBlock
+BridgedInstruction::SwitchEnumAddrInst_getSuccessorForDefault() const {
+  auto *seInst = getAs<swift::SwitchEnumAddrInst>();
   if (seInst->hasDefault())
     return {seInst->getDefaultBB()};
   return {nullptr};
@@ -3326,8 +3367,8 @@ bool BridgedContext::moduleIsSerialized() const {
   return context->getModule()->isSerialized();
 }
 
-bool BridgedContext::moduleHasLoweredAddresses() const {
-  return context->getModule()->useLoweredAddresses();
+bool BridgedContext::usesOpaqueValues() const {
+  return context->getModule()->usesOpaqueValues();
 }
 
 BridgedDeclObj BridgedContext::getCurrentModuleContext() const {

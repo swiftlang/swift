@@ -736,7 +736,8 @@ bool SerializedModuleLoaderBase::findModule(
     std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *moduleSourceInfoBuffer,
     std::string *cacheKey, bool isCanImportLookup,
-    bool isTestableDependencyLookup, bool &isFramework, bool &isSystemModule) {
+    bool isTestableDependencyLookup, bool &isFramework, bool &isSystemModule,
+    bool isSourceCanImport) {
   // Find a module with an actual, physical name on disk, in case
   // -module-alias is used (otherwise same).
   //
@@ -793,7 +794,12 @@ bool SerializedModuleLoaderBase::findModule(
 
     // We can only get here if all targetFileNamePairs failed with
     // 'std::errc::no_such_file_or_directory'.
-    if (firstAbsoluteBaseName &&
+    //
+    // A side-effect-free `canImport` probe (e.g. the secondary `#if`-region
+    // walk that resolves `@diagnose`) isn't the canonical source `canImport` so
+    // don't diagnose for it. Emitting was recursing through `#if` evaluation.
+    const bool isCanImportProbe = isCanImportLookup && !isSourceCanImport;
+    if (firstAbsoluteBaseName && !isCanImportProbe &&
         handlePossibleTargetMismatch(moduleID.Loc, moduleName,
                                      *firstAbsoluteBaseName, isCanImportLookup))
       return SearchResult::Error;
@@ -1503,7 +1509,7 @@ std::unique_ptr<llvm::MemoryBuffer> swift::extractEmbeddedBridgingHeaderContent(
 
 bool SerializedModuleLoaderBase::canImportModule(
     ImportPath::Module path, SourceLoc loc, ModuleVersionInfo *versionInfo,
-    bool isTestableDependencyLookup) {
+    bool isTestableDependencyLookup, bool isSourceCanImport) {
   // FIXME: Swift submodules?
   if (path.hasSubmodule())
     return false;
@@ -1521,7 +1527,7 @@ bool SerializedModuleLoaderBase::canImportModule(
                  /*moduleDocBuffer=*/nullptr,
                  /*moduleSourceInfoBuffer=*/nullptr, /*cacheKey=*/nullptr,
                  /*isCanImportLookup=*/true, isTestableDependencyLookup,
-                 isFramework, isSystemModule);
+                 isFramework, isSystemModule, isSourceCanImport);
   // If we cannot find the module, don't continue.
   if (!found)
     return false;
@@ -1577,7 +1583,7 @@ bool SerializedModuleLoaderBase::canImportModule(
 
 bool MemoryBufferSerializedModuleLoader::canImportModule(
     ImportPath::Module path, SourceLoc loc, ModuleVersionInfo *versionInfo,
-    bool isTestableDependencyLookup) {
+    bool isTestableDependencyLookup, bool isSourceCanImport) {
   // FIXME: Swift submodules?
   if (path.hasSubmodule())
     return false;
@@ -1620,7 +1626,7 @@ SerializedModuleLoaderBase::loadModule(SourceLoc importLoc,
                   &moduleSourceInfoInputBuffer, &cacheKey,
                   /*isCanImportLookup=*/false,
                   /*isTestableDependencyLookup=*/false, isFramework,
-                  isSystemModule)) {
+                  isSystemModule, /*isSourceCanImport=*/false)) {
     return nullptr;
   }
 

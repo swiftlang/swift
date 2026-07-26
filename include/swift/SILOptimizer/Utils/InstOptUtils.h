@@ -141,11 +141,6 @@ bool canDeleteDeadMoveOnlyOwnedDestructureInst(SILInstruction *inst);
 /// free the object.
 bool isIntermediateRelease(SILInstruction *inst, EpilogueARCFunctionInfo *erfi);
 
-/// Recursively collect all the uses and transitive uses of the
-/// instruction.
-void collectUsesOfValue(SILValue V,
-                        llvm::SmallPtrSetImpl<SILInstruction *> &Insts);
-
 /// Recursively erase all of the uses of the value (but not the
 /// value itself)
 void eraseUsesOfValue(SILValue value);

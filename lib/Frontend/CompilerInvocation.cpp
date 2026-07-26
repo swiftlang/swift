@@ -1682,6 +1682,26 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.UseStaticStandardLibrary = Args.hasArg(OPT_use_static_resource_dir);
   Opts.EnableCOMInterop = Args.hasArg(OPT_enable_com_interop);
+  // A COM interop model is in effect exactly when interop is enabled: default
+  // it from the target, then honor an explicit override.
+  if (Opts.EnableCOMInterop) {
+    Opts.COMModel = Target.isOSDarwin()
+                        ? LangOptions::COMInteropModel::CoreFoundation
+                        : LangOptions::COMInteropModel::Microsoft;
+    if (const Arg *A = Args.getLastArg(OPT_com_interop_model)) {
+      std::optional<LangOptions::COMInteropModel> model =
+          llvm::StringSwitch<decltype(model)>(A->getValue())
+              .Case("microsoft", LangOptions::COMInteropModel::Microsoft)
+              .Case("corefoundation",
+                    LangOptions::COMInteropModel::CoreFoundation)
+              .Default(std::nullopt);
+      if (model)
+        Opts.COMModel = *model;
+      else
+        Diags.diagnose(SourceLoc(), diag::error_unsupported_option_argument,
+                       A->getOption().getPrefixedName(), A->getValue());
+    }
+  }
   Opts.EnableObjCInterop =
       Args.hasFlag(OPT_enable_objc_interop, OPT_disable_objc_interop,
                    Target.isOSDarwin() && !Opts.hasFeature(Feature::Embedded));
@@ -2125,10 +2145,15 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
   if (Args.getLastArg(OPT_solver_disable_splitter))
     Opts.SolverDisableSplitter = true;
 
-  Opts.CrashOnValidSalvage =
-      Args.hasFlag(OPT_solver_enable_crash_on_valid_salvage,
-                   OPT_solver_disable_crash_on_valid_salvage,
-                   Opts.CrashOnValidSalvage);
+  Opts.DiagnoseValidSalvage =
+      Args.hasFlag(OPT_solver_enable_diagnose_valid_salvage,
+                   OPT_solver_disable_diagnose_valid_salvage,
+                   Opts.DiagnoseValidSalvage);
+
+  Opts.CrashFailDiagnostic =
+      Args.hasFlag(OPT_solver_enable_crash_fail_diagnostic,
+                   OPT_solver_disable_crash_fail_diagnostic,
+                   Opts.CrashFailDiagnostic);
 
   Opts.SolverEnableTransitiveConformance =
       Args.hasFlag(OPT_solver_enable_transitive_conformance,

@@ -1192,6 +1192,12 @@ public:
   void setMaxAssignedDiscriminator(
       const DeclContext *dc, unsigned discriminator);
 
+  /// Returns an integer, guaranteed to be unique from every other integer
+  /// previously returned by this function within the current AST context.
+  /// This identifies existential and pack element generic environments,
+  /// which are unique per call site.
+  uint64_t getNextGenericEnvironmentID();
+
   /// Retrieve the Clang module loader for this ASTContext.
   ///
   /// If there is no Clang module loader, returns a null pointer.

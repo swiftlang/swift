@@ -332,6 +332,17 @@ namespace swift {
     /// Enable COM interop code generation and build configuration options.
     bool EnableCOMInterop = false;
 
+    /// The COM interop model, selecting an environment's conventions. Today it
+    /// picks the root type an `@com` class conforms to; other conventions (byte
+    /// order, ref-counting) attach here as they are implemented. Empty exactly
+    /// when interop is off; defaulted from the target otherwise, and the user
+    /// may override it. `ISwiftObject` is compiler-managed under every model.
+    enum class COMInteropModel {
+      Microsoft,      ///< Microsoft COM: `IUnknown` root.
+      CoreFoundation, ///< CoreFoundation CFPlugIn: `IUnknown` root.
+    };
+    std::optional<COMInteropModel> COMModel = std::nullopt;
+
     /// Enable C++ interop code generation and build configuration
     /// options. Disabled by default because there is no way to control the
     /// language mode of clang on a per-header or even per-module basis. Also
@@ -1032,9 +1043,13 @@ namespace swift {
     /// debugging
     unsigned ShuffleDisjunctionChoicesSeed = 0;
 
-    /// If true, we will crash if the constraint solver found a valid solution
-    /// in diagnostic mode.
-    bool CrashOnValidSalvage = false;
+    /// If true, we will emit a fallback diagnostic if the constraint solver
+    /// finds a valid solution in diagnostic mode.
+    bool DiagnoseValidSalvage = false;
+
+    /// If true, trigger an assertion failure whenever we emit the fallback
+    /// diagnostic.
+    bool CrashFailDiagnostic = false;
 
     /// Triggers llvm fatal error if the typechecker tries to typecheck a decl
     /// or an identifier reference with any of the provided prefix names. This

@@ -145,7 +145,10 @@ static SILDeclRef getBridgingFn(std::optional<SILDeclRef> &cacheSlot,
     SILDeclRef c(fd);
     auto funcTy =
         SGM.Types.getConstantFunctionType(TypeExpansionContext::minimal(), c);
-    SILFunctionConventions fnConv(funcTy, SGM.M);
+    // No function body in scope; this only validates the bridging function's
+    // ABI shape, so use the build-mode default conventions.
+    SILFunctionConventions fnConv(
+        funcTy, SILAddressConventions::forRawSIL(SGM.M));
 
     auto toSILType = [&SGM](Type ty) {
       return SGM.Types.getLoweredType(ty, TypeExpansionContext::minimal());
@@ -2268,27 +2271,19 @@ void SILGenModule::emitSourceFile(SourceFile *sf) {
     visit(D);
   }
 
-  // FIXME: Visit macro-generated extensions separately.
-  //
-  // The code below that visits auxiliary decls of the top-level
-  // decls in the source file does not work for nested types with
-  // attached conformance macros:
+  // Visit extensions recorded in the synthesized file separately. The code
+  // above that visits auxiliary decls of the top-level decls in the source
+  // file does not work for nested types with attached conformance macros:
   // ```
   // struct Outer {
   //   @AddConformance struct Inner {}
   // }
   // ```
-  // Because the attached-to decl is not at the top-level. To fix this,
-  // visit the macro-generated conformances that are recorded in the
-  // synthesized file unit to cover all macro-generated extension decls.
+  // Because the attached-to decl is not at the top level. Other compiler
+  // features can also add extensions directly to the synthesized file.
   if (auto *synthesizedFile = sf->getSynthesizedFile()) {
     for (auto *D : synthesizedFile->getTopLevelDecls()) {
       if (!isa<ExtensionDecl>(D))
-        continue;
-
-      auto *sf = D->getInnermostDeclContext()->getParentSourceFile();
-      if (sf->getFulfilledMacroRole() != MacroRole::Conformance &&
-          sf->getFulfilledMacroRole() != MacroRole::Extension)
         continue;
 
       visit(D);

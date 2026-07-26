@@ -643,5 +643,9 @@ NOTE(dependency_scan_unexpected_variant_extra_arg_note, none,
 ERROR(bridging_header_and_pch_internal_mismatch,none,
       "bridging header and precompiled header options mismatch on internal vs. public import", ())
 
+ERROR(clang_header_underlying_module_headers_not_found,none,
+      "could not determine the headers of underlying Clang module '%0' to "
+      "import in the generated Objective-C header", (StringRef))
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

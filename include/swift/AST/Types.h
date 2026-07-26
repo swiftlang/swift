@@ -37,7 +37,6 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/InlineBitfield.h"
-#include "swift/Basic/UUID.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/DenseSet.h"
@@ -5648,11 +5647,12 @@ public:
 
   /// Get a single non-address SILType that represents all formal direct
   /// results. The actual SIL result type of an apply instruction that calls
-  /// this function depends on the current SIL stage and is known by
-  /// SILFunctionConventions. It may be a wider tuple that includes formally
-  /// indirect results.
+  /// this function depends on the per-call-site lowered-addresses state,
+  /// supplied by the caller via \p loweredAddresses. It may be a wider tuple
+  /// that includes formally indirect results.
   SILType getDirectFormalResultsType(SILModule &M,
-                                     TypeExpansionContext expansion);
+                                     TypeExpansionContext expansion,
+                                     bool loweredAddresses);
 
   unsigned getNumIndirectFormalYields() const {
     return NumAnyIndirectFormalYieldResults;
@@ -7543,7 +7543,7 @@ class ElementArchetypeType final : public LocalArchetypeType,
 
 public:
   /// Retrieve the ID number of this opened element.
-  UUID getOpenedElementID() const;
+  uint64_t getOpenedElementID() const;
 
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::ElementArchetype;

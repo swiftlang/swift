@@ -42,7 +42,6 @@
 #include "swift/Basic/Range.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceLoc.h"
-#include "swift/Basic/UUID.h"
 #include "swift/Basic/Version.h"
 #include "swift/Basic/WarningGroupBehavior.h"
 #include "llvm/ADT/DenseMapInfo.h"
@@ -4537,18 +4536,18 @@ public:
 };
 
 class OpenedTypeAttr : public SimpleTypeAttrWithArgs<TypeAttrKind::Opened> {
-  Located<UUID> ID;
+  Located<uint64_t> ID;
   TypeRepr *ConstraintType;
 public:
   OpenedTypeAttr(SourceLoc atLoc, SourceLoc kwLoc, SourceRange parensRange,
-                 Located<UUID> id, TypeRepr *constraintType)
+                 Located<uint64_t> id, TypeRepr *constraintType)
     : SimpleTypeAttr(atLoc, kwLoc, parensRange),
       ID(id), ConstraintType(constraintType) {}
 
-  UUID getUUID() const {
+  uint64_t getID() const {
     return ID.Item;
   }
-  SourceLoc getUUIDLoc() const {
+  SourceLoc getIDLoc() const {
     return ID.Loc;
   }
   TypeRepr *getConstraintType() const {
@@ -4560,16 +4559,16 @@ public:
 
 class PackElementTypeAttr
     : public SimpleTypeAttrWithArgs<TypeAttrKind::PackElement> {
-  Located<UUID> ID;
+  Located<uint64_t> ID;
 public:
   PackElementTypeAttr(SourceLoc atLoc, SourceLoc kwLoc, SourceRange parensRange,
-                      Located<UUID> id)
+                      Located<uint64_t> id)
     : SimpleTypeAttr(atLoc, kwLoc, parensRange), ID(id) {}
 
-  UUID getUUID() const {
+  uint64_t getID() const {
     return ID.Item;
   }
-  SourceLoc getUUIDLoc() const {
+  SourceLoc getIDLoc() const {
     return ID.Loc;
   }
 

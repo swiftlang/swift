@@ -443,7 +443,3 @@ Accessor Hashable.hashValue.Get() has generic signature change from <Self where 
 Func Hashable.hash(into:) has generic signature change from <Self where Self : Swift.Hashable> to <Self where Self : Swift.Hashable, Self : ~Copyable, Self : ~Escapable>
 Func Hasher.combine(_:) has generic signature change from <H where H : Swift.Hashable> to <H where H : Swift.Hashable, H : ~Copyable, H : ~Escapable>
 Func Hasher.combine(_:) has parameter 0 changing from Default to Shared
-
-Func Sequence.reduce(_:_:) has generic signature change from <Self, Result where Self : Swift.Sequence> to <Self, Result where Self : Swift.Sequence, Result : ~Copyable>
-Func Sequence.reduce(_:_:) has parameter 0 changing from Default to Owned
-

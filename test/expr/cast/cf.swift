@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck %s -verify -solver-disable-crash-on-valid-salvage
-// RUN: not --crash %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck %s -solver-enable-crash-on-valid-salvage
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck %s -verify -solver-disable-diagnose-valid-salvage -verify-additional-prefix nosalvage-
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck %s -verify -solver-enable-diagnose-valid-salvage -verify-additional-prefix salvage-
 
 // REQUIRES: objc_interop
 
@@ -124,11 +124,12 @@ func testCastWithImplicitErasure() {
         key1: flag,
         key2: info.id,
         key3: info.options ?? Null()
-        // expected-warning@-1 {{expression implicitly coerced from 'Any?' to 'Any'}}
-        // expected-note@-2 {{provide a default value to avoid this warning}}
-        // expected-note@-3 {{force-unwrap the value to avoid this warning}}
-        // expected-note@-4 {{explicitly cast to 'Any' with 'as Any' to silence this warning}}
+        // expected-nosalvage-warning@-1 {{expression implicitly coerced from 'Any?' to 'Any'}}
+        // expected-nosalvage-note@-2 {{provide a default value to avoid this warning}}
+        // expected-nosalvage-note@-3 {{force-unwrap the value to avoid this warning}}
+        // expected-nosalvage-note@-4 {{explicitly cast to 'Any' with 'as Any' to silence this warning}}
       ] as CFDictionary
+      // expected-salvage-error@-1 {{failed to produce diagnostic for expression; please submit a bug report}}
     }
   }
 }

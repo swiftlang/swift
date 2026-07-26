@@ -4861,8 +4861,8 @@ void RegionAnalysisFunctionInfo::runDataflow() {
         REGIONBASEDISOLATION_LOG(
             llvm::dbgs() << "    Pred. bb" << predBlock->getDebugID() << ": ";
             predState.exitPartition.print(llvm::dbgs()));
-        newEntryPartition =
-            Partition::join(newEntryPartition, predState.exitPartition);
+        newEntryPartition = Partition::join(newEntryPartition,
+                                            predState.exitPartition, predBlock);
       }
 
       // Update the entry partition. We need to still try to

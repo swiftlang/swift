@@ -115,6 +115,11 @@ bool ArgsToFrontendOptionsConverter::convert(
   Opts.EmitClangHeaderWithNonModularIncludes |=
       Args.hasArg(OPT_emit_clang_header_nonmodular_includes);
 
+  Opts.GeneratedHeaderUnderlyingModuleIncludeBase =
+      Args.getLastArgValue(
+              OPT_generated_header_underlying_module_include_base)
+          .str();
+
   Opts.EnableImplicitDynamic |= Args.hasArg(OPT_enable_implicit_dynamic);
 
   if (Args.hasArg(OPT_track_system_dependencies)) {

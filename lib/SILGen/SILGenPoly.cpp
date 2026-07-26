@@ -3327,12 +3327,14 @@ public:
             CanSILFunctionType innerFnType, CanSILFunctionType outerFnType) {
     // Assert that the indirect results are set up like we expect.
     assert(InnerArgs.empty());
-    assert(SGF.F.begin()->args_size()
-           >= SILFunctionConventions(outerFnType, SGF.SGM.M)
-                  .getNumIndirectSILResults());
+    assert(SGF.F.begin()->args_size() >=
+           SILFunctionConventions(
+               outerFnType, SILAddressConventions::forFunction(SGF.F))
+               .getNumIndirectSILResults());
 
     InnerArgs.reserve(
-        SILFunctionConventions(innerFnType, SGF.SGM.M)
+        SILFunctionConventions(innerFnType,
+                               SILAddressConventions::forFunction(SGF.F))
             .getNumIndirectSILResults());
 
     AllOuterResults = outerFnType->getUnsubstitutedType(SGF.SGM.M)->getResults();
@@ -3347,7 +3349,8 @@ public:
     assert(AllOuterResults.empty());
     assert(AllInnerResults.empty());
     assert(InnerArgs.size() ==
-           SILFunctionConventions(innerFnType, SGF.SGM.M)
+           SILFunctionConventions(
+               innerFnType, SILAddressConventions::forFunction(SGF.F))
                .getNumIndirectSILResults());
     OuterArgs.finish();
   }
@@ -5340,8 +5343,9 @@ SILValue ResultPlanner::execute(SILValue innerResult,
   // results).
   SmallVector<SILValue, 4> innerDirectResultStack;
   unsigned numInnerDirectResults =
-    SILFunctionConventions(innerFnType, SGF.SGM.M)
-        .getNumDirectSILResults();
+      SILFunctionConventions(innerFnType,
+                             SILAddressConventions::forFunction(SGF.F))
+          .getNumDirectSILResults();
   if (numInnerDirectResults == 0) {
     // silently ignore the result
   } else if (numInnerDirectResults > 1) {
@@ -6354,8 +6358,10 @@ ManagedValue SILGenFunction::getThunkedAutoDiffLinearMap(
   thunkSGF.collectThunkParams(
       loc, params, &thunkIndirectResults, &thunkIndirectErrorResults);
 
-  SILFunctionConventions fromConv(fromType, getModule());
-  SILFunctionConventions toConv(toType, getModule());
+  SILAddressConventions silConv =
+      SILAddressConventions::forFunction(thunkSGF.F);
+  SILFunctionConventions fromConv(fromType, silConv);
+  SILFunctionConventions toConv(toType, silConv);
   if (!toConv.useLoweredAddresses()) {
     SmallVector<ManagedValue, 4> thunkArguments;
     for (auto indRes : thunkIndirectResults)
@@ -6780,7 +6786,8 @@ SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
           ->mapTypeIntoEnvironment(
               thunkFnTy->getResults().back().getSILStorageInterfaceType())
           .castTo<SILFunctionType>();
-  SILFunctionConventions conv(thunkFnTy, thunkSGF.getModule());
+  SILFunctionConventions conv(
+      thunkFnTy, SILAddressConventions::forFunction(thunkSGF.F));
 
   // Create return instruction in the thunk, first deallocating local
   // allocations and freeing arguments-to-free.

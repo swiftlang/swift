@@ -184,7 +184,7 @@ extension CollectionOfOne {
     @_lifetime(borrow self)
     get {
       let pointer = unsafe UnsafePointer<Element>(Builtin.addressOfBorrow(self))
-      let span = unsafe Span(_unsafeStart: pointer, count: 1)
+      let span = unsafe Span(_unchecked: pointer, count: 1)
       return unsafe _overrideLifetime(span, borrowing: self)
     }
   }
@@ -199,9 +199,9 @@ extension CollectionOfOne {
     @_lifetime(&self)
     mutating get {
       let pointer = unsafe UnsafeMutablePointer<Element>(
-        Builtin.addressOfBorrow(self)
+        Builtin.addressof(&self)
       )
-      let span = unsafe MutableSpan(_unsafeStart: pointer, count: 1)
+      let span = unsafe MutableSpan(_unchecked: pointer, count: 1)
       return unsafe _overrideLifetime(span, mutating: &self)
     }
   }

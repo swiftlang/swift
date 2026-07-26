@@ -1178,6 +1178,11 @@ public:
   unsigned getAttachedMacroDiscriminator(DeclBaseName macroName, MacroRole role,
                                          const CustomAttr *attr) const;
 
+  /// If this declaration was produced by expanding a macro, retrieve the
+  /// declaration that the macro expansion originated from. Returns \c nullptr
+  /// if this declaration is not part of a macro expansion.
+  Decl *getMacroExpansionOriginatingDecl() const;
+
   /// Returns the resolved type for the give custom attribute attached to this
   /// declaration.
   Type getResolvedCustomAttrType(CustomAttr *attr) const;
@@ -5422,6 +5427,14 @@ public:
   /// Whether the class uses the ObjC object model (reference counting,
   /// allocation, etc.), the Swift model, or has no reference counting at all.
   ReferenceCounting getObjectModel() const;
+
+  /// Whether this class participates in the COM object model, i.e. it conforms
+  /// to a COM interface (a protocol marked \c \@com).
+  ///
+  /// Keying on the \c \@com marker rather than a shared root such as
+  /// \c IUnknown covers rootless COM frameworks such as IOKit; keying on
+  /// conformance rather than the class's own attribute covers subclasses.
+  bool isCOMObject() const;
 
   LayoutConstraintKind getLayoutConstraintKind() const {
     if (getObjectModel() == ReferenceCounting::ObjC)

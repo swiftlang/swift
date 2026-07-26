@@ -100,6 +100,12 @@ class SignpostMonitor {
   private static let canarySignposter = OSSignposter(
     subsystem: SignpostMonitor.subsystem, category: "TestCanary")
 
+  /// How long to wait for `log stream`'s header banner. This banner needs no
+  /// daemon round-trip and appears near-instantly when logging is reachable,
+  /// so a short budget lets an unavailable environment bail out fast instead
+  /// of hanging on the full connection timeout.
+  private static let headerTimeout: Duration = .seconds(3)
+
   private let decoder = JSONDecoder()
 
   private init(process: Process,
@@ -111,8 +117,14 @@ class SignpostMonitor {
   }
 
   /// Launches `log stream`, waits for it to be fully connected (via a canary
-  /// signpost), and returns a monitor ready to receive events.
-  static func start() async -> SignpostMonitor {
+  /// signpost), and returns a monitor ready to receive events. Returns nil if
+  /// the log stream cannot become ready — e.g. in a restricted execution
+  /// environment where the spawned `log` subprocess cannot connect to the
+  /// logging daemon. Callers should skip signpost verification in that case.
+  ///
+  /// Prefer start(), which consults a one-time availability probe so that an
+  /// unavailable environment does not pay a connection timeout per test.
+  private static func connect() async -> SignpostMonitor? {
     let pid = ProcessInfo.processInfo.processIdentifier
 
     let (events, continuation) = AsyncThrowingStream<SignpostEvent, Error>.makeStream()
@@ -170,21 +182,29 @@ class SignpostMonitor {
       fatalError("Failed to launch log stream: \(error)")
     }
 
-    // Wait for the header line, with timeout.
+    // Wait for the header line. `log` prints this banner (echoing its filter
+    // predicate) essentially immediately when logging is reachable -- it needs
+    // no daemon round-trip -- so a short timeout doubles as a fast availability
+    // pre-check: in a restricted environment the subprocess emits nothing and
+    // we bail out in a few seconds rather than the full 20s connection budget.
     do {
       try await withThrowingTaskGroup(of: Void.self) { group in
         group.addTask {
           for try await _ in headerReady.0 {}
         }
         group.addTask {
-          try await Task.sleep(for: .seconds(20))
+          try await Task.sleep(for: headerTimeout)
           throw TimeoutError()
         }
         try await group.next()
         group.cancelAll()
       }
     } catch {
-      fatalError("log stream failed to become ready: \(error)")
+      // The log stream never produced its header. This happens in restricted
+      // execution environments where the `log` subprocess cannot reach the
+      // logging daemon. Treat it as "unavailable" so the caller can skip.
+      process.terminate()
+      return nil
     }
 
     // The header line appears before the stream is fully connected to logd.
@@ -212,10 +232,31 @@ class SignpostMonitor {
         group.cancelAll()
       }
     } catch {
-      fatalError("log stream canary failed: \(error)")
+      // The stream produced a header but never delivered our canary signpost,
+      // so it is not actually live. Treat as unavailable and skip.
+      process.terminate()
+      return nil
     }
     monitor.canaryReady = nil
 
+    return monitor
+  }
+
+  /// Whether `log stream` can be connected in this environment. Probed once
+  /// on first use via a short header-timeout pre-check; if that fails
+  /// (restricted sandbox, no logging daemon, ...), later tests skip
+  /// immediately instead of each re-probing.
+  private static var availability: Bool?
+
+  /// Returns a ready monitor, or nil if signpost streaming is unavailable in
+  /// this environment. The unavailable verdict is cached so only the first
+  /// call pays the (short) availability pre-check.
+  static func start() async -> SignpostMonitor? {
+    if availability == false {
+      return nil
+    }
+    let monitor = await connect()
+    availability = (monitor != nil)
     return monitor
   }
 
@@ -296,7 +337,10 @@ class SignpostMonitor {
 var tests = TestSuite("SignpostTracing")
 
 tests.test("BasicTaskLifecycle") {
-  let monitor = await SignpostMonitor.start()
+  guard let monitor = await SignpostMonitor.start() else {
+    print("skipping: signpost log streaming unavailable in this environment")
+    return
+  }
 
   let value = await Task { return 42 }.value
   precondition(value == 42)
@@ -312,7 +356,10 @@ tests.test("BasicTaskLifecycle") {
 }
 
 tests.test("TaskWait") {
-  let monitor = await SignpostMonitor.start()
+  guard let monitor = await SignpostMonitor.start() else {
+    print("skipping: signpost log streaming unavailable in this environment")
+    return
+  }
 
   async let result = { () async -> Int in
     try? await Task.sleep(for: .milliseconds(10))
@@ -326,7 +373,10 @@ tests.test("TaskWait") {
 }
 
 tests.test("Continuation") {
-  let monitor = await SignpostMonitor.start()
+  guard let monitor = await SignpostMonitor.start() else {
+    print("skipping: signpost log streaming unavailable in this environment")
+    return
+  }
 
   await withCheckedContinuation {
     (continuation: CheckedContinuation<Void, Never>) in
@@ -344,7 +394,10 @@ tests.test("Continuation") {
 tests.test("ThrowingContinuationWithError") {
   struct TestError: Error {}
 
-  let monitor = await SignpostMonitor.start()
+  guard let monitor = await SignpostMonitor.start() else {
+    print("skipping: signpost log streaming unavailable in this environment")
+    return
+  }
 
   do {
     try await withCheckedThrowingContinuation {
@@ -365,7 +418,10 @@ tests.test("ThrowingContinuationWithError") {
 // This exercises swift_continuation_throwingResumeImpl (a different call site
 // from the non-throwing and error paths).
 tests.test("ThrowingContinuationWithoutError") {
-  let monitor = await SignpostMonitor.start()
+  guard let monitor = await SignpostMonitor.start() else {
+    print("skipping: signpost log streaming unavailable in this environment")
+    return
+  }
 
   let value = try! await withCheckedThrowingContinuation {
     (continuation: CheckedContinuation<Int, Error>) in
@@ -388,7 +444,10 @@ tests.test("ThrowingContinuationWithoutError") {
 tests.test("MainExecutorEnqueue") {
   @MainActor func onMain() -> Int { return 1 }
 
-  let monitor = await SignpostMonitor.start()
+  guard let monitor = await SignpostMonitor.start() else {
+    print("skipping: signpost log streaming unavailable in this environment")
+    return
+  }
 
   let _ = await Task.detached {
     return await onMain()
@@ -409,7 +468,10 @@ tests.test("ActorInteraction") {
     func work() {}
   }
 
-  let monitor = await SignpostMonitor.start()
+  guard let monitor = await SignpostMonitor.start() else {
+    print("skipping: signpost log streaming unavailable in this environment")
+    return
+  }
 
   let a = WorkActor()
   await a.work()
@@ -432,7 +494,10 @@ tests.test("ActorDeallocation") {
     func ping() {}
   }
 
-  let monitor = await SignpostMonitor.start()
+  guard let monitor = await SignpostMonitor.start() else {
+    print("skipping: signpost log streaming unavailable in this environment")
+    return
+  }
 
   // Create and destroy inside a helper so the actor goes out of scope.
   func createAndDestroy() async {
@@ -448,7 +513,10 @@ tests.test("ActorDeallocation") {
 }
 
 tests.test("TaskGroup") {
-  let monitor = await SignpostMonitor.start()
+  guard let monitor = await SignpostMonitor.start() else {
+    print("skipping: signpost log streaming unavailable in this environment")
+    return
+  }
 
   await withTaskGroup(of: Int.self) { group in
     group.addTask { 1 }
@@ -468,7 +536,10 @@ tests.test("TaskGroup") {
 }
 
 tests.test("AsyncLet") {
-  let monitor = await SignpostMonitor.start()
+  guard let monitor = await SignpostMonitor.start() else {
+    print("skipping: signpost log streaming unavailable in this environment")
+    return
+  }
 
   @Sendable func compute() async -> Int {
     try? await Task.sleep(for: .milliseconds(10))
@@ -501,7 +572,10 @@ tests.test("CustomSerialExecutorKind") {
     func work() -> Int { return 1 }
   }
 
-  let monitor = await SignpostMonitor.start()
+  guard let monitor = await SignpostMonitor.start() else {
+    print("skipping: signpost log streaming unavailable in this environment")
+    return
+  }
   let executor = MyExecutor()
   let actor = CustomExecutorActor(executor: executor)
 
@@ -528,7 +602,10 @@ tests.test("TaskSwitchExecutor") {
     func callInner() async -> Int { return await inner.work() }
   }
 
-  let monitor = await SignpostMonitor.start()
+  guard let monitor = await SignpostMonitor.start() else {
+    print("skipping: signpost log streaming unavailable in this environment")
+    return
+  }
   let inner = Inner()
   let outer = Outer(inner: inner)
 
@@ -547,7 +624,10 @@ tests.test("TaskExecutorKind") {
     }
   }
 
-  let monitor = await SignpostMonitor.start()
+  guard let monitor = await SignpostMonitor.start() else {
+    print("skipping: signpost log streaming unavailable in this environment")
+    return
+  }
   let executor = MyTaskExecutor()
 
   let _ = await Task(executorPreference: executor) {

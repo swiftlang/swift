@@ -109,7 +109,7 @@ class SILModule::SerializationCallback final
 SILModule::SILModule(llvm::PointerUnion<FileUnit *, ModuleDecl *> context,
                      Lowering::TypeConverter &TC, const SILOptions &Options,
                      const IRGenOptions *irgenOptions)
-    : Stage(SILStage::Raw), loweredAddresses(!Options.EnableSILOpaqueValues),
+    : Stage(SILStage::Raw),
       indexTrieRoot(new IndexTrieNode()), Options(Options),
       irgenOptions(irgenOptions), serialized(false),
       regDeserializationNotificationHandlerForAllFuncOME(false),

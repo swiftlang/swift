@@ -286,6 +286,11 @@ void SILFunction::init(
   this->IsPerformanceConstraint = false;
   this->NeedBreakInfiniteLoops = false;
   this->NeedCompleteLifetimes = false;
+  // Set by AddressLowering when it lowers this function in the Raw-stage
+  // mandatory pipeline, and copied from a clone's source by SILCloner. Functions
+  // born after the module advances past Raw are reported lowered by the
+  // module-stage term in hasLoweredAddresses(), so no creation-time seed is needed.
+  this->HasLoweredAddresses = false;
   this->stackProtection = false;
   this->Inlined = false;
   this->Zombie = false;
@@ -299,6 +304,47 @@ void SILFunction::init(
   validateSubclassScope(classSubclassScope, isThunk, nullptr);
   setDebugScope(DebugScope);
   setGenericEnvironment(genericEnv);
+}
+
+bool SILFunction::hasLoweredAddresses() const {
+  // Lowered if:
+  // - This function was individually lowered by AddressLowering
+  // - This function arrived already canonical via deserialization
+  // - This is a non-opaque-values build
+  // - Module has committed past Raw SIL stage 
+  return HasLoweredAddresses || WasDeserializedCanonical ||
+         !getModule().usesOpaqueValues() ||
+         getModule().getStage() != SILStage::Raw;
+}
+
+SILAddressConventions SILAddressConventions::forRawSIL(SILModule &M) {
+  // The module's Raw-stage representation: opaque values under opaque-values
+  // mode, raw addresses otherwise. No function in scope, so this is keyed to
+  // build mode, not the module stage (a detached value has no per-function
+  // lowered state).
+  return SILAddressConventions::withLoweredAddresses(M, !M.usesOpaqueValues());
+}
+
+SILAddressConventions SILAddressConventions::forFunction(const SILFunction &fn) {
+  return SILAddressConventions::withLoweredAddresses(fn.getModule(),
+                                                     fn.hasLoweredAddresses());
+}
+
+SILAddressConventions
+SILAddressConventions::forFunctionOrRawSIL(const SILFunction *fn,
+                                           SILModule &M) {
+  if (!fn)
+    return forRawSIL(M);
+  return forFunction(*fn);
+}
+
+SILAddressConventions SILAddressConventions::forFunctionWithOverride(
+    SILModule &M, std::optional<SILAddressConventions> overrideConv,
+    const SILFunction *fn) {
+  bool loweredAddresses =
+      (overrideConv.has_value() && overrideConv->useLoweredAddresses()) ||
+      (fn && fn->hasLoweredAddresses());
+  return SILAddressConventions::withLoweredAddresses(M, loweredAddresses);
 }
 
 SILFunction::~SILFunction() {
@@ -659,11 +705,13 @@ const TypeLowering &SILFunction::getTypeLowering(Type t) const {
 SILType
 SILFunction::getLoweredType(AbstractionPattern orig, Type subst) const {
   return getModule().Types.getLoweredType(orig, subst,
-                                          TypeExpansionContext(*this));
+                                          TypeExpansionContext(*this),
+                                          hasLoweredAddresses());
 }
 
 SILType SILFunction::getLoweredType(Type t) const {
-  return getModule().Types.getLoweredType(t, TypeExpansionContext(*this));
+  return getModule().Types.getLoweredType(t, TypeExpansionContext(*this),
+                                          hasLoweredAddresses());
 }
 
 CanType
@@ -678,7 +726,8 @@ CanType SILFunction::getLoweredRValueType(Type t) const {
 
 SILType SILFunction::getLoweredLoadableType(Type t) const {
   auto &M = getModule();
-  return M.Types.getLoweredLoadableType(t, TypeExpansionContext(*this), M);
+  return M.Types.getLoweredLoadableType(t, TypeExpansionContext(*this),
+                                        hasLoweredAddresses());
 }
 
 const TypeLowering &SILFunction::getTypeLowering(SILType type) const {

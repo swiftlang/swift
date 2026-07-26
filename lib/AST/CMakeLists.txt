@@ -130,6 +130,7 @@ add_swift_host_library(swiftAST STATIC
   StorageImpl.cpp
   SubstitutionMap.cpp
   SwiftNameTranslation.cpp
+  SynthesizedDeclBuilder.cpp
   Type.cpp
   TypeCheckRequests.cpp
   TypeDeclFinder.cpp

@@ -535,14 +535,14 @@ sil [ossa] @main : $@convention(c) () -> Int32 {
 sil @two_archetypes_from_two_params_no_singles : $<each T_1, each T_2 where (repeat (each T_1, each T_2)): Any> (Builtin.Word) -> () {
 entry(%intIndex : $Builtin.Word):
   %innerIndex = dynamic_pack_index %intIndex of $Pack{repeat each T_1, repeat each T_2}
-  %token = open_pack_element %innerIndex of <each U_1, each U_2 where (repeat (each U_1, each U_2)): Any> at <Pack{repeat each T_1, repeat each T_2}, Pack{repeat each T_2, repeat each T_1}>, shape $U_2, uuid "01234567-89AB-CDEF-0123-000000000000"
-  %metatype_1 = metatype $@thick (@pack_element("01234567-89AB-CDEF-0123-000000000000") U_1).Type
-  %metatype_2 = metatype $@thick (@pack_element("01234567-89AB-CDEF-0123-000000000000") U_2).Type
+  %token = open_pack_element %innerIndex of <each U_1, each U_2 where (repeat (each U_1, each U_2)): Any> at <Pack{repeat each T_1, repeat each T_2}, Pack{repeat each T_2, repeat each T_1}>, shape $U_2, id 1
+  %metatype_1 = metatype $@thick (@pack_element(1) U_1).Type
+  %metatype_2 = metatype $@thick (@pack_element(1) U_2).Type
   %printGenericType = function_ref @printGenericType : $@convention(thin) <T> (@thick T.Type) -> ()
   // Print the first archetype that is bound.
-  apply %printGenericType<(@pack_element("01234567-89AB-CDEF-0123-000000000000") U_1)>(%metatype_1) : $@convention(thin) <T> (@thick T.Type) -> ()
+  apply %printGenericType<(@pack_element(1) U_1)>(%metatype_1) : $@convention(thin) <T> (@thick T.Type) -> ()
   // Print the second archetype that is bound.
-  apply %printGenericType<(@pack_element("01234567-89AB-CDEF-0123-000000000000") U_2)>(%metatype_2) : $@convention(thin) <T> (@thick T.Type) -> ()
+  apply %printGenericType<(@pack_element(1) U_2)>(%metatype_2) : $@convention(thin) <T> (@thick T.Type) -> ()
   %retval = tuple ()
   return %retval : $()
 }
@@ -550,18 +550,18 @@ entry(%intIndex : $Builtin.Word):
 sil @two_archetypes_from_two_params_no_singles_with_conformance : $<each T_1 : P, each T_2 : P where (repeat (each T_1, each T_2)): Any> (Builtin.Word) -> () {
 entry(%intIndex : $Builtin.Word):
   %innerIndex = dynamic_pack_index %intIndex of $Pack{repeat each T_1, repeat each T_2}
-  %token = open_pack_element %innerIndex of <each U_1 : P, each U_2 : P where (repeat (each U_1, each U_2)): Any> at <Pack{repeat each T_1, repeat each T_2}, Pack{repeat each T_2, repeat each T_1}>, shape $U_2, uuid "01234567-89AB-CDEF-0123-000000000003"
-  %metatype_1 = metatype $@thick (@pack_element("01234567-89AB-CDEF-0123-000000000003") U_1).Type
-  %metatype_2 = metatype $@thick (@pack_element("01234567-89AB-CDEF-0123-000000000003") U_2).Type
+  %token = open_pack_element %innerIndex of <each U_1 : P, each U_2 : P where (repeat (each U_1, each U_2)): Any> at <Pack{repeat each T_1, repeat each T_2}, Pack{repeat each T_2, repeat each T_1}>, shape $U_2, id 2
+  %metatype_1 = metatype $@thick (@pack_element(2) U_1).Type
+  %metatype_2 = metatype $@thick (@pack_element(2) U_2).Type
   %printGenericType = function_ref @printGenericType : $@convention(thin) <T> (@thick T.Type) -> ()
-  %static_member_fn_1 = witness_method $(@pack_element("01234567-89AB-CDEF-0123-000000000003") U_1), #P.static_member_fn : <Self where Self : P> (Self.Type) -> () -> () : $@convention(witness_method: P) <T where T : P> (@thick T.Type) -> ()
-  %static_member_fn_2 = witness_method $(@pack_element("01234567-89AB-CDEF-0123-000000000003") U_2), #P.static_member_fn : <Self where Self : P> (Self.Type) -> () -> () : $@convention(witness_method: P) <T where T : P> (@thick T.Type) -> ()
+  %static_member_fn_1 = witness_method $(@pack_element(2) U_1), #P.static_member_fn : <Self where Self : P> (Self.Type) -> () -> () : $@convention(witness_method: P) <T where T : P> (@thick T.Type) -> ()
+  %static_member_fn_2 = witness_method $(@pack_element(2) U_2), #P.static_member_fn : <Self where Self : P> (Self.Type) -> () -> () : $@convention(witness_method: P) <T where T : P> (@thick T.Type) -> ()
   // Print the first archetype that is bound.
-  apply %printGenericType<(@pack_element("01234567-89AB-CDEF-0123-000000000003") U_1)>(%metatype_1) : $@convention(thin) <T> (@thick T.Type) -> ()
-  apply %static_member_fn_1<(@pack_element("01234567-89AB-CDEF-0123-000000000003") U_1)>(%metatype_1) : $@convention(witness_method: P) <T where T : P> (@thick T.Type) -> ()
+  apply %printGenericType<(@pack_element(2) U_1)>(%metatype_1) : $@convention(thin) <T> (@thick T.Type) -> ()
+  apply %static_member_fn_1<(@pack_element(2) U_1)>(%metatype_1) : $@convention(witness_method: P) <T where T : P> (@thick T.Type) -> ()
   // Print the second archetype that is bound.
-  apply %printGenericType<(@pack_element("01234567-89AB-CDEF-0123-000000000003") U_2)>(%metatype_2) : $@convention(thin) <T> (@thick T.Type) -> ()
-  apply %static_member_fn_2<(@pack_element("01234567-89AB-CDEF-0123-000000000003") U_2)>(%metatype_2) : $@convention(witness_method: P) <T where T : P> (@thick T.Type) -> ()
+  apply %printGenericType<(@pack_element(2) U_2)>(%metatype_2) : $@convention(thin) <T> (@thick T.Type) -> ()
+  apply %static_member_fn_2<(@pack_element(2) U_2)>(%metatype_2) : $@convention(witness_method: P) <T where T : P> (@thick T.Type) -> ()
   %retval = tuple ()
   return %retval : $()
 }
@@ -578,10 +578,10 @@ entry(%intIndex : $Builtin.Word):
 sil @direct_access_from_parameter : $<each T_1> (Builtin.Word) -> () {
 entry(%intIndex : $Builtin.Word):
   %innerIndex = dynamic_pack_index %intIndex of $Pack{repeat each T_1}
-  %token = open_pack_element %innerIndex of <each U_1> at <Pack{repeat each T_1}>, shape $U_1, uuid "01234567-89AB-CDEF-0123-000000000001"
-  %metatype_1 = metatype $@thick (@pack_element("01234567-89AB-CDEF-0123-000000000001") U_1).Type
+  %token = open_pack_element %innerIndex of <each U_1> at <Pack{repeat each T_1}>, shape $U_1, id 3
+  %metatype_1 = metatype $@thick (@pack_element(3) U_1).Type
   %printGenericType = function_ref @printGenericType : $@convention(thin) <T> (@thick T.Type) -> ()
-  apply %printGenericType<(@pack_element("01234567-89AB-CDEF-0123-000000000001") U_1)>(%metatype_1) : $@convention(thin) <T> (@thick T.Type) -> ()
+  apply %printGenericType<(@pack_element(3) U_1)>(%metatype_1) : $@convention(thin) <T> (@thick T.Type) -> ()
   %t = tuple ()
   return %t : $()
 }
@@ -607,12 +607,12 @@ entry(%intIndex : $Builtin.Word):
 sil @direct_access_from_parameter_with_conformance : $<each T_1 : P> (Builtin.Word) -> () {
 entry(%intIndex : $Builtin.Word):
   %innerIndex = dynamic_pack_index %intIndex of $Pack{repeat each T_1}
-  %token = open_pack_element %innerIndex of <each U_1 : P> at <Pack{repeat each T_1}>, shape $U_1, uuid "01234567-89AB-CDEF-0123-000000000002"
-  %metatype_1 = metatype $@thick (@pack_element("01234567-89AB-CDEF-0123-000000000002") U_1).Type
+  %token = open_pack_element %innerIndex of <each U_1 : P> at <Pack{repeat each T_1}>, shape $U_1, id 4
+  %metatype_1 = metatype $@thick (@pack_element(4) U_1).Type
   %printGenericType = function_ref @printGenericType : $@convention(thin) <T> (@thick T.Type) -> ()
-  apply %printGenericType<(@pack_element("01234567-89AB-CDEF-0123-000000000002") U_1)>(%metatype_1) : $@convention(thin) <T> (@thick T.Type) -> ()
-  %static_member_fn = witness_method $(@pack_element("01234567-89AB-CDEF-0123-000000000002") U_1), #P.static_member_fn : <Self where Self : P> (Self.Type) -> () -> () : $@convention(witness_method: P) <T where T : P> (@thick T.Type) -> ()
-  apply %static_member_fn<(@pack_element("01234567-89AB-CDEF-0123-000000000002") U_1)>(%metatype_1) : $@convention(witness_method: P) <T where T : P> (@thick T.Type) -> ()
+  apply %printGenericType<(@pack_element(4) U_1)>(%metatype_1) : $@convention(thin) <T> (@thick T.Type) -> ()
+  %static_member_fn = witness_method $(@pack_element(4) U_1), #P.static_member_fn : <Self where Self : P> (Self.Type) -> () -> () : $@convention(witness_method: P) <T where T : P> (@thick T.Type) -> ()
+  apply %static_member_fn<(@pack_element(4) U_1)>(%metatype_1) : $@convention(witness_method: P) <T where T : P> (@thick T.Type) -> ()
   %t = tuple ()
   return %t : $()
 }
@@ -636,13 +636,13 @@ entry(%intIndex : $Builtin.Word):
 sil @extract_associatedtype_with_conformance : $<each T_1 : P> (Builtin.Word) -> () {
 entry(%intIndex : $Builtin.Word):
   %innerIndex = dynamic_pack_index %intIndex of $Pack{repeat each T_1}
-  %token = open_pack_element %innerIndex of <each U_1 : PA where repeat (each U_1).A : P> at <Pack{repeat GenAssocPA<GenFwdP<each T_1>>}>, shape $U_1, uuid "01234567-89AB-CDEF-0123-000000000005"
-  %metatype_1 = metatype $@thick (@pack_element("01234567-89AB-CDEF-0123-000000000005") U_1).Type
+  %token = open_pack_element %innerIndex of <each U_1 : PA where repeat (each U_1).A : P> at <Pack{repeat GenAssocPA<GenFwdP<each T_1>>}>, shape $U_1, id 5
+  %metatype_1 = metatype $@thick (@pack_element(5) U_1).Type
   %printGenericType = function_ref @printGenericType : $@convention(thin) <T> (@thick T.Type) -> ()
-  apply %printGenericType<(@pack_element("01234567-89AB-CDEF-0123-000000000005") U_1)>(%metatype_1) : $@convention(thin) <T> (@thick T.Type) -> ()
-  %static_member_fn = witness_method $(@pack_element("01234567-89AB-CDEF-0123-000000000005") U_1).A, #P.static_member_fn : <Self where Self : P> (Self.Type) -> () -> () : $@convention(witness_method: P) <T where T : P> (@thick T.Type) -> ()
-  %metatype_2 = metatype $@thick (@pack_element("01234567-89AB-CDEF-0123-000000000005") U_1).A.Type
-  apply %static_member_fn<(@pack_element("01234567-89AB-CDEF-0123-000000000005") U_1).A>(%metatype_2) : $@convention(witness_method: P) <T where T : P> (@thick T.Type) -> ()
+  apply %printGenericType<(@pack_element(5) U_1)>(%metatype_1) : $@convention(thin) <T> (@thick T.Type) -> ()
+  %static_member_fn = witness_method $(@pack_element(5) U_1).A, #P.static_member_fn : <Self where Self : P> (Self.Type) -> () -> () : $@convention(witness_method: P) <T where T : P> (@thick T.Type) -> ()
+  %metatype_2 = metatype $@thick (@pack_element(5) U_1).A.Type
+  apply %static_member_fn<(@pack_element(5) U_1).A>(%metatype_2) : $@convention(witness_method: P) <T where T : P> (@thick T.Type) -> ()
   %t = tuple ()
   return %t : $()
 }
@@ -658,19 +658,19 @@ entry(%intIndex : $Builtin.Word):
         GenAssocPA<GenAssocPA<GenAssocPA<GenFwdP<Tee>>>>, 
         Pack{repeat GenAssocPA<GenAssocPA<GenAssocPA<GenFwdP<each T_2>>>>, repeat GenAssocPA<GenAssocPA<GenAssocPA<GenFwdP<each T_2>>>>}>
     , shape $U_1
-    , uuid "01234567-89AB-CDEF-0123-000000000004"
-  %metatype_1 = metatype $@thick (@pack_element("01234567-89AB-CDEF-0123-000000000004") U_1).Type
+    , id 6
+  %metatype_1 = metatype $@thick (@pack_element(6) U_1).Type
   %printGenericType = function_ref @printGenericType : $@convention(thin) <T> (@thick T.Type) -> ()
-  apply %printGenericType<(@pack_element("01234567-89AB-CDEF-0123-000000000004") U_1)>(%metatype_1) : $@convention(thin) <T> (@thick T.Type) -> ()
-  %static_member_fn_1 = witness_method $(@pack_element("01234567-89AB-CDEF-0123-000000000004") U_1).A.A.A, #P.static_member_fn : <Self where Self : P> (Self.Type) -> () -> () : $@convention(witness_method: P) <T where T : P> (@thick T.Type) -> ()
-  %metatype_12 = metatype $@thick (@pack_element("01234567-89AB-CDEF-0123-000000000004") U_1).A.A.A.Type
-  apply %static_member_fn_1<(@pack_element("01234567-89AB-CDEF-0123-000000000004") U_1).A.A.A>(%metatype_12) : $@convention(witness_method: P) <T where T : P> (@thick T.Type) -> ()
+  apply %printGenericType<(@pack_element(6) U_1)>(%metatype_1) : $@convention(thin) <T> (@thick T.Type) -> ()
+  %static_member_fn_1 = witness_method $(@pack_element(6) U_1).A.A.A, #P.static_member_fn : <Self where Self : P> (Self.Type) -> () -> () : $@convention(witness_method: P) <T where T : P> (@thick T.Type) -> ()
+  %metatype_12 = metatype $@thick (@pack_element(6) U_1).A.A.A.Type
+  apply %static_member_fn_1<(@pack_element(6) U_1).A.A.A>(%metatype_12) : $@convention(witness_method: P) <T where T : P> (@thick T.Type) -> ()
 
-  %metatype_2 = metatype $@thick (@pack_element("01234567-89AB-CDEF-0123-000000000004") U_2).Type
-  apply %printGenericType<(@pack_element("01234567-89AB-CDEF-0123-000000000004") U_2)>(%metatype_2) : $@convention(thin) <T> (@thick T.Type) -> ()
-  %static_member_fn_2 = witness_method $(@pack_element("01234567-89AB-CDEF-0123-000000000004") U_2).A.A.A, #P.static_member_fn : <Self where Self : P> (Self.Type) -> () -> () : $@convention(witness_method: P) <T where T : P> (@thick T.Type) -> ()
-  %metatype_22 = metatype $@thick (@pack_element("01234567-89AB-CDEF-0123-000000000004") U_2).A.A.A.Type
-  apply %static_member_fn_2<(@pack_element("01234567-89AB-CDEF-0123-000000000004") U_2).A.A.A>(%metatype_22) : $@convention(witness_method: P) <T where T : P> (@thick T.Type) -> ()
+  %metatype_2 = metatype $@thick (@pack_element(6) U_2).Type
+  apply %printGenericType<(@pack_element(6) U_2)>(%metatype_2) : $@convention(thin) <T> (@thick T.Type) -> ()
+  %static_member_fn_2 = witness_method $(@pack_element(6) U_2).A.A.A, #P.static_member_fn : <Self where Self : P> (Self.Type) -> () -> () : $@convention(witness_method: P) <T where T : P> (@thick T.Type) -> ()
+  %metatype_22 = metatype $@thick (@pack_element(6) U_2).A.A.A.Type
+  apply %static_member_fn_2<(@pack_element(6) U_2).A.A.A>(%metatype_22) : $@convention(witness_method: P) <T where T : P> (@thick T.Type) -> ()
 
   %t = tuple ()
   return %t : $()

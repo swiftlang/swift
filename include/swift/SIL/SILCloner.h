@@ -439,6 +439,7 @@ public:
   }
 
   void remapRootOpenedType(CanExistentialArchetypeType archetypeTy) {
+    auto &ctx = archetypeTy->getASTContext();
     auto *origEnv = archetypeTy->getGenericEnvironment();
 
     auto genericSig = origEnv->getGenericSignature();
@@ -447,7 +448,7 @@ public:
 
     auto *newEnv = GenericEnvironment::forOpenedExistential(
         genericSig, existentialTy, getOpSubstitutionMap(subMap),
-        UUID::fromTime());
+        ctx.getNextGenericEnvironmentID());
 
     registerLocalArchetypeRemapping(origEnv, newEnv);
   }
@@ -690,6 +691,13 @@ protected:
   /// Common fix-ups are handled first in `commonFixUp` and may not be
   /// overridden.
   void postFixUp(SILFunction *F) {}
+
+  /// Whether cloning produces a whole new function that is a clone of the
+  /// source, so the clone is in the same lowered-address form as the source.
+  ///
+  /// The inliner overrides this to false: it splices a callee into an existing
+  /// caller, whose lowered-address form is its own and must not be overwritten.
+  bool isWholeFunctionClone() const { return true; }
 
 private:
   /// MARK: SILCloner implementation details hidden from CRTP extensions.
@@ -1100,6 +1108,19 @@ template <typename ImplClass>
 void SILCloner<ImplClass>::commonFixUp(SILFunction *F) {
   // Call any cleanup specific to the CRTP extensions.
   asImpl().preFixUp(F);
+
+  // A whole-function clone is in the same lowered-address form as its source.
+  // Copy it so the clone's conventions and verification observe the right form.
+  // A partial clone (e.g. inlining) instead relies on source and destination
+  // already agreeing: AddressLowering runs before any inliner and visits
+  // functions bottom-up, so a callee is lowered before its caller is inlined.
+  if (asImpl().isWholeFunctionClone() && !getBuilder().isInsertingIntoGlobal())
+    getBuilder().getFunction().setHasLoweredAddresses(F->hasLoweredAddresses());
+  else
+    assert((getBuilder().isInsertingIntoGlobal() ||
+            getBuilder().getFunction().hasLoweredAddresses() ==
+                F->hasLoweredAddresses()) &&
+           "cloning between functions in different address-lowering forms");
 
   // If our source function is in ossa form, but the function into which we are
   // cloning is not in ossa, after we clone, eliminate default arguments.
@@ -3350,9 +3371,10 @@ void SILCloner<ImplClass>::visitOpenPackElementInst(
   auto openedShapeClass = origEnv->getOpenedElementShapeClass();
 
   // Build the new environment.
+  auto &ctx = getBuilder().getASTContext();
   auto newEnv =
     GenericEnvironment::forOpenedElement(origEnv->getGenericSignature(),
-                                         UUID::fromTime(),
+                                         ctx.getNextGenericEnvironmentID(),
                                          openedShapeClass,
                                          newContextSubs);
 

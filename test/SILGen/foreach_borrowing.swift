@@ -20,7 +20,7 @@ extension NoncopyableInt: Equatable {
   }
 }
 
-// CHECK-LABEL: sil hidden {{.*}}[ossa] @$s17foreach_borrowing23testNonCopyableIterable3seqys4SpanVyAA14NoncopyableIntVG_tF : $@convention(thin) (@guaranteed Span<NoncopyableInt>) -> () {
+// CHECK-LABEL: sil hidden {{.*}}[ossa] {{(\[opaque\] )?}}@$s17foreach_borrowing23testNonCopyableIterable3seqys4SpanVyAA14NoncopyableIntVG_tF : $@convention(thin) (@guaranteed Span<NoncopyableInt>) -> () {
 @available(SwiftStdlib 6.4, *)
 func testNonCopyableIterable(seq: borrowing Span<NoncopyableInt>) {
   // With borrowing feature enabled, we expect makeBorrowingIterator and nextSpan to be called
@@ -42,7 +42,7 @@ func testNonCopyableIterable(seq: borrowing Span<NoncopyableInt>) {
 }
 
 
-// CHECK-LABEL: sil hidden {{.*}}[ossa] @$s17foreach_borrowing20testCopyableIterable3seqys4SpanVySiG_tF : $@convention(thin) (@guaranteed Span<Int>) -> () {
+// CHECK-LABEL: sil hidden {{.*}}[ossa] {{(\[opaque\] )?}}@$s17foreach_borrowing20testCopyableIterable3seqys4SpanVySiG_tF : $@convention(thin) (@guaranteed Span<Int>) -> () {
 @available(SwiftStdlib 6.4, *)
 func testCopyableIterable(seq: borrowing Span<Int>) {
   // With borrowing feature enabled, we expect makeBorrowingIterator and nextSpan to be called
@@ -63,7 +63,7 @@ func testCopyableIterable(seq: borrowing Span<Int>) {
   }
 }
 
-// CHECK-LABEL: sil hidden {{.*}}[ossa] @$s17foreach_borrowing26testContinueTargetIterableyyF : $@convention(thin) () -> () {
+// CHECK-LABEL: sil hidden {{.*}}[ossa] {{(\[opaque\] )?}}@$s17foreach_borrowing26testContinueTargetIterableyyF : $@convention(thin) () -> () {
 @available(SwiftStdlib 6.4, *)
 func testContinueTargetIterable() {
   let arr = [0, 1, 2, 3]
@@ -94,7 +94,7 @@ func testContinueTargetIterable() {
   }
 }
 
-// CHECK-LABEL: sil hidden {{.*}}[ossa] @$s17foreach_borrowing23testBreakTargetIterableyyF : $@convention(thin) () -> () {
+// CHECK-LABEL: sil hidden {{.*}}[ossa] {{(\[opaque\] )?}}@$s17foreach_borrowing23testBreakTargetIterableyyF : $@convention(thin) () -> () {
 @available(SwiftStdlib 6.4, *)
 func testBreakTargetIterable() {
   let arr = [0, 1, 2, 3]
@@ -126,7 +126,7 @@ func testBreakTargetIterable() {
 }
 
 
-// CHECK-LABEL: sil hidden {{.*}}[ossa] @$s17foreach_borrowing20testForEachLocations3seq3valys4SpanVySiG_SitF : $@convention(thin) (@guaranteed Span<Int>, Int) -> () {
+// CHECK-LABEL: sil hidden {{.*}}[ossa] {{(\[opaque\] )?}}@$s17foreach_borrowing20testForEachLocations3seq3valys4SpanVySiG_SitF : $@convention(thin) (@guaranteed Span<Int>, Int) -> () {
 @available(SwiftStdlib 6.4, *)
 func testForEachLocations(seq: borrowing Span<Int>, val: Int) {
   // Test that synthesized code has correct source locations for the borrowing foreach loop.
@@ -181,7 +181,7 @@ func testForEachLocations(seq: borrowing Span<Int>, val: Int) {
   }
 }
 
-// CHECK-LABEL: sil hidden {{.*}}[ossa] @$s17foreach_borrowing34testForEachNonCopyableSILDebugInfo3seqys4SpanVyAA14NoncopyableIntVG_tF : $@convention(thin) (@guaranteed Span<NoncopyableInt>) -> () {
+// CHECK-LABEL: sil hidden {{.*}}[ossa] {{(\[opaque\] )?}}@$s17foreach_borrowing34testForEachNonCopyableSILDebugInfo3seqys4SpanVyAA14NoncopyableIntVG_tF : $@convention(thin) (@guaranteed Span<NoncopyableInt>) -> () {
 @available(SwiftStdlib 6.4, *)
 func testForEachNonCopyableSILDebugInfo(seq: borrowing Span<NoncopyableInt>){
   // CHECK-ADDR: debug_value {{.*}} : $*NoncopyableInt, let, name "element", expr op_deref, loc "{{.*}}":[[@LINE+2]]:7 isImplicit: false
@@ -206,7 +206,7 @@ struct DualSeq: Sequence, Iterable {
   }
 }
 
-// CHECK-LABEL: sil hidden {{.*}}[ossa] @$s17foreach_borrowing34testSequencePreferredOverBorrowing3seqyAA7DualSeqV_tF : $@convention(thin) (DualSeq) -> () {
+// CHECK-LABEL: sil hidden {{.*}}[ossa] {{(\[opaque\] )?}}@$s17foreach_borrowing34testSequencePreferredOverBorrowing3seqyAA7DualSeqV_tF : $@convention(thin) (DualSeq) -> () {
 @available(SwiftStdlib 6.4, *)
 func testSequencePreferredOverBorrowing(seq: borrowing DualSeq) {
   // DualSeq conforms to Sequence, so shouldUseIterable returns false.
@@ -234,7 +234,7 @@ extension BorrowingFallbackWithSequence: Iterable {
   typealias BorrowingIterator = BorrowingIteratorAdapter<IndexingIterator<[Int]>>
 }
 
-// CHECK-LABEL: sil hidden {{.*}}[ossa] @$s17foreach_borrowing36testUnavailableBorrowingWithSequence3seqyAA0e8FallbackfG0V_tF : $@convention(thin) (BorrowingFallbackWithSequence) -> () {
+// CHECK-LABEL: sil hidden {{.*}}[ossa] {{(\[opaque\] )?}}@$s17foreach_borrowing36testUnavailableBorrowingWithSequence3seqyAA0e8FallbackfG0V_tF : $@convention(thin) (BorrowingFallbackWithSequence) -> () {
 func testUnavailableBorrowingWithSequence(seq: BorrowingFallbackWithSequence) {
   // BorrowingFallbackWithSequence conforms to Sequence, so
   // shouldUseIterable returns false and makeIterator() is called.

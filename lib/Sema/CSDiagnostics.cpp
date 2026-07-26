@@ -1221,6 +1221,26 @@ bool ArrayLiteralToDictionaryConversionFailure::diagnoseAsError() {
   return true;
 }
 
+bool AttributedFuncToTypeConversionFailure::diagnoseAsNote() {
+  if (!getToType()->is<FunctionType>())
+    return false;
+
+  auto argApplyInfo = getFunctionArgApplyInfo(getLocator());
+  if (!argApplyInfo)
+    return false;
+
+  auto overload = getCalleeOverloadChoiceIfAvailable(getLocator());
+  if (!(overload && overload->choice.isDecl()))
+    return false;
+
+  SmallString<4> scratch;
+  emitDiagnosticAt(overload->choice.getDecl(),
+                   diag::candidate_expects_escaping_argument, attributeKind,
+                   argApplyInfo->getParamPosition(),
+                   argApplyInfo->getArgDescription(scratch));
+  return true;
+}
+
 bool AttributedFuncToTypeConversionFailure::diagnoseAsError() {
   if (diagnoseParameterUse())
     return true;
@@ -3866,14 +3886,21 @@ ContextualFailure::getDiagnosticFor(ContextualTypePurpose context,
 
 bool NonClassTypeToAnyObjectConversionFailure::diagnoseAsError() {
   auto locator = getLocator();
-  if (locator->isForContextualType()) {
-    return ContextualFailure::diagnoseAsError();
-  }
-
   auto fromType = getFromType();
   auto toType = getToType();
   assert(fromType);
   assert(toType);
+
+  if (fromType->isNoncopyable()) {
+    emitDiagnostic(diag::cannot_convert_noncopyable_value_to_anyobject,
+                   fromType, toType);
+    return true;
+  }
+
+  if (locator->isForContextualType()) {
+    return ContextualFailure::diagnoseAsError();
+  }
+
   if (locator->isLastElement<LocatorPathElt::ApplyArgToParam>()) {
     ArgumentMismatchFailure failure(getSolution(), fromType, toType, locator);
     return failure.diagnoseAsError();
@@ -5243,6 +5270,16 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
   }
 
   return false;
+}
+
+bool InvalidMetatypeExtensionMemberRefFailure::diagnoseAsError() {
+  auto baseType = resolveType(BaseType)->getWithoutSpecifierType();
+  baseType = baseType->getMetatypeInstanceType();
+
+  emitDiagnostic(diag::metatype_extension_member_on_conforming_type, baseType,
+                 Member)
+      .highlight(getSourceRange());
+  return true;
 }
 
 bool PartialApplicationFailure::diagnoseAsError() {

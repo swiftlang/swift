@@ -835,6 +835,7 @@ public:
         attributeKind(attributeKind) {}
 
   bool diagnoseAsError() override;
+  bool diagnoseAsNote() override;
 
 private:
   /// Emit tailored diagnostics for no-escape/non-sendable parameter
@@ -1391,6 +1392,26 @@ public:
       : MemberReferenceFailure(solution, locator),
         BaseType(baseType->getRValueType()), Member(member), Name(name) {
     assert(member);
+  }
+
+  bool diagnoseAsError() override;
+};
+
+/// Diagnose a member of a protocol metatype extension referenced through the
+/// metatype of a conforming type. Such members belong to the protocol metatype
+/// itself and are not inherited by conforming types.
+class InvalidMetatypeExtensionMemberRefFailure final
+    : public MemberReferenceFailure {
+  Type BaseType;
+  ValueDecl *Member;
+
+public:
+  InvalidMetatypeExtensionMemberRefFailure(
+      const Solution &solution, Type baseType, ValueDecl *member,
+      ConstraintLocator *locator)
+      : MemberReferenceFailure(solution, locator),
+        BaseType(baseType->getRValueType()), Member(member) {
+    ASSERT(member);
   }
 
   bool diagnoseAsError() override;

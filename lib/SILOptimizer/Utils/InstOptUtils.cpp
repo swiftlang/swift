@@ -312,28 +312,37 @@ void swift::recursivelyDeleteTriviallyDeadInstructions(
   recursivelyDeleteTriviallyDeadInstructions(ai, force, callbacks);
 }
 
-void swift::collectUsesOfValue(SILValue v,
-                               llvm::SmallPtrSetImpl<SILInstruction *> &insts) {
+/// Recursively collect non-debug uses of a value
+static void
+collectNonDebugUsesOfValue(SILValue v,
+                           llvm::SmallPtrSetImpl<SILInstruction *> &insts) {
   for (auto ui = v->use_begin(), E = v->use_end(); ui != E; ++ui) {
     auto *user = ui->getUser();
+    
+    // Debug values should not be removed.
+    if (isa<DebugValueInst>(user))
+      continue;
+    
     // Instruction has been processed.
     if (!insts.insert(user).second)
       continue;
 
     // Collect the users of this instruction.
     for (auto result : user->getResults())
-      collectUsesOfValue(result, insts);
+      collectNonDebugUsesOfValue(result, insts);
   }
 }
 
 void swift::eraseUsesOfValue(SILValue v) {
   llvm::SmallPtrSet<SILInstruction *, 4> insts;
   // Collect the uses.
-  collectUsesOfValue(v, insts);
+  collectNonDebugUsesOfValue(v, insts);
   // Erase the uses, we can have instructions that become dead because
   // of the removal of these instructions, leave to DCE to cleanup.
   // Its not safe to do recursively delete here as some of the SILInstruction
   // maybe tracked by this set.
+  // Debug uses will have their operand changed to undef without being erased.
+  v->replaceAllUsesWithUndef();
   for (auto inst : insts) {
     inst->replaceAllUsesOfAllResultsWithUndef();
     inst->eraseFromParent();
@@ -1014,7 +1023,7 @@ void swift::getConsumedPartialApplyArgs(PartialApplyInst *pai,
                                         bool includeTrivialAddrArgs) {
   ApplySite applySite(pai);
   SILFunctionConventions calleeConv = applySite.getSubstCalleeConv();
-  unsigned firstCalleeArgIdx = applySite.getCalleeArgIndexOfFirstAppliedArg();
+  unsigned firstCalleeArgIdx = applySite.getSubstCalleeArgIndexOfFirstAppliedArg();
   auto argList = pai->getArgumentOperands();
   SILFunction *F = pai->getFunction();
 
@@ -1494,8 +1503,6 @@ void swift::insertDestroyOfCapturedArguments(
   assert(pai->isOnStack());
 
   ApplySite site(pai);
-  SILFunctionConventions calleeConv(site.getSubstCalleeType(),
-                                    pai->getModule());
   auto loc = CleanupLocation(origLoc);
   for (auto &arg : pai->getArgumentOperands()) {
     SILValue argValue = getValueToDestroy(arg.get());
@@ -1506,9 +1513,7 @@ void swift::insertDestroyOfCapturedArguments(
            || (argValue->getOwnershipKind().isCompatibleWith(
                  OwnershipKind::Owned)));
 
-    unsigned calleeArgumentIndex = site.getCalleeArgIndex(arg);
-    assert(calleeArgumentIndex >= calleeConv.getSILArgIndexOfFirstParam());
-    auto paramInfo = calleeConv.getParamInfoForSILArg(calleeArgumentIndex);
+    auto paramInfo = site.getParamInfoForOperand(arg);
     releasePartialApplyCapturedArg(builder, loc, argValue, paramInfo);
   }
 }
@@ -1521,12 +1526,8 @@ void swift::insertDeallocOfCapturedArguments(
   assert(pai->isOnStack());
 
   ApplySite site(pai);
-  SILFunctionConventions calleeConv(site.getSubstCalleeType(),
-                                    pai->getModule());
   for (auto &arg : pai->getArgumentOperands()) {
-    unsigned calleeArgumentIndex = site.getCalleeArgIndex(arg);
-    assert(calleeArgumentIndex >= calleeConv.getSILArgIndexOfFirstParam());
-    auto paramInfo = calleeConv.getParamInfoForSILArg(calleeArgumentIndex);
+    auto paramInfo = site.getParamInfoForOperand(arg);
     if (!paramInfo.isIndirectInGuaranteed())
       continue;
 
@@ -1845,6 +1846,11 @@ bool swift::tryEliminateOnlyOwnershipUsedForwardingInst(
     return false;
   }
 
+  // Rewrite debug uses separately (they might need salvaging logic).
+  // Note: We know that `forwardingInst` is salvageable as this function is
+  // only called with convert_function instructions.
+  salvageDebugInfo(forwardingInst);
+
   // Now that we know we can perform our transform, set all uses of
   // forwardingInst to be used of its operand and then delete \p forwardingInst.
   auto newValue = singleFwdOp->get();
@@ -1992,6 +1998,8 @@ static void salvageBinaryInst(SingleValueInstruction *SVI) {
 /// Salvage debug info for identity-like instructions (copy_value, move_value).
 /// Just repoints debug uses to the operand.
 static void salvageIdentityInst(SingleValueInstruction *SVI) {
+  assert(SVI->getNumOperands() >= 1 &&
+         "salvageIdentityInst expects an operand");
   SmallVector<Operand *> debugUses(getDebugUses(SVI));
   for (Operand *U : debugUses) {
     auto *DbgInst = cast<DebugValueInst>(U->getUser());
@@ -2099,7 +2107,7 @@ static void salvagePackElementSetDebugInfo(PackElementSetInst *PESI) {
   TupleType *tupleType = nullptr;
 
   if (packType.getElementTypes().size() == 1) {
-    silType = PESI->getFunction()->getLoweredType(packType.getElementType(0));
+    silType = packType->getSILElementType(0).getObjectType();
   } else {
     llvm::SmallVector<TupleTypeElt, 4> tupleElements;
     for (const auto &elementType : packType.getElementTypes()) {
@@ -2287,7 +2295,7 @@ void swift::salvageDebugInfo(SILInstruction *I) {
     salvageUnaryInst(cast<SingleValueInstruction>(I));
 
   if (isa<UpcastInst>(I) || isa<UncheckedRefCastInst>(I) ||
-      isa<ConvertEscapeToNoEscapeInst>(I))
+      isa<ConvertEscapeToNoEscapeInst>(I) || isa<ConvertFunctionInst>(I))
     salvageUnaryInst(cast<SingleValueInstruction>(I));
 
   if (isa<StructElementAddrInst>(I) || isa<TupleElementAddrInst>(I) ||
@@ -2300,6 +2308,36 @@ void swift::salvageDebugInfo(SILInstruction *I) {
 
   if (isa<CopyValueInst>(I) || isa<MoveValueInst>(I))
     salvageIdentityInst(cast<SingleValueInstruction>(I));
+
+  if (auto *builtin = dyn_cast<BuiltinInst>(I)) {
+    // Only salvage side-effects free SIL builtins.
+    BuiltinInfo info = builtin->getBuiltinInfo();
+    if (info.ID != BuiltinValueKind::None && info.isReadNone()) {
+      if ((info.ID == BuiltinValueKind::SToSCheckedTrunc ||
+           info.ID == BuiltinValueKind::UToUCheckedTrunc ||
+           info.ID == BuiltinValueKind::SToUCheckedTrunc) &&
+          info.Types[0]->is<BuiltinIntegerLiteralType>())
+        // This special case creates a branch at IRGen, which is not supported
+        // for debug reconstruction blocks.
+        // As this is for integer literals only, we should be able to salvage
+        // it to a constant, but for now, skip.
+        return;
+
+      // assumeNonNegative and assumeAlignment just returns its first operand
+      if (info.ID == BuiltinValueKind::AssumeNonNegative ||
+          info.ID == BuiltinValueKind::AssumeAlignment)
+        return salvageIdentityInst(builtin);
+      // or, and, xor, cmp_* builtins:
+      if (builtin->getNumOperands() == 2)
+        return salvageBinaryInst(builtin);
+      // (z/s)extOrBitcast, truncOrBitcast, ptrtoint, inttoptr
+      if (builtin->getNumOperands() == 1)
+        return salvageUnaryInst(builtin);
+      // zeroInitializer
+      if (builtin->getNumOperands() == 0)
+        return salvageNullaryInst(builtin);
+    }
+  }
 }
 
 void swift::salvageLoadDebugInfo(LoadOperation load) {

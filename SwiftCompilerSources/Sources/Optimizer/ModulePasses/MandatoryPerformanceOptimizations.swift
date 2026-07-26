@@ -186,7 +186,7 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ modu
 
       case let iem as InitExistentialMetatypeInst:
         if iem.uses.ignoreDebugUses.isEmpty {
-          context.erase(instructionIncludingDebugUses: iem)
+          context.erase(instruction: iem)
         }
 
       case let fri as FunctionRefInst:
@@ -283,7 +283,7 @@ private func removeUnusedMetatypeInstructions(in function: Function, _ context: 
   for inst in function.instructions {
     if let mt = inst as? MetatypeInst,
        mt.isTriviallyDeadIgnoringDebugUses {
-      context.erase(instructionIncludingDebugUses: mt)
+      context.erase(instruction: mt)
     }
   }
 }

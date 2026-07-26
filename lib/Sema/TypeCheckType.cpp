@@ -2311,6 +2311,21 @@ TypeResolver::resolveUnqualifiedIdentTypeRepr(UnqualifiedIdentTypeRepr *repr,
   auto *DC = getDeclContext();
   auto id = repr->getNameRef();
 
+  // A protocol metatype extension has no generic signature and its members are
+  // static members of the protocol metatype, so they cannot reference 'Self'.
+  // Diagnose before name lookup binds it to the protocol's 'Self', which would
+  // leave the member's interface type carrying an unanchored type parameter.
+  if (id.isSimpleName(ctx.Id_Self)) {
+    if (auto *typeDC = DC->getInnermostTypeContext()) {
+      if (typeDC->isMetatypeExtension()) {
+        if (!options.contains(TypeResolutionFlags::SilenceDiagnostics))
+          diagnose(repr->getLoc(), diag::metatype_extension_self);
+        repr->setInvalid();
+        return ErrorType::get(ctx);
+      }
+    }
+  }
+
   // In SIL mode, we bind generic parameters here, since name lookup
   // won't find them.
   if (silContext && silContext->GenericParams) {
@@ -2347,6 +2362,22 @@ TypeResolver::resolveUnqualifiedIdentTypeRepr(UnqualifiedIdentTypeRepr *repr,
   for (const auto &entry : globals) {
     auto *foundDC = entry.getDeclContext();
     auto *typeDecl = cast<TypeDecl>(entry.getValueDecl());
+
+    // As with 'Self' above, a member of a protocol metatype extension cannot
+    // reference the extended protocol's associated types: doing so would root
+    // the member's interface type at an unanchored 'Self'.  Diagnose before
+    // resolving the reference, which would otherwise assert while substituting.
+    if (isa<AssociatedTypeDecl>(typeDecl)) {
+      if (auto *typeDC = DC->getInnermostTypeContext()) {
+        if (typeDC->isMetatypeExtension()) {
+          if (!options.contains(TypeResolutionFlags::SilenceDiagnostics))
+            diagnose(repr->getLoc(), diag::metatype_extension_associated_type,
+                     typeDecl->getName());
+          repr->setInvalid();
+          return ErrorType::get(ctx);
+        }
+      }
+    }
 
     // Compute the type of the found declaration when referenced from this
     // location.
@@ -3131,7 +3162,7 @@ static Type rebuildWithDynamicSelf(ASTContext &Context, Type ty) {
   }
 }
 
-/// In SIL, handle '@opened(UUID, constraintType) interfaceType',
+/// In SIL, handle '@opened(ID, constraintType) interfaceType',
 /// which creates an opened archetype.
 NeverNullType
 TypeResolver::resolveOpenedExistentialArchetype(
@@ -3183,7 +3214,7 @@ TypeResolver::resolveOpenedExistentialArchetype(
     // into a new opened generic environment.
     auto *env = GenericEnvironment::forOpenedExistential(
         constraintType->getCanonicalType(),
-        openedAttr->getUUID());
+        openedAttr->getID());
 
     // Rewrite the interface type into one with the correct depth.
     interfaceType = Type(interfaceType).subst(
@@ -3199,7 +3230,7 @@ TypeResolver::resolveOpenedExistentialArchetype(
   return archetypeType;
 }
 
-/// In SIL, handle '@pack_element(UUID) interfaceType',
+/// In SIL, handle '@pack_element(ID) interfaceType',
 /// which creates an opened archetype.
 NeverNullType
 TypeResolver::resolvePackElementArchetype(
@@ -3212,7 +3243,7 @@ TypeResolver::resolvePackElementArchetype(
 
   const SILTypeResolutionContext::OpenedPackElement *entry = nullptr;
   if (const auto *openedPacksMap = silContext->OpenedPackElements) {
-    auto it = openedPacksMap->find(attr->getUUID());
+    auto it = openedPacksMap->find(attr->getID());
     if (it != openedPacksMap->end()) {
       entry = &it->second;
     }

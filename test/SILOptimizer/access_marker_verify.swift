@@ -273,7 +273,7 @@ func testInitLValue(p: HasIntGetter) -> Int {
 // CHECK:   [[PROJ:%.*]] = project_box
 // CHECK:   [[OPENED:%.*]] = open_existential_addr immutable_access %0
 // CHECK:   witness_method $@opened
-// CHECK:   [[VALUE:%.*]] = apply %{{.*}}<@opened("{{.*}}", any HasIntGetter) Self>([[OPENED]])
+// CHECK:   [[VALUE:%.*]] = apply %{{.*}}<@opened({{.*}}, any HasIntGetter) Self>([[OPENED]])
 // CHECK:   [[ACCESS:%.*]] = begin_access [modify] [unsafe] [[PROJ]] : $*Int
 // CHECK:   store [[VALUE]] to [trivial] [[ACCESS]] : $*Int
 // CHECK:   end_access [[ACCESS]]
@@ -869,9 +869,9 @@ func testMixedTuple(p: HasClassGetter) -> (BaseClass, Any) {
 // CHECK-LABEL: sil hidden [ossa] @$s20access_marker_verify14testMixedTuple1pAA9BaseClassC_yptAA03HasH6Getter_p_tF : $@convention(thin) (@in_guaranteed any HasClassGetter) -> (@owned BaseClass, @out Any) {
 // CHECK: bb0(%0 : $*Any, %1 : $*any HasClassGetter):
 // CHECK: [[P1:%.*]] = open_existential_addr immutable_access %1 : $*any HasClassGetter to $*@opened
-// CHECK: [[OUTC:%.*]] = apply %{{.*}}<@opened("{{.*}}", any HasClassGetter) Self>([[P1]])
+// CHECK: [[OUTC:%.*]] = apply %{{.*}}<@opened({{.*}}, any HasClassGetter) Self>([[P1]])
 // CHECK: [[P2:%.*]] = open_existential_addr immutable_access %1 : $*any HasClassGetter to $*@opened
-// CHECK: [[R2:%.*]] = apply %{{.*}}<@opened("{{.*}}", any HasClassGetter) Self>([[P2]])
+// CHECK: [[R2:%.*]] = apply %{{.*}}<@opened({{.*}}, any HasClassGetter) Self>([[P2]])
 // CHECK: [[OUTANY:%.*]] = init_existential_addr %0 : $*Any, $BaseClass
 // CHECK: store [[R2]] to [init] [[OUTANY]] : $*BaseClass
 // CHECK: return [[OUTC]] : $BaseClass
@@ -944,9 +944,9 @@ func testOpenExistential(p: PBar) {
 // CHECK-NOT: begin_access
 // CHECK: copy_addr [take] [[OPT_Q_ADR]] to [init] [[Q]] : $*any Q
 // CHECK-NOT: begin_access
-// CHECK: [[Q_ADR:%.*]] = open_existential_addr immutable_access [[Q]] : $*any Q to $*@opened("{{.*}}", any Q) Self
-// CHECK: witness_method $@opened("{{.*}}", any Q) Self, #PBar.bar
-// CHECK: apply %{{.*}}<@opened("{{.*}}", any Q) Self>([[Q_ADR]])
+// CHECK: [[Q_ADR:%.*]] = open_existential_addr immutable_access [[Q]] : $*any Q to $*@opened({{.*}}, any Q) Self
+// CHECK: witness_method $@opened({{.*}}, any Q) Self, #PBar.bar
+// CHECK: apply %{{.*}}<@opened({{.*}}, any Q) Self>([[Q_ADR]])
 // CHECK-LABEL: } // end sil function '$s20access_marker_verify19testOpenExistential1pyAA4PBar_p_tF'
 
 // --- local existential

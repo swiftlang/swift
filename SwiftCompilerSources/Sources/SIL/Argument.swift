@@ -37,6 +37,11 @@ public class Argument : Value, Hashable {
     bridged.setReborrow(reborrow)
   }
 
+  public func set(ownership: Ownership, _ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.setOwnership(ownership._bridged)
+  }
+
   public var isLexical: Bool { false }
 
   public var decl: ValueDecl? { bridged.getDecl().getAs(ValueDecl.self) }

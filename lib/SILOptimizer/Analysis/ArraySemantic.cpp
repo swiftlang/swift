@@ -82,7 +82,6 @@ bool swift::ArraySemanticsCall::isValidSignature() {
   FunctionRefInst *FRI = cast<FunctionRefInst>(SemanticsCall->getCallee());
   SILFunction *F = FRI->getReferencedFunction();
   auto FnTy = F->getLoweredFunctionType();
-  auto &Mod = F->getModule();
 
   // Check whether we have a valid signature for semantic calls that we hoist.
   switch (getKind()) {
@@ -138,7 +137,7 @@ bool swift::ArraySemanticsCall::isValidSignature() {
     return true;
   }
   case ArrayCallKind::kWithUnsafeMutableBufferPointer: {
-    SILFunctionConventions origConv(SemanticsCall->getOrigCalleeType(), Mod);
+    SILFunctionConventions origConv = SemanticsCall->getOrigCalleeConv();
     if (origConv.getNumIndirectSILResults() != 1
         || SemanticsCall->getNumArguments() != 3)
       return false;

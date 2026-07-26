@@ -150,6 +150,10 @@ ERROR(could_not_use_instance_member_on_type,none,
       "%select{| of type %2}3 cannot be used on"
       "%select{| instance of nested}3 type %0",
       (Type, DeclNameRef, Type, bool))
+ERROR(metatype_extension_member_on_conforming_type,none,
+      "metatype extension member %1 cannot be used on conforming type %0; "
+      "it is only available on the protocol metatype",
+      (Type, const ValueDecl *))
 GROUPED_ERROR(could_not_use_member_on_existential,ExistentialMemberAccess,none,
       "member %1 cannot be used on value of type %0; consider using a"
       " generic constraint instead",
@@ -328,6 +332,8 @@ ERROR(cannot_convert_initializer_value_anyobject,none,
       "value of type %0 expected to be instance of class or "
       "class-constrained type",
       (Type, Type))
+ERROR(cannot_convert_noncopyable_value_to_anyobject,none,
+      "value of noncopyable type %0 cannot be converted to %1", (Type, Type))
 ERROR(cannot_convert_initializer_value_nil,none,
       "'nil' cannot initialize specified type %0", (Type))
 
@@ -2234,6 +2240,8 @@ ERROR(attr_com_explicit_iswiftobject, none,
       "'ISwiftObject' conformance is compiler-managed and cannot be declared explicitly", ())
 NOTE(attr_com_iswiftobject_implied, none,
      "'@com' automatically provides 'ISwiftObject' conformance", ())
+ERROR(attr_com_missing_module, none,
+      "'COM' module not imported, required for '@com'", ())
 ERROR(com_module_missing_type, none,
       "type '%0' not found in the 'COM' module", (StringRef))
 
@@ -2241,6 +2249,11 @@ ERROR(metatype_extension_com_only, none,
       "protocol metatype extensions are reserved for COM interop", ())
 ERROR(metatype_extension_non_protocol, none,
       "metatype extension can only extend a protocol, not %0", (Type))
+ERROR(metatype_extension_self, none,
+      "'Self' cannot be referenced in a protocol metatype extension", ())
+ERROR(metatype_extension_associated_type, none,
+      "associated type %0 cannot be referenced in a protocol metatype extension",
+      (DeclName))
 
 // @_staticExclusiveOnly
 ERROR(attr_static_exclusive_only_disabled,none,
@@ -5311,6 +5324,10 @@ ERROR(passing_noattrfunc_to_attrfunc,none,
       "passing %select{non-escaping|non-Sendable}0 parameter %1 to function "
       "expecting %select{an '@escaping'|a '@Sendable'}0 closure",
       (unsigned, Identifier))
+NOTE(candidate_expects_escaping_argument,none,
+     "candidate expects %select{an '@escaping'|a '@Sendable'}0 closure for "
+     "parameter #%1, but argument %2 is %select{non-escaping|non-Sendable}0",
+     (unsigned, unsigned, StringRef))
 ERROR(converting_noescape_param_to_generic_type,none,
       "converting non-escaping parameter %0 to generic parameter %1 may allow it to escape",
       (Identifier, Type))
@@ -6872,7 +6889,7 @@ ERROR(illegal_sil_type,none,
 ERROR(sil_box_arg_mismatch,none,
       "SIL box type has wrong number of generic arguments for layout", ())
 ERROR(sil_pack_element_uuid_not_found,none,
-      "open_pack_element instruction not found for '@pack_element' type UUID; "
+      "open_pack_element instruction not found for '@pack_element' type ID; "
       "possible forward reference?", ())
 // SIL Metatypes
 ERROR(sil_metatype_without_repr,none,
@@ -7902,17 +7919,16 @@ ERROR(possibly_non_exhaustive_switch,none,
       "the compiler is unable to check that this switch is exhaustive in reasonable time",
       ())
 
-NOTE(missing_several_cases,none,
-     "add "
-     "%select{missing cases|a default clause}0", (bool))
+NOTE(missing_cases,none,
+     "add missing %select{case|cases}0: %1", (bool, StringRef))
+NOTE(missing_default_case,none,
+     "add a default clause", ())
 NOTE(missing_unknown_case,none,
      "handle unknown values using \"@unknown default\"", ())
 
 NOTE(non_exhaustive_switch_drop_unknown,none,
      "remove '@unknown' to handle remaining values", ())
 
-NOTE(missing_particular_case,none,
-     "add missing case: '%0'", (StringRef))
 WARNING(redundant_particular_case,none,
         "case is already handled by previous patterns; consider removing it",())
 WARNING(redundant_particular_literal_case,none,

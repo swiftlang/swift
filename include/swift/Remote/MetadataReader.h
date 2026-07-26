@@ -1234,7 +1234,7 @@ public:
         return BuiltType();
 
       auto mangling =
-          Demangle::mangleNode(node, Mangle::ManglingFlavor::Default);
+          Demangle::mangleNode(node, Builder.getManglingFlavor());
       if (!mangling.isSuccess())
         return BuiltType();
       auto name = mangling.result();

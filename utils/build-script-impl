@@ -2097,9 +2097,9 @@ for host in "${ALL_HOSTS[@]}"; do
                     fi
 
                     case $package in
-                        "" | pthreads | darwin | linux | win32 | c11 | none) ;;
+                        "" | pthreads | darwin | linux | win32 | c11 | none | embedded) ;;
                         *)
-                        echo "build-script: unknown threading package $package for sdk $sdk; must be one of 'pthreads', 'darwin', 'linux', 'win32', 'c11', 'none', or empty for sdk default"
+                        echo "build-script: unknown threading package $package for sdk $sdk; must be one of 'pthreads', 'darwin', 'linux', 'win32', 'c11', 'none', 'embedded', or empty for sdk default"
                         exit 1
                         ;;
                     esac

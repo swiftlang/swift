@@ -12,3 +12,6 @@ import Lib
 
 let _: Int = IWidget.tag
 let _: String = IWidget.describe()
+
+// The synthesized IID is still reachable too.
+let _: GUID = IWidget.IID

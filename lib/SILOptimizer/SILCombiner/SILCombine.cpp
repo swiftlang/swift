@@ -736,11 +736,14 @@ void SwiftPassInvocation::eraseInstruction(SILInstruction *inst, bool salvageDeb
   if (silCombiner) {
     silCombiner->eraseInstFromFunction(*inst, /*addOperandsToWorklist=*/ true, salvageDebugInfo);
   } else {
-    if (salvageDebugInfo) {
-      swift::salvageDebugInfo(inst);
-    }
     if (inst->isStaticInitializerInst()) {
+      // Ignore salvageDebugInfo: Static initializers can't have debug values.
       inst->getParent()->erase(inst, *getPassManager()->getModule());
+    } else if (salvageDebugInfo) {
+      swift::salvageDebugInfo(inst);
+      // Erase debug instructions left behind by salvageDebugInfo.
+      // TODO: Change this back to eraseFromParent when salvageDebugInfo is complete.
+      swift::eraseFromParentWithDebugInsts(inst);
     } else {
       inst->eraseFromParent();
     }

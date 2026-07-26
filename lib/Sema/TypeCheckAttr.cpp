@@ -52,6 +52,7 @@
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceLoc.h"
+#include "swift/Basic/UUID.h"  // for COM
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/ParseDeclName.h"
 #include "swift/Sema/IDETypeChecking.h"
@@ -1746,27 +1747,6 @@ void AttributeChecker::visitNonObjCAttr(NonObjCAttr *attr) {
   }
 }
 
-static bool hasObjCImplementationFeature(Decl *D, ObjCImplementationAttr *attr,
-                                         Feature requiredFeature) {
-  auto &ctx = D->getASTContext();
-
-  if (ctx.LangOpts.hasFeature(requiredFeature))
-    return true;
-
-  // Allow the use of @_objcImplementation *without* Feature::ObjCImplementation
-  // as long as you're using the early adopter syntax. (Avoids breaking existing
-  // adopters.)
-  if (requiredFeature == Feature::ObjCImplementation && attr->isEarlyAdopter())
-    return true;
-
-  // Either you're using Feature::ObjCImplementation without the early adopter
-  // syntax, or you're using Feature::CImplementation. Either way, no go.
-  ctx.Diags.diagnose(attr->getLocation(), diag::requires_experimental_feature,
-                     attr->getAttrName(), attr->isDeclModifier(),
-                     requiredFeature.getName());
-  return false;
-}
-
 static SourceRange getArgListRange(ASTContext &Ctx, DeclAttribute *attr) {
   // attr->getRange() covers the attr name and argument list; adjust it to
   // exclude the first token.
@@ -1805,9 +1785,6 @@ visitObjCImplementationAttr(ObjCImplementationAttr *attr) {
   }
 
   if (auto ED = dyn_cast<ExtensionDecl>(D)) {
-    if (!hasObjCImplementationFeature(D, attr, Feature::ObjCImplementation))
-      return;
-
     auto objcLangAttr = dyn_cast<ObjCAttr>(langAttr);
     assert(objcLangAttr && "extension with @_cdecl or another lang attr???");
 
@@ -2261,6 +2238,45 @@ getSemanticAvailableRangeDeclAndAttr(const Decl *decl,
   return std::nullopt;
 }
 
+// The raw values of this enum must be kept in sync with the select clause
+// in diag::availability_stored_property_no_potential and
+// diag::availability_stored_property_no_unavailable.
+enum NoAvailableAttrDiagnosticPropertyKind : unsigned {
+  StoredProperty,
+  ComputedPropertyWithInitialValue,
+};
+
+static std::optional<NoAvailableAttrDiagnosticPropertyKind>
+getPropertyKindForAvailableAttrDiagnostic(const VarDecl *VD) {
+  if (VD->hasStorageOrWrapsStorage())
+    return StoredProperty;
+
+  if (VD->hasInitialValue())
+    return ComputedPropertyWithInitialValue;
+
+  return std::nullopt;
+}
+
+/// Returns a non-null language mode if diagnostics about the availability of
+/// \p D relative to \p domain should be downgraded to a warning until that
+/// language mode.
+static std::optional<LanguageMode>
+getLanguageModeForPropertyAvailabilityErrors(const Decl *D,
+                                             AvailabilityDomain domain) {
+  auto *VD = dyn_cast<VarDecl>(D);
+  if (!VD)
+    return std::nullopt;
+
+  auto kind = getPropertyKindForAvailableAttrDiagnostic(VD);
+  if (kind != ComputedPropertyWithInitialValue)
+    return std::nullopt;
+
+  if (!domain.isPlatform() && !domain.isUniversal())
+    return std::nullopt;
+
+  return LanguageMode::future;
+}
+
 void AttributeChecker::visitAvailableAttr(AvailableAttr *parsedAttr) {
   if (Ctx.LangOpts.DisableAvailabilityChecking)
     return;
@@ -2483,6 +2499,8 @@ void AttributeChecker::visitCOMAttr(COMAttr *attr) {
       attr->setInvalid();
       return;
     }
+
+    // FIXME: Replace this usage of UUID::fromString() with something self-contained.
 
     if (!UUID::fromString(attr->IID.str().c_str())) {
       diagnose(attr->getLocation(), diag::attr_com_invalid_guid, attr->IID);
@@ -5653,13 +5671,18 @@ void AttributeChecker::checkAvailableAttrs(ArrayRef<AvailableAttr *> attrs) {
   if (!availabilityRestriction)
     return;
 
+  auto *parsedAttr = const_cast<AvailableAttr *>(
+      availabilityRestriction->getAttr().getParsedAttr());
+  auto domain = availabilityRestriction->getAttr().getDomain();
+
   // If the decl is unavailable relative to its parent and it's not a
   // declaration that is allowed to be unavailable, diagnose.
   if (availabilityRestriction->isUnavailable()) {
-    auto attr = availabilityRestriction->getAttr();
-    if (auto diag = TypeChecker::diagnosticIfDeclCannotBeUnavailable(D, attr)) {
-      diagnoseAndRemoveAttr(const_cast<AvailableAttr *>(attr.getParsedAttr()),
-                            *diag);
+    if (auto diag = TypeChecker::diagnosticIfDeclCannotBeUnavailable(
+            D, availabilityRestriction->getAttr())) {
+      diagnoseAndRemoveAttr(parsedAttr, *diag)
+          .warnUntilLanguageMode(
+              getLanguageModeForPropertyAvailabilityErrors(D, domain));
       return;
     }
   }
@@ -5667,11 +5690,11 @@ void AttributeChecker::checkAvailableAttrs(ArrayRef<AvailableAttr *> attrs) {
   // If the decl is potentially unavailable relative to its parent and it's
   // not a declaration that is allowed to be potentially unavailable, diagnose.
   if (!availabilityRestriction->isUnavailable()) {
-    auto attr = availabilityRestriction->getAttr();
     if (auto diag =
             TypeChecker::diagnosticIfDeclCannotBePotentiallyUnavailable(D))
-      diagnoseAndRemoveAttr(const_cast<AvailableAttr *>(attr.getParsedAttr()),
-                            *diag);
+      diagnoseAndRemoveAttr(parsedAttr, *diag)
+          .warnUntilLanguageMode(
+              getLanguageModeForPropertyAvailabilityErrors(D, domain));
   }
 }
 
@@ -5971,25 +5994,6 @@ Type TypeChecker::checkReferenceOwnershipAttr(VarDecl *var, Type type,
 
   // Change the type to the appropriate reference storage type.
   return ReferenceStorageType::get(type, ownershipKind, var->getASTContext());
-}
-
-// The raw values of this enum must be kept in sync with the select clause
-// in diag::availability_stored_property_no_potential and
-// diag::availability_stored_property_no_unavailable.
-enum NoAvailableAttrDiagnosticPropertyKind : unsigned {
-  StoredProperty,
-  ComputedPropertyWithInitialValue,
-};
-
-static std::optional<NoAvailableAttrDiagnosticPropertyKind>
-getPropertyKindForAvailableAttrDiagnostic(const VarDecl *VD) {
-  if (VD->hasStorageOrWrapsStorage())
-    return StoredProperty;
-
-  if (VD->hasInitialValue())
-    return ComputedPropertyWithInitialValue;
-
-  return std::nullopt;
 }
 
 std::optional<Diagnostic>
