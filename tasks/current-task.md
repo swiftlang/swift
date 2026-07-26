@@ -1,0 +1,2 @@
+## Current Task
+COLLECT NOTION EXPORT
