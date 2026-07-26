@@ -52,6 +52,7 @@ class AvailabilityScope;
 class BreakStmt;
 class ContextualPattern;
 class ContinueStmt;
+class COMDeclInfo;
 class DefaultArgumentExpr;
 class DefaultArgumentType;
 class DoCatchStmt;
@@ -1257,11 +1258,11 @@ public:
   bool isCached() const { return true; }
 };
 
-/// Determine whether a class participates in the COM object model, i.e. it
-/// conforms to a protocol marked \c \@com.
-class IsCOMObjectRequest :
-    public SimpleRequest<IsCOMObjectRequest,
-                         bool(ClassDecl *),
+/// Retrieve the COM role and associated declaration information for a nominal
+/// type, or \c nullptr when it is not a COM interface or implementation.
+class COMDeclInfoRequest :
+    public SimpleRequest<COMDeclInfoRequest,
+                         const COMDeclInfo *(NominalTypeDecl *),
                          RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -1269,7 +1270,8 @@ public:
 private:
   friend SimpleRequest;
 
-  bool evaluate(Evaluator &evaluator, ClassDecl *classDecl) const;
+  const COMDeclInfo *evaluate(Evaluator &evaluator,
+                              NominalTypeDecl *nominal) const;
 
 public:
   // Caching

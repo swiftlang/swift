@@ -257,17 +257,65 @@ VarDecl *lookupCOMImplementationID(ClassDecl *CD) {
   return nullptr;
 }
 
+const COMAttr *getAttribute(const ClassDecl *CD) {
+  auto *attr = CD->getAttrs().getAttribute<COMAttr>();
+  if (!attr)
+    return nullptr;
+
+  ASSERT(attr->IID.empty());
+  ASSERT(!attr->CLSID || !attr->CLSID->empty());
+  return attr;
+}
+
+const COMAttr *getAttribute(const ProtocolDecl *PD) {
+  auto *attr = PD->getAttrs().getAttribute<COMAttr>();
+  if (!attr)
+    return nullptr;
+
+  ASSERT(!attr->IID.empty());
+  ASSERT(!attr->CLSID);
+  return attr;
+}
+
 }
 }
 
 namespace swift {
-bool IsCOMObjectRequest::evaluate(Evaluator &evaluator, ClassDecl *CD) const {
-  // A class participates in the COM object model when it conforms to a COM
-  // interface, a protocol marked @com.
-  for (auto *proto : CD->getAllProtocols())
-    if (proto->getAttrs().hasAttribute<COMAttr>())
-      return true;
-  return false;
+const COMDeclInfo *
+COMDeclInfoRequest::evaluate(Evaluator &evaluator,
+                             NominalTypeDecl *nominal) const {
+  auto &ctx = nominal->getASTContext();
+
+  if (auto *PD = dyn_cast<ProtocolDecl>(nominal)) {
+    auto *attr = ::com::getAttribute(PD);
+    if (!attr)
+      return nullptr;
+
+    return ctx.AllocateObjectCopy(COMDeclInfo::forInterface(attr->IID));
+  } else if (auto *CD = dyn_cast<ClassDecl>(nominal)) {
+    SmallVector<ProtocolDecl *, 2> interfaces;
+    for (auto *proto : CD->getAllProtocols(/*sorted=*/true)) {
+      if (proto->isCOMInterface())
+        interfaces.push_back(proto);
+    }
+
+    auto *attr = ::com::getAttribute(CD);
+    if (!attr && interfaces.empty())
+      return nullptr;
+
+    StringRef implementationID;
+    std::optional<COMThreadingModel> threadingModel;
+    if (attr) {
+      if (attr->CLSID)
+        implementationID = *attr->CLSID;
+      threadingModel = attr->getThreadingModel();
+    }
+
+    return ctx.AllocateObjectCopy(COMDeclInfo::forImplementation(
+        implementationID, threadingModel, ctx.AllocateCopy(interfaces)));
+  }
+
+  return nullptr;
 }
 
 ProtocolConformance *
@@ -276,7 +324,7 @@ com::deriveImplicitConformance(NominalTypeDecl *NTD, KnownProtocolKind KP) {
   if (CD == nullptr)
     return nullptr;
 
-  if (!CD->getAttrs().hasAttribute<COMAttr>())
+  if (!::com::getAttribute(CD))
     return nullptr;
 
   ASTContext &context = NTD->getASTContext();
@@ -324,10 +372,8 @@ com::deriveImplicitConformance(NominalTypeDecl *NTD, KnownProtocolKind KP) {
 VarDecl *SynthesizeCOMInterfaceIDRequest::evaluate(Evaluator &evaluator,
                                                    ProtocolDecl *PD) const {
   auto &ASTContext = PD->getASTContext();
-  if (!ASTContext.LangOpts.EnableCOMInterop)
-    return nullptr;
-  auto *attr = PD->getAttrs().getAttribute<COMAttr>();
-  if (!attr || attr->isInvalid() || attr->IID.empty())
+  auto *info = PD->getCOMDeclInfo();
+  if (!info)
     return nullptr;
   // Only synthesize for a protocol defined in a source file of the module being
   // compiled.  A deserialized module or swiftinterface already carries the
@@ -335,21 +381,22 @@ VarDecl *SynthesizeCOMInterfaceIDRequest::evaluate(Evaluator &evaluator,
   // would duplicate it, or fabricate a member absent from an older interface.
   if (!PD->isInSwiftSourceFile())
     return ::com::lookupCOMInterfaceID(PD);
-  return ::com::synthesizeIIDProperty(PD, ASTContext, attr->IID);
+  return ::com::synthesizeIIDProperty(PD, ASTContext, info->getInterfaceID());
 }
 
 VarDecl *SynthesizeCOMImplementationIDRequest::evaluate(Evaluator &evaluator,
                                                         ClassDecl *CD) const {
   auto &ASTContext = CD->getASTContext();
-  if (!ASTContext.LangOpts.EnableCOMInterop)
+  auto *info = CD->getCOMDeclInfo();
+  if (!info)
     return nullptr;
-  auto *attr = CD->getAttrs().getAttribute<COMAttr>();
-  if (!attr || attr->isInvalid() || !attr->CLSID || attr->CLSID->empty())
+  auto implementationID = info->getImplementationID();
+  if (!implementationID)
     return nullptr;
   // Synthesize only for a source-file class; recover the imported member by
   // name lookup (see SynthesizeCOMInterfaceIDRequest).
   if (!CD->isInSwiftSourceFile())
     return ::com::lookupCOMImplementationID(CD);
-  return ::com::synthesizeCLSIDProperty(CD, ASTContext, *attr->CLSID);
+  return ::com::synthesizeCLSIDProperty(CD, ASTContext, *implementationID);
 }
 }
