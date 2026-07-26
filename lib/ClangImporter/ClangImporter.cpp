@@ -3699,7 +3699,7 @@ void ClangImporter::lookupBridgingHeaderDecls(
       if (filter(macroNode)) {
         auto MI = macroNode.getAsMacro();
         Identifier Name = Impl.getNameImporter().importMacroName(II, MI);
-        if (Decl *imported = Impl.importMacro(Name, macroNode))
+        if (Decl *imported = Impl.importMacro(Name, macroNode, II))
           receiver(imported);
       }
     }
@@ -3777,7 +3777,7 @@ bool ClangImporter::lookupDeclsFromHeader(StringRef Filename,
         ClangNode MacroNode = Info;
         if (filter(MacroNode)) {
           auto Name = Impl.getNameImporter().importMacroName(II, Info);
-          if (auto *Imported = Impl.importMacro(Name, MacroNode))
+          if (auto *Imported = Impl.importMacro(Name, MacroNode, II))
             receiver(Imported);
         }
       });
