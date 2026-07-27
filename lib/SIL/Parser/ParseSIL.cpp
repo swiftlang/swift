@@ -8965,6 +8965,7 @@ bool SILParserState::parseSILDefaultOverrideTable(Parser &P) {
 /// decl-sil-differentiability-witness ::=
 ///   'sil_differentiability_witness'
 ///   ('[' 'serialized' ']')?
+///   ('[' 'default' ']')?
 ///   sil-linkage?
 ///   sil-differentiability-witness-config-and-function
 ///   decl-sil-differentiability-witness-body?
@@ -8999,6 +9000,18 @@ bool SILParserState::parseSILDifferentiabilityWitness(Parser &P) {
       return true;
   }
 
+  // Parse '[default]' flag (optional).
+  bool isDefault = false;
+  SourceLoc defaultTokLoc;
+  if (P.Tok.is(tok::l_square) && P.peekToken().is(tok::kw_default)) {
+    isDefault = true;
+    defaultTokLoc = P.Tok.getLoc();
+    P.consumeToken(tok::l_square);
+    P.consumeToken(tok::kw_default);
+    if (P.parseToken(tok::r_square, diag::sil_diff_witness_expected_token, "]"))
+      return true;
+  }
+
   // We need to turn on InSILBody to parse the function references.
   Lexer::SILBodyRAII tmp(*P.L);
 
@@ -9020,7 +9033,7 @@ bool SILParserState::parseSILDifferentiabilityWitness(Parser &P) {
     SILDifferentiabilityWitness::createDeclaration(
         M, linkage ? *linkage : SILLinkage::DefaultForDeclaration, originalFn,
         kind, config.parameterIndices, config.resultIndices,
-        config.derivativeGenericSignature);
+        config.derivativeGenericSignature, isDefault);
     return false;
   }
 
@@ -9057,7 +9070,7 @@ bool SILParserState::parseSILDifferentiabilityWitness(Parser &P) {
   SILDifferentiabilityWitness::createDefinition(
       M, linkage ? *linkage : SILLinkage::DefaultForDefinition, originalFn,
       kind, config.parameterIndices, config.resultIndices,
-      config.derivativeGenericSignature, jvp, vjp, isSerialized);
+      config.derivativeGenericSignature, jvp, vjp, isSerialized, isDefault);
   return false;
 }
 
