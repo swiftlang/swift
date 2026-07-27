@@ -259,9 +259,9 @@ void SILGenFunction::emitCallToMain(FuncDecl *mainFunc) {
   }
 
   // Form a call to the main function.
-  CanSILFunctionType mainFnType = mainFunction->getConventions().funcTy;
+  auto mainFnConv = mainFunction->getConventions();
   ASTContext &ctx = getASTContext();
-  if (mainFnType->hasErrorResult()) {
+  if (mainFnConv.funcTy->hasErrorResult()) {
     auto *successBlock = createBasicBlock();
     B.setInsertionPoint(successBlock);
     successBlock->createPhiArgument(SGM.Types.getEmptyTupleType(),
@@ -270,8 +270,7 @@ void SILGenFunction::emitCallToMain(FuncDecl *mainFunc) {
         B.createIntegerLiteral(loc, builtinInt32Type, 0);
     B.createBranch(loc, exitBlock, {zeroReturnValue});
 
-    SILResultInfo errorResult = mainFnType->getErrorResult();
-    SILType errorType = errorResult.getSILStorageInterfaceType();
+    SILType errorType = mainFnConv.getSILErrorType(getTypeExpansionContext());
 
     auto *failureBlock = createBasicBlock();
     B.setInsertionPoint(failureBlock);
@@ -301,8 +300,6 @@ void SILGenFunction::emitCallToMain(FuncDecl *mainFunc) {
     } else {
       // Call the _errorInMainTyped entrypoint, which handles
       // arbitrary error types.
-      SILValue tmpBuffer;
-
       FuncDecl *entrypoint = ctx.getErrorInMainTyped();
       auto genericSig = entrypoint->getGenericSignature();
       SubstitutionMap subMap = SubstitutionMap::get(
@@ -310,14 +307,13 @@ void SILGenFunction::emitCallToMain(FuncDecl *mainFunc) {
             return errorType.getASTType();
           }, LookUpConformanceInModule());
 
-      // Generic errors are passed indirectly.
-      if (!error->getType().isAddress()) {
+      // The intrinsic receives the error through a generic parameter, which is
+      // indirect if we've lowered addresses, so allocate if needed.
+      if (!error->getType().isAddress() && silConv.useLoweredAddresses()) {
         auto *tmp = B.createAllocStack(loc, error->getType().getObjectType(),
                                        std::nullopt);
-        emitSemanticStore(
-            loc, error, tmp,
-            getTypeLowering(tmp->getType()), IsInitialization);
-        tmpBuffer = tmp;
+        emitSemanticStore(loc, error, tmp,
+                          getTypeLowering(tmp->getType()), IsInitialization);
         error = tmp;
       }
 

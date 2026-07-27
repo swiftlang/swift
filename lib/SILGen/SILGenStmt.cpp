@@ -1361,9 +1361,9 @@ void StmtEmitter::visitDoCatchStmt(DoCatchStmt *S) {
   auto &exnTL = SGF.getTypeLowering(formalExnType);
 
   SILValue exnArg;
-
-  // FIXME: opaque values
-  if (exnTL.isAddressOnly()) {
+  bool errorIsIndirect = exnTL.isAddress();
+  
+  if (errorIsIndirect) {
     exnArg = SGF.B.createAllocStack(
         S, exnTL.getLoweredType());
     SGF.enterDeallocStackCleanup(exnArg);
@@ -1373,8 +1373,7 @@ void StmtEmitter::visitDoCatchStmt(DoCatchStmt *S) {
   JumpDest throwDest = createThrowDest(S->getBody(),
                                        ThrownErrorInfo(exnArg));
 
-  // FIXME: opaque values
-  if (!exnTL.isAddressOnly()) {
+  if (!errorIsIndirect) {
     exnArg = throwDest.getBlock()->createPhiArgument(
         exnTL.getLoweredType(), OwnershipKind::Owned);
   }
