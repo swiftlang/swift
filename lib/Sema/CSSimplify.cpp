@@ -7136,17 +7136,6 @@ bool ConstraintSystem::repairFailures(
     return true;
   }
 
-  case ConstraintLocator::ResultBuilderBodyResult: {
-    // If result type of the body couldn't be determined
-    // there is going to be other fix available to diagnose
-    // the underlying issue.
-    if (lhs->isPlaceholder())
-      return true;
-
-    conversionsOrFixes.push_back(ContextualMismatch::create(
-        *this, lhs, rhs, getConstraintLocator(locator)));
-    break;
-  }
   case ConstraintLocator::GlobalActorType: {
     // Drop global actor element as it servers only to indentify the global
     // actor matching.
