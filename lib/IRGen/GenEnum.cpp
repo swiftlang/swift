@@ -1978,22 +1978,73 @@ namespace {
                .getFixedExtraInhabitantCount(IGM) > 0;
     }
 
+    /// Whether a loadable single-payload enum can carry its payload directly as
+    /// a pointer, lowering the whole enum to `ptr` in LLVM IR.
+    ///
+    /// This holds when the payload occupies exactly one scalar pointer that
+    /// holds a managed reference -- either a bare retainable pointer, or
+    /// another enum that is itself already lowered this way (e.g. a nested
+    /// optional) -- and the payload has at least as many extra inhabitants as
+    /// the enum has no-payload cases. In that case every empty case is encoded
+    /// as one of the payload's low, invalid-pointer extra inhabitants and the
+    /// enum needs no separate tag storage, so it has the payload's
+    /// single-pointer layout. Only genuine (valid) pointer values are ever
+    /// loaded or dereferenced, so carrying the empty cases' sentinel bit
+    /// patterns in a `ptr` is safe.
+    ///
+    /// This is a strict superset of `isNullableRefcountedPayload`, which is the
+    /// special case of a single `.none == null` empty case (and additionally
+    /// permits the NullableRefcounted copy/destroy shortcut). The broader set
+    /// here -- multiple empty cases and arbitrarily nested optionals -- still
+    /// lowers to `ptr` but relies on the normal tag-checking copy/destroy.
+    static bool canRepresentPayloadAsPointer(IRGenModule &IGM,
+                                             const TypeInfo &payloadTI,
+                                             TypeInfoKind tik,
+                                             unsigned numNoPayloadCases) {
+      if (tik < TypeInfoKind::Loadable)
+        return false;
+      auto *fixedTI = dyn_cast<FixedTypeInfo>(&payloadTI);
+      if (!fixedTI)
+        return false;
+      // Every no-payload case must fit in one of the payload's extra
+      // inhabitants, so the enum keeps the payload's single-pointer layout with
+      // no separate tag storage.
+      if (fixedTI->getFixedExtraInhabitantCount(IGM) < numNoPayloadCases)
+        return false;
+      // The payload must occupy exactly one scalar pointer.
+      ExplosionSchema schema;
+      payloadTI.getSchema(schema);
+      if (schema.size() != 1 || !schema.begin()->isScalar() ||
+          !schema.begin()->getScalarType()->isPointerTy())
+        return false;
+      // ...and hold a managed reference. A single retainable pointer qualifies
+      // directly; a nested optional qualifies because it is itself already
+      // lowered to `ptr` and is non-trivial. Excluding trivially-destroyable
+      // pointers (metatypes, unsafe pointers, ...) keeps unrelated types on
+      // their existing integer representation.
+      return payloadTI.isSingleRetainablePointer(ResilienceExpansion::Maximal,
+                                                 nullptr) ||
+             !payloadTI.isTriviallyDestroyable(ResilienceExpansion::Maximal);
+    }
+
     static EnumPayloadSchema
     getPreferredPayloadSchema(IRGenModule &IGM, Element payloadElement,
                               TypeInfoKind tik, unsigned numNoPayloadCases) {
       // TODO: If the payload type info provides a preferred explosion schema,
       // use it. For now, just use a generic word-chunked schema.
       if (auto fixedTI = dyn_cast<FixedTypeInfo>(payloadElement.ti)) {
-        // When the empty case is exactly the zero pointer, represent the
-        // payload as its own pointer type so the enum lowers to `ptr` in LLVM
-        // IR with `.none == null`, rather than an opaque integer word.
-        if (isNullableRefcountedPayload(IGM, *fixedTI, tik, numNoPayloadCases,
-                                        /*refcounting=*/nullptr)) {
+        // When the payload is a single pointer and all empty cases fit in its
+        // extra inhabitants, represent the payload as its own pointer type so
+        // the enum lowers to `ptr` in LLVM IR (with the empty cases occupying
+        // low invalid-pointer values), rather than an opaque integer word.
+        if (canRepresentPayloadAsPointer(IGM, *fixedTI, tik,
+                                         numNoPayloadCases)) {
           ExplosionSchema payloadSchema;
           fixedTI->getSchema(payloadSchema);
-          assert(payloadSchema.size() == 1 && payloadSchema.begin()->isScalar()
-                 && payloadSchema.begin()->getScalarType()->isPointerTy()
-                 && "single retainable pointer should be one scalar pointer");
+          assert(payloadSchema.size() == 1 &&
+                 payloadSchema.begin()->isScalar() &&
+                 payloadSchema.begin()->getScalarType()->isPointerTy() &&
+                 "pointer-representable payload should be one scalar pointer");
           return EnumPayloadSchema::withExplicitTypes(
               payloadSchema.begin()->getScalarType());
         }
