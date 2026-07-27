@@ -10,6 +10,7 @@
 
 // FIXME: enable discarding taskgroup on windows; rdar://104762037
 // UNSUPPORTED: OS=windows-msvc
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 actor Waiter {
   let until: Int

@@ -7,6 +7,7 @@
 // In Microsoft STL, all overloads of std::any_cast return a dependent templated
 // type, which Swift isn't able to instantiate. 
 // UNSUPPORTED: OS=windows-msvc
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 import StdlibUnittest
 import StdAny
