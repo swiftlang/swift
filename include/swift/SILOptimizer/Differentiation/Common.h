@@ -17,22 +17,17 @@
 #ifndef SWIFT_SILOPTIMIZER_UTILS_DIFFERENTIATION_COMMON_H
 #define SWIFT_SILOPTIMIZER_UTILS_DIFFERENTIATION_COMMON_H
 
-#include "swift/AST/DiagnosticsSIL.h"
-#include "swift/AST/Expr.h"
-#include "swift/AST/SemanticAttrs.h"
 #include "swift/SIL/ApplySite.h"
+#include "swift/SIL/Projection.h"
 #include "swift/SIL/SILDifferentiabilityWitness.h"
 #include "swift/SIL/SILFunction.h"
-#include "swift/SIL/Projection.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/TypeSubstCloner.h"
-#include "swift/SILOptimizer/Analysis/ArraySemantic.h"
-#include "swift/SILOptimizer/Analysis/DifferentiableActivityAnalysis.h"
-#include "swift/SILOptimizer/Differentiation/ADContext.h"
 #include "swift/SILOptimizer/Differentiation/DifferentiationInvoker.h"
-#include "swift/SILOptimizer/Differentiation/TangentBuilder.h"
 
 namespace swift {
+
+class DifferentiableActivityInfo;
 
 namespace autodiff {
 
@@ -208,6 +203,10 @@ SILValue emitProjectTopLevelSubcontext(
 //===----------------------------------------------------------------------===//
 // Utilities for looking up derivatives of functions
 //===----------------------------------------------------------------------===//
+
+/// Returns the AbstractFunctionDecl corresponding to `F`. If there isn't one,
+/// returns `nullptr`.
+AbstractFunctionDecl *findAbstractFunctionDecl(SILFunction *F);
 
 /// Returns a differentiability witness (definition or declaration) exactly
 /// matching the specified indices. If none are found in the given `module`,
