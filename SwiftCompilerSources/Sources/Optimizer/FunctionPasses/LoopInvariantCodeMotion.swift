@@ -67,22 +67,6 @@ private struct MovableInstructions {
 private struct AnalyzedInstructions {
   /// Side effects of the loop.
   var loopSideEffects: StackWithCount<Instruction>
-  
-  private var blockSideEffectBottomMarker: StackWithCount<Instruction>.Marker
-  
-  /// Side effects of the currently analyzed block.
-  var sideEffectsOfCurrentBlock: StackWithCount<Instruction>.Segment {
-    return StackWithCount<Instruction>.Segment(
-      in: loopSideEffects,
-      low: blockSideEffectBottomMarker,
-      high: loopSideEffects.top
-    )
-  }
-  
-  /// Contains either:
-  /// * an apply to the addressor of the global
-  /// * a builtin "once" of the global initializer
-  var globalInitCalls: Stack<Instruction>
   var loads: Stack<LoadInst>
   var stores: Stack<StoreInst>
   var scopedInsts: Stack<UnaryInstruction>
@@ -95,9 +79,6 @@ private struct AnalyzedInstructions {
   
   init (in loop: Loop, _ context: FunctionPassContext) {
     self.loopSideEffects = StackWithCount<Instruction>(context)
-    self.blockSideEffectBottomMarker = loopSideEffects.top
-    
-    self.globalInitCalls = Stack<Instruction>(context)
     self.loads = Stack<LoadInst>(context)
     self.stores = Stack<StoreInst>(context)
     self.scopedInsts = Stack<UnaryInstruction>(context)
@@ -105,17 +86,11 @@ private struct AnalyzedInstructions {
   }
   
   mutating func deinitialize() {
-    globalInitCalls.deinitialize()
     loopSideEffects.deinitialize()
     loads.deinitialize()
     stores.deinitialize()
     scopedInsts.deinitialize()
     dominatingBlocks.deinitialize()
-  }
-  
-  /// Mark the start of currently processed block side effects.
-  mutating func markBeginOfBlock() {
-    blockSideEffectBottomMarker = loopSideEffects.top
   }
 }
 
@@ -129,8 +104,6 @@ private func analyzeLoopAndSplitLoads(loop: Loop, _ context: FunctionPassContext
   defer { analyzedInstructions.deinitialize() }
 
   analyzeInstructions(in: loop, &analyzedInstructions, context)
-
-  collectHoistableGlobalInitCalls(in: loop, analyzedInstructions, &movableInstructions, context)
 
   collectProjectableAccessPathsAndSplitLoads(in: loop, &analyzedInstructions, &movableInstructions, context)
 
@@ -149,72 +122,25 @@ private func analyzeInstructions(
   _ context: FunctionPassContext
 ) {
   for bb in loop.loopBlocks {
-    analyzedInstructions.markBeginOfBlock()
-    
     for inst in bb.instructions {
       switch inst {
       case is FixLifetimeInst:
         continue // We can ignore the side effects of FixLifetimes
       case let loadInst as LoadInst:
         analyzedInstructions.loads.append(loadInst)
-        continue // Don't set `hasOtherMemReadingInsts` in `analyzeSideEffects`
+        continue // Don't set `hasOtherMemReadingInsts`
       case let storeInst as StoreInst:
         analyzedInstructions.stores.append(storeInst)
       case let beginAccessInst as BeginAccessInst:
         analyzedInstructions.scopedInsts.append(beginAccessInst)
-      case let fullApply as FullApplySite:
-        if let callee = fullApply.referencedFunction,
-           callee.isGlobalInitFunction,
-           // Calls to global inits are different because we don't care about side effects which are "after"
-           // the call in the loop.
-           // Check against side-effects within the same block. Side-effects in other blocks are checked
-           // later (after we scanned all blocks of the loop) in `collectHoistableGlobalInitCalls`.
-           !fullApply.globalInitMayConflictWith(
-              blockSideEffectSegment: analyzedInstructions.sideEffectsOfCurrentBlock,
-              context.aliasAnalysis)
-        {
-          analyzedInstructions.globalInitCalls.append(fullApply)
-        }
-      case let builtinInst as BuiltinInst:
-        switch builtinInst.id {
-        case .Once, .OnceWithContext:
-          if !builtinInst.globalInitMayConflictWith(
-            blockSideEffectSegment: analyzedInstructions.sideEffectsOfCurrentBlock,
-            context.aliasAnalysis
-          ) {
-            analyzedInstructions.globalInitCalls.append(builtinInst)
-          }
-        default:
-          break
-        }
       default:
         break
       }
-      analyzedInstructions.analyzeSideEffects(ofInst: inst)
-    }
-  }
-}
-
-/// Process collected global init calls. Moves them to `hoistUp` if they don't conflict with any side effects.
-private func collectHoistableGlobalInitCalls(
-  in loop: Loop,
-  _ analyzedInstructions: AnalyzedInstructions,
-  _ movableInstructions: inout MovableInstructions,
-  _ context: FunctionPassContext
-) {
-  for globalInitCall in analyzedInstructions.globalInitCalls {
-    // Check against side effects which are "before" (i.e. post-dominated by) the global initializer call.
-    //
-    // The effects in the same block have already been checked before
-    // adding this global init call to `analyzedInstructions.globalInitCalls` in `analyzeInstructions`.
-    if globalInitCall.parentBlock.postDominates(loop.preheader!, context.postDominatorTree),
-       analyzedInstructions.dominatingBlocks.contains(globalInitCall.parentBlock),
-       !globalInitCall.globalInitMayConflictWith(
-         loopSideEffects: analyzedInstructions.loopSideEffects,
-         context.aliasAnalysis,
-         context.postDominatorTree)
-    {
-      movableInstructions.hoistUp.append(globalInitCall)
+      if inst.mayHaveSideEffects {
+        analyzedInstructions.loopSideEffects.append(inst)
+      } else if inst.mayReadFromMemory {
+        analyzedInstructions.hasOtherMemReadingInsts = true
+      }
     }
   }
 }
@@ -333,6 +259,14 @@ private func collectMovableInstructions(
             movableInstructions.hoistUp.append(fullApplySite)
           }
           readOnlyApplyCounter += 1
+        } else if let callee = fullApplySite.referencedFunction,
+                  callee.isGlobalInitFunction,
+                  !fullApplySite.globalInitMayConflictWith(analyzedInstructions.loopSideEffects, context) {
+          movableInstructions.hoistUp.append(fullApplySite)
+        }
+      case let builtin as BuiltinInst where builtin.id == .Once || builtin.id == .OnceWithContext:
+        if !builtin.globalInitMayConflictWith(analyzedInstructions.loopSideEffects, context) {
+          movableInstructions.hoistUp.append(builtin)
         }
       default:
         if inst.canBeHoisted(outOf: loop, context) {
@@ -374,15 +308,6 @@ extension BasicBlock {
 }
 
 private extension AnalyzedInstructions {
-  /// Adds side effects of `inst` to the analyzed instructions.
-  mutating func analyzeSideEffects(ofInst inst: Instruction) {
-    if inst.mayHaveSideEffects {
-      loopSideEffects.append(inst)
-    } else if inst.mayReadFromMemory {
-      hasOtherMemReadingInsts = true
-    }
-  }
-  
   /// Returns true if all instructions in `sideEffects` which may alias with
   /// this path are either loads or stores from this path.
   ///
@@ -981,37 +906,20 @@ private extension Instruction {
     }
   }
   
-  /// Returns `true` if any of the instructions in `sideEffects` cannot be
-  /// reordered with a call to this global initializer (which is in the same basic
-  /// block).
-  func globalInitMayConflictWith(
-    blockSideEffectSegment: StackWithCount<Instruction>.Segment,
-    _ aliasAnalysis: AliasAnalysis
-  ) -> Bool {
-    return blockSideEffectSegment
-      .contains { sideEffect in
-        globalInitMayConflictWith(
-          sideEffect: sideEffect,
-          aliasAnalysis
-        )
-      }
-  }
-
   /// Returns `true` if any of the instructions in `loopSideEffects` which are
   /// post-dominated by a call to this global initializer cannot be reordered with
   /// the call.
   func globalInitMayConflictWith(
-    loopSideEffects: StackWithCount<Instruction>,
-    _ aliasAnalysis: AliasAnalysis,
-    _ postDomTree: PostDominatorTree
+    _ loopSideEffects: StackWithCount<Instruction>,
+    _ context: FunctionPassContext
   ) -> Bool {
+    let aliasAnalysis = context.aliasAnalysis
+    let postDominatorTree = context.postDominatorTree
     return loopSideEffects
       .contains { sideEffect in
         // Only check instructions in blocks which are "before" (i.e. post-dominated
         // by) the block which contains the init-call.
-        // Instructions which are before the call in the same block have already
-        // been checked.
-        parentBlock.strictlyPostDominates(sideEffect.parentBlock, postDomTree) &&
+        self.strictlyPostDominates(sideEffect, postDominatorTree) &&
         globalInitMayConflictWith(sideEffect: sideEffect, aliasAnalysis)
       }
   }
