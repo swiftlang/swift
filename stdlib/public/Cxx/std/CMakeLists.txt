@@ -2,7 +2,8 @@
 # API Notes for the C++ Standard Library
 #
 
-# Keep this list in sync with Runtimes/Overlay/Cxx/std/CMakeLists.txt
+# Keep this list in sync with the files installed in
+# Runtimes/Overlay/Cxx/std/CMakeLists.txt.
 set(apinotes
   std.apinotes
   std_span.apinotes
