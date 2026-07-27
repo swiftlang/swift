@@ -3784,11 +3784,6 @@ void constraints::simplifyLocator(ASTNode &anchor,
       break;
     }
 
-    case ConstraintLocator::ResultBuilderBodyResult: {
-      path = path.slice(1);
-      break;
-    }
-
     case ConstraintLocator::UnresolvedMemberChainResult: {
       auto *resultExpr = castToExpr<UnresolvedMemberChainResultExpr>(anchor);
       anchor = resultExpr->getSubExpr();
