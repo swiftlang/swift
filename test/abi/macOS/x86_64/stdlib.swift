@@ -1190,7 +1190,7 @@ Added: _$s7Failures8IterablePTl
 Added: _$sSTss8IterableRzrlE19underestimatedCountSivpMV
 Added: _$sSTss8IterableRzrlE21makeBorrowingIterators0cD7AdapterVy0D0STQzGyF
 Added: _$sSlss8IterableRzrlE19underestimatedCountSivpMV
-Added: _$ss10OutputSpanVyxGs8IterablesMc
+Added: _$ss10OutputSpanVyxGs8IterablesRi_zrlMc
 Added: _$ss11InlineArrayVyxq_Gs8IterablesRi__rlMc
 Added: _$ss11InlineArrayVsRi__rlE19underestimatedCountSivpMV
 Added: _$ss11MutableSpanVyxGs8IterablesRi_zrlMc
