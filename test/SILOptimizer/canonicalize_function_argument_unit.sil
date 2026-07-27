@@ -13,6 +13,10 @@ class C {}
 struct NC : ~Copyable {
   var c: C
 }
+struct NCD : ~Copyable {
+  var c: C
+  deinit
+}
 
 // CHECK-LABEL: begin running test {{.*}} on consume_move_only
 // CHECK-LABEL: sil [ossa] @consume_move_only : {{.*}} {
@@ -74,6 +78,31 @@ bb0(%c : @guaranteed $C):
   %copy2 = copy_value %c
   %nc2 = struct $NC (%copy2)
   apply undef(%nc2) : $@convention(thin) (@owned NC) -> ()
+  %retval = tuple ()
+  return %retval
+}
+
+// A move-only value with a user-defined deinit must not be converted to a
+// guaranteed value: that would drop the call to its deinitializer. Even though
+// the value is only borrowed, the copy is necessary.
+//
+// CHECK-LABEL: begin running test {{.*}} on borrow_move_only_deinit
+// CHECK-LABEL: sil [ossa] @borrow_move_only_deinit : {{.*}} {
+// CHECK:       bb0([[C:%[^,]+]] :
+//                Necessary copy!
+// CHECK:         [[COPY:%[^,]+]] = copy_value [[C]]
+// CHECK:         [[NCD:%[^,]+]] = struct $NCD ([[COPY]]
+// CHECK:         apply undef([[NCD]])
+// CHECK:         destroy_value [[NCD]]
+// CHECK-LABEL: } // end sil function 'borrow_move_only_deinit'
+// CHECK-LABEL: end running test {{.*}} on borrow_move_only_deinit
+sil [ossa] @borrow_move_only_deinit : $@convention(thin) (@guaranteed C) -> () {
+bb0(%c : @guaranteed $C):
+  specify_test "canonicalize_function_argument @argument"
+  %copy = copy_value %c
+  %ncd = struct $NCD (%copy)
+  apply undef(%ncd) : $@convention(thin) (@guaranteed NCD) -> ()
+  destroy_value %ncd
   %retval = tuple ()
   return %retval
 }
