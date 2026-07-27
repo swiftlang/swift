@@ -5767,6 +5767,14 @@ public:
   SILValue getOperand() const { return getAllOperands()[0].get(); }
   void setOperand(SILValue V) { getAllOperands()[0].set(V); }
 
+  /// Returns the single operand, asserting that there is exactly one.
+  /// Should only be used in contexts where it is known that there is no
+  /// debug reconstruction block.
+  SILValue getSingleOperand() const {
+    ASSERT(getAllOperands().size() == 1);
+    return getAllOperands()[0].get();
+  }
+
   ArrayRef<Operand> getTypeDependentOperands() const { return {}; }
   MutableArrayRef<Operand> getTypeDependentOperands() { return {}; }
 
@@ -5886,7 +5894,7 @@ public:
   /// an address type (when moved to the stack, for example).
   /// If a reconstruction block exists, a load is added at the beginning.
   /// Otherwise, it will be prepended to the DIExpr.
-  void prependDeref();
+  void prependDeref(unsigned operandIdx = 0);
 
   /// Removes a deref operator to this debug_value in place.
   /// This must be called when the operand is changed from an address type to
@@ -5895,7 +5903,7 @@ public:
   /// If a reconstruction block exists, a load is removed at the beginning. If
   /// there is no load at the beginning, the operand is killed, marking the
   /// variable as optimized away.
-  void stripDeref();
+  void stripDeref(unsigned operandIdx = 0);
 
   /// Validates the type chain of the DIExpr.
   /// Starting from VarType, narrows through fragments (outermost first)
@@ -5939,7 +5947,7 @@ public:
   /// reconstruction block.
   /// If \p varType is specified, the undef will use that type (in the
   /// appropriate address/object form) instead of the current operand's type.
-  void killOperand(SILType operandType = SILType());
+  void killOperand(unsigned operandIdx = 0, SILType operandType = SILType());
 
   bool hasTrace() const { return sharedUInt8().DebugValueInst.trace; }
 

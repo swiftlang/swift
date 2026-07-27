@@ -2109,7 +2109,7 @@ void BridgedInstruction::DebugValue_prependDeref() const {
   getAs<swift::DebugValueInst>()->prependDeref();
 }
 void BridgedInstruction::DebugValue_killOperand(BridgedType operandType) const {
-  getAs<swift::DebugValueInst>()->killOperand(operandType.unbridged());
+  getAs<swift::DebugValueInst>()->killOperand(0, operandType.unbridged());
 }
 
 bool BridgedInstruction::AllocStack_hasVarInfo() const {
