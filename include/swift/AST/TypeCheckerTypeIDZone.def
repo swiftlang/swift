@@ -83,7 +83,7 @@ SWIFT_REQUEST(TypeChecker, DifferentiableAttributeTypeCheckRequest,
               IndexSubset *(DifferentiableAttr *),
               SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, DerivativeAttrOriginalDeclRequest,
-              AbstractFunctionDecl *(DerivativeAttr *),
+              llvm::TinyPtrVector<AbstractFunctionDecl *>(DerivativeAttr *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, TypeEraserHasViableInitRequest,
               bool(TypeEraserAttr *, ProtocolDecl *),
@@ -112,6 +112,8 @@ SWIFT_REQUEST(TypeChecker, ExtendedTypeRequest, Type(ExtensionDecl *), Cached,
 SWIFT_REQUEST(TypeChecker, ResultBuilderTypeRequest, Type(ValueDecl *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, IsActorRequest, bool(NominalTypeDecl *),
+              Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, IsCOMObjectRequest, bool(ClassDecl *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, IsDefaultActorRequest,
               bool(ClassDecl *, ModuleDecl *, ResilienceExpansion),

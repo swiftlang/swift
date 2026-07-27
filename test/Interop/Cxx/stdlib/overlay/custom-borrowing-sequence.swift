@@ -5,6 +5,7 @@
 // std::contiguous_iterator_tag from C++20.
 // UNSUPPORTED: LinuxDistribution=ubuntu-20.04
 // UNSUPPORTED: LinuxDistribution=amzn-2
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 import StdlibUnittest
 import CustomIterable

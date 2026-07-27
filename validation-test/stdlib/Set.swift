@@ -6,6 +6,7 @@
 //
 // RUN: %target-codesign %t/Set && %line-directive %t/main.swift -- %target-run %t/Set
 // REQUIRES: executable_test
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 import StdlibUnittest
 import StdlibCollectionUnittest

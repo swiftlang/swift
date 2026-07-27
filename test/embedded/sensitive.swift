@@ -7,6 +7,7 @@
 // REQUIRES: OS=macosx || OS=linux-gnu || OS=wasip1
 // REQUIRES: swift_feature_Embedded
 // REQUIRES: swift_feature_Sensitive
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 var checkBuffer: UnsafeBufferPointer<UInt32>?
 

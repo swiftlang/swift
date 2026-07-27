@@ -343,6 +343,15 @@ namespace swift {
     };
     std::optional<COMInteropModel> COMModel = std::nullopt;
 
+    /// Return the compiler-owned conditional-compilation identifier for the
+    /// selected COM interop model, or an empty string when COM interop is
+    /// disabled.
+    StringRef getCOMInteropModelConditionalCompilationFlag() const;
+
+    /// Whether \p Name is reserved for a COM interop model's
+    /// conditional-compilation identifier.
+    static bool isCOMInteropModelConditionalCompilationFlag(StringRef Name);
+
     /// Enable C++ interop code generation and build configuration
     /// options. Disabled by default because there is no way to control the
     /// language mode of clang on a per-header or even per-module basis. Also
@@ -1043,9 +1052,13 @@ namespace swift {
     /// debugging
     unsigned ShuffleDisjunctionChoicesSeed = 0;
 
-    /// If true, we will crash if the constraint solver found a valid solution
-    /// in diagnostic mode.
-    bool CrashOnValidSalvage = false;
+    /// If true, we will emit a fallback diagnostic if the constraint solver
+    /// finds a valid solution in diagnostic mode.
+    bool DiagnoseValidSalvage = false;
+
+    /// If true, trigger an assertion failure whenever we emit the fallback
+    /// diagnostic.
+    bool CrashFailDiagnostic = false;
 
     /// Triggers llvm fatal error if the typechecker tries to typecheck a decl
     /// or an identifier reference with any of the provided prefix names. This

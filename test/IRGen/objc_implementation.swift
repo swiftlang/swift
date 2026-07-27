@@ -257,7 +257,7 @@ public func fn(impl: ImplClass, swiftSub: SwiftSubclass) {
 // CHECK-LABEL: define internal swifttailcc void @"$sSo9ImplClassC19objc_implementationE11asyncMethodyyYaFyyYacfU_ToTQ0_"
 
 // Make sure this function incorporates a nil check
-// CHECK: [[IS_COMPLETION_NULL:%[0-9]+]] = icmp eq i64 {{%\.reload[0-9+]}}, 0
+// CHECK: [[IS_COMPLETION_NULL:%[0-9]+]] = icmp eq ptr {{%\.reload[0-9]*}}, null
 // CHECK: br i1 [[IS_COMPLETION_NULL]], label %[[FINISH:[^,]+]], label %[[RUN_COMPLETION:[^,]+]]
 // CHECK: [[RUN_COMPLETION]]:
 

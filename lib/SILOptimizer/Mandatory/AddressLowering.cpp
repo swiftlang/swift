@@ -850,7 +850,8 @@ void OpaqueValueVisitor::checkForIndirectApply(ApplySite applySite) {
   }
 
   if (applySite.getSubstCalleeType()->hasIndirectFormalResults() ||
-      applySite.getSubstCalleeType()->hasIndirectFormalYields()) {
+      applySite.getSubstCalleeType()->hasIndirectFormalYields() ||
+      applySite.getSubstCalleeType()->hasIndirectErrorResult()) {
     pass.indirectApplies.insert(applySite);
   }
 }
@@ -3311,8 +3312,12 @@ void ReturnRewriter::rewriteThrow(ThrowInst *throwInst) {
   auto idx = pass.loweredFnConv.getArgumentIndexOfIndirectErrorResult();
   SILArgument *errorResultAddr = pass.function->getArgument(idx.value());
 
-  auto throwBuilder = pass.getBuilder(beforeStorageDeallocs(throwInst));
-  rewriteElement(throwInst->getOperand(), errorResultAddr, throwBuilder);
+  // Copy the error into the indirect error result argument.
+  auto elementBuilder = pass.getBuilder(beforeStorageDeallocs(throwInst));
+  rewriteElement(throwInst->getOperand(), errorResultAddr, elementBuilder);
+
+  // A throw_addr replaces the direct throw.
+  auto throwBuilder = pass.getBuilder(throwInst->getIterator());
   throwBuilder.createThrowAddr(throwInst->getLoc());
   pass.deleter.forceDelete(throwInst);
 }

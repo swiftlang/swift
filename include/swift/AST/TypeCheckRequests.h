@@ -1257,6 +1257,25 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Determine whether a class participates in the COM object model, i.e. it
+/// conforms to a protocol marked \c \@com.
+class IsCOMObjectRequest :
+    public SimpleRequest<IsCOMObjectRequest,
+                         bool(ClassDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  bool evaluate(Evaluator &evaluator, ClassDecl *classDecl) const;
+
+public:
+  // Caching
+  bool isCached() const { return true; }
+};
+
 /// Determine whether the given class is a default actor.
 class IsDefaultActorRequest :
     public SimpleRequest<IsDefaultActorRequest,
@@ -3640,7 +3659,8 @@ public:
 /// Resolves the referenced original declaration for a `@derivative` attribute.
 class DerivativeAttrOriginalDeclRequest
     : public SimpleRequest<DerivativeAttrOriginalDeclRequest,
-                           AbstractFunctionDecl *(DerivativeAttr *),
+                           TinyPtrVector<AbstractFunctionDecl *>(
+                               DerivativeAttr *),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -3649,8 +3669,8 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  AbstractFunctionDecl *evaluate(Evaluator &evaluator,
-                                 DerivativeAttr *attr) const;
+  TinyPtrVector<AbstractFunctionDecl *> evaluate(Evaluator &evaluator,
+                                                 DerivativeAttr *attr) const;
 
 public:
   // Caching.

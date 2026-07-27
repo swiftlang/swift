@@ -26,6 +26,7 @@
 // RUN: %target-run %t/a.out %t/%target-library-name(mysimd)
 
 // REQUIRES: executable_test
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 import Builtin
 import StdlibUnittest

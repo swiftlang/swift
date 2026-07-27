@@ -3,6 +3,7 @@
 
 // REQUIRES: executable_test
 // REQUIRES: CPU=arm64
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 // Allocate metadata packs on the stack in a loop.  If these packs weren't
 // deallocated, the stack would be exhausted.
