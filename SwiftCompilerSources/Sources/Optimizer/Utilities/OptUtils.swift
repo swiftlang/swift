@@ -594,22 +594,6 @@ extension Instruction {
     }
   }
 
-  /// Returns true if `otherInst` is in the same block and is strictly dominated by this instruction or
-  /// the parent block of the instruction dominates parent block of `otherInst`.
-  func dominates(
-    _ otherInst: Instruction,
-    _ domTree: DominatorTree
-  ) -> Bool {
-    if parentBlock == otherInst.parentBlock {
-      return dominatesInBlock(otherInst)
-    } else {
-      return parentBlock.dominates(
-        otherInst.parentBlock,
-        domTree
-      )
-    }
-  }
-
   /// If this instruction uses a (single) existential archetype, i.e. it has a type-dependent operand,
   /// returns the concrete type if it is known.
   var concreteTypeOfDependentExistentialArchetype: CanonicalType? {
