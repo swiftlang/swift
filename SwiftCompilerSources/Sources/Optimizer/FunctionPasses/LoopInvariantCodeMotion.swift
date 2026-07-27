@@ -368,14 +368,7 @@ private func optimizeLoop(
 extension BasicBlock {
   func containsStoresTo(accessPath: AccessPath) -> Bool {
     return instructions.contains { inst in
-      return inst.operands.contains { operand in
-        if let storeInst = operand.instruction as? StoreInst,
-           storeInst.destination.accessPath == accessPath {
-          return true
-        } else {
-          return false
-        }
-      }
+      (inst as? StoreInst)?.destination.accessPath == accessPath
     }
   }
 }
@@ -400,7 +393,7 @@ private extension AnalyzedInstructions {
     storeAddr: Value,
     _ aliasAnalysis: AliasAnalysis
   ) -> Bool {
-    if (loopSideEffects.contains { sideEffect in
+    if loopSideEffects.contains(where: { sideEffect in
       switch sideEffect {
       case let storeInst as StoreInst:
         if storeInst.storesTo(accessPath) {
@@ -412,20 +405,20 @@ private extension AnalyzedInstructions {
         }
       default: break
       }
-      
+
       // Pass the original address value until we can fix alias analysis.
       return sideEffect.mayReadOrWrite(address: storeAddr, aliasAnalysis)
     }) {
       return false
     }
-        
-    if (loads.contains { loadInst in
+
+    if loads.contains(where: { loadInst in
       loadInst.mayRead(fromAddress: storeAddr, aliasAnalysis) && !loadInst.overlaps(accessPath: accessPath)
     }) {
       return false
     }
-          
-    if (stores.contains { storeInst in
+
+    if stores.contains(where: { storeInst in
       storeInst.mayWrite(toAddress: storeAddr, aliasAnalysis) && !storeInst.storesTo(accessPath)
     }) {
       return false
@@ -502,7 +495,7 @@ private extension AnalyzedInstructions {
       }
       
       if exitingBlocksSet.contains(block),
-         block.successors.filter({ $0.terminator is UnreachableInst }).count != block.successors.count {
+         !block.successors.allSatisfy({ $0.terminator is UnreachableInst }) {
         return false
       }
       
@@ -729,7 +722,9 @@ private extension MovableInstructions {
       }
     }
 
-    let phiOwnership: Ownership = firstStore.parentFunction.hasOwnership ? (firstStore.source.type.isTrivial(in: firstStore.parentFunction) ? .none : .owned) : .none
+    let function = firstStore.parentFunction
+    let phiOwnership: Ownership =
+      function.hasOwnership && !firstStore.source.type.isTrivial(in: function) ? .owned : .none
 
     var ssaUpdater = SSAUpdater(
       type: firstStore.destination.type.objectType,
@@ -765,7 +760,14 @@ private extension MovableInstructions {
       return false
     }
 
-    let ownership: LoadInst.LoadOwnership = firstStore.parentFunction.hasOwnership ? (initialAddr.type.isTrivial(in: firstStore.parentFunction) ? .trivial : .take) : .unqualified
+    let ownership: LoadInst.LoadOwnership
+    if !function.hasOwnership {
+      ownership = .unqualified
+    } else if initialAddr.type.isTrivial(in: function) {
+      ownership = .trivial
+    } else {
+      ownership = .take
+    }
 
     let initialLoad = builder.createLoad(fromAddress: initialAddr, ownership: ownership)
     ssaUpdater.addAvailableValue(initialLoad, in: loop.preheader!)
