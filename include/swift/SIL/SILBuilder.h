@@ -2019,7 +2019,7 @@ public:
                       ValueOwnershipKind forwardingOwnershipKind) {
     return insert(new (getModule()) StructExtractInst(
         getSILDebugLocation(Loc), Operand, Field, ResultTy,
-        Operand->getOwnershipKind()));
+        forwardingOwnershipKind));
   }
 
   StructElementAddrInst *createStructElementAddr(SILLocation Loc,
