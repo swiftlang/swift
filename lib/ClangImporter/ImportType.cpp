@@ -2324,6 +2324,171 @@ applyImportTypeAttrs(ImportTypeAttrs attrs, Type type,
   return type;
 }
 
+/// Try to build a Swift protocol composition existential type for a C++
+/// composition wrapper (e.g., AnyDrawableAndResizable) that was round-tripped
+/// through C++. Returns nullopt if the record is not a composition wrapper.
+static std::optional<Type>
+tryBuildCompositionExistentialType(const clang::CXXRecordDecl *recordDecl,
+                                   ClangImporter::Implementation &impl) {
+  auto *essAttr = recordDecl->getAttr<clang::ExternalSourceSymbolAttr>();
+  if (!essAttr || essAttr->getLanguage() != "Swift" ||
+      essAttr->getUSR() != "composition")
+    return std::nullopt;
+
+  auto *mod = impl.SwiftContext.getModuleByName(essAttr->getDefinedIn());
+  if (!mod)
+    return std::nullopt;
+
+  if (recordDecl->getNumBases() != 1)
+    return std::nullopt;
+  auto baseTy = recordDecl->bases_begin()->getType();
+  auto *baseDecl = dyn_cast_or_null<clang::ClassTemplateSpecializationDecl>(
+      baseTy->getAsCXXRecordDecl());
+  if (!baseDecl)
+    return std::nullopt;
+
+  SmallVector<Type, 4> memberTypes;
+  const auto &args = baseDecl->getTemplateArgs();
+  for (unsigned i = 0; i < args.size(); ++i) {
+    if (args[i].getKind() != clang::TemplateArgument::Type)
+      continue;
+    auto *tagDecl = args[i].getAsType()->getAsCXXRecordDecl();
+    if (!tagDecl)
+      continue;
+    StringRef tagName = tagDecl->getName();
+    if (!tagName.ends_with("Tag"))
+      continue;
+    StringRef protoName = tagName.drop_back(3);
+    SmallVector<ValueDecl *, 1> results;
+    mod->lookupValue(impl.SwiftContext.getIdentifier(protoName),
+                     NLKind::UnqualifiedLookup, results);
+    if (results.size() != 1)
+      return std::nullopt;
+    auto *pd = dyn_cast<ProtocolDecl>(results[0]);
+    if (!pd)
+      return std::nullopt;
+    memberTypes.push_back(pd->getDeclaredInterfaceType());
+  }
+
+  if (memberTypes.size() < 2)
+    return std::nullopt;
+
+  auto compositionType = ProtocolCompositionType::get(
+      impl.SwiftContext, memberTypes, InvertibleProtocolSet(),
+      /*HasExplicitAnyObject=*/false);
+  auto existentialType = ExistentialType::get(compositionType);
+
+  auto clangRecordType =
+      recordDecl->getASTContext().getRecordType(recordDecl);
+  impl.SwiftContext.registerClangTypeForIRGen(existentialType, clangRecordType);
+
+  return existentialType;
+}
+
+/// Build the Swift existential type for a protocol that was round-tripped
+/// through C++. If the Clang record is a template specialization (i.e., a PAT
+/// protocol wrapper like Container<swift::Int>), extract the template args,
+/// import them as Swift types, and construct a ParameterizedProtocolType.
+static Type
+buildExistentialTypeForProtocol(ProtocolDecl *pd,
+                                const clang::CXXRecordDecl *recordDecl,
+                                ClangImporter::Implementation &impl) {
+  auto registerAndReturn = [&](Type result) -> Type {
+    auto clangRecordType =
+        recordDecl->getASTContext().getRecordType(recordDecl);
+    impl.SwiftContext.registerClangTypeForIRGen(result, clangRecordType);
+    return result;
+  };
+
+  auto pats = pd->getPrimaryAssociatedTypes();
+  if (pats.empty())
+    return registerAndReturn(
+        ExistentialType::get(pd->getDeclaredInterfaceType()));
+
+  auto specDecl =
+      dyn_cast<clang::ClassTemplateSpecializationDecl>(recordDecl);
+  if (!specDecl)
+    return registerAndReturn(
+        ExistentialType::get(pd->getDeclaredInterfaceType()));
+
+  auto *templateDecl = specDecl->getSpecializedTemplate();
+  auto *templateParams = templateDecl->getTemplateParameters();
+  const auto &templateArgs = specDecl->getTemplateArgs();
+
+  // Check if all template args are defaults (e.g., Container<swift::Any>).
+  bool allDefaults = true;
+  for (unsigned i = 0, e = templateArgs.size(); i < e && i < templateParams->size(); ++i) {
+    auto *param = templateParams->getParam(i);
+    auto *typeParam = dyn_cast<clang::TemplateTypeParmDecl>(param);
+    if (!typeParam || !typeParam->hasDefaultArgument()) {
+      allDefaults = false;
+      break;
+    }
+    auto defaultType = typeParam->getDefaultArgument()
+                           .getArgument()
+                           .getAsType()
+                           .getCanonicalType();
+    if (templateArgs[i].getKind() != clang::TemplateArgument::Type) {
+      allDefaults = false;
+      break;
+    }
+    auto argType = templateArgs[i].getAsType().getCanonicalType();
+    if (defaultType != argType) {
+      allDefaults = false;
+      break;
+    }
+  }
+  if (allDefaults)
+    return registerAndReturn(
+        ExistentialType::get(pd->getDeclaredInterfaceType()));
+
+  // Import each template arg as a Swift type, matching positionally to PATs.
+  SmallVector<Type, 2> swiftArgs;
+  for (unsigned i = 0, e = std::min((unsigned)pats.size(),
+                                    templateArgs.size()); i < e; ++i) {
+    auto arg = templateArgs[i];
+    if (arg.getKind() != clang::TemplateArgument::Type)
+      return registerAndReturn(
+          ExistentialType::get(pd->getDeclaredInterfaceType()));
+
+    auto clangArgType = arg.getAsType();
+
+    // Try round-trip import first (the arg may be another existential wrapper).
+    if (auto argRecordDecl = clangArgType->getAsCXXRecordDecl()) {
+      if (auto *vd = evaluateOrDefault(
+              impl.SwiftContext.evaluator,
+              CxxRecordAsSwiftType({argRecordDecl, impl.SwiftContext}),
+              nullptr)) {
+        if (auto *argPD = dyn_cast<ProtocolDecl>(vd)) {
+          swiftArgs.push_back(
+              buildExistentialTypeForProtocol(argPD, argRecordDecl, impl));
+          continue;
+        }
+        if (auto *argCD = dyn_cast<ClassDecl>(vd)) {
+          swiftArgs.push_back(ClassType::get(argCD, Type(), impl.SwiftContext));
+          continue;
+        }
+      }
+    }
+
+    // Fall back to normal type import.
+    auto imported = impl.importType(
+        clangArgType, ImportTypeKind::Value,
+        ImportDiagnosticAdder(impl, nullptr, clang::SourceLocation()),
+        /*allowNSUIntegerAsInt=*/false, Bridgeability::None, ImportTypeAttrs());
+    if (!imported)
+      return registerAndReturn(
+          ExistentialType::get(pd->getDeclaredInterfaceType()));
+
+    swiftArgs.push_back(imported.getType());
+  }
+
+  auto *protoType = pd->getDeclaredInterfaceType()->castTo<ProtocolType>();
+  auto paramProtoType =
+      ParameterizedProtocolType::get(impl.SwiftContext, protoType, swiftArgs);
+  return registerAndReturn(ExistentialType::get(paramProtoType));
+}
+
 ImportedType ClangImporter::Implementation::importFunctionReturnType(
     DeclContext *dc, const clang::FunctionDecl *clangDecl,
     bool allowNSUIntegerAsInt) {
@@ -2422,15 +2587,22 @@ ImportedType ClangImporter::Implementation::importFunctionReturnType(
 
   // Import the underlying result type.
   if (clangDecl) {
-    if (auto recordType = returnType->getAsCXXRecordDecl()) {
+    if (auto recordDecl = returnType->getAsCXXRecordDecl()) {
       if (auto *vd = evaluateOrDefault(
               SwiftContext.evaluator,
-              CxxRecordAsSwiftType({recordType, SwiftContext}), nullptr)) {
+              CxxRecordAsSwiftType({recordDecl, SwiftContext}), nullptr)) {
         if (auto *cd = dyn_cast<ClassDecl>(vd)) {
           Type t = ClassType::get(cd, Type(), SwiftContext);
           return ImportedType(t, /*implicitlyUnwraps=*/false);
         }
+        if (auto *pd = dyn_cast<ProtocolDecl>(vd)) {
+          Type t = buildExistentialTypeForProtocol(pd, recordDecl, *this);
+          return ImportedType(t, /*implicitlyUnwraps=*/false);
+        }
       }
+      if (auto compType =
+              tryBuildCompositionExistentialType(recordDecl, *this))
+        return ImportedType(*compType, /*implicitlyUnwraps=*/false);
     }
   }
 
@@ -2485,6 +2657,27 @@ ImportedType ClangImporter::Implementation::importFunctionParamsAndReturnType(
   returnType = desugarIfBoundsAttributed(returnType);
 
   ImportedType importedType = importer::findOptionSetEnum(returnType, *this);
+
+  // Check if the return type is a Swift type round-tripped through C++.
+  if (!importedType) {
+    if (auto recordDecl = returnType->getAsCXXRecordDecl()) {
+      if (auto *vd = evaluateOrDefault(
+              SwiftContext.evaluator,
+              CxxRecordAsSwiftType({recordDecl, SwiftContext}), nullptr)) {
+        if (auto *cd = dyn_cast<ClassDecl>(vd)) {
+          importedType = {ClassType::get(cd, Type(), SwiftContext), false};
+        } else if (auto *pd = dyn_cast<ProtocolDecl>(vd)) {
+          importedType = {buildExistentialTypeForProtocol(pd, recordDecl, *this),
+                          false};
+        }
+      }
+      if (!importedType) {
+        if (auto compType =
+                tryBuildCompositionExistentialType(recordDecl, *this))
+          importedType = {*compType, false};
+      }
+    }
+  }
 
   if (auto templateType =
           dyn_cast<clang::TemplateTypeParmType>(returnType)) {
@@ -2706,7 +2899,14 @@ ClangImporter::Implementation::importParameterType(
         if (auto *cd = dyn_cast<ClassDecl>(vd)) {
 
           swiftParamTy = ClassType::get(cd, Type(), SwiftContext);
+        } else if (auto *pd = dyn_cast<ProtocolDecl>(vd)) {
+          swiftParamTy = buildExistentialTypeForProtocol(pd, recordType, *this);
         }
+      }
+      if (!swiftParamTy) {
+        if (auto compType =
+                tryBuildCompositionExistentialType(recordType, *this))
+          swiftParamTy = *compType;
       }
     }
   }

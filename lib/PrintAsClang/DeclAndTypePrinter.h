@@ -86,6 +86,9 @@ private:
   OutputLanguageMode outputLang;
   llvm::DenseMap<Type, std::optional<ClangRepresentation>> typeRepresentations;
 
+  /// Names of ad-hoc protocol composition wrappers that have been emitted.
+  llvm::StringSet<> emittedCompositions;
+
   /// The name 'CFTypeRef'.
   ///
   /// Cached for convenience.
@@ -133,6 +136,11 @@ public:
   /// Returns true if \p VD should be included in a compatibility header for
   /// the options the printer was constructed with.
   bool shouldInclude(const ValueDecl *VD);
+
+  /// Ensures a composition wrapper class has been emitted for the given
+  /// protocol set. Returns the composition name. Idempotent.
+  std::string ensureCompositionEmitted(
+      ArrayRef<const ProtocolDecl *> protocols);
 
   bool isZeroSized(const NominalTypeDecl *decl);
 

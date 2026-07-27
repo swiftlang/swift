@@ -1,11 +1,13 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -module-name Decls -verify -clang-header-expose-decls=has-expose-attr -disable-availability-checking -typecheck -verify -emit-clang-header-path %t/decls.h
+// RUN: %target-swift-frontend %s -module-name Decls -verify -clang-header-expose-decls=has-expose-attr -disable-availability-checking -typecheck -verify -emit-clang-header-path %t/decls.h -enable-experimental-feature CxxExistentialInterop
 
 // RUN: cat %s | grep -v _expose > %t/clean.swift
-// RUN: %target-swift-frontend %t/clean.swift -module-name Decls -clang-header-expose-decls=all-public -disable-availability-checking -typecheck -verify -emit-clang-header-path %t/decls.h
+// RUN: %target-swift-frontend %t/clean.swift -module-name Decls -clang-header-expose-decls=all-public -disable-availability-checking -typecheck -verify -emit-clang-header-path %t/decls.h -enable-experimental-feature CxxExistentialInterop
 // RUN: %FileCheck %s < %t/decls.h
 
 // RUN: %check-interop-cxx-header-in-clang(%t/decls.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY)
+
+// REQUIRES: swift_feature_CxxExistentialInterop
 
 public protocol Proto { init() }
 
@@ -66,7 +68,8 @@ public func makeQueryResult() -> QueryResult<UInt32> { .init(glyphIDs: []) }
 // CHECK: class SWIFT_SYMBOL("s:5Decls6Class1C") Class1 : public swift::_impl::RefCountedClass {
 // CHECK: 'index1' cannot be printed
 
-// CHECK: namespace Decls SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("Decls") {
+// CHECK: class{{.*}} Proto final : public swift::_impl::SwiftExistentialType<_impl::ProtoTag> {
+
 // CHECK: namespace Decls SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("Decls") {
 // CHECK: SWIFT_INLINE_THUNK void supportedFunc(const T_0_0& x) noexcept SWIFT_SYMBOL("s:5Decls13supportedFuncyyxlF") {
 
@@ -75,8 +78,6 @@ public func makeQueryResult() -> QueryResult<UInt32> { .init(glyphIDs: []) }
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0>
 // CHECK-NEXT: #endif // __cpp_concepts
 // CHECK-NEXT: class GlyphIndex { } SWIFT_UNAVAILABLE_MSG("generic requirements for generic struct 'GlyphIndex' can not yet be represented in C++");
-
-// CHECK: class Proto { } SWIFT_UNAVAILABLE_MSG("protocol 'Proto' can not yet be represented in C++");
 
 // CHECK: template<class T_0_0>
 // CHECK-NEXT: #ifdef __cpp_concepts

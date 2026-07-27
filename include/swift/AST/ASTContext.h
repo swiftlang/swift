@@ -906,6 +906,9 @@ public:
   /// and results.
   const clang::Type *getClangTypeForIRGen(Type ty);
 
+  /// Register a Clang type to use for IRGen when converting a Swift type.
+  void registerClangTypeForIRGen(Type swiftType, clang::QualType clangType);
+
   /// Determine whether the given Swift type is representable in a
   /// given foreign language.
   ForeignRepresentationInfo

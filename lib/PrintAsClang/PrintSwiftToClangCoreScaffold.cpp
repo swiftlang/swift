@@ -228,6 +228,245 @@ void printPrimitiveGenericTypeTraits(raw_ostream &os, ASTContext &astContext,
   }
 }
 
+static void printSwiftExistentialTypeMethodDefs(raw_ostream &os) {
+  os << "#if defined(SWIFT_CXX_EXISTENTIAL_INTEROP) && "
+        "defined(__cpp_concepts) && __cpp_concepts >= 202002L\n";
+  os << "// Out-of-line SwiftExistentialType methods.\n";
+  os << "// Needs the complete VWT declared above.\n\n";
+
+  // Template prefix for all out-of-line definitions.
+  const char *tmplPrefix = "template <typename... Tags>\n"
+    "  requires ((ProtocolTag<Tags> || MarkerTag<Tags> || InverseTag<Tags>) "
+    "&& ...)\n";
+  const char *cls = "SwiftExistentialType<Tags...>";
+
+  // _getVWT
+  os << tmplPrefix;
+  os << "SWIFT_INLINE_PRIVATE_HELPER\n";
+  os << "const ValueWitnessTable *_Nonnull\n";
+  os << cls << "::_getVWT() const noexcept {\n";
+  os << "  auto *vwTableAddr = "
+        "reinterpret_cast<ValueWitnessTable **>(_type) - 1;\n";
+  os << "#ifdef __arm64e__\n";
+  os << "  return reinterpret_cast<ValueWitnessTable *>(\n";
+  os << "      ptrauth_auth_data(\n";
+  os << "          reinterpret_cast<void *>(*vwTableAddr),\n";
+  os << "          ptrauth_key_process_independent_data,\n";
+  os << "          ptrauth_blend_discriminator(vwTableAddr, "
+     << SpecialPointerAuthDiscriminators::ValueWitnessTable << ")));\n";
+  os << "#else\n";
+  os << "  return *vwTableAddr;\n";
+  os << "#endif\n";
+  os << "}\n\n";
+
+  // _initializeWithCopy
+  os << tmplPrefix;
+  os << "SWIFT_INLINE_PRIVATE_HELPER\n";
+  os << "void\n";
+  os << cls << "::_initializeWithCopy(\n";
+  os << "    const " << cls << " &src) noexcept {\n";
+  os << "  _type = src._type;\n";
+  os << "  _getVWT()->initializeBufferWithCopyOfBuffer(\n";
+  os << "      _buffer, const_cast<void **>(src._buffer), _type);\n";
+  os << "  if constexpr (ExistentialTagTraits<Tags...>::NumWitnessTables > 0)\n";
+  os << "    for (size_t i = 0; i < ExistentialTagTraits<Tags...>::NumWitnessTables; ++i)\n";
+  os << "      this->_witnessTables[i] = src._witnessTables[i];\n";
+  os << "}\n\n";
+
+  // _initializeWithValue
+  os << tmplPrefix;
+  os << "SWIFT_INLINE_PRIVATE_HELPER\n";
+  os << "void\n";
+  os << cls << "::_initializeWithValue(\n";
+  os << "    const void *_Nonnull src) noexcept {\n";
+  os << "  auto *vwt = _getVWT();\n";
+  os << "  if (!(vwt->flags & "
+     << TargetValueWitnessFlags<uint64_t>::IsNonInline << ")) {\n";
+  os << "    vwt->initializeWithCopy(\n";
+  os << "        reinterpret_cast<char *>(_buffer),\n";
+  os << "        const_cast<char *>(\n";
+  os << "            reinterpret_cast<const char *>(src)),\n";
+  os << "        _type);\n";
+  os << "  } else {\n";
+  os << "    auto box = swift_allocBox(_type);\n";
+  os << "    _buffer[0] = box.object;\n";
+  os << "    vwt->initializeWithCopy(\n";
+  os << "        reinterpret_cast<char *>(box.buffer),\n";
+  os << "        const_cast<char *>(\n";
+  os << "            reinterpret_cast<const char *>(src)),\n";
+  os << "        _type);\n";
+  os << "  }\n";
+  os << "}\n\n";
+
+  // _projectValue
+  os << tmplPrefix;
+  os << "SWIFT_INLINE_PRIVATE_HELPER\n";
+  os << "void *_Nonnull\n";
+  os << cls << "::_projectValue() const noexcept {\n";
+  os << "  auto *vwTable = _getVWT();\n";
+  os << "  if (!(vwTable->flags & "
+     << TargetValueWitnessFlags<uint64_t>::IsNonInline << "))\n";
+  os << "    return const_cast<void **>(_buffer);\n";
+  os << "  return swift_projectBox(_buffer[0]);\n";
+  os << "}\n\n";
+
+  // _destroyValue
+  os << tmplPrefix;
+  os << "SWIFT_INLINE_PRIVATE_HELPER\n";
+  os << "void\n";
+  os << cls << "::_destroyValue() noexcept {\n";
+  os << "  auto *vwt = _getVWT();\n";
+  os << "  if (!(vwt->flags & "
+     << TargetValueWitnessFlags<uint64_t>::IsNonInline << ")) {\n";
+  os << "    vwt->destroy(reinterpret_cast<char *>(_buffer), _type);\n";
+  os << "  } else {\n";
+  os << "    vwt->destroy(\n";
+  os << "        reinterpret_cast<char *>(swift_projectBox(_buffer[0])),\n";
+  os << "        _type);\n";
+  os << "    swift_release(_buffer[0]);\n";
+  os << "  }\n";
+  os << "}\n\n";
+
+  // Copy constructor
+  os << tmplPrefix;
+  os << "SWIFT_INLINE_THUNK\n";
+  os << cls << "::" << "SwiftExistentialType(\n";
+  os << "    const " << cls << " &other) noexcept\n";
+  os << "    requires(ExistentialTagTraits<Tags...>::IsCopyable)\n";
+  os << "    : _type(other._type) {\n";
+  os << "  _getVWT()->initializeBufferWithCopyOfBuffer(\n";
+  os << "      _buffer, const_cast<void **>(other._buffer), _type);\n";
+  os << "  if constexpr (ExistentialTagTraits<Tags...>::NumWitnessTables > 0)\n";
+  os << "    for (size_t i = 0; i < ExistentialTagTraits<Tags...>::NumWitnessTables; ++i)\n";
+  os << "      this->_witnessTables[i] = other._witnessTables[i];\n";
+  os << "}\n\n";
+
+  // Move constructor. Uses copy semantics; C++ move is non-consuming.
+  os << tmplPrefix;
+  os << "SWIFT_INLINE_THUNK\n";
+  os << cls << "::" << "SwiftExistentialType(\n";
+  os << "    " << cls << " &&other) noexcept\n";
+  os << "    : _type(other._type) {\n";
+  os << "  _getVWT()->initializeBufferWithCopyOfBuffer(\n";
+  os << "      _buffer, other._buffer, _type);\n";
+  os << "  if constexpr (ExistentialTagTraits<Tags...>::NumWitnessTables > 0)\n";
+  os << "    for (size_t i = 0; i < ExistentialTagTraits<Tags...>::NumWitnessTables; ++i)\n";
+  os << "      this->_witnessTables[i] = other._witnessTables[i];\n";
+  os << "}\n\n";
+
+  // Copy assignment
+  os << tmplPrefix;
+  os << "SWIFT_INLINE_THUNK\n";
+  os << cls << " &\n";
+  os << cls << "::operator=(\n";
+  os << "    const " << cls << " &other) noexcept\n";
+  os << "    requires(ExistentialTagTraits<Tags...>::IsCopyable) {\n";
+  os << "  if (this != &other) {\n";
+  os << "    _destroyValue();\n";
+  os << "    _type = other._type;\n";
+  os << "    _getVWT()->initializeBufferWithCopyOfBuffer(\n";
+  os << "        _buffer, const_cast<void **>(other._buffer), _type);\n";
+  os << "    if constexpr (ExistentialTagTraits<Tags...>::NumWitnessTables > 0)\n";
+  os << "      for (size_t i = 0; i < ExistentialTagTraits<Tags...>::NumWitnessTables; ++i)\n";
+  os << "        this->_witnessTables[i] = other._witnessTables[i];\n";
+  os << "  }\n";
+  os << "  return *this;\n";
+  os << "}\n\n";
+
+  // Move assignment (copy semantics)
+  os << tmplPrefix;
+  os << "SWIFT_INLINE_THUNK\n";
+  os << cls << " &\n";
+  os << cls << "::operator=(\n";
+  os << "    " << cls << " &&other) noexcept {\n";
+  os << "  if (this != &other) {\n";
+  os << "    _destroyValue();\n";
+  os << "    _type = other._type;\n";
+  os << "    _getVWT()->initializeBufferWithCopyOfBuffer(\n";
+  os << "        _buffer, other._buffer, _type);\n";
+  os << "    if constexpr (ExistentialTagTraits<Tags...>::NumWitnessTables > 0)\n";
+  os << "      for (size_t i = 0; i < ExistentialTagTraits<Tags...>::NumWitnessTables; ++i)\n";
+  os << "        this->_witnessTables[i] = other._witnessTables[i];\n";
+  os << "  }\n";
+  os << "  return *this;\n";
+  os << "}\n\n";
+
+  // Destructor
+  os << tmplPrefix;
+  os << "SWIFT_INLINE_THUNK\n";
+  os << cls << "::~SwiftExistentialType() noexcept {\n";
+  os << "  _destroyValue();\n";
+  os << "}\n\n";
+
+  // Generic subset conversion (includes conversion to Any when
+  // TargetTags is empty): SwiftExistentialType<Tags...> ->
+  // SwiftExistentialType<TargetTags...> where TargetTags ⊆ Tags.
+  os << tmplPrefix;
+  os << "template <typename... TargetTags>\n";
+  os << "  requires (sizeof...(TargetTags) < sizeof...(Tags) &&\n";
+  os << "            ExistentialTagTraits<Tags...>::IsCopyable &&\n";
+  os << "            ((ProtocolTag<TargetTags> || MarkerTag<TargetTags> || "
+        "InverseTag<TargetTags>) && ...) &&\n";
+  os << "            (ContainedIn<TargetTags, Tags...> && ...))\n";
+  os << "SWIFT_INLINE_THUNK\n";
+  os << cls << "::operator SwiftExistentialType<TargetTags...>()"
+        " const noexcept {\n";
+  os << "  SwiftExistentialType<TargetTags...> result(\n";
+  os << "      typename SwiftExistentialType<TargetTags...>::uninit_t{});\n";
+  os << "  result._type = _type;\n";
+  os << "  _getVWT()->initializeBufferWithCopyOfBuffer(\n";
+  os << "      result._buffer, const_cast<void **>(_buffer), _type);\n";
+  os << "  if constexpr (SwiftExistentialType<TargetTags...>"
+        "::Traits::NumWitnessTables > 0) {\n";
+  os << "    size_t ti = 0;\n";
+  os << "    auto copyIfProtocol = [&]<typename T>() {\n";
+  os << "      if constexpr (ProtocolTag<T>)\n";
+  os << "        result._witnessTables[ti++] = "
+        "this->_witnessTables[_wtIndexOf<T, Tags...>()];\n";
+  os << "    };\n";
+  os << "    (copyIfProtocol.template operator()<TargetTags>(), ...);\n";
+  os << "  }\n";
+  os << "  return result;\n";
+  os << "}\n\n";
+
+  // SwiftClassExistentialType: generic subset conversion to opaque
+  // layout (includes conversion to Any when TargetTags is empty).
+  const char *clsTmplPrefix = "template <typename... Tags>\n"
+    "  requires ((ProtocolTag<Tags> || MarkerTag<Tags> || InverseTag<Tags>) "
+    "&& ...)\n";
+  const char *clsCls = "SwiftClassExistentialType<Tags...>";
+  os << clsTmplPrefix;
+  os << "template <typename... TargetTags>\n";
+  os << "  requires (sizeof...(TargetTags) < sizeof...(Tags) &&\n";
+  os << "            ((ProtocolTag<TargetTags> || MarkerTag<TargetTags> || "
+        "InverseTag<TargetTags>) && ...) &&\n";
+  os << "            (ContainedIn<TargetTags, Tags...> && ...))\n";
+  os << "SWIFT_INLINE_THUNK\n";
+  os << clsCls << "::operator SwiftExistentialType<TargetTags...>()"
+        " const noexcept {\n";
+  os << "  SwiftExistentialType<TargetTags...> result(\n";
+  os << "      typename SwiftExistentialType<TargetTags...>::uninit_t{});\n";
+  os << "  result._type = swift_getObjectType(\n";
+  os << "      reinterpret_cast<void *_Nonnull>(_value));\n";
+  os << "  result._buffer[0] = reinterpret_cast<void *_Nonnull>(_value);\n";
+  os << "  if (_value) swift_retain(\n";
+  os << "      reinterpret_cast<void *_Nonnull>(_value));\n";
+  os << "  if constexpr (SwiftExistentialType<TargetTags...>"
+        "::Traits::NumWitnessTables > 0) {\n";
+  os << "    size_t ti = 0;\n";
+  os << "    auto copyIfProtocol = [&]<typename T>() {\n";
+  os << "      if constexpr (ProtocolTag<T>)\n";
+  os << "        result._witnessTables[ti++] = "
+        "this->_witnessTables[_wtIndexOf<T, Tags...>()];\n";
+  os << "    };\n";
+  os << "    (copyIfProtocol.template operator()<TargetTags>(), ...);\n";
+  os << "  }\n";
+  os << "  return result;\n";
+  os << "}\n\n";
+
+  os << "#endif // SWIFT_CXX_EXISTENTIAL_INTEROP && __cpp_concepts\n\n";
+}
+
 void swift::printSwiftToClangCoreScaffold(SwiftToClangInteropContext &ctx,
                                           ASTContext &astContext,
                                           PrimitiveTypeMapping &typeMapping,
@@ -247,6 +486,9 @@ void swift::printSwiftToClangCoreScaffold(SwiftToClangInteropContext &ctx,
                                                 /*isCForwardDefinition=*/true);
               });
               os << "\n";
+              if (astContext.LangOpts.hasFeature(
+                      Feature::CxxExistentialInterop))
+                printSwiftExistentialTypeMethodDefs(os);
             });
         os << "\n";
         // C++ only supports inline variables from C++17.
