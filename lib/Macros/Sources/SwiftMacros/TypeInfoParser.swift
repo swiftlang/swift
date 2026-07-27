@@ -439,7 +439,14 @@ extension EnumTypeInfo: TypeInfoProtocol {
       .boolArg("isObjC"),
       .arrayArg("cases", parser: EnumCaseInfo.fromSyntax)
     )
-    return Self(isObjC: isObjC, cases: cases)
+    var seen: Set<String> = Set()
+    let uniqueCases = cases.reversed().compactMap { (c: EnumCaseInfo) -> EnumCaseInfo? in
+      if !seen.insert(c.name).inserted {
+        return nil
+      }
+      return c
+    }.reversed()
+    return Self(isObjC: isObjC, cases: uniqueCases.map { $0 })
   }
 
   public var syntax: ExprSyntax {
