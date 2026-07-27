@@ -109,7 +109,7 @@ private func tryEliminate(copy: CopyLikeInstruction, keepDebugInfo: Bool, _ cont
     return
   }
 
-  liverange.moveDebugValuesIntoLiverange(debugUsers: allocStackUses.debugUsers, after: copy.loadingInstruction)
+  liverange.moveDebugValuesIntoLiverange(debugUses: allocStackUses.debugUses, after: copy.loadingInstruction)
   liverange.extendAccessScopes()
 
   if !copy.isTakeOfSource {
@@ -189,12 +189,12 @@ private extension AllocStackInst {
 /// Collects all uses of the `alloc_stack`.
 private struct UseCollector : AddressDefUseWalker {
   private(set) var users: Stack<Instruction>
-  private(set) var debugUsers: Stack<DebugValueInst>
+  private(set) var debugUses: Stack<Operand>
   private let copy: CopyLikeInstruction
 
   init(copy: CopyLikeInstruction, _ context: FunctionPassContext) {
     self.users = Stack(context)
-    self.debugUsers = Stack(context)
+    self.debugUses = Stack(context)
     self.copy = copy
   }
 
@@ -289,8 +289,8 @@ private struct UseCollector : AddressDefUseWalker {
       users.append(address.instruction)
       return .continueWalk
 
-    case let debugValue as DebugValueInst:
-      debugUsers.append(debugValue)
+    case is DebugValueInst:
+      debugUses.append(address)
       return .continueWalk
 
     case is DeallocStackInst:
@@ -317,7 +317,7 @@ private struct UseCollector : AddressDefUseWalker {
 
   mutating func deinitialize() {
     users.deinitialize()
-    debugUsers.deinitialize()
+    debugUses.deinitialize()
   }
 }
 
@@ -429,15 +429,17 @@ private struct Liverange {
   }
 
   /// Move `debug_value` instructions, which are located _before_ the copy instruction, after the copy instruction.
-  func moveDebugValuesIntoLiverange(debugUsers: Stack<DebugValueInst>, after copy: Instruction) {
-    for debugValue in debugUsers where !liverange.hasBeenPushed(debugValue) {
-      if debugValue.operand.value is AllocStackInst {
-        debugValue.move(before: copy.next!, context)
+  func moveDebugValuesIntoLiverange(debugUses: Stack<Operand>, after copy: Instruction) {
+    for operand in debugUses where !liverange.hasBeenPushed(operand.instruction) {
+      if operand.value is AllocStackInst {
+        operand.instruction.move(before: copy.next!, context)
       } else {
         // If the operand of the `debugValue` is a projection, the projection can be located after the `copy`.
         // Therefore we cannot move the `debugValue` immediately after the `copy`.
         // It's not ideal to delete the `debugValue`, however this is a very rare case.
-        context.erase(instruction: debugValue)
+        context.erase(instruction: operand.instruction)
+        // TODO: This should be the following:
+        // (operand.instruction as! DebugValueInst).killOperand(index: operand.index)
       }
     }
   }
