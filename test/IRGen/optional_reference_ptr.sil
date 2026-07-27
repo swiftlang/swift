@@ -118,9 +118,10 @@ bb0(%0 : $ManyEmpty):
   return %0 : $ManyEmpty
 }
 
-// The second no-payload case is extra inhabitant #1 (pointer value 1).
+// The second no-payload case is a distinct low, non-null extra inhabitant of
+// the pointer (the exact value is platform-dependent).
 // CHECK-LABEL: define{{.*}} swiftcc ptr @make_many_empty_b()
-// CHECK: ret ptr inttoptr (i{{[0-9]+}} 1 to ptr)
+// CHECK: ret ptr inttoptr (i{{[0-9]+}} {{[0-9]+}} to ptr)
 sil @make_many_empty_b : $@convention(thin) () -> @owned ManyEmpty {
 bb0:
   %0 = enum $ManyEmpty, #ManyEmpty.b!enumelt

@@ -1115,33 +1115,20 @@ class ClassExistentialTypeInfo final
 
   /// Given an explosion with multiple pointer elements in them, pack them
   /// into an enum payload explosion.
-  /// FIXME: Assumes the explosion is broken into word-sized integer chunks.
-  /// Should use EnumPayload.
   void mergeExplosion(Explosion &In, Explosion &Out, IRGenFunction &IGF)
   const {
-    // We always have at least one entry.
-    auto *part = In.claimNext();
-
-    // With no stored protocols the optional class existential is a single
-    // retainable pointer, so its `.none == null` optional is lowered to `ptr`;
-    // keep the reference word as a pointer. With witness tables the optional
-    // uses the word-chunked integer payload representation.
-    if (getNumStoredProtocols() == 0) {
-      Out.add(part);
-      return;
-    }
-
-    Out.add(IGF.Builder.CreatePtrToInt(part, IGF.IGM.IntPtrTy));
-
-    for (unsigned i = 0; i != getNumStoredProtocols(); ++i) {
-      part = In.claimNext();
-      Out.add(IGF.Builder.CreatePtrToInt(part, IGF.IGM.IntPtrTy));
-    }
+    // A loadable optional class existential is lowered with its concrete
+    // pointer element types (the reference word and each witness table are
+    // `ptr`), just like the non-optional existential. Forward the words into
+    // the enum payload explosion unchanged, rather than round-tripping them
+    // through pointer-width integers.
+    Out.add(In.claimNext());
+    for (unsigned i = 0; i != getNumStoredProtocols(); ++i)
+      Out.add(In.claimNext());
   }
 
-  // Given an exploded enum payload consisting of consecutive word-sized
-  // chunks, cast them to their underlying component types.
-  // FIXME: Assumes the payload is word-chunked. Should use
+  // Given an exploded enum payload consisting of consecutive pointer-typed
+  // words, cast them to their underlying component types.
   void decomposeExplosion(Explosion &InE, Explosion &OutE,
                           IRGenFunction &IGF) const {
     // The first entry is always the weak*.

@@ -302,10 +302,10 @@ public distributed actor MyOtherActor {
 // CHECK: [[ARG_2_SIZE:%.*]] = and i64 {{.*}}, -16
 // CHECK-NEXT: [[ARG_2_BUF:%.*]] = call swiftcc ptr @swift_task_alloc(i64 [[ARG_2_SIZE]])
 
-// CHECK: [[NATIVE_OPT_VAL_0_PTR:%.*]] = getelementptr inbounds{{.*}} { i64, i64 }, ptr [[ARG_2_BUF]], i32 0, i32 0
+// CHECK: [[NATIVE_OPT_VAL_0_PTR:%.*]] = getelementptr inbounds{{.*}} { i64, ptr }, ptr [[ARG_2_BUF]], i32 0, i32 0
 // CHECK-NEXT: [[NATIVE_OPT_VAL_0:%.*]] = load i64, ptr [[NATIVE_OPT_VAL_0_PTR]]
-// CHECK-NEXT: [[NATIVE_OPT_VAL_1_PTR:%.*]] = getelementptr inbounds{{.*}} { i64, i64 }, ptr [[ARG_2_BUF]], i32 0, i32 1
-// CHECK-NEXT: [[NATIVE_OPT_VAL_1:%.*]] = load i64, ptr [[NATIVE_OPT_VAL_1_PTR]]
+// CHECK-NEXT: [[NATIVE_OPT_VAL_1_PTR:%.*]] = getelementptr inbounds{{.*}} { i64, ptr }, ptr [[ARG_2_BUF]], i32 0, i32 1
+// CHECK-NEXT: [[NATIVE_OPT_VAL_1:%.*]] = load ptr, ptr [[NATIVE_OPT_VAL_1_PTR]]
 
 /// -> LargeStruct (passed indirectly)
 
@@ -315,7 +315,7 @@ public distributed actor MyOtherActor {
 
 /// Now let's make sure that distributed thunk call uses the arguments correctly
 
-// CHECK: [[THUNK_RESULT:%.*]] = call { ptr, ptr } (i32, ptr, ptr, ...) @llvm.coro.suspend.async.sl_p0p0s({{.*}}, ptr [[RESULT_BUFF]], ptr {{.*}}, {{.*}} [[NATIVE_ARR_VAL]], ptr [[NATIVE_OBJ_VAL]], i64 [[NATIVE_OPT_VAL_0]], i64 [[NATIVE_OPT_VAL_1]], ptr [[ARG_3_BUF]], ptr {{.*}})
+// CHECK: [[THUNK_RESULT:%.*]] = call { ptr, ptr } (i32, ptr, ptr, ...) @llvm.coro.suspend.async.sl_p0p0s({{.*}}, ptr [[RESULT_BUFF]], ptr {{.*}}, {{.*}} [[NATIVE_ARR_VAL]], ptr [[NATIVE_OBJ_VAL]], i64 [[NATIVE_OPT_VAL_0]], ptr [[NATIVE_OPT_VAL_1]], ptr [[ARG_3_BUF]], ptr {{.*}})
 
 /// RESULT is returned indirectly so there is nothing to pass to `end`
 
