@@ -68,6 +68,27 @@ extension BasicBlock {
   }
 }
 
+extension Instruction {
+  /// Returns true if `otherInst` is in the same block and is dominated by this instruction or
+  /// the parent block of the instruction dominates parent block of `otherInst`.
+  func dominates(_ otherInst: Instruction, _ domTree: DominatorTree) -> Bool {
+    if parentBlock == otherInst.parentBlock {
+      return dominatesInBlock(otherInst)
+    } else {
+      return parentBlock.dominates(otherInst.parentBlock, domTree)
+    }
+  }
+
+  /// Like `Instruction.dominates`, but also returns false if `otherInst` == `self`.
+  func strictlyDominates(_ otherInst: Instruction, _ domTree: DominatorTree) -> Bool {
+    if parentBlock == otherInst.parentBlock {
+      return strictlyDominatesInBlock(otherInst)
+    } else {
+      return parentBlock.dominates(otherInst.parentBlock, domTree)
+    }
+  }
+}
+
 //===--------------------------------------------------------------------===//
 //                              Tests
 //===--------------------------------------------------------------------===//
@@ -88,4 +109,20 @@ let domtreeTest = FunctionTest("domtree") {
   })
 
   print("order: \(order.map { $0.index })")
+}
+
+let dominanceTest = FunctionTest("dominance") {
+  function, arguments, context in
+
+  let domtree = context.dominatorTree
+
+  let literals = Array(function.instructions.compactMap { $0 as? IntegerLiteralInst })
+
+  for first in literals {
+    for second in literals {
+      let dominates = first.dominates(second, domtree)
+      let strictly = first.strictlyDominates(second, domtree)
+      print("(\(first.value!), \(second.value!)): dominates: \(dominates), strictly: \(strictly)")
+    }
+  }
 }

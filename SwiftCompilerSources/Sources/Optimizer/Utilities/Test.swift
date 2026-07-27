@@ -56,6 +56,8 @@ public func registerOptimizerTests() {
     argumentConventionsTest,
     breakInfiniteLoopsTest,
     domtreeTest,
+    dominanceTest,
+    postDominanceTest,
     extendBorrowScopeTest,
     getAutoDiffSpecializationInfoTest,
     interiorLivenessTest,
