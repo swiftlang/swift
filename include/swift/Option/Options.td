@@ -582,7 +582,7 @@ def require_explicit_sendable : Flag<["-"], "require-explicit-sendable">,
   HelpText<"Require explicit Sendable annotations on public declarations">;
 
 def define_availability : Separate<["-"], "define-availability">,
-  Flags<[FrontendOption, NoInteractiveOption]>,
+  Flags<[HelpHidden, FrontendOption, NoInteractiveOption]>,
   HelpText<"Define an availability macro in the format 'macroName : iOS 13.0, macOS 10.15'">,
   MetaVarName<"<macro>">;
 
@@ -592,7 +592,7 @@ def check_api_availability_only : Flag<["-"], "check-api-availability-only">,
 
 def unavailable_decl_optimization_EQ : Joined<["-"], "unavailable-decl-optimization=">,
   MetaVarName<"<complete,none>">,
-  Flags<[FrontendOption, NoInteractiveOption]>,
+  Flags<[HelpHidden, FrontendOption, NoInteractiveOption]>,
   HelpText<"Specify the optimization mode for unavailable declarations. The "
            "value may be 'none' (no optimization) or 'complete' (code is not "
            "generated at all unavailable declarations)">;
@@ -621,7 +621,7 @@ def define_dynamic_availability_domain : Separate<["-"], "define-dynamic-availab
     MetaVarName<"<domain>">;
 
 def experimental_package_bypass_resilience : Flag<["-"], "experimental-package-bypass-resilience">,
-  Flags<[FrontendOption]>,
+  Flags<[HelpHidden, FrontendOption]>,
   HelpText<"Deprecated; has no effect">;
 
 def experimental_allow_non_resilient_access : Flag<["-"], "experimental-allow-non-resilient-access">,
@@ -629,7 +629,7 @@ def experimental_allow_non_resilient_access : Flag<["-"], "experimental-allow-no
   HelpText<"Deprecated; use -allow-non-resilient-access instead">;
 
 def allow_non_resilient_access : Flag<["-"], "allow-non-resilient-access">,
-  Flags<[FrontendOption]>,
+  Flags<[HelpHidden, FrontendOption]>,
   HelpText<"Ensures all contents are generated besides exportable decls in the binary module, so non-resilient access can be allowed">;
 
 def library_level : Separate<["-"], "library-level">,
@@ -1233,11 +1233,11 @@ def Oplayground : Flag<["-"], "Oplayground">, Group<O_Group>,
   HelpText<"Compile with optimizations appropriate for a playground">;
 
 def ExperimentalPackageCMOAbortOnDeserializationFail : Flag<["-"], "experimental-package-cmo-abort-on-deserialization-fail">,
-  Flags<[FrontendOption]>,
+  Flags<[HelpHidden, FrontendOption]>,
   HelpText<"Abort if a deserialization error is found while package optimization is enabled">;
 
 def ExperimentalPackageCMO : Flag<["-"], "experimental-package-cmo">,
-  Flags<[FrontendOption]>,
+  Flags<[HelpHidden, FrontendOption]>,
   HelpText<"Deprecated; use -package-cmo instead">;
 
 def PackageCMO : Flag<["-"], "package-cmo">,
@@ -1946,12 +1946,12 @@ def omit_extension_block_symbols: Flag<["-"], "omit-extension-block-symbols">,
   HelpText<"Directly associate members and conformances with the extended nominal when generating symbol graphs instead of emitting 'swift.extension' symbols for extensions to external types">;
 
 def allow_availability_platforms: Separate<["-"], "allow-availability-platforms">,
-  Flags<[SwiftSymbolGraphExtractOption]>,
+  Flags<[SwiftSymbolGraphExtractOption, HelpHidden]>,
   HelpText<"Restrict availability metadata to the given platforms, e.g. 'macOS,Swift'">,
   MetaVarName<"<platforms>">;
 
 def block_availability_platforms: Separate<["-"], "block-availability-platforms">,
-  Flags<[SwiftSymbolGraphExtractOption]>,
+  Flags<[SwiftSymbolGraphExtractOption, HelpHidden]>,
   HelpText<"Remove the given platforms from symbol graph availability metadata, e.g. 'macOS,Swift'">,
   MetaVarName<"<platforms>">;
 
