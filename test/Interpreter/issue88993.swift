@@ -8,6 +8,7 @@
 // REQUIRES: executable_test
 
 // UNSUPPORTED: back_deployment_runtime
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 // https://github.com/swiftlang/swift/issues/88993
 
