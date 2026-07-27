@@ -21,11 +21,88 @@
 #include "IRGenModule.h"
 #include "swift/ABI/System.h"
 #include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/InlineAsm.h"
 #include "llvm/IR/Module.h"
 #include "llvm/TargetParser/Triple.h"
 
 using namespace swift;
 using namespace irgen;
+
+/// The registers for which `_xN` variants of the direct retain/release
+/// entrypoints are emitted. When the object pointer already lives in one of
+/// these registers, the call site can branch to the matching variant instead of
+/// first moving the value into x0.
+///
+/// x0 is the base entrypoint, so it is not in this list. x16 and x17 are
+/// clobbered by call stubs, x18 is reserved by the platform, and x29 and x30 are
+/// the frame pointer and link register.
+static const char *const DirectRRVariantRegisters[] = {
+    "x1",  "x2",  "x3",  "x4",  "x5",  "x6",  "x7",  "x8",  "x9",
+    "x10", "x11", "x12", "x13", "x14", "x15", "x19", "x20", "x21",
+    "x22", "x23", "x24", "x25", "x26", "x27", "x28",
+};
+
+/// Build the symbol name for a direct retain/release entrypoint. The base
+/// entrypoint (object in x0) uses the bare name; a variant appends the register
+/// its object arrives in, e.g. "swift_retainDirect_x21".
+static std::string directRRName(StringRef base, StringRef objectRegister) {
+  if (objectRegister.empty())
+    return base.str();
+  return (base + "_" + objectRegister).str();
+}
+
+/// The signature of a direct retain/release entrypoint. The base entrypoint
+/// takes the object as an ordinary argument. A variant takes no IR argument at
+/// all: its object arrives in a fixed physical register, which is a private
+/// contract between the call site and the body that the IR type system does not
+/// express.
+static llvm::FunctionType *directRRFunctionType(llvm::LLVMContext &Ctx,
+                                                bool hasReturnValue,
+                                                StringRef objectRegister) {
+  auto *ptrTy = llvm::PointerType::getUnqual(Ctx);
+  auto *retTy = hasReturnValue ? static_cast<llvm::Type *>(ptrTy)
+                               : llvm::Type::getVoidTy(Ctx);
+  if (objectRegister.empty())
+    return llvm::FunctionType::get(retTy, {ptrTy}, false);
+  return llvm::FunctionType::get(retTy, {}, false);
+}
+
+/// Produce the incoming object pointer. For the base entrypoint that is just
+/// the IR argument. For an `_xN` variant the object arrives in a fixed physical
+/// register, which is read with an inline-asm `mov` out of that register.
+///
+/// The read is spelled as literal asm text with a virtual `=r` output rather
+/// than as an empty asm with an `={xN}` output constraint bound to the physical
+/// register. An `={xN}` output makes LLVM treat xN as defined by the asm, and
+/// since preserve_most makes x9-x15 and x19-x28 callee-saved, LLVM then
+/// save/restores xN around the body -- a stack frame in a function whose whole
+/// purpose is to stay frameless. Naming the register only inside the asm text
+/// leaves xN untouched as far as LLVM is concerned, so no register is preserved
+/// and no frame is built.
+///
+/// The call is marked as having side effects so it cannot be sunk or deleted,
+/// and it is emitted first in the entry block so nothing can allocate xN as a
+/// temporary before it is read. Prologue register *saves* would preserve xN, so
+/// a frame would not itself break the read; the requirement is only that the
+/// read precede any use of xN as an allocatable temporary.
+static llvm::Value *emitDirectRRObject(llvm::IRBuilder<> &B,
+                                       llvm::Function *fn,
+                                       StringRef objectRegister) {
+  if (objectRegister.empty())
+    return fn->getArg(0);
+
+  auto &Ctx = fn->getContext();
+  auto *i64Ty = llvm::Type::getInt64Ty(Ctx);
+  auto *ptrTy = llvm::PointerType::getUnqual(Ctx);
+
+  auto *asmTy = llvm::FunctionType::get(i64Ty, {}, false);
+  auto *readReg = llvm::InlineAsm::get(asmTy,
+      /*asmString=*/("mov $0, " + objectRegister).str(),
+      /*constraints=*/"=r",
+      /*hasSideEffects=*/true);
+  auto *objInt = B.CreateCall(readReg);
+  return B.CreateIntToPtr(objInt, ptrTy);
+}
 
 /// Create an IR function that saves preserve_most registers, masks the object
 /// pointer, calls the given target function, and returns. This allows LLVM to
@@ -200,29 +277,32 @@ static llvm::Function *createSlowpathFunction(
   return fn;
 }
 
-/// Emit swift_releaseDirect as LLVM IR.
+/// Emit swift_releaseDirect, or one of its `_xN` register variants, as LLVM IR.
 ///
 /// Fast path: atomically decrement the strong refcount via cmpxchg.
-/// Slow path: tail-call into the runtime (preservemost or callframe helper).
+/// Slow path: tail-call the shared slowpath function.
+///
+/// \param objectRegister empty for the base entrypoint, which takes the object
+/// as an IR argument; otherwise the register the object arrives in.
 static void emitSwiftReleaseDirect(
     IRGenModule &IGM,
     llvm::GlobalVariable *slowpathMask,
     uint64_t strongRCOne,
-    bool targetHasPreservemost) {
+    llvm::Function *slowFn,
+    StringRef objectRegister) {
   auto &Module = IGM.Module;
   auto &Ctx = Module.getContext();
-  auto *ptrTy = llvm::PointerType::getUnqual(Ctx);
   auto *i64Ty = llvm::Type::getInt64Ty(Ctx);
-  auto *voidTy = llvm::Type::getVoidTy(Ctx);
   auto *i8Ty = llvm::Type::getInt8Ty(Ctx);
 
-  auto *fnTy = llvm::FunctionType::get(voidTy, {ptrTy}, false);
-  auto *fn = getOrCreateFunction(Module, "swift_releaseDirect", fnTy,
+  auto *fnTy = directRRFunctionType(Ctx, /*hasReturnValue=*/false,
+                                    objectRegister);
+  auto *fn = getOrCreateFunction(Module,
+      directRRName("swift_releaseDirect", objectRegister), fnTy,
       llvm::GlobalValue::WeakODRLinkage,
       llvm::GlobalValue::HiddenVisibility,
       llvm::CallingConv::PreserveMost);
 
-  auto *obj = fn->getArg(0);
   llvm::IRBuilder<> B(Ctx);
 
   auto *entry = llvm::BasicBlock::Create(Ctx, "entry", fn);
@@ -235,6 +315,7 @@ static void emitSwiftReleaseDirect(
   // entry: null/negative check. Retain/release of NULL or values with the
   // high bit set is a no-op.
   B.SetInsertPoint(entry);
+  auto *obj = emitDirectRRObject(B, fn, objectRegister);
   auto *objInt = B.CreatePtrToInt(obj, i64Ty);
   auto *isNonPositive = B.CreateICmpSLE(objInt,
       llvm::ConstantInt::get(i64Ty, 0));
@@ -281,41 +362,60 @@ static void emitSwiftReleaseDirect(
   B.SetInsertPoint(done);
   B.CreateRetVoid();
 
-  // slowpath: tail-call into a separate slowpath function. Using a separate
+  // slowpath: tail-call the shared slowpath function. Using a separate
   // function keeps the main function frameless (no register saves).
+  //
+  // The slowpath always takes the object as an ordinary argument, so for an
+  // `_xN` variant the callee's prototype differs from this function's. musttail
+  // requires matching prototypes, so variants use an ordinary tail call, which
+  // the backend still lowers to a frameless branch.
   B.SetInsertPoint(slowpath);
-  auto *slowFn = createSlowpathFunction(IGM,
-      "swift_releaseDirect.slowpath",
-      "swift_release_preservemost", "swift_release_callframe",
-      fnTy, targetHasPreservemost, /*hasReturnValue=*/false);
-  createTailCallAndRet(B, fnTy, slowFn, obj,
-      llvm::CallingConv::PreserveMost, /*hasReturnValue=*/false);
+  auto *slowFnTy = directRRFunctionType(Ctx, /*hasReturnValue=*/false,
+                                        /*objectRegister=*/"");
+  createTailCallAndRet(B, slowFnTy, slowFn, obj,
+      llvm::CallingConv::PreserveMost, /*hasReturnValue=*/false,
+      /*mustTail=*/objectRegister.empty());
 }
 
-/// Emit swift_bridgeObjectReleaseDirect as LLVM IR.
+/// Emit swift_bridgeObjectReleaseDirect, or one of its `_xN` register variants,
+/// as LLVM IR.
 ///
 /// Checks for tagged pointers (bit 63) and ObjC objects (bit 62), then masks
 /// the pointer and tail-calls swift_releaseDirect.
+///
+/// A variant forwards to the *base* swift_releaseDirect, passing the object as
+/// an ordinary x0 argument. Release also has to mask the pointer here (unlike
+/// retain, which masks internally), and the masked value could not be left in xN
+/// anyway.
+///
+/// \param objectRegister empty for the base entrypoint, which takes the object
+/// as an IR argument; otherwise the register the object arrives in.
 static void emitSwiftBridgeObjectReleaseDirect(
     IRGenModule &IGM, bool objcInterop,
-    uint64_t bridgeObjectPointerBits) {
+    uint64_t bridgeObjectPointerBits,
+    StringRef objectRegister) {
   auto &Module = IGM.Module;
   auto &Ctx = Module.getContext();
   auto *ptrTy = llvm::PointerType::getUnqual(Ctx);
   auto *i64Ty = llvm::Type::getInt64Ty(Ctx);
-  auto *voidTy = llvm::Type::getVoidTy(Ctx);
 
-  auto *fnTy = llvm::FunctionType::get(voidTy, {ptrTy}, false);
-  auto *fn = getOrCreateFunction(Module, "swift_bridgeObjectReleaseDirect",
+  auto *fnTy = directRRFunctionType(Ctx, /*hasReturnValue=*/false,
+                                    objectRegister);
+  auto *fn = getOrCreateFunction(Module,
+      directRRName("swift_bridgeObjectReleaseDirect", objectRegister),
       fnTy, llvm::GlobalValue::WeakODRLinkage,
       llvm::GlobalValue::HiddenVisibility,
       llvm::CallingConv::PreserveMost);
 
-  auto *obj = fn->getArg(0);
+  // The callee always takes the object as an ordinary argument.
+  auto *targetTy = directRRFunctionType(Ctx, /*hasReturnValue=*/false,
+                                        /*objectRegister=*/"");
+
   llvm::IRBuilder<> B(Ctx);
 
   auto *entry = llvm::BasicBlock::Create(Ctx, "entry", fn);
   B.SetInsertPoint(entry);
+  auto *obj = emitDirectRRObject(B, fn, objectRegister);
   auto *objInt = B.CreatePtrToInt(obj, i64Ty);
 
   if (objcInterop) {
@@ -344,8 +444,9 @@ static void emitSwiftBridgeObjectReleaseDirect(
 
     B.SetInsertPoint(objcRelease);
     auto *cfFn = Module.getFunction("swift_objc_release_callframe");
-    createTailCallAndRet(B, fnTy, cfFn, obj,
-        llvm::CallingConv::PreserveMost, /*hasReturnValue=*/false);
+    createTailCallAndRet(B, targetTy, cfFn, obj,
+        llvm::CallingConv::PreserveMost, /*hasReturnValue=*/false,
+        /*mustTail=*/objectRegister.empty());
 
     // Mask pointer bits and tail-call swift_releaseDirect.
     B.SetInsertPoint(callRelease);
@@ -353,8 +454,9 @@ static void emitSwiftBridgeObjectReleaseDirect(
         llvm::ConstantInt::get(i64Ty, bridgeObjectPointerBits));
     auto *maskedPtr = B.CreateIntToPtr(maskedInt, ptrTy);
     auto *releaseFn = Module.getFunction("swift_releaseDirect");
-    createTailCallAndRet(B, fnTy, releaseFn, maskedPtr,
-        llvm::CallingConv::PreserveMost, /*hasReturnValue=*/false);
+    createTailCallAndRet(B, targetTy, releaseFn, maskedPtr,
+        llvm::CallingConv::PreserveMost, /*hasReturnValue=*/false,
+        /*mustTail=*/objectRegister.empty());
   } else {
     // Without ObjC interop, just mask and release. No tagged pointer check
     // needed; swift_releaseDirect's null/negative check handles high-bit values.
@@ -362,35 +464,41 @@ static void emitSwiftBridgeObjectReleaseDirect(
         llvm::ConstantInt::get(i64Ty, bridgeObjectPointerBits));
     auto *maskedPtr = B.CreateIntToPtr(maskedInt, ptrTy);
     auto *releaseFn = Module.getFunction("swift_releaseDirect");
-    createTailCallAndRet(B, fnTy, releaseFn, maskedPtr,
-        llvm::CallingConv::PreserveMost, /*hasReturnValue=*/false);
+    createTailCallAndRet(B, targetTy, releaseFn, maskedPtr,
+        llvm::CallingConv::PreserveMost, /*hasReturnValue=*/false,
+        /*mustTail=*/objectRegister.empty());
   }
 }
 
-/// Emit swift_retainDirect as LLVM IR.
+/// Emit swift_retainDirect, or one of its `_xN` register variants, as LLVM IR.
 ///
 /// Fast path: atomically increment the strong refcount via cmpxchg.
-/// Slow path: tail-call into the runtime.
-/// Returns the original (potentially unmasked) object pointer.
+/// Slow path: tail-call the shared slowpath function.
+/// Returns the original (potentially unmasked) object pointer in x0.
+///
+/// \param objectRegister empty for the base entrypoint, which takes the object
+/// as an IR argument; otherwise the register the object arrives in.
 static void emitSwiftRetainDirect(
     IRGenModule &IGM,
     llvm::GlobalVariable *slowpathMask,
     uint64_t strongRCOne,
     uint64_t bridgeObjectPointerBits,
-    bool targetHasPreservemost) {
+    llvm::Function *slowFn,
+    StringRef objectRegister) {
   auto &Module = IGM.Module;
   auto &Ctx = Module.getContext();
   auto *ptrTy = llvm::PointerType::getUnqual(Ctx);
   auto *i64Ty = llvm::Type::getInt64Ty(Ctx);
   auto *i8Ty = llvm::Type::getInt8Ty(Ctx);
 
-  auto *fnTy = llvm::FunctionType::get(ptrTy, {ptrTy}, false);
-  auto *fn = getOrCreateFunction(Module, "swift_retainDirect", fnTy,
+  auto *fnTy = directRRFunctionType(Ctx, /*hasReturnValue=*/true,
+                                    objectRegister);
+  auto *fn = getOrCreateFunction(Module,
+      directRRName("swift_retainDirect", objectRegister), fnTy,
       llvm::GlobalValue::WeakODRLinkage,
       llvm::GlobalValue::HiddenVisibility,
       llvm::CallingConv::PreserveMost);
 
-  auto *obj = fn->getArg(0);
   llvm::IRBuilder<> B(Ctx);
 
   auto *entry = llvm::BasicBlock::Create(Ctx, "entry", fn);
@@ -402,6 +510,7 @@ static void emitSwiftRetainDirect(
 
   // entry: null/negative check.
   B.SetInsertPoint(entry);
+  auto *obj = emitDirectRRObject(B, fn, objectRegister);
   auto *objInt = B.CreatePtrToInt(obj, i64Ty);
   auto *isNonPositive = B.CreateICmpSLE(objInt,
       llvm::ConstantInt::get(i64Ty, 0));
@@ -451,38 +560,55 @@ static void emitSwiftRetainDirect(
   B.SetInsertPoint(done);
   B.CreateRet(obj);
 
-  // slowpath: tail-call into a separate slowpath function.
+  // slowpath: tail-call the shared slowpath function. See the corresponding
+  // comment in emitSwiftReleaseDirect for why variants cannot use musttail.
   B.SetInsertPoint(slowpath);
-  auto *slowFn = createSlowpathFunction(IGM,
-      "swift_retainDirect.slowpath",
-      "swift_retain_preservemost", "swift_retain_callframe",
-      fnTy, targetHasPreservemost, /*hasReturnValue=*/true);
-  createTailCallAndRet(B, fnTy, slowFn, obj,
-      llvm::CallingConv::PreserveMost, /*hasReturnValue=*/true);
+  auto *slowFnTy = directRRFunctionType(Ctx, /*hasReturnValue=*/true,
+                                        /*objectRegister=*/"");
+  createTailCallAndRet(B, slowFnTy, slowFn, obj,
+      llvm::CallingConv::PreserveMost, /*hasReturnValue=*/true,
+      /*mustTail=*/objectRegister.empty());
 }
 
-/// Emit swift_bridgeObjectRetainDirect as LLVM IR.
+/// Emit swift_bridgeObjectRetainDirect, or one of its `_xN` register variants,
+/// as LLVM IR.
 ///
 /// Checks for tagged pointers (bit 63) and ObjC objects (bit 62), then
 /// tail-calls swift_retainDirect (which handles pointer masking internally).
+///
+/// A variant forwards to the *base* swift_retainDirect, passing the object as an
+/// ordinary x0 argument rather than to the matching `_xN` variant. Once the
+/// object has been read out of xN into a value, nothing in the IR keeps xN live
+/// up to the tail call, so the register-passing contract could not be honored;
+/// forwarding in x0 costs one mov and is correct.
+///
+/// \param objectRegister empty for the base entrypoint, which takes the object
+/// as an IR argument; otherwise the register the object arrives in.
 static void emitSwiftBridgeObjectRetainDirect(
-    IRGenModule &IGM, bool objcInterop) {
+    IRGenModule &IGM, bool objcInterop, StringRef objectRegister) {
   auto &Module = IGM.Module;
   auto &Ctx = Module.getContext();
-  auto *ptrTy = llvm::PointerType::getUnqual(Ctx);
   auto *i64Ty = llvm::Type::getInt64Ty(Ctx);
 
-  auto *fnTy = llvm::FunctionType::get(ptrTy, {ptrTy}, false);
-  auto *fn = getOrCreateFunction(Module, "swift_bridgeObjectRetainDirect",
+  auto *fnTy = directRRFunctionType(Ctx, /*hasReturnValue=*/true,
+                                    objectRegister);
+  auto *fn = getOrCreateFunction(Module,
+      directRRName("swift_bridgeObjectRetainDirect", objectRegister),
       fnTy, llvm::GlobalValue::WeakODRLinkage,
       llvm::GlobalValue::HiddenVisibility,
       llvm::CallingConv::PreserveMost);
 
-  auto *obj = fn->getArg(0);
+  // The callees always take the object as an ordinary argument.
+  auto *targetTy = directRRFunctionType(Ctx, /*hasReturnValue=*/true,
+                                        /*objectRegister=*/"");
+  auto *retainFn = Module.getFunction("swift_retainDirect");
+  bool mustTail = objectRegister.empty();
+
   llvm::IRBuilder<> B(Ctx);
 
   auto *entry = llvm::BasicBlock::Create(Ctx, "entry", fn);
   B.SetInsertPoint(entry);
+  auto *obj = emitDirectRRObject(B, fn, objectRegister);
 
   if (objcInterop) {
     auto *notTagged = llvm::BasicBlock::Create(Ctx, "not_tagged", fn);
@@ -512,22 +638,20 @@ static void emitSwiftBridgeObjectRetainDirect(
 
     B.SetInsertPoint(objcRetain);
     auto *cfFn = Module.getFunction("swift_objc_retain_callframe");
-    createTailCallAndRet(B, fnTy, cfFn, obj,
-        llvm::CallingConv::PreserveMost, /*hasReturnValue=*/true);
+    createTailCallAndRet(B, targetTy, cfFn, obj,
+        llvm::CallingConv::PreserveMost, /*hasReturnValue=*/true, mustTail);
 
     // Tail-call swift_retainDirect with the original bridgeObject value.
     // retainDirect handles pointer masking internally.
     B.SetInsertPoint(callRetain);
-    auto *retainFn = Module.getFunction("swift_retainDirect");
-    createTailCallAndRet(B, fnTy, retainFn, obj,
-        llvm::CallingConv::PreserveMost, /*hasReturnValue=*/true);
+    createTailCallAndRet(B, targetTy, retainFn, obj,
+        llvm::CallingConv::PreserveMost, /*hasReturnValue=*/true, mustTail);
   } else {
     // Without ObjC interop, swift_retainDirect handles everything: the
     // null/negative check catches tagged pointers (high bit set), and the
     // pointer mask clears spare bits.
-    auto *retainFn = Module.getFunction("swift_retainDirect");
-    createTailCallAndRet(B, fnTy, retainFn, obj,
-        llvm::CallingConv::PreserveMost, /*hasReturnValue=*/true);
+    createTailCallAndRet(B, targetTy, retainFn, obj,
+        llvm::CallingConv::PreserveMost, /*hasReturnValue=*/true, mustTail);
   }
 }
 
@@ -615,17 +739,49 @@ static void emitDirectRetainReleaseARM64(IRGenModule &IGM) {
                             /*returnObject=*/false, bridgeObjectPointerBits);
   }
 
-  // Emit the direct retain/release functions as LLVM IR.
+  // Emit the direct retain/release functions as LLVM IR. Each is emitted as a
+  // base entrypoint taking the object in x0, plus one `_xN` variant per
+  // register in DirectRRVariantRegisters that reads the object out of xN. The
+  // slowpath functions are shared by all variants of a given operation.
+  //
+  // The core variant is emitted before the matching bridge variant, which
+  // forwards to it.
   if (needRelease) {
-    emitSwiftReleaseDirect(IGM, maskGV, strongRCOne,
-                           targetHasPreservemostRetainRelease);
+    auto *releaseSlowFn = createSlowpathFunction(IGM,
+        "swift_releaseDirect.slowpath",
+        "swift_release_preservemost", "swift_release_callframe",
+        directRRFunctionType(Ctx, /*hasReturnValue=*/false,
+                             /*objectRegister=*/""),
+        targetHasPreservemostRetainRelease, /*hasReturnValue=*/false);
+
+    emitSwiftReleaseDirect(IGM, maskGV, strongRCOne, releaseSlowFn,
+                           /*objectRegister=*/"");
     emitSwiftBridgeObjectReleaseDirect(IGM, objcInterop,
-                                       bridgeObjectPointerBits);
+                                       bridgeObjectPointerBits,
+                                       /*objectRegister=*/"");
+    for (StringRef reg : DirectRRVariantRegisters) {
+      emitSwiftReleaseDirect(IGM, maskGV, strongRCOne, releaseSlowFn, reg);
+      emitSwiftBridgeObjectReleaseDirect(IGM, objcInterop,
+                                         bridgeObjectPointerBits, reg);
+    }
   }
   if (needRetain) {
+    auto *retainSlowFn = createSlowpathFunction(IGM,
+        "swift_retainDirect.slowpath",
+        "swift_retain_preservemost", "swift_retain_callframe",
+        directRRFunctionType(Ctx, /*hasReturnValue=*/true,
+                             /*objectRegister=*/""),
+        targetHasPreservemostRetainRelease, /*hasReturnValue=*/true);
+
     emitSwiftRetainDirect(IGM, maskGV, strongRCOne, bridgeObjectPointerBits,
-                          targetHasPreservemostRetainRelease);
-    emitSwiftBridgeObjectRetainDirect(IGM, objcInterop);
+                          retainSlowFn, /*objectRegister=*/"");
+    emitSwiftBridgeObjectRetainDirect(IGM, objcInterop,
+                                      /*objectRegister=*/"");
+    for (StringRef reg : DirectRRVariantRegisters) {
+      emitSwiftRetainDirect(IGM, maskGV, strongRCOne, bridgeObjectPointerBits,
+                            retainSlowFn, reg);
+      emitSwiftBridgeObjectRetainDirect(IGM, objcInterop, reg);
+    }
   }
 }
 
