@@ -7441,6 +7441,17 @@ const COMDeclInfo *NominalTypeDecl::getCOMDeclInfo() const {
                            COMDeclInfoRequest{mutableThis}, nullptr);
 }
 
+const COMInterfaceHierarchy *ProtocolDecl::getCOMInterfaceHierarchy() const {
+  // Preserve the non-COM fast path and, in particular, do not make early COM
+  // identity lookup resolve protocol inheritance.
+  if (!isCOMInterface())
+    return nullptr;
+
+  auto *mutableThis = const_cast<ProtocolDecl *>(this);
+  return evaluateOrDefault(getASTContext().evaluator,
+                           COMInterfaceHierarchyRequest{mutableThis}, nullptr);
+}
+
 EnumCaseDecl *EnumCaseDecl::create(SourceLoc CaseLoc,
                                    ArrayRef<EnumElementDecl *> Elements,
                                    DeclContext *DC) {
