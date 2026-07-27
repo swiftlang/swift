@@ -213,11 +213,20 @@ private:
   const clang::TagDecl *typeDecl;
 };
 
+/// Describes how a parameter should be printed: whether it is `inout`, and
+/// whether the reference/pointer printed for it can be marked SWIFT_NOESCAPE
+/// (i.e. it is a value-type parameter whose reference cannot escape the
+/// callee).
+struct ParamTypeInfo {
+  bool isInOutParam = false;
+  bool cannotEscape = false;
+};
+
 // Prints types in the C function signature that corresponds to the
 // native Swift function/method.
 class CFunctionSignatureTypePrinter
     : public TypeVisitor<CFunctionSignatureTypePrinter, ClangRepresentation,
-                         std::optional<OptionalTypeKind>, bool>,
+                         std::optional<OptionalTypeKind>, ParamTypeInfo>,
       private ClangSyntaxPrinter {
 public:
   CFunctionSignatureTypePrinter(
@@ -234,20 +243,26 @@ public:
         moduleContext(moduleContext), declPrinter(declPrinter),
         typeUseKind(typeUseKind) {}
 
-  void printInoutTypeModifier() {
+  void printNoEscapeAttrIfNeeded(bool cannotEscape) {
+    if (cannotEscape)
+      os << " SWIFT_NOESCAPE";
+  }
+
+  void printInoutTypeModifier(bool cannotEscape = false) {
     os << (languageMode == swift::OutputLanguageMode::Cxx ? " &"
                                                           : " * _Nonnull");
+    printNoEscapeAttrIfNeeded(cannotEscape);
   }
 
   bool printIfKnownSimpleType(const TypeDecl *typeDecl,
                               std::optional<OptionalTypeKind> optionalKind,
-                              bool isInOutParam) {
+                              ParamTypeInfo paramInfo) {
     auto knownTypeInfo = getKnownTypeInfo(typeDecl, typeMapping, languageMode);
     if (!knownTypeInfo)
       return false;
     bool shouldPrintOptional = optionalKind && *optionalKind != OTK_None &&
                                !knownTypeInfo->canBeNullable;
-    if (!isInOutParam && shouldPrintOptional &&
+    if (!paramInfo.isInOutParam && shouldPrintOptional &&
         typeUseKind == FunctionSignatureTypeUse::ParamType)
       os << "const ";
     printOptional(shouldPrintOptional ? optionalKind : std::nullopt, [&]() {
@@ -256,11 +271,13 @@ public:
         printNullability(optionalKind);
       }
     });
-    if (!isInOutParam && shouldPrintOptional &&
-        typeUseKind == FunctionSignatureTypeUse::ParamType)
+    if (!paramInfo.isInOutParam && shouldPrintOptional &&
+        typeUseKind == FunctionSignatureTypeUse::ParamType) {
       os << '&';
-    if (isInOutParam)
-      printInoutTypeModifier();
+      printNoEscapeAttrIfNeeded(paramInfo.cannotEscape);
+    }
+    if (paramInfo.isInOutParam)
+      printInoutTypeModifier(paramInfo.cannotEscape);
     return true;
   }
 
@@ -276,7 +293,7 @@ public:
 
   ClangRepresentation visitType(TypeBase *Ty,
                                 std::optional<OptionalTypeKind> optionalKind,
-                                bool isInOutParam) {
+                                ParamTypeInfo paramInfo) {
     assert(Ty->getDesugaredType() == Ty && "unhandled sugared type");
     os << "/* ";
     Ty->print(os);
@@ -287,7 +304,7 @@ public:
   ClangRepresentation
   visitExistentialType(ExistentialType *ty,
                        std::optional<OptionalTypeKind> optionalKind,
-                       bool isInOutParam) {
+                       ParamTypeInfo paramInfo) {
     bool hasSwiftSuperClass = false;
     if (auto superClass = ty->getExistentialLayout()
           .getExplicitSuperclassOrProtocolSuperclass()) {
@@ -296,19 +313,19 @@ public:
     }
     if (ty->isObjCExistentialType() && !hasSwiftSuperClass) {
       declPrinter.withOutputStream(os).print(ty, optionalKind);
-      if (isInOutParam) {
+      if (paramInfo.isInOutParam) {
         os << " __strong";
-        printInoutTypeModifier();
+        printInoutTypeModifier(paramInfo.cannotEscape);
       }
       return ClangRepresentation::objcxxonly;
     }
 
-    return visitPart(ty->getConstraintType(), optionalKind, isInOutParam);
+    return visit(ty->getConstraintType(), optionalKind, paramInfo);
   }
 
   ClangRepresentation
   visitTupleType(TupleType *TT, std::optional<OptionalTypeKind> optionalKind,
-                 bool isInOutParam) {
+                 ParamTypeInfo paramInfo) {
     if (TT->getNumElements() > 0)
       // FIXME: Handle non-void type.
       return ClangRepresentation::unsupported;
@@ -322,25 +339,24 @@ public:
   ClangRepresentation
   visitTypeAliasType(TypeAliasType *aliasTy,
                      std::optional<OptionalTypeKind> optionalKind,
-                     bool isInOutParam) {
+                     ParamTypeInfo paramInfo) {
     const TypeAliasDecl *alias = aliasTy->getDecl();
-    if (printIfKnownSimpleType(alias, optionalKind, isInOutParam))
+    if (printIfKnownSimpleType(alias, optionalKind, paramInfo))
       return ClangRepresentation::representable;
 
-    return visitSugarType(aliasTy, optionalKind, isInOutParam);
+    return visitSugarType(aliasTy, optionalKind, paramInfo);
   }
 
   ClangRepresentation
   visitSugarType(SugarType *sugarTy,
                  std::optional<OptionalTypeKind> optionalKind,
-                 bool isInOutParam) {
-    return visitPart(sugarTy->getSinglyDesugaredType(), optionalKind,
-                     isInOutParam);
+                 ParamTypeInfo paramInfo) {
+    return visit(sugarTy->getSinglyDesugaredType(), optionalKind, paramInfo);
   }
 
   ClangRepresentation
   visitClassType(ClassType *CT, std::optional<OptionalTypeKind> optionalKind,
-                 bool isInOutParam) {
+                 ParamTypeInfo paramInfo) {
     auto *cd = CT->getDecl();
     if (cd->hasClangNode()) {
       const auto *clangDecl = cd->getClangDecl();
@@ -357,10 +373,10 @@ public:
       os << (alreadyPointer ? " " : " *")
          << (!optionalKind || *optionalKind == OTK_None ? "_Nonnull"
                                                         : "_Nullable");
-      if (isInOutParam) {
+      if (paramInfo.isInOutParam) {
         if (isa<clang::ObjCContainerDecl>(cd->getClangDecl()))
           os << " __strong";
-        printInoutTypeModifier();
+        printInoutTypeModifier(paramInfo.cannotEscape);
       }
       // FIXME: Mark that this is only ObjC representable.
       return ClangRepresentation::representable;
@@ -370,33 +386,38 @@ public:
       os << "void * "
          << (!optionalKind || *optionalKind == OTK_None ? "_Nonnull"
                                                         : "_Nullable");
-      if (isInOutParam)
+      if (paramInfo.isInOutParam) {
         os << " * _Nonnull";
+        printNoEscapeAttrIfNeeded(paramInfo.cannotEscape);
+      }
       return ClangRepresentation::representable;
     }
-    if (typeUseKind == FunctionSignatureTypeUse::ParamType && !isInOutParam)
+    if (typeUseKind == FunctionSignatureTypeUse::ParamType &&
+        !paramInfo.isInOutParam)
       os << "const ";
     printOptional(optionalKind, [&]() {
       ClangSyntaxPrinter(CT->getASTContext(), os)
           .printPrimaryCxxTypeName(cd, moduleContext);
     });
-    if (typeUseKind == FunctionSignatureTypeUse::ParamType)
+    if (typeUseKind == FunctionSignatureTypeUse::ParamType) {
       os << "&";
+      printNoEscapeAttrIfNeeded(paramInfo.cannotEscape);
+    }
     return ClangRepresentation::representable;
   }
 
   ClangRepresentation
   visitEnumType(EnumType *ET, std::optional<OptionalTypeKind> optionalKind,
-                bool isInOutParam) {
+                ParamTypeInfo paramInfo) {
     return visitValueType(ET, ET->getNominalOrBoundGenericNominal(),
-                          optionalKind, isInOutParam);
+                          optionalKind, paramInfo);
   }
 
   ClangRepresentation
   visitStructType(StructType *ST, std::optional<OptionalTypeKind> optionalKind,
-                  bool isInOutParam) {
+                  ParamTypeInfo paramInfo) {
     return visitValueType(ST, ST->getNominalOrBoundGenericNominal(),
-                          optionalKind, isInOutParam);
+                          optionalKind, paramInfo);
   }
 
   ClangRepresentation visitGenericArgs(ArrayRef<Type> genericArgs) {
@@ -409,9 +430,8 @@ public:
     llvm::SaveAndRestore<decltype(modifiersDelegate)> modReset(
         modifiersDelegate, emptyModifiersDelegate);
     ClangRepresentation result = ClangRepresentation::representable;
-    llvm::interleaveComma(genericArgs, os, [&](Type t) {
-      result.merge(visitPart(t, std::nullopt, false));
-    });
+    llvm::interleaveComma(
+        genericArgs, os, [&](Type t) { result.merge(visit(t, std::nullopt)); });
     os << '>';
     return result;
   }
@@ -419,11 +439,11 @@ public:
   ClangRepresentation
   visitValueType(TypeBase *type, const NominalTypeDecl *decl,
                  std::optional<OptionalTypeKind> optionalKind,
-                 bool isInOutParam, ArrayRef<Type> genericArgs = {}) {
+                 ParamTypeInfo paramInfo, ArrayRef<Type> genericArgs = {}) {
     assert(isa<StructDecl>(decl) || isa<EnumDecl>(decl));
 
     // Handle known type names.
-    if (printIfKnownSimpleType(decl, optionalKind, isInOutParam))
+    if (printIfKnownSimpleType(decl, optionalKind, paramInfo))
       return ClangRepresentation::representable;
     if (!declPrinter.shouldInclude(decl))
       return ClangRepresentation::unsupported; // FIXME: propagate why it's not
@@ -438,16 +458,18 @@ public:
       if (!handler.isRepresentable())
         return ClangRepresentation::unsupported;
       if (typeUseKind == FunctionSignatureTypeUse::ParamType &&
-          !isInOutParam)
+          !paramInfo.isInOutParam)
         os << "const ";
       printOptional(optionalKind, [&]() { handler.printTypeName(decl->getASTContext(), os); });
-      if (typeUseKind == FunctionSignatureTypeUse::ParamType)
+      if (typeUseKind == FunctionSignatureTypeUse::ParamType) {
         os << '&';
+        printNoEscapeAttrIfNeeded(paramInfo.cannotEscape);
+      }
       return ClangRepresentation::representable;
     }
 
     if (typeUseKind == FunctionSignatureTypeUse::ParamType) {
-      if (!isInOutParam) {
+      if (!paramInfo.isInOutParam) {
         os << "const ";
       }
       ClangRepresentation result = ClangRepresentation::representable;
@@ -456,6 +478,7 @@ public:
         result = visitGenericArgs(genericArgs);
       });
       os << '&';
+      printNoEscapeAttrIfNeeded(paramInfo.cannotEscape);
       return result;
     }
 
@@ -477,7 +500,7 @@ public:
   std::optional<ClangRepresentation>
   printIfKnownGenericStruct(const BoundGenericStructType *BGT,
                             std::optional<OptionalTypeKind> optionalKind,
-                            bool isInOutParam) {
+                            ParamTypeInfo paramInfo) {
     auto bgsTy = Type(const_cast<BoundGenericStructType *>(BGT));
     bool isConst;
     if (bgsTy->isUnsafePointer())
@@ -502,7 +525,7 @@ public:
       if (isKnownCType(arg, typeMapping, BGT->getASTContext()) ==
           KnownTypeKind::Unknown)
         return ClangRepresentation(ClangRepresentation::unsupported);
-      auto partRepr = visitPart(arg, OTK_None, /*isInOutParam=*/false);
+      auto partRepr = visit(arg, OTK_None);
       if (partRepr.isUnsupported())
         return partRepr;
     }
@@ -510,40 +533,39 @@ public:
       os << " const";
     os << " *";
     printNullability(optionalKind);
-    if (isInOutParam)
-      printInoutTypeModifier();
+    if (paramInfo.isInOutParam)
+      printInoutTypeModifier(paramInfo.cannotEscape);
     return ClangRepresentation(ClangRepresentation::representable);
   }
 
   ClangRepresentation
   visitBoundGenericStructType(BoundGenericStructType *BGT,
                               std::optional<OptionalTypeKind> optionalKind,
-                              bool isInOutParam) {
-    if (auto result =
-            printIfKnownGenericStruct(BGT, optionalKind, isInOutParam))
+                              ParamTypeInfo paramInfo) {
+    if (auto result = printIfKnownGenericStruct(BGT, optionalKind, paramInfo))
       return *result;
-    return visitValueType(BGT, BGT->getDecl(), optionalKind, isInOutParam,
+    return visitValueType(BGT, BGT->getDecl(), optionalKind, paramInfo,
                           BGT->getGenericArgs());
   }
 
   ClangRepresentation
   visitBoundGenericEnumType(BoundGenericEnumType *BGT,
                             std::optional<OptionalTypeKind> optionalKind,
-                            bool isInOutParam) {
+                            ParamTypeInfo paramInfo) {
     if (optionalKind == OTK_None) {
       if (auto objTy = BGT->getOptionalObjectType())
-        return visitPart(objTy, OTK_Optional, isInOutParam);
+        return visit(objTy, OTK_Optional, paramInfo);
     }
-    return visitValueType(BGT, BGT->getDecl(), optionalKind, isInOutParam,
+    return visitValueType(BGT, BGT->getDecl(), optionalKind, paramInfo,
                           BGT->getGenericArgs());
   }
 
   ClangRepresentation
   visitGenericTypeParamType(GenericTypeParamType *genericTpt,
                             std::optional<OptionalTypeKind> optionalKind,
-                            bool isInOutParam) {
+                            ParamTypeInfo paramInfo) {
     bool isParam = typeUseKind == FunctionSignatureTypeUse::ParamType;
-    if (isParam && !isInOutParam)
+    if (isParam && !paramInfo.isInOutParam)
       os << "const ";
 
     if (languageMode != OutputLanguageMode::Cxx) {
@@ -559,31 +581,33 @@ public:
       ClangSyntaxPrinter(genericTpt->getASTContext(), os).printGenericTypeParamTypeName(genericTpt);
     });
     // Pass a reference to the template type.
-    if (isParam)
+    if (isParam) {
       os << '&';
+      printNoEscapeAttrIfNeeded(paramInfo.cannotEscape);
+    }
     return ClangRepresentation::representable;
   }
 
   ClangRepresentation
   visitDynamicSelfType(DynamicSelfType *ds,
                        std::optional<OptionalTypeKind> optionalKind,
-                       bool isInOutParam) {
-    return visitPart(ds->getSelfType(), optionalKind, isInOutParam);
+                       ParamTypeInfo paramInfo) {
+    return visit(ds->getSelfType(), optionalKind, paramInfo);
   }
 
   ClangRepresentation
   visitMetatypeType(MetatypeType *mt,
                     std::optional<OptionalTypeKind> optionalKind,
-                    bool isInOutParam) {
+                    ParamTypeInfo paramInfo) {
     if (typeUseKind == FunctionSignatureTypeUse::TypeReference)
-      return visitPart(mt->getInstanceType(), optionalKind, isInOutParam);
+      return visit(mt->getInstanceType(), optionalKind, paramInfo);
     return ClangRepresentation::unsupported;
   }
 
-  ClangRepresentation visitPart(Type Ty,
-                                std::optional<OptionalTypeKind> optionalKind,
-                                bool isInOutParam) {
-    return TypeVisitor::visit(Ty, optionalKind, isInOutParam);
+  ClangRepresentation visit(Type Ty,
+                            std::optional<OptionalTypeKind> optionalKind,
+                            ParamTypeInfo paramInfo = {}) {
+    return TypeVisitor::visit(Ty, optionalKind, paramInfo);
   }
 
 private:
@@ -597,6 +621,26 @@ private:
   FunctionSignatureTypeUse typeUseKind;
 };
 
+/// Returns true if a reference/pointer printed for a parameter of the given
+/// object type cannot escape the callee, so it can be marked SWIFT_NOESCAPE.
+static bool paramTypeCannotEscape(Type objectType) {
+  objectType = objectType->lookThroughAllOptionalTypes();
+  // Generic parameters / archetypes could be instantiated with a class, and
+  // existentials could hold one, so treat them conservatively as escapable.
+  if (objectType->isTypeParameter() || objectType->is<ArchetypeType>() ||
+      objectType->isExistentialType())
+    return false;
+  // A class (reference-semantics) parameter can be retained and stored by the
+  // callee regardless of its ownership, so its pointer may escape.
+  return !objectType->isAnyClassReferenceType();
+}
+
+/// Computes how \p param should be printed: whether it is `inout`, and whether
+/// the reference/pointer printed for it can be marked SWIFT_NOESCAPE.
+static ParamTypeInfo getParamTypeInfo(const ParamDecl &param) {
+  return {param.isInOut(), paramTypeCannotEscape(param.getInterfaceType())};
+}
+
 } // end namespace
 
 ClangRepresentation
@@ -608,7 +652,7 @@ DeclAndTypeClangFunctionPrinter::printClangFunctionReturnType(
       CFunctionSignatureTypePrinterModifierDelegate(), moduleContext,
       declPrinter, FunctionSignatureTypeUse::ReturnType);
   // Param for indirect return cannot be marked as inout
-  return typePrinter.visit(ty, optKind, /*isInOutParam=*/false);
+  return typePrinter.visit(ty, optKind);
 }
 
 static void addABIRecordToTypeEncoding(llvm::raw_ostream &typeEncodingOS,
@@ -837,15 +881,14 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
   // FIXME: Might need a PrintMultiPartType here.
   auto print =
       [&, this](Type ty, std::optional<OptionalTypeKind> optionalKind,
-                StringRef name, bool isInOutParam,
+                StringRef name, ParamTypeInfo paramInfo = {},
                 CFunctionSignatureTypePrinterModifierDelegate delegate = {})
       -> ClangRepresentation {
-    // FIXME: add support for noescape and PrintMultiPartType,
-    // see DeclAndTypePrinter::print.
+    // FIXME: add support for PrintMultiPartType, see DeclAndTypePrinter::print.
     CFunctionSignatureTypePrinter typePrinter(
         functionSignatureOS, cPrologueOS, typeMapping, outputLang,
         interopContext, delegate, emittedModule, declPrinter);
-    auto result = typePrinter.visit(ty, optionalKind, isInOutParam);
+    auto result = typePrinter.visit(ty, optionalKind, paramInfo);
 
     if (!name.empty()) {
       functionSignatureOS << ' ';
@@ -880,8 +923,7 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
           llvm::nulls(), llvm::nulls(), typeMapping, OutputLanguageMode::Cxx,
           interopContext, CFunctionSignatureTypePrinterModifierDelegate(),
           emittedModule, declPrinter, FunctionSignatureTypeUse::ReturnType);
-      if (resultingRepresentation
-              .merge(typePrinter.visit(objTy, optKind, /*isInOutParam=*/false))
+      if (resultingRepresentation.merge(typePrinter.visit(objTy, optKind))
               .isUnsupported())
         return resultingRepresentation;
     }
@@ -957,8 +999,8 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
           interopContext, CFunctionSignatureTypePrinterModifierDelegate(),
           emittedModule, declPrinter, FunctionSignatureTypeUse::ParamType);
       if (resultingRepresentation
-              .merge(typePrinter.visit(objTy, optKind,
-                                       /*isInOutParam=*/param->isInOut()))
+              .merge(
+                  typePrinter.visit(objTy, optKind, getParamTypeInfo(*param)))
               .isUnsupported())
         return resultingRepresentation;
     }
@@ -989,7 +1031,7 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
           functionSignatureOS, cPrologueOS, typeMapping, outputLang,
           interopContext, CFunctionSignatureTypePrinterModifierDelegate(),
           emittedModule, declPrinter);
-      auto s = typePrinter.visit(ty, optionalKind, param.isInOut());
+      auto s = typePrinter.visit(ty, optionalKind, getParamTypeInfo(param));
       resultingRepresentation.merge(s);
     };
     signature.visitParameterList(
@@ -1096,7 +1138,7 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
             os << "_" << paramIndex;
           }
           resultingRepresentation.merge(
-              print(objTy, argKind, paramName, param->isInOut()));
+              print(objTy, argKind, paramName, getParamTypeInfo(*param)));
           ++paramIndex;
         });
     if (resultingRepresentation.isUnsupported()) {
@@ -1131,7 +1173,7 @@ void DeclAndTypeClangFunctionPrinter::printTypeImplTypeSpecifier(
       os, cPrologueOS, typeMapping, OutputLanguageMode::Cxx, interopContext,
       delegate, moduleContext, declPrinter,
       FunctionSignatureTypeUse::TypeReference);
-  auto result = typePrinter.visit(type, std::nullopt, /*isInOut=*/false);
+  auto result = typePrinter.visit(type, std::nullopt);
   assert(!result.isUnsupported());
 }
 
@@ -1382,8 +1424,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
         typeOS, cPrologueOS, typeMapping, OutputLanguageMode::Cxx,
         interopContext, CFunctionSignatureTypePrinterModifierDelegate(),
         moduleContext, declPrinter, FunctionSignatureTypeUse::TypeReference);
-    auto result = typePrinter.visit(param.getInterfaceType(), OTK_None,
-                                    /*isInOutParam=*/false);
+    auto result = typePrinter.visit(param.getInterfaceType(), OTK_None);
     assert(!result.isUnsupported());
     typeOS.flush();
 
@@ -1448,8 +1489,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
               interopContext, CFunctionSignatureTypePrinterModifierDelegate(),
               moduleContext, declPrinter,
               FunctionSignatureTypeUse::TypeReference);
-          auto result = typePrinter.visit(param.getInterfaceType(), OTK_None,
-                                          /*isInOutParam=*/false);
+          auto result = typePrinter.visit(param.getInterfaceType(), OTK_None);
           assert(!result.isUnsupported());
           os << ">::getTypeMetadata()";
           return;
@@ -1507,8 +1547,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
               interopContext, delegate, moduleContext, declPrinter,
               FunctionSignatureTypeUse::TypeReference);
           auto result =
-              typePrinter.visit(metadataSrcParam.getType(), std::nullopt,
-                                /*isInOut=*/false);
+              typePrinter.visit(metadataSrcParam.getType(), std::nullopt);
           assert(!result.isUnsupported());
           os << ">::getTypeMetadata()";
         },
@@ -1863,8 +1902,7 @@ void DeclAndTypeClangFunctionPrinter::printCustomCxxFunction(
         emittedModule, declPrinter,
         NeedsReturnTypes ? FunctionSignatureTypeUse::ReturnType
                          : FunctionSignatureTypeUse::ParamType);
-    auto support =
-        typePrinter.visit(objectType, optKind, /* isInOutParam */ false);
+    auto support = typePrinter.visit(objectType, optKind);
     (void)support;
     assert(!support.isUnsupported());
     types.insert({type, typeOS.str()});
@@ -1875,7 +1913,7 @@ void DeclAndTypeClangFunctionPrinter::printCustomCxxFunction(
         typeRefOS, cPrologueOS, typeMapping, OutputLanguageMode::Cxx,
         interopContext, CFunctionSignatureTypePrinterModifierDelegate(),
         emittedModule, declPrinter, FunctionSignatureTypeUse::TypeReference);
-    typeRefPrinter.visit(objectType, optKind, /* isInOutParam */ false);
+    typeRefPrinter.visit(objectType, optKind);
     typeRefs.insert({type, typeRefOS.str()});
   }
 
@@ -1915,8 +1953,7 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::getTypeRepresentation(
       llvm::nulls(), llvm::nulls(), typeMapping, OutputLanguageMode::Cxx,
       interopContext, delegate, emittedModule, declPrinter,
       FunctionSignatureTypeUse::TypeReference);
-  auto result = typePrinter.visit(ty, OptionalTypeKind::OTK_None,
-                                  /*isInOutParam=*/false);
+  auto result = typePrinter.visit(ty, OptionalTypeKind::OTK_None);
   declPrinter.typeRepresentations[ty] = result;
   return result;
 }
@@ -1928,7 +1965,7 @@ void DeclAndTypeClangFunctionPrinter::printTypeName(
       os, cPrologueOS, typeMapping, OutputLanguageMode::Cxx, interopContext,
       delegate, moduleContext, declPrinter,
       FunctionSignatureTypeUse::TypeReference);
-  typePrinter.visit(ty, std::nullopt, /*isInOut=*/false);
+  typePrinter.visit(ty, std::nullopt);
 }
 
 void DeclAndTypeClangFunctionPrinter::printCxxReturnsRetainedAttribute(

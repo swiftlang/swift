@@ -44,7 +44,7 @@ public func passStruct(_ x : Struct) {
 
 // CHECK: class SWIFT_SYMBOL("s:8UseCxxTy6StructV") Struct final {
 
-// CHECK: SWIFT_INLINE_THUNK void passStruct(const Struct& x) noexcept SWIFT_SYMBOL("s:8UseCxxTy10passStructyyAA0E0VF") {
+// CHECK: SWIFT_INLINE_THUNK void passStruct(const Struct& SWIFT_NOESCAPE x) noexcept SWIFT_SYMBOL("s:8UseCxxTy10passStructyyAA0E0VF") {
 // CHECK-NEXT:   UseCxxTy::_impl::$s8UseCxxTy10passStructyyAA0E0VF(UseCxxTy::_impl::swift_interop_passDirect_UseCxxTy_swift_float4_0_16_swift_float4_16_32_swift_float4_32_48_swift_float4_48_64(UseCxxTy::_impl::_impl_Struct::getOpaquePointer(x)));
 // CHECK-NEXT:}
 
