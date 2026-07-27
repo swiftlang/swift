@@ -1009,8 +1009,8 @@ protected:
       : IGM(IGM), subIGF(subIGF), fwd(fwd), staticFnPtr(staticFnPtr),
         calleeHasContext(calleeHasContext), origSig(origSig),
         origType(origType), substType(substType), outType(outType), subs(subs),
-        conventions(conventions), origConv(origType, IGM.getSILModule()),
-        outConv(outType, IGM.getSILModule()),
+        conventions(conventions),
+        origConv(origType, IGM.silConv), outConv(outType, IGM.silConv),
         origParams(subIGF.collectParameters()) {}
 
 public:
@@ -1025,7 +1025,7 @@ public:
     // Lower the forwarded arguments in the original function's generic context.
     GenericContextScope scope(IGM, origType->getInvocationGenericSignature());
 
-    SILFunctionConventions origConv(origType, IGM.getSILModule());
+    SILFunctionConventions origConv(origType, IGM.silConv);
     auto &outResultTI = IGM.getTypeInfo(
         outConv.getSILResultType(IGM.getMaximalTypeExpansionContext()));
     auto &nativeResultSchema = outResultTI.nativeReturnValueSchema(IGM);
@@ -1158,7 +1158,7 @@ public:
     return substType->getParameters()[index];
   }
 
-  llvm::Value *getContext() { return origParams.claimNext(); }
+  virtual llvm::Value *getContext() { return origParams.claimNext(); }
 
   virtual llvm::Value *getDynamicFunctionPointer() = 0;
   virtual llvm::Value *getDynamicFunctionContext() = 0;
@@ -1245,7 +1245,7 @@ public:
   }
   void createReturn(llvm::CallInst *call) override {
     // Reabstract the result value as substituted.
-    SILFunctionConventions origConv(origType, IGM.getSILModule());
+    SILFunctionConventions origConv(origType, IGM.silConv);
     auto &outResultTI = IGM.getTypeInfo(
         outConv.getSILResultType(IGM.getMaximalTypeExpansionContext()));
     auto &nativeResultSchema = outResultTI.nativeReturnValueSchema(IGM);
@@ -1408,6 +1408,10 @@ public:
     addArgument(explosion);
   }
 
+  // swiftself is the last parameter of the async entry signature, so
+  // takeLast() returns it.
+  llvm::Value *getContext() override { return origParams.takeLast(); }
+
   void forwardErrorResult() override {
     // The error result pointer is already in the appropriate position but the
     // type error address is not.
@@ -1425,8 +1429,9 @@ public:
           errorSchema.shouldReturnTypedErrorIndirectly() ||
           outConv.hasIndirectSILResults() ||
           outConv.hasIndirectSILErrorResults()) {
-        auto *typedErrorResultPtr = origParams.claimNext();
-        args.add(typedErrorResultPtr);
+        // The indirect error slot is now last, since getContext() already
+        // took swiftself.
+        args.add(origParams.takeLast());
       }
     }
   }
@@ -1755,7 +1760,7 @@ static llvm::Value *emitPartialApplicationForwarder(
   auto outSig = IGM.getSignature(outType);
   llvm::AttributeList outAttrs = outSig.getAttributes();
   llvm::FunctionType *fwdTy = outSig.getType();
-  SILFunctionConventions outConv(outType, IGM.getSILModule());
+  SILFunctionConventions outConv(outType, IGM.silConv);
   std::optional<AsyncContextLayout> asyncLayout;
 
   StringRef FnName;

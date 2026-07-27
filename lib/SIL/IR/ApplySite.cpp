@@ -51,7 +51,7 @@ void ApplySite::insertAfterApplication(
 }
 
 bool ApplySite::isAddressable(const Operand &operand) const {
-  unsigned calleeArgIndex = getCalleeArgIndex(operand);
+  unsigned calleeArgIndex = getSubstCalleeArgIndex(operand);
   assert(calleeArgIndex >= getSubstCalleeConv().getSILArgIndexOfFirstParam());
   unsigned paramIdx =
     calleeArgIndex - getSubstCalleeConv().getSILArgIndexOfFirstParam();

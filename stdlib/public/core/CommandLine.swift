@@ -119,4 +119,46 @@ extension CommandLine {
   }
 }
 
+// MARK: - Executable path
+
+extension CommandLine {
+#if !os(anyAppleOS)
+// TODO: replace FPCodeUnit with FilePath.CodeUnit
+#if os(Windows)
+  private typealias FPCodeUnit = CWideChar
+
+  @usableFromInline
+  internal static var executablePathCString: ContiguousArray<CWideChar>? {
+    @_silgen_name("_swift_stdlib_executablePathCString")
+    get { _executablePathCString }
+  }
+#else
+  private typealias FPCodeUnit = CChar
+
+  @usableFromInline
+  internal static var executablePathCString: ContiguousArray<CChar>? {
+    @_silgen_name("_swift_stdlib_executablePathCString")
+    get { _executablePathCString }
+  }
+#endif
+
+  @_silgen_name("_swift_stdlib_withExecutablePath")
+  private static func _withExecutablePath(
+    _ body: (UnsafePointer<FPCodeUnit>, Int) -> Void
+  )
+
+  private static let _executablePathCString = {
+    var result: ContiguousArray<FPCodeUnit>?
+
+    unsafe _withExecutablePath { path, count in
+      if count > 0 {
+        let buffer = unsafe UnsafeBufferPointer(start: path, count: count + 1)
+        result = unsafe ContiguousArray(buffer)
+      }
+    }
+
+    return result
+  }()
+#endif
+}
 #endif // SWIFT_STDLIB_HAS_COMMANDLINE

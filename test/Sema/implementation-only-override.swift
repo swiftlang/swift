@@ -138,12 +138,12 @@ public class NaughtyChild: Parent {
 
 public class NaughtyChildByType: Parent {
   @_implementationOnly public override var roPropSECRET: NaughtyChildByType? { nil } // expected-error {{'@_implementationOnly' override must have the same type as the declaration it overrides ('Parent?')}} {{none}}
-  @_implementationOnly public override subscript(_ index: Int32) -> NaughtyChildByType? { nil } // expected-error {{'@_implementationOnly' override must have the same type as the declaration it overrides ('(Int32) -> Parent?')}} {{none}}
+  @_implementationOnly public override subscript(_ index: Int32) -> NaughtyChildByType? { nil } // expected-error {{'@_implementationOnly' override must have the same type as the declaration it overrides ('(CInt) -> Parent?' (aka '(Int32) -> Optional<Parent>'))}} {{none}}
 }
 
 public class NaughtyConcreteChildByType: GenericParent<Parent> {
   @_implementationOnly public override var roPropSECRET: NaughtyChildByType? { nil } // expected-error {{'@_implementationOnly' override must have the same type as the declaration it overrides ('Parent?')}} {{none}}
-  @_implementationOnly public override subscript(_ index: Int32) -> NaughtyChildByType? { nil } // expected-error {{'@_implementationOnly' override must have the same type as the declaration it overrides ('(Int32) -> Parent?')}} {{none}}
+  @_implementationOnly public override subscript(_ index: Int32) -> NaughtyChildByType? { nil } // expected-error {{'@_implementationOnly' override must have the same type as the declaration it overrides ('(CInt) -> Parent?' (aka '(Int32) -> Optional<Parent>'))}} {{none}}
 }
 
 public class NaughtyGrandchild: GoodChild {

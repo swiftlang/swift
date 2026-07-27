@@ -294,7 +294,7 @@ public struct Strct {
 
 // FIXME: Would we prefer to print these with the typedef names?
 // CHECK: SimpleScopedEnum retSimpleScopedEnumTypedef() noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
-// CHECK: int32_t retSimpleTypedef() noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
+// CHECK: int retSimpleTypedef() noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
 
 // CHECK: SWIFT_INLINE_THUNK Trivial retTrivial() noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
 // CHECK-NEXT: alignas(alignof(Trivial)) char storage[sizeof(Trivial)];

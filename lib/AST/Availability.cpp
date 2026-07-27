@@ -331,51 +331,24 @@ Decl::getActiveAvailableAttrForCurrentPlatform() const {
 }
 
 std::optional<SemanticAvailableAttr> Decl::getDeprecatedAttr() const {
-  auto &ctx = getASTContext();
-  std::optional<SemanticAvailableAttr> result;
-  auto bestActive = getActiveAvailableAttrForCurrentPlatform();
-
-  for (auto attr : getSemanticAvailableAttrs(/*includingInactive=*/false)) {
-    if (attr.isPlatformSpecific() && (!bestActive || attr != bestActive))
-      continue;
-
-    // Unconditional deprecated.
-    if (attr.isUnconditionallyDeprecated())
-      return attr;
-
-    auto deprecatedRange = attr.getDeprecatedRange(ctx);
-    if (!deprecatedRange)
-      continue;
-
-    // We treat the declaration as deprecated if it is deprecated on
-    // all deployment targets.
-    auto deploymentRange = attr.getDomain().getDeploymentRange(ctx);
-    if (deploymentRange && deploymentRange->isContainedIn(*deprecatedRange))
-      result.emplace(attr);
+  auto context = AvailabilityContext::forDeploymentTarget(getASTContext());
+  if (auto restriction = context.restrictionForDecl(this)) {
+    if (restriction->isDeprecated())
+      return restriction->getAttr();
   }
-  return result;
+
+  return std::nullopt;
 }
 
 std::optional<SemanticAvailableAttr> Decl::getSoftDeprecatedAttr() const {
-  auto &ctx = getASTContext();
-  std::optional<SemanticAvailableAttr> result;
-  auto bestActive = getActiveAvailableAttrForCurrentPlatform();
-
-  for (auto attr : getSemanticAvailableAttrs(/*includingInactive=*/false)) {
-    if (attr.isPlatformSpecific() && (!bestActive || attr != bestActive))
-      continue;
-
-    auto deprecatedRange = attr.getDeprecatedRange(ctx);
-    if (!deprecatedRange)
-      continue;
-
-    // We treat the declaration as soft-deprecated if it is deprecated in a
-    // future version.
-    auto deploymentRange = attr.getDomain().getDeploymentRange(ctx);
-    if (!deploymentRange || !deploymentRange->isContainedIn(*deprecatedRange))
-      result.emplace(attr);
+  auto context = AvailabilityContext::forDeploymentTarget(getASTContext());
+  if (auto restriction = context.restrictionForDecl(
+          this, AvailabilityRestrictionFlag::IncludeSoftDeprecation)) {
+    if (restriction->isDeprecated())
+      return restriction->getAttr();
   }
-  return result;
+
+  return std::nullopt;
 }
 
 std::optional<SemanticAvailableAttr> Decl::getNoAsyncAttr() const {

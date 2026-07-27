@@ -37,17 +37,13 @@ sil_vtable Bar {
 // CHECK:   cond_br {{.*}}, bb2, bb1
 
 // CHECK: bb1:
-// CHECK-NEXT:   br bb3({{.*}} : $Builtin.Int32, {{.*}} : $Builtin.Int32, {{.*}}: $Int32)
+// CHECK-NEXT:   br [[HDR:bb[0-9]+]](
 
-// CHECK: bb3({{.*}}: $Builtin.Int32, {{.*}} : $Builtin.Int32, {{.*}} : $Int32):
+// CHECK: [[HDR]]({{.*}}):
 // CHECK:   class_method
 // CHECK:   apply
-// CHECK:   cond_br {{%.*}}, bb5, bb4
+// CHECK:   cond_br
 
-// CHECK: bb5:
-// CHECK-NEXT:   br bb6({{.*}} : $Builtin.Int32)
-
-// CHECK: bb6({{.*}} : $Builtin.Int32):
 // CHECK:   [[STRUCT:%.*]] = struct $Int32 ({{%.*}} : $Builtin.Int32)
 // CHECK:   return [[STRUCT]] : $Int32
 // CHECK: } // end sil function 'looprotate'
@@ -175,7 +171,7 @@ bb0(%0 : $Int32):
 bb1(%4 : $Builtin.Int32, %5 : $Builtin.Int32):
   %6 = struct $Int32 (%5 : $Builtin.Int32)
   %8 = builtin "cmp_eq_Word"(%5 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int1
-  cond_br %8, bb3(%4 : $Builtin.Int32), bb2
+  cond_br %8, bb3, bb2
 
 bb2:
   %10 = integer_literal $Builtin.Int32, 1
@@ -190,8 +186,8 @@ bb2:
   %21 = tuple_extract %20 : $(Builtin.Int32, Builtin.Int1), 0
   br bb1(%21 : $Builtin.Int32, %14 : $Builtin.Int32)
 
-bb3 (%23 : $Builtin.Int32) :
-  %24 = struct $Int32 (%23 : $Builtin.Int32)
+bb3:
+  %24 = struct $Int32 (%4 : $Builtin.Int32)
   return %24 : $Int32
 }
 
@@ -206,12 +202,12 @@ bb0(%0 : $Int32, %25: $*P):
   %2 = integer_literal $Builtin.Int32, 0
   %30 = alloc_box $<τ_0_0> { var τ_0_0 } <Bool>
   %30a = project_box %30 : $<τ_0_0> { var τ_0_0 } <Bool>, 0
-  %40 = open_existential_addr immutable_access %25 : $*P to $*@opened("C22498FA-CABF-11E5-B9A9-685B35C48C83", P) Self
+  %40 = open_existential_addr immutable_access %25 : $*P to $*@opened(1, P) Self
   br bb1(%1 : $Builtin.Int32, %2 : $Builtin.Int32, %30 : $<τ_0_0> { var τ_0_0 } <Bool>)
 
 bb1(%4 : $Builtin.Int32, %5 : $Builtin.Int32, %31 : $<τ_0_0> { var τ_0_0 } <Bool>):
-  %111 = witness_method $@opened("C22498FA-CABF-11E5-B9A9-685B35C48C83", P) Self, #P.boo, %40 : $*@opened("C22498FA-CABF-11E5-B9A9-685B35C48C83", P) Self : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64
-  %122 = apply %111<@opened("C22498FA-CABF-11E5-B9A9-685B35C48C83", P) Self>(%40) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64
+  %111 = witness_method $@opened(1, P) Self, #P.boo, %40 : $*@opened(1, P) Self : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64
+  %122 = apply %111<@opened(1, P) Self>(%40) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64
   %6 = struct $Int32 (%5 : $Builtin.Int32)
   %8 = builtin "cmp_eq_Word"(%5 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int1
   cond_br %8, bb3, bb2
@@ -245,11 +241,11 @@ bb0:
 
 bb1(%1 : $Builtin.Int32, %2 : $Builtin.Int32):    // Preds: bb0 bb2
   %3 = integer_literal $Builtin.Int1, 0           // user: %4
-  cond_br %3, bb2(%1 : $Builtin.Int32, %2 : $Builtin.Int32), bb10 // id: %4
+  cond_br %3, bb11, bb10 // id: %4
 
 bb2(%5 : $Builtin.Int32, %6 : $Builtin.Int32):    // Preds: bb1 bb8
   %7 = integer_literal $Builtin.Int1, -1          // user: %8
-  cond_br %7, bb3, bb1(%5 : $Builtin.Int32, %6 : $Builtin.Int32) // id: %8
+  cond_br %7, bb3, bb12 // id: %8
 
 bb3:                                              // Preds: bb2
   %9 = integer_literal $Builtin.Int32, 0          // user: %11
@@ -288,6 +284,12 @@ bb9:                                              // Preds: bb4
 bb10:                                             // Preds: bb1
   %34 = tuple ()                                  // user: %35
   return %34 : $()                                // id: %35
+
+bb11:
+  br bb2(%1 : $Builtin.Int32, %2 : $Builtin.Int32)
+
+bb12:
+  br bb1(%5 : $Builtin.Int32, %6 : $Builtin.Int32)
 }
 
 // CHECK-LABEL: dont_looprotate_objc
@@ -346,18 +348,17 @@ bb0(%a0 : $Int32):
 // CHECK:   cond_br
 // Loop Header
 // CHECK: bb1:
-// CHECK-NEXT: br bb3
-// CHECK: bb3:
-// CHECK:   cond_br %{{.*}}, bb4, bb8
-// CHECK: bb4:
+// CHECK-NEXT: br [[HDR:bb[0-9]+]]
+// CHECK: [[HDR]]:
+// CHECK:   cond_br %{{.*}}, [[BODY:bb[0-9]+]], [[B8:bb[0-9]+]]
+// CHECK: [[BODY]]:
 // CHECK:   apply
-// CHECK:   br bb5(
-// CHECK: bb5(%[[ARG:[0-9]*]]
-// CHECK-NEXT: cond_br %{{.*}}, bb7, bb6
-// CHECK: bb8:
+// CHECK:   br [[LATCH:bb[0-9]+]](
+// CHECK: [[LATCH]](%[[ARG:[0-9]*]]
+// CHECK-NEXT: cond_br
+// CHECK: [[B8]]:
 // CHECK:   apply
-// CHECK:   br bb5(%
-// CHECK: bb9
+// CHECK:   br [[LATCH]](%
 // CHECK:   return
 sil @insert_backedge_block : $@convention(thin) (@owned @callee_owned () -> Builtin.Int32) -> () {
 bb0(%0 : $@callee_owned () -> Builtin.Int32):
@@ -390,17 +391,21 @@ bb5:
 // CHECK: bb0({{.*}}):
 // CHECK:   br bb1
 // CHECK: bb1:
-// CHECK:   cond_br {{.*}}, bb1, bb2
+// CHECK:   cond_br {{.*}}, bb3, bb2
 // CHECK: bb2:
 // CHECK:   return
+// CHECK: bb3:
+// CHECK:   br bb1
 sil @dont_rotate_single_basic_block_loop : $@convention(thin) (Builtin.Int1) -> () {
 bb0(%0 : $Builtin.Int1):
   br bb1
 bb1:
-  cond_br %0, bb1, bb2
+  cond_br %0, bb3, bb2
 bb2:
  %1 = tuple ()
  return %1 : $()
+bb3:
+  br bb1
 }
 
 // CHECK-LABEL: sil @dont_rotate_single_basic_block_loop_split_backedge
@@ -448,16 +453,16 @@ bb1:
 
 bb2(%37 : $Builtin.Word):
   %38 = dynamic_pack_index %37 of $Pack{KeyPath<Wrapper, Wrapper>}
-  %39 = open_pack_element %38 of <Topic, each Value where Topic : AnyObject, repeat each Value : Sendable> at <Wrapper, Pack{Wrapper}>, shape $each Value, uuid "94218A22-3595-11EF-8496-4EA2A866E4C5"
-  %40 = pack_element_get %38 of %0 : $*Pack{KeyPath<Wrapper, Wrapper>} as $*KeyPath<Wrapper, @pack_element("94218A22-3595-11EF-8496-4EA2A866E4C5") each Value>
-  %41 = unchecked_addr_cast %5 : $*KeyPath<Wrapper, Wrapper> to $*KeyPath<Wrapper, @pack_element("94218A22-3595-11EF-8496-4EA2A866E4C5") each Value>
-  %42 = load %40 : $*KeyPath<Wrapper, @pack_element("94218A22-3595-11EF-8496-4EA2A866E4C5") each Value>
-  store %42 to %41 : $*KeyPath<Wrapper, @pack_element("94218A22-3595-11EF-8496-4EA2A866E4C5") each Value>
+  %39 = open_pack_element %38 of <Topic, each Value where Topic : AnyObject, repeat each Value : Sendable> at <Wrapper, Pack{Wrapper}>, shape $each Value, id 1
+  %40 = pack_element_get %38 of %0 : $*Pack{KeyPath<Wrapper, Wrapper>} as $*KeyPath<Wrapper, @pack_element(1) each Value>
+  %41 = unchecked_addr_cast %5 : $*KeyPath<Wrapper, Wrapper> to $*KeyPath<Wrapper, @pack_element(1) each Value>
+  %42 = load %40 : $*KeyPath<Wrapper, @pack_element(1) each Value>
+  store %42 to %41 : $*KeyPath<Wrapper, @pack_element(1) each Value>
   %7 = integer_literal $Builtin.Word, 1           // users: %45, %44
   %44 = builtin "add_Word"(%37 : $Builtin.Word, %7 : $Builtin.Word) : $Builtin.Word // users: %48, %45
   cond_br undef, bb1, bb3
 
 bb3:
-  strong_retain %42 : $KeyPath<Wrapper, @pack_element("94218A22-3595-11EF-8496-4EA2A866E4C5") each Value>
+  strong_retain %42 : $KeyPath<Wrapper, @pack_element(1) each Value>
   br bb2(%44 : $Builtin.Word)
 }

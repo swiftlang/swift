@@ -416,12 +416,13 @@ ProtocolConformanceRef::getAvailabilityRestriction(DeclContext *dc,
   // involve due to source compatibility exceptions. Thus, it is important to
   // verify that neither pose a restriction in the given context when checking
   // for availability of a conformance.
-  if (auto restriction = availability.restrictionForDecl(getProtocol()))
+  if (auto restriction =
+          availability.unsatisfiedRestrictionForDecl(getProtocol()))
     return restriction;
 
   auto *conformanceDC = getConcrete()->getRootConformance()->getDeclContext();
-  if (auto restriction =
-          availability.restrictionForDecl(conformanceDC->getAsDecl()))
+  if (auto restriction = availability.unsatisfiedRestrictionForDecl(
+          conformanceDC->getAsDecl()))
     return restriction;
 
   return std::nullopt;

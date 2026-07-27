@@ -34,7 +34,7 @@ class FieldRecordFlags {
   enum : int_type {
     // Is this an indirect enum case?
     IsIndirectCase = 0x1,
-    
+
     // Is this a mutable `var` property?
     IsVar = 0x2,
 
@@ -404,14 +404,14 @@ private:
   //  descriptor isn't large enough to have that field.)
   // Lower 16 bits are flag bits
 
-  int getSizeFlagsIndex() const { return 0; }
+  size_t getSizeFlagsIndex() const { return 0; }
 
   // uint32_t PayloadSpareBitMaskByteOffsetCount;
   // Number of bytes in "payload spare bits", and
   // offset of them within the payload area
   // Only present if `usePayloadSpareBits()`
 
-  int getPayloadSpareBitMaskByteCountIndex() const {
+  size_t getPayloadSpareBitMaskByteCountIndex() const {
     return getSizeFlagsIndex() + 1;
   }
 
@@ -419,8 +419,9 @@ private:
   // Variably-sized bitmask field (padded to a multiple of 4 bytes)
   // Only present if `usePayloadSpareBits()`
 
-  int getPayloadSpareBitsIndex() const {
-    int PayloadSpareBitMaskByteCountFieldSize = usesPayloadSpareBits() ? 1 : 0;
+  size_t getPayloadSpareBitsIndex() const {
+    size_t PayloadSpareBitMaskByteCountFieldSize =
+        usesPayloadSpareBits() ? 1 : 0;
     return getPayloadSpareBitMaskByteCountIndex() + PayloadSpareBitMaskByteCountFieldSize;
   }
 
@@ -464,7 +465,8 @@ public:
   }
 
   uint32_t getPayloadSpareBitMaskByteOffset() const {
-    if (usesPayloadSpareBits()) {
+    if (usesPayloadSpareBits() &&
+        getContentsSizeInWords() > getPayloadSpareBitMaskByteCountIndex()) {
       return contents[getPayloadSpareBitMaskByteCountIndex()] >> 16;
     } else {
       return 0;
@@ -472,18 +474,23 @@ public:
   }
 
   uint32_t getPayloadSpareBitMaskByteCount() const {
-    if (usesPayloadSpareBits()) {
+    if (usesPayloadSpareBits() &&
+        getContentsSizeInWords() > getPayloadSpareBitMaskByteCountIndex()) {
       auto byteCount = contents[getPayloadSpareBitMaskByteCountIndex()] & 0xffff;
-      assert(getContentsSizeInWords() >= 2 + (byteCount + 3) / 4
-            && "Malformed MPEnum reflection record: mask bigger than record");
-      return byteCount;
+      uint32_t maxBytes = (getContentsSizeInWords() - 2) * 4;
+      assert(byteCount <= maxBytes &&
+             "Malformed MPEnum reflection record: mask bigger than record");
+      return byteCount <= maxBytes ? byteCount : maxBytes;
     } else {
       return 0;
     }
   }
 
   const uint8_t *getPayloadSpareBits() const {
-    if (usesPayloadSpareBits()) {
+    // The mask bytes live in contents[2...], only present when the record
+    // declares at least two content words.
+    if (usesPayloadSpareBits() &&
+        getContentsSizeInWords() > getPayloadSpareBitMaskByteCountIndex()) {
       return reinterpret_cast<const uint8_t *>(&contents[getPayloadSpareBitsIndex()]);
     } else {
       return nullptr;

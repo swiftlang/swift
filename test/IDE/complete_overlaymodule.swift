@@ -24,9 +24,9 @@ func testGlobalExpr(value: Overlaid) {
     value.#^EXPR_MEMBER^#
 // EXPR_MEMBER: Begin completions, 6 items
 // EXPR_MEMBER-DAG: Keyword[self]/CurrNominal:          self[#Overlaid#]; name=self
-// EXPR_MEMBER-DAG: Decl[InstanceVar]/CurrNominal:      x[#Double#]; name=x
-// EXPR_MEMBER-DAG: Decl[InstanceVar]/CurrNominal:      y[#Double#]; name=y
-// EXPR_MEMBER-DAG: Decl[InstanceVar]/CurrNominal:      z[#Double#]; name=z
+// EXPR_MEMBER-DAG: Decl[InstanceVar]/CurrNominal:      x[#CDouble#]; name=x
+// EXPR_MEMBER-DAG: Decl[InstanceVar]/CurrNominal:      y[#CDouble#]; name=y
+// EXPR_MEMBER-DAG: Decl[InstanceVar]/CurrNominal:      z[#CDouble#]; name=z
 // EXPR_MEMBER-DAG: Decl[InstanceMethod]/CurrNominal:   inOverlayFunc()[#Void#]; name=inOverlayFunc()
-// EXPR_MEMBER-DAG: Decl[InstanceMethod]/CurrNominal:   inOriginalFunc()[#Double#]; name=inOriginalFunc()
+// EXPR_MEMBER-DAG: Decl[InstanceMethod]/CurrNominal:   inOriginalFunc()[#CDouble#]; name=inOriginalFunc()
 }

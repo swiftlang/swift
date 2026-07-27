@@ -1095,7 +1095,7 @@ bb2:
 // CHECK-NEXT: load [[BEGIN]] : $*X
 // CHECK-NEXT: end_access [[BEGIN]] : $*X
 // CHECK-NEXT: br bb1
-// CHECK: cond_br {{.*}}, bb1, bb2
+// CHECK: cond_br {{.*}}, bb3, bb2
 // CHECK: [[BEGIN2:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
 // CHECK-NEXT: load [[BEGIN2]] : $*X
 // CHECK-NEXT: end_access [[BEGIN2]] : $*X
@@ -1110,7 +1110,7 @@ bb0:
   
 bb1:
   %cond = integer_literal $Builtin.Int1, 1
-  cond_br %cond, bb1, bb2
+  cond_br %cond, bb3, bb2
 
 bb2:
   %4 = begin_access [read] [dynamic] %0 : $*X
@@ -1118,6 +1118,9 @@ bb2:
   end_access %4 : $*X
   %7 = tuple ()
   return %7 : $()
+
+bb3:
+  br bb1
 }
 
 // public func testConflictInInnerLoop() {
@@ -1132,7 +1135,7 @@ bb2:
 // CHECK: [[BEGIN2:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
 // CHECK-NEXT: load [[BEGIN2]] : $*X
 // CHECK-NEXT: end_access [[BEGIN2]] : $*X
-// CHECK: cond_br {{.*}}, bb1, bb2
+// CHECK: cond_br {{.*}}, bb3, bb2
 // CHECK: [[BEGIN3:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
 // CHECK-NEXT: load [[BEGIN3]] : $*X
 // CHECK-NEXT: end_access [[BEGIN3]] : $*X
@@ -1151,7 +1154,7 @@ bb1:
   %5 = load %4 : $*X
   end_access %4 : $*X
   %cond = integer_literal $Builtin.Int1, 1
-  cond_br %cond, bb1, bb2
+  cond_br %cond, bb3, bb2
 
 bb2:
   %7 = begin_access [read] [dynamic] %0 : $*X
@@ -1159,6 +1162,9 @@ bb2:
   end_access %7 : $*X
   %10 = tuple ()
   return %10 : $()
+
+bb3:
+  br bb1
 }
 
 sil hidden_external [global_init] @globalAddressor : $@convention(thin) () -> Builtin.RawPointer
@@ -1175,7 +1181,7 @@ sil hidden_external [global_init] @globalAddressor : $@convention(thin) () -> Bu
 // CHECK: [[BEGIN2:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] {{.*}} : $*Int64
 // CHECK-NEXT: load [[BEGIN2]] : $*Int64
 // CHECK-NEXT: end_access [[BEGIN2]] : $*Int64
-// CHECK: cond_br {{.*}}, bb1, bb2
+// CHECK: cond_br {{.*}}, bb3, bb2
 // CHECK: [[BEGIN3:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
 // CHECK-NEXT: load [[BEGIN3]] : $*X
 // CHECK-NEXT: end_access [[BEGIN3]] : $*X
@@ -1197,7 +1203,7 @@ bb1:
   %u4 = load %u3 : $*Int64
   end_access %u3 : $*Int64
   %cond = integer_literal $Builtin.Int1, 1
-  cond_br %cond, bb1, bb2
+  cond_br %cond, bb3, bb2
 
 bb2:
   %7 = begin_access [read] [dynamic] %0 : $*X
@@ -1205,6 +1211,9 @@ bb2:
   end_access %7 : $*X
   %10 = tuple ()
   return %10 : $()
+
+bb3:
+  br bb1
 }
 
 // public func testIrreducibleGraph() {
@@ -1220,15 +1229,15 @@ bb2:
 // CHECK: [[BEGIN2:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
 // CHECK-NEXT: load [[BEGIN2]] : $*X
 // CHECK-NEXT: end_access [[BEGIN2]] : $*X
-// CHECK: cond_br {{.*}}, bb2, bb3
+// CHECK: cond_br {{.*}}, bb5, bb6
 // CHECK: [[BEGIN3:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
 // CHECK-NEXT: load [[BEGIN3]] : $*X
 // CHECK-NEXT: end_access [[BEGIN3]] : $*X
-// CHECK: cond_br {{.*}}, bb3, bb4
+// CHECK: cond_br {{.*}}, bb7, bb4
 // CHECK: [[BEGIN4:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
 // CHECK-NEXT: load [[BEGIN4]] : $*X
 // CHECK-NEXT: end_access [[BEGIN4]] : $*X
-// CHECK: cond_br {{.*}}, bb2, bb1
+// CHECK: cond_br {{.*}}, bb8, bb9
 // CHECK: [[BEGIN5:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
 // CHECK-NEXT: load [[BEGIN5]] : $*X
 // CHECK-NEXT: end_access [[BEGIN5]] : $*X
@@ -1247,28 +1256,43 @@ bb1:
   %5 = load %4 : $*X
   end_access %4 : $*X
   %cond1 = integer_literal $Builtin.Int1, 1
-  cond_br %cond1, bb2, bb3
-  
+  cond_br %cond1, bb5, bb6
+
 bb2:
   %6 = begin_access [read] [dynamic] %0 : $*X
   %7 = load %6 : $*X
   end_access %6 : $*X
   %cond2 = integer_literal $Builtin.Int1, 1
-  cond_br %cond2, bb3, bb4
+  cond_br %cond2, bb7, bb4
 
 bb3:
   %8 = begin_access [read] [dynamic] %0 : $*X
   %9 = load %8 : $*X
   end_access %8 : $*X
   %cond3 = integer_literal $Builtin.Int1, 1
-  cond_br %cond3, bb2, bb1
-  
+  cond_br %cond3, bb8, bb9
+
 bb4:
   %10 = begin_access [read] [dynamic] %0 : $*X
   %11 = load %10 : $*X
   end_access %10 : $*X
   %12 = tuple ()
   return %12 : $()
+
+bb5:
+  br bb2
+
+bb6:
+  br bb3
+
+bb7:
+  br bb3
+
+bb8:
+  br bb2
+
+bb9:
+  br bb1
 }
 
 // public func testIrreducibleGraph2() {
@@ -1288,7 +1312,7 @@ bb4:
 // CHECK: [[BEGIN1:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
 // CHECK-NEXT: load [[BEGIN1]] : $*X
 // CHECK-NEXT: end_access [[BEGIN1]] : $*X
-// CHECK: cond_br {{.*}}, bb2, bb3
+// CHECK: cond_br {{.*}}, bb6, bb7
 // CHECK: [[BEGIN2:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
 // CHECK-NEXT: load [[BEGIN2]] : $*X
 // CHECK-NEXT: end_access [[BEGIN2]] : $*X
@@ -1298,7 +1322,7 @@ bb4:
 // CHECK: br bb4
 // CHECK: load [[BEGIN3]] : $*X
 // CHECK-NEXT: end_access [[BEGIN3]] : $*X
-// CHECK: cond_br {{.*}}, bb2, bb5
+// CHECK: cond_br {{.*}}, bb8, bb5
 // CHECK: [[BEGIN5:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
 // CHECK-NEXT: load [[BEGIN5]] : $*X
 // CHECK-NEXT: end_access [[BEGIN5]] : $*X
@@ -1317,8 +1341,8 @@ bb1:
   %5 = load %4 : $*X
   end_access %4 : $*X
   %cond1 = integer_literal $Builtin.Int1, 1
-  cond_br %cond1, bb2, bb3
-  
+  cond_br %cond1, bb6, bb7
+
 bb2:
   %6 = begin_access [read] [dynamic] %0 : $*X
   %7 = load %6 : $*X
@@ -1330,20 +1354,29 @@ bb3:
   %9 = load %8 : $*X
   end_access %8 : $*X
   br bb4
-  
+
 bb4:
   %10 = begin_access [read] [dynamic] %0 : $*X
   %11 = load %10 : $*X
   end_access %10 : $*X
   %cond2 = integer_literal $Builtin.Int1, 1
-  cond_br %cond2, bb2, bb5
-  
+  cond_br %cond2, bb8, bb5
+
 bb5:
   %13 = begin_access [read] [dynamic] %0 : $*X
   %14 = load %13 : $*X
   end_access %13 : $*X
   %16 = tuple ()
   return %16 : $()
+
+bb6:
+  br bb2
+
+bb7:
+  br bb3
+
+bb8:
+  br bb2
 }
 
 class RefElemClass {
@@ -1432,7 +1465,7 @@ bb0(%0 : $RefElemNoConflictClass):
 // CHECK: [[BEGIN1:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
 // CHECK-NEXT: load [[BEGIN1]] : $*X
 // CHECK-NEXT: end_access [[BEGIN1]] : $*X
-// CHECK: cond_br {{.*}}, bb2, bb3
+// CHECK: cond_br {{.*}}, bb7, bb8
 // CHECK: [[BEGIN2:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
 // CHECK-NEXT: load [[BEGIN2]] : $*X
 // CHECK-NEXT: end_access [[BEGIN2]] : $*X
@@ -1465,7 +1498,7 @@ bb1:
   %5 = load %4 : $*X
   end_access %4 : $*X
   %cond1 = integer_literal $Builtin.Int1, 1
-  cond_br %cond1, bb2, bb3
+  cond_br %cond1, bb7, bb8
 
 bb2:
   %6 = begin_access [read] [dynamic] %0 : $*X
@@ -1498,6 +1531,12 @@ bb6:
   end_access %16 : $*X
   %19 = tuple ()
   return %19 : $()
+
+bb7:
+  br bb2
+
+bb8:
+  br bb3
 }
 
 // public func testMergeWithFirstConflict() {

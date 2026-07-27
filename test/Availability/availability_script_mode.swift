@@ -32,3 +32,21 @@ var unavailableOnMacOSVar: UnavailableOnMacOS = .init() // expected-error {{'Una
 
 @available(*, unavailable) // expected-error {{global variable cannot be marked unavailable with '@available' in script mode}}
 var unconditionallyUnavailableVar: UnavailableUnconditionally = .init() // expected-error {{'UnavailableUnconditionally' is unavailable}}
+
+// Computed globals have no initial value to execute eagerly, so they are safe
+// to mark unavailable in script mode.
+
+@available(macOS, introduced: 51)
+var computedPotentiallyUnavailableVar: Available51 {
+  Available51()
+}
+
+@available(macOS, unavailable)
+var computedUnavailableOnMacOSVar: UnavailableOnMacOS {
+  UnavailableOnMacOS()
+}
+
+@available(*, unavailable)
+var computedUnconditionallyUnavailableVar: UnavailableUnconditionally {
+  UnavailableUnconditionally()
+}

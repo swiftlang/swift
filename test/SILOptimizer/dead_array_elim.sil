@@ -273,10 +273,13 @@ bb1:
   strong_retain %0 : $TrivialDestructor
   store %0 to %7 : $*TrivialDestructor
   strong_release %15 : $Builtin.BridgeObject
-  cond_br undef, bb1, bb2
+  cond_br undef, bb3, bb2
 
 bb2:
   %18 = tuple ()
   return %18 : $()
+
+bb3:
+  br bb1
 }
 

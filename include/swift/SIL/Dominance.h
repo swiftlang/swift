@@ -18,7 +18,9 @@
 #ifndef SWIFT_SIL_DOMINANCE_H
 #define SWIFT_SIL_DOMINANCE_H
 
+#include "llvm/ADT/DepthFirstIterator.h"
 #include "llvm/Support/GenericDomTree.h"
+#include "llvm/Support/GraphWriter.h"
 #include "swift/Basic/ScopedTracking.h"
 #include "swift/SIL/CFG.h"
 
@@ -284,6 +286,74 @@ template <> struct GraphTraits<const swift::DominanceInfoNode *> {
   static NodeRef getEntryNode(NodeRef N) { return N; }
   static inline ChildIteratorType child_begin(NodeRef N) { return N->begin(); }
   static inline ChildIteratorType child_end(NodeRef N) { return N->end(); }
+};
+
+template <>
+struct DOTGraphTraits<swift::DominanceInfo *> : public DefaultDOTGraphTraits {
+  DOTGraphTraits(bool isSimple = false) : DefaultDOTGraphTraits(isSimple) {}
+
+  static std::string getGraphName(swift::DominanceInfo *DI) {
+    return "Dominator Tree for SIL Function";
+  }
+
+  std::string getNodeLabel(swift::DominanceInfoNode *Node,
+                           swift::DominanceInfo *DI) {
+    if (!Node)
+      return "<<null>>";
+
+    swift::SILBasicBlock *BB = Node->getBlock();
+    if (!BB)
+      return "<<entry root>>";
+
+    std::string Str;
+    raw_string_ostream OS(Str);
+
+    if (isSimple()) {
+      BB->printAsOperand(OS, false);
+    } else {
+      OS << *BB;
+    }
+
+    return OS.str();
+  }
+};
+
+template <>
+struct GraphTraits<swift::DominanceInfo *>
+    : public GraphTraits<swift::DominanceInfoNode *> {
+  typedef swift::DominanceInfoNode *NodeRef;
+  typedef df_iterator<NodeRef> nodes_iterator;
+
+  static NodeRef getEntryNode(swift::DominanceInfo *DI) {
+    return DI->getRootNode();
+  }
+
+  static nodes_iterator nodes_begin(swift::DominanceInfo *DI) {
+    if (DI->getRootNode())
+      return df_begin(DI->getRootNode());
+    return df_end(static_cast<NodeRef>(nullptr));
+  }
+
+  static nodes_iterator nodes_end(swift::DominanceInfo *DI) {
+    if (DI->getRootNode())
+      return df_end(DI->getRootNode());
+    return df_end(static_cast<NodeRef>(nullptr));
+  }
+
+  static unsigned size(swift::DominanceInfo *DI) {
+    unsigned count = 0;
+    std::function<void(swift::DominanceInfoNode *)> countNodes =
+        [&](swift::DominanceInfoNode *N) {
+          count++;
+          for (auto I = N->begin(), E = N->end(); I != E; ++I)
+            countNodes(*I);
+        };
+
+    if (DI->getRootNode())
+      countNodes(DI->getRootNode());
+
+    return count;
+  }
 };
 
 } // end namespace llvm

@@ -11,26 +11,11 @@
 
 import argparse
 import io
-import os
-import platform
-import re
 import subprocess
 import sys
 
-# LLVM Lit performs realpath with the config path, so all paths are relative
-# to the real path. Paths that come from CMake (like cmake_binary_dir and
-# swift_src_root), might not do real path. Use realpath to normalize. Because
-# this normalizes Windows paths to use backslashes, we have to replace them
-# back to forward slashes.
-def normalize_if_path(s):
-    # Check dirname for cases like a file named `%t.out.txt`
-    # There won't be a `%t` path, but we still want to match this path substring.
-    if not os.path.exists(s) and not os.path.exists(os.path.dirname(s)):
-        return s
-    if platform.system() == "Windows":
-        return os.path.abspath(s).replace('\\', '/')
-    else:
-        return os.path.realpath(s)
+import swift_path_sanitize
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -40,15 +25,10 @@ PathSanitizingFileCheck is a wrapper around LLVM's FileCheck.  In addition
 to all FileCheck features, PathSanitizingFileCheck can replace given
 strings in the input with other strings.  This feature is used to replace
 paths to the source and build directories with path-independent
-constants.""")
+constants.""",
+    )
 
-    parser.add_argument(
-        "--sanitize",
-        help="replace the given string with another string",
-        metavar="REPLACEMENT=SOURCE",
-        action="append",
-        dest="sanitize_strings",
-        default=[])
+    swift_path_sanitize.add_shared_arguments(parser)
 
     parser.add_argument(
         "--use-filecheck",
@@ -56,70 +36,30 @@ constants.""")
         metavar="PATH",
         action="store",
         dest="file_check_path",
-        default="FileCheck")
-
-    parser.add_argument(
-        "--enable-windows-compatibility",
-        help="Enable Windows path compatibility, which checks against both "
-             "forward slashes and backward slashes.",
-        action="store_true")
-
-    parser.add_argument(
-        "--enable-yaml-compatibility",
-        help="Enable YAML path compatibility. Since YAML double escapes "
-             "backward slashes, we need to check for them escaped. Only "
-             "available if Windows compatibility is enabled.",
-        action="store_true")
+        default="FileCheck",
+    )
 
     parser.add_argument(
         "--dry-run",
         help="Apply the replacements to the input and print the result "
-             "to standard output",
-        action="store_true")
-
-    parser.add_argument(
-        "--ignore-runtime-warnings",
-        help="Ignore warnings from the Swift runtime",
-        action="store_true")
+        "to standard output",
+        action="store_true",
+    )
 
     args, unknown_args = parser.parse_known_args()
 
-    if args.enable_windows_compatibility:
-        if args.enable_yaml_compatibility:
-            slashes_re = r'(/|\\\\|\\\\\\\\)'
-        else:
-            slashes_re = r'(/|\\\\)'
-    else:
-        slashes_re = r'/'
+    stdin = io.open(sys.stdin.fileno(), "r", encoding="utf-8", errors="ignore").read()
 
-    stdin = io.open(sys.stdin.fileno(), 'r', encoding='utf-8', errors='ignore').read()
-
-    for s in sorted(args.sanitize_strings, key=len, reverse=True):
-        replacement, pattern = s.split('=', 1)
-        # Since we want to use pattern as a regex in some platforms, we need
-        # to escape it first, and then replace the escaped slash
-        # literal (r'\\/') for our platform-dependent slash regex.
-        stdin = re.sub(re.sub(r'\\/' if sys.version_info[0] < 3 else r'/',
-                              slashes_re, re.escape(normalize_if_path(pattern))),
-                       replacement, stdin)
-
-    # Because we force the backtracer on in the tests, we can get runtime
-    # warnings about privileged programs.  Suppress those, and also the
-    # warning it might emit if backtracing isn't supported on the test platform.
-    # Additionally, suppress warnings about unknown backtracer options, since
-    # we might want to add new ones to the lit tests and we should ignore
-    # messages from the system copy of the runtime in that case.
-    if args.ignore_runtime_warnings:
-        stdin = re.sub(r'^swift runtime: (backtrace-on-crash is not '
-                       r'supported|unknown) .*\n', "", stdin, flags=re.M)
+    stdin = swift_path_sanitize.sanitize(stdin, args)
 
     if args.dry_run:
         print(stdin)
         return 0
     else:
         p = subprocess.Popen(
-            [args.file_check_path] + unknown_args, stdin=subprocess.PIPE)
-        stdout, stderr = p.communicate(stdin.encode('utf-8'))
+            [args.file_check_path] + unknown_args, stdin=subprocess.PIPE
+        )
+        stdout, stderr = p.communicate(stdin.encode("utf-8"))
         if stdout is not None:
             print(stdout)
         if stderr is not None:
@@ -127,5 +67,5 @@ constants.""")
         return p.wait()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     exit(main())

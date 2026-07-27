@@ -88,6 +88,25 @@ void copyView(View view1 [[clang::lifetime_capture_by(view2)]], View &view2) {
     view2 = view1;
 }
 
+// A reference parameter annotated with 'lifetime_capture_by' means the callee
+// may store the address of the referent into the capturing parameter, so it
+// must be imported as a scoped ('borrow') dependency rather than a 'copy'.
+// This holds regardless of whether the referent is escapable.
+
+// Escapable referent: captures the address of 'owner'.
+void captureOwnerRef(View &out, const Owner &owner [[clang::lifetime_capture_by(out)]]) {
+    out = View(&owner.data);
+}
+
+struct SWIFT_NONESCAPABLE ViewRef {
+    const View *ref = nullptr;
+};
+
+// Nonescapable referent: captures the address of 'v'.
+void captureViewRef(ViewRef &out, const View &v [[clang::lifetime_capture_by(out)]]) {
+    out.ref = &v;
+}
+
 struct SWIFT_NONESCAPABLE CaptureView {
     CaptureView() : view(nullptr) {}
     CaptureView(View p [[clang::lifetimebound]]) : view(p) {}
@@ -253,6 +272,20 @@ public:
 inline void retainSharedOwnerBox(SharedOwnerBox *) {}
 inline void releaseSharedOwnerBox(SharedOwnerBox *) {}
 
+struct NonTrivialByValue {
+    int data;
+    NonTrivialByValue(const NonTrivialByValue &o) : data(o.data) {}
+    ~NonTrivialByValue() {}
+};
+View fromNonTrivialValue(NonTrivialByValue o [[clang::lifetimebound]]);
+View fromTrivialValue(Owner o [[clang::lifetimebound]]);
+View fromPointer(const int *p [[clang::lifetimebound]]);
+
+View fromLvalueRefTrivialValue(Owner &o [[clang::lifetimebound]]);
+View fromLvalueRefNonTrivialValue(NonTrivialByValue &o [[clang::lifetimebound]]);
+View fromRvalueRefTrivialValue(Owner &&o [[clang::lifetimebound]]);
+View fromRvalueRefNonTrivialValue(NonTrivialByValue &&o [[clang::lifetimebound]]);
+
 // CHECK: sil {{.*}}[clang makeOwner] {{.*}}: $@convention(c) () -> Owner
 // CHECK: sil {{.*}}[clang getView] {{.*}} : $@convention(c) (@in_guaranteed Owner) -> @lifetime(borrow address 0) @owned View
 // CHECK: sil {{.*}}[clang getViewFromFirst] {{.*}} : $@convention(c) (@in_guaranteed Owner, @in_guaranteed Owner) -> @lifetime(borrow address 0) @owned View
@@ -264,6 +297,8 @@ inline void releaseSharedOwnerBox(SharedOwnerBox *) {}
 // CHECK: sil {{.*}}[clang OtherView.init] {{.*}} : $@convention(c) (View) -> @lifetime(copy 0) @out OtherView
 // CHECK: sil {{.*}}[clang returnsImmortal] {{.*}} : $@convention(c) () -> @lifetime(immortal) @owned View
 // CHECK: sil {{.*}}[clang copyView] {{.*}} : $@convention(c) (View, @lifetime(copy 0) @inout View) -> ()
+// CHECK: sil {{.*}}[clang captureOwnerRef] {{.*}} : $@convention(c) (@lifetime(borrow {{.*}}1) @inout View, @in_guaranteed Owner) -> ()
+// CHECK: sil {{.*}}[clang captureViewRef] {{.*}} : $@convention(c) (@lifetime(borrow {{.*}}1) @inout ViewRef, {{.*}}View) -> ()
 // CHECK: sil {{.*}}[clang getCaptureView] {{.*}} : $@convention(c) (@in_guaranteed Owner) -> @lifetime(borrow address 0) @owned CaptureView
 // CHECK: sil {{.*}}[clang CaptureView.captureView] {{.*}} : $@convention(cxx_method) (View, @lifetime(copy 0) @inout CaptureView) -> ()
 // CHECK: sil {{.*}}[clang CaptureView.handOut] {{.*}} : $@convention(cxx_method) (@lifetime(copy 1) @inout View, @in_guaranteed CaptureView) -> ()
@@ -272,6 +307,13 @@ inline void releaseSharedOwnerBox(SharedOwnerBox *) {}
 // CHECK: sil {{.*}}[clang makeAnonUnionNonEscapable] {{.*}} : $@convention(c) (@in_guaranteed Owner) -> @lifetime(borrow address 0) @owned HasAnonUnion<NonEscapable>
 // CHECK: sil {{.*}}[clang makeAnonStructNonEscapable] {{.*}} : $@convention(c) (@in_guaranteed Owner) -> @lifetime(borrow address 0) @owned HasAnonStruct<NonEscapable>
 // CHECK: sil {{.*}}[clang makeNonEscapableHasAnonUnionNonEscapable] {{.*}} : $@convention(c) (@in_guaranteed Owner) -> @lifetime(borrow address 0) @owned NonEscapableHasAnonUnion<NonEscapable>
+// CHECK: sil {{.*}}[clang fromNonTrivialValue] {{.*}} : $@convention(c) (@in{{(_cxx)?}} NonTrivialByValue) -> @lifetime(immortal) @owned View
+// CHECK: sil {{.*}}[clang fromTrivialValue] {{.*}} : $@convention(c) (Owner) -> @lifetime(immortal) @owned View
+// CHECK: sil {{.*}}[clang fromPointer] {{.*}} : $@convention(c) (Optional<UnsafePointer<Int32>>) -> @lifetime(immortal) @owned View
+// CHECK: sil {{.*}}[clang fromLvalueRefTrivialValue] {{.*}} : $@convention(c) (@inout Owner) -> @lifetime(borrow address 0) @owned View
+// CHECK: sil {{.*}}[clang fromLvalueRefNonTrivialValue] {{.*}} : $@convention(c) (@inout NonTrivialByValue) -> @lifetime(borrow address 0) @owned View
+// CHECK: sil {{.*}}[clang fromRvalueRefTrivialValue] {{.*}} : $@convention(c) (@in{{(_cxx)?}} Owner) -> @lifetime(immortal) @owned View
+// CHECK: sil {{.*}}[clang fromRvalueRefNonTrivialValue] {{.*}} : $@convention(c) (@in{{(_cxx)?}} NonTrivialByValue) -> @lifetime(immortal) @owned View
 
 //--- test.swift
 
@@ -290,6 +332,10 @@ public func test() {
     let _ = OtherView(defaultView)
     let _ = returnsImmortal()
     copyView(v2, &v1)
+    var out = View()
+    captureOwnerRef(&out, o)
+    var outRef = ViewRef()
+    captureViewRef(&outRef, v1)
     var cv = getCaptureView(o)
     cv.captureView(v1)
     cv.handOut(&v1)
@@ -311,6 +357,23 @@ func anonymousUnionsAndStructs(_ v: borrowing View) {
     let _ = makeAnonUnionNonEscapable(o)
     let _ = makeAnonStructNonEscapable(o)
     let _ = makeNonEscapableHasAnonUnionNonEscapable(o)
+}
+
+func byValueAndPointerLifetimebound(_ n: NonTrivialByValue, _ o: Owner,
+                                    _ p: UnsafePointer<CInt>) {
+    let _ = fromNonTrivialValue(n)
+    let _ = fromTrivialValue(o)
+    let _ = fromPointer(p)
+}
+
+func lvalueRefLifetimebound(_ o: inout Owner, _ n: inout NonTrivialByValue) {
+    let _ = fromLvalueRefTrivialValue(&o)
+    let _ = fromLvalueRefNonTrivialValue(&n)
+}
+
+func rvalueRefLifetimebound(_ o: consuming Owner, _ n: consuming NonTrivialByValue) {
+    let _ = fromRvalueRefTrivialValue(consuming: o)
+    let _ = fromRvalueRefNonTrivialValue(consuming: n)
 }
 
 //--- escaping_scopes.swift
@@ -352,6 +415,21 @@ func viaFieldFreeFunc() -> View {
   // expected-error @-1 {{lifetime-dependent value escapes its scope}}
   // expected-note @-2 {{it depends on this scoped access to variable 'globalWrapper'}}
   // expected-note @-3 {{this use causes the lifetime-dependent value to escape}}
+}
+
+// A value that captured a reference to a local via 'lifetime_capture_by' must
+// not outlive that local.
+@_lifetime(immortal)
+func captureEscapesLocal() -> View {
+  var out = View()
+  // expected-error @-1 {{lifetime-dependent variable 'out' escapes its scope}}
+  do {
+    let o = makeOwner()
+    // expected-note @-1 {{it depends on the lifetime of variable 'o'}}
+    captureOwnerRef(&out, o)
+  }
+  return out
+  // expected-note @-1 {{this use causes the lifetime-dependent value to escape}}
 }
 
 final class SwiftBoxTrivial { var field = Owner(data: 0) }

@@ -4206,11 +4206,6 @@ public:
           || getAttr()->hasInvalidImplicitLangAttrs())
       return;
 
-    // Only encourage adoption if the corresponding language feature is enabled.
-    if (isa<ExtensionDecl>(decl) &&
-        !decl->getASTContext().LangOpts.hasFeature(Feature::ObjCImplementation))
-      return;
-
     auto diag = diagnose(getAttr()->getLocation(),
                          diag::objc_implementation_early_spelling_deprecated);
     diag.fixItReplace(getAttr()->getRangeWithAt(), "@implementation");

@@ -8,5 +8,5 @@ import re
 import sys
 
 sys.stdout.write(
-    re.sub(r'@opened\("[^"]+"', '@opened("UUID"', sys.stdin.read())
+    re.sub(r'@opened\([^"]+', '@opened("UUID"', sys.stdin.read())
 )

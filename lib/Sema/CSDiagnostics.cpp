@@ -45,6 +45,7 @@
 #include "swift/Basic/SourceLoc.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/Sema/ConstraintLocator.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Sema/TypeVariableType.h"
@@ -301,13 +302,6 @@ ValueDecl *RequirementFailure::getDeclRef() const {
   if (auto opaqueLocator =
           getLocator()->findFirst<LocatorPathElt::OpenedOpaqueArchetype>()) {
     return opaqueLocator->getDecl();
-  }
-
-  // If the locator is for a result builder body result type, the requirement
-  // came from the function's return type.
-  if (getLocator()->isForResultBuilderBodyResult()) {
-    auto *func = getAsDecl<FuncDecl>(getAnchor());
-    return getAffectedDeclFromType(func->getResultInterfaceType());
   }
 
   if (isFromContextualType()) {
@@ -963,6 +957,8 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
   while (!path.empty()) {
     auto last = path.back();
     if (last.is<LocatorPathElt::OptionalInjection>() ||
+        last.is<LocatorPathElt::OpenedGeneric>() ||
+        last.is<LocatorPathElt::AnyRequirement>() ||
         last.is<LocatorPathElt::GenericType>() ||
         last.is<LocatorPathElt::GenericArgument>()) {
       path = path.drop_back();
@@ -1020,10 +1016,6 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
       diagnostic = getDiagnosticFor(purpose);
       break;
     }
-
-    case ConstraintLocator::ResultBuilderBodyResult:
-      diagnostic = diag::cannot_convert_result_builder_result_to_return_type;
-      break;
 
     case ConstraintLocator::AutoclosureResult:
     case ConstraintLocator::ApplyArgToParam:
@@ -1215,6 +1207,26 @@ bool ArrayLiteralToDictionaryConversionFailure::diagnoseAsError() {
       }
     }
   }
+  return true;
+}
+
+bool AttributedFuncToTypeConversionFailure::diagnoseAsNote() {
+  if (!getToType()->is<FunctionType>())
+    return false;
+
+  auto argApplyInfo = getFunctionArgApplyInfo(getLocator());
+  if (!argApplyInfo)
+    return false;
+
+  auto overload = getCalleeOverloadChoiceIfAvailable(getLocator());
+  if (!(overload && overload->choice.isDecl()))
+    return false;
+
+  SmallString<4> scratch;
+  emitDiagnosticAt(overload->choice.getDecl(),
+                   diag::candidate_expects_escaping_argument, attributeKind,
+                   argApplyInfo->getParamPosition(),
+                   argApplyInfo->getArgDescription(scratch));
   return true;
 }
 
@@ -2863,11 +2875,6 @@ bool ContextualFailure::diagnoseAsError() {
     return true;
   }
 
-  case ConstraintLocator::ResultBuilderBodyResult: {
-    diagnostic = *getDiagnosticFor(CTP_Initialization, toType);
-    break;
-  }
-
   case ConstraintLocator::OptionalInjection: {
     // If this is an attempt at a Double <-> CGFloat conversion
     // through optional chaining, let's produce a tailored diagnostic.
@@ -3863,14 +3870,21 @@ ContextualFailure::getDiagnosticFor(ContextualTypePurpose context,
 
 bool NonClassTypeToAnyObjectConversionFailure::diagnoseAsError() {
   auto locator = getLocator();
-  if (locator->isForContextualType()) {
-    return ContextualFailure::diagnoseAsError();
-  }
-
   auto fromType = getFromType();
   auto toType = getToType();
   assert(fromType);
   assert(toType);
+
+  if (fromType->isNoncopyable()) {
+    emitDiagnostic(diag::cannot_convert_noncopyable_value_to_anyobject,
+                   fromType, toType);
+    return true;
+  }
+
+  if (locator->isForContextualType()) {
+    return ContextualFailure::diagnoseAsError();
+  }
+
   if (locator->isLastElement<LocatorPathElt::ApplyArgToParam>()) {
     ArgumentMismatchFailure failure(getSolution(), fromType, toType, locator);
     return failure.diagnoseAsError();
@@ -4410,6 +4424,7 @@ findImportedCaseWithMatchingSuffix(Type instanceTy, DeclNameRef name) {
     // Is one more available than the other?
     WORSE(->isUnavailable());
     WORSE(->isDeprecated());
+    WORSE(->isClangDeclDeprecated());
 
     // Does one have a shorter name (so the non-matching prefix is shorter)?
     WORSE(->getName().getBaseName().userFacingName().size());
@@ -5239,6 +5254,16 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
   }
 
   return false;
+}
+
+bool InvalidMetatypeExtensionMemberRefFailure::diagnoseAsError() {
+  auto baseType = resolveType(BaseType)->getWithoutSpecifierType();
+  baseType = baseType->getMetatypeInstanceType();
+
+  emitDiagnostic(diag::metatype_extension_member_on_conforming_type, baseType,
+                 Member)
+      .highlight(getSourceRange());
+  return true;
 }
 
 bool PartialApplicationFailure::diagnoseAsError() {

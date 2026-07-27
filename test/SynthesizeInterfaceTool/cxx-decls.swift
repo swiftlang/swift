@@ -38,7 +38,7 @@ struct Iter {
 
 // `operator*()` is imported as a synthesized `pointee` property
 // CHECK: public struct Iter {
-// CHECK:     public var pointee: Int32
+// CHECK:     public var pointee: CInt
 // CHECK: }
 
 struct Base {
@@ -53,9 +53,9 @@ struct Derived : Base {
 // C++ public inheritance: `Derived` exposes `Base`'s field and method
 // alongside its own.
 // CHECK: public struct Derived {
-// CHECK:     public var baseField: Int32
+// CHECK:     public var baseField: CInt
 // CHECK:     public func baseMethod()
-// CHECK:     public var derivedField: Int32
+// CHECK:     public var derivedField: CInt
 // CHECK: }
 
 enum class Status : int {
@@ -65,10 +65,10 @@ enum class Status : int {
 
 // A C++ scoped enum imports as a Swift enum with a synthesized
 // `init?(rawValue:)`, `rawValue` property, and `RawValue` typealias.
-// CHECK: public enum Status : Int32 {
-// CHECK:     public init?(rawValue: Int32)
-// CHECK:     public var rawValue: Int32 { get }
-// CHECK:     public typealias RawValue = Int32
+// CHECK: public enum Status : CInt {
+// CHECK:     public init?(rawValue: CInt)
+// CHECK:     public var rawValue: CInt { get }
+// CHECK:     public typealias RawValue = CInt
 // CHECK:     case Active
 // CHECK:     case Inactive
 // CHECK: }
@@ -78,22 +78,22 @@ namespace OuterNS {
 // CHECK: public enum OuterNS {
 
 int globalFn(int x);
-// CHECK: public static func globalFn(_ x: Int32) -> Int32
+// CHECK: public static func globalFn(_ x: CInt) -> CInt
 
 struct Nested {
   int method() const { return field; }
   int field;
 };
 // CHECK: public struct Nested {
-// CHECK:     public func method() -> Int32
-// CHECK:     public var field: Int32
+// CHECK:     public func method() -> CInt
+// CHECK:     public var field: CInt
 // CHECK: }
 
 namespace InnerNS {
   int innerFn();
 }
 // CHECK: public enum InnerNS {
-// CHECK:     public static func innerFn() -> Int32
+// CHECK:     public static func innerFn() -> CInt
 // CHECK: }
 
 } // namespace OuterNS

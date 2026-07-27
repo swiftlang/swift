@@ -2219,6 +2219,55 @@ NominalTypeDecl::lookupDirect(DeclName name, SourceLoc loc,
                            DirectLookupRequest({this, name, flags}, loc), {});
 }
 
+static void populateMembersForLazyName(DeclName name, NominalTypeDecl *decl,
+                                       MemberLookupTable &Table,
+                                       ASTContext &ctx) {
+  DeclBaseName baseName(name.getBaseName());
+
+  if (isa_and_nonnull<clang::RecordDecl>(decl->getClangDecl())) {
+    // FIXME: This should go through populateLookupTableEntryFromLazyIDCLoader.
+    auto allFound = evaluateOrDefault(
+        ctx.evaluator,
+        ClangRecordMemberLookup({cast<NominalTypeDecl>(decl), name}), {});
+    // Add all the members we found, later we'll combine these with the
+    // existing members.
+    for (auto found : allFound)
+      Table.addMember(found);
+  } else if (!isa_and_nonnull<clang::NamespaceDecl>(decl->getClangDecl())) {
+    populateLookupTableEntryFromLazyIDCLoader(ctx, Table, baseName, decl);
+  }
+  populateLookupTableEntryFromExtensions(ctx, Table, baseName, decl);
+
+  // A `@com` type synthesizes its identity member (a class's `CLSID`, or a
+  // protocol's `IID`, in a metatype extension) the first time the table is
+  // built for that name; covers a name lookup racing member synthesis.
+  // Only for a source-file type: an imported one already carries the
+  // deserialized member, and triggering synthesis (which name-looks-up the
+  // member) would re-enter this very lookup.
+  if (ctx.LangOpts.EnableCOMInterop) {
+    if (auto *PD = dyn_cast<ProtocolDecl>(decl)) {
+      if (name.isSimpleName(ctx.Id_IID) &&
+          PD->getAttrs().hasAttribute<COMAttr>() && PD->isInSwiftSourceFile()) {
+        evaluateOrDefault(ctx.evaluator, SynthesizeCOMInterfaceIDRequest{PD},
+                          nullptr);
+      }
+    } else if (auto *CD = dyn_cast<ClassDecl>(decl)) {
+      if (name.isSimpleName(ctx.Id_CLSID) &&
+          CD->getAttrs().hasAttribute<COMAttr>() && CD->isInSwiftSourceFile()) {
+        evaluateOrDefault(ctx.evaluator,
+                          SynthesizeCOMImplementationIDRequest{CD}, nullptr);
+      }
+    }
+  }
+
+  // Ensure `id` and `actorSystem` are populated for a distributed actor.
+  // These have lazily-computed types, so should not create a cycle.
+  if (name.isSimpleName(ctx.Id_id) && decl->isInSwiftSourceFile())
+    (void)decl->getDistributedActorIDProperty();
+  if (name.isSimpleName(ctx.Id_actorSystem) && decl->isInSwiftSourceFile())
+    (void)decl->getDistributedActorSystemProperty();
+}
+
 TinyPtrVector<ValueDecl *>
 DirectLookupRequest::evaluate(Evaluator &evaluator,
                               DirectLookupDescriptor desc) const {
@@ -2245,20 +2294,23 @@ DirectLookupRequest::evaluate(Evaluator &evaluator,
 
   auto &Table = *decl->getLookupTable();
   if (!Table.isLazilyComplete(name.getBaseName())) {
-    DeclBaseName baseName(name.getBaseName());
+    // The lookup table believes it doesn't have a complete accounting of this
+    // name - either because we're never seen it before, or another extension
+    // was registered since the last time we searched. Ask the loaders to give
+    // us a hand.
+    populateMembersForLazyName(name, decl, Table, ctx);
 
+    // Bypass the regular member lookup table if we find something in
+    // the original C++ namespace. We don't want to store the C++ decl in the
+    // lookup table as the decl can be referenced  from multiple namespace
+    // declarations due to inline namespaces. We still merge in the other
+    // entries found in the lookup table, to support finding members in
+    // namespace extensions.
+    // FIXME: Can this go through the lazy member loader machinary instead?
     if (isa_and_nonnull<clang::NamespaceDecl>(decl->getClangDecl())) {
       auto allFound = evaluateOrDefault(
           ctx.evaluator, CXXNamespaceMemberLookup({cast<EnumDecl>(decl), name}),
           {});
-      populateLookupTableEntryFromExtensions(ctx, Table, baseName, decl);
-
-      // Bypass the regular member lookup table if we find something in
-      // the original C++ namespace. We don't want to store the C++ decl in the
-      // lookup table as the decl can be referenced  from multiple namespace
-      // declarations due to inline namespaces. We still merge in the other
-      // entries found in the lookup table, to support finding members in
-      // namespace extensions.
       if (!allFound.empty()) {
         auto known = Table.find(name);
         if (known != Table.end()) {
@@ -2270,26 +2322,8 @@ DirectLookupRequest::evaluate(Evaluator &evaluator,
         }
         return allFound;
       }
-    } else if (isa_and_nonnull<clang::RecordDecl>(decl->getClangDecl())) {
-      auto allFound = evaluateOrDefault(
-          ctx.evaluator,
-          ClangRecordMemberLookup({cast<NominalTypeDecl>(decl), name}), {});
-      // Add all the members we found, later we'll combine these with the
-      // existing members.
-      for (auto found : allFound)
-        Table.addMember(found);
-
-      populateLookupTableEntryFromExtensions(ctx, Table, baseName, decl);
-    } else {
-      // The lookup table believes it doesn't have a complete accounting of this
-      // name - either because we're never seen it before, or another extension
-      // was registered since the last time we searched. Ask the loaders to give
-      // us a hand.
-      populateLookupTableEntryFromLazyIDCLoader(ctx, Table, baseName, decl);
-      populateLookupTableEntryFromExtensions(ctx, Table, baseName, decl);
     }
-
-    Table.markLazilyComplete(baseName);
+    Table.markLazilyComplete(name.getBaseName());
   }
 
   DeclName macroExpansionKey = adjustLazyMacroExpansionNameKey(ctx, name);
@@ -2476,9 +2510,7 @@ static bool isAcceptableLookupResult(const DeclContext *dc, NLOptions options,
   // Filter out designated initializers, if requested.
   if (onlyCompleteObjectInits) {
     if (auto ctor = dyn_cast<ConstructorDecl>(decl)) {
-      // getSelfClassDecl() (not isa<ClassDecl>) so a non-inheritable init in a
-      // class extension (e.g. an imported ObjC category factory) is filtered too.
-      if (ctor->getDeclContext()->getSelfClassDecl() && !ctor->isInheritable())
+      if (isa<ClassDecl>(ctor->getDeclContext()) && !ctor->isInheritable())
         return false;
     } else {
       return false;
@@ -3401,13 +3433,18 @@ directReferencesForTypeRepr(Evaluator &evaluator, ASTContext &ctx,
     return result;
   }
 
+  case TypeReprKind::Protocol:
+    // `P.Protocol` refers, for the purpose of extension binding, to the
+    // protocol `P` itself (a protocol metatype extension binds to `P`).
+    return directReferencesForTypeRepr(
+        evaluator, ctx, cast<ProtocolTypeRepr>(typeRepr)->getBase(), dc, options);
+
   case TypeReprKind::Error:
   case TypeReprKind::Function:
   case TypeReprKind::Ownership:
   case TypeReprKind::CompileTimeLiteral:
   case TypeReprKind::ConstValue:
   case TypeReprKind::Metatype:
-  case TypeReprKind::Protocol:
   case TypeReprKind::SILBox:
   case TypeReprKind::Placeholder:
   case TypeReprKind::Pack:

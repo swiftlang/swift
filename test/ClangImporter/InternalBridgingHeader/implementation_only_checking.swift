@@ -13,6 +13,11 @@
 // Test library-evolution differences.
 // RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -internal-import-bridging-header %S/../Inputs/c-bridging-header.h -sdk %clang-importer-sdk -verify-ignore-unknown -swift-version 5 -enable-library-evolution
 
+// Verify with SerializeAbstractTypeLayoutForHiddenTypes enabled, diagnostics are silenced, as if library evolution was enabled
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -internal-import-bridging-header %S/../Inputs/c-bridging-header.h -sdk %clang-importer-sdk -verify-ignore-unknown -swift-version 5 -enable-experimental-feature SerializeAbstractTypeLayoutForHiddenTypes
+
+// REQUIRES: swift_feature_SerializeAbstractTypeLayoutForHiddenTypes
+
 @inlinable
 public func f() -> Any {
   return red

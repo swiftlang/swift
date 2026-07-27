@@ -7642,6 +7642,18 @@ bool swift::checkSendableConformance(
   if (classDecl && classDecl->getParentSourceFile()) {
     bool isInherited = isa<InheritedProtocolConformance>(conformance);
 
+    // Workaround: the conformance lookup table may not form an
+    // InheritedProtocolConformance for Sendable when the superclass is
+    // Sendable through @MainActor isolation (the table fix is #90251).
+    // Check the superclass directly so we don't misdiagnose.
+    if (!isInherited) {
+      if (auto superclassTy = classDecl->getSuperclass()) {
+        auto superConf = lookupConformance(superclassTy,
+            conformance->getProtocol(), /*allowMissing=*/false);
+        isInherited = superConf.isConcrete();
+      }
+    }
+
     // A non-final class cannot conform to `Sendable` unless it is protected by
     // global actor isolation.
     if (!classDecl->isSemanticallyFinal() && !isGlobalActorIsolated) {

@@ -7,18 +7,18 @@ import Builtin
 
 // CHECK-LABEL: sil @constant_cond_br_true
 // CHECK:       bb0(%0 : $Int, %1 : $Int):
-// CHECK-NEXT:    br bb1(%0 : $Int)
+// CHECK-NEXT:    br bb1
 // CHECK:       } // end sil function 'constant_cond_br_true'
 sil @constant_cond_br_true : $@convention(thin) (Int, Int) -> Int {
 bb0(%0 : $Int, %1 : $Int):
   %2 = integer_literal $Builtin.Int1, 1
-  cond_br %2, bb1(%0 : $Int), bb2(%1 : $Int)
+  cond_br %2, bb1, bb2
 
-bb1(%4 : $Int):
-  br bb3(%4 : $Int)
+bb1:
+  br bb3(%0 : $Int)
 
-bb2(%6 : $Int):
-  br bb3(%6 : $Int)
+bb2:
+  br bb3(%1 : $Int)
 
 bb3(%8 : $Int):
   return %8 : $Int
@@ -26,18 +26,19 @@ bb3(%8 : $Int):
 
 // CHECK-LABEL: sil @constant_cond_br_false
 // CHECK:       bb0(%0 : $Int, %1 : $Int):
-// CHECK-NEXT:    br bb1(%1 : $Int)
+// CHECK-NEXT:    br bb1
+// CHECK:         br bb2(%1 : $Int)
 // CHECK:       } // end sil function 'constant_cond_br_false'
 sil @constant_cond_br_false : $@convention(thin) (Int, Int) -> Int {
 bb0(%0 : $Int, %1 : $Int):
   %2 = integer_literal $Builtin.Int1, 0
-  cond_br %2, bb1(%0 : $Int), bb2(%1 : $Int)
+  cond_br %2, bb1, bb2
 
-bb1(%4 : $Int):
-  br bb3(%4 : $Int)
+bb1:
+  br bb3(%0 : $Int)
 
-bb2(%6 : $Int):
-  br bb3(%6 : $Int)
+bb2:
+  br bb3(%1 : $Int)
 
 bb3(%8 : $Int):
   return %8 : $Int
@@ -49,15 +50,14 @@ bb3(%8 : $Int):
 // CHECK:       } // end sil function 'non_constant_cond_br'
 sil @non_constant_cond_br : $@convention(thin) (Int, Int, Builtin.Int1) -> Int {
 bb0(%0 : $Int, %1 : $Int, %2 : $Builtin.Int1):
-  cond_br %2, bb1(%0 : $Int), bb2(%1 : $Int)
+  cond_br %2, bb1, bb2
 
-bb1(%4 : $Int):
-  br bb3(%4 : $Int)
+bb1:
+  br bb3(%0 : $Int)
 
-bb2(%6 : $Int):
-  br bb3(%6 : $Int)
+bb2:
+  br bb3(%1 : $Int)
 
 bb3(%8 : $Int):
   return %8 : $Int
 }
-

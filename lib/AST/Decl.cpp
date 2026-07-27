@@ -1056,6 +1056,14 @@ bool Decl::isInMacroExpansionInContext() const {
   return swift::isMacroExpansionInContext(getStartLoc(), parentSF);
 }
 
+Decl *Decl::getMacroExpansionOriginatingDecl() const {
+  SourceLoc loc = getLoc();
+  auto *sf = getModuleContext()->getSourceFileContainingLocation(loc);
+  if (!sf || sf->Kind != SourceFileKind::MacroExpansion)
+    return nullptr;
+  return sf->getMacroExpansion().dyn_cast<Decl *>();
+}
+
 bool Decl::isInMacroExpansionFromClangHeader() const {
   SourceLoc declLoc = getLoc();
   if (declLoc.isInvalid())
@@ -2057,7 +2065,7 @@ ExtensionDecl::ExtensionDecl(SourceLoc extensionLoc,
 {
   Bits.ExtensionDecl.DefaultAndMaxAccessLevel = 0;
   Bits.ExtensionDecl.HasLazyConformances = false;
-  Bits.ExtensionDecl.IsMetatypeExtension = false;
+
   setTrailingWhereClause(trailingWhereClause);
 }
 
@@ -2080,6 +2088,16 @@ ExtensionDecl *ExtensionDecl::create(ASTContext &ctx, SourceLoc extensionLoc,
     result->setClangNode(clangNode);
 
   return result;
+}
+
+bool ExtensionDecl::isMetatypeExtension() const {
+  // A parsed `extension P.Protocol` keeps its `ProtocolTypeRepr`; recognize the
+  // form from that without forcing type resolution.  Deserialized and
+  // compiler-synthesized extensions have no representation, but their extended
+  // type is the protocol metatype `(any P).Type`, so recognize it from there.
+  if (auto *repr = getExtendedTypeRepr())
+    return isa<ProtocolTypeRepr>(repr);
+  return getExtendedType()->is<MetatypeType>();
 }
 
 void ExtensionDecl::setConformanceLoader(LazyMemberLoader *lazyLoader,
@@ -3547,6 +3565,8 @@ static AccessStrategy getOpaqueReadWriteAccessStrategy(
     return AccessStrategy::getAccessor(AccessorKind::YieldingMutate, dispatch);
   if (storage->requiresOpaqueModifyCoroutine())
     return AccessStrategy::getAccessor(AccessorKind::Modify, dispatch);
+  if (storage->requiresOpaqueMutateAccessor())
+    return AccessStrategy::getAccessor(AccessorKind::Mutate, dispatch);
   return AccessStrategy::getMaterializeToTemporary(
       getOpaqueReadAccessStrategy(storage, dispatch, nullptr,
                                   ResilienceExpansion::Minimal, location,
@@ -6069,16 +6089,39 @@ bool NominalTypeDecl::isStrictlyResilient() const {
   return isResilient() && !getModuleContext()->allowNonResilientAccess();
 }
 
-DestructorDecl *NominalTypeDecl::getValueTypeDestructor() {
-  if (!isa<StructDecl>(this) && !isa<EnumDecl>(this)) {
-    return nullptr;
+bool NominalTypeDecl::hasValueTypeDestructor() const {
+  // Fast path: we already checked.
+  if (auto cached = getCachedValueTypeDestructor())
+    return *cached;
+
+  // Otherwise, do the lookup, which updates the cached bit for next time.
+  return getValueTypeDestructor() != nullptr;
+}
+
+DestructorDecl *NominalTypeDecl::getValueTypeDestructor() const {
+  bool needsUpdate = true;
+
+  if (auto cached = getCachedValueTypeDestructor()) {
+    // Skip everything else if we know we don't have a destructor.
+    if (!*cached)
+      return nullptr;
+
+    needsUpdate = false;
   }
-  
-  auto found = lookupDirect(DeclBaseName::createDestructor());
-  if (found.size() != 1) {
-    return nullptr;
-  }
-  return cast<DestructorDecl>(found[0]);
+
+  NominalTypeDecl *nominalDecl = const_cast<NominalTypeDecl *>(this);
+
+  // We might have a destructor, go check.
+  DestructorDecl *result = nullptr;
+  auto found = nominalDecl->lookupDirect(DeclBaseName::createDestructor());
+  if (found.size() == 1)
+    result = cast<DestructorDecl>(found[0]);
+
+  ASSERT(needsUpdate || result != nullptr && "Where did my destructor go?");
+  if (needsUpdate)
+    nominalDecl->setCachedValueTypeDestructor(result != nullptr);
+
+  return result;
 }
 
 static bool isOriginallyDefinedIn(const Decl *D, const ModuleDecl* MD) {
@@ -6634,7 +6677,6 @@ AssociatedTypeDecl::getOverriddenDecls() const {
   return assocTypes;
 }
 
-namespace {
 static AssociatedTypeDecl *getAssociatedTypeAnchor(
                       const AssociatedTypeDecl *ATD,
                       llvm::SmallSet<const AssociatedTypeDecl *, 8> &searched) {
@@ -6658,7 +6700,6 @@ static AssociatedTypeDecl *getAssociatedTypeAnchor(
   }
 
   return bestAnchor;
-}
 }
 
 AssociatedTypeDecl *AssociatedTypeDecl::getAssociatedTypeAnchor() const {
@@ -6771,13 +6812,6 @@ void NominalTypeDecl::synthesizeSemanticMembersIfNeeded(DeclName member) {
 
   auto baseName = member.getBaseName();
   auto &Context = getASTContext();
-
-  // For a distributed actor `id` and `actorSystem` can be synthesized without
-  // causing cycles so do them above the cycle guard.
-  if (member.isSimpleName(Context.Id_id))
-    (void)getDistributedActorIDProperty();
-  if (member.isSimpleName(Context.Id_actorSystem))
-    (void)getDistributedActorSystemProperty();
 
   // Silently break cycles here because we can't be sure when and where a
   // request to synthesize will come from yet.
@@ -7394,6 +7428,17 @@ ReferenceCounting ClassDecl::getObjectModel() const {
     return ReferenceCounting::ObjC;
 
   return ReferenceCounting::Native;
+}
+
+bool ClassDecl::isCOMObject() const {
+  // COM is only in play when the experimental interop is enabled; keep the
+  // common case free and never touch the evaluator cache for it.
+  if (!getASTContext().LangOpts.EnableCOMInterop)
+    return false;
+
+  auto *mutableThis = const_cast<ClassDecl *>(this);
+  return evaluateOrDefault(getASTContext().evaluator,
+                           IsCOMObjectRequest{mutableThis}, false);
 }
 
 EnumCaseDecl *EnumCaseDecl::create(SourceLoc CaseLoc,
@@ -12777,6 +12822,13 @@ void Decl::setClangNode(ClangNode Node) {
 #include "swift/AST/DeclNodes.def"
   }
   *(ptr - 1) = Node.getOpaqueValue();
+}
+
+bool Decl::isClangDeclDeprecated() const {
+  if (const clang::Decl *decl = getClangDecl())
+    return decl->isDeprecated();
+
+  return false;
 }
 
 // See swift/Basic/Statistic.h for declaration: this enables tracing Decls, is

@@ -1023,7 +1023,12 @@ void irgen::emitClassDeallocation(IRGenFunction &IGF,
                               size, alignMask);
 
   selfValue = emitCastToHeapObject(IGF, selfValue);
-  emitDeallocateClassInstance(IGF, selfValue, size, alignMask);
+  auto &classTI = IGF.getTypeInfo(selfType).as<ClassTypeInfo>();
+  auto &classLayout = classTI.getClassLayout(IGF.IGM, selfType,
+                                             /*forBackwardDeployment=*/false);
+  auto maybeDescriptor =
+      classLayout.computeTypedMallocTypeDescriptor(IGF.IGM, selfType);
+  emitDeallocateClassInstance(IGF, selfValue, size, alignMask, maybeDescriptor);
 }
 
 void irgen::emitPartialClassDeallocation(IRGenFunction &IGF,
@@ -1038,8 +1043,13 @@ void irgen::emitPartialClassDeallocation(IRGenFunction &IGF,
                               size, alignMask);
 
   selfValue = IGF.Builder.CreateBitCast(selfValue, IGF.IGM.RefCountedPtrTy);
+  auto &classTI = IGF.getTypeInfo(selfType).as<ClassTypeInfo>();
+  auto &classLayout = classTI.getClassLayout(IGF.IGM, selfType,
+                                             /*forBackwardDeployment=*/false);
+  auto maybeDescriptor =
+      classLayout.computeTypedMallocTypeDescriptor(IGF.IGM, selfType);
   emitDeallocatePartialClassInstance(IGF, selfValue, metadataValue,
-                                     size, alignMask);
+                                     size, alignMask, maybeDescriptor);
 }
 
 /// emitClassDecl - Emit all the declarations associated with this class type.

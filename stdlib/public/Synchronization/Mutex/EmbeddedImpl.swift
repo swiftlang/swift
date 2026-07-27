@@ -12,7 +12,7 @@
 
 // Private inline storage for EmbeddedPlatform's opaque mutex hooks.
 @usableFromInline
-internal typealias _SwiftEmbeddedMutex = [8 of UInt]
+internal typealias _SwiftEmbeddedMutex = [(EMBEDDED_SWIFT_MUTEX_NUM_WORDS) of UInt]
 
 @_extern(c, "_swift_mutex_init")
 @usableFromInline
@@ -56,7 +56,7 @@ public struct _MutexHandle: ~Copyable {
   @_alwaysEmitIntoClient
   @_transparent
   public init() {
-    storage = _Cell([0, 0, 0, 0, 0, 0, 0, 0])
+    storage = _Cell(.init(repeating: 0))
     unsafe _swift_mutex_init(UnsafeMutableRawPointer(storage._address), 0)
   }
 

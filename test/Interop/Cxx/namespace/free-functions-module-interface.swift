@@ -18,7 +18,7 @@
 // CHECK-NEXT:       }
 
 // FIXME: this seems wrong, the operator shouldn't be printed twice (https://github.com/apple/swift/issues/62727).
-// CHECK-NEXT: func == (_: FunctionsNS1.FunctionsNS2.FunctionsNS3.Y, _: FunctionsNS1.FunctionsNS2.FunctionsNS3.Y) -> Bool
+// CHECK-NEXT: func == (_: FunctionsNS1.FunctionsNS2.FunctionsNS3.Y, _: FunctionsNS1.FunctionsNS2.FunctionsNS3.Y) -> CBool
 
 // CHECK-NEXT:       static func basicFunctionLowestLevel() -> UnsafePointer<CChar>!
 // CHECK-NEXT:     }
@@ -37,4 +37,4 @@
 // CHECK-NEXT:   static func sameNameInSibling() -> UnsafePointer<CChar>!
 // CHECK-NEXT: }
 
-// CHECK-NEXT: func == (_: FunctionsNS1.FunctionsNS2.FunctionsNS3.Y, _: FunctionsNS1.FunctionsNS2.FunctionsNS3.Y) -> Bool
+// CHECK-NEXT: func == (_: FunctionsNS1.FunctionsNS2.FunctionsNS3.Y, _: FunctionsNS1.FunctionsNS2.FunctionsNS3.Y) -> CBool

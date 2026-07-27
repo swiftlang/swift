@@ -49,7 +49,6 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::ClosureBody:
   case ConstraintLocator::ConstructorMember:
   case ConstraintLocator::ConstructorMemberType:
-  case ConstraintLocator::ResultBuilderBodyResult:
   case ConstraintLocator::InstanceType:
   case ConstraintLocator::AutoclosureResult:
   case ConstraintLocator::OptionalInjection:
@@ -217,10 +216,6 @@ void LocatorPathElt::dump(raw_ostream &out) const {
 
   case ConstraintLocator::FunctionResult:
     out << "function result";
-    break;
-
-  case ConstraintLocator::ResultBuilderBodyResult:
-    out << "result builder body result";
     break;
 
   case ConstraintLocator::SequenceElementType:
@@ -683,10 +678,6 @@ bool ConstraintLocator::isForOptionalTry() const {
   return directlyAt<OptionalTryExpr>();
 }
 
-bool ConstraintLocator::isForResultBuilderBodyResult() const {
-  return isFirstElement<LocatorPathElt::ResultBuilderBodyResult>();
-}
-
 bool ConstraintLocator::isForMacroExpansion() const {
   return directlyAt<MacroExpansionExpr>();
 }
@@ -769,6 +760,10 @@ NullablePtr<Pattern> ConstraintLocator::getPatternMatch() const {
 
 bool ConstraintLocator::isForPatternMatch() const {
   return getPatternMatch() != nullptr;
+}
+
+bool ConstraintLocator::isForPatternDecl() const {
+  return isLastElement<LocatorPathElt::PatternDecl>();
 }
 
 bool ConstraintLocator::isForCollectionElement() const {

@@ -60,6 +60,7 @@ class DiagnosticEngine;
 enum class DifferentiabilityKind : uint8_t;
 class Fingerprint;
 class Identifier;
+class GenericEnvironment;
 class IfConfigClauseRangeInfo;
 class GenericSignature;
 class GenericSignatureImpl;
@@ -94,6 +95,7 @@ class BridgedLangOptions;
 struct BridgedSubstitutionMap;
 struct BridgedGenericSignature;
 struct BridgedCanGenericSignature;
+struct BridgedGenericEnvironment;
 struct BridgedConformance;
 class BridgedParameterList;
 
@@ -1569,9 +1571,6 @@ SWIFT_NAME("BridgedExtensionDecl.setParsedMembers(self:_:fingerprint:)")
 void BridgedExtensionDecl_setParsedMembers(BridgedExtensionDecl decl,
                                            BridgedArrayRef members,
                                            BridgedFingerprint fingerprint);
-
-SWIFT_NAME("BridgedExtensionDecl.setIsMetatypeExtension(self:)")
-void BridgedExtensionDecl_setIsMetatypeExtension(BridgedExtensionDecl decl);
 
 SWIFT_NAME(
     "BridgedEnumDecl.createParsed(_:declContext:enumKeywordLoc:name:nameLoc:"
@@ -3110,6 +3109,7 @@ struct BridgedASTType {
   BRIDGED_INLINE bool isGenericAtAnyLevel() const;
   BRIDGED_INLINE bool hasTypeParameter() const;
   BRIDGED_INLINE bool hasLocalArchetype() const;
+  BRIDGED_INLINE bool hasExistentialArchetype() const;
   BRIDGED_INLINE bool hasDynamicSelf() const;
   BRIDGED_INLINE bool isArchetype() const;
   BRIDGED_INLINE bool archetypeRequiresClass() const;
@@ -3188,6 +3188,7 @@ public:
   BRIDGED_INLINE BridgedCanType(swift::CanType ty);
   BRIDGED_INLINE swift::CanType unbridged() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType getRawType() const;
+  BRIDGED_INLINE bool hasLocalArchetypeFromEnvironment(BridgedGenericEnvironment env) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanGenericSignature
   SILFunctionType_getSubstGenericSignature() const;
 };
@@ -3255,6 +3256,8 @@ struct BridgedGenericSignature {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTTypeArray getGenericParams() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType mapTypeIntoEnvironment(BridgedASTType type) const;
   BRIDGED_INLINE BridgedCanGenericSignature getCanonicalSignature() const;
+  BRIDGED_INLINE bool areAllParamsConcrete() const;
+  BRIDGED_INLINE bool canBeEmittedInEmbeddedSwift() const;
 };
 
 struct BridgedCanGenericSignature {
@@ -3270,6 +3273,13 @@ struct BridgedFingerprint {
   uint64_t v2;
 
   BRIDGED_INLINE swift::Fingerprint unbridged() const;
+};
+
+struct BridgedGenericEnvironment {
+  swift::GenericEnvironment * _Nonnull env;
+
+  BRIDGED_INLINE swift::GenericEnvironment * _Nonnull unbridged() const;
+  BRIDGED_INLINE BridgedGenericSignature getGenericSignature() const;
 };
 
 enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedPoundKeyword : uint8_t {

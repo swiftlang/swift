@@ -742,6 +742,16 @@ public func main() async {
       }
     }
   case .run:
+    // A stdlib built with internal checks (assertions) does not give meaningful
+    // benchmark results, so refuse to run against one.
+    if _isStdlibInternalChecksEnabled() {
+      fatalError("""
+        Benchmarks must not be run against a standard library built with internal \
+        checks (assertions) enabled: the results are not meaningful.
+
+        Build and benchmark against a standard library built without assertions.
+        """)
+    }
     if !config.allowNondeterministicHashing && !Hasher.isDeterministic {
       fatalError("""
         Benchmark runs require deterministic hashing to be enabled.

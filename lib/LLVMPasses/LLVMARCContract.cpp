@@ -271,15 +271,17 @@ bool SwiftARCContractImpl::run() {
 
       auto Kind = classifyInstruction(Inst);
       switch (Kind) {
-      // These instructions should not reach here based on the pass ordering.
-      // i.e. LLVMARCOpt -> LLVMContractOpt.
+      // The *_n forms are normally created by this pass, so we shouldn't
+      // encounter them on input. But IR that defines the runtime entry
+      // points themselves (e.g. EmbeddedRuntime.swift) can contain calls
+      // to them directly, so just leave them alone.
       case RT_RetainN:
       case RT_UnknownObjectRetainN:
       case RT_BridgeRetainN:
       case RT_ReleaseN:
       case RT_UnknownObjectReleaseN:
       case RT_BridgeReleaseN:
-        llvm_unreachable("These are only created by LLVMARCContract !");
+        break;
       // Delete all fix lifetime and end borrow instructions. After llvm-ir they
       // have no use and show up as calls in the final binary.
       case RT_FixLifetime:

@@ -23,7 +23,7 @@ public protocol P {
 }
 
 extension P {
- // CHECK-LABEL: define{{.*}} swifttailcc void @"$s19typed_throws_thunks1PP1g4bodyyyy7FailureQzYKXE_tYaAGYKFTj"(ptr swiftasync %0, ptr %1, ptr %2, ptr noalias swiftself %3, ptr %4, ptr %5, ptr %6)
+ // CHECK-LABEL: define{{.*}} swifttailcc void @"$s19typed_throws_thunks1PP1g4bodyyyy7FailureQzYKXE_tYaAGYKFTj"(ptr swiftasync %0, ptr %1, ptr %2, ptr %3, ptr noalias swiftself %4, ptr %5, ptr %6)
  // CHECK-NOT: ret
  // CHECK:  call { ptr, ptr } (i32, ptr, ptr, ...) @llvm.coro.suspend.async.sl_p0p0s({{.*}}, ptr %1, ptr %2, ptr %3, ptr %4, ptr %5, ptr %6)
   public func g(body: () throws(Failure) -> Void) async throws(Failure) {

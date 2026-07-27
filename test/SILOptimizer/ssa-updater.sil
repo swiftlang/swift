@@ -15,6 +15,10 @@ sil @c2 : $@convention(thin) (@guaranteed C) -> @owned C
 sil @use_int64 : $@convention(thin) (Builtin.Int64) -> ()
 sil @use_two_int64 : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> ()
 
+//===----------------------------------------------------------------------===//
+//                      C++ SSAUpdater tests
+//===----------------------------------------------------------------------===//
+
 // CHECK-LABEL: sil [ossa] @reuse_phi_arg1 :
 // CHECK:       bb17([[P:%.*]] : @owned $C):
 // CHECK:         apply {{%[0-9]+}}([[P]])
@@ -183,6 +187,266 @@ bb23:
   br bb3
 
 }
+
+//===----------------------------------------------------------------------===//
+//                      Swift SSAUpdater tests
+//===----------------------------------------------------------------------===//
+
+// CHECK-LABEL: sil @single_block :
+// CHECK:       bb0:
+// CHECK-NEXT:    fix_lifetime undef
+// CHECK-NEXT:    [[L1:%.*]] = integer_literal $Builtin.Int64, 1
+// CHECK-NEXT:    return [[L1]]
+// CHECK:       } // end sil function 'single_block'
+sil @single_block : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+  specify_test "ssa_updater"
+  fix_lifetime undef : $Builtin.Int64
+  %1 = integer_literal $Builtin.Int64, 1
+  return undef : $Builtin.Int64
+}
+
+// CHECK-LABEL: sil @simple_phi :
+// CHECK:       bb0:
+// CHECK-NEXT:    fix_lifetime undef
+// CHECK:       bb1:
+// CHECK-NEXT:    fix_lifetime undef
+// CHECK-NEXT:    [[L1:%.*]] = integer_literal $Builtin.Int64, 1
+// CHECK-NEXT:    fix_lifetime [[L1]]
+// CHECK-NEXT:    br bb3([[L1]])
+// CHECK:       bb2:
+// CHECK:         [[L2:%.*]] = integer_literal $Builtin.Int64, 2
+// CHECK-NEXT:    br bb3([[L2]])
+// CHECK:       bb3([[PHI:%.*]] : $Builtin.Int64):
+// CHECK-NEXT:    return [[PHI]]
+// CHECK:       } // end sil function 'simple_phi'
+sil @simple_phi : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+  specify_test "ssa_updater"
+  fix_lifetime undef : $Builtin.Int64
+  cond_br undef, bb1, bb2
+
+bb1:
+  fix_lifetime undef : $Builtin.Int64
+  %1 = integer_literal $Builtin.Int64, 1
+  fix_lifetime undef : $Builtin.Int64
+  br bb3
+
+bb2:
+  %2 = integer_literal $Builtin.Int64, 2
+  br bb3
+
+bb3:
+  return undef : $Builtin.Int64
+}
+
+// CHECK-LABEL: sil @two_phis :
+// CHECK:       bb0:
+// CHECK-NEXT:    [[L1:%.*]] = integer_literal $Builtin.Int64, 1
+// CHECK:       bb1:
+// CHECK-NEXT:    br bb6([[L1]])
+// CHECK:       bb3:
+// CHECK-NEXT:    br bb5([[L1]])
+// CHECK:       bb4:
+// CHECK-NEXT:    [[L2:%.*]] = integer_literal $Builtin.Int64, 2
+// CHECK-NEXT:    br bb5([[L2]])
+// CHECK:       bb5([[PHI1:%.*]] : $Builtin.Int64):
+// CHECK-NEXT:    br bb6([[PHI1]])
+// CHECK:       bb6([[PHI2:%.*]] : $Builtin.Int64):
+// CHECK-NEXT:    return [[PHI2]]
+// CHECK:       } // end sil function 'two_phis'
+sil @two_phis : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+  specify_test "ssa_updater"
+  %1 = integer_literal $Builtin.Int64, 1
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb6
+
+bb2:
+  cond_br undef, bb3, bb4
+
+bb3:
+  br bb5
+
+bb4:
+  %2 = integer_literal $Builtin.Int64, 2
+  br bb5
+
+bb5:
+  br bb6
+
+bb6:
+  return undef : $Builtin.Int64
+}
+
+// CHECK-LABEL: sil @phi_and_second_use :
+// CHECK:       bb1:
+// CHECK:         [[L1:%.*]] = integer_literal $Builtin.Int64, 1
+// CHECK:       bb2:
+// CHECK-NEXT:    fix_lifetime [[L1]]
+// CHECK:       bb3:
+// CHECK-NEXT:    br bb5([[L1]])
+// CHECK:       bb4:
+// CHECK-NEXT:    [[L2:%.*]] = integer_literal $Builtin.Int64, 2
+// CHECK-NEXT:    br bb5([[L2]])
+// CHECK:       bb5([[PHI:%.*]] : $Builtin.Int64):
+// CHECK:       bb6:
+// CHECK-NEXT:    return [[PHI]]
+// CHECK:       } // end sil function 'phi_and_second_use'
+sil @phi_and_second_use : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+  specify_test "ssa_updater"
+  cond_br undef, bb1, bb4
+
+bb1:
+  %1 = integer_literal $Builtin.Int64, 1
+  cond_br undef, bb2, bb3
+
+bb2:
+  fix_lifetime undef : $Builtin.Int64
+  unreachable
+
+bb3:
+  br bb5
+
+bb4:
+  %2 = integer_literal $Builtin.Int64, 2
+  br bb5
+
+bb5:
+  br bb6
+
+bb6:
+  return undef : $Builtin.Int64
+}
+
+// CHECK-LABEL: sil @loop_with_value_in_loop :
+// CHECK:       bb0:
+// CHECK:         [[L1:%.*]] = integer_literal $Builtin.Int64, 1
+// CHECK-NEXT:    br bb1([[L1]])
+// CHECK:       bb1([[PHI:%.*]] : $Builtin.Int64):
+// CHECK:       bb2:
+// CHECK-NEXT:    [[L2:%.*]] = integer_literal $Builtin.Int64, 2
+// CHECK-NEXT:    br bb1([[L2]])
+// CHECK:       bb3:
+// CHECK:       bb4:
+// CHECK-NEXT:    return [[PHI]]
+// CHECK:       } // end sil function 'loop_with_value_in_loop'
+sil @loop_with_value_in_loop : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+  specify_test "ssa_updater"
+  %1 = integer_literal $Builtin.Int64, 1
+  br bb1
+
+bb1:
+  cond_br undef, bb2, bb3
+
+bb2:
+  %2 = integer_literal $Builtin.Int64, 2
+  br bb1
+
+bb3:
+  br bb4
+
+bb4:
+  return undef : $Builtin.Int64
+}
+
+// CHECK-LABEL: sil @loop_with_value_in_loop2 :
+// CHECK:       bb0:
+// CHECK:         [[L1:%.*]] = integer_literal $Builtin.Int64, 1
+// CHECK-NEXT:    br bb1([[L1]])
+// CHECK:       bb1([[PHI:%.*]] : $Builtin.Int64):
+// CHECK-NEXT:    fix_lifetime [[PHI]]
+// CHECK:       bb2:
+// CHECK-NEXT:    fix_lifetime [[PHI]]
+// CHECK-NEXT:    [[L2:%.*]] = integer_literal $Builtin.Int64, 2
+// CHECK-NEXT:    fix_lifetime [[L2]]
+// CHECK-NEXT:    br bb1([[L2]])
+// CHECK:       bb3:
+// CHECK-NEXT:    fix_lifetime [[PHI]]
+// CHECK:       bb4:
+// CHECK-NEXT:    return [[PHI]]
+// CHECK:       } // end sil function 'loop_with_value_in_loop2'
+sil @loop_with_value_in_loop2 : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+  specify_test "ssa_updater"
+  %1 = integer_literal $Builtin.Int64, 1
+  br bb1
+
+bb1:
+  fix_lifetime undef : $Builtin.Int64
+  cond_br undef, bb2, bb3
+
+bb2:
+  fix_lifetime undef : $Builtin.Int64
+  %2 = integer_literal $Builtin.Int64, 2
+  fix_lifetime undef : $Builtin.Int64
+  br bb1
+
+bb3:
+  fix_lifetime undef : $Builtin.Int64
+  br bb4
+
+bb4:
+  return undef : $Builtin.Int64
+}
+
+// CHECK-LABEL: sil @loop_without_value_in_loop :
+// CHECK:       bb0:
+// CHECK:         [[L1:%.*]] = integer_literal $Builtin.Int64, 1
+// CHECK:       bb1:
+// CHECK:         return [[L1]]
+// CHECK:       } // end sil function 'loop_without_value_in_loop'
+sil @loop_without_value_in_loop : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+  specify_test "ssa_updater"
+  %1 = integer_literal $Builtin.Int64, 1
+  br bb1
+
+bb1:
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  br bb4
+
+bb4:
+  return undef : $Builtin.Int64
+}
+
+// CHECK-LABEL: sil @entry_block_revisited :
+// CHECK:       bb1:
+// CHECK-NEXT:    br bb3(undef : $Builtin.Int64)
+// CHECK:       bb2
+// CHECK-NEXT:    [[L1:%.*]] = integer_literal $Builtin.Int64, 1
+// CHECK-NEXT:    br bb3([[L1]])
+// CHECK:       bb3([[PHI:%.*]] : $Builtin.Int64):
+// CHECK-NEXT:    return [[PHI]]
+// CHECK:       } // end sil function 'entry_block_revisited'
+sil @entry_block_revisited : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+  specify_test "ssa_updater"
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  %1 = integer_literal $Builtin.Int64, 1
+  br bb3
+
+bb3:
+  return undef : $Builtin.Int64
+}
+
+//===----------------------------------------------------------------------===//
+//                  Swift InstructionBasedSSAUpdater tests
+//===----------------------------------------------------------------------===//
 
 // CHECK-LABEL: sil @ib_ssa_updater :
 // CHECK:         [[L1:%.*]] = integer_literal $Builtin.Int64, 1

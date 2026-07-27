@@ -52,7 +52,6 @@ namespace swift {
   class RequirementRepr;
   class SILParserStateBase;
   class SourceManager;
-  class UUID;
 
   struct EnumElementInfo;
 
@@ -837,7 +836,7 @@ public:
   /// emit the specified error diagnostic, and a note at the specified note
   /// location.
   bool parseUnsignedInteger(unsigned &Result, SourceLoc &Loc,
-                            DiagRef D);
+                            DiagRef D, bool justChecking = false);
 
   /// The parser expects that \p K is next token in the input.  If so,
   /// it is consumed and false is returned.
@@ -1045,11 +1044,6 @@ public:
   ParserResult<AvailableAttr>
   parseExtendedAvailabilitySpecList(SourceLoc AtLoc, SourceLoc AttrLoc,
                                     StringRef AttrName);
-
-  /// Parse a string literal whose contents can be interpreted as a UUID.
-  ///
-  /// \returns false on success, true on error.
-  bool parseUUIDString(UUID &uuid, Diag<> diag, bool justChecking = false);
 
   /// Parse the Objective-C selector inside @objc
   void parseObjCSelector(SmallVector<Identifier, 4> &Names,

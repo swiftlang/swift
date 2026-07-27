@@ -233,8 +233,10 @@ public:
   explicit ReflectionContext(
       std::shared_ptr<MemoryReader> reader,
       remote::ExternalTypeRefCache *externalCache = nullptr,
-      reflection::DescriptorFinder *descriptorFinder = nullptr)
-      : super(std::move(reader), *this, externalCache, descriptorFinder) {}
+      reflection::DescriptorFinder *descriptorFinder = nullptr,
+      Mangle::ManglingFlavor flavor = Mangle::ManglingFlavor::Default)
+      : super(std::move(reader), *this, externalCache, descriptorFinder,
+              flavor) {}
 
   ReflectionContext(const ReflectionContext &other) = delete;
   ReflectionContext &operator=(const ReflectionContext &other) = delete;
@@ -457,10 +459,16 @@ public:
         savedBuffers.push_back(std::move(Buf));
 
         auto Begin = RemoteRef<void>(Addr, BufStart);
-        auto Size = COFFSec->VirtualSize;
+        uint64_t Size = COFFSec->VirtualSize;
 
         // FIXME: This code needs to be cleaned up and updated
         // to make it work for 32 bit platforms.
+        //
+        // The section is bracketed by 8-byte sentinel words at each end, so we
+        // skip the leading sentinel and drop both. If VirtualSize is too small
+        // to contain the sentinels, skip the section.
+        if (Size < 16)
+          return {nullptr, 0};
         Begin = Begin.atByteOffset(8);
         Size -= 16;
 
@@ -1584,9 +1592,14 @@ public:
   StoredPointer allocationMetadataPointer(
     MetadataAllocation<Runtime> Allocation) {
     if (Allocation.Tag == GenericMetadataCacheTag) {
+      // Allocation.Size comes from the inspected process and may be smaller
+      // than the entry we're about to overlay. Reject undersized allocations
+      // and read exactly the entry size rather than the reported size.
+      if (Allocation.Size < sizeof(GenericMetadataCacheEntry<StoredPointer>))
+        return 0;
       auto AllocationBytes = getReader().readBytes(
           RemoteAddress(Allocation.Ptr, RemoteAddress::DefaultAddressSpace),
-          Allocation.Size);
+          sizeof(GenericMetadataCacheEntry<StoredPointer>));
       if (!AllocationBytes)
         return 0;
       auto Entry =
@@ -1714,7 +1727,7 @@ public:
       auto PoolPtr = (const char *)PoolBytes.get();
 
       uintptr_t Offset = 0;
-      while (Offset < Trailer->PoolSize) {
+      while (Offset + sizeof(AllocationHeader) <= Trailer->PoolSize) {
         auto AllocationPtr = PoolPtr + Offset;
         auto Header = (const AllocationHeader *)AllocationPtr;
         if (Header->Size == 0)

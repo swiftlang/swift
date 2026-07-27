@@ -122,6 +122,17 @@ void ClangImporter::getBridgingHeaderOptions(
     break;
   }
 
+  // If the main compilation specifies '-clang-target', forward it so the
+  // bridging header PCH is emitted through the same `ClangImporter::create`
+  // configuration path (and therefore the same `clang::CodeGenOptions`) as the
+  // compilations that later consume the PCH.
+  if (ctx.LangOpts.ClangTarget.has_value()) {
+    swiftArgs.push_back("-target");
+    swiftArgs.push_back(ctx.LangOpts.Target.str());
+    swiftArgs.push_back("-clang-target");
+    swiftArgs.push_back(ctx.LangOpts.ClangTarget->str());
+  }
+
   // Add args reported by the scanner.
 
   // Round-trip clang args to canonicalize and clear the options that swift

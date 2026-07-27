@@ -22,8 +22,8 @@
 // CHECK-STRING:     typealias value_type = CWideChar
 // CHECK-STRING:   }
 
-// CHECK-TO-STRING:   static func to_string(_ __val: Int32) -> std{{(.__cxx11)?}}.string
-// CHECK-TO-STRING:   static func to_wstring(_ __val: Int32) -> std{{(.__cxx11)?}}.wstring
+// CHECK-TO-STRING:   static func to_string(_ __val: CInt) -> std{{(.__cxx11)?}}.string
+// CHECK-TO-STRING:   static func to_wstring(_ __val: CInt) -> std{{(.__cxx11)?}}.wstring
 
 // CHECK-SIZE-T:   typealias size_t = Int
 

@@ -13,7 +13,7 @@
 
 // Verify that the mangled names end up in the debug info.
 // CHECK-DWARF: TAG_module
-// CHECK-DWARF-NEXT: AT_name ("main")
+// CHECK-DWARF: AT_name ("main")
 // CHECK-DWARF: TAG_structure_type
 // CHECK-DWARF-NEXT: AT_name ("foo")
 // CHECK-DWARF-NEXT: AT_linkage_name ("$s4main3fooCD")

@@ -512,62 +512,6 @@ extension String {
       }
     }
 
-    // slow-path
-    var isASCII = true
-    var buffer: UnsafeMutableBufferPointer<UInt8>
-    unsafe buffer = UnsafeMutableBufferPointer.allocate(capacity: input.count*3)
-    var written = buffer.startIndex
-
-    var parser = Encoding.ForwardParser()
-    var input = unsafe input.makeIterator()
-
-    transcodingLoop:
-    while true {
-      switch unsafe parser.parseScalar(from: &input) {
-      case .valid(let s):
-        let scalar = Encoding.decode(s)
-        guard let utf8 = Unicode.UTF8.encode(scalar) else {
-          // transcoding error: clean up and return nil
-          fallthrough
-        }
-        if buffer.count < written + utf8.count {
-          let newCapacity = buffer.count + (buffer.count >> 1)
-          let copy: UnsafeMutableBufferPointer<UInt8>
-          unsafe copy = UnsafeMutableBufferPointer.allocate(capacity: newCapacity)
-          let copied = unsafe copy.moveInitialize(
-            fromContentsOf: buffer.prefix(upTo: written)
-          )
-          unsafe buffer.deallocate()
-          unsafe buffer = unsafe copy
-          written = copied
-        }
-        if isASCII && utf8.count > 1 {
-          isASCII = false
-        }
-        written = unsafe buffer.suffix(from: written).initialize(fromContentsOf: utf8)
-        break
-      case .error:
-        // validation error: clean up and return nil
-        unsafe buffer.prefix(upTo: written).deinitialize()
-        unsafe buffer.deallocate()
-        return nil
-      case .emptyInput:
-        break transcodingLoop
-      }
-    }
-
-    let storage = unsafe buffer.baseAddress.map {
-      unsafe __SharedStringStorage(
-        _mortal: $0,
-        countAndFlags: _StringObject.CountAndFlags(
-          count: buffer.startIndex.distance(to: written),
-          isASCII: isASCII,
-          isNFC: isASCII,
-          isNativelyStored: false,
-          isTailAllocated: false
-        )
-      )
-    }
-    return storage?.asString
+    return unsafe String._fromCodeUnits(input, encoding: encoding, repair: false)?.0
   }
 }

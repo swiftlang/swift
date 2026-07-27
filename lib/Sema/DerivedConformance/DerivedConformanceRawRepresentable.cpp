@@ -243,7 +243,7 @@ checkAvailability(const EnumElementDecl *elt,
                   AvailabilityContext availabilityContext,
                   std::optional<RuntimeVersionCheck> &versionCheck) {
   auto &C = elt->getASTContext();
-  auto restriction = availabilityContext.restrictionForDecl(elt);
+  auto restriction = availabilityContext.unsatisfiedRestrictionForDecl(elt);
 
   // Is it always available?
   if (!restriction)

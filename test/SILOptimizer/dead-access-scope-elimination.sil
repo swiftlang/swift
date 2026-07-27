@@ -395,3 +395,22 @@ bb0(%arg : @guaranteed $MyClass):
   return %r : $()
 }
 
+// CHECK-LABEL: sil [ossa] @dont_remove_signed_accesses :
+// CHECK:         begin_access
+// CHECK:         end_access
+// CHECK:       } // end sil function 'dont_remove_signed_accesses'
+sil [ossa] @dont_remove_signed_accesses : $@convention(thin) () -> () {
+bb0:
+  %obj = alloc_ref $MyClass
+  %borrow = begin_borrow %obj : $MyClass
+  %addr = ref_element_addr %borrow : $MyClass, #MyClass.x
+  %val = integer_literal $Builtin.Int64, 0
+  %access = begin_access [modify] [signed] %addr : $*Builtin.Int64
+  store %val to [trivial] %access : $*Builtin.Int64
+  end_access %access : $*Builtin.Int64
+  end_borrow %borrow : $MyClass
+  destroy_value %obj : $MyClass
+  %r = tuple ()
+  return %r : $()
+}
+

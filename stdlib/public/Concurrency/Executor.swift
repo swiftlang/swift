@@ -683,7 +683,7 @@ extension Task where Success == Never, Failure == Never {
   @available(StdlibDeploymentTarget 6.3, *)
   static var unownedDefaultExecutor: UnownedTaskExecutor {
     _createDefaultExecutorsOnce()
-    return unsafe UnownedTaskExecutor(_defaultExecutor!)
+    return unsafe UnownedTaskExecutor(Builtin.buildOrdinaryTaskExecutorRef(_defaultExecutor!))
   }
 }
 

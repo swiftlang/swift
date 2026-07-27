@@ -74,3 +74,17 @@ public func inlinable2() -> SPIClass {
 }
 
 let _ = o1 - o2
+
+public struct ConformsToProtoWithSPIRequirement: ProtoWithSPIRequirement {
+  public func publicReq() { }
+}
+
+// FIXME: Diagnostics for should indicate the default implementation requires an @_spi import
+public struct ConformsToProtoWithSPIRequirementInOtherGroup: ProtoWithSPIRequirementInOtherGroup { // expected-error {{type 'ConformsToProtoWithSPIRequirementInOtherGroup' does not conform to protocol 'ProtoWithSPIRequirementInOtherGroup'}}
+  // expected-note@-1 {{add stubs for conformance}}
+  public func publicReq() { }
+}
+
+public struct ConformsToProtoWithFutureSPIRequirement: ProtoWithFutureSPIRequirement {
+  public func publicReq() { }
+}

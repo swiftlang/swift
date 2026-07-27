@@ -26,7 +26,7 @@ Derived : public Base {};
 
 // CHECK:      public struct Base {
 // CHECK-NEXT:   public init()
-// CHECK-NEXT:   private enum Enum : [[ENUM_UNDERLYING_TYPE:Int32|UInt32]] {
+// CHECK-NEXT:   private enum Enum : [[ENUM_UNDERLYING_TYPE:CInt|CUnsignedInt]] {
 // CHECK-NEXT:     private init?(rawValue: [[ENUM_UNDERLYING_TYPE]])
 // CHECK-NEXT:     private var rawValue: [[ENUM_UNDERLYING_TYPE]] { get }
 // CHECK-NEXT:     private typealias RawValue = [[ENUM_UNDERLYING_TYPE]]

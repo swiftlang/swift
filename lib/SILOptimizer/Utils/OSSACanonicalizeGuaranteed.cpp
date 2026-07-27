@@ -118,6 +118,17 @@ bool OSSACanonicalizeGuaranteed::isRewritableOSSAForward(SILInstruction *inst) {
   if (!canOpcodeForwardOwnedValues(forwardedOper))
     return false;
 
+  // Don't rewrite the forwarding of a non-copyable value with a deinit.
+  // Converting such a value to a guaranteed value would drop the call to its
+  // deinitializer (memberwise destruction is not equivalent to aggregate
+  // destruction for a type with a user-defined deinit).
+  if (forwardedOper->get()->getType().isValueTypeWithDeinit())
+    return false;
+  for (auto result : inst->getResults()) {
+    if (result->getType().isValueTypeWithDeinit())
+      return false;
+  }
+
   return true;
 }
 
@@ -290,7 +301,8 @@ bool OSSACanonicalizeGuaranteed::visitBorrowScopeUses(SILValue innerValue,
 
       case OperandOwnership::GuaranteedForwarding:
       case OperandOwnership::ForwardingConsume:
-        if (OSSACanonicalizeGuaranteed::isRewritableOSSAForward(user)) {
+        if (OSSACanonicalizeGuaranteed::isRewritableOSSAForward(user) &&
+            canOpcodeForwardInnerGuaranteedValues(use)) {
           if (!visitor.visitForwardingUse(use)) {
             return false;
           }

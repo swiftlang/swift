@@ -255,11 +255,10 @@ static ParamDecl *createMemberwiseInitParameter(DeclContext *DC,
   }
 
   // Create the parameter.
-  auto *arg = new (ctx) ParamDecl(SourceLoc(), paramLoc, var->getName(),
-                                  paramLoc, var->getName(), DC);
-  arg->setSpecifier(ParamSpecifier::Default);
-  arg->setInterfaceType(varInterfaceType);
-  arg->setImplicit();
+  ParamDecl *arg =
+      ParamDecl::createImplicit(ctx, /*specifierLoc=*/SourceLoc(), paramLoc,
+                                var->getName(), paramLoc, var->getName(),
+                                varInterfaceType, DC, ParamSpecifier::Default);
   arg->setAutoClosure(isAutoClosure);
 
   // Don't allow the parameter to accept temporary pointer conversions.
@@ -317,11 +316,10 @@ createImplicitConstructor(NominalTypeDecl *decl, ImplicitConstructorKind ICK,
       auto systemTy = getDistributedActorSystemType(classDecl);
 
       // Create the parameter. API name is actorSystem, local name is system
-      auto *arg = new (ctx) ParamDecl(SourceLoc(), Loc, ctx.Id_actorSystem, Loc,
-                                      ctx.Id_system, decl);
-      arg->setSpecifier(ParamSpecifier::Default);
-      arg->setInterfaceType(systemTy);
-      arg->setImplicit();
+      ParamDecl *arg =
+          ParamDecl::createImplicit(ctx, /*specifierLoc=*/SourceLoc(), Loc,
+                                    ctx.Id_actorSystem, Loc, ctx.Id_system,
+                                    systemTy, decl, ParamSpecifier::Default);
 
       params.push_back(arg);
     }
@@ -1531,6 +1529,17 @@ bool HasMemberwiseInitRequest::evaluate(Evaluator &evaluator, StructDecl *decl,
   llvm::SmallPtrSet<VarDecl *, 4> initializedProperties;
   llvm::SmallVector<std::pair<VarDecl *, Identifier>> invalidOrderings;
 
+  llvm::SmallVector<std::pair<VarDecl *, AvailabilityRestriction>>
+      availabilityRestrictions;
+
+  // Synthesized memberwise intializers are available at the intersection of the
+  // availability of the struct containing the initializer and the deployment
+  // target (since they have at most 'internal' accessibility and therefore
+  // cannot be invoked by module clients).
+  auto structAvailability = AvailabilityContext::forDeclSignature(decl);
+  structAvailability.constrainWithContext(
+      AvailabilityContext::forDeploymentTarget(ctx), ctx);
+
   if (enumerateCurrentPropertiesAndAuxiliaryVars(decl, [&](VarDecl *var) {
         if (var->isStatic())
           return true;
@@ -1541,9 +1550,17 @@ bool HasMemberwiseInitRequest::evaluate(Evaluator &evaluator, StructDecl *decl,
         if (!var->isMemberwiseInitialized(initKind, /*preferDeclared=*/true))
           return true;
 
-        // Check whether use of init accessors results in access to
-        // uninitialized properties.
         if (auto *initAccessor = var->getAccessor(AccessorKind::Init)) {
+          // Check whether the property has stronger availability restrictions
+          // than the initializer.
+          if (!var->hasStorage()) {
+            if (auto restriction =
+                    structAvailability.unsatisfiedRestrictionForDecl(var)) {
+              availabilityRestrictions.push_back({var, *restriction});
+              return true;
+            }
+          }
+
           // Make sure that all properties accessed by init accessor
           // are previously initialized.
           for (auto *property : initAccessor->getAccessedProperties()) {
@@ -1578,12 +1595,8 @@ bool HasMemberwiseInitRequest::evaluate(Evaluator &evaluator, StructDecl *decl,
       }))
     return false;
 
-  if (invalidOrderings.empty())
-    return !initializedProperties.empty();
-
-  {
-    ctx.Diags.diagnose(
-        decl, diag::cannot_synthesize_memberwise_due_to_property_init_order);
+  if (!invalidOrderings.empty()) {
+    ctx.Diags.diagnose(decl, diag::cannot_synthesize_memberwise_init, decl);
 
     for (const auto &invalid : invalidOrderings) {
       auto *accessor = invalid.first->getAccessor(AccessorKind::Init);
@@ -1591,9 +1604,24 @@ bool HasMemberwiseInitRequest::evaluate(Evaluator &evaluator, StructDecl *decl,
                          diag::out_of_order_access_in_init_accessor,
                          invalid.first->getName(), invalid.second);
     }
+
+    return false;
   }
 
-  return false;
+  if (!availabilityRestrictions.empty()) {
+    ctx.Diags.diagnose(decl, diag::cannot_synthesize_memberwise_init, decl);
+
+    for (const auto &[var, restriction] : availabilityRestrictions) {
+      ctx.Diags.diagnose(
+          var->getLoc(),
+          diag::unavailable_init_accessor_prevent_memberwise_init_synthesis,
+          restriction.isUnavailable(), var);
+    }
+
+    return false;
+  }
+
+  return !initializedProperties.empty();
 }
 
 ConstructorDecl *

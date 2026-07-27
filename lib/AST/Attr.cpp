@@ -36,6 +36,7 @@
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSwitch.h"
+#include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
 using namespace swift;
@@ -272,7 +273,7 @@ void OpenedTypeAttr::printImpl(ASTPrinter &printer,
                                const PrintOptions &options) const {
   printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
   printer.printAttrName("@opened");
-  printer << "(\"" << getUUID() << "\"";
+  printer << "(" << getID();
   if (auto constraintType = getConstraintType()) {
     printer << ", ";
     constraintType->print(printer, options);
@@ -285,7 +286,7 @@ void PackElementTypeAttr::printImpl(ASTPrinter &printer,
                                     const PrintOptions &options) const {
   printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
   printer.printAttrName("@pack_element");
-  printer << "(\"" << getUUID() << "\")";
+  printer << "(" << getID() << ")";
   printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
 }
 
@@ -825,6 +826,16 @@ void DeclAttributes::print(ASTPrinter &Printer, const PrintOptions &Options,
   auto *SF = D ? D->getDeclContext()->getParentSourceFile() : nullptr;
 
   for (auto DA : llvm::reverse(FlattenedAttrs)) {
+    AttributeVector &which = DA->isDeclModifier() ? modifiers :
+                             isa<BackDeployedAttr>(DA) ? backDeployedAttributes :
+                             DA->isLongAttribute() ? longAttributes :
+                             attributes;
+
+    if (Options.alwaysIncludeAttrKind(DA->getKind())) {
+      which.push_back(DA);
+      continue;
+    }
+
     // Don't skip implicit custom attributes. Custom attributes like global
     // actor isolation have critical semantic meaning and should never be
     // suppressed. Other custom attrs that can be suppressed, like macros,
@@ -889,10 +900,6 @@ void DeclAttributes::print(ASTPrinter &Printer, const PrintOptions &Options,
       }
     }
 
-    AttributeVector &which = DA->isDeclModifier() ? modifiers :
-                             isa<BackDeployedAttr>(DA) ? backDeployedAttributes :
-                             DA->isLongAttribute() ? longAttributes :
-                             attributes;
     which.push_back(DA);
   }
 
@@ -3074,7 +3081,7 @@ DerivativeAttr::DerivativeAttr(bool implicit, SourceLoc atLoc,
                                ArrayRef<ParsedAutoDiffParameter> params)
     : DeclAttribute(DeclAttrKind::Derivative, atLoc, baseRange, implicit),
       BaseTypeRepr(baseTypeRepr), OriginalFunctionName(std::move(originalName)),
-      NumParsedParameters(params.size()) {
+      NumOriginalFunctions(0), NumParsedParameters(params.size()) {
   std::copy(params.begin(), params.end(), getTrailingObjects());
 }
 
@@ -3084,6 +3091,7 @@ DerivativeAttr::DerivativeAttr(bool implicit, SourceLoc atLoc,
                                IndexSubset *parameterIndices)
     : DeclAttribute(DeclAttrKind::Derivative, atLoc, baseRange, implicit),
       BaseTypeRepr(baseTypeRepr), OriginalFunctionName(std::move(originalName)),
+      NumOriginalFunctions(0), NumParsedParameters(0),
       ParameterIndices(parameterIndices) {}
 
 DerivativeAttr *
@@ -3107,24 +3115,28 @@ DerivativeAttr *DerivativeAttr::create(ASTContext &context, bool implicit,
                                   std::move(originalName), parameterIndices);
 }
 
-AbstractFunctionDecl *
-DerivativeAttr::getOriginalFunction(ASTContext &context) const {
+TinyPtrVector<AbstractFunctionDecl *>
+DerivativeAttr::getOriginalFunctions(ASTContext &context) const {
   return evaluateOrDefault(
       context.evaluator,
       DerivativeAttrOriginalDeclRequest{const_cast<DerivativeAttr *>(this)},
-      nullptr);
+      {});
 }
 
-void DerivativeAttr::setOriginalFunction(AbstractFunctionDecl *decl) {
-  assert(!OriginalFunction && "cannot overwrite original function");
-  OriginalFunction = decl;
+void DerivativeAttr::setOriginalFunctions(
+    ASTContext &context, ArrayRef<AbstractFunctionDecl *> decls) {
+  assert(!OriginalFunctions && "cannot overwrite original function");
+  NumOriginalFunctions = decls.size();
+  OriginalFunctions = context.AllocateCopy(decls).data();
 }
 
 void DerivativeAttr::setOriginalFunctionResolver(
-    LazyMemberLoader *resolver, uint64_t resolverContextData) {
-  assert(!OriginalFunction && "cannot overwrite original function");
-  OriginalFunction = resolver;
-  ResolverContextData = resolverContextData;
+    ASTContext &context, LazyMemberLoader *resolver,
+    ArrayRef<uint64_t> resolverContextData) {
+  assert(!OriginalFunctions && "cannot overwrite original function");
+  Resolver = resolver;
+  NumOriginalFunctions = resolverContextData.size();
+  OriginalFunctions = context.AllocateCopy(resolverContextData).data();
 }
 
 void DerivativeAttr::attachToDeclImpl(Decl *originalDeclaration) {

@@ -37,8 +37,8 @@
 
 // CHECK-STRING: enum std {
 // CHECK-STRING:   enum __1 {
-// CHECK-STRING:     static func to_string(_ __val: Int32) -> std.__1.string
-// CHECK-STRING:     static func to_wstring(_ __val: Int32) -> std.__1.wstring
+// CHECK-STRING:     static func to_string(_ __val: CInt) -> std.__1.string
+// CHECK-STRING:     static func to_wstring(_ __val: CInt) -> std.__1.wstring
 // CHECK-STRING:   }
 // CHECK-STRING: }
 // CHECK-STRING-NOT: enum std

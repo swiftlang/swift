@@ -246,6 +246,11 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
       opts.SerializeOptionsForDebugging.value_or(
           !module->isExternallyConsumed());
 
+  serializationOpts.PrefixMapSourceInfo = opts.PrefixMapSourceInfo;
+  if (opts.PrefixMapSourceInfo) {
+    serializationOpts.SourceInfoPrefixMap = getIRGenOptions().FilePrefixMap;
+  }
+
   serializationOpts.PathObfuscator = opts.serializedPathObfuscator;
   if (serializationOpts.SerializeOptionsForDebugging &&
       opts.DebugPrefixSerializedDebuggingOptions) {
@@ -318,9 +323,7 @@ Lowering::TypeConverter &CompilerInstance::getSILTypes() {
   if (auto *tc = TheSILTypes.get())
     return *tc;
 
-  auto *tc = new Lowering::TypeConverter(
-      *getMainModule(),
-      /*loweredAddresses=*/!Context->SILOpts.EnableSILOpaqueValues);
+  auto *tc = new Lowering::TypeConverter(*getMainModule());
   TheSILTypes.reset(tc);
   return *tc;
 }

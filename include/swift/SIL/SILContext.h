@@ -20,8 +20,6 @@
 
 namespace swift {
 
-class SILSSAUpdater;
-
 /// The abstract base class for the C++ implementation of Context in SwiftCompilerSources.
 /// Referenced in BridgedContext.
 ///
@@ -70,9 +68,6 @@ protected:
 
   int numClonersAllocated = 0;
 
-  SILSSAUpdater *ssaUpdater = nullptr;
-  SmallVector<SILPhiArgument *, 4> insertedPhisBySSAUpdater;
-
   /// Change notifications, collected during a pass run.
   NotificationKind changeNotifications = NotificationKind::Nothing;
 
@@ -119,14 +114,6 @@ public:
   virtual void moveFunctionBody(SILFunction *sourceFn, SILFunction *destFn) = 0;
 
   virtual SILFunction *lookupStdlibFunction(StringRef name) = 0;
-
-  // The SILSSAUpdater is implemented in the Optimizer. Therefore all the APIs need to take
-  // the indirection through virtual functions to SwiftPassInvocation.
-  virtual void initializeSSAUpdater(SILFunction *function, SILType type, ValueOwnershipKind ownership) = 0;
-  virtual void SSAUpdater_addAvailableValue(SILBasicBlock *block, SILValue value) = 0;
-  virtual SILValue SSAUpdater_getValueAtEndOfBlock(SILBasicBlock *block) = 0;
-  virtual SILValue SSAUpdater_getValueInMiddleOfBlock(SILBasicBlock *block) = 0;
-  ArrayRef<SILPhiArgument*> SSAUpdater_getInsertedPhis() { return insertedPhisBySSAUpdater; }
 };
 
 } // namespace swift

@@ -1,10 +1,7 @@
 // REQUIRES: no_asan
-// UNSUPPORTED: OS=linux-android, OS=linux-androideabi, OS=wasip1, OS=emscripten
+// UNSUPPORTED: OS=wasip1, OS=emscripten
 // RUN: %empty-directory(%t)
 import _Differentiation
-
-// Missing the field on FreeBSD (rdar://173266760)
-// XFAIL: OS=freebsd
 
 // RUN: %target-build-swift -Xfrontend -enable-anonymous-context-mangled-names %S/Inputs/AutoDiffTypes.swift -parse-as-library -emit-module -emit-library -module-name TypesToReflect -o %t/%target-library-name(TypesToReflect)
 // RUN: %target-build-swift -Xfrontend -enable-anonymous-context-mangled-names %S/Inputs/AutoDiffTypes.swift %S/Inputs/main.swift -emit-module -emit-executable -module-name TypesToReflect -o %t/TypesToReflect

@@ -1,10 +1,11 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-run-simple-swift(-parse-as-library -enable-experimental-feature Embedded -disable-availability-checking -wmo %target-embedded-posix-shim) | %FileCheck %s
+// RUN: %target-run-simple-swift(-parse-as-library -enable-experimental-feature Embedded -disable-availability-checking -wmo %target-embedded-posix-shim %target-embedded-synchronization) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
 // REQUIRES: synchronization
 // REQUIRES: swift_feature_Embedded
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 import Synchronization
 

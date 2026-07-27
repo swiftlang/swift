@@ -98,14 +98,14 @@ bb0:
   %1 = begin_borrow %0 : $(repeat each T)
   %zero = integer_literal $Builtin.Word, 0
   %index = dynamic_pack_index %zero of $Pack{repeat each T}
-  open_pack_element %index of <each U_1> at <Pack{repeat each T}>, shape $U_1, uuid "00000000-0000-0000-0000-000000000000"
-  %elt = tuple_pack_extract %index of %1 : $(repeat each T) as $@pack_element("00000000-0000-0000-0000-000000000000") U_1
+  open_pack_element %index of <each U_1> at <Pack{repeat each T}>, shape $U_1, id 1
+  %elt = tuple_pack_extract %index of %1 : $(repeat each T) as $@pack_element(1) U_1
   %f = function_ref @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
-  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f<@pack_element("00000000-0000-0000-0000-000000000000") U_1>(%elt) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> () // expected-warning {{}}
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f<@pack_element(1) U_1>(%elt) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> () // expected-warning {{}}
   // expected-note @-1 {{}}
 
-  %elt2 = tuple_pack_extract %index of %1 : $(repeat each T) as $@pack_element("00000000-0000-0000-0000-000000000000") U_1 // expected-note {{access can happen concurrently}}
-  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f<@pack_element("00000000-0000-0000-0000-000000000000") U_1>(%elt) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  %elt2 = tuple_pack_extract %index of %1 : $(repeat each T) as $@pack_element(1) U_1 // expected-note {{access can happen concurrently}}
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %f<@pack_element(1) U_1>(%elt) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
 
   end_borrow %1 : $(repeat each T)
   destroy_value %0 : $(repeat each T)
@@ -123,9 +123,9 @@ bb0:
   // expected-note @-1 {{}}
 
   %b = begin_borrow %p : $P
-  %v = open_existential_value %b : $P to $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self
-  %w = witness_method $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self, #P.doSomething, %v : $@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
-  apply %w<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", P) Self>(%v) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> () // expected-note {{access can happen concurrently}}
+  %v = open_existential_value %b : $P to $@opened(1, P) Self
+  %w = witness_method $@opened(1, P) Self, #P.doSomething, %v : $@opened(1, P) Self : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
+  apply %w<@opened(1, P) Self>(%v) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> () // expected-note {{access can happen concurrently}}
   end_borrow %b : $P
   destroy_value %p : $P
 

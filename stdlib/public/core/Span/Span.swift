@@ -77,11 +77,36 @@ public struct Span<Element: ~Copyable>: ~Escapable, Copyable, BitwiseCopyable {
   @export(implementation)
   @inline(__always)
   @lifetime(borrow pointer)
+  @_disfavoredOverload
   internal init(
     _unchecked pointer: UnsafeRawPointer?,
     count: Int
   ) {
     unsafe _pointer = pointer
+    _count = count
+  }
+
+  /// Unsafely create a `Span` over initialized memory.
+  ///
+  /// `pointer` must point to a region of `count` initialized instances.
+  ///
+  /// The region of memory representing `count` instances starting at `pointer`
+  /// must remain valid, initialized and immutable
+  /// throughout the lifetime of the newly-created `Span`.
+  /// Failure to maintain this invariant results in undefined behaviour.
+  ///
+  /// - Parameters:
+  ///   - pointer: a pointer to the first initialized element.
+  ///   - count: the number of initialized elements in the span.
+  @lifetime(borrow pointer)
+  @unsafe
+  @_alwaysEmitIntoClient
+  @_transparent
+  internal init(
+    _unchecked pointer: UnsafePointer<Element>,
+    count: Int
+  ) {
+    unsafe _pointer = UnsafeRawPointer(pointer)
     _count = count
   }
 }
@@ -108,14 +133,16 @@ extension Span where Element: ~Copyable {
   public init(
     _unsafeElements buffer: UnsafeBufferPointer<Element>
   ) {
-    //FIXME: Workaround for https://github.com/swiftlang/swift/issues/77235
-    let baseAddress = unsafe UnsafeRawPointer(buffer.baseAddress)
     _precondition(
-      ((Int(bitPattern: baseAddress) &
-        (MemoryLayout<Element>.alignment &- 1)) == 0),
+      buffer._isWellAligned(),
       "baseAddress must be properly aligned to access Element"
     )
-    let span = unsafe Span(_unchecked: baseAddress, count: buffer.count)
+
+    let span = unsafe Span(
+      _unchecked: UnsafeRawPointer(buffer.baseAddress),
+      count: buffer.count
+    )
+
     // As a trivial value, 'baseAddress' does not formally depend on the
     // lifetime of 'buffer'. Make the dependence explicit.
     self = unsafe _overrideLifetime(span, borrowing: buffer)

@@ -386,7 +386,7 @@ FixedTypeInfo::getSpareBitExtraInhabitantIndex(IRGenFunction &IGF,
   
   // If we had a valid value, return -1. Otherwise, return the index.
   auto phi = IGF.Builder.CreatePHI(IGF.IGM.Int32Ty, 2);
-  phi->addIncoming(llvm::ConstantInt::get(IGF.IGM.Int32Ty, -1), origBB);
+  phi->addIncoming(llvm::ConstantInt::getAllOnesValue(IGF.IGM.Int32Ty), origBB);
   phi->addIncoming(idx, spareBB);
   
   return phi;
@@ -3004,7 +3004,7 @@ static bool tryEmitDeinitCall(IRGenFunction &IGF,
   auto nominal = ty->getAnyNominal();
 
   // We are only concerned with move-only type deinits here.
-  if (!nominal || !nominal->getValueTypeDestructor()) {
+  if (!nominal || !nominal->hasValueTypeDestructor()) {
     return false;
   }
 
@@ -3142,7 +3142,7 @@ IsABIAccessible_t irgen::isTypeABIAccessibleIfFixedSize(IRGenModule &IGM,
   // Check for a deinit. If this type does not define a deinit it is ABI
   // accessible because we can just project onto its sub elements.
   auto nom = ty->getAnyNominal();
-  if (!nom || !nom->getValueTypeDestructor())
+  if (!nom || !nom->hasValueTypeDestructor())
     return IsABIAccessible;
 
   if (IGM.getSILModule().isTypeMetadataAccessible(ty) ||

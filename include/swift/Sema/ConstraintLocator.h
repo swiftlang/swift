@@ -299,9 +299,6 @@ public:
   /// Determine whether this locator points to the `try?` expression.
   bool isForOptionalTry() const;
 
-  /// Determine whether this locator is for a result builder body result type.
-  bool isForResultBuilderBodyResult() const;
-
   /// Determine whether this locator is for a macro expansion.
   bool isForMacroExpansion() const;
 
@@ -323,6 +320,9 @@ public:
 
   /// Whether the locator in question is for a pattern match.
   bool isForPatternMatch() const;
+
+  /// Whether the locator is for a named or `_` pattern decl.
+  bool isForPatternDecl() const;
 
   /// Whether this locator identifies an element type of a collection literal.
   bool isForCollectionElement() const;

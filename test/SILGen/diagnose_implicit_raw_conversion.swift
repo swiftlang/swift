@@ -40,7 +40,7 @@ func test_errors<T>(arg: T, sarg: String, anyBCArg: BitwiseCopyable) {
     let constArray: [T] = [arg]
     readBytes(constArray) // expected-warning {{forming 'UnsafeRawPointer' to a variable of type '[T]'; this is likely incorrect because 'T' may contain an object reference.}}
     read_char(constArray) // expected-warning {{forming 'UnsafePointer<CChar>' (aka 'UnsafePointer<Int8>') to a variable of type '[T]'; this is likely incorrect because 'T' may contain an object reference.}}
-    read_uchar(constArray) // expected-warning {{forming 'UnsafePointer<UInt8>' to a variable of type '[T]'; this is likely incorrect because 'T' may contain an object reference.}}
+    read_uchar(constArray) // expected-warning {{forming 'UnsafePointer<CUnsignedChar>' (aka 'UnsafePointer<UInt8>') to a variable of type '[T]'; this is likely incorrect because 'T' may contain an object reference.}}
 
     var array: [T] = [arg]
     readBytes(&array)     // expected-warning {{forming 'UnsafeRawPointer' to a variable of type '[T]'; this is likely incorrect because 'T' may contain an object reference.}}
@@ -48,8 +48,8 @@ func test_errors<T>(arg: T, sarg: String, anyBCArg: BitwiseCopyable) {
 
     read_char(&array)   // expected-warning {{forming 'UnsafePointer<CChar>' (aka 'UnsafePointer<Int8>') to a variable of type '[T]'; this is likely incorrect because 'T' may contain an object reference.}}
     write_char(&array)  // expected-warning {{forming 'UnsafeMutablePointer<CChar>' (aka 'UnsafeMutablePointer<Int8>') to a variable of type '[T]'; this is likely incorrect because 'T' may contain an object reference.}}
-    read_uchar(&array)  // expected-warning {{forming 'UnsafePointer<UInt8>' to a variable of type '[T]'; this is likely incorrect because 'T' may contain an object reference.}}
-    write_uchar(&array) // expected-warning {{forming 'UnsafeMutablePointer<UInt8>' to a variable of type '[T]'; this is likely incorrect because 'T' may contain an object reference.}}
+    read_uchar(&array)  // expected-warning {{forming 'UnsafePointer<CUnsignedChar>' (aka 'UnsafePointer<UInt8>') to a variable of type '[T]'; this is likely incorrect because 'T' may contain an object reference.}}
+    write_uchar(&array) // expected-warning {{forming 'UnsafeMutablePointer<CUnsignedChar>' (aka 'UnsafeMutablePointer<UInt8>') to a variable of type '[T]'; this is likely incorrect because 'T' may contain an object reference.}}
 
     var anyBC: BitwiseCopyable = anyBCArg
     readBytes(&anyBC)   // expected-warning {{forming 'UnsafeRawPointer' to a variable of type 'any BitwiseCopyable'; this is likely incorrect because 'any BitwiseCopyable' may contain an object reference.}}
@@ -62,7 +62,7 @@ func test_errors<T>(arg: T, sarg: String, anyBCArg: BitwiseCopyable) {
     let constBCArray: [BitwiseCopyable] = [anyBCArg]
     readBytes(constBCArray) // expected-warning {{forming 'UnsafeRawPointer' to a variable of type '[any BitwiseCopyable]'; this is likely incorrect because 'any BitwiseCopyable' may contain an object reference.}}
     read_char(constBCArray) // expected-warning {{forming 'UnsafePointer<CChar>' (aka 'UnsafePointer<Int8>') to a variable of type '[any BitwiseCopyable]'; this is likely incorrect because 'any BitwiseCopyable' may contain an object reference.}}
-    read_uchar(constBCArray) // expected-warning {{forming 'UnsafePointer<UInt8>' to a variable of type '[any BitwiseCopyable]'; this is likely incorrect because 'any BitwiseCopyable' may contain an object reference.}}
+    read_uchar(constBCArray) // expected-warning {{forming 'UnsafePointer<CUnsignedChar>' (aka 'UnsafePointer<UInt8>') to a variable of type '[any BitwiseCopyable]'; this is likely incorrect because 'any BitwiseCopyable' may contain an object reference.}}
 
     var bcArray: [BitwiseCopyable] = [anyBCArg]
     readBytes(&bcArray)     // expected-warning {{forming 'UnsafeRawPointer' to a variable of type '[any BitwiseCopyable]'; this is likely incorrect because 'any BitwiseCopyable' may contain an object reference.}}
@@ -70,8 +70,8 @@ func test_errors<T>(arg: T, sarg: String, anyBCArg: BitwiseCopyable) {
 
     read_char(&bcArray)   // expected-warning {{forming 'UnsafePointer<CChar>' (aka 'UnsafePointer<Int8>') to a variable of type '[any BitwiseCopyable]'; this is likely incorrect because 'any BitwiseCopyable' may contain an object reference.}}
     write_char(&bcArray)  // expected-warning {{forming 'UnsafeMutablePointer<CChar>' (aka 'UnsafeMutablePointer<Int8>') to a variable of type '[any BitwiseCopyable]'; this is likely incorrect because 'any BitwiseCopyable' may contain an object reference.}}
-    read_uchar(&bcArray)  // expected-warning {{forming 'UnsafePointer<UInt8>' to a variable of type '[any BitwiseCopyable]'; this is likely incorrect because 'any BitwiseCopyable' may contain an object reference.}}
-    write_uchar(&bcArray) // expected-warning {{forming 'UnsafeMutablePointer<UInt8>' to a variable of type '[any BitwiseCopyable]'; this is likely incorrect because 'any BitwiseCopyable' may contain an object reference.}}
+    read_uchar(&bcArray)  // expected-warning {{forming 'UnsafePointer<CUnsignedChar>' (aka 'UnsafePointer<UInt8>') to a variable of type '[any BitwiseCopyable]'; this is likely incorrect because 'any BitwiseCopyable' may contain an object reference.}}
+    write_uchar(&bcArray) // expected-warning {{forming 'UnsafeMutablePointer<CUnsignedChar>' (aka 'UnsafeMutablePointer<UInt8>') to a variable of type '[any BitwiseCopyable]'; this is likely incorrect because 'any BitwiseCopyable' may contain an object reference.}}
 
     var string: String = sarg
     readBytes(&string)   // expected-warning {{forming 'UnsafeRawPointer' to an inout variable of type String exposes the internal representation rather than the string contents.}}

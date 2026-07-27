@@ -57,6 +57,7 @@ putchar
 
 // REQUIRES: swift_feature_Embedded
 // REQUIRES: swift_feature_Extern
+// REQUIRES: embedded_stdlib_default_codegen
 
 @_extern(c, "putchar")
 @discardableResult

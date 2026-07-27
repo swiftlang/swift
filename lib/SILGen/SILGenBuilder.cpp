@@ -502,7 +502,7 @@ ManagedValue SILGenBuilder::createUncheckedEnumDataAddrForTake(
 ManagedValue
 SILGenBuilder::createLoadIfLoadable(SILLocation loc, ManagedValue addr) {
   assert(addr.getType().isAddress());
-  if (!addr.getType().isLoadable(SGF.F))
+  if (!addr.getType().isLoadableOrOpaque(SGF.F))
     return addr;
   return createLoadWithSameOwnership(loc, addr);
 }

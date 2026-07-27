@@ -15,6 +15,7 @@
 // REQUIRES: executable_test
 // REQUIRES: swift_feature_SuppressedAssociatedTypesWithDefaults
 // REQUIRES: swift_feature_Lifetimes
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 import StdlibUnittest
 
@@ -503,6 +504,32 @@ suite.test("UniqueArray/noncopyable-elementsEqual")
   expectTrue(a.elementsEqual(b))
   expectTrue(b.elementsEqual(a))
   expectTrue(b.elementsEqual(b))
+}
+
+// MARK: - Conformance checks
+
+@available(SwiftStdlib 6.4, *)
+func takesIterable<I: Iterable<T, F> & ~Copyable & ~Escapable, T: ~Copyable, F>(_ iterable: borrowing I) {}
+
+@available(SwiftStdlib 6.4, *)
+func testConformances() {
+  // Compile-only checks
+  
+  func copyableInlineArray(_ x: borrowing UniqueArray<Int>) { takesIterable(x) }
+  func copyableUniqueArray(_ x: InlineArray<1, Int>) { takesIterable(x) }
+  func copyableSpan(_ x: Span<Int>) { takesIterable(x) }
+  func copyableMutableSpan(_ x: borrowing MutableSpan<Int>) { takesIterable(x) }
+  func copyableOutputSpan(_ x: borrowing OutputSpan<Int>) { takesIterable(x) }
+
+  func noncopyableInlineArray(_ x: borrowing UniqueArray<NoncopyableInt>) { takesIterable(x) }
+  func noncopyableUniqueArray(_ x: borrowing InlineArray<1, NoncopyableInt>) { takesIterable(x) }
+  func noncopyableSpan(_ x: borrowing Span<NoncopyableInt>) { takesIterable(x) }
+  func noncopyableMutableSpan(_ x: borrowing MutableSpan<NoncopyableInt>) { takesIterable(x) }
+  func noncopyableOutputSpan(_ x: borrowing OutputSpan<NoncopyableInt>) { takesIterable(x) }
+  
+  func rawSpan(_ x: RawSpan) { takesIterable(x) }
+  func mutableRawSpan(_ x: borrowing MutableRawSpan) { takesIterable(x) }
+  func outputRawSpan(_ x: borrowing OutputRawSpan) { takesIterable(x) }
 }
 
 // MARK: - Throwing Iterable tests

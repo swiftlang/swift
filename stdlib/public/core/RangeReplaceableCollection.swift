@@ -1164,7 +1164,7 @@ extension RangeReplaceableCollection where Self: MutableCollection {
     where shouldBeRemoved: (Element) throws -> Bool
   ) rethrows {
     let suffixStart = try _halfStablePartition(isSuffixElement: shouldBeRemoved)
-    removeSubrange(suffixStart...)
+    if suffixStart != endIndex { removeSubrange(suffixStart...) }
   }
 }
 

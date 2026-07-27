@@ -137,6 +137,14 @@ public:
   restrictionForDecl(const Decl *decl,
                      AvailabilityRestrictionFlags flags = std::nullopt);
 
+  /// Returns the strongest availability restriction that must be satisfied to
+  /// use \p decl from this context, or nullopt if there is no such
+  /// restriction. Unlike `restrictionForDecl()`, deprecation restrictions are
+  /// not returned since deprecation does not prevent use of a declaration.
+  std::optional<AvailabilityRestriction>
+  unsatisfiedRestrictionForDecl(
+      const Decl *decl, AvailabilityRestrictionFlags flags = std::nullopt);
+
   /// Returns the availability restriction in \p domain that limits use of \p
   /// decl from this context, or nullopt if use of \p decl is not restricted.
   std::optional<AvailabilityRestriction>

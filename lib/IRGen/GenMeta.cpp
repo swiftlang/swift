@@ -1068,7 +1068,8 @@ namespace {
         auto address =
           B.getAddrOfCurrentPosition(IGM.ProtocolRequirementStructTy);
         int offset = WitnessTableFirstRequirementOffset;
-        auto firstReqAdjustment = llvm::ConstantInt::get(IGM.Int32Ty, -offset);
+        auto firstReqAdjustment =
+            llvm::ConstantInt::getSigned(IGM.Int32Ty, -offset);
         address = llvm::ConstantExpr::getGetElementPtr(
             IGM.ProtocolRequirementStructTy, address, firstReqAdjustment);
 
@@ -1471,6 +1472,17 @@ namespace {
       InvertibleProtocolSet result;
       auto nominal = dyn_cast<NominalTypeDecl>(Type);
       if (!nominal)
+        return result;
+
+      // GenericContextDescriptorFlags must be zero for descriptors that might
+      // be seen by a pre-5.8 runtime, so omit this on pre-5.8 targets unless
+      // we're building the runtime itself.
+      auto deploymentAvailability =
+          AvailabilityRange::forDeploymentTarget(IGM.Context);
+      if (!IGM.Context.LangOpts.DisableAvailabilityChecking &&
+          !deploymentAvailability.isContainedIn(
+              IGM.Context.getSwift58Availability()) &&
+          !IGM.getSwiftModule()->isStdlibModule())
         return result;
 
       auto checkProtocol = [&](InvertibleProtocolKind kind) {
@@ -3602,7 +3614,7 @@ static void emitInitializeRawLayoutOld(IRGenFunction &IGF, SILType likeType,
   // If we don't have a count, then we're the 'like:' variant and we need to
   // pass '-1' to the runtime call.
   if (!count) {
-    count = llvm::ConstantInt::get(IGF.IGM.Int32Ty, -1);
+    count = llvm::ConstantInt::getAllOnesValue(IGF.IGM.Int32Ty);
   }
 
   // Call swift_initRawStructMetadata().
@@ -3640,7 +3652,7 @@ static void emitInitializeRawLayout(IRGenFunction &IGF, SILType likeType,
 
     // PODness comes directly from the like type if we 'movesAsLike'. A custom
     // deinit on the raw layout type however automatically forces non-pod.
-    if (T.getStructOrBoundGenericStruct()->getValueTypeDestructor()) {
+    if (T.getStructOrBoundGenericStruct()->hasValueTypeDestructor()) {
       rawLayoutFlags = IGF.Builder.CreateOr(rawLayoutFlags,
                           IGM.getSize(Size((uint8_t) RawLayoutFlags::IsNonPOD)));
     } else {
@@ -3650,7 +3662,7 @@ static void emitInitializeRawLayout(IRGenFunction &IGF, SILType likeType,
                             IGM.getSize(Size((uint8_t) RawLayoutFlags::IsNonPOD)));
       rawLayoutFlags = IGF.Builder.CreateSelect(isPOD, rawLayoutFlags, isNonPODFlags);
     }
-  } else if (T.getStructOrBoundGenericStruct()->getValueTypeDestructor()) {
+  } else if (T.getStructOrBoundGenericStruct()->hasValueTypeDestructor()) {
     rawLayoutFlags = IGF.Builder.CreateOr(rawLayoutFlags,
                             IGM.getSize(Size((uint8_t) RawLayoutFlags::IsNonPOD)));
   }

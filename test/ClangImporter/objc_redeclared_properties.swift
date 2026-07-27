@@ -21,11 +21,11 @@ import RedeclaredPropertiesSplit2
 func test(obj: RPFoo) {
   if let _ = obj.nonnullToNullable {} // expected-error {{initializer for conditional binding must have Optional type}}
   obj.nonnullToNullable = obj // expected-error {{cannot assign to property: 'nonnullToNullable' is a get-only property}}
-  // expected-error@-1 {{cannot assign value of type 'RPFoo' to type 'UnsafeMutablePointer<Int32>'}}
+  // expected-error@-1 {{cannot assign value of type 'RPFoo' to type 'UnsafeMutablePointer<CInt>' (aka 'UnsafeMutablePointer<Int32>')}}
 
   if let _ = obj.nullableToNonnull {} // okay
   obj.nullableToNonnull = obj // expected-error {{cannot assign to property: 'nullableToNonnull' is a get-only property}}
-  // expected-error@-1 {{cannot assign value of type 'RPFoo' to type 'UnsafeMutablePointer<Int32>'}}
+  // expected-error@-1 {{cannot assign value of type 'RPFoo' to type 'UnsafeMutablePointer<CInt>' (aka 'UnsafeMutablePointer<Int32>')}}
 
   let _: RPFoo = obj.typeChangeMoreSpecific // expected-error {{cannot convert value of type 'Any' to specified type 'RPFoo'}}
   obj.typeChangeMoreSpecific = obj // expected-error {{cannot assign to property: 'typeChangeMoreSpecific' is a get-only property}}
@@ -37,6 +37,12 @@ func test(obj: RPFoo) {
   if let _ = obj.accessorDeclaredFirstAsNullable {} // expected-error {{initializer for conditional binding must have Optional type}}
 
   obj.accessorInProto = nil // okay
+
+  // A readonly weak/assign/strong object property redeclared as readwrite in a
+  // class extension imports with a setter regardless of ownership.
+  obj.weakRedeclared = obj // okay
+  obj.assignRedeclared = obj // okay
+  obj.strongRedeclared = obj // okay
 }
 
 // https://github.com/apple/swift/issues/51011
@@ -51,8 +57,8 @@ func f_51011(obj: RPSub) {
 // CHECK-NEXT:   func accessorInProto() -> Any?
 // CHECK-NEXT: }
 // CHECK-NEXT: class RPFoo : RPProto {
-// CHECK-NEXT:   var nonnullToNullable: UnsafeMutablePointer<Int32> { get }
-// CHECK-NEXT:   var nullableToNonnull: UnsafeMutablePointer<Int32>? { get }
+// CHECK-NEXT:   var nonnullToNullable: UnsafeMutablePointer<CInt> { get }
+// CHECK-NEXT:   var nullableToNonnull: UnsafeMutablePointer<CInt>? { get }
 // CHECK-NEXT:   var typeChangeMoreSpecific: Any { get }
 // CHECK-NEXT:   var typeChangeMoreGeneral: RPFoo { get }
 // CHECK-NEXT:   var accessorRedeclaredAsNullable: Any { get }
@@ -60,11 +66,17 @@ func f_51011(obj: RPSub) {
 // CHECK-NEXT:   class func accessorDeclaredFirstAsNullable() -> Any
 // CHECK-NEXT:   var accessorDeclaredFirstAsNullable: Any { get }
 // CHECK-NEXT:   var accessorInProto: Any? { get }
-// CHECK-NEXT:   class func nonnullToNullable() -> UnsafeMutablePointer<Int32>
-// CHECK-NEXT:   class func nullableToNonnull() -> UnsafeMutablePointer<Int32>?
+// CHECK-NEXT:   weak var weakRedeclared: @sil_weak RPFoo? { get }
+// CHECK-NEXT:   unowned(unsafe) var assignRedeclared: @sil_unmanaged RPFoo? { get }
+// CHECK-NEXT:   var strongRedeclared: RPFoo? { get }
+// CHECK-NEXT:   class func nonnullToNullable() -> UnsafeMutablePointer<CInt>
+// CHECK-NEXT:   class func nullableToNonnull() -> UnsafeMutablePointer<CInt>?
 // CHECK-NEXT:   class func typeChangeMoreSpecific() -> Any
 // CHECK-NEXT:   class func typeChangeMoreGeneral() -> RPFoo
 // CHECK-NEXT:   class func accessorInProto() -> Any?
+// CHECK-NEXT:   class func weakRedeclared() -> RPFoo?
+// CHECK-NEXT:   class func assignRedeclared() -> RPFoo?
+// CHECK-NEXT:   class func strongRedeclared() -> RPFoo?
 // CHECK-NEXT:   func accessorInProto() -> Any?
 // CHECK-NEXT: }
 // CHECK-NEXT: class RPBase : RPProto {

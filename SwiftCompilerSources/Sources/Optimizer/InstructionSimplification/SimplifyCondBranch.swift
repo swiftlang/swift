@@ -27,9 +27,9 @@ private extension CondBranchInst {
     }
     let builder = Builder(before: self, context)
     if conditionValue == 0 {
-      builder.createBranch(to: falseBlock, arguments: Array(falseOperands.values))
+      builder.createBranch(to: falseBlock)
     } else {
-      builder.createBranch(to: trueBlock, arguments: Array(trueOperands.values))
+      builder.createBranch(to: trueBlock)
     }
     context.erase(instruction: self)
   }

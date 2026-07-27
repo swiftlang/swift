@@ -1041,6 +1041,22 @@ AllowTypeOrInstanceMember::create(ConstraintSystem &cs, Type baseType,
       AllowTypeOrInstanceMember(cs, baseType, member, usedName, locator);
 }
 
+bool AllowMetatypeExtensionMemberOnConformingType::diagnose(
+    const Solution &solution, bool asNote) const {
+  InvalidMetatypeExtensionMemberRefFailure failure(
+      solution, getBaseType(), getMember(), getLocator());
+  return failure.diagnose(asNote);
+}
+
+AllowMetatypeExtensionMemberOnConformingType *
+AllowMetatypeExtensionMemberOnConformingType::create(
+    ConstraintSystem &cs, Type baseType, ValueDecl *member,
+    DeclNameRef usedName, ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      AllowMetatypeExtensionMemberOnConformingType(
+          cs, baseType, member, usedName, locator);
+}
+
 bool AllowInvalidPartialApplication::diagnose(const Solution &solution,
                                               bool asNote) const {
   PartialApplicationFailure failure(isWarning, solution, getLocator());
@@ -2861,8 +2877,9 @@ IgnoreKeyPathSubscriptIndexMismatch::create(ConstraintSystem &cs, Type argType,
 }
 
 AllowInlineArrayLiteralCountMismatch *
-AllowInlineArrayLiteralCountMismatch::create(ConstraintSystem &cs, Type lhsCount,
-                                             Type rhsCount,
+AllowInlineArrayLiteralCountMismatch::create(ConstraintSystem &cs,
+                                             unsigned lhsCount,
+                                             unsigned rhsCount,
                                              ConstraintLocator *locator) {
   return new (cs.getAllocator())
       AllowInlineArrayLiteralCountMismatch(cs, lhsCount, rhsCount, locator);

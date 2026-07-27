@@ -429,6 +429,11 @@ bool DeclContext::isInSwiftinterface() const {
   return sf && sf->Kind == SourceFileKind::Interface;
 }
 
+bool DeclContext::isInSwiftSourceFile() const {
+  auto *sf = getParentSourceFile();
+  return sf && sf->Kind != SourceFileKind::Interface;
+}
+
 DeclContext *DeclContext::getModuleScopeContext() const {
   // If the current context is PackageUnit, return the module
   // decl context pointing to the current context. This check
@@ -1838,5 +1843,5 @@ bool DeclContext::isAlwaysAvailableConformanceContext() const {
   // target.
   auto &ctx = getASTContext();
   auto deploymentTarget = AvailabilityContext::forDeploymentTarget(ctx);
-  return !deploymentTarget.restrictionForDecl(ext);
+  return !deploymentTarget.unsatisfiedRestrictionForDecl(ext);
 }

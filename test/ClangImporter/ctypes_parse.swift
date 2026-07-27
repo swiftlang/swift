@@ -228,7 +228,7 @@ func testArrays() {
   nonnullArrayParameters([], [], [])
   nonnullArrayParameters(nil, [], []) // expected-error {{'nil' is not compatible with expected argument type 'UnsafePointer<CChar>'}}
   nonnullArrayParameters([], nil, []) // expected-error {{'nil' is not compatible with expected argument type 'UnsafePointer<UnsafeMutableRawPointer?>'}}
-  nonnullArrayParameters([], [], nil) // expected-error {{'nil' is not compatible with expected argument type 'UnsafePointer<Int32>'}}
+  nonnullArrayParameters([], [], nil) // expected-error {{'nil' is not compatible with expected argument type 'UnsafePointer<CInt>' (aka 'UnsafePointer<Int32>')}}
 
   nullableArrayParameters([], [], [])
   nullableArrayParameters(nil, nil, nil)

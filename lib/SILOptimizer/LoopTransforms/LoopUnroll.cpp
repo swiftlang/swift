@@ -316,10 +316,10 @@ static void redirectTerminator(SILBasicBlock *Latch, unsigned CurLoopIter,
           Latch->getSinglePredecessorBlock()->getTerminator());
       if (CondBr->getTrueBB() != Latch)
         SILBuilderWithScope(CondBr).createBranch(
-            CondBr->getLoc(), CondBr->getTrueBB(), CondBr->getTrueArgs());
+            CondBr->getLoc(), CondBr->getTrueBB());
       else
         SILBuilderWithScope(CondBr).createBranch(
-            CondBr->getLoc(), CondBr->getFalseBB(), CondBr->getFalseArgs());
+            CondBr->getLoc(), CondBr->getFalseBB());
       CondBr->eraseFromParent();
       return;
     }
@@ -338,11 +338,11 @@ static void redirectTerminator(SILBasicBlock *Latch, unsigned CurLoopIter,
   if (CurLoopIter == LastLoopIter) {
     if (CondBr->getTrueBB() == CurrentHeader) {
       SILBuilderWithScope(CondBr).createBranch(
-          CondBr->getLoc(), CondBr->getFalseBB(), CondBr->getFalseArgs());
+          CondBr->getLoc(), CondBr->getFalseBB());
     } else {
       assert(CondBr->getFalseBB() == CurrentHeader);
       SILBuilderWithScope(CondBr).createBranch(
-          CondBr->getLoc(), CondBr->getTrueBB(), CondBr->getTrueArgs());
+          CondBr->getLoc(), CondBr->getTrueBB());
     }
     CondBr->eraseFromParent();
     return;
@@ -352,12 +352,12 @@ static void redirectTerminator(SILBasicBlock *Latch, unsigned CurLoopIter,
   if (CondBr->getTrueBB() == CurrentHeader) {
     SILBuilderWithScope(CondBr).createCondBranch(
         CondBr->getLoc(), CondBr->getCondition(), NextIterationsHeader,
-        CondBr->getTrueArgs(), CondBr->getFalseBB(), CondBr->getFalseArgs());
+        CondBr->getFalseBB());
   } else {
     assert(CondBr->getFalseBB() == CurrentHeader);
     SILBuilderWithScope(CondBr).createCondBranch(
         CondBr->getLoc(), CondBr->getCondition(), CondBr->getTrueBB(),
-        CondBr->getTrueArgs(), NextIterationsHeader, CondBr->getFalseArgs());
+        NextIterationsHeader);
   }
   CondBr->eraseFromParent();
 }

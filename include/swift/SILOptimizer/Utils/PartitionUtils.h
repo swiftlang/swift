@@ -335,13 +335,9 @@ public:
   void pushAssignElementRegions(Element elementToMergeInto,
                                 Element elementToMerge);
 
-  /// Push that \p other should be merged into this region.
-  void pushCFGHistoryJoin(Node *otherNode);
-
-  /// Push the top node of \p history as a CFG history join.
-  void pushCFGHistoryJoin(IsolationHistory history) {
-    return pushCFGHistoryJoin(history.getHead());
-  }
+  /// Push a CFG history join recording that \p predBlock's exit partition was
+  /// merged into this history at a control-flow merge point.
+  void pushCFGHistoryJoin(SILBasicBlock *predBlock);
 
   Node *pop();
   void print(ASTContext &ctx, llvm::raw_ostream &os) const;
@@ -395,10 +391,14 @@ private:
 
   /// Contains:
   ///
-  /// 1. Node * if we have a CFGHistoryJoin.
+  /// 1. A SILBasicBlock * if we have a CFGHistoryJoin — the predecessor block
+  ///    whose exit partition was joined in. The joined branch's history head is
+  ///    not stored; it is recovered on demand as the head of that block's exit
+  ///    partition (from RegionAnalysis), which also gives the full partition to
+  ///    keep rewinding across the join.
   /// 2. A SILLocation if we have a SequenceBoundary.
   /// 3. An element otherwise.
-  std::variant<Element, Node *, SILLocation> data;
+  std::variant<Element, SILBasicBlock *, SILLocation> data;
 
   /// Number of additional element arguments stored in the tail allocated array.
   unsigned numAdditionalElements;
@@ -447,8 +447,8 @@ private:
                             &getAdditionalElementArgs().data()[1]);
   }
 
-  Node(Kind kind, Node *parent, Node *node)
-      : kind(kind), next(parent), data(node), numAdditionalElements(0) {}
+  Node(Kind kind, Node *parent, SILBasicBlock *block)
+      : kind(kind), next(parent), data(block), numAdditionalElements(0) {}
 
 public:
   Kind getKind() const { return kind; }
@@ -462,10 +462,13 @@ public:
     return std::get<Element>(data);
   }
 
-  Node *getFirstArgAsNode() const {
+  /// The predecessor block whose exit partition this CFGHistoryJoin merged in.
+  /// The joined branch's history is recovered as that block's exit-partition
+  /// isolation history (see \c data).
+  SILBasicBlock *getFirstArgAsBlock() const {
     assert(kind == CFGHistoryJoin);
-    assert(std::holds_alternative<Node *>(data));
-    return std::get<Node *>(data);
+    assert(std::holds_alternative<SILBasicBlock *>(data));
+    return std::get<SILBasicBlock *>(data);
   }
 
   ArrayRef<Element> getAdditionalElementArgs() const {
@@ -477,12 +480,12 @@ public:
     return getKind() == SequenceBoundary;
   }
 
-  /// If this node is a history sequence join, return its node. Otherwise,
-  /// return nullptr.
-  Node *getHistorySequenceJoin() const {
+  /// If this node is a CFG history join, return the predecessor block whose
+  /// exit partition it merged in. Otherwise, return nullptr.
+  SILBasicBlock *getHistorySequenceJoin() const {
     if (kind != CFGHistoryJoin)
       return nullptr;
-    return getFirstArgAsNode();
+    return getFirstArgAsBlock();
   }
 
   std::optional<SILLocation> getHistoryBoundaryLoc() const {
@@ -1080,22 +1083,22 @@ public:
     return p;
   }
 
-  /// Rewind one PartitionOp worth of history from the partition.
+  /// Pop and undo one history node from this partition, returning the node that
+  /// was popped (its effect on the partition has already been reversed), or
+  /// null when the history is empty. Multiple nodes can make up one PartitionOp
+  /// worth of history; a caller rewinds by calling this in a loop and
+  /// inspecting each returned node (e.g. its kind, flow value, or — for a
+  /// CFGHistoryJoin — its predecessor block).
   ///
-  /// If we rewind through a join, the joined isolation history before merging
-  /// is inserted into \p foundJoinedHistories which should be processed
-  /// afterwards if the current linear history does not find what one is looking
-  /// for.
+  /// A popped CFGHistoryJoin appends its predecessor block to
+  /// \p foundJoinedBlocks; the joined branch itself is recovered from that
+  /// block's exit partition.
   ///
-  /// NOTE: This can only be used if one has cleared the sent state using
-  /// Partition::clearSendingOperandState or constructed a new Partiton using
-  /// Partition::removingSendingOperandState(). This is because history
-  /// rewinding doesn't use send information so just to be careful around
-  /// potential invariants being broken, we just require the elimination of the
-  /// send information.
-  ///
-  /// \returns true if there is more history that can be popped.
-  bool popHistory(SmallVectorImpl<IsolationHistory> &foundJoinedHistories);
+  /// This can only be used if one is not tracking sending-operand state (see
+  /// \c clearSendingOperandState / \c removingSendingOperandState) — history
+  /// rewinding does not use send information.
+  const IsolationHistoryNode *
+  popHistoryOnce(SmallVectorImpl<SILBasicBlock *> &foundJoinedBlocks);
 
   /// Returns true if this value has any isolation history stored.
   bool hasHistory() const { return bool(history.getHead()); }
@@ -1126,8 +1129,13 @@ public:
   /// NOTE: snd is passed in as mutable since we may canonicalize snd. We will
   /// not perform any further mutations to snd.
   ///
+  /// \p sndBlock is the predecessor block \p snd is the exit partition of, if
+  /// known; it is recorded on the CFG history join so the join can later be
+  /// rewound by recovering \p sndBlock's exit partition.
+  ///
   /// Runs in quadratic time.
-  static Partition join(const Partition &fst, Partition &snd);
+  static Partition join(const Partition &fst, Partition &snd,
+                        SILBasicBlock *sndBlock = nullptr);
 
   void dump_labels() const LLVM_ATTRIBUTE_USED {
     llvm::dbgs() << "Partition";
@@ -1223,12 +1231,6 @@ public:
   Region merge(Element fst, Element snd, bool updateHistory = true);
 
 private:
-  /// Pop one history node. Multiple history nodes can make up one PartitionOp
-  /// worth of history, so this is called by popHistory.
-  ///
-  /// Returns true if we succesfully popped a single history node.
-  bool popHistoryOnce(SmallVectorImpl<IsolationHistory> &foundJoinHistoryNodes);
-
   /// A canonical region is defined to have its region number as equal to the
   /// minimum element number of all of its assigned element numbers. This
   /// routine goes through the element -> region map and transforms the
@@ -1264,10 +1266,10 @@ private:
     history.pushRemoveElementFromRegion(elementFromOldRegion, elementToRemove);
   }
 
-  /// Push that \p other should be merged into this region.
-  void pushCFGHistoryJoin(IsolationHistory otherHistory) {
-    if (auto *head = otherHistory.head)
-      history.pushCFGHistoryJoin(head);
+  /// Record that \p predBlock's exit partition was merged into this partition's
+  /// history at a control-flow merge point.
+  void pushCFGHistoryJoin(SILBasicBlock *predBlock) {
+    history.pushCFGHistoryJoin(predBlock);
   }
 
   /// \see IsolationHistory::pushMergeElementRegions.
@@ -1360,17 +1362,15 @@ public:
     Element sentElement;
     SILDynamicMergedIsolationInfo isolationRegionInfo;
 
-    /// The isolation history of the partition at the point the send was
-    /// detected. Used to emit notes explaining why a disconnected element ended
-    /// up in an isolated region.
-    IsolationHistory isolationHistory;
+    /// The partition at the point where the error was emitted. Used for
+    /// isolation history rewinding.
+    Partition partition;
 
     SentNeverSendableError(const PartitionOp &op, Element sentElement,
                            SILDynamicMergedIsolationInfo isolationRegionInfo,
-                           IsolationHistory isolationHistory)
+                           const Partition &p)
         : op(&op), sentElement(sentElement),
-          isolationRegionInfo(isolationRegionInfo),
-          isolationHistory(isolationHistory) {}
+          isolationRegionInfo(isolationRegionInfo), partition(p) {}
 
     SentNeverSendableError(SentNeverSendableError &&other) = default;
     SentNeverSendableError &operator=(SentNeverSendableError &&other) = default;
@@ -2187,7 +2187,6 @@ public:
         handleError(UnknownCodePatternError(op));
       }
       assert(state.isolationInfo && "Cannot have unknown");
-      state.isolationHistory.pushCFGHistoryJoin(p.getIsolationHistory());
       auto *ptrSet = ptrSetFactory.get(op.getSourceOp());
       p.markSent(op.getOpArg1(), ptrSet);
       return;
@@ -2571,8 +2570,8 @@ private:
     }
 
     // Ok, we actually need to emit a call to the callback.
-    return handleError(SentNeverSendableError(
-        op, elt, dynamicMergedIsolationInfo, p.getIsolationHistory()));
+    return handleError(
+        SentNeverSendableError(op, elt, dynamicMergedIsolationInfo, p));
   }
 };
 

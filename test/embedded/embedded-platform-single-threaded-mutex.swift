@@ -1,19 +1,19 @@
 // RUN: %empty-directory(%t)
 
 // RUN: %target-swift-frontend -parse-as-library -enable-experimental-feature Embedded -enable-experimental-feature Extern -wmo %s -c -o %t/main.o
-// RUN: %target-embedded-link %target-clang-resource-dir-opt %t/main.o %target-embedded-single-threaded-shim %target-embedded-posix-shim -o %t/a.out -dead_strip
+// RUN: %target-embedded-link %target-clang-resource-dir-opt %t/main.o %target-embedded-single-threaded-shim -o %t/a.out -dead_strip
 // RUN: %target-run %t/a.out
 
 // RUN: %target-swift-frontend -parse-as-library -enable-experimental-feature Embedded -enable-experimental-feature Extern -D LOCK_LOCKED -module-name lock_locked -wmo %s -c -o %t/lock-locked.o
-// RUN: %target-embedded-link %target-clang-resource-dir-opt %t/lock-locked.o %target-embedded-single-threaded-shim %target-embedded-posix-shim -o %t/lock-locked.out -dead_strip
+// RUN: %target-embedded-link %target-clang-resource-dir-opt %t/lock-locked.o %target-embedded-single-threaded-shim -o %t/lock-locked.out -dead_strip
 // RUN: %target-not-crash %target-run %t/lock-locked.out
 
 // RUN: %target-swift-frontend -parse-as-library -enable-experimental-feature Embedded -enable-experimental-feature Extern -D UNLOCK_UNLOCKED -module-name unlock_unlocked -wmo %s -c -o %t/unlock-unlocked.o
-// RUN: %target-embedded-link %target-clang-resource-dir-opt %t/unlock-unlocked.o %target-embedded-single-threaded-shim %target-embedded-posix-shim -o %t/unlock-unlocked.out -dead_strip
+// RUN: %target-embedded-link %target-clang-resource-dir-opt %t/unlock-unlocked.o %target-embedded-single-threaded-shim -o %t/unlock-unlocked.out -dead_strip
 // RUN: %target-not-crash %target-run %t/unlock-unlocked.out
 
 // RUN: %target-swift-frontend -parse-as-library -enable-experimental-feature Embedded -enable-experimental-feature Extern -D DESTROY_LOCKED -module-name destroy_locked -wmo %s -c -o %t/destroy-locked.o
-// RUN: %target-embedded-link %target-clang-resource-dir-opt %t/destroy-locked.o %target-embedded-single-threaded-shim %target-embedded-posix-shim -o %t/destroy-locked.out -dead_strip
+// RUN: %target-embedded-link %target-clang-resource-dir-opt %t/destroy-locked.o %target-embedded-single-threaded-shim -o %t/destroy-locked.out -dead_strip
 // RUN: %target-not-crash %target-run %t/destroy-locked.out
 
 // REQUIRES: executable_test
@@ -36,6 +36,18 @@ func _swift_mutex_unlock(_: UnsafeMutableRawPointer)
 @_extern(c, "_swift_mutex_tryLock")
 func _swift_mutex_tryLock(_: UnsafeMutableRawPointer) -> Int
 
+@_extern(c, "_swift_mutexRecursive_init")
+func _swift_mutexRecursive_init(_: UnsafeMutableRawPointer, _: CUnsignedLongLong)
+
+@_extern(c, "_swift_mutexRecursive_destroy")
+func _swift_mutexRecursive_destroy(_: UnsafeMutableRawPointer)
+
+@_extern(c, "_swift_mutexRecursive_lock")
+func _swift_mutexRecursive_lock(_: UnsafeMutableRawPointer)
+
+@_extern(c, "_swift_mutexRecursive_unlock")
+func _swift_mutexRecursive_unlock(_: UnsafeMutableRawPointer)
+
 func check(_ condition: Bool) {
   if !condition {
     fatalError("unexpected single-threaded mutex behavior")
@@ -50,7 +62,6 @@ func withMutexStorage(_ body: (UnsafeMutableRawPointer) -> Void) {
 }
 
 let checked: CUnsignedLongLong = 0x01
-let recursive: CUnsignedLongLong = 0x02
 
 @main
 struct Main {
@@ -101,14 +112,12 @@ struct Main {
     }
 
     withMutexStorage { mutex in
-      _swift_mutex_init(mutex, checked | recursive)
-      _swift_mutex_lock(mutex)
-      _swift_mutex_lock(mutex)
-      check(_swift_mutex_tryLock(mutex) != 0)
-      _swift_mutex_unlock(mutex)
-      _swift_mutex_unlock(mutex)
-      _swift_mutex_unlock(mutex)
-      _swift_mutex_destroy(mutex)
+      _swift_mutexRecursive_init(mutex, checked)
+      _swift_mutexRecursive_lock(mutex)
+      _swift_mutexRecursive_lock(mutex)
+      _swift_mutexRecursive_unlock(mutex)
+      _swift_mutexRecursive_unlock(mutex)
+      _swift_mutexRecursive_destroy(mutex)
     }
 #endif
   }

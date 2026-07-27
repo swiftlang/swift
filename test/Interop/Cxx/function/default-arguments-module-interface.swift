@@ -2,70 +2,70 @@
 // RUN: %target-swift-ide-test -print-module -module-to-print=DefaultArguments -I %S/Inputs -source-filename=x -cxx-interoperability-mode=swift-6 | %FileCheck %s
 // RUN: %target-swift-ide-test -print-module -module-to-print=DefaultArguments -I %S/Inputs -source-filename=x -cxx-interoperability-mode=upcoming-swift | %FileCheck %s
 
-// CHECK: func isZero(_ value: Int32 = cxxDefaultArg) -> Bool
-// CHECK: func isNil(_ ptr: UnsafeMutablePointer<Int32>! = cxxDefaultArg) -> Bool
-// CHECK: func isGlobalNonNil(_ ptr: UnsafeMutablePointer<Int32>! = cxxDefaultArg) -> Bool
-// CHECK: func sum(_ a: Int32, _ b: Int32 = cxxDefaultArg) -> Int32
-// CHECK: func subtract(_ a: Int32 = cxxDefaultArg, _ b: Int32 = cxxDefaultArg) -> Int32
-// CHECK: func isArgZero(_ a: ArgTy = cxxDefaultArg) -> Bool
-// CHECK: func isArgZeroOutOfLine(_ a: ArgTy = cxxDefaultArg) -> Bool
+// CHECK: func isZero(_ value: CInt = cxxDefaultArg) -> CBool
+// CHECK: func isNil(_ ptr: UnsafeMutablePointer<CInt>! = cxxDefaultArg) -> CBool
+// CHECK: func isGlobalNonNil(_ ptr: UnsafeMutablePointer<CInt>! = cxxDefaultArg) -> CBool
+// CHECK: func sum(_ a: CInt, _ b: CInt = cxxDefaultArg) -> CInt
+// CHECK: func subtract(_ a: CInt = cxxDefaultArg, _ b: CInt = cxxDefaultArg) -> CInt
+// CHECK: func isArgZero(_ a: ArgTy = cxxDefaultArg) -> CBool
+// CHECK: func isArgZeroOutOfLine(_ a: ArgTy = cxxDefaultArg) -> CBool
 
-// CHECK: func isArgZeroConstRef(_ a: ArgTy) -> Bool
-// CHECK: func isArgNonZeroConstRef(_ a: ArgTy) -> Bool
-// CHECK: func isArgNonPODNonZeroConstRef(_ a: ArgTyNonPOD) -> Bool
+// CHECK: func isArgZeroConstRef(_ a: ArgTy) -> CBool
+// CHECK: func isArgNonZeroConstRef(_ a: ArgTy) -> CBool
+// CHECK: func isArgNonPODNonZeroConstRef(_ a: ArgTyNonPOD) -> CBool
 
-// CHECK: func isArgViewNull(_ a: ArgTyView) -> Bool
-// CHECK: func isArgViewNullAnd(_ a: ArgTyView, _ second: Bool = cxxDefaultArg) -> Bool
-// CHECK: func isArgViewNullAndReversed(_ second: Bool = cxxDefaultArg, _ a: ArgTyView) -> Bool
-// CHECK: func isArgViewNullUnsafeParam(_ a: ArgTyView = cxxDefaultArg) -> Bool
-// CHECK: func isArgViewNullUnsafeFunc(_ a: ArgTyView) -> Bool
-// CHECK: func isArgOwnedPtrNull(_ a: ArgTyOwnedPtr = cxxDefaultArg) -> Bool
-// CHECK: func isArgFRTNull(_ a: ArgFRT! = cxxDefaultArg) -> Bool
-// CHECK: func getArgFRTValue(_ a: ArgFRT! = cxxDefaultArg) -> Int32
-// CHECK: func getArgRefCountedValue(_ a: ArgRefCounted! = cxxDefaultArg) -> Int32
+// CHECK: func isArgViewNull(_ a: ArgTyView) -> CBool
+// CHECK: func isArgViewNullAnd(_ a: ArgTyView, _ second: CBool = cxxDefaultArg) -> CBool
+// CHECK: func isArgViewNullAndReversed(_ second: CBool = cxxDefaultArg, _ a: ArgTyView) -> CBool
+// CHECK: func isArgViewNullUnsafeParam(_ a: ArgTyView = cxxDefaultArg) -> CBool
+// CHECK: func isArgViewNullUnsafeFunc(_ a: ArgTyView) -> CBool
+// CHECK: func isArgOwnedPtrNull(_ a: ArgTyOwnedPtr = cxxDefaultArg) -> CBool
+// CHECK: func isArgFRTNull(_ a: ArgFRT! = cxxDefaultArg) -> CBool
+// CHECK: func getArgFRTValue(_ a: ArgFRT! = cxxDefaultArg) -> CInt
+// CHECK: func getArgRefCountedValue(_ a: ArgRefCounted! = cxxDefaultArg) -> CInt
 
 // CHECK: struct HasMethodWithDefaultArg {
-// CHECK:   func isZero(_ v: Int32 = cxxDefaultArg) -> Bool
-// CHECK:   func isNonZero(_ v: Int32 = cxxDefaultArg) -> Bool
-// CHECK:   func isNilPtr(_ v: UnsafeMutablePointer<Int32>! = cxxDefaultArg) -> Bool
-// CHECK:   func isNilConstPtr(_ v: UnsafePointer<Int32>! = cxxDefaultArg) -> Bool
-// CHECK:   func isZeroConstRef(_ v: Int32) -> Bool
+// CHECK:   func isZero(_ v: CInt = cxxDefaultArg) -> CBool
+// CHECK:   func isNonZero(_ v: CInt = cxxDefaultArg) -> CBool
+// CHECK:   func isNilPtr(_ v: UnsafeMutablePointer<CInt>! = cxxDefaultArg) -> CBool
+// CHECK:   func isNilConstPtr(_ v: UnsafePointer<CInt>! = cxxDefaultArg) -> CBool
+// CHECK:   func isZeroConstRef(_ v: CInt) -> CBool
 // CHECK: }
 
 // CHECK: struct DerivedFromHasMethodWithDefaultArg {
-// CHECK:   func isZero(_ v: Int32 = cxxDefaultArg) -> Bool
+// CHECK:   func isZero(_ v: CInt = cxxDefaultArg) -> CBool
 // CHECK: }
 
 // CHECK: struct DerivedFromDerivedFromHasMethodWithDefaultArg {
-// CHECK:   func isZero(_ v: Int32 = cxxDefaultArg) -> Bool
+// CHECK:   func isZero(_ v: CInt = cxxDefaultArg) -> CBool
 // CHECK: }
 
 // CHECK: struct HasStaticMethodWithDefaultArg {
-// CHECK:   static func isNonZero(_ v: Int32 = cxxDefaultArg) -> Bool
-// CHECK:   static func isNonZeroCounter(_ v: Int32 = cxxDefaultArg) -> Bool
-// CHECK:   static func isNonZeroPrivateCounter(_ v: Int32 = cxxDefaultArg) -> Bool
-// CHECK:   static func isArgZeroRef(_ a: inout ArgTy) -> Bool
+// CHECK:   static func isNonZero(_ v: CInt = cxxDefaultArg) -> CBool
+// CHECK:   static func isNonZeroCounter(_ v: CInt = cxxDefaultArg) -> CBool
+// CHECK:   static func isNonZeroPrivateCounter(_ v: CInt = cxxDefaultArg) -> CBool
+// CHECK:   static func isArgZeroRef(_ a: inout ArgTy) -> CBool
 // CHECK: }
 
 // CHECK: struct HasCtorWithDefaultArg {
-// CHECK:   init(_ a: Int32, _ b: Int32 = cxxDefaultArg, _ c: Int32 = cxxDefaultArg)
+// CHECK:   init(_ a: CInt, _ b: CInt = cxxDefaultArg, _ c: CInt = cxxDefaultArg)
 // CHECK: }
 
 // CHECK: struct TemplatedHasMethodWithDefaultArg<CFloat> {
-// CHECK:   func isZero(_ v: Float = cxxDefaultArg) -> Bool
-// CHECK:   func isNonZero(_ v: Float = cxxDefaultArg) -> Bool
+// CHECK:   func isZero(_ v: CFloat = cxxDefaultArg) -> CBool
+// CHECK:   func isNonZero(_ v: CFloat = cxxDefaultArg) -> CBool
 // CHECK: }
 // CHECK: struct TemplatedHasMethodWithDefaultArg<CInt> {
-// CHECK:   func isZero(_ v: Int32 = cxxDefaultArg) -> Bool
-// CHECK:   func isNonZero(_ v: Int32 = cxxDefaultArg) -> Bool
+// CHECK:   func isZero(_ v: CInt = cxxDefaultArg) -> CBool
+// CHECK:   func isNonZero(_ v: CInt = cxxDefaultArg) -> CBool
 // CHECK: }
 
-// CHECK: func ambiguous(_ a: Int32, _ b: Int32 = cxxDefaultArg) -> Int32
-// CHECK: func ambiguous(_ a: Int32) -> Int32
+// CHECK: func ambiguous(_ a: CInt, _ b: CInt = cxxDefaultArg) -> CInt
+// CHECK: func ambiguous(_ a: CInt) -> CInt
 
-// CHECK: func nonTrailing(_ a: Int32 = cxxDefaultArg, _ b: Int32 = cxxDefaultArg) -> Int32
+// CHECK: func nonTrailing(_ a: CInt = cxxDefaultArg, _ b: CInt = cxxDefaultArg) -> CInt
 
-// CHECK: func takesUnnamedParam(_: Int32 = cxxDefaultArg) -> Int32
+// CHECK: func takesUnnamedParam(_: CInt = cxxDefaultArg) -> CInt
 
 // CHECK: struct InvalidStruct<NoDefinition> {
 // CHECK:   func invalidDefaultExprMethod(_ x: Base<NoDefinition>)

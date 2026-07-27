@@ -40,7 +40,7 @@ typedef const void * _Nonnull SwiftMetatype;
 /// It must be layout compatible with the Swift object header.
 struct BridgedSwiftObject {
   SwiftMetatype metatype;
-  int64_t refCounts;
+  intptr_t refCounts;
 };
 
 typedef struct BridgedSwiftObject * _Nonnull SwiftObject;

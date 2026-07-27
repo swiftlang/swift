@@ -346,6 +346,12 @@ public:
   /// Check if the generic signature has a parameter pack.
   bool hasParameterPack() const;
 
+  /// Determine whether an entity with the given generic signature can be
+  /// emitted in Embedded Swift.
+  ///
+  /// This captures the restrictions needed to avoid unspecialized generics.
+  bool canBeEmittedInEmbeddedSwift() const;
+
   /// Compute the number of conformance requirements in this signature.
   unsigned getNumConformanceRequirements() const {
     unsigned result = 0;

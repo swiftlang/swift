@@ -3606,15 +3606,7 @@ llvm::CallBase *swift::irgen::emitCXXConstructorCall(
 //     - a class-bound archetype (class-bound existential)
 bool swift::irgen::hasValidSignatureForEmbedded(SILFunction *f) {
   auto s = f->getLoweredFunctionType()->getInvocationGenericSignature();
-  for (auto genParam : s.getGenericParams()) {
-    auto mappedParam = f->getGenericEnvironment()->mapTypeIntoEnvironment(genParam);
-    if (auto *archeTy = mappedParam->getAs<ArchetypeType>()) {
-      if (archeTy->requiresClass())
-        continue;
-    }
-    return false;
-  }
-  return true;
+  return !s || s->canBeEmittedInEmbeddedSwift();
 }
 
 StackProtectorMode IRGenModule::shouldEmitStackProtector(SILFunction *f) {

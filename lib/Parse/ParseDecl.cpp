@@ -4916,26 +4916,6 @@ bool Parser::parseConventionAttributeInternal(SourceLoc atLoc, SourceLoc attrLoc
   return false;
 }
 
-bool Parser::parseUUIDString(UUID &uuid, Diag<> diagnostic, bool justChecking) {
-  if (!Tok.is(tok::string_literal)) {
-    if (!justChecking)
-      diagnose(Tok, diagnostic);
-    return true;
-  }
-
-  bool failed = true;
-  auto literalText = Tok.getText().slice(1, Tok.getText().size() - 1);
-  llvm::SmallString<UUID::StringBufferSize> text(literalText);
-  if (auto id = UUID::fromString(text.c_str())) {
-    uuid = *id;
-    failed = false;
-  } else if (!justChecking) {
-    diagnose(Tok, diagnostic);
-  }
-  consumeToken(tok::string_literal);
-  return failed;
-}
-
 /// \verbatim
 ///   attribute-type:
 ///     'noreturn'
@@ -5126,7 +5106,7 @@ ParserStatus Parser::parseTypeAttribute(TypeOrCustomAttr &result,
   }
 
   case TypeAttrKind::Opened: {
-    // Parse the opened existential ID string in parens
+    // Parse the opened existential ID in parens
     SourceLoc beginLoc = Tok.getLoc(), idLoc, endLoc;
     if (!consumeIfAttributeLParen()) {
       if (!justChecking)
@@ -5135,9 +5115,9 @@ ParserStatus Parser::parseTypeAttribute(TypeOrCustomAttr &result,
     }
 
     idLoc = Tok.getLoc();
-    UUID id;
+    unsigned id;
     bool invalid = false;
-    if (parseUUIDString(id, diag::opened_attribute_id_value, justChecking))
+    if (parseUnsignedInteger(id, idLoc, diag::opened_attribute_id_value, justChecking))
       invalid = true;
 
     TypeRepr *constraintType = nullptr;
@@ -5188,9 +5168,9 @@ ParserStatus Parser::parseTypeAttribute(TypeOrCustomAttr &result,
     }
 
     idLoc = Tok.getLoc();
-    UUID id;
+    unsigned id;
     bool invalid = false;
-    if (parseUUIDString(id, diag::opened_attribute_id_value, justChecking))
+    if (parseUnsignedInteger(id, idLoc, diag::opened_attribute_id_value, justChecking))
       invalid = true;
 
     // TODO: allow more information so that these can be parsed
@@ -7564,13 +7544,6 @@ Parser::parseDeclExtension(ParseDeclOptions Flags, DeclAttributes &Attributes) {
                                              CurDeclContext,
                                              trailingWhereClause);
   ext->attachParsedAttrs(Attributes);
-
-  // Detect `extension P.Protocol { }` — a protocol metatype extension.
-  // Strip the `.Protocol` suffix so the extension binds to the protocol `P`.
-  if (auto *PTR = dyn_cast_or_null<ProtocolTypeRepr>(extendedType.getPtrOrNull())) {
-    ext->setIsMetatypeExtension();
-    ext->setExtendedTypeRepr(PTR->getBase());
-  }
 
   if (trailingWhereHadCodeCompletion && CodeCompletionCallbacks)
     CodeCompletionCallbacks->setParsedDecl(ext);

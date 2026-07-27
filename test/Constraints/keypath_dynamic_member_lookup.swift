@@ -2,6 +2,8 @@
 // RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-sil -Xllvm -sil-disable-pass=simplification -solver-disable-enumerate-supertypes %s | %FileCheck %s
 // RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-sil -Xllvm -sil-disable-pass=simplification -solver-enable-enumerate-supertypes %s | %FileCheck %s
 
+// REQUIRES: optimized_stdlib
+
 struct Point {
   let x: Int
   var y: Int

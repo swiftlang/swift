@@ -205,11 +205,11 @@ protocol ProtocolWithClassInits : ClassWithInits<Int> {}
 // CHECK-LABEL: sil hidden [ossa] @$s24protocol_with_superclass26useProtocolWithClassInits1yyAA0efG5Inits_pXpF : $@convention(thin) (@thick any ProtocolWithClassInits.Type) -> ()
 func useProtocolWithClassInits1(_ t: ProtocolWithClassInits.Type) {
   // CHECK: [[OPENED:%.*]] = open_existential_metatype %0 : $@thick any ProtocolWithClassInits.Type
-  // CHECK-NEXT: [[UPCAST:%.*]] = upcast [[OPENED]] : $@thick (@opened("{{.*}}", any ProtocolWithClassInits) Self).Type to $@thick ClassWithInits<Int>.Type
+  // CHECK-NEXT: [[UPCAST:%.*]] = upcast [[OPENED]] : $@thick (@opened({{.*}}, any ProtocolWithClassInits) Self).Type to $@thick ClassWithInits<Int>.Type
   // CHECK-NEXT: [[METHOD:%.*]] = class_method [[UPCAST]] : $@thick ClassWithInits<Int>.Type, #ClassWithInits.init!allocator : <T> (ClassWithInits<T>.Type) -> (()) -> ClassWithInits<T>, $@convention(method) <τ_0_0> (@thick ClassWithInits<τ_0_0>.Type) -> @owned ClassWithInits<τ_0_0>
   // CHECK-NEXT: [[RESULT:%.*]] = apply [[METHOD]]<Int>([[UPCAST]])
-  // CHECK-NEXT: [[CAST:%.*]] = unchecked_ref_cast [[RESULT]] : $ClassWithInits<Int> to $@opened("{{.*}}", any ProtocolWithClassInits) Self
-  // CHECK-NEXT: [[EXISTENTIAL:%.*]] = init_existential_ref [[CAST]] : $@opened("{{.*}}", any ProtocolWithClassInits) Self : $@opened("{{.*}}", any ProtocolWithClassInits) Self, $any ProtocolWithClassInits
+  // CHECK-NEXT: [[CAST:%.*]] = unchecked_ref_cast [[RESULT]] : $ClassWithInits<Int> to $@opened({{.*}}, any ProtocolWithClassInits) Self
+  // CHECK-NEXT: [[EXISTENTIAL:%.*]] = init_existential_ref [[CAST]] : $@opened({{.*}}, any ProtocolWithClassInits) Self : $@opened({{.*}}, any ProtocolWithClassInits) Self, $any ProtocolWithClassInits
   // CHECK-NEXT: ignored_use
   // CHECK-NEXT: destroy_value [[EXISTENTIAL]]
   let _: ProtocolWithClassInits = t.init(requiredInit: ())
@@ -262,11 +262,11 @@ func passesRefinedProtocol(_ r: RefinedProto) {
 
 // CHECK-LABEL: sil hidden [ossa] @$s24protocol_with_superclass21passesRefinedProtocolyyAA0E5Proto_pF : $@convention(thin) (@guaranteed any RefinedProto) -> ()
 // CHECK:     bb0(%0 : @guaranteed $any RefinedProto):
-// CHECK:       [[OPENED:%.*]] = open_existential_ref %0 : $any RefinedProto to $@opened("{{.*}}", any RefinedProto) Self
+// CHECK:       [[OPENED:%.*]] = open_existential_ref %0 : $any RefinedProto to $@opened({{.*}}, any RefinedProto) Self
 // CHECK-NEXT:  [[BASE:%.*]] = alloc_stack $any BaseProto
-// CHECK-NEXT:  [[BASE_PAYLOAD:%.*]] = init_existential_addr [[BASE]] : $*any BaseProto, $@opened("{{.*}}", any RefinedProto) Self
-// CHECK-NEXT:  [[OPENED_COPY:%.*]] = copy_value [[OPENED]] : $@opened("{{.*}}", any RefinedProto) Self
-// CHECK-NEXT:  store [[OPENED_COPY]] to [init] [[BASE_PAYLOAD]] : $*@opened("{{.*}}", any RefinedProto) Self
+// CHECK-NEXT:  [[BASE_PAYLOAD:%.*]] = init_existential_addr [[BASE]] : $*any BaseProto, $@opened({{.*}}, any RefinedProto) Self
+// CHECK-NEXT:  [[OPENED_COPY:%.*]] = copy_value [[OPENED]] : $@opened({{.*}}, any RefinedProto) Self
+// CHECK-NEXT:  store [[OPENED_COPY]] to [init] [[BASE_PAYLOAD]] : $*@opened({{.*}}, any RefinedProto) Self
 // CHECK:       [[FUNC:%.*]] = function_ref @$s24protocol_with_superclass17takesBaseProtocolyyAA0E5Proto_pF : $@convention(thin) (@in_guaranteed any BaseProto) -> ()
 // CHECK-NEXT:  apply [[FUNC]]([[BASE]]) : $@convention(thin) (@in_guaranteed any BaseProto) -> ()
 // CHECK-NEXT:  destroy_addr [[BASE]] : $*any BaseProto
@@ -284,9 +284,9 @@ func passesFuncTakingBaseClass() {
 // CHECK-LABEL: sil hidden [ossa] @$s24protocol_with_superclass25passesFuncTakingBaseClassyyF : $@convention(thin) () -> ()
 
 // CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$s24protocol_with_superclass9BaseClassCIegg_AA12RefinedProto_pIegg_TR : $@convention(thin) (@guaranteed any RefinedProto, @guaranteed @callee_guaranteed (@guaranteed BaseClass) -> ()) -> ()
-// CHECK: [[PAYLOAD:%.*]] = open_existential_ref %0 : $any RefinedProto to $@opened("{{.*}}", any RefinedProto) Self
+// CHECK: [[PAYLOAD:%.*]] = open_existential_ref %0 : $any RefinedProto to $@opened({{.*}}, any RefinedProto) Self
 // CHECK: [[COPY:%.*]] = copy_value [[PAYLOAD]]
-// CHECK: [[UPCAST:%.*]] = upcast [[COPY]] : $@opened("{{.*}}", any RefinedProto) Self to $BaseClass
+// CHECK: [[UPCAST:%.*]] = upcast [[COPY]] : $@opened({{.*}}, any RefinedProto) Self to $BaseClass
 // CHECK: [[BORROW:%.*]] = begin_borrow [[UPCAST]]
 // CHECK: apply %1([[BORROW]])
 // CHECK: end_borrow [[BORROW]]

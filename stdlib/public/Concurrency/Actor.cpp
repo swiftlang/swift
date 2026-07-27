@@ -24,10 +24,11 @@
 #endif
 
 #include "../CompatibilityOverride/CompatibilityOverride.h"
-#include "swift/ABI/Actor.h"
-#include "swift/ABI/Task.h"
+#include "Debug.h"
 #include "ExecutorBridge.h"
 #include "TaskPrivate.h"
+#include "swift/ABI/Actor.h"
+#include "swift/ABI/Task.h"
 #include "swift/Basic/HeaderFooterLayout.h"
 #include "swift/Basic/PriorityQueue.h"
 #include "swift/Concurrency/Actor.h"
@@ -239,7 +240,7 @@ static inline void taskInvokeWithExclusionValue(
     concurrency::trace::job_run_end(traceHandle);
 
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
-    swift_dispatch_thread_reset_override_self(dispatchOpaquePriority);
+    swift_dispatch_thread_reset_override_self({dispatchOpaquePriority});
 #endif
 
     assert(ActiveTask::get() == nullptr &&
@@ -2857,11 +2858,21 @@ void swift::swift_executor_escalate(SerialExecutorRef executor, AsyncTask *task,
     // been enqueued and still is but the original Task did manage to
     // run at some point (while rare, this wouldn't be unexpected)
     //
-    // Because this is in the escalation path, this stealer is being added
-    // in order to escalate the Task while it is enqueued on an executor
-    // so it is only an optimization and not manditory like the normal
-    // enqueue path is
-    swift_task_enqueueSelfOrStealer(task, executor, EnqueueFlagsForEscalation);
+    // Because this is in the escalation path, this stealer is being added in
+    // order to escalate the Task while it is enqueued on an executor so it is
+    // only an optimization and not mandatory like the normal enqueue path is
+    //
+    // Unlike flagAsAndEnqueueOnExecutor, we do the enqueue while our caller
+    // is still holding the Task Status Lock. That is safe here because any
+    // caller of swift_executor_escalate must hold a refcount on the Task
+    // for the duration of the call, so the Task cannot be destroyed out from
+    // under us even if it runs to completion on the target executor before
+    // the lock is released. getSelfOrStealer may still return nullptr on the
+    // async-let escalation path, in which case there is nothing to enqueue.
+    Job *job = swift_task_getSelfOrStealerForEnqueue(task, EnqueueFlagsForEscalation);
+    if (job) {
+      swift_task_enqueue(job, executor);
+    }
 #endif
     return;
   }
@@ -2960,3 +2971,11 @@ bool swift::swift_distributed_actor_is_remote(HeapObject *_actor) {
 bool DefaultActorImpl::isDistributedRemote() {
   return this->isDistributedRemoteActor;
 }
+
+// ************************* PLEASE UPDATE DEBUG.H DOCS ************************
+// * When changing this version number you MUST document the change in         *
+// * `Concurrency/Debug.h`.                                                    *
+// *****************************************************************************
+[[gnu::used, gnu::retain]]
+uint32_t swift::_swift_concurrency_debug_internal_layout_version =
+    (static_cast<uint32_t>(SWIFT_THREAD_LOCAL_STORAGE_KIND) << 24) | 3;

@@ -32,6 +32,7 @@
 #include "swift/Basic/LLVMInitialize.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/PrimitiveParsing.h"
+#include "swift/Basic/PathRemapper.h"
 #include "swift/Config.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/Driver/FrontendUtil.h"
@@ -663,6 +664,12 @@ AnnotatePrint("annotate-print",
               llvm::cl::desc("Annotate AST printing"),
               llvm::cl::cat(Category),
               llvm::cl::init(false));
+
+static llvm::cl::list<std::string>
+SourceinfoPrefixMap("sourceinfo-prefix-map",
+                    llvm::cl::desc("Prefix map for paths in sourceinfo, "
+                                   "applied during module printing"),
+                    llvm::cl::cat(Category));
 
 // AST and module printing options.
 
@@ -3156,7 +3163,14 @@ static int doPrintModuleGroups(const CompilerInvocation &InitInvok,
   return ExitCode;
 }
 
-static void printModuleMetadata(ModuleDecl *MD) {
+static void printModuleMetadata(ModuleDecl *MD,
+                                const std::vector<std::string> &SourceinfoPrefixMap) {
+  PathRemapper remapper;
+  for (const auto &mapping : SourceinfoPrefixMap) {
+    auto split = StringRef(mapping).split('=');
+    remapper.addMapping(split.first, split.second);
+  }
+
   auto &OS = llvm::outs();
   OS << "user module version: " << MD->getUserModuleVersion().getAsString() << "\n";
   OS << "fingerprint=" << MD->getFingerprint().getRawValue() << "\n";
@@ -3165,7 +3179,7 @@ static void printModuleMetadata(ModuleDecl *MD) {
        << ", force load: " << (lib.shouldForceLoad() ? "true" : "false") << "\n";
   });
   MD->collectBasicSourceFileInfo([&](const BasicSourceFileInfo &info) {
-    OS << "filepath=" << info.getFilePath() << "; ";
+    OS << "filepath=" << remapper.remapPath(info.getFilePath()) << "; ";
     OS << "hash=" << info.getInterfaceHashIncludingTypeMembers().getRawValue() << "; ";
     OS << "hashExcludingTypeMembers="
        << info.getInterfaceHashExcludingTypeMembers().getRawValue() << "; ";
@@ -3182,7 +3196,8 @@ static void printModuleMetadata(ModuleDecl *MD) {
 }
 
 static int doPrintModuleMetaData(const CompilerInvocation &InitInvok,
-                                 const std::vector<std::string> ModulesToPrint) {
+                                 const std::vector<std::string> ModulesToPrint,
+                                 const std::vector<std::string> SourceinfoPrefixMap) {
   CompilerInvocation Invocation(InitInvok);
 
   CompilerInstance CI;
@@ -3240,7 +3255,7 @@ static int doPrintModuleMetaData(const CompilerInvocation &InitInvok,
         continue;
       }
     }
-    printModuleMetadata(M);
+    printModuleMetadata(M, SourceinfoPrefixMap);
   }
 
   return ExitCode;
@@ -5028,7 +5043,8 @@ int main(int argc, char *argv[]) {
     break;
   }
   case ActionType::PrintModuleMetadata: {
-    ExitCode = doPrintModuleMetaData(InitInvok, options::ModuleToPrint);
+    ExitCode = doPrintModuleMetaData(InitInvok, options::ModuleToPrint,
+                                     options::SourceinfoPrefixMap);
     break;
   }
   case ActionType::PrintHeader: {

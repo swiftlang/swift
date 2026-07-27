@@ -179,9 +179,9 @@ func var_reassign_chain(_ x: NS, _ flag: Bool) async {
 ////////////////////////////////////////////////////////////////////////////////
 
 func diamond_then_branch_only(_ x: NS, _ flag: Bool) async {
-  var y = NS() // expected-note {{'y' is connected to 'x' which is accessible to code in the current isolation context}}
+  var y = NS()
   if flag {
-    y = x
+    y = x // expected-note {{'y' is connected to 'x' which is accessible to code in the current isolation context}}
   } else {
     // No merge here — y stays disconnected along this path.
   }
@@ -233,9 +233,9 @@ func diamond_mixed_then_isolated(_ x: NS, _ flag: Bool) async {
 func diamond_mixed_else_isolated(_ x: NS, _ flag: Bool) async {
   var y = NS()
   if flag {
-    y = x
+    y = x // expected-note {{'y' is connected to 'x' which is accessible to code in the current isolation context}}
   } else {
-    y = NS() // expected-note {{'y' is connected to 'x' which is accessible to code in the current isolation context}}
+    y = NS()
   }
   await transferToMain(y) // expected-warning {{sending 'y' risks causing data races}}
   // expected-note @-1 {{sending 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
@@ -251,9 +251,9 @@ func diamond_mixed_else_isolated(_ x: NS, _ flag: Bool) async {
 func diamond_let_then_isolated(_ x: NS, _ flag: Bool) async {
   let y: NS
   if flag {
-    y = x
+    y = x // expected-note {{'y' is connected to 'x' which is accessible to code in the current isolation context}}
   } else {
-    y = NS() // expected-note {{'y' is connected to 'x' which is accessible to code in the current isolation context}}
+    y = NS()
   }
   await transferToMain(y) // expected-warning {{sending 'y' risks causing data races}}
   // expected-note @-1 {{sending 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
@@ -287,9 +287,9 @@ func diamond_let_both_isolated(_ x: NS, _ flag: Bool) async {
 ////////////////////////////////////////////////////////////////////////////////
 
 func loop_assign(_ x: NS, _ count: Int) async {
-  var y = NS() // expected-note {{'y' is connected to 'x' which is accessible to code in the current isolation context}}
+  var y = NS()
   for _ in 0..<count {
-    y = x
+    y = x // expected-note {{'y' is connected to 'x' which is accessible to code in the current isolation context}}
   }
   await transferToMain(y) // expected-warning {{sending 'y' risks causing data races}}
   // expected-note @-1 {{sending 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
@@ -425,11 +425,10 @@ func unknown_legit_name(_ x: NS) async {
 ////////////////////////////////////////////////////////////////////////////////
 
 func loop_with_inner_diamond(_ x: NS, _ count: Int, _ flag: Bool) async {
-  // expected-note@+1{{'y' is connected to 'x' which is accessible to code in the current isolation context}}
   var y = NS()
   for _ in 0..<count {
     if flag {
-      y = x
+      y = x // expected-note {{'y' is connected to 'x' which is accessible to code in the current isolation context}}
     } else {
       y = NS()
     }
@@ -950,4 +949,193 @@ func per_arg_loc_coroutine(_ x: NS) async {
   )
   await transferToMain(y) // expected-warning {{sending 'y' risks causing data races}}
   // expected-note @-1 {{sending 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Additional control-flow coverage: switches, nested/ternary diamonds, while/
+// repeat/nested loops, guard, do/catch, break, and multiple isolated sources.
+////////////////////////////////////////////////////////////////////////////////
+
+func switch_one_isolated(_ x: NS, _ n: Int) async {
+  var y = NS()
+  switch n {
+  case 0:
+    y = x // expected-note {{'y' is connected to 'x' which is accessible to code in the current isolation context}}
+  case 1:
+    y = NS()
+  default:
+    break
+  }
+  await transferToMain(y) // expected-warning {{sending 'y' risks causing data races}}
+// expected-note @-1 {{sending 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
+}
+
+func switch_two_isolated(_ x: NS, _ n: Int) async {
+  var y = NS()
+  switch n {
+  case 0:
+    y = x
+  case 1:
+    y = x // expected-note {{'y' is connected to 'x' which is accessible to code in the current isolation context}}
+  default:
+    y = NS()
+  }
+  await transferToMain(y) // expected-warning {{sending 'y' risks causing data races}}
+// expected-note @-1 {{sending 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
+}
+
+func nested_diamond(_ x: NS, _ a: Bool, _ b: Bool) async {
+  var y = NS()
+  if a {
+    if b {
+      y = x // expected-note {{'y' is connected to 'x' which is accessible to code in the current isolation context}}
+    } else {
+      y = NS()
+    }
+  } else {
+    y = NS()
+  }
+  await transferToMain(y) // expected-warning {{sending 'y' risks causing data races}}
+// expected-note @-1 {{sending 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
+}
+
+func ternary_chain(_ x: NS, _ flag: Bool) async {
+  let y = flag ? x : NS() // expected-note {{'y' is connected to 'x' which is accessible to code in the current isolation context}}
+  await transferToMain(y) // expected-warning {{sending 'y' risks causing data races}}
+// expected-note @-1 {{sending 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
+}
+
+func while_loop_chain(_ x: NS, _ flag: Bool) async {
+  var y = NS()
+  var i = 0
+  while i < 10 {
+    if flag {
+      y = x // expected-note {{'y' is connected to 'x' which is accessible to code in the current isolation context}}
+    }
+    i += 1
+  }
+  await transferToMain(y) // expected-warning {{sending 'y' risks causing data races}}
+// expected-note @-1 {{sending 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
+}
+
+func repeat_while_chain(_ x: NS, _ flag: Bool) async {
+  var y = NS()
+  var i = 0
+  repeat {
+    if flag {
+      y = x // expected-note {{'y' is connected to 'x' which is accessible to code in the current isolation context}}
+    }
+    i += 1
+  } while i < 10
+  await transferToMain(y) // expected-warning {{sending 'y' risks causing data races}}
+// expected-note @-1 {{sending 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
+}
+
+func nested_loop_chain(_ x: NS, _ n: Int) async {
+  var y = NS()
+  for _ in 0..<n {
+    for _ in 0..<n {
+      y = x // expected-note {{'y' is connected to 'x' which is accessible to code in the current isolation context}}
+    }
+  }
+  await transferToMain(y) // expected-warning {{sending 'y' risks causing data races}}
+// expected-note @-1 {{sending 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
+}
+
+// Two distinct isolated sources, both branches isolate y. Neither branch resets
+// the isolation, so the discriminating-element rule cannot prefer one; the walk
+// falls back to first-explored (names 'a', anchored on the else arm).
+func two_isolated_sources(_ a: NS, _ b: NS, _ flag: Bool) async {
+  var y = NS()
+  if flag {
+    y = a
+  } else {
+    y = b // expected-note {{'y' is connected to 'a' which is accessible to code in the current isolation context}}
+  }
+  await transferToMain(y) // expected-warning {{sending 'y' risks causing data races}}
+// expected-note @-1 {{sending 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
+}
+
+func sequential_diamonds(_ x: NS, _ f1: Bool, _ f2: Bool) async {
+  var y = NS()
+  if f1 {
+    y = x // expected-note {{'y' is connected to 'x' which is accessible to code in the current isolation context}}
+  } else {
+    y = NS()
+  }
+  if f2 {
+    _ = y
+  }
+  await transferToMain(y) // expected-warning {{sending 'y' risks causing data races}}
+// expected-note @-1 {{sending 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
+}
+
+func do_catch_chain(_ x: NS) async throws {
+  var y = NS()
+  do {
+    y = try makeOrThrow(x) // expected-note {{'y' is connected to 'x' which is accessible to code in the current isolation context}}
+// expected-note @-1 {{'makeOrThrow' is connected to 'y'}}
+  } catch {
+    y = NS()
+  }
+  await transferToMain(y) // expected-warning {{sending 'y' risks causing data races}}
+  // expected-note @-1 {{sending 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
+}
+
+func break_in_loop_chain(_ x: NS, _ n: Int) async {
+  var y = NS()
+  for _ in 0..<n {
+    y = x // expected-note {{'y' is connected to 'x' which is accessible to code in the current isolation context}}
+    break
+  }
+  await transferToMain(y) // expected-warning {{sending 'y' risks causing data races}}
+  // expected-note @-1 {{sending 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// KNOWN-BAD DIAGNOSTICS (characterization). These pin current behavior where the
+// chain walker loses information: an internal/runtime name leaks into the chain,
+// a projection collapses to its base, the note names something other than the
+// value actually sent, or we fall back to a nameless generic note. They should
+// be *fixed* later; each FIXME says what the note ought to say.
+////////////////////////////////////////////////////////////////////////////////
+
+// FIXME: The sent value is 'box.ns', but the chain note names the container
+// 'box'. It should say 'box.ns' (or at least agree with the sending note).
+func send_projection_of_isolated(_ x: NS) async {
+  var box = Box1(NS())
+  box.ns = x // expected-note {{'box' is connected to 'x' which is accessible to code in the current isolation context}}
+  await transferToMain(box.ns) // expected-warning {{sending 'box.ns' risks causing data races}}
+// expected-note @-1 {{sending 'box.ns' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
+}
+
+// FIXME: The write is 'box.b.b.ns = x', but the note collapses the whole access
+// path to the base 'box'. It loses which field flowed the isolated value in.
+func deep_projection_store(_ x: NS) async {
+  var box = Box3(Box2(Box1(NS())))
+  box.b.b.ns = x // expected-note {{'box' is connected to 'x' which is accessible to code in the current isolation context}}
+  await transferToMain(box) // expected-warning {{sending 'box' risks causing data races}}
+// expected-note @-1 {{sending 'box' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
+}
+
+// FIXME: 'y' is a copy of the actor's stored property, yet we emit only the
+// nameless generic "value was merged … here" note. It should name the chain,
+// e.g. "'y' is connected to 'slot'".
+actor SlotActor {
+  var slot = NS()
+  func probe() async {
+    let y = slot // expected-note {{value was merged into 'self'-isolated code region here}}
+    await transferToMain(y) // expected-warning {{sending 'y' risks causing data races}}
+// expected-note @-1 {{sending 'self'-isolated 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and 'self'-isolated uses}}
+  }
+}
+
+// FIXME: The array-literal lowering leaks the compiler-internal
+// '_allocateUninitializedArray' as a chain step. An internal runtime name
+// should never appear in a user-facing note.
+func array_append_leak(_ x: NS) async {
+  var arr = [NS()] // expected-note {{'_allocateUninitializedArray' is connected to 'arr'}}
+  arr.append(x) // expected-note {{'arr' is connected to 'x' which is accessible to code in the current isolation context}}
+  await transferToMain(arr) // expected-warning {{sending 'arr' risks causing data races}}
+  // expected-note @-1 {{sending 'arr' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
 }

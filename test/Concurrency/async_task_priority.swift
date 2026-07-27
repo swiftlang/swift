@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-build-swift %s -parse-as-library -o %t/async_task_priority
+// RUN: %target-build-swift %s -import-objc-header %S/Inputs/has-dispatch-private.h -parse-as-library -o %t/async_task_priority
 // RUN: %target-codesign %t/async_task_priority
 // RUN: %target-run %t/async_task_priority
 
@@ -341,7 +341,9 @@ actor Test {
         }
 
         // This test will only work properly if Dispatch supports lowering the base priority of a thread rdar://88155873
-        if #available(macOS 9998, iOS 9998, tvOS 9998, watchOS 9998, *) {
+        // If we don't have swift_concurrency_private.h then the runtime doesn't have
+        // full priority escalation, so don't try to test it.
+        if #available(macOS 9998, iOS 9998, tvOS 9998, watchOS 9998, *), HasSwiftConcurrencyPrivateHeader() != 0 {
           tests.test("Task escalation doesn't impact qos_class_self") {
             let task = Task(priority: .utility) {
               let initialQos = DispatchQoS(
@@ -379,7 +381,9 @@ actor Test {
         }
 
         // Requires escalatePriority
-        if #available(SwiftStdlib 6.2, *) {
+        // If we don't have swift_concurrency_private.h then the runtime doesn't have
+        // full priority escalation, so don't try to test it.
+        if #available(SwiftStdlib 6.2, *), HasSwiftConcurrencyPrivateHeader() != 0 {
           // Test that Task stealers are able to escalate a Task which is enqueued but not yet running rdar://160967177
           tests.test("Tasks can be escalated even if they are enqueued but not yet running") {
             // If there are ncpu tasks of a given priority,

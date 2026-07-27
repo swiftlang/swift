@@ -146,13 +146,7 @@ public struct Type : TypeProperties, CustomStringConvertible, NoReflectionChildr
   /// such arguments, no metadata is needed, except the isa-pointer of the class.
   public var hasValidSignatureForEmbedded: Bool {
     let genericSignature = invocationGenericSignatureOfFunction
-    for genParam in genericSignature.genericParameters {
-      let mappedParam = genericSignature.mapTypeIntoEnvironment(genParam)
-      if mappedParam.isArchetype && !mappedParam.archetypeRequiresClass {
-        return false
-      }
-    }
-    return true
+    return genericSignature.isEmpty || genericSignature.canBeEmittedInEmbeddedSwift
   }
 
   //===--------------------------------------------------------------------===//

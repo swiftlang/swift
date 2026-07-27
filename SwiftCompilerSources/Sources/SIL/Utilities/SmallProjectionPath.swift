@@ -960,9 +960,9 @@ let smallProjectionPathTest = Test("small_projection_path") {
     let (k2, _, s2) = p2.pop()
     assert(k2 == .anything && s2.isEmpty)
 
-    let p3 = SmallProjectionPath(.indexedElement, index: 0xfffffffffffff)
+    let p3 = SmallProjectionPath(.indexedElement, index: Int.max >> 12)
     let (k3, i3, s3) = p3.pop()
-    assert(k3 == .indexedElement && i3 == 0xfffffffffffff && s3.isEmpty)
+    assert(k3 == .indexedElement && i3 == Int.max >> 12 && s3.isEmpty)
 
     let p4 = p3.push(.indexedElement, index: Int.max)
     let (k4, _, s4) = p4.pop()
