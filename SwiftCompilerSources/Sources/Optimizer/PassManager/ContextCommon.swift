@@ -181,3 +181,9 @@ extension Instruction {
     context.notifyInstructionsChanged()
   }
 }
+
+extension BasicBlock {
+  func isCold(_ context: FunctionPassContext) -> Bool {
+    return context.bridgedPassContext.isBlockCold(self.bridged)
+  }
+}
