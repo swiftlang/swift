@@ -6494,9 +6494,14 @@ IRGenSILFunction::visitDereferenceBorrowAddrInst(DereferenceBorrowAddrInst *i) {
     /* Semantically we are just passing through the input parameter but as a   \
      */                                                                        \
     /* strong reference... at LLVM IR level these type differences don't */    \
-    /* matter. So just set the lowered explosion appropriately. */             \
+    /* matter. A loadable optional reference that lowers to a nullable */      \
+    /* pointer already matches the referent, so it can be forwarded as-is. */  \
+    /* An optional with a multi-word payload (e.g. a class existential with */ \
+    /* witness tables) still uses the word-chunked integer enum payload, so */ \
+    /* convert the pointer words back to integers to match it. */              \
     Explosion output = getLoweredExplosion(i->getOperand());                   \
-    if (isOptional) {                                                          \
+    if (isOptional && !ti.isSingleRetainablePointer(                           \
+                          ResilienceExpansion::Maximal, nullptr)) {            \
       auto values = output.claimAll();                                         \
       output.reset();                                                          \
       for (auto value : values) {                                              \
@@ -6522,9 +6527,14 @@ IRGenSILFunction::visitDereferenceBorrowAddrInst(DereferenceBorrowAddrInst *i) {
     /* Semantically we are just passing through the input parameter but as a   \
      */                                                                        \
     /* strong reference... at LLVM IR level these type differences don't */    \
-    /* matter. So just set the lowered explosion appropriately. */             \
+    /* matter. A loadable optional reference that lowers to a nullable */      \
+    /* pointer already matches the referent, so it can be forwarded as-is. */  \
+    /* An optional with a multi-word payload (e.g. a class existential with */ \
+    /* witness tables) still uses the word-chunked integer enum payload, so */ \
+    /* convert the pointer words back to integers to match it. */              \
     Explosion output = getLoweredExplosion(i->getOperand());                   \
-    if (isOptional) {                                                          \
+    if (isOptional && !ti.isSingleRetainablePointer(                           \
+                          ResilienceExpansion::Maximal, nullptr)) {            \
       auto values = output.claimAll();                                         \
       output.reset();                                                          \
       for (auto value : values) {                                              \

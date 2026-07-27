@@ -1121,6 +1121,16 @@ class ClassExistentialTypeInfo final
   const {
     // We always have at least one entry.
     auto *part = In.claimNext();
+
+    // With no stored protocols the optional class existential is a single
+    // retainable pointer, so its `.none == null` optional is lowered to `ptr`;
+    // keep the reference word as a pointer. With witness tables the optional
+    // uses the word-chunked integer payload representation.
+    if (getNumStoredProtocols() == 0) {
+      Out.add(part);
+      return;
+    }
+
     Out.add(IGF.Builder.CreatePtrToInt(part, IGF.IGM.IntPtrTy));
 
     for (unsigned i = 0; i != getNumStoredProtocols(); ++i) {
