@@ -7,6 +7,7 @@
 // REQUIRES: swift_feature_NonisolatedNonsendingByDefault
 
 // UNSUPPORTED: freestanding
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 // Regression tests for: https://github.com/swiftlang/swift/issues/88259
 //

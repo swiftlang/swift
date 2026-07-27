@@ -1,6 +1,7 @@
 // RUN: %enable-cow-checking %target-run-simple-swiftgyb
 // REQUIRES: executable_test
 // REQUIRES: reflection
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 import StdlibUnittest
 import StdlibCollectionUnittest

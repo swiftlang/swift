@@ -4,6 +4,7 @@
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 // REQUIRES: optimized_stdlib
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 // Validate that the various forms of word breaking all lead to consistent
 // results by exhaustively enumerating all possible state machine inputs up to

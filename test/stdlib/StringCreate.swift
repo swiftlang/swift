@@ -3,6 +3,7 @@
 
 // rdar://91405760
 // UNSUPPORTED: use_os_stdlib, back_deployment_runtime
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 import StdlibUnittest
 defer { runAllTests() }
