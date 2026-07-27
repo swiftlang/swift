@@ -23,7 +23,7 @@ let RTLD_DEFAULT = UnsafeMutableRawPointer(bitPattern: -2)
 
 func registryCount() -> Int {
   typealias Fn = @convention(c) () -> Int
-  guard let sym = dlsym(RTLD_DEFAULT, "__swift_concurrency_debug_task_registryCount") else { return -1 }
+  guard let sym = dlsym(RTLD_DEFAULT, "_swift_concurrency_debug_task_registryCount") else { return -1 }
   return unsafeBitCast(sym, to: Fn.self)()
 }
 
@@ -32,17 +32,17 @@ typealias GetTaskNextFn = @convention(c) (UnsafeRawPointer) -> UnsafeRawPointer?
 typealias GetTaskIdFn = @convention(c) (UnsafeRawPointer) -> UInt64
 
 func getShardHead(index: Int) -> UnsafeRawPointer? {
-  guard let sym = dlsym(RTLD_DEFAULT, "__swift_concurrency_debug_task_getShardHead") else { return nil }
+  guard let sym = dlsym(RTLD_DEFAULT, "_swift_concurrency_debug_task_getShardHead") else { return nil }
   return unsafeBitCast(sym, to: GetShardHeadFn.self)(index)
 }
 
 func getTaskNext(task: UnsafeRawPointer) -> UnsafeRawPointer? {
-  guard let sym = dlsym(RTLD_DEFAULT, "__swift_concurrency_debug_task_getTaskNext") else { return nil }
+  guard let sym = dlsym(RTLD_DEFAULT, "_swift_concurrency_debug_task_getTaskNext") else { return nil }
   return unsafeBitCast(sym, to: GetTaskNextFn.self)(task)
 }
 
 func getTaskId(task: UnsafeRawPointer) -> UInt64 {
-  guard let sym = dlsym(RTLD_DEFAULT, "__swift_concurrency_debug_task_getId") else { return 0 }
+  guard let sym = dlsym(RTLD_DEFAULT, "_swift_concurrency_debug_task_getId") else { return 0 }
   return unsafeBitCast(sym, to: GetTaskIdFn.self)(task)
 }
 
@@ -72,17 +72,18 @@ func test_perTaskIncrementAndDecrement() async {
   let baseline = registryCount()
 
   for i in 0..<n {
-    let task = Task {
+    var task: Task<Void, Never>? = Task {
       try? await Task.sleep(nanoseconds: 10_000_000)
     }
 
     let countAfterCreate = registryCount()
     assert(countAfterCreate >= baseline + 1, "after spawning task \(i+1): expected count >= \(baseline + 1), got \(countAfterCreate)")
 
-    _ = await task.result
+    _ = await task!.result
+    task = nil
 
     // Wait a little bit for the task to be destroyed and unregistered
-    try? await Task.sleep(nanoseconds: 1_000_000)
+    try? await Task.sleep(nanoseconds: 500_000_000)
 
     let countAfterDestroy = registryCount()
     assert(countAfterDestroy <= baseline, "after task \(i+1) finished: expected count <= \(baseline), got \(countAfterDestroy)")
@@ -90,7 +91,7 @@ func test_perTaskIncrementAndDecrement() async {
 }
 
 func test_shardDistribution() async {
-  let n = 20
+  let n = 300
   let barrier = Barrier(n)
   let contRegistry = ContinuationRegistry()
 
@@ -110,11 +111,12 @@ func test_shardDistribution() async {
     try? await Task.sleep(nanoseconds: 10_000_000)
 
     var totalFound = 0
-    for shardIndex in 0..<16 {
+    for shardIndex in 0..<64 {
       var curr = getShardHead(index: shardIndex)
       while let taskPtr = curr {
         let id = getTaskId(task: taskPtr)
-        assert(Int(id % 16) == shardIndex, "Task with ID \(id) found in wrong shard \(shardIndex)")
+        let expectedShard = Int((id ^ (id >> 8)) & 63)
+        assert(expectedShard == shardIndex, "Task with ID \(id) found in wrong shard \(shardIndex)")
         totalFound += 1
         curr = getTaskNext(task: taskPtr)
       }
@@ -129,7 +131,7 @@ func test_shardDistribution() async {
 }
 
 func test_concurrentCollisions() async {
-  let concurrency = 200
+  let concurrency = 300
   let barrier = Barrier(concurrency)
   let contRegistry = ContinuationRegistry()
 
