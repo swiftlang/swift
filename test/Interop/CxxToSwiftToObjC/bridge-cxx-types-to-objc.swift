@@ -7,4 +7,4 @@ import CxxModule
 
 public func bar(x: Foo, y: UnsafeMutablePointer<UnsafeMutableRawPointer?>) {}
 
-// CHECK: void bar(const Foo& x, void * _Nullable * _Nonnull y) noexcept
+// CHECK: void bar(const Foo& SWIFT_NOESCAPE x, void * _Nullable * _Nonnull y) noexcept
