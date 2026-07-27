@@ -105,10 +105,9 @@ entry(%c : $C):
   return %c : $C
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i64 @autorelease_optional(i64 %0) {{.*}} {
-// CHECK:         %1 = inttoptr i64 %0 to ptr
-// CHECK:         call ptr @llvm.objc.autorelease(ptr %1)
-// CHECK:         ret i64 %0
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc ptr @autorelease_optional(ptr %0) {{.*}} {
+// CHECK:         call ptr @llvm.objc.autorelease(ptr %0)
+// CHECK:         ret ptr %0
 sil @autorelease_optional : $@convention(thin) (@owned C?) -> C? {
 entry(%c : $C?):
   autorelease_value %c : $C?
