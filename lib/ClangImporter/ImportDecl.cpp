@@ -1519,6 +1519,13 @@ namespace {
       return result;
     }
 
+    /// Determine the Swift access level for a given clang decl.
+    ///
+    /// This wrapper adds logic for handling dual C array projections.
+    AccessLevel getAccessLevel(const clang::Decl *decl) {
+      return convertClangAccess(decl->getAccess());
+    }
+
   public:
     explicit SwiftDeclConverter(ClangImporter::Implementation &impl,
                                 ImportNameVersion vers)
@@ -1806,7 +1813,7 @@ namespace {
               // Create a typealias for this CF typedef.
               TypeAliasDecl *typealias = nullptr;
               typealias = Impl.createDeclWithClangNode<TypeAliasDecl>(
-                  Decl, importer::convertClangAccess(Decl->getAccess()),
+                  Decl, getAccessLevel(Decl),
                   Impl.importSourceLoc(Decl->getBeginLoc()), SourceLoc(), Name,
                   Impl.importSourceLoc(Decl->getLocation()),
                   /*genericparams*/ nullptr, DC);
@@ -1824,7 +1831,7 @@ namespace {
               // Create a typealias for this CF typedef.
               TypeAliasDecl *typealias = nullptr;
               typealias = Impl.createDeclWithClangNode<TypeAliasDecl>(
-                  Decl, importer::convertClangAccess(Decl->getAccess()),
+                  Decl, getAccessLevel(Decl),
                   Impl.importSourceLoc(Decl->getBeginLoc()), SourceLoc(), Name,
                   Impl.importSourceLoc(Decl->getLocation()),
                   /*genericparams*/ nullptr, DC);
@@ -1901,7 +1908,7 @@ namespace {
 
       auto Loc = Impl.importSourceLoc(Decl->getLocation());
       auto Result = Impl.createDeclWithClangNode<TypeAliasDecl>(
-          Decl, importer::convertClangAccess(Decl->getAccess()),
+          Decl, getAccessLevel(Decl),
           Impl.importSourceLoc(Decl->getBeginLoc()), SourceLoc(), Name, Loc,
           /*genericparams*/ nullptr, DC);
 
@@ -2015,7 +2022,7 @@ namespace {
         if (!underlyingType)
           return nullptr;
 
-        auto access = importer::convertClangAccess(decl->getAccess());
+        auto access = getAccessLevel(decl);
         auto Loc = Impl.importSourceLoc(decl->getLocation());
         auto structDecl = Impl.createDeclWithClangNode<StructDecl>(
             decl, access, Loc, name, Loc, ArrayRef<InheritedEntry>(), nullptr,
@@ -2142,8 +2149,8 @@ namespace {
 
         // Create the enumeration.
         auto enumDecl = Impl.createDeclWithClangNode<EnumDecl>(
-            decl, importer::convertClangAccess(decl->getAccess()), loc,
-            enumName, Impl.importSourceLoc(decl->getLocation()),
+            decl, getAccessLevel(decl), loc, enumName,
+            Impl.importSourceLoc(decl->getLocation()),
             ArrayRef<InheritedEntry>(), nullptr, enumDC);
         enumDecl->setHasFixedRawValues();
 
@@ -2699,12 +2706,12 @@ namespace {
         }
 
         result = Impl.createDeclWithClangNode<ClassDecl>(
-            decl, importer::convertClangAccess(decl->getAccess()), loc, name,
-            loc, ArrayRef<InheritedEntry>{}, nullptr, dc, false);
+            decl, getAccessLevel(decl), loc, name, loc,
+            ArrayRef<InheritedEntry>{}, nullptr, dc, false);
       } else {
         result = Impl.createDeclWithClangNode<StructDecl>(
-            decl, importer::convertClangAccess(decl->getAccess()), loc, name,
-            loc, ArrayRef<InheritedEntry>(), nullptr, dc);
+            decl, getAccessLevel(decl), loc, name, loc,
+            ArrayRef<InheritedEntry>(), nullptr, dc);
       }
       Impl.ImportedDecls[canonicalKey] = result;
       // We've written a partial entry into ImportedDecls so that nested
@@ -3616,8 +3623,7 @@ namespace {
             name, dc, type, clang::APValue(decl->getInitVal()),
             enumKind == EnumKind::Unknown ? ConstantConvertKind::Construction
                                           : ConstantConvertKind::None,
-            isStatic, decl,
-            importer::convertClangAccess(clangEnum->getAccess()));
+            isStatic, decl, getAccessLevel(clangEnum));
 
         auto key = Impl.getImportedDeclsKey(decl, getVersion());
         Impl.ImportedDecls[key] = result;
@@ -3740,9 +3746,9 @@ namespace {
 
       // Map this indirect field to a Swift variable.
       auto result = Impl.createDeclWithClangNode<VarDecl>(
-          decl, importer::convertClangAccess(decl->getAccess()),
-          /*IsStatic*/ false, VarDecl::Introducer::Var,
-          Impl.importSourceLoc(decl->getBeginLoc()), name, dc);
+          decl, getAccessLevel(decl), /*IsStatic*/ false,
+          VarDecl::Introducer::Var, Impl.importSourceLoc(decl->getBeginLoc()),
+          name, dc);
       result->setInterfaceType(type);
       result->setIsObjC(false);
       result->setIsDynamic(false);
@@ -4367,8 +4373,7 @@ namespace {
         DeclName ctorName(Impl.SwiftContext, DeclBaseName::createConstructor(),
                           bodyParams);
         result = Impl.createDeclWithClangNode<ConstructorDecl>(
-            clangNode, importer::convertClangAccess(ctordecl->getAccess()),
-            ctorName, loc,
+            clangNode, getAccessLevel(ctordecl), ctorName, loc,
             /*failable=*/false, /*FailabilityLoc=*/SourceLoc(),
             /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
             /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
@@ -4422,7 +4427,7 @@ namespace {
             func->setImportAsStaticMember();
           }
         }
-        func->setAccess(importer::convertClangAccess(decl->getAccess()));
+        func->setAccess(getAccessLevel(decl));
 
         bool success = processSpecialImportedFunc(func, importedName, decl);
         if (!success)
@@ -5211,9 +5216,9 @@ namespace {
       auto type = importedType.getType();
 
       auto result = Impl.createDeclWithClangNode<VarDecl>(
-          decl, importer::convertClangAccess(decl->getAccess()),
-          /*IsStatic*/ false, VarDecl::Introducer::Var,
-          Impl.importSourceLoc(decl->getLocation()), name, dc);
+          decl, getAccessLevel(decl), /*IsStatic*/ false,
+          VarDecl::Introducer::Var, Impl.importSourceLoc(decl->getLocation()),
+          name, dc);
       if (decl->getType().isConstQualified()) {
         // Note that in C++ there are ways to change the values of const
         // members, so we don't use WriteImplKind::Immutable storage.
@@ -5337,7 +5342,7 @@ namespace {
 
             result = synthesizer.createConstant(
                 name, dc, type, *val, convertKind, isStatic, decl,
-                importer::convertClangAccess(decl->getAccess()));
+                getAccessLevel(decl));
           }
         }
       }
@@ -5345,8 +5350,7 @@ namespace {
       // Otherwise, import as an external declaration
       if (!result) {
         result = Impl.createDeclWithClangNode<VarDecl>(
-            decl, importer::convertClangAccess(decl->getAccess()),
-            /*IsStatic*/ isStatic, introducer,
+            decl, getAccessLevel(decl), /*IsStatic*/ isStatic, introducer,
             Impl.importSourceLoc(decl->getLocation()), name, dc);
         result->setIsObjC(false);
         result->setIsDynamic(false);
@@ -5448,7 +5452,7 @@ namespace {
           Impl.SwiftContext, loc, genericParams, loc);
 
       auto structDecl = Impl.createDeclWithClangNode<StructDecl>(
-          decl, importer::convertClangAccess(decl->getAccess()), loc, name, loc,
+          decl, getAccessLevel(decl), loc, name, loc,
           ArrayRef<InheritedEntry>(), genericParamList, dc);
 
       auto attr = AvailableAttr::createUniversallyUnavailable(
@@ -5516,7 +5520,7 @@ namespace {
 
         auto Loc = Impl.importSourceLoc(decl->getLocation());
         auto Result = Impl.createDeclWithClangNode<TypeAliasDecl>(
-            decl, importer::convertClangAccess(decl->getAccess()),
+            decl, getAccessLevel(decl),
             Impl.importSourceLoc(decl->getBeginLoc()), SourceLoc(), Name, Loc,
             /*genericparams*/ nullptr, importedDC);
         Result->setUnderlyingType(SwiftTypeDecl->getDeclaredInterfaceType());
@@ -5548,8 +5552,7 @@ namespace {
                 importedBaseMethod, importedDC, ClangInheritanceInfo()));
         if (!clonedMethod)
           return nullptr;
-        clonedMethod->overwriteAccess(
-            importer::convertClangAccess(decl->getAccess()));
+        clonedMethod->overwriteAccess(getAccessLevel(decl));
 
         bool success = processSpecialImportedFunc(clonedMethod, importedName,
                                                   targetMethod);
@@ -7231,7 +7234,7 @@ Decl *SwiftDeclConverter::importCompatibilityTypeAlias(
 
   // Create the type alias.
   auto alias = Impl.createDeclWithClangNode<TypeAliasDecl>(
-      decl, importer::convertClangAccess(decl->getAccess()),
+      decl, getAccessLevel(decl),
       Impl.importSourceLoc(decl->getBeginLoc()), SourceLoc(),
       compatibilityName.getBaseIdentifier(Impl.SwiftContext),
       Impl.importSourceLoc(decl->getLocation()), /*generic params*/ nullptr,
@@ -7342,8 +7345,8 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
   auto Loc = Impl.importSourceLoc(decl->getLocation());
 
   auto structDecl = Impl.createDeclWithClangNode<StructDecl>(
-      decl, importer::convertClangAccess(decl->getAccess()), Loc, name, Loc,
-      ArrayRef<InheritedEntry>(), nullptr, dc);
+      decl, getAccessLevel(decl), Loc, name, Loc, ArrayRef<InheritedEntry>(),
+      nullptr, dc);
 
   // Import the type of the underlying storage, bypassing C array projection
   // machinery; newtypes are never dual-imported and there is explicit logic to
@@ -7545,8 +7548,8 @@ Decl *SwiftDeclConverter::importEnumCase(const clang::EnumConstantDecl *decl,
     rawValueExpr->setNegative(SourceLoc());
 
   auto element = Impl.createDeclWithClangNode<EnumElementDecl>(
-      decl, importer::convertClangAccess(clangEnum->getAccess()), SourceLoc(),
-      name, nullptr, SourceLoc(), rawValueExpr, theEnum);
+      decl, getAccessLevel(clangEnum), SourceLoc(), name, nullptr, SourceLoc(),
+      rawValueExpr, theEnum);
 
   Impl.importAttributes(decl, element);
 
@@ -7571,7 +7574,7 @@ SwiftDeclConverter::importOptionConstant(const clang::EnumConstantDecl *decl,
   Decl *CD = synthesizer.createConstant(
       name, theStruct, theStruct->getDeclaredInterfaceType(),
       clang::APValue(decl->getInitVal()), convertKind, /*isStatic*/ true, decl,
-      importer::convertClangAccess(clangEnum->getAccess()));
+      getAccessLevel(clangEnum));
   Impl.importAttributes(decl, CD);
 
   // NS_OPTIONS members that have a value of 0 (typically named "None") do
@@ -7637,8 +7640,7 @@ Decl *SwiftDeclConverter::importEnumCaseAlias(
 
   Decl *CD = synthesizer.createConstant(
       name, importIntoDC, importedEnumTy, result, ConstantConvertKind::None,
-      /*isStatic*/ true, alias,
-      importer::convertClangAccess(clangEnum->getAccess()));
+      /*isStatic*/ true, alias, getAccessLevel(clangEnum));
   Impl.importAttributes(alias, CD);
   return CD;
 }
@@ -7650,8 +7652,8 @@ SwiftDeclConverter::importAsOptionSetType(DeclContext *dc, Identifier name,
 
   // Create a struct with the underlying type as a field.
   auto structDecl = Impl.createDeclWithClangNode<StructDecl>(
-      decl, importer::convertClangAccess(decl->getAccess()), Loc, name, Loc,
-      ArrayRef<InheritedEntry>(), nullptr, dc);
+      decl, getAccessLevel(decl), Loc, name, Loc, ArrayRef<InheritedEntry>(),
+      nullptr, dc);
   Impl.ImportedDecls[Impl.getImportedDeclsKey(decl, getVersion())] = structDecl;
 
   // Compute the underlying type.
@@ -7762,7 +7764,7 @@ Decl *SwiftDeclConverter::importGlobalAsInitializer(
                                      templateParams, SourceLoc());
 
   auto result = Impl.createDeclWithClangNode<ConstructorDecl>(
-      clangNode, importer::convertClangAccess(decl->getAccess()), name,
+      clangNode, getAccessLevel(decl), name,
       Impl.importSourceLoc(decl->getLocation()), failable,
       /*FailabilityLoc=*/SourceLoc(),
       /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
@@ -7937,9 +7939,8 @@ SwiftDeclConverter::getImplicitProperty(ImportedName importedName,
   Type swiftPropertyType = importedType.getType();
 
   auto property = Impl.createDeclWithClangNode<VarDecl>(
-      getter, importer::convertClangAccess(getter->getAccess()),
-      /*IsStatic*/ isStatic, VarDecl::Introducer::Var, SourceLoc(),
-      propertyName, dc);
+      getter, getAccessLevel(getter), /*IsStatic*/ isStatic,
+      VarDecl::Introducer::Var, SourceLoc(), propertyName, dc);
   property->setInterfaceType(swiftPropertyType);
   property->setIsObjC(false);
   property->setIsDynamic(false);
