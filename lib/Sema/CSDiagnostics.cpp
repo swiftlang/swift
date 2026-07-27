@@ -304,13 +304,6 @@ ValueDecl *RequirementFailure::getDeclRef() const {
     return opaqueLocator->getDecl();
   }
 
-  // If the locator is for a result builder body result type, the requirement
-  // came from the function's return type.
-  if (getLocator()->isForResultBuilderBodyResult()) {
-    auto *func = getAsDecl<FuncDecl>(getAnchor());
-    return getAffectedDeclFromType(func->getResultInterfaceType());
-  }
-
   if (isFromContextualType()) {
     auto anchor = getRawAnchor();
     auto contextualPurpose = getContextualTypePurpose(anchor);
@@ -1023,10 +1016,6 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
       diagnostic = getDiagnosticFor(purpose);
       break;
     }
-
-    case ConstraintLocator::ResultBuilderBodyResult:
-      diagnostic = diag::cannot_convert_result_builder_result_to_return_type;
-      break;
 
     case ConstraintLocator::AutoclosureResult:
     case ConstraintLocator::ApplyArgToParam:
@@ -2884,11 +2873,6 @@ bool ContextualFailure::diagnoseAsError() {
     }
 
     return true;
-  }
-
-  case ConstraintLocator::ResultBuilderBodyResult: {
-    diagnostic = *getDiagnosticFor(CTP_Initialization, toType);
-    break;
   }
 
   case ConstraintLocator::OptionalInjection: {
