@@ -71,7 +71,7 @@ public struct LargeStruct {
 // CHECK: class SWIFT_SYMBOL("s:4Init11LargeStructV") LargeStruct final {
 // CHECK:       SWIFT_INLINE_THUNK swift::Int getX6() const SWIFT_SYMBOL("s:4Init11LargeStructV2x6Sivp");
 // CHECK-NEXT:  static SWIFT_INLINE_THUNK LargeStruct init() SWIFT_SYMBOL("s:4Init11LargeStructVACycfc");
-// CHECK-NEXT:  static SWIFT_INLINE_THUNK LargeStruct init(swift::Int x, const FirstSmallStruct& y) SWIFT_SYMBOL("s:4Init11LargeStructV1x1yACSi_AA010FirstSmallC0Vtcfc");
+// CHECK-NEXT: static SWIFT_INLINE_THUNK LargeStruct init(swift::Int x, const FirstSmallStruct& SWIFT_NOESCAPE y) SWIFT_SYMBOL("s:4Init11LargeStructV1x1yACSi_AA010FirstSmallC0Vtcfc");
 // CHECK-NEXT: private:
 
 private class RefCountedClass {
@@ -151,7 +151,7 @@ public struct WrapOverloadedInits {
 // CHECK: DerivedClassTwo DerivedClassTwo::init(swift::Int x, swift::Int y) {
 // CHECK-NEXT: return _impl::_impl_DerivedClassTwo::makeRetained(Init::_impl::$s4Init15DerivedClassTwoCyACSi_SitcfC(x, y, swift::TypeMetadataTrait<DerivedClassTwo>::getTypeMetadata()));
 
-// CHECK: FinalClass FinalClass::init(const FirstSmallStruct& prop) {
+// CHECK: FinalClass FinalClass::init(const FirstSmallStruct& SWIFT_NOESCAPE prop) {
 // CHECK-NEXT: return _impl::_impl_FinalClass::makeRetained(Init::_impl::$s4Init10FinalClassCyAcA16FirstSmallStructVcfC(Init::_impl::swift_interop_passDirect_Init_uint32_t_0_4(Init::_impl::_impl_FirstSmallStruct::getOpaquePointer(prop)), swift::TypeMetadataTrait<FinalClass>::getTypeMetadata()));
 
 
@@ -174,7 +174,7 @@ public struct WrapOverloadedInits {
 // CHECK-NEXT:   _impl::$s4Init11LargeStructVACycfC(result);
 // CHECK-NEXT: });
 // CHECK-NEXT: }
-// CHECK-NEXT: SWIFT_INLINE_THUNK LargeStruct LargeStruct::init(swift::Int x, const FirstSmallStruct& y) {
+// CHECK-NEXT: SWIFT_INLINE_THUNK LargeStruct LargeStruct::init(swift::Int x, const FirstSmallStruct& SWIFT_NOESCAPE y) {
 // CHECK-NEXT: return Init::_impl::_impl_LargeStruct::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
 // CHECK-NEXT:   _impl::$s4Init11LargeStructV1x1yACSi_AA010FirstSmallC0VtcfC(result, x, Init::_impl::swift_interop_passDirect_Init_uint32_t_0_4(Init::_impl::_impl_FirstSmallStruct::getOpaquePointer(y)));
 // CHECK-NEXT: });
