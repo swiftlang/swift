@@ -354,8 +354,6 @@ swift::cxx_translation::getDeclRepresentation(
         return {Unsupported, UnrepresentableGeneric};
       genericSignature = typeDecl->getGenericSignature();
     }
-    if (!isa<ClassDecl>(typeDecl) && isZeroSized && (*isZeroSized)(typeDecl))
-      return {Unsupported, UnrepresentableZeroSizedValueType};
   }
   if (const auto *varDecl = dyn_cast<VarDecl>(VD)) {
     // Check if any property accessor throws, do not expose it in that case.
@@ -390,6 +388,17 @@ swift::cxx_translation::getDeclRepresentation(
         }
       }
     }
+  }
+  // The zero-sized check runs after enum-specific checks so that the more
+  // specific reason wins (e.g., a single-case enum with an unrepresentable
+  // associated-value tuple keeps its specific diagnostic instead of being
+  // labeled "zero sized value type").
+  if (const auto *typeDecl = dyn_cast<NominalTypeDecl>(VD)) {
+    if (!isa<ClassDecl>(typeDecl) && isZeroSized && (*isZeroSized)(typeDecl) &&
+        // Non-generic empty enums are exported as namespaces.
+        !(isa<EnumDecl>(typeDecl) && !cast<EnumDecl>(typeDecl)->hasCases() &&
+          !cast<EnumDecl>(typeDecl)->hasGenericParamList()))
+      return {Unsupported, UnrepresentableZeroSizedValueType};
   }
 
   // Generic requirements are not yet supported in C++.

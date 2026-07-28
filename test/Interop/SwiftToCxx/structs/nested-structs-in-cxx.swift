@@ -53,6 +53,10 @@ public class AuxConfig {
     }
 
     public var directory = AuxDirectory()
+
+    public enum Empty {
+        public static func getInt() -> Int { 55 }
+    }
 }
 
 public func makeRecordConfig() -> RecordConfig {
@@ -85,6 +89,26 @@ extension AudioFileType {
     }
 }
 
+public enum Empty {
+    public static func getInt() -> Int { 42 }
+
+    public struct NestedInEmpty {
+        public var x : Int
+    }
+}
+
+public enum Padding {
+    // Swift requires enum inits to never return; Padding is uninhabited.
+    public init() { fatalError("Padding is uninhabited") }
+}
+public struct MyStruct {
+    public let p1: Padding
+    public let someField: Int
+    public init() {
+        self.someField = 42
+        self.p1 = Padding()
+    }
+}
 
 public func getFiles() -> [RecordConfig.File] {
     []

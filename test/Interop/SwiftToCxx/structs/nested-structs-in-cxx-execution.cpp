@@ -13,6 +13,7 @@
 // XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 #include "structs.h"
+#include <iostream>
 
 int main() {
   using namespace Structs;
@@ -22,4 +23,6 @@ int main() {
 
   auto xx = makeAudioFileType();
   AudioFileType::SubType yy = xx.getCAF();
+  auto xxx = Empty::getInt();
+  Empty::NestedInEmpty *ptr = nullptr;
 }

@@ -135,6 +135,11 @@ public:
   bool shouldInclude(const ValueDecl *VD);
 
   bool isZeroSized(const NominalTypeDecl *decl);
+  bool isEmptyEnum(const Decl *decl);
+
+  /// True if \p member's enclosing type context is an empty enum
+  /// (i.e., \p member lives inside what we emit as a C++ namespace).
+  bool isMemberOfEmptyEnum(const Decl *member);
 
   /// Returns true if \p vd is visible given the current access level and thus
   /// can be included in the generated header.

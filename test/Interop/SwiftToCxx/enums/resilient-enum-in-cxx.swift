@@ -36,25 +36,8 @@ public enum Empty {
 
 }
 
-// CHECK:         // Tags for resilient enum Empty
-// CHECK-NEXT:    extern "C" {
-// CHECK-NEXT:    }
-// CHECK-EMPTY:
-// CHECK-NEXT:    } // namespace _impl
-// CHECK-EMPTY:
-// CHECK-NEXT:    class SWIFT_SYMBOL("s:5Enums5EmptyO") Empty final {
-// CHECK:         enum class cases {
-// CHECK-NEXT:      unknownDefault
-// CHECK-NEXT:    };
-// CHECK:         inline const static struct _impl_unknownDefault {  // impl struct for case unknownDefault
-// CHECK-NEXT:      SWIFT_INLINE_THUNK constexpr operator cases() const {
-// CHECK-NEXT:        return cases::unknownDefault;
-// CHECK-NEXT:      }
-// CHECK-NEXT:    } unknownDefault;
-// CHECK-NEXT:    SWIFT_INLINE_THUNK bool isUnknownDefault() const;
-// CHECK:         SWIFT_INLINE_THUNK operator cases() const {
-// CHECK-NEXT:      return cases::unknownDefault;
-// CHECK-NEXT:    }
+// CHECK:         namespace Empty {
+// CHECK:         } // namespace Empty
 // CHECK:         // Tags for resilient enum Foo
 // CHECK-NEXT:    extern "C" {
 // CHECK-NEXT:    extern unsigned $s5Enums3FooO1ayACSdcACmFWC;
