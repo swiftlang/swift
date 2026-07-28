@@ -95,18 +95,19 @@ enum MultipleEmptyRefcounted {
 
 // CHECK-LABEL: define internal void @"$s34enum_value_semantics_special_cases23MultipleEmptyRefcountedOwxx"(ptr noalias %object, ptr %MultipleEmptyRefcounted) {{.*}} {
 // CHECK: entry:
-// CHECK:   %0 = load i64, ptr %object, align 8
-// CHECK:   switch i64 %0, label %1 [
-// CHECK:     i64 0, label %2
-// CHECK-native:   i64 1, label %2
-// CHECK-objc-simulator-false:     i64 2, label %2
-// CHECK-objc-simulator-true:     i64 1, label %2
+// CHECK:   %0 = load ptr, ptr %object, align 8
+// CHECK:   %1 = ptrtoint ptr %0 to i64
+// CHECK:   switch i64 %1, label %2 [
+// CHECK:     i64 0, label %3
+// CHECK-native:   i64 1, label %3
+// CHECK-objc-simulator-false:     i64 2, label %3
+// CHECK-objc-simulator-true:     i64 1, label %3
 // CHECK:   ]
-// CHECK: 1:                                      ; preds = %entry
+// CHECK: 2:                                      ; preds = %entry
 // CHECK:   %toDestroy = load ptr, ptr %object, align 8
 // CHECK:   call void @swift_release(ptr %toDestroy)
-// CHECK:   br label %2
-// CHECK: 2:                                      ; preds = %1, %entry, %entry
+// CHECK:   br label %3
+// CHECK: 3:                                      ; preds = %2, %entry, %entry
 // CHECK:   ret void
 // CHECK: }
 

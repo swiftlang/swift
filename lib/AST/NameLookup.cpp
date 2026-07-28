@@ -2405,15 +2405,15 @@ shouldDiagnoseConflict(NominalTypeDecl *ty, AbstractFunctionDecl *newDecl,
   auto newDeclModuleName = newDecl->getModuleContext()->getName();
   auto newDeclPrivateModuleName = newDecl->getASTContext().getIdentifier(
                      (llvm::Twine(newDeclModuleName.str()) + "_Private").str());
-  auto bridgingHeaderModuleName = newDecl->getASTContext().getIdentifier(
-                                                     CLANG_HEADER_MODULE_NAME);
   if (llvm::all_of(vec, [&](AbstractFunctionDecl *oldDecl) {
     if (!oldDecl->hasClangNode())
       return false;
-    auto oldDeclModuleName = oldDecl->getModuleContext()->getName();
+    auto oldDeclModule = oldDecl->getModuleContext();
+    if (oldDeclModule->isClangBridgingHeaderImportModule())
+      return true;
+    auto oldDeclModuleName = oldDeclModule->getName();
     return oldDeclModuleName == newDeclModuleName
-               || oldDeclModuleName == newDeclPrivateModuleName
-               || oldDeclModuleName == bridgingHeaderModuleName;
+               || oldDeclModuleName == newDeclPrivateModuleName;
   }))
     return false;
 

@@ -633,6 +633,13 @@ EnumPayload::emitGatherSpareBits(IRGenFunction &IGF,
     if (DL.isBigEndian()) {
       offset = bitWidth - usedBits - numBitsInPart;
     }
+    // emitGatherBits operates on integers, so cast a pointer-typed payload
+    // element (the `.none == null` optional-reference representation) to an
+    // integer of the same width first.
+    if (!isa<llvm::IntegerType>(v->getType())) {
+      auto *intTy = llvm::IntegerType::get(C, size);
+      v = IGF.Builder.CreateBitOrPointerCast(v, intTy);
+    }
     // Get the spare bits from this part.
     auto bits = irgen::emitGatherBits(IGF, spareBitsPart,
                                       v, offset, resultBitWidth);
