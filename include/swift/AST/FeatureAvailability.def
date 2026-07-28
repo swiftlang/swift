@@ -83,6 +83,7 @@ FEATURE(InitRawStructMetadata2,                         (6, 2))
 FEATURE(TaskExecutor,                                   (6, 2))
 FEATURE(TaskPriorityEscalationHandlers,                 (6, 2))
 FEATURE(TypedCoroAlloc,                                 (6, 2))
+FEATURE(InlineArray,                                    (6, 2))
 
 FEATURE(NoncopyableReflectionSafety,                    (6, 4))
 

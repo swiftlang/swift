@@ -499,6 +499,8 @@ public:
   const bool DisableOverlayModules;
   const bool EnableClangSPI;
 
+  const CArrayProjection VisibleCArrayProjection;
+
   bool IsReadingBridgingPCH;
   llvm::SmallVector<clang::serialization::SubmoduleID, 2> PCHImportedSubmodules;
 
@@ -856,7 +858,8 @@ public:
   /// Keep track of initializer declarations that correspond to
   /// imported methods.
   llvm::DenseMap<
-      std::tuple<const clang::ObjCMethodDecl *, const DeclContext *, Version>,
+      std::tuple<const clang::ObjCMethodDecl *, const DeclContext *, Version,
+                 CArrayProjection>,
       ConstructorDecl *> Constructors;
 
   /// Keep track of all initializers that have been imported into a
@@ -2091,6 +2094,15 @@ bool isForwardDeclOfType(const clang::Decl *decl);
 /// type.
 bool isBoolOrBoolEnumType(Type ty);
 
+/// Returns \c true if \p type will be imported as a different type when
+/// when \c Feature::ModernImportedCArrays is enabled.
+bool hasLegacyCArrayType(clang::QualType type);
+
+/// If \p modernType is the modern type of an imported fixed-size C array
+/// ( \c InlineArray ), compute the legacy tuple type that would be used
+/// when \c Feature::ModernImportedCArrays is not enabled.
+ImportedType computeLegacyCArrayType(ImportedType modernType);
+
 /// Whether we should suppress the import of the given Clang declaration.
 bool shouldSuppressDeclImport(const clang::Decl *decl);
 
@@ -2377,5 +2389,29 @@ RetainReleaseOperationKind checkRetainReleaseOperationValidity(
     CustomRefCountingOperationKind operationKind);
 } // end namespace importer
 } // end namespace swift
+
+namespace llvm {
+
+template<>
+struct DenseMapInfo<swift::CArrayProjection> {
+  using CArrayProjection = swift::CArrayProjection;
+
+  using UnsignedDMI = DenseMapInfo<uint8_t>;
+
+  static inline CArrayProjection getEmptyKey() {
+    return CArrayProjection(UnsignedDMI::getEmptyKey());
+  }
+  static inline CArrayProjection getTombstoneKey() {
+    return CArrayProjection(UnsignedDMI::getTombstoneKey());
+  }
+  static inline unsigned getHashValue(CArrayProjection options) {
+    return UnsignedDMI::getHashValue(uint8_t(options));
+  }
+  static bool isEqual(CArrayProjection a, CArrayProjection b) {
+    return UnsignedDMI::isEqual(uint8_t(a), uint8_t(b));
+  }
+};
+
+}
 
 #endif

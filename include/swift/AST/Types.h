@@ -1028,6 +1028,10 @@ public:
   /// element type of the array.
   Type getInlineArrayElementType();
 
+  /// Determine if this type is an InlineArray<n, T> and, if so, provide the
+  /// count of the array as an integer.
+  std::optional<APInt> getInlineArrayCount();
+
   /// Determines the element type of a known
   /// [Autoreleasing]Unsafe[Mutable][Raw]Pointer variant, or returns null if the
   /// type is not a pointer.
@@ -2879,6 +2883,9 @@ public:
   /// getNamedElementId - If this tuple has an element with the specified name,
   /// return the element index, otherwise return -1.
   int getNamedElementId(Identifier I) const;
+
+  /// True if all elements of this tuple have the same type.
+  bool isHomogeneous() const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
@@ -8364,6 +8371,8 @@ class IntegerType final : public TypeBase, public llvm::FoldingSetNode {
 public:
   static IntegerType *get(StringRef value, bool isNegative,
                           const ASTContext &ctx);
+
+  static IntegerType *get(const APInt &value, const ASTContext &ctx);
 
   APInt getValue() const;
 

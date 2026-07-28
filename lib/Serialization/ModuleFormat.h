@@ -2463,6 +2463,8 @@ namespace decls_block {
     = BCRecordLayout<RestatedObjCConformance_DECL_ATTR>;
   using ClangImporterSynthesizedTypeDeclAttrLayout
     = BCRecordLayout<ClangImporterSynthesizedType_DECL_ATTR>;
+  using CArrayProjectionDeclAttrLayout
+    = BCRecordLayout<CArrayProjection_DECL_ATTR>;
   using PrivateImportDeclAttrLayout = BCRecordLayout<PrivateImport_DECL_ATTR>;
   using AllowFeatureSuppressionDeclAttrLayout =
       BCRecordLayout<AllowFeatureSuppression_DECL_ATTR>;

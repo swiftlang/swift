@@ -294,6 +294,10 @@ protected:
       mode : NumNonexhaustiveModeBits
     );
 
+    SWIFT_INLINE_BITFIELD(CArrayProjectionAttr, DeclAttribute, 1,
+      projection : 1
+    );
+
     SWIFT_INLINE_BITFIELD(COMAttr, DeclAttribute, 3,
       threading : 3
     );
@@ -2116,10 +2120,16 @@ public:
   ArrayRef<VarDecl *> getInitializesProperties(AccessorDecl *attachedTo) const;
   ArrayRef<VarDecl *> getAccessesProperties(AccessorDecl *attachedTo) const;
 
+  void setInitializesProperties(ArrayRef<VarDecl *> newValue,
+                                AccessorDecl *attachedTo);
+  void setAccessesProperties(ArrayRef<VarDecl *> newValue,
+                             AccessorDecl *attachedTo);
+
   static StorageRestrictionsAttr *create(ASTContext &ctx, SourceLoc atLoc,
                                          SourceRange range,
                                          ArrayRef<Identifier> initializes,
-                                         ArrayRef<Identifier> accesses);
+                                         ArrayRef<Identifier> accesses,
+                                         bool implicit = false);
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::StorageRestrictions;
@@ -3776,6 +3786,54 @@ public:
   }
 };
 
+/// Which of the two projections the declaration in question belongs to.
+enum class CArrayProjection : uint8_t {
+  /// The legacy projection, using a homogeneous tuple.
+  Legacy = 0,
+  /// The modern projection, using an \c InlineArray .
+  Modern = 1
+};
+
+StringRef getCArrayProjectionSpelling(CArrayProjection value);
+
+/// Indicates that the declaration contains an imported C array and therefore
+/// may be one of two projections.
+class CArrayProjectionAttr : public DeclAttribute {
+  ValueDecl *counterpart;
+
+public:
+  CArrayProjectionAttr(CArrayProjection projection, ValueDecl *counterpart)
+    : DeclAttribute(DeclAttrKind::CArrayProjection, SourceLoc(),
+                    SourceRange(), /*isImplicit=*/true),
+      counterpart(counterpart) {
+    Bits.CArrayProjectionAttr.projection = static_cast<uint8_t>(projection);
+  }
+
+  /// Which of the projections the attached declaration is.
+  CArrayProjection getProjection() const {
+    return static_cast<CArrayProjection>(Bits.CArrayProjectionAttr.projection);
+  }
+
+  /// The declaration that is of the opposite projection.
+  ValueDecl *getCounterpart() const {
+    return counterpart;
+  }
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DeclAttrKind::CArrayProjection;
+  }
+
+  CArrayProjectionAttr *clone(ASTContext &ctx) const {
+    return new (ctx) CArrayProjectionAttr(getProjection(),
+                                          getCounterpart());
+  }
+
+  bool isEquivalent(const CArrayProjectionAttr *other,
+                    Decl *attachedTo) const {
+    return getProjection() == other->getProjection()
+              && getCounterpart() == other->getCounterpart();
+  }
+};
 
 /// Threading model for COM coclass, specified via `@com(threading:)`.
 //Must match COMThreadingModel in the COM module.

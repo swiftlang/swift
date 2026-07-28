@@ -1,4 +1,7 @@
 // RUN: %target-typecheck-verify-swift -verify-ignore-unrelated %clang-importer-sdk -enable-objc-interop
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated %clang-importer-sdk -enable-objc-interop -enable-experimental-feature ModernImportedCArrays -DMODERN_C_ARRAYS -target %target-has-inline-array-triple -debug-diagnostic-names
+
+// REQUIRES: swift_feature_ModernImportedCArrays
 
 import ctypes
 import CoreGraphics
@@ -16,11 +19,19 @@ func testArrays() {
 
   ulong = fes.state
   pulong = fes.mutationsPtr
+#if MODERN_C_ARRAYS
+  ulong = fes.extra[0]
+  ulong = fes.extra[1]
+  ulong = fes.extra[2]
+  ulong = fes.extra[3]
+  ulong = fes.extra[4]
+#else
   ulong = fes.extra.0
   ulong = fes.extra.1
   ulong = fes.extra.2
   ulong = fes.extra.3
   ulong = fes.extra.4
+#endif
   _ = ulong; _ = pulong
 }
 

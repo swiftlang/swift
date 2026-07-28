@@ -2739,6 +2739,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
   case DeclAttrKind::RestatedObjCConformance:
   case DeclAttrKind::SynthesizedProtocol:
   case DeclAttrKind::ClangImporterSynthesizedType:
+  case DeclAttrKind::CArrayProjection:
   case DeclAttrKind::Custom:
     llvm_unreachable("virtual attributes should not be parsed "
                      "by attribute parsing code");

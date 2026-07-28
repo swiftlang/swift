@@ -3,9 +3,20 @@
 
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) %t/src/main.swift \
 // RUN:   -import-bridging-header %t/src/test.h \
-// RUN:   -module-name main -I %t -emit-sil -serialize-diagnostics -serialize-diagnostics-path %t/test.diag | %FileCheck %s
+// RUN:   -module-name main -I %t -emit-sil -serialize-diagnostics -serialize-diagnostics-path %t/test.diag > %t/out.txt
+// RUN: %FileCheck --input-file %t/out.txt %s
 
 // RUN: c-index-test -read-diagnostics %t/test.diag 2>&1 | %FileCheck --check-prefix CHECK-DIAG %t/src/test.h
+
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) %t/src/main.swift \
+// RUN:   -import-bridging-header %t/src/test.h \
+// RUN:   -enable-experimental-feature ModernImportedCArrays -target %target-has-inline-array-triple \
+// RUN:   -module-name main -I %t -emit-sil -serialize-diagnostics -serialize-diagnostics-path %t/test.modern.diag > %t/out.modern.txt
+// RUN: %FileCheck --input-file %t/out.modern.txt %s
+
+// RUN: c-index-test -read-diagnostics %t/test.modern.diag 2>&1 | %FileCheck --check-prefix CHECK-DIAG %t/src/test.h
+
+// REQUIRES: swift_feature_ModernImportedCArrays
 
 //--- test.h
 #include <stdbool.h>
@@ -75,9 +86,9 @@ func foo() {
 }
 
 // Globals that don't get their value imported stay as public_external:
-// CHECK: sil_global public_external @static_int : $Int32
-// CHECK: sil_global public_external [let] @static_const_char_array : $(Int8, Int8, Int8, Int8)
-// CHECK: sil_global public_external @static_const_pointer : $Optional<UnsafePointer<Int8>>
+// CHECK-DAG: sil_global public_external @static_int : $Int32
+// CHECK-DAG: sil_global public_external [let] @static_const_char_array : $InlineArray<4, Int8>
+// CHECK-DAG: sil_global public_external @static_const_pointer : $Optional<UnsafePointer<Int8>>
 
 // CHECK:      sil shared [transparent] @$sSC9MACRO_INTs5Int32Vvg : $@convention(thin) () -> Int32 {
 // CHECK-NEXT: bb0:

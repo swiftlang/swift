@@ -2923,6 +2923,32 @@ bool PlatformAvailability::treatDeprecatedAsUnavailable(
   llvm_unreachable("Unexpected platform");
 }
 
+static CArrayProjection selectCArrayProjection(ASTContext &ctx) {
+  // Unconditionally enable modern types.
+  if (ctx.LangOpts.hasFeature(Feature::ModernImportedCArraysOnly))
+    return CArrayProjection::Modern;
+
+  // Enable only if target is high enough to guarantee support.
+  if (ctx.LangOpts.hasFeature(Feature::ModernImportedCArrays)) {
+    auto targetAvailability = AvailabilityRange::forInliningTarget(ctx);
+    auto typeAvailability = ctx.getInlineArrayAvailability();
+
+    if (targetAvailability.isContainedIn(typeAvailability)) {
+      return CArrayProjection::Modern;
+    } else {
+      // Did the user explicitly enable this? If so, we should warn them they're
+      // not getting it.
+      auto langMode = Feature::ModernImportedCArrays.getLanguageMode()
+                          .value_or(LanguageMode::future);
+      if (!ctx.LangOpts.isLanguageModeAtLeast(langMode)) {
+        // FIXME: Diagnose
+      }
+    }
+  }
+
+  return CArrayProjection::Legacy;
+}
+
 ClangImporter::Implementation::Implementation(
     ASTContext &ctx, DependencyTracker *dependencyTracker)
     : SwiftContext(ctx), ImportForwardDeclarations(
@@ -2933,6 +2959,7 @@ ClangImporter::Implementation::Implementation(
       BridgingHeaderIsInternal(ctx.ClangImporterOpts.BridgingHeaderIsInternal),
       DisableOverlayModules(ctx.ClangImporterOpts.DisableOverlayModules),
       EnableClangSPI(ctx.ClangImporterOpts.EnableClangSPI),
+      VisibleCArrayProjection(selectCArrayProjection(ctx)),
       IsReadingBridgingPCH(false),
       CurrentVersion(ImportNameVersion::fromOptions(ctx.LangOpts)),
       Walker(DiagnosticWalker(*this)), BuffersForDiagnostics(ctx.SourceMgr),
@@ -4475,6 +4502,10 @@ StringRef ClangModuleUnit::getLoadedFilename() const {
 
 clang::TargetInfo &ClangImporter::getModuleAvailabilityTarget() const {
   return Impl.Instance->getTarget();
+}
+
+CArrayProjection ClangImporter::getVisibleCArrayProjection() const {
+  return Impl.VisibleCArrayProjection;
 }
 
 clang::TargetInfo &ClangImporter::getTargetInfo() const {
@@ -7374,6 +7405,10 @@ Type ClangImporter::importVarDeclType(
 
   if (!importedType)
     return ErrorType::get(Impl.SwiftContext);
+
+  if (auto attr = swiftDecl->getAttrs().getAttribute<CArrayProjectionAttr>())
+    if (attr->getProjection() == CArrayProjection::Legacy)
+      importedType = importer::computeLegacyCArrayType(importedType);
 
   if (importedType.isImplicitlyUnwrapped())
     swiftDecl->setImplicitlyUnwrappedOptional(true);

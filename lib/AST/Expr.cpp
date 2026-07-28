@@ -1730,12 +1730,12 @@ CallExpr::CallExpr(Expr *fn, ArgumentList *argList, bool implicit, Type ty)
 }
 
 CallExpr *CallExpr::create(ASTContext &ctx, Expr *fn, ArgumentList *argList,
-                           bool implicit) {
-  return new (ctx) CallExpr(fn, argList, implicit, Type());
+                           bool implicit, Type ty) {
+  return new (ctx) CallExpr(fn, argList, implicit, ty);
 }
 
-CallExpr *CallExpr::createImplicitEmpty(ASTContext &ctx, Expr *fn) {
-  return createImplicit(ctx, fn, ArgumentList::createImplicit(ctx, {}));
+CallExpr *CallExpr::createImplicitEmpty(ASTContext &ctx, Expr *fn, Type ty) {
+  return createImplicit(ctx, fn, ArgumentList::createImplicit(ctx, {}), ty);
 }
 
 Expr *CallExpr::getDirectCallee() const {

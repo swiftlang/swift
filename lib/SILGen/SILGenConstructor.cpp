@@ -357,6 +357,36 @@ static SubstitutionMap getSubstitutionsForPropertyInitializer(
   return SubstitutionMap();
 }
 
+static bool bitcastToInlineArrayIsValid(Type paramTy, Type fieldTy) {
+  // If the field is not an inline array, don't bitcast.
+  auto fieldCount = fieldTy->getInlineArrayCount();
+  if (!fieldCount)
+    return false;
+
+  // Collect the element types from the parameter.
+  SmallVector<Type, 8> paramElemTypes;
+  if (auto tupleParamTy = paramTy->getAs<TupleType>()) {
+    for (auto &tupleElem : tupleParamTy->getElements())
+      paramElemTypes.push_back(tupleElem.getType());
+  } else {
+    // The param not being a tuple is only valid if the array is single-element.
+    paramElemTypes.push_back(paramTy);
+  }
+
+  // If they are not the same size, don't bitcast.
+  if (paramElemTypes.size()
+        != fieldCount->getLimitedValue())
+    return false;
+
+  // If any element in the param is different from the field, don't bitcast.
+  auto fieldElemTy = fieldTy->getInlineArrayElementType();
+  for (auto paramElemType : paramElemTypes)
+    if (!fieldElemTy->isEqual(paramElemType))
+      return false;
+
+  return true;
+}
+
 static void emitImplicitValueConstructor(SILGenFunction &SGF,
                                          ConstructorDecl *ctor,
                                          MemberwiseInitKind initKind) {
@@ -423,10 +453,11 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
 
   auto subs = getSubstitutionsForPropertyInitializer(decl, decl);
 
-  /// If the stored property has an attached result builder and its
-  /// type is not a function type, the argument is a noescape closure
-  /// that needs to be called.
-  auto emitResultBuilderCallIfNeeded = [&](VarDecl *field, RValue &&arg) -> RValue {
+  auto convertArgumentForField = [&](VarDecl *field, SILType fieldTy,
+                                     RValue &&arg) -> RValue {
+    // If the stored property has an attached result builder and its
+    // type is not a function type, the argument is a noescape closure
+    // that needs to be called.
     if (field->getResultBuilderType()) {
       if (!field->getValueInterfaceType()
               ->lookThroughAllOptionalTypes()->is<AnyFunctionType>()) {
@@ -436,6 +467,20 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
             resultTy, ApplyOptions(), std::nullopt, std::nullopt);
       }
     }
+
+    // If the field is an InlineArray and the argument is not, the argument is
+    // the legacy projection of the field, and we need to bitcast it.
+    if (fieldTy.getASTType()->getInlineArrayElementType()
+          && !arg.getType()->getInlineArrayElementType()) {
+      ASSERT(bitcastToInlineArrayIsValid(arg.getType(), fieldTy.getASTType()));
+
+      // Coerce the tuple argument to an InlineArray.
+      arg = RValue(SGF, Loc, fieldTy.getASTType(),
+                   SGF.B.createUncheckedBitCast(
+                            Loc, std::move(arg).getAsSingleValue(SGF, Loc),
+                            fieldTy));
+    }
+
     return std::move(arg);
   };
 
@@ -509,7 +554,7 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
         FullExpr scope(SGF.Cleanups, field->getParentPatternBinding());
 
         RValue arg = std::move(*elti);
-        arg = emitResultBuilderCallIfNeeded(field, std::move(arg));
+        arg = convertArgumentForField(field, fieldTy, std::move(arg));
 
         maybeEmitPropertyWrapperInitFromValue(SGF, Loc, field, subs,
                                               std::move(arg))
@@ -584,7 +629,7 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
       assert(elti != eltEnd && "number of args does not match number of fields");
       (void)eltEnd;
       value = std::move(*elti);
-      value = emitResultBuilderCallIfNeeded(field, std::move(value));
+      value = convertArgumentForField(field, fieldTy, std::move(value));
       ++elti;
     } else {
       // Otherwise, use its initializer.

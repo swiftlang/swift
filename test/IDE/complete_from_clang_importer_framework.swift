@@ -7,6 +7,14 @@
 // RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=CLANG_MEMBER1 > %t.compl.txt
 // RUN: %FileCheck %s -check-prefix=CLANG_MEMBERS1 < %t.compl.txt
 
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=CLANG_MEMBER2 > %t.compl.txt
+// RUN: %FileCheck %s -check-prefixes=CLANG_MEMBERS2,CLANG_MEMBERS2-LEGACY --input-file %t.compl.txt
+
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=CLANG_MEMBER2 -enable-experimental-feature ModernImportedCArraysOnly > %t.compl.txt
+// RUN: %FileCheck %s -check-prefixes=CLANG_MEMBERS2,CLANG_MEMBERS2-MODERN --input-file %t.compl.txt
+
+// REQUIRES: swift_feature_ModernImportedCArraysOnly
+
 import macros
 import ctypes
 import Darwin
@@ -56,4 +64,12 @@ func testClangMember1() {
 // CLANG_MEMBERS1-DAG: Decl[InstanceVar]/CurrNominal/IsSystem: x[#CInt#]{{; name=.+$}}
 // CLANG_MEMBERS1-DAG: Decl[InstanceVar]/CurrNominal/IsSystem: y[#CDouble#]{{; name=.+$}}
 // CLANG_MEMBERS1-DAG: Keyword[self]/CurrNominal: self[#FooStruct1#]; name=self
+}
+
+func testClangMember2(_ s: Unsigned2x2) {
+  s.#^CLANG_MEMBER2^#
+  // CLANG_MEMBERS2: Begin completions, 2 items
+  // CLANG_MEMBERS2-DAG: Keyword[self]/CurrNominal: self[#Unsigned2x2#]; name=self
+  // CLANG_MEMBERS2-LEGACY-DAG: Decl[InstanceVar]/CurrNominal/IsSystem: elems[#((CUnsignedInt, CUnsignedInt), (CUnsignedInt, CUnsignedInt))#]{{; name=.+$}}
+  // CLANG_MEMBERS2-MODERN-DAG: Decl[InstanceVar]/CurrNominal/IsSystem: elems[#[2 of [2 of CUnsignedInt]]#]{{; name=.+$}}
 }

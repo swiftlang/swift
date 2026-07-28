@@ -32,6 +32,7 @@ class SourceLocation;
 
 namespace swift {
 
+enum class CArrayProjection : uint8_t;
 class ClangInheritanceInfo;
 class ClangNode;
 class ConcreteDeclRef;
@@ -140,6 +141,8 @@ public:
   /// (The implementing `ClangImporter` class maintains separate Target info
   /// for use by IRGen/CodeGen clients)
   virtual clang::TargetInfo &getModuleAvailabilityTarget() const = 0;
+
+  virtual CArrayProjection getVisibleCArrayProjection() const = 0;
 
   virtual clang::ASTContext &getClangASTContext() const = 0;
   virtual clang::Preprocessor &getClangPreprocessor() const = 0;

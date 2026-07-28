@@ -933,7 +933,12 @@ DECL_ATTR(com, COM,
   ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove | ForbiddenInABIAttr,
   176)
 
-LAST_DECL_ATTR(COM)
+DECL_ATTR(_cArrayProjection, CArrayProjection,
+  OnAnyClangDecl,
+  UserInaccessible | RejectByParser | NotSerialized | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  177)
+
+LAST_DECL_ATTR(CArrayProjection)
 
 #undef DECL_ATTR_ALIAS
 #undef CONTEXTUAL_DECL_ATTR_ALIAS

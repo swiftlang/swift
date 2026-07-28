@@ -96,6 +96,21 @@ static NullTerminatedStringRef copySwiftUSR(llvm::BumpPtrAllocator &Allocator,
   return NullTerminatedStringRef();
 }
 
+static bool isSameDeclAfterReconstruction(const Decl *orig,
+                                          const Decl *reconstructed) {
+  if (orig == reconstructed)
+    return true;
+
+  // The C array projection feature may create two different declarations with
+  // the same USR, but they are interchangeable and only one is visible at a
+  // time.
+  if (auto origAttr = orig->getAttrs().getAttribute<CArrayProjectionAttr>())
+    if (origAttr->getCounterpart() == reconstructed)
+      return true;
+
+  return false;
+}
+
 /// Tries to reconstruct the provided \p D declaration using \c
 /// Demangle::getDeclForUSR and verifies that the declarations match. This only
 /// works if \p D is a \c ValueDecl and \c shouldCopyAssociatedUSRForDecl is
@@ -131,7 +146,7 @@ static void verifyUSRToDeclReconstruction(const Decl *D) {
     });
   }
 
-  if (Reconstructed != VD) {
+  if (!isSameDeclAfterReconstruction(VD, Reconstructed)) {
     ABORT([&](auto &out) {
       out << "Reconstructed declaration should match the original one\n"
           << "Swift USR: " << SwiftUSR << "\n"

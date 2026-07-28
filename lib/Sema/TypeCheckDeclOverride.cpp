@@ -1693,6 +1693,7 @@ namespace  {
     UNINTERESTING_ATTR(Postfix)
     UNINTERESTING_ATTR(Infix)
     UNINTERESTING_ATTR(ReferenceOwnership)
+    UNINTERESTING_ATTR(CArrayProjection)
 
     UNINTERESTING_ATTR(SynthesizedProtocol)
     UNINTERESTING_ATTR(RequiresStoredPropertyInits)

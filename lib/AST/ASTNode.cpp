@@ -134,6 +134,7 @@ void ASTNode::dump(raw_ostream &OS, unsigned Indent) const {
 
 void ASTNode::dump() const {
   dump(llvm::errs());
+  llvm::errs() << '\n';
 }
 
 StringRef swift::getTokenText(tok kind) {

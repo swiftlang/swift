@@ -1187,7 +1187,7 @@ bool ArrayLiteralToDictionaryConversionFailure::diagnoseAsError() {
   }
 
   auto CTP = FailureDiagnostic::getContextualTypePurpose(AE);
-  emitDiagnostic(diag::should_use_dictionary_literal,
+  emitDiagnostic(diag::should_use_dictionary_literal_not_array_literal,
                  getToType()->lookThroughAllOptionalTypes(),
                  CTP == CTP_Initialization);
 
@@ -1207,6 +1207,38 @@ bool ArrayLiteralToDictionaryConversionFailure::diagnoseAsError() {
       }
     }
   }
+  return true;
+}
+
+bool ArrayLiteralToTupleConversionFailure::diagnoseAsError() {
+  ArrayExpr *AE = getAsExpr<ArrayExpr>(getAnchor());
+  assert(AE);
+
+  auto CTP = FailureDiagnostic::getContextualTypePurpose(AE);
+  emitDiagnostic(diag::should_use_tuple_not_array_literal,
+                 getToType()->lookThroughAllOptionalTypes(),
+                 CTP == CTP_Initialization);
+
+  emitDiagnostic(diag::meant_tuple)
+    .fixItReplace(AE->getLBracketLoc(), "(")
+    .fixItReplace(AE->getRBracketLoc(), ")");
+  
+  return true;
+}
+
+bool TupleToArrayConversionFailure::diagnoseAsError() {
+  TupleExpr *TE = getAsExpr<TupleExpr>(getAnchor());
+  assert(TE);
+
+  auto CTP = FailureDiagnostic::getContextualTypePurpose(TE);
+  emitDiagnostic(diag::should_use_array_literal_not_tuple,
+                 getToType()->lookThroughAllOptionalTypes(),
+                 CTP == CTP_Initialization);
+
+  emitDiagnostic(diag::meant_array)
+    .fixItReplace(TE->getLParenLoc(), "[")
+    .fixItReplace(TE->getRParenLoc(), "]");
+
   return true;
 }
 
@@ -4472,6 +4504,9 @@ bool MissingMemberFailure::diagnoseAsError() {
   if (diagnoseForSubscriptMemberWithTupleBase())
     return true;
 
+  if (diagnoseForTupleElementWithSubscriptMemberBase())
+    return true;
+
   auto baseType = resolveType(getBaseType())->getWithoutSpecifierType();
 
   DeclNameLoc nameLoc(::getLoc(anchor));
@@ -4714,6 +4749,17 @@ bool MissingMemberFailure::diagnoseInLiteralCollectionContext() const {
   return false;
 }
 
+static std::optional<unsigned> getFieldNumber(StringRef memberName) {
+  llvm::Regex NumericRegex("^[0-9]+$");
+
+  if (!NumericRegex.match(memberName))
+    return std::nullopt;
+
+  unsigned int literalValue = 0;
+  memberName.getAsInteger(/*Radix=*/0, literalValue);
+  return literalValue;
+}
+
 bool MissingMemberFailure::diagnoseForSubscriptMemberWithTupleBase() const {
   auto locator = getLocator();
   auto baseType = resolveType(getBaseType())->getWithoutSpecifierType();
@@ -4737,22 +4783,21 @@ bool MissingMemberFailure::diagnoseForSubscriptMemberWithTupleBase() const {
     // Literal expressions may have other types of representations e.g. 0x01,
     // 0b01. So let's make sure to only suggest this tailored literal fix-it for
     // number only literals.
-    if (literal && NumericRegex.match(literal->getDigitsText())) {
-      unsigned int literalValue = 0;
-      literal->getDigitsText().getAsInteger(/*Radix=*/0, literalValue);
+    if (literal) {
+      if (auto literalValue = getFieldNumber(literal->getDigitsText())) {
+        // Verify if the literal value is within the bounds of tuple elements.
+        if (!literal->isNegative() &&
+            *literalValue < tupleType->getNumElements()) {
+          llvm::SmallString<4> dotAccess;
+          llvm::raw_svector_ostream OS(dotAccess);
+          OS << "." << *literalValue;
 
-      // Verify if the literal value is within the bounds of tuple elements.
-      if (!literal->isNegative() &&
-          literalValue < tupleType->getNumElements()) {
-        llvm::SmallString<4> dotAccess;
-        llvm::raw_svector_ostream OS(dotAccess);
-        OS << "." << literalValue;
-
-        emitDiagnostic(
-            diag::could_not_find_subscript_member_tuple_did_you_mean_use_dot,
-            baseType, literal->getDigitsText())
-            .fixItReplace(args->getSourceRange(), OS.str());
-        return true;
+          emitDiagnostic(
+                         diag::could_not_find_subscript_member_tuple_did_you_mean_use_dot,
+                         baseType, literal->getDigitsText())
+          .fixItReplace(args->getSourceRange(), OS.str());
+          return true;
+        }
       }
     }
 
@@ -4779,6 +4824,64 @@ bool MissingMemberFailure::diagnoseForSubscriptMemberWithTupleBase() const {
 
   emitDiagnostic(diag::could_not_find_subscript_member_tuple, baseType);
   return true;
+}
+
+bool MissingMemberFailure::diagnoseForTupleElementWithSubscriptMemberBase() const {
+  auto locator = getLocator();
+  auto baseType = resolveType(getBaseType())->getWithoutSpecifierType();
+
+  // Are we using the tuple element syntax?
+  if (getName().hasModuleSelector() || getName().isCompoundName()
+        || getName().isSpecial())
+    return false;
+
+  auto fieldNumber = getFieldNumber(this->getName().getBaseIdentifier().str());
+  if (!fieldNumber)
+    return false;
+
+  SourceRange lookupRange;
+  if (auto *UDE = getAsExpr<UnresolvedDotExpr>(locator->getAnchor()))
+    lookupRange = SourceRange(UDE->getDotLoc(), UDE->getNameLoc().getEndLoc());
+  else
+    return false;
+
+  // Does the base type have a subscript with a single unlabeled parameter which
+  // conforms to `ExpressibleByIntegerLiteral`?
+  // FIXME: Could be refined further to handle default arguments
+  if (!baseType->mayHaveMembers())
+    return false;
+
+  auto subscriptName = DeclNameRef::createSubscript()
+                           .withArgumentLabels(getASTContext(), {Identifier()});
+  auto subscripts = TypeChecker::lookupMember(getDC(), baseType, subscriptName);
+
+  for (auto &subscript : subscripts) {
+    auto SD = cast<SubscriptDecl>(subscript.getValueDecl());
+
+    if (SD->getParameterList()->size() != 1)
+      continue;
+
+    auto PD = SD->getParameterList()->get(0);
+    if (!PD->getArgumentName().empty() ||
+        !conformsToKnownProtocol(PD->getTypeInContext(),
+            KnownProtocolKind::ExpressibleByIntegerLiteral))
+      continue;
+
+    // Found at least one; emit tailored diagnostic and return.
+    llvm::SmallString<8> subscriptAccess;
+    llvm::raw_svector_ostream os(subscriptAccess);
+
+    os << '[' << *fieldNumber << ']';
+
+    emitDiagnostic(diag::could_not_find_tuple_member_did_you_mean_use_subscript,
+                   baseType, *fieldNumber)
+        .fixItReplace(lookupRange, os.str());
+
+    return true;
+  }
+
+  // Loop did not find a suitable subscript.
+  return false;
 }
 
 bool UnintendedExtraGenericParamMemberFailure::diagnoseAsError() {
@@ -6546,7 +6649,12 @@ bool InaccessibleMemberFailure::diagnoseAsError() {
 
   auto loc = nameLoc.isValid() ? nameLoc.getStartLoc() : ::getLoc(anchor);
   auto accessLevel = Member->getFormalAccessScope().accessLevelForDiagnostics();
-  if (auto *CD = dyn_cast<ConstructorDecl>(Member)) {
+  if (accessLevel == AccessLevel::Internal
+        && Member->getAttrs().hasAttribute<CArrayProjectionAttr>()) {
+    // This is a modern C array projection with no matching legacy projection.
+    emitDiagnosticAt(loc, diag::candidate_inaccessible_c_array, Member)
+        .highlight(nameLoc.getSourceRange());
+  } else if (auto *CD = dyn_cast<ConstructorDecl>(Member)) {
     emitDiagnosticAt(loc, diag::init_candidate_inaccessible,
                      CD->getResultInterfaceType(), accessLevel)
         .highlight(nameLoc.getSourceRange());

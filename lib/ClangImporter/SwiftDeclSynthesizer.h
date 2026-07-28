@@ -88,10 +88,10 @@ public:
   /// \param convertKind How to convert the constant to the given type.
   /// \param isStatic Whether the constant should be a static member of \p dc.
   /// \param access What access level should be given to the constant.
-  ValueDecl *createConstant(Identifier name, DeclContext *dc, Type type,
-                            const clang::APValue &value,
-                            ConstantConvertKind convertKind, bool isStatic,
-                            ClangNode ClangN, AccessLevel access);
+  VarDecl *createConstant(Identifier name, DeclContext *dc, Type type,
+                          const clang::APValue &value,
+                          ConstantConvertKind convertKind, bool isStatic,
+                          ClangNode ClangN, AccessLevel access);
 
   /// Create a new named constant with the given value.
   ///
@@ -102,10 +102,10 @@ public:
   /// \param convertKind How to convert the constant to the given type.
   /// \param isStatic Whether the constant should be a static member of \p dc.
   /// \param access What access level should be given to the constant.
-  ValueDecl *createConstant(Identifier name, DeclContext *dc, Type type,
-                            StringRef value, ConstantConvertKind convertKind,
-                            bool isStatic, ClangNode ClangN,
-                            AccessLevel access);
+  VarDecl *createConstant(Identifier name, DeclContext *dc, Type type,
+                          StringRef value, ConstantConvertKind convertKind,
+                          bool isStatic, ClangNode ClangN,
+                          AccessLevel access);
 
   /// Create a new named constant using the given expression.
   ///
@@ -116,10 +116,10 @@ public:
   /// \param convertKind How to convert the constant to the given type.
   /// \param isStatic Whether the constant should be a static member of \p dc.
   /// \param access What access level should be given to the constant.
-  ValueDecl *createConstant(Identifier name, DeclContext *dc, Type type,
-                            Expr *valueExpr, ConstantConvertKind convertKind,
-                            bool isStatic, ClangNode ClangN,
-                            AccessLevel access);
+  VarDecl *createConstant(Identifier name, DeclContext *dc, Type type,
+                          Expr *valueExpr, ConstantConvertKind convertKind,
+                          bool isStatic, ClangNode ClangN,
+                          AccessLevel access);
 
   /// Create a default constructor that initializes a struct to zero.
   ConstructorDecl *createDefaultConstructor(NominalTypeDecl *structDecl);
@@ -128,7 +128,9 @@ public:
   ConstructorDecl *createValueConstructor(NominalTypeDecl *structDecl,
                                           ArrayRef<VarDecl *> members,
                                           bool wantCtorParamNames,
-                                          bool wantBody);
+                                          bool wantBody,
+                                          AccessLevel maxAccess =
+                                              AccessLevel::Open);
 
   /// Create a rawValue-ed constructor that bridges to its underlying storage.
   ConstructorDecl *createRawValueBridgingConstructor(StructDecl *structDecl,
@@ -237,6 +239,11 @@ public:
                              ArrayRef<VarDecl *> members,
                              NominalTypeDecl *importedStructDecl,
                              VarDecl *importedFieldDecl);
+
+  std::pair<AccessorDecl *, AccessorDecl *>
+  makeLegacyCArrayAccessors(DeclContext *dc,
+                            VarDecl *legacyDecl,
+                            VarDecl *modernDecl);
 
   /// Build the init(rawValue:) initializer for an imported NS_ENUM.
   ///
