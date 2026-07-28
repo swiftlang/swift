@@ -113,6 +113,13 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args,
   Invocation.setSDKPath(SDK);
 
   Invocation.setTargetTriple(Target);
+  if (auto *A = ParsedArgs.getLastArg(OPT_clang_target)) {
+    Invocation.getLangOptions().ClangTarget = llvm::Triple(A->getValue());
+  }
+  if (auto *A = ParsedArgs.getLastArg(OPT_clang_target_variant)) {
+    Invocation.getLangOptions().ClangTargetVariant =
+        llvm::Triple(A->getValue());
+  }
 
   for (const auto *A : ParsedArgs.filtered(OPT_Xcc)) {
     Invocation.getClangImporterOptions().ExtraArgs.push_back(A->getValue());
