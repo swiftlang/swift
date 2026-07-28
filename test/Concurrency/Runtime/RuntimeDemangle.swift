@@ -8,7 +8,6 @@
 // REQUIRES: executable_test
 // REQUIRES: OS=macosx || OS=linux-gnu
 // REQUIRES: runtime_module
-// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 import Swift
 import Runtime

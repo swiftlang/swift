@@ -8,7 +8,6 @@
 // UNSUPPORTED: freestanding
 // REQUIRES: libdispatch
 // REQUIRES: synchronization
-// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 import Synchronization
 
