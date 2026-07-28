@@ -3001,7 +3001,7 @@ RestrictedImportKind SourceFile::getRestrictedImportKind(const ModuleDecl *modul
 
   // Workaround for the cases where the bridging header isn't properly
   // imported implicitly.
-  if (module->getName().str() == CLANG_HEADER_MODULE_NAME)
+  if (module->isClangBridgingHeaderImportModule())
     return RestrictedImportKind::None;
 
   // Look at the imports of this source file.
