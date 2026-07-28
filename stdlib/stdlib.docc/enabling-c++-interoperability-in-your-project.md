@@ -6,7 +6,7 @@ Bring a C++ class into Swift under a Swift-friendly name.
 
 When you enable C++ interoperability, your C++ class names, methods, and conventions translate to Swift exactly as the C++ author wrote them. That specificity can sometimes clash with Swift's naming expectations or with types that already exist in your project. The bridging macros in `swift/bridging` let you reshape how your C++ API appears in Swift so it reads like idiomatic Swift.
 
-This article demonstrates how to enable interoperability, expose a C++ class to Swift through a module, and use the `SWIFT_NAME` macro to give the class a Swift-friendly name. The Swift code to use a new class is identical whether you're working in Swift Package Manager, the command line, or Xcode, and the workflow to expose your C++ to Swift is the same on macOS, Linux, and Windows.
+This article demonstrates how to enable interoperability, expose a C++ class to Swift through a module, and use the `SWIFT_NAME` macro to give the class a Swift-friendly name. The Swift code to use a new class is identical whether you're working in Swift Package Manager, the command line, or Xcode. The workflow to expose your C++ to Swift is the same on macOS, Linux, and Windows.
 
 ## Enable C++ interoperability
 
@@ -165,7 +165,7 @@ print(message)
 
 Here you can use a `let` instead of a `var`. Swift imports a `const` C++ member function as a nonmutating method, so calling `error.print()` doesn't require the instance to be mutable. If you drop `const` from `print()`, Swift imports it as `mutating`. A mutating call on a `let` fails to compile, so you need a `var`. The `const` you wrote earlier allows this code to read like ordinary, idiomatic Swift.
 
-The return value comes across just as smoothly, because the `print()` method returns a C++ `std::string` and Swift's C++ standard-library interoperability gives you a `String` initializer that converts it directly. The initializer copies the string's bytes into a native Swift `String`, so it runs in O(*n) time, where *n* is the number of bytes in the C++ string.
+The return value comes across just as smoothly, because the `print()` method returns a C++ `std::string` and Swift's C++ standard-library interoperability gives you a `String` initializer that converts it directly. The initializer copies the string's bytes into a native Swift `String`, so it runs in O(*n*) time, where *n* is the number of bytes in the C++ string.
 
 Calling the method also looks like any other Swift type: `error.print()` is just a method call, exactly like calling a method on a native Swift value.
 
@@ -187,4 +187,8 @@ If you're using Xcode, build and run. The `import` resolves through your module 
 
 ## Manage the instance's lifetime
 
-Swift imports a C++ class or struct as a value type by default, so `error` behaves like a Swift struct: there's no ARC and no manual `delete`, and Swift calls the C++ destructor when `error` goes out of scope. If you instead want reference semantics, `swift/bridging` provides macros like `SWIFT_SHARED_REFERENCE`.
+Swift imports a C++ class or struct as a value type by default, so `error` behaves like a Swift struct: there's no ARC and no manual `delete`, and Swift calls the C++ destructor when `error` goes out of scope. If you instead want reference semantics, `swift/bridging` provides macros like [`SWIFT_SHARED_REFERENCE`](https://www.swift.org/documentation/cxx-interop/#shared-reference-types).
+
+## Take the next step
+
+Now that you have a working environment mixing Swift and C++ code, you can learn more about Swift interoperability features at [Mixing Swift and C++](https://www.swift.org/documentation/cxx-interop)
