@@ -57,6 +57,12 @@ public:
   /// Cache key for imported bridging header.
   std::string BridgingHeaderPCHCacheKey;
 
+  /// CAS FS root to be used for dep-scanning.
+  std::string DepscanCASFileSystemRootID;
+
+  /// Paths for using the underlying file system instead of CASFS.
+  std::vector<std::string> CASFSEscapePaths;
+
   /// Has immutable file system input.
   bool HasImmutableFileSystem = false;
 
