@@ -291,6 +291,36 @@ extension Sequence where Element: Equatable {
 //===----------------------------------------------------------------------===//
 
 extension Sequence {
+  
+  @inlinable
+  func elementsEqualSelfNonContiguous<OtherSequence: Sequence>(
+    _ other: OtherSequence,
+    by areEquivalent: (Element, OtherSequence.Element) throws -> Bool
+  ) rethrows -> Bool {
+    let contigResult = try other.withContiguousStorageIfAvailable { buffer in
+      return try unsafe buffer.elementsEqual(
+        self,
+        by: { try areEquivalent($1, $0) }
+      )
+    }
+    if let contigResult {
+      return contigResult
+    }
+    var iter1 = self.makeIterator()
+    var iter2 = other.makeIterator()
+    while true {
+      switch (iter1.next(), iter2.next()) {
+      case let (e1?, e2?):
+        if try !areEquivalent(e1, e2) {
+          return false
+        }
+      case (_?, nil), (nil, _?): return false
+      case (nil, nil):           return true
+      }
+    }
+    fatalError()
+  }
+  
   /// Returns a Boolean value indicating whether this sequence and another
   /// sequence contain equivalent elements in the same order, using the given
   /// predicate as the equivalence test.
@@ -320,19 +350,11 @@ extension Sequence {
     _ other: OtherSequence,
     by areEquivalent: (Element, OtherSequence.Element) throws -> Bool
   ) rethrows -> Bool {
-    var iter1 = self.makeIterator()
-    var iter2 = other.makeIterator()
-    while true {
-      switch (iter1.next(), iter2.next()) {
-      case let (e1?, e2?):
-        if try !areEquivalent(e1, e2) {
-          return false
-        }
-      case (_?, nil), (nil, _?): return false
-      case (nil, nil):           return true
-      }
+    let contigResult = try withContiguousStorageIfAvailable { buffer in
+      return try unsafe buffer.elementsEqual(other, by: areEquivalent)
     }
-    fatalError()
+    if let contigResult { return contigResult }
+    return try elementsEqualSelfNonContiguous(other, by: areEquivalent)
   }
 }
 
