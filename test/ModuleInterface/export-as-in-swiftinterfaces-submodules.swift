@@ -35,11 +35,6 @@ module LibraryCore {
   header "LibraryCore/LibraryCore.h"
   export *
 
-  module NonExplicitSubmodule {
-    header "LibraryCore/NonExplicitSubmodule.h"
-    export *
-  }
-
   explicit module * { export * }
 }
 
@@ -54,18 +49,12 @@ module Library {
 //--- LibraryCore/LibraryCore.h
 // This file is re-exported by Library
 #pragma once
-#include "LibraryCore/NonExplicitSubmodule.h"
 struct LibraryCoreType {};
 
 //--- LibraryCore/Submodule.h
 // This file is re-exported by Library.Submodule (which Swift does not respect)
 #pragma once
 struct LibraryCoreSubmoduleType {};
-
-//--- LibraryCore/NonExplicitSubmodule.h
-// This file is re-exported by Library
-#pragma once
-struct LibraryCoreNonExplicitSubmoduleType {};
 
 //--- LibraryCore/ReexportedSubmodule.h
 // This file is re-exported by Library
@@ -100,9 +89,6 @@ public func foo(
   // PUBLIC-SAME: c: Library::LibraryCoreReexportedSubmoduleType
   // PRIVATE-SAME: c: LibraryCore::LibraryCoreReexportedSubmoduleType
   c: LibraryCoreReexportedSubmoduleType,
-  // PUBLIC-SAME: c2: Library::LibraryCoreNonExplicitSubmoduleType
-  // PRIVATE-SAME: c2: Library::LibraryCoreNonExplicitSubmoduleType
-  c2: LibraryCoreNonExplicitSubmoduleType,
   // PUBLIC-SAME: d: Library::LibraryType
   // PRIVATE-SAME: d: Library::LibraryType
   d: LibraryType,
@@ -128,8 +114,5 @@ public func foo(
   b: LibraryCoreSubmoduleType,
   // PUBLIC-SAME: c: Library::LibraryCoreReexportedSubmoduleType
   // PRIVATE-SAME: c: LibraryCore::LibraryCoreReexportedSubmoduleType
-  c: LibraryCoreReexportedSubmoduleType,
-  // PUBLIC-SAME: c2: Library::LibraryCoreNonExplicitSubmoduleType
-  // PRIVATE-SAME: c2: LibraryCore::LibraryCoreNonExplicitSubmoduleType
-  c2: LibraryCoreNonExplicitSubmoduleType
+  c: LibraryCoreReexportedSubmoduleType
 ) {}
