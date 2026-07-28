@@ -110,6 +110,46 @@ func useFailableThrowing() throws {
   let _: FailableThrowingEmpty? = try FailableThrowingEmpty()
 }
 
+// An initializer in the base declaration suppresses synthesis entirely, so an
+// extension initializer has nothing to take the place of and remains an
+// ordinary initializer, exactly as before.
+struct BaseDeclInit {
+  var x: Int
+  init(anything: Int) { self.x = anything }
+}
+
+extension BaseDeclInit {
+  init(x: Int) { self.x = x }
+}
+
+struct BaseDeclInitDefault {
+  var x = 0
+  init(y: Int) { self.x = y }
+}
+
+extension BaseDeclInitDefault {
+  init() { self.x = -1 }
+}
+
+func useBaseDeclInit() {
+  let _ = BaseDeclInit(anything: 1)
+  let _ = BaseDeclInit(x: 1)
+  let _ = BaseDeclInitDefault(y: 1)
+  let _ = BaseDeclInitDefault()
+  let _ = BaseDeclInitDefault(x: 1) // expected-error {{incorrect argument label in call (have 'x:', expected 'y:')}}
+}
+
+// Two explicit initializers with the same signature still conflict with each
+// other as usual.
+struct BaseDeclInitConflict {
+  var x: Int
+  init(x: Int) { self.x = x } // expected-note {{'init(x:)' previously declared here}}
+}
+
+extension BaseDeclInitConflict {
+  init(x: Int) { self.x = x } // expected-error {{invalid redeclaration of 'init(x:)'}}
+}
+
 // An initializer in an extension in a different file still conflicts.
 
 extension CrossFileMemberwise {
