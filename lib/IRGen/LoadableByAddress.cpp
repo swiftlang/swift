@@ -4777,7 +4777,7 @@ protected:
     // Rewriting them would also break nullary debug reconstruction blocks.
     if (isa<SILUndef>(dbg->getOperand()))
       return;
-    if (!dbg->hasAddrVal() &&
+    if (!dbg->getOperand()->getType().isAddress() &&
         (assignment.isPotentiallyCArray(dbg->getOperand()->getType()) ||
          overlapsWithOnStackDebugLoc(dbg->getOperand()))) {
       assignment.markForDeletion(dbg);
