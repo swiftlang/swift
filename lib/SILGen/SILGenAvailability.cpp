@@ -247,10 +247,18 @@ static void emitBackDeployForwardApplyAndReturnOrThrow(
 
     // Emit error block.
     SGF.B.emitBlock(errorBB);
-    ManagedValue error =
-        SGF.B.createPhi(SGF.F.mapTypeIntoEnvironment(fnConv.getSILErrorType(TEC)),
-                        OwnershipKind::Owned);
-    SGF.B.createBranch(loc, SGF.ThrowDest.getBlock(), {error});
+    if (fnConv.hasIndirectSILErrorResults()) {
+      // For an indirect error result (e.g. an address-only typed throw), the
+      // callee has already written the error into the indirect error result
+      // address that we forwarded to it, which is this thunk's own error
+      // result. The error block therefore takes no argument; just rethrow.
+      SGF.B.createBranch(loc, SGF.ThrowDest.getBlock());
+    } else {
+      ManagedValue error = SGF.B.createPhi(
+          SGF.F.mapTypeIntoEnvironment(fnConv.getSILErrorType(TEC)),
+          OwnershipKind::Owned);
+      SGF.B.createBranch(loc, SGF.ThrowDest.getBlock(), {error});
+    }
 
     // Emit normal block.
     SGF.B.emitBlock(normalBB);
