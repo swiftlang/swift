@@ -6,7 +6,6 @@
 // REQUIRES: concurrency
 
 // REQUIRES: concurrency_runtime
-// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 import StdlibUnittest
 

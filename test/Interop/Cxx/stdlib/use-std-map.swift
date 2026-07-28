@@ -16,7 +16,6 @@
 // Undefined hidden symbol to C++ voidify in libcxx
 // rdar://121551667
 // XFAIL: OS=freebsd
-// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 import StdlibUnittest
 #if !BRIDGING_HEADER
