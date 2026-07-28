@@ -2932,3 +2932,18 @@ bool IgnoreClassRequirementForDynamicMemberLookup::diagnose(
                                             getLocator());
   return failure.diagnose(asNote);
 }
+
+ExecutionSemanticsMismatch *
+ExecutionSemanticsMismatch::create(ConstraintSystem &cs, FunctionType *fromType,
+                                   FunctionType *toType,
+                                   ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      ExecutionSemanticsMismatch(cs, fromType, toType, locator);
+}
+
+bool ExecutionSemanticsMismatch::diagnose(const Solution &solution,
+                                          bool asNote) const {
+  ConversionBetweenFunctionsWithDifferentExecutionSemantics failure(
+      solution, getFromType(), getToType(), getLocator());
+  return failure.diagnose(asNote);
+}

@@ -682,6 +682,12 @@ static StringRef getDumpString(ExplicitSafety safety) {
     return "unsafe";
   }
 }
+static StringRef getDumpString(ExecutionSemantics semantics) {
+  switch (semantics) {
+  case ExecutionSemantics::Once:
+    return "once";
+  }
+}
 static StringRef getDumpString(ConformanceEntryKind kind) {
   switch (kind) {
   case ConformanceEntryKind::Inherited:
@@ -5721,6 +5727,12 @@ public:
     printField(StringRef{Model}, Label::always("threading"));
     printFoot();
   }
+
+  void visitCalledAttr(CalledAttr *Attr, Label label) {
+    printCommon(Attr, "called_attr", label);
+    printField(Attr->getSemantics(), Label::always("semantics"));
+    printFoot();
+  }
 };
 
 } // end anonymous namespace
@@ -6707,6 +6719,7 @@ namespace {
         printFlag(T->isAsync(), "async");
         printFlag(T->isThrowing(), "throws");
         printFlag(T->hasSendingResult(), "sending_result");
+        printFlag(T->isCalledOnce(), "called_once");
         if (T->isDifferentiable()) {
           switch (T->getDifferentiabilityKind()) {
           default:

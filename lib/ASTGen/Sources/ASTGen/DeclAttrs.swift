@@ -216,6 +216,8 @@ extension ASTGenVisitor {
         return handle(self.generateSimpleDeclAttr(attribute: node, kind: .AtRethrows))
       case .Concurrent:
         return handle(self.generateSimpleDeclAttr(attribute: node, kind: .Concurrent))
+      case .Called:
+        return handle(self.generateCalledAttr(attribute: node)?.asDeclAttribute)
       case nil where attrName == "_unavailableInEmbedded":
         return handle(self.generateUnavailableInEmbeddedAttr(attribute: node)?.asDeclAttribute)
 
@@ -2713,6 +2715,27 @@ extension ASTGenVisitor {
       atLoc: nil,
       range: self.generateSourceRange(node),
       kind: kind
+    )
+  }
+
+  func generateCalledAttr(attribute node: AttributeSyntax) -> BridgedCalledAttr? {
+    let semantics: swift.ExecutionSemantics? = self.generateSingleAttrOption(
+      attribute: node,
+      {
+        switch $0.rawText {
+        case "once": return .once
+        default: return nil
+        }
+      }
+    )
+    guard let semantics else {
+      return nil
+    }
+    return .createParsed(
+      self.ctx,
+      atLoc: self.generateSourceLoc(node.atSign),
+      range: self.generateAttrSourceRange(node),
+      semantics: semantics
     )
   }
 

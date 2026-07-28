@@ -645,6 +645,9 @@ EXPERIMENTAL_FEATURE(AbstractStoredPropertyLayout, false)
 /// Allow use of macros to derive various conformances
 EXPERIMENTAL_FEATURE(DeriveConformancesViaMacros, false)
 
+/// Allow use of `@called(...)` on function types.
+EXPERIMENTAL_FEATURE(CalledAttribute, false)
+
 /// Allow `self` to be mutated or consumed inside of non-`Copyable` type `deinit`s.
 EXPERIMENTAL_FEATURE(MutateAndConsumeInDeinit, true)
 

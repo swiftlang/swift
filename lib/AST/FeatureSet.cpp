@@ -24,6 +24,7 @@
 #include "swift/AST/TypeCheckRequests.h"
 
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/STLExtras.h"
 
 using namespace swift;
 
@@ -706,6 +707,45 @@ static bool usesFeatureBorrowInout(Decl *decl) {
 }
 
 UNINTERESTING_FEATURE(BuiltinDereferenceable)
+
+static bool usesFeatureCalledAttribute(Decl *D) {
+  auto &ctx = D->getASTContext();
+  if (!ctx.LangOpts.hasFeature(Feature::CalledAttribute))
+    return false;
+
+  std::function<bool(Type)> hasCalled = [](Type T) {
+    if (auto F = dyn_cast<AnyFunctionType>(T.getPointer()))
+      return F->isCalledOnce();
+    return false;
+  };
+
+  if (auto *TA = dyn_cast<TypeAliasDecl>(D)) {
+    if (auto type = TA->getUnderlyingType()) {
+      return type.findIf(hasCalled);
+    }
+    return false;
+  }
+
+  if (auto *PBD = dyn_cast<PatternBindingDecl>(D)) {
+    for (unsigned i = 0, n = PBD->getNumPatternEntries(); i != n; ++i) {
+      auto P = PBD->getCheckedPattern(i);
+      if (!P)
+        continue;
+
+      bool usesCalled = false;
+      P->forEachVariable([&usesCalled](auto *V) {
+        usesCalled |= usesFeatureCalledAttribute(V);
+      });
+
+      if (usesCalled)
+        return true;
+    }
+
+    return false;
+  }
+
+  return usesTypeMatching(D, hasCalled);
+}
 
 // ----------------------------------------------------------------------------
 // MARK: - FeatureSet

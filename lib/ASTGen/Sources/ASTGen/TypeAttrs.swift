@@ -94,6 +94,9 @@ extension ASTGenVisitor {
       case .Isolated:
         return (self.generateIsolatedTypeAttr(attribute: node)?.asTypeAttribute)
           .map(BridgedTypeOrCustomAttr.typeAttr(_:))
+      case .Called:
+        return (self.generateCalledTypeAttr(attribute: node)?.asTypeAttribute)
+          .map(BridgedTypeOrCustomAttr.typeAttr(_:))
 
       // SIL type attributes are not supported.
       case .Autoreleased,
@@ -290,6 +293,33 @@ extension ASTGenVisitor {
       parensRange: self.generateAttrParensRange(attribute: node),
       isolationKind: isolationKind,
       isolationKindLoc: isolationKindLoc
+    )
+  }
+
+  func generateCalledTypeAttr(attribute node: AttributeSyntax) -> BridgedCalledTypeAttr? {
+    let semanticsLoc = self.generateSourceLoc(node.arguments)
+    let semantics: BridgedCalledTypeAttrSemantics? = self.generateSingleAttrOption(
+      attribute: node,
+      {
+        switch $0.rawText {
+        case "once": return .once
+        default:
+          // TODO: Diagnose.
+          return nil
+        }
+      }
+    )
+    guard let semantics else {
+      return nil
+    }
+
+    return .createParsed(
+      self.ctx,
+      atLoc: self.generateSourceLoc(node.atSign),
+      nameLoc: self.generateSourceLoc(node.attributeName),
+      parensRange: self.generateAttrParensRange(attribute: node),
+      semantics: semantics,
+      semanticsLoc: semanticsLoc
     )
   }
 
