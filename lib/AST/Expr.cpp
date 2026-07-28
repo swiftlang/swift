@@ -23,6 +23,7 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Decl.h" // FIXME: Bad dependency
 #include "swift/AST/ExistentialLayout.h"
+#include "swift/AST/NameLookup.h"
 #include "swift/AST/MacroDiscriminatorContext.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Stmt.h"
@@ -1982,15 +1983,15 @@ unsigned AbstractClosureExpr::getDiscriminator() const {
 
   // If we don't have a discriminator, and either
   //   1. We have ill-formed code and we're able to assign a discriminator, or
-  //   2. We are in a macro expansion buffer
+  //   2. We are in a macro expansion buffer or argument
   //   3. We are within top-level code where there's nothing to anchor to
   //
   // then assign the next discriminator now.
   if (getRawDiscriminator() == InvalidDiscriminator &&
-      (ctx.Diags.hadAnyError() ||
-       getParentSourceFile()->getFulfilledMacroRole() != std::nullopt ||
+      (useFallbackDiscriminator || ctx.Diags.hadAnyError() ||
        getParent()->isModuleScopeContext() ||
-       useFallbackDiscriminator)) {
+       getParentSourceFile()->getFulfilledMacroRole() != std::nullopt ||
+       namelookup::isInMacroArgument(getParentSourceFile(), getLoc()))) {
     auto discriminator = ctx.getNextDiscriminator(getParent());
     ctx.setMaxAssignedDiscriminator(getParent(), discriminator + 1);
     const_cast<AbstractClosureExpr *>(this)->
