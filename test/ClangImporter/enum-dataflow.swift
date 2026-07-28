@@ -12,7 +12,9 @@ case .original:
 }
 
 switch aliasOriginal { // expected-error {{switch must be exhaustive}}
-// expected-note@-1 {{add missing cases: '.original', '.differentValue'}}
+// expected-note@-1 {{add missing case: '.original'}}
+// expected-note@-2 {{add missing case: '.differentValue'}}
+// expected-note@-3 {{add missing cases}}
 case .bySameValue:
   break
 }
