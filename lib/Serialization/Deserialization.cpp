@@ -2494,10 +2494,10 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
     if (getContext().LangOpts.EnableWorkaroundBrokenModules &&
         errorKind == ModularizationError::Kind::DeclMoved &&
         (baseModule->findUnderlyingClangModule() ||
-         baseModule->isClangHeaderImportModule()) &&
+         baseModule->isClangBridgingHeaderImportModule()) &&
         foundIn->findUnderlyingClangModule() &&
         !values.empty()) {
-      if (baseModule->isClangHeaderImportModule()) {
+      if (baseModule->isClangBridgingHeaderImportModule()) {
         // C++ namespaces are placed in the '__ObjC' header import module
         // but are found in their actual Clang module during deserialization.
         // This is expected, so recover silently.

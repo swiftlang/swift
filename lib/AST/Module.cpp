@@ -2628,7 +2628,7 @@ Identifier ModuleDecl::getNameForModuleSelector() {
   return this->getName();
 }
 
-bool ModuleDecl::isClangHeaderImportModule() const {
+bool ModuleDecl::isClangBridgingHeaderImportModule() const {
   auto importer = getASTContext().getClangModuleLoader();
   if (!importer)
     return false;
@@ -3083,7 +3083,7 @@ SourceFile::getImportAccessLevel(const ModuleDecl *targetModule) const {
   if ((!restrictiveImport.has_value() ||
        restrictiveImport->accessLevel < AccessLevel::Public) &&
       !(restrictiveImport &&
-        restrictiveImport->module.importedModule->isClangHeaderImportModule()) &&
+        restrictiveImport->module.importedModule->isClangBridgingHeaderImportModule()) &&
       imports.isImportedBy(targetModule, getParentModule()))
     return std::nullopt;
 

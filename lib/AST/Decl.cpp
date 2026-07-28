@@ -960,7 +960,7 @@ static ModuleDecl *getModuleContextForNameLookupForCxxDecl(const Decl *decl) {
 
   // We only need to look for the real parent module when the existing parent
   // is the imported header module.
-  if (!parentModule->isClangHeaderImportModule()) {
+  if (!parentModule->isClangBridgingHeaderImportModule()) {
     if (isClonedMember)
       return parentModule;
     return nullptr;

@@ -2354,7 +2354,7 @@ IRGenModule *IRGenerator::getGenModule(SourceFile *SF) {
    // in GenModule. The contents are @_alwaysEmitIntoClient, so for all intents
    // and purposes they belong to the primary module.
    const ModuleDecl *M = SF->getParentModule();
-   ASSERT(M->findUnderlyingClangModule() || M->isClangHeaderImportModule());
+   ASSERT(M->findUnderlyingClangModule() || M->isClangBridgingHeaderImportModule());
    return getPrimaryIGM();
  }
 

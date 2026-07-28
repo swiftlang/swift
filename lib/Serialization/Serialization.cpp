@@ -763,7 +763,7 @@ IdentifierID Serializer::addContainingModuleRef(const DeclContext *DC,
     return CURRENT_MODULE_ID;
   if (M == this->M->getASTContext().TheBuiltinModule)
     return BUILTIN_MODULE_ID;
-  if (M->isClangHeaderImportModule())
+  if (M->isClangBridgingHeaderImportModule())
     return OBJC_HEADER_MODULE_ID;
 
   // Reject references to hidden dependencies.
