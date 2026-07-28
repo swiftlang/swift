@@ -1978,25 +1978,128 @@ namespace {
                .getFixedExtraInhabitantCount(IGM) > 0;
     }
 
+    /// Whether a loadable single-payload enum can carry its payload with some
+    /// of its words typed as pointers (`ptr`) rather than as opaque integer
+    /// words. On success `types` receives the payload's element types.
+    ///
+    /// This holds when the payload holds a managed reference and stores the
+    /// enum's tag in that reference's extra inhabitants:
+    ///   * the payload has at least as many extra inhabitants as the enum has
+    ///     no-payload cases, so every empty case is one of the payload's low,
+    ///     invalid-pointer extra inhabitants and no separate tag storage is
+    ///     needed (the enum keeps the payload's own layout); and
+    ///   * the payload is non-trivial, i.e. it contains a managed reference
+    ///     (whose extra inhabitants the tag rides in) -- this also keeps
+    ///     unrelated pointer-shaped-but-trivial types (metatypes, unsafe
+    ///     pointers, ...) on their existing integer representation.
+    /// Only genuine (valid) pointer values are ever loaded or dereferenced, so
+    /// carrying the empty cases' sentinel bit patterns in a `ptr` is safe.
+    ///
+    /// The payload is chunked into pointer-sized words exactly as the generic
+    /// integer schema would (so the element offsets, sizes, and the overall
+    /// layout are unchanged), but every word that holds a single pointer is
+    /// typed `ptr` instead of an integer. Because a pointer is pointer-aligned
+    /// and pointer-sized it always fills one whole word, so any padding around
+    /// it stays inside the neighbouring integer words -- this handles payloads
+    /// whose reference is not word-adjacent (e.g. `{ Int32, Class }`) without
+    /// having to model inter-field padding.
+    ///
+    /// The pointers are located by walking the payload's loadable explosion
+    /// schema and reconstructing each element's offset by natural alignment.
+    /// (The in-memory storage type can't be used: a `.none == null` optional is
+    /// lowered to `ptr` in its explosion but keeps an opaque `[N x i8]` storage
+    /// type, so a nested optional's pointer would be missed.) A final check
+    /// that the reconstruction reproduces the payload's real size guards
+    /// against any layout whose fields are not naturally aligned.
+    ///
+    /// This is a strict superset of `isNullableRefcountedPayload`, which is the
+    /// special case of a single `.none == null` empty case over a single bare
+    /// retainable pointer (and additionally permits the NullableRefcounted
+    /// copy/destroy shortcut). The broader set here -- multiple empty cases,
+    /// nested optionals, and multi-word payloads such as a class-bound
+    /// existential -- relies on the normal tag-checking copy/destroy.
+    static bool
+    tryGetConcretePayloadTypes(IRGenModule &IGM, const TypeInfo &payloadTI,
+                               TypeInfoKind tik, unsigned numNoPayloadCases,
+                               SmallVectorImpl<llvm::Type *> &types) {
+      if (tik < TypeInfoKind::Loadable)
+        return false;
+      auto *fixedTI = dyn_cast<FixedTypeInfo>(&payloadTI);
+      if (!fixedTI)
+        return false;
+      // The tag must fit in the payload's extra inhabitants, so the enum adds
+      // no separate tag storage and keeps the payload's own layout.
+      if (fixedTI->getFixedExtraInhabitantCount(IGM) < numNoPayloadCases)
+        return false;
+      // The payload must hold a managed reference (whose extra inhabitants the
+      // tag rides in). Excluding trivially-destroyable payloads keeps unrelated
+      // pointer-shaped types (metatypes, unsafe pointers, ...) on their integer
+      // representation.
+      if (payloadTI.isTriviallyDestroyable(ResilienceExpansion::Maximal))
+        return false;
+
+      auto &DL = IGM.DataLayout;
+      uint64_t ptrBytes = IGM.getPointerSize().getValue();
+      unsigned ptrBits = IGM.getPointerSize().getValueInBits();
+      uint64_t payloadBytes = fixedTI->getFixedSize().getValue();
+      uint64_t numWords = payloadBytes / ptrBytes;
+
+      ExplosionSchema schema;
+      payloadTI.getSchema(schema);
+
+      // Walk the explosion, reconstructing each element's offset by natural
+      // alignment, and build the word-chunked schema directly: each pointer
+      // emits its own `ptr` word, and the whole words before it are filled with
+      // integers.
+      uint64_t offset = 0;   // running byte offset in the payload
+      uint64_t nextWord = 0; // number of whole words already appended
+      bool hasPointer = false;
+      for (auto &elt : schema) {
+        if (!elt.isScalar())
+          return false;
+        auto *ty = elt.getScalarType();
+        offset = llvm::alignTo(offset, DL.getABITypeAlign(ty).value());
+        if (ty->isPointerTy()) {
+          uint64_t word = offset / ptrBytes; // pointer-aligned, fills one word
+          for (; nextWord < word; ++nextWord)
+            types.push_back(IGM.SizeTy);
+          types.push_back(IGM.PtrTy);
+          ++nextWord;
+          hasPointer = true;
+        }
+        offset += DL.getTypeAllocSize(ty);
+      }
+
+      // Bail unless the naturally-aligned reconstruction reproduces the
+      // payload's real size and actually found a pointer.
+      if (offset != payloadBytes || !hasPointer) {
+        types.clear();
+        return false;
+      }
+
+      // Fill the trailing whole words and the sub-word tail with integers.
+      for (; nextWord < numWords; ++nextWord)
+        types.push_back(IGM.SizeTy);
+      if (unsigned tailBits = (payloadBytes * 8) % ptrBits)
+        types.push_back(llvm::IntegerType::get(IGM.getLLVMContext(), tailBits));
+      return true;
+    }
+
     static EnumPayloadSchema
     getPreferredPayloadSchema(IRGenModule &IGM, Element payloadElement,
                               TypeInfoKind tik, unsigned numNoPayloadCases) {
       // TODO: If the payload type info provides a preferred explosion schema,
       // use it. For now, just use a generic word-chunked schema.
       if (auto fixedTI = dyn_cast<FixedTypeInfo>(payloadElement.ti)) {
-        // When the empty case is exactly the zero pointer, represent the
-        // payload as its own pointer type so the enum lowers to `ptr` in LLVM
-        // IR with `.none == null`, rather than an opaque integer word.
-        if (isNullableRefcountedPayload(IGM, *fixedTI, tik, numNoPayloadCases,
-                                        /*refcounting=*/nullptr)) {
-          ExplosionSchema payloadSchema;
-          fixedTI->getSchema(payloadSchema);
-          assert(payloadSchema.size() == 1 && payloadSchema.begin()->isScalar()
-                 && payloadSchema.begin()->getScalarType()->isPointerTy()
-                 && "single retainable pointer should be one scalar pointer");
-          return EnumPayloadSchema::withExplicitTypes(
-              payloadSchema.begin()->getScalarType());
-        }
+        // When the payload holds a managed reference and stores the enum's tag
+        // in that reference's extra inhabitants, represent the payload with its
+        // concrete element types so pointers lower to `ptr` in LLVM IR (with
+        // the empty cases occupying low invalid-pointer values), rather than
+        // opaque integer words.
+        SmallVector<llvm::Type *, 2> concreteTypes;
+        if (tryGetConcretePayloadTypes(IGM, *fixedTI, tik, numNoPayloadCases,
+                                       concreteTypes))
+          return EnumPayloadSchema::withExplicitTypes(concreteTypes);
         return EnumPayloadSchema(fixedTI->getFixedSize().getValueInBits());
       }
       return EnumPayloadSchema();

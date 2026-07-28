@@ -1,7 +1,11 @@
 // RUN: %target-swift-frontend -primary-file %s -emit-ir | %FileCheck %s
 
-// A loadable single-level Optional of a bare retainable pointer (.none == null)
-// is lowered to `ptr` in LLVM IR, rather than a pointer-width integer.
+// A loadable single-payload enum whose payload is a single retainable pointer
+// (a bare class/AnyObject/NativeObject, or a nested optional already lowered
+// this way) is lowered to `ptr` in LLVM IR, rather than a pointer-width
+// integer. This holds for arbitrarily nested optionals and for custom enums
+// with more than one no-payload case, as long as every empty case fits in one
+// of the payload's low, invalid-pointer extra inhabitants.
 
 sil_stage canonical
 
@@ -59,11 +63,82 @@ bb3:
   return %r : $()
 }
 
-// Guard: a nested optional's outer `.none` is a *non-null* extra inhabitant, so
-// it keeps its integer representation and is unaffected by this change.
-// CHECK-LABEL: define{{.*}} swiftcc i{{[0-9]+}} @take_nested_optional(i{{[0-9]+}} %0)
+// A nested optional is also a single pointer: the outer `.none` occupies a
+// non-null low extra inhabitant of the payload, and `.some(.none)` is null.
+// Only valid pointers are ever dereferenced, so the sentinels ride along in a
+// `ptr`.
+// CHECK-LABEL: define{{.*}} swiftcc ptr @take_nested_optional(ptr %0)
 sil @take_nested_optional : $@convention(thin) (@guaranteed Optional<Optional<C>>) -> @owned Optional<Optional<C>> {
 bb0(%0 : $Optional<Optional<C>>):
   retain_value %0 : $Optional<Optional<C>>
   return %0 : $Optional<Optional<C>>
+}
+
+// A triply-nested optional stays a single pointer too.
+// CHECK-LABEL: define{{.*}} swiftcc ptr @take_triple_nested_optional(ptr %0)
+sil @take_triple_nested_optional : $@convention(thin) (@guaranteed Optional<Optional<Optional<C>>>) -> @owned Optional<Optional<Optional<C>>> {
+bb0(%0 : $Optional<Optional<Optional<C>>>):
+  retain_value %0 : $Optional<Optional<Optional<C>>>
+  return %0 : $Optional<Optional<Optional<C>>>
+}
+
+// `.some(.none)` of a nested optional is the null pointer.
+// CHECK-LABEL: define{{.*}} swiftcc ptr @make_some_none()
+// CHECK: ret ptr null
+sil @make_some_none : $@convention(thin) () -> @owned Optional<Optional<C>> {
+bb0:
+  %0 = enum $Optional<C>, #Optional.none!enumelt
+  %1 = enum $Optional<Optional<C>>, #Optional.some!enumelt, %0 : $Optional<C>
+  return %1 : $Optional<Optional<C>>
+}
+
+// The outer `.none` of a nested optional is a non-null low extra inhabitant.
+// CHECK-LABEL: define{{.*}} swiftcc ptr @make_outer_none()
+// CHECK: ret ptr inttoptr
+sil @make_outer_none : $@convention(thin) () -> @owned Optional<Optional<C>> {
+bb0:
+  %0 = enum $Optional<Optional<C>>, #Optional.none!enumelt
+  return %0 : $Optional<Optional<C>>
+}
+
+// A custom single-payload enum whose payload is a single retainable pointer
+// lowers to `ptr` even with several no-payload cases: each empty case takes a
+// distinct low extra inhabitant of the pointer.
+enum ManyEmpty {
+  case value(C)
+  case a
+  case b
+  case c
+}
+
+// CHECK-LABEL: define{{.*}} swiftcc ptr @take_many_empty(ptr %0)
+sil @take_many_empty : $@convention(thin) (@guaranteed ManyEmpty) -> @owned ManyEmpty {
+bb0(%0 : $ManyEmpty):
+  retain_value %0 : $ManyEmpty
+  return %0 : $ManyEmpty
+}
+
+// The second no-payload case is a distinct low, non-null extra inhabitant of
+// the pointer (the exact value is platform-dependent).
+// CHECK-LABEL: define{{.*}} swiftcc ptr @make_many_empty_b()
+// CHECK: ret ptr inttoptr (i{{[0-9]+}} {{[0-9]+}} to ptr)
+sil @make_many_empty_b : $@convention(thin) () -> @owned ManyEmpty {
+bb0:
+  %0 = enum $ManyEmpty, #ManyEmpty.b!enumelt
+  return %0 : $ManyEmpty
+}
+
+// A custom single-payload enum whose payload is itself a `ptr`-lowered optional
+// is a single pointer too.
+enum OptPayload {
+  case value(Optional<C>)
+  case p
+  case q
+}
+
+// CHECK-LABEL: define{{.*}} swiftcc ptr @take_opt_payload(ptr %0)
+sil @take_opt_payload : $@convention(thin) (@guaranteed OptPayload) -> @owned OptPayload {
+bb0(%0 : $OptPayload):
+  retain_value %0 : $OptPayload
+  return %0 : $OptPayload
 }

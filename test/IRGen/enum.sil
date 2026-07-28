@@ -1119,9 +1119,10 @@ enum SinglePayloadClass {
   case w
 }
 
-// CHECK-64: define{{( dllexport)?}}{{( protected)?}} swiftcc void @single_payload_class_switch(i64 %0) {{.*}} {
+// CHECK-64: define{{( dllexport)?}}{{( protected)?}} swiftcc void @single_payload_class_switch(ptr %0) {{.*}} {
 // CHECK-64: entry:
-// CHECK-64:   switch i64 %0, label %[[DFLT:[0-9]+]] [
+// CHECK-64:   [[TAG:%.*]] = ptrtoint ptr %0 to i64
+// CHECK-64:   switch i64 [[TAG]], label %[[DFLT:[0-9]+]] [
 // CHECK-64:     i64 0, label {{%.*}}
 // CHECK-objc-64-simulator-false:   i64 2, label {{%.*}}
 // CHECK-objc-64-simulator-false:   i64 4, label {{%.*}}
@@ -1131,7 +1132,7 @@ enum SinglePayloadClass {
 // CHECK-native-64: i64 2, label {{%.*}}
 // CHECK-64:   ]
 // CHECK-64: [[DFLT]]:
-// CHECK-64:   inttoptr [[WORD]] %0 to ptr
+// CHECK-64:   phi ptr [ %0,
 
 // CHECK-32: define{{( dllexport)?}}{{( protected)?}} swiftcc void @single_payload_class_switch(i32 %0) {{.*}} {
 // CHECK-32: entry:
@@ -1167,8 +1168,9 @@ enum SinglePayloadClassProtocol {
   case y, z, w
 }
 
-// CHECK-64: define{{( dllexport)?}}{{( protected)?}} swiftcc void @single_payload_class_protocol_switch(i64 %0, i64 %1) {{.*}} {
-// CHECK-64:   switch i64 %0, label {{%.*}} [
+// CHECK-64: define{{( dllexport)?}}{{( protected)?}} swiftcc void @single_payload_class_protocol_switch(ptr %0, ptr %1) {{.*}} {
+// CHECK-64:   [[TAG:%.*]] = ptrtoint ptr %0 to i64
+// CHECK-64:   switch i64 [[TAG]], label {{%.*}} [
 // CHECK-64:     i64 0, label {{%.*}}
 // CHECK-objc-64-simulator-false:     i64 2, label {{%.*}}
 // CHECK-objc-64-simulator-false:     i64 4, label {{%.*}}
@@ -1178,9 +1180,11 @@ enum SinglePayloadClassProtocol {
 // CHECK-native-64:   i64 2, label {{%.*}}
 // CHECK-64:   ]
 
-// CHECK-objc-64:     inttoptr i64 %0 to ptr
-// CHECK-native-64:   inttoptr i64 %0 to ptr
-// CHECK-64:   inttoptr i64 %1 to ptr
+// CHECK-objc-64:     ptrtoint ptr %0 to i64
+// CHECK-native-64:   ptrtoint ptr %0 to i64
+// CHECK-64:   inttoptr i64 {{%.*}} to ptr
+// CHECK-64:   [[P1:%.*]] = ptrtoint ptr %1 to i64
+// CHECK-64:   inttoptr i64 [[P1]] to ptr
 
 // CHECK-32: define{{( dllexport)?}}{{( protected)?}} swiftcc void @single_payload_class_protocol_switch(i32 %0, i32 %1) {{.*}} {
 // CHECK-32:   switch i32 %0, label {{%.*}} [
@@ -2407,10 +2411,10 @@ entry(%0 : $DynamicSingleton<NoPayloads>):
 
 // Check that payloads get properly masked in nested single-payload enums.
 // rdar://problem/18841262
-// CHECK-64-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i1 @optional_optional_class_protocol(i64 %0, i64 %1)
-// CHECK-objc-64-simulator-false:       icmp eq i64 %0, 2
-// CHECK-objc-64-simulator-true:       icmp eq i64 %0, 1
-// CHECK-native-64:     icmp eq i64 %0, 1
+// CHECK-64-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i1 @optional_optional_class_protocol(ptr %0, ptr %1)
+// CHECK-objc-64-simulator-false:       icmp eq ptr %0, inttoptr (i64 2 to ptr)
+// CHECK-objc-64-simulator-true:       icmp eq ptr %0, inttoptr (i64 1 to ptr)
+// CHECK-native-64:     icmp eq ptr %0, inttoptr (i64 1 to ptr)
 // CHECK-32-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i1 @optional_optional_class_protocol(i32 %0, i32 %1)
 // CHECK-32:         icmp eq i32 %0, 1
 enum Optionable<T> {
@@ -2431,8 +2435,8 @@ struct ContainsUnownedObjC {
   unowned let x: C
 }
 // CHECK-LABEL: define {{.*}} @optional_unowned() {{.*}} {
-// CHECK-objc:     ret { [[WORD]], [[WORD]], i8 } { [[WORD]] 0, [[WORD]] 0, i8 1 }
-// CHECK-native:   ret { [[WORD]], [[WORD]] } { [[WORD]] 0, [[WORD]] 1 }
+// CHECK-objc:     ret { ptr, [[WORD]], i8 } { ptr null, [[WORD]] 0, i8 1 }
+// CHECK-native:   ret { ptr, ptr } { ptr null, ptr inttoptr (i64 1 to ptr) }
 sil @optional_unowned : $@convention(thin) () -> (Optionable<ContainsUnowned>, Optionable<Optionable<ContainsUnowned>>) {
 entry:
   %a = enum $Optionable<ContainsUnowned>, #Optionable.none!enumelt
@@ -2441,8 +2445,8 @@ entry:
   return %t : $(Optionable<ContainsUnowned>, Optionable<Optionable<ContainsUnowned>>)
 }
 // CHECK-LABEL: define {{.*}} @optional_unowned_objc() {{.*}} {
-// CHECK-objc:     ret { [[WORD]], [[WORD]], i8 } { [[WORD]] 0, [[WORD]] 0, i8 1 }
-// CHECK-native:   ret { [[WORD]], [[WORD]] } { [[WORD]] 0, [[WORD]] 1 }
+// CHECK-objc:     ret { ptr, [[WORD]], i8 } { ptr null, [[WORD]] 0, i8 1 }
+// CHECK-native:   ret { ptr, ptr } { ptr null, ptr inttoptr (i64 1 to ptr) }
 sil @optional_unowned_objc : $@convention(thin) () -> (Optionable<ContainsUnownedObjC>, Optionable<Optionable<ContainsUnownedObjC>>) {
 entry:
   %a = enum $Optionable<ContainsUnownedObjC>, #Optionable.none!enumelt

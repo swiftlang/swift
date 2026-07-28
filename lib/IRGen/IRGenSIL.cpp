@@ -6325,11 +6325,22 @@ void IRGenSILFunction::visitCopyBlockInst(CopyBlockInst *i) {
 void IRGenSILFunction::visitImplicitActorToOpaqueIsolationCastInst(
     ImplicitActorToOpaqueIsolationCastInst *i) {
   auto lowered = getLoweredExplosion(i->getOperand());
+  // Reinterpret the implicit-actor words as the opaque isolation value,
+  // clearing the tag bits on the actor word. Match the result type's schema
+  // element types (the `(any Actor)?` enum now carries its words as `ptr`).
+  auto &resultTI = cast<LoadableTypeInfo>(getTypeInfo(i->getType()));
+  ExplosionSchema schema;
+  resultTI.getSchema(schema);
+  assert(schema.size() == 2 && schema.begin()[0].isScalar() &&
+         schema.begin()[1].isScalar() &&
+         "opaque isolation should be two scalars");
+  auto *word1 = lowered.claimNext();
+  auto *word2 = clearImplicitIsolatedActorBits(*this, lowered.claimNext());
   Explosion result;
-  result.add(Builder.CreateBitOrPointerCast(lowered.claimNext(), IGM.IntPtrTy));
-  result.add(Builder.CreateBitOrPointerCast(
-      clearImplicitIsolatedActorBits(*this, lowered.claimNext()),
-      IGM.IntPtrTy));
+  result.add(
+      Builder.CreateBitOrPointerCast(word1, schema.begin()[0].getScalarType()));
+  result.add(
+      Builder.CreateBitOrPointerCast(word2, schema.begin()[1].getScalarType()));
   setLoweredExplosion(i, result);
 }
 
@@ -6355,6 +6366,37 @@ static const ReferenceTypeInfo &getReferentTypeInfo(IRGenFunction &IGF,
   if (auto ty = type->getOptionalObjectType())
     type = ty->getCanonicalType();
   return cast<ReferenceTypeInfo>(IGF.getTypeInfoForLowered(type));
+}
+
+/// Reinterpret a reference-storage explosion as its loaded referent. The two
+/// share their bit patterns word-for-word, but the referent's lowering may use
+/// different element types (e.g. an optional reference whose enum now carries
+/// its pointers as `ptr` rather than integer words). Cast each word to the
+/// referent's schema type; if the shapes don't line up, forward unchanged.
+static Explosion coerceReferenceStorageResult(IRGenSILFunction &IGF,
+                                              SILType resultTy,
+                                              Explosion &storage) {
+  auto &resultTI = cast<LoadableTypeInfo>(IGF.getTypeInfo(resultTy));
+  ExplosionSchema schema;
+  resultTI.getSchema(schema);
+
+  auto values = storage.claimAll();
+  Explosion result;
+  if (values.size() != schema.size()) {
+    // Shapes differ; forward the words unchanged.
+    for (auto *value : values)
+      result.add(value);
+    return result;
+  }
+
+  unsigned idx = 0;
+  for (auto &elt : schema) {
+    llvm::Value *value = values[idx++];
+    if (elt.isScalar() && value->getType() != elt.getScalarType())
+      value = IGF.Builder.CreateBitOrPointerCast(value, elt.getScalarType());
+    result.add(value);
+  }
+  return result;
 }
 
 void IRGenSILFunction::visitStrongCopyWeakValueInst(
@@ -6487,28 +6529,18 @@ IRGenSILFunction::visitDereferenceBorrowAddrInst(DereferenceBorrowAddrInst *i) {
       swift::StrongCopy##Name##ValueInst *i) {                                 \
     Explosion in = getLoweredExplosion(i->getOperand());                       \
     auto silTy = i->getOperand()->getType();                                   \
-    auto ty = cast<Name##StorageType>(silTy.getASTType());                     \
-    auto isOptional = bool(ty.getReferentType()->getOptionalObjectType());     \
     auto &ti = getReferentTypeInfo(*this, silTy);                              \
     ti.strongRetain##Name(*this, in, irgen::Atomicity::Atomic);                \
     /* Semantically we are just passing through the input parameter but as a   \
      */                                                                        \
-    /* strong reference... at LLVM IR level these type differences don't */    \
-    /* matter. A loadable optional reference that lowers to a nullable */      \
-    /* pointer already matches the referent, so it can be forwarded as-is. */  \
-    /* An optional with a multi-word payload (e.g. a class existential with */ \
-    /* witness tables) still uses the word-chunked integer enum payload, so */ \
-    /* convert the pointer words back to integers to match it. */              \
+    /* strong reference... at LLVM IR level the reference-storage explosion */ \
+    /* and the loaded referent share their bit patterns but may use */         \
+    /* different element types (e.g. the referent's enum now carries its */    \
+    /* pointers as `ptr`). Coerce each word to the referent's schema type. */  \
     Explosion output = getLoweredExplosion(i->getOperand());                   \
-    if (isOptional && !ti.isSingleRetainablePointer(                           \
-                          ResilienceExpansion::Maximal, nullptr)) {            \
-      auto values = output.claimAll();                                         \
-      output.reset();                                                          \
-      for (auto value : values) {                                              \
-        output.add(Builder.CreatePtrToInt(value, IGM.IntPtrTy));               \
-      }                                                                        \
-    }                                                                          \
-    setLoweredExplosion(i, output);                                            \
+    Explosion coerced =                                                        \
+        coerceReferenceStorageResult(*this, i->getType(), output);             \
+    setLoweredExplosion(i, coerced);                                           \
   }
 #define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
   NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, name, "...") \
@@ -6518,30 +6550,20 @@ IRGenSILFunction::visitDereferenceBorrowAddrInst(DereferenceBorrowAddrInst *i) {
       swift::StrongCopy##Name##ValueInst *i) {                                 \
     Explosion in = getLoweredExplosion(i->getOperand());                       \
     auto silTy = i->getOperand()->getType();                                   \
-    auto ty = cast<Name##StorageType>(silTy.getASTType());                     \
-    auto isOptional = bool(ty.getReferentType()->getOptionalObjectType());     \
     auto &ti = getReferentTypeInfo(*this, silTy);                              \
     /* Since we are unchecked, we just use strong retain here. We do not       \
      * perform any checks */                                                   \
     ti.strongRetain(*this, in, irgen::Atomicity::Atomic);                      \
     /* Semantically we are just passing through the input parameter but as a   \
      */                                                                        \
-    /* strong reference... at LLVM IR level these type differences don't */    \
-    /* matter. A loadable optional reference that lowers to a nullable */      \
-    /* pointer already matches the referent, so it can be forwarded as-is. */  \
-    /* An optional with a multi-word payload (e.g. a class existential with */ \
-    /* witness tables) still uses the word-chunked integer enum payload, so */ \
-    /* convert the pointer words back to integers to match it. */              \
+    /* strong reference... at LLVM IR level the reference-storage explosion */ \
+    /* and the loaded referent share their bit patterns but may use */         \
+    /* different element types (e.g. the referent's enum now carries its */    \
+    /* pointers as `ptr`). Coerce each word to the referent's schema type. */  \
     Explosion output = getLoweredExplosion(i->getOperand());                   \
-    if (isOptional && !ti.isSingleRetainablePointer(                           \
-                          ResilienceExpansion::Maximal, nullptr)) {            \
-      auto values = output.claimAll();                                         \
-      output.reset();                                                          \
-      for (auto value : values) {                                              \
-        output.add(Builder.CreatePtrToInt(value, IGM.IntPtrTy));               \
-      }                                                                        \
-    }                                                                          \
-    setLoweredExplosion(i, output);                                            \
+    Explosion coerced =                                                        \
+        coerceReferenceStorageResult(*this, i->getType(), output);             \
+    setLoweredExplosion(i, coerced);                                           \
   }
 #include "swift/AST/ReferenceStorage.def"
 #undef COMMON_CHECKED_REF_STORAGE
