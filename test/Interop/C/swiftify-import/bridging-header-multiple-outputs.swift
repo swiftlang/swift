@@ -6,11 +6,6 @@
 // test/embedded/safe-interop-multiple-outputs.swift, which covers the same crash
 // when the annotated function is imported as a clang module instead.
 
-// The bridging header case is still broken: the macro expansion buffer's parent
-// module is the main module rather than a clang module, so the fallback in
-// IRGenerator::getGenModule asserts instead of returning the primary IGM.
-// XFAIL: *
-
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
