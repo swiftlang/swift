@@ -38,6 +38,23 @@ public func genericRet<T>(_ x: T) -> T {
 public func genericRequirementProtocol<T: Hashable>(_ x: T) {
 }
 
+public func genericRequirementTwoHashableParameters<T: Hashable, U: Hashable>(
+    _ x: T, _ y: U
+) {
+}
+
+public func genericOverloadUnconstrainedFirst<T>(_ x: T) {
+}
+
+public func genericOverloadUnconstrainedFirst<T: Hashable>(_ x: T) {
+}
+
+public func genericOverloadConstrainedFirst<T: Hashable>(_ x: T) {
+}
+
+public func genericOverloadConstrainedFirst<T>(_ x: T) {
+}
+
 public func genericRequirementClass<T>(_ x: T) where T: TestClass {
 }
 
@@ -91,6 +108,10 @@ public struct TestSmallStruct {
             x1 -= 1
         }
     }
+
+    public func genericMethodHashable<T: Hashable>(_ x: T) -> Bool {
+        return x == x
+    }
 }
 
 public func createTestSmallStruct(_ x: UInt32) -> TestSmallStruct {
@@ -99,14 +120,24 @@ public func createTestSmallStruct(_ x: UInt32) -> TestSmallStruct {
 
 // CHECK: SWIFT_EXTERN void $s9Functions15TestSmallStructV24genericMethodPassThroughyxxlF(SWIFT_INDIRECT_RESULT void * _Nonnull, const void * _Nonnull x, struct swift_interop_passStub_Functions_uint32_t_0_4 _self, void * _Nonnull ) SWIFT_NOEXCEPT SWIFT_CALL; // genericMethodPassThrough(_:)
 // CHECK-NEXT: SWIFT_EXTERN void $s9Functions15TestSmallStructV20genericMethodMutTakeyyxlF(const void * _Nonnull x, void * _Nonnull , SWIFT_CONTEXT void * _Nonnull _self) SWIFT_NOEXCEPT SWIFT_CALL; // genericMethodMutTake(_:)
+// CHECK-NEXT: SWIFT_EXTERN bool {{.*}}genericMethodHashable{{.*}}; // genericMethodHashable(_:)
+
+// CHECK: SWIFT_EXTERN void $s9Functions31genericOverloadConstrainedFirstyyxlF(
+// CHECK-NEXT: SWIFT_EXTERN void $s9Functions33genericOverloadUnconstrainedFirstyyxlF(
 
 // CHECK: SWIFT_EXTERN void $s9Functions20genericPrintFunctionyyxlF(const void * _Nonnull x, void * _Nonnull ) SWIFT_NOEXCEPT SWIFT_CALL; // genericPrintFunction(_:)
 // CHECK-NEXT: SWIFT_EXTERN void $s9Functions32genericPrintFunctionMultiGenericyySi_xxSiq_tr0_lF(ptrdiff_t x, const void * _Nonnull t1, const void * _Nonnull t1p, ptrdiff_t y, const void * _Nonnull t2, void * _Nonnull , void * _Nonnull ) SWIFT_NOEXCEPT SWIFT_CALL; // genericPrintFunctionMultiGeneric(_:_:_:_:_:)
 // CHECK-NEXT: SWIFT_EXTERN void $s9Functions26genericPrintFunctionTwoArgyyx_SitlF(const void * _Nonnull x, ptrdiff_t y, void * _Nonnull ) SWIFT_NOEXCEPT SWIFT_CALL; // genericPrintFunctionTwoArg(_:_:)
+// A 'Hashable' generic requirement is passed as a protocol witness table, after the type metadata.
+// CHECK-NEXT: SWIFT_EXTERN void $s9Functions26genericRequirementProtocolyyxSHRzlF(const void * _Nonnull x, void * _Nonnull , void * _Nonnull ) SWIFT_NOEXCEPT SWIFT_CALL; // genericRequirementProtocol(_:)
+// Generic requirement parameters are unnamed because multiple generic
+// parameters can each require the same protocol.
+// CHECK-NEXT: SWIFT_EXTERN void {{.*}}genericRequirementTwoHashableParameters{{.*}}(const void * _Nonnull x, const void * _Nonnull y, void * _Nonnull , void * _Nonnull , void * _Nonnull , void * _Nonnull ) SWIFT_NOEXCEPT SWIFT_CALL; // genericRequirementTwoHashableParameters(_:_:)
 // CHECK-NEXT: SWIFT_EXTERN void $s9Functions10genericRetyxxlF(SWIFT_INDIRECT_RESULT void * _Nonnull, const void * _Nonnull x, void * _Nonnull ) SWIFT_NOEXCEPT SWIFT_CALL; // genericRet(_:)
 // CHECK-NEXT: SWIFT_EXTERN void $s9Functions11genericSwapyyxz_xztlF(void * _Nonnull x, void * _Nonnull y, void * _Nonnull ) SWIFT_NOEXCEPT SWIFT_CALL; // genericSwap(_:_:)
 
-// CHECK-NOT: genericRequirement
+// Superclass generic requirements are still not representable in C++.
+// CHECK-NOT: genericRequirementClass
 
 // Skip templates in impl classes.
 // CHECK: _impl_TestSmallStruct
@@ -120,8 +151,15 @@ public func createTestSmallStruct(_ x: UInt32) -> TestSmallStruct {
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0>
 // CHECK-NEXT: #endif
 // CHECK-NEXT: SWIFT_INLINE_THUNK void genericMethodMutTake(const T_0_0& x) SWIFT_SYMBOL("s:9Functions15TestSmallStructV20genericMethodMutTakeyyxlF");
+// CHECK: SWIFT_INLINE_THUNK bool genericMethodHashable
 // CHECK:      template<class T>
 // CHECK-NEXT: returnNewValue
+
+// Swift generic requirements are erased from C++ function signatures. When a
+// constrained and unconstrained overload collide, keep the unconstrained one
+// in either source order so calls with non-Hashable types remain valid.
+// CHECK: SWIFT_INLINE_THUNK void genericOverloadConstrainedFirst(const T_0_0& x) noexcept SWIFT_SYMBOL("s:9Functions31genericOverloadConstrainedFirstyyxlF")
+// CHECK: SWIFT_INLINE_THUNK void genericOverloadUnconstrainedFirst(const T_0_0& x) noexcept SWIFT_SYMBOL("s:9Functions33genericOverloadUnconstrainedFirstyyxlF")
 
 // CHECK:      template<class T_0_0>
 // CHECK-NEXT: #ifdef __cpp_concepts
@@ -158,6 +196,22 @@ public func createTestSmallStruct(_ x: UInt32) -> TestSmallStruct {
 // CHECK-NEXT: #endif
 // CHECK-NEXT:   _impl::$s9Functions26genericPrintFunctionTwoArgyyx_SitlF(swift::_impl::getOpaquePointer(x), y, swift::TypeMetadataTrait<T_0_0>::getTypeMetadata());
 // CHECK-NEXT: }
+
+// The witness table for a 'Hashable' requirement is instantiated at runtime.
+// CHECK:      template<class T_0_0>
+// CHECK-NEXT: #ifdef __cpp_concepts
+// CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0>
+// CHECK-NEXT: #endif
+// CHECK-NEXT: SWIFT_INLINE_THUNK void genericRequirementProtocol(const T_0_0& x) noexcept SWIFT_SYMBOL("s:9Functions26genericRequirementProtocolyyxSHRzlF") {
+// CHECK-NEXT: #ifndef __cpp_concepts
+// CHECK-NEXT: static_assert(swift::isUsableInGenericContext<T_0_0>, "type cannot be used in a Swift generic context");
+// CHECK-NEXT: #endif
+// CHECK-NEXT:   _impl::$s9Functions26genericRequirementProtocolyyxSHRzlF(swift::_impl::getOpaquePointer(x), swift::TypeMetadataTrait<T_0_0>::getTypeMetadata(), swift::_impl::getConformanceWitnessTable<T_0_0, &swift::_impl::$sSHMp>());
+// CHECK-NEXT: }
+
+// CHECK:      SWIFT_INLINE_THUNK void genericRequirementTwoHashableParameters
+// CHECK:      getConformanceWitnessTable<T_0_0, &swift::_impl::$sSHMp>()
+// CHECK-SAME: getConformanceWitnessTable<T_0_1, &swift::_impl::$sSHMp>()
 
 // CHECK:      template<class T_0_0>
 // CHECK-NEXT: #ifdef __cpp_concepts
@@ -245,3 +299,12 @@ public func createTestSmallStruct(_ x: UInt32) -> TestSmallStruct {
 // CHECK-NEXT: #endif
 // CHECK-NEXT:   _impl::$s9Functions15TestSmallStructV20genericMethodMutTakeyyxlF(swift::_impl::getOpaquePointer(x), swift::TypeMetadataTrait<T_0_0>::getTypeMetadata(), _getOpaquePointer());
 // CHECK-NEXT:   }
+
+// CHECK:      SWIFT_INLINE_THUNK bool TestSmallStruct::genericMethodHashable
+// CHECK:      getConformanceWitnessTable<T_0_0, &swift::_impl::$sSHMp>()
+
+// A constrained and an unconstrained generic overload have the same C++
+// parameter types. Verify that one overload is omitted regardless of source
+// order instead of emitting an invalid duplicate C++ declaration.
+// CHECK: // Unavailable in C++: Swift global function 'genericOverloadConstrainedFirst(_:)'. An overload with the same C++ parameter types already exists.
+// CHECK: // Unavailable in C++: Swift global function 'genericOverloadUnconstrainedFirst(_:)'. An overload with the same C++ parameter types already exists.

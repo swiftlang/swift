@@ -20,6 +20,7 @@
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsSema.h"
+#include "swift/AST/KnownProtocols.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
@@ -323,6 +324,12 @@ swift::cxx_translation::getDeclRepresentation(
   if (isa<MacroDecl>(VD))
     return {Unsupported, UnrepresentableMacro};
   GenericSignature genericSignature;
+  // A declaration can be contextually generic without declaring generic
+  // parameters of its own. Validate the full signature so inherited
+  // requirements and requirements on subscripts cannot bypass the C++
+  // representability checks below.
+  if (auto *genericContext = VD->getAsGenericContext())
+    genericSignature = genericContext->getGenericSignature();
   // Don't expose decls with definitions that are emitted into the client.
   if (VD->isAlwaysEmittedIntoClient())
     return {Unsupported, UnrepresentableRequiresClientEmission};
@@ -333,8 +340,6 @@ swift::cxx_translation::getDeclRepresentation(
         !AFD->getASTContext().LangOpts.hasFeature(
             Feature::GenerateBindingsForThrowingFunctionsInCXX))
       return {Unsupported, UnrepresentableThrows};
-    if (AFD->hasGenericParamList())
-      genericSignature = AFD->getGenericSignature();
   }
   if (const auto *typeDecl = dyn_cast<NominalTypeDecl>(VD)) {
     if (isa<ProtocolDecl>(typeDecl)) {
@@ -349,11 +354,8 @@ swift::cxx_translation::getDeclRepresentation(
       return {Unsupported, UnrepresentableMoveOnly};
     if (isa<ClassDecl>(VD) && VD->isObjC())
       return {Unsupported, UnrepresentableObjC};
-    if (typeDecl->hasGenericParamList()) {
-      if (isa<ClassDecl>(VD))
-        return {Unsupported, UnrepresentableGeneric};
-      genericSignature = typeDecl->getGenericSignature();
-    }
+    if (isa<ClassDecl>(VD) && genericSignature)
+      return {Unsupported, UnrepresentableGeneric};
     if (!isa<ClassDecl>(typeDecl) && isZeroSized && (*isZeroSized)(typeDecl))
       return {Unsupported, UnrepresentableZeroSizedValueType};
   }
@@ -392,7 +394,8 @@ swift::cxx_translation::getDeclRepresentation(
     }
   }
 
-  // Generic requirements are not yet supported in C++.
+  // Reject generic requirements that the generated C++ binding cannot
+  // instantiate.
   if (!isExposableToCxx(genericSignature)) {
     return {Unsupported, UnrepresentableGenericRequirements};
   }
@@ -446,8 +449,22 @@ bool swift::cxx_translation::isExposableToCxx(GenericSignature genericSig) {
         return false;
 
       auto proto = req.getProtocolDecl();
-      if (!proto->isMarkerProtocol() && !proto->hasClangNode())
-        return false;
+      if (proto->isMarkerProtocol() || proto->hasClangNode())
+        continue;
+
+      // Conformance requirements to a small set of known standard library
+      // protocols are representable: the generated C++ code instantiates
+      // the required witness table via the Swift runtime. This is what
+      // allows e.g. `Dictionary<Key: Hashable, Value>` to be exposed.
+      // Restrict this to requirements directly on a generic parameter, as
+      // the generated code cannot obtain type metadata for a dependent
+      // member type. Embedded Swift has no runtime conformance lookup.
+      if (proto->isSpecificProtocol(KnownProtocolKind::Hashable) &&
+          req.getFirstType()->is<GenericTypeParamType>() &&
+          !proto->getASTContext().LangOpts.hasFeature(Feature::Embedded))
+        continue;
+
+      return false;
     }
   }
 
