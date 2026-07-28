@@ -4413,6 +4413,72 @@ enum KeyPathTypeKind : unsigned char {
   KPTK_ReferenceWritableKeyPath
 };
 
+/// The COM role and associated declaration information for a nominal type.
+///
+/// A protocol can declare an interface, while a class can provide an
+/// implementation. Other nominal declarations have no COM declaration info.
+class COMDeclInfo {
+public:
+  enum class Kind : uint8_t {
+    Interface,
+    Implementation,
+  };
+
+private:
+  Kind DeclKind;
+  StringRef ID;
+  std::optional<COMThreadingModel> ThreadingModel;
+  ArrayRef<ProtocolDecl *> Interfaces;
+
+  COMDeclInfo(Kind kind, StringRef id, std::optional<COMThreadingModel> model,
+              ArrayRef<ProtocolDecl *> interfaces)
+      : DeclKind(kind), ID(id), ThreadingModel(model), Interfaces(interfaces) {}
+
+public:
+  static COMDeclInfo forInterface(StringRef iid) {
+    return {Kind::Interface, iid, std::nullopt, {}};
+  }
+
+  static COMDeclInfo
+  forImplementation(StringRef clsid,
+                    std::optional<COMThreadingModel> threadingModel,
+                    ArrayRef<ProtocolDecl *> interfaces) {
+    return {Kind::Implementation, clsid, threadingModel, interfaces};
+  }
+
+  Kind getKind() const { return DeclKind; }
+  bool isInterface() const { return DeclKind == Kind::Interface; }
+  bool isImplementation() const {
+    return DeclKind == Kind::Implementation;
+  }
+
+  StringRef getInterfaceID() const {
+    assert(isInterface());
+    return ID;
+  }
+
+  std::optional<StringRef> getImplementationID() const {
+    assert(isImplementation());
+    if (ID.empty())
+      return std::nullopt;
+    return ID;
+  }
+
+  /// The effective threading model for an \c \@com implementation
+  /// declaration. This is absent when the implementation is classified solely
+  /// from its COM interface conformances.
+  std::optional<COMThreadingModel> getThreadingModel() const {
+    assert(isImplementation());
+    return ThreadingModel;
+  }
+
+  /// The COM interfaces to which this implementation conforms.
+  ArrayRef<ProtocolDecl *> getInterfaces() const {
+    assert(isImplementation());
+    return Interfaces;
+  }
+};
+
 /// NominalTypeDecl - a declaration of a nominal type, like a struct.
 class NominalTypeDecl : public GenericTypeDecl, public IterableDeclContext {
   SourceRange Braces;
@@ -4684,6 +4750,10 @@ public:
   ///
   /// \param sorted Whether to sort the protocols in canonical order.
   SmallVector<ProtocolDecl *, 2> getAllProtocols(bool sorted = false) const;
+
+  /// Retrieve this nominal declaration's COM role and associated information,
+  /// or \c nullptr when it is not a COM interface or implementation.
+  const COMDeclInfo *getCOMDeclInfo() const;
 
   /// Retrieve all of the protocol conformances for this nominal type.
   SmallVector<ProtocolConformance *, 2> getAllConformances(
@@ -5428,13 +5498,13 @@ public:
   /// allocation, etc.), the Swift model, or has no reference counting at all.
   ReferenceCounting getObjectModel() const;
 
-  /// Whether this class participates in the COM object model, i.e. it conforms
-  /// to a COM interface (a protocol marked \c \@com).
+  /// Whether this class provides a COM implementation.
   ///
-  /// Keying on the \c \@com marker rather than a shared root such as
-  /// \c IUnknown covers rootless COM frameworks such as IOKit; keying on
-  /// conformance rather than the class's own attribute covers subclasses.
-  bool isCOMObject() const;
+  /// This includes both explicitly \c \@com classes and classes that conform to
+  /// a COM interface.
+  bool isCOMImplementation() const {
+    return getCOMDeclInfo() != nullptr;
+  }
 
   LayoutConstraintKind getLayoutConstraintKind() const {
     if (getObjectModel() == ReferenceCounting::ObjC)
@@ -5740,6 +5810,11 @@ public:
 
   /// Determine whether this protocol has a superclass.
   bool hasSuperclass() const { return (bool)getSuperclassDecl(); }
+
+  /// Whether this protocol declares a COM interface.
+  bool isCOMInterface() const {
+    return getCOMDeclInfo() != nullptr;
+  }
 
   /// Retrieve the ClassDecl for the superclass of this protocol, or null if there
   /// is no superclass.
