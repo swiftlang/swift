@@ -634,7 +634,7 @@ static size_t getNumParams(const clang::FunctionDecl* D) {
 }
 
 static bool shouldSkipModule(ModuleDecl *M) {
-  if (M->getName().str() == CLANG_HEADER_MODULE_NAME) {
+  if (M->isClangBridgingHeaderImportModule()) {
     DLOG("is from bridging header (or C++ namespace)\n");
     return false;
   }
@@ -675,7 +675,7 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
   }
 
   const clang::Module *OwningModule = getOwningModule(ClangDecl);
-  bool IsInBridgingHeader = MappedDecl->getModuleContext()->getName().str() == CLANG_HEADER_MODULE_NAME;
+  bool IsInBridgingHeader = MappedDecl->getModuleContext()->isClangBridgingHeaderImportModule();
   ASSERT(OwningModule || IsInBridgingHeader);
   ForwardDeclaredConcreteTypeVisitor CheckForwardDecls(OwningModule);
 

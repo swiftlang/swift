@@ -1093,7 +1093,7 @@ createMacroSourceFile(std::unique_ptr<llvm::MemoryBuffer> buffer,
     ModuleDecl *originModule = nullptr;
     // FIXME: remove this workaround once namespace contents are imported into
     // their corresponding modules
-    if (macroSourceFile->getParentModule()->isClangHeaderImportModule())
+    if (macroSourceFile->getParentModule()->isClangBridgingHeaderImportModule())
       originModule = cast<Decl *>(target)->getModuleContextForNameLookup();
     performImportResolutionForClangMacroBuffer(*macroSourceFile, originModule);
   }

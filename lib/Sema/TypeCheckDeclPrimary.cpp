@@ -1845,7 +1845,7 @@ static void diagnoseRetroactiveConformances(
   ModuleDecl *extTypeModule = extendedNominalDecl->getParentModule();
 
   // If the type comes from the __ObjC clang header module, don't warn.
-  if (extTypeModule->getName().is(CLANG_HEADER_MODULE_NAME))
+  if (extTypeModule->isClangBridgingHeaderImportModule())
     return;
 
   // At this point, we know we're extending a type declared outside this module.
