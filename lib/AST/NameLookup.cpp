@@ -2247,13 +2247,13 @@ static void populateMembersForLazyName(DeclName name, NominalTypeDecl *decl,
   if (ctx.LangOpts.EnableCOMInterop) {
     if (auto *PD = dyn_cast<ProtocolDecl>(decl)) {
       if (name.isSimpleName(ctx.Id_IID) &&
-          PD->getAttrs().hasAttribute<COMAttr>() && PD->isInSwiftSourceFile()) {
+          PD->isCOMInterface() && PD->isInSwiftSourceFile()) {
         evaluateOrDefault(ctx.evaluator, SynthesizeCOMInterfaceIDRequest{PD},
                           nullptr);
       }
     } else if (auto *CD = dyn_cast<ClassDecl>(decl)) {
       if (name.isSimpleName(ctx.Id_CLSID) &&
-          CD->getAttrs().hasAttribute<COMAttr>() && CD->isInSwiftSourceFile()) {
+          CD->isCOMImplementation() && CD->isInSwiftSourceFile()) {
         evaluateOrDefault(ctx.evaluator,
                           SynthesizeCOMImplementationIDRequest{CD}, nullptr);
       }
