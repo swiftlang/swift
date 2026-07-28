@@ -29,6 +29,7 @@
 #include "swift/AST/AvailabilityScope.h"
 #include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/ClangModuleLoader.h"
+#include "swift/AST/DeclContext.h"
 #include "swift/AST/DeclExportabilityVisitor.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/ExistentialLayout.h"
@@ -3136,13 +3137,29 @@ bool swift::diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
       DeclAvailabilityFlag::ContinueOnPotentialUnavailability);
 }
 
+static bool exprEnclosedInSythesizedMacro(const Expr *expr, DeclContext *DC) {
+  auto &C = DC->getASTContext();
+  auto &SM = C.SourceMgr;
+  auto loc = expr->getStartLoc();
+  if (loc.isInvalid())
+    return false;
+  auto bufferID = SM.findBufferContainingLoc(loc);
+  auto SFS = SM.getSourceFilesForBufferID(bufferID);
+  if (SFS.empty())
+    return false;
+  auto *enclosing = SFS[0]->getEnclosingSourceFile();
+  if (!enclosing)
+    return false;
+  return enclosing->Kind == SourceFileKind::SyntheticMacro;
+}
+
 /// Diagnose uses of unavailable declarations.
 void swift::diagnoseExprAvailability(const Expr *E, DeclContext *DC) {
   auto where = ExportContext::forFunctionBody(DC, E->getStartLoc());
-  if (where.isImplicit())
+  if (where.isImplicit() || exprEnclosedInSythesizedMacro(E, DC))
     return;
   ExprAvailabilityWalker walker(where);
-  const_cast<Expr*>(E)->walk(walker);
+  const_cast<Expr *>(E)->walk(walker);
 }
 
 namespace {
