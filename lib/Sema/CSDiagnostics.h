@@ -1010,6 +1010,25 @@ public:
   bool diagnoseAsError() override;
 };
 
+/// Diagnose failures related to conversion between two types with different
+/// execution semantics i.e. '@called(once)' function and regular one:
+///
+/// ```swift
+/// func test(_: () -> Void) {}
+/// let fn: @called(once) () -> Void = {}
+/// test(fn) // error due to widening
+/// ```
+class ConversionBetweenFunctionsWithDifferentExecutionSemantics final
+    : public ContextualFailure {
+public:
+  ConversionBetweenFunctionsWithDifferentExecutionSemantics(
+      const Solution &solution, Type fromType, Type toType,
+      ConstraintLocator *locator)
+      : ContextualFailure(solution, fromType, toType, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
 /// Diagnose failures related attempt to implicitly convert types which
 /// do not support such implicit conversion.
 /// "as" or "as!" has to be specified explicitly in cases like that.

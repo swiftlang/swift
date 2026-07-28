@@ -3064,6 +3064,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     case DeclAttrKind::PrivateImport:
     case DeclAttrKind::AllowFeatureSuppression:
     case DeclAttrKind::Diagnose:
+    case DeclAttrKind::Called:
       llvm_unreachable("cannot serialize attribute");
 
 #define SIMPLE_DECL_ATTR(_, CLASS, ...)                                        \
@@ -6180,7 +6181,8 @@ public:
         S.addTypeRef(fnTy->getThrownError()),
         getRawStableDifferentiabilityKind(fnTy->getDifferentiabilityKind()),
         isolation,
-        fnTy->hasSendingResult());
+        fnTy->hasSendingResult(),
+        fnTy->isCalledOnce());
 
     serializeFunctionTypeParams(fnTy);
 
@@ -6202,7 +6204,7 @@ public:
         fnTy->isSendable(), fnTy->isAsync(), fnTy->isThrowing(),
         S.addTypeRef(fnTy->getThrownError()),
         getRawStableDifferentiabilityKind(fnTy->getDifferentiabilityKind()),
-        isolation, fnTy->hasSendingResult(),
+        isolation, fnTy->hasSendingResult(), fnTy->isCalledOnce(),
         S.addGenericSignatureRef(genericSig));
 
     serializeFunctionTypeParams(fnTy);
@@ -6290,10 +6292,10 @@ public:
 
     unsigned abbrCode = S.DeclTypeAbbrCodes[SILFunctionTypeLayout::Code];
     SILFunctionTypeLayout::emitRecord(
-        S.Out, S.ScratchRecord, abbrCode, fnTy->isSendable(),
-        fnTy->isAsync(), stableCoroutineKind, stableCalleeConvention,
-        stableRepresentation, fnTy->isPseudogeneric(), fnTy->isNoEscape(),
-        fnTy->isUnimplementable(), fnTy->getIsolation().getKind(),
+        S.Out, S.ScratchRecord, abbrCode, fnTy->isSendable(), fnTy->isAsync(),
+        stableCoroutineKind, stableCalleeConvention, stableRepresentation,
+        fnTy->isPseudogeneric(), fnTy->isNoEscape(), fnTy->isUnimplementable(),
+        fnTy->isCalledOnce(), fnTy->getIsolation().getKind(),
         stableDiffKind, fnTy->hasErrorResult(),
         fnTy->getParameters().size(),
         fnTy->getNumYields(), fnTy->getNumResults(),

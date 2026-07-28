@@ -639,9 +639,9 @@ static ManagedValue emitLoadOfCaptureIsolation(SILGenFunction &SGF,
     if (capturedVar != isolatedCapture) continue;
 
     // Captured actor references should always be captured as constants.
-    assert(TC.getDeclCaptureKind(capture,
-                                 TC.getCaptureTypeExpansionContext(constant))
-             == CaptureKind::Constant);
+    assert(TC.getDeclCaptureKind(
+               capture, TC.getCaptureTypeExpansionContext(constant),
+               TC.getClosureTypeInfo(constant)) == CaptureKind::Constant);
 
     auto value = captureArgs[i].copy(SGF, loc);
     return SGF.emitActorInstanceIsolation(loc, value, isolatedVarType);

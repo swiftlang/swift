@@ -4345,6 +4345,19 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
 
     break;
   }
+
+  case DeclAttrKind::Called: {
+    auto semantics = parseSingleAttrOption<ExecutionSemantics>(
+        *this, Loc, AttrRange, AttrName, DK,
+        {{Context.Id_once, ExecutionSemantics::Once}});
+    if (!semantics)
+      return makeParserSuccess();
+
+    if (!DiscardAttribute)
+      Attributes.add(new (Context) CalledAttr(AtLoc, AttrRange, *semantics));
+
+    break;
+  }
   }
 
   if (DuplicateAttribute) {
@@ -5300,6 +5313,46 @@ ParserStatus Parser::parseTypeAttribute(TypeOrCustomAttr &result,
                                                         {beginLoc, endLoc},
                                                         {mangling, manglingLoc},
                                                         {index, indexLoc});
+    }
+    return makeParserSuccess();
+  }
+
+  case TypeAttrKind::Called: {
+    SourceLoc lpLoc = Tok.getLoc(), semanticsLoc, rpLoc;
+    if (!consumeIfAttributeLParen()) {
+      if (!justChecking) {
+        diagnose(Tok, diag::attr_expected_lparen);
+      }
+      return makeParserError();
+    }
+
+    bool invalid = false;
+    std::optional<CalledTypeAttr::Semantics> semantics;
+    if (isIdentifier(Tok, "once")) {
+      semanticsLoc = consumeToken(tok::identifier);
+      semantics = CalledTypeAttr::Semantics::Once;
+    } else {
+      if (!justChecking) {
+        diagnose(Tok, diag::attr_called_expected_semantics)
+            .fixItReplace(Tok.getLoc(), "once");
+      }
+      invalid = true;
+      consumeIf(tok::identifier);
+    }
+
+    if (justChecking && !Tok.is(tok::r_paren))
+      return makeParserError();
+    if (parseMatchingToken(tok::r_paren, rpLoc,
+                           diag::attr_called_expected_rparen, lpLoc))
+      return makeParserError();
+
+    if (invalid)
+      return makeParserError();
+    assert(semantics);
+
+    if (!justChecking) {
+      result = new (Context) CalledTypeAttr(AtLoc, attrLoc, {lpLoc, rpLoc},
+                                            {*semantics, semanticsLoc});
     }
     return makeParserSuccess();
   }
