@@ -8789,77 +8789,73 @@ static bool anySubobjectsSelfContained(const clang::CXXRecordDecl *decl) {
   return false;
 }
 
-bool IsSafeUseOfCxxDecl::evaluate(Evaluator &evaluator,
-                                  SafeUseOfCxxDeclDescriptor desc) const {
-  const clang::Decl *decl = desc.decl;
+bool importer::shouldRenameCXXMethodAsUnsafe(const clang::CXXMethodDecl *method,
+                                             ASTContext &ctx) {
+  // The user explicitly asked us to import this method.
+  if (hasUnsafeAPIAttr(method))
+    return false;
 
-  if (auto method = dyn_cast<clang::CXXMethodDecl>(decl)) {
-    // The user explicitly asked us to import this method.
-    if (hasUnsafeAPIAttr(method))
-      return true;
+  // If it's a static method, it cannot project anything. It's fine.
+  if (method->isOverloadedOperator() || method->isStatic() ||
+      isa<clang::CXXConstructorDecl>(method))
+    return false;
 
-    // If it's a static method, it cannot project anything. It's fine.
-    if (method->isOverloadedOperator() || method->isStatic() ||
-        isa<clang::CXXConstructorDecl>(decl))
-      return true;
+  // begin and end methods likely return an iterator, so they're unsafe.
+  // This is required so that automatic the conformance to RAC works properly.
+  if (method->getNameAsString() == "begin" ||
+      method->getNameAsString() == "end")
+    return true;
 
-    // begin and end methods likely return an iterator, so they're unsafe.
-    // This is required so that automatic the conformance to RAC works properly.
-    if (method->getNameAsString() == "begin" ||
-        method->getNameAsString() == "end")
-      return false;
+  if (clangTypeIsForeignReference(method->getReturnType(), ctx))
+    return false;
 
-    if (clangTypeIsForeignReference(method->getReturnType(), desc.ctx))
-      return true;
+  auto parentQualType =
+      method->getParent()->getTypeForDecl()->getCanonicalTypeUnqualified();
 
-    auto parentQualType = method
-      ->getParent()->getTypeForDecl()->getCanonicalTypeUnqualified();
+  bool parentIsSelfContained =
+      !clangTypeIsForeignReference(parentQualType, ctx) &&
+      anySubobjectsSelfContained(method->getParent());
 
-    bool parentIsSelfContained =
-        !clangTypeIsForeignReference(parentQualType, desc.ctx) &&
-        anySubobjectsSelfContained(method->getParent());
+  // If it returns a pointer or reference from an owned parent, that's a
+  // projection (unsafe).
+  if (method->getReturnType()->isPointerType() ||
+      method->getReturnType()->isReferenceType())
+    return parentIsSelfContained;
 
-    // If it returns a pointer or reference from an owned parent, that's a
-    // projection (unsafe).
-    if (method->getReturnType()->isPointerType() ||
-        method->getReturnType()->isReferenceType())
-      return !parentIsSelfContained;
+  // Check if it's one of the known unsafe methods we currently
+  // mark as safe by default.
+  if (isUnsafeStdMethod(method))
+    return true;
 
-    // Check if it's one of the known unsafe methods we currently
-    // mark as safe by default.
-    if (isUnsafeStdMethod(method))
-      return false;
+  // Try to figure out the semantics of the return type. If it's a
+  // pointer/iterator, it's unsafe.
+  if (auto returnType = dyn_cast<clang::RecordType>(
+          method->getReturnType().getCanonicalType())) {
+    if (auto cxxRecordReturnType =
+            dyn_cast<clang::CXXRecordDecl>(returnType->getDecl())) {
+      if (isSwiftClassType(cxxRecordReturnType))
+        return false;
 
-    // Try to figure out the semantics of the return type. If it's a
-    // pointer/iterator, it's unsafe.
-    if (auto returnType = dyn_cast<clang::RecordType>(
-            method->getReturnType().getCanonicalType())) {
-      if (auto cxxRecordReturnType =
-              dyn_cast<clang::CXXRecordDecl>(returnType->getDecl())) {
-        if (isSwiftClassType(cxxRecordReturnType))
-          return true;
+      if (hasIteratorAPIAttr(cxxRecordReturnType) ||
+          hasIteratorCategory(cxxRecordReturnType))
+        return true;
 
-        if (hasIteratorAPIAttr(cxxRecordReturnType) ||
-            hasIteratorCategory(cxxRecordReturnType))
-          return false;
+      // Mark this as safe to help our diganostics down the road.
+      if (!cxxRecordReturnType->getDefinition()) {
+        return false;
+      }
 
-        // Mark this as safe to help our diganostics down the road.
-        if (!cxxRecordReturnType->getDefinition()) {
-          return true;
-        }
-
-        // A projection of a view type (such as a string_view) from a self
-        // contained parent is a proejction (unsafe).
-        if (!anySubobjectsSelfContained(cxxRecordReturnType) &&
-            isViewType(cxxRecordReturnType)) {
-          return !parentIsSelfContained;
-        }
+      // A projection of a view type (such as a string_view) from a self
+      // contained parent is a proejction (unsafe).
+      if (!anySubobjectsSelfContained(cxxRecordReturnType) &&
+          isViewType(cxxRecordReturnType)) {
+        return parentIsSelfContained;
       }
     }
   }
 
   // Otherwise, it's safe.
-  return true;
+  return false;
 }
 
 void swift::simple_display(llvm::raw_ostream &out,
@@ -8869,20 +8865,6 @@ void swift::simple_display(llvm::raw_ostream &out,
 }
 
 SourceLoc swift::extractNearestSourceLoc(CxxRecordSemanticsDescriptor desc) {
-  return SourceLoc();
-}
-
-void swift::simple_display(llvm::raw_ostream &out,
-                           SafeUseOfCxxDeclDescriptor desc) {
-  out << "Checking if '";
-  if (auto namedDecl = dyn_cast<clang::NamedDecl>(desc.decl))
-    out << namedDecl->getNameAsString();
-  else
-    out << "<invalid decl>";
-  out << "' is safe to use in context.\n";
-}
-
-SourceLoc swift::extractNearestSourceLoc(SafeUseOfCxxDeclDescriptor desc) {
   return SourceLoc();
 }
 
@@ -9029,7 +9011,6 @@ CustomRefCountingOperationResult CustomRefCountingOperation::evaluate(
 ExplicitSafety ClangDeclExplicitSafety::evaluate(
     Evaluator &evaluator, ClangDeclExplicitSafetyDescriptor desc) const {
   // FIXME: Also similar to hasPointerInSubobjects
-  // FIXME: should probably also subsume IsSafeUseOfCxxDecl
 
   if (desc.isClass)
     // Safety for class types is handled a bit differently than other types.
