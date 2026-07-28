@@ -3400,7 +3400,7 @@ static bool isDeclaredInModule(const ClangModuleUnit *ModuleFilter,
                                const Decl *VD) {
   // Sometimes imported decls get put into the clang header module. If we
   // found one of these decls, don't filter it out.
-  if (VD->getModuleContext()->getName().str() == CLANG_HEADER_MODULE_NAME) {
+  if (VD->getModuleContext()->isClangBridgingHeaderImportModule()) {
     return true;
   }
   // Because the ClangModuleUnit saved as a decl context will be saved as the top-level module, but

@@ -476,7 +476,7 @@ public:
 
     if (outputLangMode == OutputLanguageMode::Cxx) {
       // Do not expose compiler private '_ObjC' module.
-      if (otherModule->getName().str() == CLANG_HEADER_MODULE_NAME)
+      if (otherModule->isClangBridgingHeaderImportModule())
         return true;
       // Add C++ module imports in C++ mode explicitly, to ensure that their
       // import is always emitted in the header.

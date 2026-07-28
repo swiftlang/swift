@@ -248,7 +248,7 @@ static void printImports(raw_ostream &out,
   for (auto import : allImports) {
     auto importedModule = import.importedModule;
     if (importedModule->isOnoneSupportModule() ||
-        importedModule->isClangHeaderImportModule()) {
+        importedModule->isClangBridgingHeaderImportModule()) {
       continue;
     }
 
