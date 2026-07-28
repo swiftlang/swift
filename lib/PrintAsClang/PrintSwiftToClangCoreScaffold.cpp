@@ -15,7 +15,9 @@
 #include "PrimitiveTypeMapping.h"
 #include "SwiftToClangInteropContext.h"
 #include "swift/ABI/MetadataValues.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/KnownProtocols.h"
 #include "swift/AST/Type.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/IRGen/IRABIDetailsProvider.h"
@@ -250,6 +252,29 @@ void printPrimitiveGenericTypeTraits(raw_ostream &os, ASTContext &astContext,
   }
 }
 
+/// Prints the extern declarations for the protocol descriptors of the known
+/// standard library protocols that can occur in exposed generic requirements
+/// (see `swift::cxx_translation::isExposableToCxx`). The generated code uses
+/// them to instantiate protocol conformance witness tables via the Swift
+/// runtime.
+static void printKnownProtocolDescriptorDecls(raw_ostream &os,
+                                              ASTContext &astContext) {
+  // We do not have protocol conformance metadata in Embedded Swift.
+  if (astContext.LangOpts.hasFeature(Feature::Embedded))
+    return;
+
+  const KnownProtocolKind supportedProtocols[] = {KnownProtocolKind::Hashable};
+  for (auto kind : supportedProtocols) {
+    auto *proto = astContext.getProtocol(kind);
+    if (!proto)
+      continue;
+    auto entity = irgen::LinkEntity::forProtocolDescriptor(proto);
+    os << "// protocol descriptor for " << proto->getNameStr() << ".\n";
+    os << "SWIFT_IMPORT_STDLIB_SYMBOL extern size_t "
+       << entity.mangleAsString(astContext) << ";\n";
+  }
+}
+
 void swift::printSwiftToClangCoreScaffold(SwiftToClangInteropContext &ctx,
                                           ASTContext &astContext,
                                           PrimitiveTypeMapping &typeMapping,
@@ -267,6 +292,8 @@ void swift::printSwiftToClangCoreScaffold(SwiftToClangInteropContext &ctx,
                 os << "\n";
                 printPrimitiveGenericTypeTraits(os, astContext, typeMapping,
                                                 /*isCForwardDefinition=*/true);
+                os << "\n";
+                printKnownProtocolDescriptorDecls(os, astContext);
               });
               os << "\n";
             });

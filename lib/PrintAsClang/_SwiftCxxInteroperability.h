@@ -27,6 +27,14 @@
 #if !defined(SWIFT_CALL)
 # define SWIFT_CALL __attribute__((swiftcall))
 #endif
+#if !defined(SWIFT_IMPORT_STDLIB_SYMBOL)
+#if defined(_WIN32)
+#define SWIFT_IMPORT_STDLIB_SYMBOL __declspec(dllimport)
+#else
+#define SWIFT_IMPORT_STDLIB_SYMBOL
+#endif
+#define SWIFT_CXX_INTEROP_UNDEFINE_IMPORT_STDLIB_SYMBOL
+#endif
 
 #if __has_attribute(transparent_stepping)
 #define SWIFT_INLINE_THUNK_ATTRIBUTES                                          \
@@ -113,6 +121,34 @@ extern "C" void *_Nonnull swift_retain(void *_Nonnull) noexcept;
 
 extern "C" void swift_release(void *_Nonnull) noexcept;
 
+extern "C" const void *_Nullable swift_conformsToProtocol(
+    const void *_Nonnull type, const void *_Nonnull protocol) noexcept;
+
+#if defined(__APPLE__) && __has_attribute(weak_import)
+extern "C" SWIFT_IMPORT_STDLIB_SYMBOL size_t
+    swift_ConformanceExecutionContextSize __attribute__((weak_import));
+
+extern "C" const void *_Nullable swift_conformsToProtocolWithExecutionContext(
+    const void *_Nonnull type, const void *_Nonnull protocol,
+    void *_Nonnull context) noexcept __attribute__((weak_import));
+
+extern "C" bool
+swift_isInConformanceExecutionContext(const void *_Nonnull type,
+                                      const void *_Nonnull context) noexcept
+    __attribute__((weak_import));
+#else
+extern "C" SWIFT_IMPORT_STDLIB_SYMBOL size_t
+    swift_ConformanceExecutionContextSize;
+
+extern "C" const void *_Nullable swift_conformsToProtocolWithExecutionContext(
+    const void *_Nonnull type, const void *_Nonnull protocol,
+    void *_Nonnull context) noexcept;
+
+extern "C" bool
+swift_isInConformanceExecutionContext(const void *_Nonnull type,
+                                      const void *_Nonnull context) noexcept;
+#endif
+
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wreserved-identifier"
 
@@ -162,6 +198,89 @@ SWIFT_INLINE_THUNK void opaqueFree(void *_Nonnull p) noexcept {
   free(p);
 #endif
 #endif
+}
+
+SWIFT_INLINE_PRIVATE_HELPER bool
+hasConformanceExecutionContextRuntimeSupport() noexcept {
+#if defined(__APPLE__) && __has_attribute(weak_import)
+  return &swift_ConformanceExecutionContextSize != nullptr &&
+         swift_conformsToProtocolWithExecutionContext != nullptr &&
+         swift_isInConformanceExecutionContext != nullptr;
+#else
+  return true;
+#endif
+}
+
+template <size_t MessageSize>
+[[noreturn]] SWIFT_INLINE_PRIVATE_HELPER void
+fatalConformanceLookup(const char (&message)[MessageSize]) noexcept {
+  _swift_stdlib_reportFatalError("Fatal error", 11, message,
+                                 static_cast<int>(MessageSize - 1),
+                                 /*flags=*/0);
+  abort();
+}
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Walloca"
+
+SWIFT_INLINE_PRIVATE_HELPER const void
+    *_Nullable lookupConformanceWithExecutionContext(
+        void *_Nonnull typeMetadata,
+        const void *_Nonnull protocolDescriptor) noexcept {
+  // The runtime publishes the size of this opaque context dynamically. Keep
+  // its storage in this frame because the lookup and validation APIs both
+  // access it.
+  size_t contextSize = swift_ConformanceExecutionContextSize;
+  auto *context =
+      static_cast<unsigned char *_Nonnull>(__builtin_alloca(contextSize));
+  for (size_t index = 0; index < contextSize; ++index)
+    context[index] = 0;
+
+  const void *_Nonnull signedProtocolDescriptor = protocolDescriptor;
+#ifdef __arm64e__
+  signedProtocolDescriptor = ptrauth_sign_unauthenticated(
+      const_cast<void *>(protocolDescriptor),
+      ptrauth_key_process_dependent_data,
+      ptrauth_string_discriminator("ProtocolDescriptor"));
+#endif
+
+  const void *_Nullable witnessTable =
+      swift_conformsToProtocolWithExecutionContext(
+          typeMetadata, signedProtocolDescriptor, context);
+  if (witnessTable &&
+      !swift_isInConformanceExecutionContext(typeMetadata, context)) {
+    fatalConformanceLookup(
+        "Swift protocol conformance is unavailable in the current "
+        "execution context\n");
+  }
+  return witnessTable;
+}
+
+#pragma clang diagnostic pop
+
+/// Returns the witness table for the conformance of the Swift type identified
+/// by the given type metadata to the Swift protocol identified by the given
+/// protocol descriptor. Aborts if the conformance is unavailable or, when
+/// supported by the linked runtime, cannot be used in the current execution
+/// context.
+SWIFT_INLINE_PRIVATE_HELPER void *_Nonnull loadConformanceWitnessTable(
+    void *_Nonnull typeMetadata,
+    const void *_Nonnull protocolDescriptor) noexcept {
+  const void *_Nullable witnessTable;
+  if (hasConformanceExecutionContextRuntimeSupport()) {
+    witnessTable =
+        lookupConformanceWithExecutionContext(typeMetadata, protocolDescriptor);
+  } else {
+    // Older Apple runtimes do not expose conformance execution contexts.
+    // Preserve their dynamic-cast behavior for back deployment.
+    witnessTable = swift_conformsToProtocol(typeMetadata, protocolDescriptor);
+  }
+
+  if (!witnessTable)
+    fatalConformanceLookup(
+        "Swift protocol conformance required by generic requirements is "
+        "unavailable\n");
+  return const_cast<void *>(witnessTable);
 }
 
 /// Base class for a container for an opaque Swift value, like resilient struct.
@@ -298,6 +417,18 @@ template <class T> static inline const constexpr bool isOpaqueLayout = false;
 template <class T>
 static inline const constexpr bool isSwiftBridgedCxxRecord = false;
 
+/// Returns the witness table for the conformance of the Swift type `T` to the
+/// Swift protocol identified by the given protocol descriptor.
+///
+/// The Swift runtime caches conformance lookup results. The execution context
+/// is checked on every use because an isolated conformance may only be used
+/// while running on its global actor.
+template <class T, size_t *_Nonnull ProtocolDescriptor>
+SWIFT_INLINE_PRIVATE_HELPER void *_Nonnull getConformanceWitnessTable() {
+  return loadConformanceWitnessTable(TypeMetadataTrait<T>::getTypeMetadata(),
+                                     ProtocolDescriptor);
+}
+
 /// Returns the opaque pointer to the given value.
 template <class T>
 SWIFT_INLINE_THUNK const void *_Nonnull getOpaquePointer(const T &value) {
@@ -334,6 +465,12 @@ private:
 #pragma clang diagnostic pop
 
 } // namespace swift SWIFT_PRIVATE_ATTR
+
+#if defined(SWIFT_CXX_INTEROP_UNDEFINE_IMPORT_STDLIB_SYMBOL)
+#undef SWIFT_CXX_INTEROP_UNDEFINE_IMPORT_STDLIB_SYMBOL
+#undef SWIFT_IMPORT_STDLIB_SYMBOL
+#endif
+
 #endif
 
 #endif // SWIFT_CXX_INTEROPERABILITY_H

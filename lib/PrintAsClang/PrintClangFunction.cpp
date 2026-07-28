@@ -1073,12 +1073,10 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
                 &genericRequirementParam) {
           emitNewParam();
           functionSignatureOS << "void * _Nonnull ";
-          auto reqt = genericRequirementParam.getRequirement();
-          if (reqt.isAnyWitnessTable())
-            ClangSyntaxPrinter(FD->getASTContext(), functionSignatureOS)
-                .printBaseName(reqt.getProtocol());
-          else
-            assert(reqt.isAnyMetadata());
+          assert(
+              (genericRequirementParam.getRequirement().isAnyMetadata() ||
+               genericRequirementParam.getRequirement().isAnyWitnessTable()) &&
+              "unsupported generic requirement");
         },
         [&](const LoweredFunctionSignature::MetadataSourceParameter
                 &metadataSrcParam) {
@@ -1551,13 +1549,10 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
                 &genericRequirementParam) {
           emitNewParam();
           auto genericRequirement = genericRequirementParam.getRequirement();
-          // FIXME: Add protocol requirement support.
-          assert(genericRequirement.isAnyMetadata());
           if (auto *gtpt = genericRequirement.getTypeParameter()
                                ->getAs<GenericTypeParamType>()) {
-            os << "swift::TypeMetadataTrait<";
-            ClangSyntaxPrinter(gtpt->getASTContext(), os).printGenericTypeParamTypeName(gtpt);
-            os << ">::getTypeMetadata()";
+            ClangSyntaxPrinter(gtpt->getASTContext(), os)
+                .printGenericRequirementInstantiantion(genericRequirement);
             return;
           }
           os << "ERROR";
