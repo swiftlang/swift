@@ -1962,7 +1962,7 @@ static void salvageBinaryInst(SingleValueInstruction *SVI) {
 
     if (!lhsNullary && !rhsNullary) {
       // Debug values cannot currently have multiple operands.
-      DbgInst->killOperand();
+      DbgInst->killOperand(U->getOperandNumber());
       continue;
     }
 
@@ -1983,7 +1983,7 @@ static void salvageBinaryInst(SingleValueInstruction *SVI) {
       // Both nullary, no operand remains.
       cloned->setOperand(0, clonedLhs);
       cloned->setOperand(1, clonedRhs);
-      DbgInst->killOperand();
+      DbgInst->killOperand(U->getOperandNumber());
     } else if (rhsNullary) {
       auto *newArg =
           debugBB->replacePhiArgument(0, lhs->getType(), OwnershipKind::None);
@@ -2103,7 +2103,7 @@ static void transferStoreDebugValue(DebugVarCarryingInst DefiningInst,
   if (auto *srcDVI = dyn_cast<DebugValueInst>(*DefiningInst))
     newDVI->cloneReconstructionBlockFrom(srcDVI);
 
-  newDVI->stripDeref();
+  newDVI->stripDeref(0);
 }
 
 void swift::salvageStoreDebugInfo(SILInstruction *SI,
@@ -2384,8 +2384,8 @@ void swift::salvageLoadDebugInfo(LoadOperation load) {
     // The debug_value must be "hoisted" to the load to ensure that the
     // address is still valid.
     debugInst->moveBefore(load.getLoadInst());
-    debugInst->setOperand(load.getOperand());
-    debugInst->prependDeref();
+    debugUse->set(load.getOperand());
+    debugInst->prependDeref(debugUse->getOperandNumber());
   }
 }
 

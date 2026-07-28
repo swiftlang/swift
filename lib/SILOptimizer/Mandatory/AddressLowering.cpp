@@ -3742,10 +3742,10 @@ protected:
   }
 
   void visitDebugValueInst(DebugValueInst *debugInst) {
-    SILValue srcVal = debugInst->getOperand();
+    SILValue srcVal = use->get();
     SILValue srcAddr = pass.valueStorageMap.getStorage(srcVal).storageAddress;
-    debugInst->setOperand(srcAddr);
-    debugInst->prependDeref();
+    use->set(srcAddr);
+    debugInst->prependDeref(use->getOperandNumber());
   }
 
   void visitDeinitExistentialValueInst(

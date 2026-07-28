@@ -68,13 +68,13 @@ inline void deleteAllDebugUses(SILInstruction *inst) {
 /// but replaces its operand with undef and strips non-fragment DIExpr parts.
 /// Use this when salvage has NOT already created a replacement debug_value.
 inline void killAllDebugUses(SILValue value) {
-  SmallVector<DebugValueInst *, 4> debugUsers;
+  SmallVector<Operand *, 4> debugUses;
   for (auto *use : value->getUses()) {
-    if (auto *dvi = dyn_cast<DebugValueInst>(use->getUser()))
-      debugUsers.push_back(dvi);
+    if (isa<DebugValueInst>(use->getUser()))
+      debugUses.push_back(use);
   }
-  for (auto *dvi : debugUsers)
-    dvi->killOperand();
+  for (auto *use : debugUses)
+    cast<DebugValueInst>(use->getUser())->killOperand(use->getOperandNumber());
 }
 
 /// Drops all of the debug uses of any result of \p inst.

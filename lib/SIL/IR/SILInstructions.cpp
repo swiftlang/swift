@@ -452,7 +452,7 @@ DebugValueInst::DebugValueInst(
     setUsesMoveableValueDebugInfo();
   setTrace(trace);
   if (prependDeref)
-    this->prependDeref();
+    this->prependDeref(0);
 }
 
 DebugValueInst *DebugValueInst::create(SILDebugLocation DebugLoc,

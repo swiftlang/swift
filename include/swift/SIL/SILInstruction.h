@@ -5894,7 +5894,7 @@ public:
   /// an address type (when moved to the stack, for example).
   /// If a reconstruction block exists, a load is added at the beginning.
   /// Otherwise, it will be prepended to the DIExpr.
-  void prependDeref(unsigned operandIdx = 0);
+  void prependDeref(unsigned operandIdx);
 
   /// Removes a deref operator to this debug_value in place.
   /// This must be called when the operand is changed from an address type to
@@ -5903,7 +5903,7 @@ public:
   /// If a reconstruction block exists, a load is removed at the beginning. If
   /// there is no load at the beginning, the operand is killed, marking the
   /// variable as optimized away.
-  void stripDeref(unsigned operandIdx = 0);
+  void stripDeref(unsigned operandIdx);
 
   /// Validates the type chain of the DIExpr.
   /// Starting from VarType, narrows through fragments (outermost first)
@@ -5947,7 +5947,7 @@ public:
   /// reconstruction block.
   /// If \p varType is specified, the undef will use that type (in the
   /// appropriate address/object form) instead of the current operand's type.
-  void killOperand(unsigned operandIdx = 0, SILType operandType = SILType());
+  void killOperand(unsigned operandIdx, SILType operandType = SILType());
 
   bool hasTrace() const { return sharedUInt8().DebugValueInst.trace; }
 
