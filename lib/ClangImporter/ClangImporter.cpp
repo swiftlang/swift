@@ -8333,19 +8333,6 @@ importer::getValueDeclsForName(NominalTypeDecl *decl, StringRef name) {
   return TinyPtrVector<ValueDecl *>(ArrayRef(results));
 }
 
-/// Is this a pointer or a reference to a foreign reference type.
-static bool clangTypeIsForeignReference(const clang::QualType type,
-                                        ASTContext &ctx) {
-  if (!type->isPointerOrReferenceType())
-    return false;
-  auto *pointee = type->getPointeeType().getCanonicalType()->getAsRecordDecl();
-  if (!pointee)
-    return false;
-  auto info = evaluateOrDefault(ctx.evaluator,
-                                ForeignReferenceTypeInfoRequest({pointee}), {});
-  return info.isReference();
-}
-
 bool importer::hasSwiftAttribute(const clang::Decl *decl,
                                  ArrayRef<StringRef> attrs) {
   if (decl->hasAttrs() && llvm::any_of(decl->getAttrs(), [&](auto *A) {
@@ -8501,11 +8488,6 @@ static bool hasDestroyTypeOperations(const clang::CXXRecordDecl *decl,
   return false;
 }
 
-static bool hasCustomCopyOrMoveConstructor(const clang::CXXRecordDecl *decl) {
-  return decl->hasUserDeclaredCopyConstructor() ||
-         decl->hasUserDeclaredMoveConstructor();
-}
-
 static bool
 hasConstructorWithUnsupportedDefaultArgs(const clang::CXXRecordDecl *decl) {
   return llvm::any_of(decl->ctors(), [](clang::CXXConstructorDecl *ctor) {
@@ -8513,33 +8495,6 @@ hasConstructorWithUnsupportedDefaultArgs(const clang::CXXRecordDecl *decl) {
            // FIXME: Support default arguments (https://github.com/swiftlang/swift/issues/86260)
            ctor->getNumParams() != 1;
   });
-}
-
-static bool isSwiftClassType(const clang::CXXRecordDecl *decl) {
-  // Swift type must be annotated with external_source_symbol attribute.
-  auto essAttr = decl->getAttr<clang::ExternalSourceSymbolAttr>();
-  if (!essAttr || essAttr->getLanguage() != "Swift" ||
-      essAttr->getDefinedIn().empty() || essAttr->getUSR().empty())
-    return false;
-
-  // Ensure that the baseclass is swift::RefCountedClass.
-  auto baseDecl = decl->getDefinition();
-  if (!baseDecl)
-    return false;
-  do {
-    if (baseDecl->getNumBases() != 1)
-      return false;
-    auto baseClassSpecifier = *baseDecl->bases_begin();
-    auto Ty = baseClassSpecifier.getType();
-    auto nextBaseDecl = Ty->getAsCXXRecordDecl();
-    if (!nextBaseDecl)
-      return false;
-    baseDecl = nextBaseDecl->getDefinition();
-    if (!baseDecl)
-      return false;
-  } while (baseDecl->getName() != "RefCountedClass");
-
-  return true;
 }
 
 CxxRecordSemanticsKind
@@ -8749,113 +8704,6 @@ void swift::simple_display(llvm::raw_ostream &out,
 
 SourceLoc swift::extractNearestSourceLoc(CxxValueSemanticsDescriptor) {
   return SourceLoc();
-}
-
-static bool anySubobjectsSelfContained(const clang::CXXRecordDecl *decl) {
-  // std::pair and std::tuple might have copy and move constructors, or base
-  // classes with copy and move constructors, but they are not self-contained
-  // types, e.g. `std::pair<UnsafeType, T>`.
-  if (decl->isInStdNamespace() &&
-      (decl->getName() == "pair" || decl->getName() == "tuple"))
-    return false;
-
-  if (!decl->getDefinition())
-    return false;
-
-  if (hasCustomCopyOrMoveConstructor(decl) || hasOwnedValueAttr(decl))
-    return true;
-
-  auto checkType = [](clang::QualType t) {
-    if (auto recordType = dyn_cast<clang::RecordType>(t.getCanonicalType())) {
-      if (auto cxxRecord =
-              dyn_cast<clang::CXXRecordDecl>(recordType->getDecl())) {
-        return anySubobjectsSelfContained(cxxRecord);
-      }
-    }
-
-    return false;
-  };
-
-  for (auto field : decl->fields()) {
-    if (checkType(field->getType()))
-      return true;
-  }
-
-  for (auto base : decl->bases()) {
-    if (checkType(base.getType()))
-      return true;
-  }
-
-  return false;
-}
-
-bool importer::shouldRenameCXXMethodAsUnsafe(const clang::CXXMethodDecl *method,
-                                             ASTContext &ctx) {
-  // The user explicitly asked us to import this method.
-  if (hasUnsafeAPIAttr(method))
-    return false;
-
-  // If it's a static method, it cannot project anything. It's fine.
-  if (method->isOverloadedOperator() || method->isStatic() ||
-      isa<clang::CXXConstructorDecl>(method))
-    return false;
-
-  // begin and end methods likely return an iterator, so they're unsafe.
-  // This is required so that automatic the conformance to RAC works properly.
-  if (method->getNameAsString() == "begin" ||
-      method->getNameAsString() == "end")
-    return true;
-
-  if (clangTypeIsForeignReference(method->getReturnType(), ctx))
-    return false;
-
-  auto parentQualType =
-      method->getParent()->getTypeForDecl()->getCanonicalTypeUnqualified();
-
-  bool parentIsSelfContained =
-      !clangTypeIsForeignReference(parentQualType, ctx) &&
-      anySubobjectsSelfContained(method->getParent());
-
-  // If it returns a pointer or reference from an owned parent, that's a
-  // projection (unsafe).
-  if (method->getReturnType()->isPointerType() ||
-      method->getReturnType()->isReferenceType())
-    return parentIsSelfContained;
-
-  // Check if it's one of the known unsafe methods we currently
-  // mark as safe by default.
-  if (isUnsafeStdMethod(method))
-    return true;
-
-  // Try to figure out the semantics of the return type. If it's a
-  // pointer/iterator, it's unsafe.
-  if (auto returnType = dyn_cast<clang::RecordType>(
-          method->getReturnType().getCanonicalType())) {
-    if (auto cxxRecordReturnType =
-            dyn_cast<clang::CXXRecordDecl>(returnType->getDecl())) {
-      if (isSwiftClassType(cxxRecordReturnType))
-        return false;
-
-      if (hasIteratorAPIAttr(cxxRecordReturnType) ||
-          hasIteratorCategory(cxxRecordReturnType))
-        return true;
-
-      // Mark this as safe to help our diganostics down the road.
-      if (!cxxRecordReturnType->getDefinition()) {
-        return false;
-      }
-
-      // A projection of a view type (such as a string_view) from a self
-      // contained parent is a proejction (unsafe).
-      if (!anySubobjectsSelfContained(cxxRecordReturnType) &&
-          isViewType(cxxRecordReturnType)) {
-        return parentIsSelfContained;
-      }
-    }
-  }
-
-  // Otherwise, it's safe.
-  return false;
 }
 
 void swift::simple_display(llvm::raw_ostream &out,
