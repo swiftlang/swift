@@ -1,6 +1,7 @@
 // RUN: %target-run-simple-swift
 
 // REQUIRES: executable_test
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 func callee<X: P1, T: P2, U: P3, V: P4>(x: X, t: T, u: U, v: V)
     -> (any P1, any P2, any P3, any P4) {

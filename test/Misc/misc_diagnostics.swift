@@ -19,7 +19,7 @@ var pi = 3.14159265358979
 var d: CGFloat = 2.0
 var dpi:CGFloat = d*pi // Ok (implicit conversion Double -> CGFloat)
 
-let ff: CGFloat = floorf(20.0) // expected-error{{cannot convert value of type 'Float' to specified type 'CGFloat'}}
+let ff: CGFloat = floorf(20.0) // expected-error{{cannot convert value of type 'CFloat' (aka 'Float') to specified type 'CGFloat'}}
 let _: CGFloat = floor(20.0) // Ok (Double -> CGFloat) conversion
 
 let total = 15.0

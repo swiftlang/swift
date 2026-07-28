@@ -2292,75 +2292,92 @@ final public class CondBranchInst : TermInst {
   public var falseBlock: BasicBlock { successors[1] }
 
   public var condition: Value { operands[0].value }
-
-  public var trueOperands: OperandArray { operands[1..<(bridged.CondBranchInst_getNumTrueArgs() &+ 1)] }
-  public var falseOperands: OperandArray {
-    let ops = operands
-    return ops[(bridged.CondBranchInst_getNumTrueArgs() &+ 1)..<ops.count]
-  }
-
-  /// Returns the true or false block argument for the cond_br `operand`.
-  ///
-  /// Return nil if `operand` is the condition itself.
-  public func getArgument(for operand: Operand) -> Argument? {
-    let opIdx = operand.index
-    if opIdx == 0 {
-      return nil
-    }
-    let argIdx = opIdx - 1
-    let numTrueArgs = bridged.CondBranchInst_getNumTrueArgs()
-    if (0..<numTrueArgs).contains(argIdx) {
-      return trueBlock.arguments[argIdx]
-    } else {
-      return falseBlock.arguments[argIdx - numTrueArgs]
-    }
-  }
 }
 
 final public class SwitchValueInst : TermInst {
 }
 
-final public class SwitchEnumInst : TermInst, UnaryInstruction {
+public class SwitchEnumInstBase : TermInst, UnaryInstruction {
 
-  public var enumOp: Value { operand.value }
+  final public var enumOp: Value { operand.value }
 
   public struct CaseIndexArray : RandomAccessCollection {
-    fileprivate let switchEnum: SwitchEnumInst
+    fileprivate let switchEnum: SwitchEnumInstBase
 
     public var startIndex: Int { return 0 }
-    public var endIndex: Int { switchEnum.bridged.SwitchEnumInst_getNumCases() }
+    public var endIndex: Int { switchEnum.numCases }
 
-    public subscript(_ index: Int) -> Int {
-      switchEnum.bridged.SwitchEnumInst_getCaseIndex(index)
-    }
+    public subscript(_ index: Int) -> Int { switchEnum.getCaseIndex(index) }
   }
 
-  var caseIndices: CaseIndexArray { CaseIndexArray(switchEnum: self) }
+  final public var caseIndices: CaseIndexArray { CaseIndexArray(switchEnum: self) }
 
-  var cases: Zip2Sequence<CaseIndexArray, SuccessorArray> {
+  final public var cases: Zip2Sequence<CaseIndexArray, SuccessorArray> {
     zip(caseIndices, successors)
   }
 
-  public var numCases: Int { caseIndices.count }
+  public var numCases: Int { fatalError("numCases must be implemented by derived class") }
 
-  // This does not handle the special case where the default covers exactly
-  // the "missing" case.
-  public func getUniqueSuccessor(forCaseIndex: Int) -> BasicBlock? {
-    cases.first(where: { $0.0 == forCaseIndex })?.1
+  func getCaseIndex(_ index: Int) -> Int {
+    fatalError("getCaseIndex must be implemented by derived class")
+  }
+
+  public func getUniqueCaseForDefault() -> Int? {
+    fatalError("getUniqueCaseForDefault must be implemented by derived class")
   }
 
   public func getSuccessorForDefault() -> BasicBlock? {
-    return self.bridged.SwitchEnumInst_getSuccessorForDefault().block
+    fatalError("getSuccessorForDefault must be implemented by derived class")
   }
 
   // This does not handle the special case where the default covers exactly
   // the "missing" case.
-  public func getUniqueCase(forSuccessor: BasicBlock) -> Int? {
+  final public func getUniqueSuccessor(forCaseIndex: Int) -> BasicBlock? {
+    cases.first(where: { $0.0 == forCaseIndex })?.1
+  }
+
+  final public func getSuccessor(forCaseIndex: Int) -> BasicBlock {
+    for (idx, succ) in cases {
+      if idx == forCaseIndex {
+        return succ
+      }
+    }
+    return getSuccessorForDefault()!
+  }
+
+  // This does not handle the special case where the default covers exactly
+  // the "missing" case.
+  final public func getUniqueCase(forSuccessor: BasicBlock) -> Int? {
     cases.first(where: { $0.1 == forSuccessor })?.0
   }
 }
 
-final public class SwitchEnumAddrInst : TermInst {
+final public class SwitchEnumInst : SwitchEnumInstBase {
+  public override var numCases: Int { bridged.SwitchEnumInst_getNumCases() }
+  override func getCaseIndex(_ index: Int) -> Int { bridged.SwitchEnumInst_getCaseIndex(index) }
+
+  public override func getUniqueCaseForDefault() -> Int? {
+    let uniqueCaseIdx = bridged.SwitchEnumInst_getUniqueCaseForDefault()
+    return uniqueCaseIdx >= 0 ? uniqueCaseIdx : nil
+  }
+
+  public override func getSuccessorForDefault() -> BasicBlock? {
+    return self.bridged.SwitchEnumInst_getSuccessorForDefault().block
+  }
+}
+
+final public class SwitchEnumAddrInst : SwitchEnumInstBase {
+  public override var numCases: Int { bridged.SwitchEnumAddrInst_getNumCases() }
+  override func getCaseIndex(_ index: Int) -> Int { bridged.SwitchEnumAddrInst_getCaseIndex(index) }
+
+  public override func getUniqueCaseForDefault() -> Int? {
+    let uniqueCaseIdx = bridged.SwitchEnumAddrInst_getUniqueCaseForDefault()
+    return uniqueCaseIdx >= 0 ? uniqueCaseIdx : nil
+  }
+
+  public override func getSuccessorForDefault() -> BasicBlock? {
+    return self.bridged.SwitchEnumAddrInst_getSuccessorForDefault().block
+  }
 }
 
 final public class SelectEnumAddrInst : SingleValueInstruction {

@@ -3995,8 +3995,8 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
   if (auto opened1 = type1->getAs<ExistentialArchetypeType>()) {
     auto opened2 = type2->castTo<ExistentialArchetypeType>();
     assert(opened1->getInterfaceType()->isEqual(opened2->getInterfaceType()) &&
-           opened1->getGenericEnvironment()->getOpenedExistentialUUID() ==
-               opened2->getGenericEnvironment()->getOpenedExistentialUUID());
+           opened1->getGenericEnvironment()->getOpenedExistentialID() ==
+               opened2->getGenericEnvironment()->getOpenedExistentialID());
 
     auto args1 = opened1->getGenericEnvironment()
                      ->getOuterSubstitutions()
@@ -7136,17 +7136,6 @@ bool ConstraintSystem::repairFailures(
     return true;
   }
 
-  case ConstraintLocator::ResultBuilderBodyResult: {
-    // If result type of the body couldn't be determined
-    // there is going to be other fix available to diagnose
-    // the underlying issue.
-    if (lhs->isPlaceholder())
-      return true;
-
-    conversionsOrFixes.push_back(ContextualMismatch::create(
-        *this, lhs, rhs, getConstraintLocator(locator)));
-    break;
-  }
   case ConstraintLocator::GlobalActorType: {
     // Drop global actor element as it servers only to indentify the global
     // actor matching.
@@ -8068,11 +8057,11 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case TypeKind::ExistentialArchetype: {
       auto opened1 = cast<ExistentialArchetypeType>(desugar1);
       auto opened2 = cast<ExistentialArchetypeType>(desugar2);
-      // If they have the same interface type and UUID, two ExistentialArchetypeTypes
+      // If they have the same interface type and ID, two ExistentialArchetypeTypes
       // match if their generic arguments do as well.
       if (opened1->getInterfaceType()->isEqual(opened2->getInterfaceType()) &&
-          opened1->getGenericEnvironment()->getOpenedExistentialUUID() ==
-              opened2->getGenericEnvironment()->getOpenedExistentialUUID()) {
+          opened1->getGenericEnvironment()->getOpenedExistentialID() ==
+              opened2->getGenericEnvironment()->getOpenedExistentialID()) {
         conversionsOrFixes.push_back(ConversionRestrictionKind::DeepEquality);
       }
       break;
@@ -10780,10 +10769,15 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
     };
 
     // Metatype extension members are only accessible on the protocol
-    // metatype itself, not on conforming types.
+    // metatype itself, not on conforming types. Keep the declaration as an
+    // unviable candidate so diagnostics can explain that distinction.
     if (decl->getDeclContext()->isMetatypeExtension() &&
-        !instanceTy->isExistentialType())
+        !instanceTy->isExistentialType()) {
+      result.addUnviable(
+          candidate,
+          MemberLookupResult::UR_MetatypeExtensionMemberOnConformingType);
       return;
+    }
 
     // See if we have an instance method, instance member or static method,
     // and check if it can be accessed on our base type.
@@ -11450,6 +11444,12 @@ static ConstraintFix *fixMemberRef(
                        cs, baseTy, choice.getDecl(), memberName, locator)
                  : nullptr;
     }
+
+    case MemberLookupResult::UR_MetatypeExtensionMemberOnConformingType:
+      return choice.isDecl()
+                 ? AllowMetatypeExtensionMemberOnConformingType::create(
+                       cs, baseTy, choice.getDecl(), memberName, locator)
+                 : nullptr;
 
     case MemberLookupResult::UR_WrongModule:
       ASSERT(choice.isDecl());
@@ -16184,6 +16184,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::RemoveUnwrap:
   case FixKind::DefineMemberBasedOnUse:
   case FixKind::AllowTypeOrInstanceMember:
+  case FixKind::AllowMetatypeExtensionMemberOnConformingType:
   case FixKind::AllowInvalidPartialApplication:
   case FixKind::AllowInvalidInitRef:
   case FixKind::AllowClosureParameterDestructuring:

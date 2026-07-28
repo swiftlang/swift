@@ -145,7 +145,10 @@ static SILDeclRef getBridgingFn(std::optional<SILDeclRef> &cacheSlot,
     SILDeclRef c(fd);
     auto funcTy =
         SGM.Types.getConstantFunctionType(TypeExpansionContext::minimal(), c);
-    SILFunctionConventions fnConv(funcTy, SGM.M);
+    // No function body in scope; this only validates the bridging function's
+    // ABI shape, so use the build-mode default conventions.
+    SILFunctionConventions fnConv(
+        funcTy, SILAddressConventions::forRawSIL(SGM.M));
 
     auto toSILType = [&SGM](Type ty) {
       return SGM.Types.getLoweredType(ty, TypeExpansionContext::minimal());
@@ -1484,6 +1487,9 @@ void SILGenModule::emitDifferentiabilityWitness(
   auto origSilFnType = originalFunction->getLoweredFunctionType();
   auto *silParamIndices =
       autodiff::getLoweredParameterIndices(config.parameterIndices, origFnType);
+  bool isDefaultDerivative =
+      isa<ProtocolDecl>(originalAFD->getDeclContext()) &&
+      !originalAFD->getAttrs().hasAttribute<DifferentiableAttr>();
 
   // NOTE(TF-893): Extending capacity is necessary when `origSilFnType` has
   // parameters corresponding to captured variables. These parameters do not
@@ -1518,7 +1524,8 @@ void SILGenModule::emitDifferentiabilityWitness(
         M, linkage, originalFunction, diffKind, silConfig.parameterIndices,
         silConfig.resultIndices, config.derivativeGenericSignature,
         /*jvp*/ nullptr, /*vjp*/ nullptr,
-        /*isSerialized*/ hasPublicVisibility(linkage), attr);
+        /*isSerialized*/ hasPublicVisibility(linkage), isDefaultDerivative,
+        attr);
   }
 
   // Set derivative function in differentiability witness.
@@ -1611,21 +1618,22 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
         vjp = f;
         break;
       }
-      auto *origAFD = derivAttr->getOriginalFunction(getASTContext());
-      auto origDeclRef =
-          SILDeclRef(origAFD).asForeign(requiresForeignEntryPoint(origAFD));
-      auto *origFn = getFunction(origDeclRef, NotForDefinition);
-      auto witnessGenSig =
-          autodiff::getDifferentiabilityWitnessGenericSignature(
-              origAFD->getGenericSignature(), AFD->getGenericSignature());
-      auto *resultIndices =
-        autodiff::getFunctionSemanticResultIndices(origAFD,
-                                                   derivAttr->getParameterIndices());
-      AutoDiffConfig config(derivAttr->getParameterIndices(), resultIndices,
-                            witnessGenSig);
-      emitDifferentiabilityWitness(origAFD, origFn,
-                                   DifferentiabilityKind::Reverse, config, jvp,
-                                   vjp, derivAttr);
+
+      for (auto *origAFD : derivAttr->getOriginalFunctions(getASTContext())) {
+        auto origDeclRef =
+            SILDeclRef(origAFD).asForeign(requiresForeignEntryPoint(origAFD));
+        auto *origFn = getFunction(origDeclRef, NotForDefinition);
+        auto witnessGenSig =
+            autodiff::getDifferentiabilityWitnessGenericSignature(
+                origAFD->getGenericSignature(), AFD->getGenericSignature());
+        auto *resultIndices = autodiff::getFunctionSemanticResultIndices(
+            origAFD, derivAttr->getParameterIndices());
+        AutoDiffConfig config(derivAttr->getParameterIndices(), resultIndices,
+                              witnessGenSig);
+        emitDifferentiabilityWitness(origAFD, origFn,
+                                     DifferentiabilityKind::Reverse, config,
+                                     jvp, vjp, derivAttr);
+      }
     }
 }
 
@@ -2268,27 +2276,19 @@ void SILGenModule::emitSourceFile(SourceFile *sf) {
     visit(D);
   }
 
-  // FIXME: Visit macro-generated extensions separately.
-  //
-  // The code below that visits auxiliary decls of the top-level
-  // decls in the source file does not work for nested types with
-  // attached conformance macros:
+  // Visit extensions recorded in the synthesized file separately. The code
+  // above that visits auxiliary decls of the top-level decls in the source
+  // file does not work for nested types with attached conformance macros:
   // ```
   // struct Outer {
   //   @AddConformance struct Inner {}
   // }
   // ```
-  // Because the attached-to decl is not at the top-level. To fix this,
-  // visit the macro-generated conformances that are recorded in the
-  // synthesized file unit to cover all macro-generated extension decls.
+  // Because the attached-to decl is not at the top level. Other compiler
+  // features can also add extensions directly to the synthesized file.
   if (auto *synthesizedFile = sf->getSynthesizedFile()) {
     for (auto *D : synthesizedFile->getTopLevelDecls()) {
       if (!isa<ExtensionDecl>(D))
-        continue;
-
-      auto *sf = D->getInnermostDeclContext()->getParentSourceFile();
-      if (sf->getFulfilledMacroRole() != MacroRole::Conformance &&
-          sf->getFulfilledMacroRole() != MacroRole::Extension)
         continue;
 
       visit(D);

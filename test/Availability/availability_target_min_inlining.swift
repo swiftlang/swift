@@ -87,6 +87,12 @@ public struct Unavailable { // expected-note * {{'Unavailable' has been explicit
   init<T>(_ t: T) {}
 }
 
+@available(macOS, deprecated: 10.14.5)
+public struct DeprecatedBetweenTargets {
+  @usableFromInline internal init() {}
+  init<T>(_ t: T) {}
+}
+
 // MARK: - Protocol definitions
 
 public protocol NoAvailableProto {}
@@ -150,6 +156,7 @@ internal func internalFn( // expected-note 3 {{add '@available' attribute to enc
   _: BeforeInliningTarget,
   _: AtInliningTarget,
   _: BetweenTargets,
+  _: DeprecatedBetweenTargets, // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
   _: AtDeploymentTarget,
   _: AfterDeploymentTarget, // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
   _: ObsoletedBetweenTargets, // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
@@ -162,6 +169,7 @@ internal func internalFn( // expected-note 3 {{add '@available' attribute to enc
   _ = BeforeInliningTarget()
   _ = AtInliningTarget()
   _ = BetweenTargets()
+  _ = DeprecatedBetweenTargets() // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
   _ = AtDeploymentTarget()
   _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add 'if #available'}}
   _ = ObsoletedBetweenTargets() // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
@@ -183,6 +191,7 @@ public func deployedUseNoAvailable( // expected-note 5 {{add '@available' attrib
   _: BeforeInliningTarget,
   _: AtInliningTarget,
   _: BetweenTargets, // expected-error {{'BetweenTargets' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}}
+  _: DeprecatedBetweenTargets,
   _: AtDeploymentTarget, // expected-error {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}}
   _: AfterDeploymentTarget, // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
   _: ObsoletedBetweenTargets,
@@ -196,6 +205,7 @@ public func deployedUseNoAvailable( // expected-note 5 {{add '@available' attrib
   _ = BeforeInliningTarget()
   _ = AtInliningTarget()
   _ = BetweenTargets()
+  _ = DeprecatedBetweenTargets() // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
   _ = AtDeploymentTarget()
   _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add 'if #available'}}
   _ = ObsoletedBetweenTargets() // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
@@ -212,6 +222,7 @@ public func deployedUseBeforeInliningTarget(
   _: BeforeInliningTarget,
   _: AtInliningTarget,
   _: BetweenTargets, // expected-error {{'BetweenTargets' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}}
+  _: DeprecatedBetweenTargets,
   _: AtDeploymentTarget, // expected-error {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}}
   _: AfterDeploymentTarget, // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
   _: ObsoletedBetweenTargets,
@@ -225,6 +236,7 @@ public func deployedUseBeforeInliningTarget(
   _ = BeforeInliningTarget()
   _ = AtInliningTarget()
   _ = BetweenTargets()
+  _ = DeprecatedBetweenTargets() // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
   _ = AtDeploymentTarget()
   _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add 'if #available'}}
   _ = ObsoletedBetweenTargets() // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
@@ -241,6 +253,7 @@ public func deployedUseAtInliningTarget(
   _: BeforeInliningTarget,
   _: AtInliningTarget,
   _: BetweenTargets, // expected-error {{'BetweenTargets' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}}
+  _: DeprecatedBetweenTargets,
   _: AtDeploymentTarget, // expected-error {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}}
   _: AfterDeploymentTarget, // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
   _: ObsoletedBetweenTargets,
@@ -254,6 +267,7 @@ public func deployedUseAtInliningTarget(
   _ = BeforeInliningTarget()
   _ = AtInliningTarget()
   _ = BetweenTargets()
+  _ = DeprecatedBetweenTargets() // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
   _ = AtDeploymentTarget()
   _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add 'if #available'}}
   _ = ObsoletedBetweenTargets() // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
@@ -270,6 +284,7 @@ public func deployedUseBetweenTargets(
   _: BeforeInliningTarget,
   _: AtInliningTarget,
   _: BetweenTargets,
+  _: DeprecatedBetweenTargets, // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
   _: AtDeploymentTarget, // expected-error {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}}
   _: AfterDeploymentTarget, // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
   _: ObsoletedBetweenTargets, // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
@@ -283,6 +298,7 @@ public func deployedUseBetweenTargets(
   _ = BeforeInliningTarget()
   _ = AtInliningTarget()
   _ = BetweenTargets()
+  _ = DeprecatedBetweenTargets() // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
   _ = AtDeploymentTarget()
   _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add 'if #available'}}
   _ = ObsoletedBetweenTargets() // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
@@ -299,6 +315,7 @@ public func deployedUseAtDeploymentTarget(
   _: BeforeInliningTarget,
   _: AtInliningTarget,
   _: BetweenTargets,
+  _: DeprecatedBetweenTargets, // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
   _: AtDeploymentTarget,
   _: AfterDeploymentTarget, // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
   _: ObsoletedBetweenTargets, // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
@@ -312,6 +329,7 @@ public func deployedUseAtDeploymentTarget(
   _ = BeforeInliningTarget()
   _ = AtInliningTarget()
   _ = BetweenTargets()
+  _ = DeprecatedBetweenTargets() // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
   _ = AtDeploymentTarget()
   _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add 'if #available'}}
   _ = ObsoletedBetweenTargets() // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
@@ -328,6 +346,7 @@ public func deployedUseAfterDeploymentTarget(
   _: BeforeInliningTarget,
   _: AtInliningTarget,
   _: BetweenTargets,
+  _: DeprecatedBetweenTargets, // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
   _: AtDeploymentTarget,
   _: AfterDeploymentTarget,
   _: ObsoletedBetweenTargets, // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
@@ -341,6 +360,7 @@ public func deployedUseAfterDeploymentTarget(
   _ = BeforeInliningTarget()
   _ = AtInliningTarget()
   _ = BetweenTargets()
+  _ = DeprecatedBetweenTargets() // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
   _ = AtDeploymentTarget()
   _ = AfterDeploymentTarget()
   _ = ObsoletedBetweenTargets() // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
@@ -353,6 +373,7 @@ public func alwaysUnavailable(
   _: BeforeInliningTarget,
   _: AtInliningTarget,
   _: BetweenTargets,
+  _: DeprecatedBetweenTargets,
   _: AtDeploymentTarget,
   _: AfterDeploymentTarget,
   _: ObsoletedBetweenTargets,
@@ -367,6 +388,7 @@ public func alwaysUnavailable(
   _ = BeforeInliningTarget()
   _ = AtInliningTarget()
   _ = BetweenTargets()
+  _ = DeprecatedBetweenTargets()
   _ = AtDeploymentTarget()
   _ = AfterDeploymentTarget()
   _ = ObsoletedBetweenTargets()
@@ -384,6 +406,7 @@ public func obsoletedBeforeInliningTarget(
   _: BeforeInliningTarget,
   _: AtInliningTarget,
   _: BetweenTargets,
+  _: DeprecatedBetweenTargets,
   _: AtDeploymentTarget,
   _: AfterDeploymentTarget,
   _: ObsoletedBetweenTargets,
@@ -398,6 +421,7 @@ public func obsoletedBeforeInliningTarget(
   _ = BeforeInliningTarget()
   _ = AtInliningTarget()
   _ = BetweenTargets()
+  _ = DeprecatedBetweenTargets()
   _ = AtDeploymentTarget()
   _ = AfterDeploymentTarget()
   _ = ObsoletedBetweenTargets()
@@ -415,6 +439,7 @@ public func obsoletedAtInliningTarget(
   _: BeforeInliningTarget,
   _: AtInliningTarget,
   _: BetweenTargets,
+  _: DeprecatedBetweenTargets,
   _: AtDeploymentTarget,
   _: AfterDeploymentTarget,
   _: ObsoletedBetweenTargets,
@@ -429,6 +454,7 @@ public func obsoletedAtInliningTarget(
   _ = BeforeInliningTarget()
   _ = AtInliningTarget()
   _ = BetweenTargets()
+  _ = DeprecatedBetweenTargets()
   _ = AtDeploymentTarget()
   _ = AfterDeploymentTarget()
   _ = ObsoletedBetweenTargets()
@@ -446,6 +472,7 @@ public func obsoletedBetweenTargets(
   _: BeforeInliningTarget,
   _: AtInliningTarget,
   _: BetweenTargets, // expected-error {{'BetweenTargets' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}}
+  _: DeprecatedBetweenTargets,
   _: AtDeploymentTarget, // expected-error {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}}
   _: AfterDeploymentTarget, // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
   _: ObsoletedBetweenTargets,
@@ -460,6 +487,7 @@ public func obsoletedBetweenTargets(
   _ = BeforeInliningTarget()
   _ = AtInliningTarget()
   _ = BetweenTargets()
+  _ = DeprecatedBetweenTargets()
   _ = AtDeploymentTarget()
   _ = AfterDeploymentTarget()
   _ = ObsoletedBetweenTargets()
@@ -477,6 +505,7 @@ public func obsoletedAtDeploymentTarget(
   _: BeforeInliningTarget,
   _: AtInliningTarget,
   _: BetweenTargets, // expected-error {{'BetweenTargets' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}}
+  _: DeprecatedBetweenTargets,
   _: AtDeploymentTarget, // expected-error {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}}
   _: AfterDeploymentTarget, // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
   _: ObsoletedBetweenTargets,
@@ -491,6 +520,7 @@ public func obsoletedAtDeploymentTarget(
   _ = BeforeInliningTarget()
   _ = AtInliningTarget()
   _ = BetweenTargets()
+  _ = DeprecatedBetweenTargets()
   _ = AtDeploymentTarget()
   _ = AfterDeploymentTarget()
   _ = ObsoletedBetweenTargets()
@@ -508,6 +538,7 @@ public func obsoletedAfterDeploymentTarget(
   _: BeforeInliningTarget,
   _: AtInliningTarget,
   _: BetweenTargets, // expected-error {{'BetweenTargets' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}}
+  _: DeprecatedBetweenTargets,
   _: AtDeploymentTarget, // expected-error {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}}
   _: AfterDeploymentTarget, // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
   _: ObsoletedBetweenTargets,
@@ -522,6 +553,7 @@ public func obsoletedAfterDeploymentTarget(
   _ = BeforeInliningTarget()
   _ = AtInliningTarget()
   _ = BetweenTargets()
+  _ = DeprecatedBetweenTargets() // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
   _ = AtDeploymentTarget()
   _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add 'if #available'}}
   _ = ObsoletedBetweenTargets() // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
@@ -539,6 +571,7 @@ public func spiDeployedUseNoAvailable( // expected-note 3 {{add '@available' att
   _: BeforeInliningTarget,
   _: AtInliningTarget,
   _: BetweenTargets,
+  _: DeprecatedBetweenTargets, // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
   _: AtDeploymentTarget,
   _: AfterDeploymentTarget, // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
   _: ObsoletedBetweenTargets, // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
@@ -552,6 +585,7 @@ public func spiDeployedUseNoAvailable( // expected-note 3 {{add '@available' att
   _ = BeforeInliningTarget()
   _ = AtInliningTarget()
   _ = BetweenTargets()
+  _ = DeprecatedBetweenTargets() // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
   _ = AtDeploymentTarget()
   _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add 'if #available'}}
   _ = ObsoletedBetweenTargets() // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
@@ -574,6 +608,7 @@ public func spiDeployedUseNoAvailable( // expected-note 3 {{add '@available' att
   _: BeforeInliningTarget,
   _: AtInliningTarget,
   _: BetweenTargets, // expected-error {{'BetweenTargets' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}}
+  _: DeprecatedBetweenTargets,
   _: AtDeploymentTarget, // expected-error {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}}
   _: AfterDeploymentTarget, // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
   _: ObsoletedBetweenTargets,
@@ -587,12 +622,14 @@ public func spiDeployedUseNoAvailable( // expected-note 3 {{add '@available' att
   _ = BeforeInliningTarget()
   _ = AtInliningTarget()
   _ = BetweenTargets() // expected-error {{'BetweenTargets' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}} expected-note {{add 'if #available'}}
+  _ = DeprecatedBetweenTargets()
   _ = AtDeploymentTarget() // expected-error {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}} expected-note {{add 'if #available'}}
   _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add 'if #available'}}
   _ = ObsoletedBetweenTargets()
 
   if #available(macOS 10.14.5, *) {
     _ = BetweenTargets()
+    _ = DeprecatedBetweenTargets() // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
     _ = ObsoletedBetweenTargets() // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
   }
   if #available(macOS 10.15, *) {
@@ -615,12 +652,14 @@ public func spiDeployedUseNoAvailable( // expected-note 3 {{add '@available' att
   let _ = BeforeInliningTarget()
   let _ = AtInliningTarget()
   let _ = BetweenTargets() // expected-error {{'BetweenTargets' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}} expected-note {{add 'if #available'}}
+  let _ = DeprecatedBetweenTargets()
   let _ = AtDeploymentTarget() // expected-error {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}} expected-note {{add 'if #available'}}
   let _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add 'if #available'}}
   let _ = ObsoletedBetweenTargets()
 
   if #available(macOS 10.14.5, *) {
     let _ = BetweenTargets()
+    let _ = DeprecatedBetweenTargets() // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
     let _ = ObsoletedBetweenTargets() // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
   }
   if #available(macOS 10.15, *) {
@@ -639,6 +678,7 @@ public func spiDeployedUseNoAvailable( // expected-note 3 {{add '@available' att
   _: BeforeInliningTarget,
   _: AtInliningTarget,
   _: BetweenTargets, // expected-error {{'BetweenTargets' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}}
+  _: DeprecatedBetweenTargets,
   _: AtDeploymentTarget, // expected-error {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}}
   _: AfterDeploymentTarget, // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
   _: ObsoletedBetweenTargets,
@@ -652,12 +692,14 @@ public func spiDeployedUseNoAvailable( // expected-note 3 {{add '@available' att
   _ = BeforeInliningTarget()
   _ = AtInliningTarget()
   _ = BetweenTargets() // expected-error {{'BetweenTargets' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}} expected-note {{add 'if #available'}}
+  _ = DeprecatedBetweenTargets()
   _ = AtDeploymentTarget() // expected-error {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}} expected-note {{add 'if #available'}}
   _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add 'if #available'}}
   _ = ObsoletedBetweenTargets()
 
   if #available(macOS 10.14.5, *) {
     _ = BetweenTargets()
+    _ = DeprecatedBetweenTargets() // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
     _ = ObsoletedBetweenTargets() // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
   }
   if #available(macOS 10.15, *) {
@@ -676,6 +718,7 @@ public func spiDeployedUseNoAvailable( // expected-note 3 {{add '@available' att
   _: BeforeInliningTarget,
   _: AtInliningTarget,
   _: BetweenTargets, // expected-error {{'BetweenTargets' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}}
+  _: DeprecatedBetweenTargets,
   _: AtDeploymentTarget, // expected-error {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}}
   _: AfterDeploymentTarget, // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
   _: ObsoletedBetweenTargets,
@@ -689,12 +732,14 @@ public func spiDeployedUseNoAvailable( // expected-note 3 {{add '@available' att
   _ = BeforeInliningTarget()
   _ = AtInliningTarget()
   _ = BetweenTargets() // expected-error {{'BetweenTargets' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}} expected-note {{add 'if #available'}}
+  _ = DeprecatedBetweenTargets()
   _ = AtDeploymentTarget() // expected-error {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}} expected-note {{add 'if #available'}}
   _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add 'if #available'}}
   _ = ObsoletedBetweenTargets()
 
   if #available(macOS 10.14.5, *) {
     _ = BetweenTargets()
+    _ = DeprecatedBetweenTargets() // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
     _ = ObsoletedBetweenTargets() // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
   }
   if #available(macOS 10.15, *) {
@@ -713,6 +758,7 @@ public func spiDeployedUseNoAvailable( // expected-note 3 {{add '@available' att
   _: BeforeInliningTarget,
   _: AtInliningTarget,
   _: BetweenTargets,
+  _: DeprecatedBetweenTargets, // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
   _: AtDeploymentTarget, // expected-error {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}}
   _: AfterDeploymentTarget, // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
   _: ObsoletedBetweenTargets, // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
@@ -726,6 +772,7 @@ public func spiDeployedUseNoAvailable( // expected-note 3 {{add '@available' att
   _ = BeforeInliningTarget()
   _ = AtInliningTarget()
   _ = BetweenTargets()
+  _ = DeprecatedBetweenTargets() // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
   _ = AtDeploymentTarget() // expected-error {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}} expected-note {{add 'if #available'}}
   _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add 'if #available'}}
   _ = ObsoletedBetweenTargets() // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
@@ -746,6 +793,7 @@ public func spiDeployedUseNoAvailable( // expected-note 3 {{add '@available' att
   _: BeforeInliningTarget,
   _: AtInliningTarget,
   _: BetweenTargets,
+  _: DeprecatedBetweenTargets, // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
   _: AtDeploymentTarget,
   _: AfterDeploymentTarget, // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
   _: ObsoletedBetweenTargets, // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
@@ -759,6 +807,7 @@ public func spiDeployedUseNoAvailable( // expected-note 3 {{add '@available' att
   _ = BeforeInliningTarget()
   _ = AtInliningTarget()
   _ = BetweenTargets()
+  _ = DeprecatedBetweenTargets() // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
   _ = AtDeploymentTarget()
   _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add 'if #available'}}
   _ = ObsoletedBetweenTargets() // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
@@ -775,6 +824,7 @@ public func spiDeployedUseNoAvailable( // expected-note 3 {{add '@available' att
   _: BeforeInliningTarget,
   _: AtInliningTarget,
   _: BetweenTargets,
+  _: DeprecatedBetweenTargets, // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
   _: AtDeploymentTarget,
   _: AfterDeploymentTarget,
   _: ObsoletedBetweenTargets, // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
@@ -788,6 +838,7 @@ public func spiDeployedUseNoAvailable( // expected-note 3 {{add '@available' att
   _ = BeforeInliningTarget()
   _ = AtInliningTarget()
   _ = BetweenTargets()
+  _ = DeprecatedBetweenTargets() // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
   _ = AtDeploymentTarget()
   _ = AfterDeploymentTarget()
   _ = ObsoletedBetweenTargets() // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
@@ -799,6 +850,7 @@ public func spiDeployedUseNoAvailable( // expected-note 3 {{add '@available' att
   _: BeforeInliningTarget,
   _: AtInliningTarget,
   _: BetweenTargets,
+  _: DeprecatedBetweenTargets,
   _: AtDeploymentTarget,
   _: AfterDeploymentTarget,
   _: ObsoletedBetweenTargets,
@@ -813,6 +865,7 @@ public func spiDeployedUseNoAvailable( // expected-note 3 {{add '@available' att
   _ = BeforeInliningTarget()
   _ = AtInliningTarget()
   _ = BetweenTargets()
+  _ = DeprecatedBetweenTargets()
   _ = AtDeploymentTarget()
   _ = AfterDeploymentTarget()
   _ = ObsoletedBetweenTargets()
@@ -830,6 +883,7 @@ public func spiDeployedUseNoAvailable( // expected-note 3 {{add '@available' att
   _: BeforeInliningTarget,
   _: AtInliningTarget,
   _: BetweenTargets,
+  _: DeprecatedBetweenTargets, // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
   _: AtDeploymentTarget,
   _: AfterDeploymentTarget, // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
   _: ObsoletedBetweenTargets, // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
@@ -843,6 +897,7 @@ public func spiDeployedUseNoAvailable( // expected-note 3 {{add '@available' att
   _ = BeforeInliningTarget()
   _ = AtInliningTarget()
   _ = BetweenTargets()
+  _ = DeprecatedBetweenTargets() // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
   _ = AtDeploymentTarget()
   _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add 'if #available'}}
   _ = ObsoletedBetweenTargets() // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
@@ -860,6 +915,7 @@ public func spiDeployedUseNoAvailable( // expected-note 3 {{add '@available' att
   _ = BeforeInliningTarget()
   _ = AtInliningTarget()
   _ = BetweenTargets() // expected-error {{'BetweenTargets' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}} expected-note {{add 'if #available' version check}}
+  _ = DeprecatedBetweenTargets()
   _ = AtDeploymentTarget() // expected-error {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}} expected-note {{add 'if #available' version check}}
   _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add 'if #available'}}
 
@@ -876,6 +932,7 @@ public func spiDeployedUseNoAvailable( // expected-note 3 {{add '@available' att
     _ = BeforeInliningTarget()
     _ = AtInliningTarget()
     _ = BetweenTargets() // expected-error {{'BetweenTargets' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}} expected-note {{add 'if #available' version check}}
+    _ = DeprecatedBetweenTargets()
     _ = AtDeploymentTarget() // expected-error {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}} expected-note {{add 'if #available' version check}}
     _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add 'if #available'}}
 
@@ -893,6 +950,7 @@ public func spiDeployedUseNoAvailable( // expected-note 3 {{add '@available' att
   _ = BeforeInliningTarget()
   _ = AtInliningTarget()
   _ = BetweenTargets()
+  _ = DeprecatedBetweenTargets() // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
   _ = AtDeploymentTarget()
   _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add 'if #available'}}
 
@@ -910,6 +968,7 @@ public func spiDeployedUseNoAvailable( // expected-note 3 {{add '@available' att
     _ = BeforeInliningTarget()
     _ = AtInliningTarget()
     _ = BetweenTargets()
+    _ = DeprecatedBetweenTargets() // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
     _ = AtDeploymentTarget()
     _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add 'if #available'}}
 
@@ -927,6 +986,7 @@ public func spiDeployedUseNoAvailable( // expected-note 3 {{add '@available' att
   _ = BeforeInliningTarget()
   _ = AtInliningTarget()
   _ = BetweenTargets()
+  _ = DeprecatedBetweenTargets() // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
   _ = AtDeploymentTarget()
   _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add 'if #available'}}
 
@@ -947,6 +1007,7 @@ public func spiDeployedUseNoAvailable( // expected-note 3 {{add '@available' att
     _ = BeforeInliningTarget()
     _ = AtInliningTarget()
     _ = BetweenTargets()
+    _ = DeprecatedBetweenTargets() // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
     _ = AtDeploymentTarget()
     _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add 'if #available'}}
 
@@ -962,6 +1023,7 @@ public func spiDeployedUseNoAvailable( // expected-note 3 {{add '@available' att
   _ = BeforeInliningTarget()
   _ = AtInliningTarget()
   _ = BetweenTargets()
+  _ = DeprecatedBetweenTargets()
   _ = AtDeploymentTarget()
   _ = AfterDeploymentTarget()
 
@@ -982,6 +1044,7 @@ public func spiDeployedUseNoAvailable( // expected-note 3 {{add '@available' att
     _ = BeforeInliningTarget()
     _ = AtInliningTarget()
     _ = BetweenTargets()
+    _ = DeprecatedBetweenTargets()
     _ = AtDeploymentTarget()
     _ = AfterDeploymentTarget()
 
@@ -1000,6 +1063,7 @@ public func spiDeployedUseNoAvailable( // expected-note 3 {{add '@available' att
   _: BeforeInliningTarget,
   _: AtInliningTarget,
   _: BetweenTargets, // expected-error {{'BetweenTargets' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}}
+  _: DeprecatedBetweenTargets,
   _: AtDeploymentTarget, // expected-error {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}}
   _: AfterDeploymentTarget, // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
   _: ObsoletedBetweenTargets,
@@ -1013,12 +1077,14 @@ public func spiDeployedUseNoAvailable( // expected-note 3 {{add '@available' att
   _ = BeforeInliningTarget()
   _ = AtInliningTarget()
   _ = BetweenTargets() // expected-error {{'BetweenTargets' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}} expected-note {{add 'if #available'}}
+  _ = DeprecatedBetweenTargets()
   _ = AtDeploymentTarget() // expected-error {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}} expected-note {{add 'if #available'}}
   _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add 'if #available'}}
   _ = ObsoletedBetweenTargets()
 
   if #available(macOS 10.14.5, *) {
     _ = BetweenTargets()
+    _ = DeprecatedBetweenTargets() // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
     _ = ObsoletedBetweenTargets() // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
   }
   if #available(macOS 10.15, *) {
@@ -1043,6 +1109,7 @@ public func backDeployedToInliningTarget(
   _: BeforeInliningTarget,
   _: AtInliningTarget,
   _: BetweenTargets, // expected-error {{'BetweenTargets' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}}
+  _: DeprecatedBetweenTargets,
   _: AtDeploymentTarget, // expected-error {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}}
   _: AfterDeploymentTarget, // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
   _: ObsoletedBetweenTargets,
@@ -1056,12 +1123,14 @@ public func backDeployedToInliningTarget(
   _ = BeforeInliningTarget()
   _ = AtInliningTarget()
   _ = BetweenTargets() // expected-error {{'BetweenTargets' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}} expected-note {{add 'if #available'}}
+  _ = DeprecatedBetweenTargets()
   _ = AtDeploymentTarget() // expected-error {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}} expected-note {{add 'if #available'}}
   _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add 'if #available'}}
   _ = ObsoletedBetweenTargets()
 
   if #available(macOS 10.14.5, *) {
     _ = BetweenTargets()
+    _ = DeprecatedBetweenTargets() // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
     _ = ObsoletedBetweenTargets() // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
   }
   if #available(macOS 10.15, *) {
@@ -1084,6 +1153,7 @@ public func defaultArgsUseNoAvailable( // expected-note 3 {{add '@available' att
   _: Any = BeforeInliningTarget.self,
   _: Any = AtInliningTarget.self,
   _: Any = BetweenTargets.self, // expected-error {{'BetweenTargets' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}}
+  _: Any = DeprecatedBetweenTargets.self,
   _: Any = AtDeploymentTarget.self, // expected-error {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}}
   _: Any = AfterDeploymentTarget.self, // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
   _: Any = ObsoletedBetweenTargets.self,
@@ -1094,6 +1164,7 @@ func defaultArgsUseInternal( // expected-note {{add '@available' attribute}}
   _: Any = BeforeInliningTarget.self,
   _: Any = AtInliningTarget.self,
   _: Any = BetweenTargets.self,
+  _: Any = DeprecatedBetweenTargets.self, // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
   _: Any = AtDeploymentTarget.self,
   _: Any = AfterDeploymentTarget.self, // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
   _: Any = ObsoletedBetweenTargets.self, // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
@@ -1105,6 +1176,7 @@ public func defaultArgsUseUnavailable(
   _: Any = BeforeInliningTarget.self,
   _: Any = AtInliningTarget.self,
   _: Any = BetweenTargets.self,
+  _: Any = DeprecatedBetweenTargets.self,
   _: Any = AtDeploymentTarget.self,
   _: Any = AfterDeploymentTarget.self,
   _: Any = ObsoletedBetweenTargets.self,
@@ -1117,6 +1189,7 @@ public func spiDefaultArgsUseNoAvailable( // expected-note 1 {{add '@available' 
   _: Any = BeforeInliningTarget.self,
   _: Any = AtInliningTarget.self,
   _: Any = BetweenTargets.self,
+  _: Any = DeprecatedBetweenTargets.self, // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
   _: Any = AtDeploymentTarget.self,
   _: Any = AfterDeploymentTarget.self, // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
   _: Any = ObsoletedBetweenTargets.self, // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
@@ -1130,11 +1203,13 @@ public func defaultArgsClosureExprNoAvailable( // expected-note 3 {{add '@availa
     _ = BeforeInliningTarget.self
     _ = AtInliningTarget.self
     _ = BetweenTargets.self // expected-error {{'BetweenTargets' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}} expected-note {{add 'if #available' version check}}
+    _ = DeprecatedBetweenTargets.self
     _ = AtDeploymentTarget.self // expected-error {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}} expected-note {{add 'if #available' version check}}
     _ = AfterDeploymentTarget.self // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add 'if #available' version check}}
     _ = ObsoletedBetweenTargets.self
     if #available(macOS 10.14.5, *) {
       _ = BetweenTargets.self
+      _ = DeprecatedBetweenTargets.self // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
     }
     if #available(macOS 10.15, *) {
       _ = AtDeploymentTarget.self
@@ -1152,6 +1227,7 @@ func defaultArgsClosureExprInternal( // expected-note {{add '@available' attribu
     _ = BeforeInliningTarget.self
     _ = AtInliningTarget.self
     _ = BetweenTargets.self
+    _ = DeprecatedBetweenTargets.self // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
     _ = AtDeploymentTarget.self
     _ = AfterDeploymentTarget.self // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add 'if #available' version check}}
     _ = ObsoletedBetweenTargets.self // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
@@ -1173,12 +1249,13 @@ public struct PropertyWrapper<T> {
   public init(_ value: T) { self.wrappedValue = value }
 }
 
-public struct PublicStruct { // expected-note 21 {{add '@available' attribute}}
+public struct PublicStruct { // expected-note 22 {{add '@available' attribute}}
   // Public property declarations are exposed.
   public var aPublic: NoAvailable,
              bPublic: BeforeInliningTarget,
              cPublic: AtInliningTarget,
              dPublic: BetweenTargets, // expected-error {{'BetweenTargets' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}}
+             dPublicDep: DeprecatedBetweenTargets,
              ePublic: AtDeploymentTarget, // expected-error {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}}
              fPublic: AfterDeploymentTarget, // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
              gPublic: ObsoletedBetweenTargets
@@ -1188,6 +1265,7 @@ public struct PublicStruct { // expected-note 21 {{add '@available' attribute}}
              bPublicAvailBetween: BeforeInliningTarget,
              cPublicAvailBetween: AtInliningTarget,
              dPublicAvailBetween: BetweenTargets,
+             dPublicAvailBetweenDep: DeprecatedBetweenTargets, // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
              ePublicAvailBetween: AtDeploymentTarget, // expected-error {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}}
              fPublicAvailBetween: AfterDeploymentTarget, // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
              gPublicAvailBetween: ObsoletedBetweenTargets // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
@@ -1197,6 +1275,7 @@ public struct PublicStruct { // expected-note 21 {{add '@available' attribute}}
              bSPI: BeforeInliningTarget,
              cSPI: AtInliningTarget,
              dSPI: BetweenTargets,
+             dSPIDep: DeprecatedBetweenTargets, // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
              eSPI: AtDeploymentTarget,
              fSPI: AfterDeploymentTarget, // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
              gSPI: ObsoletedBetweenTargets // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
@@ -1222,6 +1301,11 @@ public struct PublicStruct { // expected-note 21 {{add '@available' attribute}}
   }
 
   @available(macOS, unavailable)
+  public var dDepUnavailable: DeprecatedBetweenTargets {
+    DeprecatedBetweenTargets()
+  }
+
+  @available(macOS, unavailable)
   public var eUnavailable: AtDeploymentTarget {
     AtDeploymentTarget()
   }
@@ -1241,6 +1325,7 @@ public struct PublicStruct { // expected-note 21 {{add '@available' attribute}}
              bPublicInferred = BeforeInliningTarget(),
              cPublicInferred = AtInliningTarget(),
              dPublicInferred = BetweenTargets(), // FIXME: Inferred type should be diagnosed
+             dPublicInferredDep = DeprecatedBetweenTargets(), // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
              ePublicInferred = AtDeploymentTarget(), // FIXME: Inferred type should be diagnosed
              fPublicInferred = AfterDeploymentTarget(), // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
              gPublicInferred = ObsoletedBetweenTargets() // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
@@ -1250,6 +1335,7 @@ public struct PublicStruct { // expected-note 21 {{add '@available' attribute}}
              bPublicInferredAvailBetween = BeforeInliningTarget(),
              cPublicInferredAvailBetween = AtInliningTarget(),
              dPublicInferredAvailBetween = BetweenTargets(),
+             dPublicInferredAvailBetweenDep = DeprecatedBetweenTargets(), // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
              ePublicInferredAvailBetween = AtDeploymentTarget(), // FIXME: Inferred type should be diagnosed
              fPublicInferredAvailBetween = AfterDeploymentTarget(), // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
              gPublicInferredAvailBetween = ObsoletedBetweenTargets() // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
@@ -1260,6 +1346,7 @@ public struct PublicStruct { // expected-note 21 {{add '@available' attribute}}
              bPublicInit: Any = BeforeInliningTarget(),
              cPublicInit: Any = AtInliningTarget(),
              dPublicInit: Any = BetweenTargets(),
+             dPublicInitDep: Any = DeprecatedBetweenTargets(), // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
              ePublicInit: Any = AtDeploymentTarget(),
              fPublicInit: Any = AfterDeploymentTarget(), // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
              gPublicInit: Any = ObsoletedBetweenTargets() // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
@@ -1293,6 +1380,13 @@ public struct PublicStruct { // expected-note 21 {{add '@available' attribute}}
                   return BetweenTargets(AfterDeploymentTarget()) // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add 'if #available'}}
                 }
               }(),
+              dPublicInitAvailBetweenDep: Any = {
+                if #available(macOS 11, *) {
+                  return DeprecatedBetweenTargets(AfterDeploymentTarget()) // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
+                } else {
+                  return DeprecatedBetweenTargets(AfterDeploymentTarget()) // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add 'if #available'}} expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
+                }
+              }(),
               ePublicInitAvailBetween: Any = {
                 if #available(macOS 11, *) {
                   return AtDeploymentTarget(AfterDeploymentTarget())
@@ -1313,6 +1407,7 @@ public struct PublicStruct { // expected-note 21 {{add '@available' attribute}}
       bInternal: BeforeInliningTarget = .init(),
       cInternal: AtInliningTarget = .init(),
       dInternal: BetweenTargets = .init(),
+      dInternalDep: DeprecatedBetweenTargets = .init(), // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
       eInternal: AtDeploymentTarget = .init(),
       fInternal: AfterDeploymentTarget = .init(), // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
       gInternal: ObsoletedBetweenTargets = .init() // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
@@ -1325,6 +1420,7 @@ public struct PublicStruct { // expected-note 21 {{add '@available' attribute}}
       _ = BeforeInliningTarget()
       _ = AtInliningTarget()
       _ = BetweenTargets() // expected-error {{'BetweenTargets' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}} expected-note {{add 'if #available' version check}}
+      _ = DeprecatedBetweenTargets()
       _ = AtDeploymentTarget() // expected-error {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}} expected-note {{add 'if #available'}}
       _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add 'if #available'}}
       _ = ObsoletedBetweenTargets()
@@ -1342,6 +1438,7 @@ public struct PublicStruct { // expected-note 21 {{add '@available' attribute}}
       _ = BeforeInliningTarget()
       _ = AtInliningTarget()
       _ = BetweenTargets()
+      _ = DeprecatedBetweenTargets() // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
       _ = AtDeploymentTarget()
       _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add 'if #available'}}
       _ = ObsoletedBetweenTargets() // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
@@ -1358,6 +1455,7 @@ public struct PublicStruct { // expected-note 21 {{add '@available' attribute}}
     _ = BeforeInliningTarget()
     _ = AtInliningTarget()
     _ = BetweenTargets()
+    _ = DeprecatedBetweenTargets() // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
     _ = AtDeploymentTarget()
     _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add 'if #available'}}
     _ = ObsoletedBetweenTargets() // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
@@ -1375,6 +1473,7 @@ public struct PublicStructWithWrappers { // expected-note 4 {{add '@available' a
   @PropertyWrapper public var bExplicitInit = BeforeInliningTarget()
   @PropertyWrapper public var cExplicitInit = AtInliningTarget()
   @PropertyWrapper public var dExplicitInit = BetweenTargets() // FIXME: Inferred type should be diagnosed
+  @PropertyWrapper public var dExplicitInitDep = DeprecatedBetweenTargets() // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
   @PropertyWrapper public var eExplicitInit = AtDeploymentTarget() // FIXME: Inferred type should be diagnosed
   @PropertyWrapper public var fExplicitInit = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
   
@@ -1384,6 +1483,7 @@ public struct PublicStructWithWrappers { // expected-note 4 {{add '@available' a
   @PropertyWrapper(BeforeInliningTarget()) public var bExplicitInitAlt
   @PropertyWrapper(AtInliningTarget()) public var cExplicitInitAlt
   @PropertyWrapper(BetweenTargets()) public var dExplicitInitAlt  // FIXME: Inferred type should be diagnosed
+  @PropertyWrapper(DeprecatedBetweenTargets()) public var dExplicitInitAltDep // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
   @PropertyWrapper(AtDeploymentTarget()) public var ePExplicitInitAlt  // FIXME: Inferred type should be diagnosed
   @PropertyWrapper(AfterDeploymentTarget()) public var fExplicitInitAlt // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
 
@@ -1393,6 +1493,7 @@ public struct PublicStructWithWrappers { // expected-note 4 {{add '@available' a
   @PropertyWrapper public var bAny: Any = BeforeInliningTarget()
   @PropertyWrapper public var cAny: Any = AtInliningTarget()
   @PropertyWrapper public var dAny: Any = BetweenTargets()
+  @PropertyWrapper public var dAnyDep: Any = DeprecatedBetweenTargets() // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
   @PropertyWrapper public var eAny: Any = AtDeploymentTarget()
   @PropertyWrapper public var fAny: Any = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
 
@@ -1402,6 +1503,7 @@ public struct PublicStructWithWrappers { // expected-note 4 {{add '@available' a
   @PropertyWrapper(BeforeInliningTarget()) public var bAnyAlt: Any
   @PropertyWrapper(AtInliningTarget()) public var cAnyAlt: Any
   @PropertyWrapper(BetweenTargets()) public var dAnyAlt: Any
+  @PropertyWrapper(DeprecatedBetweenTargets()) public var dAnyAltDep: Any // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
   @PropertyWrapper(AtDeploymentTarget()) public var eAnyAlt: Any
   @PropertyWrapper(AfterDeploymentTarget()) public var fAnyAlt: Any // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
 }
@@ -1412,6 +1514,7 @@ public struct PublicStructWithWrappers { // expected-note 4 {{add '@available' a
              bPublic: BeforeInliningTarget,
              cPublic: AtInliningTarget,
              dPublic: BetweenTargets, // expected-error {{'BetweenTargets' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}}
+             dPublicDep: DeprecatedBetweenTargets,
              ePublic: AtDeploymentTarget, // expected-error {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}}
              fPublic: AfterDeploymentTarget // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
 
@@ -1420,6 +1523,7 @@ public struct PublicStructWithWrappers { // expected-note 4 {{add '@available' a
              bPublicInit: Any = BeforeInliningTarget(),
              cPublicInit: Any = AtInliningTarget(),
              dPublicInit: Any = BetweenTargets(), // expected-error {{'BetweenTargets' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}}
+             dPublicInitDep: Any = DeprecatedBetweenTargets(),
              ePublicInit: Any = AtDeploymentTarget(), // expected-error {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}}
              fPublicInit: Any = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
 
@@ -1428,6 +1532,7 @@ public struct PublicStructWithWrappers { // expected-note 4 {{add '@available' a
       bInternal: BeforeInliningTarget = .init(),
       cInternal: AtInliningTarget = .init(),
       dInternal: BetweenTargets = .init(), // expected-error {{'BetweenTargets' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}}
+      dInternalDep: DeprecatedBetweenTargets = .init(),
       eInternal: AtDeploymentTarget = .init(), // expected-error {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}}
       fInternal: AfterDeploymentTarget = .init() // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
 }
@@ -1438,6 +1543,7 @@ public struct UnavailablePublicStruct {
              bPublic: BeforeInliningTarget,
              cPublic: AtInliningTarget,
              dPublic: BetweenTargets,
+             dPublicDep: DeprecatedBetweenTargets,
              ePublic: AtDeploymentTarget,
              fPublic: AfterDeploymentTarget,
              gPublic: Unavailable
@@ -1446,6 +1552,7 @@ public struct UnavailablePublicStruct {
              bPublicInit: Any = BeforeInliningTarget(),
              cPublicInit: Any = AtInliningTarget(),
              dPublicInit: Any = BetweenTargets(),
+             dPublicInitDep: Any = DeprecatedBetweenTargets(),
              ePublicInit: Any = AtDeploymentTarget(),
              fPublicInit: Any = AfterDeploymentTarget(),
              gPublicInit: Any = Unavailable()
@@ -1454,6 +1561,7 @@ public struct UnavailablePublicStruct {
       bInternal: BeforeInliningTarget = .init(),
       cInternal: AtInliningTarget = .init(),
       dInternal: BetweenTargets = .init(),
+      dInternalDep: DeprecatedBetweenTargets = .init(),
       eInternal: AtDeploymentTarget = .init(),
       fInternal: AfterDeploymentTarget = .init(),
       gInternal: Unavailable = .init()
@@ -1465,6 +1573,7 @@ public struct SPIStruct { // expected-note 3 {{add '@available' attribute}}
              bPublic: BeforeInliningTarget,
              cPublic: AtInliningTarget,
              dPublic: BetweenTargets,
+             dPublicDep: DeprecatedBetweenTargets, // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
              ePublic: AtDeploymentTarget,
              fPublic: AfterDeploymentTarget // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
 
@@ -1472,6 +1581,7 @@ public struct SPIStruct { // expected-note 3 {{add '@available' attribute}}
              bPublicInit: Any = BeforeInliningTarget(),
              cPublicInit: Any = AtInliningTarget(),
              dPublicInit: Any = BetweenTargets(),
+             dPublicInitDep: Any = DeprecatedBetweenTargets(), // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
              ePublicInit: Any = AtDeploymentTarget(),
              fPublicInit: Any = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
 
@@ -1479,6 +1589,7 @@ public struct SPIStruct { // expected-note 3 {{add '@available' attribute}}
       bInternal: BeforeInliningTarget = .init(),
       cInternal: AtInliningTarget = .init(),
       dInternal: BetweenTargets = .init(),
+      dInternalDep: DeprecatedBetweenTargets = .init(), // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
       eInternal: AtDeploymentTarget = .init(),
       fInternal: AfterDeploymentTarget = .init() // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
 }
@@ -1489,6 +1600,7 @@ internal struct InternalStruct { // expected-note 2 {{add '@available' attribute
       bInternal: BeforeInliningTarget = .init(),
       cInternal: AtInliningTarget = .init(),
       dInternal: BetweenTargets = .init(),
+      dInternalDep: DeprecatedBetweenTargets = .init(), // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
       eInternal: AtDeploymentTarget = .init(),
       fInternal: AfterDeploymentTarget = .init() // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
 
@@ -1496,6 +1608,7 @@ internal struct InternalStruct { // expected-note 2 {{add '@available' attribute
   @PropertyWrapper(BeforeInliningTarget()) var bWrapped: Any
   @PropertyWrapper(AtInliningTarget()) var cWrapped: Any
   @PropertyWrapper(BetweenTargets()) var dWrapped: Any
+  @PropertyWrapper(DeprecatedBetweenTargets()) var dWrappedDep: Any // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
   @PropertyWrapper(AtDeploymentTarget()) var eWrapped: Any
   @PropertyWrapper(AfterDeploymentTarget()) var fWrapped: Any // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
 }
@@ -1530,6 +1643,7 @@ extension NoAvailable { // expected-note {{add '@available' attribute to enclosi
     _: BeforeInliningTarget,
     _: AtInliningTarget,
     _: BetweenTargets,
+    _: DeprecatedBetweenTargets, // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
     _: AtDeploymentTarget,
     _: AfterDeploymentTarget, // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
     _: ObsoletedBetweenTargets, // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
@@ -1542,6 +1656,7 @@ extension NoAvailable { // expected-note 3 {{add '@available' attribute to enclo
     _: BeforeInliningTarget,
     _: AtInliningTarget,
     _: BetweenTargets, // expected-error {{'BetweenTargets' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}}
+    _: DeprecatedBetweenTargets,
     _: AtDeploymentTarget, // expected-error {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}}
     _: AfterDeploymentTarget, // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
     _: ObsoletedBetweenTargets,
@@ -1558,6 +1673,7 @@ extension BetweenTargets { // expected-note {{add '@available' attribute to encl
     _: BeforeInliningTarget,
     _: AtInliningTarget,
     _: BetweenTargets,
+    _: DeprecatedBetweenTargets, // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
     _: AtDeploymentTarget,
     _: AfterDeploymentTarget, // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
     _: ObsoletedBetweenTargets, // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
@@ -1570,6 +1686,7 @@ extension BetweenTargets { // expected-note 2 {{add '@available' attribute to en
     _: BeforeInliningTarget,
     _: AtInliningTarget,
     _: BetweenTargets,
+    _: DeprecatedBetweenTargets, // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
     _: AtDeploymentTarget, // expected-error {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}}
     _: AfterDeploymentTarget, // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
     _: ObsoletedBetweenTargets, // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
@@ -1583,6 +1700,7 @@ extension BetweenTargets { // expected-note 2 {{add '@available' attribute to en
     _: BeforeInliningTarget,
     _: AtInliningTarget,
     _: BetweenTargets,
+    _: DeprecatedBetweenTargets, // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
     _: AtDeploymentTarget, // expected-error {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}}
     _: AfterDeploymentTarget, // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
     _: ObsoletedBetweenTargets, // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
@@ -1596,6 +1714,7 @@ extension BetweenTargets { // expected-note 2 {{add '@available' attribute to en
     _: BeforeInliningTarget,
     _: AtInliningTarget,
     _: BetweenTargets,
+    _: DeprecatedBetweenTargets, // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
     _: AtDeploymentTarget, // expected-error {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}}
     _: AfterDeploymentTarget, // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
     _: ObsoletedBetweenTargets, // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
@@ -1609,6 +1728,7 @@ extension BetweenTargets {
     _: BeforeInliningTarget,
     _: AtInliningTarget,
     _: BetweenTargets,
+    _: DeprecatedBetweenTargets, // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
     _: AtDeploymentTarget,
     _: AfterDeploymentTarget, // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
     _: ObsoletedBetweenTargets, // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
@@ -1622,6 +1742,7 @@ extension BetweenTargets { // expected-note {{add '@available' attribute to encl
     _: BeforeInliningTarget,
     _: AtInliningTarget,
     _: BetweenTargets,
+    _: DeprecatedBetweenTargets, // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
     _: AtDeploymentTarget,
     _: AfterDeploymentTarget, // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
     _: ObsoletedBetweenTargets, // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
@@ -1635,6 +1756,7 @@ extension BetweenTargets { // expected-note {{add '@available' attribute to encl
     _: BeforeInliningTarget,
     _: AtInliningTarget,
     _: BetweenTargets,
+    _: DeprecatedBetweenTargets, // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
     _: AtDeploymentTarget,
     _: AfterDeploymentTarget, // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
     _: ObsoletedBetweenTargets, // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
@@ -1648,6 +1770,7 @@ extension BetweenTargets {
     _: BeforeInliningTarget,
     _: AtInliningTarget,
     _: BetweenTargets,
+    _: DeprecatedBetweenTargets,
     _: AtDeploymentTarget,
     _: AfterDeploymentTarget,
     _: ObsoletedBetweenTargets,
@@ -1673,6 +1796,136 @@ extension BetweenTargets { // expected-error {{'BetweenTargets' is only availabl
   public func publicFuncInExcessivelyAvailableExtension() {}
 }
 
+// MARK: Extensions on DeprecatedBetweenTargets
+
+extension DeprecatedBetweenTargets {} // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
+
+extension DeprecatedBetweenTargets { // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}} expected-note {{add '@available' attribute to enclosing extension}}
+  func internalFuncInExtension( // expected-note {{add '@available' attribute to enclosing instance method}}
+    _: NoAvailable,
+    _: BeforeInliningTarget,
+    _: AtInliningTarget,
+    _: BetweenTargets,
+    _: DeprecatedBetweenTargets, // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
+    _: AtDeploymentTarget,
+    _: AfterDeploymentTarget, // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
+    _: ObsoletedBetweenTargets, // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
+  ) {}
+}
+
+extension DeprecatedBetweenTargets { // expected-note 3 {{add '@available' attribute to enclosing extension}}
+  public func publicFuncInExtension( // expected-note 3 {{add '@available' attribute to enclosing instance method}}
+    _: NoAvailable,
+    _: BeforeInliningTarget,
+    _: AtInliningTarget,
+    _: BetweenTargets, // expected-error {{'BetweenTargets' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}}
+    _: DeprecatedBetweenTargets,
+    _: AtDeploymentTarget, // expected-error {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}}
+    _: AfterDeploymentTarget, // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
+    _: ObsoletedBetweenTargets,
+  ) {}
+}
+
+@available(iOS 8.0, *)
+extension DeprecatedBetweenTargets { // expected-note 3 {{add '@available' attribute to enclosing extension}}
+  public func publicFuncInExtensionWithExplicitiOSAvailability( // expected-note 3 {{add '@available' attribute to enclosing instance method}}
+    _: NoAvailable,
+    _: BeforeInliningTarget,
+    _: AtInliningTarget,
+    _: BetweenTargets, // expected-error {{'BetweenTargets' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}}
+    _: DeprecatedBetweenTargets,
+    _: AtDeploymentTarget, // expected-error {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}}
+    _: AfterDeploymentTarget, // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
+    _: ObsoletedBetweenTargets,
+  ) {}
+}
+
+@available(swift 5)
+extension DeprecatedBetweenTargets { // expected-note 3 {{add '@available' attribute to enclosing extension}}
+  public func publicFuncInExtensionWithExplicitSwiftAvailability( // expected-note 3 {{add '@available' attribute to enclosing instance method}}
+    _: NoAvailable,
+    _: BeforeInliningTarget,
+    _: AtInliningTarget,
+    _: BetweenTargets, // expected-error {{'BetweenTargets' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}}
+    _: DeprecatedBetweenTargets,
+    _: AtDeploymentTarget, // expected-error {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}}
+    _: AfterDeploymentTarget, // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
+    _: ObsoletedBetweenTargets,
+  ) {}
+}
+
+@available(macOS 10.15, *)
+extension DeprecatedBetweenTargets { // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
+  public func publicFuncInExtensionWithExplicitAvailability( // expected-note {{add '@available' attribute to enclosing instance method}}
+    _: NoAvailable,
+    _: BeforeInliningTarget,
+    _: AtInliningTarget,
+    _: BetweenTargets,
+    _: DeprecatedBetweenTargets, // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
+    _: AtDeploymentTarget,
+    _: AfterDeploymentTarget, // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
+    _: ObsoletedBetweenTargets, // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
+  ) {}
+}
+
+extension DeprecatedBetweenTargets { // expected-note {{add '@available' attribute to enclosing extension}}
+  @available(macOS 10.15, *)
+  public func publicFuncWithExplicitAvailabilityInExtension(
+    _: NoAvailable,
+    _: BeforeInliningTarget,
+    _: AtInliningTarget,
+    _: BetweenTargets,
+    _: DeprecatedBetweenTargets, // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
+    _: AtDeploymentTarget,
+    _: AfterDeploymentTarget, // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
+    _: ObsoletedBetweenTargets, // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
+  ) {}
+}
+
+@_spi(Private)
+extension DeprecatedBetweenTargets { // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}} expected-note {{add '@available' attribute to enclosing extension}}
+  public func inheritedSPIFuncInExtension( // expected-note {{add '@available' attribute to enclosing instance method}}
+    _: NoAvailable,
+    _: BeforeInliningTarget,
+    _: AtInliningTarget,
+    _: BetweenTargets,
+    _: DeprecatedBetweenTargets, // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
+    _: AtDeploymentTarget,
+    _: AfterDeploymentTarget, // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
+    _: ObsoletedBetweenTargets, // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
+  ) {}
+}
+
+@available(macOS, unavailable)
+extension DeprecatedBetweenTargets {
+  public func inheritsUnavailableFuncInExtension(
+    _: NoAvailable,
+    _: BeforeInliningTarget,
+    _: AtInliningTarget,
+    _: BetweenTargets,
+    _: DeprecatedBetweenTargets,
+    _: AtDeploymentTarget,
+    _: AfterDeploymentTarget,
+    _: ObsoletedBetweenTargets,
+    _: Unavailable
+  ) {}
+}
+
+@available(macOS 10.10, *)
+extension DeprecatedBetweenTargets { // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
+  func internalFuncInExcessivelyAvailableExtension() {}
+}
+
+extension DeprecatedBetweenTargets { // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
+  @available(macOS 10.10, *)
+  func excessivelyAvailableInternalFuncInExtension() {}
+}
+
+@available(macOS 10.10, *)
+extension DeprecatedBetweenTargets {
+  public func publicFuncInExcessivelyAvailableExtension() {}
+}
+
 // MARK: Extensions on BetweenTargetsInternal
 
 // Same availability as BetweenTargets but internal instead of public.
@@ -1687,6 +1940,7 @@ extension BetweenTargetsInternal { // expected-note {{add '@available' attribute
     _: BeforeInliningTarget,
     _: AtInliningTarget,
     _: BetweenTargets,
+    _: DeprecatedBetweenTargets, // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
     _: AtDeploymentTarget,
     _: AfterDeploymentTarget, // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
     _: ObsoletedBetweenTargets, // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
@@ -1699,6 +1953,7 @@ extension BetweenTargetsInternal { // expected-note {{add '@available' attribute
     _: BeforeInliningTarget,
     _: AtInliningTarget,
     _: BetweenTargets,
+    _: DeprecatedBetweenTargets, // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
     _: AtDeploymentTarget,
     _: AfterDeploymentTarget, // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
     _: ObsoletedBetweenTargets, // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
@@ -1717,6 +1972,7 @@ extension AfterDeploymentTarget { // expected-note 2 {{add '@available' attribut
     _: BeforeInliningTarget,
     _: AtInliningTarget,
     _: BetweenTargets,
+    _: DeprecatedBetweenTargets, // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
     _: AtDeploymentTarget,
     _: AfterDeploymentTarget, // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
     _: ObsoletedBetweenTargets, // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
@@ -1730,6 +1986,7 @@ extension AfterDeploymentTarget { // expected-note 2 {{add '@available' attribut
     _: BeforeInliningTarget,
     _: AtInliningTarget,
     _: BetweenTargets,
+    _: DeprecatedBetweenTargets, // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
     _: AtDeploymentTarget,
     _: AfterDeploymentTarget, // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
     _: ObsoletedBetweenTargets, // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
@@ -1743,6 +2000,7 @@ extension AfterDeploymentTarget {
     _: BeforeInliningTarget,
     _: AtInliningTarget,
     _: BetweenTargets,
+    _: DeprecatedBetweenTargets, // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
     _: AtDeploymentTarget,
     _: AfterDeploymentTarget,
     _: ObsoletedBetweenTargets, // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
@@ -1764,6 +2022,7 @@ extension BetweenTargetsEnum.Nested { // expected-note {{add '@available' attrib
     _: BeforeInliningTarget,
     _: AtInliningTarget,
     _: BetweenTargets,
+    _: DeprecatedBetweenTargets, // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
     _: AtDeploymentTarget,
     _: AfterDeploymentTarget, // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
     _: ObsoletedBetweenTargets, // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
@@ -1776,6 +2035,7 @@ extension BetweenTargetsEnum.Nested { // expected-note 2 {{add '@available' attr
     _: BeforeInliningTarget,
     _: AtInliningTarget,
     _: BetweenTargets,
+    _: DeprecatedBetweenTargets, // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
     _: AtDeploymentTarget, // expected-error {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}}
     _: AfterDeploymentTarget, // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
     _: ObsoletedBetweenTargets, // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
@@ -1790,6 +2050,7 @@ extension NoAvailable: InternalProto {}
 extension BeforeInliningTarget: InternalProto {}
 extension AtInliningTarget: InternalProto {}
 extension BetweenTargets: InternalProto {}
+extension DeprecatedBetweenTargets: InternalProto {} // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
 extension AtDeploymentTarget: InternalProto {}
 extension AfterDeploymentTarget: InternalProto {} // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add '@available' attribute to enclosing extension}}
 extension ObsoletedBetweenTargets: InternalProto {} // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
@@ -1800,6 +2061,7 @@ extension NoAvailable: PublicProto {}
 extension BeforeInliningTarget: PublicProto {}
 extension AtInliningTarget: PublicProto {}
 extension BetweenTargets: PublicProto {}
+extension DeprecatedBetweenTargets: PublicProto {}
 extension AtDeploymentTarget: PublicProto {}
 extension AfterDeploymentTarget: PublicProto {} // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add '@available' attribute to enclosing extension}}
 extension ObsoletedBetweenTargets: PublicProto {}
@@ -1915,6 +2177,7 @@ public enum PublicNoAvailableEnumWithTypeAliases { // expected-note 3 {{add '@av
   public typealias B = BeforeInliningTarget
   public typealias C = AtInliningTarget
   public typealias D = BetweenTargets // expected-error {{'BetweenTargets' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}} expected-note {{add '@available' attribute to enclosing type alias}}
+  public typealias DDep = DeprecatedBetweenTargets
   public typealias E = AtDeploymentTarget // expected-error {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}} expected-note {{add '@available' attribute to enclosing type alias}}
   public typealias F = AfterDeploymentTarget // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add '@available' attribute to enclosing type alias}}
   public typealias G = ObsoletedBetweenTargets
@@ -1926,6 +2189,7 @@ public enum UnavailableEnumWithTypeAliases {
   public typealias B = BeforeInliningTarget
   public typealias C = AtInliningTarget
   public typealias D = BetweenTargets
+  public typealias DDep = DeprecatedBetweenTargets
   public typealias E = AtDeploymentTarget
   public typealias F = AfterDeploymentTarget
   public typealias G = ObsoletedBetweenTargets
@@ -1938,6 +2202,7 @@ public enum SPIEnumWithTypeAliases { // expected-note 1 {{add '@available' attri
   public typealias B = BeforeInliningTarget
   public typealias C = AtInliningTarget
   public typealias D = BetweenTargets
+  public typealias DDep = DeprecatedBetweenTargets // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
   public typealias E = AtDeploymentTarget
   public typealias F = AfterDeploymentTarget // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add '@available' attribute to enclosing type alias}}
   public typealias G = ObsoletedBetweenTargets // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
@@ -1948,6 +2213,7 @@ enum InternalNoAvailableEnumWithTypeAliases { // expected-note {{add '@available
   public typealias B = BeforeInliningTarget
   public typealias C = AtInliningTarget
   public typealias D = BetweenTargets
+  public typealias DDep = DeprecatedBetweenTargets // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
   public typealias E = AtDeploymentTarget
   public typealias F = AfterDeploymentTarget // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add '@available' attribute to enclosing type alias}}
   public typealias G = ObsoletedBetweenTargets // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
@@ -1960,6 +2226,7 @@ public enum PublicNoAvailableEnumWithPayloads { // expected-note 5 {{add '@avail
        bNoAvailable(BeforeInliningTarget),
        cNoAvailable(AtInliningTarget),
        dNoAvailable(BetweenTargets), // expected-error {{'BetweenTargets' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}}
+       dNoAvailableDep(DeprecatedBetweenTargets),
        eNoAvailable(AtDeploymentTarget), // expected-error {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}}
        fNoAvailable(AfterDeploymentTarget), // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
        gNoAvailable(ObsoletedBetweenTargets)
@@ -1969,6 +2236,7 @@ public enum PublicNoAvailableEnumWithPayloads { // expected-note 5 {{add '@avail
        bAtDeploymentTarget(BeforeInliningTarget),
        cAtDeploymentTarget(AtInliningTarget),
        dAtDeploymentTarget(BetweenTargets),
+       dAtDeploymentTargetDep(DeprecatedBetweenTargets), // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
        eAtDeploymentTarget(AtDeploymentTarget),
        fAtDeploymentTarget(AfterDeploymentTarget), // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
        gAtDeploymentTarget(ObsoletedBetweenTargets) // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
@@ -1978,6 +2246,7 @@ public enum PublicNoAvailableEnumWithPayloads { // expected-note 5 {{add '@avail
        bSPI(BeforeInliningTarget),
        cSPI(AtInliningTarget),
        dSPI(BetweenTargets),
+       dSPIDep(DeprecatedBetweenTargets), // expected-warning {{'DeprecatedBetweenTargets' was deprecated in macOS 10.14.5}}
        eSPI(AtDeploymentTarget),
        fSPI(AfterDeploymentTarget), // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
        gSPI(ObsoletedBetweenTargets) // expected-error {{'ObsoletedBetweenTargets' is unavailable in macOS}}
@@ -1988,6 +2257,7 @@ public enum PublicNoAvailableEnumWithPayloads { // expected-note 5 {{add '@avail
        bUnavailable(BeforeInliningTarget),
        cUnavailable(AtInliningTarget),
        dUnavailable(BetweenTargets),
+       dUnavailableDep(DeprecatedBetweenTargets),
        eUnavailable(AtDeploymentTarget),
        fUnavailable(AfterDeploymentTarget),
        gUnavailable(ObsoletedBetweenTargets)

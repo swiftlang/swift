@@ -59,6 +59,7 @@ func functionWithoutAvailability() {
 func functionAvailableOn51() {
   let _: Int = globalFuncAvailableOn10_9()
   let _: Int = globalFuncAvailableOn51()
+  let _: Int = globalFuncAvailableOn51Deprecated52()
 
   // Nested functions should get their own availability scopes.
   @available(OSX, introduced: 52)
@@ -66,6 +67,7 @@ func functionAvailableOn51() {
     let _: Int = globalFuncAvailableOn10_9()
     let _: Int = globalFuncAvailableOn51()
     let _: Int = globalFuncAvailableOn52()
+    let _: Int = globalFuncAvailableOn51Deprecated52() // expected-warning {{'globalFuncAvailableOn51Deprecated52()' was deprecated in macOS 52}}
   }
 
   let _: Int = globalFuncAvailableOn52() // expected-error {{'globalFuncAvailableOn52()' is only available in macOS 52 or newer}}
@@ -190,8 +192,7 @@ if #available(OSX 51, *) {
 
 if #available(OSX 52, *) {
   let _ = globalFuncDeprecatedAndAvailableOn51() // expected-warning {{'globalFuncDeprecatedAndAvailableOn51()' is deprecated in macOS}}
-  // FIXME: [availability] Should be diagnosed as deprecated
-  let _ = globalFuncAvailableOn51Deprecated52()
+  let _ = globalFuncAvailableOn51Deprecated52() // expected-warning {{'globalFuncAvailableOn51Deprecated52()' was deprecated in macOS 52}}
   let _ = globalFuncAvailableOn51Obsoleted52() // expected-error {{'globalFuncAvailableOn51Obsoleted52()' is unavailable in macOS}}
   let _ = globalFuncUnavailableAndIntroducedOn51() // expected-error {{'globalFuncUnavailableAndIntroducedOn51()' is unavailable in macOS}}
   let _ = globalFuncDeprecatedIn11And12() // expected-warning {{'globalFuncDeprecatedIn11And12()' was deprecated in macOS 11: 11}}

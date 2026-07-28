@@ -17,7 +17,7 @@ internal func _abstract(
   file: StaticString = #file, line: UInt = #line
 ) -> Never {
 #if INTERNAL_CHECKS_ENABLED
-  _fatalErrorMessage("abstract method", methodName, file: file, line: line,
+  _fatalErrorMessage(kind: .fatal(), methodName, file: file, line: line,
       flags: _fatalErrorFlags())
 #else
   _conditionallyUnreachable()

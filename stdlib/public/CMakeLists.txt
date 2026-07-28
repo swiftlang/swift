@@ -375,6 +375,8 @@ if(SWIFT_EMBEDDED_STDLIB_SDKS_FOR_TARGET_TRIPLES)
 endif()
 
 if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
+  get_threading_package(EMBEDDED "embedded" SWIFT_SDK_embedded_THREADING_PACKAGE)
+
   set(triples)
   foreach(entry ${EMBEDDED_STDLIB_TARGET_TRIPLES})
     string(REGEX REPLACE "[ \t]+" ";" list "${entry}")
@@ -395,6 +397,19 @@ else()
   # include the libstdc++ modulemap into the build even when not building
   # C++ interop modules.
   add_subdirectory(Cxx/libstdcxx)
+endif()
+
+# Directory containing the freshly-built compiler plugins (SwiftMacros, etc.).
+# Stdlib modules that use a compiler-plugin macro -- e.g. `@DebugDescription`,
+# or `_SwiftifyImport` synthesized from Clang bounds-safety annotations in a
+# bridging header -- must pass this via `-plugin-path` so the compiler uses the
+# just-built plugin instead of falling back to a stale one from the host
+# toolchain. Computed once here and inherited by the stdlib subdirectories
+# below (core, EmbeddedPlatform, Synchronization, ...).
+if("${SWIFT_NATIVE_SWIFT_TOOLS_PATH}" STREQUAL "")
+  set(SWIFT_HOST_PLUGINS_DIR "${CMAKE_BINARY_DIR}/lib/swift/host/plugins")
+else()
+  set(SWIFT_HOST_PLUGINS_DIR "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/host/plugins")
 endif()
 
 if(SWIFT_BUILD_STDLIB)

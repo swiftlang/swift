@@ -64,7 +64,7 @@ import ctypes
 // CLANG_CTYPES-DAG: Decl[Struct]/OtherModule[ctypes]/IsSystem:    FooStruct6[#FooStruct6#]{{; name=.+$}}
 // CLANG_CTYPES-DAG: Decl[TypeAlias]/OtherModule[ctypes]/IsSystem: FooStructTypedef1[#FooStruct2#]{{; name=.+$}}
 
-// CLANG_MACROS-DAG: Decl[GlobalVar]/OtherModule[macros]/IsSystem: USES_MACRO_FROM_OTHER_MODULE_1[#Int32#]{{; name=.+$}}
+// CLANG_MACROS-DAG: Decl[GlobalVar]/OtherModule[macros]/IsSystem: USES_MACRO_FROM_OTHER_MODULE_1[#CInt#]{{; name=.+$}}
 
 // CLANG_DARWIN-DAG: Decl[TypeAlias]/OtherModule[Darwin.MacTypes]/IsSystem: FourCharCode[#UInt32#]{{; name=.+$}}
 // CLANG_DARWIN_NEG-NOT: FixedPtr
@@ -76,32 +76,32 @@ func testClangModule() {
 
 func testCompleteModuleQualifiedMacros1() {
   macros.#^CLANG_QUAL_MACROS_1^#
-// CLANG_QUAL_MACROS_1-DAG: Decl[GlobalVar]/OtherModule[macros]/IsSystem: A_PI[#Double#]{{; name=.+$}}
+// CLANG_QUAL_MACROS_1-DAG: Decl[GlobalVar]/OtherModule[macros]/IsSystem: A_PI[#CDouble#]{{; name=.+$}}
 // CLANG_QUAL_MACROS_1-DAG: Decl[GlobalVar]/OtherModule[macros]/IsSystem: CF_STRING[#String#]{{; name=.+$}}
-// CLANG_QUAL_MACROS_1-DAG: Decl[GlobalVar]/OtherModule[macros]/IsSystem: EOF[#Int32#]{{; name=.+$}}
-// CLANG_QUAL_MACROS_1-DAG: Decl[GlobalVar]/OtherModule[macros]/IsSystem: GL_FALSE[#Int32#]{{; name=.+$}}
-// CLANG_QUAL_MACROS_1-DAG: Decl[GlobalVar]/OtherModule[macros]/IsSystem: GL_RGBA[#Int32#]{{; name=.+$}}
-// CLANG_QUAL_MACROS_1-DAG: Decl[GlobalVar]/OtherModule[macros]/IsSystem: GL_RGB[#Int32#]{{; name=.+$}}
-// CLANG_QUAL_MACROS_1-DAG: Decl[GlobalVar]/OtherModule[macros]/IsSystem: MINUS_THREE[#Int32#]{{; name=.+$}}
-// CLANG_QUAL_MACROS_1-DAG: Decl[GlobalVar]/OtherModule[macros]/IsSystem: M_PIf[#Float#]{{; name=.+$}}
+// CLANG_QUAL_MACROS_1-DAG: Decl[GlobalVar]/OtherModule[macros]/IsSystem: EOF[#CInt#]{{; name=.+$}}
+// CLANG_QUAL_MACROS_1-DAG: Decl[GlobalVar]/OtherModule[macros]/IsSystem: GL_FALSE[#CInt#]{{; name=.+$}}
+// CLANG_QUAL_MACROS_1-DAG: Decl[GlobalVar]/OtherModule[macros]/IsSystem: GL_RGBA[#CInt#]{{; name=.+$}}
+// CLANG_QUAL_MACROS_1-DAG: Decl[GlobalVar]/OtherModule[macros]/IsSystem: GL_RGB[#CInt#]{{; name=.+$}}
+// CLANG_QUAL_MACROS_1-DAG: Decl[GlobalVar]/OtherModule[macros]/IsSystem: MINUS_THREE[#CInt#]{{; name=.+$}}
+// CLANG_QUAL_MACROS_1-DAG: Decl[GlobalVar]/OtherModule[macros]/IsSystem: M_PIf[#CFloat#]{{; name=.+$}}
 // CLANG_QUAL_MACROS_1-objc-DAG: Decl[GlobalVar]/OtherModule[macros]/IsSystem: OBJC_STRING[#String#]{{; name=.+$}}
-// CLANG_QUAL_MACROS_1-DAG: Decl[GlobalVar]/OtherModule[macros]/IsSystem: USES_MACRO_FROM_OTHER_MODULE_1[#Int32#]{{; name=.+$}}
+// CLANG_QUAL_MACROS_1-DAG: Decl[GlobalVar]/OtherModule[macros]/IsSystem: USES_MACRO_FROM_OTHER_MODULE_1[#CInt#]{{; name=.+$}}
 // CLANG_QUAL_MACROS_1-DAG: Decl[GlobalVar]/OtherModule[macros]/IsSystem: UTF8_STRING[#String#]{{; name=.+$}}
 // CLANG_QUAL_MACROS_1-DAG: Decl[GlobalVar]/OtherModule[macros]/IsSystem: VERSION_STRING[#String#]{{; name=.+$}}
 }
 
 func testCompleteModuleQualifiedMacros2() {
   macros#^CLANG_QUAL_MACROS_2^#
-// CLANG_QUAL_MACROS_2-DAG: Decl[GlobalVar]/OtherModule[macros]/IsSystem: .A_PI[#Double#]{{; name=.+$}}
+// CLANG_QUAL_MACROS_2-DAG: Decl[GlobalVar]/OtherModule[macros]/IsSystem: .A_PI[#CDouble#]{{; name=.+$}}
 // CLANG_QUAL_MACROS_2-DAG: Decl[GlobalVar]/OtherModule[macros]/IsSystem: .CF_STRING[#String#]{{; name=.+$}}
-// CLANG_QUAL_MACROS_2-DAG: Decl[GlobalVar]/OtherModule[macros]/IsSystem: .EOF[#Int32#]{{; name=.+$}}
-// CLANG_QUAL_MACROS_2-DAG: Decl[GlobalVar]/OtherModule[macros]/IsSystem: .GL_FALSE[#Int32#]{{; name=.+$}}
-// CLANG_QUAL_MACROS_2-DAG: Decl[GlobalVar]/OtherModule[macros]/IsSystem: .GL_RGBA[#Int32#]{{; name=.+$}}
-// CLANG_QUAL_MACROS_2-DAG: Decl[GlobalVar]/OtherModule[macros]/IsSystem: .GL_RGB[#Int32#]{{; name=.+$}}
-// CLANG_QUAL_MACROS_2-DAG: Decl[GlobalVar]/OtherModule[macros]/IsSystem: .MINUS_THREE[#Int32#]{{; name=.+$}}
-// CLANG_QUAL_MACROS_2-DAG: Decl[GlobalVar]/OtherModule[macros]/IsSystem: .M_PIf[#Float#]{{; name=.+$}}
+// CLANG_QUAL_MACROS_2-DAG: Decl[GlobalVar]/OtherModule[macros]/IsSystem: .EOF[#CInt#]{{; name=.+$}}
+// CLANG_QUAL_MACROS_2-DAG: Decl[GlobalVar]/OtherModule[macros]/IsSystem: .GL_FALSE[#CInt#]{{; name=.+$}}
+// CLANG_QUAL_MACROS_2-DAG: Decl[GlobalVar]/OtherModule[macros]/IsSystem: .GL_RGBA[#CInt#]{{; name=.+$}}
+// CLANG_QUAL_MACROS_2-DAG: Decl[GlobalVar]/OtherModule[macros]/IsSystem: .GL_RGB[#CInt#]{{; name=.+$}}
+// CLANG_QUAL_MACROS_2-DAG: Decl[GlobalVar]/OtherModule[macros]/IsSystem: .MINUS_THREE[#CInt#]{{; name=.+$}}
+// CLANG_QUAL_MACROS_2-DAG: Decl[GlobalVar]/OtherModule[macros]/IsSystem: .M_PIf[#CFloat#]{{; name=.+$}}
 // CLANG_QUAL_MACROS_2-objc-DAG: Decl[GlobalVar]/OtherModule[macros]/IsSystem: .OBJC_STRING[#String#]{{; name=.+$}}
-// CLANG_QUAL_MACROS_2-DAG: Decl[GlobalVar]/OtherModule[macros]/IsSystem: .USES_MACRO_FROM_OTHER_MODULE_1[#Int32#]{{; name=.+$}}
+// CLANG_QUAL_MACROS_2-DAG: Decl[GlobalVar]/OtherModule[macros]/IsSystem: .USES_MACRO_FROM_OTHER_MODULE_1[#CInt#]{{; name=.+$}}
 // CLANG_QUAL_MACROS_2-DAG: Decl[GlobalVar]/OtherModule[macros]/IsSystem: .UTF8_STRING[#String#]{{; name=.+$}}
 // CLANG_QUAL_MACROS_2-DAG: Decl[GlobalVar]/OtherModule[macros]/IsSystem: .VERSION_STRING[#String#]{{; name=.+$}}
 }

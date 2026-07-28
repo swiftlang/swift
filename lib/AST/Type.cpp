@@ -4123,8 +4123,8 @@ CanTypeWrapper<ElementArchetypeType> ElementArchetypeType::getNew(
       environment, interfaceType, conformsTo, superclass, layout));
 }
 
-UUID ElementArchetypeType::getOpenedElementID() const {
-  return getGenericEnvironment()->getOpenedElementUUID();
+uint64_t ElementArchetypeType::getOpenedElementID() const {
+  return getGenericEnvironment()->getOpenedElementID();
 }
 
 CanExistentialType CanExistentialType::get(CanType constraint) {
@@ -4915,6 +4915,7 @@ Type AnyFunctionType::getEffectiveThrownErrorTypeOrNever() const {
 
 std::optional<TangentSpace>
 TypeBase::getAutoDiffTangentSpace(LookupConformanceFn lookupConformance) {
+  // TODO: looks like `lookupConformance` is not used anymore
   assert(lookupConformance);
   auto &ctx = getASTContext();
 

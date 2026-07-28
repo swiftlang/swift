@@ -10,10 +10,10 @@
 // CHECK: func defaultedTemplateTypeParamUsedInReturn<T>() -> T
 // CHECK: func defaultedTemplateTypeParamAndDefaultedParam<T>(_: T)
 // CHECK: func functionTemplateWithDefaultedParam<T>(_: T)
-// CHECK: func defaultedTemplateTypeParamUsedInSignatureAndUnrelatedParam<T>(_: Int32, _: T)
-// CHECK: func defaultedTemplateTypeParamAndUnrelatedParam(_: Int32)
+// CHECK: func defaultedTemplateTypeParamUsedInSignatureAndUnrelatedParam<T>(_: CInt, _: T)
+// CHECK: func defaultedTemplateTypeParamAndUnrelatedParam(_: CInt)
 // CHECK: func overloadedDefaultedTemplate<T>(_: T)
-// CHECK: func overloadedDefaultedTemplate(_: Int32)
+// CHECK: func overloadedDefaultedTemplate(_: CInt)
 // CHECK: func defaultedTemplateReferenceTypeParam<T>(_ t: inout T)
 // The following types aren't imported correctly, but that does not have to do
 // with the fact that the template type parameters are defaulted.

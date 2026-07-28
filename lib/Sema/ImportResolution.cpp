@@ -934,6 +934,8 @@ void UnboundImport::validateResilience(NullablePtr<ModuleDecl> topLevelModule,
         inFlight.fixItReplace(import.implementationOnlyRange, "internal");
       }
     } else if (!ctx.LangOpts.hasFeature(Feature::CheckImplementationOnly) &&
+               !ctx.LangOpts.hasFeature(
+                   Feature::SerializeAbstractTypeLayoutForHiddenTypes) &&
                !shouldSuppressNonResilientImplementationOnlyImportDiagnostic(
             targetName.str(), importerName.str())) {
       ctx.Diags.diagnose(import.importLoc,

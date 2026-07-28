@@ -13,10 +13,12 @@ case some(T)
 sil private @test1 : $() -> () {
 bb0:
   %5 = integer_literal $Builtin.Int1, 1
-  cond_br %5, bb1, bb2
+  cond_br %5, bb1, bb2a
 bb1:                                              // Preds: bb0
   br bb2
-bb2:                                              // Preds: bb1 bb0
+bb2a:                                             // Preds: bb0
+  br bb2
+bb2:                                              // Preds: bb1 bb2a
   %9 = tuple ()
   return %9 : $()
 }
@@ -33,10 +35,12 @@ bb2:                                              // Preds: bb1 bb0
 sil @test2 : $@convention(thin) () -> () {
 bb0:
   %11 = integer_literal $Builtin.Int1, 0
-  cond_br %11, bb1, bb2
+  cond_br %11, bb1, bb2a
 bb1:                                              // Preds: bb0
   br bb2
-bb2:                                              // Preds: bb1 bb0
+bb2a:                                             // Preds: bb0
+  br bb2
+bb2:                                              // Preds: bb1 bb2a
   %32 = tuple ()
   return %32 : $()
 }
@@ -44,6 +48,8 @@ bb2:                                              // Preds: bb1 bb0
 // CHECK: bb0:
 // CHECK-NEXT:  br bb1
 // CHECK:bb1:                                              // Preds: bb0
+// CHECK-NEXT:  br bb2
+// CHECK:bb2:                                              // Preds: bb1
 // CHECK-NEXT:  tuple ()
 // CHECK-NEXT:  return
 // CHECK-NEXT: }
@@ -166,9 +172,11 @@ sil @removeTriviallyDeadButUsedByUnreachableBlock : $@convention(thin) (@owned B
 bb0(%0 : $B):
   %5 = unchecked_ref_cast %0 : $B to $Builtin.NativeObject  // CHECK-NOT: unchecked_ref_cast
   %11 = integer_literal $Builtin.Int1, 0          // CHECK-NOT: integer_literal
-  cond_br %11, bb1, bb2                  // CHECK: br
+  cond_br %11, bb1, bb2a                 // CHECK: br
 bb1:
   %21 = unchecked_ref_cast %5 : $Builtin.NativeObject to $B // CHECK-NOT: unchecked_ref_cast
+  br bb2
+bb2a:
   br bb2
 bb2:
   %32 = tuple ()
@@ -179,8 +187,10 @@ bb2:
 sil @removeTriviallyDeadCrossBasicBlocks : $@convention(thin) (@owned B, Builtin.Int1) -> () {
 bb0(%0:  $B, %1: $Builtin.Int1):
   %5 = unchecked_ref_cast %0 : $B to $Builtin.NativeObject     // CHECK-NOT: unchecked_ref_cast
-  cond_br %1, bb1, bb2                   // CHECK: cond_br
+  cond_br %1, bb1, bb2a                   // CHECK: cond_br
 bb1:
+  br bb2
+bb2a:
   br bb2
 bb2:
   %9 = function_ref @exit : $@convention(thin) () -> Never
@@ -193,11 +203,11 @@ bb2:
 sil @testCondBranchBBArgs : $@convention(thin) (Int, Int) -> Int {
 bb0(%0 : $Int, %1 : $Int):
   %2 = integer_literal $Builtin.Int1, 0
-  cond_br %2, bb1(%0 : $Int), bb2(%1 : $Int)
-bb1(%3 : $Int):
-  br bb3(%3 : $Int)
-bb2(%4 : $Int):
-  br bb3(%4 : $Int)
+  cond_br %2, bb1, bb2
+bb1:
+  br bb3(%0 : $Int)
+bb2:
+  br bb3(%1 : $Int)
 bb3(%5 : $Int):
   return %5 : $Int
 }
@@ -213,11 +223,11 @@ bb3(%5 : $Int):
 sil @removePredecessorWithBBArgs : $@convention(thin) (Int, Int) -> Int {
 bb0(%0 : $Int, %1 : $Int):
  %2 = integer_literal $Builtin.Int1, 0
- cond_br %2, bb2(%0 : $Int), bb3(%1 : $Int)
-bb2(%4 : $Int):
- br bb4(%4 : $Int)
-bb3(%5 : $Int):
-  br bb4(%5 : $Int)
+ cond_br %2, bb2, bb3
+bb2:
+ br bb4(%0 : $Int)
+bb3:
+  br bb4(%1 : $Int)
 bb4(%6 : $Int):
   return %6 : $Int
 }
@@ -234,10 +244,12 @@ sil @code_removed_after_a_call_to_noreturn : $@convention(thin) (Int, Builtin.In
 bb0(%0 : $Int, %1 : $Builtin.Int1):
   %6 = function_ref @exit : $@convention(thin) () -> Never
   %7 = apply %6() : $@convention(thin) () -> Never
-  cond_br %1, bb1, bb2
+  cond_br %1, bb1, bb2a
 bb1:                                              // Preds: bb0
   br bb2
-bb2:                                              // Preds: bb1 bb0
+bb2a:                                             // Preds: bb0
+  br bb2
+bb2:                                              // Preds: bb1 bb2a
   %20 = tuple ()                                  // user: %21
   return %20 : $()
 }

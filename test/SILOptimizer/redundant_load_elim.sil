@@ -221,10 +221,13 @@ bb1:
   %5 = load %3 : $*A
   %6 = load %3 : $*A
   store %2 to %3 : $*A
-  cond_br undef, bb1, bb2
+  cond_br undef, bb_crit1, bb2
 
 bb2:
   return %5 : $A
+
+bb_crit1:
+  br bb1
 }
 
 // CHECK-LABEL: sil @test_read_dependence_allows_forwarding_multi_bb_1 : $@convention(thin) (@inout A, A) -> A {
@@ -251,10 +254,13 @@ bb1:
   // longer be needed.
   %6 = load %0 : $*A
   store %1 to %0 : $*A
-  cond_br undef, bb1, bb2
+  cond_br undef, bb_crit2, bb2
 
 bb2:
   return %5 : $A
+
+bb_crit2:
+  br bb1
 }
 
 // DISABLE this test for now. it seems DCE is not getting rid of the load in bb8 after the RLE happens.
@@ -555,9 +561,9 @@ bb0:
   %8 = ref_element_addr %6 : $AX, #AX.current
   store %2 to %8 : $*Int32
   // %10 = load %8 : $*Int32
-  cond_br undef, bb3, bb2
+  cond_br undef, bb3, bb6
 
-bb2:
+bb1:
   %24 = integer_literal $Builtin.Int1, -1
   %31 = struct_element_addr %0 : $*Int32, #Int32.value
   %32 = load %31 : $*Builtin.Int32
@@ -565,12 +571,24 @@ bb2:
   %34 = tuple_extract %33 : $(Builtin.Int32, Builtin.Int1), 0
   %37 = struct $Int32 (%34 : $Builtin.Int32)
   store %37 to %0 : $*Int32
-  cond_br undef, bb3, bb2
+  cond_br undef, bb4, bb2
+
+bb2:
+  br bb1
 
 bb3:
+  br bb5
+
+bb4:
+  br bb5
+
+bb5:
   strong_release %6 : $AX
   %44 = tuple ()
   return %44 : $()
+
+bb6:
+  br bb1
 }
 
 // CHECK-LABEL: sil @load_to_load_forwarding_diamonds : $@convention(thin) (@inout Builtin.Int32) -> Builtin.Int32 {
@@ -591,7 +609,7 @@ bb2:
 
 bb3:
   // Triangle
-  cond_br undef, bb4, bb5
+  cond_br undef, bb4, bb_crit3
 
 bb4:
   br bb5
@@ -599,6 +617,9 @@ bb4:
 bb5:
   %2 = load %0 : $*Builtin.Int32
   return %2 : $Builtin.Int32
+
+bb_crit3:
+  br bb5
 }
 
 
@@ -678,10 +699,13 @@ bb1:
   %223 = apply %22(%7) : $@convention(thin) (A) -> ()
   %323 = apply %22(%8) : $@convention(thin) (A) -> ()
   store %2 to %0 : $*A
-  cond_br undef, bb1, bb2
+  cond_br undef, bb3, bb2
 
 bb2:
   return %7 : $A
+
+bb3:
+  br bb1
 }
 
 // CHECK-LABEL: sil @load_to_load_loop
@@ -708,7 +732,7 @@ bb1:
   %6 = load %0 : $*Builtin.Int32
   %11125 = function_ref @use : $@convention(thin) (Builtin.Int32) -> () // user: %23
   %11126 = apply %11125(%6) : $@convention(thin) (Builtin.Int32) -> ()
-  cond_br undef, bb1, bb2
+  cond_br undef, bb3, bb2
 
 bb2:
   %7 = load %0 : $*Builtin.Int32
@@ -718,6 +742,9 @@ bb2:
   dealloc_stack %101 : $*Int32
   %9999 = tuple()
   return %9999 : $()
+
+bb3:
+  br bb1
 }
 
 // CHECK-LABEL: store_and_load_to_load_branches_diamond
@@ -903,7 +930,7 @@ bb9:                                              // Preds: bb7 bb8
 // CHECK: bb7:
 // CHECK:   br bb10(%3 : $Int)
 // CHECK: bb8:
-// CHECK:   cond_br undef, bb9, bb10(%3 : $Int)
+// CHECK:   cond_br undef, bb9, bb11
 // CHECK-NOT: = load
 // CHECK: bb10([[A:%[0-9]+]] : $Int):
 // CHECK-NOT: = load
@@ -946,7 +973,7 @@ bb7:                                              // Preds: bb3 bb4
   br bb10                                         // id: %19
 
 bb8:                                              // Preds: bb5 bb6
-  cond_br undef, bb9, bb10                        // id: %20
+  cond_br undef, bb9, bb11                        // id: %20
 
 bb9:                                              // Preds: bb8
   %21 = struct_element_addr %1 : $*TwoField, #TwoField.a // user: %22
@@ -960,6 +987,9 @@ bb10:                                             // Preds: bb7 bb8 bb9
   %27 = load %26 : $*Int                          // user: %29
   dealloc_stack %1 : $*TwoField  // id: %28
   return %27 : $Int                               // id: %29
+
+bb11:
+  br bb10
 }
 
 // CHECK-LABEL: sil @test_project_box
@@ -1041,7 +1071,7 @@ bb0:
   %15 = load %12 : $*Builtin.Int32
   %16 = load %13 : $*Builtin.Int32
   %17 = builtin "cmp_eq_Int32"(%15 : $Builtin.Int32, %16 : $Builtin.Int32) : $Builtin.Int1
-  cond_br %17, bb3, bb1
+  cond_br %17, bb5, bb1
 
 bb2(%20 : $Builtin.Int32):
   %21 = load %12 : $*Builtin.Int32
@@ -1064,7 +1094,7 @@ bb2(%20 : $Builtin.Int32):
   %39 = load %12 : $*Builtin.Int32
   %40 = load %13 : $*Builtin.Int32
   %41 = builtin "cmp_eq_Int32"(%39 : $Builtin.Int32, %40 : $Builtin.Int32) : $Builtin.Int1
-  cond_br %41, bb3, bb2(%39 : $Builtin.Int32)
+  cond_br %41, bb6, bb4
 
 // bb1 is after bb2 to make sure the first predecessor of bb2 is not bb2 to
 // expose the bug.
@@ -1075,6 +1105,15 @@ bb3:
   strong_release %7 : $NewRangeGenerator1
   %44 = tuple ()
   return %44 : $()
+
+bb4:
+  br bb2(%39)
+
+bb5:
+  br bb3
+
+bb6:
+  br bb3
 }
 
 // Make sure the first load in bb1 is not eliminated as we have
@@ -1113,7 +1152,7 @@ bb1:
   %6 = load %0 : $*Builtin.Int32
   %11125 = function_ref @use : $@convention(thin) (Builtin.Int32) -> () // user: %23
   %11126 = apply %11125(%6) : $@convention(thin) (Builtin.Int32) -> ()
-  cond_br undef, bb1, bb2
+  cond_br undef, bb3, bb2
 
 bb2:
   %7 = load %0 : $*Builtin.Int32
@@ -1123,6 +1162,9 @@ bb2:
   dealloc_stack %101 : $*Int32
   %9999 = tuple()
   return %9999 : $()
+
+bb3:
+  br bb1
 }
 
 // CHECK-LABEL: sil hidden @redundant_load_over_intermediate_release_without_epilogue_release : $@convention(thin) (@owned AB) -> () {

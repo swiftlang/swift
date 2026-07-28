@@ -733,6 +733,8 @@ Demangler::DemangleInitRAII::DemangleInitRAII(Demangler &Dem,
   : Dem(Dem),
     NodeStack(Dem.NodeStack), Substitutions(Dem.Substitutions),
     NumWords(Dem.NumWords), Text(Dem.Text), Pos(Dem.Pos),
+    IsOldFunctionTypeMangling(Dem.IsOldFunctionTypeMangling),
+    Flavor(Dem.Flavor),
     SymbolicReferenceResolver(std::move(Dem.SymbolicReferenceResolver))
 {
   std::copy(Dem.Words, Dem.Words + MaxNumWords, Words);
@@ -742,6 +744,8 @@ Demangler::DemangleInitRAII::DemangleInitRAII(Demangler &Dem,
   Dem.NumWords = 0;
   Dem.Text = MangledName;
   Dem.Pos = 0;
+  Dem.IsOldFunctionTypeMangling = false;
+  Dem.Flavor = ManglingFlavor::Default;
   Dem.SymbolicReferenceResolver = std::move(TheSymbolicReferenceResolver);
 }
 
@@ -753,6 +757,8 @@ Demangler::DemangleInitRAII::~DemangleInitRAII() {
   std::copy(Words, Words + MaxNumWords, Dem.Words);
   Dem.Text = Text;
   Dem.Pos = Pos;
+  Dem.IsOldFunctionTypeMangling = IsOldFunctionTypeMangling;
+  Dem.Flavor = Flavor;
   Dem.SymbolicReferenceResolver = std::move(SymbolicReferenceResolver);
 }
 

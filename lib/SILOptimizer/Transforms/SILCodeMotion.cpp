@@ -996,9 +996,8 @@ static SILValue findValueShallowRoot(const SILValue &In) {
       return BI->getArg(Idx);
     }
 
-    if (auto CBI = dyn_cast<CondBranchInst>(Pred->getTerminator())) {
-      return CBI->getArgForDestBB(Parent, Arg);
-    }
+    // A cond_br passes no branch arguments (SIL has no critical edges), so a
+    // block argument is never reached through one.
   }
   return In;
 }
@@ -1122,14 +1121,8 @@ cheaperToPassOperandsAsArguments(SILInstruction *First,
 SILValue getArgForBlock(SILBasicBlock *From, SILBasicBlock *To,
                         unsigned ArgNum) {
   TermInst *Term = From->getTerminator();
-  if (auto *CondBr = dyn_cast<CondBranchInst>(Term)) {
-    if (CondBr->getFalseBB() == To)
-      return CondBr->getFalseArgs()[ArgNum];
-
-    if (CondBr->getTrueBB() == To)
-      return CondBr->getTrueArgs()[ArgNum];
-  }
-
+  // A cond_br passes no branch arguments (SIL has no critical edges), so only
+  // an unconditional branch forwards a value to a successor block argument.
   if (auto *Br = dyn_cast<BranchInst>(Term))
     return Br->getArg(ArgNum);
 

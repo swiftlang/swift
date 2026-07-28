@@ -80,8 +80,8 @@ struct Loop {
     return loopBlock.successors.contains { !contains(block: $0) }
   }
   
-  func getBlocksThatDominateAllExitingAndLatchBlocks(_ context: FunctionPassContext) -> [BasicBlock] {
-    var result: [BasicBlock] = []
+  func getBlocksThatDominateAllExitingAndLatchBlocks(_ context: FunctionPassContext) -> BasicBlockSet {
+    var result = BasicBlockSet(context)
     var cachedExitingAndLatchBlocks = Stack<BasicBlock>(context)
     var workList = BasicBlockWorklist(context)
     defer {
@@ -99,8 +99,8 @@ struct Loop {
         continue
       }
       
-      result.append(block)
-      
+      result.insert(block)
+
       workList.pushIfNotVisited(contentsOf: context.dominatorTree.getChildren(of: block))
     }
     
@@ -109,20 +109,6 @@ struct Loop {
   
   func contains(block: BasicBlock) -> Bool {
     return bridged.contains(block.bridged)
-  }
-  
-  func splitCriticalExitingAndBackEdges(_ context: FunctionPassContext) {
-    for exitingOrLatchBlock in exitingAndLatchBlocks {
-      for (index, succesor) in exitingOrLatchBlock.successors.enumerated() where !contains(block: succesor) {
-        splitCriticalEdge(
-          from: exitingOrLatchBlock.terminator.parentBlock,
-          toEdgeIndex: index,
-          dominatorTree: context.dominatorTree,
-          loopTree: context.loopTree,
-          context
-        )
-      }
-    }
   }
 }
 

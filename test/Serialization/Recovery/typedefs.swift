@@ -44,9 +44,9 @@ public func testVTableBuilding(user: User) {
 } // CHECK-IR: ret void
 
 #if VERIFY
-let _: String = useAssoc(ImportedType.self) // expected-error {{cannot convert value of type 'Int32?' to specified type 'String'}}
-let _: Bool? = useAssoc(ImportedType.self) // expected-error {{cannot assign value of type 'Int32?' to type 'Bool?'}}
-// expected-note@-1 {{arguments to generic parameter 'Wrapped' ('Int32' and 'Bool') are expected to be equal}}
+let _: String = useAssoc(ImportedType.self) // expected-error {{cannot convert value of type 'CInt?' (aka 'Optional<Int32>') to specified type 'String'}}
+let _: Bool? = useAssoc(ImportedType.self) // expected-error {{cannot assign value of type 'CInt?' (aka 'Optional<Int32>') to type 'Bool?'}}
+// expected-note@-1 {{arguments to generic parameter 'Wrapped' ('CInt' (aka 'Int32') and 'Bool') are expected to be equal}}
 let _: Int32? = useAssoc(ImportedType.self)
 
 let _: String = useAssoc(AnotherType.self) // expected-error {{cannot convert value of type 'AnotherType.Assoc?' (aka 'Optional<Int32>') to specified type 'String'}}
@@ -58,7 +58,7 @@ let _ = wrapped // expected-error {{cannot find 'wrapped' in scope}}
 let _ = unwrapped // okay
 
 _ = usesWrapped(nil) // expected-error {{cannot find 'usesWrapped' in scope}}
-_ = usesUnwrapped(nil) // expected-error {{'nil' is not compatible with expected argument type 'Int32'}}
+_ = usesUnwrapped(nil) // expected-error {{'nil' is not compatible with expected argument type 'CInt' (aka 'Int32')}}
 
 let _: WrappedAlias = nil // expected-error {{cannot find type 'WrappedAlias' in scope}}
 let _: UnwrappedAlias = nil // expected-error {{'nil' cannot initialize specified type 'UnwrappedAlias' (aka 'Int32')}} expected-note {{add '?'}}
@@ -71,7 +71,7 @@ func testExtensions(wrapped: WrappedInt, unwrapped: UnwrappedInt) {
   unwrapped.unwrappedMethod() // expected-error {{value of type 'UnwrappedInt' has no member 'unwrappedMethod'}}
 
   ***wrapped // This one works because of the UnwrappedInt extension.
-  ***unwrapped // expected-error {{cannot convert value of type 'UnwrappedInt' to expected argument type 'Int32'}}
+  ***unwrapped // expected-error {{cannot convert value of type 'UnwrappedInt' to expected argument type 'CInt' (aka 'Int32')}}
 
   let _: WrappedProto = wrapped // expected-error {{value of type 'WrappedInt' (aka 'Int32') does not conform to specified type 'WrappedProto'}}
   let _: UnwrappedProto = unwrapped // expected-error {{value of type 'UnwrappedInt' does not conform to specified type 'UnwrappedProto'}}
@@ -115,14 +115,14 @@ prefix operator ***
 // CHECK-RECOVERY-LABEL: class User {
 open class User {
   // CHECK: var unwrappedProp: UnwrappedInt?
-  // CHECK-RECOVERY: var unwrappedProp: Int32?
+  // CHECK-RECOVERY: var unwrappedProp: CInt?
   public var unwrappedProp: UnwrappedInt?
   // CHECK: var wrappedProp: WrappedInt?
   // CHECK_RECOVERY: /* placeholder for wrappedProp (vtable entries: 3) (field offsets: 1) */
   public var wrappedProp: WrappedInt?
 
   // CHECK: func returnsUnwrappedMethod() -> UnwrappedInt
-  // CHECK-RECOVERY: func returnsUnwrappedMethod() -> Int32
+  // CHECK-RECOVERY: func returnsUnwrappedMethod() -> CInt
   public func returnsUnwrappedMethod() -> UnwrappedInt { fatalError() }
   // CHECK: func returnsWrappedMethod() -> WrappedInt
   // CHECK-RECOVERY: /* placeholder for returnsWrappedMethod() (vtable entries: 1) */
@@ -283,7 +283,7 @@ open class UserSub : User {
 
 
 // CHECK-DAG: let x: MysteryTypedef
-// CHECK-RECOVERY-DAG: let x: Int32
+// CHECK-RECOVERY-DAG: let x: CInt
 public let x: MysteryTypedef = 0
 
 public protocol HasAssoc {
@@ -299,7 +299,7 @@ public struct AnotherType: HasAssoc {
 public func useAssoc<T: HasAssoc>(_: T.Type) -> T.Assoc? { return nil }
 
 // CHECK-DAG: let usesAssoc: ImportedType.Assoc?
-// CHECK-RECOVERY-DAG: let usesAssoc: Int32?
+// CHECK-RECOVERY-DAG: let usesAssoc: CInt?
 public let usesAssoc = useAssoc(ImportedType.self)
 // CHECK-DAG: let usesAssoc2: AnotherType.Assoc?
 // CHECK-RECOVERY-DAG: let usesAssoc2: AnotherType.Assoc?
@@ -310,7 +310,7 @@ public let usesAssoc2 = useAssoc(AnotherType.self)
 // CHECK-RECOVERY-NEGATIVE-NOT: let wrapped:
 public let wrapped = WrappedInt(0)
 // CHECK-DAG: let unwrapped: UnwrappedInt
-// CHECK-RECOVERY-DAG: let unwrapped: Int32
+// CHECK-RECOVERY-DAG: let unwrapped: CInt
 public let unwrapped: UnwrappedInt = 0
 
 // CHECK-DAG: let wrappedMetatype: WrappedInt.Type
@@ -368,7 +368,7 @@ public var wrappedThird, wrappedFourth: WrappedInt?
 // CHECK-RECOVERY-NEGATIVE-NOT: func usesWrapped(
 public func usesWrapped(_ wrapped: WrappedInt) {}
 // CHECK-DAG: func usesUnwrapped(_ unwrapped: UnwrappedInt)
-// CHECK-RECOVERY-DAG: func usesUnwrapped(_ unwrapped: Int32)
+// CHECK-RECOVERY-DAG: func usesUnwrapped(_ unwrapped: CInt)
 public func usesUnwrapped(_ unwrapped: UnwrappedInt) {}
 
 // CHECK-DAG: func returnsWrapped() -> WrappedInt
@@ -394,7 +394,7 @@ public typealias ConstrainedUnwrapped<T: HasAssoc> = T where T.Assoc == Unwrappe
 // CHECK-NEXT: }
 // CHECK-RECOVERY-LABEL: extension Int32 : UnwrappedProto {
 // CHECK-RECOVERY-NEXT: func unwrappedMethod()
-// CHECK-RECOVERY-NEXT: prefix static func *** (x: Int32)
+// CHECK-RECOVERY-NEXT: prefix static func *** (x: CInt)
 // CHECK-RECOVERY-NEXT: }
 // CHECK-RECOVERY-NEGATIVE-NOT: extension UnwrappedInt
 extension UnwrappedInt: UnwrappedProto {

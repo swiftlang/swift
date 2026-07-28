@@ -55,6 +55,16 @@ void swift::runSILGenPasses(SILModule &Module, bool VerifySILGen) {
   if (Module.getStage() != SILStage::Raw)
     return;
 
+  // SILGen sets needBreakInfiniteLoops / needCompleteLifetimes on functions
+  // whose blocks it erases (e.g. via eraseBlock under ownership). SILGenCleanup,
+  // the first function pass below, breaks infinite loops and completes lifetimes
+  // unconditionally, so reset these flags up front to satisfy the function pass
+  // manager's pre-condition that they are clear before any function pass runs.
+  for (auto &function : Module) {
+    function.setNeedBreakInfiniteLoops(false);
+    function.setNeedCompleteLifetimes(false);
+  }
+
   executePassPipelinePlan(&Module,
                           SILPassPipelinePlan::getSILGenPassPipeline(opts),
                           /*isMandatory*/ true);

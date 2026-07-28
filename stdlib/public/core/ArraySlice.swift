@@ -1239,7 +1239,7 @@ extension ArraySlice {
     @_lifetime(borrow self)
     borrowing get {
       let (pointer, count) = unsafe (_buffer.firstElementAddress, _buffer.count)
-      let span = unsafe Span(_unsafeStart: pointer, count: count)
+      let span = unsafe Span(_unchecked: pointer, count: count)
       return unsafe _overrideLifetime(span, borrowing: self)
     }
   }
@@ -1351,7 +1351,7 @@ extension ArraySlice {
 #endif
       // LifetimeDependence analysis inserts call to Builtin.endCOWMutation.
       let (pointer, count) = unsafe (_buffer.firstElementAddress, _buffer.count)
-      let span = unsafe MutableSpan(_unsafeStart: pointer, count: count)
+      let span = unsafe MutableSpan(_unchecked: pointer, count: count)
       return unsafe _overrideLifetime(span, mutating: &self)
     }
   }

@@ -28,6 +28,7 @@
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
+#include "swift/SILOptimizer/Utils/DebugOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "llvm/ADT/DenseMap.h"
@@ -80,13 +81,6 @@ static bool seemsUseful(SILInstruction *I) {
     if (TI->isFunctionExiting())
       return true;
   }
-
-  // Is useful if it's associating with a function argument
-  // If undef, it is useful and it doesn't cost anything.
-  if (isa<DebugValueInst>(I))
-    return isa<SILFunctionArgument>(I->getOperand(0))
-      || isa<SILUndef>(I->getOperand(0));
-
 
   // Don't delete allocation instructions in DCE.
   if (isa<AllocRefInst>(I) || isa<AllocRefDynamicInst>(I)) {
@@ -438,6 +432,7 @@ void DCE::markTerminatorArgsLive(SILBasicBlock *Pred,
   case TermKind::SwitchValueInst:
   case TermKind::SwitchEnumAddrInst:
   case TermKind::CheckedCastAddrBranchInst:
+  case TermKind::CondBranchInst:
     llvm_unreachable("Unexpected argument for terminator kind!");
     break;
 
@@ -456,21 +451,6 @@ void DCE::markTerminatorArgsLive(SILBasicBlock *Pred,
     markValueLive(cast<BranchInst>(Term)->getArg(ArgIndex));
     break;
 
-  case TermKind::CondBranchInst: {
-    auto *CondBr = cast<CondBranchInst>(Term);
-
-    if (CondBr->getTrueBB() == Succ) {
-      auto TrueArgs = CondBr->getTrueArgs();
-      markValueLive(TrueArgs[ArgIndex]);
-    }
-
-    if (CondBr->getFalseBB() == Succ) {
-      auto FalseArgs = CondBr->getFalseArgs();
-      markValueLive(FalseArgs[ArgIndex]);
-    }
-
-    break;
-  }
   case TermKind::AwaitAsyncContinuationInst:
   case TermKind::TryApplyInst: {
     assert(ArgIndex == 0 && "Expect a single argument!");
@@ -514,13 +494,6 @@ void DCE::propagateLiveness(SILInstruction *I) {
   if (!isa<TermInst>(I)) {
     for (auto &O : I->getAllOperands())
       markValueLive(O.get());
-
-    // Conceptually, the dependency from a debug instruction to its definition
-    // is in reverse direction: Only if its definition is alive, also the
-    // debug_value instruction is alive.
-    for (auto result : I->getResults())
-      for (Operand *DU : getDebugUses(result))
-        markInstructionLive(DU->getUser());
 
     // Handle all other reverse-dependency instructions, like cond_fail,
     // fix_lifetime, destroy_value, etc. Only if the definition is alive, the
@@ -635,6 +608,22 @@ void DCE::endLifetimeOfLiveValue(Operand *op, SILInstruction *insertPt) {
 bool DCE::removeDead() {
   bool Changed = false;
 
+  // Salvage debug info before erasing dead instructions. Collect all dead
+  // non-debug instructions, then salvage in reverse order (uses before defs)
+  // so that reconstruction blocks can reference operands still alive.
+  SmallVector<SILInstruction *, 16> toSalvage;
+  for (auto &bb : *F) {
+    for (auto &inst : bb) {
+      if (LiveInstructions.contains(&inst) || isa<BranchInst>(&inst))
+        continue;
+      if (isa<TermInst>(&inst) || isa<DebugValueInst>(&inst))
+        continue;
+      toSalvage.push_back(&inst);
+    }
+  }
+  for (auto *inst : llvm::reverse(toSalvage))
+    salvageDebugInfo(inst);
+
   for (auto &BB : *F) {
     for (unsigned i = 0; i < BB.getArguments().size();) {
       auto *arg = BB.getArgument(i);
@@ -646,7 +635,11 @@ bool DCE::removeDead() {
       LLVM_DEBUG(llvm::dbgs() << "Removing dead argument:\n");
       LLVM_DEBUG(arg->dump());
 
-      arg->replaceAllUsesWithUndef();
+      // Function arguments cannot be removed from the signature. Don't
+      // replace their uses with undef: debug_values should keep referencing
+      // the real arg.
+      if (!isa<SILFunctionArgument>(arg))
+        arg->replaceAllUsesWithUndef();
 
       if (!F->hasOwnership() || arg->getOwnershipKind() == OwnershipKind::None) {
         i++;
@@ -707,6 +700,12 @@ bool DCE::removeDead() {
       auto *Inst = &*I;
       ++I;
       if (LiveInstructions.contains(Inst) || isa<BranchInst>(Inst))
+        continue;
+
+      // Debug values have either already been rewritten by salvageDebugInfo,
+      // or replaceAllUsesOfAllResultsWithUndef will replace the deleted use
+      // with an undef, killing it. They should not be deleted.
+      if (isa<DebugValueInst>(Inst))
         continue;
 
       // We want to replace dead terminators with unconditional branches to

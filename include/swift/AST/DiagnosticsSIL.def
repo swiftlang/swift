@@ -924,6 +924,14 @@ ERROR(sil_movechecking_reinit_after_discard, none,
       "cannot reinitialize 'self' after 'discard self'", ())
 ERROR(sil_movechecking_consume_during_deinit, none,
       "'self' cannot be consumed during 'deinit'", ())
+ERROR(sil_movechecking_consume_entire_self_in_deinit, none,
+      "'self' cannot be consumed as an entire %0 value during 'deinit'; "
+      "either consume its individual properties, or memberwise-initialize a "
+      "new %0 value", (Type))
+ERROR(sil_movechecking_mutate_entire_self_in_deinit, none,
+      "'self' cannot be mutated as an entire %0 value during 'deinit'; "
+      "either mutate its individual properties, or memberwise-initialize a "
+      "new %0 value", (Type))
 
 NOTE(sil_movechecking_discard_self_here, none,
      "discarded self here", ())

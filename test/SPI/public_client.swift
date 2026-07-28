@@ -55,3 +55,7 @@ public func inlinable() -> SPIClass { // expected-error {{cannot find type 'SPIC
 }
 
 let _ = o1 - o2 // expected-error {{binary operator '-' cannot be applied to two 'PublicType' operands}}
+
+public struct ConformsToPublicProtoWithSPIRequirement {
+  func publicReq() { }
+}

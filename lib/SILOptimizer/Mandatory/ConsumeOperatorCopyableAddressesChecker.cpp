@@ -2041,9 +2041,8 @@ void ConsumeOperatorCopyableAddressesChecker::cloneDeferCalleeAndRewriteUses(
 bool ConsumeOperatorCopyableAddressesChecker::performClosureDataflow(
     Operand *callerOperand, ClosureOperandState &calleeOperandState) {
   auto fas = FullApplySite::isa(callerOperand->getUser());
-  auto *callee = fas.getCalleeFunction();
-  auto *address =
-      callee->begin()->getArgument(fas.getCalleeArgIndex(*callerOperand));
+  [[maybe_unused]] auto *callee = fas.getCalleeFunction();
+  auto *address = fas.getCalleeArgument(*callerOperand);
 
   LLVM_DEBUG(llvm::dbgs() << "Performing closure dataflow on caller use: "
                           << *callerOperand->getUser());

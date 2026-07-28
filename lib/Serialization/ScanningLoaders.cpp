@@ -86,7 +86,7 @@ std::error_code SwiftModuleScanner::findModuleFilesInDirectory(
 
 bool SwiftModuleScanner::canImportModule(
     ImportPath::Module path, SourceLoc loc, ModuleVersionInfo *versionInfo,
-    bool isTestableDependencyLookup) {
+    bool isTestableDependencyLookup, bool isSourceCanImport) {
   if (path.hasSubmodule())
     return false;
 
@@ -105,7 +105,7 @@ bool SwiftModuleScanner::canImportModule(
   }
 
   return SerializedModuleLoaderBase::canImportModule(
-      path, loc, versionInfo, isTestableDependencyLookup);
+      path, loc, versionInfo, isTestableDependencyLookup, isSourceCanImport);
 }
 
 bool SwiftModuleScanner::handlePossibleTargetMismatch(
@@ -427,7 +427,8 @@ SwiftModuleScanner::lookupSwiftModule(Identifier moduleName,
   // Execute the check to determine whether there is a module with this name
   // that we can import. This check will populate the result fields if one is
   // found.
-  canImportModule(modulePath, SourceLoc(), nullptr, isTestableImport);
+  canImportModule(modulePath, SourceLoc(), nullptr, isTestableImport,
+                  /*isSourceCanImport=*/true);
   return SwiftModuleScannerQueryResult(
       std::move(foundDependencyInfo), std::move(incompatibleCandidates));
 }

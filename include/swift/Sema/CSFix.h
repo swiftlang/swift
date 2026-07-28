@@ -141,6 +141,10 @@ enum class FixKind : uint8_t {
   /// Allow access to type member on instance or instance member on type
   AllowTypeOrInstanceMember,
 
+  /// Allow access to a protocol metatype extension member through the
+  /// metatype of a conforming type.
+  AllowMetatypeExtensionMemberOnConformingType,
+
   /// Allow expressions where 'mutating' method is only partially applied,
   /// which means either not applied at all e.g. `Foo.bar` or only `Self`
   /// is applied e.g. `foo.bar` or `Foo.bar(&foo)`.
@@ -1616,6 +1620,35 @@ public:
 
   static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::AllowTypeOrInstanceMember;
+  }
+};
+
+class AllowMetatypeExtensionMemberOnConformingType final
+    : public AllowInvalidMemberRef {
+  AllowMetatypeExtensionMemberOnConformingType(
+      ConstraintSystem &cs, Type baseType, ValueDecl *member, DeclNameRef name,
+      ConstraintLocator *locator)
+      : AllowInvalidMemberRef(
+            cs, FixKind::AllowMetatypeExtensionMemberOnConformingType,
+            baseType, member, name, locator) {
+    ASSERT(member);
+  }
+
+public:
+  std::string getName() const override {
+    return "allow access to protocol metatype extension member on conforming "
+           "type";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  static AllowMetatypeExtensionMemberOnConformingType *
+  create(ConstraintSystem &cs, Type baseType, ValueDecl *member,
+         DeclNameRef usedName, ConstraintLocator *locator);
+
+  static bool classof(const ConstraintFix *fix) {
+    return fix->getKind() ==
+           FixKind::AllowMetatypeExtensionMemberOnConformingType;
   }
 };
 

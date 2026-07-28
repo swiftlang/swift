@@ -299,9 +299,6 @@ public:
   /// Determine whether this locator points to the `try?` expression.
   bool isForOptionalTry() const;
 
-  /// Determine whether this locator is for a result builder body result type.
-  bool isForResultBuilderBodyResult() const;
-
   /// Determine whether this locator is for a macro expansion.
   bool isForMacroExpansion() const;
 

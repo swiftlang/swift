@@ -59,14 +59,14 @@ import Typedefs
 // CHECK-RECOVERY-LABEL: protocol Proto {
 public protocol Proto {
   // CHECK: var unwrappedProp: UnwrappedInt? { get set }
-  // CHECK-RECOVERY: var unwrappedProp: Int32?
+  // CHECK-RECOVERY: var unwrappedProp: CInt?
   var unwrappedProp: UnwrappedInt? { get set }
   // CHECK: var wrappedProp: WrappedInt? { get set }
   // CHECK-RECOVERY: /* placeholder for wrappedProp (vtable entries: 3) */
   var wrappedProp: WrappedInt? { get set }
 
   // CHECK: func returnsUnwrappedMethod() -> UnwrappedInt
-  // CHECK-RECOVERY: func returnsUnwrappedMethod() -> Int32
+  // CHECK-RECOVERY: func returnsUnwrappedMethod() -> CInt
   func returnsUnwrappedMethod() -> UnwrappedInt
   // CHECK: func returnsWrappedMethod() -> WrappedInt
   // CHECK-RECOVERY: /* placeholder for returnsWrappedMethod() (vtable entries: 1) */

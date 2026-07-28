@@ -18,6 +18,7 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AttrKind.h"
+#include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/Basic/Assertions.h"
@@ -122,6 +123,7 @@ static void writePrologue(raw_ostream &out, ASTContext &ctx,
          "#if __has_include(<swift/objc-prologue.h>)\n"
          "# include <swift/objc-prologue.h>\n"
          "#endif\n"
+         "#include <stdarg.h>\n"
          "\n"
          "#pragma clang diagnostic ignored \"-Wauto-import\"\n";
   emitObjCConditional(out,
@@ -553,10 +555,52 @@ writeImports(raw_ostream &out, llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
   }
 
   if (includeUnderlying) {
-    if (bridgingHeader.empty())
-      out << "#import <" << M.getName().str() << '/' << M.getName().str()
-          << ".h>\n\n";
-    else {
+    if (bridgingHeader.empty()) {
+      llvm::StringRef relativeToPath =
+          frontendOpts.GeneratedHeaderUnderlyingModuleIncludeBase;
+      if (relativeToPath.empty()) {
+        // Assume a framework-style umbrella header named after the module.
+        out << "#import <" << M.getName().str() << '/' << M.getName().str()
+            << ".h>\n\n";
+      } else {
+        const clang::Module *underlyingClangModule =
+            M.findUnderlyingClangModule();
+
+        llvm::SmallString<128> basePath = normalizePath(relativeToPath);
+        if (!basePath.ends_with("/"))
+          basePath.append("/");
+        llvm::SmallSet<llvm::SmallString<128>, 10> baseSearchDir;
+        baseSearchDir.insert(basePath);
+
+        llvm::SmallSet<llvm::SmallString<128>, 10> quotedIncludes;
+        if (underlyingClangModule) {
+          llvm::SmallSet<const clang::Module *, 10> visitedUnderlyingModules;
+          collectClangModuleHeaderIncludes(
+              underlyingClangModule, fileManager, quotedIncludes,
+              visitedUnderlyingModules, baseSearchDir,
+              cwd ? StringRef(*cwd) : StringRef());
+        }
+
+        if (quotedIncludes.empty()) {
+          M.getASTContext().Diags.diagnose(
+              SourceLoc(),
+              diag::clang_header_underlying_module_headers_not_found,
+              M.getName().str());
+        } else {
+          SmallVector<llvm::SmallString<128>, 4> sortedIncludes{
+              quotedIncludes.begin(), quotedIncludes.end()};
+          std::sort(sortedIncludes.begin(), sortedIncludes.end(),
+                    [](const llvm::SmallString<128> &lhs,
+                       const llvm::SmallString<128> &rhs) {
+                      return lhs.str() < rhs.str();
+                    });
+          for (const auto &header : sortedIncludes) {
+            out << "#import \"" << header << "\"\n";
+          }
+          out << "\n";
+        }
+      }
+    } else {
       out << "#if defined(__OBJC__)\n";
       out << "#import \"" << bridgingHeader << "\"\n";
       out << "#else\n";

@@ -1,4 +1,4 @@
-public func fooHelperExplicitFrameworkFunc1(_ a: Int32) -> Int32
+public func fooHelperExplicitFrameworkFunc1(_ a: CInt) -> CInt
 
 
 [
@@ -30,25 +30,25 @@ public func fooHelperExplicitFrameworkFunc1(_ a: Int32) -> Int32
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
     key.offset: 49,
-    key.length: 5
+    key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 59,
-    key.length: 5
+    key.offset: 58,
+    key.length: 4
   }
 ]
 [
   {
-    key.kind: source.lang.swift.ref.struct,
+    key.kind: source.lang.swift.ref.typealias,
     key.offset: 49,
-    key.length: 5,
+    key.length: 4,
     key.is_system: 1
   },
   {
-    key.kind: source.lang.swift.ref.struct,
-    key.offset: 59,
-    key.length: 5,
+    key.kind: source.lang.swift.ref.typealias,
+    key.offset: 58,
+    key.length: 4,
     key.is_system: 1
   }
 ]
@@ -58,10 +58,10 @@ public func fooHelperExplicitFrameworkFunc1(_ a: Int32) -> Int32
     key.accessibility: source.lang.swift.accessibility.public,
     key.name: "fooHelperExplicitFrameworkFunc1(_:)",
     key.offset: 7,
-    key.length: 57,
-    key.typename: "Int32",
+    key.length: 55,
+    key.typename: "CInt",
     key.nameoffset: 12,
-    key.namelength: 43,
+    key.namelength: 42,
     key.attributes: [
       {
         key.offset: 0,
@@ -74,8 +74,8 @@ public func fooHelperExplicitFrameworkFunc1(_ a: Int32) -> Int32
         key.kind: source.lang.swift.decl.var.parameter,
         key.name: "a",
         key.offset: 44,
-        key.length: 10,
-        key.typename: "Int32"
+        key.length: 9,
+        key.typename: "CInt"
       }
     ]
   }

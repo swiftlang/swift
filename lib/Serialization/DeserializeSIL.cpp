@@ -2374,8 +2374,9 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     auto Ty2 = MF->getType(TyID2);
     SILType FnTy = getSILType(Ty, SILValueCategory::Object, Fn);
     SILType SubstFnTy = getSILType(Ty2, SILValueCategory::Object, Fn);
-    SILFunctionConventions substConventions(SubstFnTy.castTo<SILFunctionType>(),
-                                            Builder.getModule());
+    SILFunctionConventions substConventions(
+        SubstFnTy.castTo<SILFunctionType>(),
+        SILAddressConventions::forFunctionOrRawSIL(Fn, Builder.getModule()));
     assert(substConventions.getNumSILArguments() == ListOfValues.size()
            && "Argument number mismatch in ApplyInst.");
     SmallVector<SILValue, 4> Args;
@@ -2436,8 +2437,9 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     SILBasicBlock *normalBB = getBBForReference(Fn, ListOfValues.back());
     ListOfValues = ListOfValues.drop_back();
 
-    SILFunctionConventions substConventions(SubstFnTy.castTo<SILFunctionType>(),
-                                            Builder.getModule());
+    SILFunctionConventions substConventions(
+        SubstFnTy.castTo<SILFunctionType>(),
+        SILAddressConventions::forFunctionOrRawSIL(Fn, Builder.getModule()));
     assert(substConventions.getNumSILArguments() == ListOfValues.size()
            && "Argument number mismatch in ApplyInst.");
     SmallVector<SILValue, 4> Args;
@@ -2484,8 +2486,9 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
         FnTy.castTo<SILFunctionType>()->substGenericArgs(
             Builder.getModule(), Substitutions,
             Builder.getTypeExpansionContext()));
-    SILFunctionConventions fnConv(SubstFnTy.castTo<SILFunctionType>(),
-                                  Builder.getModule());
+    SILFunctionConventions fnConv(
+        SubstFnTy.castTo<SILFunctionType>(),
+        SILAddressConventions::forFunctionOrRawSIL(Fn, Builder.getModule()));
 
     unsigned numArgs = fnConv.getNumSILArguments();
     assert(numArgs >= ListOfValues.size()
@@ -3539,35 +3542,18 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     break;
   }
   case SILInstructionKind::CondBranchInst: {
-    // Format: condition, true basic block ID, a list of arguments, false basic
-    // block ID, a list of arguments. Use SILOneTypeValuesLayout: the type is
-    // for condition, the list has value for condition, true basic block ID,
-    // false basic block ID, number of true arguments, and a list of true|false
-    // arguments.
+    // Format: condition, true basic block ID, false basic block ID, and a
+    // (always zero) count of true arguments. A cond_br never passes branch
+    // arguments because SIL does not contain critical edges.
     SILValue Cond = getLocalValue(
         Builder.maybeGetFunction(), ListOfValues[0],
         getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn));
 
-    unsigned NumTrueArgs = ListOfValues[3];
-    unsigned StartOfTrueArg = 4;
-    unsigned StartOfFalseArg = StartOfTrueArg + 3*NumTrueArgs;
-    SmallVector<SILValue, 4> TrueArgs;
-    for (unsigned I = StartOfTrueArg, E = StartOfFalseArg; I < E; I += 3)
-      TrueArgs.push_back(
-          getLocalValue(Builder.maybeGetFunction(), ListOfValues[I + 2],
-                        getSILType(MF->getType(ListOfValues[I]),
-                                   (SILValueCategory)ListOfValues[I + 1], Fn)));
-
-    SmallVector<SILValue, 4> FalseArgs;
-    for (unsigned I = StartOfFalseArg, E = ListOfValues.size(); I < E; I += 3)
-      FalseArgs.push_back(
-          getLocalValue(Builder.maybeGetFunction(), ListOfValues[I + 2],
-                        getSILType(MF->getType(ListOfValues[I]),
-                                   (SILValueCategory)ListOfValues[I + 1], Fn)));
+    assert(ListOfValues[3] == 0 && "cond_br must not have branch arguments");
 
     ResultInst = Builder.createCondBranch(
-        Loc, Cond, getBBForReference(Fn, ListOfValues[1]), TrueArgs,
-        getBBForReference(Fn, ListOfValues[2]), FalseArgs);
+        Loc, Cond, getBBForReference(Fn, ListOfValues[1]),
+        getBBForReference(Fn, ListOfValues[2]));
     break;
   }
   case SILInstructionKind::AwaitAsyncContinuationInst: {
@@ -5543,14 +5529,14 @@ SILDeserializer::readDifferentiabilityWitness(DeclID DId) {
   (void)kind;
 
   DeclID originalNameId, jvpNameId, vjpNameId;
-  unsigned rawLinkage, isDeclaration, isSerialized, rawDiffKind,
+  unsigned rawLinkage, isDeclaration, isSerialized, isDefault, rawDiffKind,
       numParameterIndices, numResultIndices;
   GenericSignatureID derivativeGenSigID;
   ArrayRef<uint64_t> rawParameterAndResultIndices;
 
   DifferentiabilityWitnessLayout::readRecord(
       scratch, originalNameId, rawLinkage, isDeclaration, isSerialized,
-      rawDiffKind, derivativeGenSigID, jvpNameId, vjpNameId,
+      isDefault, rawDiffKind, derivativeGenSigID, jvpNameId, vjpNameId,
       numParameterIndices, numResultIndices, rawParameterAndResultIndices);
 
   if (isDeclaration) {
@@ -5609,7 +5595,7 @@ SILDeserializer::readDifferentiabilityWitness(DeclID DId) {
   if (!diffWitness)
     diffWitness = SILDifferentiabilityWitness::createDeclaration(
         SILMod, linkage, original, *diffKind, parameterIndices, resultIndices,
-        derivativeGenSig);
+        derivativeGenSig, isDefault);
 
   // If the current differentiability witness is merely a declaration, and the
   // deserialized witness is a definition, upgrade the current differentiability

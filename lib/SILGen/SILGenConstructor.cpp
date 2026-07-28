@@ -298,7 +298,8 @@ emitApplyOfInitAccessor(SILGenFunction &SGF, SILLocation loc,
 
   // `initialValue`
   {
-    SILFunctionConventions fnConv(fnType, SGF.SGM.M);
+    SILFunctionConventions fnConv(
+        fnType, SILAddressConventions::forFunction(SGF.F));
     auto startArgIdx = fnConv.getSILArgIndexOfFirstParam();
 
     SmallVector<ManagedValue> initialValues;
@@ -326,9 +327,11 @@ emitApplyOfInitAccessor(SILGenFunction &SGF, SILLocation loc,
   arguments.push_back(SGF.B.createMetatype(loc, SGF.getLoweredType(metatypeTy)));
 
   SubstitutionMap subs;
-  if (auto *env =
-          accessor->getDeclContext()->getGenericEnvironmentOfContext()) {
-    subs = env->getForwardingSubstitutionMap();
+  if (fnType->getInvocationGenericSignature()) {
+    if (auto *env =
+            accessor->getDeclContext()->getGenericEnvironmentOfContext()) {
+      subs = env->getForwardingSubstitutionMap();
+    }
   }
 
   (void)SGF.B.createApply(loc, accessorRef, subs, arguments, ApplyOptions());

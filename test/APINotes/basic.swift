@@ -49,6 +49,19 @@ func testSwiftName() {
 
   let d: Double = __will_be_private
 
+  let _: APINotesUnsigned = APINOTES_TYPED_MACRO
+  let _: CInt = APINOTES_TYPED_MACRO // expected-error{{cannot convert value of type 'APINotesUnsigned'}}
+  let _: APINotesSigned = APINOTES_TYPED_MACRO_ALIAS_TARGET
+  let _: APINotesUnsigned = APINOTES_TYPED_MACRO_ALIAS_TARGET // expected-error{{cannot convert value of type 'APINotesSigned'}}
+  let _: APINotesUnsigned = APINOTES_TYPED_MACRO_ALIAS
+  let _: APINotesSigned = APINOTES_TYPED_MACRO_ALIAS // expected-error{{cannot convert value of type 'APINotesUnsigned'}}
+
+  _ = renamedMacroConstant
+  _ = APINOTES_RENAMED_MACRO // expected-error{{'APINOTES_RENAMED_MACRO' has been renamed to 'renamedMacroConstant'}}
+  let _: APINotesUnsigned = retypedRenamedMacroConstant
+  let _: CInt = retypedRenamedMacroConstant // expected-error{{cannot convert value of type 'APINotesUnsigned'}}
+  _ = APINOTES_RETYPED_RENAMED_MACRO // expected-error{{'APINOTES_RETYPED_RENAMED_MACRO' has been renamed to 'retypedRenamedMacroConstant'}}
+
   // From APINotesFrameworkTest.
   jumpTo(x: 0, y: 0, z: 0)
   jumpTo(0, 0, 0) // expected-error{{missing argument labels 'x:y:z:' in call}}

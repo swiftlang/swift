@@ -34,16 +34,16 @@ namespace ns {
 
 // CHECKB:     enum ns {
 // CHECKB-NEXT: struct B {
-// CHECKB-NEXT:    init(y: Int32)
+// CHECKB-NEXT:    init(y: CInt)
 // CHECKB-NEXT:    init()
-// CHECKB-NEXT:    var y: Int32
+// CHECKB-NEXT:    var y: CInt
 // CHECKB-NEXT:  }
 // CHECKB-NEXT: }
 
 // CHECKA:     enum ns {
 // CHECKA-NEXT: struct A {
-// CHECKA-NEXT:    init(x: Int32)
+// CHECKA-NEXT:    init(x: CInt)
 // CHECKA-NEXT:    init()
-// CHECKA-NEXT:    var x: Int32
+// CHECKA-NEXT:    var x: CInt
 // CHECKA-NEXT:  }
 // CHECKA-NEXT: }

@@ -862,6 +862,8 @@ extension StringProtocol {
     return self.utf16.index(self.utf16.startIndex, offsetBy: offset)
   }
 
+  @_specialize(where Self == String)
+  @_specialize(where Self == Substring)
   public // SPI(Foundation)
   func _toUTF16Offsets(_ indices: Range<Index>) -> Range<Int> {
     if Self.self == String.self {
@@ -877,6 +879,8 @@ extension StringProtocol {
     return unsafe Range(uncheckedBounds: (lower: startOffset, upper: endOffset))
   }
 
+  @_specialize(where Self == String)
+  @_specialize(where Self == Substring)
   public // SPI(Foundation)
   func _toUTF16Indices(_ range: Range<Int>) -> Range<Index> {
 #if hasFeature(Macros)

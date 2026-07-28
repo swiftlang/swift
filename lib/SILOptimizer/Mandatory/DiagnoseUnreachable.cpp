@@ -537,12 +537,12 @@ static bool constantFoldTerminator(SILBasicBlock &BB,
       SILBasicBlock *UnreachableBlock = nullptr;
       bool CondIsTrue = false;
       if (ConstCond->getValue() == APInt(1, /*value*/ 0, false)) {
-        B.createBranch(Loc, CBI->getFalseBB(), CBI->getFalseArgs());
+        B.createBranch(Loc, CBI->getFalseBB());
         UnreachableBlock = CBI->getTrueBB();
       } else {
         assert(ConstCond->getValue() == APInt(1, /*value*/ 1, false) &&
                "Our representation of true/false does not match.");
-        B.createBranch(Loc, CBI->getTrueBB(), CBI->getTrueArgs());
+        B.createBranch(Loc, CBI->getTrueBB());
         UnreachableBlock = CBI->getFalseBB();
         CondIsTrue = true;
       }

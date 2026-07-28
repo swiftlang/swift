@@ -17,19 +17,22 @@
 
 #define DEBUG_TYPE "differentiation"
 
+#include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 
-#include "swift/SILOptimizer/Differentiation/VJPCloner.h"
 #include "swift/SILOptimizer/Analysis/DifferentiableActivityAnalysis.h"
 #include "swift/SILOptimizer/Differentiation/ADContext.h"
 #include "swift/SILOptimizer/Differentiation/DifferentiationInvoker.h"
 #include "swift/SILOptimizer/Differentiation/LinearMapInfo.h"
 #include "swift/SILOptimizer/Differentiation/PullbackCloner.h"
+#include "swift/SILOptimizer/Differentiation/TangentBuilder.h"
 #include "swift/SILOptimizer/Differentiation/Thunk.h"
+#include "swift/SILOptimizer/Differentiation/VJPCloner.h"
 
 #include "swift/SIL/TerminatorUtils.h"
 #include "swift/SIL/TypeSubstCloner.h"
+#include "swift/SILOptimizer/Analysis/ArraySemantic.h"
 #include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
 #include "swift/SILOptimizer/PassManager/PrettyStackTrace.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
@@ -1145,7 +1148,8 @@ public:
         vjp->createBasicBlockBefore(getOpBasicBlock(tai->getNormalBB()));
     normalBB->createPhiArgument(
         vjpFnTy->getDirectFormalResultsType(getModule(),
-                                            TypeExpansionContext::minimal()),
+                                            TypeExpansionContext::minimal(),
+                                            vjp->hasLoweredAddresses()),
         tai->getNormalBB()->getArgument(0)->getOwnershipKind());
 
     // Apply the VJP.
@@ -1591,6 +1595,7 @@ SILFunction *VJPCloner::Implementation::createEmptyPullback() {
   auto &module = context.getModule();
   pullback->setDebugScope(new (module)
                               SILDebugScope(original->getLocation(), pullback));
+  pullback->setHasLoweredAddresses(original->hasLoweredAddresses());
 
   return pullback;
 }

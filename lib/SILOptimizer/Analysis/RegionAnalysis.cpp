@@ -482,8 +482,8 @@ private:
   }
 
   void init(CondBranchInst *cbi) {
-    addValues(makeOperandRefRange(cbi->getTrueOperands()), cbi->getTrueBB());
-    addValues(makeOperandRefRange(cbi->getFalseOperands()), cbi->getFalseBB());
+    // A cond_br passes no branch arguments (SIL has no critical edges), so
+    // there are no values flowing to its successor blocks.
   }
 
   void init(DynamicMethodBranchInst *dmBranchInst) {
@@ -4861,8 +4861,8 @@ void RegionAnalysisFunctionInfo::runDataflow() {
         REGIONBASEDISOLATION_LOG(
             llvm::dbgs() << "    Pred. bb" << predBlock->getDebugID() << ": ";
             predState.exitPartition.print(llvm::dbgs()));
-        newEntryPartition =
-            Partition::join(newEntryPartition, predState.exitPartition);
+        newEntryPartition = Partition::join(newEntryPartition,
+                                            predState.exitPartition, predBlock);
       }
 
       // Update the entry partition. We need to still try to

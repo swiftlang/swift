@@ -19,6 +19,16 @@ struct NoParent {}
 // CHECK: [[@LINE-1]]:{{[0-9]+}}: error: unexpected error produced: invalid redeclaration of 'NoParent'
 // CHECK: [[@LINE-3]]:{{[0-9]+}}: note: with child note: 'NoParent' previously declared here
 
+// A top-level note directive outside a children block must not match a child
+// note; the child note is left unmatched (reported against its parent) while
+// the outer directive is reported as missing.
+struct TopLevelNote {}
+// expected-note@-1 {{'TopLevelNote' previously declared here}}
+struct TopLevelNote {} // expected-error {{invalid redeclaration of 'TopLevelNote'}}
+// CHECK: [[@LINE-3]]:{{[0-9]+}}: error: unexpected child note produced: 'TopLevelNote' previously declared here
+// CHECK: [[@LINE-2]]:{{[0-9]+}}: note: for parent matched here
+// CHECK: [[@LINE-4]]:{{[0-9]+}}: error: expected note not produced
+
 enum WithNone { case none }
 
 func testAmbiguous1(_ x: WithNone?) {

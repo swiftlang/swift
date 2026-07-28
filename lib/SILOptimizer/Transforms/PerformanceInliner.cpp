@@ -372,10 +372,6 @@ bool SILPerformanceInliner::isAutoDiffLinearMapWithControlFlow(
         if (auto *bi = dyn_cast<BranchInst>(predBB->getTerminator())) {
           val = bi->getArg(phiArg->getIndex());
           continue;
-        } else if (auto *cbi =
-                       dyn_cast<CondBranchInst>(predBB->getTerminator())) {
-          val = cbi->getArgForDestBB(phiArg->getParent(), phiArg->getIndex());
-          continue;
         } else if (auto *sei =
                        dyn_cast<SwitchEnumInst>(predBB->getTerminator())) {
           val = sei->getOperand();

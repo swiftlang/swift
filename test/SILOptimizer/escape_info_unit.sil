@@ -265,11 +265,14 @@ bb7(%22 : $LinkedNode):
   store %1 to %23 : $*X
   %25 = ref_element_addr %22 : $LinkedNode, #LinkedNode.next
   %26 = load %25 : $*LinkedNode
-  cond_br undef, bb7(%26 : $LinkedNode), bb8
+  cond_br undef, bb9, bb8
 
 bb8:
   %28 = tuple ()
   return %28 : $()
+
+bb9:
+  br bb7(%26 : $LinkedNode)
 }
 
 // CHECK-LABEL: Escape information for callee_may_store_to_non_escaping_argument:
@@ -651,7 +654,7 @@ bb0:
   %4b = begin_dealloc_ref %4a : $Derived of %0 : $Derived
   %5 = upcast %4b : $Derived to $X
   %6 = init_existential_ref %5 : $X : $X, $ClassP
-  %7 = open_existential_ref %6 : $ClassP to $@opened("53729A20-8747-11EB-82C4-D0817AD9985D", ClassP) Self 
+  %7 = open_existential_ref %6 : $ClassP to $@opened(1, ClassP) Self 
 
   (%8,%9) = begin_cow_mutation %1 : $Derived
   %10 = end_cow_mutation %9 : $Derived
@@ -659,7 +662,7 @@ bb0:
   %10b = begin_dealloc_ref %10a : $Derived of %1 : $Derived
   %11 = upcast %10b : $Derived to $X
   %12 = init_existential_ref %11 : $X : $X, $ClassP
-  %13 = open_existential_ref %12 : $ClassP to $@opened("12345678-8747-11EB-82C4-D0817AD9985D", ClassP) Self 
+  %13 = open_existential_ref %12 : $ClassP to $@opened(2, ClassP) Self 
 
   return %6 : $ClassP
 }
@@ -1633,5 +1636,41 @@ bb0:
   %3 = ref_element_addr %2, #F.y
   store %0 to [init] %3
   return %1
+}
+
+struct WrapperS {
+  @_hasStorage var x: X
+}
+
+sil [ossa] @borrow_accessor_x : $@convention(method) (@in_guaranteed WrapperS) -> @guaranteed X {
+[%0: escape v** -> %r.v**, escape v**.c*.v** -> %r.v**.c*.v**]
+bb0(%0 : $*WrapperS):
+  %1 = struct_element_addr %0, #WrapperS.x
+  %2 = load_borrow %1
+  return_borrow %2 from_scopes (%2)
+}
+
+sil [ossa] @noescape_x : $@convention(thin) (@guaranteed X) -> () {
+[%0: noescape **]
+}
+
+// CHECK-LABEL: Escape information for test_borrow_accessor_noescape:
+// CHECK:  -    :   %0 = alloc_ref $X
+// CHECK: End function test_borrow_accessor_noescape
+sil [ossa] @test_borrow_accessor_noescape : $@convention(thin) () -> () {
+bb0:
+  specify_test "escape_info"
+  %0 = alloc_ref $X
+  %stk = alloc_stack $WrapperS
+  %s = struct $WrapperS (%0 : $X)
+  store %s to [init] %stk
+  %func = function_ref @borrow_accessor_x : $@convention(method) (@in_guaranteed WrapperS) -> @guaranteed X
+  %k = apply %func(%stk) : $@convention(method) (@in_guaranteed WrapperS) -> @guaranteed X
+  %use = function_ref @noescape_x : $@convention(thin) (@guaranteed X) -> ()
+  apply %use(%k) : $@convention(thin) (@guaranteed X) -> ()
+  destroy_addr %stk
+  dealloc_stack %stk
+  %r = tuple ()
+  return %r
 }
 

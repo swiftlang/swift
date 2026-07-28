@@ -6,6 +6,7 @@
 // REQUIRES: concurrency
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 @_spi(ExperimentalCustomExecutors) import _Concurrency
 

@@ -1,0 +1,119 @@
+// RUN: %target-sil-opt -sil-print-types %s -sil-combine -sil-print-debuginfo | %FileCheck %s
+
+// Test salvaging of builtin instructions into debug reconstruction blocks.
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+// Nullary builtin (zeroInitializer): salvaged by cloning into debug BB.
+
+// CHECK-LABEL: sil @test_nullary_builtin
+// CHECK:         debug_value undef : $Builtin.Int64, let, name "zero", {{.*}}transform {
+// CHECK:           %0 = builtin "zeroInitializer"() : $Builtin.Int64
+// CHECK:           return %0 : $Builtin.Int64
+// CHECK:         }
+// CHECK:         return
+// CHECK-LABEL: } // end sil function 'test_nullary_builtin'
+sil @test_nullary_builtin : $@convention(thin) () -> () {
+bb0:
+  %0 = builtin "zeroInitializer"() : $Builtin.Int64
+  debug_value %0 : $Builtin.Int64, let, name "zero"
+  %t = tuple ()
+  return %t : $()
+}
+
+// Unary builtin (zextOrBitCast): salvaged as unary with phi arg rewired.
+
+// CHECK-LABEL: sil @test_unary_builtin
+// CHECK:       bb0(%0 : $Builtin.Int32):
+// CHECK:         debug_value %0 : $Builtin.Int32, let, name "ext", {{.*}}transform {
+// CHECK:           bb0(%0 : $Builtin.Int32):
+// CHECK:             %1 = builtin "zextOrBitCast_Int32_Int64"(%0 : $Builtin.Int32) : $Builtin.Int64
+// CHECK:             return %1 : $Builtin.Int64
+// CHECK:         }
+// CHECK:         return
+// CHECK-LABEL: } // end sil function 'test_unary_builtin'
+sil @test_unary_builtin : $@convention(thin) (Builtin.Int32) -> () {
+bb0(%0 : $Builtin.Int32):
+  %1 = builtin "zextOrBitCast_Int32_Int64"(%0 : $Builtin.Int32) : $Builtin.Int64
+  debug_value %1 : $Builtin.Int64, let, name "ext"
+  %t = tuple ()
+  return %t : $()
+}
+
+// assumeNonNegative: salvaged as identity (operand repointed).
+
+// CHECK-LABEL: sil @test_assume_nonnegative
+// CHECK:       bb0(%0 : $Builtin.Int64):
+// CHECK:         debug_value %0 : $Builtin.Int64, let, name "nn"
+// CHECK:         return
+// CHECK-LABEL: } // end sil function 'test_assume_nonnegative'
+sil @test_assume_nonnegative : $@convention(thin) (Builtin.Int64) -> () {
+bb0(%0 : $Builtin.Int64):
+  %1 = builtin "assumeNonNegative_Int64"(%0 : $Builtin.Int64) : $Builtin.Int64
+  debug_value %1 : $Builtin.Int64, let, name "nn"
+  %t = tuple ()
+  return %t : $()
+}
+
+// Binary builtin with two live operands: both need phi args but debug BBs
+// only support one, so the debug value is killed.
+
+// CHECK-LABEL: sil @test_binary_builtin
+// CHECK:       bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64):
+// CHECK:         debug_value undef : $Builtin.Int64, let, name "result"
+// CHECK:         return
+// CHECK-LABEL: } // end sil function 'test_binary_builtin'
+sil @test_binary_builtin : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> () {
+bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64):
+  %2 = builtin "add_Int64"(%0 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int64
+  debug_value %2 : $Builtin.Int64, let, name "result"
+  %t = tuple ()
+  return %t : $()
+}
+
+// Binary builtin with one literal operand (rhs): salvage with phi arg for the
+// live operand and literal cloned into the debug BB.
+
+// CHECK-LABEL: sil @test_binary_builtin_one_literal
+// CHECK:       bb0(%0 : $Builtin.Int64):
+// CHECK:         debug_value %0 : $Builtin.Int64, let, name "result", {{.*}}transform {
+// CHECK:           bb0(%0 : $Builtin.Int64):
+// CHECK:             %1 = integer_literal $Builtin.Int64, 1
+// CHECK:             %2 = builtin "add_Int64"(%0 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int64
+// CHECK:             return %2 : $Builtin.Int64
+// CHECK:         }
+// CHECK:         return
+// CHECK-LABEL: } // end sil function 'test_binary_builtin_one_literal'
+sil @test_binary_builtin_one_literal : $@convention(thin) (Builtin.Int64) -> () {
+bb0(%0 : $Builtin.Int64):
+  %1 = integer_literal $Builtin.Int64, 1
+  %2 = builtin "add_Int64"(%0 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int64
+  debug_value %2 : $Builtin.Int64, let, name "result"
+  %t = tuple ()
+  return %t : $()
+}
+
+// Binary builtin where the literal is the first operand (lhs) and the live
+// value is the second operand (rhs). The phi arg should wire to the rhs.
+
+// CHECK-LABEL: sil @test_binary_builtin_literal_lhs
+// CHECK:       bb0(%0 : $Builtin.Int64):
+// CHECK:         debug_value %0 : $Builtin.Int64, let, name "result", {{.*}}transform {
+// CHECK:           bb0(%0 : $Builtin.Int64):
+// CHECK:             %1 = integer_literal $Builtin.Int64, 10
+// CHECK:             %2 = builtin "sub_Int64"(%1 : $Builtin.Int64, %0 : $Builtin.Int64) : $Builtin.Int64
+// CHECK:             return %2 : $Builtin.Int64
+// CHECK:         }
+// CHECK:         return
+// CHECK-LABEL: } // end sil function 'test_binary_builtin_literal_lhs'
+sil @test_binary_builtin_literal_lhs : $@convention(thin) (Builtin.Int64) -> () {
+bb0(%0 : $Builtin.Int64):
+  %1 = integer_literal $Builtin.Int64, 10
+  %2 = builtin "sub_Int64"(%1 : $Builtin.Int64, %0 : $Builtin.Int64) : $Builtin.Int64
+  debug_value %2 : $Builtin.Int64, let, name "result"
+  %t = tuple ()
+  return %t : $()
+}

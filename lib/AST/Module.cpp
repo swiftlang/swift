@@ -4289,7 +4289,7 @@ evaluator::SideEffect CustomDerivativesRequest::evaluate(Evaluator &evaluator,
          afd->getAttrs().getAttributes<DerivativeAttr>()) {
       // Resolve derivative function configurations from `@derivative`
       // attributes by type-checking them.
-      (void)derAttr->getOriginalFunction(sf->getASTContext());
+      (void)derAttr->getOriginalFunctions(sf->getASTContext());
     }
   }
   return {};

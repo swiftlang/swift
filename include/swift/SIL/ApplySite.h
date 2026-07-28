@@ -219,7 +219,9 @@ public:
   }
   /// Get the conventions of the callee without the applied substitutions.
   SILFunctionConventions getOrigCalleeConv() const {
-    return SILFunctionConventions(getOrigCalleeType(), getModule());
+    return SILFunctionConventions(
+        getOrigCalleeType(),
+        SILAddressConventions::forFunction(*getFunction()));
   }
 
   /// Get the type of the callee with the applied substitutions.
@@ -235,7 +237,9 @@ public:
 
   /// Get the conventions of the callee with the applied substitutions.
   SILFunctionConventions getSubstCalleeConv() const {
-    return SILFunctionConventions(getSubstCalleeType(), getModule());
+    return SILFunctionConventions(
+        getSubstCalleeType(),
+        SILAddressConventions::forFunction(*getFunction()));
   }
 
   bool isAsync() const {
@@ -309,7 +313,7 @@ public:
   // The apply operand at the given index into the callee's function's
   // arguments.
   Operand &getArgumentRefAtCalleeArgIndex(unsigned i) const {
-    return getArgumentRef(i - getCalleeArgIndexOfFirstAppliedArg());
+    return getArgumentRef(i - getSubstCalleeArgIndexOfFirstAppliedArg());
   }
 
   /// Return the ith applied argument.
@@ -317,7 +321,7 @@ public:
 
   // The argument at the given index into the callee's function's arguments.
   SILValue getArgumentAtCalleeArgIndex(unsigned i) const {
-    return getArgument(i - getCalleeArgIndexOfFirstAppliedArg());
+    return getArgument(i - getSubstCalleeArgIndexOfFirstAppliedArg());
   }
 
   /// Set the ith applied argument.
@@ -413,9 +417,10 @@ public:
     return appliedArgIndex;
   }
 
-  /// Return the callee's function argument index corresponding to the first
-  /// applied argument: 0 for full applies; >= 0 for partial applies.
-  unsigned getCalleeArgIndexOfFirstAppliedArg() const {
+private:
+  /// The argument index of the first applied argument in \p calleeConv: 0 for
+  /// full applies, >= 0 for partial applies.
+  unsigned argIndexOfFirstAppliedArg(SILFunctionConventions calleeConv) const {
     switch (ApplySiteKind(Inst->getKind())) {
     case ApplySiteKind::ApplyInst:
     case ApplySiteKind::BeginApplyInst:
@@ -423,35 +428,91 @@ public:
       return 0;
     case ApplySiteKind::PartialApplyInst:
       // The arguments to partial_apply are a suffix of the partial_apply's
-      // callee. Note that getSubstCalleeConv is function type of the callee
-      // argument passed to this apply, not necessarily the function type of
-      // the underlying callee function (i.e. it is based on the `getCallee`
-      // type, not the `getCalleeOrigin` type).
+      // callee.
       //
       // pa1 = partial_apply f(c) : $(a, b, c)
       // pa2 = partial_apply pa1(b) : $(a, b)
       // apply pa2(a)
-      return getSubstCalleeConv().getNumSILArguments() - getNumArguments();
+      return calleeConv.getNumSILArguments() - getNumArguments();
     }
     llvm_unreachable("covered switch");
   }
 
-  /// Return the callee's function argument index corresponding to the given
-  /// apply operand. Each function argument index identifies a
-  /// SILFunctionArgument in the callee and can be used as a
-  /// SILFunctionConvention argument index.
+public:
+  /// Return the callee function's argument that applied operand \p op maps to,
+  /// or nullptr if the callee is not a concrete function with a body (indirect
+  /// call, closure value, witness/vtable dispatch, or an external declaration).
   ///
-  /// Note: Passing an applied argument index into SILFunctionConvention, as
-  /// opposed to a function argument index, is incorrect.
-  unsigned getCalleeArgIndex(const Operand &oper) const {
-    return getCalleeArgIndexOfFirstAppliedArg() + getAppliedArgIndex(oper);
+  /// The index is resolved against the callee's conventions, so it is correct
+  /// even when the callee function's lowered-address form differs from that of
+  /// the function containing this apply (the caller). This is the safe way to
+  /// reach the argument in the callee function's definition. This is in
+  /// contrast to getSubstCalleeArgIndex, which indexes into the space of
+  /// arguments in *this* particular apply of the callee, from the perspective
+  /// of *this* caller.
+  ///
+  /// The raw callee-space index, if needed, is the returned argument's
+  /// getIndex().
+  SILArgument *getCalleeArgument(const Operand &op) const {
+    auto *callee = getCalleeFunction();
+    if (!callee || callee->empty())
+      return nullptr;
+    return getCalleeArgument(callee, op);
+  }
+
+  /// Return \p callee's argument that applied operand \p op maps to.
+  ///
+  /// Use this overload only when \p callee was obtained other than through
+  /// getCalleeFunction() (e.g. getReferencedFunctionOrNull, or a devirtualized
+  /// target); otherwise prefer getCalleeArgument(op). \p callee must be a
+  /// function this apply can call, i.e. with at least getNumArguments()
+  /// arguments.
+  SILArgument *getCalleeArgument(SILFunction *callee, const Operand &op) const {
+    assert(callee->getArguments().size() >= getNumArguments() &&
+           "applying more arguments than the callee has");
+    unsigned idx = argIndexOfFirstAppliedArg(callee->getConventions()) +
+                   getAppliedArgIndex(op);
+    return callee->getArgument(idx);
+  }
+
+  /// The index of the first applied argument in this call's substituted-callee
+  /// conventions: 0 for full applies; >= 0 for partial applies.
+  unsigned getSubstCalleeArgIndexOfFirstAppliedArg() const {
+    return argIndexOfFirstAppliedArg(getSubstCalleeConv());
+  }
+
+  /// The argument index of applied operand \p oper in this call's
+  /// *substituted-callee* conventions, the call site's own view of its
+  /// arguments.
+  ///
+  /// This is NOT an index into the callee function's arguments. The two
+  /// disagree on two independent axes:
+  ///   - per-function address lowering can leave caller and callee in different
+  ///     lowered-address forms mid-pipeline
+  ///   - getSubstCalleeType (the callee value's type here) can have a different
+  ///     SIL-argument structure than the callee function's own signature
+  ///     (generic substitution, reabstraction thunks).
+  ///
+  /// To reach the SILFunctionArgument declared in the callee function's
+  /// definition, use getCalleeArgument. Never pass a substituted callee
+  /// argument index into SILFunction::getArgument.
+  unsigned getSubstCalleeArgIndex(const Operand &oper) const {
+    return getSubstCalleeArgIndexOfFirstAppliedArg() + getAppliedArgIndex(oper);
   }
 
   /// Return the SILArgumentConvention for the given applied argument operand.
   SILArgumentConvention getArgumentConvention(const Operand &oper) const {
     unsigned calleeArgIdx =
-        getCalleeArgIndexOfFirstAppliedArg() + getAppliedArgIndex(oper);
+        getSubstCalleeArgIndexOfFirstAppliedArg() + getAppliedArgIndex(oper);
     return getSubstCalleeConv().getSILArgumentConvention(calleeArgIdx);
+  }
+
+  /// Return the SILParameterInfo for the given applied parameter operand, from
+  /// this call site's substituted-callee conventions. \p oper must be a
+  /// parameter operand (not an indirect result).
+  SILParameterInfo getParamInfoForOperand(const Operand &oper) const {
+    return getSubstCalleeConv().getParamInfoForSILArg(
+        getSubstCalleeArgIndex(oper));
   }
 
   /// Return the SILArgumentConvention for the given applied argument operand at
@@ -689,7 +750,7 @@ public:
            "Can only be applied to non-out parameters");
 
     // The ParameterInfo is going to be the parameter in the caller.
-    unsigned calleeArgIndex = getCalleeArgIndex(oper);
+    unsigned calleeArgIndex = getSubstCalleeArgIndex(oper);
     return getSubstCalleeConv().getParamInfoForSILArg(calleeArgIndex);
   }
 
@@ -950,15 +1011,15 @@ public:
   /// result argument to the apply site.
   bool isIndirectResultOperand(const Operand &op) const {
     return isArgumentOperand(op)
-      && (getCalleeArgIndex(op) < getNumIndirectSILResults());
+      && (getSubstCalleeArgIndex(op) < getNumIndirectSILResults());
   }
 
   /// Returns true if \p op is an operand that passes an indirect
   /// result argument to the apply site.
   bool isIndirectErrorResultOperand(const Operand &op) const {
     return isArgumentOperand(op)
-      && (getCalleeArgIndex(op) >= getNumIndirectSILResults())
-      && (getCalleeArgIndex(op) < getNumIndirectSILResults() + getNumIndirectSILErrorResults());
+      && (getSubstCalleeArgIndex(op) >= getNumIndirectSILResults())
+      && (getSubstCalleeArgIndex(op) < getNumIndirectSILResults() + getNumIndirectSILErrorResults());
   }
 
   std::optional<ApplyIsolationCrossing> getIsolationCrossing() const {

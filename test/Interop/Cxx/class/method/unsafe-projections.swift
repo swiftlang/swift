@@ -14,9 +14,9 @@
 // CHECK:   func selfContained() -> SelfContained
 // CHECK:   func nested() -> NestedSelfContained
 // CHECK:   func empty() -> Empty
-// CHECK:   func value() -> Int32
+// CHECK:   func value() -> CInt
 // CHECK:   func __viewUnsafe() -> View
-// CHECK:   func __pointerUnsafe() -> UnsafeMutablePointer<Int32>!
+// CHECK:   func __pointerUnsafe() -> UnsafeMutablePointer<CInt>!
 // CHECK:   func explicitSelfContained() -> ExplicitSelfContained
 // CHECK:   func explicitNested() -> NestedExplicitSelfContained
 // CHECK: }
@@ -26,9 +26,9 @@
 // CHECK:   func selfContained() -> SelfContained
 // CHECK:   func nested() -> NestedSelfContained
 // CHECK:   func empty() -> Empty
-// CHECK:   func value() -> Int32
+// CHECK:   func value() -> CInt
 // CHECK:   func __viewUnsafe() -> View
-// CHECK:   func __pointerUnsafe() -> UnsafeMutablePointer<Int32>!
+// CHECK:   func __pointerUnsafe() -> UnsafeMutablePointer<CInt>!
 // CHECK:   func explicitSelfContained() -> ExplicitSelfContained
 // CHECK:   func explicitNested() -> NestedExplicitSelfContained
 // CHECK: }
@@ -40,9 +40,9 @@
 // CHECK:   func selfContained() -> SelfContained
 // CHECK:   func nested() -> NestedSelfContained
 // CHECK:   func empty() -> Empty
-// CHECK:   func value() -> Int32
+// CHECK:   func value() -> CInt
 // CHECK:   func __viewUnsafe() -> View
-// CHECK:   func __pointerUnsafe() -> UnsafeMutablePointer<Int32>!
+// CHECK:   func __pointerUnsafe() -> UnsafeMutablePointer<CInt>!
 // CHECK: }
 
 // CHECK: struct ExplicitSelfContained {
@@ -54,9 +54,9 @@
 // CHECK: struct NestedExplicitSelfContained {
 // CHECK:   func selfContained() -> SelfContained
 // CHECK:   func nested() -> NestedSelfContained
-// CHECK:   func value() -> Int32
+// CHECK:   func value() -> CInt
 // CHECK:   func __viewUnsafe() -> View
-// CHECK:   func __pointerUnsafe() -> UnsafeMutablePointer<Int32>!
+// CHECK:   func __pointerUnsafe() -> UnsafeMutablePointer<CInt>!
 // CHECK: }
 
 // CHECK: struct Empty {
@@ -66,7 +66,7 @@
 // CHECK: }
 
 // CHECK: struct IntPair {
-// CHECK:   func first() -> Int32
+// CHECK:   func first() -> CInt
 // CHECK:   func pointer() -> UnsafeMutableRawPointer!
 // CHECK:   func selfContained() -> SelfContained
 // CHECK: }

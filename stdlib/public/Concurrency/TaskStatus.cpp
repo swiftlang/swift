@@ -124,8 +124,16 @@ void swift::withStatusRecordLock(
     }
 
     // Records can only be read with the status lock held, so the lock's
-    // memory barriers will ensure that a newly emplaced record will be
-    // visible to any reader, and we can use relaxed ordering here.
+    // memory barriers will ensure that a newly emplaced record will
+    // be visible to any reader, and we can use relaxed ordering here.
+    //
+    // NOTE: this clears the is-locked bit *before* the mutex below is
+    // released, and we still touch `task` afterwards (traceStatusChanged
+    // and unlock). Once the bit is clear, other threads may make lock-free
+    // progress on the task. Callers must therefore not have published the
+    // task anywhere it could be run and destroyed (e.g. swift_task_enqueue)
+    // before this point unless they hold their own refcount on it; see
+    // flagAsAndEnqueueOnExecutor and swift_task_getSelfOrStealerForEnqueue.
     if (task->_private()._status().compare_exchange_weak(
             status, newStatus,
             /*success*/ std::memory_order_relaxed,

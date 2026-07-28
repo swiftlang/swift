@@ -3,6 +3,7 @@
 // RUN: %line-directive %t/SetOperations.swift -- %target-build-swift %t/SetOperations.swift -o %t/SetOperations -Xfrontend -disable-access-control -swift-version 5
 // RUN: %target-codesign %t/SetOperations && %line-directive %t/SetOperations.swift -- %target-run %t/SetOperations
 // REQUIRES: executable_test
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 import StdlibUnittest
 import StdlibCollectionUnittest

@@ -7,15 +7,15 @@
 
 // CHECK:      public struct PublicPrivate {
 // CHECK-NEXT:   public init()
-// CHECK-NEXT:   public var PublicMemberVar: Int32
-// CHECK-NEXT:   public static var PublicStaticMemberVar: Int32
+// CHECK-NEXT:   public var PublicMemberVar: CInt
+// CHECK-NEXT:   public static var PublicStaticMemberVar: CInt
 // CHECK-NEXT:   public mutating func publicMemberFunc()
-// CHECK-NEXT:   public typealias PublicTypedef = Int32
+// CHECK-NEXT:   public typealias PublicTypedef = CInt
 // CHECK-NEXT:   public struct PublicStruct {
 // CHECK-NEXT:     init()
 // CHECK-NEXT:   }
 // CHECK-NEXT:   public struct PublicEnum : Hashable, Equatable, RawRepresentable {
-// CHECK-NEXT:     public init(_ rawValue: [[ENUM_UNDERLYING_TYPE:Int32|UInt32]])
+// CHECK-NEXT:     public init(_ rawValue: [[ENUM_UNDERLYING_TYPE:CInt|CUnsignedInt]])
 // CHECK-NEXT:     public init(rawValue: [[ENUM_UNDERLYING_TYPE]])
 // CHECK-NEXT:     public var rawValue: [[ENUM_UNDERLYING_TYPE]]
 // CHECK-NEXT:     public typealias RawValue = [[ENUM_UNDERLYING_TYPE]]
@@ -45,10 +45,10 @@
 // CHECK-NEXT:     public typealias Element = PublicPrivate.PublicFlagEnum
 // CHECK-NEXT:     public typealias ArrayLiteralElement = PublicPrivate.PublicFlagEnum
 // CHECK-NEXT:   }
-// CHECK-NEXT:   private var PrivateMemberVar: Int32
-// CHECK-NEXT:   private static var PrivateStaticMemberVar: Int32
+// CHECK-NEXT:   private var PrivateMemberVar: CInt
+// CHECK-NEXT:   private static var PrivateStaticMemberVar: CInt
 // CHECK-NEXT:   private mutating func privateMemberFunc()
-// CHECK-NEXT:   private typealias PrivateTypedef = Int32
+// CHECK-NEXT:   private typealias PrivateTypedef = CInt
 // CHECK-NEXT:   private struct PrivateStruct {
 // CHECK-NEXT:     public init()
 // CHECK-NEXT:   }
