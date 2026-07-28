@@ -20,7 +20,6 @@
 #include "TaskGroupPrivate.h"
 #include "TaskPrivate.h"
 #include "bitset"
-#include "queue" // TODO: remove and replace with usage of our mpsc queue
 #include "string"
 #include "swift/ABI/HeapObject.h"
 #include "swift/ABI/Metadata.h"
@@ -36,7 +35,6 @@
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Threading/Mutex.h"
 #include <atomic>
-#include <deque>
 #include <new>
 
 #if SWIFT_STDLIB_HAS_ASL
@@ -115,9 +113,29 @@ class DiscardingTaskGroup;
 /************************** QUEUE IMPL ***************************************/
 /*****************************************************************************/
 
+// A FIFO queue of the (at most one, for a discarding task group; many, for
+// an accumulating task group) tasks that have completed and are ready to be
+// consumed. Rather than allocating a separate queue node per item, task-
+// backed items are threaded through an intrusive linked list stored in the
+// task itself (AsyncTask::GroupChildFragment's NextReadyTask), since a
+// task-group child task is only ever offered to (and thus only ever
+// enqueued into the ready queue of) its own group, and only once. A
+// discarding task group may additionally hold a single task-less raw error
+// (thrown directly by the group's body); that has no backing task to link
+// through, so it's stored directly in this queue as a scalar instead.
+//
+// T is always ReadyQueueItem; this remains a template only so its body,
+// which is defined ahead of ReadyQueueItem/ReadyStatus (nested inside
+// TaskGroupBase, declared below), can refer to those types indirectly via
+// calls on T (resolved at instantiation) rather than by name.
 template<typename T>
 class NaiveTaskGroupQueue {
-  std::queue<T, std::deque<T, swift::cxx_allocator<T>>> queue;
+  AsyncTask *head = nullptr;
+  AsyncTask *tail = nullptr;
+
+  /// Storage for a discarding task group's at-most-one raw (task-less)
+  /// error, using 0 (matching ReadyStatus::Empty) as the "none" sentinel.
+  uintptr_t rawErrorStorage = 0;
 
 public:
   NaiveTaskGroupQueue() = default;
@@ -127,26 +145,62 @@ public:
   NaiveTaskGroupQueue &operator=(const NaiveTaskGroupQueue<T> &) = delete;
 
   NaiveTaskGroupQueue(NaiveTaskGroupQueue<T> &&other) {
-    queue = std::move(other.queue);
+    head = other.head;
+    tail = other.tail;
+    rawErrorStorage = other.rawErrorStorage;
+    other.head = nullptr;
+    other.tail = nullptr;
+    other.rawErrorStorage = 0;
   }
 
   ~NaiveTaskGroupQueue() {}
 
   bool dequeue(T &output) {
-    if (queue.empty()) {
+    if (rawErrorStorage != 0) {
+      output = T{rawErrorStorage};
+      rawErrorStorage = 0;
+      return true;
+    }
+    if (!head) {
       return false;
     }
-    output = queue.front();
-    queue.pop();
+    AsyncTask *task = head;
+    auto *fragment = task->groupChildFragment();
+    head = fragment->getNextReadyTask();
+    if (!head) {
+      tail = nullptr;
+    }
+    fragment->setNextReadyTask(nullptr);
+    output = T::fromTaskResult(task, fragment->getReadyHadErrorResult());
     return true;
   }
 
   bool isEmpty() const {
-    return queue.empty();
+    return head == nullptr && rawErrorStorage == 0;
   }
 
   void enqueue(const T item) {
-    queue.push(item);
+    if (item.isRawError()) {
+      assert(isEmpty() &&
+             "task group ready queue may only ever hold a single raw "
+             "error, with nothing else enqueued alongside it");
+      rawErrorStorage = item.storage;
+      return;
+    }
+
+    assert(rawErrorStorage == 0 &&
+           "cannot enqueue a task-based ready item while a raw error is "
+           "pending");
+    AsyncTask *task = item.getTask();
+    auto *fragment = task->groupChildFragment();
+    fragment->setNextReadyTask(nullptr);
+    fragment->setReadyHadErrorResult(item.hadErrorResult());
+    if (tail) {
+      tail->groupChildFragment()->setNextReadyTask(task);
+    } else {
+      head = task;
+    }
+    tail = task;
   }
 };
 
@@ -286,6 +340,23 @@ public:
       assert(group && "only a discarding task group uses raw errors in the ready queue");
       return ReadyQueueItem{
           reinterpret_cast<uintptr_t>(error) | static_cast<uintptr_t>(ReadyStatus::RawError)};
+    }
+
+    // The following are used by NaiveTaskGroupQueue, which is defined above
+    // this type (and thus cannot name ReadyStatus/ReadyQueueItem directly),
+    // to store/restore items via the intrusive AsyncTask linked list without
+    // needing to spell out those types there.
+
+    bool isRawError() const {
+      return getStatus() == ReadyStatus::RawError;
+    }
+
+    bool hadErrorResult() const {
+      return getStatus() == ReadyStatus::Error;
+    }
+
+    static ReadyQueueItem fromTaskResult(AsyncTask *task, bool hadErrorResult) {
+      return get(hadErrorResult ? ReadyStatus::Error : ReadyStatus::Success, task);
     }
   };
 
