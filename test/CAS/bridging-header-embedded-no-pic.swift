@@ -23,7 +23,7 @@
 
 /// Emitting the PCH with that command line must succeed.
 // RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json bridgingHeader > %t/header.cmd
-// RUN: %target-swift-frontend @%t/header.cmd %t/Bridging.h -disable-implicit-swift-modules -o %t/bridging.pch
+// RUN: %target-swift-frontend-plain @%t/header.cmd %t/Bridging.h -disable-implicit-swift-modules -o %t/bridging.pch
 
 //--- test.swift
 public func test() {}
