@@ -3156,6 +3156,13 @@ static bool exprEnclosedInSythesizedMacro(const Expr *expr, DeclContext *DC) {
 /// Diagnose uses of unavailable declarations.
 void swift::diagnoseExprAvailability(const Expr *E, DeclContext *DC) {
   auto where = ExportContext::forFunctionBody(DC, E->getStartLoc());
+  // FIXME: We skip availability checking for expressions in synthesized
+  // derivation macros to match the behavior of the old built-in conformance
+  // synthesis, whose implicit members are skipped. This is unsound: it lets a
+  // derived conformance reference a member conformance that is unavailable,
+  // which crashes at runtime under -unavailable-decl-optimization=stub. We
+  // ought to diagnose this (likely staged in as a warning first). See
+  // https://github.com/swiftlang/swift/issues/77589.
   if (where.isImplicit() || exprEnclosedInSythesizedMacro(E, DC))
     return;
   ExprAvailabilityWalker walker(where);
