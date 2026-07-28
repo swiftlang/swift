@@ -97,22 +97,18 @@ entry(%s : $CP):
   return %z : $CP
 }
 
-// CHECK-DAG: define{{( protected)?}} swiftcc void @class_existential_weak(ptr noalias sret({{.*}}) %0, i64 %1, i64 %2)
+// CHECK-DAG: define{{( protected)?}} swiftcc void @class_existential_weak(ptr noalias sret({{.*}}) %0, ptr [[SRC_REF:%.*]], ptr [[SRC_WITNESS:%.*]])
 sil @class_existential_weak : $@convention(thin) (@owned CP?) -> @out @sil_weak CP? {
 entry(%w : $*@sil_weak CP?, %a : $CP?):
   // CHECK: [[V:%.*]] = alloca { %swift.weak, ptr }
   %v = alloc_stack $@sil_weak CP?
 
-  // CHECK: [[SRC_REF:%.*]] = inttoptr {{.*}} ptr
-  // CHECK: [[SRC_WITNESS:%.*]] = inttoptr {{.*}} ptr
   // CHECK: [[DEST_WITNESS_ADDR:%.*]] = getelementptr inbounds{{.*}} { %swift.weak, ptr }, ptr %0, i32 0, i32 1
   // CHECK: store ptr [[SRC_WITNESS]], ptr [[DEST_WITNESS_ADDR]]
   // CHECK: [[DEST_REF_ADDR:%.*]] = getelementptr inbounds{{.*}} { %swift.weak, ptr }, ptr %0, i32 0, i32 0
   // CHECK: call ptr @swift_unknownObjectWeakInit(ptr returned [[DEST_REF_ADDR]], ptr [[SRC_REF]])
   store_weak %a to [init] %w : $*@sil_weak CP?
 
-  // CHECK: [[SRC_REF:%.*]] = inttoptr {{.*}} ptr
-  // CHECK: [[SRC_WITNESS:%.*]] = inttoptr {{.*}} ptr
   // CHECK: [[DEST_WITNESS_ADDR:%.*]] = getelementptr inbounds{{.*}} { %swift.weak, ptr }, ptr %0, i32 0, i32 1
   // CHECK: store ptr [[SRC_WITNESS]], ptr [[DEST_WITNESS_ADDR]]
   // CHECK: [[DEST_REF_ADDR:%.*]] = getelementptr inbounds{{.*}} { %swift.weak, ptr }, ptr %0, i32 0, i32 0

@@ -156,12 +156,10 @@ bb0(%0 : $CP):
 }
 
 // CHECK-i386-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc ptr @unchecked_ref_cast_optionalproto_optional
-// CHECK-i386: [[VALUE:%.*]] = inttoptr i32 %0 to ptr
-// CHECK-i386: ret ptr [[VALUE]]
+// CHECK-i386: ret ptr %0
 
 // CHECK-x86_64-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc ptr @unchecked_ref_cast_optionalproto_optional
-// CHECK-x86_64: [[VALUE:%.*]] = inttoptr i64 %0 to ptr
-// CHECK-x86_64: ret ptr [[VALUE]]
+// CHECK-x86_64: ret ptr %0
 sil @unchecked_ref_cast_optionalproto_optional : $@convention(thin) (@owned Optional<CP>) -> @owned Optional<AnyObject> {
 bb0(%0 : $Optional<CP>):
   %2 = unchecked_ref_cast %0 : $Optional<CP> to $Optional<AnyObject>
