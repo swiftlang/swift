@@ -2744,6 +2744,53 @@ void IRGenModule::emitGlobalDecl(Decl *D) {
   llvm_unreachable("bad decl kind!");
 }
 
+/// The @section name prefix that, on WebAssembly, requests emission into a
+/// Wasm custom section instead of an ordinary data segment. This mirrors the
+/// convention understood by LLVM's Wasm assembly parser and object writer.
+static const StringRef WasmCustomSectionPrefix = ".custom_section.";
+
+/// Whether \p section is an @section name that requests a WebAssembly custom
+/// section (i.e. the target is Wasm and the name has the `.custom_section.`
+/// prefix). Such sections are emitted via `wasm.custom_sections` module
+/// metadata rather than as an ordinary section on a global.
+static bool isWasmCustomSectionName(IRGenModule &IGM, StringRef section) {
+  return IGM.Triple.isWasm() && section.starts_with(WasmCustomSectionPrefix);
+}
+
+bool IRGenModule::tryEmitWasmCustomSection(SILGlobalVariable *var) {
+  // A `.custom_section.`-prefixed @section name on WebAssembly is emitted as a
+  // Wasm custom section holding the global's constant bytes. This is metadata,
+  // not an addressable global, so no `llvm::GlobalVariable` is created for it.
+  if (!var->isDefinition() || var->isInitializedObject() ||
+      !isWasmCustomSectionName(*this, var->section()))
+    return false;
+
+  auto *initInst = dyn_cast_or_null<SingleValueInstruction>(
+      var->getStaticInitializerValue());
+  if (!initInst)
+    return false;
+
+  Explosion initExp = emitConstantValue(*this, initInst);
+  llvm::Constant *initVal = getConstantValue(std::move(initExp),
+                                             /*paddingBytes=*/0);
+  llvm::SmallVector<char, 64> bytes;
+  if (!tryFlattenConstantBytes(*this, initVal, bytes))
+    // The initializer isn't a plain byte blob (e.g. it embeds a relocatable
+    // pointer, which a Wasm custom section cannot represent). Fall back to
+    // emitting it as an ordinary global.
+    return false;
+
+  StringRef name = var->section().drop_front(WasmCustomSectionPrefix.size());
+  auto &ctx = getLLVMContext();
+  llvm::Metadata *entry[] = {
+      llvm::MDString::get(ctx, name),
+      llvm::MDString::get(ctx, StringRef(bytes.data(), bytes.size())),
+  };
+  Module.getOrInsertNamedMetadata("wasm.custom_sections")
+      ->addOperand(llvm::MDNode::get(ctx, entry));
+  return true;
+}
+
 Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
                                                 const TypeInfo &ti,
                                                 ForDefinition_t forDefinition) {
