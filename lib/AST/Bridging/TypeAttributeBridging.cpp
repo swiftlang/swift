@@ -101,3 +101,18 @@ BridgedOpaqueReturnTypeOfTypeAttr_createParsed(
       atLoc, kwLoc, parens, {cMangled.unbridged(), mangledLoc},
       {static_cast<unsigned int>(index), indexLoc});
 }
+
+BridgedCalledTypeAttr BridgedCalledTypeAttr_createParsed(
+    BridgedASTContext cContext, SourceLoc atLoc, SourceLoc nameLoc,
+    SourceRange parensRange, BridgedCalledTypeAttrSemantics bridgedSemantics,
+    SourceLoc semanticsLoc) {
+  auto semantics = [=] {
+    switch (bridgedSemantics) {
+    case BridgedCalledTypeAttrSemantics_Once:
+      return CalledTypeAttr::Semantics::Once;
+    }
+    llvm_unreachable("bad kind");
+  }();
+  return new (cContext.unbridged())
+      CalledTypeAttr(atLoc, nameLoc, parensRange, {semantics, semanticsLoc});
+}

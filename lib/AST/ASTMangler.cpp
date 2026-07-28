@@ -2351,6 +2351,9 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn,
     break;
   }
 
+  if (fn->isCalledOnce())
+    OpArgs.push_back('O');
+
   // Differentiability kind.
   auto diffKind = fn->getExtInfo().getDifferentiabilityKind();
   if (diffKind != DifferentiabilityKind::NonDifferentiable) {
@@ -3377,6 +3380,8 @@ void ASTMangler::appendFunctionType(AnyFunctionType *fn, GenericSignature sig,
         return appendOperator("XA");
     } else if (fn->isNoEscape()) {
       return appendOperator("XE");
+    } else if (fn->isCalledOnce()) {
+      return appendOperator("XO");
     }
     return appendOperator("c");
 

@@ -2423,13 +2423,12 @@ lowerCaptureContextParameters(TypeConverter &TC, SILDeclRef function,
 
   // If the function is a closure being converted to an @isolated(any) type,
   // add the implicit isolation parameter.
-  if (auto closureInfo = TC.getClosureTypeInfo(function)) {
-    if (closureInfo->ExpectedLoweredType->hasErasedIsolation()) {
-      auto isolationTy = SILType::getOpaqueIsolationType(TC.Context);
-      inputs.push_back({isolationTy.getASTType(),
-                        ParameterConvention::Direct_Guaranteed});
-      extInfo = extInfo.withErasedIsolation(false);
-    }
+  auto closureInfo = TC.getClosureTypeInfo(function);
+  if (closureInfo && closureInfo->ExpectedLoweredType->hasErasedIsolation()) {
+    auto isolationTy = SILType::getOpaqueIsolationType(TC.Context);
+    inputs.push_back(
+        {isolationTy.getASTType(), ParameterConvention::Direct_Guaranteed});
+    extInfo = extInfo.withErasedIsolation(false);
   }
 
   // NB: The generic signature may be elided from the lowered function type
@@ -2529,7 +2528,7 @@ lowerCaptureContextParameters(TypeConverter &TC, SILDeclRef function,
         TC.getTypeLowering(AbstractionPattern(genericSig, interfaceType),
                            interfaceType, expansion);
     auto loweredTy = loweredTL.getLoweredType();
-    switch (TC.getDeclCaptureKind(capture, expansion)) {
+    switch (TC.getDeclCaptureKind(capture, expansion, closureInfo)) {
     case CaptureKind::Constant: {
       // Constants are captured by value.
       ParameterConvention convention;
@@ -2605,6 +2604,13 @@ lowerCaptureContextParameters(TypeConverter &TC, SILDeclRef function,
                                     options);
       if (function.isAsyncLetClosure)
         param = param.addingOption(SILParameterInfo::Sending);
+      inputs.push_back(param);
+      break;
+    }
+    case CaptureKind::Consuming: {
+      assert(!loweredTL.isAddressOnly());
+      auto param = SILParameterInfo(loweredTy.getASTType(),
+                                    ParameterConvention::Direct_Owned, options);
       inputs.push_back(param);
       break;
     }
@@ -3517,6 +3523,19 @@ struct DefaultBlockConventions : Conventions {
   }
 };
 
+/// The default conventions for `@called(once)` closures.
+///
+/// Calling such a value is itself the consuming use that enforces
+/// call-at-most-once, so its context must be owned rather than guaranteed.
+struct DefaultCalledOnceConventions : DefaultConventions {
+  DefaultCalledOnceConventions()
+      : DefaultConventions(NormalParameterConvention::Guaranteed) {}
+
+  ParameterConvention getCallee() const override {
+    return ParameterConvention::Direct_Owned;
+  }
+};
+
 } // end anonymous namespace
 
 static CanSILFunctionType getSILFunctionTypeForAbstractCFunction(
@@ -3575,6 +3594,10 @@ static CanSILFunctionType getNativeSILFunctionType(
               DefaultSetterConventions(), *constant);
         }
       }
+
+      if (substInterfaceType->isCalledOnce())
+        return getSILFunctionTypeForConventions(DefaultCalledOnceConventions());
+
       return getSILFunctionTypeForConventions(
           DefaultConventions(NormalParameterConvention::Guaranteed));
     }

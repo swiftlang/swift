@@ -305,6 +305,23 @@ void IsolatedTypeAttr::printImpl(ASTPrinter &printer,
   printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
 }
 
+const char *
+CalledTypeAttr::getSemanticsName(CalledTypeAttr::Semantics semantics) {
+  switch (semantics) {
+  case CalledTypeAttr::Semantics::Once:
+    return "once";
+  }
+  llvm_unreachable("bad kind");
+}
+
+void CalledTypeAttr::printImpl(ASTPrinter &printer,
+                               const PrintOptions &options) const {
+  printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
+  printer.printAttrName("@called");
+  printer << "(" << getSemanticsName() << ")";
+  printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
+}
+
 /// Given a name like "inline", return the decl attribute ID that corresponds
 /// to it.  Note that this is a many-to-one mapping, and that the identifier
 /// passed in may only be the first portion of the attribute (e.g. in the case
@@ -2133,6 +2150,11 @@ StringRef DeclAttribute::getAttrName() const {
     return cast<LifetimeAttr>(this)->isUnderscored() ? "_lifetime" : "lifetime";
   case DeclAttrKind::Nonexhaustive:
     return "nonexhaustive";
+  case DeclAttrKind::Called:
+    switch (cast<CalledAttr>(this)->getSemantics()) {
+    case ExecutionSemantics::Once:
+      return "called(once)";
+    }
   }
   llvm_unreachable("bad DeclAttrKind");
 }
