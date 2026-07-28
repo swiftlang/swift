@@ -34,6 +34,7 @@ let _ = BareWidget.CLSID // expected-error {{type 'BareWidget' has no member 'CL
 
 class ConcreteWidget: IWidget { }
 let _ = ConcreteWidget.IID // expected-error {{type 'ConcreteWidget' has no member 'IID'}}
+let _ = ConcreteWidget.CLSID // expected-error {{type 'ConcreteWidget' has no member 'CLSID'}}
 
 // --- Well-known protocols from the COM module
 

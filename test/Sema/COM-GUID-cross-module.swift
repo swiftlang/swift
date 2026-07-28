@@ -12,3 +12,4 @@ import COM
 import A
 
 let _: GUID = IWidget.IID   // re-derived in the importer from the deserialized @com attribute
+let _: GUID = Widget.CLSID

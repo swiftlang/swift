@@ -2941,11 +2941,11 @@ static ArrayRef<Decl *> evaluateMembersRequest(
   // forces them.  For imported types the request finds the deserialized member.
   if (ctx.LangOpts.EnableCOMInterop) {
     if (auto *PD = dyn_cast_or_null<ProtocolDecl>(nominal)) {
-      if (PD->getAttrs().hasAttribute<COMAttr>())
+      if (PD->isCOMInterface())
         (void)evaluateOrDefault(ctx.evaluator,
                                 SynthesizeCOMInterfaceIDRequest{PD}, nullptr);
     } else if (auto *CD = dyn_cast_or_null<ClassDecl>(nominal)) {
-      if (CD->getAttrs().hasAttribute<COMAttr>())
+      if (CD->isCOMImplementation())
         (void)evaluateOrDefault(ctx.evaluator,
                                 SynthesizeCOMImplementationIDRequest{CD}, nullptr);
     }

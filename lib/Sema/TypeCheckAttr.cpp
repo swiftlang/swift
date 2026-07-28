@@ -2495,7 +2495,7 @@ void AttributeChecker::visitCOMAttr(COMAttr *attr) {
       return;
     }
 
-    if (attr->CLSID && !attr->CLSID->empty()) {
+    if (attr->CLSID) {
       diagnose(attr->getLocation(), diag::attr_com_protocol_unexpected_arg, "CLSID");
       attr->setInvalid();
       return;
