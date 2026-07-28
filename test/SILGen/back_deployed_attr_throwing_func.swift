@@ -59,3 +59,57 @@ func caller() throws {
   // CHECK: {{%.*}} = function_ref @$s11back_deploy12throwingFuncyyKFTwb : $@convention(thin) () -> @error any Error
   try throwingFunc()
 }
+
+// -- Fallback definition of typedThrowingFunc(_:)
+// CHECK-LABEL: sil non_abi [serialized] [ossa] @$s11back_deploy17typedThrowingFuncyyxxYKs5ErrorRzlFTwB : $@convention(thin) <E where E : Error> (@in_guaranteed E) -> @error_indirect E
+// CHECK: bb0({{%.*}} : $*E, {{%.*}} : $*E):
+// CHECK:   [[RESULT:%.*]] = tuple ()
+// CHECK:   return [[RESULT]] : $()
+
+// -- Back deployment thunk for typedThrowingFunc(_:)
+// CHECK-LABEL: sil non_abi [serialized] [back_deployed_thunk] [ossa] @$s11back_deploy17typedThrowingFuncyyxxYKs5ErrorRzlFTwb : $@convention(thin) <E where E : Error> (@in_guaranteed E) -> @error_indirect E
+// CHECK: bb0([[ARG:%.*]] : $*E, [[ERR:%.*]] : $*E):
+// CHECK:   [[OSVFN:%.*]] = function_ref @$ss26_stdlib_isOSVersionAtLeastyBi1_Bw_BwBwtF : $@convention(thin) (Builtin.Word, Builtin.Word, Builtin.Word) -> Builtin.Int1
+// CHECK:   [[AVAIL:%.*]] = apply [[OSVFN]]({{.*}}) : $@convention(thin) (Builtin.Word, Builtin.Word, Builtin.Word) -> Builtin.Int1
+// CHECK:   cond_br [[AVAIL]], [[AVAIL_BB:bb[0-9]+]], [[UNAVAIL_BB:bb[0-9]+]]
+//
+// CHECK: [[UNAVAIL_BB]]:
+// CHECK:   [[FALLBACKFN:%.*]] = function_ref @$s11back_deploy17typedThrowingFuncyyxxYKs5ErrorRzlFTwB : $@convention(thin) <τ_0_0 where τ_0_0 : Error> (@in_guaranteed τ_0_0) -> @error_indirect τ_0_0
+// CHECK:   try_apply [[FALLBACKFN]]<E>([[ARG]], [[ERR]]) : {{.*}}, normal [[UNAVAIL_NORMAL_BB:bb[0-9]+]], error [[UNAVAIL_ERROR_BB:bb[0-9]+]]
+//
+// CHECK: [[UNAVAIL_ERROR_BB]]:
+// CHECK-NOT: {{ : @owned }}
+// CHECK:   br [[RETHROW_BB:bb[0-9]+]]
+//
+// CHECK: [[UNAVAIL_NORMAL_BB]]({{%.*}} : $()):
+// CHECK:   br [[RETURN_BB:bb[0-9]+]]
+//
+// CHECK: [[AVAIL_BB]]:
+// CHECK:   [[ORIGFN:%.*]] = function_ref @$s11back_deploy17typedThrowingFuncyyxxYKs5ErrorRzlF : $@convention(thin) <τ_0_0 where τ_0_0 : Error> (@in_guaranteed τ_0_0) -> @error_indirect τ_0_0
+// CHECK:   try_apply [[ORIGFN]]<E>([[ARG]], [[ERR]]) : {{.*}}, normal [[AVAIL_NORMAL_BB:bb[0-9]+]], error [[AVAIL_ERROR_BB:bb[0-9]+]]
+//
+// CHECK: [[AVAIL_ERROR_BB]]:
+// CHECK-NOT: {{ : @owned }}
+// CHECK:   br [[RETHROW_BB]]
+//
+// CHECK: [[AVAIL_NORMAL_BB]]({{%.*}} : $()):
+// CHECK:   br [[RETURN_BB]]
+//
+// CHECK: [[RETURN_BB]]
+// CHECK:   [[RESULT:%.*]] = tuple ()
+// CHECK:   return [[RESULT]] : $()
+//
+// CHECK: [[RETHROW_BB]]:
+// CHECK:   throw_addr
+
+// -- Original definition of typedThrowingFunc(_:)
+// CHECK-LABEL: sil [available 52.1] [ossa] @$s11back_deploy17typedThrowingFuncyyxxYKs5ErrorRzlF : $@convention(thin) <E where E : Error> (@in_guaranteed E) -> @error_indirect E
+@backDeployed(before: macOS 52.1)
+public func typedThrowingFunc<E>(_ error: E) throws(E) {}
+
+// CHECK-LABEL: sil hidden [ossa] @$s11back_deploy11typedCalleryyxxYKs5ErrorRzlF : $@convention(thin) <E where E : Error> (@in_guaranteed E) -> @error_indirect E
+func typedCaller<E>(_ error: E) throws(E) {
+  // -- Verify the thunk is called
+  // CHECK: {{%.*}} = function_ref @$s11back_deploy17typedThrowingFuncyyxxYKs5ErrorRzlFTwb : $@convention(thin) <τ_0_0 where τ_0_0 : Error> (@in_guaranteed τ_0_0) -> @error_indirect τ_0_0
+  try typedThrowingFunc(error)
+}
