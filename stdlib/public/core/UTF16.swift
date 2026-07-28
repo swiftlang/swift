@@ -148,7 +148,7 @@ extension Unicode.UTF16 {
 
   /// Returns a Boolean value indicating whether the specified code unit is a
   /// high or low surrogate code unit.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public static func isSurrogate(_ x: CodeUnit) -> Bool {
     return isLeadSurrogate(x) || isTrailSurrogate(x)
   }
@@ -275,7 +275,7 @@ extension Unicode.UTF16: _UnicodeEncoding {
   }
 
   /// Returns whether the given code unit represents an ASCII scalar
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public static func isASCII(_ x: CodeUnit) -> Bool {
     return x <= 0x7f
   }

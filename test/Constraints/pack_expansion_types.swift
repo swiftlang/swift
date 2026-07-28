@@ -616,3 +616,10 @@ func test_var_let_tuple_prefixOnto_equivalence() {
     return prefixOnto(a, b)
   }()
 }
+
+// Invalid example
+func invalidShouldNotCrash<each T>(_ a: repeat each T) {
+  _ = repeat each a == repeat each a
+  // expected-error@-1 {{value pack expansion can only appear inside a function argument list, tuple element, or as the expression of a for-in loop}}
+  // expected-error@-2 {{cannot pass value pack expansion to non-pack parameter of type 'Self'}}
+}

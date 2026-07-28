@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 // RUN: %target-swift-frontend -Xllvm -sil-print-types -disable-objc-interop -emit-silgen %s | %FileCheck %s
 
 public class SelfCasts {

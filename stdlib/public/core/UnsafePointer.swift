@@ -260,6 +260,13 @@ extension UnsafePointer: CustomReflectable where Pointee: ~Copyable {}
 #endif
 
 extension UnsafePointer where Pointee: ~Copyable {
+  @export(implementation)
+  @_transparent
+  internal static func _dangling() -> Self {
+    let align = MemoryLayout<Pointee>.alignment
+    return unsafe Self(bitPattern: align)._unsafelyUnwrappedUnchecked
+  }
+
   /// Deallocates the memory block previously allocated at this pointer.
   ///
   /// This pointer must be a pointer to the start of a previously allocated
@@ -281,7 +288,7 @@ extension UnsafePointer where Pointee: ~Copyable {
   ///
   /// When reading from the `pointee` property, the instance referenced by
   /// this pointer must already be initialized.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public var pointee: Pointee {
     @_transparent unsafeAddress {
       return unsafe self
@@ -292,7 +299,7 @@ extension UnsafePointer where Pointee: ~Copyable {
 extension UnsafePointer {
   // This preserves the ABI of the original (pre-6.0) `pointee` property that
   // used to export a getter. The current one above would export a read
-  // accessor, if it wasn't @_alwaysEmitIntoClient.
+  // accessor, if it wasn't @export(implementation).
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
   @usableFromInline
   internal var pointee: Pointee {
@@ -309,7 +316,7 @@ extension UnsafePointer where Pointee: ~Copyable {
   ///
   /// - Parameter i: The offset from this pointer at which to access an
   ///   instance, measured in strides of the pointer's `Pointee` type.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public subscript(i: Int) -> Pointee {
     @_transparent
     unsafeAddress {
@@ -321,7 +328,7 @@ extension UnsafePointer where Pointee: ~Copyable {
 extension UnsafePointer {
   // This preserves the ABI of the original (pre-6.0) subscript that used to
   // export a getter. The current one above would export a read accessor, if it
-  // wasn't @_alwaysEmitIntoClient.
+  // wasn't @export(implementation).
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
   @usableFromInline
   internal subscript(i: Int) -> Pointee {
@@ -392,9 +399,8 @@ extension UnsafePointer where Pointee: ~Copyable {
   ///     pointer argument is valid only for the duration of the closure's
   ///     execution. If `body` has a return value, that value is also used as
   ///     the return value for the `withMemoryRebound(to:capacity:_:)` method.
-  ///   - pointer: The pointer temporarily bound to `T`.
   /// - Returns: The return value, if any, of the `body` closure parameter.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func withMemoryRebound<T: ~Copyable, E: Error, Result: ~Copyable>(
     to type: T.Type,
     capacity count: Int,
@@ -444,7 +450,7 @@ extension UnsafePointer {
   /// - Parameter property: A `KeyPath` whose `Root` is `Pointee`.
   /// - Returns: A pointer to the stored property represented
   ///            by the key path, or `nil`.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public func pointer<Property>(
     to property: KeyPath<Pointee, Property>
@@ -471,7 +477,7 @@ extension UnsafePointer where Pointee: ~Copyable {
 
 extension UnsafePointer where Pointee: ~Copyable {
   @safe
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func _isWellAligned() -> Bool {
     (Int(bitPattern: self) & (MemoryLayout<Pointee>.alignment &- 1)) == 0
   }
@@ -767,6 +773,12 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
 }
 
 extension UnsafeMutablePointer where Pointee: ~Copyable {
+  @export(implementation)
+  @_transparent
+  internal static func _dangling() -> Self {
+    unsafe Self(mutating: ._dangling())
+  }
+
   /// Allocates uninitialized memory for the specified number of instances of
   /// type `Pointee`.
   ///
@@ -820,9 +832,7 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
     Builtin.bindMemory(rawPtr, count._builtinWordValue, Pointee.self)
     return unsafe UnsafeMutablePointer(rawPtr)
   }
-}
 
-extension UnsafeMutablePointer where Pointee: ~Copyable {
   /// Deallocates the memory block previously allocated at this pointer.
   ///
   /// This pointer must be a pointer to the start of a previously allocated
@@ -850,7 +860,7 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
   /// Uninitialized memory cannot be initialized to a nontrivial type
   /// using `pointee`. Instead, use an initializing method, such as
   /// `initialize(to:)`.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public var pointee: Pointee {
     @_transparent unsafeAddress {
       return unsafe UnsafePointer(self)
@@ -864,7 +874,7 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
 extension UnsafeMutablePointer {
   // This preserves the ABI of the original (pre-6.0) `pointee` property that
   // used to export a getter. The current one above would export a read
-  // accessor, if it wasn't @_alwaysEmitIntoClient.
+  // accessor, if it wasn't @export(implementation).
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
   @usableFromInline
   internal var pointee: Pointee {
@@ -914,7 +924,7 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
   ///
   /// - Parameters:
   ///   - value: The instance to initialize this pointer's pointee to.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func initialize(to value: consuming Pointee) {
     Builtin.initialize(value, self._rawValue)
   }
@@ -974,7 +984,7 @@ extension UnsafeMutablePointer {
     }
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @available(*, deprecated, renamed: "update(repeating:count:)")
   @_silgen_name("_swift_se0370_UnsafeMutablePointer_assign_repeating_count")
   public func assign(repeating repeatedValue: Pointee, count: Int) {
@@ -1026,7 +1036,7 @@ extension UnsafeMutablePointer {
     }
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @available(*, deprecated, renamed: "update(from:count:)")
   @_silgen_name("_swift_se0370_UnsafeMutablePointer_assign_from_count")
   @unsafe
@@ -1158,7 +1168,7 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
 }
 
 extension UnsafeMutablePointer {
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @available(*, deprecated, renamed: "moveUpdate(from:count:)")
   @_silgen_name("_swift_se0370_UnsafeMutablePointer_moveAssign_from_count")
   public func moveAssign(
@@ -1250,9 +1260,8 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
   ///     pointer argument is valid only for the duration of the closure's
   ///     execution. If `body` has a return value, that value is also used as
   ///     the return value for the `withMemoryRebound(to:capacity:_:)` method.
-  ///   - pointer: The pointer temporarily bound to `T`.
   /// - Returns: The return value, if any, of the `body` closure parameter.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @unsafe
   public func withMemoryRebound<T: ~Copyable, E: Error, Result: ~Copyable>(
     to type: T.Type,
@@ -1307,7 +1316,7 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
   ///
   /// - Parameter i: The offset from this pointer at which to access an
   ///   instance, measured in strides of the pointer's `Pointee` type.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public subscript(i: Int) -> Pointee {
     @_transparent
     unsafeAddress {
@@ -1323,7 +1332,7 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
 extension UnsafeMutablePointer {
   // This preserves the ABI of the original (pre-6.0) subscript that used to
   // export a getter. The current one above would export a read accessor, if it
-  // wasn't @_alwaysEmitIntoClient.
+  // wasn't @export(implementation).
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
   @usableFromInline
   internal subscript(i: Int) -> Pointee {
@@ -1347,7 +1356,7 @@ extension UnsafeMutablePointer {
   /// - Parameter property: A `KeyPath` whose `Root` is `Pointee`.
   /// - Returns: A pointer to the stored property represented
   ///            by the key path, or `nil`.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public func pointer<Property>(
     to property: KeyPath<Pointee, Property>
@@ -1369,7 +1378,7 @@ extension UnsafeMutablePointer {
   /// - Parameter property: A `WritableKeyPath` whose `Root` is `Pointee`.
   /// - Returns: A mutable pointer to the stored property represented
   ///            by the key path, or `nil`.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public func pointer<Property>(
     to property: WritableKeyPath<Pointee, Property>
@@ -1396,7 +1405,7 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
 
 extension UnsafeMutablePointer where Pointee: ~Copyable {
   @safe
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func _isWellAligned() -> Bool {
     (Int(bitPattern: self) & (MemoryLayout<Pointee>.alignment &- 1)) == 0
   }

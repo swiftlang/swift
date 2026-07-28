@@ -138,8 +138,14 @@ linkEmbeddedRuntimeFunctionByName(#NAME, EFFECT, StringRef(#CC) == "C_CC");    \
     // -enforce-exclusivity=unchecked mode.
     if (!M.getOptions().EnforceExclusivityDynamic && exclusivity) return;
 
-    // Swift Runtime functions are all expected to be SILLinkage::PublicExternal
-    linkUsedFunctionByName(name, SILLinkage::PublicExternal, byAsmName);
+    // Swift Runtime functions are all expected to be SILLinkage::PublicExternal.
+    // The exception is entries looked up by their C name (`@_extern(c)` shims
+    // in the stdlib), whose Swift-level access level is an implementation
+    // detail and can be internal (giving them HiddenExternal linkage).
+    std::optional<SILLinkage> expectedLinkage;
+    if (!byAsmName)
+      expectedLinkage = SILLinkage::PublicExternal;
+    linkUsedFunctionByName(name, expectedLinkage, byAsmName);
   }
 
   void linkEmbeddedRuntimeWitnessTables() {

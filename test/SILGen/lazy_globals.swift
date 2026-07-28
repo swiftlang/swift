@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -parse-as-library %s | %FileCheck %s
 
 // CHECK: sil private [global_init_once_fn] [ossa] @[[T:.*]]WZ : $@convention(c) (Builtin.RawPointer) -> () {

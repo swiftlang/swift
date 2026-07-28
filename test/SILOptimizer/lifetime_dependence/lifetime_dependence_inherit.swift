@@ -5,7 +5,6 @@
 // RUN:   -module-name test \
 // RUN:   -enable-experimental-feature Lifetimes
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_Lifetimes
 
 // TODO: Remove @_unsafeNonescapableResult. Instead, the unsafe dependence should be expressed by a builtin that is

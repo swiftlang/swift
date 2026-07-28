@@ -21,32 +21,27 @@ public protocol InstantProtocol<Duration>: Comparable, Hashable, Sendable {
 /*
 disabled for now - this perturbs operator resolution
 extension InstantProtocol {
-  @_alwaysEmitIntoClient
-  @inlinable
+  @export(implementation)
   public static func + (_ lhs: Self, _ rhs: Duration) -> Self {
     lhs.advanced(by: rhs)
   }
 
-  @_alwaysEmitIntoClient
-  @inlinable
+  @export(implementation)
   public static func += (_ lhs: inout Self, _ rhs: Duration) {
     lhs = lhs.advanced(by: rhs)
   }
 
-  @_alwaysEmitIntoClient
-  @inlinable
+  @export(implementation)
   public static func - (_ lhs: Self, _ rhs: Duration) -> Self {
     lhs.advanced(by: .zero - rhs)
   }
 
-  @_alwaysEmitIntoClient
-  @inlinable
+  @export(implementation)
   public static func -= (_ lhs: inout Self, _ rhs: Duration) {
     lhs = lhs.advanced(by: .zero - rhs)
   }
 
-  @_alwaysEmitIntoClient
-  @inlinable
+  @export(implementation)
   public static func - (_ lhs: Self, _ rhs: Self) -> Duration {
     rhs.duration(to: lhs)
   }

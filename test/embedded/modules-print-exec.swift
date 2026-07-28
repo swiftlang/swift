@@ -4,10 +4,9 @@
 // RUN: %target-swift-frontend -enable-experimental-feature Extern -emit-module -o %t/MyModule.swiftmodule %t/MyModule.swift -enable-experimental-feature Embedded -parse-as-library
 // RUN: %target-swift-frontend -enable-experimental-feature Extern -c -I %t %t/Main.swift -enable-experimental-feature Embedded -o %t/a.o
 // RUN: %target-clang -x c -c %S/Inputs/print.c -o %t/print.o
-// RUN: %target-embedded-link %target-clang-resource-dir-opt %t/a.o %t/print.o %target-embedded-posix-shim -o %t/a.out
+// RUN: %target-embedded-link %target-clang-resource-dir-opt %t/a.o %t/print.o -o %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
 // REQUIRES: OS=macosx || OS=linux-gnu || OS=wasip1
 // REQUIRES: swift_feature_Embedded

@@ -24,11 +24,14 @@
 #include "swift/SILOptimizer/Differentiation/DifferentiationInvoker.h"
 #include "swift/SILOptimizer/Differentiation/LinearMapInfo.h"
 #include "swift/SILOptimizer/Differentiation/PullbackCloner.h"
+#include "swift/SILOptimizer/Differentiation/TangentBuilder.h"
 #include "swift/SILOptimizer/Differentiation/Thunk.h"
 
+#include "swift/AST/SemanticAttrs.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/SIL/LoopInfo.h"
 #include "swift/SIL/TypeSubstCloner.h"
+#include "swift/SILOptimizer/Analysis/ArraySemantic.h"
 #include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
 #include "swift/SILOptimizer/PassManager/PrettyStackTrace.h"
 #include "swift/SILOptimizer/Utils/DifferentiationMangler.h"
@@ -211,7 +214,8 @@ private:
   SILValue emitZeroDirect(CanType type, SILLocation loc) {
     auto diffBuilder = getDifferentialBuilder();
     auto silType = getModule().Types.getLoweredLoadableType(
-        type, TypeExpansionContext::minimal(), getModule());
+        type, TypeExpansionContext::minimal(),
+        diffBuilder.getFunction().hasLoweredAddresses());
     auto *buffer = diffBuilder.createAllocStack(loc, silType);
     emitZeroIndirect(type, buffer, loc);
     auto loaded = diffBuilder.emitLoadValueOperation(
@@ -1711,6 +1715,7 @@ void JVPCloner::Implementation::prepareForDifferentialGeneration() {
       original->isRuntimeAccessible());
   differential->setDebugScope(
       new (module) SILDebugScope(original->getLocation(), differential));
+  differential->setHasLoweredAddresses(original->hasLoweredAddresses());
 
   return differential;
 }

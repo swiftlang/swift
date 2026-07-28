@@ -165,6 +165,7 @@ void BasicBlockCloner::updateSSAAfterCloning() {
     }
   }
   updateGuaranteedPhis(pm, updateSSAPhis);
+  replacePhisWithIncomingValues(pm, updateSSAPhis);
 }
 
 void BasicBlockCloner::sinkAddressProjections() {

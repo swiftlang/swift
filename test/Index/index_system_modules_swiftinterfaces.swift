@@ -70,7 +70,7 @@
 // UNIT: Unit | system | SystemModule |
 // UNIT: Record | system | SystemModule |
 // RUN: c-index-test core -print-record %t/idx | %FileCheck -check-prefix=RECORD %s
-// RECORD: function/Swift | systemFunc()
+// RECORD: function(public)/Swift | systemFunc()
 
 /// Now rebuild the same module. We should not reload or re-index any of the
 /// system modules.
@@ -139,7 +139,7 @@
 // BROKEN-UNIT: Unit | system | SystemModule |
 // BROKEN-UNIT-NOT: Record | system | SystemModule |
 // RUN: c-index-test core -print-record %t/idx | %FileCheck -check-prefix=BROKEN-RECORD %s
-// BROKEN-RECORD-NOT: function/Swift | systemFunc()
+// BROKEN-RECORD-NOT: function(public)/Swift | systemFunc()
 
 /// Subsequent builds won't attempt to index the broken swiftinterface again
 // RUN: %target-swift-frontend -typecheck -parse-stdlib \

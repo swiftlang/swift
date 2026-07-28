@@ -5,6 +5,7 @@
 
 // REQUIRES: executable_test
 // REQUIRES: swift_feature_ImportNonPublicCxxMembers
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 //--- Inputs/module.modulemap
 module CxxModule {

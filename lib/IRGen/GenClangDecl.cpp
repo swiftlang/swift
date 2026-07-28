@@ -19,6 +19,7 @@
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclGroup.h"
+#include "clang/AST/DeclTemplate.h"
 #include "clang/AST/Expr.h"
 #include "clang/AST/ExprCXX.h"
 #include "clang/AST/GlobalDecl.h"
@@ -26,7 +27,6 @@
 #include "clang/AST/RecursiveASTVisitor.h"
 #include "clang/CodeGen/ModuleBuilder.h"
 #include "clang/Sema/Sema.h"
-#include "llvm/ADT/SmallPtrSet.h"
 
 using namespace swift;
 using namespace irgen;
@@ -165,6 +165,14 @@ public:
   // Do not traverse type locs, as they might contain expressions that reference
   // code that should not be instantiated and/or emitted.
   bool TraverseTypeLoc(clang::TypeLoc TL) { return true; }
+
+  // IRGen only ever emits concrete declarations, never templates. We must not
+  // descend into a template declaration at all.
+  bool TraverseFunctionTemplateDecl(clang::FunctionTemplateDecl *) {
+    return true;
+  }
+  bool TraverseClassTemplateDecl(clang::ClassTemplateDecl *) { return true; }
+  bool TraverseVarTemplateDecl(clang::VarTemplateDecl *) { return true; }
 
   bool shouldVisitTemplateInstantiations() const { return true; }
   bool shouldVisitImplicitCode() const { return true; }

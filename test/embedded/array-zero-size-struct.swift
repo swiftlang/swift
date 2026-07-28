@@ -1,6 +1,5 @@
 // RUN: %target-swift-frontend -emit-ir %s -enable-experimental-feature Embedded | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: optimized_stdlib
 // REQUIRES: swift_feature_Embedded
 

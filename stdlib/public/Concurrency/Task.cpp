@@ -89,11 +89,6 @@ const void *const swift::_swift_concurrency_debug_asyncTaskSlabMetadata =
 bool swift::_swift_concurrency_debug_supportsPriorityEscalation =
     SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION;
 
-// ************************* PLEASE UPDATE DEBUG.H DOCS ***************************************
-// * When changing this version number you MUST document the change in `Concurrency/Debug.h`. *
-// ********************************************************************************************
-uint32_t swift::_swift_concurrency_debug_internal_layout_version = 2;
-
 void FutureFragment::destroy() {
   auto queueHead = waitQueue.load(std::memory_order_acquire);
   switch (queueHead.getStatus()) {
@@ -132,12 +127,7 @@ FutureFragment::Status AsyncTask::waitFuture(AsyncTask *waitingTask,
                            waitingTask, this);
       _swift_tsan_acquire(static_cast<Job *>(this));
       if (suspendedWaiter) {
-        // This will always return zero because we were just
-        // running this Task so its BasePriority (which is
-        // immutable) should've already been set on the thread.
-        [[maybe_unused]]
-        uint32_t opaque = waitingTask->flagAsRunning();
-        assert(opaque == 0);
+        waitingTask->resumeRunningAfterFailedSuspend();
       }
       // The task is done; we don't need to wait.
       return queueHead.getStatus();
@@ -188,7 +178,8 @@ FutureFragment::Status AsyncTask::waitFuture(AsyncTask *waitingTask,
 #else
     // Put the waiting task at the beginning of the wait queue.
     // NOTE: this acquire-release synchronizes with `completeFuture`.
-    waitingTask->getNextWaitingTask() = queueHead.getTask();
+    auto nextWaitingTask = queueHead.getTask();
+    waitingTask->getNextWaitingTask() = nextWaitingTask;
     auto newQueueHead = WaitQueueItem::get(Status::Executing, waitingTask);
     if (fragment->waitQueue.compare_exchange_weak(
             queueHead, newQueueHead,
@@ -196,6 +187,9 @@ FutureFragment::Status AsyncTask::waitFuture(AsyncTask *waitingTask,
             /*failure*/ std::memory_order_acquire)) {
 
       _swift_task_clearCurrent();
+      SWIFT_TASK_DEBUG_LOG("Task %p added to wait queue of Task %p. Next Task "
+                           "in the queue is %p",
+                           waitingTask, this, nextWaitingTask);
       return FutureFragment::Status::Executing;
     }
 #endif /* SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL */
@@ -368,10 +362,25 @@ void AsyncTask::setTaskId() {
   _private().Id = (Fetched >> 32) & 0xffffffff;
 }
 
-uint64_t AsyncTask::getTaskId() {
+uint64_t AsyncTask::getTaskId() const {
   // Reconstitute a full 64-bit task ID from the 32-bit job ID and the upper
   // 32 bits held in _private().
   return ((uint64_t)_private().Id << 32) | (uint64_t)Id;
+}
+
+/// Gets the 32-bit Job ID from the job or the 64-bit
+/// Task ID if this is an AsyncTask or AsyncTaskStealer
+uint64_t Job::getJobTaskId() const {
+  if (auto task = dyn_cast<AsyncTask>(this)) {
+    // TaskID is actually:
+    //   32bits of Job's Id
+    // + 32bits stored in the AsyncTask
+    return task->getTaskId();
+  } else if (auto stealer = dyn_cast<AsyncTaskStealer>(this)) {
+    return stealer->Task->getTaskId();
+  } else {
+    return this->getJobId();
+  }
 }
 
 SWIFT_CC(swift)
@@ -1491,17 +1500,15 @@ static void swift_task_enqueueTaskOnExecutorImpl(AsyncTask *task,
 
 namespace continuationChecking {
 
+#if !SWIFT_CONCURRENCY_EMBEDDED
 enum class State : uint8_t { Uninitialized, On, Off };
 
-#if !SWIFT_CONCURRENCY_EMBEDDED
 static std::atomic<State> CurrentState;
-#endif
 
 static LazyMutex ActiveContinuationsLock;
 static Lazy<std::unordered_set<AsyncTask *>> ActiveContinuations;
 
 static bool isEnabled() {
-#if !SWIFT_CONCURRENCY_EMBEDDED
   auto state = CurrentState.load(std::memory_order_relaxed);
   if (state == State::Uninitialized) {
     bool enabled =
@@ -1510,12 +1517,11 @@ static bool isEnabled() {
     CurrentState.store(state, std::memory_order_relaxed);
   }
   return state == State::On;
-#else
-  return false;
-#endif
 }
+#endif
 
 static void init(AsyncTask *task) {
+#if !SWIFT_CONCURRENCY_EMBEDDED
   if (!isEnabled())
     return;
 
@@ -1527,9 +1533,11 @@ static void init(AsyncTask *task) {
         0,
         "Initializing continuation for task %p that was already initialized.\n",
         task);
+#endif
 }
 
 static void willResume(AsyncTask *task) {
+#if !SWIFT_CONCURRENCY_EMBEDDED
   if (!isEnabled())
     return;
 
@@ -1541,6 +1549,7 @@ static void willResume(AsyncTask *task) {
         "Resuming continuation for task %p that is not awaited "
         "(may have already been resumed).\n",
         task);
+#endif
 }
 
 } // namespace continuationChecking
@@ -1687,11 +1696,7 @@ static void swift_continuation_awaitImpl(ContinuationAsyncContext *context) {
   // we try to tail-call.
   } while (false);
 #else
-  // This will always return zero because we were just running this Task so its
-  // BasePriority (which is immutable) should've already been set on the thread.
-  [[maybe_unused]]
-  uint32_t opaque = task->flagAsRunning();
-  assert(opaque == 0);
+  task->resumeRunningAfterFailedSuspend();
 #endif /* SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL */
 
   if (context->isExecutorSwitchForced())

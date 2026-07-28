@@ -1,3 +1,4 @@
+// RUN: %target-swift-frontend -emit-silgen-ossa -o /dev/null -sil-verify-all -enable-sil-opaque-values -import-objc-header %S/Inputs/objc_implementation.h -swift-version 5 %s -target %target-stable-abi-triple
 // RUN: %target-swift-frontend -emit-silgen -import-objc-header %S/Inputs/objc_implementation.h -swift-version 5 %s -target %target-stable-abi-triple > %t
 // RUN: %FileCheck --input-file %t %s
 // RUN: %FileCheck --input-file %t --check-prefix NEGATIVE %s

@@ -66,11 +66,11 @@ public func start() {
 // CHECK-RECORD: FileLogging.swift
 // CHECK-RECORD: ------------
 // CHECK-RECORD: struct/Swift | Logger | s:12AppleLogging6LoggerV | <no-cgname> | Def,Ref,RelCont - RelChild
-// CHECK-RECORD: constructor/Swift | init() | s:12AppleLogging6LoggerVACycfc | <no-cgname> | Def,Ref,Call,RelChild,RelCall,RelCont -
+// CHECK-RECORD: constructor(public)/Swift | init() | s:12AppleLogging6LoggerVACycfc | <no-cgname> | Def,Ref,Call,RelChild,RelCall,RelCont -
 // CHECK-RECORD: function/Swift | setup() | s:12AppleLogging5setupAA6LoggerVSgyF | <no-cgname> | Def - RelCall,RelCont
 // CHECK-RECORD: ------------
 // CHECK-RECORD: 1:15 | struct/Swift | s:12AppleLogging6LoggerV | Def | rel: 0
-// CHECK-RECORD: 2:10 | constructor/Swift | s:12AppleLogging6LoggerVACycfc | Def,RelChild | rel: 1
+// CHECK-RECORD: 2:10 | constructor(public)/Swift | s:12AppleLogging6LoggerVACycfc | Def,RelChild | rel: 1
 // CHECK-RECORD:   RelChild | s:12AppleLogging6LoggerV
 // CHECK-RECORD: 5:13 | function/Swift | s:12AppleLogging5setupAA6LoggerVSgyF | Def | rel: 0
 // CHECK-RECORD: 5:24 | module/Swift | c:@M@AppleLogging | Ref,RelCont | rel: 1
@@ -79,6 +79,6 @@ public func start() {
 // CHECK-RECORD:   RelCont | s:12AppleLogging5setupAA6LoggerVSgyF
 // CHECK-RECORD: 6:10 | struct/Swift | s:12AppleLogging6LoggerV | Ref,RelCont | rel: 1
 // CHECK-RECORD:   RelCont | s:12AppleLogging5setupAA6LoggerVSgyF
-// CHECK-RECORD: 6:10 | constructor/Swift | s:12AppleLogging6LoggerVACycfc | Ref,Call,RelCall,RelCont | rel: 1
+// CHECK-RECORD: 6:10 | constructor(public)/Swift | s:12AppleLogging6LoggerVACycfc | Ref,Call,RelCall,RelCont | rel: 1
 // CHECK-RECORD:   RelCall,RelCont | s:12AppleLogging5setupAA6LoggerVSgyF
 

@@ -26,6 +26,7 @@
 #include "GenMeta.h"
 #include "GenPack.h"
 #include "GenPointerAuth.h"
+#include "GenCast.h"
 #include "GenProto.h"
 #include "GenTuple.h"
 #include "GenType.h"
@@ -4050,6 +4051,60 @@ llvm::Value *irgen::emitClassHeapMetadataRef(IRGenFunction &IGF, CanType type,
   return result;
 }
 
+/// This is like emitClassHeapMetadataRef but additionally supports
+/// ObjC protocols.
+llvm::Value *irgen::emitObjCMetatypeRef(IRGenFunction &IGF, CanType type,
+                                        DynamicMetadataRequest request,
+                                        bool allowUninitialized) {
+  assert(request.canResponseStatusBeIgnored() &&
+         "emitClassConstrainedMetadataRef only supports satisfied requests");
+  assert(type->satisfiesClassConstraint());
+
+  if (auto archetype = dyn_cast<ArchetypeType>(type)) {
+    // Look up the Swift metadata from context.
+    auto archetypeMeta = IGF.emitTypeMetadataRef(type, request).getMetadata();
+    auto deploymentAvailability =
+        AvailabilityRange::forDeploymentTarget(IGF.IGM.Context);
+    auto getObjCMetatypeFromMetadataAvail =
+        IGF.IGM.Context.getGetObjCMetatypeFromMetadataAvailability();
+    // Use getObjCMetatypeFromMetadata if available. Otherwise, use old
+    // getObjCClassFromMetadata.
+    llvm::Value *metatypePtr = nullptr;
+    if (deploymentAvailability.isContainedIn(getObjCMetatypeFromMetadataAvail)) {
+      metatypePtr = emitObjCMetatypeForMetatype(IGF, archetypeMeta, archetype);
+    } else {
+      metatypePtr = emitClassHeapMetadataRefForMetatype(IGF, archetypeMeta,
+                                                        archetype);
+    }
+    return metatypePtr;
+  }
+
+  if (type.isObjCExistentialType()) {
+    auto layout = type.getExistentialLayout();
+    auto protocols = layout.getProtocols();
+    assert(protocols.size() == 1 && "ObjC existential should have one protocol");
+    llvm::Value *result = emitReferenceToObjCProtocol(IGF, protocols[0]);
+    result = IGF.emitObjCRetainCall(result);
+    return result;
+  }
+
+  if (ClassDecl *theClass = dyn_cast_or_null<ClassDecl>(type->getAnyNominal())) {
+    if (!hasKnownSwiftMetadata(IGF.IGM, theClass)) {
+      llvm::Value *result =
+          emitObjCHeapMetadataRef(IGF, theClass, allowUninitialized);
+      return result;
+    }
+  }
+
+  if (IGF.IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
+    llvm::Constant *result = IGF.IGM.getAddrOfTypeMetadata(type);
+    return result;
+  }
+
+  llvm::Value *result = IGF.emitTypeMetadataRef(type, request).getMetadata();
+  return result;
+}
+
 /// Emit a metatype value for a known type.
 void irgen::emitMetatypeRef(IRGenFunction &IGF, CanMetatypeType type,
                             Explosion &explosion) {
@@ -4063,9 +4118,8 @@ void irgen::emitMetatypeRef(IRGenFunction &IGF, CanMetatypeType type,
     break;
 
   case MetatypeRepresentation::ObjC:
-    explosion.add(emitClassHeapMetadataRef(IGF, type.getInstanceType(),
-                                           MetadataValueType::ObjCClass,
-                                           MetadataState::Complete));
+    explosion.add(emitObjCMetatypeRef(IGF, type.getInstanceType(),
+                                      MetadataState::Complete));
     break;
   }
 }

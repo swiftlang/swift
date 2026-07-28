@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -primary-file %s %S/Inputs/always_emit_into_client_other_file.swift -package-name Package
 // RUN: %target-swift-emit-silgen -primary-file %s %S/Inputs/always_emit_into_client_other_file.swift -package-name Package | %FileCheck %s
 
 // CHECK-LABEL: sil non_abi [serialized] [export_implementation] [ossa] @$s33always_emit_into_client_attribute0A22EmitIntoClientFunctionyyF : $@convention(thin) () -> ()

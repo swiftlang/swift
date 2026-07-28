@@ -17,6 +17,9 @@
 #ifndef SWIFT_THREADING_IMPL_C11_H
 #define SWIFT_THREADING_IMPL_C11_H
 
+#define SWIFT_THREADING_HAS_LAZY_MUTEX 1
+#define SWIFT_THREADING_HAS_CONDITION_VARIABLE 1
+
 #include <atomic>
 #include <cstdint>
 

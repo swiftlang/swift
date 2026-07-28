@@ -275,7 +275,7 @@ void AccessSummaryAnalysis::processPartialApply(FunctionInfo *callerInfo,
 
   // The argument index in the called function.
   ApplySite site(apply);
-  unsigned calleeArgumentIndex = site.getCalleeArgIndex(*applyArgumentOperand);
+  unsigned calleeArgumentIndex = site.getSubstCalleeArgIndex(*applyArgumentOperand);
 
   processCall(callerInfo, callerArgumentIndex, calleeFunction,
               calleeArgumentIndex, order);
@@ -548,6 +548,11 @@ getSingleAddressProjectionUser(SingleValueInstruction *I) {
       ProjectionIndex = inst->getFieldIndex();
       SingleUser = inst;
       break;
+    }
+    case SILInstructionKind::EndCOWMutationAddrInst: {
+      // Ignore an end_cow_mutation_addr for the purpose finding projection
+      // uses. It only uses the address, it does not produce a new address.
+      continue;
     }
     default:
       return std::make_pair(nullptr, 0);

@@ -1,6 +1,5 @@
 // RUN: %target-sil-opt %s -test-runner -o /dev/null | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 
 // Test is failing when targeting ARMv7k/ARM64_32. rdar://98669547
 // UNSUPPORTED: CPU=armv7k || CPU=arm64_32

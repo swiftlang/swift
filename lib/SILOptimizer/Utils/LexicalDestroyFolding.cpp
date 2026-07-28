@@ -660,8 +660,7 @@ bool borroweeHasUsesWithinBorrowScope(Context const &context,
                                       BorroweeUsage const &usage) {
   MultiDefPrunedLiveness liveness(context.function);
   context.borrowedValue.computeTransitiveLiveness(liveness);
-  DeadEndBlocks deadEndBlocks(context.function);
-  return !liveness.areUsesOutsideBoundary(usage.uses, &deadEndBlocks);
+  return !liveness.areUsesOutsideBoundary(usage.uses);
 }
 
 //===----------------------------------------------------------------------===//
@@ -768,7 +767,7 @@ bool FilterCandidates::rewritableArgumentIndicesForApply(
         auto convention = apply.getArgumentConvention(operand);
         if (isSimpleExtendedIntroducerDef(operand.get()) &&
             convention.isOwnedConventionInCaller()) {
-          indices.push_back(apply.getCalleeArgIndex(operand));
+          indices.push_back(apply.getSubstCalleeArgIndex(operand));
         } else {
           // This argument is a use of %lifetime but not an owned use that we
           // can rewrite.

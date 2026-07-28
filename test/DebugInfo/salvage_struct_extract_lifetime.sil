@@ -1,7 +1,7 @@
-// RUN: %target-sil-opt -sil-print-types %s -ownership-model-eliminator | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types %s -kill-invalid-debug-values -ownership-model-eliminator | %FileCheck %s
 
-// Test that OwnershipModelEliminator kills debug_values that appear after
-// a destroy_value, since the object may be freed by the release.
+// Test that the kill-invalid-debug-values pass kills debug_values that appear
+// after a destroy_value, since the object may be freed by the release.
 
 sil_stage canonical
 

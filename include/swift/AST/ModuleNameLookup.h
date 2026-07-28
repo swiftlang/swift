@@ -66,7 +66,7 @@ void simple_display(llvm::raw_ostream &out, ResolutionKind kind);
 /// \param loc Source location of the lookup. Used to add contextual options,
 ///        such as disabling macro expansions inside macro arguments.
 /// \param options name lookup options. Currently only used to communicate the
-///        NL_IncludeUsableFromInline option.
+///        NLFlags::IncludeUsableFromInline option.
 void lookupInModule(const DeclContext *moduleOrFile,
                     DeclName name,
                     bool hasModuleSelector,

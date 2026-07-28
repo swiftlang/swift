@@ -5,7 +5,6 @@
 // RUN: %target-sil-opt -enable-sil-verify-all %s -O -sil-stats-functions -sil-stats-only-function=test_simple 2>&1 | %FileCheck --check-prefix=CHECK-SIL-STATS-ONLY-FUNCTION %s
 // RUN: %target-sil-opt -enable-sil-verify-all %s -O -sil-stats-functions -sil-stats-only-functions=test 2>&1 | %FileCheck --check-prefix=CHECK-SIL-STATS-ONLY-FUNCTIONS %s
 
-// REQUIRES: swift_in_compiler
 
 
 // Test different modes of optimizer counters statistics collection.

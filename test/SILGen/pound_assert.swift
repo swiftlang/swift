@@ -1,3 +1,4 @@
+// RUN: %target-swift-frontend -enable-experimental-static-assert -Xllvm -sil-print-types -emit-silgen-ossa -o /dev/null -sil-verify-all -enable-sil-opaque-values %s
 // RUN: %target-swift-frontend -enable-experimental-static-assert -Xllvm -sil-print-types -emit-silgen %s | %FileCheck %s
 
 // CHECK-LABEL: sil hidden [ossa] @$s12pound_assert15noCustomMessage{{[_0-9a-zA-Z]*}}

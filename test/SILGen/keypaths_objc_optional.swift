@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -Xllvm -sil-print-types -import-objc-header %swift_src_root/test/Inputs/ObjCOptionalRequirements.h %s
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -import-objc-header %swift_src_root/test/Inputs/ObjCOptionalRequirements.h %s | %FileCheck  %s --check-prefix=CHECK --check-prefix=CHECK-%target-os-%target-cpu
 // RUN: %target-swift-emit-ir -import-objc-header %swift_src_root/test/Inputs/ObjCOptionalRequirements.h %s
 
@@ -26,13 +27,13 @@ import Foundation
 // CHECK: } // end sil function '${{.*}}testKeyPathAccessorsForOptionalStorageComponentsyyF'
 //
 // CHECK: sil shared [thunk] [ossa] @$[[SWIFT_PROP_GETTER]] : $@convention(keypath_accessor_getter) (@in_guaranteed any SwiftProtocol) -> @out Optional<Object> {
-// CHECK:   [[BASE:%[0-9]+]] = open_existential_ref {{%[0-9]+}} : $any SwiftProtocol to $[[OPENED_TY:@opened\("[-A-F0-9]+", any SwiftProtocol\) Self]]
+// CHECK:   [[BASE:%[0-9]+]] = open_existential_ref {{%[0-9]+}} : $any SwiftProtocol to $[[OPENED_TY:@opened\([0-9]+, any SwiftProtocol\) Self]]
 // CHECK:   dynamic_method_br [[BASE]] : $[[OPENED_TY]], #SwiftProtocol.object!getter.foreign, bb1
 // CHECK: bb1({{%[0-9]+}} : $@convention(objc_method) ([[OPENED_TY]]) -> @autoreleased Object)
 // CHECK: } // end sil function '$[[SWIFT_PROP_GETTER]]'
 //
 // CHECK: sil shared [thunk] [ossa] @$[[SWIFT_SUBSCR_GETTER]] : $@convention(keypath_accessor_getter) (@in_guaranteed any SwiftProtocol, @in_guaranteed Bool) -> @out Optional<Object> {
-// CHECK:   [[BASE:%[0-9]+]] = open_existential_ref {{%[0-9]+}} : $any SwiftProtocol to $[[OPENED_TY:@opened\("[-A-F0-9]+", any SwiftProtocol\) Self]]
+// CHECK:   [[BASE:%[0-9]+]] = open_existential_ref {{%[0-9]+}} : $any SwiftProtocol to $[[OPENED_TY:@opened\([0-9]+, any SwiftProtocol\) Self]]
 // CHECK:   [[INDEX:%[0-9]+]] = load [trivial] {{%[0-9]+}} : $*Bool
 // CHECK:   dynamic_method_br [[BASE]] : $[[OPENED_TY]], #SwiftProtocol.subscript!getter.foreign, bb1, bb2
 // CHECK: bb1({{%[0-9]+}} : $@convention(objc_method) (ObjCBool, [[OPENED_TY]]) -> @autoreleased Object):
@@ -42,7 +43,7 @@ import Foundation
 //
 // CHECK: sil shared [thunk] [ossa] @$[[OBJC_PROP_GETTER]] : $@convention(keypath_accessor_getter) (@in_guaranteed any ObjCProtocol) -> @out Optional<Bool> {
 // CHECK: bb0([[OUT:%[0-9]+]] : $*Optional<Bool>,
-// CHECK:   [[BASE:%[0-9]+]] = open_existential_ref {{%[0-9]+}} : $any ObjCProtocol to $[[OPENED_TY:@opened\("[-A-F0-9]+", any ObjCProtocol\) Self]]
+// CHECK:   [[BASE:%[0-9]+]] = open_existential_ref {{%[0-9]+}} : $any ObjCProtocol to $[[OPENED_TY:@opened\([0-9]+, any ObjCProtocol\) Self]]
 // CHECK:   [[DEST:%[0-9]+]] = alloc_stack $Optional<Bool>
 // CHECK:   dynamic_method_br [[BASE]] : $[[OPENED_TY]], #ObjCProtocol.flag!getter.foreign, bb1, bb2
 // CHECK: bb1({{%[0-9]+}} : $@convention(objc_method) ([[OPENED_TY]]) -> {{ObjCBool|Bool}}):

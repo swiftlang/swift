@@ -1,5 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %build-silgen-test-overlays
+// RUN: %target-swift-emit-silgen-ossa(mock-sdk: %clang-importer-sdk -I %t) -o /dev/null -enable-sil-opaque-values -Xllvm -sil-print-types -module-name newtype -I %S/Inputs -I %S/Inputs -I %S/../IDE/Inputs/custom-modules -enable-objc-interop -enable-source-import %s
 // RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk -I %t) -Xllvm -sil-print-types -module-name newtype -I %S/Inputs -I %S/Inputs -I %S/../IDE/Inputs/custom-modules -enable-objc-interop -enable-source-import %s | %FileCheck %s -check-prefix=CHECK-RAW
 // RUN: %target-swift-emit-sil(mock-sdk: %clang-importer-sdk -I %t) -Xllvm -sil-print-types -module-name newtype -I %S/Inputs -I %S/Inputs -I %S/../IDE/Inputs/custom-modules -enable-objc-interop -enable-source-import %s | %FileCheck %s -check-prefix=CHECK-CANONICAL
 

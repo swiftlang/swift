@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -Xllvm -sil-print-types -module-name test -Xllvm -sil-full-demangle -swift-version 6 %s
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name test -Xllvm -sil-full-demangle -swift-version 6 %s | %FileCheck %s
 
 // We weren't adjusting offsets around isolated default arguments

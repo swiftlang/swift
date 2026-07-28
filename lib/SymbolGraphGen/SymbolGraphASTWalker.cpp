@@ -10,16 +10,18 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "clang/AST/DeclObjC.h"
-#include "clang/Basic/Module.h"
-#include "llvm/ADT/StringSwitch.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/USRGeneration.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/SymbolGraphGen/SymbolGraphGen.h"
+#include "clang/AST/DeclObjC.h"
+#include "clang/Basic/Module.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/StringSwitch.h"
 
 #include "SymbolGraphASTWalker.h"
 
@@ -304,7 +306,22 @@ bool SymbolGraphASTWalker::walkToDeclPre(Decl *D, CharSourceRange Range) {
       }
 
       // Record the expanded list of protocols.
+      // The iteration order of the set is not stable as it is keyed on
+      // pointers, so sort by USR to make the order of emitted edges
+      // deterministic.
+      SmallVector<std::pair<std::string, const ProtocolDecl *>, 4>
+          SortedProtocols;
       for (const auto *Proto : Protocols) {
+        SmallString<128> USR;
+        llvm::raw_svector_ostream OS(USR);
+        ide::printDeclUSR(Proto, OS);
+        SortedProtocols.emplace_back(std::string(USR.str()), Proto);
+      }
+      llvm::sort(SortedProtocols, [](const auto &LHS, const auto &RHS) {
+        return LHS.first < RHS.first;
+      });
+
+      for (const auto &[USR, Proto] : SortedProtocols) {
         Symbol Target(&MainGraph, Proto, nullptr);
         ExtendedSG->recordEdge(Source, Target, RelationshipKind::ConformsTo(),
                                Extension);

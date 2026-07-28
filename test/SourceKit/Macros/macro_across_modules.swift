@@ -45,7 +45,7 @@ public struct AddNamedFuncMacro: MemberMacro {
 )
 public macro AddNamedFunc() = #externalMacro(module: "MacroPlugin", type: "AddNamedFuncMacro")
 
-// INDEX: [[@LINE+2]]:1 | instance-method/Swift | s:10TestModule9ModStructV7newFuncyyF
+// INDEX: [[@LINE+2]]:1 | instance-method(public)/Swift | s:10TestModule9ModStructV7newFuncyyF
 // INDEX-SAME: Def,Impl
 @AddNamedFunc
 // MOD_CURSOR: source.lang.swift.ref.function.method.instance

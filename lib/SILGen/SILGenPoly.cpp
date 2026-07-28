@@ -652,7 +652,13 @@ ManagedValue Transform::transform(ManagedValue v,
       } else if (inputSubstType->isSet()) {
         fn = SGF.SGM.getSetUpCast(Loc);
       } else {
-        llvm::report_fatal_error("unsupported collection upcast kind");
+        ABORT([&](llvm::raw_ostream &out) {
+          out << "Unsupported collection upcast kind\n";
+          v.dump(out);
+          loweredResultTy.getASTType()->dump(out);
+          inputSubstType->dump(out);
+          outputSubstType->dump(out);
+        });
       }
 
       return SGF.emitCollectionConversion(Loc, fn, inputSubstType,
@@ -762,6 +768,18 @@ ManagedValue Transform::transform(ManagedValue v,
                      outputSubstType,
                      loweredResultTy,
                      ctxt);
+  }
+
+  // CGFloat to Double.
+  if (inputSubstType->isCGFloat() &&
+      outputSubstType->isDouble()) {
+    return SGF.emitCGFloatToDouble(Loc, v.getUnmanagedValue(), ctxt);
+  }
+
+  // Double to CGFloat.
+  if (inputSubstType->isDouble() &&
+      outputSubstType->isCGFloat()) {
+    return SGF.emitDoubleToCGFloat(Loc, v.getUnmanagedValue(), ctxt);
   }
 
   // - T.TangentVector to Optional<T>.TangentVector
@@ -3309,12 +3327,14 @@ public:
             CanSILFunctionType innerFnType, CanSILFunctionType outerFnType) {
     // Assert that the indirect results are set up like we expect.
     assert(InnerArgs.empty());
-    assert(SGF.F.begin()->args_size()
-           >= SILFunctionConventions(outerFnType, SGF.SGM.M)
-                  .getNumIndirectSILResults());
+    assert(SGF.F.begin()->args_size() >=
+           SILFunctionConventions(
+               outerFnType, SILAddressConventions::forFunction(SGF.F))
+               .getNumIndirectSILResults());
 
     InnerArgs.reserve(
-        SILFunctionConventions(innerFnType, SGF.SGM.M)
+        SILFunctionConventions(innerFnType,
+                               SILAddressConventions::forFunction(SGF.F))
             .getNumIndirectSILResults());
 
     AllOuterResults = outerFnType->getUnsubstitutedType(SGF.SGM.M)->getResults();
@@ -3329,7 +3349,8 @@ public:
     assert(AllOuterResults.empty());
     assert(AllInnerResults.empty());
     assert(InnerArgs.size() ==
-           SILFunctionConventions(innerFnType, SGF.SGM.M)
+           SILFunctionConventions(
+               innerFnType, SILAddressConventions::forFunction(SGF.F))
                .getNumIndirectSILResults());
     OuterArgs.finish();
   }
@@ -5322,8 +5343,9 @@ SILValue ResultPlanner::execute(SILValue innerResult,
   // results).
   SmallVector<SILValue, 4> innerDirectResultStack;
   unsigned numInnerDirectResults =
-    SILFunctionConventions(innerFnType, SGF.SGM.M)
-        .getNumDirectSILResults();
+      SILFunctionConventions(innerFnType,
+                             SILAddressConventions::forFunction(SGF.F))
+          .getNumDirectSILResults();
   if (numInnerDirectResults == 0) {
     // silently ignore the result
   } else if (numInnerDirectResults > 1) {
@@ -6336,8 +6358,10 @@ ManagedValue SILGenFunction::getThunkedAutoDiffLinearMap(
   thunkSGF.collectThunkParams(
       loc, params, &thunkIndirectResults, &thunkIndirectErrorResults);
 
-  SILFunctionConventions fromConv(fromType, getModule());
-  SILFunctionConventions toConv(toType, getModule());
+  SILAddressConventions silConv =
+      SILAddressConventions::forFunction(thunkSGF.F);
+  SILFunctionConventions fromConv(fromType, silConv);
+  SILFunctionConventions toConv(toType, silConv);
   if (!toConv.useLoweredAddresses()) {
     SmallVector<ManagedValue, 4> thunkArguments;
     for (auto indRes : thunkIndirectResults)
@@ -6637,11 +6661,16 @@ SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
   auto customDerivativeFnTy = customDerivativeFn->getLoweredFunctionType();
   auto *thunkGenericEnv = customDerivativeFnTy->getSubstGenericSignature().getGenericEnvironment();
 
+  bool isDefaultDerivative =
+      isa<ProtocolDecl>(originalAFD->getDeclContext()) &&
+      !originalAFD->getAttrs().hasAttribute<DifferentiableAttr>();
   auto origFnTy = originalFn->getLoweredFunctionType();
   auto derivativeCanGenSig = config.derivativeGenericSignature.getCanonicalSignature();
   auto thunkFnTy = origFnTy->getAutoDiffDerivativeFunctionType(
       config.parameterIndices, config.resultIndices, kind, Types,
-      LookUpConformanceInModule(), derivativeCanGenSig);
+      LookUpConformanceInModule(), derivativeCanGenSig,
+      /*isReabstractionThunk*/ false, /* origTypeOfAbstraction */ CanType(),
+      isDefaultDerivative);
   assert(!thunkFnTy->getExtInfo().hasContext());
 
   Mangle::ASTMangler mangler(getASTContext());
@@ -6762,7 +6791,8 @@ SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
           ->mapTypeIntoEnvironment(
               thunkFnTy->getResults().back().getSILStorageInterfaceType())
           .castTo<SILFunctionType>();
-  SILFunctionConventions conv(thunkFnTy, thunkSGF.getModule());
+  SILFunctionConventions conv(
+      thunkFnTy, SILAddressConventions::forFunction(thunkSGF.F));
 
   // Create return instruction in the thunk, first deallocating local
   // allocations and freeing arguments-to-free.

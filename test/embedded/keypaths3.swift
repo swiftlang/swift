@@ -1,10 +1,10 @@
 // RUN: %target-run-simple-swift(   -enable-experimental-feature Embedded -wmo -Xfrontend -disable-access-control -runtime-compatibility-version none %target-embedded-posix-shim) | %FileCheck %s
 // RUN: %target-run-simple-swift(-O -enable-experimental-feature Embedded -wmo -Xfrontend -disable-access-control -runtime-compatibility-version none %target-embedded-posix-shim) | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
 // REQUIRES: swift_feature_Embedded
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 @dynamicMemberLookup
 public struct Box<T>: ~Copyable {

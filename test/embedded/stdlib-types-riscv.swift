@@ -2,7 +2,6 @@
 // RUN: %target-swift-frontend -target riscv64-none-none-eabi -emit-ir %s -enable-experimental-feature Embedded | %FileCheck %s
 
 // UNSUPPORTED: CPU=wasm32
-// REQUIRES: swift_in_compiler
 // REQUIRES: optimized_stdlib
 // REQUIRES: CODEGENERATOR=RISCV
 // REQUIRES: embedded_stdlib_cross_compiling

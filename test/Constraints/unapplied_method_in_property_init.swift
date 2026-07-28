@@ -11,12 +11,12 @@ struct S {
   // expected-swift6-error@-2 {{cannot use instance member 'foo' within property initializer; property initializers run before 'self' is available}}
 
   let x2: ((S) -> S).Type = type(of: bar)
-  // expected-error@-1 {{cannot use instance member 'bar' within property initializer; property initializers run before 'self' is available}}
+  // expected-swift5-error@-1 {{cannot convert value of type '((S) -> (S) -> S).Type' to specified type '((S) -> S).Type'}}
+  // expected-swift6-error@-2 {{cannot use instance member 'bar' within property initializer; property initializers run before 'self' is available}}
 
-  // FIXME: https://github.com/swiftlang/swift/issues/89920
+  // https://github.com/swiftlang/swift/issues/89920
   let y1: (S) -> S = foo
-  // expected-error@-1 {{cannot convert value of type '(main.S) -> main.S' to specified type '(main.S) -> main.S'}}
-  // expected-error@-2 {{cannot use instance member 'foo' within property initializer; property initializers run before 'self' is available}}
+  // expected-error@-1 {{cannot use instance member 'foo' within property initializer; property initializers run before 'self' is available}}
 
   let y2: (S) -> S = bar
   // expected-error@-1 {{cannot use instance member 'bar' within property initializer; property initializers run before 'self' is available}}

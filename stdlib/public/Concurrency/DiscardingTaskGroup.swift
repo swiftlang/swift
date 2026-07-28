@@ -65,10 +65,10 @@ import Swift
 /// The tasks must handle cancellation in some other way,
 /// such as returning the work completed so far, returning an empty result, or returning `nil`.
 /// For tasks that need to handle cancellation by throwing an error,
-/// use the `withThrowingDiscardingTaskGroup(returning:body:)` method instead.
+/// use the `withThrowingDiscardingTaskGroup(returning:isolation:body:)` method instead.
 ///
 /// - SeeAlso: ``TaskGroup``
-/// - SeeAlso: ``withThrowingDiscardingTaskGroup(returning:body:)``
+/// - SeeAlso: ``withThrowingDiscardingTaskGroup(returning:isolation:body:)``
 @available(SwiftStdlib 5.9, *)
 @backDeployed(before: SwiftStdlib 6.0)
 @inlinable
@@ -123,7 +123,7 @@ public func _unsafeInheritExecutor_withDiscardingTaskGroup<GroupResult>(
 /// A discarding group that contains dynamically created child tasks.
 ///
 /// To create a discarding task group,
-/// call the ``withDiscardingTaskGroup(returning:body:)`` method.
+/// call the ``withDiscardingTaskGroup(returning:isolation:body:)`` method.
 ///
 /// Don't use a task group from outside the task where you created it.
 /// In most cases,
@@ -152,8 +152,8 @@ public func _unsafeInheritExecutor_withDiscardingTaskGroup<GroupResult>(
 ///
 /// A canceled task group can still keep adding tasks, however they will start
 /// being immediately canceled, and may act accordingly to this. To avoid adding
-/// new tasks to an already canceled task group, use ``addTaskUnlessCancelled(priority:body:)``
-/// rather than the plain ``addTask(priority:body:)`` which adds tasks unconditionally.
+/// new tasks to an already canceled task group, use ``addTaskUnlessCancelled(priority:operation:)``
+/// rather than the plain ``addTask(priority:operation:)`` which adds tasks unconditionally.
 ///
 /// For information about the language-level concurrency model that `DiscardingTaskGroup` is part of,
 /// see [Concurrency][concurrency] in [The Swift Programming Language][tspl].
@@ -187,7 +187,7 @@ public struct DiscardingTaskGroup {
 
   /// A Boolean value that indicates whether the group has any remaining tasks.
   ///
-  /// At the start of the body of a `withDiscardingTaskGroup(returning:body:)` call,
+  /// At the start of the body of a `withDiscardingTaskGroup(returning:isolation:body:)` call,
   /// the task group is always empty.
   ///
   /// It's guaranteed to be empty when returning from that body
@@ -229,10 +229,10 @@ public struct DiscardingTaskGroup {
   /// ### Interaction with task cancellation shields
   ///
   /// Cancellation may be suppressed by an active task cancellation shield
-  /// (``withTaskCancellationShield(operation:)``), which may cause `isCancelled`
+  /// (``withTaskCancellationShield(operation:)-(()->Value)``), which may cause `isCancelled`
   /// to return `false` even though the task has been cancelled externally.
   ///
-  /// - SeeAlso: ``withTaskCancellationShield(operation:)``
+  /// - SeeAlso: ``withTaskCancellationShield(operation:)-(()->Value)``
   public var isCancelled: Bool {
     return _taskGroupIsCancelled(group: _group)
   }
@@ -409,7 +409,7 @@ public func _unsafeInheritExecutor_withThrowingDiscardingTaskGroup<GroupResult>(
 /// A throwing discarding group that contains dynamically created child tasks.
 ///
 /// To create a discarding task group,
-/// call the ``withDiscardingTaskGroup(returning:body:)`` method.
+/// call the ``withDiscardingTaskGroup(returning:isolation:body:)`` method.
 ///
 /// Don't use a task group from outside the task where you created it.
 /// In most cases,
@@ -452,8 +452,8 @@ public func _unsafeInheritExecutor_withThrowingDiscardingTaskGroup<GroupResult>(
 ///
 /// A canceled task group can still keep adding tasks, however they will start
 /// being immediately canceled, and may act accordingly to this. To avoid adding
-/// new tasks to an already canceled task group, use ``addTaskUnlessCancelled(priority:body:)``
-/// rather than the plain ``addTask(priority:body:)`` which adds tasks unconditionally.
+/// new tasks to an already canceled task group, use ``addTaskUnlessCancelled(priority:operation:)``
+/// rather than the plain ``addTask(priority:operation:)`` which adds tasks unconditionally.
 ///
 /// For information about the language-level concurrency model that `DiscardingTaskGroup` is part of,
 /// see [Concurrency][concurrency] in [The Swift Programming Language][tspl].
@@ -485,7 +485,7 @@ public struct ThrowingDiscardingTaskGroup<Failure: Error> {
 
   /// A Boolean value that indicates whether the group has any remaining tasks.
   ///
-  /// At the start of the body of a `withThrowingDiscardingTaskGroup(returning:body:)` call,
+  /// At the start of the body of a `withThrowingDiscardingTaskGroup(returning:isolation:body:)` call,
   /// the task group is always empty.
   ///
   /// It's guaranteed to be empty when returning from that body
@@ -527,10 +527,10 @@ public struct ThrowingDiscardingTaskGroup<Failure: Error> {
   /// ### Interaction with task cancellation shields
   ///
   /// Cancellation may be suppressed by an active task cancellation shield
-  /// (``withTaskCancellationShield(operation:)``), which may cause `isCancelled`
+  /// (``withTaskCancellationShield(operation:)-2lzl8``), which may cause `isCancelled`
   /// to return `false` even though the task has been cancelled externally.
   ///
-  /// - SeeAlso: ``withTaskCancellationShield(operation:)``
+  /// - SeeAlso: ``withTaskCancellationShield(operation:)-2lzl8``
   public var isCancelled: Bool {
     return _taskGroupIsCancelled(group: _group)
   }

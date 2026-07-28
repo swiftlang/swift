@@ -354,17 +354,19 @@ ModularizationError::diagnose(const ModuleFile *MF,
   // decls moving between both modules.
   if (errorKind == Kind::DeclMoved ||
       errorKind == Kind::DeclKindChanged) {
-    StringRef foundModuleName = foundModule->getName().str();
-    StringRef expectedModuleName = expectedModule->getName().str();
-    if (foundModuleName != expectedModuleName &&
-        (foundModuleName.starts_with(expectedModuleName) ||
-         expectedModuleName.starts_with(foundModuleName)) &&
-        (expectedUnderlying ||
-         expectedModule->findUnderlyingClangModule())) {
-      std::string name = path.getFullName();
-      ctx.Diags.diagnose(loc,
-                         diag::modularization_issue_related_modules,
-                         declIsType, name);
+    if (foundModule) {
+      StringRef foundModuleName = foundModule->getName().str();
+      StringRef expectedModuleName = expectedModule->getName().str();
+      if (foundModuleName != expectedModuleName &&
+          (foundModuleName.starts_with(expectedModuleName) ||
+           expectedModuleName.starts_with(foundModuleName)) &&
+          (expectedUnderlying ||
+           expectedModule->findUnderlyingClangModule())) {
+        std::string name = path.getFullName();
+        ctx.Diags.diagnose(loc,
+                           diag::modularization_issue_related_modules,
+                           declIsType, name);
+      }
     }
   }
 
@@ -1801,12 +1803,13 @@ Expected<GenericEnvironment *> ModuleFile::getGenericEnvironmentChecked(
         genericSigOrError.get(),
         existentialOrShapeTypeOrError.get(),
         contextSubsOrError.get(),
-        UUID::fromTime());
+        getContext().getNextGenericEnvironmentID());
     break;
 
   case GenericEnvironmentKind::OpenedElement:
     genericEnv = GenericEnvironment::forOpenedElement(
-        genericSigOrError.get(), UUID::fromTime(),
+        genericSigOrError.get(),
+        getContext().getNextGenericEnvironmentID(),
         cast<GenericTypeParamType>(
           existentialOrShapeTypeOrError.get()->getCanonicalType()),
         contextSubsOrError.get());
@@ -2227,7 +2230,7 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
                                getIdentifier(privateDiscriminator));
     } else {
       baseModule->lookupQualified(baseModule, DeclNameRef(name),
-                                  SourceLoc(), NL_RemoveOverridden,
+                                  SourceLoc(), NLFlags::RemoveOverridden,
                                   values);
     }
     filterValues(filterTy, nullptr, nullptr, isType, inProtocolExt,
@@ -2437,7 +2440,7 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
                                    getIdentifier(privateDiscriminator));
         } else {
           otherModule->lookupQualified(otherModule, DeclNameRef(name),
-                                       SourceLoc(), NL_RemoveOverridden,
+                                       SourceLoc(), NLFlags::RemoveOverridden,
                                        values);
         }
 
@@ -3610,6 +3613,8 @@ public:
   /// Deserializes the custom attributes from \c MF.DeclTypesCursor, using the
   /// offsets in \c customAttrOffsets.
   llvm::Error deserializeCustomAttrs();
+
+  IndexSubset *deserializeDifferentiableParamIndices();
 
   DeclNameRef deserializeDeclNameRefIfPresent() {
     using namespace decls_block;
@@ -5465,6 +5470,8 @@ public:
 
     auto extension = ExtensionDecl::create(ctx, SourceLoc(), nullptr, { },
                                            DC, nullptr);
+    // `isMetatypeExtension` is not stored: it is derived from the extended type
+    // (the protocol metatype `(any P).Type`), which is restored below.
     declOrOffset = extension;
 
     // Generic parameter lists are written from outermost to innermost.
@@ -5510,7 +5517,7 @@ public:
     }
 
 #ifndef NDEBUG
-    if (outerParams) {
+    if (outerParams && !extension->isMetatypeExtension()) {
       unsigned paramCount = 0;
       for (auto *paramList = outerParams;
            paramList != nullptr;
@@ -6005,6 +6012,33 @@ llvm::Error DeclDeserializer::deserializeCustomAttrs() {
   return llvm::Error::success();
 }
 
+IndexSubset *DeclDeserializer::deserializeDifferentiableParamIndices() {
+  using namespace decls_block;
+
+  BCOffsetRAII lastRecordOffset(MF.DeclTypeCursor);
+
+  llvm::BitstreamEntry entry =
+      MF.fatalIfUnexpected(MF.DeclTypeCursor.advance());
+  if (entry.Kind != llvm::BitstreamEntry::Record)
+    return nullptr;
+
+  SmallVector<uint64_t, 8> scratch;
+  unsigned recordID =
+      MF.fatalIfUnexpected(MF.DeclTypeCursor.readRecord(entry.ID, scratch));
+  if (recordID != DIFF_PARAM_INDICES)
+    return nullptr;
+
+  lastRecordOffset.reset();
+
+  ArrayRef<uint64_t> paramIndices;
+  DifferentiationParamIndicesLayout::readRecord(scratch, paramIndices);
+
+  llvm::SmallBitVector parametersBitVector(paramIndices.size());
+  for (unsigned i : indices(paramIndices))
+    parametersBitVector[i] = paramIndices[i];
+  return IndexSubset::get(ctx, parametersBitVector);
+}
+
 llvm::Error DeclDeserializer::deserializeDeclCommon() {
   using namespace decls_block;
 
@@ -6408,20 +6442,17 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
         bool isImplicit;
         uint64_t rawDiffKind;
         GenericSignatureID derivativeGenSigId;
-        ArrayRef<uint64_t> parameters;
 
         serialization::decls_block::DifferentiableDeclAttrLayout::readRecord(
-            scratch, isImplicit, rawDiffKind, derivativeGenSigId,
-            parameters);
+            scratch, isImplicit, rawDiffKind, derivativeGenSigId);
+        auto *indices = deserializeDifferentiableParamIndices();
+        if (!indices)
+          return MF.diagnoseFatal();
 
         auto diffKind = getActualDifferentiabilityKind(rawDiffKind);
         if (!diffKind)
           return MF.diagnoseFatal();
         auto derivativeGenSig = MF.getGenericSignature(derivativeGenSigId);
-        llvm::SmallBitVector parametersBitVector(parameters.size());
-        for (unsigned i : indices(parameters))
-          parametersBitVector[i] = parameters[i];
-        auto *indices = IndexSubset::get(ctx, parametersBitVector);
         auto *diffAttr = DifferentiableAttr::create(
             ctx, isImplicit, SourceLoc(), SourceRange(), *diffKind,
             /*parsedParameters*/ {}, /*trailingWhereClause*/ nullptr);
@@ -6442,13 +6473,15 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
         bool isImplicit;
         bool hasAccessorKind;
         uint64_t rawAccessorKind;
-        DeclID origDeclId;
+        ArrayRef<uint64_t> origDeclIds;
         uint64_t rawDerivativeKind;
-        ArrayRef<uint64_t> parameters;
 
         serialization::decls_block::DerivativeDeclAttrLayout::readRecord(
             scratch, isImplicit, hasAccessorKind, rawAccessorKind,
-            origDeclId, rawDerivativeKind, parameters);
+            rawDerivativeKind, origDeclIds);
+        auto *indices = deserializeDifferentiableParamIndices();
+        if (!indices)
+          return MF.diagnoseFatal();
 
         std::optional<AccessorKind> accessorKind = std::nullopt;
         if (hasAccessorKind) {
@@ -6462,10 +6495,6 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
             getActualAutoDiffDerivativeFunctionKind(rawDerivativeKind);
         if (!derivativeKind)
           return MF.diagnoseFatal();
-        llvm::SmallBitVector parametersBitVector(parameters.size());
-        for (unsigned i : indices(parameters))
-          parametersBitVector[i] = parameters[i];
-        auto *indices = IndexSubset::get(ctx, parametersBitVector);
 
         auto origName = deserializeDeclNameRefIfPresent();
         DeclNameRefWithLoc origNameWithLoc{origName, DeclNameLoc(),
@@ -6475,7 +6504,7 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
             DerivativeAttr::create(ctx, isImplicit, SourceLoc(), SourceRange(),
                                    /*baseType*/ nullptr, origNameWithLoc,
                                    indices);
-        derivativeAttr->setOriginalFunctionResolver(&MF, origDeclId);
+        derivativeAttr->setOriginalFunctionResolver(ctx, &MF, origDeclIds);
         derivativeAttr->setDerivativeKind(*derivativeKind);
         Attr = derivativeAttr;
         break;
@@ -6484,16 +6513,14 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
       case decls_block::Transpose_DECL_ATTR: {
         bool isImplicit;
         DeclID origDeclId;
-        ArrayRef<uint64_t> parameters;
 
         serialization::decls_block::TransposeDeclAttrLayout::readRecord(
-            scratch, isImplicit, origDeclId, parameters);
+            scratch, isImplicit, origDeclId);
+        auto *indices = deserializeDifferentiableParamIndices();
+        if (!indices)
+          return MF.diagnoseFatal();
 
         auto *origDecl = cast<AbstractFunctionDecl>(MF.getDecl(origDeclId));
-        llvm::SmallBitVector parametersBitVector(parameters.size());
-        for (unsigned i : indices(parameters))
-          parametersBitVector[i] = parameters[i];
-        auto *indices = IndexSubset::get(ctx, parametersBitVector);
 
         auto origNameRef = deserializeDeclNameRefIfPresent();
         DeclNameRefWithLoc origName{origNameRef, DeclNameLoc(), std::nullopt};
@@ -7430,7 +7457,7 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
                                            StringRef blobData, bool isGeneric) {
   TypeID resultID;
   uint8_t rawRepresentation, rawDiffKind;
-  bool noescape = false, sendable, async, throws, hasSendingResult;
+  bool noescape = false, sendable, async, throws, hasSendingResult, calledOnce;
   TypeID thrownErrorID;
   GenericSignature genericSig;
   TypeID clangTypeID;
@@ -7440,12 +7467,12 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
     decls_block::FunctionTypeLayout::readRecord(
         scratch, resultID, rawRepresentation, clangTypeID, noescape, sendable,
         async, throws, thrownErrorID, rawDiffKind, rawIsolation,
-        hasSendingResult);
+        hasSendingResult, calledOnce);
   } else {
     GenericSignatureID rawGenericSig;
     decls_block::GenericFunctionTypeLayout::readRecord(
         scratch, resultID, rawRepresentation, sendable, async, throws,
-        thrownErrorID, rawDiffKind, rawIsolation, hasSendingResult,
+        thrownErrorID, rawDiffKind, rawIsolation, hasSendingResult, calledOnce,
         rawGenericSig);
     genericSig = MF.getGenericSignature(rawGenericSig);
     clangTypeID = 0;
@@ -7498,7 +7525,7 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
   auto info = FunctionType::ExtInfoBuilder(
                   *representation, noescape, throws, thrownError, *diffKind,
                   clangFunctionType, isolation,
-                  /*LifetimeDependenceInfo */ {}, hasSendingResult)
+                  /*LifetimeDependenceInfo */ {}, hasSendingResult, calledOnce)
                   .withSendable(sendable)
                   .withAsync(async)
                   .build();
@@ -8023,6 +8050,7 @@ Expected<Type> DESERIALIZE_TYPE(SIL_FUNCTION_TYPE)(
   bool unimplementable;
   bool sendable;
   bool noescape;
+  bool calledOnce;
   uint8_t rawIsolation;
   bool hasErrorResult;
   unsigned numParams;
@@ -8037,7 +8065,7 @@ Expected<Type> DESERIALIZE_TYPE(SIL_FUNCTION_TYPE)(
   decls_block::SILFunctionTypeLayout::readRecord(
       scratch, sendable, async, rawCoroutineKind, rawCalleeConvention,
       rawRepresentation, pseudogeneric, noescape, unimplementable,
-      rawIsolation, rawDiffKind, hasErrorResult,
+      calledOnce, rawIsolation, rawDiffKind, hasErrorResult,
       numParams, numYields, numResults, rawInvocationGenericSig,
       rawInvocationSubs, rawPatternSubs, clangFunctionTypeID, variableData);
 
@@ -8063,11 +8091,12 @@ Expected<Type> DESERIALIZE_TYPE(SIL_FUNCTION_TYPE)(
   if (!isolation)
     return MF.diagnoseFatal();
 
-  auto extInfo = SILFunctionType::ExtInfoBuilder(
-                     *representation, pseudogeneric, noescape, sendable, async,
-                     unimplementable, *isolation, *diffKind, clangFunctionType,
-                     /*LifetimeDependenceInfo*/ {})
-                     .build();
+  auto extInfo =
+      SILFunctionType::ExtInfoBuilder(
+          *representation, pseudogeneric, noescape, sendable, async,
+          unimplementable, calledOnce, *isolation, *diffKind, clangFunctionType,
+          /*LifetimeDependenceInfo*/ {})
+          .build();
 
   // Process the coroutine kind.
   auto coroutineKind = getActualSILCoroutineKind(rawCoroutineKind);
@@ -9656,16 +9685,19 @@ ModuleFile::maybeReadLifetimeDependence() {
   bool hasInheritLifetimeParamIndices;
   bool hasScopeLifetimeParamIndices;
   bool hasAddressableParamIndices;
+  bool hasConditionallyAddressableParamIndices;
   ArrayRef<uint64_t> lifetimeDependenceData;
   LifetimeDependenceLayout::readRecord(
       scratch, targetIndex, paramIndicesLength, hasImmortalSpecifier,
       isFromAnnotation, hasCaptures, hasInheritLifetimeParamIndices,
       hasScopeLifetimeParamIndices, hasAddressableParamIndices,
+      hasConditionallyAddressableParamIndices,
       lifetimeDependenceData);
 
   SmallBitVector inheritLifetimeParamIndices(paramIndicesLength, false);
   SmallBitVector scopeLifetimeParamIndices(paramIndicesLength, false);
   SmallBitVector addressableParamIndices(paramIndicesLength, false);
+  SmallBitVector conditionallyAddressableParamIndices(paramIndicesLength, false);
 
   unsigned startIndex = 0;
   auto pushData = [&](SmallBitVector &bits) {
@@ -9686,6 +9718,9 @@ ModuleFile::maybeReadLifetimeDependence() {
   if (hasAddressableParamIndices) {
     pushData(addressableParamIndices);
   }
+  if (hasConditionallyAddressableParamIndices) {
+    pushData(conditionallyAddressableParamIndices);
+  }
 
   ASTContext &ctx = getContext();
   return LifetimeDependenceInfo(
@@ -9699,7 +9734,9 @@ ModuleFile::maybeReadLifetimeDependence() {
       hasAddressableParamIndices
           ? IndexSubset::get(ctx, addressableParamIndices)
           : nullptr,
-      nullptr,
+      hasConditionallyAddressableParamIndices
+          ? IndexSubset::get(ctx, conditionallyAddressableParamIndices)
+          : nullptr,
       LifetimeFlags()
           .withImmortalSpecifier(hasImmortalSpecifier)
           .withAnnotated(isFromAnnotation)

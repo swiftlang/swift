@@ -5,7 +5,6 @@
 
 // RUN: %sourcekitd-test -req=diags %t/file1.swift -- %t/file1.swift %t/file2.swift -enable-experimental-feature Embedded -target %target-cpu-apple-macos14 | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: embedded_stdlib
 // REQUIRES: OS=macosx
 // REQUIRES: swift_feature_Embedded

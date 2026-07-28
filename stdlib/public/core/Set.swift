@@ -211,6 +211,9 @@ extension Set: ExpressibleByArrayLiteral {
   ///     }
   ///     // Prints "Whatever it is, it's bound to be delicious!"
   ///
+  /// - Note: If the array literal contains duplicate elements, only the
+  ///   first occurrence is kept, and subsequent duplicates are ignored.
+  ///
   /// - Parameter elements: A variadic list of elements of the new set.
   @inlinable
   @inline(__always)
@@ -222,16 +225,10 @@ extension Set: ExpressibleByArrayLiteral {
     self.init(_nonEmptyArrayLiteral: elements)
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal init(_nonEmptyArrayLiteral elements: [Element]) {
-    let native = _NativeSet<Element>(capacity: elements.count)
-    for element in elements {
-      let (bucket, found) = native.find(element)
-      if found {
-        // FIXME: Shouldn't this trap?
-        continue
-      }
-      unsafe native._unsafeInsertNew(element, at: bucket)
+    let native = elements.withUnsafeBufferPointer { buffer in
+      unsafe _NativeSet(buffer)
     }
     self.init(_native: native)
   }
@@ -297,7 +294,7 @@ extension Set {
   ///   and returns a Boolean value indicating whether the element should be
   ///   included in the returned set.
   /// - Returns: A set of the elements that `isIncluded` allows.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @available(swift, introduced: 4.0)
   public consuming func filter<E: Error>(
     _ isIncluded: (Element) throws(E) -> Bool
@@ -623,7 +620,7 @@ extension Set: SetAlgebra {
 
   /// Removes all members from the set.
   ///
-  /// - Parameter keepingCapacity: If `true`, the set's buffer capacity is
+  /// - Parameter keepCapacity: If `true`, the set's buffer capacity is
   ///   preserved; if `false`, the underlying buffer is released. The
   ///   default is `false`.
   @inlinable
@@ -702,11 +699,22 @@ extension Set: SetAlgebra {
       // If this sequence is actually a `Set`, then we can quickly
       // adopt its storage and let COW handle uniquing only if necessary.
       self = s
-    } else {
-      self.init(minimumCapacity: sequence.underestimatedCount)
-      for item in sequence {
-        insert(item)
+      return
+    }
+    // Fast path: build directly from the buffer, avoiding the storage-
+    // uniqueness check performed on each `insert` and, when unspecialized,
+    // witness-table dispatch through the `Source` iterator.
+    let native: _NativeSet<Element>? =
+      sequence.withContiguousStorageIfAvailable { buffer in
+        unsafe _NativeSet(buffer)
       }
+    if let native {
+      self.init(_native: native)
+      return
+    }
+    self.init(minimumCapacity: sequence.underestimatedCount)
+    for item in sequence {
+      insert(item)
     }
   }
 
@@ -1709,7 +1717,7 @@ extension Set {
   /// with `==`, but not all equal sets are considered identical.
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func isTriviallyIdentical(to other: Self) -> Bool {
 #if _runtime(_ObjC)
     if

@@ -6,7 +6,7 @@ struct S<T> {
 
 // Test SIL combine's handling of retain_value/release_value.
 //
-// CHECK-LABEL: sil @testSpecializeOpaque : $@convention(thin) <T> (@in S<T>) -> () {
+// CHECK-LABEL: sil [opaque] @testSpecializeOpaque : $@convention(thin) <T> (@in S<T>) -> () {
 // CHECK-LABEL: bb0(%0 : $S<T>):
 // CHECK:   retain_value %0 : $S<T>
 // CHECK:   [[F:%.*]] = function_ref @testSpecializeOpaque : $@convention(thin) <τ_0_0> (@in S<τ_0_0>) -> ()

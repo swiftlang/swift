@@ -26,3 +26,10 @@ public struct Field {
 }
 
 // CHECK: __consuming get
+
+public protocol Drainable: ~Copyable {
+  // CHECK: { consuming get }
+  var consumingReq: Int { consuming get }
+  // CHECK: { borrowing get }
+  var borrowingReq: Int { borrowing get }
+}

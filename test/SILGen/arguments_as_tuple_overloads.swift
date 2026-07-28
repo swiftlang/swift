@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 // RUN: %target-swift-emit-silgen -parse-as-library -module-name=test -primary-file %s | %FileCheck %s
 
 // Check if we mangle the following constructors, functions, and

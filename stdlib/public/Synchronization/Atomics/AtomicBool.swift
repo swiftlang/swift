@@ -34,7 +34,7 @@ extension Bool: AtomicRepresentable {
   ///   to encode an instance of its `AtomicRepresentation`.
   /// - Returns: The newly encoded `AtomicRepresentation` storage.
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public static func encodeAtomicRepresentation(
     _ value: borrowing Bool
@@ -55,7 +55,7 @@ extension Bool: AtomicRepresentable {
   ///   within atomic operations.
   /// - Returns: The newly decoded logical type `Self`.
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public static func decodeAtomicRepresentation(
     _ representation: consuming AtomicRepresentation
@@ -82,7 +82,7 @@ extension Atomic where Value == Bool {
   @available(SwiftStdlib 6.0, *)
   @discardableResult
   @_semantics("atomics.requires_constant_orderings")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public func logicalAnd(
     _ operand: Bool,
@@ -140,7 +140,7 @@ extension Atomic where Value == Bool {
   @available(SwiftStdlib 6.0, *)
   @discardableResult
   @_semantics("atomics.requires_constant_orderings")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public func logicalOr(
     _ operand: Bool,
@@ -198,7 +198,7 @@ extension Atomic where Value == Bool {
   @available(SwiftStdlib 6.0, *)
   @discardableResult
   @_semantics("atomics.requires_constant_orderings")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public func logicalXor(
     _ operand: Bool,

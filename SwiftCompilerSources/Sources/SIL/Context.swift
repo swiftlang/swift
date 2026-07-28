@@ -40,7 +40,9 @@ extension Context {
 
   public var moduleIsSerialized: Bool { _bridged.moduleIsSerialized() }
 
-  public var moduleHasLoweredAddresses: Bool { _bridged.moduleHasLoweredAddresses() }
+  /// True if -enable-sil-opaque-values was passed. Address-only types are
+  /// represented as opaque SSA values in Raw SIL rather than as raw addresses.
+  public var usesOpaqueValues: Bool { _bridged.usesOpaqueValues() }
 
   public func lookupDeinit(ofNominal: NominalTypeDecl) -> Function? {
     _bridged.lookUpNominalDeinitFunction(ofNominal.bridged).function
@@ -172,8 +174,8 @@ extension MutatingContext {
   }
 
   /// Removes and deletes `instruction`.
-  /// If `salvageDebugInfo` is true, compensating `debug_value` instructions are inserted for certain
-  /// kind of instructions.
+  /// If `salvageDebugInfo` is true, `debug_value` users of the instructions will be rewritten
+  /// Otherwise, the instruction must not have any uses at this point.
   public func erase(instruction: Instruction, salvageDebugInfo: Bool = true) {
     if !instruction.isInStaticInitializer {
       verifyIsTransforming(function: instruction.parentFunction)
@@ -195,30 +197,27 @@ extension MutatingContext {
     _bridged.eraseInstruction(instruction.bridged, salvageDebugInfo)
   }
 
+  /// Removes and deletes `inst` and all its users.
+  /// `debug_value` users of any deleted instruction will be rewritten.
   public func erase(instructionIncludingAllUsers inst: Instruction) {
     if inst.isDeleted {
       return
     }
     for result in inst.results {
-      for use in result.uses {
+      // salvageDebugInfo may create new `debug_value` users, which are inserted at the begin of the
+      // use-list. Therefore we cannot iterate with a `for use in result.uses`.
+      // Debug users must not be deleted before salvageDebugInfo is called later.
+      while let use = result.uses.ignoreDebugUses.first {
         erase(instructionIncludingAllUsers: use.instruction)
       }
     }
-    // We rely that after deleting the instruction its operands have no users.
-    // Therefore `salvageDebugInfo` must be turned off because we cannot insert debug_value instructions.
-    erase(instruction: inst, salvageDebugInfo: false)
+    erase(instruction: inst)
   }
 
   public func erase<S: Sequence>(instructions: S) where S.Element: Instruction {
     for inst in instructions {
       erase(instruction: inst)
     }
-  }
-
-  public func erase(instructionIncludingDebugUses inst: Instruction) {
-    precondition(inst.results.allSatisfy { $0.uses.ignoreDebugUses.isEmpty })
-    salvageDebugInfo(of: inst)
-    erase(instructionIncludingAllUsers: inst)
   }
 
   public func erase(block: BasicBlock) {

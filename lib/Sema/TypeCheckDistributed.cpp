@@ -88,7 +88,7 @@ static AbstractFunctionDecl *findDistributedAdHocRequirement(
 
   llvm::SmallVector<ValueDecl *, 2> results;
   decl->lookupQualified(decl, DeclNameRef(identifier),
-                        SourceLoc(), NL_QualifiedDefault, results);
+                        SourceLoc(), NLFlags::QualifiedDefault, results);
   for (auto value : results) {
     auto func = dyn_cast<AbstractFunctionDecl>(value);
     if (func && matchFn(func))

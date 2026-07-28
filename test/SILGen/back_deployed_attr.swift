@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 // RUN: %target-swift-emit-sil -parse-as-library -module-name back_deploy %s -target %target-cpu-apple-macosx10.50 -verify
 // RUN: %target-swift-emit-silgen -parse-as-library -module-name back_deploy %s | %FileCheck %s
 // RUN: %target-swift-emit-silgen -parse-as-library -module-name back_deploy %s -target %target-cpu-apple-macosx10.50 | %FileCheck %s --check-prefixes=CHECK,CHECK-BACK-DEPLOY

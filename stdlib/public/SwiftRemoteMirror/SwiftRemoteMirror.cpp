@@ -1114,6 +1114,15 @@ swift_reflection_asyncTaskInfo(SwiftReflectionContextRef ContextRef,
     Result.AsyncBacktraceFramesCount = AsyncBacktraceFrames->size();
     Result.AsyncBacktraceFrames = AsyncBacktraceFrames->data();
 
+    if (!TaskInfo.Name.empty()) {
+      auto *TmpName =
+          ContextRef->allocateSubsequentTemporaryObject<std::string>();
+      *TmpName = std::move(TaskInfo.Name);
+      Result.Name = TmpName->c_str();
+    } else {
+      Result.Name = nullptr;
+    }
+
     return Result;
   });
 }

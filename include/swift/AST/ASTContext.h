@@ -724,8 +724,8 @@ public:
   /// Get Sequence.makeIterator().
   FuncDecl *getSequenceMakeIterator() const;
 
-  /// Get BorrowingSequence.makeBorrowingIterator().
-  FuncDecl *getBorrowingSequenceMakeBorrowingIterator() const;
+  /// Get Iterable.makeBorrowingIterator().
+  FuncDecl *getIterableMakeBorrowingIterator() const;
 
   /// Get AsyncSequence.makeAsyncIterator().
   FuncDecl *getAsyncSequenceMakeAsyncIterator() const;
@@ -733,7 +733,7 @@ public:
   /// Get IteratorProtocol.next().
   FuncDecl *getIteratorNext() const;
 
-  /// Get BorrowingIteratorProtocol.nextSpan(maximumCount:).
+  /// Get BorrowingIteratorProtocol.nextSpan(maxCount:).
   FuncDecl *getBorrowingIteratorNextSpan() const;
 
   /// Get AsyncIteratorProtocol.next().
@@ -1191,6 +1191,12 @@ public:
   /// Set the maximum assigned discriminator within the given declaration context.
   void setMaxAssignedDiscriminator(
       const DeclContext *dc, unsigned discriminator);
+
+  /// Returns an integer, guaranteed to be unique from every other integer
+  /// previously returned by this function within the current AST context.
+  /// This identifies existential and pack element generic environments,
+  /// which are unique per call site.
+  uint64_t getNextGenericEnvironmentID();
 
   /// Retrieve the Clang module loader for this ASTContext.
   ///

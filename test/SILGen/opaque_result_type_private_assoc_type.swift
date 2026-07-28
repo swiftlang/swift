@@ -1,5 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module %S/Inputs/opaque_result_type_private_assoc_type_other.swift -emit-module-path %t/opaque_result_type_private_assoc_type_other.swiftmodule -disable-availability-checking
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -I %t %s
 // RUN: %target-swift-emit-silgen -I %t %s | %FileCheck %s
 
 import opaque_result_type_private_assoc_type_other

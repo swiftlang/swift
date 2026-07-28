@@ -1,12 +1,12 @@
-func fooSubFunc1(_ a: Int32) -> Int32
+func fooSubFunc1(_ a: CInt) -> CInt
 
 struct FooSubEnum1 : Hashable, Equatable, RawRepresentable {
 
-    init(_ rawValue: UInt32)
+    init(_ rawValue: CUnsignedInt)
 
-    init(rawValue rawValue: UInt32)
+    init(rawValue rawValue: CUnsignedInt)
 
-    var rawValue: UInt32
+    var rawValue: CUnsignedInt
 
     @inlinable var hashValue: Int { get }
 
@@ -44,305 +44,305 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.length: 1
   },
   {
-    key.kind: source.lang.swift.ref.struct,
-    key.name: "Int32",
-    key.usr: "s:s5Int32V",
+    key.kind: source.lang.swift.ref.typealias,
+    key.name: "CInt",
+    key.usr: "s:s4CInta",
     key.offset: 22,
-    key.length: 5
+    key.length: 4
   },
   {
-    key.kind: source.lang.swift.ref.struct,
-    key.name: "Int32",
-    key.usr: "s:s5Int32V",
-    key.offset: 32,
-    key.length: 5
+    key.kind: source.lang.swift.ref.typealias,
+    key.name: "CInt",
+    key.usr: "s:s4CInta",
+    key.offset: 31,
+    key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 39,
+    key.offset: 37,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 46,
+    key.offset: 44,
     key.length: 11
   },
   {
     key.kind: source.lang.swift.ref.protocol,
     key.name: "Hashable",
     key.usr: "s:SH",
-    key.offset: 60,
+    key.offset: 58,
     key.length: 8
   },
   {
     key.kind: source.lang.swift.ref.protocol,
     key.name: "Equatable",
     key.usr: "s:SQ",
-    key.offset: 70,
+    key.offset: 68,
     key.length: 9
   },
   {
     key.kind: source.lang.swift.ref.protocol,
     key.name: "RawRepresentable",
     key.usr: "s:SY",
-    key.offset: 81,
+    key.offset: 79,
     key.length: 16
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 105,
+    key.offset: 103,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.argument,
-    key.offset: 110,
+    key.offset: 108,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 112,
+    key.offset: 110,
     key.length: 8
   },
   {
-    key.kind: source.lang.swift.ref.struct,
-    key.name: "UInt32",
-    key.usr: "s:s6UInt32V",
-    key.offset: 122,
-    key.length: 6
+    key.kind: source.lang.swift.ref.typealias,
+    key.name: "CUnsignedInt",
+    key.usr: "s:s12CUnsignedInta",
+    key.offset: 120,
+    key.length: 12
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 135,
+    key.offset: 139,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.argument,
-    key.offset: 140,
+    key.offset: 144,
     key.length: 8
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 149,
+    key.offset: 153,
     key.length: 8
   },
   {
-    key.kind: source.lang.swift.ref.struct,
-    key.name: "UInt32",
-    key.usr: "s:s6UInt32V",
-    key.offset: 159,
-    key.length: 6
+    key.kind: source.lang.swift.ref.typealias,
+    key.name: "CUnsignedInt",
+    key.usr: "s:s12CUnsignedInta",
+    key.offset: 163,
+    key.length: 12
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 172,
+    key.offset: 182,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 176,
+    key.offset: 186,
     key.length: 8
   },
   {
-    key.kind: source.lang.swift.ref.struct,
-    key.name: "UInt32",
-    key.usr: "s:s6UInt32V",
-    key.offset: 186,
-    key.length: 6
+    key.kind: source.lang.swift.ref.typealias,
+    key.name: "CUnsignedInt",
+    key.usr: "s:s12CUnsignedInta",
+    key.offset: 196,
+    key.length: 12
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 198,
+    key.offset: 214,
     key.length: 10
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 209,
+    key.offset: 225,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 213,
+    key.offset: 229,
     key.length: 9
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int",
     key.usr: "s:Si",
-    key.offset: 224,
+    key.offset: 240,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 230,
+    key.offset: 246,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 241,
+    key.offset: 257,
     key.length: 10
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 252,
+    key.offset: 268,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 257,
+    key.offset: 273,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.argument,
-    key.offset: 262,
+    key.offset: 278,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 267,
+    key.offset: 283,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 275,
+    key.offset: 291,
     key.length: 5
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Hasher",
     key.usr: "s:s6HasherV",
-    key.offset: 281,
+    key.offset: 297,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 294,
-    key.length: 6
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 301,
-    key.length: 4
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.operator,
-    key.offset: 306,
-    key.length: 2
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.argument,
     key.offset: 310,
-    key.length: 1
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 312,
-    key.length: 3
+    key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
     key.offset: 317,
-    key.length: 9
+    key.length: 4
   },
   {
-    key.kind: source.lang.swift.ref.struct,
-    key.name: "FooSubEnum1",
-    key.usr: "c:@E@FooSubEnum1",
-    key.offset: 327,
-    key.length: 11
+    key.kind: source.lang.swift.syntaxtype.operator,
+    key.offset: 322,
+    key.length: 2
   },
   {
     key.kind: source.lang.swift.syntaxtype.argument,
-    key.offset: 340,
+    key.offset: 326,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 342,
+    key.offset: 328,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 347,
+    key.offset: 333,
     key.length: 9
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "FooSubEnum1",
     key.usr: "c:@E@FooSubEnum1",
-    key.offset: 357,
+    key.offset: 343,
+    key.length: 11
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.argument,
+    key.offset: 356,
+    key.length: 1
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.parameter,
+    key.offset: 358,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 363,
+    key.length: 9
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.name: "FooSubEnum1",
+    key.usr: "c:@E@FooSubEnum1",
+    key.offset: 373,
     key.length: 11
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Bool",
     key.usr: "s:Sb",
-    key.offset: 373,
+    key.offset: 389,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 381,
+    key.offset: 397,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 385,
+    key.offset: 401,
     key.length: 12
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "FooSubEnum1",
     key.usr: "c:@E@FooSubEnum1",
-    key.offset: 399,
+    key.offset: 415,
     key.length: 11
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 413,
+    key.offset: 429,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 420,
+    key.offset: 436,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 424,
+    key.offset: 440,
     key.length: 12
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "FooSubEnum1",
     key.usr: "c:@E@FooSubEnum1",
-    key.offset: 438,
+    key.offset: 454,
     key.length: 11
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 452,
+    key.offset: 468,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 459,
+    key.offset: 475,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 463,
+    key.offset: 479,
     key.length: 25
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int",
     key.usr: "s:Si",
-    key.offset: 490,
+    key.offset: 506,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 496,
+    key.offset: 512,
     key.length: 3
   }
 ]
@@ -352,15 +352,15 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.name: "fooSubFunc1(_:)",
     key.usr: "c:@F@fooSubFunc1",
     key.offset: 0,
-    key.length: 37,
-    key.fully_annotated_decl: "<decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>fooSubFunc1</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>a</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:s5Int32V\">Int32</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:s5Int32V\">Int32</ref.struct></decl.function.returntype></decl.function.free>",
+    key.length: 35,
+    key.fully_annotated_decl: "<decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>fooSubFunc1</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>a</decl.var.parameter.name>: <decl.var.parameter.type><ref.typealias usr=\"s:s4CInta\">CInt</ref.typealias></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.typealias usr=\"s:s4CInta\">CInt</ref.typealias></decl.function.returntype></decl.function.free>",
     key.entities: [
       {
         key.kind: source.lang.swift.decl.var.local,
         key.keyword: "_",
         key.name: "a",
         key.offset: 22,
-        key.length: 5
+        key.length: 4
       }
     ],
     key.modulename: "Foo.FooSub"
@@ -369,8 +369,8 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.kind: source.lang.swift.decl.struct,
     key.name: "FooSubEnum1",
     key.usr: "c:@E@FooSubEnum1",
-    key.offset: 39,
-    key.length: 340,
+    key.offset: 37,
+    key.length: 358,
     key.fully_annotated_decl: "<decl.struct><syntaxtype.keyword>struct</syntaxtype.keyword> <decl.name>FooSubEnum1</decl.name> : <ref.protocol usr=\"s:SH\">Hashable</ref.protocol>, <ref.protocol usr=\"s:SQ\">Equatable</ref.protocol>, <ref.protocol usr=\"s:SY\">RawRepresentable</ref.protocol></decl.struct>",
     key.conforms: [
       {
@@ -394,16 +394,16 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.kind: source.lang.swift.decl.function.constructor,
         key.name: "init(_:)",
         key.usr: "s:So11FooSubEnum1VyABs6UInt32Vcfc",
-        key.offset: 105,
-        key.length: 24,
-        key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>rawValue</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:s6UInt32V\">UInt32</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
+        key.offset: 103,
+        key.length: 30,
+        key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>rawValue</decl.var.parameter.name>: <decl.var.parameter.type><ref.typealias usr=\"s:s12CUnsignedInta\">CUnsignedInt</ref.typealias></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
         key.entities: [
           {
             key.kind: source.lang.swift.decl.var.local,
             key.keyword: "_",
             key.name: "rawValue",
-            key.offset: 122,
-            key.length: 6
+            key.offset: 120,
+            key.length: 12
           }
         ]
       },
@@ -411,16 +411,16 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.kind: source.lang.swift.decl.function.constructor,
         key.name: "init(rawValue:)",
         key.usr: "s:So11FooSubEnum1V8rawValueABs6UInt32V_tcfc",
-        key.offset: 135,
-        key.length: 31,
-        key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.argument_label>rawValue</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr=\"s:s6UInt32V\">UInt32</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
+        key.offset: 139,
+        key.length: 37,
+        key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.argument_label>rawValue</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.typealias usr=\"s:s12CUnsignedInta\">CUnsignedInt</ref.typealias></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>",
         key.entities: [
           {
             key.kind: source.lang.swift.decl.var.local,
             key.keyword: "rawValue",
             key.name: "rawValue",
-            key.offset: 159,
-            key.length: 6
+            key.offset: 163,
+            key.length: 12
           }
         ]
       },
@@ -428,16 +428,16 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.kind: source.lang.swift.decl.var.instance,
         key.name: "rawValue",
         key.usr: "s:So11FooSubEnum1V8rawValues6UInt32Vvp",
-        key.offset: 172,
-        key.length: 20,
-        key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>rawValue</decl.name>: <decl.var.type><ref.struct usr=\"s:s6UInt32V\">UInt32</ref.struct></decl.var.type></decl.var.instance>"
+        key.offset: 182,
+        key.length: 26,
+        key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>rawValue</decl.name>: <decl.var.type><ref.typealias usr=\"s:s12CUnsignedInta\">CUnsignedInt</ref.typealias></decl.var.type></decl.var.instance>"
       },
       {
         key.kind: source.lang.swift.decl.var.instance,
         key.name: "hashValue",
         key.usr: "s:SYsSHRzSH8RawValueSYRpzrlE04hashB0Sivp::SYNTHESIZED::c:@E@FooSubEnum1",
         key.original_usr: "s:SYsSHRzSH8RawValueSYRpzrlE04hashB0Sivp",
-        key.offset: 198,
+        key.offset: 214,
         key.length: 37,
         key.fully_annotated_decl: "<decl.var.instance><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@inlinable</syntaxtype.attribute.name></syntaxtype.attribute.builtin> <syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>hashValue</decl.name>: <decl.var.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.var.instance>"
       },
@@ -446,7 +446,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.name: "hash(into:)",
         key.usr: "s:SYsSHRzSH8RawValueSYRpzrlE4hash4intoys6HasherVz_tF::SYNTHESIZED::c:@E@FooSubEnum1",
         key.original_usr: "s:SYsSHRzSH8RawValueSYRpzrlE4hash4intoys6HasherVz_tF",
-        key.offset: 241,
+        key.offset: 257,
         key.length: 47,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@inlinable</syntaxtype.attribute.name></syntaxtype.attribute.builtin> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>hash</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>into</decl.var.parameter.argument_label> <decl.var.parameter.name>hasher</decl.var.parameter.name>: <syntaxtype.keyword>inout</syntaxtype.keyword> <decl.var.parameter.type><ref.struct usr=\"s:s6HasherV\">Hasher</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.method.instance>",
         key.entities: [
@@ -454,7 +454,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
             key.kind: source.lang.swift.decl.var.local,
             key.keyword: "into",
             key.name: "hasher",
-            key.offset: 281,
+            key.offset: 297,
             key.length: 6
           }
         ]
@@ -465,7 +465,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.usr: "s:SQsE2neoiySbx_xtFZ::SYNTHESIZED::c:@E@FooSubEnum1",
         key.original_usr: "s:SQsE2neoiySbx_xtFZ",
         key.doc.full_as_xml: "<Function><Name>!=(_:_:)</Name><USR>s:SQsE2neoiySbx_xtFZ::SYNTHESIZED::c:@E@FooSubEnum1</USR><Declaration>static func != (lhs: borrowing FooSubEnum1, rhs: borrowing FooSubEnum1) -&gt; Bool</Declaration><CommentParts><Abstract><Para>Returns a Boolean value indicating whether two values are not equal.</Para></Abstract><Parameters><Parameter><Name>lhs</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>A value to compare.</Para></Discussion></Parameter><Parameter><Name>rhs</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>Another value to compare.</Para></Discussion></Parameter></Parameters><Discussion><Para>Inequality is the inverse of equality. For any values <codeVoice>a</codeVoice> and <codeVoice>b</codeVoice>, <codeVoice>a != b</codeVoice> implies that <codeVoice>a == b</codeVoice> is <codeVoice>false</codeVoice>.</Para><Para>This is the default implementation of the not-equal-to operator (<codeVoice>!=</codeVoice>) for any type that conforms to <codeVoice>Equatable</codeVoice>.</Para></Discussion></CommentParts></Function>",
-        key.offset: 294,
+        key.offset: 310,
         key.length: 83,
         key.fully_annotated_decl: "<decl.function.operator.infix><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@_preInverseGenerics</syntaxtype.attribute.name></syntaxtype.attribute.builtin> <syntaxtype.keyword>static</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>!= </decl.name>(<decl.var.parameter><decl.var.parameter.name>lhs</decl.var.parameter.name>: <syntaxtype.keyword>borrowing</syntaxtype.keyword> <decl.var.parameter.type><ref.struct usr=\"c:@E@FooSubEnum1\">FooSubEnum1</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.name>rhs</decl.var.parameter.name>: <syntaxtype.keyword>borrowing</syntaxtype.keyword> <decl.var.parameter.type><ref.struct usr=\"c:@E@FooSubEnum1\">FooSubEnum1</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Sb\">Bool</ref.struct></decl.function.returntype></decl.function.operator.infix>",
         key.entities: [
@@ -473,14 +473,14 @@ var FooSubUnnamedEnumeratorA1: Int { get }
             key.kind: source.lang.swift.decl.var.local,
             key.keyword: "_",
             key.name: "lhs",
-            key.offset: 327,
+            key.offset: 343,
             key.length: 11
           },
           {
             key.kind: source.lang.swift.decl.var.local,
             key.keyword: "_",
             key.name: "rhs",
-            key.offset: 357,
+            key.offset: 373,
             key.length: 11
           }
         ]
@@ -492,7 +492,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.kind: source.lang.swift.decl.var.global,
     key.name: "FooSubEnum1X",
     key.usr: "c:@E@FooSubEnum1@FooSubEnum1X",
-    key.offset: 381,
+    key.offset: 397,
     key.length: 37,
     key.fully_annotated_decl: "<decl.var.global><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>FooSubEnum1X</decl.name>: <decl.var.type><ref.struct usr=\"c:@E@FooSubEnum1\">FooSubEnum1</ref.struct></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.var.global>",
     key.modulename: "Foo.FooSub"
@@ -501,7 +501,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.kind: source.lang.swift.decl.var.global,
     key.name: "FooSubEnum1Y",
     key.usr: "c:@E@FooSubEnum1@FooSubEnum1Y",
-    key.offset: 420,
+    key.offset: 436,
     key.length: 37,
     key.fully_annotated_decl: "<decl.var.global><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>FooSubEnum1Y</decl.name>: <decl.var.type><ref.struct usr=\"c:@E@FooSubEnum1\">FooSubEnum1</ref.struct></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.var.global>",
     key.modulename: "Foo.FooSub"
@@ -510,7 +510,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.kind: source.lang.swift.decl.var.global,
     key.name: "FooSubUnnamedEnumeratorA1",
     key.usr: "c:@Ea@FooSubUnnamedEnumeratorA1@FooSubUnnamedEnumeratorA1",
-    key.offset: 459,
+    key.offset: 475,
     key.length: 42,
     key.fully_annotated_decl: "<decl.var.global><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>FooSubUnnamedEnumeratorA1</decl.name>: <decl.var.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.var.global>",
     key.modulename: "Foo.FooSub"

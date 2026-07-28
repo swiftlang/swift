@@ -16,7 +16,6 @@
 // RUN: %target-build-swift -enable-experimental-feature Embedded -wmo -runtime-compatibility-version none %s -Xlinker %t/unbuffered-putchar.o -o %t/a.out -Osize -assert-config Debug %target-embedded-posix-shim
 // RUN: %target-not-crash %target-run %t/a.out 2>&1 | %FileCheck %s --check-prefix=CHECK-MESSAGE
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
 // REQUIRES: OS=macosx || OS=linux-gnu || OS=wasip1

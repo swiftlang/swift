@@ -3498,8 +3498,8 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
         std::optional<COMThreadingModel> Model =
             llvm::StringSwitch<std::optional<COMThreadingModel>>(Tok.getText())
                 .Case("single", COMThreadingModel::Single)
-                .Cases("apartment", "sta", COMThreadingModel::Apartment)
-                .Cases("free", "mta", COMThreadingModel::Free)
+                .Cases({"apartment", "sta"}, COMThreadingModel::Apartment)
+                .Cases({"free", "mta"}, COMThreadingModel::Free)
                 .Case("both", COMThreadingModel::Both)
                 .Case("neutral", COMThreadingModel::Neutral)
                 .Default(std::nullopt);
@@ -4345,6 +4345,19 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
 
     break;
   }
+
+  case DeclAttrKind::Called: {
+    auto semantics = parseSingleAttrOption<ExecutionSemantics>(
+        *this, Loc, AttrRange, AttrName, DK,
+        {{Context.Id_once, ExecutionSemantics::Once}});
+    if (!semantics)
+      return makeParserSuccess();
+
+    if (!DiscardAttribute)
+      Attributes.add(new (Context) CalledAttr(AtLoc, AttrRange, *semantics));
+
+    break;
+  }
   }
 
   if (DuplicateAttribute) {
@@ -4916,26 +4929,6 @@ bool Parser::parseConventionAttributeInternal(SourceLoc atLoc, SourceLoc attrLoc
   return false;
 }
 
-bool Parser::parseUUIDString(UUID &uuid, Diag<> diagnostic, bool justChecking) {
-  if (!Tok.is(tok::string_literal)) {
-    if (!justChecking)
-      diagnose(Tok, diagnostic);
-    return true;
-  }
-
-  bool failed = true;
-  auto literalText = Tok.getText().slice(1, Tok.getText().size() - 1);
-  llvm::SmallString<UUID::StringBufferSize> text(literalText);
-  if (auto id = UUID::fromString(text.c_str())) {
-    uuid = *id;
-    failed = false;
-  } else if (!justChecking) {
-    diagnose(Tok, diagnostic);
-  }
-  consumeToken(tok::string_literal);
-  return failed;
-}
-
 /// \verbatim
 ///   attribute-type:
 ///     'noreturn'
@@ -5126,7 +5119,7 @@ ParserStatus Parser::parseTypeAttribute(TypeOrCustomAttr &result,
   }
 
   case TypeAttrKind::Opened: {
-    // Parse the opened existential ID string in parens
+    // Parse the opened existential ID in parens
     SourceLoc beginLoc = Tok.getLoc(), idLoc, endLoc;
     if (!consumeIfAttributeLParen()) {
       if (!justChecking)
@@ -5135,9 +5128,9 @@ ParserStatus Parser::parseTypeAttribute(TypeOrCustomAttr &result,
     }
 
     idLoc = Tok.getLoc();
-    UUID id;
+    unsigned id;
     bool invalid = false;
-    if (parseUUIDString(id, diag::opened_attribute_id_value, justChecking))
+    if (parseUnsignedInteger(id, idLoc, diag::opened_attribute_id_value, justChecking))
       invalid = true;
 
     TypeRepr *constraintType = nullptr;
@@ -5188,9 +5181,9 @@ ParserStatus Parser::parseTypeAttribute(TypeOrCustomAttr &result,
     }
 
     idLoc = Tok.getLoc();
-    UUID id;
+    unsigned id;
     bool invalid = false;
-    if (parseUUIDString(id, diag::opened_attribute_id_value, justChecking))
+    if (parseUnsignedInteger(id, idLoc, diag::opened_attribute_id_value, justChecking))
       invalid = true;
 
     // TODO: allow more information so that these can be parsed
@@ -5320,6 +5313,46 @@ ParserStatus Parser::parseTypeAttribute(TypeOrCustomAttr &result,
                                                         {beginLoc, endLoc},
                                                         {mangling, manglingLoc},
                                                         {index, indexLoc});
+    }
+    return makeParserSuccess();
+  }
+
+  case TypeAttrKind::Called: {
+    SourceLoc lpLoc = Tok.getLoc(), semanticsLoc, rpLoc;
+    if (!consumeIfAttributeLParen()) {
+      if (!justChecking) {
+        diagnose(Tok, diag::attr_expected_lparen);
+      }
+      return makeParserError();
+    }
+
+    bool invalid = false;
+    std::optional<CalledTypeAttr::Semantics> semantics;
+    if (isIdentifier(Tok, "once")) {
+      semanticsLoc = consumeToken(tok::identifier);
+      semantics = CalledTypeAttr::Semantics::Once;
+    } else {
+      if (!justChecking) {
+        diagnose(Tok, diag::attr_called_expected_semantics)
+            .fixItReplace(Tok.getLoc(), "once");
+      }
+      invalid = true;
+      consumeIf(tok::identifier);
+    }
+
+    if (justChecking && !Tok.is(tok::r_paren))
+      return makeParserError();
+    if (parseMatchingToken(tok::r_paren, rpLoc,
+                           diag::attr_called_expected_rparen, lpLoc))
+      return makeParserError();
+
+    if (invalid)
+      return makeParserError();
+    assert(semantics);
+
+    if (!justChecking) {
+      result = new (Context) CalledTypeAttr(AtLoc, attrLoc, {lpLoc, rpLoc},
+                                            {*semantics, semanticsLoc});
     }
     return makeParserSuccess();
   }
@@ -7564,6 +7597,7 @@ Parser::parseDeclExtension(ParseDeclOptions Flags, DeclAttributes &Attributes) {
                                              CurDeclContext,
                                              trailingWhereClause);
   ext->attachParsedAttrs(Attributes);
+
   if (trailingWhereHadCodeCompletion && CodeCompletionCallbacks)
     CodeCompletionCallbacks->setParsedDecl(ext);
 

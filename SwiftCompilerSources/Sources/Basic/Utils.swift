@@ -66,6 +66,31 @@ public func debugLog(prefix: Bool = true, _ message: @autoclosure () -> String) 
   Bridged_dbgs().newLine()
 }
 
+/// The Swift equivalent of C++'s `LLVM_DEBUG(llvm::dbgs() << ...)`.
+///
+/// Checks if debugging is enabled for the given type (via `-debug-only=<type>`)
+/// and if so, evaluates and prints the message.
+///
+/// Usage:
+/// ```
+/// private func log(_ message: @autoclosure () -> String) {
+///   llvmDebug("my-pass-name", message())
+/// }
+/// ```
+///
+/// Or directly:
+/// ```
+/// llvmDebug("my-pass", "found \(thing)")
+/// ```
+public func llvmDebug(_ type: StaticString, _ message: @autoclosure () -> String) {
+  if _slowPath(Bridged_isDebugFlagEnabled()) {
+    let ref = BridgedStringRef(data: type.utf8Start, count: type.utf8CodeUnitCount)
+    if Bridged_isCurrentDebugType(ref) {
+      debugLog(message())
+    }
+  }
+}
+
 /// Let's lldb's `po` command not print any "internal" properties of the conforming type.
 ///
 /// This is useful if the `description` already contains all the information of a type instance.

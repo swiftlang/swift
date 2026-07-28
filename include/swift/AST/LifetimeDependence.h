@@ -337,6 +337,9 @@ public:
   bool hasAddressableParamIndices() const {
     return addressableParamIndices != nullptr;
   }
+  bool hasConditionallyAddressableParamIndices() const {
+    return conditionallyAddressableParamIndices != nullptr;
+  }
 
   unsigned getParamIndicesLength() const {
     if (hasInheritLifetimeParamIndices()) {
@@ -347,6 +350,9 @@ public:
     }
     if (hasAddressableParamIndices()) {
       return getAddressableIndices()->getCapacity();
+    }
+    if (hasConditionallyAddressableParamIndices()) {
+      return getConditionallyAddressableIndices()->getCapacity();
     }
     return 0;
   }

@@ -1,6 +1,5 @@
 // RUN: %target-swift-frontend -parse-as-library -O -import-objc-header %S/Inputs/bitfield.h -module-name=test %s -Xllvm -sil-print-types -emit-sil | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 
 var gg: Int = {
   print("gg init")

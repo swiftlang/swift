@@ -10,7 +10,6 @@
 // RUN:   -enable-experimental-feature AddressableTypes \
 // RUN:   -o /dev/null 2>&1 | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_Lifetimes
 // REQUIRES: swift_feature_AddressableParameters
 // REQUIRES: swift_feature_AddressableTypes

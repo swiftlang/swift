@@ -1,6 +1,5 @@
 // RUN: %target-sil-opt %s -compute-escape-effects | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: objc_interop
 // REQUIRES: PTRSIZE=64
 

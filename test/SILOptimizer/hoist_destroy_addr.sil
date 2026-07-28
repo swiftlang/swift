@@ -3,7 +3,6 @@
 //
 // TODO: migrate the remaining tests from destroy_hoisting.sil.
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_Lifetimes
 
 sil_stage canonical

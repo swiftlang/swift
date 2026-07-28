@@ -136,6 +136,7 @@ public:
 /// Use Mutex instead unless you need static allocation.  LazyMutex *may*
 /// be entirely statically initialized, on some platforms, but on others
 /// it might be a little larger than and slightly slower than Mutex.
+#if SWIFT_THREADING_HAS_LAZY_MUTEX
 class LazyMutex {
 
   LazyMutex(const LazyMutex &) = delete;
@@ -193,6 +194,7 @@ public:
   void lock() { threading_impl::lazy_mutex_unsafe_lock(Handle); }
   void unlock() { threading_impl::lazy_mutex_unsafe_unlock(Handle); }
 };
+#endif // SWIFT_THREADING_HAS_LAZY_MUTEX
 
 /// An indirect variant of a Mutex. This allocates the mutex on the heap, for
 /// places where having the mutex inline takes up too much space. Used for

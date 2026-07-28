@@ -1,7 +1,6 @@
 // RUN: %target-swift-frontend -module-name constant_propagation_stdlib %s -Xllvm -sil-print-types -emit-sil -enable-builtin-module -o -    | %FileCheck --check-prefix=CHECK-ONONE %s
 // RUN: %target-swift-frontend -module-name constant_propagation_stdlib %s -Xllvm -sil-print-types -emit-sil -enable-builtin-module -o - -O | %FileCheck --check-prefix=CHECK-O %s
 
-// REQUIRES: swift_in_compiler
 
 import Builtin
 

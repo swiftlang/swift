@@ -141,6 +141,10 @@ enum class FixKind : uint8_t {
   /// Allow access to type member on instance or instance member on type
   AllowTypeOrInstanceMember,
 
+  /// Allow access to a protocol metatype extension member through the
+  /// metatype of a conforming type.
+  AllowMetatypeExtensionMemberOnConformingType,
+
   /// Allow expressions where 'mutating' method is only partially applied,
   /// which means either not applied at all e.g. `Foo.bar` or only `Self`
   /// is applied e.g. `foo.bar` or `Foo.bar(&foo)`.
@@ -500,6 +504,15 @@ enum class FixKind : uint8_t {
 
   /// Ignore that a conformance is isolated but is not allowed to be.
   IgnoreIsolatedConformance,
+
+  /// Ignore passing `WritableKeyPath` to `ReferenceWritableKeyPath` mismatch
+  /// when trying to access a member using key path dynamic member lookup.
+  IgnoreClassRequirementForDynamicMemberLookup,
+
+  /// Ignore an attempt to convert between function types with different
+  /// execution semantics i.e. go from `@called(once)` to a regular function
+  /// type.
+  ExecutionSemanticsMismatch,
 };
 
 enum class FixImpact : unsigned {
@@ -1615,6 +1628,35 @@ public:
   }
 };
 
+class AllowMetatypeExtensionMemberOnConformingType final
+    : public AllowInvalidMemberRef {
+  AllowMetatypeExtensionMemberOnConformingType(
+      ConstraintSystem &cs, Type baseType, ValueDecl *member, DeclNameRef name,
+      ConstraintLocator *locator)
+      : AllowInvalidMemberRef(
+            cs, FixKind::AllowMetatypeExtensionMemberOnConformingType,
+            baseType, member, name, locator) {
+    ASSERT(member);
+  }
+
+public:
+  std::string getName() const override {
+    return "allow access to protocol metatype extension member on conforming "
+           "type";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  static AllowMetatypeExtensionMemberOnConformingType *
+  create(ConstraintSystem &cs, Type baseType, ValueDecl *member,
+         DeclNameRef usedName, ConstraintLocator *locator);
+
+  static bool classof(const ConstraintFix *fix) {
+    return fix->getKind() ==
+           FixKind::AllowMetatypeExtensionMemberOnConformingType;
+  }
+};
+
 class AllowInvalidPartialApplication final : public ConstraintFix {
   bool isWarning;
 
@@ -1631,6 +1673,12 @@ public:
   }
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  // May have overloaded methods being partially applied, causing ambiguity that
+  // does not currently impact diagnostic produced
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
+    return diagnose(*commonFixes.front().first);
+  }
 
   static AllowInvalidPartialApplication *create(bool isWarning,
                                                 ConstraintSystem &cs,
@@ -3956,11 +4004,13 @@ public:
 };
 
 class AllowInlineArrayLiteralCountMismatch final : public ConstraintFix {
-  Type lhsCount, rhsCount;
+  unsigned lhsCount, rhsCount;
 
-  AllowInlineArrayLiteralCountMismatch(ConstraintSystem &cs, Type lhsCount,
-                                Type rhsCount, ConstraintLocator *locator)
-      : ConstraintFix(cs, FixKind::AllowInlineArrayLiteralCountMismatch, locator),
+  AllowInlineArrayLiteralCountMismatch(ConstraintSystem &cs, unsigned lhsCount,
+                                       unsigned rhsCount,
+                                       ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::AllowInlineArrayLiteralCountMismatch,
+                      locator),
         lhsCount(lhsCount), rhsCount(rhsCount) {}
 
 public:
@@ -3971,7 +4021,7 @@ public:
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
   static AllowInlineArrayLiteralCountMismatch *
-  create(ConstraintSystem &cs, Type lhsCount, Type rhsCount,
+  create(ConstraintSystem &cs, unsigned lhsCount, unsigned rhsCount,
          ConstraintLocator *locator);
 
   static bool classof(const ConstraintFix *fix) {
@@ -4032,6 +4082,55 @@ public:
 
   static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::IgnoreIsolatedConformance;
+  }
+};
+
+class IgnoreClassRequirementForDynamicMemberLookup : public ConstraintFix {
+  Type BaseType;
+  ValueDecl *Member;
+
+  IgnoreClassRequirementForDynamicMemberLookup(ConstraintSystem &cs,
+                                               Type baseTy, ValueDecl *member,
+                                               ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::IgnoreClassRequirementForDynamicMemberLookup,
+                      locator),
+        BaseType(baseTy), Member(member) {}
+
+public:
+  std::string getName() const override {
+    return "ignore non-class base used for key path dynamic member lookup";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  static IgnoreClassRequirementForDynamicMemberLookup *
+  create(ConstraintSystem &cs, Type baseTy, ValueDecl *member,
+         ConstraintLocator *locator);
+
+  static bool classof(const ConstraintFix *fix) {
+    return fix->getKind() ==
+           FixKind::IgnoreClassRequirementForDynamicMemberLookup;
+  }
+};
+
+class ExecutionSemanticsMismatch final : public ContextualMismatch {
+  ExecutionSemanticsMismatch(ConstraintSystem &cs, FunctionType *fromType,
+                             FunctionType *toType, ConstraintLocator *locator)
+      : ContextualMismatch(cs, FixKind::ExecutionSemanticsMismatch, fromType,
+                           toType, locator) {}
+
+public:
+  std::string getName() const override { return "drop 'async' attribute"; }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  static ExecutionSemanticsMismatch *create(ConstraintSystem &cs,
+                                            FunctionType *fromType,
+                                            FunctionType *toType,
+                                            ConstraintLocator *locator);
+
+  static bool classof(const ConstraintFix *fix) {
+    return fix->getKind() == FixKind::ExecutionSemanticsMismatch;
   }
 };
 

@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -mandatory-redundant-load-elimination -predictable-deadalloc-elim  | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -mandatory-redundant-load-elimination -mandatory-dead-object-elimination  | %FileCheck %s
 
 sil_stage raw
 
@@ -36,87 +36,8 @@ sil @owned_user : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Bui
 // Tests //
 ///////////
 
-// CHECK-LABEL: sil [ossa] @simple_reg_promotion
-// CHECK: bb0(%0 : $Int):
-// CHECK-NEXT: return %0 : $Int
-sil [ossa] @simple_reg_promotion : $@convention(thin) (Int) -> Int {
-bb0(%0 : $Int):
-  %1 = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
-  %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <Int>, 0
-  store %0 to [trivial] %1a : $*Int
-  %3 = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
-  %3a = project_box %3 : $<τ_0_0> { var τ_0_0 } <Int>, 0
-  %4 = load [trivial] %1a : $*Int
-  store %4 to [trivial] %3a : $*Int
-  %6 = load [trivial] %3a : $*Int
-  destroy_value %3 : $<τ_0_0> { var τ_0_0 } <Int>
-  destroy_value %1 : $<τ_0_0> { var τ_0_0 } <Int>
-  return %6 : $Int
-}
-
-// Verify that promotion has promoted the tuple load away, and we know that
-// %0 is being returned through scalar instructions in SSA form.
-//
-// CHECK-LABEL: sil [ossa] @tuple_reg_promotion
-// CHECK: bb0(%0 : $Int):
-// CHECK-NEXT: [[TUPLE:%[0-9]+]] = tuple ({{.*}} : $Int, {{.*}} : $Int)
-// CHECK-NEXT: [[TUPLE_ELT:%[0-9]+]] = tuple_extract [[TUPLE]] : $(Int, Int), 0
-// CHECK-NEXT: return [[TUPLE_ELT]] : $Int
-sil [ossa] @tuple_reg_promotion : $@convention(thin) (Int) -> Int {
-bb0(%0 : $Int):
-  %1 = alloc_box $<τ_0_0> { var τ_0_0 } <(Int, Int)>
-  %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <(Int, Int)>, 0
-  %a = tuple_element_addr %1a : $*(Int, Int), 0
-  %b = tuple_element_addr %1a : $*(Int, Int), 1
-  store %0 to [trivial] %a : $*Int
-  store %0 to [trivial] %b : $*Int
-  %c = load [trivial] %1a : $*(Int, Int)
-  %d = tuple_extract %c : $(Int, Int), 0
-  destroy_value %1 : $<τ_0_0> { var τ_0_0 } <(Int, Int)>
-  return %d : $Int
-}
-
 sil @takes_Int_inout : $@convention(thin) (@inout Int) -> ()
 sil @takes_NativeObject_inout : $@convention(thin) (@inout Builtin.NativeObject) -> ()
-
-// Verify that load promotion works properly with inout arguments.
-//
-// func used_by_inout(a : Int) -> (Int, Int) {
-//  var t = a
-//  takes_Int_inout(&a)
-//  return (t, a)
-//}
-//
-// CHECK-LABEL: sil [ossa] @used_by_inout : $@convention(thin) (Int) -> (Int, Int) {
-// CHECK: bb0([[ARG:%.*]] : $Int):
-sil [ossa] @used_by_inout : $@convention(thin) (Int) -> (Int, Int) {
-bb0(%0 : $Int):
-  // This alloc_stack can't be removed since it is used by an inout call.
-  // CHECK: [[BOX:%.*]] = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
-  // CHECK: [[PB_BOX:%.*]] = project_box [[BOX]]
-  %1 = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
-  %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <Int>, 0
-  store %0 to [trivial] %1a : $*Int
-
-  // This load should be eliminated.
-  // CHECK-NOT: load
-  // CHECK: [[FUNC:%.*]] = function_ref @takes_Int_inout : $@convention(thin) (@inout Int) -> ()
-  // CHECK: apply [[FUNC]]([[PB_BOX]])
-  %3 = load [trivial] %1a : $*Int
-  %5 = function_ref @takes_Int_inout : $@convention(thin) (@inout Int) -> ()
-  %6 = apply %5(%1a) : $@convention(thin) (@inout Int) -> ()
-
-  // This load is needed in case the callee modifies the allocation.
-  // CHECK: [[RES:%[0-9]+]] = load [trivial] [[PB_BOX]]
-  %7 = load [trivial] %1a : $*Int
-
-  // This should use the incoming argument to the function.
-  // CHECK: tuple ([[ARG]] : $Int, [[RES]] : $Int)
-  %8 = tuple (%3 : $Int, %7 : $Int)
-  destroy_value %1 : $<τ_0_0> { var τ_0_0 } <Int>
-  return %8 : $(Int, Int)
-}
-
 
 struct AddressOnlyStruct {
   var a : Any
@@ -128,28 +49,6 @@ sil @returns_generic_struct : $@convention(thin) () -> @out AddressOnlyStruct
 
 sil @takes_closure : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
 sil @closure0 : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Int>) -> ()
-
-
-// CHECK-LABEL: sil [ossa] @closure_test2
-sil [ossa] @closure_test2 : $@convention(thin) (Int) -> Int {
-bb0(%1 : $Int):
-  %0 = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
-  %0a = project_box %0 : $<τ_0_0> { var τ_0_0 } <Int>, 0
-  store %1 to [trivial] %0a : $*Int  // CHECK: store
-
-  %5 = function_ref @takes_closure : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
-  %6 = function_ref @closure0 : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Int>) -> ()
-  %0Copy = copy_value %0 : $<τ_0_0> { var τ_0_0 } <Int>
-  %8 = partial_apply %6(%0Copy) : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Int>) -> ()
-  %9 = apply %5(%8) : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
-  destroy_value %0 : $<τ_0_0> { var τ_0_0 } <Int>
-
-  store %1 to [trivial] %0a : $*Int // CHECK: store
-
-  %r = load [trivial] %0a : $*Int
-  // CHECK: return %0
-  return %r : $Int
-}
 
 class SomeClass {}
 
@@ -552,12 +451,12 @@ bb3:
 
 // This test makes sure that we insert the tuple_extracts that we need before
 // the store in bb0, not at the load block.
-// TODO: this is currently not optimized
 // CHECK-LABEL: sil [ossa] @diamond_test_2 : $@convention(thin) (@owned NativeObjectPair) -> @owned Builtin.NativeObject {
+// CHECK-NOT:     alloc_stack
 // CHECK:       bb1:
-// CHECK:         load [copy]
+// CHECK:         copy_value
 // CHECK:       bb2:
-// CHECK:         load [copy]
+// CHECK:         copy_value
 // CHECK:       } // end sil function 'diamond_test_2'
 sil [ossa] @diamond_test_2 : $@convention(thin) (@owned NativeObjectPair) -> @owned Builtin.NativeObject {
 bb0(%0 : @owned $NativeObjectPair):
@@ -585,10 +484,11 @@ bb3(%6 : @owned $Builtin.NativeObject):
 // TODO: this is currently not optimized
 //
 // CHECK-LABEL: sil [ossa] @diamond_test_3 : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
+// CHECK-NOT:     alloc_stack
 // CHECK:       bb1:
-// CHECK:         load [copy]
+// CHECK:         copy_value
 // CHECK:       bb2:
-// CHECK:         load [copy]
+// CHECK:         copy_value
 // CHECK:       } // end sil function 'diamond_test_3'
 sil [ossa] @diamond_test_3 : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
 bb0(%0 : @owned $Builtin.NativeObject, %1 : @owned $Builtin.NativeObject):
@@ -640,9 +540,9 @@ struct NativeObjectTriple {
 // CHECK-NEXT: end_borrow [[BORROWED_ARG1]]
 // CHECK-NEXT: br bb3([[PAIR_LHS_COPY]] :
 //
-// CHECK: bb3([[PHI:%.*]] : @owned $Builtin.NativeObject):
-// CHECK: [[REFORMED:%.*]] = struct $NativeObjectTriple ([[ARG0]] : {{.*}}, [[ARG1]] : {{.*}})
-// CHECK: destroy_value [[REFORMED]]
+// CHECK: bb3([[PHI:%[0-9]*]] : @owned $Builtin.NativeObject{{.*}}):
+// CHECK: destroy_value
+// CHECK: destroy_value
 // CHECK: return [[PHI]]
 // CHECK: } // end sil function 'diamond_test_4'
 sil [ossa] @diamond_test_4 : $@convention(thin) (@owned Builtin.NativeObject, @owned NativeObjectPair) -> @owned Builtin.NativeObject {
@@ -675,11 +575,9 @@ bb3:
 
 // Make sure that we do the right thing if our definite init value is partially
 // overridden along one path
-// TODO: this is currently not optimized
 //
 // CHECK-LABEL: sil [ossa] @diamond_test_5 : $@convention(thin) (@owned Builtin.NativeObject, @owned NativeObjectPair, @owned Builtin.NativeObject) -> @owned NativeObjectPair {
-// CHECK:       bb4:
-// CHECK:         load [copy]
+// CHECK-NOT:     alloc_stack
 // CHECK:       } // end sil function 'diamond_test_5'
 sil [ossa] @diamond_test_5 : $@convention(thin) (@owned Builtin.NativeObject, @owned NativeObjectPair, @owned Builtin.NativeObject) -> @owned NativeObjectPair {
 bb0(%0 : @owned $Builtin.NativeObject, %1 : @owned $NativeObjectPair, %arg2 : @owned $Builtin.NativeObject):
@@ -709,10 +607,8 @@ bb4:
   return %13 : $NativeObjectPair
 }
 
-// TODO: this is currently not optimized
 // CHECK-LABEL: sil [ossa] @diamond_test_6 : $@convention(thin) (@owned Builtin.NativeObject, @owned NativeObjectPair, @owned Builtin.NativeObject) -> @owned NativeObjectPair {
-// CHECK:       bb9:
-// CHECK:         load [copy]
+// CHECK-NOT:     alloc_stack
 // CHECK:       } // end sil function 'diamond_test_6'
 sil [ossa] @diamond_test_6 : $@convention(thin) (@owned Builtin.NativeObject, @owned NativeObjectPair, @owned Builtin.NativeObject) -> @owned NativeObjectPair {
 bb0(%0 : @owned $Builtin.NativeObject, %1 : @owned $NativeObjectPair, %arg2 : @owned $Builtin.NativeObject):
@@ -806,11 +702,8 @@ bb0(%arg : @owned $K):
   return %4 : $SWithOpt
 }
 
-// We do not support this now, so make sure we do not do anything.
-//
 // CHECK-LABEL: sil [ossa] @promote_init_enum_data_addr : $@convention(thin)
-// CHECK: alloc_stack
-// CHECK: load
+// CHECK-NOT:     alloc_stack
 // CHECK: [[RESULT:%.*]] = load
 // CHECK: return [[RESULT]]
 // CHECK: } // end sil function 'promote_init_enum_data_addr'
@@ -841,12 +734,8 @@ bb0(%0 : @owned $NativeObjectPair, %1 : @owned $Builtin.NativeObject):
   return %9999 : $()
 }
 
-// We shouldn't promote this as well since we do not support this load [take]
-// version of store [assign]. With time, we could.
-//
 // CHECK-LABEL: sil [ossa] @promote_partial_store_split_assign : $@convention(thin) (@owned NativeObjectPair, @owned Builtin.NativeObject) -> () {
-// CHECK: alloc_stack
-// CHECK: load [take]
+// CHECK-NOT:     alloc_stack
 // CHECK: } // end sil function 'promote_partial_store_split_assign'
 sil [ossa] @promote_partial_store_split_assign : $@convention(thin) (@owned NativeObjectPair, @owned Builtin.NativeObject) -> () {
 bb0(%0 : @owned $NativeObjectPair, %1 : @owned $Builtin.NativeObject):
@@ -864,9 +753,8 @@ bb0(%0 : @owned $NativeObjectPair, %1 : @owned $Builtin.NativeObject):
 }
 
 // Loop case.
-// TODO: this is currently not optimized
 // CHECK-LABEL: sil [ossa] @promote_with_loop_1 : $@convention(thin) (@owned NativeObjectPair) -> () {
-// CHECK:         load [copy]
+// CHECK-NOT:     alloc_stack
 // CHECK:       } // end sil function 'promote_with_loop_1'
 sil [ossa] @promote_with_loop_1 : $@convention(thin) (@owned NativeObjectPair) -> () {
 bb0(%0 : @owned $NativeObjectPair):
@@ -889,9 +777,8 @@ bb4:
   unreachable
 }
 
-// TODO: this is currently not optimized
 // CHECK-LABEL: sil [ossa] @promote_with_loop_2 : $@convention(thin) (@owned NativeObjectPair) -> () {
-// CHECK:         load [copy]
+// CHECK-NOT:     alloc_stack
 // CHECK:       } // end sil function 'promote_with_loop_2'
 sil [ossa] @promote_with_loop_2 : $@convention(thin) (@owned NativeObjectPair) -> () {
 bb0(%0 : @owned $NativeObjectPair):
@@ -917,12 +804,12 @@ bb4:
   return %9999 : $()
 }
 
-// TODO: this is currently not optimized
 // CHECK-LABEL: sil [ossa] @two_backedge_loop : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CHECK-NOT:     alloc_stack
 // CHECK:       bb3:
-// CHECK:         load [copy]
+// CHECK:         copy_value
 // CHECK:       bb4:
-// CHECK:         load [copy]
+// CHECK:         copy_value
 // CHECK:       } // end sil function 'two_backedge_loop'
 sil [ossa] @two_backedge_loop : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 bb0(%0 : @owned $Builtin.NativeObject):
@@ -965,12 +852,12 @@ bb9:
   return %9999 : $()
 }
 
-// TODO: this is currently not optimized
 // CHECK-LABEL: sil [ossa] @two_backedge_loop_with_take : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CHECK-NOT:     alloc_stack
 // CHECK:       bb3:
-// CHECK:         load [copy]
+// CHECK:         copy_value
 // CHECK:       bb4:
-// CHECK:         load [copy]
+// CHECK:         copy_value
 // CHECK:       } // end sil function 'two_backedge_loop_with_take'
 sil [ossa] @two_backedge_loop_with_take : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 bb0(%0 : @owned $Builtin.NativeObject):
@@ -1022,7 +909,7 @@ bb9:
 // 3a.
 //
 // CHECK-LABEL: sil [ossa] @load_take_invalidates : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Optional<Builtin.NativeObject> {
-// CHECK: load_borrow
+// CHECK-NOT:     alloc_stack
 // CHECK: } // end sil function 'load_take_invalidates'
 sil [ossa] @load_take_invalidates : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Optional<Builtin.NativeObject> {
 bb0(%0 : @owned $Builtin.NativeObject):

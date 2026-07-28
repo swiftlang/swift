@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-silgen %s -parse-as-library -enable-library-evolution -module-name Test | %FileCheck %s --check-prefixes=CHECK,CHECK-NO-SKIP
 // RUN: %target-swift-frontend -emit-silgen %s -parse-as-library -enable-library-evolution -module-name Test -experimental-skip-non-exportable-decls | %FileCheck %s --check-prefixes=CHECK,CHECK-SKIP

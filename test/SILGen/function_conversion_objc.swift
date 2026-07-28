@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -Xllvm -sil-print-types -module-name function_conversion_objc -sdk %S/Inputs %s -I %S/Inputs -enable-source-import -enable-objc-interop -verify
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name function_conversion_objc -sdk %S/Inputs %s -I %S/Inputs -enable-source-import -enable-objc-interop -verify | %FileCheck %s
 
 import Foundation

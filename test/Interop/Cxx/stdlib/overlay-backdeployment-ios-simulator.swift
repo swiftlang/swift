@@ -1,4 +1,4 @@
-// RUN: %swift -c %s -cxx-interoperability-mode=default -target arm64-apple-ios7.0-simulator
+// RUN: %swift -c %s -cxx-interoperability-mode=default -target %target-cpu-apple-ios7.0-simulator
 
 // REQUIRES: DARWIN_SIMULATOR=ios
 

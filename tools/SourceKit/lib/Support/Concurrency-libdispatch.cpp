@@ -159,15 +159,6 @@ void WorkQueue::Impl::dispatchBarrier(Ty Obj, const DispatchData &Fn) {
   dispatch_barrier_async_f(queue, Context, CFn);
 }
 
-void WorkQueue::Impl::dispatchBarrierSync(Ty Obj, const DispatchData &Fn) {
-  void *Context;
-  WorkQueue::DispatchFn CFn;
-  std::tie(Context, CFn) = toCFunction(Fn.getContext(), Fn.getFunction(),
-                                       Fn.isStackDeep());
-  dispatch_queue_t queue = dispatch_queue_t(Obj);
-  dispatch_barrier_sync_f(queue, Context, CFn);
-}
-
 void WorkQueue::Impl::dispatchOnMain(const DispatchData &Fn) {
   void *Context;
   WorkQueue::DispatchFn CFn;

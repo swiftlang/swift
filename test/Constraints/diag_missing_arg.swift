@@ -193,3 +193,13 @@ do {
     // expected-error@-1 {{cannot convert value of type '() -> Void' to expected argument type '(Int) -> Void'}}
   }
 }
+
+// https://github.com/swiftlang/swift/issues/83911
+do {
+  func compute<R>(_: Int = 42, _: () -> R) -> R {} // expected-note {{'compute' declared here}}
+  func compute<R>(_: Int = 42, _: () -> R, completion: @escaping () -> Void) -> R {}
+
+  func test() {
+    compute() // expected-error {{missing argument for parameter #2 in call}}
+  }
+}

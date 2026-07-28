@@ -45,6 +45,10 @@ Enable build caching using LLVM CAS to speed up rebuilds.
 Include Software Bill of Materials generation using syft. Used for compliance
 tracking.
 
+.PARAMETER DownloadRetryCount
+The number of attempts to make when downloading a dependency before giving up.
+Default: 3
+
 .PARAMETER ProductVersion
 The product version to be used when building the installer. Supports semantic
 version strings (e.g., "1.0.0"). Default: "0.0.0"
@@ -66,10 +70,6 @@ system.  Valid values: AMD64, ARM64
 Include debug information in the builds. Useful for debugging the toolchain
 itself.
 Note: This significantly increases build time and disk usage.
-
-.PARAMETER DebugFormat
-The debug information format for. Valid values: dwarf, codeview.
-Default: codeview
 
 .PARAMETER Android
 Build Android SDKs. Requires Android NDK to be available.
@@ -151,6 +151,10 @@ param
   [switch] $IncludeSBoM = $false,
   [string] $SyftVersion = "1.40.0",
 
+  # Dependency Download Retries
+  [ValidateRange(1, [int]::MaxValue)]
+  [int] $DownloadRetryCount = 3,
+
   # Dependencies
   [ValidatePattern('^\d+(\.\d+)*$')]
   [string] $PythonVersion = "3.10.1",
@@ -168,8 +172,6 @@ param
 
   # Debug Information
   [switch] $DebugInfo,
-  [ValidateSet("codeview", "dwarf")]
-  [string] $DebugFormat = "codeview",
 
   # Android SDK Options
   [switch] $Android = $false,
@@ -283,6 +285,7 @@ $KnownPlatforms = @{
     BinaryDir = "bin64a";
     Cache = @{};
     LinkModes = $WindowsSDKLinkModes;
+    DebugFormat = "codeview";
   };
 
   WindowsX64 = @{
@@ -297,6 +300,7 @@ $KnownPlatforms = @{
     BinaryDir = "bin64";
     Cache = @{};
     LinkModes = $WindowsSDKLinkModes;
+    DebugFormat = "codeview";
   };
 
   WindowsX86  = @{
@@ -311,6 +315,7 @@ $KnownPlatforms = @{
     BinaryDir = "bin32";
     Cache = @{};
     LinkModes = $WindowsSDKLinkModes;
+    DebugFormat = "codeview";
   };
 
   AndroidARMv7 = @{
@@ -325,6 +330,7 @@ $KnownPlatforms = @{
     BinaryDir = "bin32a";
     Cache = @{};
     LinkModes = $AndroidSDKLinkModes;
+    DebugFormat = "dwarf";
   };
 
   AndroidARM64 = @{
@@ -339,6 +345,7 @@ $KnownPlatforms = @{
     BinaryDir = "bin64a";
     Cache = @{};
     LinkModes = $AndroidSDKLinkModes;
+    DebugFormat = "dwarf";
   };
 
   AndroidX86 = @{
@@ -353,6 +360,7 @@ $KnownPlatforms = @{
     BinaryDir = "bin32";
     Cache = @{};
     LinkModes = $AndroidSDKLinkModes;
+    DebugFormat = "dwarf";
   };
 
   AndroidX64 = @{
@@ -367,6 +375,7 @@ $KnownPlatforms = @{
     BinaryDir = "bin64";
     Cache = @{};
     LinkModes = $AndroidSDKLinkModes;
+    DebugFormat = "dwarf";
   };
 }
 
@@ -1492,10 +1501,23 @@ function Get-Dependencies {
       if (Test-Path $Destination) { return }
 
       New-Item -ItemType Directory (Split-Path -Path $Destination -Parent) -ErrorAction Ignore | Out-Null
-      $WebClient.DownloadFile($URL, $Destination)
-      $SHA256 = Get-FileHash -Path $Destination -Algorithm SHA256
-      if ($SHA256.Hash -ne $Hash) {
-        throw "SHA256 mismatch ($($SHA256.Hash) vs $Hash)"
+
+      for ($Attempt = 1; $Attempt -le $DownloadRetryCount; $Attempt++) {
+        try {
+          $WebClient.DownloadFile($URL, $Destination)
+          $SHA256 = Get-FileHash -Path $Destination -Algorithm SHA256
+          if ($SHA256.Hash -ne $Hash) {
+            throw "SHA256 mismatch ($($SHA256.Hash) vs $Hash)"
+          }
+          return
+        } catch {
+          Remove-Item -Path $Destination -ErrorAction Ignore
+          if ($Attempt -eq $DownloadRetryCount) {
+            throw
+          }
+          Write-Warning "Download of $URL failed (attempt $Attempt/$DownloadRetryCount): $_"
+          Start-Sleep -Seconds ([Math]::Pow(2, $Attempt))
+        }
       }
     }
 
@@ -1798,14 +1820,6 @@ function Get-SDKLibexecDir([Hashtable] $Platform, [string] $SDKRoot, [bool] $Ins
   return [IO.Path]::Combine($SDKRoot, "usr", "libexec")
 }
 
-function Resolve-SDKRuntimeBin([Hashtable] $Platform, [string] $SDKRoot, [bool] $InstallRuntimeToStage = $true) {
-  $RuntimeBin = Get-SDKRuntimeBin $Platform $SDKRoot $InstallRuntimeToStage
-  if (Test-Path $RuntimeBin -PathType Container) {
-    return $RuntimeBin
-  }
-  return [IO.Path]::Combine($SDKRoot, "usr", "bin")
-}
-
 enum DriverStyle {
   CL
   ClangCL
@@ -1863,9 +1877,10 @@ $Compilers = @{
       Flags             = @()
       DebugFlags        = { param([string] $Format)
         if ($Format -eq "dwarf") {
-          return @("-g", "-debug-info-format=dwarf", "-use-ld=lld-link", "-Xlinker", "/DEBUG:DWARF")
+          @("-g", "-debug-info-format=dwarf")
+        } else {
+          @("-g", "-debug-info-format=codeview", "-Xlinker", "/DEBUG")
         }
-        return @("-g", "-debug-info-format=codeview", "-Xlinker", "/DEBUG")
       }
       AssumeFunctional  = $false
     }
@@ -1917,11 +1932,11 @@ $Compilers = @{
       DriverStyle       = [DriverStyle]::Swift
       Flags             = @()
       DebugFlags        = { param([string] $Format)
-        if ($Format -eq $null) { return @("-gnone") }
         if ($Format -eq "dwarf") {
-          return @("-g", "-debug-info-format=dwarf", "-use-ld=lld-link", "-Xlinker", "/DEBUG:DWARF")
+          @("-g", "-debug-info-format=dwarf")
+        } else {
+          @("-g", "-debug-info-format=codeview", "-Xlinker", "/DEBUG")
         }
-        return @("-g", "-debug-info-format=codeview", "-Xlinker", "/DEBUG")
       }
       AssumeFunctional  = $true
     }
@@ -1973,11 +1988,11 @@ $Compilers = @{
       DriverStyle       = [DriverStyle]::Swift
       Flags             = @()
       DebugFlags        = { param([string] $Format)
-        if ($Format -eq $null) { return @("-gnone") }
         if ($Format -eq "dwarf") {
-          return @("-g", "-debug-info-format=dwarf", "-use-ld=lld-link", "-Xlinker", "/DEBUG:DWARF")
+          @("-g", "-debug-info-format=dwarf")
+        } else {
+          @("-g", "-debug-info-format=codeview", "-Xlinker", "/DEBUG")
         }
-        return @("-g", "-debug-info-format=codeview", "-Xlinker", "/DEBUG")
       }
       AssumeFunctional  = $true
     }
@@ -2065,7 +2080,7 @@ function Build-CMakeProject {
     $UseC = $CCompiler -ne $null
     $UseCXX = $CXXCompiler -ne $null
     $UseSwift = $SwiftCompiler -ne $null
-    $UseMSVC = ($UseC -and $CCompiler.DriverStyle -eq [DriverStyle]::CL) -or ($UseCXX -and $CXXCompiler.DriverStyle -eq [DriverStyle]::CL)
+    $PlatformDebugFormat = $Platform.DebugFormat
 
     # Starting with CMake 3.30, CMake propagates linker flags to Swift.
     $CMakePassesSwiftLinkerFlags = $CMakeVersion -ge [version]'3.30'
@@ -2172,7 +2187,7 @@ function Build-CMakeProject {
             # the Embedded format. Provide the mapping before setting the global
             # CMAKE_MSVC_DEBUG_INFORMATION_FORMAT below.
             Add-FlagsDefine $Defines CMAKE_ASM_COMPILE_OPTIONS_MSVC_DEBUG_INFORMATION_FORMAT_Embedded `
-              $(& $Assembler.DebugFlags $DebugFormat)
+              $(& $Assembler.DebugFlags $PlatformDebugFormat)
           }
         }
 
@@ -2193,7 +2208,7 @@ function Build-CMakeProject {
           Add-FlagsDefine $Defines CMAKE_C_FLAGS $CCompiler.Flags
 
           if ($DebugInfo) {
-            Add-FlagsDefine $Defines CMAKE_C_FLAGS $(& $CCompiler.DebugFlags $DebugFormat)
+            Add-FlagsDefine $Defines CMAKE_C_FLAGS $(& $CCompiler.DebugFlags $PlatformDebugFormat)
           }
         }
 
@@ -2215,7 +2230,7 @@ function Build-CMakeProject {
           }
 
           if ($DebugInfo) {
-            Add-FlagsDefine $Defines CMAKE_CXX_FLAGS $(& $CXXCompiler.DebugFlags $DebugFormat)
+            Add-FlagsDefine $Defines CMAKE_CXX_FLAGS $(& $CXXCompiler.DebugFlags $PlatformDebugFormat)
           }
         }
 
@@ -2234,7 +2249,7 @@ function Build-CMakeProject {
             Add-FlagsDefine $Defines CMAKE_Swift_FLAGS @("-sdk", $SwiftSDK)
           }
           if ($DebugInfo) {
-            Add-FlagsDefine $Defines CMAKE_Swift_FLAGS $(& $SwiftCompiler.DebugFlags $DebugFormat)
+            Add-FlagsDefine $Defines CMAKE_Swift_FLAGS $(& $SwiftCompiler.DebugFlags $PlatformDebugFormat)
           } else {
             Add-FlagsDefine $Defines CMAKE_Swift_FLAGS @("-gnone")
           }
@@ -2268,16 +2283,7 @@ function Build-CMakeProject {
             # is no need to set them explicitly above.
             Add-KeyValueIfNew $Defines CMAKE_MSVC_DEBUG_INFORMATION_FORMAT Embedded
             Add-KeyValueIfNew $Defines CMAKE_POLICY_DEFAULT_CMP0141 NEW
-
             Add-LinkerFlagsDefine $Defines @("/DEBUG")
-
-            # The linker flags are shared across every language, and `/IGNORE:longsections` is an
-            # `lld-link.exe` argument, not `link.exe`, so this can only be enabled when we use
-            # `lld-link.exe` for linking.
-            # TODO: Investigate supporting fission with PE/COFF, this should avoid this warning.
-            if ($DebugFormat -eq "dwarf" -and -not $UseMSVC) {
-              Add-LinkerFlagsDefine $Defines @("/IGNORE:longsections")
-            }
           }
         }
       }
@@ -2299,7 +2305,7 @@ function Build-CMakeProject {
           Add-KeyValueIfNew $Defines CMAKE_C_COMPILER_TARGET $Platform.Triple
           Add-FlagsDefine $Defines CMAKE_C_FLAGS $CCompiler.Flags
           if ($DebugInfo) {
-            Add-FlagsDefine $Defines CMAKE_C_FLAGS $(& $CCompiler.DebugFlags $DebugFormat)
+            Add-FlagsDefine $Defines CMAKE_C_FLAGS $(& $CCompiler.DebugFlags $PlatformDebugFormat)
           }
         }
 
@@ -2307,7 +2313,7 @@ function Build-CMakeProject {
           Add-KeyValueIfNew $Defines CMAKE_CXX_COMPILER_TARGET $Platform.Triple
           Add-FlagsDefine $Defines CMAKE_CXX_FLAGS $CXXCompiler.Flags
           if ($DebugInfo) {
-            Add-FlagsDefine $Defines CMAKE_CXX_FLAGS $(& $CXXCompiler.DebugFlags $DebugFormat)
+            Add-FlagsDefine $Defines CMAKE_CXX_FLAGS $(& $CXXCompiler.DebugFlags $PlatformDebugFormat)
           }
         }
 
@@ -2332,7 +2338,7 @@ function Build-CMakeProject {
             Add-FlagsDefine $Defines CMAKE_Swift_FLAGS @("-sdk", $SwiftSDK, "-sysroot", $AndroidSysroot)
           }
           if ($DebugInfo) {
-            Add-FlagsDefine $Defines CMAKE_Swift_FLAGS (& $SwiftCompiler.DebugFlags $DebugFormat)
+            Add-FlagsDefine $Defines CMAKE_Swift_FLAGS $(& $SwiftCompiler.DebugFlags $PlatformDebugFormat)
           } else {
             Add-FlagsDefine $Defines CMAKE_Swift_FLAGS @("-gnone")
           }
@@ -2531,7 +2537,7 @@ function Build-SPMProject {
   Invoke-IsolatingEnvVars {
 
     $HostSDKRoot = Get-SwiftSDK -OS $HostPlatform.OS
-    $HostRuntimeBin = Resolve-SDKRuntimeBin $HostPlatform $HostSDKRoot
+    $HostRuntimeBin = Get-SDKRuntimeBin $HostPlatform $HostSDKRoot
     $env:Path = "$HostRuntimeBin;$($HostPlatform.ToolchainInstallRoot)\usr\bin;${env:Path}"
     $env:SDKROOT = $HostSDKRoot
     $env:SWIFTCI_USE_LOCAL_DEPS = "1"
@@ -2542,11 +2548,7 @@ function Build-SPMProject {
       "-c", $Configuration
     )
     if ($DebugInfo) {
-      if ($Platform.OS -eq [OS]::Windows -and $DebugFormat -eq "codeview") {
-        $Arguments += @("-debug-info-format", "codeview")
-      } else {
-        $Arguments += @("-debug-info-format", "dwarf")
-      }
+      $Arguments += @("-debug-info-format", $Platform.DebugFormat)
     } else {
       $Arguments += @("-debug-info-format", "none")
     }
@@ -3278,7 +3280,7 @@ function Set-WindowsSxSToolchainRuntimePerDLL {
 function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $TestClang, [switch] $TestLLD, [switch] $TestLLDB, [switch] $TestLLDBSwift, [switch] $TestLLVM, [switch] $TestSwift) {
   Invoke-IsolatingEnvVars {
     $SwiftSDK = Get-SwiftSDK -OS $Platform.OS
-    $SwiftRuntime = Resolve-SDKRuntimeBin $Platform $SwiftSDK
+    $SwiftRuntime = Get-SDKRuntimeBin $Platform $SwiftSDK
     $Stage2BinDir = [IO.Path]::Combine((Get-ProjectBinaryCache $Platform Stage2Compilers), "bin")
     $CDispatchBinaryCache = Get-ProjectBinaryCache $Platform DynamicCDispatch
     $env:Path = "$SwiftRuntime;$Stage2BinDir;$CDispatchBinaryCache;$CDispatchBinaryCache\bin;$(Get-CMarkBinaryCache $Platform)\src;$env:Path;$VSInstallRoot\DIA SDK\bin\$($HostPlatform.Architecture.VSName);$UnixToolsBinDir"
@@ -3291,14 +3293,16 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
     $TestingDefines["SWIFT_BUILD_LIBEXEC"] = "YES"
     # Keep %host-build-swift on the same platform SDK that Stage2 uses.
     $TestingDefines["SWIFT_HOST_SDKROOT"] = $SwiftSDK
+    $Targets = @()
     if ($TestLLVM) { $Targets += @("check-llvm") }
     if ($TestClang) { $Targets += @("check-clang") }
     if ($TestLLD) { $Targets += @("check-lld") }
     if ($TestSwift) {
       $Targets += @("SwiftCompilerPlugin", "check-swift")
     }
-    if ($TestLLDB) { $Targets += @("check-lldb") }
-    if ($TestLLDBSwift) { $Targets += @("check-lldb-swift") }
+    $LLDBTargets = @()
+    if ($TestLLDB) { $LLDBTargets += @("check-lldb") }
+    if ($TestLLDBSwift) { $LLDBTargets += @("check-lldb-swift") }
     if ($TestLLDB -or $TestLLDBSwift) {
       # Override test filter for known issues in downstream LLDB
       Load-LitTestOverrides ([IO.Path]::GetFullPath([IO.Path]::Combine($PSScriptRoot, "..", "..", "llvm-project", "lldb", "test", "windows-swift-llvm-lit-test-overrides.txt")))
@@ -3328,6 +3332,7 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
         # No watchpoint support on windows: https://github.com/llvm/llvm-project/issues/24820
         LLDB_TEST_USER_ARGS = "--skip-category=watchpoint;--sysroot=$SwiftSDK";
         LLDB_TEST_SWIFT_DRIVER_EXTRA_FLAGS = "-sdk '$SwiftSDK'"
+        LLDB_TEST_INFERIOR_RUNTIME_BIN = "$SwiftRuntime";
         # gtest sharding breaks llvm-lit's --xfail and LIT_XFAIL inputs: https://github.com/llvm/llvm-project/issues/102264
         LLVM_LIT_ARGS = "-v --no-gtest-sharding --time-tests";
         # LLDB Unit tests link against this library
@@ -3335,7 +3340,7 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
       }
     }
 
-    if (-not $Targets) {
+    if ((-not $Targets) -and (-not $LLDBTargets)) {
       Write-Warning "Test-Compilers invoked without specifying test target(s)."
     }
 
@@ -3402,7 +3407,9 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
                                    "sourcekitd-test.exe",
                                    "swift-ide-test.exe",
                                    "swift-plugin-server.exe",
-                                   "swiftc-legacy-driver.exe"
+                                   "swiftc-legacy-driver.exe",
+                                   "lldb.exe",
+                                   "repl_swift.exe"
                                  )
       # SxS only probes the EXE's own directory for the named assembly.
       if (Test-Path (Join-Path $Stage2LibexecSwiftDir "swift-backtrace.exe")) {
@@ -3421,8 +3428,14 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
     # that load them, otherwise the linker races with memory-mapped DLLs
     # causing LNK1104. Build swift-test-stdlib first to enforce ordering.
     $Targets = @("swift-test-stdlib") + $Targets
-
     Build-CMakeProject @BuildCMakeArgs -BuildTargets $Targets
+
+    if ($LLDBTargets) {
+      Invoke-IsolatingEnvVars {
+        $env:SDKROOT = $SwiftSDK
+        Build-CMakeProject @BuildCMakeArgs -BuildTargets $LLDBTargets
+      }
+    }
   }
 }
 
@@ -5668,6 +5681,7 @@ function Build-Installer([Hashtable] $Platform) {
 
 function Copy-BuildArtifactsToStage([Hashtable] $Platform) {
   # Save the installer binary log
+  if (-not $Package) { return }
   Copy-File "$BinaryCache\$($Platform.Triple)\msi\$($Platform.Architecture.VSName)-$([System.IO.Path]::GetFileNameWithoutExtension("bundle\installer.wixproj")).binlog" $Stage
   Copy-File "$BinaryCache\$($Platform.Triple)\installer\Release\$($Platform.Architecture.VSName)\*.cab" $Stage
   Copy-File "$BinaryCache\$($Platform.Triple)\installer\Release\$($Platform.Architecture.VSName)\*.msi" $Stage
@@ -5939,7 +5953,7 @@ if ($Toolchain) {
 
   if ($HostPlatform.OS -eq [OS]::Windows) {
     $HostSDKRoot = Get-SwiftSDK -OS $HostPlatform.OS
-    $HostRuntimeBin = Resolve-SDKRuntimeBin $HostPlatform $HostSDKRoot
+    $HostRuntimeBin = Get-SDKRuntimeBin $HostPlatform $HostSDKRoot
     Invoke-BuildStep Stage-WindowsToolchainSxS $HostPlatform @{
       ToolchainRoot   = $HostPlatform.ToolchainInstallRoot;
       RuntimeLocation = $HostRuntimeBin;
@@ -6020,7 +6034,7 @@ if ($Windows) {
   # copies after the final runtime image is in place.
   if ($Toolchain -and $RebuiltHostDynamicRuntime) {
     $HostSDKRoot = Get-SwiftSDK -OS $HostPlatform.OS
-    $HostRuntimeBin = Resolve-SDKRuntimeBin $HostPlatform $HostSDKRoot
+    $HostRuntimeBin = Get-SDKRuntimeBin $HostPlatform $HostSDKRoot
     Invoke-BuildStep Stage-WindowsToolchainSxS $HostPlatform @{
       ToolchainRoot   = $HostPlatform.ToolchainInstallRoot;
       RuntimeLocation = $HostRuntimeBin;
@@ -6112,7 +6126,7 @@ if ($Stage) {
 if (-not $IsCrossCompiling) {
   if (-not $Toolchain -and $HostPlatform.OS -eq [OS]::Windows -and $Test.Count -gt 0) {
     $HostSDKRoot = Get-SwiftSDK -OS $HostPlatform.OS
-    $HostRuntimeBin = Resolve-SDKRuntimeBin $HostPlatform $HostSDKRoot
+    $HostRuntimeBin = Get-SDKRuntimeBin $HostPlatform $HostSDKRoot
     Invoke-BuildStep Stage-WindowsToolchainSxS $HostPlatform @{
       ToolchainRoot   = $HostPlatform.ToolchainInstallRoot;
       RuntimeLocation = $HostRuntimeBin;

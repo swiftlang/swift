@@ -640,7 +640,7 @@ extension Value {
     guard apply.singleDirectResult != nil else {
       return false
     }
-    return apply.functionConvention.resultsWithError[0].convention == .guaranteed
+    return apply.hasGuaranteedResult
   }
 }
 

@@ -41,6 +41,7 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/StringExtras.h"
 #include "clang/AST/Type.h"
+#include "clang/Basic/Module.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
@@ -679,6 +680,12 @@ static StringRef getDumpString(ExplicitSafety safety) {
     return "safe";
   case ExplicitSafety::Unsafe:
     return "unsafe";
+  }
+}
+static StringRef getDumpString(ExecutionSemantics semantics) {
+  switch (semantics) {
+  case ExecutionSemantics::Once:
+    return "once";
   }
 }
 static StringRef getDumpString(ConformanceEntryKind kind) {
@@ -3033,8 +3040,15 @@ namespace {
 
     void visitModuleDecl(ModuleDecl *MD, Label label) {
       printCommon(MD, "module", label);
-      printFlag(MD->isNonSwiftModule(), "non_swift");
       printAttributes(MD);
+      printFlag(MD->isNonSwiftModule(), "non_swift");
+      if (auto clangMod = MD->findUnderlyingClangModule()) {
+        printFlag(clangMod->isSubModule(), "is_submodule");
+        if (clangMod->isSubModule()) {
+          printFieldQuoted(clangMod->getFullModuleName(),
+                           Label::always("clang_full_name"));
+        }
+      }
       printFoot();
     }
 
@@ -5713,6 +5727,12 @@ public:
     printField(StringRef{Model}, Label::always("threading"));
     printFoot();
   }
+
+  void visitCalledAttr(CalledAttr *Attr, Label label) {
+    printCommon(Attr, "called_attr", label);
+    printField(Attr->getSemantics(), Label::always("semantics"));
+    printFoot();
+  }
 };
 
 } // end anonymous namespace
@@ -6514,6 +6534,13 @@ namespace {
       printCommon("module_type", label);
       printDeclName(T->getModule(), Label::always("module"));
       printFlag(T->getModule()->isNonSwiftModule(), "foreign");
+      if (auto clangMod = T->getModule()->findUnderlyingClangModule()) {
+        printFlag(clangMod->isSubModule(), "is_submodule");
+        if (clangMod->isSubModule()) {
+          printFieldQuoted(clangMod->getFullModuleName(),
+                           Label::always("clang_full_name"));
+        }
+      }
       printFoot();
     }
 
@@ -6558,8 +6585,8 @@ namespace {
       printArchetypeCommon(T, "existential_archetype_type", label);
 
       auto *env = T->getGenericEnvironment();
-      printFieldQuoted(env->getOpenedExistentialUUID(),
-                       Label::always("opened_existential_id"));
+      printField(std::to_string(env->getOpenedExistentialID()),
+                 Label::always("opened_existential_id"));
 
       printArchetypeCommonRec(T);
       printRec(env->getOpenedExistentialType(),
@@ -6593,8 +6620,8 @@ namespace {
     }
     void visitElementArchetypeType(ElementArchetypeType *T, Label label) {
       printArchetypeCommon(T, "element_archetype_type", label);
-      printFieldQuoted(T->getOpenedElementID(),
-                       Label::always("opened_element_id"));
+      printField(std::to_string(T->getOpenedElementID()),
+                 Label::always("opened_element_id"));
       printFoot();
     }
 
@@ -6692,6 +6719,7 @@ namespace {
         printFlag(T->isAsync(), "async");
         printFlag(T->isThrowing(), "throws");
         printFlag(T->hasSendingResult(), "sending_result");
+        printFlag(T->isCalledOnce(), "called_once");
         if (T->isDifferentiable()) {
           switch (T->getDifferentiabilityKind()) {
           default:

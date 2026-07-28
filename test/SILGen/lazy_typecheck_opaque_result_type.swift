@@ -1,6 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 // RUN: %target-swift-frontend -emit-module %t/Library.swift -parse-as-library -module-name Library -enable-library-evolution -emit-module-path %t/Library.swiftmodule
+// RUN: %target-swift-frontend -emit-silgen-ossa -o /dev/null -sil-verify-all -enable-sil-opaque-values -primary-file %t/Primary.swift %t/Other.swift -parse-as-library -module-name Test -I %t
 // RUN: %target-swift-frontend -emit-silgen -primary-file %t/Primary.swift %t/Other.swift -parse-as-library -module-name Test -I %t | %FileCheck %s --check-prefixes CHECK,CHECK-PRIMARY,CHECK-COMMON
 // RUN: %target-swift-frontend -emit-silgen %t/Primary.swift %t/Other.swift -parse-as-library -module-name Test -I %t | %FileCheck %s --check-prefixes CHECK,CHECK-WHOLE-MODULE,CHECK-COMMON
 // RUN: %target-swift-frontend -emit-silgen -primary-file %t/Primary.swift %t/Other.swift -parse-as-library -module-name Test -I %t -experimental-lazy-typecheck | %FileCheck %s --check-prefixes CHECK,CHECK-PRIMARY,CHECK-COMMON

@@ -1,5 +1,5 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature KeyPathWithMethodMembers -verify-additional-prefix non-resilient-
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature KeyPathWithMethodMembers -enable-library-evolution -verify-additional-prefix resilient-
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature KeyPathWithMethodMembers -solver-disable-enumerate-supertypes -verify-additional-prefix non-resilient-
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature KeyPathWithMethodMembers -solver-disable-enumerate-supertypes -enable-library-evolution -verify-additional-prefix resilient-
 // REQUIRES: swift_feature_KeyPathWithMethodMembers
 
 var global = 42

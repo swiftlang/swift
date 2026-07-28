@@ -1,3 +1,6 @@
+// FIXME: crashes under opaque values
+// RUN: not --crash %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -Xllvm -sil-print-types -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -disable-objc-attr-requires-foundation-module -enable-objc-interop
+
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck %s
 
 protocol AddrOnly {}

@@ -1,4 +1,6 @@
-// RUN: %target-swift-frontend -parse -verify -enable-experimental-com-interop %s
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -enable-experimental-com-interop -emit-module -module-name COM -emit-module-path %t/COM.swiftmodule %S/../Inputs/COM.swift
+// RUN: %target-swift-frontend -enable-experimental-com-interop -parse -verify %s -I %t
 
 @com(interface: "00000000-0000-0000-C000-000000000046")
 protocol IUnknown: AnyObject { }

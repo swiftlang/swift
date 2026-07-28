@@ -1,6 +1,5 @@
 // RUN: %target-sil-opt %s -simplification -simplify-instruction=index_raw_pointer | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 
 sil_stage canonical
 

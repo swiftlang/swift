@@ -85,6 +85,10 @@ if not "%WINDOWS_SDKS%"=="" set "WindowsSDKArgs=%WindowsSDKArgs% -WindowsSDKArch
 set "HostArchNameArg="
 if not "%HOST_ARCH_NAME%"=="" set "HostArchNameArg=-HostArchName %HOST_ARCH_NAME%"
 
+:: Build the -DebugInfo argument, if any.
+set "DebugInfoArg="
+if not "%DEBUG_INFO%"=="" set "DebugInfoArg=-DebugInfo"
+
 call :CloneRepositories || (exit /b 1)
 
 :: We only have write access to BuildRoot, so use that as the image root.
@@ -97,7 +101,17 @@ powershell.exe -ExecutionPolicy RemoteSigned -File %~dp0build.ps1 ^
   %PackagingArg% ^
   %TestArg% ^
   -IncludeSBoM ^
+  %DebugInfoArg% ^
   -Summary || (exit /b 1)
+
+:: Publish PDBs into a Microsoft-compatible symbol store and zip it so that
+:: CI can upload the archive to the Swift debug-symbols server.
+if not "%DEBUG_INFO%"=="" (
+  powershell.exe -ExecutionPolicy RemoteSigned -File %~dp0CreateSymStore.ps1 ^
+    -Search "%BuildRoot%\bin" ^
+    -SymbolStore "%BuildRoot%\symstore" ^
+    -Destination "%PackageRoot%\swift-windows-symbols.zip" || (exit /b 1)
+)
 
 :: Clean up the module cache
 rd /s /q %LocalAppData%\clang\ModuleCache

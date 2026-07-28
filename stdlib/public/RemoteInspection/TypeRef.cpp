@@ -610,6 +610,261 @@ struct TypeRefIsConcrete
   }
 };
 
+namespace {
+
+bool typeRefVectorEquals(llvm::ArrayRef<const TypeRef *> lhs,
+                          llvm::ArrayRef<const TypeRef *> rhs) {
+  if (lhs.size() != rhs.size())
+    return false;
+  for (size_t i = 0, e = lhs.size(); i != e; ++i)
+    if (!TypeRef::deepEquals(lhs[i], rhs[i]))
+      return false;
+  return true;
+}
+
+bool typeRefRequirementEquals(const TypeRefRequirement &lhs,
+                               const TypeRefRequirement &rhs) {
+  if (lhs.getKind() != rhs.getKind())
+    return false;
+  if (!TypeRef::deepEquals(lhs.getFirstType(), rhs.getFirstType()))
+    return false;
+  if (lhs.getKind() == RequirementKind::Layout)
+    return lhs.getLayoutConstraint() == rhs.getLayoutConstraint();
+  return TypeRef::deepEquals(lhs.getSecondType(), rhs.getSecondType());
+}
+
+bool typeRefRequirementsEquals(llvm::ArrayRef<TypeRefRequirement> lhs,
+                                llvm::ArrayRef<TypeRefRequirement> rhs) {
+  if (lhs.size() != rhs.size())
+    return false;
+  for (size_t i = 0, e = lhs.size(); i != e; ++i)
+    if (!typeRefRequirementEquals(lhs[i], rhs[i]))
+      return false;
+  return true;
+}
+
+/// Structural equality for TypeRefs. The caller (TypeRef::deepEquals) has
+/// already checked that lhs and the visited node share a TypeRefKind, so the
+/// casts of
+/// \c other below are safe.
+class TypeRefEquals
+    : public TypeRefVisitor<TypeRefEquals, bool, const TypeRef *> {
+public:
+  bool visitBuiltinTypeRef(const BuiltinTypeRef *B, const TypeRef *other) {
+    return B->getMangledName() ==
+           cast<BuiltinTypeRef>(other)->getMangledName();
+  }
+
+  bool visitNominalTypeRef(const NominalTypeRef *N, const TypeRef *other) {
+    auto *Other = cast<NominalTypeRef>(other);
+    return N->getMangledName() == Other->getMangledName() &&
+           TypeRef::deepEquals(N->getParent(), Other->getParent());
+  }
+
+  bool visitBoundGenericTypeRef(const BoundGenericTypeRef *BG,
+                                const TypeRef *other) {
+    auto *Other = cast<BoundGenericTypeRef>(other);
+    return BG->getMangledName() == Other->getMangledName() &&
+           TypeRef::deepEquals(BG->getParent(), Other->getParent()) &&
+           typeRefVectorEquals(BG->getGenericParams(),
+                                Other->getGenericParams());
+  }
+
+  bool visitTupleTypeRef(const TupleTypeRef *T, const TypeRef *other) {
+    auto *Other = cast<TupleTypeRef>(other);
+    return T->getLabels() == Other->getLabels() &&
+           typeRefVectorEquals(T->getElements(), Other->getElements());
+  }
+
+  bool visitPackTypeRef(const PackTypeRef *P, const TypeRef *other) {
+    return typeRefVectorEquals(P->getElements(),
+                                cast<PackTypeRef>(other)->getElements());
+  }
+
+  bool visitPackExpansionTypeRef(const PackExpansionTypeRef *PE,
+                                 const TypeRef *other) {
+    auto *Other = cast<PackExpansionTypeRef>(other);
+    return TypeRef::deepEquals(PE->getPattern(), Other->getPattern()) &&
+           TypeRef::deepEquals(PE->getCount(), Other->getCount());
+  }
+
+  bool visitOpaqueArchetypeTypeRef(const OpaqueArchetypeTypeRef *O,
+                                   const TypeRef *other) {
+    auto *Other = cast<OpaqueArchetypeTypeRef>(other);
+    if (O->getID() != Other->getID() ||
+        O->getOrdinal() != Other->getOrdinal())
+      return false;
+
+    auto lhsLists = O->getArgumentLists();
+    auto rhsLists = Other->getArgumentLists();
+    if (lhsLists.size() != rhsLists.size())
+      return false;
+    for (size_t i = 0, e = lhsLists.size(); i != e; ++i)
+      if (!typeRefVectorEquals(lhsLists[i], rhsLists[i]))
+        return false;
+    return true;
+  }
+
+  bool visitFunctionTypeRef(const FunctionTypeRef *F, const TypeRef *other) {
+    auto *Other = cast<FunctionTypeRef>(other);
+    auto lhsParams = F->getParameters();
+    auto rhsParams = Other->getParameters();
+    if (lhsParams.size() != rhsParams.size())
+      return false;
+    for (size_t i = 0, e = lhsParams.size(); i != e; ++i) {
+      auto &lhsParam = lhsParams[i];
+      auto &rhsParam = rhsParams[i];
+      if (lhsParam.getLabel() != rhsParam.getLabel() ||
+          lhsParam.getFlags() != rhsParam.getFlags() ||
+          !TypeRef::deepEquals(lhsParam.getType(), rhsParam.getType()))
+        return false;
+    }
+
+    return F->getFlags() == Other->getFlags() &&
+           F->getExtFlags() == Other->getExtFlags() &&
+           F->getDifferentiabilityKind().getIntValue() ==
+               Other->getDifferentiabilityKind().getIntValue() &&
+           TypeRef::deepEquals(F->getGlobalActor(), Other->getGlobalActor()) &&
+           TypeRef::deepEquals(F->getThrownError(), Other->getThrownError());
+  }
+
+  bool visitProtocolCompositionTypeRef(const ProtocolCompositionTypeRef *PC,
+                                       const TypeRef *other) {
+    auto *Other = cast<ProtocolCompositionTypeRef>(other);
+    return PC->hasExplicitAnyObject() == Other->hasExplicitAnyObject() &&
+           TypeRef::deepEquals(PC->getSuperclass(), Other->getSuperclass()) &&
+           typeRefVectorEquals(PC->getProtocols(), Other->getProtocols());
+  }
+
+  bool visitConstrainedExistentialTypeRef(
+      const ConstrainedExistentialTypeRef *CET, const TypeRef *other) {
+    auto *Other = cast<ConstrainedExistentialTypeRef>(other);
+    return TypeRef::deepEquals(CET->getBase(), Other->getBase()) &&
+           typeRefRequirementsEquals(CET->getRequirements(),
+                                      Other->getRequirements());
+  }
+
+  bool visitSymbolicExtendedExistentialTypeRef(
+      const SymbolicExtendedExistentialTypeRef *SEET, const TypeRef *other) {
+    auto *Other = cast<SymbolicExtendedExistentialTypeRef>(other);
+    return SEET->getFlags().getIntValue() ==
+               Other->getFlags().getIntValue() &&
+           TypeRef::deepEquals(SEET->getProtocol(), Other->getProtocol()) &&
+           typeRefRequirementsEquals(SEET->getRequirements(),
+                                      Other->getRequirements()) &&
+           typeRefVectorEquals(SEET->getArguments(),
+                                Other->getArguments());
+  }
+
+  bool visitMetatypeTypeRef(const MetatypeTypeRef *M, const TypeRef *other) {
+    auto *Other = cast<MetatypeTypeRef>(other);
+    return M->wasAbstract() == Other->wasAbstract() &&
+           TypeRef::deepEquals(M->getInstanceType(), Other->getInstanceType());
+  }
+
+  bool visitExistentialMetatypeTypeRef(const ExistentialMetatypeTypeRef *EM,
+                                       const TypeRef *other) {
+    return TypeRef::deepEquals(
+        EM->getInstanceType(),
+        cast<ExistentialMetatypeTypeRef>(other)->getInstanceType());
+  }
+
+  bool
+  visitGenericTypeParameterTypeRef(const GenericTypeParameterTypeRef *GTP,
+                                   const TypeRef *other) {
+    auto *Other = cast<GenericTypeParameterTypeRef>(other);
+    return GTP->getDepth() == Other->getDepth() &&
+           GTP->getIndex() == Other->getIndex();
+  }
+
+  bool visitDependentMemberTypeRef(const DependentMemberTypeRef *DM,
+                                   const TypeRef *other) {
+    auto *Other = cast<DependentMemberTypeRef>(other);
+    return DM->getMember() == Other->getMember() &&
+           DM->getProtocol() == Other->getProtocol() &&
+           TypeRef::deepEquals(DM->getBase(), Other->getBase());
+  }
+
+  bool visitForeignClassTypeRef(const ForeignClassTypeRef *F,
+                                const TypeRef *other) {
+    return F->getName() == cast<ForeignClassTypeRef>(other)->getName();
+  }
+
+  bool visitObjCClassTypeRef(const ObjCClassTypeRef *OC,
+                             const TypeRef *other) {
+    return OC->getName() == cast<ObjCClassTypeRef>(other)->getName();
+  }
+
+  bool visitObjCProtocolTypeRef(const ObjCProtocolTypeRef *OC,
+                                const TypeRef *other) {
+    return OC->getName() == cast<ObjCProtocolTypeRef>(other)->getName();
+  }
+
+  bool visitOpaqueTypeRef(const OpaqueTypeRef *O, const TypeRef *other) {
+    return true;
+  }
+
+#define REF_STORAGE(Name, name, ...)                                         \
+  bool visit##Name##StorageTypeRef(const Name##StorageTypeRef *US,           \
+                                   const TypeRef *other) {                    \
+    return TypeRef::deepEquals(                                              \
+        US->getType(), cast<Name##StorageTypeRef>(other)->getType());        \
+  }
+#include "swift/AST/ReferenceStorage.def"
+
+  bool visitSILBoxTypeRef(const SILBoxTypeRef *SB, const TypeRef *other) {
+    return TypeRef::deepEquals(SB->getBoxedType(),
+                               cast<SILBoxTypeRef>(other)->getBoxedType());
+  }
+
+  bool visitSILBoxTypeWithLayoutTypeRef(const SILBoxTypeWithLayoutTypeRef *SB,
+                                        const TypeRef *other) {
+    auto *Other = cast<SILBoxTypeWithLayoutTypeRef>(other);
+
+    auto lhsFields = SB->getFields();
+    auto rhsFields = Other->getFields();
+    if (lhsFields.size() != rhsFields.size())
+      return false;
+    for (size_t i = 0, e = lhsFields.size(); i != e; ++i)
+      if (lhsFields[i].isMutable() != rhsFields[i].isMutable() ||
+          !TypeRef::deepEquals(lhsFields[i].getType(),
+                               rhsFields[i].getType()))
+        return false;
+
+    auto lhsSubs = SB->getSubstitutions();
+    auto rhsSubs = Other->getSubstitutions();
+    if (lhsSubs.size() != rhsSubs.size())
+      return false;
+    for (size_t i = 0, e = lhsSubs.size(); i != e; ++i)
+      if (!TypeRef::deepEquals(lhsSubs[i].first, rhsSubs[i].first) ||
+          !TypeRef::deepEquals(lhsSubs[i].second, rhsSubs[i].second))
+        return false;
+
+    return typeRefRequirementsEquals(SB->getRequirements(),
+                                      Other->getRequirements());
+  }
+
+  bool visitIntegerTypeRef(const IntegerTypeRef *I, const TypeRef *other) {
+    return I->getValue() == cast<IntegerTypeRef>(other)->getValue();
+  }
+
+  bool visitBuiltinFixedArrayTypeRef(const BuiltinFixedArrayTypeRef *BA,
+                                     const TypeRef *other) {
+    auto *Other = cast<BuiltinFixedArrayTypeRef>(other);
+    return TypeRef::deepEquals(BA->getSizeType(), Other->getSizeType()) &&
+           TypeRef::deepEquals(BA->getElementType(), Other->getElementType());
+  }
+
+  bool visitBuiltinBorrowTypeRef(const BuiltinBorrowTypeRef *BA,
+                                 const TypeRef *other) {
+    return TypeRef::deepEquals(
+        BA->getReferentType(),
+        cast<BuiltinBorrowTypeRef>(other)->getReferentType());
+  }
+};
+
+} // end anonymous namespace
+
 const OpaqueTypeRef *
 OpaqueTypeRef::Singleton = new OpaqueTypeRef();
 
@@ -700,6 +955,18 @@ class DemanglingForTypeRef
 public:
   DemanglingForTypeRef(Demangle::Demangler &Dem) : Dem(Dem) {}
 
+  /// Add \p child to \p parent, propagating failure instead of crashing:
+  /// returns false when \p child is null. Demangling a TypeRef reconstructed
+  /// from a remote process can fail on any subterm (corrupt, truncated, or
+  /// newer-version metadata), and Node::addChild asserts and aborts on a null
+  /// child. Callers should return null when this returns false.
+  bool tryAddChild(Demangle::NodePointer parent, Demangle::NodePointer child) {
+    if (!child)
+      return false;
+    parent->addChild(child, Dem);
+    return true;
+  }
+
   Demangle::NodePointer visit(const TypeRef *typeRef) {
     auto node = TypeRefVisitor<DemanglingForTypeRef,
                                 Demangle::NodePointer>::visit(typeRef);
@@ -759,10 +1026,16 @@ public:
       genericNodeKind = Node::Kind::BoundGenericOtherNominalType;
     }
     auto unspecializedType = Dem.demangleType(BG->getMangledName());
+    if (!unspecializedType)
+      return nullptr;
 
     auto genericArgsList = Dem.createNode(Node::Kind::TypeList);
-    for (auto param : BG->getGenericParams())
-      genericArgsList->addChild(visit(param), Dem);
+    for (auto param : BG->getGenericParams()) {
+      auto paramNode = visit(param);
+      if (!paramNode)
+        return nullptr;
+      genericArgsList->addChild(paramNode, Dem);
+    }
 
     auto genericNode = Dem.createNode(genericNodeKind);
     genericNode->addChild(unspecializedType, Dem);
@@ -815,7 +1088,8 @@ public:
         auto name = Dem.createNode(Node::Kind::TupleElementName, Label);
         tupleElt->addChild(name, Dem);
       }
-      tupleElt->addChild(visit(std::get<1>(LabelElement)), Dem);
+      if (!tryAddChild(tupleElt, visit(std::get<1>(LabelElement))))
+        return nullptr;
       tuple->addChild(tupleElt, Dem);
     }
     return tuple;
@@ -824,14 +1098,16 @@ public:
   Demangle::NodePointer visitPackTypeRef(const PackTypeRef *P) {
     auto pack = Dem.createNode(Node::Kind::Pack);
     for (auto Element : P->getElements())
-      pack->addChild(visit(Element), Dem);
+      if (!tryAddChild(pack, visit(Element)))
+        return nullptr;
     return pack;
   }
 
   Demangle::NodePointer visitPackExpansionTypeRef(const PackExpansionTypeRef *PE) {
     auto expansion = Dem.createNode(Node::Kind::PackExpansion);
-    expansion->addChild(visit(PE->getPattern()), Dem);
-    expansion->addChild(visit(PE->getCount()), Dem);
+    if (!tryAddChild(expansion, visit(PE->getPattern())) ||
+        !tryAddChild(expansion, visit(PE->getCount())))
+      return nullptr;
     return expansion;
   }
 
@@ -857,6 +1133,8 @@ public:
     for (const auto &param : F->getParameters()) {
       auto flags = param.getFlags();
       auto input = visit(param.getType());
+      if (!input)
+        return nullptr;
 
       auto wrapInput = [&](Node::Kind kind) {
         auto parent = Dem.createNode(kind);
@@ -946,6 +1224,8 @@ public:
     parameters->addChild(paramType, Dem);
 
     NodePointer resultTy = visit(F->getResult());
+    if (!resultTy)
+      return nullptr;
     NodePointer result = Dem.createNode(Node::Kind::ReturnType);
     result->addChild(resultTy, Dem);
 
@@ -963,6 +1243,8 @@ public:
     if (auto globalActor = F->getGlobalActor()) {
       auto node = Dem.createNode(Node::Kind::GlobalActorFunctionType);
       auto globalActorNode = visit(globalActor);
+      if (!globalActorNode)
+        return nullptr;
       node->addChild(globalActorNode, Dem);
       funcNode->addChild(node, Dem);
     } else if (F->getExtFlags().isIsolatedAny()) {
@@ -998,6 +1280,8 @@ public:
       if (auto thrownError = F->getThrownError()) {
         auto node = Dem.createNode(Node::Kind::TypedThrowsAnnotation);
         auto thrownErrorNode = visit(thrownError);
+        if (!thrownErrorNode)
+          return nullptr;
         node->addChild(thrownErrorNode, Dem);
         funcNode->addChild(node, Dem);
       } else {
@@ -1020,7 +1304,8 @@ public:
   visitProtocolCompositionTypeRef(const ProtocolCompositionTypeRef *PC) {
     auto type_list = Dem.createNode(Node::Kind::TypeList);
     for (auto protocol : PC->getProtocols())
-      type_list->addChild(visit(protocol), Dem);
+      if (!tryAddChild(type_list, visit(protocol)))
+        return nullptr;
 
     auto proto_list = Dem.createNode(Node::Kind::ProtocolList);
     proto_list->addChild(type_list, Dem);
@@ -1029,7 +1314,8 @@ public:
     if (auto superclass = PC->getSuperclass()) {
       node = Dem.createNode(Node::Kind::ProtocolListWithClass);
       node->addChild(proto_list, Dem);
-      node->addChild(visit(superclass), Dem);
+      if (!tryAddChild(node, visit(superclass)))
+        return nullptr;
     } else if (PC->hasExplicitAnyObject()) {
       node = Dem.createNode(Node::Kind::ProtocolListWithAnyObject);
       node->addChild(proto_list, Dem);
@@ -1040,11 +1326,16 @@ public:
   Demangle::NodePointer
   visitConstrainedExistentialTypeRef(const ConstrainedExistentialTypeRef *CET) {
     auto node = Dem.createNode(Node::Kind::ConstrainedExistential);
-    node->addChild(visit(CET->getBase()), Dem);
+    if (!tryAddChild(node, visit(CET->getBase())))
+      return nullptr;
     auto constraintList =
         Dem.createNode(Node::Kind::ConstrainedExistentialRequirementList);
-    for (auto req : CET->getRequirements())
-      constraintList->addChild(visitTypeRefRequirement(req), Dem);
+    for (auto req : CET->getRequirements()) {
+      // Some requirement kinds are not represented; skip them rather than
+      // failing the whole demangling.
+      if (auto reqNode = visitTypeRefRequirement(req))
+        constraintList->addChild(reqNode, Dem);
+    }
     node->addChild(constraintList, Dem);
     return node;
   }
@@ -1052,11 +1343,16 @@ public:
   Demangle::NodePointer visitSymbolicExtendedExistentialTypeRef(
       const SymbolicExtendedExistentialTypeRef *SEET) {
     auto node = Dem.createNode(Node::Kind::ConstrainedExistential);
-    node->addChild(visit(SEET->getProtocol()), Dem);
+    if (!tryAddChild(node, visit(SEET->getProtocol())))
+      return nullptr;
     auto constraintList =
         Dem.createNode(Node::Kind::ConstrainedExistentialRequirementList);
-    for (auto req : SEET->getRequirements())
-      constraintList->addChild(visitTypeRefRequirement(req), Dem);
+    for (auto req : SEET->getRequirements()) {
+      // Some requirement kinds are not represented; skip them rather than
+      // failing the whole demangling.
+      if (auto reqNode = visitTypeRefRequirement(req))
+        constraintList->addChild(reqNode, Dem);
+    }
     node->addChild(constraintList, Dem);
     // FIXME: This is lossy. We're dropping the Arguments here.
     return node;
@@ -1068,14 +1364,16 @@ public:
     auto repr = Dem.createNode(Node::Kind::MetatypeRepresentation,
                                M->wasAbstract() ? "@thick" : "@thin");
     node->addChild(repr, Dem);
-    node->addChild(visit(M->getInstanceType()), Dem);
+    if (!tryAddChild(node, visit(M->getInstanceType())))
+      return nullptr;
     return node;
   }
 
   Demangle::NodePointer
   visitExistentialMetatypeTypeRef(const ExistentialMetatypeTypeRef *EM) {
     auto node = Dem.createNode(Node::Kind::Metatype);
-    node->addChild(visit(EM->getInstanceType()), Dem);
+    if (!tryAddChild(node, visit(EM->getInstanceType())))
+      return nullptr;
     return node;
   }
 
@@ -1092,6 +1390,8 @@ public:
 
     auto node = Dem.createNode(Node::Kind::DependentMemberType);
     auto Base = visit(DM->getBase());
+    if (!Base)
+      return nullptr;
     node->addChild(Base, Dem);
 
     auto MemberId = Dem.createNode(Node::Kind::Identifier, DM->getMember());
@@ -1106,8 +1406,8 @@ public:
       auto AssocTy = Dem.createNode(Node::Kind::DependentAssociatedTypeRef);
       AssocTy->addChild(MemberId, Dem);
       auto Proto = Dem.demangleType(MangledProtocol);
-      assert(Proto && "Failed to demangle");
-      assert(Proto->getKind() == Node::Kind::Type && "Protocol type is not a type?!");
+      if (!Proto || Proto->getKind() != Node::Kind::Type)
+        return nullptr;
       AssocTy->addChild(Proto, Dem);
       node->addChild(AssocTy, Dem);
     }
@@ -1139,14 +1439,16 @@ public:
   Demangle::NodePointer visit##Name##StorageTypeRef(                           \
       const Name##StorageTypeRef *US) {                                        \
     auto node = Dem.createNode(Node::Kind::Name);                              \
-    node->addChild(visit(US->getType()), Dem);                                 \
+    if (!tryAddChild(node, visit(US->getType())))                             \
+      return nullptr;                                                          \
     return node;                                                               \
   }
 #include "swift/AST/ReferenceStorage.def"
 
   Demangle::NodePointer visitSILBoxTypeRef(const SILBoxTypeRef *SB) {
     auto node = Dem.createNode(Node::Kind::SILBoxType);
-    node->addChild(visit(SB->getBoxedType()), Dem);
+    if (!tryAddChild(node, visit(SB->getBoxedType())))
+      return nullptr;
     return node;
   }
 
@@ -1158,20 +1460,23 @@ public:
     }
     case RequirementKind::Conformance: {
       auto r = Dem.createNode(Node::Kind::DependentGenericConformanceRequirement);
-      r->addChild(visit(req.getFirstType()), Dem);
-      r->addChild(visit(req.getSecondType()), Dem);
+      if (!tryAddChild(r, visit(req.getFirstType())) ||
+          !tryAddChild(r, visit(req.getSecondType())))
+        return nullptr;
       return r;
     }
     case RequirementKind::Superclass: {
       auto r = Dem.createNode(Node::Kind::DependentGenericConformanceRequirement);
-      r->addChild(visit(req.getFirstType()), Dem);
-      r->addChild(visit(req.getSecondType()), Dem);
+      if (!tryAddChild(r, visit(req.getFirstType())) ||
+          !tryAddChild(r, visit(req.getSecondType())))
+        return nullptr;
       return r;
     }
     case RequirementKind::SameType: {
       auto r = Dem.createNode(Node::Kind::DependentGenericSameTypeRequirement);
-      r->addChild(visit(req.getFirstType()), Dem);
-      r->addChild(visit(req.getSecondType()), Dem);
+      if (!tryAddChild(r, visit(req.getFirstType())) ||
+          !tryAddChild(r, visit(req.getSecondType())))
+        return nullptr;
       return r;
     }
     case RequirementKind::Layout:
@@ -1188,7 +1493,8 @@ public:
       auto field =
           Dem.createNode(f.isMutable() ? Node::Kind::SILBoxMutableField
                                        : Node::Kind::SILBoxImmutableField);
-      field->addChild(visit(f.getType()), Dem);
+      if (!tryAddChild(field, visit(f.getType())))
+        return nullptr;
       layout->addChild(field, Dem);
     }
     node->addChild(layout, Dem);
@@ -1218,7 +1524,8 @@ public:
     node->addChild(signature, Dem);
     auto list = Dem.createNode(Node::Kind::TypeList);
     for (auto &subst : SB->getSubstitutions())
-      list->addChild(visit(subst.second), Dem);
+      if (!tryAddChild(list, visit(subst.second)))
+        return nullptr;
     node->addChild(list, Dem);
     return node;
   }
@@ -1272,15 +1579,17 @@ public:
   Demangle::NodePointer visitBuiltinFixedArrayTypeRef(const BuiltinFixedArrayTypeRef *BA) {
     auto ba = Dem.createNode(Node::Kind::BuiltinFixedArray);
 
-    ba->addChild(visit(BA->getSizeType()), Dem);
-    ba->addChild(visit(BA->getElementType()), Dem);
+    if (!tryAddChild(ba, visit(BA->getSizeType())) ||
+        !tryAddChild(ba, visit(BA->getElementType())))
+      return nullptr;
 
     return ba;
   }
   Demangle::NodePointer visitBuiltinBorrowTypeRef(const BuiltinBorrowTypeRef *BA) {
     auto ba = Dem.createNode(Node::Kind::BuiltinBorrow);
 
-    ba->addChild(visit(BA->getReferentType()), Dem);
+    if (!tryAddChild(ba, visit(BA->getReferentType())))
+      return nullptr;
 
     return ba;
   }
@@ -1290,7 +1599,8 @@ Demangle::NodePointer TypeRef::getDemangling(Demangle::Demangler &Dem) const {
   return DemanglingForTypeRef(Dem).visit(this);
 }
 
-std::optional<std::string> TypeRef::mangle(Demangle::Demangler &Dem) const {
+std::optional<std::string> TypeRef::mangle(Demangle::Demangler &Dem,
+                                           Mangle::ManglingFlavor Flavor) const {
   NodePointer node = getDemangling(Dem);
   if (!node)
     return {};
@@ -1302,7 +1612,7 @@ std::optional<std::string> TypeRef::mangle(Demangle::Demangler &Dem) const {
   auto global = Dem.createNode(Node::Kind::Global);
   global->addChild(node, Dem);
 
-  auto mangling = mangleNode(global, Mangle::ManglingFlavor::Default);
+  auto mangling = mangleNode(global, Flavor);
   if (!mangling.isSuccess())
     return {};
   return mangling.result();
@@ -1311,6 +1621,22 @@ std::optional<std::string> TypeRef::mangle(Demangle::Demangler &Dem) const {
 bool TypeRef::isConcrete() const {
   GenericArgumentMap Subs;
   return TypeRefIsConcrete(Subs).visit(this);
+}
+
+bool TypeRef::deepEquals(const TypeRef &Other) const {
+  if (this == &Other)
+    return true;
+  if (getKind() != Other.getKind())
+    return false;
+  return TypeRefEquals().visit(this, &Other);
+}
+
+bool TypeRef::deepEquals(const TypeRef *lhs, const TypeRef *rhs) {
+  if (lhs == rhs)
+    return true;
+  if (!lhs || !rhs)
+    return false;
+  return lhs->deepEquals(*rhs);
 }
 
 bool TypeRef::isConcreteAfterSubstitutions(

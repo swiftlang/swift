@@ -220,7 +220,7 @@ extension String.UTF8View: BidirectionalCollection {
   ///     print("First character's UTF-8 code unit: \(greeting.utf8[i])")
   ///     // Prints "First character's UTF-8 code unit: 72"
   ///
-  /// - Parameter position: A valid index of the view. `position`
+  /// - Parameter i: A valid index of the view. `i`
   ///   must be less than the view's end index.
   @inlinable @inline(__always)
   public subscript(i: Index) -> UTF8.CodeUnit {
@@ -230,7 +230,7 @@ extension String.UTF8View: BidirectionalCollection {
     return self[_unchecked: i]
   }
 
-  @_alwaysEmitIntoClient @inline(__always)
+  @export(implementation) @inline(__always)
   internal subscript(_unchecked i: Index) -> UTF8.CodeUnit {
     if _fastPath(_guts.isFastUTF8) {
       return _guts.withFastUTF8 { utf8 in unsafe utf8[_unchecked: i._encodedOffset] }
@@ -376,7 +376,7 @@ extension String.UTF8View {
   ///   UTF-16 strings.
   @available(SwiftStdlib 6.2, *)
   public var _span: Span<UTF8.CodeUnit>? {
-    @_alwaysEmitIntoClient @inline(__always)
+    @export(implementation) @inline(__always)
     @_lifetime(borrow self)
     borrowing get {
       span
@@ -541,7 +541,7 @@ extension String.UTF8View {
   // (referring to a continuation byte) and returns `idx`. Otherwise, this will
   // scalar-align the index. This is needed because we may be passed a
   // non-scalar-aligned foreign index from the UTF16View.
-  @_alwaysEmitIntoClient @inline(__always)
+  @export(implementation) @inline(__always)
   internal func _utf8AlignForeignIndex(_ idx: String.Index) -> String.Index {
     _internalInvariant(_guts.isForeign)
     guard idx.transcodedOffset == 0 else { return idx }

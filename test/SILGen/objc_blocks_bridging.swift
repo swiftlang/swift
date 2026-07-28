@@ -1,6 +1,7 @@
 
 // RUN: %empty-directory(%t)
 // RUN: %build-silgen-test-overlays
+// RUN: %target-swift-emit-silgen-ossa(mock-sdk: -sdk %S/Inputs -I %t) -o /dev/null -enable-sil-opaque-values -Xllvm -sil-print-types -module-name objc_blocks_bridging -verify -I %S/Inputs -disable-objc-attr-requires-foundation-module %s
 // RUN: %target-swift-emit-silgen(mock-sdk: -sdk %S/Inputs -I %t) -Xllvm -sil-print-types -module-name objc_blocks_bridging -verify -I %S/Inputs -disable-objc-attr-requires-foundation-module %s | %FileCheck %s
 // RUN: %target-swift-emit-silgen(mock-sdk: -sdk %S/Inputs -I %t) -Xllvm -sil-print-types -module-name objc_blocks_bridging -verify -I %S/Inputs -disable-objc-attr-requires-foundation-module  %s | %FileCheck %s --check-prefix=GUARANTEED
 

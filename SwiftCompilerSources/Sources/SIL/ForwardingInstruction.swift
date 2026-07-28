@@ -306,6 +306,12 @@ extension MoveOnlyWrapperToCopyableBoxInst : ConversionInstruction {
   public var canForwardOwnedValues: Bool { true }
 }
 
+extension UncheckedOwnershipInst : ConversionInstruction {
+  public var preservesRepresentation: Bool { true }
+  public var canForwardGuaranteedValues: Bool { true }
+  public var canForwardOwnedValues: Bool { true }
+}
+
 extension UpcastInst : ConversionInstruction {
   public var preservesRepresentation: Bool { true }
   public var canForwardGuaranteedValues: Bool { true }

@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 // RUN: %target-swift-emit-silgen -emit-sorted-sil %s | %FileCheck %s
 // RUN: %target-swift-emit-silgen -emit-sorted-sil -enable-library-evolution %s | %FileCheck -check-prefix=CHECK-RESILIENT %s
 

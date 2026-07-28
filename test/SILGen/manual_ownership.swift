@@ -1,3 +1,4 @@
+// RUN: %target-swift-frontend %s -emit-silgen-ossa -sil-verify-all -enable-sil-opaque-values -verify -sil-verify-all -enable-experimental-feature ManualOwnership -o %t.silgen
 // RUN: %target-swift-frontend %s -emit-silgen -verify -sil-verify-all \
 // RUN:   -enable-experimental-feature ManualOwnership -o %t.silgen
 

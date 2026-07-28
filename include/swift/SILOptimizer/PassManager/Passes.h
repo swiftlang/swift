@@ -28,10 +28,16 @@ namespace swift {
     class IRGenModule;
   }
 
+  /// Run the SIL passes that SILGen relies on to produce fully verified SIL.
+  /// This happens immediately after SILGen.
+  ///
+  /// \param VerifySILGen whether the caller requests verification.
+  void runSILGenPasses(SILModule &M, bool VerifySILGen=false);
+
   /// Run all the SIL diagnostic passes on \p M.
   ///
   /// \returns true if the diagnostic passes produced an error
-  bool runSILDiagnosticPasses(SILModule &M);
+  bool runSILDiagnosticPasses(SILModule &M, bool RunSILGenPasses=true);
 
   /// Run all the SIL performance optimization passes on \p M.
   void runSILOptimizationPasses(SILModule &M);

@@ -1725,12 +1725,18 @@ do {
 
   let baz: Int? = nil
 
-  func foo<T: Equatable>(
-    _ a: @autoclosure () throws -> T,
-    _ b: @autoclosure () throws -> T
+  func foo1<T: Equatable>(
+    _ a: @autoclosure () -> T,
+    _ b: @autoclosure () -> T
   ) {}
 
-  foo(Foo().bar, [baz])
+  func foo2<T: Equatable>(
+    _ a: T,
+    _ b: T
+  ) {}
+
+  foo1(Foo().bar, [baz])
+  foo2(Foo().bar, [baz])
 }
 
 // https://github.com/apple/swift/issues/55681

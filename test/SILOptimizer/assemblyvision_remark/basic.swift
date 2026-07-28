@@ -1,6 +1,5 @@
 // RUN: %target-swiftc_driver -O -Rpass-missed=sil-assembly-vision-remark-gen -Xllvm -sil-disable-pass=FunctionSignatureOpts -Xfrontend -enable-copy-propagation -emit-sil %s -o /dev/null -Xfrontend -verify
 // REQUIRES: optimized_stdlib,swift_stdlib_no_asserts
-// REQUIRES: swift_in_compiler
 
 public class Klass {
     var next: Klass? = nil
@@ -157,7 +156,6 @@ func lookThroughRefCast(x: Klass) -> SubKlass {
 
 func lookThroughEnum(x: Klass?) -> Klass {
     return x! // expected-remark {{retain of type 'Klass'}}
-              // expected-note @-2:22 {{of 'x.some'}}
 }
 
 func castAsQuestion(x: Klass) -> SubKlass? {
@@ -220,7 +218,6 @@ func inoutKlassTuplePairArgument(x: inout (Klass, Klass)) -> Klass {
 
 func inoutKlassOptionalArgument(x: inout Klass?) -> Klass {
     return x! // expected-remark {{retain of type 'Klass'}}
-              // expected-note @-2 {{of 'x.some'}}
 }
 
 func inoutKlassBangCastArgument(x: inout Klass) -> SubKlass {
@@ -292,10 +289,7 @@ func simpleInOutUser<T>(_ x: inout T) {
 func simpleInOut() -> Klass {
     let x = Klass() // expected-remark @:13 {{heap allocated ref of type 'Klass'}}
                     // expected-note @-1:9 {{of 'x'}}
-    simpleInOutUser(&x.next) // expected-remark @:5 {{begin exclusive access to value of type 'Optional<Klass>'}}
-                             // expected-note @-3:9 {{of 'x.next'}}
-                             // expected-remark @-2:28 {{end exclusive access to value of type 'Optional<Klass>'}}
-                             // expected-note @-5:9 {{of 'x.next'}}
+    simpleInOutUser(&x.next)
     return x
 }
 

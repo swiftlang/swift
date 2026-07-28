@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -mandatory-redundant-load-elimination -predictable-deadalloc-elim  | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -mandatory-redundant-load-elimination -mandatory-dead-object-elimination  | %FileCheck %s
 
 sil_stage raw
 
@@ -158,9 +158,8 @@ bb0(%0 : @owned $SomeClass, %1 : @guaranteed $SomeClass):
 //
 // CHECK-LABEL: sil [ossa] @markdep_source_promote_stack : $@convention(thin) (@owned SomeClass, @guaranteed SomeClass) -> @owned SomeClass {
 // CHECK:   [[CP1:%.*]] = copy_value %0 : $SomeClass
-// CHECK:   [[MD_OLD:%.*]] = mark_dependence %0 : $SomeClass on %1 : $SomeClass
 // CHECK:   [[MD:%.*]] = mark_dependence [[CP1]] : $SomeClass on %1 : $SomeClass
-// CHECK:   destroy_value [[MD_OLD]] : $SomeClass
+// CHECK:   destroy_value %0
 // CHECK:   return [[MD]] : $SomeClass
 // CHECK-LABEL: } // end sil function 'markdep_source_promote_stack'
 sil [ossa] @markdep_source_promote_stack: $@convention(thin) (@owned SomeClass, @guaranteed SomeClass) -> @owned SomeClass {
@@ -313,9 +312,8 @@ bb0(%0 : @owned $SomeClass, %1 : @guaranteed $SomeClass):
 // CHECK-LABEL: sil [ossa] @markdep_source_dead_stack : $@convention(thin) (@owned SomeClass, @guaranteed SomeClass) -> () {
 // CHECK: bb0(%0 : @owned $SomeClass, %1 : @guaranteed $SomeClass):
 // CHECK-NEXT: [[CP1:%.*]] = copy_value %0 : $SomeClass
-// CHECK-NEXT: [[MD_OLD:%.*]] = mark_dependence %0 : $SomeClass on %1 : $SomeClass
 // CHECK-NEXT: [[MD:%.*]] = mark_dependence [[CP1]] : $SomeClass on %1 : $SomeClass
-// CHECK-NEXT: destroy_value [[MD_OLD]] : $SomeClass
+// CHECK-NEXT: destroy_value %0
 // CHECK-NEXT: destroy_value [[MD]] : $SomeClass
 // CHECK-LABEL: } // end sil function 'markdep_source_dead_stack'
 sil [ossa] @markdep_source_dead_stack: $@convention(thin) (@owned SomeClass, @guaranteed SomeClass) -> () {
@@ -337,8 +335,8 @@ bb0(%0 : @owned $SomeClass, %1 : @guaranteed $SomeClass):
 //
 // CHECK-LABEL: sil [ossa] @markdep_source_before_partial : $@convention(thin) (@owned SomeClass, @owned SomeClass, @guaranteed SomeClass) -> () {
 // CHECK: bb0(%0 : @owned $SomeClass, %1 : @owned $SomeClass, %2 : @guaranteed $SomeClass):
-// CHECK-NEXT:  struct $SomeClassPair (%0 : $SomeClass, %1 : $SomeClass)
-// CHECK-NEXT:  destroy_value
+// CHECK-NEXT:  destroy_value %0
+// CHECK-NEXT:  destroy_value %1
 // CHECK-LABEL: } // end sil function 'markdep_source_before_partial'
 sil [ossa] @markdep_source_before_partial : $@convention(thin) (@owned SomeClass, @owned SomeClass, @guaranteed SomeClass) -> () {
 bb0(%0 : @owned $SomeClass, %1 : @owned $SomeClass, %2 : @guaranteed $SomeClass):
@@ -358,9 +356,8 @@ bb0(%0 : @owned $SomeClass, %1 : @owned $SomeClass, %2 : @guaranteed $SomeClass)
 //
 // CHECK-LABEL: sil [ossa] @markdep_source_partial_preinit : $@convention(thin) (@owned SomeClass, @owned SomeClass, @guaranteed SomeClass) -> () {
 // CHECK: bb0(%0 : @owned $SomeClass, %1 : @owned $SomeClass, %2 : @guaranteed $SomeClass):
-// CHECK-NEXT: [[PAIR:%.*]] = struct $SomeClassPair (%0 : $SomeClass, %1 : $SomeClass)
-// CHECK-NEXT: destroy_value [[PAIR]] : $SomeClassPair
-// CHECK-NOT: destroy_addr
+// CHECK-NEXT:  destroy_value %0
+// CHECK-NEXT:  destroy_value %1
 // CHECK-LABEL: } // end sil function 'markdep_source_partial_preinit'
 sil [ossa] @markdep_source_partial_preinit : $@convention(thin) (@owned SomeClass, @owned SomeClass, @guaranteed SomeClass) -> () {
 bb0(%0 : @owned $SomeClass, %1 : @owned $SomeClass, %2 : @guaranteed $SomeClass):
@@ -378,14 +375,10 @@ bb0(%0 : @owned $SomeClass, %1 : @owned $SomeClass, %2 : @guaranteed $SomeClass)
 
 // Test mark_dependence source: partially available after init
 //
-// TODO: Partially available values are not handled by dependent dataflow.
-//
 // CHECK-LABEL: sil [ossa] @markdep_source_partial_postinit : $@convention(thin) (@owned SomeClass, @owned SomeClass, @guaranteed SomeClass) -> () {
-// CHECK: [[STK:%.*]] = alloc_stack $SomeClassPair
-// CHECK: [[STK1:%.*]] = struct_element_addr [[STK]] : $*SomeClassPair, #SomeClassPair.y
-// CHECK: store %1 to [init] [[STK1]] : $*SomeClass
-// CHECK: [[MD:%.*]] = mark_dependence [[STK1]] : $*SomeClass on %2 : $SomeClass
-// CHECK: destroy_addr [[STK]] : $*SomeClassPair
+// CHECK: bb0(%0 : @owned $SomeClass, %1 : @owned $SomeClass, %2 : @guaranteed $SomeClass):
+// CHECK-NEXT:  destroy_value %0
+// CHECK-NEXT:  destroy_value %1
 // CHECK-LABEL: } // end sil function 'markdep_source_partial_postinit'
 sil [ossa] @markdep_source_partial_postinit : $@convention(thin) (@owned SomeClass, @owned SomeClass, @guaranteed SomeClass) -> () {
 bb0(%0 : @owned $SomeClass, %1 : @owned $SomeClass, %2 : @guaranteed $SomeClass):
@@ -408,12 +401,13 @@ bb0(%0 : @owned $SomeClass, %1 : @owned $SomeClass, %2 : @guaranteed $SomeClass)
 // CHECK-NEXT:    [[CP0:%.*]] = copy_value %0 : $SomeClass
 // CHECK:       bb1:
 // CHECK-NEXT:    [[CP1:%.*]] = copy_value [[CP0]]
-// CHECK-NEXT:    br bb3([[CP1]] : $SomeClass)
+// CHECK-NEXT:    br bb3([[CP1]] : $SomeClass, [[CP0]] : $SomeClass)
 // CHECK:       bb2:
 // CHECK-NEXT:    [[CP2:%.*]] = copy_value [[CP0]]
-// CHECK-NEXT:    br bb3([[CP2]] : $SomeClass)
-// CHECK:       bb3([[PHI:%.*]] : @owned $SomeClass):
+// CHECK-NEXT:    br bb3([[CP2]] : $SomeClass, [[CP0]] : $SomeClass)
+// CHECK:       bb3([[PHI:%.*]] : @owned $SomeClass, [[PHI2:%.*]] : @owned $SomeClass):
 // CHECK:         [[MD:%.*]] = mark_dependence [[PHI]] : $SomeClass on %0 : $SomeClass
+// CHECK:         destroy_value [[PHI2]]
 // CHECK:         return [[MD]]
 // CHECK-LABEL: } // end sil function 'markdep_source_load_phi'
 sil [ossa] @markdep_source_load_phi : $@convention(thin) (@guaranteed SomeClass) -> @owned SomeClass {
@@ -452,9 +446,8 @@ bb3:
 // CHECK: bb2:
 // CHECK-NOT: store
 // CHECK-NOT: load
-// CHECK: bb3:
-// CHECK-NEXT: [[MD:%.*]] = mark_dependence %1 : $SomeClass on %0 : $SomeClass
-// CHECK-NEXT: destroy_value [[MD]] : $SomeClass
+// CHECK: bb3([[PHI:%.*]] : @owned $SomeClass):
+// CHECK-NEXT: destroy_value [[PHI]]
 // CHECK-LABEL: } // end sil function 'markdep_source_dead_phi'
 sil [ossa] @markdep_source_dead_phi : $@convention(thin) (@guaranteed SomeClass) -> () {
 bb0(%0 : @guaranteed $SomeClass):
@@ -484,24 +477,12 @@ bb3:
 
 // Test mark_dependence source: conflicting available values.
 //
-// No optimization.
-//
-// TODO: the current algorithm can't handle this. With the current
-// approach, we would need to run a completely separate dataflow for
-// each mark_dependence.
 // CHECK-LABEL: sil [ossa] @markdep_source_conflicting_load : $@convention(thin) (@guaranteed SomeClass) -> () {
-// CHECK: bb0(%0 : @guaranteed $SomeClass):
-// CHECK:   %1 = alloc_stack $SomeClass
-// CHECK:   store %{{.*}} to [init] %1 : $*SomeClass
-// CHECK: bb1:
-// CHECK:   %{{.*}} = mark_dependence %1 : $*SomeClass on %0 : $SomeClass
-// CHECK: bb2:
-// CHECK:   load [take] %1 : $*SomeClass
-// CHECK:   store %{{.*}} to [init] %1 : $*SomeClass
-// CHECK: bb3:
-// CHECK:   load [copy] %1 : $*SomeClass
-// CHECK:   destroy_addr %1 : $*SomeClass
-// CHECK:   dealloc_stack %1 : $*SomeClass
+// CHECK-NOT:     alloc_stack
+// CHECK:       bb3([[PHI:%.*]] : @owned $SomeClass):
+// CHECK:         [[C:%.*]] = copy_value [[PHI]]
+// CHECK:         destroy_value [[C]]
+// CHECK:         destroy_value [[PHI]]
 // CHECK-LABEL: } // end sil function 'markdep_source_conflicting_load'
 sil [ossa] @markdep_source_conflicting_load : $@convention(thin) (@guaranteed SomeClass) -> () {
 bb0(%0 : @guaranteed $SomeClass):
@@ -536,12 +517,7 @@ bb3:
 // reusing the promoted instruction as the available value.
 //
 // CHECK-LABEL: sil [ossa] @markdep_source_base_dead_stack : $@convention(thin) (@owned SomeClass, @guaranteed SomeClass, UnsafeMutablePointer<Int>) -> Int {
-// CHECK: bb0(%0 : @owned $SomeClass, %1 : @guaranteed $SomeClass, %2 : $UnsafeMutablePointer<Int>):
-// CHECK-NEXT: [[MD1:%.*]] = mark_dependence %0 : $SomeClass on %1 : $SomeClass
-// CHECK-NEXT: [[MD2:%.*]] = mark_dependence %2 : $UnsafeMutablePointer<Int> on [[MD1]] : $SomeClass
-// CHECK-NOT:  mark_dependence
-// CHECK:      struct_extract [[MD2]] : $UnsafeMutablePointer<Int>, #UnsafeMutablePointer._rawValue
-// CHECK:      destroy_value [[MD1]] : $SomeClass
+// TODO: this is currenctly not optimized
 // CHECK-LABEL: } // end sil function 'markdep_source_base_dead_stack'
 sil [ossa] @markdep_source_base_dead_stack : $@convention(thin) (@owned SomeClass, @guaranteed SomeClass, UnsafeMutablePointer<Int>) -> Int {
 bb0(%0 : @owned $SomeClass, %1 : @guaranteed $SomeClass, %2 : $UnsafeMutablePointer<Int>):
@@ -564,9 +540,9 @@ bb0(%0 : @owned $SomeClass, %1 : @guaranteed $SomeClass, %2 : $UnsafeMutablePoin
 // Promote the mark_dependence and eliminate the load.
 //
 // CHECK-LABEL: sil [ossa] @markdep_source_load_take : $@convention(thin) (@owned SomeClass, @guaranteed SomeClass) -> @owned SomeClass {
-// CHECK: bb0(%0 : @owned $SomeClass, %1 : @guaranteed $SomeClass):
-// CHECK-NEXT: [[MD:%.*]] = mark_dependence %0 : $SomeClass on %1 : $SomeClass
-// CHECK-NEXT: return [[MD]] : $SomeClass
+// CHECK:       bb0(%0 : @owned $SomeClass, %1 : @guaranteed $SomeClass):
+// CHECK-NEXT:    [[MD:%.*]] = mark_dependence %0 : $SomeClass on %1 : $SomeClass
+// CHECK:          return [[MD]] : $SomeClass
 // CHECK-LABEL: } // end sil function 'markdep_source_load_take'
 sil [ossa] @markdep_source_load_take : $@convention(thin) (@owned SomeClass, @guaranteed SomeClass) -> @owned SomeClass {
 bb0(%0 : @owned $SomeClass, %1 : @guaranteed $SomeClass):
@@ -582,14 +558,9 @@ bb0(%0 : @owned $SomeClass, %1 : @guaranteed $SomeClass):
 // but need to be deleted after a conflict is detected.
 //
 // CHECK-LABEL: sil [ossa] @markdep_source_chain_cleanup : $@convention(thin) (@owned SomeClass, @owned SomeClass, @guaranteed SomeClass) -> () {
-// CHECK: bb0(%0 : @owned $SomeClass, %1 : @owned $SomeClass, %2 : @guaranteed $SomeClass):
-// CHECK:   [[STK:%.*]] = alloc_stack $SomeClassPair
-// CHECK:   [[Y:%.*]] = struct_element_addr [[STK]] : $*SomeClassPair, #SomeClassPair.y
-// CHECK:   store %1 to [init] [[Y]] : $*SomeClass
-// CHECK-NOT: mark_dependence %{{.*}} : $SomeClass
-// CHECK:   [[MD1:%.*]] = mark_dependence [[Y]] : $*SomeClass on %2 : $SomeClass
-// CHECK:   mark_dependence [[MD1]] : $*SomeClass on %2 : $SomeClass
-// CHECK:   destroy_addr [[STK]] : $*SomeClassPair
+// CHECK:       bb0(%0 : @owned $SomeClass, %1 : @owned $SomeClass, %2 : @guaranteed $SomeClass):
+// CHECK-NEXT:    destroy_value %0
+// CHECK-NEXT:    destroy_value %1
 // CHECK-LABEL: } // end sil function 'markdep_source_chain_cleanup'
 sil [ossa] @markdep_source_chain_cleanup : $@convention(thin) (@owned SomeClass, @owned SomeClass, @guaranteed SomeClass) -> () {
 bb0(%0 : @owned $SomeClass, %1 : @owned $SomeClass, %2 : @guaranteed $SomeClass):

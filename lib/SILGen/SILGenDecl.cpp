@@ -1506,8 +1506,13 @@ public:
   void copyOrInitValueInto(SILGenFunction &SGF, SILLocation loc,
                            ManagedValue value, bool isInit) override {
 
-    auto bindValue = SGF.B.createMarkUnresolvedNonCopyableValueInst(
-        pattern, value,
+    ManagedValue bindValue = value;
+    if (!SGF.useLoweredAddresses()) {
+      bindValue = bindValue.copy(SGF, loc);
+    }
+
+    bindValue = SGF.B.createMarkUnresolvedNonCopyableValueInst(
+        pattern, bindValue,
         MarkUnresolvedNonCopyableValueInst::CheckKind::NoConsumeOrAssign,
         MarkUnresolvedNonCopyableValueInst::IsStrict);
 

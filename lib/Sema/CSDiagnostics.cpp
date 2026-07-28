@@ -45,6 +45,7 @@
 #include "swift/Basic/SourceLoc.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/Sema/ConstraintLocator.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Sema/TypeVariableType.h"
@@ -301,13 +302,6 @@ ValueDecl *RequirementFailure::getDeclRef() const {
   if (auto opaqueLocator =
           getLocator()->findFirst<LocatorPathElt::OpenedOpaqueArchetype>()) {
     return opaqueLocator->getDecl();
-  }
-
-  // If the locator is for a result builder body result type, the requirement
-  // came from the function's return type.
-  if (getLocator()->isForResultBuilderBodyResult()) {
-    auto *func = getAsDecl<FuncDecl>(getAnchor());
-    return getAffectedDeclFromType(func->getResultInterfaceType());
   }
 
   if (isFromContextualType()) {
@@ -963,6 +957,8 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
   while (!path.empty()) {
     auto last = path.back();
     if (last.is<LocatorPathElt::OptionalInjection>() ||
+        last.is<LocatorPathElt::OpenedGeneric>() ||
+        last.is<LocatorPathElt::AnyRequirement>() ||
         last.is<LocatorPathElt::GenericType>() ||
         last.is<LocatorPathElt::GenericArgument>()) {
       path = path.drop_back();
@@ -1020,10 +1016,6 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
       diagnostic = getDiagnosticFor(purpose);
       break;
     }
-
-    case ConstraintLocator::ResultBuilderBodyResult:
-      diagnostic = diag::cannot_convert_result_builder_result_to_return_type;
-      break;
 
     case ConstraintLocator::AutoclosureResult:
     case ConstraintLocator::ApplyArgToParam:
@@ -1194,7 +1186,7 @@ bool ArrayLiteralToDictionaryConversionFailure::diagnoseAsError() {
     return true;
   }
 
-  auto CTP = getConstraintSystem().getContextualTypePurpose(AE);
+  auto CTP = FailureDiagnostic::getContextualTypePurpose(AE);
   emitDiagnostic(diag::should_use_dictionary_literal,
                  getToType()->lookThroughAllOptionalTypes(),
                  CTP == CTP_Initialization);
@@ -1215,6 +1207,26 @@ bool ArrayLiteralToDictionaryConversionFailure::diagnoseAsError() {
       }
     }
   }
+  return true;
+}
+
+bool AttributedFuncToTypeConversionFailure::diagnoseAsNote() {
+  if (!getToType()->is<FunctionType>())
+    return false;
+
+  auto argApplyInfo = getFunctionArgApplyInfo(getLocator());
+  if (!argApplyInfo)
+    return false;
+
+  auto overload = getCalleeOverloadChoiceIfAvailable(getLocator());
+  if (!(overload && overload->choice.isDecl()))
+    return false;
+
+  SmallString<4> scratch;
+  emitDiagnosticAt(overload->choice.getDecl(),
+                   diag::candidate_expects_escaping_argument, attributeKind,
+                   argApplyInfo->getParamPosition(),
+                   argApplyInfo->getArgDescription(scratch));
   return true;
 }
 
@@ -2258,7 +2270,7 @@ bool AssignmentFailure::diagnoseAsError() {
         if (auto *nominal = typeContext->getSelfNominalTypeDecl()) {
           SmallVector<ValueDecl *, 2> results;
           DC->lookupQualified(nominal, VD->createNameRef(), Loc,
-                              NL_QualifiedDefault, results);
+                              NLFlags::QualifiedDefault, results);
 
           auto foundProperty = llvm::find_if(results, [&](ValueDecl *decl) {
             // We're looking for a settable property that is the same type as
@@ -2863,11 +2875,6 @@ bool ContextualFailure::diagnoseAsError() {
     return true;
   }
 
-  case ConstraintLocator::ResultBuilderBodyResult: {
-    diagnostic = *getDiagnosticFor(CTP_Initialization, toType);
-    break;
-  }
-
   case ConstraintLocator::OptionalInjection: {
     // If this is an attempt at a Double <-> CGFloat conversion
     // through optional chaining, let's produce a tailored diagnostic.
@@ -3034,8 +3041,8 @@ bool ContextualFailure::diagnoseKeyPathLiteralMutabilityMismatch() const {
       continue;
 
     if (auto *setter = storageDecl->getOpaqueAccessor(AccessorKind::Set)) {
-      if (getUnsatisfiedAvailabilityConstraint(setter, S.getDC(),
-                                               component.getLoc())) {
+      if (getUnsatisfiedAvailabilityRestriction(setter, S.getDC(),
+                                                component.getLoc())) {
         auto where =
             ExportContext::forFunctionBody(S.getDC(), component.getLoc());
         return diagnoseDeclAvailability(setter, component.getLoc(),
@@ -3656,8 +3663,12 @@ bool ContextualFailure::tryProtocolConformanceFixIt() const {
     }
   }
 
-  assert(!missingProtoTypeStrings.empty() &&
-         "type already conforms to all the protocols?");
+  if (missingProtoTypeStrings.empty()) {
+    // This can happen if a type is declared as implementing all the
+    // protocols, but where the conformance to one or more protocols is
+    // invalid.
+    return false;
+  }
 
   // Combine all protocol names together, separated by commas.
   std::string protoString = llvm::join(missingProtoTypeStrings, ", ");
@@ -3859,14 +3870,21 @@ ContextualFailure::getDiagnosticFor(ContextualTypePurpose context,
 
 bool NonClassTypeToAnyObjectConversionFailure::diagnoseAsError() {
   auto locator = getLocator();
-  if (locator->isForContextualType()) {
-    return ContextualFailure::diagnoseAsError();
-  }
-
   auto fromType = getFromType();
   auto toType = getToType();
   assert(fromType);
   assert(toType);
+
+  if (fromType->isNoncopyable()) {
+    emitDiagnostic(diag::cannot_convert_noncopyable_value_to_anyobject,
+                   fromType, toType);
+    return true;
+  }
+
+  if (locator->isForContextualType()) {
+    return ContextualFailure::diagnoseAsError();
+  }
+
   if (locator->isLastElement<LocatorPathElt::ApplyArgToParam>()) {
     ArgumentMismatchFailure failure(getSolution(), fromType, toType, locator);
     return failure.diagnoseAsError();
@@ -4406,6 +4424,7 @@ findImportedCaseWithMatchingSuffix(Type instanceTy, DeclNameRef name) {
     // Is one more available than the other?
     WORSE(->isUnavailable());
     WORSE(->isDeprecated());
+    WORSE(->isClangDeclDeprecated());
 
     // Does one have a shorter name (so the non-matching prefix is shorter)?
     WORSE(->getName().getBaseName().userFacingName().size());
@@ -5235,6 +5254,16 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
   }
 
   return false;
+}
+
+bool InvalidMetatypeExtensionMemberRefFailure::diagnoseAsError() {
+  auto baseType = resolveType(BaseType)->getWithoutSpecifierType();
+  baseType = baseType->getMetatypeInstanceType();
+
+  emitDiagnostic(diag::metatype_extension_member_on_conforming_type, baseType,
+                 Member)
+      .highlight(getSourceRange());
+  return true;
 }
 
 bool PartialApplicationFailure::diagnoseAsError() {
@@ -7568,6 +7597,13 @@ bool AsyncFunctionConversionFailure::diagnoseAsError() {
   }
 
   emitDiagnostic(diag::async_functiontype_mismatch, getFromType(),
+                 getToType());
+  return true;
+}
+
+bool ConversionBetweenFunctionsWithDifferentExecutionSemantics::
+    diagnoseAsError() {
+  emitDiagnostic(diag::called_once_function_type_mismatch, getFromType(),
                  getToType());
   return true;
 }
@@ -9923,6 +9959,22 @@ bool DisallowedIsolatedConformance::diagnoseAsError() {
 
   if (auto *decl = selectedOverload->choice.getDeclOrNull()) {
     emitDiagnosticAt(decl, diag::decl_declared_here, decl);
+  }
+
+  return true;
+}
+
+bool NonClassBaseInDynamicMemberLookup::diagnoseAsError() {
+  emitDiagnostic(diag::keypath_dynamic_member_lookup_expects_class_base,
+                 BaseType, Member);
+
+  auto *loc = getLocator();
+  auto *memberLoc =
+      getConstraintLocator(loc->getAnchor(), loc->getPath().drop_back());
+
+  if (auto overload = getCalleeOverloadChoiceIfAvailable(memberLoc)) {
+    emitDiagnostic(diag::keypath_dynamic_member_lookup_expects_class_base_note,
+                   overload->choice.getBaseType());
   }
 
   return true;

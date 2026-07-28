@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s | %FileCheck %s
 
 // CHECK-LABEL: sil hidden [ossa] @$s17variant_overrides1AC3foo5blockyyACc_tF :

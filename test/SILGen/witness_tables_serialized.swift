@@ -1,5 +1,6 @@
 // This file is also used by witness_tables_serialized_import.swift.
 
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s -package-name Package
 // RUN: %target-swift-emit-silgen %s -package-name Package | %FileCheck -check-prefix CHECK -check-prefix CHECK-NONRESILIENT %s
 // RUN: %target-swift-emit-silgen -enable-library-evolution %s -package-name Package | %FileCheck -check-prefix CHECK -check-prefix CHECK-RESILIENT %s
 

@@ -7,7 +7,6 @@
 
 // REQUIRES: executable_test,swift_stdlib_no_asserts
 // REQUIRES: CPU=arm64 || CPU=x86_64
-// REQUIRES: swift_in_compiler
 
 // The required relocation format for a single return LLVM instruction are not necessarily
 // supported on object file formats other than Mach-O.

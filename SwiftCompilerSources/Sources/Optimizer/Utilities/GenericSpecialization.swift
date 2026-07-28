@@ -62,6 +62,10 @@ private struct VTableSpecializer {
       if baseTypesOfMethods[entry.implementation] == nil {
         baseTypesOfMethods[entry.implementation] = classType
       }
+      // Ensure the SIL body of every vtable entry is loaded from the
+      // defining module.
+      _ = context.loadFunction(function: entry.implementation,
+                               loadCalleesRecursively: true)
     }
 
     if classType.isGenericAtAnyLevel {
@@ -266,8 +270,7 @@ private extension Function {
 
   // True, if the self argument is a generic parameter.
   func hasGenericSelf(_ context: some Context) -> Bool {
-    let convention = FunctionConvention(for: loweredFunctionType,
-                                        hasLoweredAddresses: context.moduleHasLoweredAddresses)
+    let convention = FunctionConvention(for: loweredFunctionType, in: self)
     if convention.hasSelfParameter,
        let selfParam = convention.parameters.last,
        selfParam.type.isGenericTypeParameter

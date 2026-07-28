@@ -9,7 +9,6 @@
 // RUN: %target-swift-frontend -enable-experimental-feature Embedded -parse-as-library -module-name test %s -S -Xcc -mtail-call | %FileCheck %s --check-prefix=TAIL-ASM
 // RUN: %target-swift-frontend -enable-experimental-feature Embedded -parse-as-library -module-name test %s -S | %FileCheck %s --check-prefix=NOTAIL-ASM
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: optimized_stdlib
 // REQUIRES: OS=wasip1
 // REQUIRES: swift_feature_Embedded

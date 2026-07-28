@@ -57,6 +57,27 @@ static bool isOSObjectType(const clang::Decl *decl) {
   return !DeclAndTypePrinter::maybeGetOSObjectBaseName(named).empty();
 }
 
+/// Whether \p ty is printed as an ObjC runtime type in a C header (AnyClass ->
+/// 'Class'), which requires <objc/objc.h>.
+static bool cReferencesObjCRuntimeType(Type ty) {
+  ty = ty->lookThroughAllOptionalTypes();
+  if (auto metatype = ty->getAs<ExistentialMetatypeType>())
+    return metatype->getInstanceType()->isAnyObject();
+  return false;
+}
+
+/// Whether \p FD's C signature uses such a type.
+static bool cDeclUsesObjCRuntimeType(const AbstractFunctionDecl *FD) {
+  if (auto *fd = dyn_cast<FuncDecl>(FD))
+    if (cReferencesObjCRuntimeType(fd->getResultInterfaceType()))
+      return true;
+  if (auto *params = FD->getParameters())
+    for (auto *param : *params)
+      if (cReferencesObjCRuntimeType(param->getInterfaceType()))
+        return true;
+  return false;
+}
+
 namespace {
 class ReferencedTypeFinder : public TypeDeclFinder {
   friend TypeDeclFinder;
@@ -393,6 +414,7 @@ class ModuleWriter {
   DeclAndTypePrinter printer;
   OutputLanguageMode outputLangMode;
   bool dependsOnStdlib = false;
+  bool requiresObjCRuntimeHeader = false;
 
 public:
   ModuleWriter(raw_ostream &os, raw_ostream &prologueOS,
@@ -413,6 +435,10 @@ public:
   bool isStdlibRequired() const {
     return dependsOnStdlib;
   }
+
+  /// Returns true if an emitted `@c` declaration uses a type whose C
+  /// representation needs <objc/objc.h> (AnyClass -> 'Class').
+  bool isObjCRuntimeHeaderRequired() const { return requiresObjCRuntimeHeader; }
 
   /// Returns true if we added the decl's module to the import set, false if
   /// the decl is a local decl.
@@ -801,6 +827,12 @@ public:
   bool writeFunc(const FuncDecl *FD) {
     if (addImport(FD))
       return true;
+
+    // A @c function in the C section using an ObjC runtime type (AnyClass ->
+    // 'Class') needs <objc/objc.h>.
+    if (outputLangMode == OutputLanguageMode::C &&
+        cDeclUsesObjCRuntimeType(FD))
+      requiresObjCRuntimeHeader = true;
 
     PrettyStackTraceDecl entry(
         "printing forward declarations needed by function", FD);
@@ -1208,17 +1240,18 @@ void swift::printModuleContentsAsObjC(
       .write();
 }
 
-void swift::printModuleContentsAsC(
+bool swift::printModuleContentsAsC(
     raw_ostream &os, llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
     ModuleDecl &M, SwiftToClangInteropContext &interopContext,
     std::optional<AccessLevel> minAccess) {
   llvm::raw_null_ostream prologueOS;
   llvm::StringSet<> exposedModules;
-  ModuleWriter(os, prologueOS, imports, M, interopContext,
-               getRequiredAccess(M, minAccess),
-               /*requiresExposedAttribute=*/false, exposedModules,
-               OutputLanguageMode::C)
-      .write();
+  ModuleWriter writer(os, prologueOS, imports, M, interopContext,
+                      getRequiredAccess(M, minAccess),
+                      /*requiresExposedAttribute=*/false, exposedModules,
+                      OutputLanguageMode::C);
+  writer.write();
+  return writer.isObjCRuntimeHeaderRequired();
 }
 
 EmittedClangHeaderDependencyInfo swift::printModuleContentsAsCxx(

@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -import-objc-header %S/Inputs/objc_witnesses_serialized.h
 // RUN: %target-swift-emit-silgen -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -import-objc-header %S/Inputs/objc_witnesses_serialized.h | %FileCheck %s
 
 // REQUIRES: objc_interop

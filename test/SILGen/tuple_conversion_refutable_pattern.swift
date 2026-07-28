@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 // RUN: %target-swift-emit-silgen %s | %FileCheck %s
 
 // CHECK-LABEL: sil hidden [ossa] @$s34tuple_conversion_refutable_pattern2f13argySi1a_SiSg1bt_tF : $@convention(thin) (Int, Optional<Int>) -> () {

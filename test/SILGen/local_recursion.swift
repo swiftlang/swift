@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 // RUN: %target-swift-emit-silgen  -parse-as-library %s | %FileCheck %s
 
 // CHECK-LABEL: sil hidden [ossa] @$s15local_recursionAA_1yySi_SitF : $@convention(thin) (Int, Int) -> () {

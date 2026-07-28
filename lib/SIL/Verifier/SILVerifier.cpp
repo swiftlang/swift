@@ -37,6 +37,7 @@
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/InstructionUtils.h"
+#include "swift/SIL/LoopInfo.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/OwnershipLiveness.h"
 #include "swift/SIL/OwnershipUtils.h"
@@ -87,17 +88,13 @@ static llvm::cl::opt<bool> VerifyDIHoles("verify-di-holes", llvm::cl::init(
 #endif
                                                                 ));
 
-// Verify the type chain of debug_value instructions. Disabled by default
-// while we fix all root causes.
-static llvm::cl::opt<bool> VerifyDebugValueExpr("verify-debug-value-expr",
-                                                llvm::cl::init(false));
-
 static llvm::cl::opt<bool> SkipConvertEscapeToNoescapeAttributes(
     "verify-skip-convert-escape-to-noescape-attributes", llvm::cl::init(false));
 
-// Allow unit tests to gradually migrate toward -allow-critical-edges=false.
-static llvm::cl::opt<bool> AllowCriticalEdges("allow-critical-edges",
-                                              llvm::cl::init(true));
+static llvm::cl::opt<bool> VerifyReducibleLoops(
+    "verify-reducible-loops", llvm::cl::init(false),
+    llvm::cl::desc("Verify that SIL does not contain irreducible loops"));
+
 extern llvm::cl::opt<bool> SILPrintDebugInfo;
 
 void swift::verificationFailure(
@@ -418,6 +415,7 @@ namespace {
 
 /// Verify invariants on a key path component.
 void verifyKeyPathComponent(SILModule &M,
+                            const SILFunction *F,
                             TypeExpansionContext typeExpansionContext,
                             SerializedKind_t serializedKind,
                             llvm::function_ref<void(bool, StringRef)> require,
@@ -666,7 +664,8 @@ void verifyKeyPathComponent(SILModule &M,
         // object type until AddressLowering rewrites it. Accept that
         // intermediate shape.
         require(contextType == operandType ||
-                    (!M.useLoweredAddresses() &&
+                    (!SILAddressConventions::forFunctionOrRawSIL(F, M)
+                          .useLoweredAddresses() &&
                      (contextType.isAddress() && operandType.isObject() &&
                       contextType.getObjectType() == operandType)),
                 "operand must match type required by pattern");
@@ -1505,20 +1504,14 @@ public:
     assert(arg->isPhi() && "precondition");
     for (SILBasicBlock *predBB : arg->getParent()->getPredecessorBlocks()) {
       auto *TI = predBB->getTerminator();
+      require(isa<BranchInst>(TI), "All phi inputs must be branch operands.");
       if (F.hasOwnership()) {
-        require(isa<BranchInst>(TI), "All phi inputs must be branch operands.");
-
         // Address-only values are potentially unmovable when borrowed. See also
         // checkOwnershipForwardingInst. A phi implies a move of its arguments
         // because they can't necessarily all reuse the same storage.
         require((!arg->getType().isAddressOnly(F)
                  || arg->getOwnershipKind() != OwnershipKind::Guaranteed),
                 "Guaranteed address-only phi not allowed--implies a copy");
-      } else {
-        // FIXME: when critical edges are removed and cond_br arguments are
-        // disallowed, only allow BranchInst.
-        require(isa<BranchInst>(TI) || isa<CondBranchInst>(TI),
-                "All phi argument inputs must be from branches.");
       }
     }
     if (arg->isPhi()) {
@@ -1817,6 +1810,25 @@ public:
     if (!varInfo)
       return;
 
+    // The `$error` debug variable is a placeholder for the function's
+    // error-result slot so the debugger can display the in-flight error.
+    // It only makes sense in a function whose SIL type actually has an
+    // error result; see `SILGenFunction::emitBasicProlog`. Downstream
+    // consumers (IRGen's `visitDebugValueInst`) call `getErrorResult()`
+    // on it, which asserts when no such result exists.
+    //
+    // For an inlined occurrence the variable belongs to the function it
+    // was originally declared in (which must itself have an error
+    // result), not the function it was inlined into. Look through the
+    // debug scope to that function rather than checking the containing
+    // function.
+    if (isa<DebugValueInst>(inst) && varInfo->Name == "$error") {
+      auto *owningFn = varInfo->Scope->getInlinedFunction();
+      require(owningFn->getLoweredFunctionType()->hasErrorResult(),
+              "'$error' debug_value may only appear in a function whose "
+              "SIL type has an error result");
+    }
+
     SILType DebugVarTy = *varInfo->Type;
 
     auto *debugScope = inst->getDebugScope();
@@ -1970,9 +1982,7 @@ public:
     }
 
     // Type chain: SSA operand -> DebugBB -> deref -> fragments -> vartype
-    if (VerifyDebugValueExpr)
-      require(inst->isExprTypeValid(),
-              "debug_value type chain should hold");
+    require(inst->isExprTypeValid(), "debug_value type chain should hold");
   }
 
   void checkInstructionsDebugInfo(SILInstruction *inst) {
@@ -2291,7 +2301,7 @@ public:
             "substituted callee type does not match substitutions");
 
     // Check that the arguments and result match.
-    SILFunctionConventions substConv(substTy, F.getModule());
+    SILFunctionConventions substConv(substTy, fnConv.silConv);
     require(site.getNumArguments() == substConv.getNumSILArguments(),
             "apply doesn't have right number of arguments for function");
     for (size_t i = 0, size = site.getNumArguments(); i < size; ++i) {
@@ -2338,7 +2348,7 @@ public:
   void checkApplyInst(ApplyInst *AI) {
     checkFullApplySite(AI);
 
-    SILFunctionConventions calleeConv(AI->getSubstCalleeType(), F.getModule());
+    SILFunctionConventions calleeConv(AI->getSubstCalleeType(), fnConv.silConv);
     requireSameType(
         AI->getType(), calleeConv.getSILResultType(F.getTypeExpansionContext()),
         "type of apply instruction doesn't match function result type");
@@ -2365,7 +2375,7 @@ public:
   void checkTryApplyInst(TryApplyInst *AI) {
     checkFullApplySite(AI);
 
-    SILFunctionConventions calleeConv(AI->getSubstCalleeType(), F.getModule());
+    SILFunctionConventions calleeConv(AI->getSubstCalleeType(), fnConv.silConv);
 
     require(!calleeConv.funcTy->isCoroutine(),
             "cannot call coroutine with normal apply");
@@ -2405,7 +2415,7 @@ public:
   void checkBeginApplyInst(BeginApplyInst *AI) {
     checkFullApplySite(AI);
 
-    SILFunctionConventions calleeConv(AI->getSubstCalleeType(), F.getModule());
+    SILFunctionConventions calleeConv(AI->getSubstCalleeType(), fnConv.silConv);
     auto yieldResults = AI->getYieldedValues();
     auto yields = calleeConv.getYields();
     require(yields.size() == yieldResults.size(),
@@ -2451,7 +2461,7 @@ public:
             "operand of end_apply must be a begin_apply");
 
     BeginApplyInst *bai = AI->getBeginApply();
-    SILFunctionConventions calleeConv(bai->getSubstCalleeType(), F.getModule());
+    SILFunctionConventions calleeConv(bai->getSubstCalleeType(), fnConv.silConv);
 
     requireSameType(
       AI->getType(), calleeConv.getSILResultType(F.getTypeExpansionContext()),
@@ -2536,7 +2546,7 @@ public:
             "result of partial_apply should take as many inputs as were not "
             "applied by the instruction");
 
-    SILFunctionConventions substConv(substTy, F.getModule());
+    SILFunctionConventions substConv(substTy, fnConv.silConv);
     unsigned appliedArgStartIdx =
         substConv.getNumSILArguments() - PAI->getNumArguments();
     for (auto p : llvm::enumerate(PAI->getArguments())) {
@@ -3116,7 +3126,7 @@ public:
                                   LinearLiveness::DoNotIncludeExtensions);
     linearLiveness.compute();
     auto &liveness = linearLiveness.getLiveness();
-    require(!liveness.isWithinBoundary(I, /*deadEndBlocks=*/nullptr),
+    require(!liveness.isWithinBoundary(I),
             "extend_lifetime use within unextended linear liveness boundary!?");
     PrunedLivenessBoundary boundary;
     liveness.computeBoundary(boundary);
@@ -3212,8 +3222,7 @@ public:
       if (scopedAddress.isScopeEndingUse(use)) {
         continue;
       }
-      if (!scopedAddressLiveness->isWithinBoundary(user,
-                                                   /*deadEndBlocks=*/nullptr)) {
+      if (!scopedAddressLiveness->isWithinBoundary(user)) {
         llvm::errs() << "User found outside scope: " << *user;
         return false;
       }
@@ -3432,11 +3441,10 @@ public:
     bool success = useKind == AddressUseKind::NonEscaping;
 
     require(!success || checkScopedAddressUses(
-              scopedAddress, &scopedAddressLiveness, DEBlocks.get()),
+              scopedAddress, &scopedAddressLiveness, &getDeadEndBlocks()),
             "Ill formed store_borrow scope");
 
-    require(!success || !hasOtherStoreBorrowsInLifetime(
-              SI, &scopedAddressLiveness, DEBlocks.get()),
+    require(!success || !hasOtherStoreBorrowsInLifetime(SI, &scopedAddressLiveness),
             "A store_borrow cannot be nested within another "
             "store_borrow to its destination");
 
@@ -3508,7 +3516,8 @@ public:
     // and `initialValue`.
     {
       CanSILFunctionType initTy = initFn->getType().castTo<SILFunctionType>();
-      SILFunctionConventions initConv(initTy, AI->getModule());
+      SILFunctionConventions initConv(
+          initTy, SILAddressConventions::forFunction(F));
 
       require(initConv.getResults().size() ==
                   AI->getNumInitializedProperties(),
@@ -3522,7 +3531,8 @@ public:
     // Check setter - it's a partially applied reference which takes
     // `initialValue`.
     CanSILFunctionType setterTy = setterFn->getType().castTo<SILFunctionType>();
-    SILFunctionConventions setterConv(setterTy, AI->getModule());
+    SILFunctionConventions setterConv(
+        setterTy, SILAddressConventions::forFunction(F));
     require(setterConv.getNumIndirectSILResults() == 0,
             "set function has indirect results");
     checkAssignByWrapperArgs(Src->getType(), setterConv);
@@ -3756,21 +3766,21 @@ public:
   }
 
   void checkUnownedCopyValueInst(UnownedCopyValueInst *I) {
-    require(!F.getModule().useLoweredAddresses(),
+    require(!F.hasLoweredAddresses(),
             "unowned_copy_value is only valid in opaque values");
     require(I->getType().isAddressOnly(F),
             "unowned_copy_value must produce an address-only value");
   }
 
   void checkWeakCopyValueInst(WeakCopyValueInst *I) {
-    require(!F.getModule().useLoweredAddresses(),
+    require(!F.hasLoweredAddresses(),
             "weak_copy_value is only valid in opaque values");
     require(I->getType().isAddressOnly(F),
             "weak_copy_value must produce an address-only value");
   }
 
   void checkStrongCopyWeakValueInst(StrongCopyWeakValueInst *I) {
-    require(!F.getModule().useLoweredAddresses(),
+    require(!F.hasLoweredAddresses(),
             "strong_copy_weak_value is only valid in opaque values");
     require(I->getOperand()->getType().isAddressOnly(F),
             "strong_copy_weak_value requires an address-only operand");
@@ -4072,7 +4082,7 @@ public:
   }
 
   void checkTupleAddrConstructorInst(TupleAddrConstructorInst *taci) {
-    require(F.getModule().useLoweredAddresses(),
+    require(F.hasLoweredAddresses(),
             "tuple_addr_constructor is invalid in opaque values");
     require(taci->getNumElements() > 0,
             "Cannot be applied to tuples that do not contain any real "
@@ -4461,7 +4471,7 @@ public:
                 "ownership kind result?!");
       }
       if (operandTy.getNominalOrBoundGenericNominal()
-          ->getValueTypeDestructor()) {
+          ->hasValueTypeDestructor()) {
         require(
           isa<DropDeinitInst>(lookThroughOwnershipInsts(DSI->getOperand())),
             "a destructure of a move-only-type-with-deinit requires a "
@@ -4490,7 +4500,8 @@ public:
   }
 
   SILType getMethodSelfType(CanSILFunctionType ft) {
-    SILFunctionConventions fnConv(ft, F.getModule());
+    SILFunctionConventions fnConv(ft,
+                                  SILAddressConventions::forFunction(F));
     return fnConv.getSILType(ft->getParameters().back(),
                              F.getTypeExpansionContext());
   }
@@ -5189,8 +5200,8 @@ public:
     auto fromCanTy = fromTy.getASTType();
     auto toCanTy = toTy.getASTType();
 
-    require(canSILUseScalarCheckedCastInstructions(F.getModule(),
-                                                   fromCanTy, toCanTy),
+    require(canSILUseScalarCheckedCastInstructions(
+                F.getModule(), F.hasLoweredAddresses(), fromCanTy, toCanTy),
             "invalid value checked cast src or dest types");
 
     // Peel off metatypes. If two types are checked-cast-able, so are their
@@ -6046,34 +6057,15 @@ public:
                         1, cbi->getCondition()->getType().getASTContext()),
                     "condition of conditional branch must have Int1 type");
 
-    require(cbi->getTrueArgs().size() == cbi->getTrueBB()->args_size(),
-            "true branch has wrong number of arguments for dest bb");
     require(cbi->getTrueBB() != cbi->getFalseBB(), "identical destinations");
-    require(std::equal(cbi->getTrueArgs().begin(), cbi->getTrueArgs().end(),
-                       cbi->getTrueBB()->args_begin(),
-                       [&](SILValue branchArg, SILArgument *bbArg) {
-                         return verifyBranchArgs(branchArg, bbArg);
-                       }),
-            "true branch argument types do not match arguments for dest bb");
 
-    require(cbi->getFalseArgs().size() == cbi->getFalseBB()->args_size(),
-            "false branch has wrong number of arguments for dest bb");
-    require(std::equal(cbi->getFalseArgs().begin(), cbi->getFalseArgs().end(),
-                       cbi->getFalseBB()->args_begin(),
-                       [&](SILValue branchArg, SILArgument *bbArg) {
-                         return verifyBranchArgs(branchArg, bbArg);
-                       }),
-            "false branch argument types do not match arguments for dest bb");
-    // When we are in ossa, cond_br can not have any arguments that are
-    // non-trivial.
-    if (!F.hasOwnership())
-      return;
-
-    require(llvm::all_of(cbi->getOperandValues(),
-                         [&](SILValue v) -> bool {
-                           return v->getType().isTrivial(*cbi->getFunction());
-                         }),
-            "cond_br must not have a non-trivial value in ossa.");
+    // A cond_br never passes branch arguments: because SIL does not contain
+    // critical edges, both destinations have a single predecessor and therefore
+    // must not take any block arguments.
+    require(cbi->getTrueBB()->args_empty(),
+            "true branch destination must not take arguments");
+    require(cbi->getFalseBB()->args_empty(),
+            "false branch destination must not take arguments");
   }
 
   void checkDynamicMethodBranchInst(DynamicMethodBranchInst *DMBI) {
@@ -6304,7 +6296,7 @@ public:
           break;
         }
       
-        verifyKeyPathComponent(F.getModule(),
+        verifyKeyPathComponent(F.getModule(), &F,
                                F.getTypeExpansionContext(),
                                F.getSerializedKind(),
           [&](bool reqt, StringRef message) { _require(reqt, message); },
@@ -6851,7 +6843,7 @@ public:
   }
 
   void checkTuplePackExtractInst(TuplePackExtractInst *i) {
-    require(!F.getModule().useLoweredAddresses(),
+    require(!F.hasLoweredAddresses(),
             "tuple_pack_extract is only valid in opaque values");
     auto index = requireValueKind<AnyPackIndexInst>(
         i->getIndex(),
@@ -6921,8 +6913,12 @@ public:
         return;
       }
 
+      // Use the function's own conventions (fnConv carries its per-function
+      // lowered-addresses state) so an already-lowered function verifies against
+      // address-form ownership even while the module stage is still Raw.
       auto ownershipkind = ValueOwnershipKind(
-          F, mappedTy, fnConv.getSILArgumentConvention(bbarg->getIndex()));
+          F, mappedTy, fnConv.getSILArgumentConvention(bbarg->getIndex()),
+          fnConv.silConv);
 
       if (bbarg->getOwnershipKind() != ownershipkind) {
         llvm::errs() << what << " ownership kind mismatch!\n";
@@ -7013,7 +7009,7 @@ public:
     require(type.isMoveOnly(/*orWrapped=*/false),
             "drop_deinit only allowed for move-only types");
     require(type.getNominalOrBoundGenericNominal()
-            ->getValueTypeDestructor(), "drop_deinit only allowed for "
+            ->hasValueTypeDestructor(), "drop_deinit only allowed for "
             "struct/enum types that define a deinit");
     assert(!type.isTrivial(F) && "a type with a deinit is nontrivial");
 
@@ -7223,31 +7219,17 @@ public:
   }
 
   void verifyBranches(const SILFunction *F) {
-    // Verify no critical edge.
-    auto requireNonCriticalSucc = [this](const TermInst *termInst,
-                                         const Twine &message) {
-      // A critical edge has more than one outgoing edges from the source
-      // block.
-      auto succBlocks = termInst->getSuccessorBlocks();
-      if (succBlocks.size() <= 1)
-        return;
-
-      for (const SILBasicBlock *destBB : succBlocks) {
-        // And its destination block has more than one predecessor.
-        _require(destBB->getSinglePredecessorBlock(), message);
-      }
-    };
-
     for (auto &bb : *F) {
       const TermInst *termInst = bb.getTerminator();
       VerifierErrorEmitterGuard guard(this, termInst);
 
-      if (isSILOwnershipEnabled() && F->hasOwnership()) {
-        requireNonCriticalSucc(termInst, "critical edges not allowed in OSSA");
-      }
-      // In Lowered SIL, they are allowed on conditional branches only.
-      if (!AllowCriticalEdges && !isa<CondBranchInst>(termInst)) {
-        requireNonCriticalSucc(termInst, "only cond_br critical edges allowed");
+      // A critical edge has more than one outgoing edges from the source
+      // block.
+      if (!isa<BranchInst>(termInst)) {
+        for (const SILBasicBlock *destBB : termInst->getSuccessorBlocks()) {
+          // And its destination block has more than one predecessor.
+          _require(destBB->getSinglePredecessorBlock(), "critical edges not allowed");
+        }
       }
     }
   }
@@ -7368,6 +7350,10 @@ public:
   void visitSILBasicBlock(SILBasicBlock *BB) {
     SILInstructionVisitor::visitSILBasicBlock(BB);
     verifyDebugScopeHoles(BB);
+
+    for (SILInstruction &inst : *BB) {
+      inst.verifyOperandOwnership(&fnConv.silConv);
+    }
   }
 
   void visitBasicBlockArguments(SILBasicBlock *BB) {
@@ -7570,6 +7556,9 @@ public:
         !mod.getASTContext().hadError()) {
       F->verifyMemoryLifetime(calleeCache, &getDeadEndBlocks());
     }
+
+    if (VerifyReducibleLoops)
+      verifyReducibleLoops(F);
   }
 
   void verify(bool isCompleteOSSA) {
@@ -7577,6 +7566,23 @@ public:
       DEBlocks = std::make_shared<DeadEndBlocks>(const_cast<SILFunction *>(&F));
     }
     visitSILFunction(const_cast<SILFunction*>(&F));
+  }
+
+  void verifyReducibleLoops(SILFunction *func) {
+    llvm::SmallPtrSet<SILBasicBlock *, 32> loopHeaders;
+    findLoopHeaders(*func, loopHeaders);
+
+    SILLoopInfo loopInfo(func, Dominance);
+
+    for (auto *loopHeader : loopHeaders) {
+      auto *loop = loopInfo.getLoopFor(loopHeader);
+      if (!loop) {
+        llvm::errs() << "Irreducible loop detected in function "
+                     << func->getName() << ":\n";
+        loopHeader->dump();
+        require(false, "SIL contains irreducible loop");
+      }
+    }
   }
 };
 } // end anonymous namespace
@@ -7709,7 +7715,7 @@ void SILProperty::verify(const SILModule &M) const {
         TypeExpansionContext::noOpaqueTypeArchetypesSubstitution(
             ResilienceExpansion::Maximal);
     auto baseTy = getBaseType();
-    verifyKeyPathComponent(const_cast<SILModule&>(M),
+    verifyKeyPathComponent(const_cast<SILModule&>(M), /*F=*/nullptr,
                            typeExpansionContext,
                            getSerializedKind(),
                            require,

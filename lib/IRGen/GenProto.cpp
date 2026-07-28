@@ -950,7 +950,8 @@ namespace {
       // ProtocolDescriptorBuilder::getRequirementInfo.
       assert((isa<ConstructorDecl>(func.getDecl())
                   ? (func.kind == SILDeclRef::Kind::Allocator)
-                  : (func.kind == SILDeclRef::Kind::Func)) &&
+                  : (func.kind == SILDeclRef::Kind::Func ||
+                     func.kind == SILDeclRef::Kind::DistributedThunk)) &&
              "unexpected kind for protocol witness declaration ref");
       Entries.push_back(WitnessTableEntry::forFunction(func));
     }
@@ -1135,12 +1136,14 @@ static bool isDependentConformance(
     if (assocConformance.isInvalid())
       return false;
 
-    if (assocConformance.isAbstract() ||
-        isDependentConformance(IGM,
-                               assocConformance.getConcrete()
-                                 ->getRootConformance(),
-                               isResilient,
-                               visited))
+    if (assocConformance.isAbstract())
+      return true;
+
+    auto *assocRoot = assocConformance.getConcrete()->getRootConformance();
+    if (isDependentConformance(
+            IGM, assocRoot,
+            IGM.isResilientConformance(assocRoot, /*disableOptimizations=*/true),
+            visited))
       return true;
   }
 

@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -Xllvm -sil-print-types -sdk %S/Inputs %s -enable-objc-interop
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -sdk %S/Inputs %s -enable-objc-interop | %FileCheck %s
 
 import ansible

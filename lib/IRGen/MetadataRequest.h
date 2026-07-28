@@ -672,6 +672,14 @@ llvm::Value *emitClassHeapMetadataRef(IRGenFunction &IGF, CanType type,
                                       DynamicMetadataRequest request,
                                       bool allowUninitialized = false);
 
+/// Emit a reference to the ObjC metatype for a class or protocol.
+///
+/// Only requests whose response status can be ignored can be used.
+///
+llvm::Value *emitObjCMetatypeRef(IRGenFunction &IGF, CanType type,
+                                 DynamicMetadataRequest request,
+                                 bool allowUninitialized = false);
+
 /// Emit a reference to the (initialized) ObjC heap metadata for a class.
 ///
 /// \returns a value of type ObjCClassPtrTy

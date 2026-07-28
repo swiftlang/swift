@@ -1,7 +1,6 @@
 // RUN: %target-run-simple-swift(-enable-experimental-feature Embedded -parse-as-library -wmo %target-embedded-posix-shim) | %FileCheck %s
 // RUN: %target-run-simple-swift(-O -enable-experimental-feature Embedded -parse-as-library -wmo %target-embedded-posix-shim) | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
 // REQUIRES: swift_feature_Embedded

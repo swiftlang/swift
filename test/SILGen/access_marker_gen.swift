@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name access_marker_gen -parse-as-library -Xllvm -sil-full-demangle -enforce-exclusivity=checked %s | %FileCheck %s
 

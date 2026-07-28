@@ -89,15 +89,17 @@ static bool canonicalizeInputFunction(Function &F, ARCEntryPointBuilder &B,
       Instruction &Inst = *I++;
 
       switch (classifyInstruction(Inst)) {
-      // These instructions should not reach here based on the pass ordering.
-      // i.e. LLVMARCOpt -> LLVMContractOpt.
+      // The *_n forms are normally only created by LLVMARCContract, which
+      // runs after this pass. But IR that defines the runtime entry points
+      // themselves (e.g. EmbeddedRuntime.swift) can contain calls to them
+      // directly, so just leave them alone.
       case RT_RetainN:
       case RT_UnknownObjectRetainN:
       case RT_BridgeRetainN:
       case RT_ReleaseN:
       case RT_UnknownObjectReleaseN:
       case RT_BridgeReleaseN:
-        llvm_unreachable("These are only created by LLVMARCContract !");
+        break;
       case RT_Unknown:
       case RT_BridgeRelease:
       case RT_AllocObject:
@@ -286,15 +288,17 @@ static bool performLocalReleaseMotion(CallInst &Release, BasicBlock &BB,
     }
 
     switch (classifyInstruction(*BBI)) {
-    // These instructions should not reach here based on the pass ordering.
-    // i.e. LLVMARCOpt -> LLVMContractOpt.
+    // The *_n forms are normally only created by LLVMARCContract, which
+    // runs after this pass. But IR that defines the runtime entry points
+    // themselves (e.g. EmbeddedRuntime.swift) can contain calls to them
+    // directly, so just leave them alone.
     case RT_UnknownObjectRetainN:
     case RT_BridgeRetainN:
     case RT_RetainN:
     case RT_UnknownObjectReleaseN:
     case RT_BridgeReleaseN:
     case RT_ReleaseN:
-        llvm_unreachable("These are only created by LLVMARCContract !");
+        break;
     case RT_NoMemoryAccessed:
       // Skip over random instructions that don't touch memory.  They don't need
       // protection by retain/release.
@@ -436,15 +440,17 @@ static bool performLocalRetainMotion(CallInst &Retain, BasicBlock &BB,
     // can be skipped and is interesting, and a "continue" when it is a retain
     // of the same pointer.
     switch (classifyInstruction(CurInst)) {
-    // These instructions should not reach here based on the pass ordering.
-    // i.e. LLVMARCOpt -> LLVMContractOpt.
+    // The *_n forms are normally only created by LLVMARCContract, which
+    // runs after this pass. But IR that defines the runtime entry points
+    // themselves (e.g. EmbeddedRuntime.swift) can contain calls to them
+    // directly, so just leave them alone.
     case RT_RetainN:
     case RT_UnknownObjectRetainN:
     case RT_BridgeRetainN:
     case RT_ReleaseN:
     case RT_UnknownObjectReleaseN:
     case RT_BridgeReleaseN:
-        llvm_unreachable("These are only created by LLVMARCContract !");
+        break;
     case RT_NoMemoryAccessed:
     case RT_AllocObject:
     case RT_CheckUnowned:
@@ -590,15 +596,17 @@ static DtorKind analyzeDestructor(Value *P) {
     for (Instruction &I : BB) {
       // Note that the destructor may not be in any particular canonical form.
       switch (classifyInstruction(I)) {
-      // These instructions should not reach here based on the pass ordering.
-      // i.e. LLVMARCOpt -> LLVMContractOpt.
+      // The *_n forms are normally only created by LLVMARCContract, which
+      // runs after this pass. But IR that defines the runtime entry points
+      // themselves (e.g. EmbeddedRuntime.swift) can contain calls to them
+      // directly, so just leave them alone.
       case RT_RetainN:
       case RT_UnknownObjectRetainN:
       case RT_BridgeRetainN:
       case RT_ReleaseN:
       case RT_UnknownObjectReleaseN:
       case RT_BridgeReleaseN:
-        llvm_unreachable("These are only created by LLVMARCContract !");
+        break;
       case RT_NoMemoryAccessed:
       case RT_AllocObject:
       case RT_FixLifetime:
@@ -706,15 +714,17 @@ static bool performStoreOnlyObjectElimination(CallInst &Allocation,
 
     // Okay, this is the first time we've seen this instruction, proceed.
     switch (classifyInstruction(*I)) {
-    // These instructions should not reach here based on the pass ordering.
-    // i.e. LLVMARCOpt -> LLVMContractOpt.
+    // The *_n forms are normally only created by LLVMARCContract, which
+    // runs after this pass. But IR that defines the runtime entry points
+    // themselves (e.g. EmbeddedRuntime.swift) can contain calls to them
+    // directly, so just leave them alone.
     case RT_RetainN:
     case RT_UnknownObjectRetainN:
     case RT_BridgeRetainN:
     case RT_ReleaseN:
     case RT_UnknownObjectReleaseN:
     case RT_BridgeReleaseN:
-      llvm_unreachable("These are only created by LLVMARCContract !");
+      break;
     case RT_AllocObject:
       // If this is a different swift_allocObject than we started with, then
       // there is some computation feeding into a size or alignment computation

@@ -28,7 +28,8 @@ class MIDIDevice {
 Normally, a global actor like `@MainActor` implies `Sendable`, but this is not the case for classes with non-Sendable superclasses for the same reason.
 
 ```swift
-@MainActor class MIDISynth: MIDIDevice {} // Not implicitly Sendable!
+@MainActor
+class MIDISynth: MIDIDevice {} // Not implicitly Sendable!
 ```
 
 If `@MainActor` made `MIDISynth` conform to `Sendable`, `MIDISynth` could be sent to multiple actors, upcast to `MIDIDevice`, and concurrently mutated:

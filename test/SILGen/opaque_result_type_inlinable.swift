@@ -1,3 +1,4 @@
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -emit-silgen-ossa -sil-verify-all -enable-sil-opaque-values -primary-file %s -primary-file %S/Inputs/opaque_result_type_inlinable_other.swift
 // RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -emit-silgen -primary-file %s -primary-file %S/Inputs/opaque_result_type_inlinable_other.swift | %FileCheck %s
 // RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -emit-silgen -primary-file %s %S/Inputs/opaque_result_type_inlinable_other.swift | %FileCheck %s
 // RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -emit-silgen %s %S/Inputs/opaque_result_type_inlinable_other.swift | %FileCheck %s

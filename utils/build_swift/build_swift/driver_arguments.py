@@ -906,6 +906,17 @@ def create_argument_parser():
            toggle_true('build_emscriptenstdlib'),
            help='build the stdlib for Emscripten target into a '
                 'separate build directory')
+    option(['--build-emscripten-host-llvm'],
+           toggle_true('build_emscripten_host_llvm'),
+           help='cross-build LLVM static libraries to run hosted on a '
+                'WebAssembly (Emscripten) runtime')
+    option(['--build-emscripten-host-swift'],
+           toggle_true('build_emscripten_host_swift'),
+           help='cross-build swift-frontend to run hosted on a WebAssembly '
+                '(Emscripten) runtime. Requires the cross-LLVM and the '
+                'emscripten target stdlib/sysroot to exist already: build '
+                'them in this or a prior invocation with '
+                '--build-emscripten-host-llvm and --build-emscripten-stdlib')
     option(['--emscripten-path'], store_path,
            help='path to the Emscripten checkout')
     option(['--skip-test-emscripten-stdlib'],
@@ -1517,13 +1528,14 @@ def create_argument_parser():
            help='enable building llvm using modules')
 
     option('--llvm-enable-index-store', toggle_true('llvm_enable_index_store'),
-           default=True,
+           default=False,
            help='emit -index-store-path while building LLVM/Clang and Swift '
                 'host tools (gated on the host compiler accepting the flag, '
-                'so it is a no-op for older compilers). Defaults to ON, but '
-                'is forced OFF when --sccache is in use (sccache cannot '
-                'cache the index-store side outputs and would otherwise '
-                'miss on every translation unit).')
+                'so it is a no-op for older compilers). Defaults to OFF. It '
+                'is also forced OFF when --sccache or an explicit '
+                '--cmake-c-launcher/--cmake-cxx-launcher is in use (compiler '
+                'caches cannot cache the index-store side outputs and would '
+                'otherwise miss on every translation unit).')
 
     option('--llvm-targets-to-build', store,
            default='X86;ARM;AArch64;PowerPC;SystemZ;Mips;RISCV;WebAssembly;AVR;BPF',

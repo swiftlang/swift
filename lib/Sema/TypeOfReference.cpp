@@ -2014,6 +2014,10 @@ ConstraintSystem::getTypeOfMemberReferencePre(
                                   preparedOverload);
         }
       }
+    } else if (outerDC->isMetatypeExtension()) {
+      // Metatype extension members do not require existential opening.
+      // The member belongs to the protocol metatype itself, not a
+      // conforming type.
     } else {
       // Open the existential.
       auto openedArchetype =
@@ -2029,17 +2033,27 @@ ConstraintSystem::getTypeOfMemberReferencePre(
   assert(openedParams.size() == 1);
 
   bool isDynamicLookup = (choice.getKind() == OverloadChoiceKind::DeclViaDynamic);
-  bool skipProtocolSelfConstraint = isDynamicLookup || isRequirementOrWitness(locator);
+  bool skipProtocolSelfConstraint =
+      isDynamicLookup || isRequirementOrWitness(locator);
+
+  // This candidate is only selected in diagnostic mode. Its self type is the
+  // protocol existential, which cannot be bound to a conforming archetype;
+  // suppress that constraint so the recorded fix can diagnose the reference.
+  bool isInvalidMetatypeExtensionMemberRef =
+      outerDC->isMetatypeExtension() && !baseObjTy->isExistentialType() &&
+      hasFixFor(locator,
+                FixKind::AllowMetatypeExtensionMemberOnConformingType);
 
   Type selfObjTy = openedParams.front().getPlainType()->getMetatypeInstanceType();
-  if (outerDC->getSelfProtocolDecl()) {
+  if (outerDC->getSelfProtocolDecl() &&
+      !isInvalidMetatypeExtensionMemberRef) {
     // For a protocol, substitute the base object directly. We don't need a
     // conformance constraint because we wouldn't have found the declaration
     // if it didn't conform.
     addConstraint(ConstraintKind::Bind, baseOpenedTy, selfObjTy,
                   getConstraintLocator(locator), /*isFavored=*/false,
                   preparedOverload);
-  } else if (!isDynamicLookup) {
+  } else if (!isDynamicLookup && !isInvalidMetatypeExtensionMemberRef) {
     addSelfConstraint(*this, baseOpenedTy, selfObjTy, locator, preparedOverload);
   }
 

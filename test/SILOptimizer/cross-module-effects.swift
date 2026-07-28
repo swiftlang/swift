@@ -13,7 +13,6 @@
 // RUN: %target-sil-opt %t/Module.swiftmodule | %FileCheck --check-prefix=CHECK-LE-MODULE %s
 // RUN: %target-swift-frontend -parse-as-library -I%t -module-name=Main -DMAIN %s -O -emit-sil | %FileCheck --check-prefix=CHECK-MAIN --check-prefix=CHECK-LE-MAIN %s
 
-// REQUIRES: swift_in_compiler
 
 #if MODULE
 

@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -enable-experimental-feature KeyPathWithMethodMembers -typecheck -verify %S/Inputs/keypath.swift -primary-file %s
+// RUN: %target-swift-frontend -enable-experimental-feature KeyPathWithMethodMembers -typecheck -verify %S/Inputs/keypath.swift -primary-file %s -solver-disable-enumerate-supertypes
+// RUN: %target-swift-frontend -enable-experimental-feature KeyPathWithMethodMembers -typecheck -verify %S/Inputs/keypath.swift -primary-file %s -solver-enable-enumerate-supertypes
 // REQUIRES: swift_feature_KeyPathWithMethodMembers
 
 struct S {

@@ -10,6 +10,7 @@
 // rdar://82123254
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 func run1(on object: PFXObject) async throws {
   do {

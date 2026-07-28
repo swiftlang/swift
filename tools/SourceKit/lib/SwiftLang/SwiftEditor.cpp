@@ -282,69 +282,57 @@ void EditorDiagConsumer::handleDiagnostic(SourceManager &SM,
 
 SwiftEditorDocumentRef
 SwiftEditorDocumentFileMap::getByUnresolvedName(StringRef FilePath) {
-  SwiftEditorDocumentRef EditorDoc;
+  std::lock_guard<std::mutex> lock(DocsMtx);
+  auto It = Docs.find(FilePath);
+  if (It != Docs.end())
+    return It->second.DocRef;
 
-  Queue.dispatchSync([&]{
-    auto It = Docs.find(FilePath);
-    if (It != Docs.end())
-      EditorDoc = It->second.DocRef;
-   });
-
-  return EditorDoc;
+  return nullptr;
 }
 
 SwiftEditorDocumentRef
 SwiftEditorDocumentFileMap::findByPath(StringRef FilePath, bool IsRealpath) {
-  SwiftEditorDocumentRef EditorDoc;
-
   std::string Scratch;
   if (!IsRealpath) {
     Scratch = SwiftLangSupport::resolvePathSymlinks(FilePath);
     FilePath = Scratch;
   }
-  Queue.dispatchSync([&]{
-    for (auto &Entry : Docs) {
-      if (Entry.getKey() == FilePath ||
-          Entry.getValue().ResolvedPath == FilePath) {
-        EditorDoc = Entry.getValue().DocRef;
-        break;
-      }
-    }
-  });
 
-  return EditorDoc;
+  std::lock_guard<std::mutex> lock(DocsMtx);
+  for (auto &Entry : Docs) {
+    if (Entry.getKey() == FilePath ||
+        Entry.getValue().ResolvedPath == FilePath) {
+      return Entry.getValue().DocRef;
+    }
+  }
+  return nullptr;
 }
 
 bool SwiftEditorDocumentFileMap::getOrUpdate(
     StringRef FilePath, SwiftLangSupport &LangSupport,
     SwiftEditorDocumentRef &EditorDoc) {
 
-  bool found = false;
-
   std::string ResolvedPath = SwiftLangSupport::resolvePathSymlinks(FilePath);
-  Queue.dispatchBarrierSync([&]{
-    DocInfo &Doc = Docs[FilePath];
-    if (!Doc.DocRef) {
-      Doc.DocRef = EditorDoc;
-      Doc.ResolvedPath = ResolvedPath;
-    } else {
-      EditorDoc = Doc.DocRef;
-      found = true;
-    }
-  });
 
-  return found;
+  std::lock_guard<std::mutex> lock(DocsMtx);
+  DocInfo &Doc = Docs[FilePath];
+  if (!Doc.DocRef) {
+    Doc.DocRef = EditorDoc;
+    Doc.ResolvedPath = ResolvedPath;
+    return false;
+  }
+  EditorDoc = Doc.DocRef;
+  return true;
 }
 
 SwiftEditorDocumentRef SwiftEditorDocumentFileMap::remove(StringRef FilePath) {
-  SwiftEditorDocumentRef Removed;
-  Queue.dispatchBarrierSync([&]{
-    auto I = Docs.find(FilePath);
-    if (I != Docs.end()) {
-      Removed = I->second.DocRef;
-      Docs.erase(I);
-    }
-  });
+  std::lock_guard<std::mutex> lock(DocsMtx);
+  auto I = Docs.find(FilePath);
+  if (I == Docs.end())
+    return nullptr;
+
+  auto Removed = I->second.DocRef;
+  Docs.erase(I);
   return Removed;
 }
 

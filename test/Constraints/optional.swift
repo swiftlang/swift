@@ -652,3 +652,14 @@ do {
     context(from: TestSyntax(v) ?? TestSyntax(other.first?.value), root: v) // Ok (no warnings)
   }
 }
+
+do {
+  struct Test<T> { // expected-note {{'T' declared as parameter to type 'Test'}}
+    var v: T
+    init?(_: Int) {
+    }
+  }
+  _ = Test(0)?.v
+  // expected-error@-1 {{generic parameter 'T' could not be inferred}}
+  // expected-note@-2 {{explicitly specify the generic arguments to fix this issue}}
+}

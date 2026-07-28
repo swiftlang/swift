@@ -115,6 +115,11 @@ bool ArgsToFrontendOptionsConverter::convert(
   Opts.EmitClangHeaderWithNonModularIncludes |=
       Args.hasArg(OPT_emit_clang_header_nonmodular_includes);
 
+  Opts.GeneratedHeaderUnderlyingModuleIncludeBase =
+      Args.getLastArgValue(
+              OPT_generated_header_underlying_module_include_base)
+          .str();
+
   Opts.EnableImplicitDynamic |= Args.hasArg(OPT_enable_implicit_dynamic);
 
   if (Args.hasArg(OPT_track_system_dependencies)) {
@@ -390,6 +395,7 @@ bool ArgsToFrontendOptionsConverter::convert(
     Opts.SerializeOptionsForDebugging =
         A->getOption().matches(OPT_serialize_debugging_options);
   }
+  Opts.PrefixMapSourceInfo = Args.hasArg(OPT_prefix_map_sourceinfo);
 
   Opts.DebugPrefixSerializedDebuggingOptions |=
       Args.hasArg(OPT_prefix_serialized_debugging_options);
@@ -670,6 +676,8 @@ ArgsToFrontendOptionsConverter::determineRequestedAction(const ArgList &args) {
     return FrontendOptions::ActionType::EmitSIL;
   if (Opt.matches(OPT_emit_silgen))
     return FrontendOptions::ActionType::EmitSILGen;
+  if (Opt.matches(OPT_emit_silgen_ossa))
+    return FrontendOptions::ActionType::EmitSILGenOSSA;
   if (Opt.matches(OPT_emit_lowered_sil))
     return FrontendOptions::ActionType::EmitLoweredSIL;
   if (Opt.matches(OPT_emit_sib))

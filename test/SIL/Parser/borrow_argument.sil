@@ -1,6 +1,5 @@
 // RUN: %target-sil-opt -sil-print-types %s | %target-sil-opt -sil-print-types | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 
 sil_stage canonical
 

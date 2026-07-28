@@ -1,5 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/mangling_private_helper.swift
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %S/Inputs/mangling_private_helper.swift
 // RUN: %target-swift-emit-silgen %S/Inputs/mangling_private_helper.swift | %FileCheck %s -check-prefix=CHECK-BASE
 
 // RUN: %target-swift-emit-silgen %s -I %t | %FileCheck %s

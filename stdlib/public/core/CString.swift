@@ -65,8 +65,7 @@ extension String {
   ///
   /// - Parameter nullTerminatedUTF8:
   ///     An array containing a null-terminated sequence of UTF-8 code units.
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @available(swift, deprecated: 6, message:
     "Use String(decoding: array, as: UTF8.self) instead, after truncating the null termination."
   )
@@ -76,7 +75,7 @@ extension String {
     }
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal init(_checkingCString bytes: UnsafeBufferPointer<UInt8>) {
     guard let length = unsafe bytes.firstIndex(of: 0) else {
       _preconditionFailure(
@@ -91,8 +90,7 @@ extension String {
     ).0
   }
 
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @available(*, deprecated, message: "Use String(_ scalar: Unicode.Scalar)")
   public init(cString nullTerminatedUTF8: inout CChar) {
     guard nullTerminatedUTF8 == 0 else {
@@ -129,8 +127,7 @@ extension String {
   ///
   /// - Parameter nullTerminatedUTF8:
   ///     An array containing a null-terminated UTF-8 code unit sequence.
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @available(swift, deprecated: 6, message:
     "Use String(decoding: array, as: UTF8.self) instead, after truncating the null termination."
   )
@@ -140,15 +137,13 @@ extension String {
     }
   }
 
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @available(*, deprecated, message: "Use a copy of the String argument")
   public init(cString nullTerminatedUTF8: String) {
     self = unsafe nullTerminatedUTF8.withCString(String.init(cString:))
   }
 
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @available(*, deprecated, message: "Use String(_ scalar: Unicode.Scalar)")
   public init(cString nullTerminatedUTF8: inout UInt8) {
     guard nullTerminatedUTF8 == 0 else {
@@ -228,8 +223,7 @@ extension String {
   ///
   /// - Parameter cString:
   ///     A pointer to a null-terminated sequence of UTF-8 code units.
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @available(swift, deprecated: 6, renamed: "String.init(validatingCString:)")
   @_silgen_name("_swift_se0405_String_validatingUTF8")
   public init?(validatingUTF8 cString: UnsafePointer<CChar>) {
@@ -248,8 +242,7 @@ extension String {
   ///
   /// - Parameter nullTerminatedUTF8:
   ///     An array containing a null-terminated sequence of UTF-8 code units.
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @available(swift, deprecated: 6, message:
     "Use String(validating: array, as: UTF8.self) instead, after truncating the null termination."
   )
@@ -278,8 +271,7 @@ extension String {
   ///
   /// - Parameter cString:
   ///     An array containing a null-terminated sequence of UTF-8 code units.
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @available(swift, deprecated: 6, message:
     "Use String(validating: array, as: UTF8.self) instead, after truncating the null termination."
   )
@@ -287,22 +279,19 @@ extension String {
     self.init(validatingCString: cString)
   }
 
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @available(*, deprecated, message: "Use a copy of the String argument")
   public init?(validatingCString nullTerminatedUTF8: String) {
     self = unsafe nullTerminatedUTF8.withCString(String.init(cString:))
   }
 
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @available(*, deprecated, message: "Use a copy of the String argument")
   public init?(validatingUTF8 cString: String) {
     self.init(validatingCString: cString)
   }
 
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @available(*, deprecated, message: "Use String(_ scalar: Unicode.Scalar)")
   public init?(validatingCString nullTerminatedUTF8: inout CChar) {
     guard nullTerminatedUTF8 == 0 else {
@@ -313,8 +302,7 @@ extension String {
     self = ""
   }
 
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @available(*, deprecated, message: "Use String(_ scalar: Unicode.Scalar)")
   public init?(validatingUTF8 cString: inout CChar) {
     self.init(validatingCString: &cString)
@@ -396,8 +384,7 @@ extension String {
       codeUnits, encoding: encoding, repair: isRepairing)
   }
 
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public static func decodeCString<Encoding: _UnicodeEncoding>(
     _ cString: [Encoding.CodeUnit],
     as encoding: Encoding.Type,
@@ -430,8 +417,7 @@ extension String {
     }
   }
 
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @available(*, deprecated, message: "Use a copy of the String argument")
   public static func decodeCString<Encoding: _UnicodeEncoding>(
     _ cString: String,
@@ -445,8 +431,7 @@ extension String {
     }
   }
 
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @available(*, deprecated, message: "Use String(_ scalar: Unicode.Scalar)")
   public static func decodeCString<Encoding: _UnicodeEncoding>(
     _ cString: inout Encoding.CodeUnit,
@@ -499,8 +484,7 @@ extension String {
   ///     sequence of code units encoded in `encoding`.
   ///   - encoding: The encoding in which the code units should be
   ///     interpreted.
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @available(swift, deprecated: 6, message:
     "Use String(decoding: array, as: Encoding.self) instead, after truncating the null termination."
   )
@@ -511,8 +495,7 @@ extension String {
     self = String.decodeCString(nullTerminatedCodeUnits, as: encoding)!.0
   }
 
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @available(*, deprecated, message: "Use a copy of the String argument")
   public init<Encoding: _UnicodeEncoding>(
     decodingCString nullTerminatedCodeUnits: String,
@@ -523,8 +506,7 @@ extension String {
     }
   }
 
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @available(*, deprecated, message: "Use String(_ scalar: Unicode.Scalar)")
   public init<Encoding: Unicode.Encoding>(
     decodingCString nullTerminatedCodeUnits: inout Encoding.CodeUnit,

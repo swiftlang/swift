@@ -762,8 +762,6 @@ void MemoryLifetimeVerifier::checkBlock(SILBasicBlock *block, Bits &bits) {
             // initialization. See initDataflowInBlock().
             requireBitsClear(bits & nonTrivialLocations, IEAI->getOperand(), &I);
             locations.setBits(bits, IEAI->getOperand());
-          } else {
-            requireBitsSet(bits, IEAI->getOperand(), &I);
           }
         }
         requireNoStoreBorrowLocation(IEAI->getOperand(), &I);

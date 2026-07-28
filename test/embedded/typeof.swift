@@ -1,6 +1,5 @@
 // RUN: %target-swift-emit-ir %s -enable-experimental-feature Embedded -wmo -o - | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: optimized_stdlib
 // REQUIRES: swift_feature_Embedded
 

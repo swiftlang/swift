@@ -756,13 +756,12 @@ func invalidDictionaryLiteral() {
   var g = [1: "one", 2: ;] // expected-error {{expected value in dictionary literal}}
 }
 
-
+// Other overloads of `joined(separator:)` have multiple issues - argument is a String and element of the base should be `String` of conform to `StringProtocol`.
 [4].joined(separator: [1])
-// expected-error@-1 {{no exact matches in call to instance method 'joined'}}
-// There is one more note here - candidate requires that 'Int' conform to 'Sequence' (requirement specified as 'Self.Element' : 'Sequence') pointing to Sequence extension
+// expected-error@-1 {{referencing instance method 'joined(separator:)' on 'Sequence' requires that 'Int' conform to 'Sequence'}}
 
 [4].joined(separator: [[[1]]])
-// expected-error@-1 {{cannot convert value of type 'Int' to expected element type 'String'}}
+// expected-error@-1 {{referencing instance method 'joined(separator:)' on 'Sequence' requires that 'Int' conform to 'StringProtocol'}}
 // expected-error@-2 {{cannot convert value of type '[[[Int]]]' to expected argument type 'String'}}
 
 //===----------------------------------------------------------------------===//
@@ -795,8 +794,7 @@ func testNilCoalescePrecedence(cond: Bool, a: Int?, r: ClosedRange<Int>?) {
   // ?? should have higher precedence than logical operators like || and comparisons.
   if cond || (a ?? 42 > 0) {}  // Ok.
   if (cond || a) ?? 42 > 0 {}  // expected-error {{cannot be used as a boolean}} {{15-15=(}} {{16-16= != nil)}}
-  // expected-error@-1 {{binary operator '>' cannot be applied to operands of type 'Bool' and 'Int'}}  expected-note@-1 {{overloads for '>' exist with these partially matching parameter list}}
-  // expected-error@-2 {{binary operator '??' cannot be applied to operands of type 'Bool' and 'Int'}}
+  // expected-error@-1 {{cannot convert value of type 'Bool' to expected argument type 'Int'}}
   if (cond || a) ?? (42 > 0) {}  // expected-error {{cannot be used as a boolean}} {{15-15=(}} {{16-16= != nil)}}
 
   if cond || a ?? 42 > 0 {}    // Parses as the first one, not the others.

@@ -6,7 +6,7 @@ import Builtin
 
 // Test that foo is specialized on Builtin.Int64 and the copy_values and destroy_values are dropped.
 //
-// CHECK-LABEL: sil shared [ossa] @$s3fooBi64__Tg5 : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> () {
+// CHECK-LABEL: sil shared [ossa] [opaque] @$s3fooBi64__Tg5 : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> () {
 // CHECK: bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64):
 // CHECK:   [[F:%.*]] = function_ref @$s3fooBi64__Tg5 : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> ()
 // CHECK:   %{{.*}} = apply [[F]](%0, %1) : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> ()
@@ -16,7 +16,7 @@ import Builtin
 // CHECK: } // end sil function '$s3fooBi64__Tg5'
 
 // Test that foo when specialized on Builtin.NativeObject, keeps copy_value/etc.
-// CHECK-LABEL: sil shared [ossa] @$s3fooBo_Tg5 : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
+// CHECK-LABEL: sil shared [ossa] [opaque] @$s3fooBo_Tg5 : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
 // CHECK: copy_value
 // CHECK: apply
 // CHECK: destroy_value

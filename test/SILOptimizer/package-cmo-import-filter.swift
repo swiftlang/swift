@@ -43,7 +43,6 @@
 // RUN: %target-sil-opt %t/UI.swiftmodule -I %t -sil-verify-all -o %t/UI.sil
 // RUN: %FileCheck %s < %t/UI.sil
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: OS=macosx || OS=ios || OS=tvos || OS=watchos || OS=maccatalyst
 
 //--- Client.swift

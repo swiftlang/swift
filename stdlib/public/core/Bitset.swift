@@ -352,7 +352,7 @@ extension _UnsafeBitset.Word: @unsafe Sequence, @unsafe IteratorProtocol {
 }
 
 extension _UnsafeBitset {
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @inline(__always)
   internal static func _withTemporaryUninitializedBitset<R, E: Error>(
     wordCount: Int,
@@ -367,7 +367,7 @@ extension _UnsafeBitset {
     }
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @inline(__always)
   internal static func withTemporaryBitset<R, E: Error>(
     capacity: Int,
@@ -384,7 +384,7 @@ extension _UnsafeBitset {
 }
 
 extension _UnsafeBitset {
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @inline(__always)
   internal static func withTemporaryCopy<R, E: Error>(
     of original: _UnsafeBitset,

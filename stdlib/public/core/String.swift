@@ -356,10 +356,9 @@ public struct String {
   // an initializer would conflict with the Int-parsing initializer, when used
   // as function name, e.g.
   //   [1, 2, 3].map(String.init)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_semantics("string.init_empty_with_capacity")
   @_semantics("inline_late")
-  @inlinable
   internal static func _createEmpty(withInitialCapacity: Int) -> String {
     return String(_StringGuts(_initialCapacity: withInitialCapacity))
   }
@@ -408,7 +407,7 @@ extension String {
   /// identical.
   ///
   /// - Performance: O(1)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func _isIdentical(to other: Self) -> Bool {
     self._guts.rawBits == other._guts.rawBits
   }
@@ -418,7 +417,7 @@ extension String {
   // This force type-casts element to UInt8, since we cannot currently
   // communicate to the type checker that we proved this with our dynamic
   // check in String(decoding:as:).
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @inline(never) // slow-path
   internal static func _fromNonContiguousUnsafeBitcastUTF8Repairing<
     C: Collection
@@ -642,7 +641,7 @@ extension String {
   ///     memory with room for `capacity` UTF-8 code units, initializes
   ///     that memory, and returns the number of initialized elements.
 #if hasFeature(Embedded)
-  @_alwaysEmitIntoClient @inline(__always)
+  @export(implementation) @inline(__always)
   @available(SwiftStdlib 5.3, *)
   @safe
   public init<E: Error>(
@@ -674,7 +673,7 @@ extension String {
     )
   }
 #else
-  @_alwaysEmitIntoClient @inline(__always)
+  @export(implementation) @inline(__always)
   @available(SwiftStdlib 5.3, *)
   @safe
   public init<E: Error>(
@@ -760,7 +759,7 @@ extension String {
   ///   `withCString(_:)` method. The pointer argument is valid only for the
   ///   duration of the method's execution.
   /// - Returns: The return value, if any, of the `body` closure parameter.
-  @_alwaysEmitIntoClient // (Primarily @inlinable) fast-path: already C-string compatible
+  @export(implementation) // (Primarily @inlinable) fast-path: already C-string compatible
   @safe
   public func withCString<Result, E: Error>(
     _ body: (UnsafePointer<Int8>) throws(E) -> Result
@@ -799,7 +798,7 @@ extension String {
   ///   - targetEncoding: The encoding in which the code units should be
   ///     interpreted.
   /// - Returns: The return value, if any, of the `body` closure parameter.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @inline(__always) // Eliminate dynamic type check when possible
   @safe
   public func withCString<Result, TargetEncoding: Unicode.Encoding, E: Error>(
@@ -835,7 +834,7 @@ extension String {
   }
 #endif // !hasFeature(Embedded)
 
-  @_alwaysEmitIntoClient @inline(never) // slow-path
+  @export(implementation) @inline(never) // slow-path
   @_effects(releasenone)
   internal func _slowWithCString<Result, TargetEncoding: Unicode.Encoding, E: Error>(
     encodedAs targetEncoding: TargetEncoding.Type,
@@ -1226,7 +1225,7 @@ extension String {
   }
 
 #if hasFeature(Embedded)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public // @testable
   func _withNFCCodeUnits<E: Error>(
     _ f: (UInt8) throws(E) -> Void
@@ -1245,7 +1244,7 @@ extension String {
     try _gutsSlice._withNFCCodeUnits(f)
   }
 #else
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public // @testable
   func _withNFCCodeUnits<E: Error>(
     _ f: (UInt8) throws(E) -> Void

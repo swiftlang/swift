@@ -29,6 +29,7 @@ add_swift_unittest(SwiftBasicTests
   OwnedStringTest.cpp
   MultiMapCacheTest.cpp
   PointerIntEnumTest.cpp
+  PointerIntPairTest.cpp
   PrefixMapTest.cpp
   RangeTest.cpp
   SmallMapTest.cpp
@@ -55,9 +56,20 @@ target_link_libraries(SwiftBasicTests
   swiftOption
   swiftThreading
   clangBasic
-  LLVMOption
   LLVMTestingSupport
   )
+
+if(LLVM_LINK_LLVM_DYLIB)
+  target_link_libraries(SwiftBasicTests
+    PRIVATE
+    LLVM
+    )
+else()
+  target_link_libraries(SwiftBasicTests
+    PRIVATE
+    LLVMOption
+    )
+endif()
 
 if(SWIFT_HOST_VARIANT STREQUAL "windows")
   target_link_libraries(SwiftBasicTests PRIVATE Synchronization)

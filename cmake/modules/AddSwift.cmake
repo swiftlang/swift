@@ -340,7 +340,7 @@ function(_add_host_variant_c_compile_flags target)
   # The LLVM backend is built with these defines on most 32-bit platforms,
   # llvm/llvm-project@66395c9, which can cause incompatibilities with the Swift
   # frontend if not built the same way.
-  if("${SWIFT_HOST_VARIANT_ARCH}" MATCHES "armv6|armv7|i686" AND
+  if("${SWIFT_HOST_VARIANT_ARCH}" MATCHES "mipsel|armv6|armv7|i686" AND
      NOT (SWIFT_HOST_VARIANT_SDK STREQUAL "ANDROID" AND SWIFT_ANDROID_API_LEVEL LESS 24))
     target_compile_definitions(${target} PRIVATE
       $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:_LARGEFILE_SOURCE _FILE_OFFSET_BITS=64>)
@@ -357,7 +357,7 @@ function(_add_host_variant_link_flags target)
     target_link_libraries(${target} PRIVATE
       pthread
       dl)
-    if("${SWIFT_HOST_VARIANT_ARCH}" MATCHES "armv5|armv6|armv7|i686")
+    if("${SWIFT_HOST_VARIANT_ARCH}" MATCHES "mipsel|armv5|armv6|armv7|i686")
       target_link_libraries(${target} PRIVATE atomic)
     endif()
   elseif(SWIFT_HOST_VARIANT_SDK STREQUAL "FREEBSD")
@@ -622,6 +622,18 @@ function(_add_swift_runtime_link_flags target relpath_to_lib_dir bootstrapping)
     else()
       message(FATAL_ERROR "Unknown BOOTSTRAPPING_MODE '${ASRLF_BOOTSTRAPPING_MODE}'")
     endif()
+  elseif(SWIFT_HOST_VARIANT_SDK STREQUAL "EMSCRIPTEN")
+    if(NOT SWIFT_PATH_TO_SWIFT_SDK)
+      message(FATAL_ERROR "SWIFT_PATH_TO_SWIFT_SDK must point at the prebuilt "
+        "Emscripten Swift stdlib when building a wasm host compiler; without it "
+        "the Swift runtime link path would resolve to '/lib/swift/...' and mislink.")
+    endif()
+    set(host_lib_arch_dir
+        "${SWIFT_PATH_TO_SWIFT_SDK}/lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}/${SWIFT_HOST_VARIANT_ARCH}")
+    target_link_libraries(${target} PRIVATE
+        "${host_lib_arch_dir}/swiftrt${CMAKE_C_OUTPUT_EXTENSION}")
+    target_link_libraries(${target} PRIVATE "${host_lib_arch_dir}/libswiftCore.a")
+    target_link_directories(${target} PRIVATE ${host_lib_arch_dir})
   else()
     target_link_directories(${target} PRIVATE
       ${SWIFT_PATH_TO_SWIFT_SDK}/usr/lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}/${SWIFT_HOST_VARIANT_ARCH})

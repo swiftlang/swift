@@ -1107,11 +1107,14 @@ std::pair<FuncDecl *, FuncDecl *> SwiftDeclSynthesizer::makeBitFieldAccessors(
     cGetterDecl->setParams(cGetterSelf);
 
     auto cGetterSelfExpr =
-        createClangDeclRefExpr(Ctx, cGetterSelf, recordType);
-    auto cGetterExpr = clang::MemberExpr::CreateImplicit(
+        createClangDeclRefExpr(Ctx, cGetterSelf, recordType, clang::VK_LValue);
+    auto cGetterMemberExpr = clang::MemberExpr::CreateImplicit(
         Ctx, cGetterSelfExpr,
-        /*isarrow=*/false, fieldDecl, fieldType, clang::VK_PRValue,
+        /*isarrow=*/false, fieldDecl, fieldType, clang::VK_LValue,
         clang::OK_BitField);
+    auto cGetterExpr = clang::ImplicitCastExpr::Create(
+        Ctx, fieldType, clang::CK_LValueToRValue, cGetterMemberExpr,
+        /*BasePath=*/nullptr, clang::VK_PRValue, clang::FPOptionsOverride());
 
     cGetterDecl->setBody(createClangReturnStmt(Ctx, cGetterExpr));
   }
@@ -1825,6 +1828,14 @@ SubscriptDecl *SwiftDeclSynthesizer::makeSubscript(FuncDecl *getter,
   bool useAddress =
       rawElementTy->getAnyPointerElementType() && elementIsNoncopyable;
 
+  // Foreign references (e.g., FRT* or FRT&) are directly mapped to the FRT
+  // class type rather than UnsafeMutablePointer<FRT>, and isn't something we
+  // can synthesize a valid setter for.
+  //
+  // ty->isForeignReferenceType() implies !ty->getAnyPointerElementType().
+  if (rawElementTy->isForeignReferenceType())
+    setterImpl = nullptr;
+
   AccessorDecl *getterDecl = AccessorDecl::create(
       ctx, getterImpl->getLoc(), getterImpl->getLoc(),
       useAddress ? AccessorKind::Address : AccessorKind::Get, subscript,
@@ -1926,6 +1937,14 @@ SwiftDeclSynthesizer::makeDereferencedPointeeProperty(FuncDecl *getter,
   bool isImplicit = !(isNoncopyable || resultDependsOnSelf);
   bool useAddress =
       rawElementTy->getAnyPointerElementType() && (isNoncopyable || resultDependsOnSelf);
+
+  // Foreign references (e.g., FRT* or FRT&) are directly mapped to the FRT
+  // class type rather than UnsafeMutablePointer<FRT>, and isn't something we
+  // can synthesize a valid setter for.
+  //
+  // ty->isForeignReferenceType() implies !ty->getAnyPointerElementType().
+  if (rawElementTy->isForeignReferenceType())
+    setterImpl = nullptr;
 
   auto result = new (ctx)
       VarDecl(/*isStatic*/ false, VarDecl::Introducer::Var,
@@ -2650,6 +2669,9 @@ synthesizeDefaultArgumentBody(AbstractFunctionDecl *afd, void *context) {
   defaultArgFuncDecl->setAccess(clang::AccessSpecifier::AS_public);
   defaultArgFuncDecl->setBody(defaultArgReturnStmt);
 
+  ctx.getClangModuleLoader()->registerSynthesizedClangDecl(defaultArgFuncDecl,
+                                                           defaultArgFuncDecl);
+
   // Import `func __cxx__defaultArg_XYZ() -> ParamTY` into Swift.
   auto defaultArgGenerator = dyn_cast_or_null<FuncDecl>(
       ctx.getClangModuleLoader()->importDeclDirectly(defaultArgFuncDecl));
@@ -3094,14 +3116,23 @@ SwiftDeclSynthesizer::synthesizeStaticFactoryForCXXForeignRef(
     }
     synthCxxMethodDecl->setParams(synthParams);
 
-    auto attrInfo = ReturnOwnershipInfo(selectedCtorDecl);
-    if (attrInfo.hasReturnsRetained)
-      synthCxxMethodDecl->addAttr(
-          clang::SwiftAttrAttr::Create(clangCtx, "returns_retained"));
+    if (selectedCtorDecl->hasAttrs()) {
+      auto attrInfo = ReturnOwnershipInfo(selectedCtorDecl);
+      if (attrInfo.hasReturnsRetained)
+        synthCxxMethodDecl->addAttr(
+            clang::SwiftAttrAttr::Create(clangCtx, "returns_retained"));
 
-    if (attrInfo.hasReturnsUnretained)
-      synthCxxMethodDecl->addAttr(
-          clang::SwiftAttrAttr::Create(clangCtx, "returns_unretained"));
+      if (attrInfo.hasReturnsUnretained)
+        synthCxxMethodDecl->addAttr(
+            clang::SwiftAttrAttr::Create(clangCtx, "returns_unretained"));
+
+      for (auto *attr : selectedCtorDecl->getAttrs()) {
+        if (isa<clang::AvailabilityAttr>(attr) ||
+            isa<clang::DeprecatedAttr>(attr) ||
+            isa<clang::UnavailableAttr>(attr))
+          synthCxxMethodDecl->addAttr(attr->clone(clangCtx));
+      }
+    }
 
     std::string swiftInitStr = "init(";
     for (unsigned i = 0; i < ctorParamCount; ++i) {
@@ -3165,6 +3196,92 @@ SwiftDeclSynthesizer::synthesizeStaticFactoryForCXXForeignRef(
   }
 
   return synthesizedFactories;
+}
+
+FuncDecl *SwiftDeclSynthesizer::makeBaseClassPointerCastFunction(
+    const clang::CXXRecordDecl *derivedClass,
+    const clang::CXXRecordDecl *baseClass) {
+  auto key = std::make_pair(derivedClass->getCanonicalDecl(),
+                            baseClass->getCanonicalDecl());
+  auto &cache = ImporterImpl.synthesizedBaseCastFunctions;
+
+  if (auto [it, inserted] = cache.try_emplace(key, nullptr); !inserted)
+    return it->second;
+
+  auto &clangCtx = ImporterImpl.getClangASTContext();
+  auto &clangSema = ImporterImpl.getClangSema();
+  ASTContext &ctx = ImporterImpl.SwiftContext;
+
+  clang::SourceLocation loc = derivedClass->getLocation();
+  clang::DeclContext *TUDC = clangCtx.getTranslationUnitDecl();
+
+  clang::Sema::SFINAETrap trap(clangSema);
+
+  // Build `Derived * _Nonnull` and `Base * _Nonnull`, and the function type.
+  clang::QualType derivedTy = clangCtx.getRecordType(derivedClass),
+                  baseTy = clangCtx.getRecordType(baseClass);
+
+  clang::QualType derivedPtrTy = clangCtx.getPointerType(derivedTy),
+                  basePtrTy = clangCtx.getPointerType(baseTy);
+
+  if (clangSema.CheckImplicitNullabilityTypeSpecifier(
+          derivedPtrTy, clang::NullabilityKind::NonNull, loc, /*isParam=*/true,
+          /*OverrideExisting=*/true))
+    return nullptr;
+  if (clangSema.CheckImplicitNullabilityTypeSpecifier(
+          basePtrTy, clang::NullabilityKind::NonNull, loc, /*isParam=*/false,
+          /*OverrideExisting=*/true))
+    return nullptr;
+
+  clang::QualType funcTy = clangCtx.getFunctionType(
+      basePtrTy, {derivedPtrTy}, clang::FunctionProtoType::ExtProtoInfo());
+
+  // Build a deterministic, unique name from the mangled canonical types of the
+  // derived and base classes, to avoid collisions in the SwiftLookupTable.
+  clang::DeclarationName declName;
+  {
+    std::string funcName;
+    llvm::raw_string_ostream os(funcName);
+    std::unique_ptr<clang::ItaniumMangleContext> mangler{
+        clang::ItaniumMangleContext::create(clangCtx,
+                                            clangCtx.getDiagnostics())};
+    os << "__swift_interopStaticCast_";
+    mangler->mangleCanonicalTypeName(derivedTy, os);
+    os << "_to_";
+    mangler->mangleCanonicalTypeName(baseTy, os);
+
+    declName = clang::DeclarationName(&clangCtx.Idents.get(os.str()));
+  }
+
+  auto *castDecl = createClangFunctionDecl(clangCtx, TUDC, declName, funcTy);
+
+  auto *paramDecl =
+      createClangParmVarDecl(clangCtx, castDecl, nullptr, derivedPtrTy);
+  auto *paramRefExpr = createClangDeclRefExpr(clangCtx, paramDecl, derivedPtrTy,
+                                              clang::VK_LValue);
+  castDecl->setParams({paramDecl});
+
+  // Synthesize `return static_cast<Base *>(from);`. Using a real static_cast
+  // is required because a base subobject may live at a non-zero offset within
+  // the derived object (multiple/virtual inheritance).
+  auto castResult = clangSema.BuildCXXNamedCast(
+      loc, clang::tok::kw_static_cast,
+      clangCtx.getTrivialTypeSourceInfo(basePtrTy), paramRefExpr,
+      clang::SourceRange(), clang::SourceRange());
+  if (!castResult.isUsable())
+    return nullptr;
+
+  castDecl->setBody(createClangReturnStmt(clangCtx, castResult.get()));
+
+  ImporterImpl.registerSynthesizedClangDecl(castDecl, derivedClass);
+
+  auto *importedFn = dyn_cast_or_null<FuncDecl>(
+      ctx.getClangModuleLoader()->importDeclDirectly(castDecl));
+
+  // N.B. we need to do another lookup here because the import above may have
+  // invalidated the iterator from the beginning of this function.
+  cache[key] = importedFn;
+  return importedFn;
 }
 
 static std::pair<BraceStmt *, bool>

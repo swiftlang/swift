@@ -172,7 +172,7 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
     self.defaultValue = defaultValue
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   var key: Builtin.RawPointer {
     unsafe unsafeBitCast(self, to: Builtin.RawPointer.self)
   }
@@ -203,7 +203,7 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
   /// task present, as the underlying storage will fallback to using a managed thread-local value
   /// when no task is available. From the perspective of task local APIs, the presented semantics
   /// remain exactly the same as when a task is present.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @abi(func get_aeic() -> Value)
   public func get() -> Value {
     guard let rawValue = unsafe _taskLocalValueGet(key: key) else {
@@ -234,7 +234,7 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
   /// If this method is called form a context where no current Swift concurrency task
   /// is available, a fallback thread-local is used to manage the task locals and
   /// all existing semantics of task-locals are upheld as-if a task was actually available.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @discardableResult
   @available(SwiftStdlib 5.1, *)
   // ABI Note: @abi needed because the mangling otherwise conflicts with the
@@ -311,7 +311,7 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
   /// calls to swift_task_de/alloc for the copy as follows:
   /// - withValue contains the compiler-emitted calls swift_task_de/alloc.
   /// - withValueImpl contains the calls to Builtin.{add,remove}TaskLocalValue
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @discardableResult
   @available(SwiftStdlib 5.1, *)
   internal nonisolated(nonsending) func withValueImpl<R>(

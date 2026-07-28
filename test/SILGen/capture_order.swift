@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -enable-upcoming-feature ImmutableWeakCaptures %s -verify
 // RUN: %target-swift-emit-silgen -enable-upcoming-feature ImmutableWeakCaptures %s -verify
 
 // REQUIRES: swift_feature_ImmutableWeakCaptures

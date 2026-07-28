@@ -102,7 +102,7 @@ cloneDebugValueMakeUndef(DebugVarCarryingInst original, SILBasicBlock *block) {
     undef = SILUndef::get(original->getFunction(),
                           abi->getAddressType().getObjectType());
   return builder.createDebugValue(original->getLoc(), undef,
-                                  *original.getVarInfo(), DontPoisonRefs,
+                                  *original.getVarInfo(),
                                   UsesMoveableValueDebugInfo);
 }
 
@@ -116,7 +116,7 @@ cloneDebugValueMakeUndef(DebugVarCarryingInst original,
     undef = SILUndef::get(original->getFunction(),
                           abi->getAddressType().getObjectType());
   return builder.createDebugValue(original->getLoc(), undef,
-                                  *original.getVarInfo(), DontPoisonRefs,
+                                  *original.getVarInfo(),
                                   UsesMoveableValueDebugInfo);
 }
 
@@ -131,7 +131,7 @@ static SILInstruction *cloneDebugValue(DebugVarCarryingInst original,
          "Unexpected debug reconstruction block in Onone-only Pass");
   return builder.createDebugValue(
       original->getLoc(), original.getOperandForDebugValueClone(),
-      *original.getVarInfo(), DontPoisonRefs, UsesMoveableValueDebugInfo);
+      *original.getVarInfo(), UsesMoveableValueDebugInfo);
 }
 
 static SILInstruction *cloneDebugValue(DebugVarCarryingInst original,
@@ -145,7 +145,7 @@ static SILInstruction *cloneDebugValue(DebugVarCarryingInst original,
          "Unexpected debug reconstruction block in Onone-only Pass");
   return builder.createDebugValue(
       original->getLoc(), original.getOperandForDebugValueClone(),
-      *original.getVarInfo(), DontPoisonRefs, UsesMoveableValueDebugInfo);
+      *original.getVarInfo(), UsesMoveableValueDebugInfo);
 }
 
 namespace {

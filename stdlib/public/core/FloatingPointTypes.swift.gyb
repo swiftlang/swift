@@ -1093,7 +1093,7 @@ extension ${Self} {
 
   // Fast-path for conversion when the source is representable as int,
   // falling back on the generic _convert operation otherwise.
-  @_alwaysEmitIntoClient @inline(never)
+  @export(implementation) @inline(never)
   public init?<Source: BinaryInteger>(exactly value: Source) {
     if value.bitWidth <= ${word_bits} {
       // If the source is small enough to fit in a word, we can use the LLVM

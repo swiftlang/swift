@@ -1,6 +1,5 @@
 // RUN: %target-swift-frontend -sil-verify-all -Xllvm -sil-print-types -emit-sil -O -g %s | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 
 // Fix for https://github.com/apple/swift/issues/62608
 // We need to emit separate debug info location for different adjoint buffers

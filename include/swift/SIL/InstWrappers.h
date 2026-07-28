@@ -352,6 +352,7 @@ public:
   bool canForwardOwnedCompatibleValuesOnly() {
     switch (forwardingInst->getKind()) {
     case SILInstructionKind::MarkUninitializedInst:
+    case SILInstructionKind::DropDeinitInst:
       return true;
     default:
       return false;

@@ -110,6 +110,26 @@ enum class ConversionBehavior : unsigned {
 /// Classify the possible conversions having this type as result type.
 ConversionBehavior getConversionBehavior(Type type);
 
+struct TypeVarOccurrences {
+  // Covariant position, eg () -> $T0 or Array<$T0>.
+  SmallPtrSet<TypeVariableType *, 2> covariant;
+
+  // Contravariant position, eg ($T0) -> ().
+  SmallPtrSet<TypeVariableType *, 2> contravariant;
+
+  // Invariant position, eg G<$T0> where G is some user-defined type.
+  SmallPtrSet<TypeVariableType *, 2> invariant;
+
+  // Type variables that occur as the base of a dependent member type,
+  // eg $T0.A.
+  SmallPtrSet<TypeVariableType *, 1> base;
+};
+
+void getTypeVariablesWithVariance(
+    TypeVarOccurrences *result,
+    Type type, TypePosition pos,
+    bool funcResultIsInvariant=false);
+
 /// Suppose we are given a type T and a protocol P, and T conv U for
 /// some type U; if U conforms to P, does it follow that T conforms to P?
 bool checkTransitiveSupertypeConformance(ConstraintSystem &cs,

@@ -1,3 +1,4 @@
+// RUN: %target-swift-frontend -emit-silgen-ossa -sil-verify-all -enable-sil-opaque-values -enable-experimental-feature ReferenceBindings -o - %s
 // RUN: %target-swift-frontend -emit-silgen -enable-experimental-feature ReferenceBindings -o - %s | %FileCheck %s
 // RUN: %target-swift-frontend -emit-sil -sil-verify-all -enable-experimental-feature ReferenceBindings -o - %s | %FileCheck -check-prefix=SIL %s
 

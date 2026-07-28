@@ -77,7 +77,7 @@ internal struct _BridgeStorage<NativeClass: AnyObject> {
     return isNative && _isUnique(&rawValue)
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @inline(__always)
   internal mutating func beginCOWMutationNative() -> Bool {
     return Bool(Builtin.beginCOWMutation(&rawValue))
@@ -139,14 +139,14 @@ internal struct _BridgeStorage<NativeClass: AnyObject> {
     return _isUnique_native(&rawValue)
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @inline(__always)
   internal mutating func beginCOWMutationUnflaggedNative() -> Bool {
     _internalInvariant(isNative)
     return Bool(Builtin.beginCOWMutation_native(&rawValue))
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @inline(__always)
   internal mutating func endCOWMutation() {
     _internalInvariant(isNative)
@@ -190,7 +190,7 @@ internal struct _BridgeStorage<NativeClass: AnyObject> {
     return _isUnique(&rawValue)
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @inline(__always)
   internal mutating func beginCOWMutationNative() -> Bool {
     return Bool(Builtin.beginCOWMutation(&rawValue))
@@ -223,13 +223,13 @@ internal struct _BridgeStorage<NativeClass: AnyObject> {
     return _isUnique_native(&rawValue)
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @inline(__always)
   internal mutating func beginCOWMutationUnflaggedNative() -> Bool {
     return Bool(Builtin.beginCOWMutation_native(&rawValue))
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @inline(__always)
   internal mutating func endCOWMutation() {
     Builtin.endCOWMutation(&rawValue)

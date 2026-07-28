@@ -189,7 +189,7 @@ extension _NativeDictionary { // Low-level lookup operations
 }
 
 extension _NativeDictionary { // ensureUnique
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @inline(never)
   internal mutating func _copyOrMoveAndResize(
     capacity: Int,
@@ -459,7 +459,7 @@ internal func KEY_TYPE_OF_DICTIONARY_VIOLATES_HASHABLE_REQUIREMENTS(
   _ keyType: Any.Type
 ) -> Never {
   _assertionFailure(
-    "Fatal error",
+    kind: .fatal(),
     """
     Duplicate keys of type '\(keyType)' were found in a Dictionary.
     This usually means either that the type violates Hashable's requirements, or
@@ -501,7 +501,7 @@ extension _NativeDictionary { // Insertions
   /// Insert a new element into uniquely held storage, replacing an existing
   /// value (if any).  Storage must be uniquely referenced with adequate
   /// capacity.
-  @_alwaysEmitIntoClient @inlinable // Introduced in 5.1
+  @export(implementation) // Introduced in 5.1
   internal mutating func _unsafeUpdate(
     key: __owned Key,
     value: __owned Value
@@ -619,8 +619,8 @@ extension _NativeDictionary {
     unsafe (_values + a.offset).moveInitialize(from: _values + b.offset, count: 1)
     unsafe (_values + b.offset).initialize(to: value)
   }
-
-  @_alwaysEmitIntoClient
+  
+  @export(implementation)
   internal func extractDictionary(
     using bitset: _UnsafeBitset,
     count: Int
@@ -755,7 +755,7 @@ extension _NativeDictionary { // Deletion
 }
 
 extension _NativeDictionary { // High-level operations
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal func mapValues<T, E: Error>(
     _ transform: (Value) throws(E) -> T
   ) throws(E) -> _NativeDictionary<Key, T> {
@@ -807,7 +807,7 @@ extension _NativeDictionary { // High-level operations
   }
 #endif
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal mutating func merge<S: Sequence, E: Error>(
     _ keysAndValues: __owned S,
     isUnique: Bool,
@@ -826,7 +826,7 @@ extension _NativeDictionary { // High-level operations
     }
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal mutating func merge<S: Sequence>(
     trappingOnDuplicates keysAndValues: __owned S,
   ) where S.Element == (Key, Value) {
@@ -868,7 +868,7 @@ extension _NativeDictionary { // High-level operations
   }
 #endif
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @inline(__always)
   internal init<S: Sequence, E: Error>(
     grouping values: __owned S,
@@ -906,7 +906,7 @@ extension _NativeDictionary { // High-level operations
   }
 #endif
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal func filter<E: Error>(
     _ isIncluded: (Element) throws(E) -> Bool
   ) throws(E) -> _NativeDictionary<Key, Value> {

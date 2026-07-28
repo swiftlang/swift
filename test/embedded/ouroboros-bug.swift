@@ -7,7 +7,6 @@
 // RUN: %target-swift-frontend -target arm64-apple-none-macho -assert-config Debug -Osize -emit-ir %s -enable-experimental-feature Embedded | %FileCheck %s
 
 // UNSUPPORTED: CPU=wasm32
-// REQUIRES: swift_in_compiler
 // REQUIRES: optimized_stdlib
 // REQUIRES: CODEGENERATOR=ARM
 // REQUIRES: embedded_stdlib_cross_compiling

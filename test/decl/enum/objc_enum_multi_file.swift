@@ -13,13 +13,13 @@
 }
 
 #elseif BAD_RAW_TYPE
-// BAD_RAW_TYPE: :[[@LINE+1]]:12: error: '@objc' enum raw type 'Array<Int>' is not an integer type
+// BAD_RAW_TYPE: :[[@LINE+1]]:12: error: '@objc' enum raw type 'Array<Int>' must be an integer type expressible in Objective-C
 @objc enum TheEnum : Array<Int> {
   case A
 }
 
 #elseif NON_INT_RAW_TYPE
-// NON_INT_RAW_TYPE: :[[@LINE+1]]:12: error: '@objc' enum raw type 'Float' is not an integer type
+// NON_INT_RAW_TYPE: :[[@LINE+1]]:12: error: '@objc' enum raw type 'Float' must be an integer type expressible in Objective-C
 @objc enum TheEnum : Float {
   case A = 0.0
 }

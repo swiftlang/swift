@@ -163,6 +163,11 @@ bool TypeVariableType::Implementation::isTernary() const {
   return locator && locator->directlyAt<TernaryExpr>();
 }
 
+bool TypeVariableType::Implementation::isSynthesizedArgument() const {
+  return locator &&
+         locator->isLastElement<LocatorPathElt::SynthesizedArgument>();
+}
+
 TypeVariableType *ConstraintSystem::createTypeVariable(
                                      ConstraintLocator *locator,
                                      unsigned options,

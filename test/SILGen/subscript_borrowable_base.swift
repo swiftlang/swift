@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 // RUN: %target-swift-frontend -emit-sil -verify %s
 
 func test(foo: borrowing Foo, s: String) -> Bool {

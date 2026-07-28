@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 // RUN: %target-swift-frontend -emit-silgen -target %target-future-triple -swift-version 6 -module-name main %s | %FileCheck %s
 
 // REQUIRES: concurrency

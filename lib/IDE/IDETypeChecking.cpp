@@ -940,11 +940,18 @@ Type swift::tryMergeBaseTypeForCompletionLookup(Type ty1, Type ty2,
       return Type();
   }
 
-  // In general we want to prefer a subtype over a supertype.
-  if (isSubtypeOf(ty1, ty2, dc))
+  auto lt = isSubtypeOf(ty1, ty2, dc);
+  auto gt = isSubtypeOf(ty2, ty1, dc);
+
+  if (lt && gt) {
+    // The two types convert to each other, but they're distinct. Give up.
+    return Type();
+  } else if (lt) {
+    // Otherwise, prefer a subtype over a supertype.
     return ty1;
-  if (isSubtypeOf(ty2, ty1, dc))
+  } else if (gt) {
     return ty2;
+  }
 
   // Incomparable, return null.
   return Type();

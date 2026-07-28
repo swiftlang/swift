@@ -1954,11 +1954,51 @@ namespace {
       return func;
     }
 
-    static EnumPayloadSchema getPreferredPayloadSchema(Element payloadElement) {
+    /// Whether a single-payload enum with the given payload and no-payload
+    /// case count represents its empty case as the all-zero pointer (nullptr).
+    ///
+    /// This is the governing rule for the `.none == null` representation: the
+    /// enum is loadable, the payload is a single bare retainable pointer, there
+    /// is exactly one no-payload case, and the payload has extra inhabitants
+    /// (so the empty case is extra-inhabitant #0, i.e. the zero pointer). It is
+    /// shared between the payload-schema choice and the NullableRefcounted
+    /// copy/destroy decision so the two predicates cannot drift.
+    static bool isNullableRefcountedPayload(IRGenModule &IGM,
+                                            const TypeInfo &payloadTI,
+                                            TypeInfoKind tik,
+                                            unsigned numNoPayloadCases,
+                                            ReferenceCounting *refcounting) {
+      return tik >= TypeInfoKind::Loadable
+          && payloadTI.isSingleRetainablePointer(ResilienceExpansion::Maximal,
+                                                 refcounting)
+          && numNoPayloadCases == 1
+          // FIXME: All single-retainable-pointer types should eventually have
+          // extra inhabitants.
+          && cast<FixedTypeInfo>(payloadTI)
+               .getFixedExtraInhabitantCount(IGM) > 0;
+    }
+
+    static EnumPayloadSchema
+    getPreferredPayloadSchema(IRGenModule &IGM, Element payloadElement,
+                              TypeInfoKind tik, unsigned numNoPayloadCases) {
       // TODO: If the payload type info provides a preferred explosion schema,
       // use it. For now, just use a generic word-chunked schema.
-      if (auto fixedTI = dyn_cast<FixedTypeInfo>(payloadElement.ti))
+      if (auto fixedTI = dyn_cast<FixedTypeInfo>(payloadElement.ti)) {
+        // When the empty case is exactly the zero pointer, represent the
+        // payload as its own pointer type so the enum lowers to `ptr` in LLVM
+        // IR with `.none == null`, rather than an opaque integer word.
+        if (isNullableRefcountedPayload(IGM, *fixedTI, tik, numNoPayloadCases,
+                                        /*refcounting=*/nullptr)) {
+          ExplosionSchema payloadSchema;
+          fixedTI->getSchema(payloadSchema);
+          assert(payloadSchema.size() == 1 && payloadSchema.begin()->isScalar()
+                 && payloadSchema.begin()->getScalarType()->isPointerTy()
+                 && "single retainable pointer should be one scalar pointer");
+          return EnumPayloadSchema::withExplicitTypes(
+              payloadSchema.begin()->getScalarType());
+        }
         return EnumPayloadSchema(fixedTI->getFixedSize().getValueInBits());
+      }
       return EnumPayloadSchema();
     }
 
@@ -1977,7 +2017,8 @@ namespace {
                                     bitwiseTakable, NumElements,
                                     std::move(WithPayload),
                                     std::move(WithNoPayload),
-                                getPreferredPayloadSchema(WithPayload.front())),
+                                getPreferredPayloadSchema(IGM, WithPayload.front(),
+                                                          tik, WithNoPayload.size())),
                                     CopyDestroyKind(Normal),
                                     Refcounting(ReferenceCounting::Native)
     {
@@ -1993,14 +2034,9 @@ namespace {
       // If the payload is a single refcounted pointer and we have a single
       // empty case, then the layout will be a nullable pointer, and we can
       // pass enum values directly into swift_retain/swift_release as-is.
-      } else if (tik >= TypeInfoKind::Loadable
-          && payloadTI.isSingleRetainablePointer(ResilienceExpansion::Maximal,
-                                                 &Refcounting)
-          && ElementsWithNoPayload.size() == 1
-          // FIXME: All single-retainable-pointer types should eventually have
-          // extra inhabitants.
-          && cast<FixedTypeInfo>(payloadTI)
-            .getFixedExtraInhabitantCount(IGM) > 0) {
+      } else if (isNullableRefcountedPayload(IGM, payloadTI, tik,
+                                             ElementsWithNoPayload.size(),
+                                             &Refcounting)) {
         CopyDestroyKind = NullableRefcounted;
       // If the payload's value witnesses can accept the extra inhabitants we
       // use, then we can forward to them instead of checking for empty tags.
@@ -2202,11 +2238,25 @@ namespace {
       unsigned extraInhabitantCount = getFixedExtraInhabitantCount(IGF.IGM);
       if (!tagBits ||
           ElementsWithNoPayload.size() != extraInhabitantCount + 1) {
-        payloadResult = payload.emitCompare(
-            IGF,
-            extraInhabitantCount == 0 ? APInt::getAllOnes(PayloadBitCount)
-                                      : ti.getFixedExtraInhabitantMask(IGF.IGM),
-            payloadTag);
+        // When the no-payload case is represented using an extra inhabitant of
+        // the payload, only the bits that actually carry the extra-inhabitant
+        // discriminator are significant; the remaining payload bits may hold
+        // arbitrary garbage (e.g. a value produced by the runtime value
+        // witness, which only sets the spare bits). Mask the comparison to the
+        // payload's extra-inhabitant mask in that case. The all-ones
+        // (whole-value) mask is only correct when the payload has no extra
+        // inhabitants of its own -- it must not be selected merely because
+        // *this* enum has exhausted its own residual extra inhabitants (which
+        // can happen for deeply nested optionals), since the no-payload case is
+        // still extra-inhabitant encoded.
+        unsigned payloadExtraInhabitantCount =
+            ti.getFixedExtraInhabitantCount(IGF.IGM);
+        payloadResult =
+            payload.emitCompare(IGF,
+                                payloadExtraInhabitantCount == 0
+                                    ? APInt::getAllOnes(PayloadBitCount)
+                                    : ti.getFixedExtraInhabitantMask(IGF.IGM),
+                                payloadTag);
       }
 
       // If any tag bits are present, they must match.
@@ -2945,7 +2995,7 @@ namespace {
       case NullableRefcounted: {
         // Bitcast to swift.refcounted*, and hand to swift_release.
         llvm::Value *val = src.claimNext();
-        llvm::Value *ptr = IGF.Builder.CreateIntToPtr(val,
+        llvm::Value *ptr = IGF.Builder.CreateBitOrPointerCast(val,
                                                 getRefcountedPtrType(IGM));
         fixLifetimeOfRefcountedPayload(IGF, ptr);
         return;
@@ -5236,16 +5286,14 @@ namespace {
 
     void collectMetadataForOutlining(OutliningMetadataCollector &collector,
                                      SILType T) const override {
-      if (CopyDestroyKind != Normal) {
-        return;
-      }
-
-      for (auto &payloadCasePair : ElementsWithPayload) {
-        SILType payloadT = T.getEnumElementType(
-            payloadCasePair.decl, collector.IGF.getSILModule(),
-            collector.IGF.IGM.getMaximalTypeExpansionContext());
-        auto &payloadTI = *payloadCasePair.ti;
-        payloadTI.collectMetadataForOutlining(collector, payloadT);
+      if (CopyDestroyKind == Normal) {
+        for (auto &payloadCasePair : ElementsWithPayload) {
+          SILType payloadT = T.getEnumElementType(
+              payloadCasePair.decl, collector.IGF.getSILModule(),
+              collector.IGF.IGM.getMaximalTypeExpansionContext());
+          auto &payloadTI = *payloadCasePair.ti;
+          payloadTI.collectMetadataForOutlining(collector, payloadT);
+        }
       }
       collector.collectTypeMetadata(T);
     }
@@ -5733,8 +5781,9 @@ namespace {
                                tag);
       auto isExtraInhabitant = IGF.Builder.CreateICmpULT(index,
                               llvm::ConstantInt::get(IGF.IGM.Int32Ty, xiCount));
-      return IGF.Builder.CreateSelect(isExtraInhabitant,
-                            index, llvm::ConstantInt::get(IGM.Int32Ty, -1));
+      return IGF.Builder.CreateSelect(
+          isExtraInhabitant, index,
+          llvm::ConstantInt::getAllOnesValue(IGM.Int32Ty));
     }
 
     void storeExtraInhabitant(IRGenFunction &IGF,
@@ -6390,7 +6439,7 @@ EnumImplStrategy::get(TypeConverter &TC, SILType type, EnumDecl *theEnum) {
   unsigned numElements = 0;
   TypeInfoKind tik = Loadable;
   IsFixedSize_t alwaysFixedSize = IsFixedSize;
-  auto triviallyDestroyable = theEnum->getValueTypeDestructor()
+  auto triviallyDestroyable = theEnum->hasValueTypeDestructor()
     ? IsNotTriviallyDestroyable : IsTriviallyDestroyable;
   auto copyable = !theEnum->canBeCopyable()
     ? IsNotCopyable : IsCopyable;
@@ -7083,7 +7132,7 @@ TypeInfo *SinglePayloadEnumImplStrategy::completeFixedLayout(
   auto alignment = payloadTI.getFixedAlignment();
   applyLayoutAttributes(TC.IGM, theEnum, /*fixed*/true, alignment);
 
-  auto deinit = theEnum->getValueTypeDestructor()
+  auto deinit = theEnum->hasValueTypeDestructor()
     ? IsNotTriviallyDestroyable : IsTriviallyDestroyable;
   auto copyable = !theEnum->canBeCopyable()
     ? IsNotCopyable : IsCopyable;
@@ -7122,7 +7171,7 @@ TypeInfo *SinglePayloadEnumImplStrategy::completeDynamicLayout(
   
   auto enumAccessible = IsABIAccessible_t(TC.IGM.isTypeABIAccessible(Type));
 
-  auto deinit = theEnum->getValueTypeDestructor()
+  auto deinit = theEnum->hasValueTypeDestructor()
     ? IsNotTriviallyDestroyable : IsTriviallyDestroyable;
   auto copyable = !theEnum->canBeCopyable()
     ? IsNotCopyable : IsCopyable;
@@ -7162,7 +7211,7 @@ MultiPayloadEnumImplStrategy::completeFixedLayout(TypeConverter &TC,
   Alignment worstAlignment(1);
   auto isCopyable = !theEnum->canBeCopyable()
     ? IsNotCopyable : IsCopyable;
-  auto isTriviallyDestroyable = theEnum->getValueTypeDestructor()
+  auto isTriviallyDestroyable = theEnum->hasValueTypeDestructor()
     ? IsNotTriviallyDestroyable : IsTriviallyDestroyable;
   IsBitwiseTakable_t isBT = IsBitwiseTakableAndBorrowable;
   PayloadSize = 0;
@@ -7330,7 +7379,7 @@ TypeInfo *MultiPayloadEnumImplStrategy::completeDynamicLayout(
   // during initializeMetadata. We can at least glean the best available
   // static information from the payloads.
   Alignment alignment(1);
-  auto td = theEnum->getValueTypeDestructor()
+  auto td = theEnum->hasValueTypeDestructor()
     ? IsNotTriviallyDestroyable : IsTriviallyDestroyable;
   auto bt = IsBitwiseTakableAndBorrowable;
   for (auto &element : ElementsWithPayload) {

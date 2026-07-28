@@ -26,7 +26,7 @@
 # 9999 is the generic unknown future Swift release. It always needs to resolve
 # to the special placeholder version numbers 9999.
 
-SwiftStdlib 9999:macOS 9999, iOS 9999, watchOS 9999, tvOS 9999
+SwiftStdlib 9999:macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, visionOS 9999
 
 # The last entry in this list corresponds to the Swift version currently under
 # development. This usually resolves to placeholder version numbers (9999) until

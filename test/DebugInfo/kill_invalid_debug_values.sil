@@ -1,0 +1,244 @@
+// RUN: %target-sil-opt -sil-print-types %s -kill-invalid-debug-values | %FileCheck %s
+
+// Tests for the kill-invalid-debug-values pass which kills debug_value
+// instructions that appear after the underlying memory has been freed.
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+class Klass {}
+
+struct Pair {
+  var first: Klass
+  var second: Klass
+}
+
+// =============================================================================
+// Basic: debug_value before destroy is kept, after destroy is killed.
+// =============================================================================
+
+// CHECK-LABEL: sil [ossa] @test_basic_destroy
+// CHECK:         debug_value %0 : $Klass, let, name "before"
+// CHECK:         destroy_value %0
+// CHECK:         debug_value undef : $Klass, let, name "after"
+// CHECK-LABEL: } // end sil function 'test_basic_destroy'
+sil [ossa] @test_basic_destroy : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  debug_value %0 : $Klass, let, name "before"
+  destroy_value %0 : $Klass
+  debug_value %0 : $Klass, let, name "after"
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// =============================================================================
+// Diamond: destroys on both branches, debug_value after merge is killed.
+// =============================================================================
+
+// CHECK-LABEL: sil [ossa] @test_diamond_destroy
+// CHECK:       bb0({{.*}}):
+// CHECK:         debug_value %0 : $Klass, let, name "before"
+// CHECK:       bb3:
+// CHECK:         debug_value undef : $Klass, let, name "after_merge"
+// CHECK-LABEL: } // end sil function 'test_diamond_destroy'
+sil [ossa] @test_diamond_destroy : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  debug_value %0 : $Klass, let, name "before"
+  cond_br undef, bb1, bb2
+bb1:
+  destroy_value %0 : $Klass
+  br bb3
+bb2:
+  destroy_value %0 : $Klass
+  br bb3
+bb3:
+  debug_value %0 : $Klass, let, name "after_merge"
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// =============================================================================
+// Borrow: debug_value on begin_borrow result after destroy of original.
+// =============================================================================
+
+// CHECK-LABEL: sil [ossa] @test_borrow_after_destroy
+// CHECK:         debug_value %1 : $Klass, let, name "borrow_before"
+// CHECK:         destroy_value %0
+// CHECK:         debug_value undef : $Klass, let, name "borrow_after"
+// CHECK-LABEL: } // end sil function 'test_borrow_after_destroy'
+sil [ossa] @test_borrow_after_destroy : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  %1 = begin_borrow %0 : $Klass
+  end_borrow %1 : $Klass
+  debug_value %1 : $Klass, let, name "borrow_before"
+  destroy_value %0 : $Klass
+  debug_value %1 : $Klass, let, name "borrow_after"
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// =============================================================================
+// Forwarding consume: debug_value kept between struct and its destroy.
+// The class, after being forwarded into a struct, is still available for debug
+// info. After the pair is destroyed, the class is released, and might be
+// deallocated, so referencing it is unsafe.
+// =============================================================================
+
+// CHECK-LABEL: sil [ossa] @test_forwarding_consume
+// CHECK:         debug_value %0 : $Klass, let, name "before_struct"
+// CHECK:         %{{.*}} = struct $Pair
+// CHECK:         debug_value %0 : $Klass, let, name "after_struct"
+// CHECK:         destroy_value
+// CHECK:         debug_value undef : $Klass, let, name "after_destroy"
+// CHECK-LABEL: } // end sil function 'test_forwarding_consume'
+sil [ossa] @test_forwarding_consume : $@convention(thin) (@owned Klass, @owned Klass) -> () {
+bb0(%0 : @owned $Klass, %1 : @owned $Klass):
+  debug_value %0 : $Klass, let, name "before_struct"
+  %pair = struct $Pair (%0 : $Klass, %1 : $Klass)
+  debug_value %0 : $Klass, let, name "after_struct"
+  destroy_value %pair : $Pair
+  debug_value %0 : $Klass, let, name "after_destroy"
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// =============================================================================
+// Return path: debug_value before return of owned value is kept.
+// =============================================================================
+
+// CHECK-LABEL: sil [ossa] @test_return_path
+// CHECK:       bb1:
+// CHECK:         debug_value %0 : $Klass, let, name "before_return"
+// CHECK:         return %0
+// CHECK-LABEL: } // end sil function 'test_return_path'
+sil [ossa] @test_return_path : $@convention(thin) (@owned Klass) -> @owned Klass {
+bb0(%0 : @owned $Klass):
+  cond_br undef, bb1, bb2
+bb1:
+  debug_value %0 : $Klass, let, name "before_return"
+  return %0 : $Klass
+bb2:
+  destroy_value %0 : $Klass
+  unreachable
+}
+
+// =============================================================================
+// Mixed paths: destroy on one branch, return on another.
+// =============================================================================
+
+// CHECK-LABEL: sil [ossa] @test_destroy_and_return
+// CHECK:       bb0({{.*}}):
+// CHECK:         debug_value %0 : $Klass, let, name "entry"
+// CHECK:       bb2:
+// CHECK:         debug_value undef : $Klass, let, name "after_destroy"
+// CHECK-LABEL: } // end sil function 'test_destroy_and_return'
+sil [ossa] @test_destroy_and_return : $@convention(thin) (@owned Klass) -> @owned Klass {
+bb0(%0 : @owned $Klass):
+  debug_value %0 : $Klass, let, name "entry"
+  cond_br undef, bb1, bb2
+bb1:
+  return %0 : $Klass
+bb2:
+  destroy_value %0 : $Klass
+  debug_value %0 : $Klass, let, name "after_destroy"
+  unreachable
+}
+
+// =============================================================================
+// Guaranteed forwarding: debug_value on struct_extract result after destroy.
+// =============================================================================
+
+// CHECK-LABEL: sil [ossa] @test_guaranteed_forwarding
+// CHECK:         debug_value %2 : $Klass, let, name "extract_in_borrow"
+// CHECK:         debug_value %2 : $Klass, let, name "extract_end_borrow"
+// CHECK:         destroy_value %0
+// CHECK:         debug_value undef : $Klass, let, name "extract_destroy"
+// CHECK-LABEL: } // end sil function 'test_guaranteed_forwarding'
+sil [ossa] @test_guaranteed_forwarding : $@convention(thin) (@owned Pair) -> () {
+bb0(%0 : @owned $Pair):
+  %1 = begin_borrow %0 : $Pair
+  %2 = struct_extract %1 : $Pair, #Pair.first
+  debug_value %2 : $Klass, let, name "extract_in_borrow"
+  end_borrow %1 : $Pair
+  debug_value %2 : $Klass, let, name "extract_end_borrow"
+  destroy_value %0 : $Pair
+  debug_value %2 : $Klass, let, name "extract_destroy"
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// =============================================================================
+// Trivial value: debug_value is never killed (nil ownership root).
+// =============================================================================
+
+// CHECK-LABEL: sil [ossa] @test_trivial_not_killed
+// CHECK:         debug_value %0 : $Builtin.Int64, let, name "trivial"
+// CHECK-NOT:     undef
+// CHECK-LABEL: } // end sil function 'test_trivial_not_killed'
+sil [ossa] @test_trivial_not_killed : $@convention(thin) (Builtin.Int64) -> () {
+bb0(%0 : $Builtin.Int64):
+  debug_value %0 : $Builtin.Int64, let, name "trivial"
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// =============================================================================
+// Chained forwarding: value forwarded through multiple structs.
+// =============================================================================
+
+// CHECK-LABEL: sil [ossa] @test_chained_forwarding
+// CHECK:         debug_value %0 : $Klass, let, name "alive"
+// CHECK:         debug_value %1 : $Klass, let, name "still_alive"
+// CHECK:         destroy_value
+// CHECK:         debug_value undef : $Klass, let, name "dead"
+// CHECK-LABEL: } // end sil function 'test_chained_forwarding'
+sil [ossa] @test_chained_forwarding : $@convention(thin) (@owned Klass, @owned Klass, @owned Klass, @owned Klass) -> () {
+bb0(%0 : @owned $Klass, %1 : @owned $Klass, %2 : @owned $Klass, %3 : @owned $Klass):
+  %p1 = struct $Pair (%0 : $Klass, %1 : $Klass)
+  debug_value %0 : $Klass, let, name "alive"
+  %p2 = struct $Pair (%2 : $Klass, %3 : $Klass)
+  %tup = tuple (%p1, %p2)
+  debug_value %1 : $Klass, let, name "still_alive"
+  destroy_value %tup : $(Pair, Pair)
+  debug_value %0 : $Klass, let, name "dead"
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// =============================================================================
+// Consuming apply: debug_value after consuming apply is killed.
+// =============================================================================
+
+sil @take_owned : $@convention(thin) (@owned Klass) -> ()
+
+// CHECK-LABEL: sil [ossa] @test_consuming_apply
+// CHECK:         debug_value %0 : $Klass, let, name "before_apply"
+// CHECK:         apply
+// CHECK:         debug_value undef : $Klass, let, name "after_apply"
+// CHECK-LABEL: } // end sil function 'test_consuming_apply'
+sil [ossa] @test_consuming_apply : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  debug_value %0 : $Klass, let, name "before_apply"
+  %fn = function_ref @take_owned : $@convention(thin) (@owned Klass) -> ()
+  %apply = apply %fn(%0) : $@convention(thin) (@owned Klass) -> ()
+  debug_value %0 : $Klass, let, name "after_apply"
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// =============================================================================
+// Guaranteed function argument: no ownership root, debug_value kept.
+// =============================================================================
+
+// CHECK-LABEL: sil [ossa] @test_guaranteed_arg
+// CHECK:         debug_value %0 : $Klass, let, name "guaranteed"
+// CHECK-NOT:     undef
+// CHECK-LABEL: } // end sil function 'test_guaranteed_arg'
+sil [ossa] @test_guaranteed_arg : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  debug_value %0 : $Klass, let, name "guaranteed"
+  %ret = tuple ()
+  return %ret : $()
+}

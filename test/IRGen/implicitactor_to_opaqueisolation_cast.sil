@@ -7,6 +7,7 @@ import _Concurrency
 
 // REQUIRES: concurrency
 // REQUIRES: CODEGENERATOR=AArch64
+// REQUIRES: SWIFT_STDLIB_ARCH=arm64
 // REQUIRES: OS=macosx
 
 // TAGGED_POINTER: define swiftcc { i64, i64 } @test_cast_implicitactor_to_opaqueisolation(i64 [[WORD1:%.*]], i64 [[WORD2:%.*]])

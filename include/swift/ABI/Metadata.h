@@ -2193,7 +2193,7 @@ private:
     if (!Flags.hasTypePacks())
       return 0;
 
-    return getGenSigPackShapeHeader().NumTypePacks;
+    return getGenSigPackShapeHeader().NumPacks;
   }
 
   const TargetGenericContextDescriptorHeader<Runtime> *

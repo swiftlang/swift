@@ -38,7 +38,7 @@ public struct Span<Element: ~Copyable>: ~Escapable, Copyable, BitwiseCopyable {
   internal let _pointer: UnsafeRawPointer?
 
   @unsafe
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal func _start() -> UnsafeRawPointer {
     unsafe _pointer._unsafelyUnwrappedUnchecked
   }
@@ -52,7 +52,7 @@ public struct Span<Element: ~Copyable>: ~Escapable, Copyable, BitwiseCopyable {
   internal let _count: Int
 
   /// Create an empty span.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @inline(__always)
   @lifetime(immortal)
   public init() {
@@ -74,14 +74,39 @@ public struct Span<Element: ~Copyable>: ~Escapable, Copyable, BitwiseCopyable {
   ///   - pointer: a pointer to the first initialized element.
   ///   - count: the number of initialized elements in the span.
   @unsafe
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @inline(__always)
   @lifetime(borrow pointer)
+  @_disfavoredOverload
   internal init(
     _unchecked pointer: UnsafeRawPointer?,
     count: Int
   ) {
     unsafe _pointer = pointer
+    _count = count
+  }
+
+  /// Unsafely create a `Span` over initialized memory.
+  ///
+  /// `pointer` must point to a region of `count` initialized instances.
+  ///
+  /// The region of memory representing `count` instances starting at `pointer`
+  /// must remain valid, initialized and immutable
+  /// throughout the lifetime of the newly-created `Span`.
+  /// Failure to maintain this invariant results in undefined behaviour.
+  ///
+  /// - Parameters:
+  ///   - pointer: a pointer to the first initialized element.
+  ///   - count: the number of initialized elements in the span.
+  @lifetime(borrow pointer)
+  @unsafe
+  @_alwaysEmitIntoClient
+  @_transparent
+  internal init(
+    _unchecked pointer: UnsafePointer<Element>,
+    count: Int
+  ) {
+    unsafe _pointer = UnsafeRawPointer(pointer)
     _count = count
   }
 }
@@ -102,20 +127,22 @@ extension Span where Element: ~Copyable {
   ///
   /// - Parameters:
   ///   - buffer: an `UnsafeBufferPointer` to initialized elements.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @lifetime(borrow buffer)
   @unsafe
   public init(
     _unsafeElements buffer: UnsafeBufferPointer<Element>
   ) {
-    //FIXME: Workaround for https://github.com/swiftlang/swift/issues/77235
-    let baseAddress = unsafe UnsafeRawPointer(buffer.baseAddress)
     _precondition(
-      ((Int(bitPattern: baseAddress) &
-        (MemoryLayout<Element>.alignment &- 1)) == 0),
+      buffer._isWellAligned(),
       "baseAddress must be properly aligned to access Element"
     )
-    let span = unsafe Span(_unchecked: baseAddress, count: buffer.count)
+
+    let span = unsafe Span(
+      _unchecked: UnsafeRawPointer(buffer.baseAddress),
+      count: buffer.count
+    )
+
     // As a trivial value, 'baseAddress' does not formally depend on the
     // lifetime of 'buffer'. Make the dependence explicit.
     self = unsafe _overrideLifetime(span, borrowing: buffer)
@@ -129,7 +156,7 @@ extension Span where Element: ~Copyable {
   ///
   /// - Parameters:
   ///   - buffer: an `UnsafeMutableBufferPointer` to initialized elements.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @lifetime(borrow buffer)
   @unsafe
   public init(
@@ -152,7 +179,7 @@ extension Span where Element: ~Copyable {
   /// - Parameters:
   ///   - pointer: a pointer to the first initialized element.
   ///   - count: the number of initialized elements in the span.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @lifetime(borrow pointer)
   @unsafe
   public init(
@@ -180,7 +207,7 @@ extension Span /*where Element: Copyable*/ {
   ///
   /// - Parameters:
   ///   - buffer: an `UnsafeBufferPointer` to initialized elements.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @lifetime(borrow buffer)
   @unsafe
   public init(
@@ -201,7 +228,7 @@ extension Span /*where Element: Copyable*/ {
   ///
   /// - Parameters:
   ///   - buffer: an `UnsafeMutableBufferPointer` to initialized elements.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @lifetime(borrow buffer)
   @unsafe
   public init(
@@ -231,7 +258,7 @@ extension Span where Element: BitwiseCopyable {
   ///
   /// - Parameters:
   ///   - buffer: a buffer to initialized elements.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @lifetime(borrow buffer)
   @unsafe
   public init(
@@ -267,7 +294,7 @@ extension Span where Element: BitwiseCopyable {
   ///
   /// - Parameters:
   ///   - buffer: a buffer to initialized elements.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @lifetime(borrow buffer)
   @unsafe
   public init(
@@ -294,7 +321,7 @@ extension Span where Element: BitwiseCopyable {
   /// - Parameters:
   ///   - pointer: a pointer to the first initialized element.
   ///   - byteCount: the number of bytes in the span.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @lifetime(borrow pointer)
   @unsafe
   public init(
@@ -323,7 +350,7 @@ extension Span where Element: BitwiseCopyable {
   ///
   /// - Parameters:
   ///   - buffer: a buffer to initialized elements.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @lifetime(borrow buffer)
   @unsafe
   public init(
@@ -348,7 +375,7 @@ extension Span where Element: BitwiseCopyable {
   ///
   /// - Parameters:
   ///   - buffer: a buffer to initialized elements.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @lifetime(borrow buffer)
   @unsafe
   public init(
@@ -366,7 +393,7 @@ extension Span where Element: BitwiseCopyable {
   /// - Parameters:
   ///   - bytes: An existing `RawSpan`, which will define both this
   ///            `Span`'s lifetime and the memory it represents.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @unsafe
   @lifetime(copy bytes)
   public init(_bytes bytes: consuming RawSpan) {
@@ -389,7 +416,7 @@ extension Span where Element: BitwiseCopyable {
   /// - Parameters:
   ///   - bytes: An existing `RawSpan`, which will define both this
   ///            `Span`'s lifetime and the memory it represents.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_lifetime(copy bytes)
   public init(viewing bytes: RawSpan) where Element: ConvertibleFromBytes {
     let rawBuffer = unsafe UnsafeRawBufferPointer(
@@ -410,14 +437,14 @@ extension Span where Element: ~Copyable {
   /// instead of comparing `count` to zero.
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_semantics("fixed_storage.get_count")
   public var count: Int { _assumeNonNegative(_count) }
 
   /// A Boolean value indicating whether the span is empty.
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public var isEmpty: Bool { _count == 0 }
 
@@ -428,7 +455,7 @@ extension Span where Element: ~Copyable {
   /// order.
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public var indices: Range<Index> {
     unsafe Range(_uncheckedBounds: (0, count))
   }
@@ -440,7 +467,7 @@ extension Span where Element: ~Copyable {
   // SILOptimizer looks for fixed_storage.check_index semantics for bounds check optimizations.
   @_semantics("fixed_storage.check_index")
   @inline(__always)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal func _checkIndex(_ position: Index) {
     _precondition(indices.contains(position), "Index out of bounds")
   }
@@ -451,7 +478,7 @@ extension Span where Element: ~Copyable {
   ///     must be greater or equal to zero, and less than `count`.
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public subscript(_ position: Index) -> Element {
     @_transparent
     borrow {
@@ -470,7 +497,7 @@ extension Span where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @unsafe
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public subscript(unchecked position: Index) -> Element {
     @_unsafeSelfDependentResult
     borrow {
@@ -480,7 +507,7 @@ extension Span where Element: ~Copyable {
   }
 
   @unsafe
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal func _unsafeAddressOfElement(
     unchecked position: Index
   ) -> Builtin.RawPointer {
@@ -502,7 +529,7 @@ extension Span where Element: BitwiseCopyable {
   ///     must be greater or equal to zero, and less than `count`.
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public subscript(_ position: Index) -> Element {
     @_transparent
     get {
@@ -521,7 +548,7 @@ extension Span where Element: BitwiseCopyable {
   ///
   /// - Complexity: O(1)
   @unsafe
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public subscript(unchecked position: Index) -> Element {
     get {
       let address = unsafe _unsafeAddressOfElement(unchecked: position)
@@ -537,7 +564,7 @@ extension Span where Element: Copyable {
   /// Construct a raw span over the memory represented by this span.
   ///
   /// - Returns: A `RawSpan` over the memory represented by this span.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   @unsafe
   public var bytes: RawSpan {
@@ -556,7 +583,7 @@ extension Span where Element: ConvertibleToBytes {
   /// A raw span over the memory represented by this span.
   ///
   /// - Returns: A RawSpan over the memory represented by this span.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public var bytes: RawSpan {
     @_lifetime(copy self)
@@ -584,7 +611,7 @@ extension Span where Element: ~Copyable {
   /// - Returns: A `Span` over the items within `bounds`.
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @lifetime(copy self)
   public func extracting(_ bounds: Range<Index>) -> Self {
     _precondition(
@@ -596,7 +623,7 @@ extension Span where Element: ~Copyable {
   }
 
   @available(*, deprecated, renamed: "extracting(_:)")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @lifetime(copy self)
   public func _extracting(_ bounds: Range<Index>) -> Self {
     extracting(bounds)
@@ -618,7 +645,7 @@ extension Span where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @unsafe
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @lifetime(copy self)
   public func extracting(unchecked bounds: Range<Index>) -> Self {
     let delta = bounds.lowerBound &* MemoryLayout<Element>.stride
@@ -631,7 +658,7 @@ extension Span where Element: ~Copyable {
 
   @unsafe
   @available(*, deprecated, renamed: "extracting(unchecked:)")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @lifetime(copy self)
   public func _extracting(unchecked bounds: Range<Index>) -> Self {
     unsafe extracting(unchecked: bounds)
@@ -650,7 +677,7 @@ extension Span where Element: ~Copyable {
   /// - Returns: A `Span` over the items within `bounds`.
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @lifetime(copy self)
   public func extracting(
     _ bounds: some RangeExpression<Index>
@@ -659,7 +686,7 @@ extension Span where Element: ~Copyable {
   }
 
   @available(*, deprecated, renamed: "extracting(_:)")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @lifetime(copy self)
   public func _extracting(_ bounds: some RangeExpression<Index>) -> Self {
     extracting(bounds)
@@ -681,7 +708,7 @@ extension Span where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @unsafe
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @lifetime(copy self)
   public func extracting(
     unchecked bounds: ClosedRange<Index>
@@ -694,7 +721,7 @@ extension Span where Element: ~Copyable {
 
   @unsafe
   @available(*, deprecated, renamed: "extracting(unchecked:)")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @lifetime(copy self)
   public func _extracting(unchecked bounds: ClosedRange<Index>) -> Self {
     unsafe extracting(unchecked: bounds)
@@ -709,14 +736,14 @@ extension Span where Element: ~Copyable {
   /// - Returns: A `Span` over all the items of this span.
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @lifetime(copy self)
   public func extracting(_: UnboundedRange) -> Self {
     self
   }
 
   @available(*, deprecated, renamed: "extracting(_:)")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @lifetime(copy self)
   public func _extracting(_: UnboundedRange) -> Self {
     self
@@ -740,7 +767,7 @@ extension Span where Element: ~Copyable  {
   ///   for the `withUnsafeBufferPointer(_:)` method. The closure's
   ///   parameter is valid only for the duration of its execution.
   /// - Returns: The return value of the `body` closure parameter.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   @safe
   public func withUnsafeBufferPointer<E: Error, Result: ~Copyable>(
@@ -774,7 +801,7 @@ extension Span where Element: BitwiseCopyable {
   ///   The closure's parameter is valid only for the duration of
   ///   its execution.
   /// - Returns: The return value of the `body` closure parameter.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   @safe
   public func withUnsafeBytes<E: Error, Result: ~Copyable>(
@@ -801,7 +828,7 @@ extension Span where Element: ~Copyable {
   ///     in memory.
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func isIdentical(to other: Self) -> Bool {
     unsafe (self._pointer == other._pointer) && (self._count == other._count)
   }
@@ -817,7 +844,7 @@ extension Span where Element: ~Copyable {
   ///     in memory.
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func isTriviallyIdentical(to other: Self) -> Bool {
     unsafe (self._pointer == other._pointer) && (self._count == other._count)
   }
@@ -828,7 +855,7 @@ extension Span where Element: ~Copyable {
   /// - Parameters:
   ///   - other: a span that may be a subrange of `self`
   /// - Returns: A range of indices within `self`, or `nil`.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func indices(of other: borrowing Self) -> Range<Index>? {
     if other._count > _count { return nil }
     guard let spanStart = unsafe other._pointer, _count > 0 else {
@@ -867,7 +894,7 @@ extension Span where Element: ~Copyable {
   /// - Returns: A span with at most `maxLength` elements.
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @lifetime(copy self)
   public func extracting(first maxLength: Int) -> Self {
     _precondition(maxLength >= 0, "Can't have a prefix of negative length")
@@ -877,7 +904,7 @@ extension Span where Element: ~Copyable {
   }
 
   @available(*, deprecated, renamed: "extracting(first:)")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @lifetime(copy self)
   public func _extracting(first maxLength: Int) -> Self {
     extracting(first: maxLength)
@@ -897,7 +924,7 @@ extension Span where Element: ~Copyable {
   /// - Returns: A span leaving off the specified number of elements at the end.
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @lifetime(copy self)
   public func extracting(droppingLast k: Int) -> Self {
     _precondition(k >= 0, "Can't drop a negative number of elements")
@@ -907,7 +934,7 @@ extension Span where Element: ~Copyable {
   }
 
   @available(*, deprecated, renamed: "extracting(droppingLast:)")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @lifetime(copy self)
   public func _extracting(droppingLast k: Int) -> Self {
     extracting(droppingLast: k)
@@ -928,7 +955,7 @@ extension Span where Element: ~Copyable {
   /// - Returns: A span with at most `maxLength` elements.
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @lifetime(copy self)
   public func extracting(last maxLength: Int) -> Self {
     _precondition(maxLength >= 0, "Can't have a suffix of negative length")
@@ -942,7 +969,7 @@ extension Span where Element: ~Copyable {
   }
 
   @available(*, deprecated, renamed: "extracting(last:)")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @lifetime(copy self)
   public func _extracting(last maxLength: Int) -> Self {
     extracting(last: maxLength)
@@ -962,7 +989,7 @@ extension Span where Element: ~Copyable {
   /// - Returns: A span starting after the specified number of elements.
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @lifetime(copy self)
   public func extracting(droppingFirst k: Int) -> Self {
     _precondition(k >= 0, "Can't drop a negative number of elements")
@@ -977,7 +1004,7 @@ extension Span where Element: ~Copyable {
   }
 
   @available(*, deprecated, renamed: "extracting(droppingFirst:)")
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @lifetime(copy self)
   public func _extracting(droppingFirst k: Int) -> Self {
     extracting(droppingFirst: k)
@@ -993,43 +1020,43 @@ extension Span where Element: ~Copyable {
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension Span where Element: ~Copyable {
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @available(*, unavailable, renamed: "extracting(_:)")
   public subscript(bounds: Range<Index>) -> Self {
     Builtin.unreachable()
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @available(*, unavailable, renamed: "extracting(_:)")
   public subscript(bounds: some RangeExpression<Index>) -> Self {
     Builtin.unreachable()
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @available(*, unavailable, renamed: "extracting(_:)")
   public subscript(bounds: UnboundedRange) -> Self {
     Builtin.unreachable()
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @available(*, unavailable, renamed: "extracting(first:)")
   public func prefix(_ maxLength: Int) -> Self {
     Builtin.unreachable()
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @available(*, unavailable, renamed: "extracting(last:)")
   public func suffix(_ maxLength: Int) -> Self {
     Builtin.unreachable()
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @available(*, unavailable, renamed: "extracting(droppingFirst:)")
   public func dropFirst(_ k: Int = 1) -> Self {
     Builtin.unreachable()
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @available(*, unavailable, renamed: "extracting(droppingLast:)")
   public func dropLast(_ k: Int = 1) -> Self {
     Builtin.unreachable()
@@ -1044,7 +1071,7 @@ extension Span where Element == UInt8 {
   /// - Parameters:
   ///   - bytes: An existing `RawSpan`, which will define both this
   ///            `Span`'s lifetime and the memory it represents.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_lifetime(copy bytes)
   public init(viewing bytes: RawSpan) {
     let span = unsafe Self(_unchecked: bytes._pointer, count: bytes._count)
@@ -1054,12 +1081,20 @@ extension Span where Element == UInt8 {
 
 #if !SPAN_COMPATIBILITY_STUB
 @available(SwiftStdlib 6.4, *)
-extension Span: BorrowingSequence where Element: ~Copyable {
+extension Span: Iterable where Element: ~Copyable {
   @available(SwiftStdlib 6.4, *)
-  @inlinable
+  public typealias Failure = Never
+
+  @export(implementation)
+  public var underestimatedCount: Int {
+    self.count
+  }
+
+  @available(SwiftStdlib 6.4, *)
+  @export(implementation)
   @lifetime(borrow self)
-  public func makeBorrowingIterator() -> SpanIterator<Element> {
-    SpanIterator(self)
+  public func makeBorrowingIterator() -> BorrowingIterator {
+    .init(self)
   }
 }
 #endif
@@ -1067,7 +1102,7 @@ extension Span: BorrowingSequence where Element: ~Copyable {
 @available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension Span where Element: Equatable & ~Copyable {
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal func _elementsEqual(to other: borrowing Self) -> Bool {
     return self.withUnsafeBufferPointer { a in
       other.withUnsafeBufferPointer { b in
@@ -1087,7 +1122,7 @@ extension Span where Element: Equatable & ~Copyable {
 @available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension Span where Element: Hashable & ~Copyable {
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal func _hashContents(into hasher: inout Hasher) {
     // Note: no discriminating combine call -- caller is expected to do that
     // separately when needed.

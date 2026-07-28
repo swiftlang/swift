@@ -88,7 +88,8 @@ std::optional<SILValue> emitDistributedActorSystemWitnessCall(
   }
 
   auto methodSILFnTy = methodSILTy.castTo<SILFunctionType>();
-  SILFunctionConventions conv(methodSILFnTy, M);
+  SILFunctionConventions conv(methodSILFnTy,
+                              SILAddressConventions::forFunction(F));
 
   // Since this code lives outside of SILGen, manage our clean-ups manually.
   SmallVector<SILInstruction *, 2> cleanups;

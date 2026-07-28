@@ -6,8 +6,26 @@
 
 import SwiftUI
 
+// Stand-in for SwiftUI's `@State`, which became a macro in recent SDKs and would
+// otherwise require the SwiftUIMacros plugin. This test exercises type-checking
+// diagnostics, not `@State` itself; the box reproduces `@State`'s nonmutating
+// setter and `Binding` projected value.
+@propertyWrapper
+struct FakeState<Value> {
+  final class Box { var value: Value; init(_ value: Value) { self.value = value } }
+  private let box: Box
+  init(wrappedValue: Value) { box = Box(wrappedValue) }
+  var wrappedValue: Value {
+    get { box.value }
+    nonmutating set { box.value = newValue }
+  }
+  var projectedValue: Binding<Value> {
+    Binding(get: { box.value }, set: { box.value = $0 })
+  }
+}
+
 struct ContentView : View {
-  @State var foo: [String] = Array(repeating: "", count: 5)
+  @FakeState var foo: [String] = Array(repeating: "", count: 5)
 
   var body: some View {
     VStack {

@@ -1,3 +1,4 @@
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-silgen-ossa -o /dev/null -sil-verify-all -enable-sil-opaque-values -enable-experimental-feature LifetimeDependence -disable-availability-checking -module-name main %s
 // RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-silgen -enable-experimental-feature LifetimeDependence -disable-availability-checking -module-name main %s | %FileCheck %s
 
 // REQUIRES: swift_feature_LifetimeDependence

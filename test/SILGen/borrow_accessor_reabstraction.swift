@@ -1,3 +1,6 @@
+// FIXME: crashes under opaque values
+// RUN: not --crash %target-swift-frontend -emit-silgen-ossa -o /dev/null -sil-verify-all -enable-sil-opaque-values %s -verify
+
 // RUN: %target-swift-frontend -emit-silgen %s -verify
 // RUN: %target-swift-frontend -emit-silgen -enable-library-evolution %s -verify
 

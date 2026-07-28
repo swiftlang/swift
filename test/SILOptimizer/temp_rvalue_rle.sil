@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -redundant-load-elimination -deadobject-elim | %FileCheck %s
+// RUN: %target-sil-opt %s -redundant-load-elimination -dead-object-elimination | %FileCheck %s
 
 sil_stage canonical
 
@@ -85,7 +85,7 @@ bb0(%0 : @owned $GS<Builtin.NativeObject>):
 // We do not support this today while we are bringing up store support.
 //
 // CHECK-LABEL: sil [ossa] @store_rvalue_simple
-// CHECK: alloc_stack
+// CHECK-NOT:     alloc_stack
 // CHECK-LABEL: } // end sil function 'store_rvalue_simple'
 sil [ossa] @store_rvalue_simple : $@convention(thin) (@in_guaranteed GS<Klass>, @owned GS<Klass>) -> () {
 bb0(%0 : $*GS<Klass>, %1 : @owned $GS<Klass>):
@@ -396,7 +396,7 @@ bb0(%0 : @owned $GS<Builtin.NativeObject>):
 // We don't support liferange exits currently
 //
 // CHECK-LABEL: sil [ossa] @test_optimize_store_of_enum1
-// CHECK:      alloc_stack
+// CHECK-NOT:      alloc_stack
 // CHECK:       } // end sil function 'test_optimize_store_of_enum1'
 sil [ossa] @test_optimize_store_of_enum1 : $@convention(method) <Element> (@guaranteed Optional<Klass>) -> () {
 bb0(%0 : @guaranteed $Optional<Klass>):
@@ -423,7 +423,7 @@ bb7:
 // We don't support liferange exits currently
 //
 // CHECK-LABEL: sil [ossa] @test_optimize_store_of_enum2
-// CHECK:         alloc_stack
+// CHECK-NOT:     alloc_stack
 // CHECK:       } // end sil function 'test_optimize_store_of_enum2'
 sil [ossa] @test_optimize_store_of_enum2 : $@convention(method) <Element> (@owned Optional<Klass>) -> () {
 bb0(%0 : @owned $Optional<Klass>):
@@ -490,11 +490,8 @@ bb0(%0 : $*Klass):
 
 // Check that we don't crash with this.
 // CHECK-LABEL: sil [ossa] @unhandled_user : $@convention(thin) (@owned Klass) -> @owned Klass {
-// CHECK:   alloc_stack
-// CHECK:   store
-// CHECK:   begin_access
-// CHECK:   load
-// CHECK: } // end sil function 'unhandled_user'
+// CHECK-NOT:     alloc_stack
+// CHECK:       } // end sil function 'unhandled_user'
 sil [ossa] @unhandled_user : $@convention(thin) (@owned Klass) -> @owned Klass {
 bb0(%0 : @owned $Klass):
   %5 = alloc_stack $Klass

@@ -16,7 +16,6 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Attr.h"
-#include "swift/AST/AvailabilityConstraint.h"
 #include "swift/AST/AvailabilityContext.h"
 #include "swift/AST/AvailabilityDomain.h"
 #include "swift/AST/AvailabilityInference.h"
@@ -332,51 +331,24 @@ Decl::getActiveAvailableAttrForCurrentPlatform() const {
 }
 
 std::optional<SemanticAvailableAttr> Decl::getDeprecatedAttr() const {
-  auto &ctx = getASTContext();
-  std::optional<SemanticAvailableAttr> result;
-  auto bestActive = getActiveAvailableAttrForCurrentPlatform();
-
-  for (auto attr : getSemanticAvailableAttrs(/*includingInactive=*/false)) {
-    if (attr.isPlatformSpecific() && (!bestActive || attr != bestActive))
-      continue;
-
-    // Unconditional deprecated.
-    if (attr.isUnconditionallyDeprecated())
-      return attr;
-
-    auto deprecatedRange = attr.getDeprecatedRange(ctx);
-    if (!deprecatedRange)
-      continue;
-
-    // We treat the declaration as deprecated if it is deprecated on
-    // all deployment targets.
-    auto deploymentRange = attr.getDomain().getDeploymentRange(ctx);
-    if (deploymentRange && deploymentRange->isContainedIn(*deprecatedRange))
-      result.emplace(attr);
+  auto context = AvailabilityContext::forDeploymentTarget(getASTContext());
+  if (auto restriction = context.restrictionForDecl(this)) {
+    if (restriction->isDeprecated())
+      return restriction->getAttr();
   }
-  return result;
+
+  return std::nullopt;
 }
 
 std::optional<SemanticAvailableAttr> Decl::getSoftDeprecatedAttr() const {
-  auto &ctx = getASTContext();
-  std::optional<SemanticAvailableAttr> result;
-  auto bestActive = getActiveAvailableAttrForCurrentPlatform();
-
-  for (auto attr : getSemanticAvailableAttrs(/*includingInactive=*/false)) {
-    if (attr.isPlatformSpecific() && (!bestActive || attr != bestActive))
-      continue;
-
-    auto deprecatedRange = attr.getDeprecatedRange(ctx);
-    if (!deprecatedRange)
-      continue;
-
-    // We treat the declaration as soft-deprecated if it is deprecated in a
-    // future version.
-    auto deploymentRange = attr.getDomain().getDeploymentRange(ctx);
-    if (!deploymentRange || !deploymentRange->isContainedIn(*deprecatedRange))
-      result.emplace(attr);
+  auto context = AvailabilityContext::forDeploymentTarget(getASTContext());
+  if (auto restriction = context.restrictionForDecl(
+          this, AvailabilityRestrictionFlag::IncludeSoftDeprecation)) {
+    if (restriction->isDeprecated())
+      return restriction->getAttr();
   }
-  return result;
+
+  return std::nullopt;
 }
 
 std::optional<SemanticAvailableAttr> Decl::getNoAsyncAttr() const {
@@ -423,10 +395,9 @@ bool Decl::isUnavailableInCurrentSwiftVersion() const {
 
 std::optional<SemanticAvailableAttr> Decl::getUnavailableAttr() const {
   auto context = AvailabilityContext::forDeploymentTarget(getASTContext());
-  if (auto constraint = getAvailabilityConstraintsForDecl(this, context)
-                            .getPrimaryConstraint()) {
-    if (constraint->isUnavailable())
-      return constraint->getAttr();
+  if (auto restriction = context.restrictionForDecl(this)) {
+    if (restriction->isUnavailable())
+      return restriction->getAttr();
   }
 
   return std::nullopt;
@@ -478,23 +449,24 @@ computeDeclRuntimeAvailability(const Decl *decl) {
   auto rootTargetDomains = getRootTargetDomains(ctx);
   auto remainingTargetDomains = rootTargetDomains;
 
-  AvailabilityConstraintFlags flags;
+  AvailabilityRestrictionFlags flags;
 
   // Semantic availability was already computed separately for any enclosing
   // extension.
-  flags |= AvailabilityConstraintFlag::SkipEnclosingExtension;
+  flags |= AvailabilityRestrictionFlag::SkipEnclosingExtension;
 
   // FIXME: [availability] Replace IncludeAllDomains with a RuntimeAvailability
-  // flag that includes the target variant constraints and keeps all constraints
-  // from active platforms.
-  flags |= AvailabilityConstraintFlag::IncludeAllDomains;
+  // flag that includes the target variant restrictions and keeps all
+  // restrictions from active platforms.
+  flags |= AvailabilityRestrictionFlag::IncludeAllDomains;
 
-  auto constraints = getAvailabilityConstraintsForDecl(
-      decl, AvailabilityContext::forInliningTarget(ctx), flags);
+  auto restrictions =
+      AvailabilityContext::forInliningTarget(ctx).allRestrictionsForDecl(decl,
+                                                                         flags);
 
-  // First, collect the unavailable domains from the constraints.
+  // First, collect the unavailable domains from the restrictions.
   llvm::SmallVector<AvailabilityDomain, 8> unavailableDomains;
-  getRuntimeUnavailableDomains(constraints, unavailableDomains, ctx);
+  getRuntimeUnavailableDomains(restrictions, unavailableDomains, ctx);
 
   // Check whether there are any available attributes that would make the
   // decl available in descendants of the unavailable domains.
@@ -812,7 +784,7 @@ SemanticAvailableAttr::getIntroducedDomainAndRange(
     return std::nullopt;
 
   // For version-less domains, an attribute that does not indicate some other
-  // kind of unconditional availability constraint implicitly specifies that
+  // kind of unconditional availability restriction implicitly specifies that
   // the decl is available in all versions of the domain.
   switch (attr->getKind()) {
   case AvailableAttr::Kind::Default:

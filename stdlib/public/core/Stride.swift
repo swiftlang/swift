@@ -225,7 +225,7 @@ extension Strideable {
 }
 
 extension Strideable where Self: FixedWidthInteger & SignedInteger {
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public static func _step(
     after current: (index: Int?, value: Self),
     from start: Self, by distance: Self.Stride
@@ -243,7 +243,7 @@ extension Strideable where Self: FixedWidthInteger & SignedInteger {
 }
 
 extension Strideable where Self: FixedWidthInteger & UnsignedInteger {
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public static func _step(
     after current: (index: Int?, value: Self),
     from start: Self, by distance: Self.Stride
@@ -289,7 +289,7 @@ extension Strideable where Self: FloatingPoint, Self == Stride {
 }
 
 extension Strideable {
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal mutating func _advance(
     by distance: inout Stride, limitedBy limit: Self
   ) {

@@ -2,7 +2,6 @@
 // RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -release-hoisting %s | %FileCheck --check-prefix=CHECK-RELEASE-HOISTING %s
 // RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -retain-sinking -retain-sinking -late-release-hoisting %s | %FileCheck --check-prefix=CHECK-MULTIPLE-RS-ROUNDS %s
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: concurrency
 
 import Builtin
@@ -476,7 +475,7 @@ bb0(%0 : $Builtin.NativeObject):
   br bb1
 
 bb1:
-  cond_br undef, bb1, bb2
+  cond_br undef, bb3, bb2
 
 bb2:
   %2 = function_ref @blocker : $@convention(thin) () -> ()
@@ -484,6 +483,9 @@ bb2:
   strong_release %0 : $Builtin.NativeObject
   %1 = tuple()
   return %1 : $()
+
+bb3:
+  br bb1
 }
 
 // CHECK-LABEL: sil @move_release_over_loop
@@ -507,9 +509,12 @@ bb0(%0 : $Builtin.NativeObject):
   br bb1
 
 bb1:
-  cond_br undef, bb1, bb2
+  cond_br undef, bb2, bb3
 
 bb2:
+  br bb1
+
+bb3:
   strong_release %0 : $Builtin.NativeObject
   %1 = tuple()
   return %1 : $()

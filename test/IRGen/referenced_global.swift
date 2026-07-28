@@ -1,6 +1,5 @@
 // RUN: %target-swift-frontend -parse-as-library -primary-file %s -O -emit-ir -o - | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 
 // Check that IRGen doesn't crash when a global variable reference another private global.
 

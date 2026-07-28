@@ -12,12 +12,12 @@
 
 // Index validation
 extension _StringGuts {
-  @_alwaysEmitIntoClient @inline(__always)
+  @export(implementation) @inline(__always)
   internal func isFastScalarIndex(_ i: String.Index) -> Bool {
     hasMatchingEncoding(i) && i._isScalarAligned
   }
 
-  @_alwaysEmitIntoClient @inline(__always)
+  @export(implementation) @inline(__always)
   internal func isFastCharacterIndex(_ i: String.Index) -> Bool {
     hasMatchingEncoding(i) && i._isCharacterAligned
   }
@@ -25,14 +25,14 @@ extension _StringGuts {
 
 // Subscalar index validation (UTF-8 & UTF-16 views)
 extension _StringGuts {
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal func validateSubscalarIndex(_ i: String.Index) -> String.Index {
     let i = ensureMatchingEncoding(i)
     _precondition(i._encodedOffset < count, "String index is out of bounds")
     return i
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal func validateSubscalarIndex(
     _ i: String.Index,
     in bounds: Range<String.Index>
@@ -45,7 +45,7 @@ extension _StringGuts {
     return i
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal func validateInclusiveSubscalarIndex(
     _ i: String.Index
   ) -> String.Index {
@@ -54,7 +54,7 @@ extension _StringGuts {
     return i
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal func validateInclusiveSubscalarIndex(
     _ i: String.Index,
     in bounds: Range<String.Index>
@@ -67,7 +67,7 @@ extension _StringGuts {
     return i
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal func validateSubscalarRange(
     _ range: Range<String.Index>
   ) -> Range<String.Index> {
@@ -83,7 +83,7 @@ extension _StringGuts {
     return unsafe Range(_uncheckedBounds: (lower, upper))
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal func validateSubscalarRange(
     _ range: Range<String.Index>,
     in bounds: Range<String.Index>
@@ -115,7 +115,7 @@ extension _StringGuts {
   /// - has an encoding that matches this string,
   /// - is within the bounds of this string, and
   /// - is aligned on a scalar boundary.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal func validateScalarIndex(_ i: String.Index) -> String.Index {
     if isFastScalarIndex(i) {
       _precondition(i._encodedOffset < count, "String index is out of bounds")
@@ -132,7 +132,7 @@ extension _StringGuts {
   /// - has an encoding that matches this string,
   /// - is within `start ..< end`, and
   /// - is aligned on a scalar boundary.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal func validateScalarIndex(
     _ i: String.Index,
     in bounds: Range<String.Index>
@@ -157,7 +157,7 @@ extension _StringGuts {
   /// - has an encoding that matches this string,
   /// - is within the bounds of this string (including the `endIndex`), and
   /// - is aligned on a scalar boundary.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal func validateInclusiveScalarIndex(
     _ i: String.Index
   ) -> String.Index {
@@ -176,7 +176,7 @@ extension _StringGuts {
   /// - has an encoding that matches this string,
   /// - is within the bounds of this string (including the `endIndex`), and
   /// - is aligned on a scalar boundary.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal func validateInclusiveScalarIndex(
     _ i: String.Index,
     in bounds: Range<String.Index>

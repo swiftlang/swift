@@ -1,5 +1,4 @@
 // RUN: %target-swift-frontend -parse-as-library -target %target-future-triple -O -module-name=test %s -Xllvm -sil-print-types -emit-sil | %FileCheck %s
-// REQUIRES: swift_in_compiler
 
 @globalActor actor AnotherActor: GlobalActor {
   static let shared = AnotherActor()
@@ -14,10 +13,16 @@ final class IsolatedDeinit {
 
 final class Container {
     var ref: IsolatedDeinit?
+
+    // To avoid dead-object elimination of Container
+    @inline(never)
+    deinit {
+      print("deinit")
+    }
 }
 
 // CHECK-LABEL: sil [noinline] {{.*}}@$s4test0A16ContainerOutsideyyF : $@convention(thin) () -> () {
-// CHECK: [[C:%.*]] = alloc_ref [bare] [stack] $Container
+// CHECK: [[C:%.*]] = alloc_ref [stack] $Container
 // CHECK: [[ID:%.*]] = alloc_ref $IsolatedDeinit
 // CHECK: dealloc_stack_ref [[C]] : $Container
 // CHECK: return
@@ -31,7 +36,7 @@ public func testContainerOutside() {
 
 // CHECK-LABEL: sil [noinline] @$s4test0A15ContainerInsideyyF : $@convention(thin) () -> () {
 // CHECK: [[D:%.*]] = alloc_ref $IsolatedDeinit
-// CHECK: [[C:%.*]] = alloc_ref [bare] [stack] $Container
+// CHECK: [[C:%.*]] = alloc_ref [stack] $Container
 // CHECK: dealloc_stack_ref [[C]] : $Container
 // CHECK: return
 @inline(never)

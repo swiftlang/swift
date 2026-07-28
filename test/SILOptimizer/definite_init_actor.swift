@@ -1,7 +1,6 @@
 // RUN: %target-swift-frontend -module-name test -target %target-swift-5.1-abi-triple -swift-version 5 -sil-verify-all -Xllvm -sil-print-types -emit-sil %s | %FileCheck --enable-var-scope --implicit-check-not='hop_to_executor' %s
 
 // REQUIRES: concurrency
-// REQUIRES: swift_in_compiler
 
  enum ActingError<T> : Error {
    case forgotLine

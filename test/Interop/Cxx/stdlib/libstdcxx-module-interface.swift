@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-ide-test -print-module -module-to-print=CxxStdlib -source-filename=x -enable-experimental-cxx-interop -module-cache-path %t -enable-experimental-feature ImportCxxMembersLazily -enable-experimental-feature BorrowingSequence > %t/interface.swift
+// RUN: %target-swift-ide-test -print-module -module-to-print=CxxStdlib -source-filename=x -enable-experimental-cxx-interop -module-cache-path %t -enable-experimental-feature ImportCxxMembersLazily > %t/interface.swift
 // RUN: %FileCheck %s -check-prefix=CHECK-STD < %t/interface.swift
 // RUN: %FileCheck %s -check-prefix=CHECK-SIZE-T < %t/interface.swift
 // RUN: %FileCheck %s -check-prefix=CHECK-TO-STRING < %t/interface.swift
@@ -13,18 +13,17 @@
 // The RHS of basic_string's typealias value_type depends on how eagerly/lazily
 // we import type members
 // REQUIRES: swift_feature_ImportCxxMembersLazily
-// REQUIRES: swift_feature_BorrowingSequence
 
 // CHECK-STD: enum std {
-// CHECK-STRING:   struct basic_string<CChar, std{{(.__cxx11)?}}.char_traits<CChar>, std{{(.__cxx11)?}}.allocator<CChar>> : CxxMutableRandomAccessCollection, CxxBorrowingSequence {
+// CHECK-STRING:   struct basic_string<CChar, std{{(.__cxx11)?}}.char_traits<CChar>, std{{(.__cxx11)?}}.allocator<CChar>> : CxxMutableRandomAccessCollection, CxxIterable {
 // CHECK-STRING:     typealias value_type = CChar
 // CHECK-STRING:   }
-// CHECK-STRING:   struct basic_string<CWideChar, std{{(.__cxx11)?}}.char_traits<CWideChar>, std{{(.__cxx11)?}}.allocator<CWideChar>> : CxxMutableRandomAccessCollection, CxxBorrowingSequence {
+// CHECK-STRING:   struct basic_string<CWideChar, std{{(.__cxx11)?}}.char_traits<CWideChar>, std{{(.__cxx11)?}}.allocator<CWideChar>> : CxxMutableRandomAccessCollection, CxxIterable {
 // CHECK-STRING:     typealias value_type = CWideChar
 // CHECK-STRING:   }
 
-// CHECK-TO-STRING:   static func to_string(_ __val: Int32) -> std{{(.__cxx11)?}}.string
-// CHECK-TO-STRING:   static func to_wstring(_ __val: Int32) -> std{{(.__cxx11)?}}.wstring
+// CHECK-TO-STRING:   static func to_string(_ __val: CInt) -> std{{(.__cxx11)?}}.string
+// CHECK-TO-STRING:   static func to_wstring(_ __val: CInt) -> std{{(.__cxx11)?}}.wstring
 
 // CHECK-SIZE-T:   typealias size_t = Int
 

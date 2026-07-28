@@ -8,6 +8,7 @@
 // RUN: %FileCheck %s < %t/output.sil
 
 // REQUIRES: OS=xros
+// REQUIRES: SWIFT_STDLIB_ARCH=arm64
 
 // CHECK-LABEL: // Metasyntactics.init(rawValue:)
 // Ensure that OS version check is generated for the current platform

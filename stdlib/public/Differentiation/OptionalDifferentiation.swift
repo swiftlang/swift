@@ -73,7 +73,7 @@ extension Optional.TangentVector: CustomReflectable {
 
 @derivative(of: ??)
 @_transparent
-@_alwaysEmitIntoClient
+@export(implementation)
 func _vjpNilCoalescing<T: Differentiable>(optional: T?, defaultValue: @autoclosure () throws -> T)
  rethrows -> (value: T, pullback: (T.TangentVector) -> Optional<T>.TangentVector) {
   let hasValue = optional != nil

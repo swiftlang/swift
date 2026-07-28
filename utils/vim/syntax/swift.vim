@@ -88,7 +88,8 @@ syn keyword swiftFuncKeyword
 syn keyword swiftScope
       \ autoreleasepool
 
-syn keyword swiftMutating skipwhite skipempty nextgroup=swiftFuncDefinition
+syn keyword swiftFuncAttribute skipwhite skipempty nextgroup=swiftFuncDefinition
+      \ borrowing
       \ mutating
 syn keyword swiftFuncDefinition skipwhite skipempty nextgroup=swiftTypeName,swiftOperator
       \ func
@@ -250,6 +251,7 @@ hi def link swiftConstraint Special
 hi def link swiftFuncDefinition Define
 hi def link swiftDefinitionModifier Operator
 hi def link swiftInOutKeyword Define
+hi def link swiftFuncAttribute Statement
 hi def link swiftFuncKeyword Function
 hi def link swiftFuncKeywordGeneral Function
 hi def link swiftTypeAliasDefinition Define
@@ -272,7 +274,6 @@ hi def link swiftBin Number
 hi def link swiftOperator Function
 hi def link swiftChar Character
 hi def link swiftLabel Operator
-hi def link swiftMutating Statement
 hi def link swiftPreproc PreCondit
 hi def link swiftPreprocFalse Comment
 hi def link swiftFreestandingMacro Macro

@@ -571,7 +571,6 @@ SILLocation.
 
 ```
 sil-instruction ::= debug_value sil-debug-value-option* sil-operand (',' debug-var-attr)* advanced-debug-var-attr* (',' 'expr' debug-info-expr)? (',' 'transform' debug-transform-block)?
-sil-debug-value-option ::= [poison]
 sil-debug-value-option ::= [moveable_value_debuginfo]
 sil-debug-value-option ::= [trace]
 
@@ -604,15 +603,6 @@ variable that is being described, including the name of the variable.
 For function and closure arguments `argno` is the number of the function
 argument starting with 1. A compiler-generated source variable will be
 marked `implicit` and optimizers are free to remove it even in -Onone.
-
-If the '[poison]' flag is set, then all references within this debug
-value will be overwritten with a sentinel at this point in the program.
-This is used in debug builds when shortening non-trivial value lifetimes
-to ensure the debugger cannot inspect invalid memory. `debug_value`
-instructions with the poison flag are not generated until OSSA is
-lowered. They are not expected to be serialized within the module, and
-the pipeline is not expected to do any significant code motion after
-lowering.
 
 ```
 advanced-debug-var-attr ::= '(' 'name' string-literal (',' sil-instruction-source-info)? ')'
@@ -3261,7 +3251,7 @@ This instruction is _not_ available in OSSA.
 ### destroy_value
 
 ```
-sil-instruction ::= 'destroy_value' '[dead_end]'? '[poison]'? sil-operand
+sil-instruction ::= 'destroy_value' '[dead_end]'? sil-operand
 
 destroy_value %0 : $A
 ```
@@ -4339,7 +4329,7 @@ pack type. The value of the instruction has type `Builtin.Word`.
 ### open_pack_element
 
 ```
-sil-instruction ::= 'open_pack_element' sil-value 'of' generic-parameter-list+ 'at' sil-apply-substitution-list ',' 'shape' sil-type ',' 'uuid' string-literal
+sil-instruction ::= 'open_pack_element' sil-value 'of' generic-parameter-list+ 'at' sil-apply-substitution-list ',' 'shape' sil-type ',' 'id' integer
 ```
 
 Binds one or more opened pack element archetypes in the local type
@@ -4353,12 +4343,11 @@ The `shape` type operand is resolved in the context of the
 generalization signature. It must name a pack parameter. Archetypes will
 be bound for all pack parameters with the same shape as this parameter.
 
-The `uuid` operand must be an RFC 4122 UUID string, which is composed of
-32 hex digits separated by hyphens in the pattern `8-4-4-4-12`. There
-must not be any other `open_pack_element` instruction with this UUID in
-the SIL function. Opened pack element archetypes are identified by this
-UUID and are different from any other opened pack element archetypes in
-the function, even if the operands otherwise match exactly.
+The `id` operand must be an unsigned integer. There must not be any other
+`open_pack_element` instruction with this ID in the SIL module. Opened
+pack element archetypes are identified by this ID and are different from
+any other opened pack element archetypes anywhere else, even if the
+operands otherwise match exactly.
 
 The value operand is the pack index and must be the result of a pack
 indexing instruction.
@@ -5183,25 +5172,16 @@ destination basic block.
 ### cond_br
 
 ```
-sil-terminator ::= 'cond_br' sil-operand ','
-                     sil-identifier '(' (sil-operand (',' sil-operand)*)? ')' ','
-                     sil-identifier '(' (sil-operand (',' sil-operand)*)? ')'
+sil-terminator ::= 'cond_br' sil-operand ',' sil-identifier ',' sil-identifier
 
-cond_br %0 : $Builtin.Int1, true_label (%a : $A, %b : $B, ...), 
-                               false_label (%x : $X, %y : $Y, ...)
+cond_br %0 : $Builtin.Int1, true_label, false_label
 // %0 must be of $Builtin.Int1 type
 // `true_label` and `false_label` must refer to block labels within the
 //   current function and must not be identical
-// %a, %b, etc. must be of the types of `true_label`'s arguments
-// %x, %y, etc. must be of the types of `false_label`'s arguments
 ```
 
 Conditionally branches to `true_label` if `%0` is equal to `1` or to
-`false_label` if `%0` is equal to `0`, binding the corresponding set of
-values to the arguments of the chosen destination block.
-
-In OSSA, `cond_br` must not have any arguments because in OSSA critical control
-flow edges are not allowed.
+`false_label` if `%0` is equal to `0`.
 
 ### switch_value
 

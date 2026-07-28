@@ -44,11 +44,14 @@ bb3:
   end_access %6 : $*X
   end_access %4 : $*X
   %cond = integer_literal $Builtin.Int1, 1
-  cond_br %cond, bb2, bb4
+  cond_br %cond, bb5, bb4
 
 bb4:
   %10 = tuple ()
   return %10 : $()
+
+bb5:
+  br bb2
 }
 
 // No, do cannot optimize a nested loop access.
@@ -75,11 +78,14 @@ bb3:
   end_access %6 : $*X
   end_access %4 : $*X
   %cond = integer_literal $Builtin.Int1, 1
-  cond_br %cond, bb2, bb4
+  cond_br %cond, bb5, bb4
 
 bb4:
   %10 = tuple ()
   return %10 : $()
+
+bb5:
+  br bb2
 }
 
 // Yes, insert a preheader check for unidentifiable access (address argument).
@@ -103,9 +109,12 @@ bb3:
   %6 = begin_access [modify] [dynamic] [no_nested_conflict] %0 : $*Int64
   end_access %6 : $*Int64
   %cond = integer_literal $Builtin.Int1, 1
-  cond_br %cond, bb2, bb4
+  cond_br %cond, bb5, bb4
 
 bb4:
   %10 = tuple ()
   return %10 : $()
+
+bb5:
+  br bb2
 }

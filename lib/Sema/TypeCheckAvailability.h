@@ -14,8 +14,8 @@
 #define SWIFT_SEMA_TYPE_CHECK_AVAILABILITY_H
 
 #include "swift/AST/Attr.h"
-#include "swift/AST/AvailabilityConstraint.h"
 #include "swift/AST/AvailabilityContext.h"
+#include "swift/AST/AvailabilityRestriction.h"
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/DeclExportabilityVisitor.h"
 #include "swift/AST/Identifier.h"
@@ -260,9 +260,9 @@ void diagnoseOverrideOfUnavailableDecl(ValueDecl *override,
 
 /// Checks whether a declaration should be considered unavailable when referred
 /// to at the given source location in the given decl context and, if so,
-/// returns a result that describes the unsatisfied constraint.
+/// returns a result that describes the unsatisfied restriction.
 /// Returns `std::nullopt` if the declaration is available.
-std::optional<AvailabilityConstraint> getUnsatisfiedAvailabilityConstraint(
+std::optional<AvailabilityRestriction> getUnsatisfiedAvailabilityRestriction(
     const Decl *decl, const DeclContext *referenceDC, SourceLoc referenceLoc);
 
 /// Diagnose uses of the runtime support of the given type, such as

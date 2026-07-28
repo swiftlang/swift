@@ -309,13 +309,13 @@ internal final class _ContiguousArrayStorage<
   }
 }
 
-@_alwaysEmitIntoClient
+@export(implementation)
 @inline(__always)
 internal func _uncheckedUnsafeBitCast<T, U>(_ x: T, to type: U.Type) -> U {
   return Builtin.reinterpretCast(x)
 }
 
-@_alwaysEmitIntoClient
+@export(implementation)
 @inline(never)
 @_effects(readonly)
 @_semantics("array.getContiguousArrayStorageType")
@@ -436,7 +436,7 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
   /// A mutable pointer to the first element.
   ///
   /// - Precondition: The buffer must be mutable.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal var mutableFirstElementAddress: UnsafeMutablePointer<Element> {
     return unsafe UnsafeMutablePointer(Builtin.projectTailElems(mutableOrEmptyStorage,
                                                          Element.self))
@@ -461,7 +461,7 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
 
   /// Call `body(p)`, where `p` is an `UnsafeBufferPointer` over the
   /// underlying contiguous storage.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @safe
   internal func withUnsafeBufferPointer<R, E>(
     _ body: (UnsafeBufferPointer<Element>) throws(E) -> R
@@ -485,7 +485,7 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
 
   /// Call `body(p)`, where `p` is an `UnsafeMutableBufferPointer`
   /// over the underlying contiguous storage.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @safe
   internal mutating func withUnsafeMutableBufferPointer<R, E>(
     _ body: (UnsafeMutableBufferPointer<Element>) throws(E) -> R
@@ -543,7 +543,7 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
   /// The storage of an immutable buffer.
   ///
   /// - Precondition: The buffer must be immutable.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @inline(__always)
   internal var immutableStorage : __ContiguousArrayStorageBase {
 #if INTERNAL_CHECKS_ENABLED && COW_CHECKS_ENABLED
@@ -555,7 +555,7 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
   /// The storage of a mutable buffer.
   ///
   /// - Precondition: The buffer must be mutable.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @inline(__always)
   internal var mutableStorage : __ContiguousArrayStorageBase {
 #if INTERNAL_CHECKS_ENABLED && COW_CHECKS_ENABLED
@@ -567,7 +567,7 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
   /// The storage of a mutable or empty buffer.
   ///
   /// - Precondition: The buffer must be mutable or the empty array singleton.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @inline(__always)
   internal var mutableOrEmptyStorage : __ContiguousArrayStorageBase {
 #if INTERNAL_CHECKS_ENABLED && COW_CHECKS_ENABLED
@@ -578,7 +578,7 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
   }
 
 #if INTERNAL_CHECKS_ENABLED && COW_CHECKS_ENABLED
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal var isImmutable: Bool {
     get {
       if (_COWChecksEnabled()) {
@@ -604,7 +604,7 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
     }
   }
   
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal var isMutable: Bool {
     if (_COWChecksEnabled()) {
       return !_swift_isImmutableCOWBuffer(_storage)
@@ -659,7 +659,7 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
   /// The number of elements of the buffer.
   ///
   /// - Precondition: The buffer must be immutable.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @inline(__always)
   internal var immutableCount: Int {
     return immutableStorage.countAndCapacity.count
@@ -668,7 +668,7 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
   /// The number of elements of the buffer.
   ///
   /// - Precondition: The buffer must be mutable.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal var mutableCount: Int {
     @inline(__always)
     get {
@@ -703,7 +703,7 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
   /// `0 ≤ index < count`.
   ///
   /// - Precondition: The buffer must be mutable.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @inline(__always)
   internal func _checkValidSubscriptMutating(_ index: Int) {
     _precondition(
@@ -725,7 +725,7 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
   /// The number of elements the buffer can store without reallocation.
   ///
   /// - Precondition: The buffer must be immutable.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @inline(__always)
   internal var immutableCapacity: Int {
     return immutableStorage.countAndCapacity.capacity
@@ -734,7 +734,7 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
   /// The number of elements the buffer can store without reallocation.
   ///
   /// - Precondition: The buffer must be mutable.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @inline(__always)
   internal var mutableCapacity: Int {
     return mutableOrEmptyStorage.countAndCapacity.capacity
@@ -812,7 +812,7 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
   ///
   /// - Warning: It's a requirement to call `beginCOWMutation` before the buffer
   ///   is mutated.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal mutating func beginCOWMutation() -> Bool {
     if Bool(Builtin.beginCOWMutation(&_storage)) {
 #if INTERNAL_CHECKS_ENABLED && COW_CHECKS_ENABLED
@@ -824,7 +824,7 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
   }
 
 #if INTERNAL_CHECKS_ENABLED && COW_CHECKS_ENABLED
- @_alwaysEmitIntoClient
+  @export(implementation)
   internal mutating func beginCOWMutationUnchecked() -> Bool {
     if Bool(Builtin.beginCOWMutation(&_storage)) {
       return true
@@ -839,7 +839,7 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
   ///
   /// - Warning: After a call to `endCOWMutation` the buffer must not be mutated
   ///   until the next call of `beginCOWMutation`.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @inline(__always)
   internal mutating func endCOWMutation() {
 #if INTERNAL_CHECKS_ENABLED && COW_CHECKS_ENABLED
@@ -852,7 +852,7 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
   /// this buffer.
   ///
   /// This buffer is consumed, i.e. it's released.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @inline(never)
   @_semantics("optimize.sil.specialize.owned2guarantee.never")
   internal __consuming func _consumeAndCreateNew() -> _ContiguousArrayBuffer {
@@ -872,7 +872,7 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
   /// `_growArrayCapacity`, but at least kept at `minimumCapacity`.
   ///
   /// This buffer is consumed, i.e. it's released.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @inline(never)
   @_semantics("optimize.sil.specialize.owned2guarantee.never")
   internal __consuming func _consumeAndCreateNew(

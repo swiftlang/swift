@@ -1,10 +1,10 @@
 // RUN: %target-run-simple-swift(-import-objc-header %S/Inputs/existential_foreign.h -enable-experimental-feature Embedded -parse-as-library -wmo %target-embedded-posix-shim) | %FileCheck %s --check-prefix=OUTPUT
 // RUN: %target-run-simple-swift(-import-objc-header %S/Inputs/existential_foreign.h -enable-experimental-feature Embedded -parse-as-library -wmo -O %target-embedded-posix-shim) | %FileCheck %s --check-prefix=OUTPUT
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
 // REQUIRES: swift_feature_Embedded
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 protocol P {
   func printme()

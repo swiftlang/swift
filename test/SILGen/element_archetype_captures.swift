@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 // RUN: %target-swift-emit-silgen %s | %FileCheck %s
 
 // CHECK-LABEL: sil hidden [ossa] @$s26element_archetype_captures6calleeyyx_q_q0_tSTRzSTR_7ElementQy_ACRtzr1_lF : $@convention(thin) <T, U, V where T : Sequence, U : Sequence, T.Element == U.Element> (@in_guaranteed T, @in_guaranteed U, @in_guaranteed V) -> () {

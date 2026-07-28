@@ -23,7 +23,7 @@
 
 // swift-frontend cannot be copied to another location with bootstrapping because
 // it will not find the libswiftCore library with its relative RPATH.
-// UNSUPPORTED: swift_in_compiler
+// REQUIRES: rdar181018226
 
 // CHECK-SWIFT-INVOKES-INTERPRETER: {{.*}}/swift-frontend -frontend -interpret
 

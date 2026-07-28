@@ -1,9 +1,6 @@
-// RUN: %target-swift-frontend -typecheck -verify -I %S/Inputs/custom-modules -verify-ignore-unknown -target aarch64-unknown-linux-android24 %s
+// RUN: %target-swift-frontend -typecheck -verify -I %S/Inputs/custom-modules -verify-ignore-unknown -target %target-arch-unknown-linux-android24 %s
 
 // REQUIRES: OS=linux-android || OS=linux-androideabi
-
-// Disable this test till we get a LTS NDK on the CI that supports it.
-// REQUIRES: NDK28
 
 import AndroidVersioning
 import Android

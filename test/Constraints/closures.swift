@@ -1082,11 +1082,9 @@ let explicitUnboundResult1 = { () -> Array in [0] }
 let explicitUnboundResult2: (Array<Bool>) -> Array<Int> = {
   (arr: Array) -> Array in [0]
 }
-// FIXME: Should we prioritize the contextual result type and infer Array<Int>
-// rather than using a type variable in these cases?
-// expected-error@+1 {{unable to infer closure type without a type annotation}}
+
 let explicitUnboundResult3: (Array<Bool>) -> Array<Int> = {
-  (arr: Array) -> Array in [true]
+  (arr: Array) -> Array in [true]  // expected-error {{declared closure result 'Array<Bool>' is incompatible with contextual type 'Array<Int>'}}
 }
 
 // rdar://problem/71525503 - Assertion failed: (!shouldHaveDirectCalleeOverload(call) && "Should we have resolved a callee for this?")
@@ -1175,8 +1173,7 @@ func rdar76058892() {
   func experiment(arr: [S]?) {
     test { // expected-error {{contextual closure type '() -> String' expects 0 arguments, but 1 was used in closure body}}
       if let arr = arr {
-        arr.map($0.test) // expected-note {{anonymous closure parameter '$0' is used here}} // expected-error {{generic parameter 'T' could not be inferred}}
-        // expected-error@-1 {{generic parameter 'E' could not be inferred}}
+        arr.map($0.test) // expected-note {{anonymous closure parameter '$0' is used here}}
       }
     }
   }

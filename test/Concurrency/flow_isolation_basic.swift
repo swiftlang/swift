@@ -1,6 +1,5 @@
-// RUN: %target-swift-frontend -strict-concurrency=complete -enable-experimental-feature FlowIsolationGlobalActor -swift-version 5 -parse-as-library -emit-sil -verify %s -o /dev/null
+// RUN: %target-swift-frontend -strict-concurrency=complete -swift-version 5 -parse-as-library -emit-sil -verify %s -o /dev/null
 
-// REQUIRES: swift_feature_FlowIsolationGlobalActor
 
 // NOTE: This test is for general testing of how flow isolation handles control
 // flow and basic errors. For specific testing related to

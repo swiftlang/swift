@@ -40,6 +40,7 @@
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/RecursiveASTVisitor.h"
+#include "clang/AST/Type.h"
 #include "clang/Basic/IdentifierTable.h"
 #include "clang/Basic/Specifiers.h"
 #include "clang/Basic/TargetInfo.h"
@@ -72,6 +73,9 @@ class ParmVarDecl;
 class Parser;
 class QualType;
 class TypedefNameDecl;
+namespace serialization {
+class ModuleFile;
+} // namespace serialization
 } // namespace clang
 
 namespace swift {
@@ -577,6 +581,20 @@ public:
   /// Mapping of already-imported declarations.
   llvm::DenseMap<std::pair<const clang::Decl *, Version>, Decl *> ImportedDecls;
 
+  /// Per-module count of Clang decls actually deserialized (materialized) into
+  /// the shared ASTContext, keyed by the owning serialized module. Populated by
+  /// the deserialization listener's DeclRead callback only when
+  /// \c CollectMemoryStats is set; used to attribute in-RAM AST cost per module
+  /// (the deserialized AST bytes themselves live in one shared allocator and
+  /// cannot be split).
+  llvm::DenseMap<const clang::serialization::ModuleFile *, uint64_t>
+      MaterializedDeclsPerModule;
+
+  /// When set, the deserialization listener records per-module materialized decl
+  /// counts. Enabled by \c -stats-output-dir or \c -print-clang-stats; off by
+  /// default to avoid per-decl overhead in normal builds.
+  bool CollectMemoryStats = false;
+
   /// The set of "special" typedef-name declarations, which are
   /// mapped to specific Swift types.
   ///
@@ -658,8 +676,11 @@ private:
 
   /// Sets the target & code generation options for use by IRGen/CodeGen
   /// clients of `ClangImporter`. If `CI` is null, the data is drawn from the
-  /// importer's invocation.
+  /// importer's invocation. When `IRGenOpts` is non-null, also applies the
+  /// AST-affecting CodeGen configuration (optimization level, debug info, ...)
+  /// to the Clang invocation and, if distinct, the IRGen-facing copy.
   void configureOptionsForCodeGen(clang::DiagnosticsEngine &Diags,
+                                  const IRGenOptions *IRGenOpts,
                                   clang::CompilerInvocation *CI = nullptr);
 
   clang::TargetInfo &getCodeGenTargetInfo() const { return *CodeGenTargetInfo; }
@@ -770,6 +791,13 @@ private:
   llvm::DenseMap<NominalTypeDecl *, FuncDecl *> importedOperatorBoolCache;
 
 public:
+  /// Cache of synthesized derived-to-base pointer upcast functions,
+  /// keyed by the (derived, base) C++ record pair.
+  llvm::DenseMap<
+      std::pair<const clang::CXXRecordDecl *, const clang::CXXRecordDecl *>,
+      FuncDecl *>
+      synthesizedBaseCastFunctions;
+
   llvm::DenseMap<const clang::ParmVarDecl*, FuncDecl*> defaultArgGenerators;
 
   bool isDefaultArgSafeToImport(const clang::ParmVarDecl *param);
@@ -1150,7 +1178,8 @@ public:
   ///
   /// \returns The imported declaration, or null if the macro could not be
   /// translated into Swift.
-  ValueDecl *importMacro(Identifier name, ClangNode macroNode);
+  ValueDecl *importMacro(Identifier name, ClangNode macroNode,
+                         const clang::IdentifierInfo *II = nullptr);
 
   /// Map a Clang identifier name to its imported Swift equivalent.
   StringRef getSwiftNameFromClangName(StringRef name);
@@ -1902,6 +1931,14 @@ public:
 
   /// Find the lookup table that should contain the given Clang declaration.
   SwiftLookupTable *findLookupTable(const clang::Decl *decl);
+
+  /// Register a Clang declaration synthesized by the importer so that it is
+  /// discoverable by Swift name lookup and resolvable when a cross-reference
+  /// to it is deserialized. Marks it always-visible and adds it to the lookup
+  /// table(s) for \p anchorDecl (and its owning module, to handle
+  /// namespace-spanning C++ declarations).
+  void registerSynthesizedClangDecl(clang::FunctionDecl *synthesizedDecl,
+                                    const clang::Decl *anchorDecl);
 
   /// Visit each of the lookup tables in some deterministic order.
   ///

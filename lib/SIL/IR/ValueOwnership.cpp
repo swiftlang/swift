@@ -182,7 +182,7 @@ CONSTANT_OWNERSHIP_INST(None, DifferentiabilityWitnessFunction)
 // TODO: It would be great to get rid of these.
 CONSTANT_OWNERSHIP_INST(Unowned, RawPointerToRef)
 CONSTANT_OWNERSHIP_INST(Unowned, ObjCProtocol)
-CONSTANT_OWNERSHIP_INST(Unowned, ValueToBridgeObject)
+CONSTANT_OWNERSHIP_INST(None, ValueToBridgeObject)
 CONSTANT_OWNERSHIP_INST(None, GetAsyncContinuation)
 CONSTANT_OWNERSHIP_INST(None, GetAsyncContinuationAddr)
 CONSTANT_OWNERSHIP_INST(None, ThinToThickFunction)
@@ -345,13 +345,12 @@ FORWARDING_OWNERSHIP_INST(UncheckedOwnership)
 
 ValueOwnershipKind
 ValueOwnershipKindClassifier::visitEnumInst(EnumInst *I) {
-  if (!I->getModule().useLoweredAddresses() && I->getType().isAddressOnly(*I->getFunction())) {
-    // During address lowering, an address-only enum instruction will eventually
-    // be lowered to inject_enum_addr/init_enum_data_addr, initializing a
-    // non-trivial storage location.  So prior to AddressLowering (in opaque
-    // values mode) such an enum instruction produces a non-trivial value,
-    // without regard to whether it is in a trivial case.  Otherwise, non-trivial
-    // storage would fail to be destroy_addr'd.
+  if (!I->getFunction()->hasLoweredAddresses() && I->getType().isAddressOnly(*I->getFunction())) {
+    // In opaque-values mode an address-only `enum` is still an SSA value here.
+    // AddressLowering will later replace it with address storage (alloc_stack),
+    // which is non-trivial and must be destroy_addr'd. So the enum's result
+    // must be Owned now, even when the selected case is trivial/payloadless,
+    // otherwise no destroy is emitted for it and the lowered storage leaks.
     assert(!I->getType().isTrivial(*I->getFunction()));
     // An enum instruction is representation changing, so its address-only
     // operand must be owned.
@@ -403,7 +402,10 @@ static ValueOwnershipKind visitFullApplySite(FullApplySite fai,
   if (isTrivial)
     return OwnershipKind::None;
 
-  SILFunctionConventions fnConv(fai.getSubstCalleeType(), f->getModule());
+  // Per-function conventions (via getSubstCalleeConv): an already-lowered
+  // function's apply has its formally-indirect results as address arguments
+  // with no direct result, even while the module stage is still Raw.
+  SILFunctionConventions fnConv = fai.getSubstCalleeConv();
   auto results = fnConv.getDirectSILResults();
   // No results => None.
   if (results.empty())
@@ -762,6 +764,10 @@ ValueOwnershipKind ValueBase::getOwnershipKind() const {
     // variable. We don't verify ownership there so just return
     // OwnershipKind::None.
     if (!f)
+      return OwnershipKind::None;
+
+    // Debug reconstruction blocks don't participate in the ownership system.
+    if (block->isDebugReconstructionBlock())
       return OwnershipKind::None;
 
     // Now that we know that we do have a block/function, check if we have

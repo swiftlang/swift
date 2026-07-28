@@ -941,11 +941,13 @@ ConstraintSystem::getPackExpansionEnvironment(PackExpansionExpr *expr) const {
 
 GenericEnvironment *ConstraintSystem::createPackExpansionEnvironment(
     PackExpansionExpr *expr, CanGenericTypeParamType shapeParam) {
+  auto &ctx = getASTContext();
   auto *contextEnv = DC->getGenericEnvironmentOfContext();
-  auto elementSig = getASTContext().getOpenedElementSignature(
+  auto elementSig = ctx.getOpenedElementSignature(
       contextEnv->getGenericSignature().getCanonicalSignature(), shapeParam);
   auto contextSubs = contextEnv->getForwardingSubstitutionMap();
-  auto *env = GenericEnvironment::forOpenedElement(elementSig, UUID::fromTime(),
+  auto *env = GenericEnvironment::forOpenedElement(elementSig,
+                                                   ctx.getNextGenericEnvironmentID(),
                                                    shapeParam, contextSubs);
   recordPackExpansionEnvironment(expr, env);
   return env;
@@ -1440,6 +1442,11 @@ FunctionType::ExtInfo ClosureEffectsRequest::evaluate(
   bool throws = expr->getThrowsLoc().isValid();
   bool async = expr->getAsyncLoc().isValid();
   bool sendable = expr->getAttrs().hasAttribute<SendableAttr>();
+  bool isCalledOnce = false;
+
+  if (auto *called = expr->getAttrs().getAttribute<CalledAttr>()) {
+    isCalledOnce = called->isOnce();
+  }
 
   if (throws || async) {
     if (expr->getThrowsLoc().isValid() && !expr->getExplicitThrownTypeRepr())
@@ -1458,6 +1465,7 @@ FunctionType::ExtInfo ClosureEffectsRequest::evaluate(
       .withThrows(throws, /*FIXME:*/Type())
       .withAsync(async)
       .withSendable(sendable)
+      .withCalledOnce(isCalledOnce)
       .build();
   }
 
@@ -1472,6 +1480,7 @@ FunctionType::ExtInfo ClosureEffectsRequest::evaluate(
       .withThrows(throwFinder.foundThrow(), /*FIXME:*/Type())
       .withAsync(bool(findAsyncNode(expr)))
       .withSendable(sendable)
+      .withCalledOnce(isCalledOnce)
       .build();
 }
 
@@ -2042,6 +2051,13 @@ OverloadChoice::getIUOReferenceKind(ConstraintSystem &cs,
   return IUOReferenceKind::ReturnValue;
 }
 
+bool Solution::isValidSolution() const {
+  return (Fixes.empty() &&
+          FixedScore.Data[SK_Unavailable] == 0 &&
+          FixedScore.Data[SK_Hole] == 0 &&
+          FixedScore.Data[SK_Fix] == 0);
+}
+
 SolutionResult ConstraintSystem::salvage() {
   if (isDebugMode()) {
     llvm::errs() << "---Attempting to salvage and emit diagnostics---\n";
@@ -2083,19 +2099,12 @@ SolutionResult ConstraintSystem::salvage() {
         viable[0] = std::move(viable[*best]);
       viable.erase(viable.begin() + 1, viable.end());
 
-      if (getASTContext().TypeCheckerOpts.CrashOnValidSalvage) {
-        auto &solution = viable[0];
-        if (solution.Fixes.empty() &&
-            diagnosticTransaction == nullptr &&
-            !getASTContext().LangOpts.DisableAvailabilityChecking &&
-            solution.getFixedScore().Data[SK_Unavailable] == 0 &&
-            solution.getFixedScore().Data[SK_Hole] == 0 &&
-            solution.getFixedScore().Data[SK_Fix] == 0) {
-          ABORT([&](auto &out) {
-            out << "Found valid solution in salvage()\n\n";
-            solution.dump(out, 0);
-          });
-        }
+      // We should not have found a valid solution in salvage().
+      if (getASTContext().TypeCheckerOpts.DiagnoseValidSalvage &&
+          diagnosticTransaction == nullptr &&
+          !getASTContext().LangOpts.DisableAvailabilityChecking &&
+          viable[0].isValidSolution()) {
+        return SolutionResult::forUndiagnosedError();
       }
 
       return SolutionResult::forSolved(std::move(viable[0]));
@@ -3782,11 +3791,6 @@ void constraints::simplifyLocator(ASTNode &anchor,
       break;
     }
 
-    case ConstraintLocator::ResultBuilderBodyResult: {
-      path = path.slice(1);
-      break;
-    }
-
     case ConstraintLocator::UnresolvedMemberChainResult: {
       auto *resultExpr = castToExpr<UnresolvedMemberChainResultExpr>(anchor);
       anchor = resultExpr->getSubExpr();
@@ -4763,7 +4767,7 @@ void ConstraintSystem::diagnoseFailureFor(SyntacticElementTarget target) {
   // If constraint system is in invalid state always produce
   // a fallback diagnostic that asks to file a bug.
   if (inInvalidState()) {
-    DE.diagnose(target.getLoc(), diag::failed_to_produce_diagnostic);
+    produceFallbackDiagnostic(target.getLoc());
     return;
   }
 
@@ -4802,9 +4806,7 @@ void ConstraintSystem::diagnoseFailureFor(SyntacticElementTarget target) {
   }
 
   // Emit a poor fallback message.
-  auto diag = DE.diagnose(target.getLoc(), diag::failed_to_produce_diagnostic);
-  if (auto *expr = target.getAsExpr())
-    diag.highlight(expr->getSourceRange());
+  produceFallbackDiagnostic(target.getLoc());
 }
 
 bool ConstraintSystem::isDeclUnavailable(const Decl *D,
@@ -4819,7 +4821,7 @@ bool ConstraintSystem::isDeclUnavailable(const Decl *D,
       loc = getLoc(anchor);
   }
 
-  auto result = getUnsatisfiedAvailabilityConstraint(D, DC, loc).has_value();
+  auto result = getUnsatisfiedAvailabilityRestriction(D, DC, loc).has_value();
   const_cast<ConstraintSystem *>(this)->UnavailableDecls.insert(
       std::make_pair(std::make_pair(D, locator), result));
   return result;
@@ -4839,6 +4841,15 @@ bool ConstraintSystem::isConformanceUnavailable(ProtocolConformanceRef conforman
   return isDeclUnavailable(ext, locator);
 }
 
+void ConstraintSystem::produceFallbackDiagnostic(SourceLoc loc) const {
+  auto &ctx = getASTContext();
+  if (ctx.TypeCheckerOpts.CrashFailDiagnostic) {
+    ABORT("Failed to produce a diagnostic, and "
+          "-solver-enable-crash-fail-diagnostic was enabled");
+  }
+  ctx.Diags.diagnose(loc, diag::failed_to_produce_diagnostic);
+}
+
 /// If we aren't certain that we've emitted a diagnostic, emit a fallback
 /// diagnostic.
 void ConstraintSystem::maybeProduceFallbackDiagnostic(SourceLoc loc) const {
@@ -4853,7 +4864,7 @@ void ConstraintSystem::maybeProduceFallbackDiagnostic(SourceLoc loc) const {
       (diagnosticTransaction && diagnosticTransaction->hasErrors()))
     return;
 
-  ctx.Diags.diagnose(loc, diag::failed_to_produce_diagnostic);
+  produceFallbackDiagnostic(loc);
 }
 
 SourceLoc constraints::getLoc(ASTNode anchor) {
@@ -5019,7 +5030,7 @@ bool ConstraintSystem::isReadOnlyKeyPathComponent(
   // If the setter is unavailable, then the keypath ought to be read-only
   // in this context.
   if (auto setter = storage->getOpaqueAccessor(AccessorKind::Set)) {
-    if (getUnsatisfiedAvailabilityConstraint(setter, DC, referenceLoc))
+    if (getUnsatisfiedAvailabilityRestriction(setter, DC, referenceLoc))
       return true;
   }
 

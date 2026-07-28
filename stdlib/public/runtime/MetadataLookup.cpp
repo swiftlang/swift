@@ -2607,6 +2607,45 @@ swift_getTypeByMangledNameImpl(MetadataRequest request, StringRef typeName,
                                     substGenericParam, substWitnessTable);
 }
 
+/// Emit a warning when a type-by-name lookup failed, if failure logging is
+/// requested and SWIFT_DEBUG_FAILED_TYPE_LOOKUP is enabled. Returns the
+/// resolved metadata, which is null when the lookup failed.
+///
+/// \p logFailures should be true for callers that use the resulting metadata
+/// unconditionally (compiler-emitted metadata accessors, keypath
+/// instantiation), where a failure is always a real error. It should be false
+/// for probing callers that treat a null result as an expected outcome.
+static const Metadata *_Nullable handleTypeByMangledNameResult(
+    TypeLookupErrorOr<TypeInfo> result, const char *typeNameStart,
+    size_t typeNameLength, bool logFailures) {
+  if (logFailures && result.isError() &&
+      runtime::environment::SWIFT_DEBUG_FAILED_TYPE_LOOKUP()) {
+    TypeLookupError *error = result.getError();
+    char *errorString = error->copyErrorString();
+#if SWIFT_STDLIB_HAS_TYPE_PRINTING
+    // The raw mangled name often contains symbolic references (control bytes in
+    // the 0x01-0x1F range followed by relative pointers) that don't print
+    // legibly. Demangle it into a readable type name, resolving symbolic
+    // references to the names of the entities they point to.
+    Demangler demangler;
+    NodePointer node =
+        demangler.demangleType(StringRef(typeNameStart, typeNameLength),
+                               ResolveToDemanglingForContext(demangler));
+    std::string demangled = node ? nodeToString(node) : std::string();
+    if (!demangled.empty()) {
+      swift::warning(0, "failed type lookup for %s: %s\n", demangled.c_str(),
+                     errorString);
+    } else
+#endif
+    {
+      swift::warning(0, "failed type lookup for %.*s: %s\n",
+                     (int)typeNameLength, typeNameStart, errorString);
+    }
+    error->freeErrorString(errorString);
+  }
+  return result.getType().getMetadata();
+}
+
 SWIFT_CC(swift) SWIFT_RUNTIME_EXPORT
 const Metadata * _Nullable
 swift_getTypeByMangledNameInEnvironment(
@@ -2625,17 +2664,8 @@ swift_getTypeByMangledNameInEnvironment(
     [&substitutions](const Metadata *type, unsigned index) {
       return substitutions.getWitnessTable(type, index);
     });
-  if (result.isError()
-      && runtime::environment::SWIFT_DEBUG_FAILED_TYPE_LOOKUP()) {
-    TypeLookupError *error = result.getError();
-    char *errorString = error->copyErrorString();
-    swift::warning(0, "failed type lookup for %.*s: %s\n",
-                   (int)typeNameLength, typeNameStart,
-                   errorString);
-    error->freeErrorString(errorString);
-    return nullptr;
-  }
-  return result.getType().getMetadata();
+  return handleTypeByMangledNameResult(result, typeNameStart, typeNameLength,
+                                       /*logFailures=*/true);
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_EXPORT
@@ -2657,26 +2687,14 @@ swift_getTypeByMangledNameInEnvironmentInMetadataState(
     [&substitutions](const Metadata *type, unsigned index) {
       return substitutions.getWitnessTable(type, index);
     });
-  if (result.isError()
-      && runtime::environment::SWIFT_DEBUG_FAILED_TYPE_LOOKUP()) {
-    TypeLookupError *error = result.getError();
-    char *errorString = error->copyErrorString();
-    swift::warning(0, "failed type lookup for %.*s: %s\n",
-                   (int)typeNameLength, typeNameStart,
-                   errorString);
-    error->freeErrorString(errorString);
-    return nullptr;
-  }
-  return result.getType().getMetadata();
+  return handleTypeByMangledNameResult(result, typeNameStart, typeNameLength,
+                                       /*logFailures=*/true);
 }
 
-static
-const Metadata * _Nullable
-swift_getTypeByMangledNameInContextImpl(
-                        const char *typeNameStart,
-                        size_t typeNameLength,
-                        const TargetContextDescriptor<InProcess> *context,
-                        const void * const *genericArgs) {
+static const Metadata *_Nullable swift_getTypeByMangledNameInContextImpl(
+    const char *typeNameStart, size_t typeNameLength,
+    const TargetContextDescriptor<InProcess> *context,
+    const void *const *genericArgs, bool logFailures) {
   llvm::StringRef typeName(typeNameStart, typeNameLength);
   SubstGenericParametersFromMetadata substitutions(context, genericArgs);
   TypeLookupErrorOr<TypeInfo> result = swift_getTypeByMangledName(
@@ -2688,17 +2706,8 @@ swift_getTypeByMangledNameInContextImpl(
     [&substitutions](const Metadata *type, unsigned index) {
       return substitutions.getWitnessTable(type, index);
     });
-  if (result.isError()
-      && runtime::environment::SWIFT_DEBUG_FAILED_TYPE_LOOKUP()) {
-    TypeLookupError *error = result.getError();
-    char *errorString = error->copyErrorString();
-    swift::warning(0, "failed type lookup for %.*s: %s\n",
-                   (int)typeNameLength, typeNameStart,
-                   errorString);
-    error->freeErrorString(errorString);
-    return nullptr;
-  }
-  return result.getType().getMetadata();
+  return handleTypeByMangledNameResult(result, typeNameStart, typeNameLength,
+                                       logFailures);
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_EXPORT
@@ -2711,7 +2720,8 @@ swift_getTypeByMangledNameInContext2(
   context = swift_auth_data_non_address(
       context, SpecialPointerAuthDiscriminators::ContextDescriptor);
   return swift_getTypeByMangledNameInContextImpl(typeNameStart, typeNameLength,
-                                                 context, genericArgs);
+                                                 context, genericArgs,
+                                                 /*logFailures=*/true);
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_EXPORT
@@ -2729,7 +2739,21 @@ swift_getTypeByMangledNameInContext(
   return swift_getTypeByMangledNameInContextImpl(
       typeNameStart, typeNameLength,
       static_cast<const TargetContextDescriptor<InProcess> *>(context),
-      genericArgs);
+      genericArgs, /*logFailures=*/true);
+}
+
+/// A variant of swift_getTypeByMangledNameInContext that never logs lookup
+/// failures, for probing callers (e.g. the debugger) that treat a null result
+/// as an expected outcome rather than an error.
+SWIFT_CC(swift)
+SWIFT_RUNTIME_STDLIB_INTERNAL const
+    Metadata *_Nullable swift_getTypeByMangledNameInContextQuiet(
+        const char *typeNameStart, size_t typeNameLength, const void *context,
+        const void *const *genericArgs) {
+  return swift_getTypeByMangledNameInContextImpl(
+      typeNameStart, typeNameLength,
+      static_cast<const TargetContextDescriptor<InProcess> *>(context),
+      genericArgs, /*logFailures=*/false);
 }
 
 static
@@ -2751,17 +2775,8 @@ swift_getTypeByMangledNameInContextInMetadataStateImpl(
     [&substitutions](const Metadata *type, unsigned index) {
       return substitutions.getWitnessTable(type, index);
     });
-  if (result.isError()
-      && runtime::environment::SWIFT_DEBUG_FAILED_TYPE_LOOKUP()) {
-    TypeLookupError *error = result.getError();
-    char *errorString = error->copyErrorString();
-    swift::warning(0, "failed type lookup for %.*s: %s\n",
-                   (int)typeNameLength, typeNameStart,
-                   errorString);
-    error->freeErrorString(errorString);
-    return nullptr;
-  }
-  return result.getType().getMetadata();
+  return handleTypeByMangledNameResult(result, typeNameStart, typeNameLength,
+                                       /*logFailures=*/true);
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_EXPORT

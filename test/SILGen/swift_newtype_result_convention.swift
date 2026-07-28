@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa(mock-sdk: %clang-importer-sdk) -o /dev/null -enable-sil-opaque-values -import-objc-header %S/Inputs/swift_newtype_result_convention.h %s
 // RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk) -import-objc-header %S/Inputs/swift_newtype_result_convention.h %s | %FileCheck %s
 // REQUIRES: objc_interop
 

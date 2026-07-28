@@ -758,10 +758,8 @@ SILFunction *SILGenModule::emitProtocolWitness(
        witnessRef.getFuncDecl()->isDistributed());
   if (shouldUseDistributedThunkWitness) {
     // we may not have a thunk if we're in a protocol?
-    if (auto thunk = witnessRef.getFuncDecl()->getDistributedThunk()) {
-      auto thunkDeclRef = SILDeclRef(thunk, SILDeclRef::Kind::Func);
-      witnessRef = thunkDeclRef.asDistributed();
-    }
+    if (witnessRef.getFuncDecl()->getDistributedThunk())
+      witnessRef = witnessRef.getDistributedThunkDeclRef();
   }
 
   // Work out the lowered function type of the SIL witness thunk.
@@ -1353,7 +1351,8 @@ SILFunction *SILGenModule::emitDefaultOverride(SILDeclRef replacement,
           .SILFnType;
   auto originalFn =
       SGF.emitClassMethodRef(loc, self.getValue(), original, originalTy);
-  auto originalConvention = SILFunctionConventions(originalTy, M);
+  auto originalConvention = SILFunctionConventions(
+      originalTy, SILAddressConventions::forFunction(SGF.F));
   assert(indirectErrors.size() == 0 &&
          "coroutine accessor with indirect error!?");
   SmallVector<SILValue> args;

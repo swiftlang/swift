@@ -693,8 +693,6 @@ static SILValue tryRewriteToPartialApplyStack(
     saveDeleteInst(noImplicitCopyWrapperToDelete.pop_back_val());
 
   ApplySite site(newPA);
-  SILFunctionConventions calleeConv(site.getSubstCalleeType(),
-                                      newPA->getModule());
 
   // Since we create temporary allocation for in_guaranteed captures during SILGen,
   // the dealloc_stack of it can occur before the apply due to conversion scopes.
@@ -703,9 +701,7 @@ static SILValue tryRewriteToPartialApplyStack(
   // The code below proactively removes the dealloc_stack of in_guaranteed capture,
   // so that it can be reinserted at the correct place after the destroy_addr below.
   for (auto &arg : newPA->getArgumentOperands()) {
-    unsigned calleeArgumentIndex = site.getCalleeArgIndex(arg);
-    assert(calleeArgumentIndex >= calleeConv.getSILArgIndexOfFirstParam());
-    auto paramInfo = calleeConv.getParamInfoForSILArg(calleeArgumentIndex);
+    auto paramInfo = site.getParamInfoForOperand(arg);
     if (paramInfo.getConvention() == ParameterConvention::Indirect_In_Guaranteed) {
       SILValue argValue = arg.get();
       if (auto *mmci = dyn_cast<MoveOnlyWrapperToCopyableAddrInst>(argValue))
@@ -876,8 +872,7 @@ static SILValue tryRewriteToPartialApplyStack(
         if (!origUse->getUser()->mayWriteToMemory()) {
           return true;
         }
-        if (closureLiveness.isWithinBoundary(origUse->getUser(),
-                                             /*deadEndBlocks=*/nullptr)) {
+        if (closureLiveness.isWithinBoundary(origUse->getUser())) {
           origIsUnmodifiedDuringClosureLifetime = false;
           LLVM_DEBUG(llvm::dbgs() << "-- original has other possibly writing "
                                      "use during closure lifetime\n";
@@ -1064,7 +1059,7 @@ static bool tryExtendLifetimeToLastUse(
         auto loc = RegularLocation(builder.getInsertionPointLoc());
         auto isDeadEnd = IsDeadEnd_t(
             deadEndBlocks->isDeadEnd(builder.getInsertionPoint()->getParent()));
-        builder.createDestroyValue(loc, closureCopy, DontPoisonRefs, isDeadEnd);
+        builder.createDestroyValue(loc, closureCopy, isDeadEnd);
       });
 
   // Closure User may not be post-dominating the previously created copy_value.

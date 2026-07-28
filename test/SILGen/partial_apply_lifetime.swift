@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -module-name partial_apply_lifetime -enable-experimental-feature Lifetimes %s
 // RUN: %target-swift-emit-silgen -module-name partial_apply_lifetime -enable-experimental-feature Lifetimes %s | %FileCheck %s
 
 // REQUIRES: swift_feature_Lifetimes

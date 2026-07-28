@@ -71,6 +71,7 @@ fileprivate class ConcurrencyDumper {
     var childTasks: [swift_reflection_ptr_t]
     var asyncBacktrace: [swift_reflection_ptr_t]
     var parent: swift_reflection_ptr_t?
+    var name: String?
   }
 
   struct HeapInfo {
@@ -233,7 +234,8 @@ fileprivate class ConcurrencyDumper {
       allocatorTotalSize: allocatorTotalSize,
       allocatorTotalChunks: allocatorTotalChunks,
       childTasks: children,
-      asyncBacktrace: asyncBacktraceFrames
+      asyncBacktrace: asyncBacktraceFrames,
+      name: reflectionInfo.Name.map { String(cString: $0) }
     )
   }
 
@@ -364,7 +366,8 @@ fileprivate class ConcurrencyDumper {
 
       let flags = decodeTaskFlags(task)
 
-      output("Task \(task.id) - flags=\(flags) enqueuePriority=\(hex: task.enqueuePriority) maxPriority=\(hex: task.maxPriority) address=\(hex: task.address)")
+      let namePart: String = if let name = task.name { #" "\#(name)""# } else { "" }
+      output("Task\(namePart) \(task.id) - flags=\(flags) enqueuePriority=\(hex: task.enqueuePriority) maxPriority=\(hex: task.maxPriority) address=\(hex: task.address)")
       if let thread = taskToThread[swift_addr_t(task.address)] {
         output("current task on thread \(hex: thread)")
       }

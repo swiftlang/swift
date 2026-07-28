@@ -661,7 +661,7 @@ public:
 #endif
 
 // MARK: Iterators with dereference operators that prevent conformance to
-// CxxBorrowingSequence.
+// CxxIterable.
 
 struct NonInlineDereferenceOperator {
   using iterator_category = std::input_iterator_tag;

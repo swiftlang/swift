@@ -204,6 +204,26 @@ public:
   /// Imports a clang decl directly, rather than looking up its name.
   virtual Decl *importDeclDirectly(const clang::NamedDecl *decl) = 0;
 
+  /// Register a Clang declaration synthesized by the importer so that it is
+  /// discoverable by Swift name lookup and so that it can be resolved when
+  /// a cross-reference to it is deserialized (e.g., during SIL cross-module
+  /// optimization).
+  ///
+  /// Declarations are added to the SwiftLookupTable for the \a anchorDecl
+  /// as well as the one for its owning module, to handle the case where a C++
+  /// namespace spans across multiple Clang modules.
+  ///
+  /// Also mark \a synthesizedDecl as always-visible.
+  ///
+  /// \param synthesizedDecl The synthesized Clang function to register.
+  /// \param anchorDecl The Clang declaration whose SwiftLookupTable(s)
+  /// the declaration should be registered in. Pass the enclosing record for a
+  /// synthesized member, or \p synthesizedDecl itself for a translation-unit
+  /// -level thunk.
+  virtual void
+  registerSynthesizedClangDecl(clang::FunctionDecl *synthesizedDecl,
+                               const clang::Decl *anchorDecl) = 0;
+
   /// Returns a decl that was imported earlier or null if it was not found in
   /// the cache.
   virtual Decl *lookupImportedDecl(const clang::NamedDecl *decl) = 0;

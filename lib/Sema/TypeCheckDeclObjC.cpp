@@ -1818,8 +1818,9 @@ static bool isEnumObjC(EnumDecl *enumDecl, DeclAttribute *attr) {
     SourceRange errorRange;
     if (!enumDecl->getInherited().empty())
       errorRange = enumDecl->getInherited().getEntry(0).getSourceRange();
-    enumDecl->diagnose(diag::objc_enum_raw_type_not_integer, attr, rawType)
-      .highlight(errorRange);
+    auto languageName = dyn_cast<ObjCAttr>(attr) ? "Objective-C" : "C";
+    enumDecl->diagnose(diag::objc_enum_raw_type_not_integer, attr, rawType,
+      languageName).highlight(errorRange);
     return false;
   }
 
@@ -4203,11 +4204,6 @@ public:
     // there are no mismatches that they might be working around with it.
     if (hasDiagnosed || !getAttr()->isEarlyAdopter()
           || getAttr()->hasInvalidImplicitLangAttrs())
-      return;
-
-    // Only encourage adoption if the corresponding language feature is enabled.
-    if (isa<ExtensionDecl>(decl) &&
-        !decl->getASTContext().LangOpts.hasFeature(Feature::ObjCImplementation))
       return;
 
     auto diag = diagnose(getAttr()->getLocation(),

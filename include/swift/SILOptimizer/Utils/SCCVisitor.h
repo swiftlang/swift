@@ -104,16 +104,6 @@ private:
     case TermKind::BranchInst:
       return Operands.push_back(cast<BranchInst>(Term)->getArg(Index));
 
-    case TermKind::CondBranchInst: {
-      auto *CBI = cast<CondBranchInst>(Term);
-      if (SuccBB == CBI->getTrueBB())
-        return Operands.push_back(CBI->getTrueArgs()[Index]);
-      assert(SuccBB == CBI->getFalseBB() &&
-             "Block is not a successor of terminator!");
-      Operands.push_back(CBI->getFalseArgs()[Index]);
-      return;
-    }
-        
     case TermKind::AwaitAsyncContinuationInst: {
       auto *AACI = cast<AwaitAsyncContinuationInst>(Term);
       Operands.push_back(AACI->getOperand());
@@ -135,6 +125,7 @@ private:
     case TermKind::ThrowInst:
     case TermKind::ThrowAddrInst:
     case TermKind::UnwindInst:
+    case TermKind::CondBranchInst:
       llvm_unreachable("Did not expect terminator that does not have args!");
 
     case TermKind::YieldInst:

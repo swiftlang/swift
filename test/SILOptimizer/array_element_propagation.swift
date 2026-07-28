@@ -27,6 +27,8 @@ func testAppend(_ arr: inout [Int]) {
 
 // CHECK-LABEL: sil hidden [noinline] @$s25array_element_propagation8testLoopyyF :
 // CHECK-NOT:     load
+// CHECK-NOT:     retain
+// CHECK-NOT:     release
 // CHECK:       } // end sil function '$s25array_element_propagation8testLoopyyF'
 @inline(never)
 func testLoop() {
@@ -39,6 +41,8 @@ func testLoop() {
 
 // CHECK-LABEL: sil hidden [noinline] @$s25array_element_propagation12testNonConstyySSF :
 // CHECK-NOT:     load
+// CHECK-NOT:     retain
+// CHECK-NOT:     release
 // CHECK:       } // end sil function '$s25array_element_propagation12testNonConstyySSF'
 @inline(never)
 func testNonConst(_ s: String) {

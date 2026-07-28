@@ -2,7 +2,6 @@
 
 // RUN: %target-swift-frontend -g -emit-ir %s -enable-experimental-feature Embedded -module-name trap -wmo -o - | %FileCheck -check-prefix IR %s
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_Embedded
 // REQUIRES: CPU=x86_64 || CPU=arm64 || CPU=arm64e
 

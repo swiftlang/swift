@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 // RUN: %target-swift-frontend -emit-silgen %s -parse-as-library -module-name Test -experimental-lazy-typecheck -experimental-skip-non-inlinable-function-bodies | %FileCheck %s
 
 // Note: This test has been carefully constructed to create the preconditions of

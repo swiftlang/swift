@@ -1,7 +1,6 @@
 // RUN: %target-swift-frontend %s -sil-verify-all -Xllvm -sil-print-types -emit-sil -enable-copy-propagation=false -o - -I %S/Inputs/usr/include | %FileCheck %s
 // REQUIRES: objc_interop
 
-// REQUIRES: swift_in_compiler
 
 // Using -enable-copy-propagation=false to pattern match against older SIL
 // output. At least until -enable-copy-propagation has been around
@@ -45,8 +44,8 @@ public protocol DangerousEscaper {
 // CHECK:   destroy_addr [[CLOSURE_ADDR]] : $*@callee_guaranteed () -> ()
 // CHECK:   dealloc_stack [[BLOCK_STORAGE]] : $*@block_storage @callee_guaranteed () -> ()
 
-// CHECK:   [[METH:%.*]] = objc_method [[OE]] : $@opened("{{.*}}", any DangerousEscaper) Self, #DangerousEscaper.malicious!foreign : <Self where Self : DangerousEscaper> (Self) -> (() -> ()) -> (), $@convention(objc_method) <τ_0_0 where τ_0_0 : DangerousEscaper> (@convention(block) @noescape () -> (), τ_0_0) -> ()
-// CHECK:   apply [[METH]]<@opened("{{.*}}", any DangerousEscaper) Self>([[BLOCK_COPY]], [[OE]]) : $@convention(objc_method) <τ_0_0 where τ_0_0 : DangerousEscaper> (@convention(block) @noescape () -> (), τ_0_0) -> ()
+// CHECK:   [[METH:%.*]] = objc_method [[OE]] : $@opened({{.*}}, any DangerousEscaper) Self, #DangerousEscaper.malicious!foreign : <Self where Self : DangerousEscaper> (Self) -> (() -> ()) -> (), $@convention(objc_method) <τ_0_0 where τ_0_0 : DangerousEscaper> (@convention(block) @noescape () -> (), τ_0_0) -> ()
+// CHECK:   apply [[METH]]<@opened({{.*}}, any DangerousEscaper) Self>([[BLOCK_COPY]], [[OE]]) : $@convention(objc_method) <τ_0_0 where τ_0_0 : DangerousEscaper> (@convention(block) @noescape () -> (), τ_0_0) -> ()
 
 // Release sentinel closure copy (5).
 // CHECK:   strong_release [[BLOCK_COPY]] : $@convention(block) @noescape () -> ()

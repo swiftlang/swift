@@ -68,7 +68,7 @@ StructLayout::StructLayout(IRGenModule &IGM, std::optional<CanType> type,
     builder.addHeapHeader();
   }
 
-  auto triviallyDestroyable = (decl && decl->getValueTypeDestructor())
+  auto triviallyDestroyable = (decl && decl->hasValueTypeDestructor())
     ? IsNotTriviallyDestroyable : IsTriviallyDestroyable;
   auto copyable = (decl && !decl->canBeCopyable())
     ? IsNotCopyable : IsCopyable;

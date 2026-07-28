@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 // RUN: %target-swift-emit-silgen -swift-version 6 %s | %FileCheck %s
 
 // https://github.com/swiftlang/swift/issues/87893

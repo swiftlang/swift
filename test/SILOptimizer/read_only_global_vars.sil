@@ -1,6 +1,5 @@
 // RUN: %target-sil-opt -enable-sil-verify-all %s -read-only-global-variables | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 
 import Builtin
 import Swift

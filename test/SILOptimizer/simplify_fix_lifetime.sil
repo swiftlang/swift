@@ -5,6 +5,13 @@ import Builtin
 
 class C {}
 
+struct EmptyArrayStorage { }
+
+class ArrayStorage {}
+
+sil_global public_external @emptyArrayStorage : $EmptyArrayStorage
+
+
 // CHECK-LABEL: sil @load_from_alloc_stack :
 // CHECK:         %1 = alloc_stack
 // CHECK-NEXT:    store %0 to %1
@@ -102,5 +109,32 @@ bb0(%0: $Int):
   dealloc_stack %1
   %r = tuple ()
   return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @fix_lifetime_of_empty_array :
+// CHECK-NOT:     fix_lifetime
+// CHECK:       } // end sil function 'fix_lifetime_of_empty_array'
+sil [ossa] @fix_lifetime_of_empty_array : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @emptyArrayStorage : $*EmptyArrayStorage
+  %1 = address_to_pointer [stack_protection] %0 to $Builtin.RawPointer
+  %2 = raw_pointer_to_ref %1 to $ArrayStorage
+  %3 = copy_value %2
+  fix_lifetime %3
+  destroy_value %3
+  %6 = tuple ()
+  return %6
+}
+
+// CHECK-LABEL: sil [ossa] @dont_remove_fix_lifetime_of_copy :
+// CHECK:         fix_lifetime
+// CHECK:       } // end sil function 'dont_remove_fix_lifetime_of_copy'
+sil [ossa] @dont_remove_fix_lifetime_of_copy : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  %1 = copy_value %0
+  fix_lifetime %1
+  destroy_value %1
+  %r = tuple ()
+  return %r
 }
 

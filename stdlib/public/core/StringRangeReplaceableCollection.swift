@@ -285,8 +285,6 @@ extension String: RangeReplaceableCollection {
   /// - Parameter bounds: The range of the elements to remove. The upper and
   ///   lower bounds of `bounds` must be valid indices of the string and not
   ///   equal to the string's end index.
-  /// - Parameter bounds: The range of the elements to remove. The upper and
-  ///   lower bounds of `bounds` must be valid indices of the string.
   public mutating func removeSubrange(_ bounds: Range<Index>) {
     let bounds = _guts.validateScalarRange(bounds)
     _guts.remove(from: bounds.lowerBound, to: bounds.upperBound)

@@ -38,7 +38,12 @@ void printModuleContentsAsObjC(raw_ostream &os,
                                SwiftToClangInteropContext &interopContext,
                                std::optional<AccessLevel> minAccess);
 
-void printModuleContentsAsC(raw_ostream &os,
+/// Prints the `@c` declarations of \p M to \p os, collecting imports in
+/// \p imports along the way.
+///
+/// \returns true if an emitted `@c` declaration needs <objc/objc.h> (it uses
+/// AnyClass, printed as 'Class').
+bool printModuleContentsAsC(raw_ostream &os,
                             llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
                             ModuleDecl &M,
                             SwiftToClangInteropContext &interopContext,

@@ -5,7 +5,6 @@
 // RUN: llvm-objdump -r %t/b.o | %FileCheck -check-prefix B-OBJDUMP %s
 
 // UNSUPPORTED: CPU=wasm32
-// REQUIRES: swift_in_compiler
 // REQUIRES: optimized_stdlib
 // REQUIRES: CODEGENERATOR=ARM
 // REQUIRES: embedded_stdlib_cross_compiling
@@ -26,8 +25,8 @@ extension X: P {
 
 
 //--- b.swift
-// B-OBJDUMP: R_ARM_REL32 $e4main1XVMf
-// B-OBJDUMP: R_ARM_REL32 $e4main1XVAA1PAAWP
+// B-OBJDUMP: R_ARM_THM_MOVW_ABS_NC $e4main1XVMf
+// B-OBJDUMP: R_ARM_THM_MOVW_ABS_NC $e4main1XVAA1PAAWP
 public func getP() -> any P {
   return X()
 }

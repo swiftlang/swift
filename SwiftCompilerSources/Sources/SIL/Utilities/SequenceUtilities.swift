@@ -128,33 +128,54 @@ extension LazyFilterSequence : /*@retroactive*/ SIL.CollectionLikeSequence,
 //===----------------------------------------------------------------------===//
 
 public struct SingleInlineArray<Element>: RandomAccessCollection, FormattedLikeArray {
-  public var singleElement: Element?
-  private var multipleElements: [Element] = []
+  enum Storage {
+    case empty
+    case singleElement(Element)
+    case multipleElements([Element])
+  }
+  var storage: Storage
 
-  public init() {}
+  public init() {
+    self.storage = .empty
+  }
 
   public init(element: Element) {
-    singleElement = element
+    self.storage = .singleElement(element)
   }
 
   public var startIndex: Int { 0 }
   public var endIndex: Int {
-    singleElement == nil ? 0 : multipleElements.count + 1
+    switch storage {
+      case .empty:                       return 0
+      case .singleElement:               return 1
+      case .multipleElements(let array): return array.count
+    }
   }
 
   public subscript(_ index: Int) -> Element {
     _read {
-      if index == 0 {
-        yield singleElement!
-      } else {
-        yield multipleElements[index - 1]
+      switch storage {
+      case .empty:
+        fatalError("index out of bounds")
+      case .singleElement(let element):
+        precondition(index == 0, "index out of bounds")
+        yield element
+      case .multipleElements(let array):
+        yield array[index]
       }
     }
     _modify {
-      if index == 0 {
-        yield &singleElement!
-      } else {
-        yield &multipleElements[index - 1]
+      switch storage {
+      case .empty:
+        fatalError("index out of bounds")
+      case .singleElement(var element):
+        precondition(index == 0, "index out of bounds")
+        yield &element
+        storage = .singleElement(element)
+      case .multipleElements(var array):
+        storage = .empty
+        yield &array[index]
+        storage = .multipleElements(array)
       }
     }
   }
@@ -169,20 +190,42 @@ public struct SingleInlineArray<Element>: RandomAccessCollection, FormattedLikeA
     }
   }
 
-  public mutating func push(_ element: __owned Element) {
-    guard singleElement != nil else {
-      singleElement = element
-      return
+  public mutating func push(_ newElement: __owned Element) {
+    switch storage {
+    case .empty:
+      storage = .singleElement(newElement)
+    case .singleElement(let element):
+      storage = .multipleElements([element, newElement])
+    case .multipleElements(var array):
+      storage = .empty
+      array.append(newElement)
+      storage = .multipleElements(array)
     }
-    multipleElements.append(element)
   }
 
   public mutating func popLast() -> Element? {
-    if multipleElements.isEmpty {
-      let last = singleElement
-      singleElement = nil
-      return last
+    switch storage {
+    case .empty:
+      return nil
+    case .singleElement(let element):
+      storage = .empty
+      return element
+    case .multipleElements(var array):
+      storage = .empty
+      let element = array.popLast()
+      storage = .multipleElements(array)
+      return element
     }
-    return multipleElements.popLast()
+  }
+
+  public mutating func sort(by areInIncreasingOrder: (Element, Element) -> Bool) {
+    switch storage {
+    case .empty, .singleElement:
+      return
+    case .multipleElements(var array):
+      storage = .empty
+      array.sort(by: areInIncreasingOrder)
+      storage = .multipleElements(array)
+    }
   }
 }

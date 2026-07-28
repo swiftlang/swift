@@ -4,7 +4,6 @@
 // RUN:   -module-name test \
 // RUN:   -enable-experimental-feature Lifetimes
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_Lifetimes
 
 // Simply test that it is possible for a module to define a pseudo-Optional type without triggering any compiler errors.

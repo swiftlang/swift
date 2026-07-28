@@ -12,7 +12,7 @@
 
 @available(SwiftStdlib 6.4, *)
 extension _RigidArray where Element: ~Copyable {
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal func isTriviallyIdentical(to other: borrowing Self) -> Bool {
     unsafe _count == other._count &&
     _storage.isTriviallyIdentical(to: other._storage)
@@ -22,7 +22,7 @@ extension _RigidArray where Element: ~Copyable {
 @available(SwiftStdlib 6.4, *)
 extension _RigidArray: Equatable where Element: Equatable & ~Copyable {
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal static func ==(
     left: borrowing Self,
     right: borrowing Self

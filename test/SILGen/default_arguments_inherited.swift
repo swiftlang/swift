@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 // RUN: %target-swift-emit-silgen %s | %FileCheck %s
 
 // When we synthesize an inherited designated initializer, the default

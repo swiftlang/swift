@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa(mock-sdk: %clang-importer-sdk) -o /dev/null -enable-sil-opaque-values -Xllvm -sil-print-types -enable-objc-interop -import-objc-header %S/Inputs/objc_init_unavailable.h %s
 // RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk) -Xllvm -sil-print-types -enable-objc-interop -import-objc-header %S/Inputs/objc_init_unavailable.h %s | %FileCheck %s
 // REQUIRES: objc_interop
 // REQUIRES: OS=macosx

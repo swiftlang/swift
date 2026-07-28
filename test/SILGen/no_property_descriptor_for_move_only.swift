@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-emit-silgen %s > %t/fragile-out.sil
 // %FileCheck --check-prefix=POS %s < %t/fragile-out.sil

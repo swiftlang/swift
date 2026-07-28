@@ -4,7 +4,7 @@
 // CHECK-UNABLE-LOAD: error: unable to load plugin 'nonexistent.dylib': 'Could not load library{{.*}}'
 
 // RUN: %empty-directory(%t)
-// RUN: %target-clangxx %S/Inputs/TestPlugin.cpp -std=c++17 -stdlib=libc++ \
+// RUN: %clangxx %S/Inputs/TestPlugin.cpp -std=c++17 -stdlib=libc++ \
 // RUN:     -isysroot %sdk -I %llvm_src_root/include -I %llvm_obj_root/include -L %llvm_obj_root/lib \
 // RUN:     -Wl,-hidden-lLLVMSupport -Wl,-undefined -Wl,dynamic_lookup -Wl,-flat_namespace \
 // RUN:     -dynamiclib -o %t/libTestPlugin.dylib

@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 // RUN: %target-swift-frontend -primary-file %s -target %target-cpu-apple-macosx10.14 -enable-upcoming-feature DynamicActorIsolation -emit-silgen -o - | %FileCheck %s
 
 // REQUIRES: concurrency

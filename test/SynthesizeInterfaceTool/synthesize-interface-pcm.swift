@@ -7,8 +7,8 @@
 
 // CHECK:     public struct MyStruct {
 // CHECK-DAG:     public init()
-// CHECK-DAG:     public init(value: Int32)
-// CHECK-DAG:     public var value: Int32
+// CHECK-DAG:     public init(value: CInt)
+// CHECK-DAG:     public var value: CInt
 // CHECK-DAG: }
 // CHECK-DAG: extension MyStruct {
 // CHECK-DAG:     public func printValue()

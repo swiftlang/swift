@@ -32,7 +32,7 @@ extension UnsafePointer: @unsafe AtomicRepresentable where Pointee: ~Copyable {
   ///   to encode an instance of its `AtomicRepresentation`.
   /// - Returns: The newly encoded `AtomicRepresentation` storage.
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public static func encodeAtomicRepresentation(
     _ value: consuming UnsafePointer<Pointee>
@@ -53,7 +53,7 @@ extension UnsafePointer: @unsafe AtomicRepresentable where Pointee: ~Copyable {
   ///   within atomic operations.
   /// - Returns: The newly decoded logical type `Self`.
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public static func decodeAtomicRepresentation(
     _ representation: consuming AtomicRepresentation
@@ -83,7 +83,7 @@ extension UnsafePointer: @unsafe AtomicOptionalRepresentable where Pointee: ~Cop
   ///   destroyed to encode an instance of its `AtomicOptionalRepresentation`.
   /// - Returns: The newly encoded `AtomicOptionalRepresentation` storage.
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public static func encodeAtomicOptionalRepresentation(
     _ value: consuming UnsafePointer<Pointee>?
@@ -105,7 +105,7 @@ extension UnsafePointer: @unsafe AtomicOptionalRepresentable where Pointee: ~Cop
   ///   that's used within atomic operations on `Optional`.
   /// - Returns: The newly decoded logical type `Self?`.
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public static func decodeAtomicOptionalRepresentation(
     _ representation: consuming AtomicOptionalRepresentation
@@ -138,7 +138,7 @@ extension UnsafeMutablePointer: @unsafe AtomicRepresentable where Pointee: ~Copy
   ///   to encode an instance of its `AtomicRepresentation`.
   /// - Returns: The newly encoded `AtomicRepresentation` storage.
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public static func encodeAtomicRepresentation(
     _ value: consuming UnsafeMutablePointer<Pointee>
@@ -159,7 +159,7 @@ extension UnsafeMutablePointer: @unsafe AtomicRepresentable where Pointee: ~Copy
   ///   within atomic operations.
   /// - Returns: The newly decoded logical type `Self`.
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public static func decodeAtomicRepresentation(
     _ representation: consuming AtomicRepresentation
@@ -190,7 +190,7 @@ where Pointee: ~Copyable {
   ///   destroyed to encode an instance of its `AtomicOptionalRepresentation`.
   /// - Returns: The newly encoded `AtomicOptionalRepresentation` storage.
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public static func encodeAtomicOptionalRepresentation(
     _ value: consuming UnsafeMutablePointer<Pointee>?
@@ -212,7 +212,7 @@ where Pointee: ~Copyable {
   ///   that's used within atomic operations on `Optional`.
   /// - Returns: The newly decoded logical type `Self?`.
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public static func decodeAtomicOptionalRepresentation(
     _ representation: consuming AtomicOptionalRepresentation
@@ -245,7 +245,7 @@ extension UnsafeRawPointer: @unsafe AtomicRepresentable {
   ///   to encode an instance of its `AtomicRepresentation`.
   /// - Returns: The newly encoded `AtomicRepresentation` storage.
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public static func encodeAtomicRepresentation(
     _ value: consuming UnsafeRawPointer
@@ -266,7 +266,7 @@ extension UnsafeRawPointer: @unsafe AtomicRepresentable {
   ///   within atomic operations.
   /// - Returns: The newly decoded logical type `Self`.
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public static func decodeAtomicRepresentation(
     _ representation: consuming AtomicRepresentation
@@ -296,7 +296,7 @@ extension UnsafeRawPointer: @unsafe AtomicOptionalRepresentable {
   ///   destroyed to encode an instance of its `AtomicOptionalRepresentation`.
   /// - Returns: The newly encoded `AtomicOptionalRepresentation` storage.
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public static func encodeAtomicOptionalRepresentation(
     _ value: consuming UnsafeRawPointer?
@@ -318,7 +318,7 @@ extension UnsafeRawPointer: @unsafe AtomicOptionalRepresentable {
   ///   that's used within atomic operations on `Optional`.
   /// - Returns: The newly decoded logical type `Self?`.
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public static func decodeAtomicOptionalRepresentation(
     _ representation: consuming AtomicOptionalRepresentation
@@ -351,7 +351,7 @@ extension UnsafeMutableRawPointer: @unsafe AtomicRepresentable {
   ///   to encode an instance of its `AtomicRepresentation`.
   /// - Returns: The newly encoded `AtomicRepresentation` storage.
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public static func encodeAtomicRepresentation(
     _ value: consuming UnsafeMutableRawPointer
@@ -372,7 +372,7 @@ extension UnsafeMutableRawPointer: @unsafe AtomicRepresentable {
   ///   within atomic operations.
   /// - Returns: The newly decoded logical type `Self`.
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public static func decodeAtomicRepresentation(
     _ representation: consuming AtomicRepresentation
@@ -402,7 +402,7 @@ extension UnsafeMutableRawPointer: @unsafe AtomicOptionalRepresentable {
   ///   destroyed to encode an instance of its `AtomicOptionalRepresentation`.
   /// - Returns: The newly encoded `AtomicOptionalRepresentation` storage.
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public static func encodeAtomicOptionalRepresentation(
     _ value: consuming UnsafeMutableRawPointer?
@@ -424,7 +424,7 @@ extension UnsafeMutableRawPointer: @unsafe AtomicOptionalRepresentable {
   ///   that's used within atomic operations on `Optional`.
   /// - Returns: The newly decoded logical type `Self?`.
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public static func decodeAtomicOptionalRepresentation(
     _ representation: consuming AtomicOptionalRepresentation
@@ -457,7 +457,7 @@ extension Unmanaged: @unsafe AtomicRepresentable {
   ///   to encode an instance of its `AtomicRepresentation`.
   /// - Returns: The newly encoded `AtomicRepresentation` storage.
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public static func encodeAtomicRepresentation(
     _ value: consuming Unmanaged<Instance>
@@ -478,7 +478,7 @@ extension Unmanaged: @unsafe AtomicRepresentable {
   ///   within atomic operations.
   /// - Returns: The newly decoded logical type `Self`.
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public static func decodeAtomicRepresentation(
     _ representation: consuming AtomicRepresentation
@@ -508,7 +508,7 @@ extension Unmanaged: @unsafe AtomicOptionalRepresentable {
   ///   destroyed to encode an instance of its `AtomicOptionalRepresentation`.
   /// - Returns: The newly encoded `AtomicOptionalRepresentation` storage.
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public static func encodeAtomicOptionalRepresentation(
     _ value: consuming Unmanaged<Instance>?
@@ -538,7 +538,7 @@ extension Unmanaged: @unsafe AtomicOptionalRepresentable {
   ///   that's used within atomic operations on `Optional`.
   /// - Returns: The newly decoded logical type `Self?`.
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public static func decodeAtomicOptionalRepresentation(
     _ representation: consuming AtomicOptionalRepresentation
@@ -571,7 +571,7 @@ extension OpaquePointer: @unsafe AtomicRepresentable {
   ///   to encode an instance of its `AtomicRepresentation`.
   /// - Returns: The newly encoded `AtomicRepresentation` storage.
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public static func encodeAtomicRepresentation(
     _ value: consuming OpaquePointer
@@ -592,7 +592,7 @@ extension OpaquePointer: @unsafe AtomicRepresentable {
   ///   within atomic operations.
   /// - Returns: The newly decoded logical type `Self`.
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public static func decodeAtomicRepresentation(
     _ representation: consuming AtomicRepresentation
@@ -622,7 +622,7 @@ extension OpaquePointer: @unsafe AtomicOptionalRepresentable {
   ///   destroyed to encode an instance of its `AtomicOptionalRepresentation`.
   /// - Returns: The newly encoded `AtomicOptionalRepresentation` storage.
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public static func encodeAtomicOptionalRepresentation(
     _ value: consuming OpaquePointer?
@@ -644,7 +644,7 @@ extension OpaquePointer: @unsafe AtomicOptionalRepresentable {
   ///   that's used within atomic operations on `Optional`.
   /// - Returns: The newly decoded logical type `Self?`.
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public static func decodeAtomicOptionalRepresentation(
     _ representation: consuming AtomicOptionalRepresentation
@@ -677,7 +677,7 @@ extension ObjectIdentifier: AtomicRepresentable {
   ///   to encode an instance of its `AtomicRepresentation`.
   /// - Returns: The newly encoded `AtomicRepresentation` storage.
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public static func encodeAtomicRepresentation(
     _ value: consuming ObjectIdentifier
@@ -698,7 +698,7 @@ extension ObjectIdentifier: AtomicRepresentable {
   ///   within atomic operations.
   /// - Returns: The newly decoded logical type `Self`.
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public static func decodeAtomicRepresentation(
     _ representation: consuming AtomicRepresentation
@@ -730,7 +730,7 @@ extension ObjectIdentifier: AtomicOptionalRepresentable {
   ///   destroyed to encode an instance of its `AtomicOptionalRepresentation`.
   /// - Returns: The newly encoded `AtomicOptionalRepresentation` storage.
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public static func encodeAtomicOptionalRepresentation(
     _ value: consuming ObjectIdentifier?
@@ -754,7 +754,7 @@ extension ObjectIdentifier: AtomicOptionalRepresentable {
   ///   that's used within atomic operations on `Optional`.
   /// - Returns: The newly decoded logical type `Self?`.
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public static func decodeAtomicOptionalRepresentation(
     _ representation: consuming AtomicOptionalRepresentation
@@ -791,7 +791,7 @@ extension UnsafeBufferPointer: @unsafe AtomicRepresentable where Element: ~Copya
   ///   to encode an instance of its `AtomicRepresentation`.
   /// - Returns: The newly encoded `AtomicRepresentation` storage.
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public static func encodeAtomicRepresentation(
     _ value: consuming UnsafeBufferPointer<Element>
@@ -817,7 +817,7 @@ extension UnsafeBufferPointer: @unsafe AtomicRepresentable where Element: ~Copya
   ///   within atomic operations.
   /// - Returns: The newly decoded logical type `Self`.
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public static func decodeAtomicRepresentation(
     _ representation: consuming AtomicRepresentation
@@ -859,7 +859,7 @@ where Element: ~Copyable
   ///   to encode an instance of its `AtomicRepresentation`.
   /// - Returns: The newly encoded `AtomicRepresentation` storage.
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public static func encodeAtomicRepresentation(
     _ value: consuming UnsafeMutableBufferPointer<Element>
@@ -885,7 +885,7 @@ where Element: ~Copyable
   ///   within atomic operations.
   /// - Returns: The newly decoded logical type `Self`.
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public static func decodeAtomicRepresentation(
     _ representation: consuming AtomicRepresentation
@@ -925,7 +925,7 @@ extension UnsafeRawBufferPointer: @unsafe AtomicRepresentable {
   ///   to encode an instance of its `AtomicRepresentation`.
   /// - Returns: The newly encoded `AtomicRepresentation` storage.
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public static func encodeAtomicRepresentation(
     _ value: consuming UnsafeRawBufferPointer
@@ -951,7 +951,7 @@ extension UnsafeRawBufferPointer: @unsafe AtomicRepresentable {
   ///   within atomic operations.
   /// - Returns: The newly decoded logical type `Self`.
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public static func decodeAtomicRepresentation(
     _ representation: consuming AtomicRepresentation
@@ -991,7 +991,7 @@ extension UnsafeMutableRawBufferPointer: @unsafe AtomicRepresentable {
   ///   to encode an instance of its `AtomicRepresentation`.
   /// - Returns: The newly encoded `AtomicRepresentation` storage.
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public static func encodeAtomicRepresentation(
     _ value: consuming UnsafeMutableRawBufferPointer
@@ -1017,7 +1017,7 @@ extension UnsafeMutableRawBufferPointer: @unsafe AtomicRepresentable {
   ///   within atomic operations.
   /// - Returns: The newly decoded logical type `Self`.
   @available(SwiftStdlib 6.0, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   public static func decodeAtomicRepresentation(
     _ representation: consuming AtomicRepresentation

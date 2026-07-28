@@ -1,6 +1,4 @@
-// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -onone-simplification -simplify-instruction=copy_value | %FileCheck %s
-
-// REQUIRES: swift_in_compiler
+// RUN: %target-sil-opt -enable-sil-verify-all %s -simplification -simplify-instruction=copy_value | %FileCheck %s
 
 sil_stage canonical
 
@@ -12,8 +10,27 @@ sil @cl : $@convention(thin) () -> Int
 
 actor A {}
 
+class B {}
+class C : B {}
+
+struct S1 {
+  @_hasStorage let c: C
+}
+
+struct S2 {
+  @_hasStorage let c1: C
+  @_hasStorage let c2: C
+}
+
+struct S3 {
+  @_hasStorage let i: Int
+  @_hasStorage let ci: (Int, C)
+}
+
+sil @takeOwnedC : $@convention(thin) (@owned C) -> ()
+
 // CHECK-LABEL: sil [ossa] @remove_copy :
-// CHECK:         [[F:%.*]] = thin_to_thick_function %0 : $@convention(thin) () -> Int to $@callee_guaranteed () -> Int
+// CHECK:         [[F:%.*]] = thin_to_thick_function %0 to $@callee_guaranteed () -> Int
 // CHECK-NEXT:    destroy_value [[F]]
 // CHECK:       } // end sil function 'remove_copy'
 sil [ossa] @remove_copy : $@convention(thin) () -> () {
@@ -37,4 +54,169 @@ bb0:
   %3 = tuple (%1, %2)
   return %3
 }
+
+// Single-field struct: copy_value from struct_extract of a borrow.
+// The owned value is replaced by a destructure; no unused elements to destroy.
+//
+// CHECK-LABEL: sil [ossa] @projected_copy_single_field :
+// CHECK:         end_borrow
+// CHECK:         %3 = destructure_struct %0
+// CHECK-NOT:     copy_value
+// CHECK-NOT:     destroy_value {{.*}} : $S1
+// CHECK:         return %3
+// CHECK:       } // end sil function 'projected_copy_single_field'
+sil [ossa] @projected_copy_single_field : $@convention(thin) (@owned S1) -> @owned C {
+bb0(%0 : @owned $S1):
+  %1 = begin_borrow %0
+  %2 = struct_extract %1, #S1.c
+  %3 = copy_value %2
+  end_borrow %1
+  destroy_value %0
+  return %3
+}
+
+// Two-field struct: copy_value extracts c1; c2 is destroyed as the unused element.
+//
+// CHECK-LABEL: sil [ossa] @projected_copy_two_fields :
+// CHECK:         end_borrow
+// CHECK:         (%3, %4) = destructure_struct %0
+// CHECK:         destroy_value %4
+// CHECK-NOT:     copy_value
+// CHECK:         return %3
+// CHECK:       } // end sil function 'projected_copy_two_fields'
+sil [ossa] @projected_copy_two_fields : $@convention(thin) (@owned S2) -> @owned C {
+bb0(%0 : @owned $S2):
+  %1 = begin_borrow %0
+  %2 = struct_extract %1, #S2.c1
+  %3 = copy_value %2
+  end_borrow %1
+  destroy_value %0
+  return %3
+}
+
+// Same as above but extracts the second field; c1 is destroyed as unused.
+//
+// CHECK-LABEL: sil [ossa] @projected_copy_second_field :
+// CHECK:         end_borrow
+// CHECK:         (%3, %4) = destructure_struct %0
+// CHECK:         destroy_value %3
+// CHECK-NOT:     copy_value
+// CHECK:         return %4
+// CHECK:       } // end sil function 'projected_copy_second_field'
+sil [ossa] @projected_copy_second_field : $@convention(thin) (@owned S2) -> @owned C {
+bb0(%0 : @owned $S2):
+  %1 = begin_borrow %0
+  %2 = struct_extract %1, #S2.c2
+  %3 = copy_value %2
+  end_borrow %1
+  destroy_value %0
+  return %3
+}
+
+// Tuple with two class elements: copy_value extracts element 0; element 1 is destroyed.
+//
+// CHECK-LABEL: sil [ossa] @projected_copy_tuple_element :
+// CHECK:         end_borrow
+// CHECK:         (%3, %4) = destructure_tuple %0
+// CHECK:         destroy_value %4
+// CHECK-NOT:     copy_value
+// CHECK:         return %3
+// CHECK:       } // end sil function 'projected_copy_tuple_element'
+sil [ossa] @projected_copy_tuple_element : $@convention(thin) (@owned (C, C)) -> @owned C {
+bb0(%0 : @owned $(C, C)):
+  %1 = begin_borrow %0
+  %2 = tuple_extract %1, 0
+  %3 = copy_value %2
+  end_borrow %1
+  destroy_value %0
+  return %3
+}
+
+// S3 { i: Int, ci: (Int, C) }: two-level projection extracts the C from ci.
+// Two destructures are emitted; no destroy_values because Int is trivial.
+//
+// CHECK-LABEL: sil [ossa] @projected_copy_nested_struct_tuple :
+// CHECK:         end_borrow
+// CHECK:         ([[I:%[0-9]+]], [[CI:%[0-9]+]]) = destructure_struct %0
+// CHECK-NOT:     destroy_value [[I]]
+// CHECK:         ([[CI_INT:%[0-9]+]], [[C:%[0-9]+]]) = destructure_tuple [[CI]]
+// CHECK-NOT:     destroy_value [[CI_INT]]
+// CHECK-NOT:     copy_value
+// CHECK:         return [[C]]
+// CHECK:       } // end sil function 'projected_copy_nested_struct_tuple'
+sil [ossa] @projected_copy_nested_struct_tuple : $@convention(thin) (@owned S3) -> @owned C {
+bb0(%0 : @owned $S3):
+  %1 = begin_borrow %0
+  %2 = struct_extract %1, #S3.ci
+  %3 = tuple_extract %2, 1
+  %4 = copy_value %3
+  end_borrow %1
+  destroy_value %0
+  return %4
+}
+
+// The copy_value result is forwarded through an upcast before its terminal use.
+// The upcast is moved out of the owned value's liverange (to after the destructure).
+//
+// CHECK-LABEL: sil [ossa] @projected_copy_with_forwarding :
+// CHECK:         end_borrow
+// CHECK:         [[C:%.*]] = destructure_struct %0
+// CHECK-NEXT:    [[B:%.*]] = upcast [[C]] to $B
+// CHECK-NEXT:    [[D:%.*]] = unchecked_ref_cast [[B]]
+// CHECK-NOT:     copy_value
+// CHECK:         return [[D]]
+// CHECK:       } // end sil function 'projected_copy_with_forwarding'
+sil [ossa] @projected_copy_with_forwarding : $@convention(thin) (@owned S1) -> @owned C {
+bb0(%0 : @owned $S1):
+  %1 = begin_borrow %0
+  %2 = struct_extract %1, #S1.c
+  %3 = copy_value %2
+  %4 = upcast %3 to $B
+  %5 = unchecked_ref_cast %4 to $C
+  end_borrow %1
+  destroy_value %0
+  return %5
+}
+
+// -----------------------------------------------------------------------------
+// negative tests (optimization must NOT fire)
+// -----------------------------------------------------------------------------
+
+// The copy_value is consumed inside the owned value's liverange (before destroy_value).
+// The optimization requires all uses of the copy chain to be outside the liverange.
+//
+// CHECK-LABEL: sil [ossa] @no_projected_copy_use_in_liverange :
+// CHECK:         copy_value
+// CHECK-NOT:     destructure_struct
+// CHECK:       } // end sil function 'no_projected_copy_use_in_liverange'
+sil [ossa] @no_projected_copy_use_in_liverange : $@convention(thin) (@owned S1) -> @owned C {
+bb0(%0 : @owned $S1):
+  %1 = begin_borrow %0
+  %2 = struct_extract %1, #S1.c
+  %3 = copy_value %2
+  apply undef(%3) : $@convention(thin) (@guaranteed C) -> ()
+  end_borrow %1
+  destroy_value %0
+  return %3
+}
+
+
+// The optimization requires them to be in the same block.
+//
+// CHECK-LABEL: sil [ossa] @no_projected_copy_destroy_different_block :
+// CHECK:         copy_value
+// CHECK-NOT:     destructure_struct
+// CHECK:       } // end sil function 'no_projected_copy_destroy_different_block'
+sil [ossa] @no_projected_copy_destroy_different_block : $@convention(thin) (@owned S1) -> @owned C {
+bb0(%0 : @owned $S1):
+  %1 = begin_borrow %0 : $S1
+  %2 = struct_extract %1 : $S1, #S1.c
+  %3 = copy_value %2 : $C
+  end_borrow %1 : $S1
+  br bb1
+bb1:
+  destroy_value %0 : $S1
+  return %3 : $C
+}
+
 

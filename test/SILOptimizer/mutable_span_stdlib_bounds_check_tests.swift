@@ -5,7 +5,7 @@ public protocol P {
 }
 
 // CHECK-SIL-LABEL: sil @$s38mutable_span_stdlib_bounds_check_tests0a1_B7_doubleyys11MutableSpanVyxGzAA1PRzlF :
-// CHECK-SIL: bb3({{.*}}):
+// CHECK-SIL: bb{{[0-9]+}}({{.*}}):
 // CHECK-SIL-NOT: end_cow_mutation
 // CHECK-SIL-NOT: cond_fail "index out of bounds"
 // CHECK-SIL-LABEL: } // end sil function '$s38mutable_span_stdlib_bounds_check_tests0a1_B7_doubleyys11MutableSpanVyxGzAA1PRzlF'

@@ -134,6 +134,8 @@ void PrimitiveTypeMapping::initialize(ASTContext &ctx) {
   MAP(UnsafeRawPointer, "void const *", true);
   MAP(UnsafeMutableRawPointer, "void *", true);
 
+  MAP(CVaListPointer, "va_list", false);
+
   // Map other module types.
 
   addMappedType(ctx.Id_ObjectiveC, ctx.getIdentifier("ObjCBool"),

@@ -93,7 +93,7 @@ extension _SmallString {
 #endif
   }
 
-  @_alwaysEmitIntoClient @inline(__always)
+  @export(implementation) @inline(__always)
   internal static func contiguousCapacity() -> Int {
 #if os(watchOS) && _pointerBitWidth(_32)
     return capacity &- 2
@@ -223,13 +223,13 @@ extension _SmallString: RandomAccessCollection, MutableCollection {
     }
     // This setter is required for _SmallString to be a valid MutableCollection.
     // Since _SmallString is internal and this setter unused, we cheat.
-    @_alwaysEmitIntoClient set { fatalError() }
-    @_alwaysEmitIntoClient _modify { fatalError() }
+    @export(implementation) set { fatalError() }
+    @export(implementation) _modify { fatalError() }
   }
 }
 
 extension _SmallString {
-  @_alwaysEmitIntoClient @inline(__always)
+  @export(implementation) @inline(__always)
   @safe
   internal func withUTF8<Result, E: Error>(
     _ f: (UnsafeBufferPointer<UInt8>) throws(E) -> Result
@@ -284,8 +284,7 @@ extension _SmallString {
     self = _SmallString(leading: _storage.0, trailing: _storage.1, count: len)
   }
 
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal static func zeroTrailingBytes(
     of storage: inout RawBitPattern, from index: Int
   ) {

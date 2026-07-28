@@ -4,6 +4,7 @@
 // RUN: %target-swift-emit-ir -I %t/Inputs -cxx-interoperability-mode=default %t/test.swift -target arm64-apple-macos12 | %FileCheck %s
 
 // REQUIRES: objc_interop
+// REQUIRES: SWIFT_STDLIB_ARCH=arm64
 
 //--- Inputs/header.h
 

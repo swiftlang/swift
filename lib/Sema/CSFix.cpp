@@ -1041,6 +1041,22 @@ AllowTypeOrInstanceMember::create(ConstraintSystem &cs, Type baseType,
       AllowTypeOrInstanceMember(cs, baseType, member, usedName, locator);
 }
 
+bool AllowMetatypeExtensionMemberOnConformingType::diagnose(
+    const Solution &solution, bool asNote) const {
+  InvalidMetatypeExtensionMemberRefFailure failure(
+      solution, getBaseType(), getMember(), getLocator());
+  return failure.diagnose(asNote);
+}
+
+AllowMetatypeExtensionMemberOnConformingType *
+AllowMetatypeExtensionMemberOnConformingType::create(
+    ConstraintSystem &cs, Type baseType, ValueDecl *member,
+    DeclNameRef usedName, ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      AllowMetatypeExtensionMemberOnConformingType(
+          cs, baseType, member, usedName, locator);
+}
+
 bool AllowInvalidPartialApplication::diagnose(const Solution &solution,
                                               bool asNote) const {
   PartialApplicationFailure failure(isWarning, solution, getLocator());
@@ -1921,7 +1937,7 @@ ExpandArrayIntoVarargs::attempt(ConstraintSystem &cs, Type argType,
   auto result = cs.matchTypes(elementType, paramType, ConstraintKind::Subtype,
                               options, builder);
 
-  if (result.isFailure())
+  if (result == ConstraintSystem::SolutionKind::Error)
     return nullptr;
 
   return new (cs.getAllocator())
@@ -2217,7 +2233,7 @@ UnwrapOptionalBaseKeyPathApplication::attempt(ConstraintSystem &cs, Type baseTy,
   auto result =
       cs.matchTypes(nonOptionalTy, rootTy, ConstraintKind::Subtype,
                     ConstraintSystem::TypeMatchFlags::TMF_ApplyingFix, locator);
-  if (result.isFailure())
+  if (result == ConstraintSystem::SolutionKind::Error)
     return nullptr;
 
   return new (cs.getAllocator())
@@ -2861,8 +2877,9 @@ IgnoreKeyPathSubscriptIndexMismatch::create(ConstraintSystem &cs, Type argType,
 }
 
 AllowInlineArrayLiteralCountMismatch *
-AllowInlineArrayLiteralCountMismatch::create(ConstraintSystem &cs, Type lhsCount,
-                                             Type rhsCount,
+AllowInlineArrayLiteralCountMismatch::create(ConstraintSystem &cs,
+                                             unsigned lhsCount,
+                                             unsigned rhsCount,
                                              ConstraintLocator *locator) {
   return new (cs.getAllocator())
       AllowInlineArrayLiteralCountMismatch(cs, lhsCount, rhsCount, locator);
@@ -2898,5 +2915,35 @@ IgnoreIsolatedConformance::create(ConstraintSystem &cs,
 bool IgnoreIsolatedConformance::diagnose(const Solution &solution,
                                          bool asNote) const {
   DisallowedIsolatedConformance failure(solution, conformance, getLocator());
+  return failure.diagnose(asNote);
+}
+
+IgnoreClassRequirementForDynamicMemberLookup *
+IgnoreClassRequirementForDynamicMemberLookup::create(
+    ConstraintSystem &cs, Type baseTy, ValueDecl *member,
+    ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      IgnoreClassRequirementForDynamicMemberLookup(cs, baseTy, member, locator);
+}
+
+bool IgnoreClassRequirementForDynamicMemberLookup::diagnose(
+    const Solution &solution, bool asNote) const {
+  NonClassBaseInDynamicMemberLookup failure(solution, BaseType, Member,
+                                            getLocator());
+  return failure.diagnose(asNote);
+}
+
+ExecutionSemanticsMismatch *
+ExecutionSemanticsMismatch::create(ConstraintSystem &cs, FunctionType *fromType,
+                                   FunctionType *toType,
+                                   ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      ExecutionSemanticsMismatch(cs, fromType, toType, locator);
+}
+
+bool ExecutionSemanticsMismatch::diagnose(const Solution &solution,
+                                          bool asNote) const {
+  ConversionBetweenFunctionsWithDifferentExecutionSemantics failure(
+      solution, getFromType(), getToType(), getLocator());
   return failure.diagnose(asNote);
 }

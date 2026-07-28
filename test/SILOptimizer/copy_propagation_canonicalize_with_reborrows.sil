@@ -1,6 +1,5 @@
 // RUN: %target-sil-opt -sil-print-types -copy-propagation -enable-sil-verify-all %s | %FileCheck %s --check-prefixes=CHECK,CHECK-OPT
 
-// REQUIRES: swift_in_compiler
 
 class X {}
 

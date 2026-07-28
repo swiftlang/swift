@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 // RUN: %target-swift-emit-silgen -module-name moveonly_closure %s | %FileCheck %s
 // RUN: %target-swift-emit-sil -module-name moveonly_closure -verify %s
 

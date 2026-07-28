@@ -152,7 +152,7 @@ struct PotentialBinding {
   /// Determine whether this binding could be a viable candidate
   /// to be "joined" with some other binding. It has to be at least
   /// a non-default r-value supertype binding with no type variables.
-  bool isViableForJoin() const;
+  bool isViableForJoinOrMeet() const;
 
   static PotentialBinding forHole(TypeVariableType *typeVar,
                                   ConstraintLocator *locator) {
@@ -346,6 +346,8 @@ struct PotentialBindings {
   void reset();
 
   void dump(llvm::raw_ostream &out, unsigned indent) const;
+
+  void printVars(llvm::raw_ostream &out, unsigned indent, bool showVia) const;
 };
 
 
@@ -507,6 +509,9 @@ public:
   /// that represents a generic parameter.
   bool forGenericParameter() const;
 
+  /// Whether the binding set is for a named or `_` pattern decl.
+  bool isForPatternDecl() const;
+
   /// Whether the binding set has changed after construction, in which
   /// case we must recompute it on the next call to determineBestBindings().
   bool isDirty() const {
@@ -664,12 +669,6 @@ public:
   void forEachLiteralRequirement(
       llvm::function_ref<void(KnownProtocolKind)> callback) const;
 
-  void forEachAdjacentVariable(
-      llvm::function_ref<void(TypeVariableType *)> callback) const {
-    for (auto *typeVar : AdjacentVars)
-      callback(typeVar);
-  }
-
   /// Return a literal requirement that has the most impact on the binding
   /// score.
   LiteralBindingKind getLiteralForScore() const;
@@ -767,6 +766,9 @@ private:
 
   SubsumeBindingResult subsumeBinding(const PotentialBinding &binding,
                                       const PotentialBinding &existing);
+
+  void inferTransitiveKeyPathBindingFrom(const PotentialBinding &binding,
+                                         TypeVariableType *keyPathTy);
 
   void addDefault(Constraint *constraint);
 

@@ -1,7 +1,6 @@
 // RUN: %target-swift-emit-ir %s -parse-stdlib -enable-experimental-feature Embedded -target arm64e-apple-none -wmo | %FileCheck %s
 
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_Embedded
 
 public class MyClass {}

@@ -4,7 +4,6 @@
 // RUN:   -enable-experimental-feature Lifetimes \
 // RUN:   2>&1 | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_Lifetimes
 
 struct BV : ~Escapable {

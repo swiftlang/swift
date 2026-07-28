@@ -1,3 +1,4 @@
+// RUN: %target-swift-frontend -emit-silgen-ossa -o /dev/null -sil-verify-all -enable-sil-opaque-values %s -module-name test -swift-version 6 -target %target-swift-5.1-abi-triple -verify
 // RUN: %target-swift-frontend -emit-silgen %s -module-name test -swift-version 6 -target %target-swift-5.1-abi-triple -verify
 // REQUIRES: concurrency
 

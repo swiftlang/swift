@@ -175,4 +175,3 @@ func testNondestructiveBecauseGenericInstanceL(foo: borrowing Bar<AnyObject>) {
 		use(x)
 	}
 }
-

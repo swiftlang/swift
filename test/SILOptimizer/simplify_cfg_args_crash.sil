@@ -17,8 +17,8 @@ sil public @test : $@convention(thin) (Builtin.Int64, @inout E) -> () {
 
 bb0(%0 : $Builtin.Int64, %x : $*E):
   %1 = integer_literal $Builtin.Int64, 0
-  %2 = builtin "cmp_eq_Int64"(%0 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int1 
-  cond_br %2, bb3, bb1
+  %2 = builtin "cmp_eq_Int64"(%0 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %2, bb4, bb1
 
 bb1:
   %4 = enum $E, #E.A!enumelt
@@ -28,9 +28,12 @@ bb2(%6 : $E):
   store %6 to %x : $*E
   br bb3
 
-bb3:                                            
-  %8 = tuple ()                                
-  return %8 : $()                              
+bb3:
+  %8 = tuple ()
+  return %8 : $()
+
+bb4:
+  br bb3
 }
 
 // Verify that we do not crash in argument splitting (rdar://problem/25008398).

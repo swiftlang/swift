@@ -194,7 +194,7 @@ extension Optional {
   ///   of the instance.
   /// - Returns: The result of the given closure. If this instance is `nil`,
   ///   returns `nil`.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func map<E: Error, U: ~Copyable>(
     _ transform: (Wrapped) throws(E) -> U
   ) throws(E) -> U? {
@@ -222,7 +222,7 @@ extension Optional {
 
 extension Optional where Wrapped: ~Copyable {
   // FIXME(NCG): Make this public.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public consuming func _consumingMap<U: ~Copyable, E: Error>(
     _ transform: (consuming Wrapped) throws(E) -> U
   ) throws(E) -> U? {
@@ -235,7 +235,7 @@ extension Optional where Wrapped: ~Copyable {
   }
 
   // FIXME(NCG): Make this public.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public borrowing func _borrowingMap<U: ~Copyable, E: Error>(
     _ transform: (borrowing Wrapped) throws(E) -> U
   ) throws(E) -> U? {
@@ -268,7 +268,7 @@ extension Optional {
   ///   of the instance.
   /// - Returns: The result of the given closure. If this instance is `nil`,
   ///   returns `nil`.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func flatMap<E: Error, U: ~Copyable>(
     _ transform: (Wrapped) throws(E) -> U?
   ) throws(E) -> U? {
@@ -296,7 +296,7 @@ extension Optional {
 
 extension Optional where Wrapped: ~Copyable {
   // FIXME(NCG): Make this public.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public consuming func _consumingFlatMap<U: ~Copyable, E: Error>(
     _ transform: (consuming Wrapped) throws(E) -> U?
   ) throws(E) -> U? {
@@ -309,7 +309,7 @@ extension Optional where Wrapped: ~Copyable {
   }
 
   // FIXME(NCG): Make this public.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public func _borrowingFlatMap<U: ~Copyable, E: Error>(
     _ transform: (borrowing Wrapped) throws(E) -> U?
   ) throws(E) -> U? {
@@ -366,7 +366,7 @@ extension Optional where Wrapped: ~Escapable {
 
 extension Optional where Wrapped: ~Copyable & ~Escapable {
   // FIXME(NCG): Do we want this? It seems like we do. Make this public.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_lifetime(copy self)
   public consuming func _consumingUnsafelyUnwrap() -> Wrapped {
     switch consume self {
@@ -402,7 +402,7 @@ extension Optional where Wrapped: ~Copyable & ~Escapable {
   ///
   /// This version is for internal stdlib use; it avoids any checking
   /// overhead for users, even in Debug builds.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_lifetime(copy self)
   internal consuming func _consumingUncheckedUnwrapped() -> Wrapped {
     if let x = self {
@@ -415,7 +415,7 @@ extension Optional where Wrapped: ~Copyable & ~Escapable {
 @available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension Optional where Wrapped: ~Copyable & Escapable {
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_addressableSelf
   @_lifetime(borrow self)
   public func _span() -> Span<Wrapped> {
@@ -445,7 +445,7 @@ extension Optional where Wrapped: ~Copyable & ~Escapable {
   ///
   /// - Returns: The wrapped value being stored in this instance. If this
   ///   instance is `nil`, returns `nil`.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_lifetime(copy self)
   public mutating func take() -> Self {
     let result = consume self
@@ -831,7 +831,7 @@ extension Optional where Wrapped: ~Copyable & ~Escapable {
 ///   - defaultValue: A value to use as a default. `defaultValue` is the same
 ///     type as the `Wrapped` type of `optional`.
 @_transparent
-@_alwaysEmitIntoClient
+@export(implementation)
 public func ?? <T: ~Copyable>(
   optional: consuming T?,
   defaultValue: @autoclosure () throws -> T // FIXME: typed throws
@@ -907,7 +907,7 @@ internal func _legacy_abi_optionalNilCoalescingOperator <T>(
 ///   - defaultValue: A value to use as a default. `defaultValue` and
 ///     `optional` have the same type.
 @_transparent
-@_alwaysEmitIntoClient
+@export(implementation)
 public func ?? <T: ~Copyable>(
   optional: consuming T?,
   defaultValue: @autoclosure () throws -> T? // FIXME: typed throws

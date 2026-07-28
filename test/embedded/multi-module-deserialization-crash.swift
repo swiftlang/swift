@@ -5,7 +5,6 @@
 // RUN: %target-swift-frontend -c -I %t %t/B.swift -enable-experimental-feature Embedded -enable-experimental-feature CheckImplementationOnly
 
 // REQUIRES: OS=macosx || OS=linux-gnu || OS=wasip1
-// REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
 // REQUIRES: swift_feature_Embedded
 // REQUIRES: swift_feature_CheckImplementationOnly

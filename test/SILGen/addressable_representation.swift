@@ -1,3 +1,6 @@
+// FIXME: crashes under opaque values
+// RUN: not --crash %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -enable-experimental-feature Lifetimes -enable-experimental-feature BuiltinModule -enable-experimental-feature AddressableTypes -enable-experimental-feature AddressableParameters -module-name main %s -define-availability 'Span 0.1:macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, visionOS 9999'
+
 // RUN: %target-swift-emit-silgen -enable-experimental-feature Lifetimes -enable-experimental-feature BuiltinModule -enable-experimental-feature AddressableTypes -enable-experimental-feature AddressableParameters -module-name main %s -define-availability 'Span 0.1:macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, visionOS 9999' | %FileCheck %s
 
 // REQUIRES: swift_feature_Lifetimes

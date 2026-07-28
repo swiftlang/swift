@@ -136,7 +136,7 @@ public struct Slice<Base: Collection> {
     return _base
   }
 
-  @_alwaysEmitIntoClient @inline(__always)
+  @export(implementation) @inline(__always)
   internal var _bounds: Range<Base.Index> {
     unsafe Range(_uncheckedBounds: (_startIndex, _endIndex))
   }
@@ -221,7 +221,7 @@ extension Slice: Collection {
     _base._failEarlyRangeCheck(range, bounds: bounds)
   }
 
-  @_alwaysEmitIntoClient @inlinable
+  @export(implementation)
   @safe
   public func withContiguousStorageIfAvailable<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
@@ -236,7 +236,7 @@ extension Slice: Collection {
 }
 
 extension Slice {
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public __consuming func _copyContents(
       initializing buffer: UnsafeMutableBufferPointer<Element>
   ) -> (Iterator, UnsafeMutableBufferPointer<Element>.Index) {
@@ -293,7 +293,7 @@ extension Slice: MutableCollection where Base: MutableCollection {
     }
   }
 
-  @_alwaysEmitIntoClient @inlinable
+  @export(implementation)
   @safe
   public mutating func withContiguousMutableStorageIfAvailable<R>(
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R

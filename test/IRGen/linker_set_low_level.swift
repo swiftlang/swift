@@ -1,6 +1,5 @@
 // RUN: %target-swift-frontend %s -emit-ir -parse-as-library | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 
 @used
 @section("__TEXT,__mysection")

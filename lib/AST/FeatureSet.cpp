@@ -24,6 +24,7 @@
 #include "swift/AST/TypeCheckRequests.h"
 
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/STLExtras.h"
 
 using namespace swift;
 
@@ -176,7 +177,9 @@ UNINTERESTING_FEATURE(KeyPathWithMethodMembers)
 UNINTERESTING_FEATURE(ImportMacroAliases)
 UNINTERESTING_FEATURE(NoExplicitNonIsolated)
 UNINTERESTING_FEATURE(EmbeddedDynamicExclusivity)
+UNINTERESTING_FEATURE(EmbeddedKeyPaths)
 UNINTERESTING_FEATURE(TypedAllocation)
+UNINTERESTING_FEATURE(MutateAndConsumeInDeinit)
 
 static bool usesFeatureUnderscoreOwned(Decl *D) {
   return D->getAttrs().hasAttribute<OwnedAttr>();
@@ -198,6 +201,7 @@ UNINTERESTING_FEATURE(SameElementRequirements)
 UNINTERESTING_FEATURE(SendingArgsAndResults)
 UNINTERESTING_FEATURE(CheckImplementationOnly)
 UNINTERESTING_FEATURE(CheckImplementationOnlyStrict)
+UNINTERESTING_FEATURE(SerializeAbstractTypeLayoutForHiddenTypes)
 UNINTERESTING_FEATURE(EnforceSPIOperatorGroup)
 
 static bool usesFeatureCAttribute(Decl *decl) {
@@ -410,7 +414,7 @@ static bool usesFeatureAddressableParameters(Decl *d) {
   if (!fd) {
     return false;
   }
-  
+
   for (auto pd : *fd->getParameters()) {
     if (pd->isAddressable()) {
       return true;
@@ -423,7 +427,7 @@ static bool usesFeatureAddressableTypes(Decl *d) {
   if (d->getAttrs().hasAttribute<AddressableForDependenciesAttr>()) {
     return true;
   }
-  
+
   return false;
 }
 
@@ -452,7 +456,7 @@ static bool usesFeatureABIAttributeSE0479(Decl *decl) {
   return getABIAttr(decl) != nullptr;
 }
 
-static bool usesFeatureIsolatedConformances(Decl *decl) { 
+static bool usesFeatureIsolatedConformances(Decl *decl) {
   // FIXME: Check conformances associated with this decl?
   return false;
 }
@@ -689,7 +693,6 @@ static bool usesFeatureReparenting(Decl *decl) {
 UNINTERESTING_FEATURE(StrictAccessControl)
 UNINTERESTING_FEATURE(BorrowingSequence)
 UNINTERESTING_FEATURE(AbstractStoredPropertyLayout)
-UNINTERESTING_FEATURE(FlowIsolationGlobalActor)
 
 UNINTERESTING_FEATURE(DeriveConformancesViaMacros)
 
@@ -704,6 +707,45 @@ static bool usesFeatureBorrowInout(Decl *decl) {
 }
 
 UNINTERESTING_FEATURE(BuiltinDereferenceable)
+
+static bool usesFeatureCalledAttribute(Decl *D) {
+  auto &ctx = D->getASTContext();
+  if (!ctx.LangOpts.hasFeature(Feature::CalledAttribute))
+    return false;
+
+  std::function<bool(Type)> hasCalled = [](Type T) {
+    if (auto F = dyn_cast<AnyFunctionType>(T.getPointer()))
+      return F->isCalledOnce();
+    return false;
+  };
+
+  if (auto *TA = dyn_cast<TypeAliasDecl>(D)) {
+    if (auto type = TA->getUnderlyingType()) {
+      return type.findIf(hasCalled);
+    }
+    return false;
+  }
+
+  if (auto *PBD = dyn_cast<PatternBindingDecl>(D)) {
+    for (unsigned i = 0, n = PBD->getNumPatternEntries(); i != n; ++i) {
+      auto P = PBD->getCheckedPattern(i);
+      if (!P)
+        continue;
+
+      bool usesCalled = false;
+      P->forEachVariable([&usesCalled](auto *V) {
+        usesCalled |= usesFeatureCalledAttribute(V);
+      });
+
+      if (usesCalled)
+        return true;
+    }
+
+    return false;
+  }
+
+  return usesTypeMatching(D, hasCalled);
+}
 
 // ----------------------------------------------------------------------------
 // MARK: - FeatureSet

@@ -23,7 +23,7 @@
 
 namespace swift {
 
-class DeclAvailabilityConstraints;
+class DeclAvailabilityRestrictions;
 
 /// A wrapper for storing an `AvailabilityDomain` and its associated information
 /// in `AvailabilityContext::Storage`.

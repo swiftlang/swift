@@ -38,6 +38,7 @@
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ImportCache.h"
+#include "swift/AST/LookupKinds.h"
 #include "swift/AST/MacroDefinition.h"
 #include "swift/AST/ModuleNameLookup.h"
 #include "swift/AST/NameLookup.h"
@@ -51,12 +52,14 @@
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceLoc.h"
+#include "swift/Basic/UUID.h"  // for COM
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/ParseDeclName.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "clang/Basic/CharInfo.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/Debug.h"
 #include <optional>
 
@@ -539,6 +542,8 @@ public:
   void visitAddressableForDependenciesAttr(AddressableForDependenciesAttr *attr);
   void visitUnsafeAttr(UnsafeAttr *attr);
   void visitUnsafeSelfDependentResultAttr(UnsafeSelfDependentResultAttr *attr);
+
+  void visitCalledAttr(CalledAttr *attr);
 };
 
 } // end anonymous namespace
@@ -1567,8 +1572,14 @@ void AttributeChecker::visitObjCAttr(ObjCAttr *attr) {
     if (!Ext->getSelfClassDecl())
       error = diag::objc_extension_not_class;
   } else if (auto ED = dyn_cast<EnumDecl>(D)) {
-    if (ED->isGenericContext())
-      error = diag::objc_enum_generic;
+    // @objc (and @c) enums cannot be generic.
+    if (ED->isGenericContext()) {
+      diagnoseAndRemoveAttr(attr, diag::objc_enum_generic, ED,
+                            getObjCDiagnosticAttrKind(reason))
+          .limitBehavior(behavior);
+      reason.describe(D);
+      return;
+    }
   } else if (auto EED = dyn_cast<EnumElementDecl>(D)) {
     auto ED = EED->getParentEnum();
     if (!ED->getAttrs().hasAttribute<ObjCAttr>())
@@ -1739,27 +1750,6 @@ void AttributeChecker::visitNonObjCAttr(NonObjCAttr *attr) {
   }
 }
 
-static bool hasObjCImplementationFeature(Decl *D, ObjCImplementationAttr *attr,
-                                         Feature requiredFeature) {
-  auto &ctx = D->getASTContext();
-
-  if (ctx.LangOpts.hasFeature(requiredFeature))
-    return true;
-
-  // Allow the use of @_objcImplementation *without* Feature::ObjCImplementation
-  // as long as you're using the early adopter syntax. (Avoids breaking existing
-  // adopters.)
-  if (requiredFeature == Feature::ObjCImplementation && attr->isEarlyAdopter())
-    return true;
-
-  // Either you're using Feature::ObjCImplementation without the early adopter
-  // syntax, or you're using Feature::CImplementation. Either way, no go.
-  ctx.Diags.diagnose(attr->getLocation(), diag::requires_experimental_feature,
-                     attr->getAttrName(), attr->isDeclModifier(),
-                     requiredFeature.getName());
-  return false;
-}
-
 static SourceRange getArgListRange(ASTContext &Ctx, DeclAttribute *attr) {
   // attr->getRange() covers the attr name and argument list; adjust it to
   // exclude the first token.
@@ -1798,9 +1788,6 @@ visitObjCImplementationAttr(ObjCImplementationAttr *attr) {
   }
 
   if (auto ED = dyn_cast<ExtensionDecl>(D)) {
-    if (!hasObjCImplementationFeature(D, attr, Feature::ObjCImplementation))
-      return;
-
     auto objcLangAttr = dyn_cast<ObjCAttr>(langAttr);
     assert(objcLangAttr && "extension with @_cdecl or another lang attr???");
 
@@ -2233,17 +2220,18 @@ static std::optional<std::pair<SemanticAvailableAttr, const Decl *>>
 getSemanticAvailableRangeDeclAndAttr(const Decl *decl,
                                      AvailabilityDomain domain) {
   auto &ctx = decl->getASTContext();
-  AvailabilityConstraintFlags flags =
-      AvailabilityConstraintFlag::SkipEnclosingExtension;
-  if (auto constraint = swift::getAvailabilityConstraintForDeclInDomain(
-          decl, AvailabilityContext::forAlwaysAvailable(ctx), domain, flags)) {
-    switch (constraint->getReason()) {
-    case AvailabilityConstraint::Reason::UnavailableUnconditionally:
-    case AvailabilityConstraint::Reason::UnavailableObsolete:
+  AvailabilityRestrictionFlags flags =
+      AvailabilityRestrictionFlag::SkipEnclosingExtension;
+  if (auto restriction = AvailabilityContext::forAlwaysAvailable(ctx)
+                             .restrictionForDeclInDomain(decl, domain, flags)) {
+    switch (restriction->getReason()) {
+    case AvailabilityRestriction::Reason::UnavailableUnconditionally:
+    case AvailabilityRestriction::Reason::UnavailableObsolete:
+    case AvailabilityRestriction::Reason::Deprecated:
       break;
-    case AvailabilityConstraint::Reason::UnavailableUnintroduced:
-    case AvailabilityConstraint::Reason::Unintroduced:
-      return std::make_pair(constraint->getAttr(), decl);
+    case AvailabilityRestriction::Reason::UnavailableUnintroduced:
+    case AvailabilityRestriction::Reason::Unintroduced:
+      return std::make_pair(restriction->getAttr(), decl);
     }
   }
 
@@ -2251,6 +2239,45 @@ getSemanticAvailableRangeDeclAndAttr(const Decl *decl,
     return getSemanticAvailableRangeDeclAndAttr(parent, domain);
 
   return std::nullopt;
+}
+
+// The raw values of this enum must be kept in sync with the select clause
+// in diag::availability_stored_property_no_potential and
+// diag::availability_stored_property_no_unavailable.
+enum NoAvailableAttrDiagnosticPropertyKind : unsigned {
+  StoredProperty,
+  ComputedPropertyWithInitialValue,
+};
+
+static std::optional<NoAvailableAttrDiagnosticPropertyKind>
+getPropertyKindForAvailableAttrDiagnostic(const VarDecl *VD) {
+  if (VD->hasStorageOrWrapsStorage())
+    return StoredProperty;
+
+  if (VD->hasInitialValue())
+    return ComputedPropertyWithInitialValue;
+
+  return std::nullopt;
+}
+
+/// Returns a non-null language mode if diagnostics about the availability of
+/// \p D relative to \p domain should be downgraded to a warning until that
+/// language mode.
+static std::optional<LanguageMode>
+getLanguageModeForPropertyAvailabilityErrors(const Decl *D,
+                                             AvailabilityDomain domain) {
+  auto *VD = dyn_cast<VarDecl>(D);
+  if (!VD)
+    return std::nullopt;
+
+  auto kind = getPropertyKindForAvailableAttrDiagnostic(VD);
+  if (kind != ComputedPropertyWithInitialValue)
+    return std::nullopt;
+
+  if (!domain.isPlatform() && !domain.isUniversal())
+    return std::nullopt;
+
+  return LanguageMode::future;
 }
 
 void AttributeChecker::visitAvailableAttr(AvailableAttr *parsedAttr) {
@@ -2441,6 +2468,16 @@ void AttributeChecker::visitCDeclAttr(CDeclAttr *attr) {
              attr, "func");
   }
 
+  // @c (and @objc) enums cannot be generic.
+  if (auto *ED = dyn_cast<EnumDecl>(D)) {
+    if (ED->isGenericContext()) {
+      unsigned reasonKind = attr->Underscored
+                                ? unsigned(ObjCReason::ExplicitlyUnderscoreCDecl)
+                                : unsigned(ObjCReason::ExplicitlyCDecl);
+      diagnoseAndRemoveAttr(attr, diag::objc_enum_generic, ED, reasonKind);
+    }
+  }
+
   // Reject using both @c and @objc on the same decl.
   if (D->getAttrs().getAttribute<ObjCAttr>()) {
     diagnose(attr->getLocation(), diag::cdecl_incompatible_with_objc, D);
@@ -2460,18 +2497,20 @@ void AttributeChecker::visitCOMAttr(COMAttr *attr) {
       return;
     }
 
-    if (attr->CLSID && !attr->CLSID->empty()) {
+    if (attr->CLSID) {
       diagnose(attr->getLocation(), diag::attr_com_protocol_unexpected_arg, "CLSID");
       attr->setInvalid();
       return;
     }
+
+    // FIXME: Replace this usage of UUID::fromString() with something self-contained.
 
     if (!UUID::fromString(attr->IID.str().c_str())) {
       diagnose(attr->getLocation(), diag::attr_com_invalid_guid, attr->IID);
       attr->setInvalid();
       return;
     }
-  } else if (isa<ClassDecl>(D)) {
+  } else if (auto *CD = dyn_cast<ClassDecl>(D)) {
     if (!attr->IID.empty()) {
       diagnose(attr->getLocation(), diag::attr_com_class_unexpected_iid);
       attr->setInvalid();
@@ -2484,9 +2523,26 @@ void AttributeChecker::visitCOMAttr(COMAttr *attr) {
       attr->setInvalid();
       return;
     }
-  }
 
-  // TODO(compnerd) ensure that `ISwiftObject` is not conformed to.
+    const ProtocolDecl *ISO = Ctx.getProtocol(KnownProtocolKind::ISwiftObject);
+    if (!ISO) {
+      diagnose(SourceLoc(), diag::com_module_missing_type, "ISwiftObject");
+      return;
+    }
+
+    bool AnyObject = false;
+    InvertibleProtocolSet inverses;
+    auto inherited =
+        getDirectlyInheritedNominalTypeDecls(CD, inverses, AnyObject);
+    const auto &entry =
+        llvm::find_if(inherited, [ISO](const auto &E) { return E.Item == ISO; });
+    if (entry != inherited.end()) {
+      diagnose(entry->Loc, diag::attr_com_explicit_iswiftobject);
+      diagnose(attr->getLocation(), diag::attr_com_iswiftobject_implied);
+      attr->setInvalid();
+      return;
+    }
+  }
 }
 
 void AttributeChecker::visitExposeAttr(ExposeAttr *attr) {
@@ -3019,7 +3075,7 @@ void AttributeChecker::checkApplicationMainAttribute(DeclAttribute *attr,
                                decls, NLKind::QualifiedLookup,
                                namelookup::ResolutionKind::TypesOnly,
                                SF, attr->getLocation(),
-                               NL_QualifiedDefault);
+                               NLFlags::QualifiedDefault);
     if (decls.size() == 1)
       ApplicationDelegateProto = dyn_cast<ProtocolDecl>(decls[0]);
   }
@@ -3945,9 +4001,9 @@ static void lookupReplacedDecl(DeclNameRef replacedDeclName,
   if (!typeCtx)
     typeCtx = cast<ExtensionDecl>(declCtxt->getAsDecl())->getExtendedNominal();
 
-  auto options = NL_QualifiedDefault;
+  NLOptions options = NLFlags::QualifiedDefault;
   if (declCtxt->isInSpecializeExtensionContext())
-    options |= NL_IncludeUsableFromInline;
+    options |= NLFlags::IncludeUsableFromInline;
 
   if (typeCtx)
     moduleScopeCtxt->lookupQualified({typeCtx}, replacedDeclName,
@@ -5045,11 +5101,11 @@ void AttributeChecker::visitResultBuilderAttr(ResultBuilderAttr *attr) {
 
       auto builderType = nominal->getDeclaredType();
       nominal->lookupQualified(builderType, DeclNameRef(buildPartialBlockFirst),
-                               attr->getLocation(), NL_QualifiedDefault,
+                               attr->getLocation(), NLFlags::QualifiedDefault,
                                buildPartialBlockFirstMatches);
       nominal->lookupQualified(
           builderType, DeclNameRef(buildPartialBlockAccumulated),
-          attr->getLocation(), NL_QualifiedDefault,
+          attr->getLocation(), NLFlags::QualifiedDefault,
           buildPartialBlockAccumulatedMatches);
 
       hasAccessibleBuildPartialBlockFirst = llvm::any_of(
@@ -5605,7 +5661,7 @@ void AttributeChecker::checkAvailableAttrs(ArrayRef<AvailableAttr *> attrs) {
   if (Ctx.LangOpts.DisableAvailabilityChecking)
     return;
 
-  // Compute availability constraints for the decl, relative to its parent
+  // Compute availability restrictions for the decl, relative to its parent
   // declaration or to the deployment target.
   auto availabilityContext = AvailabilityContext::forDeploymentTarget(Ctx);
   if (auto parent = D->parentDeclForAvailability()) {
@@ -5613,30 +5669,35 @@ void AttributeChecker::checkAvailableAttrs(ArrayRef<AvailableAttr *> attrs) {
     availabilityContext.constrainWithContext(parentAvailability, Ctx);
   }
 
-  auto availabilityConstraint =
-      getAvailabilityConstraintsForDecl(D, availabilityContext)
-          .getPrimaryConstraint();
-  if (!availabilityConstraint)
+  auto availabilityRestriction =
+      availabilityContext.unsatisfiedRestrictionForDecl(D);
+  if (!availabilityRestriction)
     return;
+
+  auto *parsedAttr = const_cast<AvailableAttr *>(
+      availabilityRestriction->getAttr().getParsedAttr());
+  auto domain = availabilityRestriction->getAttr().getDomain();
 
   // If the decl is unavailable relative to its parent and it's not a
   // declaration that is allowed to be unavailable, diagnose.
-  if (availabilityConstraint->isUnavailable()) {
-    auto attr = availabilityConstraint->getAttr();
-    if (auto diag = TypeChecker::diagnosticIfDeclCannotBeUnavailable(D, attr)) {
-      diagnoseAndRemoveAttr(const_cast<AvailableAttr *>(attr.getParsedAttr()),
-                            *diag);
+  if (availabilityRestriction->isUnavailable()) {
+    if (auto diag = TypeChecker::diagnosticIfDeclCannotBeUnavailable(
+            D, availabilityRestriction->getAttr())) {
+      diagnoseAndRemoveAttr(parsedAttr, *diag)
+          .warnUntilLanguageMode(
+              getLanguageModeForPropertyAvailabilityErrors(D, domain));
       return;
     }
   }
 
   // If the decl is potentially unavailable relative to its parent and it's
   // not a declaration that is allowed to be potentially unavailable, diagnose.
-  if (!availabilityConstraint->isUnavailable()) {
-    auto attr = availabilityConstraint->getAttr();
+  if (!availabilityRestriction->isUnavailable()) {
     if (auto diag =
             TypeChecker::diagnosticIfDeclCannotBePotentiallyUnavailable(D))
-      diagnose(attr.getParsedAttr()->getLocation(), diag.value());
+      diagnoseAndRemoveAttr(parsedAttr, *diag)
+          .warnUntilLanguageMode(
+              getLanguageModeForPropertyAvailabilityErrors(D, domain));
   }
 }
 
@@ -5953,7 +6014,8 @@ TypeChecker::diagnosticIfDeclCannotBePotentiallyUnavailable(const Decl *D) {
   }
 
   if (auto *VD = dyn_cast<VarDecl>(D)) {
-    if (!VD->hasStorageOrWrapsStorage())
+    auto disallowedKind = ::getPropertyKindForAvailableAttrDiagnostic(VD);
+    if (!disallowedKind)
       return std::nullopt;
 
     // Do not permit potential availability of script-mode global variables;
@@ -5965,7 +6027,8 @@ TypeChecker::diagnosticIfDeclCannotBePotentiallyUnavailable(const Decl *D) {
     // Globals and statics are lazily initialized, so they are safe
     // for potential unavailability.
     if (!VD->isStatic() && !DC->isModuleScopeContext())
-      return diag::availability_stored_property_no_potential;
+      return Diagnostic(diag::availability_stored_property_no_potential,
+                        unsigned(*disallowedKind));
 
   } else if (auto *EED = dyn_cast<EnumElementDecl>(D)) {
     // An enum element with an associated value cannot be potentially
@@ -6027,7 +6090,8 @@ TypeChecker::diagnosticIfDeclCannotBeUnavailable(const Decl *D,
   }
 
   if (auto *VD = dyn_cast<VarDecl>(D)) {
-    if (!VD->hasStorageOrWrapsStorage())
+    auto disallowedKind = ::getPropertyKindForAvailableAttrDiagnostic(VD);
+    if (!disallowedKind)
       return std::nullopt;
 
     if (parentIsUnavailable(D))
@@ -6051,7 +6115,8 @@ TypeChecker::diagnosticIfDeclCannotBeUnavailable(const Decl *D,
     // Globals and statics are lazily initialized, so they are safe for
     // unavailability.
     if (!VD->isStatic() && !D->getDeclContext()->isModuleScopeContext())
-      return diag::availability_stored_property_no_unavailable;
+      return Diagnostic(diag::availability_stored_property_no_unavailable,
+                        unsigned(*disallowedKind));
   }
 
   return std::nullopt;
@@ -6444,8 +6509,6 @@ enum class AbstractFunctionDeclLookupErrorKind {
   CandidateMissingAccessor,
   /// Candidate accessor type is not supported
   CandidateUnsupportedAccessor,
-  /// Lookup candidate is a protocol requirement.
-  CandidateProtocolRequirement,
   /// Lookup candidate could be resolved to an `AbstractFunctionDecl`.
   CandidateNotFunctionDeclaration
 };
@@ -6466,10 +6529,11 @@ enum class AbstractFunctionDeclLookupErrorKind {
 ///
 /// Used for resolving the referenced declaration in `@derivative` and
 /// `@transpose` attributes.
-static AbstractFunctionDecl *findAutoDiffOriginalFunctionDecl(
+static llvm::TinyPtrVector<AbstractFunctionDecl *>
+findAutoDiffOriginalFunctionDecl(
     DeclAttribute *attr, Type baseType,
     const DeclNameRefWithLoc &funcNameWithLoc, DeclContext *lookupContext,
-    NameLookupOptions lookupOptions,
+    NLOptions lookupOptions,
     const llvm::function_ref<std::optional<AbstractFunctionDeclLookupErrorKind>(
         AbstractFunctionDecl *)> &isValidCandidate,
     AnyFunctionType *expectedOriginalFnType) {
@@ -6483,8 +6547,8 @@ static AbstractFunctionDecl *findAutoDiffOriginalFunctionDecl(
 
   // Perform lookup.
   LookupResult results;
-  // If `baseType` is not null but `lookupContext` is a type context, set
-  // `baseType` to the `self` type of `lookupContext` to perform member lookup.
+  // If `baseType` is null but `lookupContext` is a type context, set `baseType`
+  // to the `self` type of `lookupContext` to perform member lookup.
   if (!baseType && lookupContext->isTypeContext())
     baseType = lookupContext->getSelfTypeInContext();
   if (baseType) {
@@ -6499,7 +6563,7 @@ static AbstractFunctionDecl *findAutoDiffOriginalFunctionDecl(
   if (results.empty()) {
     diags.diagnose(funcNameLoc, diag::cannot_find_in_scope, funcName,
                    funcName.isOperator());
-    return nullptr;
+    return {};
   }
 
   // Track invalid and valid candidates.
@@ -6572,6 +6636,7 @@ static AbstractFunctionDecl *findAutoDiffOriginalFunctionDecl(
     // Otherwise, record valid candidate.
     validCandidates.push_back(candidate);
   }
+
   // If there are no valid candidates, emit diagnostics for invalid candidates.
   if (validCandidates.empty()) {
     assert(!invalidCandidates.empty());
@@ -6631,10 +6696,6 @@ static AbstractFunctionDecl *findAutoDiffOriginalFunctionDecl(
                        getAccessorDescriptiveDeclKind(accessorKind));
         break;
       }
-      case AbstractFunctionDeclLookupErrorKind::CandidateProtocolRequirement:
-        diags.diagnose(invalidCandidate,
-                       diag::derivative_attr_protocol_requirement_unsupported);
-        break;
       case AbstractFunctionDeclLookupErrorKind::CandidateNotFunctionDeclaration:
         diags.diagnose(invalidCandidate,
                        diag::autodiff_attr_original_decl_invalid_kind,
@@ -6642,10 +6703,15 @@ static AbstractFunctionDecl *findAutoDiffOriginalFunctionDecl(
         break;
       }
     }
-    return nullptr;
+    return {};
   }
-  // Error if there are multiple valid candidates.
-  if (validCandidates.size() > 1) {
+
+  // Success if there is one unambiguous valid candidate.
+  if (validCandidates.size() == 1)
+    return {validCandidates.front()};
+
+  auto diagnoseAmbiguity = [&]() {
+    // Error if there are multiple valid candidates.
     diags.diagnose(funcNameLoc, diag::autodiff_attr_original_decl_ambiguous,
                    funcName);
     for (auto *validCandidate : validCandidates) {
@@ -6654,9 +6720,29 @@ static AbstractFunctionDecl *findAutoDiffOriginalFunctionDecl(
                      validCandidate);
     }
     return nullptr;
+  };
+
+  // If we are having a derivative registered for a protocol requirement default
+  // implementation the lookup might end with multiple results: the requirement
+  // declaration in the protocol itself and corresponding default
+  // implementation. Attach derivative to both of them.
+  if (isa<ExtensionDecl>(lookupContext)) {
+    // Find the original protocol decl
+    ProtocolDecl *proto = lookupContext->getExtendedProtocolDecl();
+    for (auto *candidate : validCandidates) {
+      auto candidateDeclContext = candidate->getDeclContext();
+      if (candidateDeclContext != proto &&
+          candidateDeclContext->getExtendedProtocolDecl() != proto) {
+        diagnoseAmbiguity();
+        return {};
+      }
+    }
+  } else {
+    diagnoseAmbiguity();
+    return {};
   }
-  // Success if there is one unambiguous valid candidate.
-  return validCandidates.front();
+
+  return TinyPtrVector<AbstractFunctionDecl *>(ArrayRef(validCandidates));
 }
 
 /// Checks that the `candidate` function type equals the `required` function
@@ -7338,6 +7424,163 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   (void)attr->getParameterIndices();
 }
 
+static bool
+typeCheckOriginalFuncWithCustomDerivative(DerivativeAttr *attr,
+                                          AbstractFunctionDecl *originalAFD) {
+  Decl *D = attr->getOriginalDeclaration();
+  auto originalName = attr->getOriginalFunctionName();
+
+  auto &Ctx = D->getASTContext();
+  auto &diags = Ctx.Diags;
+  auto *derivative = cast<FuncDecl>(D);
+
+  // Diagnose original stored properties. Stored properties cannot have custom
+  // registered derivatives.
+  if (auto *accessorDecl = dyn_cast<AccessorDecl>(originalAFD)) {
+    // Diagnose original stored properties. Stored properties cannot have custom
+    // registered derivatives.
+    auto *asd = accessorDecl->getStorage();
+    if (asd->hasStorage()) {
+      diags.diagnose(originalName.Loc,
+                     diag::derivative_attr_original_stored_property_unsupported,
+                     originalName.Name);
+      diags.diagnose(originalAFD->getLoc(), diag::decl_declared_here, asd);
+      return true;
+    }
+    // Diagnose original class property and subscript setters.
+    // TODO(https://github.com/apple/swift/issues/55542): Fix derivative function typing results regarding class-typed function parameters.
+    if (asd->getDeclContext()->getSelfClassDecl() &&
+        accessorDecl->getAccessorKind() == AccessorKind::Set) {
+      diags.diagnose(originalName.Loc,
+                     diag::derivative_attr_class_setter_unsupported);
+      diags.diagnose(originalAFD->getLoc(), diag::decl_declared_here, asd);
+      return true;
+    }
+  }
+
+  // Diagnose if original function has opaque result types.
+  if (originalAFD->getOpaqueResultTypeDecl()) {
+    diags.diagnose(attr->getLocation(),
+                   diag::autodiff_attr_opaque_result_type_unsupported);
+    return true;
+  }
+
+  // Diagnose if original function is an invalid class member.
+  bool isOriginalClassMember =
+      originalAFD->getDeclContext() &&
+      originalAFD->getDeclContext()->getSelfClassDecl();
+  if (isOriginalClassMember) {
+    auto *classDecl = originalAFD->getDeclContext()->getSelfClassDecl();
+    assert(classDecl);
+    // Class members returning dynamic `Self` are not supported.
+    // Dynamic `Self` is supported only as a single top-level result for class
+    // members. JVP/VJP functions returning `(Self, ...)` tuples would not
+    // type-check.
+    if (isa<ConstructorDecl>(originalAFD)) {
+      // Diagnose class initializers in non-final classes.
+      if (!classDecl->isSemanticallyFinal()) {
+        diags.diagnose(attr->getLocation(),
+                       diag::derivative_attr_nonfinal_class_init_unsupported,
+                       classDecl->getDeclaredInterfaceType());
+        return true;
+      }
+    }
+
+    if (auto *FD = dyn_cast<FuncDecl>(originalAFD)) {
+      // Diagnose all other declarations returning dynamic `Self`.
+      if (FD->getResultInterfaceType()->hasDynamicSelfType()) {
+        diags.diagnose(
+            attr->getLocation(),
+            diag::derivative_attr_class_member_dynamic_self_result_unsupported,
+            DeclNameRef(originalAFD->getName()));
+        return true;
+      }
+    }
+  }
+
+  // Returns true if:
+  // - Original function and derivative function are static methods.
+  // - Original function and derivative function are non-static methods.
+  // - Original function is a Constructor declaration and derivative function is
+  // a static method.
+  auto compatibleStaticDecls = [&]() {
+    return (isa<ConstructorDecl>(originalAFD) || originalAFD->isStatic()) ==
+           derivative->isStatic();
+  };
+
+  // Diagnose if original function and derivative differ in terms of static declaration.
+  if (!compatibleStaticDecls()) {
+    bool derivativeMustBeStatic = !derivative->isStatic();
+    diags
+        .diagnose(originalName.Loc.getBaseNameLoc(),
+                  diag::derivative_attr_static_method_mismatch_original,
+                  originalAFD, derivative, derivativeMustBeStatic)
+        .highlight(originalName.Loc.getSourceRange());
+    if (originalAFD->getNameLoc())
+      diags.diagnose(originalAFD->getNameLoc(),
+                     diag::derivative_attr_static_method_mismatch_original_note,
+                     originalAFD, derivativeMustBeStatic);
+    auto fixItDiag =
+        diags.diagnose(derivative->getStartLoc(),
+                       diag::derivative_attr_static_method_mismatch_fix,
+                       derivative, derivativeMustBeStatic);
+    if (derivativeMustBeStatic) {
+      fixItDiag.fixItInsert(derivative->getStartLoc(), "static ");
+    } else {
+      fixItDiag.fixItRemove(derivative->getStaticLoc());
+    }
+    return true;
+  }
+
+  // Returns true if:
+  // - Original function and derivative function have the same access level.
+  // - Original function is public and derivative function is internal
+  //   `@usableFromInline`. This is the only special case.
+  auto compatibleAccessLevels = [&]() {
+    if (originalAFD->getFormalAccess() == derivative->getFormalAccess())
+      return true;
+    return originalAFD->getFormalAccess() == AccessLevel::Public &&
+           (derivative->getFormalAccess() == AccessLevel::Public ||
+            derivative->isUsableFromInline());
+  };
+
+  // Check access level compatibility for original and derivative functions.
+  if (!compatibleAccessLevels()) {
+    auto originalAccess = originalAFD->getFormalAccess();
+    auto derivativeAccess =
+        derivative->getFormalAccessScope().accessLevelForDiagnostics();
+    diags.diagnose(originalName.Loc,
+                   diag::derivative_attr_access_level_mismatch,
+                   originalAFD, originalAccess,
+                   derivative, derivativeAccess);
+    auto fixItDiag =
+        derivative->diagnose(diag::derivative_attr_fix_access, originalAccess);
+    // If original access is public, suggest adding `@usableFromInline` to
+    // derivative.
+    if (originalAccess == AccessLevel::Public) {
+      fixItDiag.fixItInsert(
+          derivative->getAttributeInsertionLoc(/*forModifier*/ false),
+          "@usableFromInline ");
+    }
+    // Otherwise, suggest changing derivative access level.
+    else {
+      fixItAccess(fixItDiag, derivative, originalAccess);
+    }
+    return true;
+  }
+
+  // If original function is definition, then derivative must match it in
+  // terms of exported interface / implementation.
+  if (originalAFD->hasBody() && originalAFD->isAlwaysEmittedIntoClient() !=
+      derivative->isAlwaysEmittedIntoClient()) {
+    diags.diagnose(derivative->getLoc(),
+                   diag::derivative_attr_always_emit_into_client_mismatch);
+    return true;
+  }
+
+  return false;
+}
+
 /// Type-checks the given `@derivative` attribute `attr` on declaration `D`.
 ///
 /// Effects are:
@@ -7425,12 +7668,6 @@ static bool typeCheckDerivativeAttr(DerivativeAttr *attr) {
 
   auto isValidOriginalCandidate = [&](AbstractFunctionDecl *originalCandidate)
       -> std::optional<AbstractFunctionDeclLookupErrorKind> {
-    // Error if the original candidate is a protocol requirement. Derivative
-    // registration does not yet support protocol requirements.
-    // TODO(TF-982): Allow default derivative implementations for protocol
-    // requirements.
-    if (isa<ProtocolDecl>(originalCandidate->getDeclContext()))
-      return AbstractFunctionDeclLookupErrorKind::CandidateProtocolRequirement;
     // Error if the original candidate is not defined in a type context
     // compatible with the derivative function.
     if (!hasValidTypeContext(originalCandidate))
@@ -7463,159 +7700,24 @@ static bool typeCheckDerivativeAttr(DerivativeAttr *attr) {
     derivativeTypeCtx = derivative->getParent();
   assert(derivativeTypeCtx);
 
-  // Look up original function.
-  auto *originalAFD = findAutoDiffOriginalFunctionDecl(
+  // Look up original function(s).
+  auto originalAFDs = findAutoDiffOriginalFunctionDecl(
       attr, baseType, originalName, derivativeTypeCtx, lookupOptions,
       isValidOriginalCandidate, originalFnType);
-  if (!originalAFD) {
+  if (originalAFDs.empty()) {
     attr->setInvalid();
     return true;
   }
 
-  // Diagnose original stored properties. Stored properties cannot have custom
-  // registered derivatives.
-  if (auto *accessorDecl = dyn_cast<AccessorDecl>(originalAFD)) {
-    // Diagnose original stored properties. Stored properties cannot have custom
-    // registered derivatives.
-    auto *asd = accessorDecl->getStorage();
-    if (asd->hasStorage()) {
-      diags.diagnose(originalName.Loc,
-                     diag::derivative_attr_original_stored_property_unsupported,
-                     originalName.Name);
-      diags.diagnose(originalAFD->getLoc(), diag::decl_declared_here, asd);
-      return true;
-    }
-    // Diagnose original class property and subscript setters.
-    // TODO(https://github.com/apple/swift/issues/55542): Fix derivative function typing results regarding class-typed function parameters.
-    if (asd->getDeclContext()->getSelfClassDecl() &&
-        accessorDecl->getAccessorKind() == AccessorKind::Set) {
-      diags.diagnose(originalName.Loc,
-                     diag::derivative_attr_class_setter_unsupported);
-      diags.diagnose(originalAFD->getLoc(), diag::decl_declared_here, asd);
-      return true;
-    }
-  }
-
-  // Diagnose if original function has opaque result types.
-  if (originalAFD->getOpaqueResultTypeDecl()) {
-    diags.diagnose(
-        attr->getLocation(),
-        diag::autodiff_attr_opaque_result_type_unsupported);
+  bool diagnosed = false;
+  for (auto *originalAFD : originalAFDs)
+    diagnosed |= typeCheckOriginalFuncWithCustomDerivative(attr, originalAFD);
+  if (diagnosed) {
     attr->setInvalid();
     return true;
   }
 
-  // Diagnose if original function is an invalid class member.
-  bool isOriginalClassMember =
-      originalAFD->getDeclContext() &&
-      originalAFD->getDeclContext()->getSelfClassDecl();
-  if (isOriginalClassMember) {
-    auto *classDecl = originalAFD->getDeclContext()->getSelfClassDecl();
-    assert(classDecl);
-    // Class members returning dynamic `Self` are not supported.
-    // Dynamic `Self` is supported only as a single top-level result for class
-    // members. JVP/VJP functions returning `(Self, ...)` tuples would not
-    // type-check.
-    if (isa<ConstructorDecl>(originalAFD)) {
-      // Diagnose class initializers in non-final classes.
-      if (!classDecl->isSemanticallyFinal()) {
-        diags.diagnose(attr->getLocation(),
-                       diag::derivative_attr_nonfinal_class_init_unsupported,
-                       classDecl->getDeclaredInterfaceType());
-        return true;
-      }
-    }
-
-    if (auto *FD = dyn_cast<FuncDecl>(originalAFD)) {
-      // Diagnose all other declarations returning dynamic `Self`.
-      if (FD->getResultInterfaceType()->hasDynamicSelfType()) {
-        diags.diagnose(
-            attr->getLocation(),
-            diag::derivative_attr_class_member_dynamic_self_result_unsupported,
-            DeclNameRef(originalAFD->getName()));
-        return true;
-      }
-    }
-  }
-
-  attr->setOriginalFunction(originalAFD);
-
-  // Returns true if:
-  // - Original function and derivative function are static methods.
-  // - Original function and derivative function are non-static methods.
-  // - Original function is a Constructor declaration and derivative function is
-  // a static method.
-  auto compatibleStaticDecls = [&]() {
-    return (isa<ConstructorDecl>(originalAFD) || originalAFD->isStatic()) ==
-           derivative->isStatic();
-  };
-
-  // Diagnose if original function and derivative differ in terms of static declaration.
-  if (!compatibleStaticDecls()) {
-    bool derivativeMustBeStatic = !derivative->isStatic();
-    diags
-        .diagnose(attr->getOriginalFunctionName().Loc.getBaseNameLoc(),
-                  diag::derivative_attr_static_method_mismatch_original,
-                  originalAFD, derivative, derivativeMustBeStatic)
-        .highlight(attr->getOriginalFunctionName().Loc.getSourceRange());
-    diags.diagnose(originalAFD->getNameLoc(),
-                   diag::derivative_attr_static_method_mismatch_original_note,
-                   originalAFD, derivativeMustBeStatic);
-    auto fixItDiag =
-        diags.diagnose(derivative->getStartLoc(),
-                       diag::derivative_attr_static_method_mismatch_fix,
-                       derivative, derivativeMustBeStatic);
-    if (derivativeMustBeStatic) {
-      fixItDiag.fixItInsert(derivative->getStartLoc(), "static ");
-    } else {
-      fixItDiag.fixItRemove(derivative->getStaticLoc());
-    }
-    return true;
-  }
-
-  // Returns true if:
-  // - Original function and derivative function have the same access level.
-  // - Original function is public and derivative function is internal
-  //   `@usableFromInline`. This is the only special case.
-  auto compatibleAccessLevels = [&]() {
-    if (originalAFD->getFormalAccess() == derivative->getFormalAccess())
-      return true;
-    return originalAFD->getFormalAccess() == AccessLevel::Public &&
-           (derivative->getFormalAccess() == AccessLevel::Public ||
-            derivative->isUsableFromInline());
-  };
-
-  // Check access level compatibility for original and derivative functions.
-  if (!compatibleAccessLevels()) {
-    auto originalAccess = originalAFD->getFormalAccess();
-    auto derivativeAccess =
-        derivative->getFormalAccessScope().accessLevelForDiagnostics();
-    diags.diagnose(originalName.Loc,
-                   diag::derivative_attr_access_level_mismatch,
-                   originalAFD, originalAccess,
-                   derivative, derivativeAccess);
-    auto fixItDiag =
-        derivative->diagnose(diag::derivative_attr_fix_access, originalAccess);
-    // If original access is public, suggest adding `@usableFromInline` to
-    // derivative.
-    if (originalAccess == AccessLevel::Public) {
-      fixItDiag.fixItInsert(
-          derivative->getAttributeInsertionLoc(/*forModifier*/ false),
-          "@usableFromInline ");
-    }
-    // Otherwise, suggest changing derivative access level.
-    else {
-      fixItAccess(fixItDiag, derivative, originalAccess);
-    }
-    return true;
-  }
-
-  if (originalAFD->isAlwaysEmittedIntoClient() !=
-      derivative->isAlwaysEmittedIntoClient()) {
-    diags.diagnose(derivative->getLoc(),
-                   diag::derivative_attr_always_emit_into_client_mismatch);
-    return true;
-  }
+  attr->setOriginalFunctions(Ctx, originalAFDs);
 
   // Get the resolved differentiability parameter indices.
   auto *resolvedDiffParamIndices = attr->getParameterIndices();
@@ -7653,7 +7755,7 @@ static bool typeCheckDerivativeAttr(DerivativeAttr *attr) {
       diags
           .diagnose(attr->getLocation(),
                     diag::autodiff_attr_original_void_result,
-                    originalAFD->getName())
+                    originalAFDs.front()->getName())
           .highlight(attr->getOriginalFunctionName().Loc.getSourceRange());
       return;
     case DerivativeFunctionTypeError::Kind::NoDifferentiabilityParameters:
@@ -7705,10 +7807,11 @@ static bool typeCheckDerivativeAttr(DerivativeAttr *attr) {
 
   // Check if differential/pullback type matches expected type.
   if (!actualLinearMapType->isEqual(expectedLinearMapType)) {
+    auto *diagAFD = originalAFDs.front();
     // Emit differential/pullback type mismatch error on attribute.
     diags.diagnose(attr->getLocation(),
                    diag::derivative_attr_result_func_type_mismatch,
-                   funcResultElt.getName(), originalAFD);
+                   funcResultElt.getName(), diagAFD);
     // Emit note with expected differential/pullback type on actual type
     // location.
     auto *tupleReturnTypeRepr =
@@ -7720,37 +7823,39 @@ static bool typeCheckDerivativeAttr(DerivativeAttr *attr) {
                   funcResultElt.getName(), expectedLinearMapType)
         .highlight(funcEltTypeRepr->getSourceRange());
     // Emit note showing original function location, if possible.
-    if (originalAFD->getLoc().isValid())
-      diags.diagnose(originalAFD->getLoc(),
-                     diag::derivative_attr_result_func_original_note,
+    auto originalLoc = diagAFD->getLoc();
+    if (originalLoc.isValid())
+      diags.diagnose(originalLoc,
+                     diag::derivative_attr_result_func_original_note, diagAFD,
+                     diagAFD->hasBody());
+    return true;
+  }
+
+  for (auto *originalAFD : originalAFDs) {
+    // Reject duplicate `@derivative` attributes.
+    auto &derivativeAttrs = Ctx.DerivativeAttrs[std::make_tuple(
+        originalAFD, resolvedDiffParamIndices, kind)];
+    derivativeAttrs.insert(attr);
+    if (derivativeAttrs.size() > 1) {
+      diags.diagnose(attr->getLocation(),
+                     diag::derivative_attr_original_already_has_derivative,
                      originalAFD);
-    return true;
-  }
-
-  // Reject duplicate `@derivative` attributes.
-  auto &derivativeAttrs = Ctx.DerivativeAttrs[std::make_tuple(
-      originalAFD, resolvedDiffParamIndices, kind)];
-  derivativeAttrs.insert(attr);
-  if (derivativeAttrs.size() > 1) {
-    diags.diagnose(attr->getLocation(),
-                   diag::derivative_attr_original_already_has_derivative,
-                   originalAFD);
-    for (auto *duplicateAttr : derivativeAttrs) {
-      if (duplicateAttr == attr)
-        continue;
-      diags.diagnose(duplicateAttr->getLocation(),
-                     diag::derivative_attr_duplicate_note);
+      for (auto *duplicateAttr : derivativeAttrs) {
+        if (duplicateAttr == attr)
+          continue;
+        diags.diagnose(duplicateAttr->getLocation(),
+                       diag::derivative_attr_duplicate_note);
+      }
+      return true;
     }
-    return true;
-  }
 
-  // Register derivative function configuration.
-  auto *resultIndices =
-    autodiff::getFunctionSemanticResultIndices(originalAFD,
-                                               resolvedDiffParamIndices);
-  originalAFD->addDerivativeFunctionConfiguration(
-      {resolvedDiffParamIndices, resultIndices,
-       derivative->getGenericSignature()});
+    // Register derivative function configuration.
+    auto *resultIndices = autodiff::getFunctionSemanticResultIndices(
+        originalAFD, resolvedDiffParamIndices);
+    originalAFD->addDerivativeFunctionConfiguration(
+        {resolvedDiffParamIndices, resultIndices,
+         derivative->getGenericSignature()});
+  }
 
   return false;
 }
@@ -7760,24 +7865,32 @@ void AttributeChecker::visitDerivativeAttr(DerivativeAttr *attr) {
     attr->setInvalid();
 }
 
-AbstractFunctionDecl *
+llvm::TinyPtrVector<AbstractFunctionDecl *>
 DerivativeAttrOriginalDeclRequest::evaluate(Evaluator &evaluator,
                                             DerivativeAttr *attr) const {
   // Try to resolve the original function.
-  if (attr->isValid() && attr->OriginalFunction.isNull())
+  if (attr->isValid() && attr->OriginalFunctions.isNull())
     if (typeCheckDerivativeAttr(attr))
       attr->setInvalid();
 
   // If the typechecker has resolved the original function, return it.
-  if (auto *FD = attr->OriginalFunction.dyn_cast<AbstractFunctionDecl *>())
-    return FD;
+  if (auto *FD = attr->OriginalFunctions.dyn_cast<AbstractFunctionDecl **>())
+    return llvm::TinyPtrVector<AbstractFunctionDecl *>(
+        ArrayRef(FD, attr->NumOriginalFunctions));
 
   // If the function can be lazily resolved, do so now.
-  if (auto *Resolver = attr->OriginalFunction.dyn_cast<LazyMemberLoader *>())
-    return Resolver->loadReferencedFunctionDecl(attr,
-                                                attr->ResolverContextData);
+  if (auto *ResolverContextData =
+          attr->OriginalFunctions.dyn_cast<uint64_t *>()) {
+    assert(attr->Resolver && "resolver must be set");
+    llvm::TinyPtrVector<AbstractFunctionDecl *> resolvedAFDs;
+    for (auto declID :
+         ArrayRef(ResolverContextData, attr->NumOriginalFunctions))
+      resolvedAFDs.push_back(
+          attr->Resolver->loadReferencedFunctionDecl(attr, declID));
+    return resolvedAFDs;
+  }
 
-  return nullptr;
+  return {};
 }
 
 /// Computes the linearity parameter indices from the given parsed linearity
@@ -8040,7 +8153,7 @@ void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
   auto lookupOptions =
       (attr->getBaseTypeRepr() ? defaultMemberLookupOptions
                                : defaultUnqualifiedLookupOptions) |
-      NameLookupFlags::IgnoreAccessControl;
+      NLFlags::IgnoreAccessControl;
   auto transposeTypeCtx = transpose->getInnermostTypeContext();
   if (!transposeTypeCtx) transposeTypeCtx = transpose->getParent();
   assert(transposeTypeCtx);
@@ -8049,13 +8162,14 @@ void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
   auto funcLoc = originalName.Loc.getBaseNameLoc();
   if (attr->getBaseTypeRepr())
     funcLoc = attr->getBaseTypeRepr()->getLoc();
-  auto *originalAFD = findAutoDiffOriginalFunctionDecl(
+  auto originalAFDs = findAutoDiffOriginalFunctionDecl(
       attr, baseType, originalName, transposeTypeCtx, lookupOptions,
       isValidOriginalCandidate, expectedOriginalFnType);
-  if (!originalAFD) {
+  if (originalAFDs.empty()) {
     attr->setInvalid();
     return;
   }
+  auto *originalAFD = originalAFDs.front();
   attr->setOriginalFunction(originalAFD);
 
   // Diagnose if original function has opaque result types.
@@ -9001,6 +9115,14 @@ void AttributeChecker::visitUnsafeSelfDependentResultAttr(
                      diag::unsafe_self_dependent_result_attr_on_invalid_decl);
 }
 
+void AttributeChecker::visitCalledAttr(CalledAttr *attr) {
+  if (!Ctx.LangOpts.hasFeature(Feature::CalledAttribute)) {
+    diagnoseAndRemoveAttr(attr, diag::requires_experimental_feature, "@called",
+                          false, Feature::CalledAttribute.getName());
+    return;
+  }
+}
+
 namespace {
 
 class ClosureAttributeChecker
@@ -9056,6 +9178,15 @@ public:
         !ctx.LangOpts.hasFeature(Feature::ClosureIsolation)) {
       visitDeclAttribute(attr);
     }
+  }
+
+  void visitCalledAttr(CalledAttr *attr) {
+    if (ctx.LangOpts.hasFeature(Feature::CalledAttribute))
+      return;
+
+    ctx.Diags.diagnose(attr->getLocation(), diag::requires_experimental_feature,
+                       "@called", false, Feature::CalledAttribute.getName());
+    attr->setInvalid();
   }
 
   void visitCustomAttr(CustomAttr *attr) {
@@ -9182,7 +9313,7 @@ ValueDecl *RenamedDeclRequest::evaluate(Evaluator &evaluator,
     SmallVector<ValueDecl *, 1> lookupResults;
     attachedContext->lookupQualified(attachedContext->getParentModule(),
                                      nameRef.withoutArgumentLabels(ctx),
-                                     attr->getLocation(), NL_OnlyTypes,
+                                     attr->getLocation(), NLFlags::OnlyTypes,
                                      lookupResults);
     if (lookupResults.size() == 1)
       return lookupResults[0];

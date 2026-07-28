@@ -1,4 +1,5 @@
-// RUN: %target-swift-emit-sil -verify %s
+// RUN: %target-swift-emit-sil -sil-verify-all %s -enable-sil-opaque-values -o /dev/null
+// RUN: %target-swift-emit-sil -sil-verify-all %s -o /dev/null
 
 protocol P {
     associatedtype A
@@ -35,3 +36,24 @@ enum EU<T: P> {
 
 func zim(x: EU<ER>) -> EU<ER> { return x }
 func zang(x: E<ER>) -> E<ER> { return x }
+
+
+struct CCC {
+  var members: [Member]
+  var isInverted: Bool
+}
+enum Member {
+  case atom(Int)
+  case custom(CCC)
+  indirect case intersection(CCC, CCC)
+}
+indirect enum Node {
+  case customCharacterClass(CCC)
+  case leaf
+}
+func f(_ n: Node) -> Int {
+  switch n {
+  case .customCharacterClass: return 1
+  case .leaf: return 0
+  }
+}

@@ -2,6 +2,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %build-silgen-test-overlays
 
+// RUN: %target-swift-emit-silgen-ossa(mock-sdk: -sdk %S/Inputs -I %t) -o /dev/null -enable-sil-opaque-values -Xllvm -sil-print-types -module-name objc_dictionary_bridging %s
 // RUN: %target-swift-emit-silgen(mock-sdk: -sdk %S/Inputs -I %t) -Xllvm -sil-print-types -module-name objc_dictionary_bridging %s | %FileCheck %s
 
 // REQUIRES: objc_interop

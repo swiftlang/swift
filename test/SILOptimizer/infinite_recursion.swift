@@ -1,6 +1,5 @@
 // RUN: %target-swift-frontend -emit-sil %s -o /dev/null -verify
 
-// REQUIRES: swift_in_compiler
 
 func a() {
   a()  // expected-warning {{function call causes an infinite recursion}}

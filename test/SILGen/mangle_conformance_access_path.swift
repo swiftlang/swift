@@ -1,5 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module %S/Inputs/mangle_conformance_access_path_helper.swift -emit-module-path %t/mangle_conformance_access_path_helper.swiftmodule
+// RUN: %target-swift-frontend -emit-silgen-ossa -o /dev/null -sil-verify-all -enable-sil-opaque-values %s -I %t
 // RUN: %target-swift-frontend -emit-silgen %s -I %t | %FileCheck %s
 
 import mangle_conformance_access_path_helper

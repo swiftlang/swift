@@ -6,7 +6,6 @@
 // RUN: %swift_frontend_plain -sil-opt -sil-print-types %s -test-runner -o %t/out.sil | %FileCheck --check-prefix=LOG %s
 // RUN: %FileCheck %s < %t/out.sil
 
-// REQUIRES: swift_in_compiler
 
 sil_stage canonical
 

@@ -25,6 +25,10 @@ struct FunctionPassContext : MutatingContext {
     return bridgedPassContext.continueWithNextSubpassRun(inst.bridged)
   }
 
+  func continueWithNextSubpassRun(forValue value: Value?) -> Bool {
+    return bridgedPassContext.continueWithNextSubpassRun(value.bridged)
+  }
+
   func createSimplifyContext(preserveDebugInfo: Bool,
                              notifyInstructionChanged: @escaping (Instruction) -> ()
   ) -> SimplifyContext {
@@ -67,14 +71,6 @@ struct FunctionPassContext : MutatingContext {
       let nameStr = BridgedStringRef(data: nameBuffer.baseAddress, count: nameBuffer.count)
       return _bridged.loadFunction(nameStr, loadCalleesRecursively).function
     }
-  }
-
-  func eliminateDeadAllocations(in function: Function) -> Bool {
-    if bridgedPassContext.eliminateDeadAllocations(function.bridged) {
-      notifyInstructionsChanged()
-      return true
-    }
-    return false
   }
 
   func specializeClassMethodInst(_ cm: ClassMethodInst) -> Bool {

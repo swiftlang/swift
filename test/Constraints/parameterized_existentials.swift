@@ -53,3 +53,13 @@ func h3(x: (any P<Int>)?) -> (any P<String>)? {
 func generic1<T>(x: any P<T>) -> T {
   return x.f()
 }
+
+protocol P2<T> {
+  associatedtype T
+}
+
+final class P2Class<T> {}
+
+func makeP2<T>() -> any P2<T> {
+  P2Class<T>() // expected-error {{return expression of type 'P2Class<T>' does not conform to 'P2'}}
+}

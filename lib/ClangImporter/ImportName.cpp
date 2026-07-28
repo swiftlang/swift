@@ -1594,17 +1594,6 @@ addDefaultArgNamesForClangFunction(const clang::FunctionDecl *funcDecl,
     argumentNames.emplace_back();
 }
 
-static StringRef renameUnsafeMethod(ASTContext &ctx,
-                                    const clang::NamedDecl *decl,
-                                    StringRef name) {
-  if (isa<clang::CXXMethodDecl>(decl) &&
-      !evaluateOrDefault(ctx.evaluator, IsSafeUseOfCxxDecl({decl, ctx}), {})) {
-    return ctx.getIdentifier(("__" + name + "Unsafe").str()).str();
-  }
-
-  return name;
-}
-
 std::optional<StringRef>
 NameImporter::findCustomName(const clang::Decl *decl,
                              ImportNameVersion version) {
@@ -1770,6 +1759,14 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     ParsedDeclName parsedName = parseDeclName(nameAttr->name);
     if (!parsedName || parsedName.isOperator())
       return result;
+
+    // swift_name can't rename a declaration to `deinit`; forming a FuncDecl
+    // with that special name asserts. Ignore it and import under the original
+    // name.
+    if (parsedName.BaseNameKind == DeclBaseName::Kind::Destructor) {
+      skipCustomName = true;
+      result.info.hasInvalidCustomName = true;
+    }
 
     // If we have an Objective-C method that is being mapped to an
     // initializer (e.g., a factory method whose name doesn't fit the
@@ -2576,8 +2573,6 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     }
   }
 
-  baseName = renameUnsafeMethod(swiftCtx, D, baseName);
-
   result.declName =
       formDeclName(swiftCtx, baseName, argumentNames, isFunction,
                    isInitializer ? DeclBaseName::Kind::Constructor
@@ -2623,16 +2618,33 @@ Identifier ImportedName::getBaseIdentifier(ASTContext &ctx) const {
 }
 
 Identifier
-NameImporter::importMacroName(const clang::IdentifierInfo *clangIdentifier,
-                              const clang::MacroInfo *macro) {
+NameImporter::importMacroName(const clang::IdentifierInfo *II,
+                              const clang::MacroInfo *MI,
+                              const clang::Module *M,
+                              Identifier *invalidCustomName) {
+  if (invalidCustomName)
+    *invalidCustomName = Identifier();
+
   // If we're supposed to ignore this macro, return an empty identifier.
-  if (::shouldIgnoreMacro(clangIdentifier->getName(), macro,
-                          getClangPreprocessor()))
+  if (::shouldIgnoreMacro(II->getName(), MI, getClangPreprocessor()))
     return Identifier();
 
-  // No transformation is applied to the name.
-  StringRef name = clangIdentifier->getName();
-  return swiftCtx.getIdentifier(name);
+  // Honor an APINotes 'SwiftName:' override, if one applies. A macro constant
+  // can only be renamed to a simple identifier, so reject function, operator,
+  // and member names, which are meaningless here.
+  if (auto notes = getClangSema().ProcessAPINotes(M, II, MI->getDefinitionLoc())) {
+    if (!notes->SwiftName.empty()) {
+      ParsedDeclName ident = parseDeclName(notes->SwiftName);
+      if (ident && !ident.isOperator() && !ident.IsFunctionName &&
+          !ident.isMember())
+        return swiftCtx.getIdentifier(ident.BaseName);
+      if (invalidCustomName)
+        *invalidCustomName = swiftCtx.getIdentifier(notes->SwiftName);
+    }
+  }
+
+  // Otherwise, no transformation is applied to the name.
+  return swiftCtx.getIdentifier(II->getName());
 }
 
 ImportedName NameImporter::importName(const clang::NamedDecl *decl,

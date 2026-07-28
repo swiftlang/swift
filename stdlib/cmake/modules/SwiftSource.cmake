@@ -49,7 +49,7 @@ function(handle_swift_sources
     dependency_sibgen_target_out_var_name
     sourcesvar externalvar name)
   cmake_parse_arguments(SWIFTSOURCES
-      "IS_MAIN;IS_STDLIB;IS_STDLIB_CORE;IS_SDK_OVERLAY;EMBED_BITCODE;STATIC;NO_LINK_NAME;IS_FRAGILE;ONLY_SWIFTMODULE;NO_SWIFTMODULE"
+      "IS_MAIN;IS_STDLIB;IS_STDLIB_CORE;IS_SDK_OVERLAY;EMBED_BITCODE;STATIC;NO_LINK_NAME;IS_FRAGILE;NO_SWIFTMODULE"
       "SDK;ARCHITECTURE;ARCHITECTURE_SUBDIR_NAME;INSTALL_IN_COMPONENT;DEPLOYMENT_VERSION_OSX;DEPLOYMENT_VERSION_IOS;DEPLOYMENT_VERSION_TVOS;DEPLOYMENT_VERSION_WATCHOS;MACCATALYST_BUILD_FLAVOR;BOOTSTRAPPING;INSTALL_BINARY_SWIFTMODULE"
       "DEPENDS;COMPILE_FLAGS;MODULE_NAME;MODULE_DIR;ENABLE_LTO"
       ${ARGN})
@@ -65,7 +65,6 @@ function(handle_swift_sources
                  STATIC_arg)
   translate_flag(${SWIFTSOURCES_NO_LINK_NAME} "NO_LINK_NAME" NO_LINK_NAME_arg)
   translate_flag(${SWIFTSOURCES_IS_FRAGILE} "IS_FRAGILE" IS_FRAGILE_arg)
-  translate_flag(${SWIFTSOURCES_ONLY_SWIFTMODULE} "ONLY_SWIFTMODULE" ONLY_SWIFTMODULE_arg)
   translate_flag(${SWIFTSOURCES_NO_SWIFTMODULE} "NO_SWIFTMODULE" NO_SWIFTMODULE_arg)
   if(DEFINED SWIFTSOURCES_BOOTSTRAPPING)
     set(BOOTSTRAPPING_arg "BOOTSTRAPPING" ${SWIFTSOURCES_BOOTSTRAPPING})
@@ -165,7 +164,6 @@ function(handle_swift_sources
         ${STATIC_arg}
         ${BOOTSTRAPPING_arg}
         ${IS_FRAGILE_arg}
-        ${ONLY_SWIFTMODULE_arg}
         ${NO_SWIFTMODULE_arg}
         INSTALL_BINARY_SWIFTMODULE ${SWIFTSOURCES_INSTALL_BINARY_SWIFTMODULE}
         INSTALL_IN_COMPONENT "${SWIFTSOURCES_INSTALL_IN_COMPONENT}"
@@ -272,6 +270,11 @@ function(_add_target_variant_swift_compile_flags
     if(target_variant)
       list(APPEND result "-target-variant" "${target_variant}")
     endif()
+  elseif("${sdk}" STREQUAL "ANDROID")
+    get_target_triple(target target_variant "${sdk}" "${arch}"
+    DEPLOYMENT_VERSION "${SWIFT_ANDROID_API_LEVEL}")
+
+    list(APPEND result "-target" "${target}")
   else()
     list(APPEND result
         "-target" "${SWIFT_SDK_${sdk}_ARCH_${arch}_TRIPLE}")
@@ -411,7 +414,6 @@ endfunction()
 #     [IS_MAIN]                         # This is an executable, not a library
 #     [IS_STDLIB]
 #     [IS_STDLIB_CORE]                  # This is the core standard library
-#     [ONLY_SWIFTMODULE]                # Emit swiftmodule only, no binary
 #     [NO_SWIFTMODULE]                  # Emit binary only, no swiftmodule
 #     [OPT_FLAGS]                       # Optimization flags (overrides SWIFT_OPTIMIZE)
 #     [MODULE_DIR]                      # Put .swiftmodule, .swiftdoc., and .o
@@ -427,7 +429,7 @@ function(_compile_swift_files
     dependency_sib_target_out_var_name dependency_sibopt_target_out_var_name
     dependency_sibgen_target_out_var_name)
   cmake_parse_arguments(SWIFTFILE
-    "IS_MAIN;IS_STDLIB;IS_STDLIB_CORE;IS_SDK_OVERLAY;EMBED_BITCODE;STATIC;IS_FRAGILE;ONLY_SWIFTMODULE;NO_SWIFTMODULE"
+    "IS_MAIN;IS_STDLIB;IS_STDLIB_CORE;IS_SDK_OVERLAY;EMBED_BITCODE;STATIC;IS_FRAGILE;NO_SWIFTMODULE"
     "OUTPUT;MODULE_NAME;INSTALL_IN_COMPONENT;DEPLOYMENT_VERSION_OSX;DEPLOYMENT_VERSION_IOS;DEPLOYMENT_VERSION_TVOS;DEPLOYMENT_VERSION_WATCHOS;MACCATALYST_BUILD_FLAVOR;BOOTSTRAPPING;INSTALL_BINARY_SWIFTMODULE"
     "SOURCES;FLAGS;DEPENDS;SDK;ARCHITECTURE;OPT_FLAGS;MODULE_DIR"
     ${ARGN})
@@ -455,6 +457,13 @@ function(_compile_swift_files
   precondition(SWIFTFILE_SDK MESSAGE "Should specify an SDK")
   precondition(SWIFTFILE_ARCHITECTURE MESSAGE "Should specify an architecture")
   precondition(SWIFTFILE_INSTALL_IN_COMPONENT MESSAGE "INSTALL_IN_COMPONENT is required")
+
+  # Route embedded-stdlib Swift compilations through a bounded ninja job
+  # pool defined in the top-level CMakeLists.txt.
+  set(_swiftfile_job_pool_args)
+  if("${SWIFTFILE_SDK}" STREQUAL "embedded")
+    set(_swiftfile_job_pool_args JOB_POOL swift_embedded_compile_job_pool)
+  endif()
 
   # Determine if/what macCatalyst build variant we are
   get_maccatalyst_build_flavor(maccatalyst_build_flavor
@@ -692,7 +701,7 @@ function(_compile_swift_files
   #
   # We're not ready to enable this flag uconditionally yet, but turn it on for the
   # standard library.
-  list(APPEND swift_flags "-Xfrontend" "-solver-enable-crash-on-valid-salvage")
+  list(APPEND swift_flags "-Xfrontend" "-solver-enable-diagnose-valid-salvage")
 
   list(APPEND swift_flags ${SWIFT_STDLIB_EXTRA_SWIFT_COMPILE_FLAGS})
 
@@ -1099,7 +1108,6 @@ function(_compile_swift_files
     set(copy_legacy_layouts_dep)
   endif()
 
-  if(NOT SWIFTFILE_ONLY_SWIFTMODULE)
   add_custom_command_target(
       dependency_target
       COMMAND "${CMAKE_COMMAND}" -E make_directory ${dirs_to_create}
@@ -1117,9 +1125,9 @@ function(_compile_swift_files
         ${source_files} ${SWIFTFILE_DEPENDS}
         ${swift_ide_test_dependency}
         ${copy_legacy_layouts_dep}
+      ${_swiftfile_job_pool_args}
       COMMENT "Compiling ${first_output}")
   set("${dependency_target_out_var_name}" "${dependency_target}" PARENT_SCOPE)
-  endif()
 
   # This is the target to generate:
   #
@@ -1165,6 +1173,7 @@ function(_compile_swift_files
           ${source_files} ${SWIFTFILE_DEPENDS}
           ${swift_ide_test_dependency}
           ${copy_legacy_layouts_dep}
+        ${_swiftfile_job_pool_args}
         COMMENT "Generating ${module_file}")
 
     if(SWIFTFILE_STATIC)
@@ -1245,6 +1254,7 @@ function(_compile_swift_files
           ${swift_ide_test_dependency}
           ${obj_dirs_dependency_target}
           ${copy_legacy_layouts_dep}
+        ${_swiftfile_job_pool_args}
         COMMENT
           "Generating ${maccatalyst_module_file}")
 

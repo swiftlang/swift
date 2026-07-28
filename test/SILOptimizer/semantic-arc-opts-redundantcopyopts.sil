@@ -266,4 +266,29 @@ bb0:
   return %9
 }
 
+// A `drop_deinit` always requires an owned operand, even though it is a
+// forwarding instruction. Make sure that the copy_value feeding it is not
+// eliminated in favor of the guaranteed struct_extract result.
+struct WithDeinit: ~Copyable {
+  var klass: Klass
+  deinit
+}
+
+// CHECK-LABEL: sil [ossa] @test_drop_deinit_requires_owned_operand :
+// CHECK:         copy_value
+// CHECK-NEXT:    struct $WithDeinit
+// CHECK-NEXT:    drop_deinit
+// CHECK-LABEL: } // end sil function 'test_drop_deinit_requires_owned_operand'
+sil [ossa] @test_drop_deinit_requires_owned_operand : $@convention(thin) (@guaranteed ContainsKlass) -> () {
+bb0(%0 : @guaranteed $ContainsKlass):
+  %1 = struct_extract %0, #ContainsKlass.x
+  %2 = copy_value %1
+  %3 = struct $WithDeinit(%2)
+  %4 = drop_deinit %3
+  %5 = destructure_struct %4
+  destroy_value %5
+  %7 = tuple ()
+  return %7
+}
+
 

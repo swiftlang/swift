@@ -1,6 +1,5 @@
 // RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-sil -enable-copy-propagation=false %s | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 
 // Using -enable-copy-propagation=false to pattern match against older SIL
 // output. At least until -enable-copy-propagation has been around

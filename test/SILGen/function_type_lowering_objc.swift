@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 // RUN: %empty-directory(%t)
 // RUN: %build-clang-importer-objc-overlays
 // RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk-nosource -I %t) -module-name main %s | %FileCheck %s

@@ -112,11 +112,9 @@ transferNodesFromList(llvm::ilist_traits<SILInstruction> &L2,
 /// block and deletes it.
 ///
 void SILInstruction::eraseFromParent() {
-#ifndef NDEBUG
   for (auto result : getResults()) {
-    assert(result->use_empty() && "Uses of SILInstruction remain at deletion.");
+    ASSERT(result->use_empty() && "Uses of SILInstruction remain at deletion.");
   }
-#endif
   getParent()->erase(this);
 }
 
@@ -476,13 +474,11 @@ namespace {
     }
     
     bool visitDestroyValueInst(const DestroyValueInst *RHS) {
-      auto *left = cast<DestroyValueInst>(LHS);
-      return left->poisonRefs() == RHS->poisonRefs();
+      return true;
     }
 
     bool visitDebugValue(const DebugValueInst *RHS) {
-      auto *left = cast<DebugValueInst>(LHS);
-      return left->poisonRefs() == RHS->poisonRefs();
+      return true;
     }
 
     bool visitBeginCOWMutationInst(const BeginCOWMutationInst *RHS) {
@@ -1841,6 +1837,10 @@ SILInstructionResultArray::SILInstructionResultArray(
   auto TRangeEnd = TypedRange.end();
   assert(MVResults.size() == unsigned(std::distance(TRangeBegin, TRangeEnd)));
   for (unsigned i : indices(MVResults)) {
+    // Avoid quadratic complexity for multi-value instructions with many results.
+    if (i >= 8)
+      break;
+
     assert(SILValue(&MVResults[i]) == (*this)[i]);
     assert(SILValue(&MVResults[i])->getType() == (*this)[i]->getType());
     assert(SILValue(&MVResults[i]) == (*VRangeIter));

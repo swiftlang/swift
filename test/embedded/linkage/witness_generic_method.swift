@@ -1,6 +1,5 @@
 // RUN: %target-swift-frontend %s -parse-as-library -enable-experimental-feature Embedded -wmo -emit-ir -o - | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_Embedded
 
 // In Embedded Swift, a protocol requirement that takes an unspecialized

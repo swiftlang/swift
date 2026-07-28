@@ -4,7 +4,6 @@
 // RUN: %target-swift-frontend %s -emit-ir -O \
 // RUN:   -disable-availability-checking | %FileCheck %s  --check-prefix=CHECK-IR
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: swift_stdlib_no_asserts, optimized_stdlib
 
 // CHECK-IR shape differs on wasm32: optimized vector-reduce form not produced, trap retained
@@ -317,7 +316,7 @@ public func local_inlinearray_repeating_init_sum_iterate_to_count_trap_spl() -> 
 
 // TODO: To support hoisting bounds checks of mutable InlineArray, we should prove it's not rewritten within the loop.
 // CHECK-SIL-LABEL: sil @$s30inlinearray_bounds_check_tests0A11_inc_by_oneyys11InlineArrayVyxSiGz_SitSiRVzlF :
-// CHECK-SIL: bb3({{.*}}):
+// CHECK-SIL: bb{{[0-9]+}}({{.*}}):
 // TODO-CHECK-SIL-NOT: cond_fail {{.*}}, "Index out of bounds"
 // CHECK-SIL: cond_br
 public func inlinearray_inc_by_one<let N: Int>(_ v: inout InlineArray<N, Int>, _ n: Int) {

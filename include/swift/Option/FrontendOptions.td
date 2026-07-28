@@ -131,6 +131,10 @@ def emit_module_source_info : Flag<["-"], "emit-module-source-info">,
 def ignore_module_source_info : Flag<["-"], "ignore-module-source-info">,
   HelpText<"Avoid getting source location from .swiftsourceinfo files">;
 
+def prefix_map_sourceinfo : Flag<["-"], "prefix-map-sourceinfo">,
+  HelpText<"Apply path remapping from -file-prefix-map to generated "
+           " swiftsourceinfo files and sets the last modified timestamp to 0">;
+
 def merge_modules
   : Flag<["-"], "merge-modules">, ModeOpt,
     HelpText<"Merge the input modules without otherwise processing them">;
@@ -436,6 +440,10 @@ let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOption] 
   def enable_com_interop
     : Flag<["-"], "enable-experimental-com-interop">,
       HelpText<"Enable COM interop code generation and configuration directives">;
+
+  def com_interop_model
+    : Joined<["-"], "com-interop-model=">,
+      HelpText<"Select the COM interop model: 'microsoft' or 'corefoundation'">;
 }
 
 // HIDDEN FLAGS
@@ -463,11 +471,17 @@ def solver_shuffle_disjunctions_EQ : Joined<["-"], "solver-shuffle-disjunctions=
 def solver_shuffle_choices_EQ : Joined<["-"], "solver-shuffle-choices=">,
   HelpText<"Random seed for shuffling disjunction choices. For debugging solver performance">;
 
-def solver_enable_crash_on_valid_salvage : Flag<["-"], "solver-enable-crash-on-valid-salvage">,
+def solver_enable_diagnose_valid_salvage : Flag<["-"], "solver-enable-diagnose-valid-salvage">,
   HelpText<"Reject valid solutions in diagnostic mode">;
 
-def solver_disable_crash_on_valid_salvage : Flag<["-"], "solver-disable-crash-on-valid-salvage">,
+def solver_disable_diagnose_valid_salvage : Flag<["-"], "solver-disable-diagnose-valid-salvage">,
   HelpText<"Accept valid solutions in diagnostic mode">;
+
+def solver_enable_crash_fail_diagnostic : Flag<["-"], "solver-enable-crash-fail-diagnostic">,
+  HelpText<"Trigger assertion failure on 'failed to produce diagnostic for expression'">;
+
+def solver_disable_crash_fail_diagnostic : Flag<["-"], "solver-disable-crash-fail-diagnostic">,
+  HelpText<"Do not trigger assertion failure on 'failed to produce diagnostic for expression'">;
 
 def solver_enable_transitive_conformance : Flag<["-"], "solver-enable-transitive-conformance">,
   HelpText<"Enable transitive conformance constraint optimization">;
@@ -552,6 +566,10 @@ def max_substitution_depth : Joined<["-"], "max-substitution-depth=">,
 def max_substitution_count : Joined<["-"], "max-substitution-count=">,
   Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
   HelpText<"Set the maximum step count for type substitution operations">;
+
+def max_associated_type_inference_iterations : Joined<["-"], "max-associated-type-inference-iterations=">,
+  Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Maximum number of iterations to attempt in the type witness solver">;
 
 def dump_type_witness_systems : Flag<["-"], "dump-type-witness-systems">,
   HelpText<"Enables dumping type witness systems from associated type inference">;
@@ -996,8 +1014,14 @@ def solver_disable_performance_hacks : Flag<["-"], "solver-disable-performance-h
            "subsumed by subsequent improvements">;
 
 def solver_enable_performance_hacks : Flag<["-"], "solver-enable-performance-hacks">,
-  HelpText<"Enble various constraint solver performance optimizations that have been "
+  HelpText<"Enable various constraint solver performance optimizations that have been "
            "subsumed by subsequent improvements">;
+
+def solver_disable_enumerate_supertypes : Flag<["-"], "solver-disable-enumerate-supertypes">,
+  HelpText<"Disable an inefficient form of inference in the solver, which allows certain optimizations">;
+
+def solver_enable_enumerate_supertypes : Flag<["-"], "solver-enable-enumerate-supertypes">,
+  HelpText<"Enable an inefficient form of inference in the solver, which prevents certain optimizations">;
 
 def solver_disable_splitter : Flag<["-"], "solver-disable-splitter">,
   HelpText<"Disable the component splitter phase of expression type checking">;

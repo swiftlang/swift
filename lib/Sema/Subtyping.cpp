@@ -32,6 +32,129 @@
 using namespace swift;
 using namespace constraints;
 
+void swift::constraints::getTypeVariablesWithVariance(
+    TypeVarOccurrences *result,
+    Type type, TypePosition pos,
+    bool funcResultIsInvariant) {
+  if (!type->hasTypeVariable())
+    return;
+
+  auto rec = [&](Type type, TypePosition pos) {
+    getTypeVariablesWithVariance(result, type, pos,
+                                 /*funcResultIsInvariant=*/false);
+  };
+
+  switch (pos) {
+  case TypePosition::Covariant:
+  case TypePosition::Contravariant: {
+    if (auto *typeVar = type->getAs<TypeVariableType>()) {
+      switch (pos) {
+      case TypePosition::Covariant:
+        result->covariant.insert(typeVar);
+        break;
+      case TypePosition::Contravariant:
+        result->contravariant.insert(typeVar);
+        break;
+      case TypePosition::Shape:
+      case TypePosition::Invariant:
+        ASSERT(false && "Handled above");
+        break;
+      }
+
+      return;
+    } else if (auto *funcTy = type->getAs<FunctionType>()) {
+      for (auto param : funcTy->getParams()) {
+        auto paramTy = param.getOldType();
+        if (param.isInOut())
+          rec(paramTy, TypePosition::Invariant);
+        else
+          rec(paramTy, pos.flipped());
+      }
+
+      auto resultTy = funcTy->getResult();
+      if (funcResultIsInvariant)
+        rec(resultTy, TypePosition::Invariant);
+      else
+        rec(resultTy, pos);
+
+      // FIXME: Error type variance?
+      if (auto thrownError = funcTy->getThrownError())
+        rec(thrownError, TypePosition::Invariant);
+
+      return;
+    } else if (auto *tupleTy = type->getAs<TupleType>()) {
+      for (auto eltTy : tupleTy->getElementTypes())
+        rec(eltTy, pos);
+
+      return;
+    } else if (auto *metatypeTy = type->getAs<MetatypeType>()) {
+      auto instanceTy = metatypeTy->getInstanceType();
+      rec(instanceTy, pos);
+
+      return;
+    } else if (auto objectTy = type->getOptionalObjectType()) {
+      rec(objectTy, pos);
+
+      return;
+    } else if (auto elementTy = type->getArrayElementType()) {
+      rec(elementTy, pos);
+
+      return;
+    } else if (auto elementTy = ConstraintSystem::isSetType(type)) {
+      // FIXME: This differs from TypeTransform.h because we say that
+      // the Set element type is covariant, which is correct.
+      rec(*elementTy, pos);
+
+      return;
+    } else if (auto pair = ConstraintSystem::isDictionaryType(type)) {
+      // FIXME: This differs from TypeTransform.h because we say that
+      // the Dictionary key type is covariant, which is correct.
+      rec(pair->first, pos);
+      rec(pair->second, pos);
+
+      return;
+    }
+
+    // We return upon encountering a known case above.
+    break;
+  }
+  case TypePosition::Invariant:
+  case TypePosition::Shape:
+    break;
+  }
+
+  // Handle all remaining occurrences.
+  class Walker : public TypeWalker {
+    SmallPtrSetImpl<TypeVariableType *> &invariant;
+    SmallPtrSetImpl<TypeVariableType *> &base;
+
+  public:
+    explicit Walker(SmallPtrSetImpl<TypeVariableType *> &invariant,
+                    SmallPtrSetImpl<TypeVariableType *> &base)
+        : invariant(invariant), base(base) {}
+
+    Action walkToTypePre(Type ty) override {
+      // Skip children that don't contain type variables.
+      if (!ty->hasTypeVariable())
+        return Action::SkipNode;
+
+      if (ty->is<DependentMemberType>()) {
+        if (auto *tv = ty->getDependentMemberRoot()->getAs<TypeVariableType>())
+          base.insert(tv);
+
+        return Action::SkipNode;
+      } else if (auto *tv = dyn_cast<TypeVariableType>(ty.getPointer())) {
+        invariant.insert(tv);
+      }
+
+      return Action::Continue;
+    }
+  };
+
+  Walker walker(result->invariant, result->base);
+  type.walk(walker);
+}
+
 /// Determine whether the candidate type is a subclass of the superclass type.
 bool swift::constraints::isSubclassOf(Type candidateType, Type superclassType) {
   if (!superclassType->getClassOrBoundGenericClass())

@@ -117,7 +117,7 @@ AutoDiffClosureSpecMultiBBNoBTETests.testWithLeakChecking("Test3") {
   // CHECK3:       {{^}}// reverse-mode derivative of multiply #1 (_:)
   // CHECK3-NEXT: {{^}}// Isolation: nonisolated
   // CHECK3-NEXT:  sil private @$s3outyycfU1_8multiplyL_ySfAAyycfU1_20RealPropertyWrappersL_VFTJrSpSr : $@convention(thin) (RealPropertyWrappers) -> (Float, @owned @callee_guaranteed (Float) -> RealPropertyWrappers.TangentVector) {
-  // CHECK3:         %[[#A22:]] = function_ref @$s3outyycfU1_8multiplyL_ySfAAyycfU1_20RealPropertyWrappersL_VFTJpSpSr073$sSf16_DifferentiationE12_vjpMultiply3lhs3rhsSf5value_Sf_SftSfc8pullbacktm1_n5FZSf_N6SfcfU_S2fTf1nnE_n015$s3outyycfU1_20cdE16L_V1xSfvgTJpSpSrTf1ncnn_n : $@convention(thin) (Float, Float, Float) -> RealPropertyWrappers.TangentVector
+  // CHECK3:         %[[#A22:]] = function_ref @$s3outyycfU1_8multiplyL_ySfAAyycfU1_20RealPropertyWrappersL_VFTJpSpSr015$s3outyycfU1_20cdE16L_V1xSfvgTJpSpSr073$sSf16_DifferentiationE12_vjpMultiply3lhs3rhsSf5value_Sf_SftSfc8pullbacktt1_u5FZSf_U6SfcfU_S2fTf1ncE_n : $@convention(thin) (Float, Float, Float) -> RealPropertyWrappers.TangentVector
   // CHECK3:         %[[#A23:]] = partial_apply [callee_guaranteed] %[[#A22]](%[[#]], %[[#]]) : $@convention(thin) (Float, Float, Float) -> RealPropertyWrappers.TangentVector
   // CHECK3:         %[[#A24:]] = tuple (%[[#]], %[[#A23]])
   // CHECK3:         return %[[#A24]]
@@ -125,7 +125,7 @@ AutoDiffClosureSpecMultiBBNoBTETests.testWithLeakChecking("Test3") {
 
   // CHECK3-NONE:  {{^}}// pullback of multiply
   // CHECK3:       {{^}}// specialized pullback of multiply
-  // CHECK3:       sil private @$s3outyycfU1_8multiplyL_ySfAAyycfU1_20RealPropertyWrappersL_VFTJpSpSr073$sSf16_DifferentiationE12_vjpMultiply3lhs3rhsSf5value_Sf_SftSfc8pullbacktm1_n5FZSf_N6SfcfU_S2fTf1nnE_n015$s3outyycfU1_20cdE16L_V1xSfvgTJpSpSrTf1ncnn_n : $@convention(thin) (Float, Float, Float) -> RealPropertyWrappers.TangentVector {
+  // CHECK3:       sil private @$s3outyycfU1_8multiplyL_ySfAAyycfU1_20RealPropertyWrappersL_VFTJpSpSr015$s3outyycfU1_20cdE16L_V1xSfvgTJpSpSr073$sSf16_DifferentiationE12_vjpMultiply3lhs3rhsSf5value_Sf_SftSfc8pullbacktt1_u5FZSf_U6SfcfU_S2fTf1ncE_n : $@convention(thin) (Float, Float, Float) -> RealPropertyWrappers.TangentVector {
 
   @differentiable(reverse)
   func multiply(_ s: RealPropertyWrappers) -> Float {

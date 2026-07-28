@@ -1,5 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -enable-library-evolution -emit-module-path=%t/resilient_struct.swiftmodule -module-name=resilient_struct %S/../Inputs/resilient_struct.swift
+// RUN: %target-swift-frontend -I %t -target %target-swift-5.1-abi-triple -Xllvm -sil-print-types -emit-silgen-ossa -o /dev/null -sil-verify-all -enable-sil-opaque-values %s
 // RUN: %target-swift-frontend -I %t -target %target-swift-5.1-abi-triple -Xllvm -sil-print-types -emit-silgen %s | %FileCheck %s
 
 import resilient_struct

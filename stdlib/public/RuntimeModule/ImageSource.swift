@@ -393,10 +393,16 @@ struct ImageSource: CustomStringConvertible {
 
   /// Get a sub-range of this ImageSource as an ImageSource
   subscript(range: Range<Address>) -> ImageSource {
-    let intRange = Int(range.lowerBound)..<Int(range.upperBound)
-    return ImageSource(storage: storage[intRange],
-                       isMappedImage: isMappedImage,
-                       path: path)
+    get throws {
+      guard let lowerBound = Int(exactly: range.lowerBound),
+            let upperBound = Int(exactly: range.upperBound),
+            lowerBound <= count, upperBound <= count else {
+        throw ImageSourceError.outOfBoundsRead
+      }
+      return ImageSource(storage: storage[lowerBound..<upperBound],
+                         isMappedImage: isMappedImage,
+                         path: path)
+    }
   }
 
   /// Mark unused bytes in the storage as used
@@ -415,9 +421,9 @@ struct ImageSource: CustomStringConvertible {
 extension ImageSource: MemoryReader {
   public func fetch(from address: Address,
                     into buffer: UnsafeMutableRawBufferPointer) throws {
-    let offset = Int(address)
-    guard bytes.count >= buffer.count &&
-            offset <= bytes.count - buffer.count else {
+    guard let offset = Int(exactly: address),
+          bytes.count >= buffer.count &&
+            offset >= 0 && offset <= bytes.count - buffer.count else {
       throw ImageSourceError.outOfBoundsRead
     }
     buffer.copyMemory(from: UnsafeRawBufferPointer(
@@ -426,22 +432,33 @@ extension ImageSource: MemoryReader {
 
   public func fetch<T>(from address: Address, as type: T.Type) throws -> T {
     let size = MemoryLayout<T>.size
-    let offset = Int(address)
-    guard offset <= bytes.count - size else {
+    guard let offset = Int(exactly: address),
+            bytes.count >= size &&
+            offset >= 0 && offset <= bytes.count - size else {
       throw ImageSourceError.outOfBoundsRead
     }
     return bytes.loadUnaligned(fromByteOffset: offset, as: type)
   }
 
-  public func fetchString(from address: Address) throws -> String? {
-    let offset = Int(address)
-    let len = strnlen(bytes.baseAddress! + offset, bytes.count - offset)
+  public func fetchString(from address: Address) throws
+    -> (String?, consumedBytes: Int) {
+    guard let offset = Int(exactly: address),
+            offset >= 0 && offset <= bytes.count else {
+      throw ImageSourceError.outOfBoundsRead
+    }
+    let maxLen = bytes.count - offset
+    let len = strnlen(bytes.baseAddress! + offset, maxLen)
     let stringBytes = bytes[offset..<offset+len]
-    return String(decoding: stringBytes, as: UTF8.self)
+    return (String(decoding: stringBytes, as: UTF8.self),
+            consumedBytes: len == maxLen ? maxLen : len + 1)
   }
 
   public func fetchString(from address: Address, length: Int) throws -> String? {
-    let offset = Int(address)
+    guard let offset = Int(exactly: address),
+            bytes.count >= length &&
+            offset >= 0 && offset <= bytes.count - length else {
+      throw ImageSourceError.outOfBoundsRead
+    }
     let stringBytes = bytes[offset..<offset+length]
     return String(decoding: stringBytes, as: UTF8.self)
   }
@@ -489,10 +506,11 @@ struct ImageSourceCursor {
   }
 
   mutating func readString() throws -> String? {
-    guard let result = try source.fetchString(from: pos) else {
+    guard let (result, count) = try? source.fetchString(from: pos),
+          let result else {
       return nil
     }
-    pos += Size(result.utf8.count + 1) // +1 for the NUL
+    pos += Size(count) // +1 for the NUL
     return result
   }
 

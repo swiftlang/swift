@@ -121,9 +121,8 @@ die:
 sil [ossa] @test_debug_value_alloc_stack_moved : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 bb0(%0 : @owned $Builtin.NativeObject):
   debug_value [moveable_value_debuginfo] %0 : $Builtin.NativeObject
-  debug_value [poison] %0 : $Builtin.NativeObject
-  debug_value [moveable_value_debuginfo] [poison] %0 : $Builtin.NativeObject
-  debug_value [poison] [moveable_value_debuginfo] %0 : $Builtin.NativeObject
+  debug_value %0 : $Builtin.NativeObject
+  debug_value [moveable_value_debuginfo] %0 : $Builtin.NativeObject
 
   %1 = alloc_stack [moveable_value_debuginfo] $Builtin.NativeObject
   dealloc_stack %1 : $*Builtin.NativeObject
@@ -176,7 +175,7 @@ bb0(%0 : $*T, %1 : $*Builtin.Borrow<T>):
 // CHECK:         cond_br undef, [[BLEFT:bb[0-9]+]], [[BRIGHT:bb[0-9]+]]
 // CHECK:       [[BRIGHT]]:
 // CHECK:         %3 = apply %0()
-// CHECK:         destroy_value [poison] [dead_end] %3
+// CHECK:         destroy_value [dead_end] %3
 // CHECK:         unreachable
 // CHECK:       [[BLEFT]]:
 // CHECK:         %6 = apply %0()
@@ -186,7 +185,7 @@ bb0(%0 : $*T, %1 : $*Builtin.Borrow<T>):
 // CHECK:         cond_br undef, [[GLEFT:bb[0-9]+]], [[GRIGHT:bb[0-9]+]]
 // CHECK:       [[GRIGHT]]:
 // CHECK:         %10 = apply %0()
-// CHECK:         destroy_value [poison] %10
+// CHECK:         destroy_value %10
 // CHECK:         br [[EXIT:bb[0-9]+]]
 // CHECK:       [[GLEFT]]:
 // CHECK:         %13 = apply %0()
@@ -207,7 +206,7 @@ gleft:
   br exit
 gright:
   %k2 = apply %getC() : $@convention(thin) () -> (@owned C)
-  destroy_value [poison] %k2 : $C
+  destroy_value %k2 : $C
   br exit
 exit:
   %retval = tuple()
@@ -220,7 +219,7 @@ bleft:
   unreachable
 bright:
   %k4 = apply %getC() : $@convention(thin) () -> (@owned C)
-  destroy_value [poison] [dead_end] %k4 : $C
+  destroy_value [dead_end] %k4 : $C
   unreachable
 }
 

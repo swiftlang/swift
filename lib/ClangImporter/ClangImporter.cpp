@@ -166,6 +166,7 @@ namespace {
 
   class PCHDeserializationCallbacks : public clang::ASTDeserializationListener {
     ClangImporter::Implementation &Impl;
+    clang::ASTReader *Reader = nullptr;
   public:
     explicit PCHDeserializationCallbacks(ClangImporter::Implementation &impl)
       : Impl(impl) {}
@@ -177,11 +178,25 @@ namespace {
     }
 
     void ReaderInitialized(clang::ASTReader *Reader) override {
+      // Stash the reader so DeclRead can map decls back to their owning module.
+      this->Reader = Reader;
+
       if (!Impl.IsReadingBridgingPCH)
         return;
 
       if (Impl.CASIDForPCH)
         Reader->getModuleManager().getPrimaryModule().CASID = *Impl.CASIDForPCH;
+    }
+
+    void DeclRead(clang::GlobalDeclID ID, const clang::Decl *D) override {
+      // Attribute each materialized (deserialized) decl to its owning serialized
+      // module, so we can report per-module in-RAM AST cost. Only tracked when
+      // memory-stat collection is enabled, to avoid per-decl overhead in normal
+      // builds.
+      if (!Impl.CollectMemoryStats || !Reader)
+        return;
+      if (auto *MF = Reader->getOwningModuleFile(ID))
+        ++Impl.MaterializedDeclsPerModule[MF];
     }
   };
 
@@ -573,9 +588,20 @@ void importer::getNormalInvocationArguments(
     invocationArgStrs.insert(invocationArgStrs.end(), {"-D__swift_embedded__"});
   }
 
-  // Enable Position Independence.  `-fPIC` is not supported on Windows, which
-  // is implicitly position independent.
-  if (!triple.isOSWindows())
+  // Swift generates position-independent code by default, so establish `-fPIC`
+  // as the baseline for any code Clang emits (e.g. inline functions). `-fPIC`
+  //
+  // Embedded Swift targeting a bare-metal ("-none-" OS) triple is an
+  // exception: we let Clang use the target's default relocation model
+  // (typically static) rather than forcing firmware into PIC. Users can still
+  // opt in explicitly with -Xcc -fPIC.
+  //
+  // This is only a default: because the last PIC-related flag wins, a
+  // subsequent `-Xcc -fno-pic` (etc.) overrides it, and the resulting
+  // relocation model is read back from Clang for Swift's own code generation.
+  bool bareMetalEmbedded =
+      LangOpts.hasFeature(Feature::Embedded) && triple.getOSName() == "none";
+  if (!triple.isOSWindows() && !bareMetalEmbedded)
     invocationArgStrs.insert(invocationArgStrs.end(), {"-fPIC"});
 
   // Enable modules.
@@ -1459,12 +1485,11 @@ std::unique_ptr<clang::CompilerInvocation> ClangImporter::createClangInvocation(
   return CI;
 }
 
-std::unique_ptr<ClangImporter>
-ClangImporter::create(ASTContext &ctx, const IRGenOptions *IRGenOpts,
-                      StringRef swiftPCHHash, std::string casidForPCH,
-                      DependencyTracker *tracker, bool ignoreFileMapping,
-                      std::shared_ptr<llvm::cas::ObjectStore> CAS,
-                      std::shared_ptr<llvm::cas::ActionCache> Cache) {
+std::unique_ptr<ClangImporter> ClangImporter::create(
+    ASTContext &ctx, const IRGenOptions *IRGenOpts, StringRef swiftPCHHash,
+    std::string casidForPCH, DependencyTracker *tracker, bool ignoreFileMapping,
+    bool needCodeGenTargetOpts, std::shared_ptr<llvm::cas::ObjectStore> CAS,
+    std::shared_ptr<llvm::cas::ActionCache> Cache) {
   std::unique_ptr<ClangImporter> importer{new ClangImporter(ctx, tracker)};
   auto &importerOpts = ctx.ClangImporterOpts;
 
@@ -1577,63 +1602,41 @@ ClangImporter::create(ASTContext &ctx, const IRGenOptions *IRGenOpts,
                          clang::SourceLocation());
   clangDiags.setFatalsAsError(ctx.Diags.getShowDiagnosticsAfterFatalError());
 
-  // Use Clang to configure/save options for Swift IRGen/CodeGen
-  if (ctx.LangOpts.ClangTarget.has_value()) {
-    // If '-clang-target' is set, create a mock invocation with the Swift triple
-    // to configure CodeGen and Target options for Swift compilation.
-    auto swiftTargetClangInvocation = importer->createClangInvocation(
+  // Configure the Clang CodeGen/Target options used by Swift IRGen and by the
+  // Clang invocation. Under '-clang-target', for SIL-generating actions, IRGen
+  // needs options for the Swift triple, so build a mock invocation for it.
+  // The AST-affecting policy is applied to the "real" underlying invocation
+  // regardless (see configureOptionsForCodeGen).
+  std::unique_ptr<clang::CompilerInvocation> swiftTargetClangInvocation;
+  if (ctx.LangOpts.ClangTarget.has_value() && needCodeGenTargetOpts) {
+    swiftTargetClangInvocation = importer->createClangInvocation(
         ctx, instance.getVirtualFileSystemPtr(), /*forCodeGen=*/true);
     if (!swiftTargetClangInvocation)
       return nullptr;
-
-    importer->Impl.configureOptionsForCodeGen(clangDiags,
-                                              swiftTargetClangInvocation.get());
-  } else {
-    // Set using the existing invocation.
-    importer->Impl.configureOptionsForCodeGen(clangDiags);
   }
+  importer->Impl.configureOptionsForCodeGen(clangDiags, IRGenOpts,
+                                            swiftTargetClangInvocation.get());
 
   if (IRGenOpts) {
-    // We need to set the AST-affecting CodeGenOpts here early so that
-    // the clang module cache hash will be consistent throughout. Also
-    // prefer to set the AST-benign ones here unless they are computed
-    // after this point or may var per inputs.
+    // Non-PIC code generation is only supported in Embedded Swift, which does
+    // not depend on the position-independent Swift runtime. The relocation
+    // model is decided by Clang (and can be influenced via -Xcc, e.g.
+    // -fno-pic), so validate the resolved model here rather than at the flag
+    // level.
+    //
+    // This only applies where Swift requests PIC as the baseline, i.e.
+    // non-Windows targets (see the `-fPIC` injection in
+    // getNormalInvocationArguments). Windows is implicitly
+    // position-independent and legitimately resolves to a non-PIC relocation
+    // model on some architectures (e.g. 32-bit x86/ARM), so it must not be
+    // diagnosed.
     auto &CGO = importer->getCodeGenOpts();
-    CGO.OptimizationLevel = IRGenOpts->shouldOptimize() ? 3 : 0;
-    CGO.DebugTypeExtRefs = !IRGenOpts->DisableClangModuleSkeletonCUs;
-    switch (IRGenOpts->DebugInfoLevel) {
-    case IRGenDebugInfoLevel::None:
-      CGO.setDebugInfo(llvm::codegenoptions::DebugInfoKind::NoDebugInfo);
-      break;
-    case IRGenDebugInfoLevel::LineTables:
-      CGO.setDebugInfo(llvm::codegenoptions::DebugInfoKind::DebugLineTablesOnly);
-      break;
-    case IRGenDebugInfoLevel::ASTTypes:
-    case IRGenDebugInfoLevel::DwarfTypes:
-      CGO.setDebugInfo(llvm::codegenoptions::DebugInfoKind::FullDebugInfo);
-      break;
+    if (!ctx.LangOpts.Target.isOSWindows() &&
+        CGO.RelocationModel != llvm::Reloc::PIC_ &&
+        !ctx.LangOpts.hasFeature(Feature::Embedded)) {
+      ctx.Diags.diagnose(SourceLoc(), diag::non_pic_without_embedded);
+      return nullptr;
     }
-    switch (IRGenOpts->DebugInfoFormat) {
-    case IRGenDebugInfoFormat::None:
-      break;
-    case IRGenDebugInfoFormat::DWARF:
-      CGO.DebugCompilationDir = IRGenOpts->DebugCompilationDir;
-      CGO.DwarfVersion = IRGenOpts->DWARFVersion;
-      break;
-    case IRGenDebugInfoFormat::CodeView:
-      CGO.EmitCodeView = true;
-      CGO.DebugCompilationDir = IRGenOpts->DebugCompilationDir;
-      break;
-    }
-    if (!IRGenOpts->TrapFuncName.empty()) {
-      CGO.TrapFuncName = IRGenOpts->TrapFuncName;
-    }
-    // We don't need to perform coverage mapping for any Clang decls we've
-    // synthesized, as they have no user-written code. This is also needed to
-    // avoid a Clang crash when attempting to emit coverage for decls without
-    // source locations (rdar://100172217).
-    CGO.CoverageMapping = false;
-
   }
 
   // Set up PCH content CASID.
@@ -2437,7 +2440,8 @@ static llvm::VersionTuple getCurrentVersionFromTBD(llvm::vfs::FileSystem &FS,
 bool ClangImporter::canImportModule(ImportPath::Module modulePath,
                                     SourceLoc loc,
                                     ModuleVersionInfo *versionInfo,
-                                    bool isTestableDependencyLookup) {
+                                    bool isTestableDependencyLookup,
+                                    bool isSourceCanImport) {
   // Look up the top-level module to see if it exists, mapping any -module-alias
   // to the real module name so canImport(<alias>) matches import <alias>.
   auto topModule = modulePath.front();
@@ -3695,7 +3699,7 @@ void ClangImporter::lookupBridgingHeaderDecls(
       if (filter(macroNode)) {
         auto MI = macroNode.getAsMacro();
         Identifier Name = Impl.getNameImporter().importMacroName(II, MI);
-        if (Decl *imported = Impl.importMacro(Name, macroNode))
+        if (Decl *imported = Impl.importMacro(Name, macroNode, II))
           receiver(imported);
       }
     }
@@ -3773,7 +3777,7 @@ bool ClangImporter::lookupDeclsFromHeader(StringRef Filename,
         ClangNode MacroNode = Info;
         if (filter(MacroNode)) {
           auto Name = Impl.getNameImporter().importMacroName(II, Info);
-          if (auto *Imported = Impl.importMacro(Name, MacroNode))
+          if (auto *Imported = Impl.importMacro(Name, MacroNode, II))
             receiver(Imported);
         }
       });
@@ -4590,8 +4594,91 @@ ClangImporter::importDeclCached(const clang::NamedDecl *ClangDecl) {
   return Impl.importDeclCached(ClangDecl, Impl.CurrentVersion);
 }
 
+void ClangImporter::enableMemoryStatistics() {
+  Impl.CollectMemoryStats = true;
+}
+
+ClangImporter::ClangMemoryStats ClangImporter::getClangMemoryStats() const {
+  ClangMemoryStats stats;
+  // All imported modules share one ASTContext, so this is the aggregate
+  // deserialized-AST cost across every module (it cannot be split per module).
+  auto &clangCtx = Impl.getClangASTContext();
+  stats.astContextBytes =
+      clangCtx.getASTAllocatedMemory() + clangCtx.getSideTableAllocatedMemory();
+
+  auto *reader = Impl.Instance->getASTReader().get();
+  if (!reader)
+    return stats;
+
+  auto &moduleMgr = reader->getModuleManager();
+  stats.numLoadedModules = moduleMgr.size();
+  stats.perModule.reserve(stats.numLoadedModules);
+
+  for (clang::serialization::ModuleFile &MF : moduleMgr) {
+    ClangModuleMemoryInfo info;
+    info.moduleName = MF.ModuleName;
+    if (MF.Buffer) {
+      // In-memory size of the serialized (.pcm) bitstream buffer. The buffer
+      // may be malloc-backed (heap-allocated) or mmap-backed (file-backed and
+      // demand-paged). These are reported separately because their cost to the
+      // process differs and is hard to attribute uniformly (e.g. mmap pages may
+      // be shared or paged out, and CAS-backed storage differs again).
+      info.inMemoryBufferBytes = MF.Buffer->getBufferSize();
+      info.bufferIsMMapped =
+          MF.Buffer->getBufferKind() == llvm::MemoryBuffer::MemoryBuffer_MMap;
+      if (info.bufferIsMMapped)
+        stats.moduleBufferMMapBytes += info.inMemoryBufferBytes;
+      else
+        stats.moduleBufferMallocBytes += info.inMemoryBufferBytes;
+    }
+    info.onDiskDecls = MF.LocalNumDecls;
+    info.onDiskTypes = MF.LocalNumTypes;
+    info.onDiskIdentifiers = MF.LocalNumIdentifiers;
+    info.onDiskMacros = MF.LocalNumMacros;
+
+    auto it = Impl.MaterializedDeclsPerModule.find(&MF);
+    if (it != Impl.MaterializedDeclsPerModule.end()) {
+      info.materializedDecls = it->second;
+      stats.numMaterializedDecls += it->second;
+    }
+    stats.perModule.push_back(std::move(info));
+  }
+  return stats;
+}
+
 void ClangImporter::printStatistics() const {
   Impl.Instance->getASTReader()->PrintStats();
+
+  // Memory accounting summary + per-module breakdown.
+  auto stats = getClangMemoryStats();
+  uint64_t swiftBytes = Impl.SwiftContext.getTotalMemory();
+  auto &os = llvm::errs();
+  os << "\n*** Clang importer memory ***\n";
+  os << "Clang ASTContext bytes (shared, all modules): "
+     << stats.astContextBytes << "\n";
+  os << "Module buffer bytes (malloc):                 "
+     << stats.moduleBufferMallocBytes << "\n";
+  os << "Module buffer bytes (mmap):                   "
+     << stats.moduleBufferMMapBytes << "\n";
+  os << "Swift ASTContext bytes:                       " << swiftBytes << "\n";
+  os << "Loaded Clang modules: " << stats.numLoadedModules
+     << ", materialized decls: " << stats.numMaterializedDecls << "\n";
+
+  // Sort heaviest-first by materialized decls, then by buffer size.
+  llvm::stable_sort(stats.perModule,
+                    [](const ClangModuleMemoryInfo &a,
+                       const ClangModuleMemoryInfo &b) {
+                      if (a.materializedDecls != b.materializedDecls)
+                        return a.materializedDecls > b.materializedDecls;
+                      return a.inMemoryBufferBytes > b.inMemoryBufferBytes;
+                    });
+  os << "Per-module (sorted by materialized decls):\n";
+  os << "  materializedDecls / onDiskDecls  bufferBytes(kind)  module\n";
+  for (const auto &m : stats.perModule) {
+    os << "  " << m.materializedDecls << " / " << m.onDiskDecls << "  "
+       << m.inMemoryBufferBytes << (m.bufferIsMMapped ? "(mmap)" : "(malloc)")
+       << "  " << m.moduleName << "\n";
+  }
 }
 
 void ClangImporter::verifyAllModules() {
@@ -4962,8 +5049,54 @@ void ClangImporter::Implementation::getItaniumMangledName(
   return getMangledName(mangler.get(), clangDecl, os);
 }
 
+/// The AST-affecting Clang CodeGen options derived from the Swift compilation.
+/// Applied identically wherever these must agree for PCH/module interop.
+///
+/// - Important: This must remain idempotent, so only assign, never accumulate.
+static void applyASTAffectingCodeGenOptions(clang::CodeGenOptions &CGO,
+                                            const IRGenOptions &IRGenOpts) {
+  // Reflect the Swift optimization mode in the Clang optimization level, but
+  // only raise it: preserving a nonzero level from the cc1 '-Xcc -O' arguments
+  // keeps '__OPTIMIZE__' defined when Swift itself is not optimizing.
+  if (IRGenOpts.shouldOptimize())
+    CGO.OptimizationLevel = 3;
+  CGO.DebugTypeExtRefs = !IRGenOpts.DisableClangModuleSkeletonCUs;
+  switch (IRGenOpts.DebugInfoLevel) {
+  case IRGenDebugInfoLevel::None:
+    CGO.setDebugInfo(llvm::codegenoptions::DebugInfoKind::NoDebugInfo);
+    break;
+  case IRGenDebugInfoLevel::LineTables:
+    CGO.setDebugInfo(llvm::codegenoptions::DebugInfoKind::DebugLineTablesOnly);
+    break;
+  case IRGenDebugInfoLevel::ASTTypes:
+  case IRGenDebugInfoLevel::DwarfTypes:
+    CGO.setDebugInfo(llvm::codegenoptions::DebugInfoKind::FullDebugInfo);
+    break;
+  }
+  switch (IRGenOpts.DebugInfoFormat) {
+  case IRGenDebugInfoFormat::None:
+    break;
+  case IRGenDebugInfoFormat::DWARF:
+    CGO.DebugCompilationDir = IRGenOpts.DebugCompilationDir;
+    CGO.DwarfVersion = IRGenOpts.DWARFVersion;
+    break;
+  case IRGenDebugInfoFormat::CodeView:
+    CGO.EmitCodeView = true;
+    CGO.DebugCompilationDir = IRGenOpts.DebugCompilationDir;
+    break;
+  }
+  if (!IRGenOpts.TrapFuncName.empty())
+    CGO.TrapFuncName = IRGenOpts.TrapFuncName;
+  // We don't need to perform coverage mapping for any Clang decls we've
+  // synthesized, as they have no user-written code. This is also needed to
+  // avoid a Clang crash when attempting to emit coverage for decls without
+  // source locations (rdar://100172217).
+  CGO.CoverageMapping = false;
+}
+
 void ClangImporter::Implementation::configureOptionsForCodeGen(
-    clang::DiagnosticsEngine &Diags, clang::CompilerInvocation *CI) {
+    clang::DiagnosticsEngine &Diags, const IRGenOptions *IRGenOpts,
+    clang::CompilerInvocation *CI) {
   clang::TargetInfo *targetInfo = nullptr;
   if (CI) {
     TargetOpts.reset(new clang::TargetOptions(std::move(CI->getTargetOpts())));
@@ -4982,6 +5115,17 @@ void ClangImporter::Implementation::configureOptionsForCodeGen(
   }
 
   CodeGenTargetInfo.reset(targetInfo);
+
+  if (!IRGenOpts)
+    return;
+
+  // The underlying ClangImporter invocation is what the bridging-header PCH and
+  // Clang modules are emitted/validated against, so it must carry a matching
+  // configuration in every path. The IRGen-facing copy above (created for
+  // '-clang-target') also needs it for Swift codegen.
+  applyASTAffectingCodeGenOptions(Invocation->getCodeGenOpts(), *IRGenOpts);
+  if (CodeGenOpts)
+    applyASTAffectingCodeGenOptions(*CodeGenOpts, *IRGenOpts);
 }
 
 clang::CodeGenOptions &
@@ -5036,6 +5180,26 @@ ClangImporter::Implementation::findLookupTable(const clang::Decl *decl) {
       owningModule = decl->getOwningModule();
   }
   return findLookupTable(owningModule);
+}
+
+void ClangImporter::Implementation::registerSynthesizedClangDecl(
+    clang::FunctionDecl *synthesizedDecl, const clang::Decl *anchorDecl) {
+  synthesizedAndAlwaysVisibleDecls.insert(synthesizedDecl);
+
+  auto *contextTable = findLookupTable(anchorDecl);
+  if (contextTable)
+    addEntryToLookupTable(*contextTable, synthesizedDecl, getNameImporter());
+
+  auto *owningModule =
+      importer::getClangOwningModule(anchorDecl, anchorDecl->getASTContext());
+  auto *moduleTable = findLookupTable(owningModule);
+  if (moduleTable && moduleTable != contextTable)
+    addEntryToLookupTable(*moduleTable, synthesizedDecl, getNameImporter());
+}
+
+void ClangImporter::registerSynthesizedClangDecl(
+    clang::FunctionDecl *synthesizedDecl, const clang::Decl *anchorDecl) {
+  Impl.registerSynthesizedClangDecl(synthesizedDecl, anchorDecl);
 }
 
 bool ClangImporter::Implementation::forEachLookupTable(
@@ -5655,60 +5819,14 @@ SourceLoc swift::extractNearestSourceLoc(EscapabilityLookupDescriptor) {
   return SourceLoc();
 }
 
-// Just create a specialized function decl for "__swift_interopStaticCast"
-// using the types base and derived.
-static
-DeclRefExpr *getInteropStaticCastDeclRefExpr(ASTContext &ctx,
-                                             const clang::Module *owningModule,
-                                             Type base, Type derived) {
-  if (base->isForeignReferenceType() && derived->isForeignReferenceType()) {
-    base = base->wrapInPointer(PTK_UnsafePointer);
-    derived = derived->wrapInPointer(PTK_UnsafePointer);
-  }
-
-  // Lookup our static cast helper function in the C++ shim module.
-  auto wrapperModule = ctx.getLoadedModule(ctx.getIdentifier(CXX_SHIM_NAME));
-  assert(wrapperModule &&
-         "CxxShim module is required when using members of a base class. "
-         "Make sure you `import CxxShim`.");
-
-  SmallVector<ValueDecl *, 1> results;
-  ctx.lookupInModule(wrapperModule, "__swift_interopStaticCast", results);
-  assert(
-      results.size() == 1 &&
-      "Did you forget to define a __swift_interopStaticCast helper function?");
-  FuncDecl *staticCastFn = cast<FuncDecl>(results.back());
-
-  // Now we have to force instantiate this. We can't let the type checker do
-  // this yet because it can't infer the "To" type.
-  auto subst =
-      SubstitutionMap::get(staticCastFn->getGenericSignature(), {derived, base},
-                           LookUpConformanceInModule());
-  auto functionTemplate = const_cast<clang::FunctionTemplateDecl *>(
-      cast<clang::FunctionTemplateDecl>(staticCastFn->getClangDecl()));
-  auto spec = ctx.getClangModuleLoader()->instantiateCXXFunctionTemplate(
-      ctx, functionTemplate, subst);
-  auto specializedStaticCastFn =
-      cast<FuncDecl>(ctx.getClangModuleLoader()->importDeclDirectly(spec));
-
-  auto staticCastRefExpr = new (ctx)
-      DeclRefExpr(ConcreteDeclRef(specializedStaticCastFn), DeclNameLoc(),
-                  /*implicit*/ true);
-  staticCastRefExpr->setType(specializedStaticCastFn->getInterfaceType());
-
-  return staticCastRefExpr;
-}
-
 // Create the following expressions:
 // %0 = Builtin.addressof(&self)
 // %1 = Builtin.reinterpretCast<UnsafeMutablePointer<Derived>>(%0)
-// %2 = __swift_interopStaticCast<UnsafeMutablePointer<Base>?>(%1)
-// %3 = %2!
-// return %3.pointee
-static
-MemberRefExpr *getSelfInteropStaticCast(FuncDecl *funcDecl,
-                                        NominalTypeDecl *baseStruct,
-                                        NominalTypeDecl *derivedStruct) {
+// %2 = __swift_interopStaticCast_...(%1) // UnsafeMutablePointer<Base>
+// return %2.pointee
+static MemberRefExpr *getSelfInteropStaticCast(FuncDecl *funcDecl,
+                                               NominalTypeDecl *baseStruct,
+                                               NominalTypeDecl *derivedStruct) {
   auto &ctx = funcDecl->getASTContext();
 
   auto mutableSelf = [&ctx](FuncDecl *funcDecl) {
@@ -5754,15 +5872,30 @@ MemberRefExpr *getSelfInteropStaticCast(FuncDecl *funcDecl,
                           Argument::unlabeled(rawSelfPointer));
   selfPointer->setType(derivedPtrType);
 
-  auto staticCastRefExpr = getInteropStaticCastDeclRefExpr(
-      ctx, baseStruct->getClangDecl()->getOwningModule(),
-      baseStruct->getSelfInterfaceType()->wrapInPointer(
-          PTK_UnsafeMutablePointer),
-      derivedStruct->getSelfInterfaceType()->wrapInPointer(
-          PTK_UnsafeMutablePointer));
+  auto *baseRecord =
+      dyn_cast_or_null<clang::CXXRecordDecl>(baseStruct->getClangDecl());
+  auto *derivedRecord =
+      dyn_cast_or_null<clang::CXXRecordDecl>(derivedStruct->getClangDecl());
+  if (!baseRecord || !derivedRecord)
+    return nullptr;
+
+  // Synthesize call to __swift_interopStaticCast_...(), which is just a wrapper
+  // around C++ static_cast() to upcast from derived to base.
+  auto *importer = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
+  FuncDecl *castFn =
+      SwiftDeclSynthesizer(importer).makeBaseClassPointerCastFunction(
+          derivedRecord, baseRecord);
+  if (!castFn)
+    return nullptr;
+
+  auto *staticCastRefExpr =
+      new (ctx) DeclRefExpr(ConcreteDeclRef(castFn), DeclNameLoc(),
+                            /*implicit*/ true);
+  staticCastRefExpr->setType(castFn->getInterfaceType());
+
   auto *argList = ArgumentList::forImplicitUnlabeled(ctx, {selfPointer});
   auto casted = CallExpr::createImplicit(ctx, staticCastRefExpr, argList);
-  // This will be "Optional<UnsafeMutablePointer<Base>>"
+  // This will be "UnsafeMutablePointer<Base>" (non-optional)
   casted->setType(cast<FunctionType>(staticCastRefExpr->getType().getPointer())
                       ->getResult());
   casted->setThrows(nullptr);
@@ -6076,6 +6209,11 @@ static clang::CXXMethodDecl *synthesizeCxxBaseGetterAccessorMethod(
                                clangCtx, body, clang::FPOptionsOverride(),
                                clang::SourceLocation(), clang::SourceLocation())
                          : body[0]);
+
+  // Register the synthesized accessor so that it can be resolved when
+  // deserializing SIL that was serialized under cross-module optimization.
+  impl.registerSynthesizedClangDecl(newMethod, derivedClass);
+
   return newMethod;
 }
 
@@ -6238,10 +6376,9 @@ synthesizeBaseClassFieldAddressGetterBody(AbstractFunctionDecl *afd,
 // For setters we have to pass self as a pointer and then emit an assign:
 //   %0 = Builtin.addressof(&self)
 //   %1 = Builtin.reinterpretCast<UnsafeMutablePointer<Derived>>(%0)
-//   %2 = __swift_interopStaticCast<UnsafeMutablePointer<Base>?>(%1)
-//   %3 = %2!
-//   %4 = %3.pointee
-//   assign newValue to %4
+//   %2 = __swift_interopStaticCast_...(%1) // UnsafeMutablePointer<Base>
+//   %3 = %2.pointee
+//   assign newValue to %3
 static std::pair<BraceStmt *, bool>
 synthesizeBaseClassFieldSetterBody(AbstractFunctionDecl *afd, void *context) {
   auto setterDecl = cast<AccessorDecl>(afd);
@@ -6255,6 +6392,13 @@ synthesizeBaseClassFieldSetterBody(AbstractFunctionDecl *afd, void *context) {
 
   auto *pointeePropertyRefExpr =
       getSelfInteropStaticCast(setterDecl, baseStruct, derivedStruct);
+  if (!pointeePropertyRefExpr) {
+    ctx.Diags.diagnose(SourceLoc(), diag::failed_base_method_call_synthesis,
+                       setterDecl, baseStruct);
+    auto body = BraceStmt::create(ctx, SourceLoc(), {}, SourceLoc(),
+                                  /*implicit=*/true);
+    return {body, /*isTypeChecked=*/true};
+  }
 
   Expr *storedRef = nullptr;
   if (auto subscript = dyn_cast<SubscriptDecl>(baseClassVar)) {
@@ -6395,10 +6539,8 @@ static void cloneImportedAttributes(ValueDecl *fromDecl, ValueDecl *toDecl) {
     }
     case DeclAttrKind::Custom: {
       CustomAttr *cAttr = cast<CustomAttr>(attr);
-      toDecl->addAttribute(
-          CustomAttr::create(context, SourceLoc(), cAttr->getTypeExpr(),
-                             /*owner*/ toDecl, cAttr->getInitContext(),
-                             cAttr->getArgs(), /*implicit*/ true));
+      if (cAttr->canClone())
+        toDecl->addAttribute(cAttr->clone(context));
       break;
     }
     case DeclAttrKind::DiscardableResult: {
@@ -6692,9 +6834,9 @@ static void lookupRelatedFuncs(AbstractFunctionDecl *func,
     swiftName = func->getName();
 
   if (auto ty = func->getDeclContext()->getSelfNominalTypeDecl()) {
-    NLOptions options = NL_IgnoreAccessControl | NL_IgnoreMissingImports;
+    NLOptions options = {NLFlags::IgnoreAccessControl, NLFlags::IgnoreMissingImports};
     ty->lookupQualified({ ty }, DeclNameRef(swiftName), func->getLoc(),
-                        NL_QualifiedDefault | options, results);
+                        (NLFlags::QualifiedDefault) | options, results);
   }
   else {
     ASTContext &ctx = func->getASTContext();
@@ -8180,7 +8322,7 @@ importer::getValueDeclsForName(NominalTypeDecl *decl, StringRef name) {
         ctx.MainModule, ctx.getIdentifier(name), /*hasModuleSelector=*/false,
         results, NLKind::UnqualifiedLookup,
         namelookup::ResolutionKind::Overloadable, ctx.MainModule, SourceLoc(),
-        NL_UnqualifiedDefault);
+        NLFlags::UnqualifiedDefault);
 
     // Filter out any declarations that didn't come from Clang.
     auto newEnd =
@@ -8381,7 +8523,9 @@ static bool isSwiftClassType(const clang::CXXRecordDecl *decl) {
     return false;
 
   // Ensure that the baseclass is swift::RefCountedClass.
-  auto baseDecl = decl;
+  auto baseDecl = decl->getDefinition();
+  if (!baseDecl)
+    return false;
   do {
     if (baseDecl->getNumBases() != 1)
       return false;
@@ -8390,7 +8534,9 @@ static bool isSwiftClassType(const clang::CXXRecordDecl *decl) {
     auto nextBaseDecl = Ty->getAsCXXRecordDecl();
     if (!nextBaseDecl)
       return false;
-    baseDecl = nextBaseDecl;
+    baseDecl = nextBaseDecl->getDefinition();
+    if (!baseDecl)
+      return false;
   } while (baseDecl->getName() != "RefCountedClass");
 
   return true;
@@ -8657,14 +8803,14 @@ bool IsSafeUseOfCxxDecl::evaluate(Evaluator &evaluator,
         isa<clang::CXXConstructorDecl>(decl))
       return true;
 
-    if (clangTypeIsForeignReference(method->getReturnType(), desc.ctx))
-      return true;
-
-    // begin and end methods likely return an interator, so they're unsafe. This
-    // is required so that automatic the conformance to RAC works properly.
+    // begin and end methods likely return an iterator, so they're unsafe.
+    // This is required so that automatic the conformance to RAC works properly.
     if (method->getNameAsString() == "begin" ||
         method->getNameAsString() == "end")
       return false;
+
+    if (clangTypeIsForeignReference(method->getReturnType(), desc.ctx))
+      return true;
 
     auto parentQualType = method
       ->getParent()->getTypeForDecl()->getCanonicalTypeUnqualified();

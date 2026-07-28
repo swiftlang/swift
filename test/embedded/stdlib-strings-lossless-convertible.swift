@@ -1,10 +1,10 @@
 // RUN: %target-run-simple-swift(-enable-experimental-feature Embedded -parse-as-library -wmo %embedded-unicode-tables %target-embedded-posix-shim) | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
 // REQUIRES: OS=macosx || OS=linux-gnu || OS=wasip1
 // REQUIRES: swift_feature_Embedded
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 func f<T: LosslessStringConvertible>(t: inout T?, s: String) {
   t = .init(s)

@@ -5,6 +5,7 @@
 
 // RUN: %target-swift-frontend -emit-module %s -DCoreDishwasher -module-name CoreDishwasher -o %t/CoreDishwasher -emit-module-path %t/CoreDishwasher.swiftmodule -I %t
 // RUN: %target-swift-frontend -emit-module %s -DDishwasherKit -module-name DishwasherKit -o %t/DishwasherKit -emit-module-path %t/DishwasherKit.swiftmodule -enable-library-evolution -I %t
+// RUN: %target-swift-frontend -emit-silgen-ossa -o /dev/null -sil-verify-all -enable-sil-opaque-values -I %t %s
 // RUN: %target-swift-frontend -emit-silgen -I %t %s
 
 #if CoreDishwasher

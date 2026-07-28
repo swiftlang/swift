@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -enable-sil-opaque-values %s -o /dev/null -verify
 // RUN: %target-swift-emit-silgen %s -o /dev/null -verify
 // RUN: %target-swift-emit-silgen -enforce-exclusivity=checked %s -o /dev/null -verify
 

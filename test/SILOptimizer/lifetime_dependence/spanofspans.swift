@@ -4,7 +4,6 @@
 // RUN:   -sil-verify-all \
 // RUN:   -module-name test
 
-// REQUIRES: swift_in_compiler
 
 // REQUIRES: rdar132874319
 // ([nonescapable] improve diagnostics for spanofspans.swift; prefer an exclusivity violation to a lifetime error)

@@ -1,6 +1,5 @@
 // RUN: %target-sil-opt -test-runner -sil-disable-input-verify %s -o /dev/null 2>&1 | %FileCheck %s
 //
-// REQUIRES: swift_in_compiler
 
 sil_stage raw
 

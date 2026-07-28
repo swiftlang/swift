@@ -31,7 +31,6 @@
 // @export(interface) hides the body of test().
 // RUN: %target-swift-frontend -emit-ir -parse-as-library %t/Files/Application.swift -enable-experimental-feature Embedded -I %t/Modules -o %t/Application.ir
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_Embedded
 
 //--- Library.swift

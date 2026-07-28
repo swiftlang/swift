@@ -1109,3 +1109,19 @@ func testInvalidTransforDoesntHideConversionFailure() {
     test("") // expected-error {{cannot convert value of type 'String' to expected argument type 'Int'}}
   }
 }
+
+func testInvalidPatternInResultBuilderBody() {
+  @resultBuilder struct Builder {
+    static func buildBlock() -> Int { 0 }
+  }
+
+  struct Test {
+    @Builder func invalidA() -> Int {
+      let a // expected-error {{type annotation missing in pattern}}
+    }
+
+    @Builder var invalidB: Int {
+      @Invalid var b // expected-error {{type annotation missing in pattern}}
+    }
+  }
+}

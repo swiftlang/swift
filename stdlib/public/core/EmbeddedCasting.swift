@@ -149,6 +149,17 @@ enum MetadataKind: Equatable {
   static let lastEnumerated = 0x7FF
 }
 
+@_silgen_name("swift_isClassType")
+@used
+public func swift_isClassType(metadata: UnsafeRawPointer) -> Bool {
+  if let kind = unsafe MetadataKind(metadata: metadata) {
+    return kind == .class
+  }
+
+  return false
+}
+
+
 func projectHeapObject(_ exist: UnsafeRawPointer) -> UnsafeRawPointer{
   return unsafe exist.assumingMemoryBound(to: UnsafeRawPointer.self).pointee
 }

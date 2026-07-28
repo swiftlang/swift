@@ -31,7 +31,7 @@ bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.NativeObject, %2 : $Builtin.Int32):
   %20 = builtin "xor_Int32"(%17 : $Builtin.Int32, %18 : $Builtin.Int32) : $Builtin.Int32
   %22 = builtin "and_Int32"(%2 : $Builtin.Int32, %20 : $Builtin.Int32) : $Builtin.Int32
 // CHECK-NOT: cond_br
-  cond_br %8, bb1, bb2(%22 : $Builtin.Int32)
+  cond_br %8, bb1, bb2a
 
 bb1:
   %24 = global_addr @globalinit_token11 : $*Builtin.Word
@@ -41,6 +41,9 @@ bb1:
 // CHECK: [[VAR_21:%[0-9]+]] = builtin "and_Int32"
   %30 = builtin "or_Int32"(%22 : $Builtin.Int32, %28 : $Builtin.Int32) : $Builtin.Int32
   br bb2(%30 : $Builtin.Int32)
+
+bb2a:
+  br bb2(%22 : $Builtin.Int32)
 
 bb2(%32 : $Builtin.Int32):
 // CHECK-NOT: tuple
@@ -243,11 +246,14 @@ bb0(%0 : $Int32, %1 : $Int32, %2 : $X, %24 : $Builtin.Int1):
 
 bb9(%21 : $(Int32, Int32)):
   %22 = tuple_extract %21 : $(Int32, Int32), 1
-  cond_br %24, bb1(%22 : $Int32), bb5(%22 : $Int32)
+  cond_br %24, bb1, bb5a
+
+bb5a:
+  br bb5(%22 : $Int32)
 
 // CHECK: bb1
 // CHECK-NOT: switch_enum
-bb1(%12: $Int32):
+bb1:
   switch_enum %2 : $X, case #X.A!enumelt: bb6, case #X.B!enumelt: bb7, case #X.C!enumelt: bb8
 
 bb2:
@@ -497,10 +503,13 @@ bb0(%0 : $Optional<Int32>):
 // CHECK: select_enum
 // CHECK-NEXT: return
   %1 = select_enum %0 : $Optional<Int32>, case #Optional.some!enumelt: %t, default %f : $Builtin.Int1
-  cond_br %1, bb1(%0 : $Optional<Int32>), bb2(%0 : $Optional<Int32>)
+  cond_br %1, bb1, bb2a
 
-bb1(%2 : $Optional<Int32>):
-  br bb2(%2 : $Optional<Int32>)
+bb1:
+  br bb2(%0 : $Optional<Int32>)
+
+bb2a:
+  br bb2(%0 : $Optional<Int32>)
 
 bb2(%3 : $Optional<Int32>):
   return %0 : $Optional<Int32>
@@ -802,7 +811,10 @@ bb4:
   %18 = load %5 : $*Payload
   %19 = enum $MyEnum, #MyEnum.payload!enumelt, %18 : $Payload
   dealloc_stack %5 : $*Payload
-  cond_br undef, bb7, bb5
+  cond_br undef, bb7a, bb5
+
+bb7a:
+  br bb7
 
 bb5:
   br bb6(%19 : $MyEnum)

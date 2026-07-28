@@ -5,7 +5,8 @@
 A function value with type `@isolated(any)` carries its actor isolation dynamically. Calling such a function from a context that does not share its isolation requires hopping to the function's actor, which can only be done from an asynchronous context. As a result, an `@isolated(any)` function value cannot be converted to a synchronous, non-`@isolated(any)` function type.
 
 ```swift
-@MainActor func updateUI() { /* ... */ }
+@MainActor
+func updateUI() { /* ... */ }
 
 func runInBackground(_ work: @escaping @Sendable () -> ()) {
   DispatchQueue.global().async { work() }

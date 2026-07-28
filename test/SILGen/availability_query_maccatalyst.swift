@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 // RUN: %target-swift-emit-silgen %s -target x86_64-apple-ios50.0-macabi | %FileCheck %s
 
 // REQUIRES: OS=macosx || OS=maccatalyst

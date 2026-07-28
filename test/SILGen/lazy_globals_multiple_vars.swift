@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 // RUN: %target-swift-emit-silgen -parse-as-library %s | %FileCheck %s
 
 // CHECK:       sil private [global_init_once_fn] [ossa] [[INIT_A_B:@.*1a.*1b.*WZ]] :

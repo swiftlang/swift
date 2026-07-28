@@ -3,7 +3,6 @@
 // RUN:   -enable-experimental-feature SuppressedAssociatedTypesWithDefaults \
 // RUN: | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_Lifetimes
 // REQUIRES: swift_feature_SuppressedAssociatedTypesWithDefaults
 

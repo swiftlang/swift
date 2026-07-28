@@ -993,14 +993,37 @@ private:
     B.addInt16(uint16_t(kind));
     B.addInt16(FieldRecordSize);
 
+    // A `@_rawLayout(like: T)` struct has no stored properties, so it would
+    // otherwise emit an empty field descriptor. Generic raw-layout types don't
+    // get an opaque builtin descriptor either (their size depends on the
+    // substituted generic arguments), so remote reflection has no way to
+    // recover their size and would report it as zero. Expose the "like" type
+    // as an artificial field so remote reflection can compute the layout by
+    // substituting the type's generic arguments. In-process reflection is
+    // unaffected: it derives the child count from the nominal type descriptor,
+    // which records no stored properties for a raw-layout type.
+    Type rawLayoutLikeType;
+    if (auto *SD = dyn_cast<StructDecl>(const_cast<NominalTypeDecl *>(NTD))) {
+      if (auto *attr = SD->getAttrs().getAttribute<RawLayoutAttr>()) {
+        if (auto likeType = attr->getResolvedScalarLikeType(SD))
+          rawLayoutLikeType = (*likeType)->mapTypeOutOfEnvironment();
+      }
+    }
+
     // Emit exportable fields, prefixed with a count
-    B.addInt32(countExportableFields(IGM, NTD));
+    B.addInt32(countExportableFields(IGM, NTD) + (rawLayoutLikeType ? 1 : 0));
 
     // Filter to select which fields we'll export FieldDescriptor for.
     forEachField(IGM, NTD, [&](Field field) {
       if (isExportableField(field))
         addField(field);
     });
+
+    if (rawLayoutLikeType) {
+      reflection::FieldRecordFlags flags;
+      flags.setIsArtificial();
+      addField(flags, rawLayoutLikeType, "_rawLayout");
+    }
   }
 
   void addField(const EnumDecl *enumDecl, const EnumElementDecl *decl,

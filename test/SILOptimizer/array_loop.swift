@@ -1,7 +1,6 @@
 // RUN: %target-swift-frontend -O -module-name=test -emit-sil -primary-file %s | %FileCheck %s
 
 // REQUIRES: swift_stdlib_no_asserts
-// REQUIRES: swift_in_compiler
 
 
 // Test that even with a generic array the iteration is done efficiently.

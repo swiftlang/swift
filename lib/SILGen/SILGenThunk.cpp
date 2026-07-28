@@ -120,8 +120,8 @@ void SILGenModule::emitDistributedThunkForDecl(
   if (!thunkDecl || !thunkDecl->hasBody() || thunkDecl->isBodySkipped())
     return;
 
-  auto thunk = SILDeclRef(thunkDecl).asDistributed();
-  emitFunctionDefinition(SILDeclRef(thunkDecl).asDistributed(),
+  auto thunk = SILDeclRef(thunkDecl).getDistributedThunkDeclRef();
+  emitFunctionDefinition(thunk,
                          getFunction(thunk, ForDefinition));
 }
 
@@ -134,7 +134,7 @@ void SILGenModule::emitDistributedResolvableProxyAdapterThunkForDecl(
 
   // Unlike the regular distributed thunk, the resolvable proxy adapter thunk
   // is a plain `nonisolated(nonsending)` function, so it is referenced by
-  // an ordinary SILDeclRef (not `.asDistributed()`).
+  // an ordinary SILDeclRef (not `.asDistributedThunk()`).
   auto ref = SILDeclRef(thunkDecl);
   SILFunction *fn = getFunction(ref, ForDefinition);
   // Mark the SIL function so DFE keeps it alive.

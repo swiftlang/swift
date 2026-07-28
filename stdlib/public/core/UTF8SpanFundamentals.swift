@@ -355,12 +355,12 @@ extension UTF8Span {
 @available(SwiftStdlib 6.2, *)
 extension UTF8Span {
   /// Whether `i` is in bounds
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal func _boundsCheck(_ i: Int) -> Bool {
     i >= 0 && i < count
   }
   /// Whether `bounds` is in bounds
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal func _boundsCheck(_ bounds: Range<Int>) -> Bool {
     _boundsCheck(bounds.lowerBound)
     && _boundsCheck(bounds.upperBound &- 1)

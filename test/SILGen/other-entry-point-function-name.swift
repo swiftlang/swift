@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 // RUN: %empty-directory(%t)
 // RUN: %target-clang -c --language=c %S/Inputs/forward-to-foobar.c -o %t/forward.o
 // RUN: %target-build-swift %s %t/forward.o -Xfrontend -entry-point-function-name -Xfrontend foobar -o %t/main

@@ -1,0 +1,84 @@
+#!/usr/bin/env python3
+# utils/PathSanitizingDiff -*- python -*-
+#
+# This source file is part of the Swift.org open source project
+#
+# Copyright (c) 2026 Apple Inc. and the Swift project authors
+# Licensed under Apache License v2.0 with Runtime Library Exception
+#
+# See https://swift.org/LICENSE.txt for license information
+# See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+
+import argparse
+import io
+import shlex
+import subprocess
+import sys
+
+import swift_path_sanitize
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description="""
+PathSanitizingDiff sanitizes its standard input the same way
+PathSanitizingFileCheck does (replacing paths to the source and build
+directories with path-independent constants), then compares the result
+against a reference file using diff.  It collapses the common two-step
+`PathSanitizingFileCheck --dry-run > out; diff out expected` idiom into a
+single step.""",
+    )
+
+    swift_path_sanitize.add_shared_arguments(parser)
+
+    parser.add_argument(
+        "--use-diff",
+        help="diff command to invoke; may include flags (e.g. "
+        "'diff --strip-trailing-cr')",
+        metavar="COMMAND",
+        action="store",
+        dest="diff_command",
+        default="diff",
+    )
+
+    parser.add_argument(
+        swift_path_sanitize.TEMP_DIR_OPTION,
+        help="the test's temporary location (%%t). When given, the sanitized "
+        "input is written to an output file derived from it on a mismatch "
+        "so the update plugin can repair the reference file/slice.",
+        metavar="PATH",
+        action="store",
+        dest="temp_dir",
+        default=None,
+    )
+
+    args, unknown_args = parser.parse_known_args()
+
+    stdin = io.open(sys.stdin.fileno(), "r", encoding="utf-8", errors="ignore").read()
+
+    stdin = swift_path_sanitize.sanitize(stdin, args)
+
+    # Feed the sanitized text as the first operand (via '-') so that the diff
+    # direction matches the historical `diff <actual> <expected>` ordering,
+    # where the reference file is passed as a positional argument.
+    diff_argv = shlex.split(args.diff_command) + ["-"] + unknown_args
+    p = subprocess.Popen(diff_argv, stdin=subprocess.PIPE)
+    p.communicate(stdin.encode("utf-8"))
+    returncode = p.wait()
+
+    # On a mismatch, persist the sanitized input for the update plugin. The
+    # output is placed in the per-test temporary namespace so parallel tests
+    # cannot collide.
+    if returncode != 0 and args.temp_dir is not None:
+        reference = swift_path_sanitize.reference_path(unknown_args)
+        if reference is not None:
+            output = swift_path_sanitize.output_path(args.temp_dir, reference)
+            with io.open(output, "w", encoding="utf-8") as f:
+                f.write(stdin)
+
+    return returncode
+
+
+if __name__ == "__main__":
+    exit(main())

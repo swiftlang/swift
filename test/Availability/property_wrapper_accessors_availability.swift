@@ -307,3 +307,14 @@ class Subclass: Base<Item> {
     didSet {}
   }
 }
+
+struct HasDeprecatedWrappedProperty {
+  @available(*, deprecated)
+  @UnrestrictedProjection var value: Int
+
+  func use() {
+    _ = value  // expected-warning {{'value' is deprecated}}
+    _ = $value // expected-warning {{'$value' is deprecated}}
+    _ = _value // expected-warning {{'_value' is deprecated}}
+  }
+}

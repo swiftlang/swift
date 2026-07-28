@@ -199,6 +199,9 @@ void MemoryLocations::analyzeLocation(SILValue loc) {
   if (loc->getType().isEmpty(*function))
     return;
 
+  if (loc->getType().aggregateHasUnreferenceableStorage())
+    return;
+
   unsigned currentLocIdx = locations.size();
   locations.push_back(Location(loc, isTrivial(loc->getType(), function), currentLocIdx));
   SmallVector<SILValue, 8> collectedVals;
@@ -397,6 +400,9 @@ bool MemoryLocations::analyzeAddrProjection(
 
   SILFunction *f = projection->getFunction();
   if (projection->getType().isEmpty(*f))
+    return false;
+
+  if (projection->getType().aggregateHasUnreferenceableStorage())
     return false;
 
   auto key = std::make_pair(parentLocIdx, fieldNr);

@@ -9,9 +9,12 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-// RUN: %target-run-simple-swift(-enable-experimental-feature Lifetimes)
+// The emission of runtime metadata for inverted requirements needs a 5.8+
+// target, so build the test targeting 5.8 and mark the tests as requiring 5.8.
+// RUN: %target-run-simple-swift(-target %target-swift-5.8-abi-triple -enable-experimental-feature Lifetimes)
 // REQUIRES: executable_test
 // REQUIRES: swift_feature_Lifetimes
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 import StdlibUnittest
 
@@ -57,7 +60,7 @@ extension InlineArray where Element: Equatable & ~Copyable {
   }
 }
 
-NoncopyableEquatableTests.test("equating noncopyables") {  
+NoncopyableEquatableTests.test("equating noncopyables").require(.stdlib_5_8).code {
   // TODO: update StdLibUnitTest to work with ~Copyable Equtable
   
   let a = Noncopyable(wrapping: 1)
@@ -96,7 +99,7 @@ NoncopyableEquatableTests.test("equating noncopyables") {
   expectNil(array.firstIndex(of: .init(wrapping: 3)))
 }
 
-NoncopyableEquatableTests.test("equating nonescapables") {  
+NoncopyableEquatableTests.test("equating nonescapables").require(.stdlib_5_8).code {
   let nc1 = Noncopyable<Nonescapable>(wrapping: .init(wrapped: 1))
   let nc2 = Noncopyable<Nonescapable>(wrapping: .init(wrapped: 1))
   let nc3 = Noncopyable<Nonescapable>(wrapping: .init(wrapped: 2))

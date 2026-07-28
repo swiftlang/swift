@@ -387,7 +387,7 @@ fileprivate func binaryExponentFor10ToThe(_ p: Int) -> Int {
 // utility encapsulates the standard idiom needed to multiply such
 // values with a truncated (rounded down) result.
 fileprivate func multiply64x64RoundingDown(_ lhs: UInt64, _ rhs: UInt64) -> UInt64 {
-  UInt64(truncatingIfNeeded: (_UInt128(lhs) * _UInt128(rhs)) >> 64)
+  UInt64(truncatingIfNeeded: (UInt128(lhs) * UInt128(rhs)) >> 64)
 }
 
 // Description of target FP format
@@ -455,7 +455,7 @@ fileprivate func hexFloat(
 ) -> ParseResult {
   var i = start + 2 // Skip leading '0x'
   let firstDigitOffset = i
-  var significand: _UInt128 = 0
+  var significand: UInt128 = 0
 
   //
   // Digits before the binary point
@@ -465,7 +465,7 @@ fileprivate func hexFloat(
   let limit = UInt64(1) << 60
   while i < input.count && hexdigit(input[i]) < 16 && significand._high < limit {
     significand &<<= 4
-    significand |= _UInt128(hexdigit(input[i]))
+    significand |= UInt128(hexdigit(input[i]))
     i += 1
   }
 
@@ -483,7 +483,7 @@ fileprivate func hexFloat(
     // Fill that many bits from the next digit
     let digit = hexdigit(input[i])
     let upperPartialDigit = digit >> (4 - bits)
-    significand |= _UInt128(upperPartialDigit)
+    significand |= UInt128(upperPartialDigit)
     // Did we drop any non-zero bits?
     remainderNonZero = remainderNonZero || ((digit - (upperPartialDigit << (4 - bits))) != 0)
 
@@ -521,14 +521,14 @@ fileprivate func hexFloat(
         let digit = hexdigit(input[i])
         let upperZeros = digit.leadingZeroBitCount - 4
         binaryExponent -= upperZeros
-        significand = _UInt128(digit)
+        significand = UInt128(digit)
         i += 1
       }
     }
     // Pack more bits into the accumulator (up to 124)
     while i < input.count && hexdigit(input[i]) < 16 && significand._high < limit {
       significand &<<= 4
-      significand |= _UInt128(hexdigit(input[i]))
+      significand |= UInt128(hexdigit(input[i]))
       i += 1
     }
     // Part of the digit that would overflow our 128-bit accumulator
@@ -538,7 +538,7 @@ fileprivate func hexFloat(
       // Fill that many bits from the next digit
       let digit = hexdigit(input[i])
       let upperPartialDigit = digit >> (4 - bits)
-      significand |= _UInt128(upperPartialDigit)
+      significand |= UInt128(upperPartialDigit)
       // Did we drop any non-zero bits?
       remainderNonZero = remainderNonZero || ((digit - (upperPartialDigit << (4 - bits))) != 0)
       i += 1
@@ -637,12 +637,12 @@ fileprivate func hexFloat(
     {
       // Round up, test for overflow
       targetSignificand += 1
-      if targetSignificand >= (_UInt128(1) << targetFormat.significandBits) {
+      if targetSignificand >= (UInt128(1) << targetFormat.significandBits) {
         // Normal overflowed, need to renormalize
         targetSignificand >>= 1
         binaryExponent += 1
       } else if (binaryExponent < targetFormat.minBinaryExponent
-                   && targetSignificand >= (_UInt128(1) << (targetFormat.significandBits - 1))) {
+                   && targetSignificand >= (UInt128(1) << (targetFormat.significandBits - 1))) {
         // Subnormal overflowed to normal
         binaryExponent += 1
       }
@@ -666,7 +666,7 @@ fileprivate func nan_payload(
   input: Span<UInt8>,
   start: Int,
   end: Int
-) -> _UInt128? {
+) -> UInt128? {
   if start == end {
     return 0
   }
@@ -687,14 +687,14 @@ fileprivate func nan_payload(
   }
   // Accumulate the payload, preserving only
   // the least-significant 64 bits.
-  var payload : _UInt128 = 0
+  var payload : UInt128 = 0
   for i in p..<end {
     let d = hexdigit(input[i])
     if d >= base {
       return nil
     }
-    payload &*= _UInt128(base)
-    payload &+= _UInt128(d)
+    payload &*= UInt128(base)
+    payload &+= UInt128(d)
   }
   return payload
 }
@@ -1337,15 +1337,15 @@ fileprivate func multiplyMPBy32(
 fileprivate func multiplyMPBy96(
   work: inout MutableSpan<MPWord>,
   range: inout Range<Int>,
-  multiplier: _UInt128
+  multiplier: UInt128
 ) {
   // Multiplier must be <= 96 bits so the efficient multiply loop works.
   _internalInvariant(multiplier._high.leadingZeroBitCount >= 32)
   let bitsPerMPWord = MPWord.bitWidth
   var i = range.lowerBound
-  var t = _UInt128(0)
+  var t = UInt128(0)
   while i < range.upperBound {
-    t &+= multiplier &* _UInt128(unsafe work[unchecked: i])
+    t &+= multiplier &* UInt128(unsafe work[unchecked: i])
     unsafe work[unchecked: i] = MPWord(truncatingIfNeeded: t)
     t >>= bitsPerMPWord
     i &+= 1
@@ -1362,23 +1362,23 @@ fileprivate func multiplyMPBy96(
 fileprivate func multiplyMPBy128(
   work: inout MutableSpan<MPWord>,
   range: inout Range<Int>,
-  multiplier: _UInt128
+  multiplier: UInt128
 ) {
   let bitsPerMPWord = MPWord.bitWidth
   var i = range.lowerBound
-  let a = _UInt128(multiplier._high)
-  let b = _UInt128(multiplier._low)
-  var u = _UInt128(0)
-  var l = _UInt128(0)
+  let a = UInt128(multiplier._high)
+  let b = UInt128(multiplier._low)
+  var u = UInt128(0)
+  var l = UInt128(0)
   while i < range.upperBound {
-    let word = _UInt128(unsafe work[unchecked: i])
+    let word = UInt128(unsafe work[unchecked: i])
     l &+= b &* word
     u &+= a &* word
     unsafe work[unchecked: i] = MPWord(truncatingIfNeeded: l)
     l >>= bitsPerMPWord
     let t = MPWord(truncatingIfNeeded: u)
     u >>= bitsPerMPWord
-    l += _UInt128(t) << bitsPerMPWord
+    l += UInt128(t) << bitsPerMPWord
     i &+= 1
   }
   while u != 0 || l != 0 {
@@ -1386,7 +1386,7 @@ fileprivate func multiplyMPBy128(
     l >>= bitsPerMPWord
     let t = MPWord(truncatingIfNeeded: u)
     u >>= bitsPerMPWord
-    l += _UInt128(t) << bitsPerMPWord
+    l += UInt128(t) << bitsPerMPWord
     i &+= 1
   }
   range = range.lowerBound..<i
@@ -1555,7 +1555,7 @@ fileprivate func multiplyByFiveToTheN(
   // Largest power of 5 such that multiplying it by any 32-bit value
   // gives a < 128-bit result
   while remainingPower >= 40 {
-    let fiveToThe40 = _UInt128(high: 493038065, low: 14077307678380127585)
+    let fiveToThe40 = UInt128(_low: 14077307678380127585, _high: 493038065)
     multiplyMPBy96(work: &work, range: &range, multiplier: fiveToThe40)
     remainingPower &-= 40
   }
@@ -1563,7 +1563,7 @@ fileprivate func multiplyByFiveToTheN(
   // We know remainingPower < 40, so we need at most one factor of 27
   // 5 ** 27 is the largest power of 5 that fits in 64 bits
   if remainingPower >= 27 {
-    let fiveToThe27 = _UInt128(7450580596923828125)
+    let fiveToThe27 = UInt128(7450580596923828125)
     multiplyMPBy96(work: &work, range: &range, multiplier: fiveToThe27)
     remainingPower &-= 27
   }
@@ -1571,7 +1571,7 @@ fileprivate func multiplyByFiveToTheN(
   if remainingPower >= 14 {
     // We know 14 <= remainingPower < 27
     let next = unsafe powersOfFive_64[unchecked: remainingPower &- 14]
-    multiplyMPBy96(work: &work, range: &range, multiplier: _UInt128(next))
+    multiplyMPBy96(work: &work, range: &range, multiplier: UInt128(next))
   } else if remainingPower > 0 {
     // We know remainingPower < 14
     let next = unsafe powersOfFive_32[unchecked: remainingPower]
@@ -1760,13 +1760,13 @@ fileprivate func mostSignificantBitsFrom(
   range: Range<Int>,
   count: Int,
   remainderNonZero: Bool
-) -> _UInt128 {
+) -> UInt128 {
   let bitsPerMPWord = MPWord.bitWidth
 
   var i = range.upperBound &- 1
   let firstWord = unsafe work[unchecked: i]
   let firstWordBits = bitsPerMPWord - firstWord.leadingZeroBitCount
-  var accumulator = _UInt128(firstWord)
+  var accumulator = UInt128(firstWord)
   var remainingBits = count
   var fractionBits = 0
   var fraction = UInt64(0)
@@ -1783,7 +1783,7 @@ fileprivate func mostSignificantBitsFrom(
     while remainingBits >= bitsPerMPWord && i > range.lowerBound {
       accumulator &<<= bitsPerMPWord
       i &-= 1
-      accumulator |= unsafe _UInt128(work[unchecked: i])
+      accumulator |= unsafe UInt128(work[unchecked: i])
       remainingBits -= bitsPerMPWord
     }
 
@@ -1793,7 +1793,7 @@ fileprivate func mostSignificantBitsFrom(
       accumulator &<<= remainingBits
       i &-= 1
       let nextWord = unsafe work[unchecked: i]
-      accumulator |= _UInt128(nextWord &>> (32 &- remainingBits))
+      accumulator |= UInt128(nextWord &>> (32 &- remainingBits))
 
       fractionBits = 32 &- remainingBits
       fraction = UInt64((nextWord &<< remainingBits) &>> remainingBits)
@@ -1828,12 +1828,12 @@ fileprivate func mostSignificantBitsFrom(
 
   if _slowPath(count == 0) {
     // If count == 0, then value is zero, so we only care about rounding...
-    return unsafe _UInt128(unsafeBitCast(fraction > 0x8000000000000000, to: UInt8.self))
+    return unsafe UInt128(unsafeBitCast(fraction > 0x8000000000000000, to: UInt8.self))
   }
 
   let greater = unsafe unsafeBitCast(fraction > 0x8000000000000000, to: UInt8.self)
   let equal = unsafe unsafeBitCast(fraction == 0x8000000000000000, to: UInt8.self)
-  let roundUp = _UInt128(greater) | (_UInt128(equal) & accumulator)
+  let roundUp = UInt128(greater) | (UInt128(equal) & accumulator)
   return accumulator &+ roundUp
 }
 
@@ -1870,7 +1870,7 @@ fileprivate func slowDecimalToBinary(
   let significandWordsNeeded = (significandBitsNeeded &+ (bitsPerMPWord - 1)) / bitsPerMPWord
 
   var binaryExponent = 0
-  let targetSignificand: _UInt128
+  let targetSignificand: UInt128
 
   if decimalExponent >= 0 {
     // ================================================================
@@ -1928,7 +1928,7 @@ fileprivate func slowDecimalToBinary(
                                               count: targetFormat.significandBits,
                                               remainderNonZero: false)
 
-    if significand >= (_UInt128(1) &<< targetFormat.significandBits) {
+    if significand >= (UInt128(1) &<< targetFormat.significandBits) {
       significand >>= 1
       binaryExponent &+= 1
     }
@@ -2019,7 +2019,7 @@ fileprivate func slowDecimalToBinary(
                                                 range: quotientRange,
                                                 count: targetFormat.significandBits,
                                                 remainderNonZero: remainderNonZero)
-      if significand >= (_UInt128(1) &<< targetFormat.significandBits) {
+      if significand >= (UInt128(1) &<< targetFormat.significandBits) {
         significand >>= 1
         binaryExponent &+= 1
       }
@@ -2043,7 +2043,7 @@ fileprivate func slowDecimalToBinary(
       // exponent.  Then we've transitioned from a subnormal to
       // a normal, so the extra overflow bit will naturally get
       // dropped, we just have to bump the exponent.
-      if significand >= (_UInt128(1) &<< (targetFormat.significandBits &- 1)) {
+      if significand >= (UInt128(1) &<< (targetFormat.significandBits &- 1)) {
         binaryExponent &+= 1
       }
       targetSignificand = significand
@@ -2837,7 +2837,7 @@ internal func _swift_stdlib_strtold_clocale(
 /*
 
 // Note: Float128 will be introduced after UInt128, so we can use UInt128
-// in the implementation here instead of _UInt128
+// in the implementation here instead of UInt128
 @available(...)
 internal func parse_float128(_ span: Span<UInt8>) -> Optional<Float128> {
   let targetFormat = TargetFormat(

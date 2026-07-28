@@ -1,6 +1,7 @@
 
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -emit-module-path=%t/weak_other.swiftmodule -module-name=weak_other %S/Inputs/weak_other.swift
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -module-name weak_multiple_modules -I %t %s
 // RUN: %target-swift-emit-silgen -module-name weak_multiple_modules -I %t %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
 
 import weak_other

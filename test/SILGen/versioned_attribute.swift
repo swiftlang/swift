@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 // RUN: %target-swift-emit-silgen -emit-verbose-sil %s | %FileCheck %s
 
 // Check that @usableFromInline entities have public linkage.

@@ -310,6 +310,9 @@ extension ASTGenVisitor {
 extension ASTGenVisitor {
   func generate(extensionDecl node: ExtensionDeclSyntax) -> BridgedExtensionDecl {
     let attrs = self.generateDeclAttributes(node, allowStatic: false)
+    // `extension P.Protocol { }` (a protocol metatype extension) is recognized
+    // in the `ExtensionDecl` constructor, which strips the `.Protocol` and
+    // marks the extension; ASTGen just forwards the written type.
     let decl = BridgedExtensionDecl.createParsed(
       self.ctx,
       declContext: self.declContext,

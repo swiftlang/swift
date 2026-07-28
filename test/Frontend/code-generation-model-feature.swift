@@ -15,5 +15,4 @@
 // RUN: %target-swift-frontend -typecheck -parse-stdlib %s -enable-experimental-feature Embedded -enable-experimental-feature CodeGenerationModel=implementation
 // RUN: %target-swift-frontend -typecheck -parse-stdlib %s -enable-experimental-feature Embedded -enable-experimental-feature CodeGenerationModel=inlinable
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_Embedded

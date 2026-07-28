@@ -1,7 +1,6 @@
 // RUN: %target-swift-frontend -enable-experimental-feature CompileTimeValuesPreview -primary-file %s -emit-sil -parse-as-library | %FileCheck %s --check-prefix=SIL
 // RUN: %target-swift-frontend -enable-experimental-feature CompileTimeValuesPreview -primary-file %s -emit-ir  -parse-as-library | %FileCheck %s --check-prefix=IR
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_CompileTimeValuesPreview
 
 @section("__DATA,__mysection") var g0: Int = 1

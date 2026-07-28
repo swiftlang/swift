@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -enable-library-evolution %s
 // RUN: %target-swift-emit-silgen %s -enable-library-evolution | %FileCheck %s
 
 public enum E: Hashable {

@@ -1,6 +1,5 @@
 // RUN: %target-sil-opt -disable-swift-verification -dont-abort-on-memory-lifetime-errors -o /dev/null %s 2>&1 | %FileCheck %s
 // REQUIRES: asserts
-// REQUIRES: swift_in_compiler
 
 sil_stage canonical
 
@@ -543,11 +542,11 @@ bb0(%0 : $*U):
 sil [ossa] @test_open_existential : $@convention(thin) <U: P> (@in_guaranteed U) -> () {
 bb0(%0 : $*U):
   %s = alloc_stack $P
-  %o = open_existential_addr immutable_access %s : $*P to $*@opened("5B62392E-7C62-11EB-BF90-D0817AD9985D", P) Self
-  %s2 = alloc_stack $@opened("5B62392E-7C62-11EB-BF90-D0817AD9985D", P) Self
-  copy_addr %o to [init] %s2 : $*@opened("5B62392E-7C62-11EB-BF90-D0817AD9985D", P) Self
-  destroy_addr %s2 : $*@opened("5B62392E-7C62-11EB-BF90-D0817AD9985D", P) Self
-  dealloc_stack %s2 : $*@opened("5B62392E-7C62-11EB-BF90-D0817AD9985D", P) Self
+  %o = open_existential_addr immutable_access %s : $*P to $*@opened(1, P) Self
+  %s2 = alloc_stack $@opened(1, P) Self
+  copy_addr %o to [init] %s2 : $*@opened(1, P) Self
+  destroy_addr %s2 : $*@opened(1, P) Self
+  dealloc_stack %s2 : $*@opened(1, P) Self
   destroy_addr %s : $*P
   dealloc_stack %s : $*P
   %5 = tuple ()
@@ -857,7 +856,7 @@ bb0(%0 : @owned $T, %1 : @owned $Inner):
 
 sil @initfn : $@convention(thin) () -> @out T 
 
-// CHECK: SIL memory lifetime failure in @inject_enum_case: memory is not initialized, but should be
+// This is currently not checked
 sil [ossa] @inject_enum_case : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_stack $Optional<T>

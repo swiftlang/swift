@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -enable-experimental-move-only -parse-stdlib -disable-availability-checking %s
 // RUN: %target-swift-emit-silgen -enable-experimental-move-only -parse-stdlib -disable-availability-checking %s | %FileCheck %s
 // RUN: %target-swift-emit-sil -enable-experimental-move-only -parse-stdlib -disable-availability-checking %s | %FileCheck -check-prefix=CHECK-SIL %s
 // RUN: %target-swift-emit-sil -O -enable-experimental-move-only -Xllvm -sil-disable-pass=FunctionSignatureOpts -parse-stdlib -disable-availability-checking %s | %FileCheck -check-prefix=CHECK-SIL %s

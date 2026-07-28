@@ -1,4 +1,5 @@
 
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -verify -module-name nested_types_referencing_nested_functions %s
 // RUN: %target-swift-emit-silgen -verify -module-name nested_types_referencing_nested_functions %s | %FileCheck %s
 
 do {

@@ -39,6 +39,7 @@
 #include "swift/AST/ExtInfo.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/LookupKinds.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PackExpansionMatcher.h"
@@ -658,7 +659,7 @@ private:
   /// that correction failed.
   NeverNullType diagnoseUnknownType(Type parentType, SourceRange parentRange,
                                     DeclRefTypeRepr *repr,
-                                    NameLookupOptions lookupOptions,
+                                    NLOptions lookupOptions,
                                     TypeResolutionOptions options);
 
   void maybeDiagnoseBadConformanceRef(Type parentTy, SourceLoc loc,
@@ -1997,7 +1998,7 @@ static std::string getDeclNameFromContext(DeclContext *dc,
 NeverNullType
 TypeResolver::diagnoseUnknownType(Type parentType, SourceRange parentRange,
                                   DeclRefTypeRepr *repr,
-                                  NameLookupOptions lookupOptions,
+                                  NLOptions lookupOptions,
                                   TypeResolutionOptions options) {
   assert(parentType || isa<UnqualifiedIdentTypeRepr>(repr));
 
@@ -2050,8 +2051,7 @@ TypeResolver::diagnoseUnknownType(Type parentType, SourceRange parentRange,
     }
 
     // Try ignoring access control.
-    NameLookupOptions relookupOptions = lookupOptions;
-    relookupOptions |= NameLookupFlags::IgnoreAccessControl;
+    NLOptions relookupOptions = lookupOptions | NLFlags::IgnoreAccessControl;
     auto inaccessibleResults = TypeChecker::lookupUnqualifiedType(
         dc, repr->getNameRef(), repr->getLoc(), relookupOptions);
     if (!inaccessibleResults.empty()) {
@@ -2161,8 +2161,7 @@ TypeResolver::diagnoseUnknownType(Type parentType, SourceRange parentRange,
   }
 
   // Try ignoring access control.
-  NameLookupOptions relookupOptions = lookupOptions;
-  relookupOptions |= NameLookupFlags::IgnoreAccessControl;
+  NLOptions relookupOptions = lookupOptions | NLFlags::IgnoreAccessControl;
   auto inaccessibleMembers = TypeChecker::lookupMemberType(
       dc, parentType, repr->getNameRef(),
       repr->getLoc(), relookupOptions);
@@ -2194,9 +2193,9 @@ TypeResolver::diagnoseUnknownType(Type parentType, SourceRange parentRange,
     LookupResult memberLookup;
     // Let's try to look any member of the parent type with the given name,
     // even if it is not a type, allowing for a more precise diagnostic.
-    NLOptions memberLookupOptions = (NL_QualifiedDefault |
-                                     NL_IgnoreAccessControl |
-                                     NL_IgnoreMissingImports);
+    NLOptions memberLookupOptions = {NLFlags::QualifiedDefault,
+                                     NLFlags::IgnoreAccessControl,
+                                     NLFlags::IgnoreMissingImports};
     SmallVector<ValueDecl *, 2> results;
     dc->lookupQualified(parentType, repr->getNameRef(), repr->getLoc(),
                         memberLookupOptions, results);
@@ -2293,33 +2292,6 @@ void TypeResolver::diagnoseGenericArgumentsOnSelf(
   }
 }
 
-/// Diagnose when this is one of the BorrowingSequence types, which currently require
-/// an experimental feature to use.
-static void diagnoseBorrowingSequenceType(TypeDecl *typeDecl, SourceLoc loc,
-                             const DeclContext *dc) {
-  if (loc.isInvalid())
-    return;
-
-  if (!typeDecl->isStdlibDecl())
-    return;
-
-  ASTContext &ctx = typeDecl->getASTContext();
-  if (ctx.LangOpts.hasFeature(Feature::BorrowingSequence))
-    return;
-
-  auto nameString = typeDecl->getName().str();
-  if (nameString != "BorrowingSequence" && nameString != "BorrowingIteratorProtocol"
-      && nameString != "SpanIterator" && nameString != "BorrowingIteratorAdapter")
-    return;
-
-  // Don't require this in the standard library or _Concurrency library.
-  auto module = dc->getParentModule();
-  if (module->isStdlibModule() || module->getName().str() == "_Concurrency")
-    return;
-
-  ctx.Diags.diagnose(loc, diag::borrowingsequence_experimental, nameString);
-}
-
 NeverNullType
 TypeResolver::resolveUnqualifiedIdentTypeRepr(UnqualifiedIdentTypeRepr *repr,
                                               TypeResolutionOptions options) {
@@ -2339,6 +2311,21 @@ TypeResolver::resolveUnqualifiedIdentTypeRepr(UnqualifiedIdentTypeRepr *repr,
   auto *DC = getDeclContext();
   auto id = repr->getNameRef();
 
+  // A protocol metatype extension has no generic signature and its members are
+  // static members of the protocol metatype, so they cannot reference 'Self'.
+  // Diagnose before name lookup binds it to the protocol's 'Self', which would
+  // leave the member's interface type carrying an unanchored type parameter.
+  if (id.isSimpleName(ctx.Id_Self)) {
+    if (auto *typeDC = DC->getInnermostTypeContext()) {
+      if (typeDC->isMetatypeExtension()) {
+        if (!options.contains(TypeResolutionFlags::SilenceDiagnostics))
+          diagnose(repr->getLoc(), diag::metatype_extension_self);
+        repr->setInvalid();
+        return ErrorType::get(ctx);
+      }
+    }
+  }
+
   // In SIL mode, we bind generic parameters here, since name lookup
   // won't find them.
   if (silContext && silContext->GenericParams) {
@@ -2350,9 +2337,9 @@ TypeResolver::resolveUnqualifiedIdentTypeRepr(UnqualifiedIdentTypeRepr *repr,
     }
   }
 
-  NameLookupOptions lookupOptions = defaultUnqualifiedLookupOptions;
+  NLOptions lookupOptions = defaultUnqualifiedLookupOptions;
   if (options.contains(TypeResolutionFlags::AllowUsableFromInline))
-    lookupOptions |= NameLookupFlags::IncludeUsableFromInline;
+    lookupOptions |= NLFlags::IncludeUsableFromInline;
   auto globals =
       TypeChecker::lookupUnqualifiedType(DC, id, repr->getLoc(), lookupOptions);
 
@@ -2361,7 +2348,7 @@ TypeResolver::resolveUnqualifiedIdentTypeRepr(UnqualifiedIdentTypeRepr *repr,
   bool didIgnoreMissingImports = false;
   if (!globals && ctx.LangOpts.hasFeature(Feature::MemberImportVisibility,
                                           /*allowMigration=*/true)) {
-    lookupOptions |= NameLookupFlags::IgnoreMissingImports;
+    lookupOptions |= NLFlags::IgnoreMissingImports;
     globals = TypeChecker::lookupUnqualifiedType(DC, id, repr->getLoc(),
                                                  lookupOptions);
     didIgnoreMissingImports = true;
@@ -2375,6 +2362,22 @@ TypeResolver::resolveUnqualifiedIdentTypeRepr(UnqualifiedIdentTypeRepr *repr,
   for (const auto &entry : globals) {
     auto *foundDC = entry.getDeclContext();
     auto *typeDecl = cast<TypeDecl>(entry.getValueDecl());
+
+    // As with 'Self' above, a member of a protocol metatype extension cannot
+    // reference the extended protocol's associated types: doing so would root
+    // the member's interface type at an unanchored 'Self'.  Diagnose before
+    // resolving the reference, which would otherwise assert while substituting.
+    if (isa<AssociatedTypeDecl>(typeDecl)) {
+      if (auto *typeDC = DC->getInnermostTypeContext()) {
+        if (typeDC->isMetatypeExtension()) {
+          if (!options.contains(TypeResolutionFlags::SilenceDiagnostics))
+            diagnose(repr->getLoc(), diag::metatype_extension_associated_type,
+                     typeDecl->getName());
+          repr->setInvalid();
+          return ErrorType::get(ctx);
+        }
+      }
+    }
 
     // Compute the type of the found declaration when referenced from this
     // location.
@@ -2422,8 +2425,6 @@ TypeResolver::resolveUnqualifiedIdentTypeRepr(UnqualifiedIdentTypeRepr *repr,
       repr->setInvalid();
       return ErrorType::get(ctx);
     }
-
-    diagnoseBorrowingSequenceType(currentDecl, repr->getLoc(), DC);
 
     repr->setValue(currentDecl, currentDC);
     return current;
@@ -2599,9 +2600,9 @@ TypeResolver::resolveQualifiedIdentTypeRepr(Type parentTy,
   // Phase 1: Find and bind the type declaration.
 
   // Look for member types with the given name.
-  NameLookupOptions lookupOptions = defaultMemberLookupOptions;
+  NLOptions lookupOptions = defaultMemberLookupOptions;
   if (options.contains(TypeResolutionFlags::AllowUsableFromInline))
-    lookupOptions |= NameLookupFlags::IncludeUsableFromInline;
+    lookupOptions |= NLFlags::IncludeUsableFromInline;
   LookupTypeResult memberTypes;
   if (parentTy->mayHaveMembers()) {
     memberTypes = TypeChecker::lookupMemberType(
@@ -2610,7 +2611,7 @@ TypeResolver::resolveQualifiedIdentTypeRepr(Type parentTy,
     // If no members were found, try ignoring missing imports.
     if (!memberTypes && ctx.LangOpts.hasFeature(Feature::MemberImportVisibility,
                                                 /*allowMigration=*/true)) {
-      lookupOptions |= NameLookupFlags::IgnoreMissingImports;
+      lookupOptions |= NLFlags::IgnoreMissingImports;
       memberTypes = TypeChecker::lookupMemberType(
           DC, parentTy, repr->getNameRef(), repr->getLoc(), lookupOptions);
 
@@ -2652,8 +2653,6 @@ TypeResolver::resolveQualifiedIdentTypeRepr(Type parentTy,
     member = memberTypes.back().Member;
     inferredAssocType = memberTypes.back().InferredAssociatedType;
     repr->setValue(member, nullptr);
-
-    diagnoseBorrowingSequenceType(member, repr->getLoc(), DC);
   }
 
   return maybeDiagnoseBadMemberType(member, memberType, inferredAssocType);
@@ -3163,7 +3162,7 @@ static Type rebuildWithDynamicSelf(ASTContext &Context, Type ty) {
   }
 }
 
-/// In SIL, handle '@opened(UUID, constraintType) interfaceType',
+/// In SIL, handle '@opened(ID, constraintType) interfaceType',
 /// which creates an opened archetype.
 NeverNullType
 TypeResolver::resolveOpenedExistentialArchetype(
@@ -3215,7 +3214,7 @@ TypeResolver::resolveOpenedExistentialArchetype(
     // into a new opened generic environment.
     auto *env = GenericEnvironment::forOpenedExistential(
         constraintType->getCanonicalType(),
-        openedAttr->getUUID());
+        openedAttr->getID());
 
     // Rewrite the interface type into one with the correct depth.
     interfaceType = Type(interfaceType).subst(
@@ -3231,7 +3230,7 @@ TypeResolver::resolveOpenedExistentialArchetype(
   return archetypeType;
 }
 
-/// In SIL, handle '@pack_element(UUID) interfaceType',
+/// In SIL, handle '@pack_element(ID) interfaceType',
 /// which creates an opened archetype.
 NeverNullType
 TypeResolver::resolvePackElementArchetype(
@@ -3244,7 +3243,7 @@ TypeResolver::resolvePackElementArchetype(
 
   const SILTypeResolutionContext::OpenedPackElement *entry = nullptr;
   if (const auto *openedPacksMap = silContext->OpenedPackElements) {
-    auto it = openedPacksMap->find(attr->getUUID());
+    auto it = openedPacksMap->find(attr->getID());
     if (it != openedPacksMap->end()) {
       entry = &it->second;
     }
@@ -3536,6 +3535,7 @@ static bool isFunctionAttribute(const TypeAttribute *attr) {
       TypeAttrKind::YieldMany,
       TypeAttrKind::Async,
       TypeAttrKind::Isolated,
+      TypeAttrKind::Called,
   };
   return llvm::any_of(FunctionAttrs,
                       [attrKind = attr->getKind()](TypeAttrKind functionAttr) {
@@ -4266,6 +4266,31 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
       }
     }
 
+    if (auto *fnTy = ty->getAs<AnyFunctionType>()) {
+      if (fnTy->isCalledOnce()) {
+      switch (ownership) {
+      case ParamSpecifier::Borrowing:
+      case ParamSpecifier::LegacyShared:
+        diagnose(eltTypeRepr->getLoc(),
+                 diag::called_once_cannot_be_used_with_borrowing);
+        elements.emplace_back(ErrorType::get(getASTContext()));
+        continue;
+
+      case ParamSpecifier::InOut:
+      case ParamSpecifier::Consuming:
+      case ParamSpecifier::LegacyOwned:
+      // used by `sending`
+      case ParamSpecifier::ImplicitlyCopyableConsuming:
+        break;
+      // @called(once) is consuming by default and we don't
+      // require it be to written explicitly.
+      case ParamSpecifier::Default:
+        ownership = ParamSpecifier::Consuming;
+        break;
+      }
+      }
+    }
+
     // Validate the presence of ownership for a noncopyable parameter.
     // FIXME: This won't diagnose if the type contains unbound generics.
     if (inStage(TypeResolutionStage::Interface)
@@ -4743,10 +4768,35 @@ NeverNullType TypeResolver::resolveASTFunctionType(
   // TODO: maybe make this the place that claims @escaping.
   bool noescape = isDefaultNoEscapeContext(parentOptions);
 
+  bool isCalledOnce = false;
+  if (auto called = claim<CalledTypeAttr>(attrs)) {
+    if (ctx.LangOpts.hasFeature(Feature::CalledAttribute)) {
+      if (representation != FunctionTypeRepresentation::Swift) {
+        diagnoseInvalid(repr, conventionAttr->getAtLoc(),
+                        diag::invalid_called_and_attr_attributes,
+                        conventionAttr);
+        representation = FunctionType::Representation::Swift;
+        parsedClangFunctionType = nullptr;
+      }
+
+      if (!repr->isInvalid() && called->isOnce()) {
+        isCalledOnce = true;
+        // `@called(once)` implies `consuming` which means that the
+        // type should always be escaping in parameter positions.
+        if (parentOptions.is(TypeResolverContext::FunctionInput))
+          noescape = false;
+      }
+    } else {
+      diagnoseInvalid(repr, called->getAttrLoc(),
+                      diag::requires_experimental_feature, "@called", false,
+                      Feature::CalledAttribute.getName());
+    }
+  }
+
   FunctionType::ExtInfoBuilder extInfoBuilder(
       FunctionTypeRepresentation::Swift, noescape, repr->isThrowing(), thrownTy,
       diffKind, /*clangFunctionType*/ nullptr, isolation,
-      /*LifetimeDependenceInfo*/ {}, hasSendingResult);
+      /*LifetimeDependenceInfo*/ {}, hasSendingResult, isCalledOnce);
 
   const clang::Type *clangFnType = parsedClangFunctionType;
   if (shouldStoreClangType(representation) && !clangFnType)
@@ -4995,9 +5045,14 @@ NeverNullType TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
     }
   }
 
+  bool isCalledOnce = false;
+  if (auto *called = claim<CalledTypeAttr>(attrs)) {
+    isCalledOnce = called->isOnce();
+  }
+
   auto extInfoBuilder = SILFunctionType::ExtInfoBuilder(
       representation, pseudogeneric, noescape, sendable, async, unimplementable,
-      isolation, diffKind, clangFnType,
+      isCalledOnce, isolation, diffKind, clangFnType,
       /*LifetimeDependenceInfo*/ {});
 
   // Resolve parameter and result types using the function's generic

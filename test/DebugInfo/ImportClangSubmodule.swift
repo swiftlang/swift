@@ -29,14 +29,14 @@ import OtherClangModule.SubModule
 
 // The Swift compiler uses an ugly hack that auto-imports a
 // submodule's top-level-module, even if we didn't ask for it.
-// CHECK-NOT: !DIImportedEntity({{.*}}, entity: ![[SUBMODULE]]
-// CHECK-NOT: !DIImportedEntity({{.*}}, entity: ![[OTHERSUBMODULE]]
-// CHECK: !DIImportedEntity({{.*}}, entity: ![[CLANGMODULE]]
-// CHECK-NOT: !DIImportedEntity({{.*}}, entity: ![[SUBMODULE]]
-// CHECK-NOT: !DIImportedEntity({{.*}}, entity: ![[OTHERSUBMODULE]]
-// CHECK: !DIImportedEntity({{.*}}, entity: ![[OTHERCLANGMODULE]]
-// CHECK-NOT: !DIImportedEntity({{.*}}, entity: ![[SUBMODULE]]
-// CHECK-NOT: !DIImportedEntity({{.*}}, entity: ![[OTHERSUBMODULE]]
+// CHECK-NOT: !DIImportedEntity({{.*}}, entity: ![[SUBMODULE]],
+// CHECK-NOT: !DIImportedEntity({{.*}}, entity: ![[OTHERSUBMODULE]],
+// CHECK: !DIImportedEntity({{.*}}, entity: ![[CLANGMODULE]],
+// CHECK-NOT: !DIImportedEntity({{.*}}, entity: ![[SUBMODULE]],
+// CHECK-NOT: !DIImportedEntity({{.*}}, entity: ![[OTHERSUBMODULE]],
+// CHECK: !DIImportedEntity({{.*}}, entity: ![[OTHERCLANGMODULE]],
+// CHECK-NOT: !DIImportedEntity({{.*}}, entity: ![[SUBMODULE]],
+// CHECK-NOT: !DIImportedEntity({{.*}}, entity: ![[OTHERSUBMODULE]],
 
 let bar = Bar()
 let baz = OtherBar()

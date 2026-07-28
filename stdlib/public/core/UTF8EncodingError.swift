@@ -110,7 +110,7 @@ extension Unicode.UTF8 {
     /// The range of offsets into our input containing the error
     public var byteOffsets: Range<Int>
 
-    @_alwaysEmitIntoClient
+    @export(implementation)
     public init(
       _ kind: Unicode.UTF8.ValidationError.Kind,
       _ byteOffsets: Range<Int>
@@ -127,7 +127,7 @@ extension Unicode.UTF8 {
       self.byteOffsets = byteOffsets
     }
 
-    @_alwaysEmitIntoClient
+    @export(implementation)
     public init(
       _ kind: Unicode.UTF8.ValidationError.Kind, at byteOffset: Int
     ) {
@@ -152,32 +152,32 @@ extension UTF8.ValidationError {
     }
 
     /// A continuation byte (`10xxxxxx`) outside of a multi-byte sequence
-    @_alwaysEmitIntoClient
+    @export(implementation)
     public static var unexpectedContinuationByte: Self {
       .init(rawValue: 0)!
     }
 
     /// A byte in a surrogate code point (`U+D800..U+DFFF`) sequence
-    @_alwaysEmitIntoClient
+    @export(implementation)
     public static var surrogateCodePointByte: Self {
       .init(rawValue: 1)!
     }
 
     /// A byte in an invalid, non-surrogate code point (`>U+10FFFF`) sequence
-    @_alwaysEmitIntoClient
+    @export(implementation)
     public static var invalidNonSurrogateCodePointByte: Self {
       .init(rawValue: 2)!
     }
 
     /// A byte in an overlong encoding sequence
-    @_alwaysEmitIntoClient
+    @export(implementation)
     public static var overlongEncodingByte: Self {
       .init(rawValue: 3)!
     }
 
     /// A multi-byte sequence that is the start of a valid multi-byte scalar
     /// but is cut off before ending correctly
-    @_alwaysEmitIntoClient
+    @export(implementation)
     public static var truncatedScalar: Self {
       .init(rawValue: 4)!
     }

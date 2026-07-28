@@ -1,3 +1,6 @@
+// FIXME: crashes under opaque values
+// RUN: not --crash %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s -target %target-swift-5.9-abi-triple
+
 // RUN: %target-swift-emit-silgen %s -target %target-swift-5.9-abi-triple
 
 // Make sure we can lower all of these types without crashing.

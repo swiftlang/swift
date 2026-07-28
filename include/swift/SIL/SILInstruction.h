@@ -640,8 +640,8 @@ public:
   /// Currently there are two kinds of type dependent operands:
   ///
   /// 1. for opened archetypes:
-  ///     %o = open_existential_addr %0 : $*P to $*@opened("UUID") P
-  ///     %w = witness_method $@opened("UUID") P, ... // type-defs: %o
+  ///     %o = open_existential_addr %0 : $*P to $*@opened(id, Self) P
+  ///     %w = witness_method $@opened(ID, Self) P, ... // type-defs: %o
   ///
   /// 2. for the dynamic self argument:
   ///     sil @foo : $@convention(method) (@thick X.Type) {
@@ -951,7 +951,7 @@ public:
 
   /// Verify that all operands of this instruction have compatible ownership
   /// with this instruction.
-  void verifyOperandOwnership(SILModuleConventions *silConv = nullptr) const;
+  void verifyOperandOwnership(SILAddressConventions *silConv = nullptr) const;
 
   /// Verify that this instruction and its associated debug information follow
   /// all SIL debug info invariants.
@@ -2957,7 +2957,11 @@ public:
     return getCallee()->getType().template castTo<SILFunctionType>();
   }
   SILFunctionConventions getOrigCalleeConv() const {
-    return SILFunctionConventions(getOrigCalleeType(), this->getModule());
+    // Keyed to the containing function's lowered-addresses state (see
+    // getSubstCalleeConv), not the module stage.
+    return SILFunctionConventions(
+        getOrigCalleeType(),
+        SILAddressConventions::forFunction(*this->getFunction()));
   }
 
   /// Get the type of the callee with the applied substitutions.
@@ -2973,7 +2977,15 @@ public:
   }
   
   SILFunctionConventions getSubstCalleeConv() const {
-    return SILFunctionConventions(getSubstCalleeType(), this->getModule());
+    // Keyed to the lowered-addresses state of the function containing this
+    // apply, not the module stage: AddressLowering rewrites a call's operands
+    // in the caller's context, so the operand shapes track the caller's state
+    // even while the module flag is still false. Routed through a free helper
+    // because reading the bit needs the complete SILFunction, only
+    // forward-declared here.
+    return SILFunctionConventions(
+        getSubstCalleeType(),
+        SILAddressConventions::forFunction(*this->getFunction()));
   }
 
   bool isCalleeNoReturn() const {
@@ -3362,7 +3374,7 @@ class ApplyInst final
   create(SILDebugLocation debugLoc, SILValue callee,
          SubstitutionMap substitutions, ArrayRef<SILValue> args,
          ApplyOptions options,
-         std::optional<SILModuleConventions> moduleConventions,
+         std::optional<SILAddressConventions> moduleConventions,
          SILFunction &parentFunction,
          const GenericSpecializationInformation *specializationInfo,
          std::optional<ApplyIsolationCrossing> isolationCrossing,
@@ -3493,7 +3505,7 @@ class BeginApplyInst final
   create(SILDebugLocation debugLoc, SILValue callee,
          SubstitutionMap substitutions, ArrayRef<SILValue> args,
          ApplyOptions options,
-         std::optional<SILModuleConventions> moduleConventions,
+         std::optional<SILAddressConventions> moduleConventions,
          SILFunction &parentFunction,
          const GenericSpecializationInformation *specializationInfo,
          std::optional<ApplyIsolationCrossing> isolationCrossing,
@@ -3652,9 +3664,6 @@ public:
 
   CanSILFunctionType getFunctionType() const {
     return getType().castTo<SILFunctionType>();
-  }
-  SILFunctionConventions getConventions() const {
-    return SILFunctionConventions(getFunctionType(), getModule());
   }
 
   ArrayRef<Operand> getAllOperands() const { return {}; }
@@ -4167,7 +4176,7 @@ public:
   void visitReferencedFunctionsAndMethods(
       std::function<void (SILFunction *)> functionCallBack,
       std::function<void (SILDeclRef)> methodCallBack) const;
-    
+
   void incrementRefCounts() const;
   void decrementRefCounts() const;
 
@@ -4437,6 +4446,13 @@ public:
   }
 
   SubstitutionMap getSubstitutions() const { return Substitutions; }
+
+  /// If this `keypath_inst` can be emitted as a statically-instantiated
+  /// immortal instance in Embedded Swift, returns the concrete key path
+  /// class SILType (e.g. `$KeyPath<Foo, Bar>`, `$WritableKeyPath<Foo,
+  /// Bar>`, or `$ReferenceWritableKeyPath<Foo, Bar>`) that IRGen would use
+  /// as the object's isa.  Returns an invalid SILType otherwise.
+  SILType getStaticInstanceClassType() const;
 
   void dropReferencedPattern();
   
@@ -5716,11 +5732,6 @@ public:
   MutableArrayRef<Operand> getAllOperands() { return {}; }
 };
 
-enum PoisonRefs_t : bool {
-  DontPoisonRefs = false,
-  PoisonRefs = true,
-};
-
 /// Define the start or update to a symbolic variable value (for loadable
 /// types).
 class DebugValueInst final
@@ -5740,12 +5751,11 @@ class DebugValueInst final
   SILBasicBlock *ReconstructionBlock = nullptr;
 
   DebugValueInst(SILDebugLocation DebugLoc, SILValue Operand,
-                 SILDebugVariable Var, PoisonRefs_t poisonRefs,
+                 SILDebugVariable Var,
                  UsesMoveableValueDebugInfo_t operandWasMoved, bool trace,
                  bool prependDeref);
   static DebugValueInst *create(SILDebugLocation DebugLoc, SILValue Operand,
                                 SILModule &M, SILDebugVariable Var,
-                                PoisonRefs_t poisonRefs,
                                 UsesMoveableValueDebugInfo_t operandWasMoved,
                                 bool trace);
 
@@ -5872,6 +5882,12 @@ public:
     return sharedUInt8().DebugValueInst.prependDeref;
   }
 
+  /// Converts the op_deref flag into an explicit load at the end of the
+  /// reconstruction block. This is used after type substitution when an
+  /// address-only generic type becomes loadable, making the deref
+  /// representable as a real load instruction.
+  void convertDerefToLoad();
+
   /// Prepends a deref operator to this debug_value in place.
   /// This must be called when the operand is changed from an object type to
   /// an address type (when moved to the stack, for example).
@@ -5931,23 +5947,6 @@ public:
   /// If \p varType is specified, the undef will use that type (in the
   /// appropriate address/object form) instead of the current operand's type.
   void killOperand(SILType operandType = SILType());
-
-  /// True if all references within this debug value will be overwritten with a
-  /// poison sentinel at this point in the program. This is used in debug builds
-  /// when shortening non-trivial value lifetimes to ensure the debugger cannot
-  /// inspect invalid memory. These are not generated until OSSA is
-  /// lowered. They are not expected to be serialized within the module, and the
-  /// debug pipeline is not expected to do any significant code motion after
-  /// OSSA lowering. It should not be necessary to model the poison operation as
-  /// a side effect, which would violate the rule that debug_values cannot
-  /// affect optimization.
-  PoisonRefs_t poisonRefs() const {
-    return PoisonRefs_t(sharedUInt8().DebugValueInst.poisonRefs);
-  }
-
-  void setPoisonRefs(PoisonRefs_t poisonRefs = PoisonRefs) {
-    sharedUInt8().DebugValueInst.poisonRefs = poisonRefs;
-  }
 
   bool hasTrace() const { return sharedUInt8().DebugValueInst.trace; }
 
@@ -7343,8 +7342,7 @@ class EnumInst
   EnumInst(SILDebugLocation DebugLoc, SILValue Operand,
            EnumElementDecl *Element, SILType ResultTy,
            ValueOwnershipKind forwardingOwnershipKind)
-    : InstructionBase(DebugLoc, ResultTy,
-                      forwardingOwnershipKind.forwardToInit(ResultTy)),
+    : InstructionBase(DebugLoc, ResultTy, forwardingOwnershipKind),
       Element(Element) {
     sharedUInt32().EnumInst.caseIndex = InvalidCaseIndex;
 
@@ -9571,9 +9569,8 @@ class DestroyValueInst
   USE_SHARED_UINT8;
 
   DestroyValueInst(SILDebugLocation DebugLoc, SILValue operand,
-                   PoisonRefs_t poisonRefs, IsDeadEnd_t isDeadEnd)
+                   IsDeadEnd_t isDeadEnd)
       : UnaryInstructionBase(DebugLoc, operand) {
-    sharedUInt8().DestroyValueInst.poisonRefs = poisonRefs;
     sharedUInt8().DestroyValueInst.deadEnd = isDeadEnd;
   }
 
@@ -9582,22 +9579,6 @@ public:
   /// user-defined deinitializer if present. This returns false if a prior
   /// drop_deinit is present.
   bool isFullDeinitialization();
-
-  /// If true, then all references within the destroyed value will be
-  /// overwritten with a sentinel. This is used in debug builds when shortening
-  /// non-trivial value lifetimes to ensure the debugger cannot inspect invalid
-  /// memory. These semantics are part of the destroy_value instruction to
-  /// avoid representing use-after-destroy in OSSA form and so that OSSA
-  /// transformations keep the poison operation associated with the destroy
-  /// point. After OSSA, these are lowered to 'debug_values [poison]'
-  /// instructions, after which the Onone pipeline should avoid code motion.
-  PoisonRefs_t poisonRefs() const {
-    return PoisonRefs_t(sharedUInt8().DestroyValueInst.poisonRefs);
-  }
-
-  void setPoisonRefs(PoisonRefs_t poisonRefs = PoisonRefs) {
-    sharedUInt8().DestroyValueInst.poisonRefs = poisonRefs;
-  }
 
   /// If the value being destroyed is a stack allocation of a nonescaping
   /// closure, then return the PartialApplyInst that allocated the closure.
@@ -10960,18 +10941,10 @@ public:
 
 /// A conditional branch.
 class CondBranchInst final
-    : public InstructionBaseWithTrailingOperands<
-                                             SILInstructionKind::CondBranchInst,
-                                             CondBranchInst,
-                                             TermInst> {
+    : public UnaryInstructionBase<SILInstructionKind::CondBranchInst, TermInst> {
   friend SILBuilder;
 
 public:
-  enum {
-    /// The operand index of the condition value used for the branch.
-    ConditionIdx,
-    NumFixedOpers,
-  };
   enum {
     // Map branch targets to block successor indices.
     TrueIdx,
@@ -10979,36 +10952,18 @@ public:
   };
 private:
   std::array<SILSuccessor, 2> DestBBs;
-  unsigned numTrueArguments;
 
   CondBranchInst(SILDebugLocation DebugLoc, SILValue Condition,
                  SILBasicBlock *TrueBB, SILBasicBlock *FalseBB,
-                 ArrayRef<SILValue> Args, unsigned NumTrue, unsigned NumFalse,
                  ProfileCounter TrueBBCount, ProfileCounter FalseBBCount);
-
-  /// Construct a CondBranchInst that will branch to TrueBB or FalseBB based on
-  /// the Condition value. Both blocks must not take any arguments.
-  static CondBranchInst *create(SILDebugLocation DebugLoc, SILValue Condition,
-                                SILBasicBlock *TrueBB, SILBasicBlock *FalseBB,
-                                ProfileCounter TrueBBCount,
-                                ProfileCounter FalseBBCount, SILFunction &F);
-
-  /// Construct a CondBranchInst that will either branch to TrueBB and pass
-  /// TrueArgs or branch to FalseBB and pass FalseArgs based on the Condition
-  /// value.
-  static CondBranchInst *
-  create(SILDebugLocation DebugLoc, SILValue Condition, SILBasicBlock *TrueBB,
-         ArrayRef<SILValue> TrueArgs, SILBasicBlock *FalseBB,
-         ArrayRef<SILValue> FalseArgs, ProfileCounter TrueBBCount,
-         ProfileCounter FalseBBCount, SILFunction &F);
 
 public:
   const Operand *getConditionOperand() const {
-    return &getAllOperands()[ConditionIdx];
+    return &getOperandRef();
   }
-  SILValue getCondition() const { return getConditionOperand()->get(); }
+  SILValue getCondition() const { return getOperand(); }
   void setCondition(SILValue newCondition) {
-    getAllOperands()[ConditionIdx].set(newCondition);
+    setOperand(newCondition);
   }
 
   SuccessorListTy getSuccessors() {
@@ -11025,114 +10980,10 @@ public:
   /// The number of times the False branch was executed.
   ProfileCounter getFalseBBCount() const { return DestBBs[1].getCount(); }
 
-  /// The number of arguments for the True branch.
-  unsigned getNumTrueArgs() const { return numTrueArguments; }
-
-  /// The number of arguments for the False branch.
-  unsigned getNumFalseArgs() const {
-    return getAllOperands().size() - NumFixedOpers - numTrueArguments;
-  }
-
-  /// Get the arguments to the true BB.
-  OperandValueArrayRef getTrueArgs() const {
-    return OperandValueArrayRef(getTrueOperands());
-  }
-  /// Get the arguments to the false BB.
-  OperandValueArrayRef getFalseArgs() const {
-    return OperandValueArrayRef(getFalseOperands());
-  }
-
-  /// Get the operands to the true BB.
-  ArrayRef<Operand> getTrueOperands() const {
-    return getAllOperands().slice(NumFixedOpers, getNumTrueArgs());
-  }
-  MutableArrayRef<Operand> getTrueOperands() {
-    return getAllOperands().slice(NumFixedOpers, getNumTrueArgs());
-  }
-
-  /// Get the operands to the false BB.
-  ArrayRef<Operand> getFalseOperands() const {
-    // The remaining arguments are 'false' operands.
-    return getAllOperands().slice(NumFixedOpers + getNumTrueArgs());
-  }
-  MutableArrayRef<Operand> getFalseOperands() {
-    // The remaining arguments are 'false' operands.
-    return getAllOperands().slice(NumFixedOpers + getNumTrueArgs());
-  }
-
   /// Returns true if \p op is mapped to the condition operand of the cond_br.
   bool isConditionOperand(Operand *op) const {
     return getConditionOperand() == op;
   }
-
-  bool isConditionOperandIndex(unsigned OpIndex) const {
-    assert(OpIndex < getNumOperands() &&
-           "OpIndex must be an index for an actual operand");
-    return OpIndex == ConditionIdx;
-  }
-
-  /// Is \p OpIndex an operand associated with the true case?
-  bool isTrueOperandIndex(unsigned OpIndex) const {
-    assert(OpIndex < getNumOperands() &&
-           "OpIndex must be an index for an actual operand");
-    if (getNumTrueArgs() == 0)
-      return false;
-
-    auto Operands = getTrueOperands();
-    return Operands.front().getOperandNumber() <= OpIndex &&
-           OpIndex <= Operands.back().getOperandNumber();
-  }
-
-  /// Is \p OpIndex an operand associated with the false case?
-  bool isFalseOperandIndex(unsigned OpIndex) const {
-    assert(OpIndex < getNumOperands() &&
-           "OpIndex must be an index for an actual operand");
-    if (getNumFalseArgs() == 0)
-      return false;
-
-    auto Operands = getFalseOperands();
-    return Operands.front().getOperandNumber() <= OpIndex &&
-           OpIndex <= Operands.back().getOperandNumber();
-  }
-
-  /// Returns the operand on the cond_br terminator associated with the value
-  /// that will be passed to DestBB in A.
-  Operand *getOperandForDestBB(const SILBasicBlock *DestBB,
-                               const SILArgument *A) const;
-
-  /// Returns the operand on the cond_br terminator associated with the value
-  /// that will be passed as the \p Index argument to DestBB.
-  Operand *getOperandForDestBB(const SILBasicBlock *DestBB,
-                               unsigned ArgIndex) const;
-
-  /// Returns the argument on the cond_br terminator that will be passed to
-  /// DestBB in A.
-  SILValue getArgForDestBB(const SILBasicBlock *DestBB,
-                           const SILArgument *A) const {
-    if (auto *op = getOperandForDestBB(DestBB, A)) {
-      return op->get();
-    }
-    return SILValue();
-  }
-
-  /// Returns the argument on the cond_br terminator that will be passed as the
-  /// \p Index argument to DestBB.
-  SILValue getArgForDestBB(const SILBasicBlock *DestBB,
-                           unsigned ArgIndex) const {
-    if (auto *op = getOperandForDestBB(DestBB, ArgIndex)) {
-      return op->get();
-    }
-    return SILValue();
-  }
-
-  /// Return the SILPhiArgument from either the true or false destination for
-  /// the given operand.
-  ///
-  /// Returns nullptr for an operand with no block argument
-  /// (i.e the branch condition).
-  ///
-  /// See SILArgument.cpp.
-  const SILPhiArgument *getArgForOperand(const Operand *oper) const;
 
   void swapSuccessors();
 };

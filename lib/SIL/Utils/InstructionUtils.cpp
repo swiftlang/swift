@@ -152,14 +152,6 @@ SILValue swift::stripSinglePredecessorArgs(SILValue V) {
       V = BI->getArg(A->getIndex());
       continue;
     }
-    
-    if (auto *CBI = dyn_cast<CondBranchInst>(PredTI)) {
-      if (SILValue Arg = CBI->getArgForDestBB(BB, A)) {
-        V = Arg;
-        continue;
-      }
-    }
-    
     return V;
   }
 }
@@ -1491,7 +1483,7 @@ bool swift::shouldExpand(SILModule &module, SILType ty) {
   //
   // TODO: we could loosen this requirement if all paths lead to a drop_deinit.
   if (auto *nominalTy = ty.getNominalOrBoundGenericNominal()) {
-    if (nominalTy->getValueTypeDestructor())
+    if (nominalTy->hasValueTypeDestructor())
       return false;
   }
 

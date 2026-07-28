@@ -99,8 +99,9 @@ private func insertEndInitInstructions(
   atEndOf initRegion: InstructionRange,
   _ context: FunctionPassContext
 ) {
-  var ssaUpdater = SSAUpdater(function: markUninitialized.parentFunction,
-                              type: markUninitialized.type, ownership: .owned, context)
+  var ssaUpdater = SSAUpdater(type: markUninitialized.type, ownership: .owned, context)
+  defer { ssaUpdater.deinitialize() }
+
   ssaUpdater.addAvailableValue(markUninitialized, in: markUninitialized.parentBlock)
 
   for endInst in initRegion.ends {
@@ -122,8 +123,6 @@ private func insertEndInitInstructions(
       use.set(to: ssaUpdater.getValue(atEndOf: use.instruction.parentBlock), context)
     }
   }
-  // This peephole optimization is required to avoid ownership errors.
-  replacePhisWithIncomingValues(phis: ssaUpdater.insertedPhis, context)
 }
 
 private func constructLetInitRegion(

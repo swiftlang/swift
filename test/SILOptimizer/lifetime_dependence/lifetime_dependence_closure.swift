@@ -6,7 +6,6 @@
 // RUN:   -module-name test \
 // RUN:   -enable-experimental-feature Lifetimes
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_Lifetimes
 
 struct NCInt: ~Copyable {

@@ -37,6 +37,13 @@ import SIL
 let mandatoryDestroyHoisting = FunctionPass(name: "mandatory-destroy-hoisting") {
   (function: Function, context: FunctionPassContext) in
 
+  // Swift modules are serialized after the mandatory pipeline. At this point lifetimes
+  // (lexical or not) are fixed. When de-serializing a function in the mandatory pipeline, it means
+  // that for such functions lifetimes are fixed and MandatoryDestroyHoisting must not run.
+  if function.linkage.isExternal {
+    return
+  }
+
   var endAccesses = Stack<EndAccessInst>(context)
   defer { endAccesses.deinitialize() }
   endAccesses.append(contentsOf: function.instructions.compactMap{ $0 as? EndAccessInst })
@@ -266,6 +273,9 @@ private extension Stack where Element == Instruction {
       if $0.instruction is DestroyValueInst,
          $0.value == value
       {
+        return .continueWalk
+      }
+      if $0.instruction is DebugValueInst {
         return .continueWalk
       }
       users.append($0.instruction)

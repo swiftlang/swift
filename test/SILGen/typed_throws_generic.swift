@@ -1,3 +1,6 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -swift-version 5 -Xllvm -sil-print-types %s -enable-experimental-feature FullTypedThrows
+// RUN: %target-swift-emit-sil -sil-verify-all -enable-sil-opaque-values -swift-version 5 %s -enable-experimental-feature FullTypedThrows -o /dev/null
+
 // RUN: %target-swift-emit-silgen -swift-version 5 -Xllvm -sil-print-types %s -enable-experimental-feature FullTypedThrows | %FileCheck %s
 
 // REQUIRES: swift_feature_FullTypedThrows

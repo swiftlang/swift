@@ -141,7 +141,6 @@ public struct Observations<Element: Sendable, Failure: Error>: AsyncSequence, Se
   /// The emit closure is responsible for extracting a value out of a single or many `@Observable` types.
   ///
   /// - Parameters:
-  ///     - isolation:  The concurrency isolation domain of the caller.
   ///     - emit: A closure to generate an element for the sequence.
   public init(
     @_inheritActorContext _ emit: @escaping @isolated(any) @Sendable () throws(Failure) -> Element
@@ -155,7 +154,6 @@ public struct Observations<Element: Sendable, Failure: Error>: AsyncSequence, Se
   /// continues to be invoked until the .finished option is returned or an error is thrown.
   ///
   /// - Parameters:
-  ///     - isolation:  The concurrency isolation domain of the caller.
   ///     - emit: A closure to generate an element for the sequence.
   public static func untilFinished(
     @_inheritActorContext _ emit: @escaping @isolated(any) @Sendable () throws(Failure) -> Iteration

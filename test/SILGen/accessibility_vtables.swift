@@ -1,5 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-module -o %t %S/Inputs/accessibility_vtables_helper.swift
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -Xllvm -sil-full-demangle -primary-file %s %S/Inputs/accessibility_vtables_other.swift -I %t -module-name accessibility_vtables
 // RUN: %target-swift-emit-silgen -Xllvm -sil-full-demangle -primary-file %s %S/Inputs/accessibility_vtables_other.swift -I %t -module-name accessibility_vtables | %FileCheck %s
 
 import accessibility_vtables_helper

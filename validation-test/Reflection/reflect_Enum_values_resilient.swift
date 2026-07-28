@@ -6,7 +6,7 @@
 // RUN: %target-build-swift -lswiftSwiftReflectionTest %s -L %t -I %t -lresilient_enums -o %t/reflect_Enum_values_resilient %target-rpath(%t)
 // RUN: %target-codesign %t/reflect_Enum_values_resilient
 
-// RUN: %target-run %target-swift-reflection-test %t/reflect_Enum_values_resilient | tee /dev/stderr | %FileCheck %s --dump-input=fail
+// RUN: env %env-_EXTRA_DYLIB=%t/%target-library-name(resilient_enums) %target-run %target-swift-reflection-test %t/reflect_Enum_values_resilient | tee /dev/stderr | %FileCheck %s --dump-input=fail
 
 // REQUIRES: executable_test
 // REQUIRES: objc_interop, OS=macosx

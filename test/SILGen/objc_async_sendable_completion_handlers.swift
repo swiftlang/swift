@@ -1,6 +1,9 @@
 // RUN: %empty-directory(%t/src)
 // RUN: split-file %s %t/src
 
+// FIXME: crashes under opaque values
+// RUN: not --crash %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-silgen-ossa -o /dev/null -sil-verify-all -enable-sil-opaque-values %t/src/main.swift -import-objc-header %t/src/Test.h -swift-version 6 -module-name main -I %t -verify
+
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-sil %t/src/main.swift \
 // RUN:   -import-objc-header %t/src/Test.h \
 // RUN:   -swift-version 6 \

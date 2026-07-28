@@ -1,7 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %s -Osize -enable-experimental-feature Embedded -emit-ir -Xllvm -link-embedded-runtime=0 -disable-access-control | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
 // REQUIRES: OS=macosx || OS=linux-gnu

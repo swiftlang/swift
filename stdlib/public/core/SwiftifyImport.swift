@@ -115,7 +115,7 @@ public enum _SwiftifyProtocolMethodInfo {
 /// This mimics the stdlib definition. It is public for use with import macros.
 @unsafe
 @_unsafeNonescapableResult
-@_alwaysEmitIntoClient
+@export(implementation)
 @_transparent
 @_lifetime(borrow source)
 public func _swiftifyOverrideLifetime<
@@ -135,7 +135,7 @@ public func _swiftifyOverrideLifetime<
 /// This mimics the stdlib definition. It is public for use with import macros.
 @unsafe
 @_unsafeNonescapableResult
-@_alwaysEmitIntoClient
+@export(implementation)
 @_transparent
 @_lifetime(copy source)
 public func _swiftifyOverrideLifetime<

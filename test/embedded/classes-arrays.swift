@@ -1,10 +1,10 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-run-simple-swift(-parse-as-library -enable-experimental-feature Embedded -wmo %target-embedded-posix-shim) | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
 // REQUIRES: swift_feature_Embedded
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 class MyClass {
   init() { print("MyClass.init") }

@@ -30,7 +30,7 @@ extension _InlineArray: @unchecked Sendable where Element: Sendable & ~Copyable 
 
 extension _InlineArray where Element: ~Copyable {
   /// Returns a pointer to the first element in the array.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   internal var _address: UnsafePointer<Element> {
 #if $AddressOfProperty2
@@ -41,7 +41,7 @@ extension _InlineArray where Element: ~Copyable {
   }
 
   /// Returns a buffer pointer over the entire array.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   internal var _buffer: UnsafeBufferPointer<Element> {
     unsafe UnsafeBufferPointer<Element>(start: _address, count: count)
@@ -52,7 +52,7 @@ extension _InlineArray where Element: ~Copyable {
   ///
   /// Use this when the value of the pointer could potentially be directly used
   /// by users (e.g. through the use of span or the unchecked subscript).
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   internal var _protectedAddress: UnsafePointer<Element> {
 #if $AddressOfProperty2
@@ -67,14 +67,14 @@ extension _InlineArray where Element: ~Copyable {
   ///
   /// Use this when the value of the pointer could potentially be directly used
   /// by users (e.g. through the use of span or the unchecked subscript).
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   internal var _protectedBuffer: UnsafeBufferPointer<Element> {
     unsafe UnsafeBufferPointer<Element>(start: _protectedAddress, count: count)
   }
 
   /// Returns a mutable pointer to the first element in the array.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   internal var _mutableAddress: UnsafeMutablePointer<Element> {
     mutating get {
@@ -87,7 +87,7 @@ extension _InlineArray where Element: ~Copyable {
   }
 
   /// Returns a mutable buffer pointer over the entire array.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   internal var _mutableBuffer: UnsafeMutableBufferPointer<Element> {
     mutating get {
@@ -103,7 +103,7 @@ extension _InlineArray where Element: ~Copyable {
   ///
   /// Use this when the value of the pointer could potentially be directly used
   /// by users (e.g. through the use of span or the unchecked subscript).
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   internal var _protectedMutableAddress: UnsafeMutablePointer<Element> {
     mutating get {
@@ -120,7 +120,7 @@ extension _InlineArray where Element: ~Copyable {
   ///
   /// Use this when the value of the pointer could potentially be directly used
   /// by users (e.g. through the use of span or the unchecked subscript).
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   internal var _protectedMutableBuffer: UnsafeMutableBufferPointer<Element> {
     mutating get {
@@ -134,7 +134,7 @@ extension _InlineArray where Element: ~Copyable {
   /// Converts the given raw pointer, which points at an uninitialized array
   /// instance, to a mutable buffer suitable for initialization.
   @unsafe
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   internal static func _initializationBuffer(
     start: Builtin.RawPointer
@@ -167,7 +167,7 @@ extension _InlineArray where Element: ~Copyable {
   ///
   /// - Parameter body: A closure that returns an owned `Element` to emplace at
   ///   the passed in index.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal init<E: Error>(_ body: (Index) throws(E) -> Element) throws(E) {
     _storage = try Builtin.emplace { (rawPtr) throws(E) -> () in
       let buffer = unsafe Self._initializationBuffer(start: rawPtr)
@@ -208,7 +208,7 @@ extension _InlineArray where Element: ~Copyable {
   ///   - next: A closure that takes an immutable borrow reference to the
   ///     preceding element, and returns an owned `Element` instance to emplace
   ///     into the array.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal init<E: Error>(
     first: consuming Element,
     next: (borrowing Element) throws(E) -> Element
@@ -248,7 +248,7 @@ extension _InlineArray where Element: ~Copyable {
     }
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal init<E: Error>(
     initializingWith initializer: (inout OutputSpan<Element>) throws(E) -> Void
   ) throws(E) {
@@ -267,7 +267,7 @@ extension _InlineArray where Element: Copyable {
   /// Initializes every element in this array to a copy of the given value.
   ///
   /// - Parameter value: The instance to initialize this array with.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal init(repeating value: Element) {
     _storage = Builtin.emplace {
       let buffer = unsafe Self._initializationBuffer(start: $0)
@@ -295,7 +295,7 @@ extension _InlineArray where Element: ~Copyable {
   /// The number of elements in the array.
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_semantics("fixed_storage.get_count")
   @inline(__always)
   internal var count: Int {
@@ -305,7 +305,7 @@ extension _InlineArray where Element: ~Copyable {
   /// A Boolean value indicating whether the array is empty.
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   internal var isEmpty: Bool {
     count == 0
@@ -316,7 +316,7 @@ extension _InlineArray where Element: ~Copyable {
   /// If the array is empty, `startIndex` is equal to `endIndex`.
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   internal var startIndex: Index {
     0
@@ -328,7 +328,7 @@ extension _InlineArray where Element: ~Copyable {
   /// If the array is empty, `endIndex` is equal to `startIndex`.
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   internal var endIndex: Index {
     count
@@ -337,7 +337,7 @@ extension _InlineArray where Element: ~Copyable {
   /// The indices that are valid for subscripting the array, in ascending order.
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   internal var indices: Range<Index> {
     unsafe Range(_uncheckedBounds: (0, count))
@@ -350,7 +350,7 @@ extension _InlineArray where Element: ~Copyable {
   /// - Returns: The index immediately after `i`.
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   internal borrowing func index(after i: Index) -> Index {
     i &+ 1
@@ -363,13 +363,13 @@ extension _InlineArray where Element: ~Copyable {
   /// - Returns: The index value immediately before `i`.
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   internal borrowing func index(before i: Index) -> Index {
     i &- 1
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_semantics("fixed_storage.check_index")
   @inline(__always)
   internal func _checkIndex(_ i: Index) {
@@ -383,7 +383,7 @@ extension _InlineArray where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @_addressableSelf
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal subscript(_ i: Index) -> Element {
     @_transparent
     borrow {
@@ -408,7 +408,7 @@ extension _InlineArray where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @_addressableSelf
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @unsafe
   internal subscript(unchecked i: Index) -> Element {
     @_transparent
@@ -440,7 +440,7 @@ extension _InlineArray where Element: ~Copyable {
   ///   - j: The index of the second value to swap.
   ///
   /// - Complexity: O(1)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal mutating func swapAt(
     _ i: Index,
     _ j: Index
@@ -464,7 +464,7 @@ extension _InlineArray where Element: ~Copyable {
 //===----------------------------------------------------------------------===//
 
 extension _InlineArray where Element: ~Copyable {
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal var span: Span<Element> {
     @_lifetime(borrow self)
     @_transparent
@@ -474,7 +474,7 @@ extension _InlineArray where Element: ~Copyable {
     }
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal var mutableSpan: MutableSpan<Element> {
     @_lifetime(&self)
     @_transparent

@@ -14,7 +14,6 @@
 // RUN: %target-swift-frontend -wmo -I %t -module-name C -emit-irgen -o %t/C4.ll  %t/C.swift -enable-experimental-feature Embedded -parse-as-library -disable-implicit-concurrency-module-import
 // RUN: %FileCheck --check-prefix=C4 %s < %t/C4.ll
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: optimized_stdlib
 // REQUIRES: swift_feature_Embedded
 

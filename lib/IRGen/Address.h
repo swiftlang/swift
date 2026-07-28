@@ -18,6 +18,7 @@
 #define SWIFT_IRGEN_ADDRESS_H
 
 #include "IRGen.h"
+#include "swift/Basic/PointerIntPair.h"
 #include "llvm/ADT/ilist.h"
 #include "llvm/IR/Argument.h"
 #include "llvm/IR/DerivedTypes.h"
@@ -173,7 +174,7 @@ public:
   /// The address of an object of type T.
   Address Addr;
 
-  llvm::PointerIntPair<llvm::Value*, 3, Kind> ExtraInfoAndKind;
+  swift::PointerIntPair<llvm::Value*, 3, Kind> ExtraInfoAndKind;
 
 public:
   StackAddress() : ExtraInfoAndKind(nullptr, StaticAlloca) {}

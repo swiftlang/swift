@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -Xllvm -sil-print-types -module-name functions -Xllvm -sil-full-demangle -parse-stdlib -parse-as-library %s
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name functions -Xllvm -sil-full-demangle -parse-stdlib -parse-as-library %s | %FileCheck %s
 
 import Swift // just for Optional

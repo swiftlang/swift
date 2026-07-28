@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-enable-experimental-feature Embedded -parse-as-library -wmo) | %FileCheck %s
+// RUN: %target-run-simple-swift(-enable-experimental-feature Embedded -parse-as-library -wmo %target-embedded-synchronization) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: OS=wasip1

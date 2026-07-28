@@ -1,6 +1,5 @@
 // RUN: %target-sil-opt -sil-print-types %s -sil-combine -sil-print-debuginfo | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 
 // This test uses SILCombine's SimplifyUncheckedEnumData.swift for the payload
 // case (enum + unchecked_enum_data).

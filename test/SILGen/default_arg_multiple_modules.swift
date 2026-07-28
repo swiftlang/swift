@@ -1,5 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -emit-module-path=%t/default_arg_other.swiftmodule -module-name=default_arg_other %S/Inputs/default_arg_other.swift
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -Xllvm -sil-print-types -module-name default_arg_multiple_modules -I %t %s
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name default_arg_multiple_modules -I %t %s | %FileCheck %s
 
 import default_arg_other

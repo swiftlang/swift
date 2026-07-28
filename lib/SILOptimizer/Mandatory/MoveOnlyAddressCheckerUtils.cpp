@@ -326,7 +326,7 @@ static void insertDebugValueBefore(SILInstruction *insertPt,
   SILBuilderWithScope debugInfoBuilder(insertPt);
   debugInfoBuilder.setCurrentDebugScope(debugVar->getDebugScope());
   debugInfoBuilder.createDebugValue(debugVar->getLoc(), operand(), *varInfo,
-                                    DontPoisonRefs, UsesMoveableValueDebugInfo);
+                                    UsesMoveableValueDebugInfo);
 }
 
 static void convertMemoryReinitToInitForm(SILInstruction *memInst,
@@ -358,19 +358,44 @@ static void convertMemoryReinitToInitForm(SILInstruction *memInst,
 
 /// Is this a reinit instruction that we know how to convert into its init form.
 static bool isReinitToInitConvertibleInst(SILInstruction *memInst) {
+  SILValue dest;
   switch (memInst->getKind()) {
   default:
     return false;
 
   case SILInstructionKind::CopyAddrInst: {
     auto *cai = cast<CopyAddrInst>(memInst);
-    return !cai->isInitializationOfDest();
+    if (cai->isInitializationOfDest())
+      return false;
+    dest = cai->getDest();
+    break;
   }
   case SILInstructionKind::StoreInst: {
     auto *si = cast<StoreInst>(memInst);
-    return si->getOwnershipQualifier() == StoreOwnershipQualifier::Assign;
+    if (si->getOwnershipQualifier() != StoreOwnershipQualifier::Assign)
+      return false;
+    dest = si->getDest();
+    break;
   }
   }
+
+  // If the store's destination is a begin_access, the reinit can only be
+  // converted into an init if the access exists solely to host this reinit.
+  // When the store is converted to an init, then the begin_access is
+  // considered the beginning of that reinitialization. A destroy_addres can
+  // then be inserted before the access to compensate for the reinit
+  // conversion. If, however, the access includes other reads, then we cannot
+  // hoist the destroy_addr out of the access scope.
+  if (auto *bai = dyn_cast<BeginAccessInst>(dest)) {
+    for (auto *use : bai->getUses()) {
+      auto *user = use->getUser();
+      if (user == memInst || isa<EndAccessInst>(user))
+        continue;
+      return false;
+    }
+  }
+
+  return true;
 }
 
 using ScopeRequiringFinalInit = DiagnosticEmitter::ScopeRequiringFinalInit;
@@ -1376,7 +1401,7 @@ void UseState::initializeLiveness(
                             << *livenessInstAndValue.first;
                liveness.print(llvm::dbgs()));
   }
-  
+
   auto updateForLivenessAccess = [&](BeginAccessInst *beginAccess,
                                      const SmallBitVector &livenessMask) {
     for (auto *endAccess : beginAccess->getEndAccesses()) {
@@ -1966,15 +1991,16 @@ shouldEmitPartialMutationError(UseState &useState, PartialMutation::Kind kind,
   // Allowing full object consumption in a deinit is still not allowed.
   if (iterType == targetType && !isa<DropDeinitInst>(user)) {
     // Don't allow whole-value consumption of `self` from a `deinit`.
-    if (!fn->getModule().getASTContext().LangOpts
-            .hasFeature(Feature::ConsumeSelfInDeinit)
+    auto &Ctx = fn->getModule().getASTContext();
+    if (!Ctx.LangOpts.hasFeature(Feature::ConsumeSelfInDeinit)
+        && !Ctx.LangOpts.hasFeature(Feature::MutateAndConsumeInDeinit)
         && kind == PartialMutation::Kind::Consume
         && useState.sawDropDeinit
         // TODO: Revisit this when we introduce deinits on enums.
         && !targetType.getEnumOrBoundGenericEnum()) {
       LLVM_DEBUG(llvm::dbgs() << "    IterType is TargetType in deinit! "
                                  "Not allowed yet");
-      
+
       return {PartialMutationError::consumeDuringDeinit(iterType)};
     }
 
@@ -2014,7 +2040,7 @@ shouldEmitPartialMutationError(UseState &useState, PartialMutation::Kind kind,
           (kind == PartialMutation::Kind::Consume) && useState.sawDropDeinit &&
           (nom ==
            useState.address->getType().getNominalOrBoundGenericNominal());
-      if (nom->getValueTypeDestructor() && !isAllowedPartialConsume) {
+      if (nom->hasValueTypeDestructor() && !isAllowedPartialConsume) {
         // If we find one, emit an error since we are going to have to extract
         // through the deinit. Emit a nice error saying what it is. Since we
         // are emitting an error, we do a bit more work and construct the
@@ -2176,7 +2202,7 @@ struct GatherUsesVisitor : public TransitiveAddressWalker<GatherUsesVisitor> {
   /// base address that we are checking which should be the operand of the mark
   /// must check value.
   SILValue getRootAddress() const { return markedValue; }
-  
+
   ASTContext &getASTContext() {
     return markedValue->getFunction()->getASTContext();
   }
@@ -2208,9 +2234,7 @@ struct GatherUsesVisitor : public TransitiveAddressWalker<GatherUsesVisitor> {
     liveness->initializeDef(bai);
     liveness->computeSimple();
     for (auto *consumingUse : li->getConsumingUses()) {
-      if (!liveness->isWithinBoundary(
-              consumingUse->getUser(),
-              moveChecker.deba->get(consumingUse->getFunction()))) {
+      if (!liveness->isWithinBoundary(consumingUse->getUser())) {
         diagnosticEmitter.emitAddressExclusivityHazardDiagnostic(
             markedValue, consumingUse->getUser());
         emittedError = true;
@@ -2218,7 +2242,7 @@ struct GatherUsesVisitor : public TransitiveAddressWalker<GatherUsesVisitor> {
     }
     return emittedError;
   }
-  
+
   void onError(Operand *op) {
       LLVM_DEBUG(llvm::dbgs() << "    Found use unrecognized by the walker!\n";
                  op->getUser()->print(llvm::dbgs()));
@@ -2314,7 +2338,7 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
   // Ignore end_access.
   if (isa<EndAccessInst>(user))
     return true;
-  
+
   // Ignore end_cow_mutation_addr.
   if (isa<EndCOWMutationAddrInst>(user)) {
     return true;
@@ -2538,7 +2562,7 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
         auto operand = stripAccessAndIdentityCasts(markedValue->getOperand());
         auto *fArg = dyn_cast<SILFunctionArgument>(operand);
         auto *ptrToAddr = dyn_cast<PointerToAddressInst>(operand);
-            
+
         // If we have a closure captured that we specialized, we should have a
         // no consume or assign and should emit a normal guaranteed diagnostic.
         if (fArg && fArg->isClosureCapture() &&
@@ -2874,7 +2898,7 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     }
     return true;
   }
-  
+
   if (auto *access = dyn_cast<BeginAccessInst>(op->getUser())) {
     switch (access->getAccessKind()) {
     // Treat an opaque read access as a borrow liveness use for the duration
@@ -3737,7 +3761,23 @@ void ExtendUnconsumedLiveness::run() {
     }
     for (auto pair : addressUseState.reinitInsts) {
       if (pair.second.test(element)) {
-        destroys[pair.first] = DestroyKind::Reinit;
+        SILInstruction *reinit = pair.first;
+        // If the reinit stores through a begin_access and will be converted
+        // into an init, record the begin_access as the destroy point rather
+        // than the reinit itself. This keeps the old value's destroy from
+        // being sunk into the access scope (immediately before the reinit);
+        // instead liveness is extended only up to the begin_access.
+        SILInstruction *destroy = reinit;
+        if (isReinitToInitConvertibleInst(reinit)) {
+          SILValue dest;
+          if (auto *si = dyn_cast<StoreInst>(reinit))
+            dest = si->getDest();
+          else if (auto *cai = dyn_cast<CopyAddrInst>(reinit))
+            dest = cai->getDest();
+          if (auto *bai = dyn_cast_or_null<BeginAccessInst>(dest))
+            destroy = bai;
+        }
+        destroys[destroy] = DestroyKind::Reinit;
       }
     }
 

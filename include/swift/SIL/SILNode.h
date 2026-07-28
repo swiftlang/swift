@@ -212,7 +212,6 @@ protected:
         isProjection : 1);
     SHARED_FIELD(HopToExecutorInst, bool mandatory);
     SHARED_FIELD(DestroyValueInst, uint8_t
-        poisonRefs : 1,
         deadEnd : 1);
     SHARED_FIELD(EndCOWMutationInst, bool keepUnique);
     SHARED_FIELD(ConvertFunctionInst, bool withoutActuallyEscaping);
@@ -225,7 +224,6 @@ protected:
                  pointerEscape : 1);
 
     SHARED_FIELD(DebugValueInst, uint8_t
-                 poisonRefs : 1,
                  usesMoveableValueDebugInfo : 1,
                  trace : 1,
                  prependDeref : 1);

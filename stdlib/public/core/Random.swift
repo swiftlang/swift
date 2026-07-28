@@ -71,7 +71,7 @@ extension RandomNumberGenerator {
   // unsigned integer will be used, recursing infinitely and probably blowing
   // the stack.
   @available(*, unavailable)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public mutating func next() -> UInt64 { fatalError() }
   
   /// Returns a value from a uniform, independent distribution of binary data.

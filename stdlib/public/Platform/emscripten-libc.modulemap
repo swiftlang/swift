@@ -10,12 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-module SwiftEmscriptenLibc [system] {
+module SwiftEmscriptenLibc [system] [no_undeclared_includes] {
   header "stdc-predef.h"
   header "features.h"
 
   // C standard library
-  header "complex.h"
   header "ctype.h"
   header "errno.h"
   header "fenv.h"
@@ -74,4 +73,9 @@ module SwiftEmscriptenLibc [system] {
   // includes this header and maps POSIX errno names to __WASI_ERRNO_* values.
   header "wasi/api.h"
   export *
+
+  explicit module Complex {
+    header "complex.h"
+    export *
+  }
 }

@@ -124,6 +124,23 @@ class Git:
     def _quote_command(command: List[Any]) -> str:
         return " ".join(Git._quote(arg) for arg in command)
 
+    @staticmethod
+    def is_shallow(*, repo_path: Path) -> bool:
+        """
+        Returns whether a repository is shallow.
+
+        Args:
+            repo_path (Path): The path to the repository.
+
+        Returns:
+            bool: A Boolean value indicating whether the repository is shallow.
+        """
+
+        is_shallow_output, _, _ = Git.run(
+            repo_path, ["rev-parse", "--is-shallow-repository"],
+        )
+        return is_shallow_output.strip() == "true"
+
 
 def is_git_repository(path: Path) -> bool:
     """Returns whether a Path object is a Git repository.

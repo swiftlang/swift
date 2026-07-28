@@ -10,6 +10,7 @@ import MeowActor
 @HissActor func doHiss() {}
 
 // RUN: %target-swift-frontend  -target %target-swift-5.1-abi-triple -enable-library-evolution -emit-module -o %t/MeowActor.swiftmodule %S/Inputs/MeowActor.swift
+// RUN: %target-swift-frontend  -target %target-swift-5.1-abi-triple -emit-silgen-ossa -o /dev/null -sil-verify-all -enable-sil-opaque-values %s -I %t
 // RUN: %target-swift-frontend  -target %target-swift-5.1-abi-triple -emit-silgen %s -I %t | %FileCheck --check-prefix CHECK-RESILIENT %s
 // CHECK-RESILIENT: metatype $@thick MeowActor.Type
 // CHECK-RESILIENT: metatype $@thick HissActor.Type

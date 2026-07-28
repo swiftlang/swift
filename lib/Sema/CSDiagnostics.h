@@ -114,18 +114,18 @@ protected:
   }
 
   Type getContextualType(ASTNode anchor) const {
-    auto &cs = getConstraintSystem();
-    return cs.getContextualType(anchor, /*forConstraint=*/false);
+    return getSolution().getContextualType(anchor);
   }
 
   TypeLoc getContextualTypeLoc(ASTNode anchor) const {
-    auto &cs = getConstraintSystem();
-    return cs.getContextualTypeLoc(anchor);
+    auto &solution = getSolution();
+    if (auto contextualInfo = solution.getContextualTypeInfo(anchor))
+      return contextualInfo->typeLoc;
+    return TypeLoc();
   }
 
   ContextualTypePurpose getContextualTypePurpose(ASTNode anchor) const {
-    auto &cs = getConstraintSystem();
-    return cs.getContextualTypePurpose(anchor);
+    return getSolution().getContextualTypePurpose(anchor);
   }
 
   DeclContext *getDC() const {
@@ -663,8 +663,7 @@ public:
             locator->isForContextualType()
                 ? locator->castLastElementTo<LocatorPathElt::ContextualType>()
                       .getPurpose()
-                : solution.getConstraintSystem().getContextualTypePurpose(
-                      locator->getAnchor()),
+                : solution.getContextualTypePurpose(locator->getAnchor()),
             lhs, rhs, locator, fixBehavior) {}
 
   ContextualFailure(const Solution &solution, ContextualTypePurpose purpose,
@@ -691,7 +690,7 @@ public:
   bool diagnoseAsNote() override;
 
   /// If the type of a key path literal is read-only due to setter
-  /// availability constraints but the context requires a writable
+  /// availability restrictions but the context requires a writable
   /// key path, let's produce a tailed availability diagnostic that
   /// points to the offending setter.
   bool diagnoseKeyPathLiteralMutabilityMismatch() const;
@@ -836,6 +835,7 @@ public:
         attributeKind(attributeKind) {}
 
   bool diagnoseAsError() override;
+  bool diagnoseAsNote() override;
 
 private:
   /// Emit tailored diagnostics for no-escape/non-sendable parameter
@@ -1006,6 +1006,25 @@ public:
     assert(fnType1->isAsync() != fnType2->isAsync());
 #endif
   }
+
+  bool diagnoseAsError() override;
+};
+
+/// Diagnose failures related to conversion between two types with different
+/// execution semantics i.e. '@called(once)' function and regular one:
+///
+/// ```swift
+/// func test(_: () -> Void) {}
+/// let fn: @called(once) () -> Void = {}
+/// test(fn) // error due to widening
+/// ```
+class ConversionBetweenFunctionsWithDifferentExecutionSemantics final
+    : public ContextualFailure {
+public:
+  ConversionBetweenFunctionsWithDifferentExecutionSemantics(
+      const Solution &solution, Type fromType, Type toType,
+      ConstraintLocator *locator)
+      : ContextualFailure(solution, fromType, toType, locator) {}
 
   bool diagnoseAsError() override;
 };
@@ -1392,6 +1411,26 @@ public:
       : MemberReferenceFailure(solution, locator),
         BaseType(baseType->getRValueType()), Member(member), Name(name) {
     assert(member);
+  }
+
+  bool diagnoseAsError() override;
+};
+
+/// Diagnose a member of a protocol metatype extension referenced through the
+/// metatype of a conforming type. Such members belong to the protocol metatype
+/// itself and are not inherited by conforming types.
+class InvalidMetatypeExtensionMemberRefFailure final
+    : public MemberReferenceFailure {
+  Type BaseType;
+  ValueDecl *Member;
+
+public:
+  InvalidMetatypeExtensionMemberRefFailure(
+      const Solution &solution, Type baseType, ValueDecl *member,
+      ConstraintLocator *locator)
+      : MemberReferenceFailure(solution, locator),
+        BaseType(baseType->getRValueType()), Member(member) {
+    ASSERT(member);
   }
 
   bool diagnoseAsError() override;
@@ -3381,13 +3420,14 @@ public:
 /// let x: InlineArray<4, Int> = [1, 2] // expected '4' elements but got '2'
 /// \endcode
 class IncorrectInlineArrayLiteralCount final : public FailureDiagnostic {
-  Type lhsCount, rhsCount;
+  unsigned lhsCount, rhsCount;
 
 public:
-  IncorrectInlineArrayLiteralCount(const Solution &solution, Type lhsCount,
-                            Type rhsCount, ConstraintLocator *locator)
-      : FailureDiagnostic(solution, locator), lhsCount(resolveType(lhsCount)),
-        rhsCount(resolveType(rhsCount)) {}
+  IncorrectInlineArrayLiteralCount(const Solution &solution, unsigned lhsCount,
+                                   unsigned rhsCount,
+                                   ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator), lhsCount(lhsCount),
+        rhsCount(rhsCount) {}
 
   bool diagnoseAsError() override;
 };
@@ -3414,6 +3454,23 @@ public:
                                 ProtocolConformance *conformance,
                                 ConstraintLocator *locator)
       : FailureDiagnostic(solution, locator), conformance(conformance) {}
+
+  bool diagnoseAsError() override;
+};
+
+/// Diagnose situations when a key path dynamic member lookup expects
+/// a `ReferenceWritableKeyPath` but the base is not a class and so
+/// the argument is `WritableKeyPath`.
+class NonClassBaseInDynamicMemberLookup final : public FailureDiagnostic {
+  Type BaseType;
+  ValueDecl *Member;
+
+public:
+  NonClassBaseInDynamicMemberLookup(const Solution &solution, Type baseType,
+                                    ValueDecl *member,
+                                    ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator), BaseType(resolveType(baseType)),
+        Member(member) {}
 
   bool diagnoseAsError() override;
 };

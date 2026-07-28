@@ -15,12 +15,11 @@
 
 #include "swift/AST/ASTPrinter.h"
 #include "FeatureSet.h"
-#include "swift/AST/InlinableText.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Attr.h"
-#include "swift/AST/AvailabilityConstraint.h"
+#include "swift/AST/AttrKind.h"
 #include "swift/AST/AvailabilityContext.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/ClangModuleLoader.h"
@@ -34,6 +33,7 @@
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ImportCache.h"
+#include "swift/AST/InlinableText.h"
 #include "swift/AST/MacroDefinition.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
@@ -86,10 +86,6 @@ static llvm::cl::opt<bool> NumberSuppressionChecks(
                    "asserts enabled and intended for compiler tests."),
     llvm::cl::init(false), llvm::cl::Hidden);
 #endif
-
-llvm::cl::opt<bool>
-PrintNoUUIDS("print-no-uuids", llvm::cl::init(false),
-                   llvm::cl::desc("don't print UUIDs to make the output better diffable"));
 
 // Defined here to avoid repeatedly paying the price of template instantiation.
 const std::function<bool(const ExtensionDecl *)>
@@ -209,10 +205,10 @@ static bool shouldSkipDeclInPublicInterface(const Decl *D) {
   if (!SF)
     return false;
 
-  auto constraints = getAvailabilityConstraintsForDecl(
-      D, AvailabilityContext::forDeploymentTarget(ctx));
+  auto restrictions =
+      AvailabilityContext::forDeploymentTarget(ctx).allRestrictionsForDecl(D);
   llvm::SmallVector<AvailabilityDomain, 4> unavailableDomains;
-  getRuntimeUnavailableDomains(constraints, unavailableDomains, ctx);
+  getRuntimeUnavailableDomains(restrictions, unavailableDomains, ctx);
 
   for (auto domain : unavailableDomains) {
     if (auto *domainDecl = domain.getDecl()) {
@@ -701,21 +697,6 @@ ASTPrinter &ASTPrinter::operator<<(unsigned long long N) {
   llvm::raw_svector_ostream OS(Str);
   OS << N;
   printTextImpl(OS.str());
-  return *this;
-}
-
-void ASTPrinter::getUUIDStringForPrinting(UUID uuid, llvm::SmallVectorImpl<char> &out) {
-  if (PrintNoUUIDS) {
-    out.clear();
-    return;
-  }
-  uuid.toString(out);
-}
-
-ASTPrinter &ASTPrinter::operator<<(UUID UU) {
-  llvm::SmallString<UUID::StringBufferSize> Str;
-  getUUIDStringForPrinting(UU, Str);
-  printTextImpl(Str);
   return *this;
 }
 
@@ -2711,6 +2692,23 @@ void PrintAST::printBodyIfNecessary(const AbstractFunctionDecl *decl) {
   printBraceStmt(decl->getBody(), /*newlineIfEmpty*/!isa<AccessorDecl>(decl));
 }
 
+static StringRef getPrintedSelfOwnershipModifier(SelfAccessKind kind,
+                                                 const PrintOptions &options) {
+  switch (kind) {
+  case SelfAccessKind::Consuming:
+    return options.excludeAttrKind(DeclAttrKind::Consuming) ? "" : "consuming";
+  case SelfAccessKind::LegacyConsuming:
+    return options.excludeAttrKind(DeclAttrKind::LegacyConsuming) ? ""
+                                                                  : "__consuming";
+  case SelfAccessKind::Borrowing:
+    return options.excludeAttrKind(DeclAttrKind::Borrowing) ? "" : "borrowing";
+  case SelfAccessKind::Mutating:
+  case SelfAccessKind::NonMutating:
+    return "";
+  }
+  llvm_unreachable("covered switch");
+}
+
 void PrintAST::printSelfAccessKindModifiersIfNeeded(const FuncDecl *FD) {
   if (!Options.PrintSelfAccessKindKeyword)
     return;
@@ -2729,17 +2727,14 @@ void PrintAST::printSelfAccessKindModifiersIfNeeded(const FuncDecl *FD) {
       Printer.printKeyword("nonmutating", Options, " ");
     break;
   case SelfAccessKind::LegacyConsuming:
-    if (!Options.excludeAttrKind(DeclAttrKind::LegacyConsuming))
-      Printer.printKeyword("__consuming", Options, " ");
-    break;
   case SelfAccessKind::Consuming:
-    if (!Options.excludeAttrKind(DeclAttrKind::Consuming))
-      Printer.printKeyword("consuming", Options, " ");
+  case SelfAccessKind::Borrowing: {
+    StringRef keyword =
+        getPrintedSelfOwnershipModifier(FD->getSelfAccessKind(), Options);
+    if (!keyword.empty())
+      Printer.printKeyword(keyword, Options, " ");
     break;
-  case SelfAccessKind::Borrowing:
-    if (!Options.excludeAttrKind(DeclAttrKind::Borrowing))
-      Printer.printKeyword("borrowing", Options, " ");
-    break;
+  }
   }
 }
 
@@ -2839,6 +2834,15 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
 
     Printer << " {";
     if (mutatingGetter) printWithSpace("mutating");
+
+    if (Options.PrintSelfAccessKindKeyword) {
+      if (auto *getter = ASD->getAccessor(AccessorKind::Get)) {
+        StringRef keyword =
+            getPrintedSelfOwnershipModifier(getter->getSelfAccessKind(), Options);
+        if (!keyword.empty())
+          printWithSpace(keyword);
+      }
+    }
 
     if (ASD->getParsedAccessor(AccessorKind::Borrow)) {
       printWithSpace("borrow");
@@ -3070,6 +3074,21 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
 static bool sortClangDecls(Decl *lhs, Decl *rhs) {
   auto &SM = lhs->getASTContext().SourceMgr;
   auto *CML = lhs->getASTContext().getClangModuleLoader();
+
+  // If this is a decl from a macro expansion, sort it with its original.
+  Decl *lhsOrig = lhs->getMacroExpansionOriginatingDecl();
+  Decl *rhsOrig = rhs->getMacroExpansionOriginatingDecl();
+
+  // The original comes first, followed by aux decls.
+  if (lhsOrig == rhs)
+    return false;
+  if (rhsOrig == lhs)
+    return true;
+
+  if (lhsOrig)
+    lhs = lhsOrig;
+  if (rhsOrig)
+    rhs = rhsOrig;
 
   auto getClangDecl = [&CML](Decl *d) -> const clang::Decl * {
     // Has an attached clang::Decl
@@ -3770,14 +3789,14 @@ static void printWithSuppressibleFeatureChecks(ASTPrinter &printer,
   });
 }
 
-// Returns true if the given declaration is CxxBorrowingSequence,
+// Returns true if the given declaration is CxxIterable,
 // CxxBorrowingIterator or an extension of one of these.
-static bool isCxxBorrowingSequenceOrIterator(Decl *decl) {
+static bool isCxxIterableOrBorrowingIterator(Decl *decl) {
   if (auto *ext = dyn_cast<ExtensionDecl>(decl))
     decl = ext->getExtendedNominal();
 
   if (auto *proto = dyn_cast<ProtocolDecl>(decl))
-    return proto->getNameStr() == "CxxBorrowingSequence";
+    return proto->getNameStr() == "CxxIterable";
   if (auto *sd = dyn_cast<StructDecl>(decl))
     return sd->getNameStr() == "CxxBorrowingIterator";
   return false;
@@ -3845,13 +3864,17 @@ void swift::printWithCompatibilityFeatureChecks(ASTPrinter &printer,
     return;
   }
 
-  // CxxBorrowingSequence and CxxBorrowingIterator, defined in the Cxx overlay,
-  // conform to BorrowingSequence and BorrowingIteratorProtocol. When a newer
+  // CxxIterable and CxxBorrowingIterator, defined in the Cxx overlay,
+  // conform to Iterable and BorrowingIteratorProtocol. When a newer
   // compiler is used with an older SDK, the Cxx module interface may reference
   // these Swift stdlib protocols even though they don't exist in the SDK's
   // stdlib. To handle this, we guard them behind a Swift version.
-  if (isCxxBorrowingSequenceOrIterator(decl)) {
-    printer << "#if canImport(Swift, _version: 6.4.0.12)\n";
+  if (isCxxIterableOrBorrowingIterator(decl)) {
+    // Iterable exists on 6.4.0.30+ and 6.5.0.7+,
+    // but it is absent in [6.5, 6.5.0.7).
+    printer << "#if canImport(Swift, _version: 6.5.0.7) || "
+                  "(canImport(Swift, _version: 6.4.0.30) && "
+                  "!canImport(Swift, _version: 6.5))\n";
     printBody();
     printer.printNewline();
     printer << "#endif";
@@ -4340,7 +4363,7 @@ static void printParameterFlags(ASTPrinter &printer,
     if (!options.excludeAttrKind(TypeAttrKind::Escaping) && escaping)
       printer.printAttrName("@escaping ");
   }
-
+  
   if (flags.isConstValue())
     printer.printAttrName("@const ");
 }
@@ -4477,13 +4500,16 @@ void PrintAST::printOneParameter(const ParamDecl *param,
       auto type = TheTypeLoc.getType();
 
       bool isNonisolatedNonsending = false;
-      if (auto *funcTy = dyn_cast<AnyFunctionType>(interfaceTy.getPointer()))
-        isNonisolatedNonsending = funcTy->getIsolation().isNonisolatedNonsending();
+      if (auto *funcTy = dyn_cast<AnyFunctionType>(interfaceTy.getPointer())) {
+        isNonisolatedNonsending =
+            funcTy->getIsolation().isNonisolatedNonsending();
+      }
 
       // We suppress `@escaping` on enum element parameters because it cannot
       // be written explicitly in this position.
       printParameterFlags(Printer, Options, param, paramFlags,
-                          isEscaping(type) && !isEnumElement, isNonisolatedNonsending);
+                          isEscaping(type) && !isEnumElement,
+                          isNonisolatedNonsending);
     }
 
     printTypeLoc(TheTypeLoc, getNonRecursiveOptions(param));
@@ -5456,9 +5482,11 @@ void PrintAST::visitTypeJoinExpr(TypeJoinExpr *expr) {
 }
 
 void PrintAST::visitAssignExpr(AssignExpr *expr) {
-  visit(expr->getDest());
+  if (auto dest = expr->getDest())
+    visit(dest);
   Printer << " = ";
-  visit(expr->getSrc());
+  if (auto src = expr->getSrc())
+    visit(src);
 }
 
 void PrintAST::visitBinaryExpr(BinaryExpr *expr) {
@@ -6428,14 +6456,18 @@ class TypePrinter : public TypeVisitor<TypePrinter, void, NonRecursivePrintOptio
     return Options.CurrentModule->getVisibleClangModules(Options.InterfaceContentKind);
   }
 
-  /// If \p TyDecl belongs to a submodule, return the \c ModuleDecl for that
-  /// submodule; otherwise just return the parent module.
+  /// If \p TyDecl belongs to an explicit submodule, return the \c ModuleDecl
+  /// for that submodule; otherwise just return the parent module.
   ModuleDecl *getParentSubModuleOrModule(GenericTypeDecl *TyDecl) {
     // Only clang declarations can belong to a submodule
     if (auto clangNode = TyDecl->getClangNode()) {
       auto importer = TyDecl->getASTContext().getClangModuleLoader();
       if (auto clangMod = importer->getClangOwningModule(clangNode)) {
-        return importer->getWrapperForModule(clangMod);
+        // Explicit submodules are only visible if specifically imported;
+        // everything else has the visibility of its top-level module.
+        if (clangMod->isSubModule() && clangMod->IsExplicit) {
+          return importer->getWrapperForModule(clangMod);
+        }
       }
     }
 
@@ -7140,6 +7172,10 @@ public:
       Printer.printSimpleAttr("@Sendable") << " ";
     }
 
+    if (!Options.excludeAttrKind(TypeAttrKind::Called) && info.isCalledOnce()) {
+      Printer.printSimpleAttr("@called(once)") << " ";
+    }
+    
     // Print lifetime dependencies using Swift syntax.
     if (!Options.PrintInSILBody && fnType->hasLifetimeDependencies()) {
       ArrayRef<AnyFunctionType::Param> params = fnType->getParams();
@@ -7341,6 +7377,13 @@ public:
     if (info.isAsync()) {
       Printer.printSimpleAttr("@async") << " ";
     }
+    if (info.isCalledOnce()) {
+      Printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
+      Printer.printAttrName("@called");
+      Printer << "(once)";
+      Printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
+      Printer << " ";
+    }
   }
 
   /// Print a function type's parameter list.
@@ -7404,8 +7447,8 @@ public:
         visit(type);
         Printer << "...";
       } else {
-        printParameterFlags(Printer, Options, nullptr, Param.getParameterFlags(),
-                            isEscaping(type));
+        printParameterFlags(Printer, Options, nullptr,
+                            Param.getParameterFlags(), isEscaping(type));
         visit(type);
       }
     }
@@ -7896,7 +7939,7 @@ public:
       if (!T->isRoot())
         Printer << '(';
 
-      Printer << "@opened(\"" << env->getOpenedExistentialUUID() << "\", ";
+      Printer << "@opened(" << env->getOpenedExistentialID() << ", ";
       auto existentialTy = env->maybeApplyOuterContextSubstitutions(
           env->getOpenedExistentialType());
       visit(existentialTy);
@@ -7967,7 +8010,7 @@ public:
   void visitElementArchetypeType(ElementArchetypeType *T,
                                  NonRecursivePrintOptions nrOptions) {
     if (Options.PrintForSIL) {
-      Printer << "@pack_element(\"" << T->getOpenedElementID() << "\") ";
+      Printer << "@pack_element(" << T->getOpenedElementID() << ") ";
       auto packTy = findPackForElementArchetype(T);
       visit(packTy);
     } else {

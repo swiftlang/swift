@@ -536,6 +536,14 @@ bool CrossModuleOptimization::canSerializeFunction(
   if (!function->isDefinition() || function->isAvailableExternally())
     return false;
 
+  CanSILFunctionType fnTy = function->getLoweredFunctionType();
+  for (auto &result : fnTy->getResults()) {
+    if (result.getInterfaceType()->hasOpaqueArchetype()) {
+      // We don't support functions with opaque result types, yet.
+      return false;
+    }
+  }
+
   // Avoid a stack overflow in case of a very deeply nested call graph.
   if (maxDepth <= 0)
     return false;
@@ -566,12 +574,12 @@ bool CrossModuleOptimization::canSerializeFunction(
   if (conservative) {
     // Even in conservative mode we want to serialize most generic functions,
     // except they are large (for code size reasons).
-    if (function->getLoweredFunctionType()->isPolymorphic())
+    if (fnTy->isPolymorphic())
       sizeLimit = sizeLimit * 20;
   } else {
     // The basic heuristic: serialize all generic functions, because it makes a
     // huge difference if generic functions can be specialized or not.
-    if (function->getLoweredFunctionType()->isPolymorphic())
+    if (fnTy->isPolymorphic())
       skipSizeLimitCheck = true;
     if (function->getLinkage() == SILLinkage::Shared)
       skipSizeLimitCheck = true;

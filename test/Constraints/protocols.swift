@@ -526,7 +526,6 @@ do {
   }
 }
 
-// FIXME: These should all produce correct diagnostics
 do {
   protocol P {}
 
@@ -539,18 +538,21 @@ do {
   func f2() -> (any P)? {
     let x: Any? = nil
     return x
-    // expected-error@-1 {{failed to produce diagnostic for expression}}
+    // expected-error@-1 {{cannot convert return expression of type 'Any?' to return type '(any P)?'}}
+    // expected-note@-2 {{arguments to generic parameter 'Wrapped' ('Any' and 'any P') are expected to be equal}}
   }
 
   func f3() -> [any P] {
     let x: [Any] = []
     return x
-    // expected-error@-1 {{failed to produce diagnostic for expression}}
+    // expected-error@-1 {{cannot convert return expression of type '[Any]' to return type '[any P]'}}
+    // expected-note@-2 {{arguments to generic parameter 'Element' ('Any' and 'any P') are expected to be equal}}
   }
 
   func f4() -> [Int: any P] {
     let x: [Int: Any] = [:]
     return x
-    // expected-error@-1 {{failed to produce diagnostic for expression}}
+    // expected-error@-1 {{cannot convert return expression of type '[Int : Any]' to return type '[Int : any P]'}}
+    // expected-note@-2 {{arguments to generic parameter 'Value' ('Any' and 'any P') are expected to be equal}}
   }
 }

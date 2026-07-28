@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -verify %s | %FileCheck %s
 
 // Check that dynamic calls resolve to the right `dynamicallyCall` method in SIL.

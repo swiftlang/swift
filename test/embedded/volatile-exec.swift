@@ -1,11 +1,11 @@
 // RUN: %target-run-simple-swift(-parse-as-library -enable-experimental-feature Extern -enable-experimental-feature Embedded -wmo -runtime-compatibility-version none %target-embedded-posix-shim) | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
 // REQUIRES: volatile
 // REQUIRES: swift_feature_Embedded
 // REQUIRES: swift_feature_Extern
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 import _Volatile
 

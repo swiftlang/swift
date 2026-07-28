@@ -1,6 +1,5 @@
-// RUN: %target-typecheck-verify-swift -DSALVAGE -solver-disable-crash-on-valid-salvage
-// RUN: not --crash %target-typecheck-verify-swift -DSALVAGE -solver-enable-crash-on-valid-salvage
-// RUN: %target-typecheck-verify-swift -solver-enable-crash-on-valid-salvage
+// RUN: %target-typecheck-verify-swift -solver-disable-diagnose-valid-salvage
+// RUN: %target-typecheck-verify-swift -solver-enable-diagnose-valid-salvage -verify-additional-prefix salvage-
 
 // All of the below should of course type check successfully.
 // FIXME: Once everything below is passing, we can gyb it.

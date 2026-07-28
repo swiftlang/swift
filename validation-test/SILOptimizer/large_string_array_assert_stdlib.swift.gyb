@@ -1,9 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %gyb %s > %t/main.swift
 
-// https://github.com/apple/swift/issues/56816
-// UNSUPPORTED: OS=linux-gnu
-
 // The compiler should finish in less than 1 minute. To give some slack,
 // specify a timeout of 10 minutes.
 // If the compiler needs more than 10 minutes, there is probably a real problem.

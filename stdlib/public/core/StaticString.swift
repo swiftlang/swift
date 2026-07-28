@@ -160,7 +160,7 @@ public struct StaticString: Sendable {
     return Int(_utf8CodeUnitCount)
   }
 
-  @_alwaysEmitIntoClient @_transparent
+  @export(implementation) @_transparent
   internal var unsafeRawPointer: Builtin.RawPointer {
     return Builtin.inttoptr_Word(_startPtrOrData)
   }

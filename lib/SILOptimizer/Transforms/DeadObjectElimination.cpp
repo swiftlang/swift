@@ -1337,6 +1337,6 @@ bool DeadObjectElimination::insertCompensatingReleases(SILInstruction *before,
 //                              Top Level Driver
 //===----------------------------------------------------------------------===//
 
-SILTransform *swift::createDeadObjectElimination() {
+SILTransform *swift::createLegacyDeadObjectElimination() {
   return new DeadObjectElimination();
 }

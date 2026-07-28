@@ -194,3 +194,8 @@ module NoncopyableNonmovableGlobal {
   header "noncopyable-nonmovable-global.h"
   requires cplusplus
 }
+
+module BitFields {
+  header "bit-fields.h"
+  requires cplusplus
+}

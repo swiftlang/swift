@@ -27,8 +27,8 @@ void span(int *__counted_by(len) p __noescape, int len) __attribute__((availabil
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
 @available(macOS 10.5, *) @_alwaysEmitIntoClient @_disfavoredOverload
-public func bufferPointer(_ _bufferPointer_param0: UnsafeMutableBufferPointer<Int32>) {
-    let _bufferPointer_param1 = Int32(exactly: _bufferPointer_param0.count)!
+public func bufferPointer(_ _bufferPointer_param0: UnsafeMutableBufferPointer<CInt>) {
+    let _bufferPointer_param1 = CInt(exactly: _bufferPointer_param0.count)!
     return unsafe bufferPointer(_bufferPointer_param0.baseAddress, _bufferPointer_param1)
 }
 ------------------------------
@@ -36,8 +36,8 @@ public func bufferPointer(_ _bufferPointer_param0: UnsafeMutableBufferPointer<In
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
 @available(macOS 10.5, *) @_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
-public func span(_ p: inout MutableSpan<Int32>) {
-    let len = Int32(exactly: p.count)!
+public func span(_ p: inout MutableSpan<CInt>) {
+    let len = CInt(exactly: p.count)!
     let _pPtr = p.withUnsafeMutableBufferPointer {
         unsafe $0
     }
@@ -52,8 +52,8 @@ public func span(_ p: inout MutableSpan<Int32>) {
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
 @available(iOS 2.0, *) @_alwaysEmitIntoClient @_disfavoredOverload
-public func bufferPointer(_ _bufferPointer_param0: UnsafeMutableBufferPointer<Int32>) {
-    let _bufferPointer_param1 = Int32(exactly: _bufferPointer_param0.count)!
+public func bufferPointer(_ _bufferPointer_param0: UnsafeMutableBufferPointer<CInt>) {
+    let _bufferPointer_param1 = CInt(exactly: _bufferPointer_param0.count)!
     return unsafe bufferPointer(_bufferPointer_param0.baseAddress, _bufferPointer_param1)
 }
 ------------------------------
@@ -61,8 +61,8 @@ public func bufferPointer(_ _bufferPointer_param0: UnsafeMutableBufferPointer<In
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
 @available(iOS 2.0, *) @_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
-public func span(_ p: inout MutableSpan<Int32>) {
-    let len = Int32(exactly: p.count)!
+public func span(_ p: inout MutableSpan<CInt>) {
+    let len = CInt(exactly: p.count)!
     let _pPtr = p.withUnsafeMutableBufferPointer {
         unsafe $0
     }
@@ -77,8 +77,8 @@ public func span(_ p: inout MutableSpan<Int32>) {
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
 @available(watchOS 2.0, *) @_alwaysEmitIntoClient @_disfavoredOverload
-public func bufferPointer(_ _bufferPointer_param0: UnsafeMutableBufferPointer<Int32>) {
-    let _bufferPointer_param1 = Int32(exactly: _bufferPointer_param0.count)!
+public func bufferPointer(_ _bufferPointer_param0: UnsafeMutableBufferPointer<CInt>) {
+    let _bufferPointer_param1 = CInt(exactly: _bufferPointer_param0.count)!
     return unsafe bufferPointer(_bufferPointer_param0.baseAddress, _bufferPointer_param1)
 }
 ------------------------------
@@ -86,8 +86,8 @@ public func bufferPointer(_ _bufferPointer_param0: UnsafeMutableBufferPointer<In
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
 @available(watchOS 2.0, *) @_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
-public func span(_ p: inout MutableSpan<Int32>) {
-    let len = Int32(exactly: p.count)!
+public func span(_ p: inout MutableSpan<CInt>) {
+    let len = CInt(exactly: p.count)!
     let _pPtr = p.withUnsafeMutableBufferPointer {
         unsafe $0
     }
@@ -102,8 +102,8 @@ public func span(_ p: inout MutableSpan<Int32>) {
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
 @available(visionOS 1.0, *) @_alwaysEmitIntoClient @_disfavoredOverload
-public func bufferPointer(_ _bufferPointer_param0: UnsafeMutableBufferPointer<Int32>) {
-    let _bufferPointer_param1 = Int32(exactly: _bufferPointer_param0.count)!
+public func bufferPointer(_ _bufferPointer_param0: UnsafeMutableBufferPointer<CInt>) {
+    let _bufferPointer_param1 = CInt(exactly: _bufferPointer_param0.count)!
     return unsafe bufferPointer(_bufferPointer_param0.baseAddress, _bufferPointer_param1)
 }
 ------------------------------
@@ -111,8 +111,8 @@ public func bufferPointer(_ _bufferPointer_param0: UnsafeMutableBufferPointer<In
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
 @available(visionOS 1.0, *) @_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
-public func span(_ p: inout MutableSpan<Int32>) {
-    let len = Int32(exactly: p.count)!
+public func span(_ p: inout MutableSpan<CInt>) {
+    let len = CInt(exactly: p.count)!
     let _pPtr = p.withUnsafeMutableBufferPointer {
         unsafe $0
     }
@@ -126,16 +126,16 @@ public func span(_ p: inout MutableSpan<Int32>) {
 @__swiftmacro_So13bufferPointer15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_disfavoredOverload public func bufferPointer(_ _bufferPointer_param0: UnsafeMutableBufferPointer<Int32>) {
-    let _bufferPointer_param1 = Int32(exactly: _bufferPointer_param0.count)!
+@_alwaysEmitIntoClient @_disfavoredOverload public func bufferPointer(_ _bufferPointer_param0: UnsafeMutableBufferPointer<CInt>) {
+    let _bufferPointer_param1 = CInt(exactly: _bufferPointer_param0.count)!
     return unsafe bufferPointer(_bufferPointer_param0.baseAddress, _bufferPointer_param1)
 }
 ------------------------------
 @__swiftmacro_So4span15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload public func span(_ p: inout MutableSpan<Int32>) {
-    let len = Int32(exactly: p.count)!
+@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload public func span(_ p: inout MutableSpan<CInt>) {
+    let len = CInt(exactly: p.count)!
     let _pPtr = p.withUnsafeMutableBufferPointer {
         unsafe $0
     }
@@ -149,16 +149,16 @@ public func span(_ p: inout MutableSpan<Int32>) {
 @__swiftmacro_So13bufferPointer15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_disfavoredOverload public func bufferPointer(_ _bufferPointer_param0: UnsafeMutableBufferPointer<Int32>) {
-    let _bufferPointer_param1 = Int32(exactly: _bufferPointer_param0.count)!
+@_alwaysEmitIntoClient @_disfavoredOverload public func bufferPointer(_ _bufferPointer_param0: UnsafeMutableBufferPointer<CInt>) {
+    let _bufferPointer_param1 = CInt(exactly: _bufferPointer_param0.count)!
     return unsafe bufferPointer(_bufferPointer_param0.baseAddress, _bufferPointer_param1)
 }
 ------------------------------
 @__swiftmacro_So4span15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload public func span(_ p: inout MutableSpan<Int32>) {
-    let len = Int32(exactly: p.count)!
+@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload public func span(_ p: inout MutableSpan<CInt>) {
+    let len = CInt(exactly: p.count)!
     let _pPtr = p.withUnsafeMutableBufferPointer {
         unsafe $0
     }

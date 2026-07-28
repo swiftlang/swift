@@ -691,7 +691,7 @@ extension ${Self} {
   // to get literal expression comparands typed Int in generic contexts,
   // but there's also a pretty straightforward workaround (adding an
   // explicit type).
-  @_transparent @_alwaysEmitIntoClient
+  @_transparent @export(implementation)
   public static func !=(lhs: ${Self}, rhs: ${Self}) -> Bool {
     return !(lhs == rhs)
   }

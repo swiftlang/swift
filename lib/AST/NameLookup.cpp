@@ -1846,7 +1846,7 @@ SmallVector<MacroDecl *, 1> namelookup::lookupMacros(DeclContext *dc,
 
     ModuleQualifiedLookupRequest req{moduleScopeDC, moduleDecl, macroName,
                                      SourceLoc(),
-                                     NL_ExcludeMacroExpansions | NL_OnlyMacros};
+                                     {NLFlags::ExcludeMacroExpansions, NLFlags::OnlyMacros}};
     auto lookup = evaluateOrDefault(ctx.evaluator, req, {});
     for (auto *found : lookup)
       addChoiceIfApplicable(found);
@@ -2219,6 +2219,55 @@ NominalTypeDecl::lookupDirect(DeclName name, SourceLoc loc,
                            DirectLookupRequest({this, name, flags}, loc), {});
 }
 
+static void populateMembersForLazyName(DeclName name, NominalTypeDecl *decl,
+                                       MemberLookupTable &Table,
+                                       ASTContext &ctx) {
+  DeclBaseName baseName(name.getBaseName());
+
+  if (isa_and_nonnull<clang::RecordDecl>(decl->getClangDecl())) {
+    // FIXME: This should go through populateLookupTableEntryFromLazyIDCLoader.
+    auto allFound = evaluateOrDefault(
+        ctx.evaluator,
+        ClangRecordMemberLookup({cast<NominalTypeDecl>(decl), name}), {});
+    // Add all the members we found, later we'll combine these with the
+    // existing members.
+    for (auto found : allFound)
+      Table.addMember(found);
+  } else if (!isa_and_nonnull<clang::NamespaceDecl>(decl->getClangDecl())) {
+    populateLookupTableEntryFromLazyIDCLoader(ctx, Table, baseName, decl);
+  }
+  populateLookupTableEntryFromExtensions(ctx, Table, baseName, decl);
+
+  // A `@com` type synthesizes its identity member (a class's `CLSID`, or a
+  // protocol's `IID`, in a metatype extension) the first time the table is
+  // built for that name; covers a name lookup racing member synthesis.
+  // Only for a source-file type: an imported one already carries the
+  // deserialized member, and triggering synthesis (which name-looks-up the
+  // member) would re-enter this very lookup.
+  if (ctx.LangOpts.EnableCOMInterop) {
+    if (auto *PD = dyn_cast<ProtocolDecl>(decl)) {
+      if (name.isSimpleName(ctx.Id_IID) &&
+          PD->isCOMInterface() && PD->isInSwiftSourceFile()) {
+        evaluateOrDefault(ctx.evaluator, SynthesizeCOMInterfaceIDRequest{PD},
+                          nullptr);
+      }
+    } else if (auto *CD = dyn_cast<ClassDecl>(decl)) {
+      if (name.isSimpleName(ctx.Id_CLSID) &&
+          CD->isCOMImplementation() && CD->isInSwiftSourceFile()) {
+        evaluateOrDefault(ctx.evaluator,
+                          SynthesizeCOMImplementationIDRequest{CD}, nullptr);
+      }
+    }
+  }
+
+  // Ensure `id` and `actorSystem` are populated for a distributed actor.
+  // These have lazily-computed types, so should not create a cycle.
+  if (name.isSimpleName(ctx.Id_id) && decl->isInSwiftSourceFile())
+    (void)decl->getDistributedActorIDProperty();
+  if (name.isSimpleName(ctx.Id_actorSystem) && decl->isInSwiftSourceFile())
+    (void)decl->getDistributedActorSystemProperty();
+}
+
 TinyPtrVector<ValueDecl *>
 DirectLookupRequest::evaluate(Evaluator &evaluator,
                               DirectLookupDescriptor desc) const {
@@ -2245,20 +2294,23 @@ DirectLookupRequest::evaluate(Evaluator &evaluator,
 
   auto &Table = *decl->getLookupTable();
   if (!Table.isLazilyComplete(name.getBaseName())) {
-    DeclBaseName baseName(name.getBaseName());
+    // The lookup table believes it doesn't have a complete accounting of this
+    // name - either because we're never seen it before, or another extension
+    // was registered since the last time we searched. Ask the loaders to give
+    // us a hand.
+    populateMembersForLazyName(name, decl, Table, ctx);
 
+    // Bypass the regular member lookup table if we find something in
+    // the original C++ namespace. We don't want to store the C++ decl in the
+    // lookup table as the decl can be referenced  from multiple namespace
+    // declarations due to inline namespaces. We still merge in the other
+    // entries found in the lookup table, to support finding members in
+    // namespace extensions.
+    // FIXME: Can this go through the lazy member loader machinary instead?
     if (isa_and_nonnull<clang::NamespaceDecl>(decl->getClangDecl())) {
       auto allFound = evaluateOrDefault(
           ctx.evaluator, CXXNamespaceMemberLookup({cast<EnumDecl>(decl), name}),
           {});
-      populateLookupTableEntryFromExtensions(ctx, Table, baseName, decl);
-
-      // Bypass the regular member lookup table if we find something in
-      // the original C++ namespace. We don't want to store the C++ decl in the
-      // lookup table as the decl can be referenced  from multiple namespace
-      // declarations due to inline namespaces. We still merge in the other
-      // entries found in the lookup table, to support finding members in
-      // namespace extensions.
       if (!allFound.empty()) {
         auto known = Table.find(name);
         if (known != Table.end()) {
@@ -2270,26 +2322,8 @@ DirectLookupRequest::evaluate(Evaluator &evaluator,
         }
         return allFound;
       }
-    } else if (isa_and_nonnull<clang::RecordDecl>(decl->getClangDecl())) {
-      auto allFound = evaluateOrDefault(
-          ctx.evaluator,
-          ClangRecordMemberLookup({cast<NominalTypeDecl>(decl), name}), {});
-      // Add all the members we found, later we'll combine these with the
-      // existing members.
-      for (auto found : allFound)
-        Table.addMember(found);
-
-      populateLookupTableEntryFromExtensions(ctx, Table, baseName, decl);
-    } else {
-      // The lookup table believes it doesn't have a complete accounting of this
-      // name - either because we're never seen it before, or another extension
-      // was registered since the last time we searched. Ask the loaders to give
-      // us a hand.
-      populateLookupTableEntryFromLazyIDCLoader(ctx, Table, baseName, decl);
-      populateLookupTableEntryFromExtensions(ctx, Table, baseName, decl);
     }
-
-    Table.markLazilyComplete(baseName);
+    Table.markLazilyComplete(name.getBaseName());
   }
 
   DeclName macroExpansionKey = adjustLazyMacroExpansionNameKey(ctx, name);
@@ -2490,8 +2524,8 @@ static bool isAcceptableLookupResult(const DeclContext *dc, NLOptions options,
   }
 
   // Check access.
-  if (!(options & NL_IgnoreAccessControl) && !ctx.isAccessControlDisabled()) {
-    bool allowUsableFromInline = options & NL_IncludeUsableFromInline;
+  if (!options.contains(NLFlags::IgnoreAccessControl) && !ctx.isAccessControlDisabled()) {
+    bool allowUsableFromInline = options.contains(NLFlags::IncludeUsableFromInline);
     if (!decl->isAccessibleFrom(dc, /*forConformance*/ false,
                                 allowUsableFromInline))
       return false;
@@ -2501,7 +2535,7 @@ static bool isAcceptableLookupResult(const DeclContext *dc, NLOptions options,
   if (requireImport) {
     // If the options indicate that visibility should be enforced in this
     // lookup, check if the decl is imported.
-    bool checkDeclImport = !(options & NL_IgnoreMissingImports);
+    bool checkDeclImport = !options.contains(NLFlags::IgnoreMissingImports);
 
     // Even when missing imports are being ignored, we still need to filter out
     // overrides that haven't been imported. Otherwise, removeOverriddenDecls()
@@ -2537,7 +2571,7 @@ void namelookup::pruneLookupResultSet(const DeclContext *dc, NLOptions options,
                                       Identifier moduleSelector,
                                       SmallVectorImpl<ValueDecl *> &decls) {
   // If we're supposed to remove associated type declarations, do so now.
-  if (options & NL_RemoveAssociatedTypes) {
+  if (options.contains(NLFlags::RemoveAssociatedTypes)) {
     decls.erase(
       std::remove_if(decls.begin(), decls.end(),
                      [&](ValueDecl *decl) {
@@ -2547,11 +2581,11 @@ void namelookup::pruneLookupResultSet(const DeclContext *dc, NLOptions options,
   }
 
   // If we're supposed to remove overridden declarations, do so now.
-  if (options & NL_RemoveOverridden)
+  if (options.contains(NLFlags::RemoveOverridden))
     removeOverriddenDecls(decls);
 
   // If we're supposed to remove shadowed/hidden declarations, do so now.
-  if (options & NL_RemoveNonVisible) {
+  if (options.contains(NLFlags::RemoveNonVisible)) {
     removeOutOfModuleDecls(decls, moduleSelector, dc);
     removeShadowedDecls(decls, dc);
   }
@@ -2763,7 +2797,7 @@ QualifiedLookupRequest::evaluate(Evaluator &eval, const DeclContext *DC,
 
   // Visit all of the nominal types we know about, discovering any others
   // we need along the way.
-  bool wantProtocolMembers = (options & NL_ProtocolMembers);
+  bool wantProtocolMembers = options.contains(NLFlags::ProtocolMembers);
   while (!stack.empty()) {
     auto current = stack.back();
     stack.pop_back();
@@ -2774,11 +2808,11 @@ QualifiedLookupRequest::evaluate(Evaluator &eval, const DeclContext *DC,
     // Look for results within the current nominal type and its extensions.
     bool currentIsProtocol = isa<ProtocolDecl>(current);
     auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
-    if (options & NL_IncludeAttributeImplements)
+    if (options.contains(NLFlags::IncludeAttributeImplements))
       flags |= NominalTypeDecl::LookupDirectFlags::IncludeAttrImplements;
-    if (options & NL_ExcludeMacroExpansions)
+    if (options.contains(NLFlags::ExcludeMacroExpansions))
       flags |= NominalTypeDecl::LookupDirectFlags::ExcludeMacroExpansions;
-    if (options & NL_ABIProviding)
+    if (options.contains(NLFlags::ABIProviding))
       flags |= NominalTypeDecl::LookupDirectFlags::ABIProviding;
 
     // Note that the source loc argument doesn't matter, because excluding
@@ -2787,12 +2821,18 @@ QualifiedLookupRequest::evaluate(Evaluator &eval, const DeclContext *DC,
                                            SourceLoc(), flags)) {
       // If we're performing a type lookup, don't even attempt to validate
       // the decl if its not a type.
-      if ((options & NL_OnlyTypes) && !isa<TypeDecl>(decl))
+      if (options.contains(NLFlags::OnlyTypes) && !isa<TypeDecl>(decl))
         continue;
 
       // If we're performing a macro lookup, don't even attempt to validate
       // the decl if its not a macro.
-      if ((options & NL_OnlyMacros) && !isa<MacroDecl>(decl))
+      if (options.contains(NLFlags::OnlyMacros) && !isa<MacroDecl>(decl))
+        continue;
+
+      // Metatype extension members are only visible when looking up directly
+      // on the protocol, not when reached via a conforming type.
+      if (decl->getDeclContext()->isMetatypeExtension() &&
+          !llvm::is_contained(typeDecls, current))
         continue;
 
       if (isAcceptableLookupResult(DC, options, decl, onlyCompleteObjectInits,
@@ -2824,7 +2864,7 @@ QualifiedLookupRequest::evaluate(Evaluator &eval, const DeclContext *DC,
     auto gpList = current->getGenericParams();
 
     // .. But not in type contexts (yet)
-    if (!(options & NL_OnlyTypes) && gpList && !member.isSpecial()) {
+    if (!options.contains(NLFlags::OnlyTypes) && gpList && !member.isSpecial()) {
       auto gp = gpList->lookUpGenericParam(member.getBaseIdentifier());
 
       if (gp && gp->isValue()) {
@@ -2891,8 +2931,8 @@ ModuleQualifiedLookupRequest::evaluate(Evaluator &eval, const DeclContext *DC,
   using namespace namelookup;
   QualifiedLookupResult decls;
 
-  auto kind = (options & NL_OnlyTypes ? ResolutionKind::TypesOnly
-               : options & NL_OnlyMacros ? ResolutionKind::MacrosOnly
+  auto kind = (options.contains(NLFlags::OnlyTypes)    ? ResolutionKind::TypesOnly
+               : options.contains(NLFlags::OnlyMacros) ? ResolutionKind::MacrosOnly
                : ResolutionKind::Overloadable);
   auto topLevelScope = DC->getModuleScopeContext();
   if (module == topLevelScope->getParentModule()) {
@@ -2937,7 +2977,8 @@ AnyObjectLookupRequest::evaluate(Evaluator &evaluator, const DeclContext *dc,
 
   // Type-only and macro lookup won't find anything on AnyObject.
   // AnyObject doesn't provide ABI.
-  if (options & (NL_OnlyTypes | NL_OnlyMacros | NL_ABIProviding))
+  if (options.contains(NLFlags::OnlyTypes) || options.contains(NLFlags::OnlyMacros)
+      || options.contains(NLFlags::ABIProviding))
     return decls;
 
   // Collect all of the visible declarations.
@@ -3221,19 +3262,19 @@ static llvm::TinyPtrVector<TypeDecl *> directReferencesForQualifiedTypeLookup(
   {
     // Look into the base types.
     SmallVector<ValueDecl *, 4> members;
-    auto options = NL_RemoveNonVisible | NL_OnlyTypes;
+    NLOptions options = {NLFlags::RemoveNonVisible, NLFlags::OnlyTypes};
 
     if (typeLookupOptions.contains(
             DirectlyReferencedTypeLookupFlags::AllowUsableFromInline))
-      options |= NL_IncludeUsableFromInline;
+      options |= NLFlags::IncludeUsableFromInline;
 
     if (typeLookupOptions.contains(
             DirectlyReferencedTypeLookupFlags::IgnoreMissingImports))
-      options |= NL_IgnoreMissingImports;
+      options |= NLFlags::IgnoreMissingImports;
 
     if (typeLookupOptions.contains(
             DirectlyReferencedTypeLookupFlags::ExcludeMacroExpansions))
-      options |= NL_ExcludeMacroExpansions;
+      options |= NLFlags::ExcludeMacroExpansions;
 
     // Look through the type declarations we were given, resolving them down
     // to nominal type declarations, module declarations, and
@@ -3249,8 +3290,8 @@ static llvm::TinyPtrVector<TypeDecl *> directReferencesForQualifiedTypeLookup(
     // Search all of the modules.
     for (auto module : moduleDecls) {
       auto innerOptions = options;
-      innerOptions &= ~NL_RemoveOverridden;
-      innerOptions &= ~NL_RemoveNonVisible;
+      innerOptions -= NLFlags::RemoveOverridden;
+      innerOptions -= NLFlags::RemoveNonVisible;
       SmallVector<ValueDecl *, 4> moduleMembers;
       dc->lookupQualified(module, name, loc, innerOptions, moduleMembers);
       members.append(moduleMembers.begin(), moduleMembers.end());
@@ -3392,13 +3433,18 @@ directReferencesForTypeRepr(Evaluator &evaluator, ASTContext &ctx,
     return result;
   }
 
+  case TypeReprKind::Protocol:
+    // `P.Protocol` refers, for the purpose of extension binding, to the
+    // protocol `P` itself (a protocol metatype extension binds to `P`).
+    return directReferencesForTypeRepr(
+        evaluator, ctx, cast<ProtocolTypeRepr>(typeRepr)->getBase(), dc, options);
+
   case TypeReprKind::Error:
   case TypeReprKind::Function:
   case TypeReprKind::Ownership:
   case TypeReprKind::CompileTimeLiteral:
   case TypeReprKind::ConstValue:
   case TypeReprKind::Metatype:
-  case TypeReprKind::Protocol:
   case TypeReprKind::SILBox:
   case TypeReprKind::Placeholder:
   case TypeReprKind::Pack:
@@ -4358,8 +4404,8 @@ bool IsCallAsFunctionNominalRequest::evaluate(Evaluator &evaluator,
   // that will be checked when we actually try to solve with a `callAsFunction`
   // member access.
   SmallVector<ValueDecl *, 4> results;
-  auto opts = NL_QualifiedDefault | NL_ProtocolMembers |
-              NL_IgnoreAccessControl | NL_IgnoreMissingImports;
+  NLOptions opts = {NLFlags::QualifiedDefault, NLFlags::ProtocolMembers,
+              NLFlags::IgnoreAccessControl, NLFlags::IgnoreMissingImports};
   dc->lookupQualified(decl, DeclNameRef(ctx.Id_callAsFunction),
                       decl->getLoc(), opts, results);
 
@@ -4482,7 +4528,7 @@ FuncDecl *LookupIntrinsicRequest::evaluate(Evaluator &evaluator,
                                            Identifier funcName) const {
   llvm::SmallVector<ValueDecl *, 1> decls;
   module->lookupQualified(module, DeclNameRef(funcName), SourceLoc(),
-                          NL_QualifiedDefault | NL_IncludeUsableFromInline,
+                          {NLFlags::QualifiedDefault, NLFlags::IncludeUsableFromInline},
                           decls);
   if (decls.size() != 1)
     return nullptr;
@@ -4506,22 +4552,23 @@ void swift::simple_display(llvm::raw_ostream &out, NLOptions options) {
   using Flag = std::pair<NLOptions, StringRef>;
   Flag possibleFlags[] = {
 #define FLAG(Name) {Name, #Name},
-    FLAG(NL_ProtocolMembers)
-    FLAG(NL_RemoveNonVisible)
-    FLAG(NL_RemoveOverridden)
-    FLAG(NL_IgnoreAccessControl)
-    FLAG(NL_OnlyTypes)
-    FLAG(NL_IncludeAttributeImplements)
-    FLAG(NL_IncludeUsableFromInline)
-    FLAG(NL_ExcludeMacroExpansions)
-    FLAG(NL_OnlyMacros)
-    FLAG(NL_IgnoreMissingImports)
-    FLAG(NL_ABIProviding)
+    FLAG(NLFlags::ProtocolMembers)
+    FLAG(NLFlags::RemoveNonVisible)
+    FLAG(NLFlags::RemoveOverridden)
+    FLAG(NLFlags::IgnoreAccessControl)
+    FLAG(NLFlags::OnlyTypes)
+    FLAG(NLFlags::IncludeAttributeImplements)
+    FLAG(NLFlags::IncludeUsableFromInline)
+    FLAG(NLFlags::ExcludeMacroExpansions)
+    FLAG(NLFlags::OnlyMacros)
+    FLAG(NLFlags::IgnoreMissingImports)
+    FLAG(NLFlags::ABIProviding)
+    FLAG(NLFlags::IncludeOuterResults)
 #undef FLAG
   };
 
   auto flagsToPrint = llvm::make_filter_range(
-      possibleFlags, [&](Flag flag) { return options & flag.first; });
+      possibleFlags, [&](Flag flag) { return options.contains(flag.first); });
 
   out << "{ ";
   interleave(

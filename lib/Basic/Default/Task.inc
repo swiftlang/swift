@@ -53,7 +53,7 @@ public:
   llvm::sys::ProcessInfo PI;
 
   Task(const char *ExecPath, llvm::ArrayRef<const char *> Args,
-       llvm::ArrayRef<const char *> Env = std::nullopt, void *Context = nullptr,
+       llvm::ArrayRef<const char *> Env = {}, void *Context = nullptr,
        bool SeparateErrors = false)
       : ExecPath(ExecPath), Args(Args), Env(Env), Context(Context),
         SeparateErrors(SeparateErrors) {}

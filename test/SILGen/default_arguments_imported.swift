@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -Xllvm -sil-print-types -sdk %S/Inputs -I %S/Inputs -enable-source-import %s
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -sdk %S/Inputs -I %S/Inputs -enable-source-import %s | %FileCheck %s
 
 // Test SIL generation for imported default arguments.

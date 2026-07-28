@@ -1,3 +1,4 @@
+// RUN: %target-swift-frontend -emit-silgen-ossa -o /dev/null -sil-verify-all -enable-sil-opaque-values %s -sil-verify-none -verify
 // RUN:%target-swift-frontend -emit-silgen %s -sil-verify-none -verify
 
 

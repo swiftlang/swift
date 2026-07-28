@@ -1,6 +1,5 @@
 // RUN: %target-swift-frontend %s -emit-sil -O -swift-version 6 -target %target-swift-5.9-abi-triple -o /dev/null
 
-// REQUIRES: swift_in_compiler
 
 // Regression tests for:
 // * https://github.com/swiftlang/swift/issues/88987

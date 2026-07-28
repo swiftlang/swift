@@ -1,7 +1,6 @@
 // RUN: %target-swift-frontend -emit-sil -O -parse-as-library -enable-copy-propagation=false -module-name=main %s | %FileCheck %s
 // RUN: %target-swift-frontend -emit-sil -O -parse-as-library -enable-lexical-lifetimes=false -module-name=main %s | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 
 @_silgen_name("takeGuaranteed")
 @inline(never)

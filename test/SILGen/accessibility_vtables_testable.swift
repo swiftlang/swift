@@ -6,6 +6,7 @@
 // RUN: %target-swift-frontend -enable-library-evolution -emit-silgen %S/Inputs/accessibility_vtables_testable_helper.swift | %FileCheck %s --check-prefix=LIBRARY
 
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/accessibility_vtables_testable_helper.swift
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -primary-file %s -I %t
 // RUN: %target-swift-emit-silgen -primary-file %s -I %t | %FileCheck %s --check-prefix=FRAGILE-CLIENT
 
 // RUN: %target-swift-frontend -emit-module -enable-testing -o %t %S/Inputs/accessibility_vtables_testable_helper.swift

@@ -376,7 +376,7 @@ extension OptionSet where RawValue: FixedWidthInteger {
 }
 
 extension OptionSet where RawValue: FixedWidthInteger, Element == Self {
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @discardableResult
   public mutating func insert(
     _ newMember: Element

@@ -897,6 +897,11 @@ void addStride(ConstantStructBuilder &B, const TypeInfo *TI, IRGenModule &IGM) {
 } // end anonymous namespace
 
 bool irgen::layoutStringsEnabled(IRGenModule &IGM, bool diagnose) {
+  // Layout string value witnesses are not available in embedded mode
+  if (IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
+    return false;
+  }
+
   if (!IGM.isLayoutStringValueWitnessesFeatureAvailable(IGM.Context)) {
     return false;
   }

@@ -3,7 +3,6 @@
 
 // RUN: %target-swift-frontend -target %target-cpu-apple-macos14 -emit-ir -enable-experimental-feature Embedded -g %s -o - | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
 // REQUIRES: OS=macosx
 // REQUIRES: embedded_stdlib

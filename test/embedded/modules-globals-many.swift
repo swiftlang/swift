@@ -6,7 +6,6 @@
 // RUN: %target-swift-frontend -emit-module -I %t -o %t/MyModuleC.swiftmodule %t/MyModuleC.swift -enable-experimental-feature Embedded -parse-as-library
 // RUN: %target-swift-frontend -emit-ir -I %t %t/Main.swift -enable-experimental-feature Embedded -parse-as-library | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_Embedded
 
 // Dependencies look like this:

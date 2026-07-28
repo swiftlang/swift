@@ -1483,10 +1483,8 @@ ValueDecl::isSpecialDistributedActorProperty(bool onlyCheckName) const {
   // The synthesized bit doesn't get preserved by serialization or module
   // interfaces, we only need to check it when compiling a SourceFile though
   // since we'll diagnose any conflicting user-defined versions.
-  if (!isSynthesized() && DC->getParentSourceFile() &&
-      !DC->isInSwiftinterface()) {
+  if (!isSynthesized() && DC->isInSwiftSourceFile())
     return std::nullopt;
-  }
 
   return kind;
 }
@@ -1732,7 +1730,7 @@ FuncDecl *swift::getDoneRecordingOnDistributedInvocationEncoder(
 
   llvm::SmallVector<ValueDecl *, 2> results;
   nominal->lookupQualified(nominal, DeclNameRef(ctx.Id_doneRecording),
-                           SourceLoc(), NL_QualifiedDefault, results);
+                           SourceLoc(), NLFlags::QualifiedDefault, results);
   for (auto result : results) {
     auto *fd = dyn_cast<FuncDecl>(result);
     if (!fd)

@@ -70,13 +70,13 @@ func testStruct() {
 
 func testEnum() {
   // CHECK-DAG: declare extern_weak {{.+}} @"$s24weaklinked_import_helper1EOMa"
-  _ = MemoryLayout<E>.size
+  var x1 = MemoryLayout<E>.size
 
   // CHECK-DAG: @"$s24weaklinked_import_helper1EO5basicyA2CmFWC" = extern_weak constant i32
-  _ = E.basic
+  var x2 = E.basic
 
   // CHECK-DAG: @"$s24weaklinked_import_helper1EO5assocyACSicACmFWC" = extern_weak constant i32
-  _ = E.assoc(0)
+  var x3 = E.assoc(0)
 }
 
 func testClass() {

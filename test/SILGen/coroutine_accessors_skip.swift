@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s -enable-callee-allocated-coro-abi -experimental-skip-non-inlinable-function-bodies -enable-library-evolution -enable-experimental-feature CoroutineAccessors
 // RUN: %target-swift-emit-silgen                            \
 // RUN:     %s                                               \
 // RUN:     -enable-callee-allocated-coro-abi                \

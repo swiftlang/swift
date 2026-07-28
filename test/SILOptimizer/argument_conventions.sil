@@ -3,7 +3,6 @@
 // RUN:   -enable-experimental-feature LifetimeDependence \
 // RUN:   2>&1 | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_LifetimeDependence
 
 import Builtin

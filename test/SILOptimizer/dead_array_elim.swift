@@ -1,7 +1,6 @@
 // RUN: %target-swift-frontend -O -Xllvm -sil-print-types -Xllvm -sil-print-transform-blocks=false -emit-sil -primary-file %s | grep -v debug_value | %FileCheck %s
 
 // REQUIRES: swift_stdlib_no_asserts
-// REQUIRES: swift_in_compiler
 
 // These tests check whether DeadObjectElimination pass runs as a part of the
 // optimization pipeline and eliminates dead array literals in Swift code.

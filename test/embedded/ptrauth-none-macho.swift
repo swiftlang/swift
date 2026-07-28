@@ -1,7 +1,6 @@
 // RUN: %target-swift-frontend -target arm64e-apple-none-macho -enable-experimental-feature Embedded -emit-ir %s -o - | %FileCheck %s
 // RUN: %target-swift-frontend -target arm64e-apple-macos14 -enable-experimental-feature Embedded -emit-ir %s -o - | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: OS=macosx
 // REQUIRES: embedded_stdlib_cross_compiling
 // REQUIRES: swift_feature_Embedded

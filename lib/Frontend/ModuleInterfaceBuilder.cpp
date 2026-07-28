@@ -184,7 +184,7 @@ bool ExplicitModuleInterfaceBuilder::collectDepsForSerialization(
       auto buf = getDepBuf();
       if (!buf)
         return true;
-      uint64_t hash = xxHash64(buf->getBuffer());
+      uint64_t hash = xxh3_64bits(buf->getBuffer());
       Deps.push_back(FileDependency::hashBased(DepNameToStore, IsSDKRelative,
                                                Status->getSize(), hash));
     } else {

@@ -1,0 +1,56 @@
+// RUN: %target-sil-opt --sil-disable-input-verify %s -module-name=test | %target-sil-opt --sil-disable-input-verify -module-name=test | %FileCheck %s
+
+// REQUIRES: concurrency
+// REQUIRES: distributed
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import _Concurrency
+
+// Two distinct protocols so we can hand-author two witness tables in the
+// same module without redeclaring the same conformance.
+
+protocol Greeter {
+  func greet() async throws -> String
+}
+
+protocol LegacyGreeter {
+  func greet() async throws -> String
+}
+
+class Impl : Greeter, LegacyGreeter {
+  init()
+  func greet() async throws -> String
+}
+
+sil @$greet_witness_A : $@convention(witness_method: Greeter) @async <T where T : Greeter> (@in_guaranteed T) -> (@owned String, @error any Error)
+sil @$greet_thunk_A : $@convention(witness_method: Greeter) @async <T where T : Greeter> (@in_guaranteed T) -> (@owned String, @error any Error)
+
+sil @$greet_witness_B : $@convention(witness_method: LegacyGreeter) @async <T where T : LegacyGreeter> (@in_guaranteed T) -> (@owned String, @error any Error)
+sil @$greet_thunk_B : $@convention(witness_method: LegacyGreeter) @async <T where T : LegacyGreeter> (@in_guaranteed T) -> (@owned String, @error any Error)
+
+// Properly parse `!distributed` and `!distributed_thunk`:
+//
+// CHECK-LABEL: sil_witness_table hidden Impl: Greeter module test
+// CHECK: method #Greeter.greet: {{.*}} : @$greet_witness_A
+// CHECK: method #Greeter.greet!distributed_thunk: {{.*}} : @$greet_thunk_A
+sil_witness_table hidden Impl: Greeter module test {
+  method #Greeter.greet: @$greet_witness_A
+  method #Greeter.greet!distributed_thunk: @$greet_thunk_A
+}
+
+// Legacy mode:
+// We used to emit the decl for debugging purposes but this isn't necessary so we removed it again.
+// To not cause disruption in parsing interfaces which may have the `(0x...)` we still  are able to parse these,
+// and just drop the debugging part.
+//
+// CHECK-LABEL: sil_witness_table hidden Impl: LegacyGreeter module test
+// CHECK: method #LegacyGreeter.greet: {{.*}} : @$greet_witness_B
+// CHECK: method #LegacyGreeter.greet!distributed_thunk: {{.*}} : @$greet_thunk_B
+// CHECK-NOT: method #LegacyGreeter.greet!distributed_thunk(0x
+sil_witness_table hidden Impl: LegacyGreeter module test {
+  method #LegacyGreeter.greet: @$greet_witness_B
+  method #LegacyGreeter.greet!distributed_thunk(0xdeadbeef): @$greet_thunk_B
+}

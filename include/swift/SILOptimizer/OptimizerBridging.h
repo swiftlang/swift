@@ -230,7 +230,6 @@ struct BridgedPassContext {
   BridgedOwnedString mangleWithChangedRepresentation(BridgedFunction applySiteCallee) const;
 
   void inlineFunction(BridgedInstruction apply, bool mandatoryInline) const;
-  BRIDGED_INLINE bool eliminateDeadAllocations(BridgedFunction f) const;
   void eraseFunction(BridgedFunction function) const;
 
   BRIDGED_INLINE bool shouldExpand(BridgedType type) const;
@@ -272,6 +271,7 @@ struct BridgedPassContext {
   // Passmanager housekeeping
 
   BRIDGED_INLINE bool continueWithNextSubpassRun(OptionalBridgedInstruction inst) const;
+  BRIDGED_INLINE bool continueWithNextSubpassRun(OptionalBridgedValue value) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedContext initializeNestedPassContext(BridgedFunction newFunction) const;
   BRIDGED_INLINE void deinitializedNestedPassContext() const;
   BRIDGED_INLINE void

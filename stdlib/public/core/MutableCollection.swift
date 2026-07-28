@@ -301,7 +301,7 @@ extension MutableCollection {
   // runtime the generic implementation would call itself
   // in an infinite recursion due to the absence of a better option.
   @available(*, unavailable)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public subscript(bounds: Range<Index>) -> SubSequence {
     get { fatalError() }
     set { fatalError() }
@@ -353,8 +353,7 @@ extension MutableCollection where SubSequence == Slice<Self> {
   ///   the range must be valid indices of the collection.
   ///
   /// - Complexity: O(1)
-  @inlinable
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public subscript(bounds: Range<Index>) -> Slice<Self> {
     get {
       _failEarlyRangeCheck(bounds, bounds: startIndex..<endIndex)
@@ -543,7 +542,7 @@ public func swap<T: ~Copyable>(_ a: inout T, _ b: inout T) {
 ///   - item: A mutable binding.
 ///   - newValue: The new value of `item`.
 /// - Returns: The original value of `item`.
-@_alwaysEmitIntoClient
+@export(implementation)
 public func exchange<T: ~Copyable>(
   _ item: inout T,
   with newValue: consuming T

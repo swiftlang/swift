@@ -23,6 +23,8 @@
 
 namespace swift {
 
+#if SWIFT_THREADING_HAS_CONDITION_VARIABLE
+
 // A condition variable.
 //
 // Note that use of this class should be minimised because there is no
@@ -139,6 +141,8 @@ public:
 private:
   threading_impl::cond_handle Handle;
 };
+
+#endif // SWIFT_THREADING_HAS_CONDITION_VARIABLE
 
 }
 

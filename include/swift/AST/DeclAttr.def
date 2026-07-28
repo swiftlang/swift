@@ -933,7 +933,13 @@ DECL_ATTR(com, COM,
   ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove | ForbiddenInABIAttr,
   176)
 
-LAST_DECL_ATTR(COM)
+DECL_ATTR(called, Called,
+  /*Requirements=*/0,
+  ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove | NotSerialized | UnconstrainedInABIAttr,
+  177)
+DECL_ATTR_FEATURE_REQUIREMENT(Called, CalledAttribute)
+
+LAST_DECL_ATTR(Called)
 
 #undef DECL_ATTR_ALIAS
 #undef CONTEXTUAL_DECL_ATTR_ALIAS

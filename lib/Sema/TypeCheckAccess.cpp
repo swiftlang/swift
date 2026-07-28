@@ -2827,9 +2827,22 @@ DisallowedOriginKind swift::getDisallowedOriginKind(const Decl *decl,
 void swift::recordRequiredImportAccessLevelForDecl(
     const Decl *decl, const DeclContext *dc, AccessLevel accessLevel,
     RequiredImportAccessLevelCallback remark) {
+  // Macros are consumed at compile time and are not surfaced in the importing
+  // module's API at any access level, so a reference to a macro should not
+  // count toward the import-access tracking of its defining module.
+  if (isa<MacroDecl>(decl))
+    return;
+
   auto sf = dc->getParentSourceFile();
   if (!sf)
     return;
+
+  // When `dc` is inside a macro expansion, its parent source file is the
+  // synthesized macro buffer rather than the user-written file that contains
+  // the import. Walk up to the enclosing user source file so import usage is
+  // attributed to the file that actually carries the import declaration.
+  while (auto *enclosing = sf->getEnclosingSourceFile())
+    sf = enclosing;
 
   auto definingModule = decl->getModuleContext();
   if (definingModule == dc->getParentModule())
@@ -2947,6 +2960,32 @@ void registerPackageAccessForPackageExtendedType(ExtensionDecl *ED) {
   // package visibility.
   recordRequiredImportAccessLevelForDecl(extendedType, DC, AccessLevel::Package,
                                          ED->getLoc());
+
+  // Also record types that appear only in the extension's where clause, so
+  // their modules count as used at package level.
+  if (ED->getTrailingWhereClause()) {
+    auto record = [&](const ValueDecl *VD, const TypeRepr *typeRepr) {
+      if (!VD)
+        return;
+      recordRequiredImportAccessLevelForDecl(
+          VD, DC, AccessLevel::Package,
+          typeRepr ? typeRepr->getLoc() : ED->getLoc());
+    };
+
+    forAllRequirementTypes(ED, [&](Type type, TypeRepr *typeRepr) {
+      if (typeRepr) {
+        typeRepr->walk(DeclRefTypeReprFinder([&](const DeclRefTypeRepr *TR) {
+          record(TR->getBoundDecl(), TR);
+          return true;
+        }));
+      } else if (type) {
+        type.walk(SimpleTypeDeclFinder([&](const ValueDecl *VD) {
+          record(VD, /*typeRepr=*/nullptr);
+          return TypeWalker::Action::Continue;
+        }));
+      }
+    });
+  }
 }
 
 void swift::checkAccessControl(Decl *D) {

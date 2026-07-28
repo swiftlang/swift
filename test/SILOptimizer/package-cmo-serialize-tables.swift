@@ -15,7 +15,6 @@
 // RUN: %target-build-swift -module-name=Main -package-name Pkg -enable-library-evolution -I%t -emit-sil %t/main.swift -o %t/Main.sil
 // RUN: %FileCheck %s --check-prefix=CHECK-MAIN < %t/Main.sil
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
 
 // Temporarily disabling on watchOS (both arm64_32 & armv7k):

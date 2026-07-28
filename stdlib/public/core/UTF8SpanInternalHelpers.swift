@@ -15,30 +15,30 @@
 // import Builtin
 
 extension UnsafeRawPointer {
-  // @_alwaysEmitIntoClient
+  // @export(implementation)
   internal func _loadByte(_ i: Int) -> UInt8 {
     _internalInvariant(i >= 0)
     return unsafe (self+i).loadUnaligned(as: UInt8.self)
   }
 
-  // @_alwaysEmitIntoClient
+  // @export(implementation)
   internal func _isUTF8Continuation(_ i: Int) -> Bool {
     unsafe UTF8.isContinuation(_loadByte(i))
   }
 
-  // @_alwaysEmitIntoClient
+  // @export(implementation)
   internal func _isScalarAligned(_ i: Int) -> Bool {
     _internalInvariant(i >= 0)
     return unsafe !_isUTF8Continuation(i)
   }
 
-  // @_alwaysEmitIntoClient
+  // @export(implementation)
   internal func _scalarLength(startingAt i: Int) -> Int {
     unsafe _utf8ScalarLength(_loadByte(i))
   }
 
   // NOTE: Adaptation of `_decodeScalar` to work on URP
-//  @_alwaysEmitIntoClient
+//  @export(implementation)
   internal func _decodeScalar(
     startingAt i: Int
   ) -> (Unicode.Scalar, nextScalarStart: Int) {
@@ -62,7 +62,7 @@ extension UnsafeRawPointer {
     }
   }
 
-  // @_alwaysEmitIntoClient
+  // @export(implementation)
   internal func _decodeScalar(
     endingAt i: Int
   ) -> (Unicode.Scalar, previousScalarStart: Int) {
@@ -71,7 +71,7 @@ extension UnsafeRawPointer {
     return unsafe (_decodeScalar(startingAt: start).0, start)
   }
 
-  // @_alwaysEmitIntoClient
+  // @export(implementation)
   internal func _previousScalarStart(_ i: Int) -> Int {
     var prev = i &- 1
     _internalInvariant(prev >= 0)
@@ -83,7 +83,7 @@ extension UnsafeRawPointer {
     return prev
   }
 
-  // @_alwaysEmitIntoClient
+  // @export(implementation)
   internal func _scalarAlign(_ i: Int) -> Int {
     var i = i
     while _slowPath(unsafe !_isScalarAligned(i)) {
@@ -101,7 +101,7 @@ extension UnsafeRawPointer {
     unsafe .init(start: self + range.lowerBound, count: range.count)
   }
 
-  @_alwaysEmitIntoClient
+  @export(implementation)
   internal func _ubp(_ range: Range<Int>) -> UnsafeBufferPointer<UInt8> {
     unsafe UnsafeBufferPointer<UInt8>(
       start: UnsafePointer((self+range.lowerBound)._rawValue),

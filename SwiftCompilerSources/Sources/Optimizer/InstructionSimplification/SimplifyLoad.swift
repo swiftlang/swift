@@ -23,7 +23,16 @@ extension LoadInst : OnoneSimplifiable, SILCombineSimplifiable {
     if optimizeLoadFromEmptyCollection(context) {
       return
     }
+    if optimizeLoadFromStoreBorrow(context) {
+      return
+    }
     if replaceLoadOfGlobalLet(context) {
+      return
+    }
+    if replaceLoadOfEmptyType(context) {
+      return
+    }
+    if replaceTrivialLoadOfAddrCast(context) {
       return
     }
     if tryRemoveAddressCast(context) {
@@ -104,6 +113,32 @@ extension LoadInst : OnoneSimplifiable, SILCombineSimplifiable {
     return false
   }
 
+  /// Replaces a `load` of a `store_borrow`:
+  /// ```
+  ///   %1 = alloc_stack $T
+  ///   %2 = store_borrow %0 to %1
+  ///   %3 = load [copy] %2
+  /// ```
+  /// ->
+  /// ```
+  ///   %1 = alloc_stack $T
+  ///   %2 = store_borrow %0 to %1
+  ///   %3 = copy_value %0
+  /// ```
+  private func optimizeLoadFromStoreBorrow(_ context: SimplifyContext) -> Bool {
+    let accessPath = address.accessPath
+    guard case .storeBorrow(let storeBorrow) = accessPath.base,
+          accessPath.projectionPath.isMaterializable
+    else {
+      return false
+    }
+
+    let builder = Builder(before: self, context)
+    let v = storeBorrow.source.createProjectionAndCopy(path: accessPath.projectionPath, builder: builder)
+    replace(with: v, context)
+    return true
+  }
+
   /// The load of a global let variable is replaced by its static initializer value.
   private func replaceLoadOfGlobalLet(_ context: SimplifyContext) -> Bool {
     guard let globalInitVal = getGlobalInitValue(address: address, context) else {
@@ -121,6 +156,61 @@ extension LoadInst : OnoneSimplifiable, SILCombineSimplifiable {
     // Also erases a builtin "once" on which the global_addr depends on. This is fine
     // because we only replace the load if the global init function doesn't have any side effect.
     transitivelyErase(load: self, context)
+    return true
+  }
+
+  /// Replaces a `load` of an "empty" type, e.g. an empty tuple:
+  /// ```
+  ///   %1 = load [trivial %0 : $*()
+  /// ```
+  /// ->
+  /// ```
+  ///   %1 = tuple ()
+  /// ```
+  private func replaceLoadOfEmptyType(_ context: SimplifyContext) -> Bool {
+    guard type.isEmpty(in: parentFunction),
+          // Avoid generating a `struct`, using e.g. an open pack element type, before the type is defined.
+          !type.hasLocalArchetype,
+          // We cannot remove a `load [take]` of an empty non-copyable type, because that would
+          // violate memory lifetime. Note that a non-copyable empty type is not trivial.
+          !type.isMoveOnly
+    else {
+      return false
+    }
+
+    let emptyValue = createEmptyAggregate(ofType: type, before: self, context)
+    replace(with: emptyValue, context)
+    return true
+  }
+
+  /// Replaces a `load [trivial]` from an `unchecked_addr_cast` between two trivial types:
+  /// ```
+  ///   %1 = unchecked_addr_cast %0 : $*SrcType to $*DstType
+  ///   %2 = load [trivial] %1
+  /// ```
+  /// with a load from the original address followed by a value cast:
+  /// ```
+  ///   %1 = load [trivial] %0 : $*SrcType
+  ///   %2 = unchecked_trivial_bit_cast %1 to $DstType
+  /// ```
+  private func replaceTrivialLoadOfAddrCast(_ context: SimplifyContext) -> Bool {
+    guard loadOwnership == .trivial,
+          let addrCast = address as? UncheckedAddrCastInst,
+          addrCast.type != addrCast.fromAddress.type,
+          addrCast.fromAddress.type.objectType.isTrivial(in: parentFunction),
+          let fromSize = addrCast.fromAddress.type.objectType.getStaticSize(context: context),
+          let toSize = addrCast.type.objectType.getStaticSize(context: context),
+          fromSize == toSize,
+          let fromAlignment = addrCast.fromAddress.type.objectType.getStaticAlignment(context: context),
+          let toAlignment = addrCast.type.objectType.getStaticAlignment(context: context),
+          fromAlignment == toAlignment
+    else {
+      return false
+    }
+    let builder = Builder(before: self, context)
+    let newLoad = builder.createLoad(fromAddress: addrCast.fromAddress, ownership: .trivial)
+    let cast = builder.createUncheckedTrivialBitCast(from: newLoad, to: type)
+    replace(with: cast, context)
     return true
   }
 
@@ -494,4 +584,24 @@ private func getGlobalInitialization(
     return (allocInst: allocInst!, storeToGlobal: store)
   }
   return nil
+}
+
+private func createEmptyAggregate(ofType type: Type, before instruction: Instruction, _ context: SimplifyContext) -> Value {
+  if type.isTuple {
+    let elements = type.tupleElements.map { elementType in
+      createEmptyAggregate(ofType: elementType, before: instruction, context)
+    }
+    return Builder(before: instruction, context).createTuple(type: type, elements: elements)
+  }
+  if type.isStruct,
+     let fields = type.getNominalFields(in: instruction.parentFunction)
+  {
+    let elements = fields.map { elementType in
+      createEmptyAggregate(ofType: elementType, before: instruction, context)
+    }
+    return Builder(before: instruction, context).createStruct(type: type, elements: elements)
+  }
+  // This shouldn't happen because there are no other possibilities than empty tuples and empty structs.
+  // However, let's handle this case to be on the safe side.
+  return Undef.get(type: type, context)
 }

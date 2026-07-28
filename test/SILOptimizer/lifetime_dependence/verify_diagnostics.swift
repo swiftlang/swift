@@ -8,7 +8,6 @@
 // RUN:   -enable-experimental-feature Lifetimes \
 // RUN:   -enable-experimental-feature AddressableParameters
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_Lifetimes
 // REQUIRES: swift_feature_AddressableParameters
 
@@ -540,4 +539,44 @@ struct TestBuiltinBorrowInit<T: ~Copyable & ~Escapable>: ~Escapable {
   init(_ target: borrowing T) {
     self.ref = Builtin.makeBorrow(target)
   }
+}
+
+// =============================================================================
+// Reassignment
+// =============================================================================
+
+// Test reassignment of a lifetime-dependent variable to a value that depends on a narrower scope.
+@available(Span 0.1, *)
+struct UniqueArray: ~Copyable {
+  var ptr: UnsafeMutablePointer<Int>
+
+  init() {
+    ptr = .allocate(capacity: 1)
+  }
+
+  var mutableSpan: MutableSpan<Int> {
+    @_lifetime(&self)
+    mutating get {
+      MutableSpan(_unsafeStart: ptr, count: 1)
+    }
+  }
+
+  deinit {
+    ptr.deallocate()
+  }
+}
+
+@available(Span 0.1, *)
+func useSpan(_: borrowing MutableSpan<Int>) {}
+
+@available(Span 0.1, *)
+func testReassignFromNarrowerScope() {
+  var ms = MutableSpan<Int>() // expected-error{{lifetime-dependent variable 'ms' escapes its scope}}
+  useSpan(ms)
+
+  do {
+    var ua = UniqueArray()
+    ms = ua.mutableSpan // expected-note{{it depends on this scoped access to variable 'ua'}}
+  }
+  useSpan(ms) // expected-note{{this use of the lifetime-dependent value is out of scope}}
 }

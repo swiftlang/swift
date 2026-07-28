@@ -73,9 +73,9 @@ public func demangle(_ mangledName: String) throws(DemanglingError) -> String {
 /// of the output span.
 /// 
 /// The demangled output may be _truncated_ if the output span's capacity is insufficient for the
-/// demangled output string! You can detect this situation by inspecting the returned ``DemanglingResult``,
-/// for the ``DemanglingResult/truncated`` case.
-/// 
+/// demangled output string! You can detect this situation by inspecting the thrown ``DemanglingError``,
+/// for the ``DemanglingError/truncated(requiredBufferSize:)`` case.
+///
 /// - Parameters:
 ///   - mangledName: A mangled Swift symbol.
 ///   - output: A pre-allocated span to demangle the Swift symbol into.

@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -experimental-performance-annotations %s -sil-verify-all -module-name=test -emit-sil | %FileCheck %s
 
-// REQUIRES: swift_in_compiler,swift_stdlib_no_asserts,optimized_stdlib
+// REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
 // UNSUPPORTED: swift_test_mode_optimize
 
 public struct Stack<T> {

@@ -1330,10 +1330,6 @@ DiagnosticBehavior toDiagnosticBehavior(DiagnosticKind kind, bool isFatal) {
 std::optional<DiagnosticBehavior>
 DiagnosticState::determineUserControlledWarningBehavior(
     const Diagnostic &diag, SourceManager &sourceMgr) const {
-  auto &diagInfo = storedDiagnosticInfos[(unsigned)diag.getID()];
-  if (diagInfo.kind != DiagnosticKind::Warning)
-    return std::nullopt;
-
   // Compute a behavior relying strictly on command-line provided
   // `warningGroupBehaviorMap`.
   std::optional<DiagnosticBehavior> userControlledBehavior;

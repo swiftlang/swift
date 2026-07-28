@@ -1,3 +1,5 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -strict-memory-safety -verify %s
+
 // RUN:%target-swift-frontend -emit-silgen %s -verify   -strict-memory-safety | %FileCheck %s
 
 

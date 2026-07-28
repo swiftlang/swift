@@ -10,7 +10,6 @@
 // RUN:   -enable-experimental-feature Lifetimes \
 // RUN:   -enable-experimental-feature AddressableParameters
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_Lifetimes
 // REQUIRES: swift_feature_AddressableParameters
 

@@ -4,7 +4,6 @@
 // REQUIRES: concurrency
 // REQUIRES: distributed
 
-// REQUIRES: swift_in_compiler
 
 /// The convention in this test is that the Swift declaration comes before its FileCheck lines.
 

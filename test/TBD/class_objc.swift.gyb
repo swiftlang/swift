@@ -1,13 +1,13 @@
 // RUN: %empty-directory(%t)
 // RUN: %gyb %s > %t/main.swift
 
-// RUN: %target-swift-frontend -emit-ir -o/dev/null -parse-as-library -module-name test -import-objc-header %S/Inputs/objc_class_header.h -validate-tbd-against-ir=missing %t/main.swift -disable-objc-attr-requires-foundation-module
+// RUN: %target-swift-frontend -emit-ir -o/dev/null -parse-as-library -module-name test -import-objc-header %S/Inputs/objc_class_header.h -validate-tbd-against-ir=all %t/main.swift -disable-objc-attr-requires-foundation-module
 
-// RUN: %target-swift-frontend -enable-library-evolution -emit-ir -o/dev/null -parse-as-library -module-name test -import-objc-header %S/Inputs/objc_class_header.h -validate-tbd-against-ir=missing %t/main.swift -disable-objc-attr-requires-foundation-module
+// RUN: %target-swift-frontend -enable-library-evolution -emit-ir -o/dev/null -parse-as-library -module-name test -import-objc-header %S/Inputs/objc_class_header.h -validate-tbd-against-ir=all %t/main.swift -disable-objc-attr-requires-foundation-module
 
-// RUN: %target-swift-frontend -emit-ir -o/dev/null -parse-as-library -module-name test -import-objc-header %S/Inputs/objc_class_header.h -validate-tbd-against-ir=missing %t/main.swift -disable-objc-attr-requires-foundation-module -O
+// RUN: %target-swift-frontend -emit-ir -o/dev/null -parse-as-library -module-name test -import-objc-header %S/Inputs/objc_class_header.h -validate-tbd-against-ir=all %t/main.swift -disable-objc-attr-requires-foundation-module -O
 
-// RUN: %target-swift-frontend -enable-library-evolution -emit-ir -o/dev/null -parse-as-library -module-name test -import-objc-header %S/Inputs/objc_class_header.h -validate-tbd-against-ir=missing %t/main.swift -disable-objc-attr-requires-foundation-module -O
+// RUN: %target-swift-frontend -enable-library-evolution -emit-ir -o/dev/null -parse-as-library -module-name test -import-objc-header %S/Inputs/objc_class_header.h -validate-tbd-against-ir=all %t/main.swift -disable-objc-attr-requires-foundation-module -O
 
 // With -enable-testing:
 
@@ -74,5 +74,23 @@ ${classBody(i)}
 @objc
 internal class InternalObjCOnlyUsableFromInline {
 ${classBody(names.index("Internal"))}
+}
+
+extension NSString {
+  public convenience init(convenienceExtension: Bool) {
+    self.init()
+  }
+}
+
+public class PublicNSObjectSubclass: NSObject {
+  public convenience init(x: Int) {
+    self.init()
+  }
+}
+
+public class PublicNSObjectSubclassObjC: NSObject {
+  @objc public convenience init(y: Int) {
+    self.init()
+  }
 }
 

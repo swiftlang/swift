@@ -955,6 +955,46 @@ ManagedValue SILGenFunction::emitProtocolMetatypeToObject(SILLocation loc,
   return emitManagedRValueWithCleanup(value);
 }
 
+ManagedValue SILGenFunction::emitDoubleToCGFloat(SILLocation loc,
+                                                 SILValue doubleValue, SGFContext C) {
+  // Call CGFloat.init(_:)
+  ASTContext &ctx = getASTContext();
+  auto init = ctx.getCGFloatInitDecl();
+  auto argType = CanType(ctx.getDoubleType());
+  RValue arg(*this,
+             ManagedValue::forObjectRValueWithoutOwnership(doubleValue),
+             argType);
+
+  PreparedArguments args((AnyFunctionType::Param(argType)));
+  args.add(loc, std::move(arg));
+
+  auto result =
+    emitApplyAllocatingInitializer(loc, ConcreteDeclRef(init),
+                                   std::move(args), Type(), C);
+
+  return std::move(result).getScalarValue();
+}
+
+ManagedValue SILGenFunction::emitCGFloatToDouble(SILLocation loc,
+                                                 SILValue cgfloatValue, SGFContext C) {
+  // Call Double.init(_:)
+  ASTContext &ctx = getASTContext();
+  auto init = ctx.getDoubleInitDecl();
+  auto argType = CanType(ctx.getCGFloatType());
+  RValue arg(*this,
+             ManagedValue::forObjectRValueWithoutOwnership(cgfloatValue),
+             argType);
+
+  PreparedArguments args((AnyFunctionType::Param(argType)));
+  args.add(loc, std::move(arg));
+
+  auto result =
+    emitApplyAllocatingInitializer(loc, ConcreteDeclRef(init),
+                                   std::move(args), Type(), C);
+
+  return std::move(result).getScalarValue();
+}
+
 ManagedValue
 SILGenFunction::emitOpenExistential(
        SILLocation loc,

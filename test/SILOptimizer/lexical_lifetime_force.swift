@@ -1,6 +1,5 @@
 // RUN: %target-swift-frontend -emit-sil -enable-lexical-lifetimes=false -O -module-name=main %s | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 
 class C {}
 

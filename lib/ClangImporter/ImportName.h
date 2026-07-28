@@ -438,13 +438,6 @@ public:
                           clang::DeclarationName preferredName =
                             clang::DeclarationName());
 
-  /// Clear the cached imported name for a particular Clang decl so that the
-  /// next call to importName will recompute it.
-  void clearCachedName(const clang::NamedDecl *decl,
-                       ImportNameVersion version) {
-    importNameCache.erase({decl, version});
-  }
-
   /// Attempts to import the name of \p decl with each possible
   /// ImportNameVersion. \p action will be called with each unique name.
   ///
@@ -468,8 +461,16 @@ public:
       llvm::function_ref<bool(ImportedName, ImportNameVersion)> action);
 
   /// Imports the name of the given Clang macro into Swift.
-  Identifier importMacroName(const clang::IdentifierInfo *clangIdentifier,
-                             const clang::MacroInfo *macro);
+  ///
+  /// If APINotes provides a 'SwiftName:' for the macro, that name is used;
+  /// \p M allows module APINotes sidecars to be consulted in addition to
+  /// location-based notes. If the provided name is not valid for a macro
+  /// constant, it is returned in \p invalidCustomName and the original C name
+  /// is used instead.
+  Identifier importMacroName(const clang::IdentifierInfo *II,
+                             const clang::MacroInfo *MI,
+                             const clang::Module *M = nullptr,
+                             Identifier *invalidCustomName = nullptr);
 
   ASTContext &getContext() { return swiftCtx; }
   const LangOptions &getLangOpts() const { return swiftCtx.LangOpts; }

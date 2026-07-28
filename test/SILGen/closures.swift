@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -Xllvm -sil-print-types -module-name closures -parse-stdlib -parse-as-library %s -disable-availability-checking
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name closures -parse-stdlib -parse-as-library %s -disable-availability-checking | %FileCheck %s
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name closures -parse-stdlib -parse-as-library %s -disable-availability-checking | %FileCheck %s --check-prefix=GUARANTEED
 

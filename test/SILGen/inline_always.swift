@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 // RUN: %target-swift-emit-silgen -enable-experimental-feature InlineAlways -parse-as-library %s | %FileCheck %s
 // RUN: %target-swift-emit-silgen -parse-as-library %s | %FileCheck %s
 

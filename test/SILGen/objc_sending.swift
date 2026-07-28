@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa(mock-sdk: %clang-importer-sdk) -o /dev/null -enable-sil-opaque-values -module-name objc_sending -Xllvm -sil-print-types -import-objc-header %S/Inputs/objc_sending.h %s
 // RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk) -module-name objc_sending -Xllvm -sil-print-types -import-objc-header %S/Inputs/objc_sending.h %s | %FileCheck %s
 // RUN: %target-swift-emit-sil(mock-sdk: %clang-importer-sdk) -sil-verify-all -module-name objc_sending -Xllvm -sil-print-types -import-objc-header %S/Inputs/objc_sending.h %s
 

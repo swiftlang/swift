@@ -1,6 +1,5 @@
 // RUN: %target-swift-emit-sil -Xllvm -sil-print-types -I %S/Inputs -enable-experimental-cxx-interop %s | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 
 // CHECK: // clang name: WithStaticMember::staticMember
 // CHECK: sil_global public_external @{{_ZN16WithStaticMember12staticMemberE|\?staticMember@WithStaticMember@@2HA}} : $Int32

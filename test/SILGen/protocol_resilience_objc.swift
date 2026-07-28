@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -enable-objc-interop -disable-objc-attr-requires-foundation-module -enable-library-evolution %s
 // RUN: %target-swift-emit-silgen -enable-objc-interop -disable-objc-attr-requires-foundation-module -enable-library-evolution %s | %FileCheck %s --check-prefix=CHECK
 
 // @objc protocols don't need default witness tables

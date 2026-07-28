@@ -2197,9 +2197,10 @@ namespace {
           .isReference();
     }
 
-    void markReturnsUnsafeNonescapable(AbstractFunctionDecl *fd) {
-      fd->addAttribute(new (Impl.SwiftContext) UnsafeAttr(/*Implicit=*/true));
-
+    // Cache an immortal lifetime dependence for the non-escapable result of
+    // `fd`. This also prevents the implicit single-parameter
+    // lifetime-dependence inference from running for it.
+    void cacheImmortalLifetime(AbstractFunctionDecl *fd) {
       unsigned resultIndex = fd->getParameters()->size();
       if (fd->isInstanceMethod()) {
         ++resultIndex;
@@ -2212,6 +2213,11 @@ namespace {
       Impl.SwiftContext.evaluator.cacheOutput(
           LifetimeDependenceInfoRequest{fd},
           Impl.SwiftContext.AllocateCopy(lifetimeDependencies));
+    }
+
+    void markReturnsUnsafeNonescapable(AbstractFunctionDecl *fd) {
+      fd->addAttribute(new (Impl.SwiftContext) UnsafeAttr(/*Implicit=*/true));
+      cacheImmortalLifetime(fd);
     }
 
     bool
@@ -4339,6 +4345,14 @@ namespace {
       if (correctSwiftName)
         markAsVariant(result, *correctSwiftName);
 
+      // If we ignored an invalid custom Swift name (e.g. a rename to
+      // `deinit`), diagnose that now.
+      if (importedName.hasInvalidCustomName() && isActiveSwiftVersion()) {
+        if (auto customName = NameImporter::findCustomName(decl, getVersion()))
+          result->diagnose(diag::invalid_swift_name_for_decl, *customName,
+                           result);
+      }
+
       return result;
     }
 
@@ -4468,28 +4482,54 @@ namespace {
       SmallBitVector inheritLifetimeParamIndicesForReturn(dependencyVecSize);
       SmallBitVector scopedLifetimeParamIndicesForReturn(dependencyVecSize);
       SmallBitVector paramHasAnnotation(dependencyVecSize);
-      std::map<unsigned, SmallBitVector> inheritedArgDependences;
+      // For each target parameter (e.g. the parameter named in a
+      // 'lifetime_capture_by'), track the sources it inherits its lifetime from
+      // ('copy') separately from the sources it is scoped by ('borrow').
+      struct TargetDependenceIndices {
+        SmallBitVector inheritIndices;
+        SmallBitVector scopeIndices;
+        TargetDependenceIndices(unsigned size)
+            : inheritIndices(size), scopeIndices(size) {}
+      };
+      std::map<unsigned, TargetDependenceIndices> capturedArgDependences;
       auto processLifetimeBound = [&](unsigned idx, clang::QualType ty,
                                       bool forSelf = false) {
         warnForEscapableReturnType();
         if (importedAsClass(ty, forSelf))
           hasSkippedLifetimeAnnotation = true;
         paramHasAnnotation[idx] = true;
-        if (isEscapable(ty))
+        // 'self' and lvalue references borrow the referent's storage.
+        if (forSelf || ty->isLValueReferenceType())
           scopedLifetimeParamIndicesForReturn[idx] = true;
-        else
+        // An rvalue reference is imported as 'consuming'; its storage is not
+        // guaranteed to outlive the call, so we cannot form a scoped
+        // dependency on it, nor can the result inherit its lifetime as if it
+        // were passed by value. Import the API as @unsafe.
+        else if (ty->isRValueReferenceType())
+          hasSkippedLifetimeAnnotation = true;
+        // A non-escapable passed by value: the result inherits its lifetime.
+        else if (!isEscapable(ty))
           inheritLifetimeParamIndicesForReturn[idx] = true;
+        // An escapable/unknown value or pointer passed by value has no
+        // borrowable storage, so we cannot form a scoped lifetime dependency.
+        // Import the API as @unsafe.
+        else
+          hasSkippedLifetimeAnnotation = true;
       };
       auto processLifetimeCaptureBy =
           [&](const clang::LifetimeCaptureByAttr *attr, unsigned idx,
               clang::QualType ty) {
-            // FIXME: support scoped lifetimes. This is not straightforward as
-            // const T& is imported as taking a value
-            //        and we assume the address of T would not escape. An
-            //        annotation in this case contradicts our assumptions. We
-            //        should diagnose that, and support this for the non-const
-            //        case.
-            if (isEscapable(ty))
+            // When the captured parameter is passed by reference, the callee
+            // may store the address of the referent into the capturing
+            // parameter. Model this as a scoped ('borrow') dependency: the
+            // capturing value must not outlive the borrow of this argument.
+            //
+            // FIXME: for a non-reference escapable parameter we have no way to
+            // express that its address escapes (it is imported by value and we
+            // assume its address does not escape), so we still skip it. We
+            // should diagnose that case instead.
+            bool isScoped = ty->isReferenceType();
+            if (!isScoped && isEscapable(ty))
               return;
             for (auto param : attr->params()) {
               // FIXME: Swift assumes no escaping to globals. We should diagnose
@@ -4500,17 +4540,19 @@ namespace {
                 continue;
 
               paramHasAnnotation[idx] = true;
+              unsigned targetIdx;
               if (isa<clang::CXXMethodDecl>(decl) &&
                   param == clang::LifetimeCaptureByAttr::This) {
-                auto [it, inserted] = inheritedArgDependences.try_emplace(
-                    result->getSelfIndex(), SmallBitVector(dependencyVecSize));
-                it->second[idx] = true;
+                targetIdx = result->getSelfIndex();
               } else {
-                auto [it, inserted] = inheritedArgDependences.try_emplace(
-                    param - isa<clang::CXXMethodDecl>(decl),
-                    SmallBitVector(dependencyVecSize));
-                it->second[idx] = true;
+                targetIdx = param - isa<clang::CXXMethodDecl>(decl);
               }
+              auto [it, inserted] = capturedArgDependences.try_emplace(
+                  targetIdx, dependencyVecSize);
+              if (isScoped)
+                it->second.scopeIndices[idx] = true;
+              else
+                it->second.inheritIndices[idx] = true;
             }
           };
       for (auto [idx, param] : llvm::enumerate(decl->parameters())) {
@@ -4531,12 +4573,15 @@ namespace {
             attr, result->getSelfIndex(),
             cast<clang::CXXMethodDecl>(decl)->getThisType()->getPointeeType());
 
-      for (auto& [idx, inheritedDepVec]: inheritedArgDependences) {
+      for (auto &[idx, depIndices] : capturedArgDependences) {
         lifetimeDependencies.emplace_back(
-            inheritedDepVec.any()
-                ? IndexSubset::get(Impl.SwiftContext, inheritedDepVec)
+            depIndices.inheritIndices.any()
+                ? IndexSubset::get(Impl.SwiftContext, depIndices.inheritIndices)
                 : nullptr,
-            nullptr, idx, LifetimeFlags().withAnnotated());
+            depIndices.scopeIndices.any()
+                ? IndexSubset::get(Impl.SwiftContext, depIndices.scopeIndices)
+                : nullptr,
+            idx, LifetimeFlags().withAnnotated());
       }
 
       if (inheritLifetimeParamIndicesForReturn.any() ||
@@ -4561,18 +4606,28 @@ namespace {
                 CxxEscapability::Unknown) == CxxEscapability::NonEscapable)
           lifetimeDependencies.push_back(immortalLifetime);
       }
-      if (lifetimeDependencies.empty()) {
-        if (isNonEscapableAnnotatedType(retType.getTypePtr())) {
-          Impl.addImportDiagnostic(
-              decl,
-              Diagnostic(diag::return_nonescapable_without_lifetimebound,
-                         Impl.SwiftContext.AllocateCopy(retType.getAsString())),
-              decl->getLocation());
-        }
-      } else {
+      bool resultIsNonEscapable =
+          isNonEscapableAnnotatedType(retType.getTypePtr());
+      if (auto *ctordecl = dyn_cast<clang::CXXConstructorDecl>(decl))
+        resultIsNonEscapable = isNonEscapableAnnotatedType(
+            ctordecl->getParent()->getTypeForDecl());
+
+      if (!lifetimeDependencies.empty()) {
         Impl.SwiftContext.evaluator.cacheOutput(
             LifetimeDependenceInfoRequest{result},
             Impl.SwiftContext.AllocateCopy(lifetimeDependencies));
+      } else if (hasSkippedLifetimeAnnotation && resultIsNonEscapable) {
+        // We skipped a lifetime annotation we could not faithfully represent
+        // The API is imported @unsafe (below); give the non-escapable result an
+        // immortal lifetime so the implicit single-parameter inference does not
+        // synthesize a scoped dependency that would be invalid.
+        cacheImmortalLifetime(result);
+      } else if (resultIsNonEscapable) {
+        Impl.addImportDiagnostic(
+            decl,
+            Diagnostic(diag::return_nonescapable_without_lifetimebound,
+                       Impl.SwiftContext.AllocateCopy(retType.getAsString())),
+            decl->getLocation());
       }
 
       if (hasSkippedLifetimeAnnotation) {
@@ -4622,6 +4677,61 @@ namespace {
       Impl.swiftify(result);
     }
 
+    /// Apply the __Unsafe-method rename to \a imported, imported from \a decl.
+    ///
+    /// Instantiation is gated on ImportCxxMembersLazily; without that
+    /// feature ClangImporter eagerly instantiates typedef members, so the
+    /// return type is usually already instantiated by the time we get here.
+    ///
+    /// This is done post-import so we don't eagerly instantiate templates for
+    /// methods we may not import.
+    void renameToUnsafeIfNeeded(const clang::CXXMethodDecl *clangDecl,
+                                ValueDecl *swiftDecl) {
+      if (isa<clang::CXXConstructorDecl, clang::CXXDestructorDecl,
+              clang::CXXConversionDecl>(clangDecl) ||
+          clangDecl->getOverloadedOperator() !=
+              clang::OverloadedOperatorKind::OO_None)
+        // Does not apply to operators, ctors, dtors, conversions
+        return;
+
+      if (Impl.SwiftContext.LangOpts.hasFeature(
+              Feature::ImportCxxMembersLazily)) {
+        using ClassTmplSpec = clang::ClassTemplateSpecializationDecl;
+
+        auto retTy = desugarIfElaborated(clangDecl->getReturnType());
+        auto *retTemplate =
+            dyn_cast_or_null<ClassTmplSpec>(retTy->getAsTagDecl());
+
+        if (retTemplate && !retTemplate->hasDefinition()) {
+          // N.B. InstantiateClassTemplateSpecialization() returns true if it
+          // encountered an error while instantiating the returned template.
+          (void)Impl.getClangSema().InstantiateClassTemplateSpecialization(
+              clangDecl->getLocation(),
+              const_cast<ClassTmplSpec *>(retTemplate),
+              clang::TemplateSpecializationKind::TSK_ImplicitInstantiation,
+              /*Complain*/ false, /*PrimaryStrictPackMatch*/ false);
+        }
+      }
+
+      auto importedName = Impl.importFullName(clangDecl, Impl.CurrentVersion);
+      if (!importedName || importedName.hasCustomName())
+        return;
+      if (evaluateOrDefault(Impl.SwiftContext.evaluator,
+                            IsSafeUseOfCxxDecl({clangDecl, Impl.SwiftContext}),
+                            {}))
+        return;
+
+      DeclName currentName = swiftDecl->getName();
+      Identifier unsafeId = Impl.SwiftContext.getIdentifier(
+          ("__" + currentName.getBaseIdentifier().str() + "Unsafe").str());
+      DeclName unsafeName = currentName.isCompoundName()
+                                ? DeclName(Impl.SwiftContext, unsafeId,
+                                           currentName.getArgumentNames())
+                                : DeclName(unsafeId);
+      if (currentName != unsafeName)
+        swiftDecl->setName(unsafeName);
+    }
+
     Decl *VisitCXXMethodDecl(const clang::CXXMethodDecl *decl) {
       // The static `operator ()` introduced in C++ 23 is still callable as an
       // instance operator in C++, and we want to preserve the ability to call
@@ -4635,72 +4745,43 @@ namespace {
         if (result)
           return result;
       }
-      auto method = VisitFunctionDecl(decl);
 
-      // For regular methods (not operators, constructors, etc.), if the return
-      // type is an uninstantiated templated class, instantiate it now and
-      // update the imported name if it changed. The safety detection logic
-      // (IsSafeUseOfCxxDecl) relies on the returned class being instantiated,
-      // and may affect the imported name (e.g., adding a "__*Unsafe" prefix).
-      // We defer this instantiation to after importing the method so that we
-      // don't eagerly instantiate templates for methods we may not even end up
-      // importing. The "__*Unsafe" lookup fallback in ClangRecordMemberLookup
-      // will also find methods whose imported name changes due to safety after
-      // instantiation.
-      //
-      // This post-import behavior is gated on ImportCxxMembersLazily, because
-      // without that feature, IsSafeUseOfCxxDecl relies on ClangImporter
-      // (over-)eagerly instantiating typedef members.
-      if (method && Impl.SwiftContext.LangOpts.hasFeature(
-                        Feature::ImportCxxMembersLazily)) {
-        if (!isa<clang::CXXConstructorDecl, clang::CXXDestructorDecl,
-                 clang::CXXConversionDecl>(decl) &&
-            decl->getOverloadedOperator() ==
-                clang::OverloadedOperatorKind::OO_None) {
+      // First, import this CXXMethodDecl as we would any regular C/C++ function
+      auto *method = cast_or_null<ValueDecl>(VisitFunctionDecl(decl));
+      if (!method)
+        return nullptr;
 
-          using ClassTmplSpec = clang::ClassTemplateSpecializationDecl;
-
-          auto retTy = desugarIfElaborated(decl->getReturnType());
-          auto *retTemplate =
-              dyn_cast_or_null<ClassTmplSpec>(retTy->getAsTagDecl());
-
-          if (retTemplate && !retTemplate->hasDefinition()) {
-            // N.B. InstantiateClassTemplateSpecialization() returns true if it
-            // encountered an error while instantiating the returned template.
-            (void)Impl.getClangSema().InstantiateClassTemplateSpecialization(
-                decl->getLocation(), const_cast<ClassTmplSpec *>(retTemplate),
-                clang::TemplateSpecializationKind::TSK_ImplicitInstantiation,
-                /*Complain*/ false, /*PrimaryStrictPackMatch*/ false);
-          }
-          // Re-import the name now that the return type template is (or was
-          // already) instantiated; safety may have changed, affecting the
-          // base name. Clear the cached name first so importFullName
-          // recomputes it.
-          Impl.getNameImporter().clearCachedName(decl, Impl.CurrentVersion);
-          if (auto updatedName =
-                  Impl.importFullName(decl, Impl.CurrentVersion)) {
-            auto *valueDecl = cast<ValueDecl>(method);
-            if (valueDecl->getName() != updatedName.getDeclName())
-              valueDecl->setName(updatedName.getDeclName());
-          }
-        }
+      // VisitFunctionDecl() might return a FuncDecl that was already
+      // fully-imported from a CXXMethodDecl due to circular importing.
+      // In that case, the fully-imported result should already be cached.
+      if (auto known =
+              Impl.ImportedDecls.find({decl->getCanonicalDecl(), getVersion()});
+          known != Impl.ImportedDecls.end()) {
+        ASSERT(known->second == method && "returning different");
+        // Skip VisitCXXMethodDecl post-processing (which is not idempotent)
+        // and return the already-cached result.
+        return known->second;
       }
+
+      // Post-VisitFunctionDecl(), perform special handling that is specific
+      // to importing CXXMethodDecls...
+
+      renameToUnsafeIfNeeded(decl, method);
 
       // Do not expose constructors of abstract C++ classes.
       if (auto recordDecl =
               dyn_cast<clang::CXXRecordDecl>(decl->getDeclContext())) {
-        if (isa<clang::CXXConstructorDecl>(decl) && recordDecl->isAbstract() &&
-            isa_and_nonnull<ValueDecl>(method)) {
+        if (isa<clang::CXXConstructorDecl>(decl) && recordDecl->isAbstract()) {
           Impl.markUnavailable(
-              cast<ValueDecl>(method),
+              method,
               "constructors of abstract C++ classes are unavailable in Swift");
           return method;
         }
       }
 
       if (decl->isVirtual()) {
-        if (auto funcDecl = dyn_cast_or_null<FuncDecl>(method)) {
-          if (isa_and_nonnull<StructDecl>(method->getDeclContext())) {
+        if (auto funcDecl = dyn_cast<FuncDecl>(method)) {
+          if (isa<StructDecl>(method->getDeclContext())) {
             // If this is a method of a Swift struct, any possible override of
             // this method would get sliced away, and an invocation would get
             // dispatched statically. This is fine because it matches the C++
@@ -4712,7 +4793,7 @@ namespace {
                                    "virtual function is not available in Swift "
                                    "because it is pure");
             }
-          } else if (isa_and_nonnull<ClassDecl>(funcDecl->getDeclContext())) {
+          } else if (isa<ClassDecl>(funcDecl->getDeclContext())) {
             // This is a foreign reference type. Since `class T` on the Swift
             // side is mapped from `T*` on the C++ side, an invocation of a
             // virtual method `t->method()` should get dispatched dynamically.
@@ -4747,7 +4828,7 @@ namespace {
 
       if (Impl.SwiftContext.LangOpts.CxxInteropGettersSettersAsProperties ||
           hasComputedPropertyAttr(decl)) {
-        if (auto funcDecl = dyn_cast_or_null<FuncDecl>(method)) {
+        if (auto funcDecl = dyn_cast<FuncDecl>(method)) {
           auto parent = funcDecl->getParent()->getSelfNominalTypeDecl();
           CXXMethodBridging bridgingInfo(decl);
           if (bridgingInfo.classify() == CXXMethodBridging::Kind::getter) {
@@ -5071,8 +5152,16 @@ namespace {
             return isa<clang::TemplateTypeParmDecl>(param);
           }))
         return nullptr;
-      return importFunctionDecl(decl->getAsFunction(), importedName,
-                                correctSwiftName, std::nullopt, decl);
+      auto *imported = importFunctionDecl(decl->getAsFunction(), importedName,
+                                          correctSwiftName, std::nullopt, decl);
+      if (imported) {
+        // Member function templates bypass VisitCXXMethodDecl, so the unsafe
+        // method rename that that performs must be applied here too.
+        if (auto *MD = dyn_cast<clang::CXXMethodDecl>(decl->getAsFunction()))
+          renameToUnsafeIfNeeded(MD, cast<ValueDecl>(imported));
+      }
+
+      return imported;
     }
 
     Decl *VisitClassTemplateDecl(const clang::ClassTemplateDecl *decl) {
@@ -6485,9 +6574,15 @@ namespace {
       // different (usually in something like nullability), but for Swift it's
       // an AST invariant that's assumed and asserted elsewhere. If the type is
       // different, just drop the setter, and leave the property as get-only.
+      //
+      // Compare through any reference-storage wrapper: applyPropertyOwnership()
+      // above may have rewritten the original property's type into a
+      // WeakStorageType/UnmanagedStorageType for weak/assign ownership, while
+      // the setter parameter is always the plain referent type.
       assert(setter->getParameters()->size() == 1);
       const ParamDecl *param = setter->getParameters()->get(0);
-      if (!param->getInterfaceType()->isEqual(original->getInterfaceType()))
+      if (!param->getInterfaceType()->isEqual(
+              original->getInterfaceType()->getReferenceStorageReferent()))
         return;
 
       original->setComputedSetter(setter);
@@ -8005,7 +8100,7 @@ void SwiftDeclConverter::recordObjCOverride(AbstractFunctionDecl *decl) const {
   SmallVector<ValueDecl *, 4> results;
   superDecl->lookupQualified(
       superDecl, DeclNameRef(decl->getName()), decl->getLoc(),
-      NL_QualifiedDefault | NL_IgnoreMissingImports, results);
+      {NLFlags::QualifiedDefault, NLFlags::IgnoreMissingImports}, results);
   for (auto member : results) {
     if (member->getKind() != decl->getKind() ||
         member->isInstanceMember() != decl->isInstanceMember() ||
@@ -8077,7 +8172,7 @@ void SwiftDeclConverter::recordObjCOverride(SubscriptDecl *subscript) {
   SmallVector<ValueDecl *, 2> lookup;
   subscript->getModuleContext()->lookupQualified(
       superDecl, DeclNameRef(subscript->getName()),
-      subscript->getLoc(), NL_QualifiedDefault, lookup);
+      subscript->getLoc(), NLFlags::QualifiedDefault, lookup);
 
   for (auto result : lookup) {
     auto parentSub = dyn_cast<SubscriptDecl>(result);
@@ -8774,8 +8869,19 @@ void addCompletionHandlerAttribute(Decl *asyncImport,
     if (!afd)
       continue;
 
-    // Only add the attribute to functions that don't already have availability
-    if (afd->getAttrs().hasAttribute<AvailableAttr>())
+    // Skip if the method already carries a rename pointing at its async
+    // alternative (e.g. one synthesized during import); a plain imported OS
+    // availability attribute must not suppress it, or an async
+    // '@objc @implementation' member won't match its completion-handler
+    // requirement and no thunk will be generated.
+    //
+    // Check the attribute syntactically: resolving getAsyncAlternative() here
+    // does name lookup, which re-enters member loading while this nominal is
+    // still importing and corrupts its member lookup table.
+    if (llvm::any_of(afd->getAttrs().getAttributes<AvailableAttr>(),
+                     [](const AvailableAttr *attr) {
+                       return !attr->getRename().empty();
+                     }))
       continue;
 
     llvm::VersionTuple NoVersion;
@@ -10156,10 +10262,10 @@ static void finishTypeWitnesses(NormalProtocolConformance *conformance,
     bool satisfied = false;
 
     SmallVector<ValueDecl *, 4> lookupResults;
-    NLOptions options = (NL_QualifiedDefault |
-                         NL_RemoveAssociatedTypes |
-                         NL_OnlyTypes |
-                         NL_ProtocolMembers);
+    NLOptions options = {NLFlags::QualifiedDefault,
+                         NLFlags::RemoveAssociatedTypes,
+                         NLFlags::OnlyTypes,
+                         NLFlags::ProtocolMembers};
 
     dc->lookupQualified(nominal, DeclNameRef(assocType->getName()),
                         nominal->getLoc(), options,

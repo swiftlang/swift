@@ -123,6 +123,15 @@ public:
   /// Look up the given public symbol name in the remote process.
   virtual RemoteAddress getSymbolAddress(const std::string &name) = 0;
 
+  /// Lookup the given public symbol name from a given ImageStart address when
+  /// operating on multi-image processes.
+  ///
+  /// Performs a full-process lookup if not overridden in a subclass.
+  virtual RemoteAddress getSymbolAddress(RemoteAddress ImageStart,
+                                         const std::string &name) {
+    return getSymbolAddress(name);
+  }
+
   /// Attempts to read a C string from the given address in the remote
   /// process.
   ///

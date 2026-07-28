@@ -54,7 +54,7 @@ extension UniqueArray where Element: ~Copyable {
   /// - Complexity: O(`self.count` + `newItemCount`) in addition to the complexity
   ///    of the callback invocations.
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public mutating func replaceSubrange<E: Error>(
     _ subrange: Range<Int>,
     addingCount newItemCount: Int,
@@ -103,7 +103,7 @@ extension UniqueArray where Element: ~Copyable {
   ///
   /// - Complexity: O(`self.count` + `newElements.count`)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public mutating func replaceSubrange(
     _ subrange: Range<Int>,
     moving newElements: UnsafeMutableBufferPointer<Element>,
@@ -141,7 +141,7 @@ extension UniqueArray where Element: ~Copyable {
   ///
   /// - Complexity: O(`self.count` + `items.count`)
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public mutating func replaceSubrange(
     _ subrange: Range<Int>,
     moving items: inout OutputSpan<Element>
@@ -183,7 +183,7 @@ extension UniqueArray where Element: Copyable {
   /// - Complexity: O(*n* + *m*), where *n* is count of this array and
   ///   *m* is the count of `newElements`.
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public mutating func replaceSubrange(
     _ subrange: Range<Int>,
     copying newElements: UnsafeBufferPointer<Element>
@@ -222,7 +222,7 @@ extension UniqueArray where Element: Copyable {
   /// - Complexity: O(*n* + *m*), where *n* is count of this array and
   ///   *m* is the count of `newElements`.
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public mutating func replaceSubrange(
     _ subrange: Range<Int>,
     copying newElements: UnsafeMutableBufferPointer<Element>
@@ -261,7 +261,7 @@ extension UniqueArray where Element: Copyable {
   /// - Complexity: O(*n* + *m*), where *n* is count of this array and
   ///   *m* is the count of `newElements`.
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public mutating func replaceSubrange(
     _ subrange: Range<Int>,
     copying newElements: Span<Element>
@@ -300,7 +300,7 @@ extension UniqueArray where Element: Copyable {
   /// - Complexity: O(*n* + *m*), where *n* is count of this array and
   ///   *m* is the count of `newElements`.
   @available(SwiftStdlib 6.4, *)
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public mutating func replaceSubrange(
     _ subrange: Range<Int>,
     copying newElements: consuming some Collection<Element>

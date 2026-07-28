@@ -1,4 +1,5 @@
 // RUN: %target-typecheck-verify-swift -package-name accessibility_warnings
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s -package-name accessibility_warnings -module-name accessibility_warnings
 // RUN: %target-swift-emit-silgen %s -package-name accessibility_warnings -module-name accessibility_warnings | %FileCheck %s -check-prefixes=CHECK,CHECK-NONRES
 // RUN: %target-swift-emit-silgen %s -package-name accessibility_warnings -module-name accessibility_warnings -enable-library-evolution | %FileCheck %s -check-prefixes=CHECK,CHECK-RES
 

@@ -11,6 +11,7 @@
 
 // REQUIRES: OS=macosx
 // REQUIRES: CODEGENERATOR=X86 && CODEGENERATOR=AArch64
+// REQUIRES: SWIFT_STDLIB_ARCH=x86_64 && SWIFT_STDLIB_ARCH=arm64
 
 @_silgen_name("opaque_function")
 func blarpy()

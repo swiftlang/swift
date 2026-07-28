@@ -555,6 +555,10 @@ bool BridgedASTType::hasLocalArchetype() const {
   return unbridged()->hasLocalArchetype();
 }
 
+bool BridgedASTType::hasExistentialArchetype() const {
+  return unbridged()->hasOpenedExistential();
+}
+
 bool BridgedASTType::hasDynamicSelf() const {
   return unbridged()->hasDynamicSelfType();
 }
@@ -872,6 +876,10 @@ BridgedASTType BridgedCanType::getRawType() const {
   return {type};
 }
 
+bool BridgedCanType::hasLocalArchetypeFromEnvironment(BridgedGenericEnvironment env) const {
+  return unbridged()->hasLocalArchetypeFromEnvironment(env.unbridged());
+}
+
 BridgedCanGenericSignature
 BridgedCanType::SILFunctionType_getSubstGenericSignature() const {
   return {swift::CanSILFunctionType(llvm::cast<swift::SILFunctionType>(type))
@@ -1075,6 +1083,14 @@ BridgedGenericSignature::getCanonicalSignature() const {
   return BridgedCanGenericSignature{impl};
 }
 
+bool BridgedGenericSignature::areAllParamsConcrete() const {
+  return unbridged()->areAllParamsConcrete();
+}
+
+bool BridgedGenericSignature::canBeEmittedInEmbeddedSwift() const {
+  return unbridged()->canBeEmittedInEmbeddedSwift();
+}
+
 swift::CanGenericSignature BridgedCanGenericSignature::unbridged() const {
   return swift::GenericSignature(impl).getCanonicalSignature();
 }
@@ -1082,6 +1098,18 @@ swift::CanGenericSignature BridgedCanGenericSignature::unbridged() const {
 BridgedGenericSignature
 BridgedCanGenericSignature::getGenericSignature() const {
   return BridgedGenericSignature{impl};
+}
+
+//===----------------------------------------------------------------------===//
+// MARK: BridgedGenericEnvironment
+//===----------------------------------------------------------------------===//
+
+swift::GenericEnvironment * _Nonnull BridgedGenericEnvironment::unbridged() const {
+  return env;
+}
+
+BridgedGenericSignature BridgedGenericEnvironment::getGenericSignature() const {
+  return {unbridged()->getGenericSignature().getPointer()};
 }
 
 //===----------------------------------------------------------------------===//

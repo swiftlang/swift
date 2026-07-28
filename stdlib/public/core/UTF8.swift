@@ -39,7 +39,7 @@ extension Unicode.UTF8 {
   ///
   /// - Parameter x: A Unicode scalar value.
   /// - Returns: The width of `x` when encoded in UTF-8, from `1` to `4`.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public static func width(_ x: Unicode.Scalar) -> Int {
     switch x.value {
       case 0..<0x80: return 1
@@ -66,7 +66,7 @@ extension Unicode.UTF8: _UnicodeEncoding {
   }
 
   /// Returns whether the given code unit represents an ASCII scalar
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @inline(__always)
   public static func isASCII(_ x: CodeUnit) -> Bool {
     return x & 0b1000_0000 == 0

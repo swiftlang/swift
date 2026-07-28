@@ -2,6 +2,7 @@
 
 // RUN: %target-build-swift -module-name keypaths_resilient -emit-module %S/Inputs/keypaths_multi_file_c.swift -emit-module-path %t/keypaths_resilient.swiftmodule
 
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -module-name keypaths -primary-file %s %S/Inputs/keypaths_multi_file_b.swift -I %t
 // RUN: %target-swift-emit-silgen -module-name keypaths -primary-file %s %S/Inputs/keypaths_multi_file_b.swift -I %t | %FileCheck %s
 // RUN: %target-swift-emit-silgen -module-name keypaths %s -primary-file %S/Inputs/keypaths_multi_file_b.swift -I %t | %FileCheck --check-prefix=DEFINITION %s
 

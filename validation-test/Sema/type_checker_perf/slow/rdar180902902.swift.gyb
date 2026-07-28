@@ -1,0 +1,43 @@
+// RUN: %scale-test --invert --begin 1 --end 5 --step 1 --select NumConstraintScopes %s
+// REQUIRES: asserts,no_asan
+
+// This was fast in 6.3 out of sheer luck, because we would pick the
+// right one out of multiple equally-ranked disjunctions. In 6.4,
+// disjunction pruning changes the picture so now the disjunction
+// scores differ, for equally bogus reasons.
+//
+// The underlying problem is that the Data overload init(base64Encoded:)
+// sends us down a path of attempting all the RangeReplaceableCollection.+
+// overloads in combination. We should fail faster since Data does not
+// conform to ExpressibleByStringLiteral.
+
+struct Options: OptionSet {
+  var rawValue: Int
+}
+
+struct Data {
+  init?(base64Encoded: String, options: Options) {}
+  init?(base64Encoded: Data, options: Options) {}
+}
+
+extension Data: RangeReplaceableCollection, RandomAccessCollection {
+  init() {}
+
+  var startIndex: Int { return 0 }
+  var endIndex: Int { return 0 }
+
+  subscript(_: Int) -> UInt8 {
+    get { return 0 }
+    set {}
+  }
+
+  func replaceSubrange(_: Range<Int>, with: some Collection<UInt8>) {}
+}
+
+func test() -> Data? {
+  return Data(base64Encoded: ""
+%for i in range(0, N):
+  + ""
+%end
+    , options: [])
+}

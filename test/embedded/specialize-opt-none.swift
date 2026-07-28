@@ -1,7 +1,6 @@
 // RUN: %target-swift-emit-sil %s -parse-stdlib -O | %FileCheck %s
 // RUN: %target-swift-emit-sil %s -parse-stdlib -O -enable-experimental-feature Embedded | %FileCheck %s --check-prefix EMBEDDED
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_Embedded
 
 struct X {}

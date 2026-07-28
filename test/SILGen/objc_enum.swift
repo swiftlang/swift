@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -sdk %S/Inputs -I %S/Inputs -enable-source-import %s
 // RUN: %target-swift-emit-silgen -sdk %S/Inputs -I %S/Inputs -enable-source-import %s > %t.out
 // RUN: %FileCheck -check-prefix=CHECK -check-prefix=CHECK-%target-ptrsize %s < %t.out
 // RUN: %FileCheck -check-prefix=NEGATIVE %s < %t.out

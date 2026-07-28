@@ -116,8 +116,10 @@ static bool hasSingletonMetatype(CanType instanceType) {
   return HasSingletonMetatype().visit(instanceType);
 }
 
-CaptureKind TypeConverter::getDeclCaptureKind(CapturedValue capture,
-                                              TypeExpansionContext expansion) {
+CaptureKind
+TypeConverter::getDeclCaptureKind(CapturedValue capture,
+                                  TypeExpansionContext expansion,
+                                  const FunctionTypeInfo *closureInfo) {
   if (auto *expr = capture.getPackElement()) {
     auto contextTy = expr->getType();
     auto props = getTypeProperties(
@@ -140,6 +142,21 @@ CaptureKind TypeConverter::getDeclCaptureKind(CapturedValue capture,
   auto props = getTypeProperties(
       contextTy, TypeExpansionContext::noOpaqueTypeArchetypesSubstitution(
                           expansion.getResilienceExpansion()));
+
+  bool isInOutCapture = false;
+  if (auto *param = dyn_cast<ParamDecl>(var))
+    isInOutCapture = param->isInOut();
+
+  if (!isInOutCapture && !capture.isNoEscape()) {
+    // @called(once) capture of a @called(once) closure is supposed to
+    // be consumed by the closure because it's guaranteed to be called
+    // at most once.
+    if (auto *fnTy = contextTy->getAs<AnyFunctionType>()) {
+      if (fnTy->isCalledOnce() && closureInfo &&
+          closureInfo->ExpectedLoweredType->isCalledOnce())
+        return CaptureKind::Consuming;
+    }
+  }
 
   // If this is a noncopyable 'let' constant that is not a shared paramdecl or
   // used by a noescape capture, then we know it is boxed and want to pass it in
@@ -1732,7 +1749,7 @@ namespace {
                             TypeExpansionKind loweringStyle) const override {
       // A value type with a deinit cannot be memberwise destroyed.
       if (auto *nominal = getLoweredType().getNominalOrBoundGenericNominal()) {
-        if (nominal->getValueTypeDestructor()) {
+        if (nominal->hasValueTypeDestructor()) {
           emitDestroyValue(B, loc, aggValue);
           return;
         }
@@ -2197,10 +2214,6 @@ namespace {
   /// Lower address only types as opaque values.
   class OpaqueValueTypeLowering : public LeafLoadableTypeLowering {
   public:
-    void setLoweredAddresses() const override {
-      LoweredType = LoweredType.getAddressType();
-    }
-
     OpaqueValueTypeLowering(SILType type, SILTypeProperties properties,
                             TypeExpansionContext forExpansion)
       : LeafLoadableTypeLowering(type, properties, IsNotReferenceCounted,
@@ -2209,7 +2222,7 @@ namespace {
     void emitCopyInto(SILBuilder &B, SILLocation loc,
                       SILValue src, SILValue dest, IsTake_t isTake,
                       IsInitialization_t isInit) const override {
-      if (LoweredType.isAddress()) {
+      if (B.getFunction().hasLoweredAddresses()) {
         B.createCopyAddr(loc, src, dest, isTake, isInit);
       } else {
         SILValue value = emitLoadOfCopy(B, loc, src, isTake);
@@ -2268,10 +2281,6 @@ namespace {
         : LeafLoadableTypeLowering(type, properties, IsNotReferenceCounted,
                                    forExpansion) {}
 
-    void setLoweredAddresses() const override {
-      LoweredType = LoweredType.getAddressType();
-    }
-
     void emitCopyInto(SILBuilder &B, SILLocation loc, SILValue src,
                       SILValue dest, IsTake_t isTake,
                       IsInitialization_t isInit) const override {
@@ -2309,13 +2318,9 @@ namespace {
   class LowerType
     : public TypeClassifierBase<LowerType, TypeLowering *>
   {
-    bool loweredAddresses;
-
   public:
-    LowerType(TypeConverter &TC, TypeExpansionContext Expansion,
-              bool loweredAddresses)
-        : TypeClassifierBase(TC, Expansion),
-          loweredAddresses(loweredAddresses) {}
+    LowerType(TypeConverter &TC, TypeExpansionContext Expansion)
+        : TypeClassifierBase(TC, Expansion) {}
 
     TypeLowering *handleTrivial(CanType type) {
       return handleTrivial(type, SILTypeProperties::forTrivial());
@@ -2378,9 +2383,10 @@ namespace {
         return new (TC) AddressOnlyTypeLowering(silType, properties,
                                                            Expansion);
       }
-      auto silType = SILType::getPrimitiveType(
-          type, loweredAddresses ? SILValueCategory::Address
-                                 : SILValueCategory::Object);
+      // Store the canonical (object) form. The address-vs-object category is
+      // derived per query by TypeLowering::getLoweredType(bool) from the
+      // caller's lowered-addresses state, rather than baked in here.
+      auto silType = SILType::getPrimitiveObjectType(type);
       return new (TC) OpaqueValueTypeLowering(silType, properties, Expansion);
     }
     
@@ -2391,6 +2397,7 @@ namespace {
       // opaque for code generation purposes.
       properties.setAddressOnly();
       properties.setInfinite();
+      properties.setNonTrivial();
       return handleAddressOnly(type, properties);
     }
 
@@ -2717,7 +2724,7 @@ namespace {
       if (origType.isNoncopyable(structType)) {
         properties.setNonTrivial();
         properties.setLexical(IsLexical);
-        if (D->getValueTypeDestructor()) {
+        if (D->hasValueTypeDestructor()) {
           properties.setCustomDeinit(MayHaveCustomDeinit);
         }
         if (properties.isAddressOnly())
@@ -2830,7 +2837,7 @@ namespace {
       if (origType.isNoncopyable(enumType)) {
         properties.setNonTrivial();
         properties.setLexical(IsLexical);
-        if (D->getValueTypeDestructor()) {
+        if (D->hasValueTypeDestructor()) {
           properties.setCustomDeinit(MayHaveCustomDeinit);
         }
         if (properties.isAddressOnly())
@@ -2914,8 +2921,8 @@ namespace {
   };
 } // end anonymous namespace
 
-TypeConverter::TypeConverter(ModuleDecl &m, bool loweredAddresses)
-    : LoweredAddresses(loweredAddresses), M(m), Context(m.getASTContext()) {}
+TypeConverter::TypeConverter(ModuleDecl &m)
+    : M(m), Context(m.getASTContext()) {}
 
 TypeConverter::~TypeConverter() {
   // The bump pointer allocator destructor will deallocate but not destroy all
@@ -3123,7 +3130,7 @@ TypeConverter::getTypeLowering(AbstractionPattern origType,
   // and cache it.
   if (loweredSubstType == substType && key.isCacheable()) {
     lowering =
-        LowerType(*this, forExpansion, LoweredAddresses)
+        LowerType(*this, forExpansion)
             .visit(key.SubstType, key.OrigType, isTypeExpansionSensitive);
 
     // Otherwise, check the table at a key that would be used by the
@@ -3973,7 +3980,7 @@ const TypeLowering &TypeConverter::getTypeLoweringForLoweredType(
         forExpansion, origType, loweredType);
   }
 
-  lowering = LowerType(*this, forExpansion, LoweredAddresses)
+  lowering = LowerType(*this, forExpansion)
                  .visit(loweredType, origType, isTypeExpansionSensitive);
 
   if (!lowering->isResilient() && !lowering->isTypeExpansionSensitive())
@@ -4381,9 +4388,11 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
     return cast<AnyFunctionType>(derivativeFnTy->getCanonicalType());
   }
 
-  auto *vd = c.loc.dyn_cast<ValueDecl *>();
+  auto *vd = c.getDecl();
+
   switch (c.kind) {
-  case SILDeclRef::Kind::Func: {
+  case SILDeclRef::Kind::Func:
+  case SILDeclRef::Kind::DistributedThunk: {
     CanAnyFunctionType funcTy;
     if (auto *ACE = c.loc.dyn_cast<AbstractClosureExpr *>()) {
       funcTy = cast<AnyFunctionType>(ACE->getType()->getCanonicalType());
@@ -4471,6 +4480,7 @@ TypeConverter::getGenericSignatureWithCapturedEnvironments(SILDeclRef c) {
   /// Get the function generic params, including outer params.
   switch (c.kind) {
   case SILDeclRef::Kind::Func:
+  case SILDeclRef::Kind::DistributedThunk:
   case SILDeclRef::Kind::Allocator:
   case SILDeclRef::Kind::Initializer:
   case SILDeclRef::Kind::Destroyer:
@@ -5556,14 +5566,6 @@ void TypeConverter::setCaptureTypeExpansionContext(SILDeclRef constant,
     // some place we need to keep opaque types opaque.
     CaptureTypeExpansionContexts.insert({constant, context});
   }
-}
-
-void TypeConverter::setLoweredAddresses() {
-  assert(!LoweredAddresses);
-  for (auto &pair : this->LoweredTypes) {
-    pair.getSecond()->setLoweredAddresses();
-  }
-  LoweredAddresses = true;
 }
 
 static void countNumberOfInnerFields(unsigned &fieldsCount, TypeConverter &TC,

@@ -75,16 +75,16 @@ func testStruct() {
 
 func testEnum() {
   // CHECK-DAG: @"$s25weak_import_native_helper1EO6strongyA2CmFWC" = external constant i32
-  _ = E.strong
+  var x1 = E.strong
 
   // CHECK-DAG: @"$s25weak_import_native_helper1EO0A0yA2CmFWC" = extern_weak constant i32
-  _ = E.weak
+  var x2 = E.weak
 
   // CHECK-DAG: @"$s25weak_import_native_helper1EO11strongAssocyACSicACmFWC" = external constant i32
-  _ = E.strongAssoc(0)
+  var x3 = E.strongAssoc(0)
 
   // CHECK-DAG: @"$s25weak_import_native_helper1EO0A5AssocyACSicACmFWC" = extern_weak constant i32
-  _ = E.weakAssoc(0)
+  var x4 = E.weakAssoc(0)
 }
 
 func testClass() {

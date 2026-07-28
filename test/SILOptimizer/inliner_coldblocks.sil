@@ -9,7 +9,6 @@
 // REMARKS_MISSED-NOT: remark:
 // NO_REMARKS-NOT: remark:
 
-// REQUIRES: swift_in_compiler
 
 sil_stage canonical
 
@@ -221,7 +220,7 @@ bb0:
   // YAML-NEXT:   - Callee:          '"update_global"'
   // YAML-NEXT:     DebugLoc:
   // YAML:          File:            {{.*}}inliner_coldblocks.sil
-  // YAML:            Line:            22
+  // YAML:            Line:            21
   // YAML:            Column:          6
   // YAML-NEXT:   - String:          ' inlined into '
   // YAML-NEXT:   - Caller:          '"regular_large_callee"'

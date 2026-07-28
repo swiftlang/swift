@@ -62,7 +62,7 @@ public struct ObjectIdentifier: Sendable {
   ///
   /// - Parameters:
   ///   - x: A metatype.
-  @_alwaysEmitIntoClient
+  @export(implementation)
   public init(_ x: any (~Copyable & ~Escapable).Type) {
     self._value = unsafe unsafeBitCast(x, to: Builtin.RawPointer.self)
   }
@@ -128,7 +128,7 @@ extension ObjectIdentifier: Hashable {
     hasher.combine(Int(Builtin.ptrtoint_Word(_value)))
   }
 
-  @_alwaysEmitIntoClient // For back deployment
+  @export(implementation) // For back deployment
   public func _rawHashValue(seed: Int) -> Int {
     Int(Builtin.ptrtoint_Word(_value))._rawHashValue(seed: seed)
   }

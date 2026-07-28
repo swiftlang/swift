@@ -87,7 +87,7 @@ extension Substring: Equatable {}
 // Below are concrete overloads to give us most of the benefit without potential
 // harm to expression type checking performance.
 extension String {
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @inline(__always)
   @_effects(readonly)
   public static func ~= (lhs: String, rhs: Substring) -> Bool {
@@ -95,7 +95,7 @@ extension String {
   }
 }
 extension Substring {
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @inline(__always)
   @_effects(readonly)
   public static func ~= (lhs: Substring, rhs: String) -> Bool {

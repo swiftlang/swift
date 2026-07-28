@@ -58,6 +58,18 @@ foreach(lib ${compiler_swiftsyntax_libs})
   _add_swift_caching_compile_options(${lib})
 endforeach()
 
+# FIXME(https://github.com/swiftlang/swift/issues/90100): On Windows ARM64 the
+# MSVC linker 'link.exe' aborts with LNK1322 (Cortex-A53 erratum #843419
+# hazard) while linking SyntaxVisitor.swift.obj. Link swift-syntax with
+# lld-link, which emits the hazard workaround.
+if(SWIFT_HOST_VARIANT_SDK STREQUAL "WINDOWS" AND
+   SWIFT_HOST_VARIANT_ARCH STREQUAL "aarch64" AND
+   NOT LLVM_ENABLE_LTO)
+  foreach(lib ${compiler_swiftsyntax_libs})
+    target_link_options(${lib} PRIVATE "-use-ld=lld-link")
+  endforeach()
+endif()
+
 swift_install_in_component(TARGETS ${compiler_swiftsyntax_libs}
   ARCHIVE DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/host/compiler" COMPONENT compiler-swift-syntax-lib
   LIBRARY DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/host/compiler" COMPONENT compiler-swift-syntax-lib

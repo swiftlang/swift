@@ -9,6 +9,7 @@
 
 // RUN: %target-swift-frontend -emit-module -I %t -o %t %S/../Inputs/fixed_layout_class.swift
 
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -Xllvm -sil-print-types -module-name super -parse-as-library -I %t %s
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name super -parse-as-library -I %t %s | %FileCheck %s
 
 import resilient_class

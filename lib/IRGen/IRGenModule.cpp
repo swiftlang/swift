@@ -218,7 +218,8 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
       DataLayout(irgen.getClangDataLayoutString()),
       Triple(irgen.getEffectiveClangTriple()),
       VariantTriple(irgen.getEffectiveClangVariantTriple()),
-      TargetMachine(std::move(target)), silConv(irgen.SIL),
+      TargetMachine(std::move(target)),
+      silConv(SILAddressConventions::forFullyLoweredModule(irgen.SIL)),
       OutputFilename(OutputFilename),
       MainInputFilenameForDebugInfo(MainInputFilenameForDebugInfo),
       CacheKeyForJob(CacheKeyForJob), TargetInfo(SwiftTargetInfo::get(*this)),
@@ -1206,10 +1207,51 @@ llvm::Constant *IRGenModule::getDeletedAsyncMethodErrorAsyncFunctionPointer() {
 
 llvm::Constant *IRGenModule::
     getDeletedCalleeAllocatedCoroutineMethodErrorCoroFunctionPointer() {
-  return getAddrOfLLVMVariableOrGOTEquivalent(
-             LinkEntity::forKnownCoroFunctionPointer(
-                 "swift_deletedCalleeAllocatedCoroutineMethodError"))
-      .getValue();
+  // A callee-allocated (yield_once_2) coroutine accessor method that is removed
+  // by dead-method elimination still needs its vtable/witness slot filled with
+  // a trapping coro function pointer.  Emit a local one targeting the shared
+  // dead-method stub (which calls swift_deletedMethodError), mirroring how
+  // emitVTableStubs() fills eliminated coroutine function symbols.
+  //
+  // This deliberately avoids a dedicated runtime symbol: such a symbol would
+  // have to be provided by libswiftCore, which does not exist in Embedded
+  // Swift, and a by-name reference to it there would be unresolved.  Emitting
+  // the stub locally works uniformly for all targets.
+  if (!DeletedCalleeAllocatedCoroutineMethodErrorCoroFP) {
+    auto *stub = getOrCreateDeadMethodErrorStub();
+    DeletedCalleeAllocatedCoroutineMethodErrorCoroFP =
+        emitLocalCoroFunctionPointer(*this, stub, "_swift_dead_method_coro_stub");
+  }
+  return DeletedCalleeAllocatedCoroutineMethodErrorCoroFP;
+}
+
+/// Get (creating if necessary) a single local stub function which calls
+/// swift_deletedMethodError().  Used to fill dead-method vtable/witness slots.
+llvm::Function *IRGenModule::getOrCreateDeadMethodErrorStub() {
+  if (DeadMethodErrorStub)
+    return DeadMethodErrorStub;
+
+  // Use linkonce_odr hidden to merge these symbols, except on COFF where the
+  // linker cannot merge them.
+  bool canLinkOnce = !Module.getTargetTriple().isOSBinFormatCOFF();
+  auto linkage = canLinkOnce ? llvm::GlobalValue::LinkOnceODRLinkage
+                             : llvm::GlobalValue::InternalLinkage;
+  auto *stub = llvm::Function::Create(llvm::FunctionType::get(VoidTy, false),
+                                      linkage, "_swift_dead_method_stub",
+                                      &Module);
+  ApplyIRLinkage(canLinkOnce ? IRLinkage::InternalLinkOnceODR
+                             : IRLinkage::Internal)
+      .to(stub, /* nonAliasedDefinition */ false);
+  stub->setAttributes(constructInitialAttributes());
+  stub->setCallingConv(DefaultCC);
+  auto *entry = llvm::BasicBlock::Create(getLLVMContext(), "entry", stub);
+  auto *errorFunc = getDeletedMethodErrorFn();
+  llvm::CallInst::Create(getDeletedMethodErrorFnType(), errorFunc,
+                         ArrayRef<llvm::Value *>(), "", entry);
+  new llvm::UnreachableInst(getLLVMContext(), entry);
+
+  DeadMethodErrorStub = stub;
+  return stub;
 }
 
 static bool isReturnAttribute(llvm::Attribute::AttrKind Attr);
@@ -1575,6 +1617,13 @@ void IRGenModule::constructInitialFnAttributes(
   if (stackProtector == StackProtectorMode::StackProtector) {
     Attrs.addAttribute(llvm::Attribute::StackProtectReq);
     Attrs.addAttribute("stack-protector-buffer-size", llvm::utostr(8));
+  }
+
+  // When the Clang configuration disables builtins Clang stamps
+  // its functions with the "no-builtins" attribute. Mirror that on
+  // the Swift side (otherwise the mismatch prevents function inlining.)
+  if (getClangASTContext().getLangOpts().NoBuiltin) {
+    Attrs.addAttribute("no-builtins");
   }
 
   // Mark as 'nounwind' to avoid referencing exception personality symbols, this

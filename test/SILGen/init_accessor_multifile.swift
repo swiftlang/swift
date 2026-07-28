@@ -1,3 +1,4 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -primary-file %s %S/Inputs/init_accessor_multifile_other.swift -module-name InitAccMulti
 // RUN: %target-swift-emit-silgen -primary-file %s %S/Inputs/init_accessor_multifile_other.swift -module-name InitAccMulti | %FileCheck %s
 
 // Constructor in this file implicitly refers to Holder's stored properties declared in

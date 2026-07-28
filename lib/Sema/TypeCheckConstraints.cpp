@@ -1557,7 +1557,7 @@ void ConstraintSystem::print(raw_ostream &out) const {
       out.indent(indent + 2);
       dumpAnchor(packExpansion, &getASTContext().SourceMgr, out);
       out << " = (" << env->getOpenedElementShapeClass() << ", "
-      << env->getOpenedElementUUID() << ")" << '\n';
+      << env->getOpenedElementID() << ")" << '\n';
     }
   }
 

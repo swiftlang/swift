@@ -1,6 +1,5 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature Embedded
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_Embedded
 
 @_transparent

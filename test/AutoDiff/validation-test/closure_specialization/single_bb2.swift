@@ -33,7 +33,7 @@ AutoDiffClosureSpecSingleBBTests.testWithLeakChecking("Test4") {
   // CHECK4-LABEL: {{^}}// reverse-mode derivative of test4 #1 (_:)
   // CHECK4-NEXT: {{^}}// Isolation: nonisolated
   // CHECK4-NEXT:  sil private @$s3outyycfU_5test4L_yS2fFTJrSpSr : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
-  // CHECK4:         %[[#D9:]] = function_ref @$s3outyycfU_5test4L_yS2fFTJpSpSr128$s3outyycfU_6doubleL_yS2fFTJpSpSr067$sSf16_DifferentiationE7_vjpAdd3lhs3rhsSf5value_Sf_SftSfc8pullbacktj1_k5FZSf_K6SfcfU_Tf1nc_n0c12U_6squareL_yefg7Sr073$si1_j4E12_l16Multiply3lhs3rhsn1_o1_pq1_rs1_tu2U_E7Tf1nE_nS2fTf1ncE_n : $@convention(thin) (Float, Float, Float) -> Float
+  // CHECK4:         %[[#D9:]] = function_ref @$s3outyycfU_5test4L_yS2fFTJpSpSr33$s3outyycfU_6doubleL_yS2fFTJpSpSrS3fIegydd_0c12U_6squareL_yefgH0S3fIegydd_Tf1nEE_n067$sSf16_DifferentiationE7_vjpAdd3lhs3rhsSf5value_Sf_SftSfc8pullbacktq1_r5FZSf_R6SfcfU_0jk1_l4E12_n16Multiply3lhs3rhsp1_q1_rsq1_rt1_rU2U_S2fTf1ncE_n : $@convention(thin) (Float, Float, Float) -> Float
   // CHECK4:         %[[#D10:]] = partial_apply [callee_guaranteed] %[[#D9]](%[[#]], %[[#]]) : $@convention(thin) (Float, Float, Float) -> Float
   // CHECK4:         %[[#D11:]] = tuple (%[[#]], %[[#D10]])
   // CHECK4:         return %[[#D11]]
@@ -41,7 +41,7 @@ AutoDiffClosureSpecSingleBBTests.testWithLeakChecking("Test4") {
 
   // CHECK4-NONE:  {{^}}// pullback of test4 #1 (_:)
   // CHECK4:       {{^}}// specialized pullback of test4 #1 (_:)
-  // CHECK4:       sil private @$s3outyycfU_5test4L_yS2fFTJpSpSr128$s3outyycfU_6doubleL_yS2fFTJpSpSr067$sSf16_DifferentiationE7_vjpAdd3lhs3rhsSf5value_Sf_SftSfc8pullbacktj1_k5FZSf_K6SfcfU_Tf1nc_n0c12U_6squareL_yefg7Sr073$si1_j4E12_l16Multiply3lhs3rhsn1_o1_pq1_rs1_tu2U_E7Tf1nE_nS2fTf1ncE_n : $@convention(thin) (Float, Float, Float) -> Float {
+  // CHECK4:       sil private @$s3outyycfU_5test4L_yS2fFTJpSpSr33$s3outyycfU_6doubleL_yS2fFTJpSpSrS3fIegydd_0c12U_6squareL_yefgH0S3fIegydd_Tf1nEE_n067$sSf16_DifferentiationE7_vjpAdd3lhs3rhsSf5value_Sf_SftSfc8pullbacktq1_r5FZSf_R6SfcfU_0jk1_l4E12_n16Multiply3lhs3rhsp1_q1_rsq1_rt1_rU2U_S2fTf1ncE_n : $@convention(thin) (Float, Float, Float) -> Float {
 
   @differentiable(reverse)
   func test4(_ x: Float) -> Float {
