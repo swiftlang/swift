@@ -1,6 +1,7 @@
 // RUN: %batch-code-completion -solver-scope-threshold=1000 -code-completion-verify-usr-to-decl=false
 // REQUIRES: objc_interop
 // REQUIRES: OS=macosx
+// REQUIRES: rdar183384089
 
 import SwiftUI
 
