@@ -144,6 +144,18 @@ class SwiftTestingCMakeShim(cmake_product.CMakeProduct):
         if not self.is_darwin_host(host_target) and \
                 not host_target.startswith('wasi'):
             build_root = os.path.dirname(self.build_dir)
+
+            # Use a compiler from the build tree rather than the toolchain being
+            # assembled. The latter may already contain shared corelibs module
+            # maps, which conflict with the build-tree dependencies when
+            # building the static variant.
+            native_swift_tools_path = self.args.native_swift_tools_path or \
+                os.path.join(
+                    build_root, 'swift-%s' % self.args.host_target, 'bin')
+            self.cmake_options.define(
+                'CMAKE_Swift_COMPILER:PATH',
+                os.path.join(native_swift_tools_path, 'swiftc'))
+
             dependency_suffix = '' if self.build_shared_libs else '_static'
             dispatch_build_dir = os.path.join(
                 build_root, 'libdispatch%s-%s' %
