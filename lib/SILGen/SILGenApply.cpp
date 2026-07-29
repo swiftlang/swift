@@ -6910,7 +6910,7 @@ ManagedValue SILGenFunction::emitInjectEnum(SILLocation loc,
   // Easy case -- no payload
   if (!element->hasAssociatedValues()) {
     assert(payloads.empty());
-    if (enumTy.isLoadable(F) || !silConv.useLoweredAddresses()) {
+    if (enumTy.isLoadableOrOpaque(F)) {
       return emitManagedRValueWithCleanup(
           B.createEnum(loc, SILValue(), element, enumTy.getObjectType()));
     }
@@ -6962,7 +6962,7 @@ ManagedValue SILGenFunction::emitInjectEnum(SILLocation loc,
   }
 
   // Loadable with payload
-  if (enumTy.isLoadable(F) || !silConv.useLoweredAddresses()) {
+  if (enumTy.isLoadableOrOpaque(F)) {
     ManagedValue payloadMV;
     if (boxMV) {
       payloadMV = boxMV;

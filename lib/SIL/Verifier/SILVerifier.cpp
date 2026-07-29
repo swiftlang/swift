@@ -2698,8 +2698,7 @@ public:
       require(!BI->getSubstitutions(),
               "zeroInitializer has no generic arguments as a SIL builtin");
       if (arguments.size() == 0) {
-        require(!fnConv.useLoweredAddresses()
-                || BI->getType().isLoadable(*BI->getFunction()),
+        require(BI->getType().isLoadableOrOpaque(*BI->getFunction()),
                 "scalar zeroInitializer must have a loadable result type");
       } else {
         require(arguments.size() == 1,
@@ -3003,8 +3002,7 @@ public:
 
   void checkLoadInst(LoadInst *LI) {
     require(LI->getType().isObject(), "Result of load must be an object");
-    require(!fnConv.useLoweredAddresses()
-                || LI->getType().isLoadable(*LI->getFunction()),
+    require(LI->getType().isLoadableOrOpaque(*LI->getFunction()),
             "Load must have a loadable type");
     require(LI->getOperand()->getType().isAddress(),
             "Load operand must be an address");
@@ -3047,8 +3045,7 @@ public:
         F.hasOwnership(),
         "Inst with qualified ownership in a function that is not qualified");
     require(LBI->getType().isObject(), "Result of load must be an object");
-    require(!fnConv.useLoweredAddresses()
-            || LBI->getType().isLoadable(*LBI->getFunction()),
+    require(LBI->getType().isLoadableOrOpaque(*LBI->getFunction()),
             "Load must have a loadable type");
     require(LBI->getOperand()->getType().isAddress(),
             "Load operand must be an address");
@@ -3360,8 +3357,7 @@ public:
   void checkStoreInst(StoreInst *SI) {
     require(SI->getSrc()->getType().isObject(),
             "Can't store from an address source");
-    require(!fnConv.useLoweredAddresses()
-                || SI->getSrc()->getType().isLoadable(*SI->getFunction()),
+    require(SI->getSrc()->getType().isLoadableOrOpaque(*SI->getFunction()),
             "Can't store a non loadable type");
     require(SI->getDest()->getType().isAddress(),
             "Must store to an address dest");
@@ -3406,8 +3402,7 @@ public:
     // used by store_borrows (and dealloc_stacks).
     require(SI->getSrc()->getType().isObject(),
             "Can't store from an address source");
-    require(!fnConv.useLoweredAddresses()
-                || SI->getSrc()->getType().isLoadable(*SI->getFunction()),
+    require(SI->getSrc()->getType().isLoadableOrOpaque(*SI->getFunction()),
             "Can't store a non loadable type");
     require(SI->getDest()->getType().isAddress(),
             "Must store to an address dest");

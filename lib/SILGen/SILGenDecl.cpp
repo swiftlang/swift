@@ -1346,7 +1346,7 @@ void EnumElementPatternInitialization::emitEnumMatch(
           // NOTE: The APIs that we are using here will ensure that if we have
           // a trivial value, the load_borrow will become a load [trivial] and
           // the copies will be "automagically" elided.
-          if (boxedTL.isLoadable() || !SGF.silConv.useLoweredAddresses()) {
+          if (boxedTL.isLoadableOrOpaque(SGF.F)) {
             UnenforcedAccess access;
             SILValue accessAddress = access.beginAccess(
                 SGF, loc, boxedValue.getValue(), SILAccessKind::Read);

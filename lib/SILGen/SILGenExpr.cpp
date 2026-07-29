@@ -1065,7 +1065,7 @@ RValue RValueEmitter::visitNilLiteralExpr(NilLiteralExpr *E, SGFContext C) {
     auto enumTy = SGF.getLoweredType(E->getType());
 
     ManagedValue noneValue;
-    if (enumTy.isLoadable(SGF.F) || !SGF.silConv.useLoweredAddresses()) {
+    if (enumTy.isLoadableOrOpaque(SGF.F)) {
       auto *e = SGF.B.createEnum(E, SILValue(), noneDecl, enumTy);
       noneValue = SGF.emitManagedRValueWithCleanup(e);
     } else {
@@ -5847,7 +5847,7 @@ RValue RValueEmitter::visitTernaryExpr(TernaryExpr *E, SGFContext C) {
   auto NumTrueTaken = SGF.loadProfilerCount(E->getThenExpr());
   auto NumFalseTaken = SGF.loadProfilerCount(E->getElseExpr());
 
-  if (lowering.isLoadable() || !SGF.silConv.useLoweredAddresses()) {
+  if (lowering.isLoadableOrOpaque(SGF.F)) {
     // If the result is loadable, emit each branch and forward its result
     // into the destination block argument.
     
@@ -6216,7 +6216,7 @@ ManagedValue SILGenFunction::emitBindOptional(SILLocation loc,
 
   // If optValue was loadable, we emitted a switch_enum. In such a case, return
   // the argument from hasValueBB.
-  if (optValue.getType().isLoadable(F) || !silConv.useLoweredAddresses()) {
+  if (optValue.getType().isLoadableOrOpaque(F)) {
     return emitManagedRValueWithCleanup(hasValueBB->getArgument(0));
   }
 
@@ -6237,7 +6237,7 @@ RValue RValueEmitter::visitBindOptionalExpr(BindOptionalExpr *E, SGFContext C) {
   auto &optTL = SGF.getTypeLowering(E->getSubExpr()->getType());
   
   ManagedValue optValue;
-  if (!SGF.silConv.useLoweredAddresses() || optTL.isLoadable()
+  if (optTL.isLoadableOrOpaque(SGF.F)
       || E->getType()->hasOpenedExistential()) {
     optValue = SGF.emitRValueAsSingleValue(E->getSubExpr());
   } else {
@@ -7373,7 +7373,7 @@ RValue RValueEmitter::visitConsumeExpr(ConsumeExpr *E, SGFContext C) {
     }
     optTemp->finishInitialization(SGF);
 
-    if (subType.isLoadable(SGF.F) || !SGF.useLoweredAddresses()) {
+    if (subType.isLoadableOrOpaque(SGF.F)) {
       ManagedValue value =
           SGF.B.createLoadTake(E, optTemp->getManagedAddress());
       return RValue(SGF, {value}, subType.getASTType());
@@ -7382,7 +7382,7 @@ RValue RValueEmitter::visitConsumeExpr(ConsumeExpr *E, SGFContext C) {
     return RValue(SGF, {optTemp->getManagedAddress()}, subType.getASTType());
   }
 
-  if (subType.isLoadable(SGF.F) || !SGF.useLoweredAddresses()) {
+  if (subType.isLoadableOrOpaque(SGF.F)) {
     ManagedValue mv = SGF.emitRValue(subExpr).getAsSingleValue(SGF, subExpr);
     if (mv.getType().isTrivial(SGF.F))
       return RValue(SGF, {mv}, subType.getASTType());
@@ -7498,7 +7498,7 @@ RValue RValueEmitter::visitCopyExpr(CopyExpr *E, SGFContext C) {
     return RValue(SGF, {optTemp->getManagedAddress()}, subType.getASTType());
   }
 
-  if (subType.isLoadable(SGF.F) || !SGF.silConv.useLoweredAddresses()) {
+  if (subType.isLoadableOrOpaque(SGF.F)) {
     ManagedValue mv =
       SGF.emitRValue(subExpr, SGFContext::AllowImmediatePlusZero)
          .getAsSingleValue(SGF, subExpr);
