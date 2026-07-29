@@ -263,27 +263,27 @@ protocol GettableTitle {
   var title: String { get }
 }
 
-// CHECK-LABEL: sil{{.*}} [ossa] @$s19coroutine_accessors17OverridableReaderCAA13GettableTitleA2aDP5titleSSvgTW : {{.*}} {
-// CHECK:       bb0(
-// CHECK-SAME:      [[SELF_ADDR:%[^,]+]] :
-// CHECK-SAME:  ):
-// CHECK:         [[SELF:%[^,]+]] = load_borrow [[SELF_ADDR]]
-// CHECK:         [[GETTER:%[^,]+]] = function_ref @$s19coroutine_accessors17OverridableReaderC5titleSSvg
-// CHECK:         [[RETVAL:%[^,]+]] = apply [[GETTER]]([[SELF]])
-// CHECK:         end_borrow [[SELF]]
-// CHECK:         return [[RETVAL]]
-// CHECK-LABEL: } // end sil function '$s19coroutine_accessors17OverridableReaderCAA13GettableTitleA2aDP5titleSSvgTW'
 // CHECK-LABEL: sil{{.*}} [ossa] @$s19coroutine_accessors17OverridableReaderC5titleSSvg : {{.*}} {
 // CHECK:       bb0(
 // CHECK-SAME:      [[SELF:%[^,]+]] :
 // CHECK-SAME:  ):
-// CHECK:         [[READER:%[^,]+]] = class_method [[SELF]] : $OverridableReader, #OverridableReader.title!yielding_borrow
+// CHECK:         [[READER:%[^,]+]] = function_ref @$s19coroutine_accessors17OverridableReaderC5titleSSvy
 // CHECK:         ([[TITLE:%[^,]+]], [[TOKEN:%[^,]+]], [[ALLOCATION:%[^,]]]) = begin_apply [[READER]]([[SELF]])
 // CHECK:         [[RETVAL:%[^,]+]] = copy_value [[TITLE]]
 // CHECK:         end_apply [[TOKEN]] as $()
 // CHECK:         dealloc_stack [[ALLOCATION]]
 // CHECK:         return [[RETVAL]]
 // CHECK-LABEL: } // end sil function '$s19coroutine_accessors17OverridableReaderC5titleSSvg'
+// CHECK-LABEL: sil{{.*}} [ossa] @$s19coroutine_accessors17OverridableReaderCAA13GettableTitleA2aDP5titleSSvgTW : {{.*}} {
+// CHECK:       bb0(
+// CHECK-SAME:      [[SELF_ADDR:%[^,]+]] :
+// CHECK-SAME:  ):
+// CHECK:         [[SELF:%[^,]+]] = load_borrow [[SELF_ADDR]]
+// CHECK:         [[GETTER:%[^,]+]] = class_method [[SELF]] : $OverridableReader, #OverridableReader.title!getter
+// CHECK:         [[RETVAL:%[^,]+]] = apply [[GETTER]]([[SELF]])
+// CHECK:         end_borrow [[SELF]]
+// CHECK:         return [[RETVAL]]
+// CHECK-LABEL: } // end sil function '$s19coroutine_accessors17OverridableReaderCAA13GettableTitleA2aDP5titleSSvgTW'
 
 // CHECK-LABEL:      sil_vtable C {
 // CHECK-NEXT:   #C.init!allocator

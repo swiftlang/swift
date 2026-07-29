@@ -1063,8 +1063,13 @@ OpaqueReadOwnershipRequest::evaluate(Evaluator &evaluator,
     return OpaqueReadOwnership::YieldingBorrow;
   };
 
-  if (auto *accessorDecl = storage->getAccessor(AccessorKind::Read)) {
-    auto lifetimeDependencies = accessorDecl->getLifetimeDependencies();
+  // A '_read' or 'yielding borrow' coroutine whose yielded value has a scoped
+  // lifetime dependence borrows its source, so the opaque read is a borrow.
+  auto *readAccessor = storage->getAccessor(AccessorKind::Read);
+  if (!readAccessor)
+    readAccessor = storage->getAccessor(AccessorKind::YieldingBorrow);
+  if (readAccessor) {
+    auto lifetimeDependencies = readAccessor->getLifetimeDependencies();
     if (lifetimeDependencies.has_value() && !lifetimeDependencies->empty()) {
       for (auto &lifetimeDependenceInfo : *lifetimeDependencies) {
         if (lifetimeDependenceInfo.hasScopeLifetimeParamIndices()) {
@@ -1075,7 +1080,13 @@ OpaqueReadOwnershipRequest::evaluate(Evaluator &evaluator,
     }
   }
 
-  if (storage->getAccessor(AccessorKind::YieldingBorrow))
+  // A 'yielding borrow' protocol requirement keeps a borrowing opaque read, like
+  // '@_borrowed', so the read-coroutine spellings stay symmetric in a protocol's
+  // witness layout.  Only concrete storage synthesizes a getter for it (see
+  // below); protocol requirement layout is handled separately by the
+  // additive-witness work.
+  if (storage->getAccessor(AccessorKind::YieldingBorrow) &&
+      isa<ProtocolDecl>(storage->getDeclContext()))
     return OpaqueReadOwnership::YieldingBorrow;
 
   if (storage->getAccessor(AccessorKind::Borrow))
@@ -1090,6 +1101,15 @@ OpaqueReadOwnershipRequest::evaluate(Evaluator &evaluator,
   if (storage->getInnermostDeclContext()->mapTypeIntoEnvironment(
         storage->getValueInterfaceType())->isNoncopyable())
     return usesBorrowed(DiagKind::NoncopyableType);
+
+  // A concrete copyable 'yielding borrow' exposes an owned getter -- matching
+  // '_read', whose synthesized getter is part of the shipped ABI -- in addition
+  // to the borrowing coroutine, so a caller can use either.  (A getter alone
+  // would drop the coroutine that the property was written with; the coroutine
+  // alone would lose the getter that a remapped '_read' shipped.)  The getter
+  // delegates to the coroutine, running its full body including the back half.
+  if (storage->getAccessor(AccessorKind::YieldingBorrow))
+    return OpaqueReadOwnership::OwnedOrBorrowed;
 
   return OpaqueReadOwnership::Owned;
 }

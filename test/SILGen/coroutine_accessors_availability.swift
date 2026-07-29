@@ -485,6 +485,7 @@ public class DerivedOldFromBaseClassOld : BaseClassOld {
 
 // CHECK-LABEL: sil_vtable [serialized] DerivedOldFromBaseClassOld {
 // CHECK-NEXT:    #BaseClassOld.init!allocator
+// CHECK-NEXT:    #BaseClassOld.i!getter
 // CHECK-NEXT:    #BaseClassOld.i!read
 // CHECK-NEXT:    #BaseClassOld.i!yielding_borrow
 // CHECK-NEXT:    #BaseClassOld.i!setter
