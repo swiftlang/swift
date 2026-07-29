@@ -53,6 +53,7 @@ class BreakStmt;
 class ContextualPattern;
 class ContinueStmt;
 class COMDeclInfo;
+class COMInterfaceHierarchy;
 class DefaultArgumentExpr;
 class DefaultArgumentType;
 class DoCatchStmt;
@@ -1272,6 +1273,26 @@ private:
 
   const COMDeclInfo *evaluate(Evaluator &evaluator,
                               NominalTypeDecl *nominal) const;
+
+public:
+  // Caching
+  bool isCached() const { return true; }
+};
+
+/// Retrieve the validated inheritance hierarchy for a COM interface, or null
+/// when the protocol does not declare a COM interface.
+class COMInterfaceHierarchyRequest
+    : public SimpleRequest<COMInterfaceHierarchyRequest,
+                           const COMInterfaceHierarchy *(ProtocolDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  const COMInterfaceHierarchy *evaluate(Evaluator &evaluator,
+                                        ProtocolDecl *protocol) const;
 
 public:
   // Caching
