@@ -6420,6 +6420,32 @@ computeDefaultInferredActorIsolation(ValueDecl *value) {
     return {{ActorIsolation::forNonisolatedNonsending(), {}}, nullptr, {}};
   }
 
+  // Lets use `nonisolated(unsafe)` and @preconcurrency from the wrapped
+  // property as a default isolation for its backing storage property.
+  // These attributes are intended for the storage and helpful
+  // when property wrapper initializer references something that would
+  // otherwise cause concurrency warnings or errors and since it's a
+  // default it doesn't clash with other inference rules associated with
+  // property wrappers.
+  if (auto *var = dyn_cast<VarDecl>(value)) {
+    if (auto *originalVar = var->getOriginalWrappedProperty(
+            PropertyWrapperSynthesizedPropertyKind::Backing)) {
+      if (auto *nonisolated =
+              originalVar->getAttrs().getAttribute<NonisolatedAttr>()) {
+        if (nonisolated->isUnsafe()) {
+          auto isolation =
+              ActorIsolation::forNonisolated(/*unsafe=*/true)
+                  .withPreconcurrency(originalVar->getAttrs()
+                                          .hasAttribute<PreconcurrencyAttr>());
+          return {{isolation, IsolationSource(originalVar,
+                                              IsolationSource::Kind::Explicit)},
+                  nullptr,
+                  {}};
+        }
+      }
+    }
+  }
+
   // We did not find anything special, return unspecified.
   return {{ActorIsolation::forUnspecified(), {}}, nullptr, {}};
 }
