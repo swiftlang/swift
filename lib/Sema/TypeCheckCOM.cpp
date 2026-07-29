@@ -21,6 +21,7 @@
 #include "swift/AST/ImportCache.h"
 #include "swift/AST/KnownProtocols.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -277,6 +278,47 @@ const COMAttr *getAttribute(const ProtocolDecl *PD) {
   return attr;
 }
 
+/// Select the unique most-derived interface among a set of comparable COM
+/// bases. Unrelated bases cannot share one interface pointer and are invalid.
+std::optional<ProtocolDecl *>
+resolveABIBase(ProtocolDecl *protocol,
+               ArrayRef<std::pair<ProtocolDecl *, SourceLoc>> bases) {
+  ASSERT(!bases.empty());
+  ProtocolDecl *selection = nullptr;
+  bool invalid = false;
+  ASTContext &C = protocol->getASTContext();
+
+  for (auto [base, loc] : bases) {
+    auto *hierarchy = base->getCOMInterfaceHierarchy();
+    if (!hierarchy || hierarchy->isInvalid()) {
+      invalid = true;
+    } else if (!selection || base->inheritsFrom(selection)) {
+      selection = base;
+    } else if (selection != base && !selection->inheritsFrom(base)) {
+      C.Diags.diagnose(loc, diag::com_interface_multiple_abi_bases,
+                       protocol->getName(), selection->getName(),
+                       base->getName());
+      invalid = true;
+    }
+  }
+
+  if (invalid)
+    return std::nullopt;
+  ASSERT(selection);
+  return selection;
+}
+
+ProtocolDecl *findInterface(ArrayRef<ProtocolDecl *> chain,
+                            StringRef iid) {
+  for (auto *interface : chain) {
+    auto *info = interface->getCOMDeclInfo();
+    ASSERT(info && info->isInterface());
+    if (iid.equals_insensitive(info->getInterfaceID()))
+      return interface;
+  }
+  return nullptr;
+}
+
 }
 }
 
@@ -316,6 +358,128 @@ COMDeclInfoRequest::evaluate(Evaluator &evaluator,
   }
 
   return nullptr;
+}
+
+const COMInterfaceHierarchy *
+COMInterfaceHierarchyRequest::evaluate(Evaluator &evaluator,
+                                       ProtocolDecl *protocol) const {
+  auto &C = protocol->getASTContext();
+  auto *info = protocol->getCOMDeclInfo();
+
+  // Ordinary circular-inheritance checking owns the diagnostic. Do not start
+  // a recursive COM hierarchy walk in that case.
+  if (protocol->hasCircularInheritedProtocols()) {
+    if (!info)
+      return nullptr;
+    return C.AllocateObjectCopy(COMInterfaceHierarchy::invalid());
+  }
+
+  SmallVector<InheritedNominalEntry, 4> inherited;
+  if (protocol->wasDeserialized()) {
+    for (auto *base : protocol->getInheritedProtocols()) {
+      inherited.emplace_back(base, SourceLoc(), /*inheritedTypeRepr=*/nullptr,
+                             ConformanceAttributes(),
+                             /*isSuppressed=*/false);
+    }
+  } else {
+    bool ignoredAnyObject = false;
+    InvertibleProtocolSet inverses;
+    inherited = getDirectlyInheritedNominalTypeDecls(protocol, inverses,
+                                                      ignoredAnyObject);
+  }
+
+  // A protocol that refines a COM interface must itself introduce a COM
+  // identity. A malformed @com attribute already has its own diagnostic, so
+  // do not obscure it with this follow-on error.
+  if (!info) {
+    if (protocol->getAttrs().hasAttribute<COMAttr>(
+            /*AllowInvalid=*/true))
+      return nullptr;
+
+    for (const auto &entry : inherited) {
+      auto *PD = dyn_cast<ProtocolDecl>(entry.Item);
+      if (PD && PD->isCOMInterface()) {
+        C.Diags.diagnose(entry.Loc,
+                         diag::com_interface_refinement_requires_identity,
+                         protocol->getName(), PD->getName());
+        break;
+      }
+    }
+
+    return nullptr;
+  }
+
+  bool invalid = false;
+
+  SmallVector<ProtocolDecl *, 4> markers;
+  auto record = [&](ProtocolDecl *marker) {
+    if (!llvm::is_contained(markers, marker))
+      markers.push_back(marker);
+  };
+
+  SmallVector<std::pair<ProtocolDecl *, SourceLoc>, 2> bases;
+
+  for (const auto &entry : inherited) {
+    auto *PD = dyn_cast<ProtocolDecl>(entry.Item);
+    if (!PD) {
+      C.Diags.diagnose(entry.Loc, diag::com_interface_inherits_non_protocol,
+                       protocol->getName(),
+                       entry.Item->getDeclaredInterfaceType());
+      invalid = true;
+    } else if (PD->isCOMInterface()) {
+      bases.emplace_back(PD, entry.Loc);
+    } else if (PD->isMarkerProtocol()) {
+      record(PD);
+      for (auto *marker : PD->getAllInheritedProtocols()) {
+        if (marker->isMarkerProtocol())
+          record(marker);
+      }
+    } else {
+      C.Diags.diagnose(entry.Loc, diag::com_interface_inherits_non_marker,
+                       protocol->getName(), PD->getName());
+      invalid = true;
+    }
+  }
+
+  ProtocolDecl *base = nullptr;
+  if (!bases.empty()) {
+    if (const auto resolved = ::com::resolveABIBase(protocol, bases))
+      base = *resolved;
+    else
+      invalid = true;
+  }
+
+  if (invalid)
+    return C.AllocateObjectCopy(COMInterfaceHierarchy::invalid());
+
+  SmallVector<ProtocolDecl *, 4> chain;
+  // A root interface has no COM base; its ABI chain starts with the current
+  // interface when it is appended below.
+  if (base) {
+    auto *hierarchy = base->getCOMInterfaceHierarchy();
+    ASSERT(hierarchy && !hierarchy->isInvalid());
+    for (auto *marker : hierarchy->getMarkerProtocols())
+      record(marker);
+    llvm::append_range(chain, hierarchy->getABIChain());
+  }
+  llvm::sort(markers, [](ProtocolDecl *lhs, ProtocolDecl *rhs) {
+    return TypeDecl::compare(lhs, rhs) < 0;
+  });
+
+  // An IID denotes one logical interface in an ABI chain. Reusing it for a
+  // derived declaration would make QueryInterface unable to distinguish the
+  // two layouts.
+  if (auto *interface = ::com::findInterface(chain, info->getInterfaceID())) {
+    auto *attr = protocol->getAttrs().getAttribute<COMAttr>();
+    SourceLoc loc = attr ? attr->getLocation() : protocol->getLoc();
+    C.Diags.diagnose(loc, diag::com_interface_repeated_iid, protocol->getName(),
+                     interface->getName(), info->getInterfaceID());
+    return C.AllocateObjectCopy(COMInterfaceHierarchy::invalid());
+  }
+
+  chain.push_back(protocol);
+  return C.AllocateObjectCopy(
+      COMInterfaceHierarchy(C.AllocateCopy(markers), C.AllocateCopy(chain)));
 }
 
 ProtocolConformance *

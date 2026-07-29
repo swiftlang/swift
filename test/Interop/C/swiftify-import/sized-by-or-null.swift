@@ -149,7 +149,7 @@ module Test {
 
 //--- test.swift
 // GENERATED-BY: %target-swift-ide-test -print-module -module-to-print=Test -plugin-path %swift-plugin-dir -I %t -source-filename=x -Xcc -Wno-nullability-completeness > %t/Test-interface.swift && %swift-function-caller-generator Test %t/Test-interface.swift
-// GENERATED-HASH: f3a4ba5bf982f52e53454729d13d39b82e277f1a7cae401414cbf4ecf23ed0c3
+// GENERATED-HASH: 5701badde853d541916b7f9c9b7afc59f3b89e704784fd303cb1ba16b8646b2a
 import Test
 
 
@@ -158,15 +158,31 @@ func call_simple(_ len: CInt, _ p: UnsafeMutableRawPointer!) {
   return unsafe simple(len, p)
 }
 
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_simple(_ p: UnsafeMutableRawBufferPointer) {
+  return unsafe simple(p)
+}
+
 func call_swiftAttr(_ len: CInt, _ p: UnsafeMutableRawPointer!) {
   return unsafe swiftAttr(len, p)
+}
+
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_swiftAttr(_ p: UnsafeMutableRawBufferPointer) {
+  return unsafe swiftAttr(p)
 }
 
 func call_shared(_ len: CInt, _ p1: UnsafeMutableRawPointer!, _ p2: UnsafeMutableRawPointer!) {
   return unsafe shared(len, p1, p2)
 }
 
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_shared(_ p1: UnsafeMutableRawBufferPointer, _ p2: UnsafeMutableRawBufferPointer) {
+  return unsafe shared(p1, p2)
+}
+
 func call_complexExpr(_ len: CInt, _ offset: CInt, _ p: UnsafeMutableRawPointer!) {
+  return unsafe complexExpr(len, offset, p)
+}
+
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_complexExpr(_ len: CInt, _ offset: CInt, _ p: UnsafeMutableRawBufferPointer) {
   return unsafe complexExpr(len, offset, p)
 }
 
@@ -174,15 +190,31 @@ func call_nullUnspecified(_ len: CInt, _ p: UnsafeMutableRawPointer!) {
   return unsafe nullUnspecified(len, p)
 }
 
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_nullUnspecified(_ p: UnsafeMutableRawBufferPointer) {
+  return unsafe nullUnspecified(p)
+}
+
 func call_nonnull(_ len: CInt, _ p: UnsafeMutableRawPointer) {
   return unsafe nonnull(len, p)
+}
+
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_nonnull(_ p: UnsafeMutableRawBufferPointer) {
+  return unsafe nonnull(p)
 }
 
 func call_nullable(_ len: CInt, _ p: UnsafeMutableRawPointer?) {
   return unsafe nullable(len, p)
 }
 
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_nullable(_ p: UnsafeMutableRawBufferPointer?) {
+  return unsafe nullable(p)
+}
+
 func call_returnPointer(_ len: CInt) -> UnsafeMutableRawPointer! {
+  return unsafe returnPointer(len)
+}
+
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_returnPointer(_ len: CInt) -> UnsafeMutableRawBufferPointer {
   return unsafe returnPointer(len)
 }
 
@@ -190,15 +222,31 @@ func call_opaque(_ len: CInt, _ p: OpaquePointer!) {
   return unsafe opaque(len, p)
 }
 
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_opaque(_ p: UnsafeRawBufferPointer) {
+  return unsafe opaque(p)
+}
+
 func call_opaqueptr(_ len: CInt, _ p: OpaquePointer!) {
   return unsafe opaqueptr(len, p)
+}
+
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_opaqueptr(_ p: UnsafeRawBufferPointer) {
+  return unsafe opaqueptr(p)
 }
 
 func call_charsized(_ _charsized_param0: UnsafeMutablePointer<CChar>!, _ size: CInt) {
   return unsafe charsized( _charsized_param0, size)
 }
 
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_charsized(_ _charsized_param0: UnsafeMutableRawBufferPointer) {
+  return unsafe charsized(_charsized_param0)
+}
+
 func call_bytesized(_ size: CInt) -> UnsafeMutablePointer<UInt8>! {
+  return unsafe bytesized(size)
+}
+
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_bytesized(_ size: CInt) -> UnsafeMutableRawBufferPointer {
   return unsafe bytesized(size)
 }
 
@@ -212,52 +260,4 @@ func call_aliasedBytesized(_ p: UnsafeMutablePointer<UInt8>!, _ size: CInt) {
 
 @_alwaysEmitIntoClient @_disfavoredOverload public func call_aliasedBytesized(_ p: UnsafeMutableRawBufferPointer) {
   return unsafe aliasedBytesized(p)
-}
-
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_bytesized(_ size: CInt) -> UnsafeMutableRawBufferPointer {
-  return unsafe bytesized(size)
-}
-
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_charsized(_ _charsized_param0: UnsafeMutableRawBufferPointer) {
-  return unsafe charsized(_charsized_param0)
-}
-
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_complexExpr(_ len: CInt, _ offset: CInt, _ p: UnsafeMutableRawBufferPointer) {
-  return unsafe complexExpr(len, offset, p)
-}
-
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_nonnull(_ p: UnsafeMutableRawBufferPointer) {
-  return unsafe nonnull(p)
-}
-
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_nullUnspecified(_ p: UnsafeMutableRawBufferPointer) {
-  return unsafe nullUnspecified(p)
-}
-
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_nullable(_ p: UnsafeMutableRawBufferPointer?) {
-  return unsafe nullable(p)
-}
-
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_opaque(_ p: UnsafeRawBufferPointer) {
-  return unsafe opaque(p)
-}
-
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_opaqueptr(_ p: UnsafeRawBufferPointer) {
-  return unsafe opaqueptr(p)
-}
-
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_returnPointer(_ len: CInt) -> UnsafeMutableRawBufferPointer {
-  return unsafe returnPointer(len)
-}
-
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_shared(_ p1: UnsafeMutableRawBufferPointer, _ p2: UnsafeMutableRawBufferPointer) {
-  return unsafe shared(p1, p2)
-}
-
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_simple(_ p: UnsafeMutableRawBufferPointer) {
-  return unsafe simple(p)
-}
-
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_swiftAttr(_ p: UnsafeMutableRawBufferPointer) {
-  return unsafe swiftAttr(p)
 }

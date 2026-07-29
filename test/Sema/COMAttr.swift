@@ -5,7 +5,7 @@
 @com(interface: "00000000-0000-0000-0000-000000000000")
 protocol IInterface1: IUnknown { }
 
-@com(interface: "00000000-0000-0000-0000-000000000000")
+@com(interface: "00000000-0000-0000-0000-000000000002")
 protocol IInterface2: IInterface1 { }
 
 @com(interface: "AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA")

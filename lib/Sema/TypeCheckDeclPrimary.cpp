@@ -3609,6 +3609,13 @@ public:
 
     checkInheritanceClause(PD);
 
+    // Validate COM inheritance only after ordinary inherited types have been
+    // resolved. Keep this out of the early declaration-classification query
+    // used by name lookup and identity synthesis.
+    if (Ctx.LangOpts.EnableCOMInterop && !PD->hasCircularInheritedProtocols())
+      (void)evaluateOrDefault(Ctx.evaluator, COMInterfaceHierarchyRequest{PD},
+                              nullptr);
+
     // Explicitly compute the requirement signature to detect errors.
     // Do this before visiting members, to avoid a request cycle if
     // a member references another declaration whose generic signature
