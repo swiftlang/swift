@@ -9,3 +9,5 @@
 // RUN: %FileCheck %S/Inputs/constant_evaluable.swift < %t/error-output
 
 // REQUIRES: swift_feature_InferSendableFromCaptures
+// REQUIRES: optimized_stdlib
+
