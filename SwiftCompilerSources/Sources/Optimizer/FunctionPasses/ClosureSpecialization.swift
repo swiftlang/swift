@@ -786,14 +786,39 @@ private func isClosureApplied(_ closure: Value) -> Bool {
 }
 
 private func checkRecursivelyIfClosureIsApplied(_ closure: Value, _ handledFuncs: inout Set<Function>) -> Bool {
+  let recursionBudget = 8
   for use in closure.uses {
     switch use.instruction {
+
+    case is ConvertFunctionInst,
+         is ConvertEscapeToNoEscapeInst,
+         is MoveValueInst,
+         is CopyValueInst:
+      if checkRecursivelyIfClosureIsApplied(use.instruction as! SingleValueInstruction, &handledFuncs) {
+        return true
+      }
+
+    case let pai as PartialApplyInst:
+      if pai.isPartialApplyOfThunk {
+        return checkRecursivelyIfClosureIsApplied(pai, &handledFuncs)
+      }
+      guard let callee = pai.referencedFunction,
+            callee.isDefinition,
+            handledFuncs.insert(callee).inserted,
+            handledFuncs.count <= recursionBudget,
+            let calleeArg = pai.calleeArgument(of: use, in: callee)
+      else {
+        continue
+      }
+
+      if checkRecursivelyIfClosureIsApplied(calleeArg, &handledFuncs) {
+        return checkRecursivelyIfClosureIsApplied(pai, &handledFuncs)
+      }
 
     case let apply as FullApplySite:
       if apply.callee == closure {
         return true
       }
-      let recursionBudget = 8
 
       // Recurse into called function
       if let callee = apply.referencedFunction,
@@ -908,7 +933,7 @@ private extension PartialApplyInst {
   var isPartialApplyOfThunk: Bool {
     if self.numArguments == 1,
       let fun = self.referencedFunction,
-      fun.thunkKind == .reabstractionThunk || fun.thunkKind == .thunk,
+      fun.thunkKind == .reabstractionThunk || fun.isAutodiffSubsetParametersThunk,
       self.arguments[0].type.isLoweredFunction,
       self.arguments[0].type.isReferenceCounted(in: self.parentFunction) || self.callee.type.isThickFunction
     {
@@ -1227,7 +1252,7 @@ private extension Instruction {
     guard let pai = self as? PartialApplyInst,
           pai.argumentOperands.singleElement != nil,
           let function = pai.referencedFunction,
-          function.bridged.isAutodiffSubsetParametersThunk()
+          function.isAutodiffSubsetParametersThunk
     else {
       return nil
     }
