@@ -612,6 +612,21 @@ ${Suite}.test("${ArrayType}/init(unsafeUninitializedCapacity:...:)/reassignBuffe
   }
 }
 
+${Suite}.test("${ArrayType}/init(unsafeUninitializedCapacity:...:)/negativeCapacity")
+.require(.crashTesting)
+.code {
+  expectCrashLater()
+  _ = ${ArrayType}<Int>(unsafeUninitializedCapacity: -10) { $1 = 0 }
+}
+
+${Suite}.test("${ArrayType}/init(unsafeUninitializedCapacity:...:)/negativeCount")
+.require(.minimumStdlib(.stdlib_6_4))
+.require(.crashTesting)
+.code {
+  expectCrashLater()
+  _ = ${ArrayType}<Int>(unsafeUninitializedCapacity: 10) { $1 = -1 }
+}
+
 %end
 
 //===---
