@@ -751,8 +751,15 @@ public func withUnsafeCurrentTask<T>(body: (UnsafeCurrentTask?) throws -> T) ret
 ///
 /// - Returns: The return value, if any, of the `body` closure.
 @available(SwiftStdlib 6.0, *)
-// Note: Could not be always-emit-into client since the UnsafeCurrentTask initializer was not usableFromInline
-// in 6.0, so we can't make this symbol more available than the availability of UnsafeCurrentTask.init.
+// Note: This adopted 'nonisolated(nonsending)' in 6.4, which introduced a new
+// mangled symbol that must be back deployed, or binaries built against an older
+// SDK would fail to launch against an older runtime with a missing symbol error.
+//
+// We can't just @export(implementation) this symbol instead, because
+// UnsafeCurrentTask.init only became usableFromInline in 6.4, and
+// UnsafeCurrentTask is not @frozen so the initializer cannot be emitted into
+// the client either.
+@backDeployed(before: SwiftStdlib 6.4)
 @abi(
   // abi only necessary to avoid redeclaration clash with previous declaration (__abi_withUnsafeCurrentTask)
   nonisolated(nonsending) func withUnsafeCurrentTaskNonsending<T>(
@@ -762,14 +769,12 @@ public func withUnsafeCurrentTask<T>(body: (UnsafeCurrentTask?) throws -> T) ret
 public nonisolated(nonsending) func withUnsafeCurrentTask<T>(
   body: nonisolated(nonsending) (UnsafeCurrentTask?) async throws -> T
 ) async rethrows -> T {
-  guard let _task = _getCurrentAsyncTask() else {
-    return try await body(nil)
-  }
-
-  // FIXME: This will be unnecessary once we avoid the release of the task builtin
-  Builtin.retain(_task)
-
-  return try unsafe await body(UnsafeCurrentTask(_task))
+  // This is a backdeployment workaround!
+  // We cannot use the UnsafeCurrentTask initializer since it can't be used from a backdeployed function.
+  // We can get the UnsafeCurrentTask using the withUnsafeCurrentTask and escape the reference.
+  // This is safe, because we know this is the _current task_ so it must be alive still anyway.
+  let task: UnsafeCurrentTask? = unsafe withUnsafeCurrentTask { unsafe $0 }
+  return try unsafe await body(task)
 }
 
 // Old version for ABI compatibility
