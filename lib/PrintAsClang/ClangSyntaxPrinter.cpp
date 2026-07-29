@@ -71,7 +71,7 @@ void ClangSyntaxPrinter::printBaseName(const ValueDecl *decl) const {
 }
 
 void ClangSyntaxPrinter::printModuleNameCPrefix(const ModuleDecl &mod) {
-  os << mod.getName().str() << '_';
+  os << cxx_translation::sanitizeNameForCxx(mod.getName().str()) << '_';
 }
 
 void ClangSyntaxPrinter::printModuleNamespaceQualifiersIfNeeded(
