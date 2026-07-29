@@ -907,7 +907,7 @@ void SILGenFunction::emitEnumConstructor(EnumElementDecl *element) {
 
   // Emit the indirect return slot.
   InitializationPtr dest;
-  if (enumTI.isAddressOnly() && silConv.useLoweredAddresses()) {
+  if (!enumTI.isLoadableOrOpaque(F)) {
     auto &AC = getASTContext();
     auto VD = new (AC) ParamDecl(SourceLoc(), SourceLoc(),
                                  AC.getIdentifier("$return_value"),

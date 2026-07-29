@@ -206,7 +206,7 @@ public:
 
     ManagedValue value;
     // If the value isn't address-only, go ahead and load.
-    if (!substTL.isAddressOnly()) {
+    if (substTL.isLoadableOrOpaque(SGF.F)) {
       auto load = substTL.emitLoad(SGF.B, loc, resultBuf,
                                    LoadOwnershipQualifier::Take);
       value = SGF.emitManagedRValueWithCleanup(load);
@@ -255,7 +255,7 @@ public:
       auto &substTL = SGF.getTypeLowering(value.getType());
 
       // If the value isn't address-only, go ahead and load.
-      if (!substTL.isAddressOnly()) {
+      if (substTL.isLoadableOrOpaque(SGF.F)) {
         auto load = substTL.emitLoad(SGF.B, loc, value.forward(SGF),
                                      LoadOwnershipQualifier::Take);
         value = SGF.emitManagedRValueWithCleanup(load);
@@ -539,7 +539,7 @@ public:
         // Move the value into the destination.
         ManagedValue eltMV = [&] {
           auto &eltTL = SGF.getTypeLowering(eltAddrTy);
-          if (!eltTL.isAddressOnly()) {
+          if (eltTL.isLoadableOrOpaque(SGF.F)) {
             auto load = eltTL.emitLoad(SGF.B, loc, eltAddr,
                                        LoadOwnershipQualifier::Take);
             return SGF.emitManagedRValueWithCleanup(load, eltTL);
@@ -1417,8 +1417,8 @@ ResultPlanPtr ResultPlanBuilder::buildForTuple(Initialization *init,
   // do that if we're not using lowered addresses because we prefer to
   // build tuples with scalar operations.
   auto &substTL = SGF.getTypeLowering(substType);
-  assert(substTL.isAddressOnly() || !substHasPackExpansion);
-  if (substTL.isAddressOnly() &&
+  assert(substTL.getRecursiveProperties().isAddressOnly() || !substHasPackExpansion);
+  if (substTL.getRecursiveProperties().isAddressOnly() &&
       (substHasPackExpansion ||
        (init != nullptr && SGF.F.getConventions().useLoweredAddresses()))) {
     // Create a temporary.
