@@ -5749,12 +5749,13 @@ class DebugValueInst final
   /// Optional debug basic block holding reconstruction instructions.
   SILBasicBlock *ReconstructionBlock = nullptr;
 
-  DebugValueInst(SILDebugLocation DebugLoc, SILValue Operand, SILModule &M,
-                 SILDebugVariable Var,
+  DebugValueInst(SILDebugLocation DebugLoc, ArrayRef<SILValue> Operands,
+                 SILModule &M, SILDebugVariable Var,
                  UsesMoveableValueDebugInfo_t operandWasMoved, bool trace,
                  bool prependDeref);
-  static DebugValueInst *create(SILDebugLocation DebugLoc, SILValue Operand,
-                                SILModule &M, SILDebugVariable Var,
+  static DebugValueInst *create(SILDebugLocation DebugLoc,
+                                ArrayRef<SILValue> Operands, SILModule &M,
+                                SILDebugVariable Var,
                                 UsesMoveableValueDebugInfo_t operandWasMoved,
                                 bool trace);
 

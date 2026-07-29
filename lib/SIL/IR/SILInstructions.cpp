@@ -436,11 +436,11 @@ SILType AllocBoxInst::getAddressType() const {
 }
 
 DebugValueInst::DebugValueInst(
-    SILDebugLocation DebugLoc, SILValue Operand, SILModule &M,
+    SILDebugLocation DebugLoc, ArrayRef<SILValue> Operands, SILModule &M,
     SILDebugVariable Var,
     UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo, bool trace,
     bool prependDeref)
-    : InstructionBaseWithTrailingOperands({Operand}, DebugLoc),
+    : InstructionBaseWithTrailingOperands(Operands, DebugLoc),
       SILDebugVariableSupplement(Var.DIExpr.getNumElements(),
                                  Var.Type.has_value(), Var.Loc.has_value(),
                                  Var.Scope),
@@ -448,7 +448,10 @@ DebugValueInst::DebugValueInst(
               getTrailingObjects<SILLocation>(),
               getTrailingObjects<const SILDebugScope *>(),
               getTrailingObjects<SILDIExprElement>()) {
-  if (usesMoveableValueDebugInfo || Operand->getType().isMoveOnly())
+  if (usesMoveableValueDebugInfo ||
+      llvm::any_of(Operands, [](SILValue op) {
+        return op->getType().isMoveOnly();
+      }))
     setUsesMoveableValueDebugInfo();
   setTrace(trace);
   if (prependDeref)
@@ -456,8 +459,8 @@ DebugValueInst::DebugValueInst(
 }
 
 DebugValueInst *DebugValueInst::create(SILDebugLocation DebugLoc,
-                                       SILValue Operand, SILModule &M,
-                                       SILDebugVariable Var,
+                                       ArrayRef<SILValue> Operands,
+                                       SILModule &M, SILDebugVariable Var,
                                        UsesMoveableValueDebugInfo_t wasMoved,
                                        bool trace) {
   // Don't store the same information twice.
@@ -465,7 +468,8 @@ DebugValueInst *DebugValueInst::create(SILDebugLocation DebugLoc,
     Var.Loc = {};
   if (Var.Scope == DebugLoc.getScope())
     Var.Scope = nullptr;
-  if (Var.Type == Operand->getType().getObjectType() &&
+  if (Operands.size() == 1 &&
+      Var.Type == Operands[0]->getType().getObjectType() &&
       !Var.DIExpr.getFragmentPart())
     Var.Type = {};
   // Use the prependDeref bit rather than storing it in the DIExpr.
@@ -473,9 +477,9 @@ DebugValueInst *DebugValueInst::create(SILDebugLocation DebugLoc,
   if (prependDeref) {
     Var.DIExpr.eraseElement(Var.DIExpr.element_begin());
   }
-  void *buf = allocateDebugVarCarryingInst<DebugValueInst>(M, Var, {Operand});
+  void *buf = allocateDebugVarCarryingInst<DebugValueInst>(M, Var, Operands);
   return ::new (buf)
-    DebugValueInst(DebugLoc, Operand, M, Var, wasMoved, trace, prependDeref);
+    DebugValueInst(DebugLoc, Operands, M, Var, wasMoved, trace, prependDeref);
 }
 
 void DebugValueInst::prependDeref(unsigned operandIdx) {
