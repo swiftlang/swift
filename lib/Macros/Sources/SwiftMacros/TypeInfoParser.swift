@@ -41,10 +41,11 @@ public struct EnumTypeInfo {
 
 /// Represents information on a single case of an enumeration.
 public struct EnumCaseInfo {
+  /// The case's name, escaped as it must appear in Swift source
   var name: String
 
-  /// For each associated value, we have the label's name and `nil` if there
-  /// isn't one
+  /// For each associated value, we have the label's name (escaped as it must
+  /// appear in Swift source) and `nil` if there isn't one
   var associatedValueLabels: [String?]
 
   /// Whether or not the enum case is marked as reachable
@@ -57,7 +58,7 @@ public struct StructTypeInfo {
 }
 
 public struct StoredProperty {
-  /// name of the stored property
+  /// name of the stored property, escaped as it must appear in Swift source
   var name: String
 
   /// Textual representation of the property's type.
