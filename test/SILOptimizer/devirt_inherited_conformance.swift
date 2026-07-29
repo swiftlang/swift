@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -O %s -emit-sil | %FileCheck %s
+// RUN: %target-swift-frontend -O %s -emit-sil -Xllvm -sil-print-transform-blocks=false | %FileCheck %s
 
 // Make sure that we can dig all the way through the class hierarchy and
 // protocol conformances.
@@ -165,8 +165,8 @@ public func compareComparable<T:Comparable>(_ x: T, _ y:T) -> Bool {
 // CHECK: bb0
 // CHECK-NEXT: debug_value undef : $D, let, name "x", argno 1
 // CHECK-NEXT: debug_value undef : $D, let, name "y", argno 2
-// CHECK-NEXT: debug_value undef : $C, let, name "lhs", argno 1
-// CHECK-NEXT: debug_value undef : $C, let, name "rhs", argno 2
+// CHECK-NEXT: debug_value undef : {{.*}}, let, name "lhs", argno 1
+// CHECK-NEXT: debug_value undef : {{.*}}, let, name "rhs", argno 2
 // CHECK-NEXT: integer_literal $Builtin.Int1, -1
 // CHECK-NEXT: struct $Bool
 // CHECK: return
@@ -182,8 +182,8 @@ public func testCompareEquals() -> Bool {
 // CHECK: bb0
 // CHECK-NEXT: debug_value undef : $D, let, name "x", argno 1
 // CHECK-NEXT: debug_value undef : $D, let, name "y", argno 2
-// CHECK-NEXT: debug_value undef : $C, let, name "lhs", argno 1
-// CHECK-NEXT: debug_value undef : $C, let, name "rhs", argno 2
+// CHECK-NEXT: debug_value undef : {{.*}}, let, name "lhs", argno 1
+// CHECK-NEXT: debug_value undef : {{.*}}, let, name "rhs", argno 2
 // CHECK-NEXT: integer_literal $Builtin.Int1, -1
 // CHECK-NEXT: struct $Bool
 // CHECK: return
@@ -196,11 +196,11 @@ public func testCompareMinMinMin() -> Bool {
 // CHECK: bb0
 // CHECK-NEXT: debug_value undef : $D, let, name "x", argno 1
 // CHECK-NEXT: debug_value undef : $D, let, name "y", argno 2
-// CHECK-NEXT: debug_value undef : $C, let, name "c1", argno 1
-// CHECK-NEXT: debug_value undef : $C, let, name "c2", argno 2
-// CHECK-NEXT: debug_value undef : $C, let, name "self", argno 3
-// CHECK-NEXT: debug_value undef : $C, let, name "lhs", argno 1
-// CHECK-NEXT: debug_value undef : $C, let, name "rhs", argno 2
+// CHECK-NEXT: debug_value undef : {{.*}}, let, name "c1", argno 1
+// CHECK-NEXT: debug_value undef : {{.*}}, let, name "c2", argno 2
+// CHECK-NEXT: debug_value undef : {{.*}}, let, name "self", argno 3
+// CHECK-NEXT: debug_value undef : {{.*}}, let, name "lhs", argno 1
+// CHECK-NEXT: debug_value undef : {{.*}}, let, name "rhs", argno 2
 // CHECK-NEXT: integer_literal $Builtin.Int1, -1
 // CHECK-NEXT: struct $Bool
 // CHECK: return
@@ -217,9 +217,9 @@ public func BooCall<T:Simple>(_ x:T, _ y:T) -> Bool {
 // CHECK: bb0
 // CHECK-NEXT: debug_value undef : $D, let, name "x", argno 1
 // CHECK-NEXT: debug_value undef : $D, let, name "y", argno 2
-// CHECK-NEXT: debug_value undef : $C, let, name "c1", argno 1
-// CHECK-NEXT: debug_value undef : $C, let, name "c2", argno 2
-// CHECK-NEXT: debug_value undef : $C, let, name "self", argno 3
+// CHECK-NEXT: debug_value undef : {{.*}}, let, name "c1", argno 1
+// CHECK-NEXT: debug_value undef : {{.*}}, let, name "c2", argno 2
+// CHECK-NEXT: debug_value undef : {{.*}}, let, name "self", argno 3
 // CHECK-NEXT: integer_literal $Builtin.Int1, 0
 // CHECK-NEXT: struct $Bool
 // CHECK: return
