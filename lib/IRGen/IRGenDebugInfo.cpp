@@ -1747,7 +1747,8 @@ private:
   llvm::DIType *createPointerSizedStruct(
       llvm::DIScope *Scope, StringRef Name, llvm::DIType *PointeeTy,
       llvm::DIFile *File, unsigned Line, llvm::DINode::DIFlags Flags,
-      StringRef MangledName, llvm::DIType *SpecificationOf = nullptr) {
+      StringRef MangledName, llvm::DIType *SpecificationOf = nullptr,
+      uint32_t NumExtraInhabitants = 0) {
     unsigned PtrSize =
         CI.getTargetInfo().getPointerWidth(clang::LangAS::Default);
     auto PtrTy = DBuilder.createPointerType(PointeeTy, PtrSize, 0);
@@ -1756,14 +1757,14 @@ private:
     return DBuilder.createStructType(
         Scope, Name, File, Line, PtrSize, 0, Flags,
         /* DerivedFrom */ nullptr, DBuilder.getOrCreateArray(Elements),
-        llvm::dwarf::DW_LANG_Swift, nullptr, MangledName, SpecificationOf);
+        llvm::dwarf::DW_LANG_Swift, nullptr, MangledName, SpecificationOf,
+        NumExtraInhabitants);
   }
 
-  llvm::DIType *
-  createDoublePointerSizedStruct(llvm::DIScope *Scope, StringRef Name,
-                                 llvm::DIType *PointeeTy, llvm::DIFile *File,
-                                 unsigned Line, llvm::DINode::DIFlags Flags,
-                                 StringRef MangledName) {
+  llvm::DIType *createDoublePointerSizedStruct(
+      llvm::DIScope *Scope, StringRef Name, llvm::DIType *PointeeTy,
+      llvm::DIFile *File, unsigned Line, llvm::DINode::DIFlags Flags,
+      StringRef MangledName, uint32_t NumExtraInhabitants = 0) {
     unsigned PtrSize = CI.getTargetInfo().getPointerWidth(clang::LangAS::Default);
     llvm::Metadata *Elements[] = {
         DBuilder.createMemberType(
@@ -1775,7 +1776,8 @@ private:
     return DBuilder.createStructType(
         Scope, Name, File, Line, 2 * PtrSize, 0, Flags,
         /* DerivedFrom */ nullptr, DBuilder.getOrCreateArray(Elements),
-        llvm::dwarf::DW_LANG_Swift, nullptr, MangledName);
+        llvm::dwarf::DW_LANG_Swift, nullptr, MangledName,
+        /*Specification=*/nullptr, NumExtraInhabitants);
   }
 
   llvm::DIType *createFixedValueBufferStruct(llvm::DIType *PointeeTy) {
@@ -1810,7 +1812,8 @@ private:
   llvm::DIType *createFunctionPointer(DebugTypeInfo DbgTy, llvm::DIScope *Scope,
                                       unsigned SizeInBits, unsigned AlignInBits,
                                       llvm::DINode::DIFlags Flags,
-                                      StringRef MangledName) {
+                                      StringRef MangledName,
+                                      uint32_t NumExtraInhabitants) {
     auto FwdDecl = createTemporaryReplaceableForwardDecl(
         DbgTy.getType(), Scope, MainFile, 0, SizeInBits, AlignInBits, Flags,
         MangledName, MangledName);
@@ -1838,15 +1841,18 @@ private:
       if (SizeInBits == 2 * CI.getTargetInfo().getPointerWidth(clang::LangAS::Default))
         // This is a FunctionPairTy: { i8*, %swift.refcounted* }.
         DITy = createDoublePointerSizedStruct(Scope, MangledName, FnTy,
-                                              MainFile, 0, Flags, MangledName);
+                                              MainFile, 0, Flags, MangledName,
+                                              NumExtraInhabitants);
       else
         // This is a generic function as noted above.
         DITy = createOpaqueStruct(Scope, MangledName, MainFile, 0, SizeInBits,
-                                  AlignInBits, Flags, MangledName);
+                                  AlignInBits, Flags, MangledName, {}, nullptr,
+                                  nullptr, NumExtraInhabitants);
     } else {
       assert(SizeInBits == CI.getTargetInfo().getPointerWidth(clang::LangAS::Default));
-      DITy = createPointerSizedStruct(Scope, MangledName, FnTy, MainFile, 0,
-                                      Flags, MangledName);
+      DITy = createPointerSizedStruct(
+          Scope, MangledName, FnTy, MainFile, 0, Flags, MangledName,
+          /*SpecificationOf=*/nullptr, NumExtraInhabitants);
     }
     return DBuilder.replaceTemporary(std::move(FwdDecl), DITy);
   }
@@ -1895,13 +1901,14 @@ private:
                unsigned Line, unsigned SizeInBits, unsigned AlignInBits,
                llvm::DINode::DIFlags Flags, StringRef MangledName,
                llvm::DINodeArray Elements, llvm::DINodeArray BoundParams,
-               llvm::DIType *SpecificationOf, llvm::DINodeArray Annotations) {
+               llvm::DIType *SpecificationOf, llvm::DINodeArray Annotations,
+               uint32_t NumExtraInhabitants = 0) {
 
     auto StructType = DBuilder.createStructType(
         Scope, Name, File, Line, SizeInBits, AlignInBits, Flags,
         /* DerivedFrom */ nullptr, Elements, llvm::dwarf::DW_LANG_Swift,
-        nullptr, MangledName, SpecificationOf,
-        /*NumExtraInhabitants=*/0, Annotations);
+        nullptr, MangledName, SpecificationOf, NumExtraInhabitants,
+        Annotations);
 
     if (BoundParams)
       DBuilder.replaceArrays(StructType, nullptr, BoundParams);
@@ -1914,10 +1921,11 @@ private:
                      llvm::DINode::DIFlags Flags, StringRef MangledName,
                      llvm::DINodeArray BoundParams = {},
                      llvm::DIType *SpecificationOf = nullptr,
-                     llvm::DINodeArray Annotations = nullptr) {
+                     llvm::DINodeArray Annotations = nullptr,
+                     uint32_t NumExtraInhabitants = 0) {
     return createStruct(Scope, Name, File, Line, SizeInBits, AlignInBits, Flags,
                         MangledName, {}, BoundParams, SpecificationOf,
-                        Annotations);
+                        Annotations, NumExtraInhabitants);
   }
 
   bool shouldCacheDIType(llvm::DIType *DITy, DebugTypeInfo &DbgTy) {
@@ -2366,10 +2374,10 @@ private:
       auto L = getFileAndLocation(DbgTy.getDecl());
       unsigned FwdDeclLine = 0;
 
-      return DBuilder.createStructType(Scope, MangledName, L.File, FwdDeclLine,
-                                       SizeInBits, AlignInBits, Flags, nullptr,
-                                       nullptr, llvm::dwarf::DW_LANG_Swift,
-                                       nullptr, MangledName);
+      return DBuilder.createStructType(
+          Scope, MangledName, L.File, FwdDeclLine, SizeInBits, AlignInBits,
+          Flags, nullptr, nullptr, llvm::dwarf::DW_LANG_Swift, nullptr,
+          MangledName, /*Specification=*/nullptr, NumExtraInhabitants);
     }
 
     case TypeKind::SILFunction:
@@ -2377,10 +2385,11 @@ private:
     case TypeKind::GenericFunction: {
       if (Opts.DebugInfoLevel > IRGenDebugInfoLevel::ASTTypes)
         return createFunctionPointer(DbgTy, Scope, SizeInBits, AlignInBits,
-                                     Flags, MangledName);
+                                     Flags, MangledName, NumExtraInhabitants);
       else
         return createOpaqueStruct(Scope, MangledName, MainFile, 0, SizeInBits,
-                                  AlignInBits, Flags, MangledName);
+                                  AlignInBits, Flags, MangledName, {}, nullptr,
+                                  nullptr, NumExtraInhabitants);
     }
 
     case TypeKind::Enum: {
@@ -2507,12 +2516,16 @@ private:
           nullptr, llvm::dwarf::DW_LANG_Swift, nullptr, MangledName);
     }
 
+    // A special stdlib builtin type, which the debugger looks up by mangled
+    // name, so it must not be renamed to "<unknown>" below.
+    case TypeKind::BuiltinUnsafeValueBuffer:
+      break;
+
     // The following types exist primarily for internal use by the type
     // checker.
     case TypeKind::Error:
     case TypeKind::SILBlockStorage:
     case TypeKind::SILToken:
-    case TypeKind::BuiltinUnsafeValueBuffer:
     case TypeKind::BuiltinDefaultActorStorage:
     case TypeKind::BuiltinNonDefaultDistributedActorStorage:
     case TypeKind::SILMoveOnlyWrapped:
@@ -2606,11 +2619,36 @@ private:
   void createSpecialStlibBuiltinTypes() {
     if (Opts.DebugInfoLevel <= IRGenDebugInfoLevel::ASTTypes)
       return;
-    for (auto BuiltinType: IGM.getOrCreateSpecialStlibBuiltinTypes()) {
+    for (auto BuiltinType : IGM.getOrCreateSpecialStlibBuiltinTypes()) {
       auto DbgTy = DebugTypeInfo::getFromTypeInfo(
           BuiltinType, IGM.getTypeInfoForUnlowered(BuiltinType), IGM);
-      DBuilder.retainType(getOrCreateType(DbgTy));
+      anchorType(getOrCreateType(DbgTy));
+
+      // The reflection metadata emits AnyObject as the old
+      // Builtin.UnknownObject for ABI compatibility (see
+      // FixedTypeMetadataBuilder::layout()), so emit a second DIE under that
+      // name.
+      if (!BuiltinType->isAnyObject())
+        continue;
+      if (auto CompletedDbgTy = completeType(DbgTy)) {
+        StringRef Prefix = IGM.Context.LangOpts.hasFeature(Feature::Embedded)
+                               ? MANGLING_PREFIX_EMBEDDED_STR
+                               : MANGLING_PREFIX_STR;
+        anchorType(DBuilder.createBasicType(
+            BumpAllocatedString((Twine(Prefix) + "BOD").str()),
+            CompletedDbgTy->getSizeInBits(), /*Encoding=*/0,
+            llvm::DINode::FlagZero,
+            CompletedDbgTy->getNumExtraInhabitants().value_or(0)));
+      }
     }
+  }
+
+  /// Retain \p DITy, and keep dsymutil from stripping it as unused.
+  void anchorType(llvm::DIType *DITy) {
+    if (!DITy)
+      return;
+    DBuilder.retainType(DITy);
+    DBuilder.createImportedDeclaration(TheCU, DITy, MainFile, 0);
   }
 
   /// Anchor DW_TAG_typedef DIEs for the stdlib C-interop typealiases (CChar,
@@ -2649,10 +2687,7 @@ private:
                                          /*genericArgs=*/{}, Underlying);
       auto AliasDbgTy = DebugTypeInfo::getFromTypeInfo(
           AliasTy, IGM.getTypeInfoForUnlowered(AliasTy), IGM);
-      llvm::DIType *TypeDef = getOrCreateType(AliasDbgTy);
-      DBuilder.retainType(TypeDef);
-      // This is needed to prevent dsymutil from considering the type unused.
-      DBuilder.createImportedDeclaration(TheCU, TypeDef, MainFile, 0);
+      anchorType(getOrCreateType(AliasDbgTy));
     };
 #define MAP_BUILTIN_TYPE(CLANG, SWIFT) anchorAlias(#SWIFT);
 #include "swift/ClangImporter/BuiltinMappedTypes.def"
