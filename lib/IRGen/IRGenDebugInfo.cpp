@@ -161,6 +161,7 @@ class IRGenDebugInfoImpl : public IRGenDebugInfo {
   llvm::StringMap<llvm::TrackingMDNodeRef> DIFileCache;
   llvm::StringMap<llvm::TrackingMDNodeRef> RuntimeErrorFnCache;
   llvm::StringSet<> OriginallyDefinedInTypes;
+  llvm::StringSet<> AnchoredTypeAliases;
   TrackingDIRefMap DIRefMap;
   TrackingDIRefMap InnerTypeCache;
   TrackingDIRefMap ExistentialTypeAliasMap;
@@ -1215,16 +1216,18 @@ private:
                 memberTy,
                 IGM.getTypeInfoForUnlowered(
                     IGM.getSILTypes().getAbstractionPattern(VD), memberTy),
-                IGM))
+                IGM)) {
           MemberTypes.emplace_back(VD->getName().str(),
                                    getByteSize() *
                                        DbgTy->getAlignment().getValue(),
                                    getOrCreateType(*DbgTy));
-        else
+          anchorTypeAliasesIn(memberTy);
+        } else {
           // Without complete type info we can only create a forward decl.
           return DBuilder.createForwardDecl(
               llvm::dwarf::DW_TAG_structure_type, MangledName, Scope, File, Line,
               llvm::dwarf::DW_LANG_Swift, SizeInBits, 0);
+        }
       }
     }
 
@@ -1278,6 +1281,7 @@ private:
         MemberTypes.emplace_back(VD->getName().str(),
                                  getByteSize() * DbgTy.getAlignment().getValue(),
                                  getOrCreateType(DbgTy));
+        anchorTypeAliasesIn(memberTy);
       }
     }
 
@@ -1530,6 +1534,7 @@ private:
                                  getByteSize() *
                                      ElemDbgTy->getAlignment().getValue(),
                                  TrackingDIType(PayloadDITy));
+        anchorTypeAliasesIn(PayloadTy);
       } else {
         // A variant with no payload.
         MemberTypes.emplace_back(ElemDecl->getBaseIdentifier().str(), 0,
@@ -1591,6 +1596,7 @@ private:
                                  getByteSize() *
                                      ElemDbgTy->getAlignment().getValue(),
                                  TrackingDIType(PayloadDITy));
+        anchorTypeAliasesIn(PayloadTy);
       } else {
         // A variant with no payload.
         MemberTypes.emplace_back(ElemDecl->getBaseIdentifier().str(), 0,
@@ -2651,6 +2657,31 @@ private:
 #define MAP_BUILTIN_TYPE(CLANG, SWIFT) anchorAlias(#SWIFT);
 #include "swift/ClangImporter/BuiltinMappedTypes.def"
 #undef MAP_BUILTIN_TYPE
+  }
+
+  /// Forward-declared composite types may still refer refer to a type alias by
+  /// name in their mangled name. We need to make sure they are emitted in
+  /// DWARF.
+  void anchorTypeAliasesIn(Type Ty) {
+    if (!Ty || Opts.DebugInfoLevel < IRGenDebugInfoLevel::ASTTypes)
+      return;
+    Ty.findIf([&](Type T) -> bool {
+      auto *Alias = llvm::dyn_cast<TypeAliasType>(T.getPointer());
+      if (!Alias)
+        return false;
+      DebugTypeInfo AliasDbgTy = DebugTypeInfo::getForwardDecl(Alias);
+      // Dedup by the alias's mangled name.
+      auto Mangled = getMangledName(AliasDbgTy);
+      if (Mangled.Sugared.empty() ||
+          !AnchoredTypeAliases.insert(Mangled.Sugared).second)
+        return false;
+      if (llvm::DIType *TypeDef = getOrCreateType(AliasDbgTy)) {
+        DBuilder.retainType(TypeDef);
+        // Keep dsymutil from stripping the typedef as unused.
+        DBuilder.createImportedDeclaration(TheCU, TypeDef, MainFile, 0);
+      }
+      return false;
+    });
   }
 
   /// A TypeWalker that finds if a given type's mangling is affected by an
