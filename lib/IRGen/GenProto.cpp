@@ -2757,7 +2757,16 @@ static void addWTableTypeMetadata(IRGenModule &IGM,
   auto linkage = stripExternalFromLinkage(wt->getLinkage());
   switch (linkage) {
   case SILLinkage::Private:
-    vis = VCallVisibility::VCallVisibilityTranslationUnit;
+    // A private conformance can escape its defining module as an existential.
+    // If the protocol is defined in another module, the dispatch thunks that
+    // make witness method uses visible to VFE are not in this translation
+    // unit. Only assume they are in the linkage unit when the user explicitly
+    // allows link-time internalization.
+    if (conf->getProtocol()->getModuleContext() == IGM.getSwiftModule()) {
+      vis = VCallVisibility::VCallVisibilityTranslationUnit;
+    } else if (IGM.getOptions().InternalizeAtLink) {
+      vis = VCallVisibility::VCallVisibilityLinkageUnit;
+    }
     break;
   case SILLinkage::Hidden:
   case SILLinkage::Shared:
