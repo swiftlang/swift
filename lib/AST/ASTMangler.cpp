@@ -2907,6 +2907,12 @@ void ASTMangler::appendProtocolName(const ProtocolDecl *protocol,
     return;
   }
 
+  // As we're mangling a plain (non-symbolic) name for this protocol,
+  // the enclosing context mangled below must not use a symbolic
+  // reference either so that it will be resolvable at
+  // runtime. Temporarily disable symbolic references.
+  llvm::SaveAndRestore<bool> X(AllowSymbolicReferences, false);
+
   BaseEntitySignature base(protocol);
   appendContextOf(protocol, base);
   auto *clangDecl = protocol->getClangDecl();
