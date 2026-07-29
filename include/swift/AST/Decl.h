@@ -8651,6 +8651,20 @@ public:
   /// Whether the function is a non-static method.
   bool isInstanceMethod() const { return hasImplicitSelfDecl() && !isStatic(); }
 
+  /// Whether 'self' occupies an index in this function's lifetime dependence
+  /// index space, which consists of the parameters, optionally followed by
+  /// 'self', followed by the result.
+  ///
+  /// An imported C++ constructor's implicit metatype 'self' is dropped when
+  /// lowering to SIL (see TypeConverter::getLoweredFormalTypes()), so, unlike
+  /// the 'self' of an importer-synthesized value constructor, it does not
+  /// occupy an index.
+  bool hasSelfInLifetimeDependenceIndices() const;
+
+  /// The index representing this function's result in its lifetime dependence
+  /// index space. See hasSelfInLifetimeDependenceIndices().
+  unsigned getLifetimeDependenceResultIndex() const;
+
   /// Retrieve the declaration that this method overrides, if any.
   AbstractFunctionDecl *getOverriddenDecl() const {
     return cast_or_null<AbstractFunctionDecl>(ValueDecl::getOverriddenDecl());

@@ -2,7 +2,7 @@
 // RUN: split-file %s %t
 // RUN: %target-swift-frontend  -I %t/Inputs -emit-sil %t/test.swift -enable-experimental-feature LifetimeDependence -cxx-interoperability-mode=default -diagnostic-style llvm 2>&1 | %FileCheck %s
 // RUN: %target-swift-frontend  -I %t/Inputs -emit-sil %t/test.swift -cxx-interoperability-mode=default -diagnostic-style llvm 2>&1 | %FileCheck %s
-// RUN: %target-swift-frontend  -I %t/Inputs -emit-sil -verify %t/escaping_scopes.swift -enable-experimental-feature Lifetimes -cxx-interoperability-mode=default -diagnostic-style llvm
+// RUN: %target-swift-frontend  -I %t%{fs-sep}Inputs -emit-sil -verify %t%{fs-sep}escaping_scopes.swift -enable-experimental-feature Lifetimes -cxx-interoperability-mode=default -diagnostic-style llvm -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}nonescapable.h
 
 // REQUIRES: swift_feature_LifetimeDependence
 // REQUIRES: swift_feature_Lifetimes
@@ -127,6 +127,22 @@ CaptureView getCaptureView(const Owner& owner [[clang::lifetimebound]]) {
 }
 
 struct SWIFT_NONESCAPABLE AggregateView {
+    const int *member;
+};
+
+struct SWIFT_NONESCAPABLE ViewFromValue {
+    ViewFromValue(Owner o [[clang::lifetimebound]]);
+    const int *member;
+};
+
+struct SWIFT_NONESCAPABLE ViewFromFactory {
+    static ViewFromFactory make(Owner o [[clang::lifetimebound]]) SWIFT_NAME(init(_:));
+    const int *member;
+};
+
+// expected-warning@+2 {{the returned type 'ViewNoAnnotation' is annotated as non-escapable; its lifetime dependencies must be annotated}}
+struct SWIFT_NONESCAPABLE ViewNoAnnotation {
+    ViewNoAnnotation(const Owner &o);
     const int *member;
 };
 
@@ -303,6 +319,8 @@ View fromRvalueRefNonTrivialValue(NonTrivialByValue &&o [[clang::lifetimebound]]
 // CHECK: sil {{.*}}[clang CaptureView.captureView] {{.*}} : $@convention(cxx_method) (View, @lifetime(copy 0) @inout CaptureView) -> ()
 // CHECK: sil {{.*}}[clang CaptureView.handOut] {{.*}} : $@convention(cxx_method) (@lifetime(copy 1) @inout View, @in_guaranteed CaptureView) -> ()
 // CHECK: sil {{.*}}[clang NS.getView] {{.*}} : $@convention(c) (@in_guaranteed Owner) -> @lifetime(borrow address 0) @owned View
+// CHECK: sil {{.*}}[clang ViewFromValue.init] {{.*}} : $@convention(c) (Owner) -> @lifetime(immortal) @out ViewFromValue
+// CHECK: sil {{.*}}[clang ViewFromFactory.init] {{.*}} : $@convention(c) (Owner) -> @lifetime(immortal) @owned ViewFromFactory
 // CHECK: sil {{.*}}[clang moveOnlyId] {{.*}} : $@convention(c) (@in_guaranteed MoveOnly) -> @lifetime(borrow {{.*}}0) @out MoveOnly
 // CHECK: sil {{.*}}[clang makeAnonUnionNonEscapable] {{.*}} : $@convention(c) (@in_guaranteed Owner) -> @lifetime(borrow address 0) @owned HasAnonUnion<NonEscapable>
 // CHECK: sil {{.*}}[clang makeAnonStructNonEscapable] {{.*}} : $@convention(c) (@in_guaranteed Owner) -> @lifetime(borrow address 0) @owned HasAnonStruct<NonEscapable>
@@ -344,6 +362,11 @@ public func test() {
 
 public func test2(_ x: AggregateView) {
     let _ = AggregateView(member: x.member)
+}
+
+public func test3(_ o: Owner) {
+    let _ = unsafe ViewFromValue(o)
+    let _ = unsafe ViewFromFactory(o)
 }
 
 func canImportMoveOnlyNonEscapable(_ x: borrowing MoveOnly) {
@@ -396,6 +419,16 @@ func viaMethod() -> View {
 @_lifetime(immortal)
 func viaFreeFunc() -> View {
   return getView(globalOwner)
+  // expected-error @-1 {{lifetime-dependent value escapes its scope}}
+  // expected-note @-2 {{it depends on this scoped access to variable 'globalOwner'}}
+  // expected-note @-3 {{this use causes the lifetime-dependent value to escape}}
+}
+
+// An unannotated constructor's dependency is inferred, and it is a real borrow
+// of the parameter rather than an immortal lifetime.
+@_lifetime(immortal)
+func viaUnannotatedCtor() -> ViewNoAnnotation {
+  return ViewNoAnnotation(globalOwner)
   // expected-error @-1 {{lifetime-dependent value escapes its scope}}
   // expected-note @-2 {{it depends on this scoped access to variable 'globalOwner'}}
   // expected-note @-3 {{this use causes the lifetime-dependent value to escape}}
