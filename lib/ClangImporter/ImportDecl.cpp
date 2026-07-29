@@ -4605,11 +4605,14 @@ namespace {
                 CxxEscapability::Unknown) == CxxEscapability::NonEscapable)
           lifetimeDependencies.push_back(immortalLifetime);
       }
-      bool resultIsNonEscapable =
-          isNonEscapableAnnotatedType(retType.getTypePtr());
+      clang::QualType resultTypeForEscapability = retType;
       if (auto *ctordecl = dyn_cast<clang::CXXConstructorDecl>(decl))
-        resultIsNonEscapable = isNonEscapableAnnotatedType(
-            ctordecl->getParent()->getTypeForDecl());
+        resultTypeForEscapability =
+            Impl.getClangASTContext().getRecordType(ctordecl->getParent());
+      bool resultIsNonEscapable =
+          isNonEscapableAnnotatedType(resultTypeForEscapability.getTypePtr());
+      bool resultDependenceIsAnnotated =
+          getLifetimeDependenceFor(lifetimeDependencies, returnIdx).has_value();
 
       if (!lifetimeDependencies.empty()) {
         Impl.SwiftContext.evaluator.cacheOutput(
@@ -4629,7 +4632,17 @@ namespace {
             decl->getLocation());
       }
 
-      if (hasSkippedLifetimeAnnotation) {
+      // A ~Escapable result with no dependency spelled in C++ still gets one
+      // synthesized by Swift's implicit inference. Import it as @unsafe unless
+      // it has a hand-written '@lifetime(...)' or an explicit 'safe' as an
+      // author's audit.
+      bool resultDependenceIsInferred =
+          !resultDependenceIsAnnotated &&
+          !isEscapable(resultTypeForEscapability) &&
+          !result->getAttrs().hasAttribute<LifetimeAttr>() &&
+          !hasSwiftAttribute(decl, {"safe"});
+
+      if (hasSkippedLifetimeAnnotation || resultDependenceIsInferred) {
         result->addAttribute(new (ASTContext) UnsafeAttr(/*implicit=*/true));
       } else {
         for (auto [idx, param] : llvm::enumerate(decl->parameters())) {
