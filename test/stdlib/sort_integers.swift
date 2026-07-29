@@ -69,7 +69,7 @@ let sort_verifier: ([Int]) -> Void = {
     var y = $0.sorted()
     for i in 0..<y.count - 1 {
     if (y[i] > y[i+1]) {
-        print("Error: \(y)")
+        print("Error! \(y)")
         return
       }
     }
