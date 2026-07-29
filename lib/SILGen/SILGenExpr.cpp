@@ -7459,7 +7459,7 @@ RValue RValueEmitter::visitCopyExpr(CopyExpr *E, SGFContext C) {
         SGF.emitLValue(li->getSubExpr(), SGFAccessKind::BorrowedAddressRead);
     auto address = SGF.emitAddressOfLValue(subExpr, std::move(lv));
 
-    if (subType.isLoadable(SGF.F)) {
+    if (subType.isLoadableOrOpaque(SGF.F)) {
       // Trivial types don't undergo any lifetime analysis, so simply load
       // the value.
       if (subType.isTrivial(SGF.F)
