@@ -123,7 +123,9 @@ actor MyGenericGlobalActor<T> {
 // KEYWORD2-NEXT:             Keyword/None:                       Sendable[#Func Attribute#]; name=Sendable
 // KEYWORD2-NEXT:             Keyword/None:                       preconcurrency[#Func Attribute#]; name=preconcurrency
 // KEYWORD2-NEXT:             Keyword/None:                       backDeployed[#Func Attribute#]; name=backDeployed
+// KEYWORD2-NEXT:             Keyword/None:                       unsafe[#Func Attribute#]; name=unsafe
 // KEYWORD2-NEXT:             Keyword/None:                       lifetime[#Func Attribute#]; name=lifetime
+// KEYWORD2-NEXT:             Keyword/None:                       safe[#Func Attribute#]; name=safe
 // KEYWORD2-NEXT:             Keyword/None:                       abi[#Func Attribute#]; name=abi{{$}}
 // KEYWORD2-NEXT:             Keyword/None:                       concurrent[#Func Attribute#]; name=concurrent
 // KEYWORD2-NEXT:             Keyword/None:                       diagnose[#Func Attribute#]; name=diagnose
@@ -206,6 +208,8 @@ actor MyGenericGlobalActor<T> {
 // ON_GLOBALVAR-DAG: Keyword/None:                       backDeployed[#Var Attribute#]; name=backDeployed
 // ON_GLOBALVAR-DAG: Keyword/None:                       concurrent[#Var Attribute#]; name=concurrent
 // ON_GLOBALVAR-DAG: Keyword/None:                       diagnose[#Var Attribute#]; name=diagnose
+// ON_GLOBALVAR-DAG: Keyword/None:                       unsafe[#Var Attribute#]; name=unsafe
+// ON_GLOBALVAR-DAG: Keyword/None:                       safe[#Var Attribute#]; name=safe
 // ON_GLOBALVAR-NOT: Keyword
 // ON_GLOBALVAR-DAG: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
 // ON_GLOBALVAR-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyPropertyWrapper[#Property Wrapper#]; name=MyPropertyWrapper
@@ -247,6 +251,8 @@ struct _S {
 // ON_PROPERTY-DAG: Keyword/None:                       backDeployed[#Var Attribute#]; name=backDeployed
 // ON_PROPERTY-DAG: Keyword/None:                       concurrent[#Var Attribute#]; name=concurrent
 // ON_PROPERTY-DAG: Keyword/None:                       diagnose[#Var Attribute#]; name=diagnose
+// ON_PROPERTY-DAG: Keyword/None:                       unsafe[#Var Attribute#]; name=unsafe
+// ON_PROPERTY-DAG: Keyword/None:                       safe[#Var Attribute#]; name=safe
 // ON_PROPERTY-NOT: Keyword
 // ON_PROPERTY-DAG: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
 // ON_PROPERTY-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyPropertyWrapper[#Property Wrapper#]; name=MyPropertyWrapper
@@ -284,6 +290,8 @@ struct _S {
 // ON_METHOD-DAG: Keyword/None:                       lifetime[#Func Attribute#]; name=lifetime
 // ON_METHOD-DAG: Keyword/None:                       concurrent[#Func Attribute#]; name=concurrent
 // ON_METHOD-DAG: Keyword/None:                       diagnose[#Func Attribute#]; name=diagnose
+// ON_METHOD-DAG: Keyword/None:                       unsafe[#Func Attribute#]; name=unsafe
+// ON_METHOD-DAG: Keyword/None:                       safe[#Func Attribute#]; name=safe
 // ON_METHOD-NOT: Keyword
 // ON_METHOD-DAG: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
 // ON_METHOD-DAG: Decl[Struct]/CurrModule:            MyPropertyWrapper[#Property Wrapper#]; name=MyPropertyWrapper
@@ -362,6 +370,8 @@ struct _S {
 // ON_MEMBER_LAST-DAG: Keyword/None:                       concurrent[#Declaration Attribute#]; name=concurrent
 // ON_MEMBER_LAST-DAG: Keyword/None:                       diagnose[#Declaration Attribute#]; name=diagnose
 // ON_MEMBER_LAST-DAG: Keyword/None:                       com[#Declaration Attribute#]; name=com
+// ON_MEMBER_LAST-DAG: Keyword/None:                       unsafe[#Declaration Attribute#]; name=unsafe
+// ON_MEMBER_LAST-DAG: Keyword/None:                       safe[#Declaration Attribute#]; name=safe
 // ON_MEMBER_LAST-NOT: Keyword
 // ON_MEMBER_LAST-DAG: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
 // ON_MEMBER_LAST-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyPropertyWrapper[#Property Wrapper#]; name=MyPropertyWrapper
@@ -440,6 +450,8 @@ func dummy2() {}
 // KEYWORD_LAST-DAG: Keyword/None:                       concurrent[#Declaration Attribute#]; name=concurrent
 // KEYWORD_LAST-DAG: Keyword/None:                       diagnose[#Declaration Attribute#]; name=diagnose
 // KEYWORD_LAST-DAG: Keyword/None:                       com[#Declaration Attribute#]; name=com
+// KEYWORD_LAST-DAG: Keyword/None:                       unsafe[#Declaration Attribute#]; name=unsafe
+// KEYWORD_LAST-DAG: Keyword/None:                       safe[#Declaration Attribute#]; name=safe
 // KEYWORD_LAST-NOT: Keyword
 // KEYWORD_LAST-DAG: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
 // KEYWORD_LAST-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyGenericPropertyWrapper[#Property Wrapper#]; name=MyGenericPropertyWrapper
