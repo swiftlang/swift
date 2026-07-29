@@ -53,6 +53,8 @@ struct BuiltinTypeDescriptorBase {
         Borrowability(Borrowability),
         AddressableForDependencies(AFD) {}
 
+  bool hasKnownAlignment() const { return Alignment != 0; }
+
   virtual ~BuiltinTypeDescriptorBase(){};
 
   virtual llvm::StringRef getMangledTypeName() = 0;
