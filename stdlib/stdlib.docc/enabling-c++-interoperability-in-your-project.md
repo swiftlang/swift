@@ -8,7 +8,7 @@ When you enable C++ interoperability, your C++ class names, methods, and convent
 
 This article demonstrates how to enable interoperability, expose a C++ class to Swift through a module, and use the `SWIFT_NAME` macro to give the class a Swift-friendly name. The Swift code to use a new class is identical whether you're working in Swift Package Manager, the command line, or Xcode. The workflow to expose your C++ to Swift is the same on macOS, Linux, and Windows.
 
-After you set up a working environment that mixes Swift and C++ code, you can find out more about Swift interoperability features at [Mixing Swift and C++](https://www.swift.org/documentation/cxx-interop)."
+After you set up a working environment that mixes Swift and C++ code, you can find out more about Swift interoperability features at [Mixing Swift and C++](https://www.swift.org/documentation/cxx-interop).
 
 ## Enable C++ interoperability
 
