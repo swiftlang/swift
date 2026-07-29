@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2020-2021 Apple Inc. and the Swift project authors
+// Copyright (c) 2020-2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -46,8 +46,8 @@ import Swift
 ///
 /// ### Concurrent Iteration
 ///
-/// When you iterate the stream concurrently, each element you provide
-/// to the `yield(_:)` method is delivered to only a single consumer.
+/// When you iterate the stream concurrently, each element you yield
+/// to the stream is delivered to only a single iterator once.
 ///
 /// ### Adapting Existing Code to Use Streams
 ///
@@ -438,12 +438,12 @@ extension AsyncThrowingStream: AsyncSequence {
 
     /// The next value from the asynchronous stream.
     ///
-    /// When `next()` returns `nil`, this signifies the end of the
+    /// When `next(isolation:)` returns `nil`, this signifies the end of the
     /// `AsyncThrowingStream`.
     ///
-    /// If you cancel the task this iterator is running in while `next()`
+    /// If you cancel the task this iterator is running in while `next(isolation:)`
     /// is awaiting a value, the `AsyncThrowingStream` terminates. In this case,
-    /// `next()` may return `nil` immediately, or else return `nil` on
+    /// `next(isolation:)` may return `nil` immediately, or else return `nil` on
     /// subsequent calls.
     @available(SwiftStdlib 6.0, *)
     public mutating func next(isolation actor: isolated (any Actor)?) async throws(Failure) -> Element? {
