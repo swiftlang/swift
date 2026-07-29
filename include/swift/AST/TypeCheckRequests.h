@@ -52,6 +52,8 @@ class AvailabilityScope;
 class BreakStmt;
 class ContextualPattern;
 class ContinueStmt;
+class COMDeclInfo;
+class COMInterfaceHierarchy;
 class DefaultArgumentExpr;
 class DefaultArgumentType;
 class DoCatchStmt;
@@ -1251,6 +1253,46 @@ private:
   friend SimpleRequest;
 
   bool evaluate(Evaluator &evaluator, NominalTypeDecl *nominal) const;
+
+public:
+  // Caching
+  bool isCached() const { return true; }
+};
+
+/// Retrieve the COM role and associated declaration information for a nominal
+/// type, or \c nullptr when it is not a COM interface or implementation.
+class COMDeclInfoRequest :
+    public SimpleRequest<COMDeclInfoRequest,
+                         const COMDeclInfo *(NominalTypeDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  const COMDeclInfo *evaluate(Evaluator &evaluator,
+                              NominalTypeDecl *nominal) const;
+
+public:
+  // Caching
+  bool isCached() const { return true; }
+};
+
+/// Retrieve the validated inheritance hierarchy for a COM interface, or null
+/// when the protocol does not declare a COM interface.
+class COMInterfaceHierarchyRequest
+    : public SimpleRequest<COMInterfaceHierarchyRequest,
+                           const COMInterfaceHierarchy *(ProtocolDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  const COMInterfaceHierarchy *evaluate(Evaluator &evaluator,
+                                        ProtocolDecl *protocol) const;
 
 public:
   // Caching
@@ -3007,6 +3049,47 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Synthesizes the implicit metatype extension carrying \c var \c IID for a
+/// \c @com protocol.  The GUID is read from the protocol's own \c COMAttr, so
+/// the property is re-derived in modules importing a binary \c .swiftmodule.
+class SynthesizeCOMInterfaceIDRequest
+    : public SimpleRequest<SynthesizeCOMInterfaceIDRequest,
+                           VarDecl *(ProtocolDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  VarDecl *evaluate(Evaluator &evaluator, ProtocolDecl *decl) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
+/// Synthesizes the \c static \c var \c CLSID member on a \c @com class.  The
+/// GUID is read from the class's own \c COMAttr.
+class SynthesizeCOMImplementationIDRequest
+    : public SimpleRequest<SynthesizeCOMImplementationIDRequest,
+                           VarDecl *(ClassDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  VarDecl *evaluate(Evaluator &evaluator, ClassDecl *decl) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
 class CompareDeclSpecializationRequest
     : public SimpleRequest<CompareDeclSpecializationRequest,
                            bool(DeclContext *, ValueDecl *, ValueDecl *, bool,
@@ -3599,7 +3682,8 @@ public:
 /// Resolves the referenced original declaration for a `@derivative` attribute.
 class DerivativeAttrOriginalDeclRequest
     : public SimpleRequest<DerivativeAttrOriginalDeclRequest,
-                           AbstractFunctionDecl *(DerivativeAttr *),
+                           TinyPtrVector<AbstractFunctionDecl *>(
+                               DerivativeAttr *),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -3608,8 +3692,8 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  AbstractFunctionDecl *evaluate(Evaluator &evaluator,
-                                 DerivativeAttr *attr) const;
+  TinyPtrVector<AbstractFunctionDecl *> evaluate(Evaluator &evaluator,
+                                                 DerivativeAttr *attr) const;
 
 public:
   // Caching.

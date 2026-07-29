@@ -380,6 +380,10 @@ public:
   /// Retrieve the constraint system that this solution solves.
   ConstraintSystem &getConstraintSystem() const { return *constraintSystem; }
 
+  /// Whether this looks like a valid solution, without any fixes or holes.
+  /// Such solutions must not be produced from salvage() mode.
+  bool isValidSolution() const;
+
   DeclContext *getDC() const;
 
   /// The set of type bindings.

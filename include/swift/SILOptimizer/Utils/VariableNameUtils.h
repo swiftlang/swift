@@ -25,6 +25,8 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/StackList.h"
 
+#include <variant>
+
 namespace swift {
 
 class VariableNameInferrer {
@@ -39,6 +41,31 @@ public:
   };
 
   using Options = OptionSet<Flag>;
+
+  /// One element of the path the inferrer accumulates as it walks. Each
+  /// component records the \c subject it is naming (a textual \c StringRef
+  /// for sources without a recoverable decl, e.g. a debug_value's name
+  /// attribute or a tuple-element index; a \c ValueDecl* when one is
+  /// available, e.g. for the callee of an \c apply or a stored property
+  /// being projected). Consumers that only need a rendered string call
+  /// \c text(); consumers that want decl-aware diagnostics (\c %kind etc.)
+  /// can match on the variant directly.
+  struct InferredNameComponent {
+    std::variant<StringRef, ValueDecl *> subject;
+
+    /// Source location associated with this component (e.g., a let-binding's
+    /// decl loc or an apply's call loc). Used for diagnostic anchoring.
+    SourceLoc providingLoc;
+
+    InferredNameComponent(StringRef name, SourceLoc loc)
+        : subject(name), providingLoc(loc) {}
+    InferredNameComponent(ValueDecl *decl, SourceLoc loc)
+        : subject(decl), providingLoc(loc) {}
+
+    /// Render this component as the textual fragment used to build the
+    /// joined name path. Used by \c drainVariableNamePath.
+    StringRef getStringRef() const;
+  };
 
 private:
   /// A two phase stack data structure. The first phase only allows for two
@@ -129,7 +156,7 @@ private:
   ///
   /// Has to be a small vector since we push/pop the last segment start. This
   /// lets us speculate when processing phis.
-  VariableNamePathArray<StringRef, 4> variableNamePath;
+  VariableNamePathArray<InferredNameComponent, 4> variableNamePath;
 
   /// The root value of our string.
   ///
@@ -144,6 +171,14 @@ private:
   /// than the root variable's location (which for a stored property accessed
   /// in an init can be on the `init` keyword, far from the access).
   SourceLoc firstNameProvidingLoc;
+
+  /// The leaf component's \c ValueDecl, if any. Captured by
+  /// \c drainVariableNamePath right before it consumes the path so callers
+  /// can recover decl-kind-aware info after a successful inference. Null
+  /// when no path was pushed or when the leaf component was a bare
+  /// \c StringRef (e.g. a tuple-element index, or a debug_value's name
+  /// attribute that didn't carry a decl).
+  ValueDecl *leafDecl = nullptr;
 
   /// The final string we computed.
   SmallString<64> &resultingString;
@@ -246,9 +281,37 @@ public:
   static std::optional<std::pair<Identifier, SourceLoc>>
   inferNameAndFirstPathComponent(SILValue value);
 
+  /// Result of \c inferNameAndLeafDecl. Carries the joined+interned name,
+  /// the first-name-providing source location (see \c firstNameProvidingLoc),
+  /// and the leaf-most component's \c ValueDecl when one was recorded by
+  /// the walk (otherwise \c leafDecl is null).
+  struct InferredNameAndLeafDecl {
+    Identifier name;
+    SourceLoc declLoc;
+    ValueDecl *leafDecl;
+  };
+
+  /// Like \c inferNameAndFirstPathComponent, but also returns the leaf
+  /// component's \c ValueDecl when the inferrer recorded one (e.g. the
+  /// callee \c FuncDecl for a value that originates from an apply, or the
+  /// stored-property \c VarDecl for a struct-extract chain). Diagnostic
+  /// consumers can check \c leafDecl to pick a \c %kind-bearing variant
+  /// rather than printing the leaf's basename as if it were a bare value
+  /// identifier.
+  static std::optional<InferredNameAndLeafDecl>
+  inferNameAndLeafDecl(SILValue value);
+
   /// Returns the source location whose name was first pushed onto the name
   /// path during the walk. See \c firstNameProvidingLoc for details.
   SourceLoc getFirstNameProvidingLoc() const { return firstNameProvidingLoc; }
+
+  /// Returns the leaf-most component's \c ValueDecl if \c drainVariableNamePath
+  /// has run on a non-empty path whose leaf was a decl, otherwise null.
+  /// Useful for diagnostics that want decl-kind-aware rendering (\c %kind)
+  /// rather than treating the inferred name as a bare value identifier
+  /// (e.g. a function called inline whose function_ref leaked through name
+  /// inference as if it were a variable name).
+  ValueDecl *getLeafDecl() const { return leafDecl; }
 
   /// Given a specific decl \p d, come up with a name for it.
   ///
@@ -271,9 +334,30 @@ private:
   /// as the first name-providing source location if none has been recorded
   /// yet.
   void pushPathComponent(StringRef name, SourceLoc providingLoc) {
-    variableNamePath.push_back(name);
+    variableNamePath.push_back({name, providingLoc});
     if (firstNameProvidingLoc.isInvalid())
       firstNameProvidingLoc = providingLoc;
+  }
+
+  /// Decl-bearing overload of \c pushPathComponent: preserves \p decl in the
+  /// component's \c subject so consumers (e.g. \c %kind diagnostics) can
+  /// recover decl-kind-aware rendering. \c getStringRef() falls back to the
+  /// decl's base-name text for callers that only want a string.
+  void pushPathComponent(ValueDecl *decl, SourceLoc providingLoc) {
+    variableNamePath.push_back({decl, providingLoc});
+    if (firstNameProvidingLoc.isInvalid())
+      firstNameProvidingLoc = providingLoc;
+  }
+
+  /// Convenience overloads that take a \c SILLocation and extract its
+  /// \c SourceLoc. Most callers have a SILLocation in hand (e.g. from
+  /// \c getLoc()) and would otherwise repeat \c .getSourceLoc() at every
+  /// call site.
+  void pushPathComponent(StringRef name, SILLocation providingLoc) {
+    pushPathComponent(name, providingLoc.getSourceLoc());
+  }
+  void pushPathComponent(ValueDecl *decl, SILLocation providingLoc) {
+    pushPathComponent(decl, providingLoc.getSourceLoc());
   }
 
   /// Finds the SILValue that either provides the direct debug information or

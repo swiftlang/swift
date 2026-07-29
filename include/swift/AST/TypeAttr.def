@@ -70,6 +70,7 @@ TYPE_ATTR(isolated, Isolated)
 SIMPLE_TYPE_ATTR(nonisolated, Nonisolated)
 SIMPLE_TYPE_ATTR(_addressable, Addressable)
 SIMPLE_TYPE_ATTR(concurrent, Concurrent)
+TYPE_ATTR(called, Called)
 
 // SIL-specific attributes
 SIMPLE_SIL_TYPE_ATTR(async, Async)

@@ -29,6 +29,6 @@ func bar(_ s: Span<CInt>) {
 import Unrelated
 
 func bar(_ s: Span<CInt>) {
-  // expected-error@+1{{cannot convert value of type 'Span<CInt>' (aka 'Span<Int32>') to expected argument type 'UnsafeBufferPointer<Int32>'}}
+  // expected-error@+1{{cannot convert value of type 'Span<CInt>' (aka 'Span<Int32>') to expected argument type 'UnsafeBufferPointer<CInt>' (aka 'UnsafeBufferPointer<Int32>')}}
   foo(s)
 }

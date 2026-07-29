@@ -17,7 +17,10 @@
 #define DEBUG_TYPE "differentiation"
 
 #include "swift/SILOptimizer/Differentiation/Thunk.h"
+
+#include "swift/SILOptimizer/Differentiation/ADContext.h"
 #include "swift/SILOptimizer/Differentiation/Common.h"
+#include "swift/SILOptimizer/Differentiation/TangentBuilder.h"
 
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/Requirement.h"
@@ -99,6 +102,31 @@ static void forwardFunctionArgumentsConvertingOwnership(
       valuesToCleanup.push_back(arg);
       continue;
     }
+    // Handle metatype conversion
+    if (auto fromMeta = toParam.getInterfaceType()->getAs<MetatypeType>()) {
+      auto toMeta = fromParam.getInterfaceType()->castTo<MetatypeType>();
+      auto wasRepr = fromMeta->getRepresentation();
+      auto willBeRepr = toMeta->getRepresentation();
+      auto expectedType =
+          SILType::getPrimitiveObjectType(toMeta->getCanonicalType());
+      if ((wasRepr == MetatypeRepresentation::Thick &&
+           willBeRepr == MetatypeRepresentation::Thin) ||
+          (wasRepr == MetatypeRepresentation::Thin &&
+           willBeRepr == MetatypeRepresentation::Thick)) {
+        // If we have a thin-to-thick abstraction change, cook up new a metatype
+        // value out of nothing -- thin metatypes carry no runtime state.
+        auto newMeta = builder.createMetatype(loc, expectedType);
+        forwardedArgs.push_back(newMeta);
+        continue;
+      } else if (fromMeta != toMeta) {
+        // Otherwise, we have a metatype subtype conversion of thick metatypes.
+        assert(wasRepr == willBeRepr && "Unhandled metatype conversion");
+        auto up = builder.createUpcast(loc, arg, expectedType);
+        forwardedArgs.push_back(up);
+        continue;
+      }
+    }
+
     // Otherwise, simply forward the argument.
     forwardedArgs.push_back(arg);
   }
@@ -136,13 +164,21 @@ SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
   if (!thunk->empty())
     return thunk;
 
+  // Differentiation runs after AddressLowering, so this thunk is synthesized
+  // into an already-lowered module and its body below is emitted in
+  // lowered-address form. Record that (matching the caller) so the per-function
+  // conventions used here -- and read by later passes -- don't treat the
+  // thunk's address arguments as opaque values.
+  thunk->setHasLoweredAddresses(caller->hasLoweredAddresses());
+
   thunk->setGenericEnvironment(genericEnv);
   auto *entry = thunk->createBasicBlock();
   SILBuilder builder(entry);
   createEntryArguments(thunk);
 
-  SILFunctionConventions fromConv(fromType, module);
-  SILFunctionConventions toConv(toType, module);
+  SILAddressConventions silConv = SILAddressConventions::forFunction(*thunk);
+  SILFunctionConventions fromConv(fromType, silConv);
+  SILFunctionConventions toConv(toType, silConv);
   assert(toConv.useLoweredAddresses());
 
   // Forward thunk arguments, handling ownership convention mismatches.
@@ -433,6 +469,7 @@ getOrCreateSubsetParametersThunkForLinearMap(
   if (!thunk->empty())
     return {thunk, interfaceSubs};
 
+  thunk->setHasLoweredAddresses(parentThunk->hasLoweredAddresses());
   thunk->setGenericEnvironment(genericEnv);
   auto *entry = thunk->createBasicBlock();
   TangentBuilder builder(entry, adContext);
@@ -669,7 +706,8 @@ getOrCreateSubsetParametersThunkForLinearMap(
   collectAllActualResultsInTypeOrder(ai, pullbackDirectResults, allResults);
   // Collect pullback semantic result arguments in type order.
   unsigned semanticResultArgIdx = 0;
-  SILFunctionConventions origConv(origFnType, thunk->getModule());
+  SILFunctionConventions origConv(
+      origFnType, SILAddressConventions::forFunction(*thunk));
   for (auto paramIdx : actualConfig.parameterIndices->getIndices()) {
     auto paramInfo = origConv.getParameters()[paramIdx];
     if (!paramInfo.isAutoDiffSemanticResult())
@@ -783,6 +821,7 @@ getOrCreateSubsetParametersThunkForDerivativeFunction(
   if (!thunk->empty())
     return {thunk, interfaceSubs};
 
+  thunk->setHasLoweredAddresses(caller->hasLoweredAddresses());
   thunk->setGenericEnvironment(genericEnv);
   auto *entry = thunk->createBasicBlock();
   SILBuilder builder(entry);

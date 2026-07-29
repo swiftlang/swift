@@ -21,6 +21,7 @@
 #include "TypeCheckAccess.h"
 #include "TypeCheckAvailability.h"
 #include "TypeCheckBitwise.h"
+#include "TypeCheckCOM.h"
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckInvertible.h"
 #include "TypeCheckObjC.h"
@@ -52,6 +53,7 @@
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeWalker.h"
+#include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Bridging/ASTGen.h"
@@ -83,7 +85,7 @@ struct RawValueKey {
   enum class Kind : uint8_t {
     String, Float, Int, Bool, Tombstone, Empty
   } kind;
-  
+
   struct IntValueTy {
     uint64_t v0;
     uint64_t v1;
@@ -109,7 +111,7 @@ struct RawValueKey {
     FloatValueTy floatValue;
     bool boolValue;
   };
-  
+
   explicit RawValueKey(LiteralExpr *expr) {
     switch (expr->getKind()) {
     case ExprKind::IntegerLiteral:
@@ -153,13 +155,13 @@ struct RawValueKey {
       llvm_unreachable("not a valid literal expr for raw value");
     }
   }
-  
+
   explicit RawValueKey(Kind k) : kind(k) {
     assert((k == Kind::Tombstone || k == Kind::Empty)
            && "this ctor is only for creating DenseMap special values");
   }
 };
-  
+
 /// Used during enum raw value checking to identify the source of a raw value,
 /// which may have been derived by auto-incrementing, for diagnostic purposes.
 struct RawValueSource {
@@ -229,7 +231,7 @@ public:
     llvm_unreachable("Unhandled RawValueKey in switch.");
   }
 };
-  
+
 } // namespace llvm
 
 static bool canSkipCircularityCheck(NominalTypeDecl *decl) {
@@ -529,7 +531,7 @@ BodyInitKindRequest::evaluate(Evaluator &evaluator,
       // Don't walk into further nominal decls.
       return Action::SkipNodeIf(isa<NominalTypeDecl>(D));
     }
-    
+
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       // Don't walk into closures.
       if (isa<ClosureExpr>(E))
@@ -542,7 +544,7 @@ BodyInitKindRequest::evaluate(Evaluator &evaluator,
 
       auto *argList = apply->getArgs();
       auto Callee = apply->getSemanticFn();
-      
+
       Expr *arg;
 
       if (isa<OtherConstructorDeclRefExpr>(Callee)) {
@@ -584,7 +586,7 @@ BodyInitKindRequest::evaluate(Evaluator &evaluator,
             myKind = BodyInitKind::Delegating;
         }
       }
-      
+
       if (myKind == BodyInitKind::None)
         return Action::Continue(E);
 
@@ -1045,7 +1047,7 @@ NeedsNewVTableEntryRequest::evaluate(Evaluator &evaluator,
   // Destructors always use a fixed vtable entry.
   if (isa<DestructorDecl>(decl))
     return false;
-  
+
   assert(isa<FuncDecl>(decl) || isa<ConstructorDecl>(decl));
 
   // Final members are always be called directly.
@@ -1173,7 +1175,7 @@ std::optional<AutomaticEnumValueKind>
 swift::computeAutomaticEnumValueKind(EnumDecl *ED) {
   Type rawTy = ED->getRawType();
   assert(rawTy && "Cannot compute value kind without raw type!");
-  
+
   if (ED->getGenericEnvironmentOfContext() != nullptr)
     rawTy = ED->mapTypeIntoEnvironment(rawTy);
 
@@ -1188,7 +1190,7 @@ swift::computeAutomaticEnumValueKind(EnumDecl *ED) {
     KnownProtocolKind::ExpressibleByUnicodeScalarLiteral,
     KnownProtocolKind::ExpressibleByExtendedGraphemeClusterLiteral,
   };
-  
+
   if (conformsToProtocol(KnownProtocolKind::ExpressibleByIntegerLiteral)) {
     return AutomaticEnumValueKind::Integer;
   } else if (conformsToProtocol(KnownProtocolKind::ExpressibleByStringLiteral)){
@@ -1208,7 +1210,7 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED) const {
   if (!rawTy) {
     return std::make_tuple<>();
   }
-  
+
   // Avoid computing raw values for enum cases in swiftinterface files since raw
   // values are intentionally omitted from them (unless the enum is @objc).
   // Without bailing here, incorrect raw values can be automatically generated
@@ -1255,7 +1257,7 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED) const {
           return std::make_tuple<>();
         }
       }
-      
+
       // If the enum element has no explicit raw value, try to
       // autoincrement from the previous value, or start from zero if this
       // is the first element.
@@ -1327,7 +1329,7 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED) const {
 
     // Diagnose the duplicate value.
     Diags.diagnose(diagLoc, diag::enum_raw_value_not_unique);
-    
+
     if (lastExplicitValueElt != elt &&
         valueKind == AutomaticEnumValueKind::Integer) {
       Diags.diagnose(uncheckedRawValueOf(lastExplicitValueElt)->getLoc(),
@@ -1339,7 +1341,7 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED) const {
     diagLoc = uncheckedRawValueOf(foundElt)->isImplicit()
         ? foundElt->getLoc() : uncheckedRawValueOf(foundElt)->getLoc();
     Diags.diagnose(diagLoc, diag::enum_raw_value_used_here);
-    
+
     if (foundElt != prevSource.lastExplicitValueElt &&
         valueKind == AutomaticEnumValueKind::Integer) {
       if (prevSource.lastExplicitValueElt)
@@ -1839,7 +1841,7 @@ UnderlyingTypeRequest::evaluate(Evaluator &evaluator,
 /// Bind the given function declaration, which declares an operator, to the
 /// corresponding operator declaration.
 OperatorDecl *
-FunctionOperatorRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {  
+FunctionOperatorRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
   auto &C = FD->getASTContext();
   auto &diags = C.Diags;
   const auto operatorName = FD->getBaseIdentifier();
@@ -2137,25 +2139,7 @@ ParamSpecifierRequest::evaluate(Evaluator &evaluator,
     auto selfParam = computeSelfParam(afd,
                                       /*isInitializingCtor*/true,
                                       /*wantDynamicSelf*/false);
-    if (auto fd = dyn_cast<FuncDecl>(afd)) {
-      switch (fd->getSelfAccessKind()) {
-      case SelfAccessKind::LegacyConsuming:
-        return ParamSpecifier::LegacyOwned;
-      case SelfAccessKind::Consuming:
-        return ParamSpecifier::Consuming;
-      case SelfAccessKind::Borrowing:
-        return ParamSpecifier::Borrowing;
-      case SelfAccessKind::Mutating:
-        return ParamSpecifier::InOut;
-      case SelfAccessKind::NonMutating:
-        return ParamSpecifier::Default;
-      }
-      llvm_unreachable("nonexhaustive switch");
-    } else {
-      return (selfParam.getParameterFlags().isInOut()
-              ? ParamSpecifier::InOut
-              : ParamSpecifier::Default);
-    }
+    return selfParam.getParameterFlags().getOwnershipSpecifier();
   }
 
   if (auto *accessor = dyn_cast<AccessorDecl>(dc)) {
@@ -2239,6 +2223,14 @@ ParamSpecifierRequest::evaluate(Evaluator &evaluator,
       return ParamSpecifier::Default;
     }
     return ownershipRepr->getSpecifier();
+  }
+
+  // @called(once) implies `consumed`.
+  if (auto *attributedTy = dyn_cast<AttributedTypeRepr>(nestedRepr)) {
+    if (auto *calledAttr = attributedTy->get(TypeAttrKind::Called)) {
+      if (cast<CalledTypeAttr>(calledAttr)->isOnce())
+        return ParamSpecifier::Consuming;
+    }
   }
 
   return ParamSpecifier::Default;
@@ -2331,6 +2323,30 @@ static Type validateParameterType(ParamDecl *decl) {
   if (Ty->hasError()) {
     decl->setInvalid();
     return ErrorType::get(ctx);
+  }
+
+  if (auto *F = Ty->getAs<AnyFunctionType>()) {
+    if (F->isCalledOnce()) {
+      switch (ownership) {
+      case ParamSpecifier::Borrowing:
+      case ParamSpecifier::LegacyShared:
+        ctx.Diags.diagnose(decl->getTypeRepr()->getLoc(),
+                           diag::called_once_cannot_be_used_with_borrowing);
+        return ErrorType::get(ctx);
+
+      case ParamSpecifier::InOut:
+      case ParamSpecifier::Consuming:
+      case ParamSpecifier::LegacyOwned:
+      // used by `sending`
+      case ParamSpecifier::ImplicitlyCopyableConsuming:
+        break;
+      // @called(once) is consuming by default and we don't
+      // require it be to written explicitly.
+      case ParamSpecifier::Default:
+        ownership = ParamSpecifier::Consuming;
+        break;
+      }
+    }
   }
 
   // Validate the presence of ownership for a parameter with an inverse applied.
@@ -2951,6 +2967,22 @@ static ArrayRef<Decl *> evaluateMembersRequest(
     (void)nominal->getDistributedActorSystemProperty();
   }
 
+  // Synthesize the COM identity members -- a @com class's CLSID, a @com
+  // protocol's IID -- so they are always present in getAllMembers/getABIMembers
+  // for vtable emission, code completion, and ABI, not only when name lookup
+  // forces them.  For imported types the request finds the deserialized member.
+  if (ctx.LangOpts.EnableCOMInterop) {
+    if (auto *PD = dyn_cast_or_null<ProtocolDecl>(nominal)) {
+      if (PD->isCOMInterface())
+        (void)evaluateOrDefault(ctx.evaluator,
+                                SynthesizeCOMInterfaceIDRequest{PD}, nullptr);
+    } else if (auto *CD = dyn_cast_or_null<ClassDecl>(nominal)) {
+      if (CD->isCOMImplementation())
+        (void)evaluateOrDefault(ctx.evaluator,
+                                SynthesizeCOMImplementationIDRequest{CD}, nullptr);
+    }
+  }
+
   // Expand synthesized member macros.
   auto *mutableDecl = const_cast<Decl *>(idc->getDecl());
   (void)evaluateOrDefault(
@@ -3157,47 +3189,6 @@ ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
   return extendedType;
 }
 
-namespace {
-ProtocolConformance *deriveImplicitCOMConformance(NominalTypeDecl *NTD,
-                                                  KnownProtocolKind KP) {
-  const auto *CD = dyn_cast<ClassDecl>(NTD);
-  if (CD == nullptr)
-    return nullptr;
-
-  if (!CD->getAttrs().hasAttribute<COMAttr>())
-    return nullptr;
-
-  ASTContext &context = NTD->getASTContext();
-  auto *protocol = context.getProtocol(KP);
-  if (protocol == nullptr)
-    return nullptr;
-
-  // Ensure that `ISwiftObject` is always compiler managed.
-  if (KP == KnownProtocolKind::ISwiftObject) {
-    llvm::SmallVector<ProtocolConformance *, 2> conformances;
-    NTD->lookupConformance(protocol, conformances);
-    if (!conformances.empty()) {
-      context.Diags.diagnose(CD->getLoc(), diag::attr_com_explicit_iswiftobject);
-      if (auto *A = CD->getAttrs().getAttribute<COMAttr>())
-        context.Diags.diagnose(A->getLocation(),
-                               diag::attr_com_iswiftobject_implied);
-      return conformances.front();
-    }
-  }
-
-  auto conformance =
-      context.getNormalConformance(NTD->getDeclaredInterfaceType(), protocol,
-                                   NTD->getLoc(), /*inheritedTypeRepr=*/nullptr,
-                                   /*conformanceDC=*/NTD,
-                                   ProtocolConformanceState::Complete,
-                                   ProtocolConformanceOptions());
-  conformance->setSourceKindAndImplyingConformance(ConformanceEntryKind::Synthesized,
-                                                   nullptr);
-  NTD->registerProtocolConformance(conformance, /*synthesized=*/true);
-  return conformance;
-}
-}
-
 //----------------------------------------------------------------------------//
 // ImplicitKnownProtocolConformanceRequest
 //----------------------------------------------------------------------------//
@@ -3212,7 +3203,7 @@ ImplicitKnownProtocolConformanceRequest::evaluate(Evaluator &evaluator,
     return deriveImplicitBitwiseCopyableConformance(nominal);
   case KnownProtocolKind::IUnknown:
   case KnownProtocolKind::ISwiftObject:
-    return deriveImplicitCOMConformance(nominal, kp);
+    return com::deriveImplicitConformance(nominal, kp);
   default:
     llvm_unreachable("non-implicitly derived KnownProtocol");
   }

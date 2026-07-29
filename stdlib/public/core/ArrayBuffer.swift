@@ -271,7 +271,7 @@ extension _ArrayBuffer {
       let element: AnyObject = cast(toBufferOf: AnyObject.self)._native[index]
       guard element is Element else {
         _assertionFailure(
-          "Fatal error",
+          kind: .fatal(),
           """
           Down-casted Array element failed to match the target type
           Expected \(Element.self) but found \(type(of: element))
@@ -284,7 +284,7 @@ extension _ArrayBuffer {
       let element = _nonNative[index]
       guard element is Element else {
         _assertionFailure(
-          "Fatal error",
+          kind: .fatal(),
           """
           NSArray element failed to match the Swift Array Element type
           Expected \(Element.self) but found \(type(of: element))
@@ -536,7 +536,7 @@ extension _ArrayBuffer {
       element = cast(toBufferOf: AnyObject.self)._native[i]
       guard element is Element else {
         _assertionFailure(
-          "Fatal error",
+          kind: .fatal(),
           """
           Down-casted Array element failed to match the target type
           Expected \(Element.self) but found \(type(of: element))
@@ -549,7 +549,7 @@ extension _ArrayBuffer {
       element = _nonNative[i]
       guard element is Element else {
         _assertionFailure(
-          "Fatal error",
+          kind: .fatal(),
           """
           NSArray element failed to match the Swift Array Element type
           Expected \(Element.self) but found \(type(of: element))

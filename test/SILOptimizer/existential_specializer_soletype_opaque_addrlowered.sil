@@ -18,7 +18,7 @@ public struct S : P {
 // address lowered even though it has an OpaqueValueTypeLowering.
 // CHECK-LABEL: sil hidden [signature_optimized_thunk] [heuristic_always_inline] @$s6test2_6storePyyAA1P_p_AaC_pztF : {{.*}} {
 // CHECK:       {{bb[0-9]+}}([[IN_ADDR:%[^,]+]] : $*any P, [[OUT_ADDR:%[^,]+]] : $*any P):
-// CHECK:         [[OPENED_IN_ADDR:%[^,]+]] = open_existential_addr mutable_access [[IN_ADDR]] : $*any P to $*@opened([[UUID:".*"]], any P) Self 
+// CHECK:         [[OPENED_IN_ADDR:%[^,]+]] = open_existential_addr mutable_access [[IN_ADDR]] : $*any P to $*@opened([[UUID:.*]], any P) Self 
 // CHECK:         [[OPENED_OUT_ADDR:%[^,]+]] = alloc_stack $@opened([[UUID]], any P) Self 
 // CHECK:         copy_addr [[OPENED_IN_ADDR]] to [init] [[OPENED_OUT_ADDR]] : $*@opened([[UUID]], any P) Self 
 // CHECK:         apply {{%[^,]+}}<@opened([[UUID]], any P) Self>([[OPENED_OUT_ADDR]], [[OUT_ADDR]])

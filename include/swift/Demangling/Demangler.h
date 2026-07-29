@@ -499,8 +499,10 @@ protected:
     StringRef Words[MaxNumWords];
     StringRef Text;
     size_t Pos;
+    bool IsOldFunctionTypeMangling;
+    Mangle::ManglingFlavor Flavor;
     std::function<SymbolicReferenceResolver_t> SymbolicReferenceResolver;
-    
+
   public:
     DemangleInitRAII(Demangler &Dem, StringRef MangledName,
          std::function<SymbolicReferenceResolver_t> SymbolicReferenceResolver);

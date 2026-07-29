@@ -634,6 +634,12 @@ public:
   /// textual imports
   bool EmitClangHeaderWithNonModularIncludes = false;
 
+  /// When non-empty, the generated Objective-C header for a mixed-source module
+  /// imports the underlying Clang module's headers using quoted includes
+  /// spelled relative to this path, instead of assuming a framework-style
+  /// umbrella header named after the module.
+  std::string GeneratedHeaderUnderlyingModuleIncludeBase;
+
   /// All block list configuration files to be honored in this compilation.
   std::vector<std::string> BlocklistConfigFilePaths;
 

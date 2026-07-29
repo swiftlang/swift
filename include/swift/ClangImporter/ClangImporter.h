@@ -289,7 +289,8 @@ public:
   /// parsed and populated.
   virtual bool canImportModule(ImportPath::Module named, SourceLoc loc,
                                ModuleVersionInfo *versionInfo,
-                               bool isTestableImport = false) override;
+                               bool isTestableImport,
+                               bool isSourceCanImport) override;
 
   /// Import a module with the given module path.
   ///

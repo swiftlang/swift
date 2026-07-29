@@ -339,11 +339,13 @@ def apply_default_arguments(toolchain, args):
     if ninja_required and toolchain.ninja is None:
         args.build_ninja = True
 
-    # Force --llvm-enable-index-store off when --sccache is in use. sccache
-    # can't cache compilations that emit -index-store-path side outputs, so
-    # leaving the index store enabled forces a cache miss on every
-    # translation unit.
-    if args.sccache:
+    # Force --llvm-enable-index-store off when a compiler-cache launcher is in
+    # use. sccache (and other caching wrappers) can't cache compilations that
+    # emit -index-store-path side outputs, so leaving the index store enabled
+    # forces a cache miss on every translation unit. --sccache is translated
+    # into --cmake-c-launcher/--cmake-cxx-launcher later on, but a launcher can
+    # also be passed explicitly, so cover both spellings here.
+    if args.sccache or args.cmake_c_launcher or args.cmake_cxx_launcher:
         args.llvm_enable_index_store = False
 
     # Enable test colors if we're on a tty.

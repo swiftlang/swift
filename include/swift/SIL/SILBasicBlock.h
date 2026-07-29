@@ -763,11 +763,7 @@ struct PhiValue {
 
   Operand *getOperand(SILBasicBlock *predecessor) {
     auto *term = predecessor->getTerminator();
-    if (auto *branch = dyn_cast<BranchInst>(term)) {
-      return &branch->getAllOperands()[argIndex];
-    }
-    // TODO: Support CondBr for legacy reasons
-    return cast<CondBranchInst>(term)->getOperandForDestBB(phiBlock, argIndex);
+    return &cast<BranchInst>(term)->getAllOperands()[argIndex];
   }
 
   operator SILValue() const { return getValue(); }

@@ -42,10 +42,24 @@ typedef ptrdiff_t __swift_ptrdiff_t;
 typedef unsigned long long __swift_typeid_t;
 
 /**
- * 64-bit type  information that is used for typed allocation and
- * deallocation.
+ * 64-bit option set used to provide options for various functions in the
+ * platform abstraction layer.
  */
 typedef unsigned long long __swift_options_t;
+
+typedef __swift_ptrdiff_t swift_tls_key_t;
+
+/**
+ * Number of reserved TLS keys used by Embedded Swift runtime components.
+ *
+ * The numeric values are kept in sync with the reserved keys in
+ * swift/Threading/TLSKeys.h. The EmbeddedPlatform TLS contract does not
+ * provide dynamic key allocation; every key passed to the `_swift_tls_*`
+ * functions will be one of these reserved values. The key values are dense in
+ * the range `[0, SWIFT_TLS_KEY_COUNT)`, so platform implementations may use
+ * them directly as array indices.
+ */
+#define SWIFT_TLS_KEY_COUNT 8
 
 #if __has_feature(nullability)
 #define EMBEDDED_SWIFT_NONNULL _Nonnull
@@ -54,6 +68,15 @@ typedef unsigned long long __swift_options_t;
 #define EMBEDDED_SWIFT_NONNULL
 #define EMBEDDED_SWIFT_NULLABLE
 #endif
+
+/**
+ * A function called with a non-NULL TLS value when the execution context that
+ * owns it exits.
+ *
+ * A platform with a fixed set of execution contexts that never exit may never
+ * call this function.
+ */
+typedef void (*__swift_tls_dtor_t)(void * EMBEDDED_SWIFT_NULLABLE);
 
 #if defined(__has_feature) && (__has_feature(bounds_attributes) || __has_feature(bounds_safety_attributes))
 #define EMBEDDED_SWIFT_COUNTED_BY(N) __attribute__((__counted_by__(N)))
@@ -65,16 +88,28 @@ typedef unsigned long long __swift_options_t;
 #define EMBEDDED_SWIFT_SINGLE
 #endif
 
-#if defined(__has_feature) && __has_attribute(flag_enum)
+#if defined(__has_attribute) && __has_attribute(flag_enum) && __has_attribute(enum_extensibility)
 #define EMBEDDED_SWIFT_OPTION_SET __attribute__((flag_enum,enum_extensibility(open)))
 #else
 #define EMBEDDED_SWIFT_OPTION_SET
 #endif
 
-#if defined(__has_feature) && __has_attribute(swift_name)
+#if defined(__has_attribute) && __has_attribute(swift_name)
 #define EMBEDDED_SWIFT_NAME(_name) __attribute__((swift_name(#_name)))
 #else
 #define EMBEDDED_SWIFT_NAME(_name)
+#endif
+
+#if defined(__has_attribute) && __has_attribute(noreturn)
+#define EMBEDDED_SWIFT_NORETURN __attribute__((noreturn))
+#else
+#define EMBEDDED_SWIFT_NORETURN
+#endif
+
+#if defined(__has_attribute) && __has_attribute(enum_extensibility)
+#define EMBEDDED_SWIFT_ENUM __attribute__((enum_extensibility(open)))
+#else
+#define EMBEDDED_SWIFT_ENUM
 #endif
 
 /**
@@ -95,9 +130,14 @@ typedef unsigned long long __swift_options_t;
  */
 #define EMBEDDED_SWIFT_PLATFORM_VERSION_MINOR 1
 
+#if defined(__cplusplus)
+extern "C" {
+#endif
+
 /**
- * The number of pointer-size words that will be used to store a Mutex (as
- * provided by the Synchronization library).
+ * The number of pointer-size words that will be used to store a non-recursive
+ * Mutex (as provided by the Synchronization library), i.e., one backed by the
+ * `_swift_mutex_*` functions.
  *
  * This needs to be large enough to accommodate any implementation of Mutex that
  * can be implemented for that given platform (e.g., via the `_swift_mutex_*`
@@ -112,6 +152,26 @@ typedef unsigned long long __swift_options_t;
 #define EMBEDDED_SWIFT_MUTEX_NUM_WORDS (__swift_ptrdiff_t)12
 #else
 #define EMBEDDED_SWIFT_MUTEX_NUM_WORDS (__swift_ptrdiff_t)8
+#endif
+#endif
+
+/**
+ * The number of pointer-size words that will be used to store a recursive
+ * Mutex, i.e., one backed by the `_swift_mutexRecursive_*` functions.
+ *
+ * This is tracked separately from EMBEDDED_SWIFT_MUTEX_NUM_WORDS because a
+ * platform's recursive mutex implementation need not have the same size as
+ * its non-recursive one. It can be defined externally (via `-D` on the
+ * command line for Clang, `-Xcc -D` for Swift) to a different value, but that
+ * value must be consistent throughout the build to prevent ABI mismatches.
+ */
+#ifndef EMBEDDED_SWIFT_MUTEX_RECURSIVE_NUM_WORDS
+#if defined(__APPLE__) && __SIZEOF_POINTER__ == 4
+// On 32-bit Apple targets (e.g., watchOS armv7k / arm64_32) `pthread_mutex_t`
+// is 40 bytes, which doesn't fit in 8 four-byte words.
+#define EMBEDDED_SWIFT_MUTEX_RECURSIVE_NUM_WORDS (__swift_ptrdiff_t)12
+#else
+#define EMBEDDED_SWIFT_MUTEX_RECURSIVE_NUM_WORDS (__swift_ptrdiff_t)8
 #endif
 #endif
 
@@ -158,6 +218,28 @@ typedef enum EMBEDDED_SWIFT_OPTION_SET: __swift_options_t {
 } swift_dealloc_flags_t EMBEDDED_SWIFT_NAME(SwiftDeallocFlags);
 
 /**
+ * The kind of error being reported.
+ */
+typedef enum EMBEDDED_SWIFT_ENUM {
+  /**
+   * A fatal error, produced by fatalError(...).
+   */
+  SWIFT_ERROR_FATAL EMBEDDED_SWIFT_NAME(fatal) = 0,
+
+  /**
+   * A precondition failure, produced by precondition(...).
+   */
+  SWIFT_ERROR_PRECONDITION EMBEDDED_SWIFT_NAME(precondition),
+
+  /**
+   * An assertion failure, produced by assert(...).
+   *
+   * These won't occur when assertions are disabled, e.g., in release builds.
+   */
+  SWIFT_ERROR_ASSERTION EMBEDDED_SWIFT_NAME(assertion),
+} swift_error_kind_t EMBEDDED_SWIFT_NAME(SwiftErrorKind);
+
+/**
  * Options provided to the Swift mutex initialization function.
  */
 typedef enum EMBEDDED_SWIFT_OPTION_SET: __swift_options_t {
@@ -169,12 +251,7 @@ typedef enum EMBEDDED_SWIFT_OPTION_SET: __swift_options_t {
   /**
    * Diagnose mutex misuse when the platform can do so cheaply.
    */
-  SWIFT_MUTEX_CHECKED EMBEDDED_SWIFT_NAME(checked) = 0x01,
-
-  /**
-   * Allow the same execution context to acquire the mutex recursively.
-   */
-  SWIFT_MUTEX_RECURSIVE EMBEDDED_SWIFT_NAME(recursive) = 0x02
+  SWIFT_MUTEX_CHECKED EMBEDDED_SWIFT_NAME(checked) = 0x01
 } swift_mutex_flags_t EMBEDDED_SWIFT_NAME(SwiftMutexFlags);
 
 /**
@@ -243,6 +320,30 @@ void * EMBEDDED_SWIFT_NULLABLE _swift_typedAllocate(
     __swift_size_t size, __swift_size_t alignment, swift_alloc_flags_t flags, __swift_typeid_t typeId);
 
 /**
+ * Deallocates the memory referenced by `ptr` with a given type
+ *
+ * - Parameters:
+ *   - ptr: The pointer to be deallocated. If it is NULL, the operation does
+ *     nothing.
+ *   - alignment: The minimum alignment of the resulting pointer, which must
+ *     be a power of at least as large as `sizeof(void *)`, or be zero to
+ *     indicate that the alignment is not known.
+ *   - size: The number of allocated bytes, which may be -1 if it is not
+ *     known.
+ *   - flags: Flags to control the behavior of the deallocation.
+ *   - typeId: An identifier used by a typed allocator to e.g. place the
+ *     allocation in a particular bucket.
+ *
+ * This function is required when using any Embedded Swift facility that
+ * requires memory allocation from the heap, whether explicitly (e.g., via the
+ * `allocate` operation on unsafe pointers) or implicitly (e.g., creating a
+ * copy-on-write array or an instance of a class type).
+ *
+ * This function can be implemented as a direct call to `free`.
+ */
+void _swift_typedDeallocate(void * EMBEDDED_SWIFT_NONNULL ptr, __swift_size_t size, __swift_size_t alignment, swift_dealloc_flags_t flags, __swift_typeid_t typeId);
+
+/**
  * Writes a sequence of UTF-8 code points to standard output.
  *
  * - Parameters:
@@ -260,6 +361,45 @@ void * EMBEDDED_SWIFT_NULLABLE _swift_typedAllocate(
 __swift_size_t _swift_writeToStandardOutput(
     const unsigned char * EMBEDDED_SWIFT_NULLABLE EMBEDDED_SWIFT_COUNTED_BY(count) chars,
     __swift_size_t count);
+
+/**
+ * Reports a fatal error and terminates the program.
+ *
+ * - Parameters:
+ *   - message: The UTF-8 code points that make up the failure message. It is
+ *     not NULL-terminated. May be NULL when messageCount is 0.
+ *   - messageCount: The number of UTF-8 code points in message.
+ *   - flags: Flags that describe more about the error condition. The lower 8
+ *     bits contain a swift_error_kind_t / SwiftErrorKind value.
+ */
+void _swift_reportError(
+    const unsigned char * EMBEDDED_SWIFT_NULLABLE EMBEDDED_SWIFT_COUNTED_BY(messageCount) message,
+    __swift_size_t messageCount,
+    __swift_options_t flags
+) EMBEDDED_SWIFT_NORETURN;
+
+/**
+ * Reports a fatal error at a given file/line and terminates the program.
+ *
+ * - Parameters:
+ *   - message: The UTF-8 code points that make up the failure message. It is
+ *     not NULL-terminated. May be NULL when messageCount is 0.
+ *   - messageCount: The number of UTF-8 code points in message.
+ *   - fileName: The UTF-8 code points that make up the file name. It is
+ *     not NULL-terminated. May be NULL when fileNameCount is 0.
+ *   - fileNameCount: The number of UTF-8 code points in fileName.
+ *   - line: The line number within the file at which the error occurred.
+ *   - flags: Flags that describe more about the error condition. The lower 8
+ *     bits contain a swift_error_kind_t / SwiftErrorKind value.
+ */
+void _swift_reportErrorAt(
+    const unsigned char * EMBEDDED_SWIFT_NULLABLE EMBEDDED_SWIFT_COUNTED_BY(messageCount) message,
+    __swift_size_t messageCount,
+    const unsigned char * EMBEDDED_SWIFT_NULLABLE EMBEDDED_SWIFT_COUNTED_BY(fileNameCount) fileName,
+    __swift_size_t fileNameCount,
+    __swift_size_t line,
+    __swift_options_t flags
+) EMBEDDED_SWIFT_NORETURN;
 
 /**
  * Generates random bytes into the given buffer.
@@ -387,6 +527,87 @@ void _swift_mutex_unlock(void * EMBEDDED_SWIFT_NONNULL mutex);
 __swift_ptrdiff_t _swift_mutex_tryLock(void * EMBEDDED_SWIFT_NONNULL mutex);
 
 /**
+ * Initializes a recursive mutex, i.e., one that can be acquired more than
+ * once by the same execution context without deadlocking.
+ *
+ * - Parameters:
+ *   - mutex: Opaque caller-owned mutex storage initialized by this function
+ *     and later passed to the other `_swift_mutexRecursive_*` functions. The
+ *     contents are private to the platform implementation. The storage is at
+ *     least EMBEDDED_SWIFT_MUTEX_RECURSIVE_NUM_WORDS pointer-sized words and
+ *     has pointer alignment.
+ *   - flags: Flags controlling mutex behavior.
+ *
+ * This function is required when using Synchronization.Mutex with a
+ * recursive locking policy.
+ */
+void _swift_mutexRecursive_init(void * EMBEDDED_SWIFT_NONNULL mutex,
+                                swift_mutex_flags_t flags);
+
+/**
+ * Destroys a recursive mutex initialized by `_swift_mutexRecursive_init`.
+ *
+ * - Parameters:
+ *   - mutex: The mutex to destroy. Must not be locked.
+ */
+void _swift_mutexRecursive_destroy(void * EMBEDDED_SWIFT_NONNULL mutex);
+
+/**
+ * Acquires a recursive mutex, blocking or spinning until ownership is
+ * obtained. If the current execution context already holds the mutex, this
+ * increments its recursion count instead of deadlocking.
+ *
+ * - Parameters:
+ *   - mutex: The mutex to acquire.
+ */
+void _swift_mutexRecursive_lock(void * EMBEDDED_SWIFT_NONNULL mutex);
+
+/**
+ * Releases one level of recursive ownership of a mutex held by the current
+ * execution context.
+ *
+ * - Parameters:
+ *   - mutex: The mutex to release.
+ */
+void _swift_mutexRecursive_unlock(void * EMBEDDED_SWIFT_NONNULL mutex);
+
+/**
+ * Initializes a reserved TLS key. `key` is one of the numeric reserved keys
+ * described by `SWIFT_TLS_KEY_COUNT`. `destructor` may be NULL. This function
+ * is called at most once for each key that needs a destructor.
+ */
+void _swift_tls_init(swift_tls_key_t key,
+                     __swift_tls_dtor_t EMBEDDED_SWIFT_NULLABLE destructor);
+
+/**
+ * Returns the value stored for a TLS key in the current execution context, or
+ * NULL if no value has been stored.
+ *
+ * This function may be called before `_swift_tls_init`. In that case, it must
+ * return NULL until a value is stored for the key.
+ *
+ * Precondition: `key < SWIFT_TLS_KEY_COUNT`.
+ */
+void * EMBEDDED_SWIFT_NULLABLE _swift_tls_get(swift_tls_key_t key);
+
+/**
+ * Stores a value for a TLS key in the current execution context.
+ *
+ * This function may be called before `_swift_tls_init`. The platform must make
+ * storage available for the key on demand in that case.
+ *
+ * Precondition: `key < SWIFT_TLS_KEY_COUNT`.
+ */
+void _swift_tls_set(swift_tls_key_t key,
+                    void * EMBEDDED_SWIFT_NULLABLE value);
+
+/**
+ * Returns nonzero when the current execution context is the platform's main
+ * execution context.
+ */
+__swift_ptrdiff_t _swift_thread_isMain(void);
+
+/**
  * Exit the program.
  *
  * - Parameters:
@@ -398,6 +619,10 @@ __swift_ptrdiff_t _swift_mutex_tryLock(void * EMBEDDED_SWIFT_NONNULL mutex);
  * function.
  */
 void _swift_exit(__swift_ptrdiff_t code);
+
+#if defined(__cplusplus)
+}
+#endif
 
 #undef EMBEDDED_SWIFT_NAME
 #undef EMBEDDED_SWIFT_OPTION_SET

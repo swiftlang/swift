@@ -71,14 +71,16 @@ public let ${prefix}_TRUE_MIN = ${type}.leastNonzeroMagnitude
 % end
 %end
 
-// FILE is an opaque type on Musl (struct _IO_FILE is only forward-declared),
-// so these are OpaquePointers rather than UnsafeMutablePointer<FILE>.
-nonisolated(unsafe) public var stdin: OpaquePointer {
-  OpaquePointer(_swift_stdlib_stdin())
+// `struct _IO_FILE` is only forward-declared in Musl's <stdio.h>, but Swift
+// still imports pointers to it as `UnsafeMutablePointer<FILE>`, and every
+// stdio function in the same overlay (fputs, setvbuf, etc.) is imported
+// with that signature.
+nonisolated(unsafe) public var stdin: UnsafeMutablePointer<FILE>! {
+  _swift_stdlib_stdin().assumingMemoryBound(to: FILE.self)
 }
-nonisolated(unsafe) public var stdout: OpaquePointer {
-  OpaquePointer(_swift_stdlib_stdout())
+nonisolated(unsafe) public var stdout: UnsafeMutablePointer<FILE>! {
+  _swift_stdlib_stdout().assumingMemoryBound(to: FILE.self)
 }
-nonisolated(unsafe) public var stderr: OpaquePointer {
-  OpaquePointer(_swift_stdlib_stderr())
+nonisolated(unsafe) public var stderr: UnsafeMutablePointer<FILE>! {
+  _swift_stdlib_stderr().assumingMemoryBound(to: FILE.self)
 }

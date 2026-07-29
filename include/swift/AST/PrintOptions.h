@@ -484,6 +484,10 @@ public:
   /// Empty means allow all.
   std::vector<AnyAttrKind> ExclusiveAttrList;
 
+  /// List of attribute kinds that should always be printed, even when they
+  /// would otherwise be hidden because they are implicit or user-inaccessible.
+  std::vector<AnyAttrKind> AlwaysIncludeAttrList;
+
   /// List of decls that should be printed even if they are implicit and \c SkipImplicit is set to true.
   std::vector<const Decl*> TreatAsExplicitDeclList;
 
@@ -710,6 +714,13 @@ public:
       return std::none_of(ExclusiveAttrList.begin(), ExclusiveAttrList.end(),
                           [K](AnyAttrKind other) { return other == K; });
     return false;
+  }
+
+  /// Whether the given attribute kind should be printed even if it would
+  /// otherwise be suppressed for being implicit or user-inaccessible.
+  bool alwaysIncludeAttrKind(AnyAttrKind K) const {
+    return std::any_of(AlwaysIncludeAttrList.begin(), AlwaysIncludeAttrList.end(),
+                       [K](AnyAttrKind other) { return other == K; });
   }
 
   bool excludeAttr(const DeclAttribute *DA) const;

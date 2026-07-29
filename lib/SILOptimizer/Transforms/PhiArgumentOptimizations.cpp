@@ -363,16 +363,10 @@ bool PhiExpansionPass::optimizeArg(SILPhiArgument *initialArg) {
           collectedPhiArgs.push_back(destArg);
         continue;
       }
-      if (auto *branch = dyn_cast<CondBranchInst>(user)) {
-        const SILPhiArgument *destArg = branch->getArgForOperand(use);
-
-        // destArg is null if the use is the condition and not a block argument.
-        if (!destArg)
-          return false;
-
-        if (handled.insert(destArg).second)
-          collectedPhiArgs.push_back(destArg);
-        continue;
+      if (isa<CondBranchInst>(user)) {
+        // A cond_br only uses its condition operand and passes no branch
+        // arguments, so there is no phi argument to collect: bail.
+        return false;
       }
       // An unexpected use -> bail.
       return false;

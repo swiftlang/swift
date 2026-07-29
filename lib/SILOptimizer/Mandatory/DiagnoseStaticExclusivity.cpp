@@ -726,7 +726,7 @@ checkAccessSummary(ApplySite Apply, AccessState &State,
   for (unsigned ArgumentIndex : range(Apply.getNumArguments())) {
 
     unsigned CalleeIndex =
-        Apply.getCalleeArgIndexOfFirstAppliedArg() + ArgumentIndex;
+        Apply.getSubstCalleeArgIndexOfFirstAppliedArg() + ArgumentIndex;
 
     const AccessSummaryAnalysis::ArgumentSummary &AS =
         FS.getAccessForArgument(CalleeIndex);

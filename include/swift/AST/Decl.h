@@ -652,7 +652,7 @@ protected:
     IsDebuggerAlias : 1
   );
 
-  SWIFT_INLINE_BITFIELD(NominalTypeDecl, GenericTypeDecl, 1+1+1,
+  SWIFT_INLINE_BITFIELD(NominalTypeDecl, GenericTypeDecl, 1+1+1+1+1,
     /// Whether we have already added implicitly-defined initializers
     /// to this declaration.
     AddedImplicitInitializers : 1,
@@ -661,7 +661,13 @@ protected:
     HasLazyConformances : 1,
 
     /// Whether this nominal type is having its semantic members resolved.
-    IsComputingSemanticMembers : 1
+    IsComputingSemanticMembers : 1,
+
+    /// Whether we've computed HasDestructor.
+    HasDestructorComputed : 1,
+
+    /// Whether we have a user-defined deinit.
+    HasDestructor : 1
   );
 
   SWIFT_INLINE_BITFIELD_FULL(ProtocolDecl, NominalTypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+8,
@@ -741,16 +747,17 @@ protected:
     IsActor : 1
   );
 
-  SWIFT_INLINE_BITFIELD(StructDecl, NominalTypeDecl, 1 + 1 + 1,
-                        /// True if this struct has storage for fields that
-                        /// aren't accessible in Swift.
-                        HasUnreferenceableStorage : 1,
-                        /// True if this struct is imported from C++ and does
-                        /// not have trivial value witness functions.
-                        IsCxxNonTrivial : 1,
-                        /// True if this struct is imported from C and has
-                        /// address diversified ptrauth qualified field.
-                        IsNonTrivialPtrAuth : 1);
+  SWIFT_INLINE_BITFIELD(StructDecl, NominalTypeDecl, 1+1+1,
+    /// True if this struct has storage for fields that
+    /// aren't accessible in Swift.
+    HasUnreferenceableStorage : 1,
+    /// True if this struct is imported from C++ and does
+    /// not have trivial value witness functions.
+    IsCxxNonTrivial : 1,
+    /// True if this struct is imported from C and has
+    /// address diversified ptrauth qualified field.
+    IsNonTrivialPtrAuth : 1
+  );
 
   SWIFT_INLINE_BITFIELD(EnumDecl, NominalTypeDecl, 2+1+1,
     /// True if the enum has cases and at least one case has associated values.
@@ -1170,6 +1177,11 @@ public:
   /// an attached macro.
   unsigned getAttachedMacroDiscriminator(DeclBaseName macroName, MacroRole role,
                                          const CustomAttr *attr) const;
+
+  /// If this declaration was produced by expanding a macro, retrieve the
+  /// declaration that the macro expansion originated from. Returns \c nullptr
+  /// if this declaration is not part of a macro expansion.
+  Decl *getMacroExpansionOriginatingDecl() const;
 
   /// Returns the resolved type for the give custom attribute attached to this
   /// declaration.
@@ -4401,6 +4413,115 @@ enum KeyPathTypeKind : unsigned char {
   KPTK_ReferenceWritableKeyPath
 };
 
+/// The validated inheritance hierarchy of a COM interface.
+///
+/// COM interface inheritance contributes at most one ABI-bearing base chain.
+/// Marker protocols can refine the interface without contributing to that
+/// chain.
+class COMInterfaceHierarchy {
+  ArrayRef<ProtocolDecl *> MarkerProtocols;
+  ArrayRef<ProtocolDecl *> ABIChain;
+
+  COMInterfaceHierarchy() = default;
+
+public:
+  COMInterfaceHierarchy(ArrayRef<ProtocolDecl *> markers,
+                        ArrayRef<ProtocolDecl *> chain)
+      : MarkerProtocols(markers), ABIChain(chain) {
+    assert(!chain.empty());
+  }
+
+  static COMInterfaceHierarchy invalid() { return {}; }
+
+  bool isInvalid() const { return ABIChain.empty(); }
+
+  /// The most-derived directly inherited COM interface, or null for a root
+  /// interface.
+  ProtocolDecl *getABIBase() const {
+    assert(!isInvalid());
+    return ABIChain.size() > 1 ? ABIChain[ABIChain.size() - 2] : nullptr;
+  }
+
+  /// Marker protocols inherited by this interface or its COM ABI bases.
+  ArrayRef<ProtocolDecl *> getMarkerProtocols() const {
+    assert(!isInvalid());
+    return MarkerProtocols;
+  }
+
+  /// The COM ABI inheritance chain in base-most-to-derived order, including
+  /// this interface as its final element.
+  ArrayRef<ProtocolDecl *> getABIChain() const {
+    assert(!isInvalid());
+    return ABIChain;
+  }
+};
+
+/// The COM role and associated declaration information for a nominal type.
+///
+/// A protocol can declare an interface, while a class can provide an
+/// implementation. Other nominal declarations have no COM declaration info.
+class COMDeclInfo {
+public:
+  enum class Kind : uint8_t {
+    Interface,
+    Implementation,
+  };
+
+private:
+  Kind DeclKind;
+  StringRef ID;
+  std::optional<COMThreadingModel> ThreadingModel;
+  ArrayRef<ProtocolDecl *> Interfaces;
+
+  COMDeclInfo(Kind kind, StringRef id, std::optional<COMThreadingModel> model,
+              ArrayRef<ProtocolDecl *> interfaces)
+      : DeclKind(kind), ID(id), ThreadingModel(model), Interfaces(interfaces) {}
+
+public:
+  static COMDeclInfo forInterface(StringRef iid) {
+    return {Kind::Interface, iid, std::nullopt, {}};
+  }
+
+  static COMDeclInfo
+  forImplementation(StringRef clsid,
+                    std::optional<COMThreadingModel> threadingModel,
+                    ArrayRef<ProtocolDecl *> interfaces) {
+    return {Kind::Implementation, clsid, threadingModel, interfaces};
+  }
+
+  Kind getKind() const { return DeclKind; }
+  bool isInterface() const { return DeclKind == Kind::Interface; }
+  bool isImplementation() const {
+    return DeclKind == Kind::Implementation;
+  }
+
+  StringRef getInterfaceID() const {
+    assert(isInterface());
+    return ID;
+  }
+
+  std::optional<StringRef> getImplementationID() const {
+    assert(isImplementation());
+    if (ID.empty())
+      return std::nullopt;
+    return ID;
+  }
+
+  /// The effective threading model for an \c \@com implementation
+  /// declaration. This is absent when the implementation is classified solely
+  /// from its COM interface conformances.
+  std::optional<COMThreadingModel> getThreadingModel() const {
+    assert(isImplementation());
+    return ThreadingModel;
+  }
+
+  /// The COM interfaces to which this implementation conforms.
+  ArrayRef<ProtocolDecl *> getInterfaces() const {
+    assert(isImplementation());
+    return Interfaces;
+  }
+};
+
 /// NominalTypeDecl - a declaration of a nominal type, like a struct.
 class NominalTypeDecl : public GenericTypeDecl, public IterableDeclContext {
   SourceRange Braces;
@@ -4497,12 +4618,31 @@ protected:
     IterableDeclContext(IterableDeclContextKind::NominalTypeDecl)
   {
     Bits.NominalTypeDecl.AddedImplicitInitializers = false;
-    ExtensionGeneration = 0;
     Bits.NominalTypeDecl.HasLazyConformances = false;
     Bits.NominalTypeDecl.IsComputingSemanticMembers = false;
+    Bits.NominalTypeDecl.HasDestructorComputed = false;
+    Bits.NominalTypeDecl.HasDestructor = false;
+    ExtensionGeneration = 0;
   }
 
   friend class ProtocolType;
+
+  std::optional<bool> getCachedValueTypeDestructor() const {
+    if (isa<StructDecl>(this) || isa<EnumDecl>(this)) {
+      if (Bits.NominalTypeDecl.HasDestructorComputed)
+        return Bits.NominalTypeDecl.HasDestructor;
+
+      return std::nullopt;
+    } else {
+      return false;
+    }
+  }
+
+  void setCachedValueTypeDestructor(bool value) {
+    ASSERT(isa<StructDecl>(this) || isa<EnumDecl>(this));
+    Bits.NominalTypeDecl.HasDestructorComputed = true;
+    Bits.NominalTypeDecl.HasDestructor = value;
+  }
 
 public:
   using GenericTypeDecl::getASTContext;
@@ -4653,6 +4793,10 @@ public:
   ///
   /// \param sorted Whether to sort the protocols in canonical order.
   SmallVector<ProtocolDecl *, 2> getAllProtocols(bool sorted = false) const;
+
+  /// Retrieve this nominal declaration's COM role and associated information,
+  /// or \c nullptr when it is not a COM interface or implementation.
+  const COMDeclInfo *getCOMDeclInfo() const;
 
   /// Retrieve all of the protocol conformances for this nominal type.
   SmallVector<ProtocolConformance *, 2> getAllConformances(
@@ -4815,7 +4959,11 @@ public:
 
   /// Return the `DestructorDecl` for a struct or enum's `deinit` declaration.
   /// Returns null if the type is a class, or does not have a declared `deinit`.
-  DestructorDecl *getValueTypeDestructor();
+  bool hasValueTypeDestructor() const;
+
+  /// Return the `DestructorDecl` for a struct or enum's `deinit` declaration.
+  /// Returns null if the type is a class, or does not have a declared `deinit`.
+  DestructorDecl *getValueTypeDestructor() const;
 
   /// Does a conformance for a given invertible protocol exist for this
   /// type declaration.
@@ -5393,6 +5541,14 @@ public:
   /// allocation, etc.), the Swift model, or has no reference counting at all.
   ReferenceCounting getObjectModel() const;
 
+  /// Whether this class provides a COM implementation.
+  ///
+  /// This includes both explicitly \c \@com classes and classes that conform to
+  /// a COM interface.
+  bool isCOMImplementation() const {
+    return getCOMDeclInfo() != nullptr;
+  }
+
   LayoutConstraintKind getLayoutConstraintKind() const {
     if (getObjectModel() == ReferenceCounting::ObjC)
       return LayoutConstraintKind::Class;
@@ -5697,6 +5853,18 @@ public:
 
   /// Determine whether this protocol has a superclass.
   bool hasSuperclass() const { return (bool)getSuperclassDecl(); }
+
+  /// Whether this protocol declares a COM interface.
+  bool isCOMInterface() const {
+    return getCOMDeclInfo() != nullptr;
+  }
+
+  /// Retrieve this COM interface's validated inheritance hierarchy.
+  ///
+  /// Returns null for a protocol that does not declare a COM interface. An
+  /// invalid COM interface has a non-null hierarchy whose \c isInvalid() is
+  /// true.
+  const COMInterfaceHierarchy *getCOMInterfaceHierarchy() const;
 
   /// Retrieve the ClassDecl for the superclass of this protocol, or null if there
   /// is no superclass.

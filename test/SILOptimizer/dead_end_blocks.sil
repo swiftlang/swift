@@ -82,7 +82,7 @@ exit:
 sil @function_with_loop : $@convention(thin) () -> () {
 entry:
   specify_test "has_any_dead_ends"
-  cond_br undef, exit, loop
+  cond_br undef, exit, loopTrampoline
 
 loop:
   br loop
@@ -90,6 +90,9 @@ loop:
 exit:
   %retval = tuple ()
   return %retval : $()
+
+loopTrampoline:
+  br loop
 }
 
 // no dead ends – conditional branches but all paths return
@@ -99,7 +102,7 @@ exit:
 sil @branching_no_dead_ends : $@convention(thin) () -> () {
 entry:
   specify_test "has_any_dead_ends"
-  cond_br undef, then, else
+  cond_br undef, then, elseTrampoline
 
 then:
   br else
@@ -107,4 +110,7 @@ then:
 else:
   %retval2 = tuple ()
   return %retval2 : $()
+
+elseTrampoline:
+  br else
 }

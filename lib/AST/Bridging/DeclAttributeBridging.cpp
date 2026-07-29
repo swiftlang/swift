@@ -852,3 +852,10 @@ BridgedUnavailableFromAsyncAttr_createParsed(BridgedASTContext cContext,
   return new (cContext.unbridged()) UnavailableFromAsyncAttr(
       cMessage.unbridged(), atLoc, range, /*implicit=*/false);
 }
+
+BridgedCalledAttr
+BridgedCalledAttr_createParsed(BridgedASTContext cContext, SourceLoc atLoc,
+                               SourceRange range,
+                               swift::ExecutionSemantics semantics) {
+  return new (cContext.unbridged()) CalledAttr(atLoc, range, semantics);
+}

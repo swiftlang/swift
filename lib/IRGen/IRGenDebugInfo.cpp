@@ -59,6 +59,7 @@
 #include "clang/Lex/HeaderSearchOptions.h"
 #include "clang/Lex/Preprocessor.h"
 #include "clang/Serialization/ASTReader.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Config/config.h"
@@ -76,6 +77,7 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/Local.h"
+#include "llvm/WindowsDriver/MSVCPaths.h"
 
 #define DEBUG_TYPE "debug-info"
 
@@ -159,6 +161,7 @@ class IRGenDebugInfoImpl : public IRGenDebugInfo {
   llvm::StringMap<llvm::TrackingMDNodeRef> DIFileCache;
   llvm::StringMap<llvm::TrackingMDNodeRef> RuntimeErrorFnCache;
   llvm::StringSet<> OriginallyDefinedInTypes;
+  llvm::StringSet<> AnchoredTypeAliases;
   TrackingDIRefMap DIRefMap;
   TrackingDIRefMap InnerTypeCache;
   TrackingDIRefMap ExistentialTypeAliasMap;
@@ -805,7 +808,8 @@ private:
           IGM.getSILModule(), fnTy, IGM.getMaximalTypeExpansionContext());
     } else if (!fnTy->getNumIndirectFormalResults()) {
       return fnTy->getDirectFormalResultsType(
-          IGM.getSILModule(), IGM.getMaximalTypeExpansionContext());
+          IGM.getSILModule(), IGM.getMaximalTypeExpansionContext(),
+          /*loweredAddresses=*/true);
     } else {
       SmallVector<TupleTypeElt, 4> eltTys;
       for (auto &result : fnTy->getResults()) {
@@ -1212,16 +1216,18 @@ private:
                 memberTy,
                 IGM.getTypeInfoForUnlowered(
                     IGM.getSILTypes().getAbstractionPattern(VD), memberTy),
-                IGM))
+                IGM)) {
           MemberTypes.emplace_back(VD->getName().str(),
                                    getByteSize() *
                                        DbgTy->getAlignment().getValue(),
                                    getOrCreateType(*DbgTy));
-        else
+          anchorTypeAliasesIn(memberTy);
+        } else {
           // Without complete type info we can only create a forward decl.
           return DBuilder.createForwardDecl(
               llvm::dwarf::DW_TAG_structure_type, MangledName, Scope, File, Line,
               llvm::dwarf::DW_LANG_Swift, SizeInBits, 0);
+        }
       }
     }
 
@@ -1275,6 +1281,7 @@ private:
         MemberTypes.emplace_back(VD->getName().str(),
                                  getByteSize() * DbgTy.getAlignment().getValue(),
                                  getOrCreateType(DbgTy));
+        anchorTypeAliasesIn(memberTy);
       }
     }
 
@@ -1527,6 +1534,7 @@ private:
                                  getByteSize() *
                                      ElemDbgTy->getAlignment().getValue(),
                                  TrackingDIType(PayloadDITy));
+        anchorTypeAliasesIn(PayloadTy);
       } else {
         // A variant with no payload.
         MemberTypes.emplace_back(ElemDecl->getBaseIdentifier().str(), 0,
@@ -1588,6 +1596,7 @@ private:
                                  getByteSize() *
                                      ElemDbgTy->getAlignment().getValue(),
                                  TrackingDIType(PayloadDITy));
+        anchorTypeAliasesIn(PayloadTy);
       } else {
         // A variant with no payload.
         MemberTypes.emplace_back(ElemDecl->getBaseIdentifier().str(), 0,
@@ -2604,6 +2613,77 @@ private:
     }
   }
 
+  /// Anchor DW_TAG_typedef DIEs for the stdlib C-interop typealiases (CChar,
+  /// CInt, CDouble, CWideChar, ...). LLDB can encounter these via DWARF
+  /// references on fields of clang-imported types, even when the Swift source
+  /// never names them. Most Swift programs use most of these types, so it's
+  /// not worth trying to figure out a minimal required set; just emit them all.
+  void anchorClangInteropTypeAliases() {
+    if (Opts.DebugInfoLevel < IRGenDebugInfoLevel::ASTTypes)
+      return;
+
+    SmallVector<ImportedModule, 8> ModuleWideImports;
+    IGM.getSwiftModule()->getImportedModules(
+        ModuleWideImports, ModuleDecl::getImportFilterLocal());
+    const bool importsAnyClangModule =
+        llvm::any_of(ModuleWideImports, [](ImportedModule M) {
+          return M.importedModule->findUnderlyingClangModule() != nullptr;
+        });
+    if (!importsAnyClangModule)
+      return;
+
+    ASTContext &Ctx = IGM.Context;
+    ModuleDecl *Stdlib = Ctx.getStdlibModule();
+    if (!Stdlib)
+      return;
+
+    auto anchorAlias = [&](StringRef Name) {
+      SmallVector<ValueDecl *, 1> Results;
+      Stdlib->lookupMember(Results, Stdlib, Ctx.getIdentifier(Name),
+                           Identifier());
+      if (Results.size() != 1)
+        return;
+      auto *AliasDecl = cast<TypeAliasDecl>(Results.front());
+      Type Underlying = AliasDecl->getUnderlyingType();
+      auto *AliasTy = TypeAliasType::get(AliasDecl, /*parent=*/Type(),
+                                         /*genericArgs=*/{}, Underlying);
+      auto AliasDbgTy = DebugTypeInfo::getFromTypeInfo(
+          AliasTy, IGM.getTypeInfoForUnlowered(AliasTy), IGM);
+      llvm::DIType *TypeDef = getOrCreateType(AliasDbgTy);
+      DBuilder.retainType(TypeDef);
+      // This is needed to prevent dsymutil from considering the type unused.
+      DBuilder.createImportedDeclaration(TheCU, TypeDef, MainFile, 0);
+    };
+#define MAP_BUILTIN_TYPE(CLANG, SWIFT) anchorAlias(#SWIFT);
+#include "swift/ClangImporter/BuiltinMappedTypes.def"
+#undef MAP_BUILTIN_TYPE
+  }
+
+  /// Forward-declared composite types may still refer refer to a type alias by
+  /// name in their mangled name. We need to make sure they are emitted in
+  /// DWARF.
+  void anchorTypeAliasesIn(Type Ty) {
+    if (!Ty || Opts.DebugInfoLevel < IRGenDebugInfoLevel::ASTTypes)
+      return;
+    Ty.findIf([&](Type T) -> bool {
+      auto *Alias = llvm::dyn_cast<TypeAliasType>(T.getPointer());
+      if (!Alias)
+        return false;
+      DebugTypeInfo AliasDbgTy = DebugTypeInfo::getForwardDecl(Alias);
+      // Dedup by the alias's mangled name.
+      auto Mangled = getMangledName(AliasDbgTy);
+      if (Mangled.Sugared.empty() ||
+          !AnchoredTypeAliases.insert(Mangled.Sugared).second)
+        return false;
+      if (llvm::DIType *TypeDef = getOrCreateType(AliasDbgTy)) {
+        DBuilder.retainType(TypeDef);
+        // Keep dsymutil from stripping the typedef as unused.
+        DBuilder.createImportedDeclaration(TheCU, TypeDef, MainFile, 0);
+      }
+      return false;
+    });
+  }
+
   /// A TypeWalker that finds if a given type's mangling is affected by an
   /// @_originallyDefinedIn annotation.
   struct OriginallyDefinedInFinder : public TypeWalker {
@@ -3095,6 +3175,7 @@ IRGenDebugInfoImpl::IRGenDebugInfoImpl(const IRGenOptions &Opts,
     OS << '"';
   }
   createSpecialStlibBuiltinTypes();
+  anchorClangInteropTypeAliases();
 }
 
 void IRGenDebugInfoImpl::finalize() {

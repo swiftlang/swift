@@ -34,12 +34,6 @@ static bool hasBranchArguments(TermInst *T, unsigned edgeIdx) {
     assert(edgeIdx == 0);
     return BI->getNumArgs() != 0;
   }
-  if (auto CBI = dyn_cast<CondBranchInst>(T)) {
-    assert(edgeIdx <= 1);
-    return edgeIdx == CondBranchInst::TrueIdx ? !CBI->getTrueArgs().empty()
-                                              : !CBI->getFalseArgs().empty();
-  }
-  // No other terminator have branch arguments.
   return false;
 }
 
@@ -74,21 +68,13 @@ void swift::changeBranchTarget(TermInst *T, unsigned edgeIdx,
     SILBasicBlock *trueDest = CBI->getTrueBB();
     SILBasicBlock *falseDest = CBI->getFalseBB();
 
-    SmallVector<SILValue, 8> trueArgs;
-    SmallVector<SILValue, 8> falseArgs;
-    if (edgeIdx == CondBranchInst::FalseIdx) {
+    if (edgeIdx == CondBranchInst::FalseIdx)
       falseDest = newDest;
-      for (auto arg : CBI->getTrueArgs())
-        trueArgs.push_back(arg);
-    } else {
+    else
       trueDest = newDest;
-      for (auto arg : CBI->getFalseArgs())
-        falseArgs.push_back(arg);
-    }
 
-    B.createCondBranch(CBI->getLoc(), CBI->getCondition(), trueDest, trueArgs,
-                       falseDest, falseArgs, CBI->getTrueBBCount(),
-                       CBI->getFalseBBCount());
+    B.createCondBranch(CBI->getLoc(), CBI->getCondition(), trueDest, falseDest,
+                       CBI->getTrueBBCount(), CBI->getFalseBBCount());
     CBI->dropAllReferences();
     CBI->eraseFromParent();
     return;
@@ -123,11 +109,8 @@ void swift::getEdgeArgs(TermInst *T, unsigned edgeIdx, SILBasicBlock *newEdgeBB,
   }
 
   case SILInstructionKind::CondBranchInst: {
-    auto CBI = cast<CondBranchInst>(T);
+    // A cond_br passes no branch arguments (SIL has no critical edges).
     assert(edgeIdx < 2);
-    auto OpdArgs = edgeIdx ? CBI->getFalseArgs() : CBI->getTrueArgs();
-    for (auto V : OpdArgs)
-      args.push_back(V);
     return;
   }
       

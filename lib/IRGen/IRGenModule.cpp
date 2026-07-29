@@ -218,7 +218,8 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
       DataLayout(irgen.getClangDataLayoutString()),
       Triple(irgen.getEffectiveClangTriple()),
       VariantTriple(irgen.getEffectiveClangVariantTriple()),
-      TargetMachine(std::move(target)), silConv(irgen.SIL),
+      TargetMachine(std::move(target)),
+      silConv(SILAddressConventions::forFullyLoweredModule(irgen.SIL)),
       OutputFilename(OutputFilename),
       MainInputFilenameForDebugInfo(MainInputFilenameForDebugInfo),
       CacheKeyForJob(CacheKeyForJob), TargetInfo(SwiftTargetInfo::get(*this)),
@@ -2352,7 +2353,8 @@ IRGenModule *IRGenerator::getGenModule(SourceFile *SF) {
    // to a function imported from clang module, so it doesn't have a mapping
    // in GenModule. The contents are @_alwaysEmitIntoClient, so for all intents
    // and purposes they belong to the primary module.
-   ASSERT(SF->getParentModule()->findUnderlyingClangModule());
+   const ModuleDecl *M = SF->getParentModule();
+   ASSERT(M->findUnderlyingClangModule() || M->isClangBridgingHeaderImportModule());
    return getPrimaryIGM();
  }
 

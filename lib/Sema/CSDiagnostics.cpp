@@ -304,13 +304,6 @@ ValueDecl *RequirementFailure::getDeclRef() const {
     return opaqueLocator->getDecl();
   }
 
-  // If the locator is for a result builder body result type, the requirement
-  // came from the function's return type.
-  if (getLocator()->isForResultBuilderBodyResult()) {
-    auto *func = getAsDecl<FuncDecl>(getAnchor());
-    return getAffectedDeclFromType(func->getResultInterfaceType());
-  }
-
   if (isFromContextualType()) {
     auto anchor = getRawAnchor();
     auto contextualPurpose = getContextualTypePurpose(anchor);
@@ -690,7 +683,9 @@ bool MissingConformanceFailure::diagnoseAsError() {
   }
 
   if (isExpr<KeyPathExpr>(anchor)) {
-    if (auto *P = dyn_cast<ProtocolDecl>(protocolType->getAnyNominal())) {
+    // Note that we may not have a nominal here for a layout constraint.
+    auto *NTD = protocolType->getAnyNominal();
+    if (auto *P = dyn_cast_or_null<ProtocolDecl>(NTD)) {
       if (P->isSpecificProtocol(KnownProtocolKind::Copyable)) {
         emitDiagnostic(diag::expr_keypath_noncopyable_type, nonConformingType);
         return true;
@@ -1024,10 +1019,6 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
       break;
     }
 
-    case ConstraintLocator::ResultBuilderBodyResult:
-      diagnostic = diag::cannot_convert_result_builder_result_to_return_type;
-      break;
-
     case ConstraintLocator::AutoclosureResult:
     case ConstraintLocator::ApplyArgToParam:
     case ConstraintLocator::ApplyArgument: {
@@ -1218,6 +1209,26 @@ bool ArrayLiteralToDictionaryConversionFailure::diagnoseAsError() {
       }
     }
   }
+  return true;
+}
+
+bool AttributedFuncToTypeConversionFailure::diagnoseAsNote() {
+  if (!getToType()->is<FunctionType>())
+    return false;
+
+  auto argApplyInfo = getFunctionArgApplyInfo(getLocator());
+  if (!argApplyInfo)
+    return false;
+
+  auto overload = getCalleeOverloadChoiceIfAvailable(getLocator());
+  if (!(overload && overload->choice.isDecl()))
+    return false;
+
+  SmallString<4> scratch;
+  emitDiagnosticAt(overload->choice.getDecl(),
+                   diag::candidate_expects_escaping_argument, attributeKind,
+                   argApplyInfo->getParamPosition(),
+                   argApplyInfo->getArgDescription(scratch));
   return true;
 }
 
@@ -2866,11 +2877,6 @@ bool ContextualFailure::diagnoseAsError() {
     return true;
   }
 
-  case ConstraintLocator::ResultBuilderBodyResult: {
-    diagnostic = *getDiagnosticFor(CTP_Initialization, toType);
-    break;
-  }
-
   case ConstraintLocator::OptionalInjection: {
     // If this is an attempt at a Double <-> CGFloat conversion
     // through optional chaining, let's produce a tailored diagnostic.
@@ -3866,14 +3872,21 @@ ContextualFailure::getDiagnosticFor(ContextualTypePurpose context,
 
 bool NonClassTypeToAnyObjectConversionFailure::diagnoseAsError() {
   auto locator = getLocator();
-  if (locator->isForContextualType()) {
-    return ContextualFailure::diagnoseAsError();
-  }
-
   auto fromType = getFromType();
   auto toType = getToType();
   assert(fromType);
   assert(toType);
+
+  if (fromType->isNoncopyable()) {
+    emitDiagnostic(diag::cannot_convert_noncopyable_value_to_anyobject,
+                   fromType, toType);
+    return true;
+  }
+
+  if (locator->isForContextualType()) {
+    return ContextualFailure::diagnoseAsError();
+  }
+
   if (locator->isLastElement<LocatorPathElt::ApplyArgToParam>()) {
     ArgumentMismatchFailure failure(getSolution(), fromType, toType, locator);
     return failure.diagnoseAsError();
@@ -5243,6 +5256,16 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
   }
 
   return false;
+}
+
+bool InvalidMetatypeExtensionMemberRefFailure::diagnoseAsError() {
+  auto baseType = resolveType(BaseType)->getWithoutSpecifierType();
+  baseType = baseType->getMetatypeInstanceType();
+
+  emitDiagnostic(diag::metatype_extension_member_on_conforming_type, baseType,
+                 Member)
+      .highlight(getSourceRange());
+  return true;
 }
 
 bool PartialApplicationFailure::diagnoseAsError() {
@@ -7576,6 +7599,13 @@ bool AsyncFunctionConversionFailure::diagnoseAsError() {
   }
 
   emitDiagnostic(diag::async_functiontype_mismatch, getFromType(),
+                 getToType());
+  return true;
+}
+
+bool ConversionBetweenFunctionsWithDifferentExecutionSemantics::
+    diagnoseAsError() {
+  emitDiagnostic(diag::called_once_function_type_mismatch, getFromType(),
                  getToType());
   return true;
 }

@@ -682,6 +682,12 @@ static StringRef getDumpString(ExplicitSafety safety) {
     return "unsafe";
   }
 }
+static StringRef getDumpString(ExecutionSemantics semantics) {
+  switch (semantics) {
+  case ExecutionSemantics::Once:
+    return "once";
+  }
+}
 static StringRef getDumpString(ConformanceEntryKind kind) {
   switch (kind) {
   case ConformanceEntryKind::Inherited:
@@ -5721,6 +5727,12 @@ public:
     printField(StringRef{Model}, Label::always("threading"));
     printFoot();
   }
+
+  void visitCalledAttr(CalledAttr *Attr, Label label) {
+    printCommon(Attr, "called_attr", label);
+    printField(Attr->getSemantics(), Label::always("semantics"));
+    printFoot();
+  }
 };
 
 } // end anonymous namespace
@@ -6573,8 +6585,8 @@ namespace {
       printArchetypeCommon(T, "existential_archetype_type", label);
 
       auto *env = T->getGenericEnvironment();
-      printFieldQuoted(env->getOpenedExistentialUUID(),
-                       Label::always("opened_existential_id"));
+      printField(std::to_string(env->getOpenedExistentialID()),
+                 Label::always("opened_existential_id"));
 
       printArchetypeCommonRec(T);
       printRec(env->getOpenedExistentialType(),
@@ -6608,8 +6620,8 @@ namespace {
     }
     void visitElementArchetypeType(ElementArchetypeType *T, Label label) {
       printArchetypeCommon(T, "element_archetype_type", label);
-      printFieldQuoted(T->getOpenedElementID(),
-                       Label::always("opened_element_id"));
+      printField(std::to_string(T->getOpenedElementID()),
+                 Label::always("opened_element_id"));
       printFoot();
     }
 
@@ -6707,6 +6719,7 @@ namespace {
         printFlag(T->isAsync(), "async");
         printFlag(T->isThrowing(), "throws");
         printFlag(T->hasSendingResult(), "sending_result");
+        printFlag(T->isCalledOnce(), "called_once");
         if (T->isDifferentiable()) {
           switch (T->getDifferentiabilityKind()) {
           default:

@@ -1,4 +1,4 @@
-// RUN: %batch-code-completion -solver-scope-threshold=500 -code-completion-verify-usr-to-decl=false
+// RUN: %batch-code-completion -solver-scope-threshold=1000 -code-completion-verify-usr-to-decl=false
 // REQUIRES: objc_interop
 // REQUIRES: OS=macosx
 
@@ -25,6 +25,6 @@ struct V: View {
       }
     }
     .#^COMPLETE^#
-    // COMPLETE: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: foo()[#View#]; name=foo()
+    // COMPLETE: Decl[InstanceMethod]/CurrNominal{{(/TypeRelation\[Convertible\])?}}: foo()[#View#]; name=foo()
   }
 }

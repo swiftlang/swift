@@ -19,6 +19,7 @@
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/AttrKind.h"
 #include "swift/AST/AvailabilityContext.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/ClangModuleLoader.h"
@@ -85,10 +86,6 @@ static llvm::cl::opt<bool> NumberSuppressionChecks(
                    "asserts enabled and intended for compiler tests."),
     llvm::cl::init(false), llvm::cl::Hidden);
 #endif
-
-llvm::cl::opt<bool>
-PrintNoUUIDS("print-no-uuids", llvm::cl::init(false),
-                   llvm::cl::desc("don't print UUIDs to make the output better diffable"));
 
 // Defined here to avoid repeatedly paying the price of template instantiation.
 const std::function<bool(const ExtensionDecl *)>
@@ -700,21 +697,6 @@ ASTPrinter &ASTPrinter::operator<<(unsigned long long N) {
   llvm::raw_svector_ostream OS(Str);
   OS << N;
   printTextImpl(OS.str());
-  return *this;
-}
-
-void ASTPrinter::getUUIDStringForPrinting(UUID uuid, llvm::SmallVectorImpl<char> &out) {
-  if (PrintNoUUIDS) {
-    out.clear();
-    return;
-  }
-  uuid.toString(out);
-}
-
-ASTPrinter &ASTPrinter::operator<<(UUID UU) {
-  llvm::SmallString<UUID::StringBufferSize> Str;
-  getUUIDStringForPrinting(UU, Str);
-  printTextImpl(Str);
   return *this;
 }
 
@@ -3093,6 +3075,21 @@ static bool sortClangDecls(Decl *lhs, Decl *rhs) {
   auto &SM = lhs->getASTContext().SourceMgr;
   auto *CML = lhs->getASTContext().getClangModuleLoader();
 
+  // If this is a decl from a macro expansion, sort it with its original.
+  Decl *lhsOrig = lhs->getMacroExpansionOriginatingDecl();
+  Decl *rhsOrig = rhs->getMacroExpansionOriginatingDecl();
+
+  // The original comes first, followed by aux decls.
+  if (lhsOrig == rhs)
+    return false;
+  if (rhsOrig == lhs)
+    return true;
+
+  if (lhsOrig)
+    lhs = lhsOrig;
+  if (rhsOrig)
+    rhs = rhsOrig;
+
   auto getClangDecl = [&CML](Decl *d) -> const clang::Decl * {
     // Has an attached clang::Decl
     if (auto *D = d->getClangDecl())
@@ -3873,7 +3870,11 @@ void swift::printWithCompatibilityFeatureChecks(ASTPrinter &printer,
   // these Swift stdlib protocols even though they don't exist in the SDK's
   // stdlib. To handle this, we guard them behind a Swift version.
   if (isCxxIterableOrBorrowingIterator(decl)) {
-    printer << "#if canImport(Swift, _version: 6.4.0.30)\n";
+    // Iterable exists on 6.4.0.30+ and 6.5.0.7+,
+    // but it is absent in [6.5, 6.5.0.7).
+    printer << "#if canImport(Swift, _version: 6.5.0.7) || "
+                  "(canImport(Swift, _version: 6.4.0.30) && "
+                  "!canImport(Swift, _version: 6.5))\n";
     printBody();
     printer.printNewline();
     printer << "#endif";
@@ -4362,7 +4363,7 @@ static void printParameterFlags(ASTPrinter &printer,
     if (!options.excludeAttrKind(TypeAttrKind::Escaping) && escaping)
       printer.printAttrName("@escaping ");
   }
-
+  
   if (flags.isConstValue())
     printer.printAttrName("@const ");
 }
@@ -4499,13 +4500,16 @@ void PrintAST::printOneParameter(const ParamDecl *param,
       auto type = TheTypeLoc.getType();
 
       bool isNonisolatedNonsending = false;
-      if (auto *funcTy = dyn_cast<AnyFunctionType>(interfaceTy.getPointer()))
-        isNonisolatedNonsending = funcTy->getIsolation().isNonisolatedNonsending();
+      if (auto *funcTy = dyn_cast<AnyFunctionType>(interfaceTy.getPointer())) {
+        isNonisolatedNonsending =
+            funcTy->getIsolation().isNonisolatedNonsending();
+      }
 
       // We suppress `@escaping` on enum element parameters because it cannot
       // be written explicitly in this position.
       printParameterFlags(Printer, Options, param, paramFlags,
-                          isEscaping(type) && !isEnumElement, isNonisolatedNonsending);
+                          isEscaping(type) && !isEnumElement,
+                          isNonisolatedNonsending);
     }
 
     printTypeLoc(TheTypeLoc, getNonRecursiveOptions(param));
@@ -7168,6 +7172,10 @@ public:
       Printer.printSimpleAttr("@Sendable") << " ";
     }
 
+    if (!Options.excludeAttrKind(TypeAttrKind::Called) && info.isCalledOnce()) {
+      Printer.printSimpleAttr("@called(once)") << " ";
+    }
+    
     // Print lifetime dependencies using Swift syntax.
     if (!Options.PrintInSILBody && fnType->hasLifetimeDependencies()) {
       ArrayRef<AnyFunctionType::Param> params = fnType->getParams();
@@ -7369,6 +7377,13 @@ public:
     if (info.isAsync()) {
       Printer.printSimpleAttr("@async") << " ";
     }
+    if (info.isCalledOnce()) {
+      Printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
+      Printer.printAttrName("@called");
+      Printer << "(once)";
+      Printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
+      Printer << " ";
+    }
   }
 
   /// Print a function type's parameter list.
@@ -7432,8 +7447,8 @@ public:
         visit(type);
         Printer << "...";
       } else {
-        printParameterFlags(Printer, Options, nullptr, Param.getParameterFlags(),
-                            isEscaping(type));
+        printParameterFlags(Printer, Options, nullptr,
+                            Param.getParameterFlags(), isEscaping(type));
         visit(type);
       }
     }
@@ -7924,7 +7939,7 @@ public:
       if (!T->isRoot())
         Printer << '(';
 
-      Printer << "@opened(\"" << env->getOpenedExistentialUUID() << "\", ";
+      Printer << "@opened(" << env->getOpenedExistentialID() << ", ";
       auto existentialTy = env->maybeApplyOuterContextSubstitutions(
           env->getOpenedExistentialType());
       visit(existentialTy);
@@ -7995,7 +8010,7 @@ public:
   void visitElementArchetypeType(ElementArchetypeType *T,
                                  NonRecursivePrintOptions nrOptions) {
     if (Options.PrintForSIL) {
-      Printer << "@pack_element(\"" << T->getOpenedElementID() << "\") ";
+      Printer << "@pack_element(" << T->getOpenedElementID() << ") ";
       auto packTy = findPackForElementArchetype(T);
       visit(packTy);
     } else {

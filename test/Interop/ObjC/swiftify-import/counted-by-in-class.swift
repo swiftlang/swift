@@ -5,7 +5,7 @@
 // RUN: %target-swift-frontend -plugin-path %swift-plugin-dir -I %t/Inputs %t/method.swift -dump-macro-expansions -typecheck -verify
 
 // CHECK: class Foo {
-// CHECK:  func bar(_ p: UnsafeMutableBufferPointer<Float>)
+// CHECK:  func bar(_ p: UnsafeMutableBufferPointer<CFloat>)
 
 //--- Inputs/module.modulemap
 module Method {

@@ -733,6 +733,8 @@ Demangler::DemangleInitRAII::DemangleInitRAII(Demangler &Dem,
   : Dem(Dem),
     NodeStack(Dem.NodeStack), Substitutions(Dem.Substitutions),
     NumWords(Dem.NumWords), Text(Dem.Text), Pos(Dem.Pos),
+    IsOldFunctionTypeMangling(Dem.IsOldFunctionTypeMangling),
+    Flavor(Dem.Flavor),
     SymbolicReferenceResolver(std::move(Dem.SymbolicReferenceResolver))
 {
   std::copy(Dem.Words, Dem.Words + MaxNumWords, Words);
@@ -742,6 +744,8 @@ Demangler::DemangleInitRAII::DemangleInitRAII(Demangler &Dem,
   Dem.NumWords = 0;
   Dem.Text = MangledName;
   Dem.Pos = 0;
+  Dem.IsOldFunctionTypeMangling = false;
+  Dem.Flavor = ManglingFlavor::Default;
   Dem.SymbolicReferenceResolver = std::move(TheSymbolicReferenceResolver);
 }
 
@@ -753,6 +757,8 @@ Demangler::DemangleInitRAII::~DemangleInitRAII() {
   std::copy(Words, Words + MaxNumWords, Dem.Words);
   Dem.Text = Text;
   Dem.Pos = Pos;
+  Dem.IsOldFunctionTypeMangling = IsOldFunctionTypeMangling;
+  Dem.Flavor = Flavor;
   Dem.SymbolicReferenceResolver = std::move(SymbolicReferenceResolver);
 }
 
@@ -1746,7 +1752,8 @@ NodePointer Demangler::popFunctionParamLabels(NodePointer Type) {
     FuncType = FuncType->getChild(1)->getFirstChild();
 
   if (FuncType->getKind() != Node::Kind::FunctionType &&
-      FuncType->getKind() != Node::Kind::NoEscapeFunctionType)
+      FuncType->getKind() != Node::Kind::NoEscapeFunctionType &&
+      FuncType->getKind() != Node::Kind::CalledOnceFunctionType)
     return nullptr;
 
   unsigned FirstChildIdx = 0;
@@ -2428,6 +2435,9 @@ NodePointer Demangler::demangleImplFunctionType() {
   if (nextIf('N'))
     type->addChild(createNode(Node::Kind::ImplNonisolatedNonsendingIsolation),
                    *this);
+
+  if (nextIf('O'))
+    type->addChild(createNode(Node::Kind::ImplCalledOnceFunction), *this);
 
   switch ((MangledDifferentiabilityKind)peekChar()) {
   case MangledDifferentiabilityKind::Normal:  // 'd'
@@ -3947,6 +3957,8 @@ NodePointer Demangler::demangleSpecialType() {
       return popFunctionType(Node::Kind::ObjCBlock);
     case 'C':
       return popFunctionType(Node::Kind::CFunctionPointer);
+    case 'O':
+      return popFunctionType(Node::Kind::CalledOnceFunctionType);
     case 'g':
     case 'G':
       return demangleExtendedExistentialShape(specialChar);

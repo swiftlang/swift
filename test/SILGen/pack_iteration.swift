@@ -47,14 +47,14 @@ enum E<T> {
 //
 // CHECK: [[SOME_BB]]:
 // CHECK: [[DYN_PACK_IDX:%.*]] = dynamic_pack_index [[IDX3]] of $Pack{repeat each Element}
-// CHECK: open_pack_element [[DYN_PACK_IDX]] of <each Element> at <Pack{repeat each Element}>, shape $each Element, uuid "[[UUID:.*]]"
-// CHECK: [[STACK:%.*]] = alloc_stack [lexical] [var_decl] $@pack_element("[[UUID]]") each Element, let, name "el"
-// CHECK: [[PACK_ELT_GET:%.*]] = pack_element_get [[DYN_PACK_IDX]] of [[PACK]] : $*Pack{repeat each Element} as $*@pack_element("[[UUID]]") each Element
-// CHECK: copy_addr [[PACK_ELT_GET]] to [init] [[STACK]] : $*@pack_element("[[UUID]]") each Element
+// CHECK: open_pack_element [[DYN_PACK_IDX]] of <each Element> at <Pack{repeat each Element}>, shape $each Element, id [[UUID:[0-9]+]]
+// CHECK: [[STACK:%.*]] = alloc_stack [lexical] [var_decl] $@pack_element([[UUID]]) each Element, let, name "el"
+// CHECK: [[PACK_ELT_GET:%.*]] = pack_element_get [[DYN_PACK_IDX]] of [[PACK]] : $*Pack{repeat each Element} as $*@pack_element([[UUID]]) each Element
+// CHECK: copy_addr [[PACK_ELT_GET]] to [init] [[STACK]] : $*@pack_element([[UUID]]) each Element
 // CHECK: [[LOOP_END_FUNC:%.*]] = function_ref @loopBodyEnd : $@convention(thin) () -> ()
 // CHECK: apply [[LOOP_END_FUNC]]() : $@convention(thin) () -> ()
-// CHECK: destroy_addr [[STACK]] : $*@pack_element("[[UUID]]") each Element
-// CHECK: dealloc_stack [[STACK]] : $*@pack_element("[[UUID]]") each Element
+// CHECK: destroy_addr [[STACK]] : $*@pack_element([[UUID]]) each Element
+// CHECK: dealloc_stack [[STACK]] : $*@pack_element([[UUID]]) each Element
 // CHECK: [[IDX4:%.*]] = builtin "add_Word"([[IDX3]] : $Builtin.Word, [[IDX2]] : $Builtin.Word) : $Builtin.Word
 // CHECK: br [[LOOP_DEST]]([[IDX4]] : $Builtin.Word)
 //
@@ -81,14 +81,14 @@ func iterateTrivial<each Element>(over element: repeat each Element) {
 //
 // CHECK: [[SOME_BB]]:
 // CHECK: [[DYN_PACK_IDX:%.*]] = dynamic_pack_index [[IDX3]] of $Pack{repeat (each Element, each Element)}
-// CHECK: [[OPEN_PACK_ELT:%.*]] = open_pack_element [[DYN_PACK_IDX]] of <each Element where repeat each Element : Equatable> at <Pack{repeat each Element}>, shape $each Element, uuid "[[UUID:.*]]"
-// CHECK: [[STACK_LEFT:%.*]] = alloc_stack [lexical] [var_decl] $@pack_element("[[UUID]]") each Element, let, name "left"
-// CHECK: [[STACK_RIGHT:%.*]] = alloc_stack [lexical] [var_decl] $@pack_element("[[UUID]]") each Element, let, name "right"
-// CHECK: tuple_pack_element_addr [[DYN_PACK_IDX]] of [[STACK1]] : $*(repeat each Element) as $*@pack_element("[[UUID]]") each Element
-// CHECK: tuple_pack_element_addr [[DYN_PACK_IDX]] of [[STACK2]] : $*(repeat each Element) as $*@pack_element("[[UUID]]") each Element
-// CHECK: [[METATYPE:%.*]] = metatype $@thick (@pack_element("[[UUID]]") each Element).Type
-// CHECK: [[WITNESS_METHOD:%.*]] = witness_method $@pack_element("[[UUID]]") each Element, #Equatable."==" : <Self where Self : Equatable, Self : ~Copyable, Self : ~Escapable> (Self.Type) -> (borrowing Self, borrowing Self) -> Bool, [[OPEN_PACK_ELT]] : $Builtin.SILToken : $@convention(witness_method: Equatable) <τ_0_0 where τ_0_0 : Equatable, τ_0_0 : ~Copyable, τ_0_0 : ~Escapable> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0, @thick τ_0_0.Type) -> Bool
-// CHECK: apply [[WITNESS_METHOD]]<@pack_element("[[UUID]]") each Element>([[STACK_LEFT]], [[STACK_RIGHT]], [[METATYPE]]) : $@convention(witness_method: Equatable) <τ_0_0 where τ_0_0 : Equatable, τ_0_0 : ~Copyable, τ_0_0 : ~Escapable> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0, @thick τ_0_0.Type) -> Bool
+// CHECK: [[OPEN_PACK_ELT:%.*]] = open_pack_element [[DYN_PACK_IDX]] of <each Element where repeat each Element : Equatable> at <Pack{repeat each Element}>, shape $each Element, id [[UUID:[0-9]+]]
+// CHECK: [[STACK_LEFT:%.*]] = alloc_stack [lexical] [var_decl] $@pack_element([[UUID]]) each Element, let, name "left"
+// CHECK: [[STACK_RIGHT:%.*]] = alloc_stack [lexical] [var_decl] $@pack_element([[UUID]]) each Element, let, name "right"
+// CHECK: tuple_pack_element_addr [[DYN_PACK_IDX]] of [[STACK1]] : $*(repeat each Element) as $*@pack_element([[UUID]]) each Element
+// CHECK: tuple_pack_element_addr [[DYN_PACK_IDX]] of [[STACK2]] : $*(repeat each Element) as $*@pack_element([[UUID]]) each Element
+// CHECK: [[METATYPE:%.*]] = metatype $@thick (@pack_element([[UUID]]) each Element).Type
+// CHECK: [[WITNESS_METHOD:%.*]] = witness_method $@pack_element([[UUID]]) each Element, #Equatable."==" : <Self where Self : Equatable, Self : ~Copyable, Self : ~Escapable> (Self.Type) -> (borrowing Self, borrowing Self) -> Bool, [[OPEN_PACK_ELT]] : $Builtin.SILToken : $@convention(witness_method: Equatable) <τ_0_0 where τ_0_0 : Equatable, τ_0_0 : ~Copyable, τ_0_0 : ~Escapable> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0, @thick τ_0_0.Type) -> Bool
+// CHECK: apply [[WITNESS_METHOD]]<@pack_element([[UUID]]) each Element>([[STACK_LEFT]], [[STACK_RIGHT]], [[METATYPE]]) : $@convention(witness_method: Equatable) <τ_0_0 where τ_0_0 : Equatable, τ_0_0 : ~Copyable, τ_0_0 : ~Escapable> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0, @thick τ_0_0.Type) -> Bool
 //
 // CHECK: } // end sil function '$s14pack_iteration11equalTuples3lhs3rhsSbxxQp_t_xxQp_ttRvzSQRzlF'
 func equalTuples<each Element: Equatable>(lhs: (repeat each Element), rhs: (repeat each Element)) -> Bool {
@@ -113,12 +113,12 @@ func equalTuples<each Element: Equatable>(lhs: (repeat each Element), rhs: (repe
 //
 // CHECK: [[SOME_BB]]:
 // CHECK: [[DYN_PACK_IDX:%.*]] = dynamic_pack_index [[IDX3]] of $Pack{repeat E<each Element>}
-// CHECK: open_pack_element [[DYN_PACK_IDX]] of <each Element> at <Pack{repeat each Element}>, shape $each Element, uuid "[[UUID:.*]]"
-// CHECK: [[STACK:%.*]] = alloc_stack [lexical] [var_decl] $@pack_element("[[UUID]]") each Element, let, name "value"
-// CHECK: [[PACK_ELT_GET:%.*]] = pack_element_get [[DYN_PACK_IDX]] of [[PACK]] : $*Pack{repeat E<each Element>} as $*E<@pack_element("[[UUID]]") each Element>
-// CHECK: [[ENUM_STACK:%.*]] = alloc_stack $E<@pack_element("[[UUID]]") each Element>
-// CHECK: copy_addr [[PACK_ELT_GET]] to [init] [[ENUM_STACK]] : $*E<@pack_element("[[UUID]]") each Element>
-// CHECK: switch_enum_addr [[ENUM_STACK]] : $*E<@pack_element("[[UUID]]") each Element>, case #E.one!enumelt: [[ENUM_MATCH_BB:bb[0-9]+]], case #E.two!enumelt: [[CONTINUE_BB:bb[0-9]+]]
+// CHECK: open_pack_element [[DYN_PACK_IDX]] of <each Element> at <Pack{repeat each Element}>, shape $each Element, id [[UUID:[0-9]+]]
+// CHECK: [[STACK:%.*]] = alloc_stack [lexical] [var_decl] $@pack_element([[UUID]]) each Element, let, name "value"
+// CHECK: [[PACK_ELT_GET:%.*]] = pack_element_get [[DYN_PACK_IDX]] of [[PACK]] : $*Pack{repeat E<each Element>} as $*E<@pack_element([[UUID]]) each Element>
+// CHECK: [[ENUM_STACK:%.*]] = alloc_stack $E<@pack_element([[UUID]]) each Element>
+// CHECK: copy_addr [[PACK_ELT_GET]] to [init] [[ENUM_STACK]] : $*E<@pack_element([[UUID]]) each Element>
+// CHECK: switch_enum_addr [[ENUM_STACK]] : $*E<@pack_element([[UUID]]) each Element>, case #E.one!enumelt: [[ENUM_MATCH_BB:bb[0-9]+]], case #E.two!enumelt: [[CONTINUE_BB:bb[0-9]+]]
 //
 // CHECK: [[CONTINUE_BB]]:
 // CHECK: destroy_addr [[ENUM_STACK]]
@@ -127,7 +127,7 @@ func equalTuples<each Element: Equatable>(lhs: (repeat each Element), rhs: (repe
 // CHECK:  br [[LATCH_BB:bb[0-9]+]]
 //
 // CHECK: [[ENUM_MATCH_BB]]:
-// CHECK: [[ENUM_DATA_ADDR:%.*]] = unchecked_inplace_enum_data_addr %13 : $*E<@pack_element("[[UUID]]") each Element>, #E.one!enumelt
+// CHECK: [[ENUM_DATA_ADDR:%.*]] = unchecked_inplace_enum_data_addr %13 : $*E<@pack_element([[UUID]]) each Element>, #E.one!enumelt
 // CHECK: copy_addr [take] [[ENUM_DATA_ADDR]] to [init] [[STACK]]
 // CHECK: [[LOOP_END_FUNC:%.*]] = function_ref @loopBodyEnd : $@convention(thin) () -> ()
 // CHECK: apply [[LOOP_END_FUNC]]() : $@convention(thin) () -> ()
@@ -164,14 +164,14 @@ func iteratePatternMatch<each Element>(over element: repeat E<each Element>) {
 //
 // CHECK: [[SOME_BB]]:
 // CHECK: [[DYN_PACK_IDX:%.*]] = dynamic_pack_index [[IDX3]] of $Pack{repeat each Element}
-// CHECK: open_pack_element [[DYN_PACK_IDX]] of <each Element> at <Pack{repeat each Element}>, shape $each Element, uuid "[[UUID:.*]]"
-// CHECK: [[STACK:%.*]] = alloc_stack [lexical] [var_decl] $@pack_element("[[UUID]]") each Element, let, name "el"
-// CHECK: [[PACK_ELT_GET:%.*]] = pack_element_get [[DYN_PACK_IDX]] of [[PACK]] : $*Pack{repeat each Element} as $*@pack_element("[[UUID]]") each Element
-// CHECK: copy_addr [[PACK_ELT_GET]] to [init] [[STACK]] : $*@pack_element("[[UUID]]") each Element
+// CHECK: open_pack_element [[DYN_PACK_IDX]] of <each Element> at <Pack{repeat each Element}>, shape $each Element, id [[UUID:[0-9]+]]
+// CHECK: [[STACK:%.*]] = alloc_stack [lexical] [var_decl] $@pack_element([[UUID]]) each Element, let, name "el"
+// CHECK: [[PACK_ELT_GET:%.*]] = pack_element_get [[DYN_PACK_IDX]] of [[PACK]] : $*Pack{repeat each Element} as $*@pack_element([[UUID]]) each Element
+// CHECK: copy_addr [[PACK_ELT_GET]] to [init] [[STACK]] : $*@pack_element([[UUID]]) each Element
 // CHECK: [[LOOP_END_FUNC:%.*]] = function_ref @loopBreakEnd : $@convention(thin) () -> ()
 // CHECK: apply [[LOOP_END_FUNC]]() : $@convention(thin) () -> ()
-// CHECK: destroy_addr [[STACK]] : $*@pack_element("[[UUID]]") each Element
-// CHECK: dealloc_stack [[STACK]] : $*@pack_element("[[UUID]]") each Element
+// CHECK: destroy_addr [[STACK]] : $*@pack_element([[UUID]]) each Element
+// CHECK: dealloc_stack [[STACK]] : $*@pack_element([[UUID]]) each Element
 // CHECK: br [[FUNC_END_BB:bb[0-9]+]]
 //
 // CHECK: [[NONE_BB]]:
@@ -202,10 +202,10 @@ func iterateTrivialBreak<each Element>(over element: repeat each Element) {
 //
 // CHECK: [[SOME_BB]]:
 // CHECK: [[DYN_PACK_IDX:%.*]] = dynamic_pack_index [[IDX3]] of $Pack{repeat each Element}
-// CHECK: open_pack_element [[DYN_PACK_IDX]] of <each Element> at <Pack{repeat each Element}>, shape $each Element, uuid "[[UUID:.*]]"
-// CHECK: [[STACK:%.*]] = alloc_stack [lexical] [var_decl] $@pack_element("[[UUID]]") each Element, let, name "el"
-// CHECK: [[PACK_ELT_GET:%.*]] = pack_element_get [[DYN_PACK_IDX]] of [[PACK]] : $*Pack{repeat each Element} as $*@pack_element("[[UUID]]") each Element
-// CHECK: copy_addr [[PACK_ELT_GET]] to [init] [[STACK]] : $*@pack_element("[[UUID]]") each Element
+// CHECK: open_pack_element [[DYN_PACK_IDX]] of <each Element> at <Pack{repeat each Element}>, shape $each Element, id [[UUID:[0-9]+]]
+// CHECK: [[STACK:%.*]] = alloc_stack [lexical] [var_decl] $@pack_element([[UUID]]) each Element, let, name "el"
+// CHECK: [[PACK_ELT_GET:%.*]] = pack_element_get [[DYN_PACK_IDX]] of [[PACK]] : $*Pack{repeat each Element} as $*@pack_element([[UUID]]) each Element
+// CHECK: copy_addr [[PACK_ELT_GET]] to [init] [[STACK]] : $*@pack_element([[UUID]]) each Element
 // CHECK: [[COND_FUNC:%.*]] = function_ref @condition : $@convention(thin) () -> Bool
 // CHECK: [[BOOL:%.*]] = apply [[COND_FUNC]]() : $@convention(thin) () -> Bool
 // CHECK: [[IF:%.*]] = struct_extract [[BOOL]] : $Bool, #Bool._value
@@ -214,8 +214,8 @@ func iterateTrivialBreak<each Element>(over element: repeat each Element) {
 // CHECK: [[LOOP_BREAK]]:
 // CHECK: [[LOOP_BREAK_FUNC:%.*]] = function_ref @loopBreakEnd : $@convention(thin) () -> ()
 // CHECK: apply [[LOOP_BREAK_FUNC]]() : $@convention(thin) () -> ()
-// CHECK: destroy_addr [[STACK]] : $*@pack_element("[[UUID]]") each Element
-// CHECK: dealloc_stack [[STACK]] : $*@pack_element("[[UUID]]") each Element
+// CHECK: destroy_addr [[STACK]] : $*@pack_element([[UUID]]) each Element
+// CHECK: dealloc_stack [[STACK]] : $*@pack_element([[UUID]]) each Element
 // br [[FUNC_END:bb[0-9]+]]
 //
 // CHECK: [[LOOP_CONDITION]]:
@@ -227,15 +227,15 @@ func iterateTrivialBreak<each Element>(over element: repeat each Element) {
 // CHECK: [[LOOP_CONTINUE]]:
 // CHECK: [[LOOP_CONTINUE_FUNC:%.*]] = function_ref @loopContinueEnd : $@convention(thin) () -> ()
 // CHECK: apply [[LOOP_CONTINUE_FUNC]]() : $@convention(thin) () -> ()
-// CHECK: destroy_addr [[STACK]] : $*@pack_element("[[UUID]]") each Element
-// CHECK: dealloc_stack [[STACK]] : $*@pack_element("[[UUID]]") each Element
+// CHECK: destroy_addr [[STACK]] : $*@pack_element([[UUID]]) each Element
+// CHECK: dealloc_stack [[STACK]] : $*@pack_element([[UUID]]) each Element
 // CHECK: br [[LATCH:bb[0-9]+]]
 //
 // CHECK: [[LOOP_BODY_END]]:
 // CHECK: [[LOOP_BODY_END_FUNC:%.*]] = function_ref @loopBodyEnd : $@convention(thin) () -> ()
 // CHECK: apply [[LOOP_BODY_END_FUNC]]() : $@convention(thin) () -> ()
-// CHECK: destroy_addr [[STACK]] : $*@pack_element("[[UUID]]") each Element
-// CHECK: dealloc_stack [[STACK]] : $*@pack_element("[[UUID]]") each Element
+// CHECK: destroy_addr [[STACK]] : $*@pack_element([[UUID]]) each Element
+// CHECK: dealloc_stack [[STACK]] : $*@pack_element([[UUID]]) each Element
 // CHECK: br [[LATCH]]
 //
 // CHECK: [[NONE_BB]]:
@@ -284,9 +284,9 @@ func iterateContinueBreak<each Element>(over element: repeat each Element) {
 //
 // CHECK: [[ITER_BB]]:
 // CHECK: [[PACK_IDX:%.*]] = dynamic_pack_index [[IDX3]] of $Pack{repeat each Element}
-// CHECK: [[OPEN_ELT:%.*]] = open_pack_element [[PACK_IDX]] of <each Element> at <Pack{repeat each Element}>, shape $each Element, uuid "[[UUID:.*]]"
-// CHECK: [[TUPLE_ADDR:%.*]] = tuple_pack_element_addr [[PACK_IDX]] of [[PACK]] : $*(repeat each Element) as $*@pack_element("[[UUID]]") each Element
-// CHECK: pack_element_set [[TUPLE_ADDR]] : $*@pack_element("[[UUID]]") each Element into [[PACK_IDX]] of [[ALLOC_PACK]] : $*Pack{repeat each Element}
+// CHECK: [[OPEN_ELT:%.*]] = open_pack_element [[PACK_IDX]] of <each Element> at <Pack{repeat each Element}>, shape $each Element, id [[UUID:[0-9]+]]
+// CHECK: [[TUPLE_ADDR:%.*]] = tuple_pack_element_addr [[PACK_IDX]] of [[PACK]] : $*(repeat each Element) as $*@pack_element([[UUID]]) each Element
+// CHECK: pack_element_set [[TUPLE_ADDR]] : $*@pack_element([[UUID]]) each Element into [[PACK_IDX]] of [[ALLOC_PACK]] : $*Pack{repeat each Element}
 // CHECK: [[ADD_WORD:%.*]] = builtin "add_Word"([[IDX3]] : $Builtin.Word, [[IDX2]] : $Builtin.Word) : $Builtin.Word
 // CHECK: br [[LOOP_DEST]]([[ADD_WORD]] : $Builtin.Word)
 //
@@ -303,14 +303,14 @@ func iterateContinueBreak<each Element>(over element: repeat each Element) {
 //
 // CHECK: [[SOME_BB]]:
 // CHECK: [[DYN_PACK_IDX:%.*]] = dynamic_pack_index [[IDX4]] of $Pack{repeat each Element}
-// CHECK: open_pack_element [[DYN_PACK_IDX]] of <each Element> at <Pack{repeat each Element}>, shape $each Element, uuid "[[UUID:.*]]"
-// CHECK: [[STACK:%.*]] = alloc_stack [lexical] [var_decl] $@pack_element("[[UUID]]") each Element, let, name "el"
-// CHECK: [[PACK_ELT_GET:%.*]] = pack_element_get [[DYN_PACK_IDX]] of [[ALLOC_PACK]] : $*Pack{repeat each Element} as $*@pack_element("[[UUID]]") each Element
-// CHECK: copy_addr [[PACK_ELT_GET]] to [init] [[STACK]] : $*@pack_element("[[UUID]]") each Element
+// CHECK: open_pack_element [[DYN_PACK_IDX]] of <each Element> at <Pack{repeat each Element}>, shape $each Element, id [[UUID:[0-9]+]]
+// CHECK: [[STACK:%.*]] = alloc_stack [lexical] [var_decl] $@pack_element([[UUID]]) each Element, let, name "el"
+// CHECK: [[PACK_ELT_GET:%.*]] = pack_element_get [[DYN_PACK_IDX]] of [[ALLOC_PACK]] : $*Pack{repeat each Element} as $*@pack_element([[UUID]]) each Element
+// CHECK: copy_addr [[PACK_ELT_GET]] to [init] [[STACK]] : $*@pack_element([[UUID]]) each Element
 // CHECK: [[LOOP_END_FUNC:%.*]] = function_ref @loopBodyEnd : $@convention(thin) () -> ()
 // CHECK: apply [[LOOP_END_FUNC]]() : $@convention(thin) () -> ()
-// CHECK: destroy_addr [[STACK]] : $*@pack_element("[[UUID]]") each Element
-// CHECK: dealloc_stack [[STACK]] : $*@pack_element("[[UUID]]") each Element
+// CHECK: destroy_addr [[STACK]] : $*@pack_element([[UUID]]) each Element
+// CHECK: dealloc_stack [[STACK]] : $*@pack_element([[UUID]]) each Element
 // CHECK: br [[LATCH_BB:bb[0-9]+]]
 //
 // CHECK: [[NONE_BB]]:

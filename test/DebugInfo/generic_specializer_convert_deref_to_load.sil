@@ -1,0 +1,44 @@
+// RUN: %target-sil-opt %s -generic-specializer -enable-sil-verify-all | %FileCheck %s
+
+// Test that specializing a generic function with a debug reconstruction block
+// that has op_deref converts the deref to a load when the substituted type
+// is loadable.
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+struct MyStruct {
+  @_hasStorage var x: Int64 { get set }
+}
+
+// A generic function with a debug_value that has op_deref and a
+// reconstruction block. This simulates an address-only generic parameter
+// whose debug info has been salvaged.
+sil @process : $@convention(thin) <T> (@in_guaranteed T) -> Int64 {
+bb0(%0 : $*T):
+  debug_value %0 : $*T, let, name "context", expr op_deref, transform {
+  bb0(%a0 : $*T):
+    return %a0 : $*T
+  }
+  %lit = integer_literal $Builtin.Int64, 1
+  %int = struct $Int64 (%lit : $Builtin.Int64)
+  return %int : $Int64
+}
+
+// CHECK-LABEL: sil shared @$s7process4main8MyStructV_Tg5
+// After specialization with T=MyStruct, the deref should be converted to a
+// load in the reconstruction block since MyStruct is loadable.
+// CHECK:         debug_value %{{[0-9]+}}, let, name "context", transform {
+// CHECK:           bb0(%0 : $*MyStruct):
+// CHECK:             %1 = load %0
+// CHECK:             return %1
+// CHECK:         }
+// CHECK-LABEL: } // end sil function '$s7process4main8MyStructV_Tg5'
+sil @caller : $@convention(thin) (@in_guaranteed MyStruct) -> Int64 {
+bb0(%0 : $*MyStruct):
+  %fn = function_ref @process : $@convention(thin) <T> (@in_guaranteed T) -> Int64
+  %result = apply %fn<MyStruct>(%0) : $@convention(thin) <T> (@in_guaranteed T) -> Int64
+  return %result : $Int64
+}

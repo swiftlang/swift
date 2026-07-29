@@ -93,6 +93,18 @@ bool everyMergeHasAncestorBoundary(IsolationHistory history) {
   return true;
 }
 
+/// Pop one PartitionOp worth of history (nodes up to and including the next
+/// SequenceBoundary), undoing each. Returns true if more history remains.
+/// Mirrors the drain the removed Partition::popHistory used to provide, built
+/// on the node-returning popHistoryOnce.
+bool popOnePartitionOp(Partition &p, SmallVectorImpl<SILBasicBlock *> &blocks) {
+  while (auto *node = p.popHistoryOnce(blocks)) {
+    if (node->getKind() == IsolationHistory::Node::SequenceBoundary)
+      break;
+  }
+  return p.hasHistory();
+}
+
 } // namespace
 
 //===----------------------------------------------------------------------===//
@@ -151,88 +163,6 @@ TEST(IsolationHistory, PushMergeElementRegionsPrimitive) {
   ASSERT_EQ(args.size(), 2u);
   EXPECT_EQ(args[0], Element(2));
   EXPECT_EQ(args[1], Element(5));
-}
-
-// CFGHistoryJoin is suppressed when joining the same head — pushCFGHistoryJoin
-// early-returns rather than recording a self-edge that would pollute the
-// walker's worklist.
-TEST(IsolationHistory, CFGHistoryJoinSelfSuppressed) {
-  llvm::BumpPtrAllocator allocator;
-  IsolationHistory::Factory historyFactory(allocator);
-
-  IsolationHistory history = historyFactory.get();
-  history.pushHistorySequenceBoundary(SILLocation::invalid());
-  auto *headBefore = history.getHead();
-
-  // Joining ourselves at our current head should be a no-op.
-  history.pushCFGHistoryJoin(headBefore);
-
-  EXPECT_EQ(history.getHead(), headBefore);
-}
-
-// pushCFGHistoryJoin(nullptr) is the other early-return path. The walker
-// occasionally hands us a null head when the predecessor never recorded
-// anything — must not allocate or rewrite head.
-TEST(IsolationHistory, CFGHistoryJoinNullSuppressed) {
-  llvm::BumpPtrAllocator allocator;
-  IsolationHistory::Factory historyFactory(allocator);
-
-  IsolationHistory history = historyFactory.get();
-  history.pushHistorySequenceBoundary(SILLocation::invalid());
-  auto *headBefore = history.getHead();
-
-  history.pushCFGHistoryJoin(static_cast<IsolationHistory::Node *>(nullptr));
-
-  EXPECT_EQ(history.getHead(), headBefore);
-}
-
-// pushCFGHistoryJoin from an empty-headed history adopts otherNode directly
-// rather than synthesizing a CFGHistoryJoin wrapper. This is the
-// "predecessor's history wins" shortcut that drives
-// TestHistory_JoiningEmptyAndNotEmpty's historySize == 2 expectation.
-TEST(IsolationHistory, CFGHistoryJoinFromEmptyAdoptsOther) {
-  llvm::BumpPtrAllocator allocator;
-  IsolationHistory::Factory historyFactory(allocator);
-
-  // Build a non-empty otherNode chain.
-  IsolationHistory other = historyFactory.get();
-  other.pushHistorySequenceBoundary(SILLocation::invalid());
-  other.pushNewElementRegion(Element(3));
-  auto *otherHead = other.getHead();
-
-  IsolationHistory empty = historyFactory.get();
-  EXPECT_EQ(empty.getHead(), nullptr);
-
-  empty.pushCFGHistoryJoin(otherHead);
-
-  EXPECT_EQ(empty.getHead(), otherHead)
-      << "Empty history should adopt otherNode rather than wrap it.";
-}
-
-// When both histories are non-empty and have distinct heads, pushCFGHistoryJoin
-// allocates a fresh CFGHistoryJoin node whose firstArgAsNode is otherNode and
-// whose parent is the previous head. This is the only path that records a
-// genuine CFG merge for the SendNonSendable walker to recurse into.
-TEST(IsolationHistory, CFGHistoryJoinDistinctNonEmptyCreatesNode) {
-  llvm::BumpPtrAllocator allocator;
-  IsolationHistory::Factory historyFactory(allocator);
-
-  IsolationHistory other = historyFactory.get();
-  other.pushHistorySequenceBoundary(SILLocation::invalid());
-  auto *otherHead = other.getHead();
-
-  IsolationHistory main = historyFactory.get();
-  main.pushHistorySequenceBoundary(SILLocation::invalid());
-  auto *mainHeadBefore = main.getHead();
-
-  main.pushCFGHistoryJoin(otherHead);
-
-  auto *newHead = main.getHead();
-  ASSERT_NE(newHead, nullptr);
-  EXPECT_NE(newHead, mainHeadBefore);
-  EXPECT_EQ(newHead->getKind(), IsolationHistory::Node::CFGHistoryJoin);
-  EXPECT_EQ(newHead->getFirstArgAsNode(), otherHead);
-  EXPECT_EQ(newHead->getNext(), mainHeadBefore);
 }
 
 //===----------------------------------------------------------------------===//
@@ -342,8 +272,8 @@ TEST(IsolationHistory, SingleRegionRoundTrip) {
 
   // Drain history. popHistory returns true while there's more to pop;
   // joins is unused since singleRegion never records a CFGHistoryJoin.
-  llvm::SmallVector<IsolationHistory, 4> joins;
-  while (p.popHistory(joins))
+  llvm::SmallVector<SILBasicBlock *, 4> joins;
+  while (popOnePartitionOp(p, joins))
     continue;
 
   EXPECT_FALSE(p.hasHistory());
@@ -516,8 +446,8 @@ TEST(IsolationHistory, SeparateRegionsRoundTrip) {
   auto p = makePartitionWithSeparateRegions(
       loc, {Element(0), Element(1), Element(2)}, historyFactory.get());
 
-  llvm::SmallVector<IsolationHistory, 4> joins;
-  while (p.popHistory(joins))
+  llvm::SmallVector<SILBasicBlock *, 4> joins;
+  while (popOnePartitionOp(p, joins))
     continue;
 
   EXPECT_FALSE(p.hasHistory());
@@ -586,8 +516,8 @@ TEST(IsolationHistory, JoinSecondBranchPushPopAsymmetry) {
 
   // Drain the joined partition's history. After full unwind, no element
   // should be tracked — both fst and snd's contributions should reverse.
-  llvm::SmallVector<IsolationHistory, 4> joins;
-  while (joined.popHistory(joins))
+  llvm::SmallVector<SILBasicBlock *, 4> joins;
+  while (popOnePartitionOp(joined, joins))
     continue;
 
   EXPECT_FALSE(joined.isTrackingElement(Element(1)))
@@ -609,7 +539,7 @@ TEST(IsolationHistory, CreateVariable) {
   llvm::BumpPtrAllocator allocator;
   Partition::SendingOperandSetFactory factory(allocator);
   IsolationHistory::Factory historyFactory(allocator);
-  SmallVector<IsolationHistory, 8> joinedHistories;
+  SmallVector<SILBasicBlock *, 8> joinedHistories;
   SendingOperandToStateMap transferringOpToStateMap(historyFactory);
 
   // First make sure that we do this correctly with an assign fresh.
@@ -627,7 +557,7 @@ TEST(IsolationHistory, CreateVariable) {
     eval.apply({PartitionOp::AssignFresh(Element(2))});
   }
 
-  p.popHistory(joinedHistories);
+  popOnePartitionOp(p, joinedHistories);
 
   EXPECT_TRUE(Partition::equals(p, pSnapshot));
   EXPECT_TRUE(joinedHistories.empty());
@@ -638,7 +568,7 @@ TEST(IsolationHistory, AssignRegion) {
   Partition::SendingOperandSetFactory factory(allocator);
   IsolationHistory::Factory historyFactory(allocator);
   SendingOperandToStateMap transferringOpToStateMap(historyFactory);
-  SmallVector<IsolationHistory, 8> joinedHistories;
+  SmallVector<SILBasicBlock *, 8> joinedHistories;
 
   // First make sure that we do this correctly with an assign fresh.
   Partition p(historyFactory.get());
@@ -662,12 +592,12 @@ TEST(IsolationHistory, AssignRegion) {
     eval.apply({PartitionOp::AssignDirect(Element(0), Element(2))});
   }
 
-  p.popHistory(joinedHistories);
+  popOnePartitionOp(p, joinedHistories);
 
   EXPECT_TRUE(Partition::equals(p, pSnapshot2));
   EXPECT_TRUE(joinedHistories.empty());
 
-  p.popHistory(joinedHistories);
+  popOnePartitionOp(p, joinedHistories);
 
   EXPECT_TRUE(Partition::equals(p, pSnapshot));
   EXPECT_TRUE(joinedHistories.empty());
@@ -678,7 +608,7 @@ TEST(IsolationHistory, BuildNewRegionRepIsMerge) {
   Partition::SendingOperandSetFactory factory(allocator);
   IsolationHistory::Factory historyFactory(allocator);
   SendingOperandToStateMap transferringOpToStateMap(historyFactory);
-  SmallVector<IsolationHistory, 8> joinedHistories;
+  SmallVector<SILBasicBlock *, 8> joinedHistories;
 
   Partition p(historyFactory.get());
   {
@@ -710,13 +640,13 @@ TEST(IsolationHistory, BuildNewRegionRepIsMerge) {
   EXPECT_TRUE(Partition::equals(p, pSnapshot2));
 
   // We pop but nothing changes since we did not need to change anything.
-  p.popHistory(joinedHistories);
+  popOnePartitionOp(p, joinedHistories);
 
   EXPECT_TRUE(Partition::equals(p, pSnapshot2));
   EXPECT_TRUE(joinedHistories.empty());
 
   // We pop a last time to return to our original value.
-  p.popHistory(joinedHistories);
+  popOnePartitionOp(p, joinedHistories);
 
   EXPECT_TRUE(Partition::equals(p, pSnapshot));
   EXPECT_TRUE(joinedHistories.empty());
@@ -726,12 +656,12 @@ TEST(IsolationHistory, ReturnFalseWhenNoneLeft) {
   llvm::BumpPtrAllocator allocator;
   Partition::SendingOperandSetFactory factory(allocator);
   IsolationHistory::Factory historyFactory(allocator);
-  SmallVector<IsolationHistory, 8> joinedHistories;
+  SmallVector<SILBasicBlock *, 8> joinedHistories;
   SendingOperandToStateMap transferringOpToStateMap(historyFactory);
 
   Partition p(historyFactory.get());
 
-  EXPECT_FALSE(p.popHistory(joinedHistories));
+  EXPECT_FALSE(popOnePartitionOp(p, joinedHistories));
   EXPECT_TRUE(joinedHistories.empty());
 
   {
@@ -740,10 +670,10 @@ TEST(IsolationHistory, ReturnFalseWhenNoneLeft) {
                 PartitionOp::AssignFresh(Element(3))});
   }
 
-  EXPECT_TRUE(p.popHistory(joinedHistories));
+  EXPECT_TRUE(popOnePartitionOp(p, joinedHistories));
   EXPECT_TRUE(joinedHistories.empty());
 
-  EXPECT_FALSE(p.popHistory(joinedHistories));
+  EXPECT_FALSE(popOnePartitionOp(p, joinedHistories));
   EXPECT_TRUE(joinedHistories.empty());
 }
 
@@ -752,7 +682,7 @@ TEST(IsolationHistory, JoiningTwoEmpty) {
   llvm::BumpPtrAllocator allocator;
   Partition::SendingOperandSetFactory factory(allocator);
   IsolationHistory::Factory historyFactory(allocator);
-  SmallVector<IsolationHistory, 8> joinedHistories;
+  SmallVector<SILBasicBlock *, 8> joinedHistories;
 
   Partition p1(historyFactory.get());
   Partition p2(historyFactory.get());
@@ -768,7 +698,7 @@ TEST(IsolationHistory, JoiningNotEmptyAndEmpty) {
   llvm::BumpPtrAllocator allocator;
   Partition::SendingOperandSetFactory factory(allocator);
   IsolationHistory::Factory historyFactory(allocator);
-  SmallVector<IsolationHistory, 8> joinedHistories;
+  SmallVector<SILBasicBlock *, 8> joinedHistories;
   SendingOperandToStateMap transferringOpToStateMap(historyFactory);
 
   Partition p1(historyFactory.get());
@@ -795,7 +725,7 @@ TEST(IsolationHistory, JoiningEmptyAndNotEmpty) {
   Partition::SendingOperandSetFactory factory(allocator);
   IsolationHistory::Factory historyFactory(allocator);
   SendingOperandToStateMap transferringOpToStateMap(historyFactory);
-  SmallVector<IsolationHistory, 8> joinedHistories;
+  SmallVector<SILBasicBlock *, 8> joinedHistories;
 
   Partition p1(historyFactory.get());
   Partition p2(historyFactory.get());
@@ -828,7 +758,7 @@ TEST(IsolationHistory, AssignDirectMovesElementRoundTrip) {
   Partition::SendingOperandSetFactory factory(allocator);
   IsolationHistory::Factory historyFactory(allocator);
   SendingOperandToStateMap opToStateMap(historyFactory);
-  SmallVector<IsolationHistory, 8> joins;
+  SmallVector<SILBasicBlock *, 8> joins;
 
   // Set up two separate regions: {0, 1} and {2}. Element 1 lives in 0's
   // region.
@@ -861,7 +791,7 @@ TEST(IsolationHistory, AssignDirectMovesElementRoundTrip) {
   EXPECT_EQ(after.getRegion(1), after.getRegion(2));
   EXPECT_NE(after.getRegion(1), after.getRegion(0));
 
-  p.popHistory(joins);
+  popOnePartitionOp(p, joins);
   EXPECT_TRUE(joins.empty());
   EXPECT_TRUE(Partition::equals(p, snapshot))
       << "AssignDirect that moved an element across regions did not "

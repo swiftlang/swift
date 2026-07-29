@@ -1567,7 +1567,7 @@ public:
         diagnosed = true;
 
       // has to have a deinit or else it's pointless.
-      } else if (!nominalDecl->getValueTypeDestructor()) {
+      } else if (!nominalDecl->hasValueTypeDestructor()) {
         ctx.Diags.diagnose(DS->getDiscardLoc(),
                            diag::discard_no_deinit,
                            nominalType)

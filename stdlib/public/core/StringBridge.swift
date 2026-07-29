@@ -756,29 +756,32 @@ extension String {
 // Note: This function is not intended to be called from Swift.  The
 // availability information here is perfunctory; this function isn't considered
 // part of the Stdlib's Swift ABI.
-@available(SwiftStdlib 5.2, *)
+@available(SwiftStdlib 6.4, *)
 @_cdecl("_SwiftCreateBridgedString")
 @usableFromInline
 internal func _SwiftCreateBridgedString_DoNotCall(
   bytes: UnsafePointer<UInt8>,
   length: Int,
   encoding: _swift_shims_CFStringEncoding
-) -> Unmanaged<AnyObject> {
+) -> Unmanaged<AnyObject>? {
   let bufPtr = unsafe UnsafeBufferPointer(start: bytes, count: length)
-  let str:String
+  let str:String?
   switch encoding {
   case kCFStringEncodingUTF8:
-    str = unsafe String(decoding: bufPtr, as: Unicode.UTF8.self)
+    str = unsafe String(validating: bufPtr, as: Unicode.UTF8.self)
   case kCFStringEncodingASCII:
-    str = unsafe String(decoding: bufPtr, as: Unicode.ASCII.self)
+    str = unsafe String(validating: bufPtr, as: Unicode.ASCII.self)
   case kCFStringEncodingUTF16:
     str = unsafe bufPtr.withMemoryRebound(to: UInt16.self) {
-      unsafe String(decoding: $0, as: Unicode.UTF16.self)
+      unsafe String(validating: $0, as: Unicode.UTF16.self)
     }
   default:
     fatalError("Unsupported encoding in shim")
   }
-  return unsafe Unmanaged<AnyObject>.passRetained(str._bridgeToObjectiveCImpl())
+  if let str {
+    return unsafe Unmanaged<AnyObject>.passRetained(str._bridgeToObjectiveCImpl())
+  }
+  return nil
 }
 
 @available(SwiftStdlib 6.1, *)
@@ -788,6 +791,10 @@ internal func _SwiftCreateBridgedString_DoNotCall(
 ) -> String? {
   if buffer.count == 0 {
     return ""
+  if isASCII {
+    return unsafe _allASCII(buffer) ?
+      String(_StringGuts(buffer, isASCII: true)) :
+      nil
   }
   switch unsafe validateUTF8(buffer) {
   case .success(let extraInfo):
@@ -865,6 +872,8 @@ extension StringProtocol {
     return self.utf16.index(self.utf16.startIndex, offsetBy: offset)
   }
 
+  @_specialize(where Self == String)
+  @_specialize(where Self == Substring)
   public // SPI(Foundation)
   func _toUTF16Offsets(_ indices: Range<Index>) -> Range<Int> {
     if Self.self == String.self {
@@ -880,6 +889,8 @@ extension StringProtocol {
     return unsafe Range(uncheckedBounds: (lower: startOffset, upper: endOffset))
   }
 
+  @_specialize(where Self == String)
+  @_specialize(where Self == Substring)
   public // SPI(Foundation)
   func _toUTF16Indices(_ range: Range<Int>) -> Range<Index> {
 #if hasFeature(Macros)

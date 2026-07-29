@@ -27,11 +27,22 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
   add_custom_target(embedded-multi-threaded-darwin-shim)
   add_dependencies(embedded-libraries embedded-multi-threaded-darwin-shim)
 
+  # The bridging header annotates its C declarations with Clang bounds-safety
+  # attributes (EMBEDDED_SWIFT_COUNTED_BY / EMBEDDED_SWIFT_SIZED_BY, i.e.
+  # __counted_by / __sized_by). The ClangImporter expands those into the
+  # `_SwiftifyImport` macro, which is provided by the SwiftMacros compiler
+  # plugin. Point the compiler at the freshly-built plugin directory
+  # (`SWIFT_HOST_PLUGINS_DIR`, computed in stdlib/public/CMakeLists.txt) so it
+  # doesn't fall back to a stale plugin from the host toolchain (which may
+  # predate `SwiftifyImportMacro`). Unlike `core`, this sibling directory does
+  # not inherit `core`'s `-plugin-path`, so add it here.
   set(_embedded_platform_swift_flags
     ${swift_stdlib_compile_flags}
+    "-plugin-path" "${SWIFT_HOST_PLUGINS_DIR}"
     "-import-bridging-header" ${CMAKE_CURRENT_SOURCE_DIR}/swift/EmbeddedPlatform.h
     -enable-experimental-feature Extern
     -enable-experimental-feature AllowRuntimeSymbolDeclarations
+    "-enable-builtin-module"
     "-disable-bridging-pch")
 
   add_embedded_swift_target_library(
@@ -40,6 +51,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
     PARTIAL_SOURCES_INTENDED
     INSTALL_BINARY
     NON_EMPTY_OBJECT_FILE
+    DETECT_MALLOC_TYPE
 
     EmbeddedPlatformPOSIX.swift
 

@@ -548,7 +548,7 @@ bb0:
   %0 = function_ref @createit : $@convention(thin) () -> @owned Kl
   %1 = apply %0() : $@convention(thin) () -> @owned Kl
   %2 = keypath $any KeyPath<KeyPathRoot, Int> & Sendable, (root $KeyPathRoot; stored_property #KeyPathRoot.int : $Int)
-  %3 = open_existential_ref %2 to $@opened("11111111-1111-1111-1111-111111111111", any KeyPath<KeyPathRoot, Int> & Sendable) Self
+  %3 = open_existential_ref %2 to $@opened(1, any KeyPath<KeyPathRoot, Int> & Sendable) Self
   %4 = upcast %3 to $KeyPath<KeyPathRoot, Int>
   %5 = enum $Optional<Int>, #Optional.none!enumelt
   %6 = struct $KeyPathWrapper<KeyPathRoot, Int> (%1, %5, %4)

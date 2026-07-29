@@ -1824,6 +1824,12 @@ ManglingError Remangler::mangleImplErasedIsolation(Node *node, unsigned depth) {
   return ManglingError::Success;
 }
 
+ManglingError Remangler::mangleImplCalledOnceFunction(Node *node,
+                                                      unsigned depth) {
+  // The old mangler does not encode @called(once).
+  return ManglingError::Success;
+}
+
 ManglingError Remangler::mangleImplSendingResult(Node *node, unsigned depth) {
   // The old mangler does not encode sending result
   return ManglingError::Success;
@@ -3183,5 +3189,10 @@ ManglingError Remangler::mangleBorrowAccessor(Node *node, EntityContext &ctx,
 
 ManglingError Remangler::mangleMutateAccessor(Node *node, EntityContext &ctx,
                                               unsigned depth) {
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
+}
+
+ManglingError Remangler::mangleCalledOnceFunctionType(Node *node,
+                                                      unsigned depth) {
   return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }

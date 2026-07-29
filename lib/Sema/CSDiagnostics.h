@@ -835,6 +835,7 @@ public:
         attributeKind(attributeKind) {}
 
   bool diagnoseAsError() override;
+  bool diagnoseAsNote() override;
 
 private:
   /// Emit tailored diagnostics for no-escape/non-sendable parameter
@@ -1005,6 +1006,25 @@ public:
     assert(fnType1->isAsync() != fnType2->isAsync());
 #endif
   }
+
+  bool diagnoseAsError() override;
+};
+
+/// Diagnose failures related to conversion between two types with different
+/// execution semantics i.e. '@called(once)' function and regular one:
+///
+/// ```swift
+/// func test(_: () -> Void) {}
+/// let fn: @called(once) () -> Void = {}
+/// test(fn) // error due to widening
+/// ```
+class ConversionBetweenFunctionsWithDifferentExecutionSemantics final
+    : public ContextualFailure {
+public:
+  ConversionBetweenFunctionsWithDifferentExecutionSemantics(
+      const Solution &solution, Type fromType, Type toType,
+      ConstraintLocator *locator)
+      : ContextualFailure(solution, fromType, toType, locator) {}
 
   bool diagnoseAsError() override;
 };
@@ -1391,6 +1411,26 @@ public:
       : MemberReferenceFailure(solution, locator),
         BaseType(baseType->getRValueType()), Member(member), Name(name) {
     assert(member);
+  }
+
+  bool diagnoseAsError() override;
+};
+
+/// Diagnose a member of a protocol metatype extension referenced through the
+/// metatype of a conforming type. Such members belong to the protocol metatype
+/// itself and are not inherited by conforming types.
+class InvalidMetatypeExtensionMemberRefFailure final
+    : public MemberReferenceFailure {
+  Type BaseType;
+  ValueDecl *Member;
+
+public:
+  InvalidMetatypeExtensionMemberRefFailure(
+      const Solution &solution, Type baseType, ValueDecl *member,
+      ConstraintLocator *locator)
+      : MemberReferenceFailure(solution, locator),
+        BaseType(baseType->getRValueType()), Member(member) {
+    ASSERT(member);
   }
 
   bool diagnoseAsError() override;

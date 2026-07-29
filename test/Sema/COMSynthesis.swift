@@ -1,6 +1,10 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module-path %t/COM.swiftmodule -module-name COM -enable-experimental-com-interop %S/../Inputs/COM.swift
-// RUN: %target-typecheck-verify-swift -enable-experimental-com-interop -I %t
+// RUN: %target-typecheck-verify-swift -enable-experimental-com-interop -com-interop-model=microsoft -I %t
+// RUN: %target-typecheck-verify-swift -enable-experimental-com-interop -com-interop-model=corefoundation -I %t
+
+// Both interop models root at `IUnknown`, so the synthesized root conformance
+// is the same under either; run both to pin that portability.
 
 import COM
 

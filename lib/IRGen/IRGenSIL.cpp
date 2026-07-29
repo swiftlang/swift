@@ -1051,6 +1051,21 @@ public:
       return Storage;
     }
 
+    // The same variable can be described in one scope by debug_values of
+    // different storage kinds (e.g. a loadable value and, for async code, an
+    // alloc_box projection). Shadow slots are keyed by {ArgNo, Scope, Name} and
+    // reuse one alloca, so a differently-typed store cannot fit it; keep the
+    // existing shadow copy instead. rdar://181840734
+    unsigned ArgNo = VarInfo.ArgNo;
+    auto existingSlot =
+        ShadowStackSlots.lookup({ArgNo, {Scope, VarInfo.Name}});
+    if (!WasMoved && existingSlot.isValid() &&
+        existingSlot.getElementType() != Storage->getType() &&
+        existingSlot.getElementType() !=
+            Storage->stripPointerCasts()->getType()) {
+      return Storage;
+    }
+
     // Emit a shadow copy.
     auto shadow = emitShadowCopy(Storage, Scope, VarInfo, Align, true, WasMoved)
                       .getAddress();
@@ -2083,7 +2098,7 @@ static ArrayRef<SILArgument *> emitEntryPointIndirectReturn(
     llvm::function_ref<bool(SILType)> requiresIndirectResult) {
   // Map an indirect return for a type SIL considers loadable but still
   // requires an indirect return at the IR level.
-  SILFunctionConventions fnConv(funcTy, IGF.getSILModule());
+  SILFunctionConventions fnConv(funcTy, IGF.IGM.silConv);
   SILType directResultType = IGF.CurSILFn->mapTypeIntoEnvironment(
       fnConv.getSILResultType(IGF.IGM.getMaximalTypeExpansionContext()));
 
@@ -2212,7 +2227,7 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
                                    witnessMetadata);
   }
 
-  SILFunctionConventions fnConv(funcTy, IGF.getSILModule());
+  SILFunctionConventions fnConv(funcTy, IGF.IGM.silConv);
 
   // Bind the self/context parameter, the last parameter of the async entry
   // signature. Factored out so async binds it before popping the error result
@@ -2310,6 +2325,7 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
   // Sync path: bind the context after the error result (async bound it above).
   if (!funcTy->isAsync())
     boundContextParameter = bindContextParameter();
+
 
   if (!boundContextParameter &&
       isKeyPathAccessorRepresentation(funcTy->getRepresentation())) {
@@ -3903,7 +3919,7 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
                             getLoweredValue(site.getCallee());
 
   auto args = site.getArguments();
-  SILFunctionConventions origConv(origCalleeType, getSILModule());
+  SILFunctionConventions origConv(origCalleeType, IGM.silConv);
   assert(origConv.getNumSILArguments() == args.size());
 
   // Extract 'self' if it needs to be passed as the context parameter.
@@ -4052,7 +4068,7 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
     auto tryApplyInst = cast<TryApplyInst>(i);
 
     // Load the error value.
-    SILFunctionConventions substConv(substCalleeType, getSILModule());
+    SILFunctionConventions substConv(substCalleeType, IGM.silConv);
     SILType errorType =
         substConv.getSILErrorType(IGM.getMaximalTypeExpansionContext());
     Address calleeErrorSlot = emission->getCalleeErrorSlot(
@@ -4518,7 +4534,7 @@ static void emitReturnInst(IRGenSILFunction &IGF,
                            CanSILFunctionType fnType,
                            bool mayPeepholeLoad) {
   SILFunctionConventions conv(IGF.CurSILFn->getLoweredFunctionType(),
-                              IGF.getSILModule());
+                              IGF.IGM.silConv);
 
   auto getNullErrorValue = [&] () -> llvm::Value* {
     if (!conv.isTypedError()) {
@@ -4664,7 +4680,7 @@ void IRGenSILFunction::visitReturnInst(swift::ReturnInst *i) {
 
 void IRGenSILFunction::visitThrowInst(swift::ThrowInst *i) {
   SILFunctionConventions conv(CurSILFn->getLoweredFunctionType(),
-                              getSILModule());
+                              IGM.silConv);
   assert(!conv.hasIndirectSILErrorResults());
 
   if (!isAsync()) {
@@ -4780,7 +4796,7 @@ void IRGenSILFunction::visitThrowInst(swift::ThrowInst *i) {
 
 void IRGenSILFunction::visitThrowAddrInst(swift::ThrowAddrInst *i) {
   SILFunctionConventions conv(CurSILFn->getLoweredFunctionType(),
-                              getSILModule());
+                              IGM.silConv);
   assert(conv.isTypedError());
   assert(conv.hasIndirectSILErrorResults());
 
@@ -4826,7 +4842,7 @@ void IRGenSILFunction::visitUnwindInst(swift::UnwindInst *i) {
 
 void IRGenSILFunction::visitYieldInst(swift::YieldInst *i) {
   auto coroutineType = CurSILFn->getLoweredFunctionType();
-  SILFunctionConventions coroConv(coroutineType, getSILModule());
+  SILFunctionConventions coroConv(coroutineType, IGM.silConv);
 
   GenericContextScope scope(IGM, coroutineType->getInvocationGenericSignature());
 
@@ -5495,9 +5511,6 @@ void IRGenSILFunction::visitCondBranchInst(swift::CondBranchInst *i) {
   LoweredBB &falseBB = getLoweredBB(i->getFalseBB());
   llvm::Value *condValue =
     getLoweredExplosion(i->getCondition(), &Builder).claimNext();
-
-  addIncomingSILArgumentsToPHINodes(*this, trueBB, i->getTrueArgs());
-  addIncomingSILArgumentsToPHINodes(*this, falseBB, i->getFalseArgs());
 
   llvm::MDNode *Weights = nullptr;
   auto TrueBBCount = i->getTrueBBCount();
@@ -6312,11 +6325,22 @@ void IRGenSILFunction::visitCopyBlockInst(CopyBlockInst *i) {
 void IRGenSILFunction::visitImplicitActorToOpaqueIsolationCastInst(
     ImplicitActorToOpaqueIsolationCastInst *i) {
   auto lowered = getLoweredExplosion(i->getOperand());
+  // Reinterpret the implicit-actor words as the opaque isolation value,
+  // clearing the tag bits on the actor word. Match the result type's schema
+  // element types (the `(any Actor)?` enum now carries its words as `ptr`).
+  auto &resultTI = cast<LoadableTypeInfo>(getTypeInfo(i->getType()));
+  ExplosionSchema schema;
+  resultTI.getSchema(schema);
+  assert(schema.size() == 2 && schema.begin()[0].isScalar() &&
+         schema.begin()[1].isScalar() &&
+         "opaque isolation should be two scalars");
+  auto *word1 = lowered.claimNext();
+  auto *word2 = clearImplicitIsolatedActorBits(*this, lowered.claimNext());
   Explosion result;
-  result.add(Builder.CreateBitOrPointerCast(lowered.claimNext(), IGM.IntPtrTy));
-  result.add(Builder.CreateBitOrPointerCast(
-      clearImplicitIsolatedActorBits(*this, lowered.claimNext()),
-      IGM.IntPtrTy));
+  result.add(
+      Builder.CreateBitOrPointerCast(word1, schema.begin()[0].getScalarType()));
+  result.add(
+      Builder.CreateBitOrPointerCast(word2, schema.begin()[1].getScalarType()));
   setLoweredExplosion(i, result);
 }
 
@@ -6342,6 +6366,37 @@ static const ReferenceTypeInfo &getReferentTypeInfo(IRGenFunction &IGF,
   if (auto ty = type->getOptionalObjectType())
     type = ty->getCanonicalType();
   return cast<ReferenceTypeInfo>(IGF.getTypeInfoForLowered(type));
+}
+
+/// Reinterpret a reference-storage explosion as its loaded referent. The two
+/// share their bit patterns word-for-word, but the referent's lowering may use
+/// different element types (e.g. an optional reference whose enum now carries
+/// its pointers as `ptr` rather than integer words). Cast each word to the
+/// referent's schema type; if the shapes don't line up, forward unchanged.
+static Explosion coerceReferenceStorageResult(IRGenSILFunction &IGF,
+                                              SILType resultTy,
+                                              Explosion &storage) {
+  auto &resultTI = cast<LoadableTypeInfo>(IGF.getTypeInfo(resultTy));
+  ExplosionSchema schema;
+  resultTI.getSchema(schema);
+
+  auto values = storage.claimAll();
+  Explosion result;
+  if (values.size() != schema.size()) {
+    // Shapes differ; forward the words unchanged.
+    for (auto *value : values)
+      result.add(value);
+    return result;
+  }
+
+  unsigned idx = 0;
+  for (auto &elt : schema) {
+    llvm::Value *value = values[idx++];
+    if (elt.isScalar() && value->getType() != elt.getScalarType())
+      value = IGF.Builder.CreateBitOrPointerCast(value, elt.getScalarType());
+    result.add(value);
+  }
+  return result;
 }
 
 void IRGenSILFunction::visitStrongCopyWeakValueInst(
@@ -6474,23 +6529,18 @@ IRGenSILFunction::visitDereferenceBorrowAddrInst(DereferenceBorrowAddrInst *i) {
       swift::StrongCopy##Name##ValueInst *i) {                                 \
     Explosion in = getLoweredExplosion(i->getOperand());                       \
     auto silTy = i->getOperand()->getType();                                   \
-    auto ty = cast<Name##StorageType>(silTy.getASTType());                     \
-    auto isOptional = bool(ty.getReferentType()->getOptionalObjectType());     \
     auto &ti = getReferentTypeInfo(*this, silTy);                              \
     ti.strongRetain##Name(*this, in, irgen::Atomicity::Atomic);                \
     /* Semantically we are just passing through the input parameter but as a   \
      */                                                                        \
-    /* strong reference... at LLVM IR level these type differences don't */    \
-    /* matter. So just set the lowered explosion appropriately. */             \
+    /* strong reference... at LLVM IR level the reference-storage explosion */ \
+    /* and the loaded referent share their bit patterns but may use */         \
+    /* different element types (e.g. the referent's enum now carries its */    \
+    /* pointers as `ptr`). Coerce each word to the referent's schema type. */  \
     Explosion output = getLoweredExplosion(i->getOperand());                   \
-    if (isOptional) {                                                          \
-      auto values = output.claimAll();                                         \
-      output.reset();                                                          \
-      for (auto value : values) {                                              \
-        output.add(Builder.CreatePtrToInt(value, IGM.IntPtrTy));               \
-      }                                                                        \
-    }                                                                          \
-    setLoweredExplosion(i, output);                                            \
+    Explosion coerced =                                                        \
+        coerceReferenceStorageResult(*this, i->getType(), output);             \
+    setLoweredExplosion(i, coerced);                                           \
   }
 #define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
   NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, name, "...") \
@@ -6500,25 +6550,20 @@ IRGenSILFunction::visitDereferenceBorrowAddrInst(DereferenceBorrowAddrInst *i) {
       swift::StrongCopy##Name##ValueInst *i) {                                 \
     Explosion in = getLoweredExplosion(i->getOperand());                       \
     auto silTy = i->getOperand()->getType();                                   \
-    auto ty = cast<Name##StorageType>(silTy.getASTType());                     \
-    auto isOptional = bool(ty.getReferentType()->getOptionalObjectType());     \
     auto &ti = getReferentTypeInfo(*this, silTy);                              \
     /* Since we are unchecked, we just use strong retain here. We do not       \
      * perform any checks */                                                   \
     ti.strongRetain(*this, in, irgen::Atomicity::Atomic);                      \
     /* Semantically we are just passing through the input parameter but as a   \
      */                                                                        \
-    /* strong reference... at LLVM IR level these type differences don't */    \
-    /* matter. So just set the lowered explosion appropriately. */             \
+    /* strong reference... at LLVM IR level the reference-storage explosion */ \
+    /* and the loaded referent share their bit patterns but may use */         \
+    /* different element types (e.g. the referent's enum now carries its */    \
+    /* pointers as `ptr`). Coerce each word to the referent's schema type. */  \
     Explosion output = getLoweredExplosion(i->getOperand());                   \
-    if (isOptional) {                                                          \
-      auto values = output.claimAll();                                         \
-      output.reset();                                                          \
-      for (auto value : values) {                                              \
-        output.add(Builder.CreatePtrToInt(value, IGM.IntPtrTy));               \
-      }                                                                        \
-    }                                                                          \
-    setLoweredExplosion(i, output);                                            \
+    Explosion coerced =                                                        \
+        coerceReferenceStorageResult(*this, i->getType(), output);             \
+    setLoweredExplosion(i, coerced);                                           \
   }
 #include "swift/AST/ReferenceStorage.def"
 #undef COMMON_CHECKED_REF_STORAGE

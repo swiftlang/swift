@@ -9,6 +9,9 @@ roots:
       - name: module.modulemap
         type: file
         external-contents: "@PROJECT_SOURCE_DIR@\\public\\Platform\\winsdk_um.modulemap"
+      - name: WinSDK.apinotes
+        type: file
+        external-contents: "@PROJECT_SOURCE_DIR@\\public\\Platform\\WinSDK.apinotes"
   - name: "@UniversalCRTSdkDir@\\Include\\@UCRTVersion@\\shared"
     type: directory
     contents:
@@ -30,4 +33,3 @@ roots:
       - name: vcruntime.apinotes
         type: file
         external-contents: "@PROJECT_SOURCE_DIR@\\public\\Platform\\vcruntime.apinotes"
-

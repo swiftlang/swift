@@ -156,7 +156,6 @@ func lookThroughRefCast(x: Klass) -> SubKlass {
 
 func lookThroughEnum(x: Klass?) -> Klass {
     return x! // expected-remark {{retain of type 'Klass'}}
-              // expected-note @-2:22 {{of 'x.some'}}
 }
 
 func castAsQuestion(x: Klass) -> SubKlass? {
@@ -219,7 +218,6 @@ func inoutKlassTuplePairArgument(x: inout (Klass, Klass)) -> Klass {
 
 func inoutKlassOptionalArgument(x: inout Klass?) -> Klass {
     return x! // expected-remark {{retain of type 'Klass'}}
-              // expected-note @-2 {{of 'x.some'}}
 }
 
 func inoutKlassBangCastArgument(x: inout Klass) -> SubKlass {

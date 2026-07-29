@@ -35,10 +35,10 @@ sil @ConcreteClass_doSomething_witness : $@convention(witness_method: ClassProto
 sil [ossa] [noinline] @use_class_existential_guaranteed : $@convention(thin) (@in_guaranteed ClassProto) -> () {
 bb0(%0 : $*ClassProto):
   %1 = load [copy] %0 : $*ClassProto
-  %2 = open_existential_ref %1 : $ClassProto to $@opened("AABBCCDD-0011-2233-4455-66778899AABB", ClassProto) Self
-  %f = witness_method $@opened("AABBCCDD-0011-2233-4455-66778899AABB", ClassProto) Self, #ClassProto.doSomething : <Self: ClassProto> (Self) -> () -> (), %2 : $@opened("AABBCCDD-0011-2233-4455-66778899AABB", ClassProto) Self : $@convention(witness_method: ClassProto) <Self: ClassProto> (@guaranteed Self) -> ()
-  apply %f<@opened("AABBCCDD-0011-2233-4455-66778899AABB", ClassProto) Self>(%2) : $@convention(witness_method: ClassProto) <Self: ClassProto> (@guaranteed Self) -> ()
-  destroy_value %2 : $@opened("AABBCCDD-0011-2233-4455-66778899AABB", ClassProto) Self
+  %2 = open_existential_ref %1 : $ClassProto to $@opened(1, ClassProto) Self
+  %f = witness_method $@opened(1, ClassProto) Self, #ClassProto.doSomething : <Self: ClassProto> (Self) -> () -> (), %2 : $@opened(1, ClassProto) Self : $@convention(witness_method: ClassProto) <Self: ClassProto> (@guaranteed Self) -> ()
+  apply %f<@opened(1, ClassProto) Self>(%2) : $@convention(witness_method: ClassProto) <Self: ClassProto> (@guaranteed Self) -> ()
+  destroy_value %2 : $@opened(1, ClassProto) Self
   %r = tuple ()
   return %r : $()
 }

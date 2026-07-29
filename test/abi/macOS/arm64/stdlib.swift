@@ -1195,7 +1195,7 @@ Added: _$s7Failures8IterablePTl
 Added: _$sSTss8IterableRzrlE19underestimatedCountSivpMV
 Added: _$sSTss8IterableRzrlE21makeBorrowingIterators0cD7AdapterVy0D0STQzGyF
 Added: _$sSlss8IterableRzrlE19underestimatedCountSivpMV
-Added: _$ss10OutputSpanVyxGs8IterablesMc
+Added: _$ss10OutputSpanVyxGs8IterablesRi_zrlMc
 Added: _$ss11InlineArrayVyxq_Gs8IterablesRi__rlMc
 Added: _$ss11InlineArrayVsRi__rlE19underestimatedCountSivpMV
 Added: _$ss11MutableSpanVyxGs8IterablesRi_zrlMc
@@ -1316,9 +1316,12 @@ Added: _$ss11_RigidArrayVMn
 Added: _$ss11_RigidArrayVsRi_zrlE6_countSivM
 Added: _$ss11_RigidArrayVsRi_zrlE6_countSivg
 Added: _$ss11_RigidArrayVsRi_zrlE6_countSivs
-Added: _$ss11_RigidArrayVsRi_zrlE8_storageSryxGvM
-Added: _$ss11_RigidArrayVsRi_zrlE8_storageSryxGvg
-Added: _$ss11_RigidArrayVsRi_zrlE8_storageSryxGvs
+Added: _$ss11_RigidArrayVsRi_zrlE4_ptrSpyxGvM
+Added: _$ss11_RigidArrayVsRi_zrlE4_ptrSpyxGvg
+Added: _$ss11_RigidArrayVsRi_zrlE4_ptrSpyxGvs
+Added: _$ss11_RigidArrayVsRi_zrlE9_capacitySivM
+Added: _$ss11_RigidArrayVsRi_zrlE9_capacitySivg
+Added: _$ss11_RigidArrayVsRi_zrlE9_capacitySivs
 Added: _$ss11_RigidArrayVsSHRzRi_zrlE9hashValueSivg
 Added: _$ss11_RigidArrayVyxGSHsSHRzRi_zrlMc
 Added: _$ss11_RigidArrayVyxGSQsSQRzRi_zrlMc
@@ -1343,3 +1346,6 @@ Added: _swift_retainReturningCount
 Added: _$sSS9UTF16ViewV13_copyContents12initializingAB8IteratorV_SitSrys6UInt16VG_tF
 Added: _$sSs9UTF16ViewV13_copyContents12initializings16IndexingIteratorVyABG_SitSrys6UInt16VG_tF
 
+// Changing the ABI of _SwiftCreateBridgedString
+Removed: _$ss35_SwiftCreateBridgedString_DoNotCall5bytes6length8encodings9UnmanagedVyyXlGSPys5UInt8VG_Sis6UInt32VtF
+Added: _$ss35_SwiftCreateBridgedString_DoNotCall5bytes6length8encodings9UnmanagedVyyXlGSgSPys5UInt8VG_Sis6UInt32VtF

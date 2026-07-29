@@ -506,7 +506,7 @@ final class PeCoffImage {
         )
       )
       let stringTableEnd = stringTableOffset + Address(stringTableSize)
-      let stringSource = source[stringTableOffset..<stringTableEnd]
+      let stringSource = try source[stringTableOffset..<stringTableEnd]
       stringTable = PeCoffStringTable(source: stringSource)
 
       var theFunctions: [PeFunction] = []
@@ -658,7 +658,7 @@ final class PeCoffImage {
           }
 
           let dataEnd = dataPos + Address(entry.SizeOfData)
-          let entrySource = source[dataPos..<dataEnd]
+          let entrySource = try source[dataPos..<dataEnd]
           switch entry.Type {
             case .PE_DEBUG_TYPE_CODEVIEW:
               let magic = maybeSwap(try entrySource.fetch(from:0, as: UInt32.self))
@@ -671,7 +671,10 @@ final class PeCoffImage {
                                                as: UInt8.self)
               let age = maybeSwap(try entrySource.fetch(from: 20,
                                                         as: UInt32.self))
-              let pdbFile = try entrySource.fetchString(from: 24)!
+              let (pdbFile, _) = try entrySource.fetchString(from: 24)
+              guard let pdbFile else {
+                break
+              }
 
               self.codeview = PeCodeview(uuid: uuid, age: age, pdbPath: pdbFile)
 
@@ -731,11 +734,11 @@ final class PeCoffImage {
     if source.isMappedImage {
       let base = Address(section.virtualAddress)
       let end = base + Address(section.virtualSize)
-      return source[base..<end]
+      return try? source[base..<end]
     } else {
       let base = Address(section.pointerToRawData)
       let end = base + Address(min(section.virtualSize, section.sizeOfRawData))
-      return source[base..<end]
+      return try? source[base..<end]
     }
   }
 

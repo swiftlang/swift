@@ -960,7 +960,7 @@ static ModuleDecl *getModuleContextForNameLookupForCxxDecl(const Decl *decl) {
 
   // We only need to look for the real parent module when the existing parent
   // is the imported header module.
-  if (!parentModule->isClangHeaderImportModule()) {
+  if (!parentModule->isClangBridgingHeaderImportModule()) {
     if (isClonedMember)
       return parentModule;
     return nullptr;
@@ -1054,6 +1054,14 @@ bool Decl::isInMacroExpansionInContext() const {
     return getDeclContext()->getParentSourceFile();
   }();
   return swift::isMacroExpansionInContext(getStartLoc(), parentSF);
+}
+
+Decl *Decl::getMacroExpansionOriginatingDecl() const {
+  SourceLoc loc = getLoc();
+  auto *sf = getModuleContext()->getSourceFileContainingLocation(loc);
+  if (!sf || sf->Kind != SourceFileKind::MacroExpansion)
+    return nullptr;
+  return sf->getMacroExpansion().dyn_cast<Decl *>();
 }
 
 bool Decl::isInMacroExpansionFromClangHeader() const {
@@ -3557,6 +3565,8 @@ static AccessStrategy getOpaqueReadWriteAccessStrategy(
     return AccessStrategy::getAccessor(AccessorKind::YieldingMutate, dispatch);
   if (storage->requiresOpaqueModifyCoroutine())
     return AccessStrategy::getAccessor(AccessorKind::Modify, dispatch);
+  if (storage->requiresOpaqueMutateAccessor())
+    return AccessStrategy::getAccessor(AccessorKind::Mutate, dispatch);
   return AccessStrategy::getMaterializeToTemporary(
       getOpaqueReadAccessStrategy(storage, dispatch, nullptr,
                                   ResilienceExpansion::Minimal, location,
@@ -6079,16 +6089,39 @@ bool NominalTypeDecl::isStrictlyResilient() const {
   return isResilient() && !getModuleContext()->allowNonResilientAccess();
 }
 
-DestructorDecl *NominalTypeDecl::getValueTypeDestructor() {
-  if (!isa<StructDecl>(this) && !isa<EnumDecl>(this)) {
-    return nullptr;
+bool NominalTypeDecl::hasValueTypeDestructor() const {
+  // Fast path: we already checked.
+  if (auto cached = getCachedValueTypeDestructor())
+    return *cached;
+
+  // Otherwise, do the lookup, which updates the cached bit for next time.
+  return getValueTypeDestructor() != nullptr;
+}
+
+DestructorDecl *NominalTypeDecl::getValueTypeDestructor() const {
+  bool needsUpdate = true;
+
+  if (auto cached = getCachedValueTypeDestructor()) {
+    // Skip everything else if we know we don't have a destructor.
+    if (!*cached)
+      return nullptr;
+
+    needsUpdate = false;
   }
-  
-  auto found = lookupDirect(DeclBaseName::createDestructor());
-  if (found.size() != 1) {
-    return nullptr;
-  }
-  return cast<DestructorDecl>(found[0]);
+
+  NominalTypeDecl *nominalDecl = const_cast<NominalTypeDecl *>(this);
+
+  // We might have a destructor, go check.
+  DestructorDecl *result = nullptr;
+  auto found = nominalDecl->lookupDirect(DeclBaseName::createDestructor());
+  if (found.size() == 1)
+    result = cast<DestructorDecl>(found[0]);
+
+  ASSERT(needsUpdate || result != nullptr && "Where did my destructor go?");
+  if (needsUpdate)
+    nominalDecl->setCachedValueTypeDestructor(result != nullptr);
+
+  return result;
 }
 
 static bool isOriginallyDefinedIn(const Decl *D, const ModuleDecl* MD) {
@@ -6644,7 +6677,6 @@ AssociatedTypeDecl::getOverriddenDecls() const {
   return assocTypes;
 }
 
-namespace {
 static AssociatedTypeDecl *getAssociatedTypeAnchor(
                       const AssociatedTypeDecl *ATD,
                       llvm::SmallSet<const AssociatedTypeDecl *, 8> &searched) {
@@ -6668,7 +6700,6 @@ static AssociatedTypeDecl *getAssociatedTypeAnchor(
   }
 
   return bestAnchor;
-}
 }
 
 AssociatedTypeDecl *AssociatedTypeDecl::getAssociatedTypeAnchor() const {
@@ -6781,13 +6812,6 @@ void NominalTypeDecl::synthesizeSemanticMembersIfNeeded(DeclName member) {
 
   auto baseName = member.getBaseName();
   auto &Context = getASTContext();
-
-  // For a distributed actor `id` and `actorSystem` can be synthesized without
-  // causing cycles so do them above the cycle guard.
-  if (member.isSimpleName(Context.Id_id))
-    (void)getDistributedActorIDProperty();
-  if (member.isSimpleName(Context.Id_actorSystem))
-    (void)getDistributedActorSystemProperty();
 
   // Silently break cycles here because we can't be sure when and where a
   // request to synthesize will come from yet.
@@ -7404,6 +7428,28 @@ ReferenceCounting ClassDecl::getObjectModel() const {
     return ReferenceCounting::ObjC;
 
   return ReferenceCounting::Native;
+}
+
+const COMDeclInfo *NominalTypeDecl::getCOMDeclInfo() const {
+  // COM is only in play when the experimental interop is enabled; keep the
+  // common case free and never touch the evaluator cache for it.
+  if (!getASTContext().LangOpts.EnableCOMInterop)
+    return nullptr;
+
+  auto *mutableThis = const_cast<NominalTypeDecl *>(this);
+  return evaluateOrDefault(getASTContext().evaluator,
+                           COMDeclInfoRequest{mutableThis}, nullptr);
+}
+
+const COMInterfaceHierarchy *ProtocolDecl::getCOMInterfaceHierarchy() const {
+  // Preserve the non-COM fast path and, in particular, do not make early COM
+  // identity lookup resolve protocol inheritance.
+  if (!isCOMInterface())
+    return nullptr;
+
+  auto *mutableThis = const_cast<ProtocolDecl *>(this);
+  return evaluateOrDefault(getASTContext().evaluator,
+                           COMInterfaceHierarchyRequest{mutableThis}, nullptr);
 }
 
 EnumCaseDecl *EnumCaseDecl::create(SourceLoc CaseLoc,

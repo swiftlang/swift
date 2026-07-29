@@ -51,9 +51,10 @@ class SILBuilderContext {
 
   SILModule &Module;
 
-  /// Allow the SIL module conventions to be overridden within the builder.
-  /// This supports passes that lower SIL to a new stage.
-  SILModuleConventions silConv = SILModuleConventions(Module);
+  /// The builder's address conventions, overridable for passes that lower SIL
+  /// to a new stage. Seeded with the Raw-stage SIL representation.
+  SILAddressConventions silConv =
+      SILAddressConventions::forRawSIL(Module);
 
   /// If this pointer is non-null, then any inserted instruction is
   /// recorded in this list.
@@ -72,7 +73,7 @@ public:
   // Allow a pass to override the current SIL module conventions. This should
   // only be done by a pass responsible for lowering SIL to a new stage
   // (e.g. AddressLowering).
-  void setSILConventions(SILModuleConventions silConv) {
+  void setSILConventions(SILAddressConventions silConv) {
     this->silConv = silConv;
   }
 
@@ -195,7 +196,7 @@ public:
   // Allow a pass to override the current SIL module conventions. This should
   // only be done by a pass responsible for lowering SIL to a new stage
   // (e.g. AddressLowering).
-  void setSILConventions(SILModuleConventions silConv) { C.silConv = silConv; }
+  void setSILConventions(SILAddressConventions silConv) { C.silConv = silConv; }
 
   SILFunction &getFunction() const {
     ASSERT(F && "cannot create this instruction without a function context");
@@ -1117,7 +1118,7 @@ public:
 
   UnownedCopyValueInst *createUnownedCopyValue(SILLocation Loc,
                                                SILValue operand) {
-    ASSERT(!getFunction().getModule().useLoweredAddresses());
+    ASSERT(!getFunction().hasLoweredAddresses());
     auto type = operand->getType()
                     .getReferenceStorageType(getFunction().getASTContext(),
                                              ReferenceOwnership::Unowned)
@@ -1127,7 +1128,7 @@ public:
   }
 
   WeakCopyValueInst *createWeakCopyValue(SILLocation Loc, SILValue operand) {
-    ASSERT(!getFunction().getModule().useLoweredAddresses());
+    ASSERT(!getFunction().hasLoweredAddresses());
     auto type = operand->getType()
                     .getReferenceStorageType(getFunction().getASTContext(),
                                              ReferenceOwnership::Weak)
@@ -1757,7 +1758,7 @@ public:
   createTupleAddrConstructor(SILLocation Loc, SILValue DestAddr,
                              ArrayRef<SILValue> Elements,
                              IsInitialization_t IsInitOfDest) {
-    ASSERT(getFunction().getModule().useLoweredAddresses());
+    ASSERT(getFunction().hasLoweredAddresses());
     return insert(TupleAddrConstructorInst::create(getSILDebugLocation(Loc),
                                                    DestAddr, Elements,
                                                    IsInitOfDest, getModule()));
@@ -2018,7 +2019,7 @@ public:
                       ValueOwnershipKind forwardingOwnershipKind) {
     return insert(new (getModule()) StructExtractInst(
         getSILDebugLocation(Loc), Operand, Field, ResultTy,
-        Operand->getOwnershipKind()));
+        forwardingOwnershipKind));
   }
 
   StructElementAddrInst *createStructElementAddr(SILLocation Loc,
@@ -2357,7 +2358,7 @@ public:
                                                SILValue packIndex,
                                                SILValue tuple,
                                                SILType elementType) {
-    ASSERT(!getFunction().getModule().useLoweredAddresses());
+    ASSERT(!getFunction().hasLoweredAddresses());
     return insert(TuplePackExtractInst::create(
         getFunction(), getSILDebugLocation(loc), packIndex, tuple, elementType,
         tuple->getOwnershipKind()));
@@ -2818,41 +2819,9 @@ public:
                    ProfileCounter Target1Count = ProfileCounter(),
                    ProfileCounter Target2Count = ProfileCounter()) {
     return insertTerminator(
-        CondBranchInst::create(getSILDebugLocation(Loc), Cond, Target1, Target2,
-                               Target1Count, Target2Count, getFunction()));
-  }
-
-  CondBranchInst *
-  createCondBranch(SILLocation Loc, SILValue Cond, SILBasicBlock *Target1,
-                   ArrayRef<SILValue> Args1, SILBasicBlock *Target2,
-                   ArrayRef<SILValue> Args2,
-                   ProfileCounter Target1Count = ProfileCounter(),
-                   ProfileCounter Target2Count = ProfileCounter()) {
-    return insertTerminator(
-        CondBranchInst::create(getSILDebugLocation(Loc), Cond, Target1, Args1,
-                               Target2, Args2, Target1Count, Target2Count, getFunction()));
-  }
-
-  CondBranchInst *
-  createCondBranch(SILLocation Loc, SILValue Cond, SILBasicBlock *Target1,
-                   OperandValueArrayRef Args1, SILBasicBlock *Target2,
-                   OperandValueArrayRef Args2,
-                   ProfileCounter Target1Count = ProfileCounter(),
-                   ProfileCounter Target2Count = ProfileCounter()) {
-    SmallVector<SILValue, 6> ArgsCopy1;
-    SmallVector<SILValue, 6> ArgsCopy2;
-
-    ArgsCopy1.reserve(Args1.size());
-    ArgsCopy2.reserve(Args2.size());
-
-    for (auto I = Args1.begin(), E = Args1.end(); I != E; ++I)
-      ArgsCopy1.push_back(*I);
-    for (auto I = Args2.begin(), E = Args2.end(); I != E; ++I)
-      ArgsCopy2.push_back(*I);
-
-    return insertTerminator(CondBranchInst::create(
-        getSILDebugLocation(Loc), Cond, Target1, ArgsCopy1, Target2, ArgsCopy2,
-        Target1Count, Target2Count, getFunction()));
+        new (getModule()) CondBranchInst(getSILDebugLocation(Loc),
+                                         Cond, Target1, Target2,
+                                         Target1Count, Target2Count));
   }
 
   BranchInst *createBranch(SILLocation Loc, SILBasicBlock *TargetBlock) {
@@ -3378,15 +3347,24 @@ private:
       // sync. We don't care if an instruction is used in global_addr.
       if (F)
         TheInst->verifyDebugInfo();
-      TheInst->verifyOperandOwnership(&C.silConv);
+      // Treat the operands as lowered if either the builder's configured
+      // conventions say so or the function itself has been lowered.
+      SILAddressConventions opOwnershipConv =
+          SILAddressConventions::forFunctionWithOverride(getModule(), C.silConv,
+                                                         F);
+      TheInst->verifyOperandOwnership(&opOwnershipConv);
     }
 #endif
   }
 
   bool isLoadableOrOpaque(SILType Ty) {
-    auto &M = C.Module;
+    // Per-function lowered state when building into a function, build-mode
+    // default when inserting into a global (no function in scope).
+    bool loweredAddresses =
+        SILAddressConventions::forFunctionOrRawSIL(maybeGetFunction(), C.Module)
+            .useLoweredAddresses();
 
-    if (!SILModuleConventions(M).useLoweredAddresses())
+    if (!loweredAddresses)
       return true;
 
     return getTypeProperties(Ty).isLoadable();

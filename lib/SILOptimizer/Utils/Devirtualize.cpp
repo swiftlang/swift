@@ -858,7 +858,9 @@ swift::devirtualizeClassMethod(SILPassManager *pm, FullApplySite applySite,
   if (genCalleeType->isPolymorphic())
     substCalleeType = genCalleeType->substGenericArgs(
         module, subs, TypeExpansionContext(*applySite.getFunction()));
-  SILFunctionConventions substConv(substCalleeType, module);
+  SILFunctionConventions substConv(
+      substCalleeType,
+      SILAddressConventions::forFunction(*applySite.getFunction()));
 
   SILBuilderWithScope builder(applySite.getInstruction());
   SILLocation loc = applySite.getLoc();
@@ -1163,8 +1165,10 @@ devirtualizeWitnessMethod(SILPassManager *pm, ApplySite applySite, SILFunction *
   // Iterate over the non self arguments and add them to the
   // new argument list, upcasting when required.
   SILBuilderWithScope argBuilder(applySite.getInstruction());
-  SILFunctionConventions substConv(substCalleeCanType, module);
-  unsigned substArgIdx = applySite.getCalleeArgIndexOfFirstAppliedArg();
+  SILFunctionConventions substConv(
+      substCalleeCanType,
+      SILAddressConventions::forFunction(*applySite.getFunction()));
+  unsigned substArgIdx = applySite.getSubstCalleeArgIndexOfFirstAppliedArg();
   for (auto arg : applySite.getArguments()) {
     auto paramInfo = substConv.getSILArgumentConvention(substArgIdx);
     auto paramType =

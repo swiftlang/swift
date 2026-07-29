@@ -37,7 +37,6 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/InlineBitfield.h"
-#include "swift/Basic/UUID.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/DenseSet.h"
@@ -406,8 +405,8 @@ class alignas(1 << TypeAlignInBits) TypeBase
   }
 
 protected:
-  enum { NumAFTExtInfoBits = 16 };
-  enum { NumSILExtInfoBits = 15 };
+  enum { NumAFTExtInfoBits = 17 };
+  enum { NumSILExtInfoBits = 16 };
 
   // clang-format off
   union { uint64_t OpaqueBits;
@@ -4028,6 +4027,8 @@ public:
     return getExtInfo().getDifferentiabilityKind();
   }
 
+  bool isCalledOnce() const { return getExtInfo().isCalledOnce(); }
+
   /// Returns a new function type exactly like this one but with the ExtInfo
   /// replaced.
   AnyFunctionType *withExtInfo(ExtInfo info) const;
@@ -5502,6 +5503,7 @@ public:
   bool isSendable() const { return getExtInfo().isSendable(); }
   bool isUnimplementable() const { return getExtInfo().isUnimplementable(); }
   bool isAsync() const { return getExtInfo().isAsync(); }
+  bool isCalledOnce() const { return getExtInfo().isCalledOnce(); }
   bool hasNonisolatedNonsendingIsolation() const {
     return getExtInfo().hasNonisolatedNonsendingIsolation();
   }
@@ -5648,11 +5650,12 @@ public:
 
   /// Get a single non-address SILType that represents all formal direct
   /// results. The actual SIL result type of an apply instruction that calls
-  /// this function depends on the current SIL stage and is known by
-  /// SILFunctionConventions. It may be a wider tuple that includes formally
-  /// indirect results.
+  /// this function depends on the per-call-site lowered-addresses state,
+  /// supplied by the caller via \p loweredAddresses. It may be a wider tuple
+  /// that includes formally indirect results.
   SILType getDirectFormalResultsType(SILModule &M,
-                                     TypeExpansionContext expansion);
+                                     TypeExpansionContext expansion,
+                                     bool loweredAddresses);
 
   unsigned getNumIndirectFormalYields() const {
     return NumAnyIndirectFormalYieldResults;
@@ -6056,13 +6059,16 @@ public:
   ///     function - this is more direct. It may be possible to implement
   ///     reabstraction thunk derivatives using "reabstraction thunks for
   ///     the original function's derivative", avoiding extra code generation.
+  /// - Default derivatives for non-differentiable protocol requirements
+  ///   are using `@convention(method)` representation
   CanSILFunctionType getAutoDiffDerivativeFunctionType(
       IndexSubset *parameterIndices, IndexSubset *resultIndices,
       AutoDiffDerivativeFunctionKind kind, Lowering::TypeConverter &TC,
       LookupConformanceFn lookupConformance,
       CanGenericSignature derivativeFunctionGenericSignature = nullptr,
       bool isReabstractionThunk = false,
-      CanType origTypeOfAbstraction = CanType());
+      CanType origTypeOfAbstraction = CanType(),
+      bool isDefaultDerivative = false);
 
   /// If \p M is nullptr, the type is not substituted.
   uint16_t getPointerAuthDiscriminator(SILModule *M);
@@ -7543,7 +7549,7 @@ class ElementArchetypeType final : public LocalArchetypeType,
 
 public:
   /// Retrieve the ID number of this opened element.
-  UUID getOpenedElementID() const;
+  uint64_t getOpenedElementID() const;
 
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::ElementArchetype;

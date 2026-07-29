@@ -1446,6 +1446,12 @@ void PatternMatchEmission::bindBorrow(Pattern *pattern, VarDecl *var,
 
   SGF.VarLocs[var] = SILGenFunction::VarLoc(bindValue.getValue(),
                                             SILAccessEnforcement::Unknown);
+
+  // Rewind to the bound value's definition so the buffer's insertion-point
+  // marker dominates it, while its cleanup is still pushed after the value's.
+  SavedInsertionPointRAII savedIP(SGF.B,
+                                  bindValue.getValue()->getDefiningInstruction());
+  SGF.enterLocalVariableAddressableBufferScope(var);
 }
 
 /// Evaluate a guard expression and, if it returns false, branch to
@@ -1871,7 +1877,8 @@ emitCastOperand(SILGenFunction &SGF, SILLocation loc,
 
   // Figure out if we need the value to be in a temporary.
   bool requiresAddress =
-    !canSILUseScalarCheckedCastInstructions(SGF.SGM.M, sourceType, targetType);
+    !canSILUseScalarCheckedCastInstructions(
+        SGF.SGM.M, SGF.F.hasLoweredAddresses(), sourceType, targetType);
 
   AbstractionPattern abstraction = SGF.SGM.M.Types.getMostGeneralAbstraction();
   auto &srcAbstractTL = SGF.getTypeLowering(abstraction, sourceType);

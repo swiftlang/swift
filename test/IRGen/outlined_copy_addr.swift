@@ -36,7 +36,7 @@ struct OtherInternal<T> {
 struct MyPrivate<T: P> {
   var otherHelper: OtherInternal<T>? = nil
 
-  // CHECK-LABEL: define hidden swiftcc {{i32|i64}} @"$s11outcopyaddr9MyPrivateVyACyxGxcfC"(ptr noalias %0, ptr %T, ptr %T.P) {{.*}} {
+  // CHECK-LABEL: define hidden swiftcc ptr @"$s11outcopyaddr9MyPrivateVyACyxGxcfC"(ptr noalias %0, ptr %T, ptr %T.P) {{.*}} {
   // CHECK: call ptr @"$s11outcopyaddr9MyPrivateVyxGAA1PRzlWOh"(ptr {{%.*}})
   // CHECK: ret
   init(_: T) { }

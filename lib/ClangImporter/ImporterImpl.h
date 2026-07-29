@@ -676,8 +676,11 @@ private:
 
   /// Sets the target & code generation options for use by IRGen/CodeGen
   /// clients of `ClangImporter`. If `CI` is null, the data is drawn from the
-  /// importer's invocation.
+  /// importer's invocation. When `IRGenOpts` is non-null, also applies the
+  /// AST-affecting CodeGen configuration (optimization level, debug info, ...)
+  /// to the Clang invocation and, if distinct, the IRGen-facing copy.
   void configureOptionsForCodeGen(clang::DiagnosticsEngine &Diags,
+                                  const IRGenOptions *IRGenOpts,
                                   clang::CompilerInvocation *CI = nullptr);
 
   clang::TargetInfo &getCodeGenTargetInfo() const { return *CodeGenTargetInfo; }
@@ -788,6 +791,13 @@ private:
   llvm::DenseMap<NominalTypeDecl *, FuncDecl *> importedOperatorBoolCache;
 
 public:
+  /// Cache of synthesized derived-to-base pointer upcast functions,
+  /// keyed by the (derived, base) C++ record pair.
+  llvm::DenseMap<
+      std::pair<const clang::CXXRecordDecl *, const clang::CXXRecordDecl *>,
+      FuncDecl *>
+      synthesizedBaseCastFunctions;
+
   llvm::DenseMap<const clang::ParmVarDecl*, FuncDecl*> defaultArgGenerators;
 
   bool isDefaultArgSafeToImport(const clang::ParmVarDecl *param);
@@ -1168,7 +1178,8 @@ public:
   ///
   /// \returns The imported declaration, or null if the macro could not be
   /// translated into Swift.
-  ValueDecl *importMacro(Identifier name, ClangNode macroNode);
+  ValueDecl *importMacro(Identifier name, ClangNode macroNode,
+                         const clang::IdentifierInfo *II = nullptr);
 
   /// Map a Clang identifier name to its imported Swift equivalent.
   StringRef getSwiftNameFromClangName(StringRef name);

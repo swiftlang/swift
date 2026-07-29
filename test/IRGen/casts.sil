@@ -133,18 +133,17 @@ entry(%0 : $A):
   return %1
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc ptr @unconditional_optional_fast_class_cast(i64 %0)
-// CHECK:         [[PTR:%.*]] = inttoptr i64 %0 to ptr
-// CHECK:         [[ISNULL:%.*]] = icmp eq ptr [[PTR]], null
-// CHECK:         [[ENN:%.*]] = call i1 @llvm.expect.i1(i1 [[ISNULL]], i1 false) 
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc ptr @unconditional_optional_fast_class_cast(ptr %0)
+// CHECK:         [[ISNULL:%.*]] = icmp eq ptr %0, null
+// CHECK:         [[ENN:%.*]] = call i1 @llvm.expect.i1(i1 [[ISNULL]], i1 false)
 // CHECK:         br i1 [[ENN]], label %[[NULLTRAPBB:[0-9]*]], label %[[CONTBB:[0-9]*]]
 // CHECK:       [[CONTBB]]:
-// CHECK:         [[ISA:%.*]] = load ptr, ptr [[PTR]]
+// CHECK:         [[ISA:%.*]] = load ptr, ptr %0
 // CHECK:         [[NE:%.*]] = icmp ne {{.*}}, [[ISA]]
-// CHECK:         [[E:%.*]] = call i1 @llvm.expect.i1(i1 [[NE]], i1 false) 
+// CHECK:         [[E:%.*]] = call i1 @llvm.expect.i1(i1 [[NE]], i1 false)
 // CHECK:         br i1 [[E]], label %[[TRAPBB:[0-9]*]], label %[[RETBB:[0-9]*]]
 // CHECK:       [[RETBB]]:
-// CHECK-NEXT:    ret ptr [[PTR]]
+// CHECK-NEXT:    ret ptr %0
 // CHECK:       [[NULLTRAPBB]]:
 // CHECK-NEXT:    call void @llvm.trap()
 // CHECK:       [[TRAPBB]]:
@@ -254,11 +253,10 @@ nay:
   unreachable
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc ptr @checked_downcast_optional({{(i32|i64)}} %0) {{.*}} {
-// CHECK:         [[T0:%.*]] = inttoptr {{(i32|i64)}} %0 to ptr
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc ptr @checked_downcast_optional(ptr %0) {{.*}} {
 // CHECK:         [[T1:%.*]] = call swiftcc %swift.metadata_response @"$s5casts1ACMa"([[INT]] 0)
 // CHECK:         [[METADATA:%.*]] = extractvalue %swift.metadata_response [[T1]], 0
-// CHECK:         [[RESULT_PTR:%.*]] = call ptr @swift_dynamicCastClass(ptr [[T0]], ptr [[METADATA]])
+// CHECK:         [[RESULT_PTR:%.*]] = call ptr @swift_dynamicCastClass(ptr %0, ptr [[METADATA]])
 // CHECK:         [[COND:%.*]] = icmp ne ptr [[RESULT_PTR]], null
 // CHECK:         br i1 [[COND]]
 sil @checked_downcast_optional : $@convention(thin) (Optional<A>) -> @owned A {
@@ -302,13 +300,12 @@ nay:
   unreachable
 }
 
-// CHECK: define {{(dllexport )?}}{{(protected )?}}swiftcc {{.*}} @checked_downcast_optional_class_to_ex([[INT]] %0)
+// CHECK: define {{(dllexport )?}}{{(protected )?}}swiftcc {{.*}} @checked_downcast_optional_class_to_ex(ptr %0)
 // CHECK: entry:
-// CHECK:   [[V1:%.*]] = inttoptr [[INT]] %0 to ptr
-// CHECK:   [[V2:%.*]] = icmp ne ptr [[V1]], null
+// CHECK:   [[V2:%.*]] = icmp ne ptr %0, null
 // CHECK:   br i1 [[V2]], label %[[LBL:.*]], label
 // CHECK:    [[LBL]]:
-// CHECK:    load ptr, ptr [[V1]]
+// CHECK:    load ptr, ptr %0
 sil @checked_downcast_optional_class_to_ex : $@convention(thin) (@guaranteed Optional<A>) -> @owned Optional<CP> {
 bb0(%0 : $Optional<A>):
   checked_cast_br Optional<A> in %0 : $Optional<A> to CP, bb1, bb2
