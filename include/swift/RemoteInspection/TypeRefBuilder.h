@@ -1606,6 +1606,10 @@ private:
   RefDemangler TypeRefDemangler;
   UnderlyingTypeReader OpaqueUnderlyingTypeReader;
 
+  /// Reason the most recent TypeRefDemangler run produced a null node.
+  remote::DemangleFailureReason LastTypeRefDemangleFailure =
+      remote::DemangleFailureReason::None;
+
   // Opaque fields captured from the MetadataReader's MemoryReader
   ByteReader OpaqueByteReader;
   StringReader OpaqueStringReader;
@@ -1629,7 +1633,8 @@ public:
                                          bool useOpaqueTypeSymbolicReferences)
                              -> Demangle::Node * {
           return reader.demangle(string, remote::MangledNameKind::Type, Dem,
-                                 useOpaqueTypeSymbolicReferences);
+                                 useOpaqueTypeSymbolicReferences,
+                                 &LastTypeRefDemangleFailure);
         }),
         OpaqueUnderlyingTypeReader(
             [&reader](remote::RemoteAddress descriptorAddr,
@@ -1711,6 +1716,12 @@ public:
   Demangle::Node *demangleTypeRef(RemoteRef<char> string,
                                   bool useOpaqueTypeSymbolicReferences = true) {
     return TypeRefDemangler(string, useOpaqueTypeSymbolicReferences);
+  }
+
+  /// Reason the most recent demangleTypeRef() produced a null node (or None).
+  /// Valid only immediately after that call.
+  remote::DemangleFailureReason getLastDemangleFailure() const {
+    return LastTypeRefDemangleFailure;
   }
 
   TypeConverter &getTypeConverter() { return TC; }

@@ -160,6 +160,13 @@ struct RemoteExistential {
       IsBridgedError(IsBridgedError) {}
 };
 
+enum class DemangleFailureReason {
+  None,
+  /// The mangled name contained an accessor-function symbolic reference,
+  /// e.g., a noncopyable stored property built for a pre-macOS 27 runtime.
+  AccessorFunctionReference,
+};
+
 /// A generic reader of metadata.
 ///
 /// BuilderType must implement a particular interface which is currently
@@ -448,7 +455,10 @@ public:
   Demangle::NodePointer demangle(RemoteRef<char> mangledName,
                                  MangledNameKind kind,
                                  Demangler &dem,
-                                 bool useOpaqueTypeSymbolicReferences = false) {
+                                 bool useOpaqueTypeSymbolicReferences = false,
+                                 DemangleFailureReason *failureReason = nullptr) {
+    if (failureReason)
+      *failureReason = DemangleFailureReason::None;
     // Symbolic reference resolver for the demangle operation below.
     auto symbolicReferenceResolver = [&](SymbolicReferenceKind kind,
                                          Directness directness,
@@ -496,6 +506,8 @@ public:
       case Demangle::SymbolicReferenceKind::AccessorFunctionReference: {
         // The symbolic reference points at a resolver function, but we can't
         // execute code in the target process to resolve it from here.
+        if (failureReason)
+          *failureReason = DemangleFailureReason::AccessorFunctionReference;
         return nullptr;
       }
       case Demangle::SymbolicReferenceKind::UniqueExtendedExistentialTypeShape: {
