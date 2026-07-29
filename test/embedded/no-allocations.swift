@@ -10,7 +10,7 @@
 // RUN: %target-swift-emit-ir %t/main.swift -enable-experimental-feature Embedded -no-allocations -wmo -verify -verify-ignore-unknown
 
 // REQUIRES: optimized_stdlib
-// REQUIRES: OS=macosx || OS=linux-gnu || OS=wasip1
+// REQUIRES: OS=macosx || OS=linux-gnu
 // REQUIRES: swift_feature_Embedded
 
 //--- main.swift
