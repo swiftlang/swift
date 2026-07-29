@@ -935,8 +935,16 @@ namespace {
     /// Map the given element to the appropriate value in the
     /// discriminator type.
     llvm::ConstantInt *getDiscriminatorIdxConst(EnumElementDecl *target) const {
-      int64_t index = getDiscriminatorIndex(target);
-      return llvm::ConstantInt::get(getDiscriminatorType(), index);
+      auto index = getDiscriminatorIndex(target);
+      auto *intType = getDiscriminatorType();
+
+      // Construct an all-ones value for a null index.
+      if (!index) {
+        return cast<llvm::ConstantInt>(
+            llvm::ConstantInt::getAllOnesValue(intType));
+      }
+
+      return llvm::ConstantInt::get(intType, index.value());
     }
     
 
@@ -1205,9 +1213,10 @@ namespace {
 
 
     // TODO: Support this function also for other enum implementation strategies.
-    int64_t getDiscriminatorIndex(EnumElementDecl *elt) const override {
+    std::optional<uint64_t>
+    getDiscriminatorIndex(EnumElementDecl *elt) const override {
       // The elements are assigned discriminators in declaration order.
-      return getTagIndex(elt);
+      return uint64_t(getTagIndex(elt));
     }
 
     // TODO: Support this function also for other enum implementation strategies.
@@ -1313,13 +1322,14 @@ namespace {
     : public NoPayloadEnumImplStrategyBase
   {
   protected:
-    int64_t getDiscriminatorIndex(EnumElementDecl *target) const override {
+    std::optional<uint64_t>
+    getDiscriminatorIndex(EnumElementDecl *target) const override {
       // The elements are assigned discriminators ABI-compatible with their
-      // raw values from C. An invalid raw value is assigned the error index -1.
+      // raw values from C. If the raw value is invalid, return nil.
       auto intExpr =
           dyn_cast_or_null<IntegerLiteralExpr>(target->getRawValueExpr());
       if (!intExpr) {
-        return -1;
+        return std::nullopt;
       }
       auto intType = getDiscriminatorType();
 
