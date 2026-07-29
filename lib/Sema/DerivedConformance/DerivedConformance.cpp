@@ -1141,14 +1141,23 @@ static void printEnumCaseInfo(llvm::raw_ostream &out,
                               const EnumElementDecl *decl) {
   bool markReachable = !decl->isUnreachableAtRuntime() ||
                        decl->getParentEnum()->isUnreachableAtRuntime();
-  out << "EnumCaseInfo(name: " << QuotedString(decl->getNameStr())
+  // Escape names as they must appear in source so a keyword-named case or
+  // label (`init`, `class`, ...) round-trips as a valid reference in the macros.
+  out << "EnumCaseInfo(name: "
+      << QuotedString(
+             identifierEscapingIfNeeded(decl->getNameStr(),
+                                        PrintNameContext::TypeMember))
       << ", associatedValueLabels: [";
   llvm::interleaveComma(decl->getName().getArgumentNames(), out,
                         [&](Identifier name) {
                           if (name.empty()) {
                             out << "nil";
                           } else {
-                            printAsQuotedString(out, name.str());
+                            printAsQuotedString(
+                                out,
+                                identifierEscapingIfNeeded(
+                                    name.str(),
+                                    PrintNameContext::FunctionParameterExternal));
                           }
                         });
   out << "], isReachable: " << (markReachable ? "true" : "false") << ")";
@@ -1169,7 +1178,12 @@ static void printEnumTypeKind(llvm::raw_ostream &out, EnumDecl *decl) {
 /// decl with relevant information to \p out.
 static void printStoredProperty(llvm::raw_ostream &out, const VarDecl *decl) {
   bool isVar = decl->getIntroducer() == VarDecl::Introducer::Var;
-  out << "StoredProperty(name: " << QuotedString(decl->getNameStr())
+  // Escape the name as above so a keyword-named property is emitted as a valid
+  // member reference by the macros.
+  out << "StoredProperty(name: "
+      << QuotedString(
+             identifierEscapingIfNeeded(decl->getNameStr(),
+                                        PrintNameContext::TypeMember))
       << ", typeName: " << QuotedString(decl->getTypeInContext().getString())
       << ", isVar: " << (isVar ? "true" : "false")
       << ", isStatic: " << (decl->isStatic() ? "true" : "false")
