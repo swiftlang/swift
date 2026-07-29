@@ -1019,6 +1019,23 @@ while [[ "$1" ]] ; do
     shift
 done
 
+# TEMPORARY -- DO NOT MERGE (rdar://182785830).
+#
+# Skip the Swift compiler/stdlib test suites to cut CI turnaround while
+# investigating the flaky lldb Data formatter. Those suites are by far the
+# longest phase: check-swift-validation runs once per stdlib deployment target
+# (macosx + iphonesimulator + watchsimulator), i.e. the same ~21.8k tests three
+# times -- about 195 min on x86_64 and 82 min on arm64, versus 24/11 min for the
+# lldb tests we actually care about.
+#
+# The lldb test phase is guarded separately (SKIP_TEST_LLDB) and still runs, and
+# `lldb-test-swift-only` keeps it at the swift-dense ~612 tests that reproduce
+# the bug. Set RDAR182785830_RUN_SWIFT_TESTS=1 to opt back in.
+if [[ -z "${RDAR182785830_RUN_SWIFT_TESTS:-}" ]]; then
+    SKIP_TEST_SWIFT=1
+    SKIP_TEST_BENCHMARKS=1
+fi
+
 # TODO: Rename this argument
 LOCAL_HOST=$HOST_TARGET
 
