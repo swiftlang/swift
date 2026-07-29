@@ -806,7 +806,7 @@ static void renameCxxParameterIfNeeded(const AbstractFunctionDecl *FD,
   // Rename a parameter in an enum method that shadows an existing case name,
   // to avoid a -Wshadow warning in Clang.
   for (const auto *Case : enumDecl->getAllElements()) {
-    if (Case->getNameStr() == paramName) {
+    if (cxx_translation::getNameForCxx(Case) == paramName) {
       paramName = (llvm::Twine(paramName) + "_").str();
       return;
     }
@@ -857,7 +857,8 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
     //        colliding functions.
     for (const auto *enumElement : enumDecl->getAllElements()) {
       auto elementName = enumElement->getName();
-      if (!elementName.isSpecial() && elementName.getBaseIdentifier().is(name))
+      if (!elementName.isSpecial() &&
+          cxx_translation::getNameForCxx(enumElement) == name)
         return ClangRepresentation::unsupported;
     }
   }
@@ -1004,7 +1005,9 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
     };
     auto printParamName = [&](const ParamDecl &param) {
       std::string paramName =
-          param.getName().empty() ? "" : param.getName().str().str();
+          param.getName().empty()
+              ? ""
+              : cxx_translation::sanitizeNameForCxx(param.getName().str());
       if (param.isSelfParameter())
         paramName = "_self";
       if (!paramName.empty()) {
@@ -1138,7 +1141,9 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
               DeclAndTypePrinter::getObjectTypeAndOptionality(
                   param, param->getInterfaceType());
           std::string paramName =
-              param->getName().empty() ? "" : param->getName().str().str();
+              param->getName().empty()
+                  ? ""
+                  : cxx_translation::sanitizeNameForCxx(param->getName().str());
           renameCxxParameterIfNeeded(FD, paramName);
           // Always emit a named parameter for the C++ inline thunk to ensure it
           // can be referenced in the body.
@@ -1417,9 +1422,10 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
         paramOS << "_";
       paramOS << paramIndex;
     } else {
-      StringRef nameStr = param.getName().str();
+      std::string nameStr =
+          cxx_translation::sanitizeNameForCxx(param.getName().str());
       if (isConsumed)
-        paramName += nameStr.str();
+        paramName += nameStr;
       else
         paramName = nameStr;
       renameCxxParameterIfNeeded(FD, paramName);
