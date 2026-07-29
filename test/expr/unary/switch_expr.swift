@@ -556,7 +556,9 @@ case false:
 _ = (switch Bool.random() {
   // expected-error@-1 {{'switch' may only be used as expression in return, throw, or as the source of an assignment}}
   // expected-error@-2 {{switch must be exhaustive}}
-  // expected-note@-3 {{add missing cases: 'true', 'false'}}
+  // expected-note@-3 {{add missing case: 'true'}}
+  // expected-note@-4 {{add missing case: 'false'}}
+  // expected-note@-5 {{add missing cases}}
   #if FOO
 case true:
   0
@@ -569,7 +571,9 @@ case false:
 _ = (switch Bool.random() {
   // expected-error@-1 {{'switch' may only be used as expression in return, throw, or as the source of an assignment}}
   // expected-error@-2 {{switch must be exhaustive}}
-  // expected-note@-3 {{add missing cases: 'true', 'false'}}
+  // expected-note@-3 {{add missing case: 'true'}}
+  // expected-note@-4 {{add missing case: 'false'}}
+  // expected-note@-5 {{add missing cases}}
   #if FOO
 case true:
   0

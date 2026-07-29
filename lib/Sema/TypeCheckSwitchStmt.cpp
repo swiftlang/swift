@@ -1200,14 +1200,14 @@ namespace {
         OS << tok::kw_default << ":\n" << placeholder << "\n";
         DE.diagnose(startLoc, mainDiagType.value())
           .limitBehaviorIf(downgrade, DiagnosticBehavior::Warning);
-        DE.diagnose(startLoc, diag::missing_default_case)
+        DE.diagnose(startLoc, diag::missing_several_cases, /*default*/true)
           .fixItInsert(insertLoc, buffer.str());
       }
         return;
       case RequiresDefault::SpaceTooLarge: {
         OS << tok::kw_default << ":\n" << "<#fatalError()#>" << "\n";
         DE.diagnose(startLoc, diag::possibly_non_exhaustive_switch);
-        DE.diagnose(startLoc, diag::missing_default_case)
+        DE.diagnose(startLoc, diag::missing_several_cases, /*default*/true)
           .fixItInsert(insertLoc, buffer.str());
       }
         return;
@@ -1292,47 +1292,20 @@ namespace {
       //     case (.some(_), .none):
       //       <#code#>
       //
-      // We also list the missing cases in the message, up to a given character
-      // limit to avoid being too noisy.
+      // To also provide actionable output for command line errors, emit notes
+      // like the following:
+      //
+      // missing case '(.none, .some(_))'
+      // missing case '(.some(_), .none)'
       SmallString<128> missingSeveralCasesFixIt;
-      SmallString<85> caseList;
-
-      unsigned numCases = 0;
-      bool hasUnknownDefault = false;
-      bool listTruncated = false;
-
-      // Add the case name to the diagnostic message, truncating once it reaches
-      // the character limit. Always adds at least one case.
-      auto addCaseStr = [&](StringRef caseStr) {
-        numCases += 1;
-        if (listTruncated)
-          return;
-
-        llvm::SmallString<64> item;
-        {
-          llvm::raw_svector_ostream itemOS(item);
-          itemOS << '\'' << caseStr << '\'';
-        }
-        llvm::raw_svector_ostream caseListOS(caseList);
-        if (caseList.empty()) {
-          caseListOS << item;
-        } else if (caseList.size() + 2 + item.size() <= 80) {
-          caseListOS << ", " << item;
-        } else {
-          caseListOS << ", ...";
-          listTruncated = true;
-        }
-      };
+      int diagnosedCases = 0;
 
       processUncoveredSpaces([&](const Space &space,
                                  bool onlyOneUncoveredSpace) {
         llvm::SmallString<64> fixItBuffer;
         llvm::raw_svector_ostream fixItOS(fixItBuffer);
         if (space.getKind() == SpaceKind::UnknownCase) {
-          hasUnknownDefault = true;
-          fixItOS << "@unknown " << tok::kw_default;
-          addCaseStr(fixItBuffer);
-          fixItOS << ":\n<#fatalError()#>\n";
+          fixItOS << "@unknown " << tok::kw_default << ":\n<#fatalError()#>\n";
           DE.diagnose(startLoc, diag::missing_unknown_case)
               .fixItInsert(insertLoc, fixItBuffer.str());
         } else {
@@ -1340,15 +1313,18 @@ namespace {
           llvm::raw_svector_ostream spaceOS(spaceBuffer);
           space.show(spaceOS);
 
-          addCaseStr(spaceBuffer);
           fixItOS << tok::kw_case << " " << spaceBuffer << ":\n"
                   << placeholder << "\n";
+          DE.diagnose(startLoc, diag::missing_particular_case,
+                      spaceBuffer.str())
+              .fixItInsert(insertLoc, fixItBuffer);
         }
+        diagnosedCases += 1;
         missingSeveralCasesFixIt += fixItBuffer;
       });
 
-      if ((numCases == 1 && !hasUnknownDefault) || numCases > 1) {
-        DE.diagnose(startLoc, diag::missing_cases, numCases > 1, caseList.str())
+      if (diagnosedCases > 1) {
+        DE.diagnose(startLoc, diag::missing_several_cases, false)
             .fixItInsert(insertLoc, missingSeveralCasesFixIt.str());
       }
     }
