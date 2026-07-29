@@ -18,4 +18,3 @@ public class CClass2 { }
 @com
 public class CClass3 { }
 // CHECK-DAG: <COM_DECL_ATTR abbrevid=292 op0=0 op1=0 op2=2/> blob data = ''
-

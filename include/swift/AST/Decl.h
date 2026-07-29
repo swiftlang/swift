@@ -4413,6 +4413,49 @@ enum KeyPathTypeKind : unsigned char {
   KPTK_ReferenceWritableKeyPath
 };
 
+/// The validated inheritance hierarchy of a COM interface.
+///
+/// COM interface inheritance contributes at most one ABI-bearing base chain.
+/// Marker protocols can refine the interface without contributing to that
+/// chain.
+class COMInterfaceHierarchy {
+  ArrayRef<ProtocolDecl *> MarkerProtocols;
+  ArrayRef<ProtocolDecl *> ABIChain;
+
+  COMInterfaceHierarchy() = default;
+
+public:
+  COMInterfaceHierarchy(ArrayRef<ProtocolDecl *> markers,
+                        ArrayRef<ProtocolDecl *> chain)
+      : MarkerProtocols(markers), ABIChain(chain) {
+    assert(!chain.empty());
+  }
+
+  static COMInterfaceHierarchy invalid() { return {}; }
+
+  bool isInvalid() const { return ABIChain.empty(); }
+
+  /// The most-derived directly inherited COM interface, or null for a root
+  /// interface.
+  ProtocolDecl *getABIBase() const {
+    assert(!isInvalid());
+    return ABIChain.size() > 1 ? ABIChain[ABIChain.size() - 2] : nullptr;
+  }
+
+  /// Marker protocols inherited by this interface or its COM ABI bases.
+  ArrayRef<ProtocolDecl *> getMarkerProtocols() const {
+    assert(!isInvalid());
+    return MarkerProtocols;
+  }
+
+  /// The COM ABI inheritance chain in base-most-to-derived order, including
+  /// this interface as its final element.
+  ArrayRef<ProtocolDecl *> getABIChain() const {
+    assert(!isInvalid());
+    return ABIChain;
+  }
+};
+
 /// The COM role and associated declaration information for a nominal type.
 ///
 /// A protocol can declare an interface, while a class can provide an
@@ -5815,6 +5858,13 @@ public:
   bool isCOMInterface() const {
     return getCOMDeclInfo() != nullptr;
   }
+
+  /// Retrieve this COM interface's validated inheritance hierarchy.
+  ///
+  /// Returns null for a protocol that does not declare a COM interface. An
+  /// invalid COM interface has a non-null hierarchy whose \c isInvalid() is
+  /// true.
+  const COMInterfaceHierarchy *getCOMInterfaceHierarchy() const;
 
   /// Retrieve the ClassDecl for the superclass of this protocol, or null if there
   /// is no superclass.

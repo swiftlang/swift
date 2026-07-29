@@ -2244,6 +2244,21 @@ ERROR(attr_com_missing_module, none,
       "'COM' module not imported, required for '@com'", ())
 ERROR(com_module_missing_type, none,
       "type '%0' not found in the 'COM' module", (StringRef))
+ERROR(com_interface_inherits_non_marker, none,
+      "COM interface %0 cannot inherit non-COM, non-marker protocol %1",
+      (DeclName, DeclName))
+ERROR(com_interface_inherits_non_protocol, none,
+      "COM interface %0 cannot inherit non-protocol type %1",
+      (DeclName, Type))
+ERROR(com_interface_multiple_abi_bases, none,
+      "COM interface %0 cannot inherit unrelated COM interfaces %1 and %2",
+      (DeclName, DeclName, DeclName))
+ERROR(com_interface_refinement_requires_identity, none,
+      "protocol %0 refines COM interface %1 and must declare its own "
+      "'@com(interface:)' identity", (DeclName, DeclName))
+ERROR(com_interface_repeated_iid, none,
+      "COM interface %0 and inherited interface %1 use the same interface "
+      "identifier '%2'", (DeclName, DeclName, StringRef))
 
 ERROR(metatype_extension_com_only, none,
       "protocol metatype extensions are reserved for COM interop", ())
