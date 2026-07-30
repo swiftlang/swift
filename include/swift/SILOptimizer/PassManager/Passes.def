@@ -372,8 +372,6 @@ LEGACY_PASS(NestedSemanticFunctionCheck, "nested-semantic-function-check",
      "Diagnose improperly nested '@_semantics' functions")
 LEGACY_PASS(RCIdentityDumper, "rc-id-dumper",
      "Print Reference Count Identities")
-LEGACY_PASS(AlwaysInlineInliner, "always-inline",
-     "Inline always inline functions")
 LEGACY_PASS(PerfInliner, "inline",
      "Performance Function Inlining")
 LEGACY_PASS(PerformanceConstantPropagation, "performance-constant-propagation",
