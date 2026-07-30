@@ -198,6 +198,7 @@ namespace {
       case ElementLayout::Kind::Empty:
       case ElementLayout::Kind::EmptyTailAllocatedCType:
       case ElementLayout::Kind::Fixed:
+      case ElementLayout::Kind::Hollow:
         return field.getFixedByteOffset();
       case ElementLayout::Kind::InitialNonFixedSize:
         return Size(0);
@@ -228,7 +229,8 @@ namespace {
       for (unsigned i : indices(fields)) {
         const TupleFieldInfo &field = fields[i];
         switch (field.getKind()) {
-        case ElementLayout::Kind::Fixed: {
+        case ElementLayout::Kind::Fixed:
+        case ElementLayout::Kind::Hollow: {
           // Check that the fixed layout matches the layout in the tuple
           // metadata.
           auto fixedOffset = field.getFixedByteOffset();

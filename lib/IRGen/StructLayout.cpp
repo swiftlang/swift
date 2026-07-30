@@ -317,6 +317,7 @@ Address ElementLayout::project(IRGenFunction &IGF, Address baseAddr,
     return getType().getUndefAddress();
 
   case Kind::Fixed:
+  case Kind::Hollow:
     return IGF.Builder.CreateStructGEP(baseAddr,
                                        getStructIndex(),
                                        getByteOffset(),

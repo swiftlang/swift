@@ -69,6 +69,8 @@ public:
     return Layout.isEmpty();
   }
 
+  bool isEmptyOrHollow() const { return Layout.isEmptyOrHollow(); }
+
   IsTriviallyDestroyable_t isTriviallyDestroyable() const {
     return Layout.isTriviallyDestroyable();
   }
@@ -175,6 +177,8 @@ public:
   /// The standard schema is just all the fields jumbled together.
   void getSchema(ExplosionSchema &schema) const override {
     for (auto &field : getFields()) {
+      if (field.isEmptyOrHollow())
+        continue;
       field.getTypeInfo().getSchema(schema);
     }
   }
@@ -189,7 +193,7 @@ public:
     if (isOutlined || T.hasParameterizedExistential()) {
       auto offsets = asImpl().getNonFixedOffsets(IGF, T);
       for (auto &field : getFields()) {
-        if (field.isEmpty())
+        if (field.isEmptyOrHollow())
           continue;
 
         Address destField = field.projectAddress(IGF, dest, offsets);
@@ -219,7 +223,7 @@ public:
     if (isOutlined || T.hasParameterizedExistential()) {
       auto offsets = asImpl().getNonFixedOffsets(IGF, T);
       for (auto &field : getFields()) {
-        if (field.isEmpty())
+        if (field.isEmptyOrHollow())
           continue;
 
         Address destField = field.projectAddress(IGF, dest, offsets);
@@ -250,7 +254,7 @@ public:
     if (isOutlined || T.hasParameterizedExistential()) {
       auto offsets = asImpl().getNonFixedOffsets(IGF, T);
       for (auto &field : getFields()) {
-        if (field.isEmpty())
+        if (field.isEmptyOrHollow())
           continue;
 
         Address destField = field.projectAddress(IGF, dest, offsets);
@@ -283,7 +287,7 @@ public:
     } else if (isOutlined || T.hasParameterizedExistential()) {
       auto offsets = asImpl().getNonFixedOffsets(IGF, T);
       for (auto &field : getFields()) {
-        if (field.isEmpty())
+        if (field.isEmptyOrHollow())
           continue;
 
         Address destField = field.projectAddress(IGF, dest, offsets);
@@ -635,7 +639,7 @@ private:
     unsigned result = 0;
     for (auto &field : fields) {
       // Ignore empty fields.
-      if (field.isEmpty()) continue;
+      if (field.isEmptyOrHollow()) continue;
 
       // If the field is not ABI-accessible, suppress this.
       if (!field.isABIAccessible()) return 0;
@@ -794,7 +798,7 @@ private:
   void forAllFields(IRGenFunction &IGF, Address addr, Explosion &out) const {
     auto offsets = asImpl().getNonFixedOffsets(IGF);
     for (auto &field : getFields()) {
-      if (field.isEmpty()) continue;
+      if (field.isEmptyOrHollow()) continue;
 
       Address fieldAddr = field.projectAddress(IGF, addr, offsets);
       (cast<LoadableTypeInfo>(field.getTypeInfo()).*Op)(IGF, fieldAddr, out);
@@ -807,7 +811,7 @@ private:
                     Atomicity atomicity) const {
     auto offsets = asImpl().getNonFixedOffsets(IGF);
     for (auto &field : getFields()) {
-      if (field.isEmpty()) continue;
+      if (field.isEmptyOrHollow()) continue;
 
       Address fieldAddr = field.projectAddress(IGF, addr, offsets);
       (cast<LoadableTypeInfo>(field.getTypeInfo()).*Op)(IGF, fieldAddr, out,
@@ -821,7 +825,7 @@ private:
                     bool isOutlined) const {
     auto offsets = asImpl().getNonFixedOffsets(IGF);
     for (auto &field : getFields()) {
-      if (field.isEmpty()) continue;
+      if (field.isEmptyOrHollow()) continue;
 
       Address fieldAddr = field.projectAddress(IGF, addr, offsets);
       (cast<LoadableTypeInfo>(field.getTypeInfo()).*Op)(IGF, in, fieldAddr,
@@ -836,7 +840,7 @@ private:
                     bool isOutlined, SILType T) const {
     auto offsets = asImpl().getNonFixedOffsets(IGF);
     for (auto &field : getFields()) {
-      if (field.isEmpty()) continue;
+      if (field.isEmptyOrHollow()) continue;
 
       Address fieldAddr = field.projectAddress(IGF, addr, offsets);
       (cast<LoadableTypeInfo>(field.getTypeInfo()).*Op)(IGF, in, fieldAddr,
@@ -874,28 +878,39 @@ public:
 
   void reexplode(Explosion &src,
                  Explosion &dest) const override {
-    for (auto &field : getFields())
+    for (auto &field : getFields()) {
+      if (field.isEmptyOrHollow())
+        continue;
       cast<LoadableTypeInfo>(field.getTypeInfo()).reexplode(src, dest);
+    }
   }
 
   void copy(IRGenFunction &IGF, Explosion &src,
             Explosion &dest, Atomicity atomicity) const override {
-    for (auto &field : getFields())
+    for (auto &field : getFields()) {
+      if (field.isEmptyOrHollow())
+        continue;
       cast<LoadableTypeInfo>(field.getTypeInfo())
           .copy(IGF, src, dest, atomicity);
+    }
   }
 
   void consume(IRGenFunction &IGF, Explosion &src,
                Atomicity atomicity, SILType T) const override {
     for (auto &field : getFields()) {
+      if (field.isEmptyOrHollow())
+        continue;
       cast<LoadableTypeInfo>(field.getTypeInfo())
           .consume(IGF, src, atomicity, field.getType(IGF.IGM, T));
     }
   }
 
   void fixLifetime(IRGenFunction &IGF, Explosion &src) const override {
-    for (auto &field : getFields())
+    for (auto &field : getFields()) {
+      if (field.isEmptyOrHollow())
+        continue;
       cast<LoadableTypeInfo>(field.getTypeInfo()).fixLifetime(IGF, src);
+    }
   }
   
   void packIntoEnumPayload(IRGenModule &IGM,
@@ -904,7 +919,7 @@ public:
                            Explosion &src,
                            unsigned startOffset) const override {
     for (auto &field : getFields()) {
-      if (!field.isEmpty()) {
+      if (!field.isEmptyOrHollow()) {
         unsigned offset = field.getFixedByteOffset().getValueInBits()
           + startOffset;
         cast<LoadableTypeInfo>(field.getTypeInfo())
@@ -917,7 +932,7 @@ public:
                              Explosion &dest, unsigned startOffset)
                             const override {
     for (auto &field : getFields()) {
-      if (!field.isEmpty()) {
+      if (!field.isEmptyOrHollow()) {
         unsigned offset = field.getFixedByteOffset().getValueInBits()
           + startOffset;
         cast<LoadableTypeInfo>(field.getTypeInfo())
