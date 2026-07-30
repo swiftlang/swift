@@ -2768,7 +2768,7 @@ void AttributeChecker::visitUsedAttr(UsedAttr *attr) {
 
 void AttributeChecker::visitSectionAttr(SectionAttr *attr) {
   // The name must not be empty.
-  if (attr->Name.empty())
+  if (attr->Name && attr->Name->empty())
     diagnose(attr->getLocation(), diag::section_empty_name);
 
   if (D->getDeclContext()->isLocalContext())

@@ -1347,10 +1347,11 @@ BridgedReferenceOwnershipAttr BridgedReferenceOwnershipAttr_createParsed(
     BridgedASTContext cContext, swift::SourceLoc atLoc,
     swift::SourceRange range, BridgedReferenceOwnership cKind);
 
-SWIFT_NAME("BridgedSectionAttr.createParsed(_:atLoc:range:name:)")
+SWIFT_NAME("BridgedSectionAttr.createParsed(_:atLoc:range:isDefault:name:)")
 BridgedSectionAttr BridgedSectionAttr_createParsed(BridgedASTContext cContext,
                                                    swift::SourceLoc atLoc,
                                                    swift::SourceRange range,
+                                                   bool isDefault,
                                                    BridgedStringRef cName);
 
 SWIFT_NAME("BridgedSemanticsAttr.createParsed(_:atLoc:range:value:)")

@@ -5579,7 +5579,10 @@ public:
   }
   void visitSectionAttr(SectionAttr *Attr, Label label) {
     printCommon(Attr, "section_attr", label);
-    printFieldQuoted(Attr->Name, Label::always("name"));
+    if (auto sectionName = Attr->Name)
+      printFieldQuoted(*sectionName, Label::always("name"));
+    else
+      printFlag("default");
     printFoot();
   }
   void visitSemanticsAttr(SemanticsAttr *Attr, Label label) {

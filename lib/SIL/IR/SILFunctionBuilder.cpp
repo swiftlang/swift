@@ -255,7 +255,8 @@ void SILFunctionBuilder::addFunctionAttributes(
   // Add section for anything that was originally a function.
   if (isa<AbstractFunctionDecl>(decl)) {
     if (auto *SA = Attrs.getAttribute<SectionAttr>())
-      F->setSection(SA->Name);
+      if (auto sectionName = SA->Name)
+        F->setSection(*sectionName);
   }
 
   // Only emit replacements for the objc entry point of objc methods.

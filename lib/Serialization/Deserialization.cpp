@@ -6736,9 +6736,12 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
 
       case decls_block::Section_DECL_ATTR: {
         bool isImplicit;
+        bool isDefault;
         serialization::decls_block::SectionDeclAttrLayout::readRecord(
-            scratch, isImplicit);
-        Attr = new (ctx) SectionAttr(blobData, isImplicit);
+            scratch, isImplicit, isDefault);
+        Attr = new (ctx) SectionAttr(
+            isDefault ? std::nullopt : std::optional<StringRef>(blobData),
+            isImplicit);
         break;
       }
 

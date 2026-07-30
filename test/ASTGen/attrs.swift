@@ -136,6 +136,7 @@ class ExclusivityAttrClass {
 
 struct SectionStruct {
 	@section("__TEXT,__mysection") @used func foo() {}
+	@section(default) @used func bar() {}
 }
 
 protocol ImplementsProto {
