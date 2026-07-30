@@ -51,14 +51,14 @@ enum NSErrorDomainKind: TypeInfoProtocol {
       stringlit(domain)
     case .regular:
       """
-      String(reflecting: self)
+      Swift::String(reflecting: self)
       """
     }
   }
 
   func expand() -> DeclSyntax {
     """
-    static var _nsErrorDomain: String {
+    static var _nsErrorDomain: Swift::String {
       return \(self.expandValue())
     }
     """
