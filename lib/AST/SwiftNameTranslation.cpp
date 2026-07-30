@@ -234,10 +234,11 @@ std::string swift::cxx_translation::sanitizeNameForCxx(StringRef name) {
 /// Returns the given Swift name, sanitized if needed to form a valid C++
 /// identifier. The result is interned in the ASTContext to remain valid past
 /// the lifetime of the sanitized string.
-static StringRef getSanitizedNameForCxx(ASTContext &ctx, StringRef name) {
-  if (name.empty() || swift::cxx_translation::isValidCxxIdentifier(name))
-    return name;
-  return ctx.getIdentifier(swift::cxx_translation::sanitizeNameForCxx(name))
+static StringRef getSanitizedNameForCxx(ASTContext &ctx, Identifier name) {
+  if (name.empty() || swift::cxx_translation::isValidCxxIdentifier(name.str()))
+    return name.str();
+  return ctx
+      .getIdentifier(swift::cxx_translation::sanitizeNameForCxx(name.str()))
       .str();
 }
 
@@ -305,11 +306,11 @@ swift::cxx_translation::getNameForCxx(const ValueDecl *VD,
         os << char(std::toupper(paramNameStr[0]));
         os << paramNameStr.drop_front(1);
       }
-      return getSanitizedNameForCxx(ctx, ctx.getIdentifier(os.str()).str());
+      return getSanitizedNameForCxx(ctx, ctx.getIdentifier(os.str()));
     }
   }
 
-  return getSanitizedNameForCxx(ctx, VD->getBaseIdentifier().str());
+  return getSanitizedNameForCxx(ctx, VD->getBaseIdentifier());
 }
 
 namespace {
