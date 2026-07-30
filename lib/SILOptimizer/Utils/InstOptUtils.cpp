@@ -433,10 +433,6 @@ getConcreteValueOfExistentialBoxAddr(SILValue addr, SILInstruction *ignoreUser) 
     case SILInstructionKind::LoadInst:
       break;
     case SILInstructionKind::DebugValueInst:
-      if (!DebugValueInst::hasAddrVal(stackUser)) {
-        if (stackUser != ignoreUser)
-          return SILValue();
-      }
       break;
     case SILInstructionKind::StoreInst: {
       auto *store = cast<StoreInst>(stackUser);
