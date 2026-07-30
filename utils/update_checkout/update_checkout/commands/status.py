@@ -33,10 +33,10 @@ class StatusCommand:
             repo_name = repo_path.name
 
             my_args = RunnerArguments(
+                args=args,
+                scheme_name="",
                 repo_name=repo_name,
                 output_prefix="Checking the status of",
-                source_root=args.source_root,
-                verbose=args.verbose,
             )
             self._pool_args.append(my_args)
 
@@ -83,5 +83,5 @@ class StatusCommand:
 
     @staticmethod
     def _get_uncommitted_changes_of_repository(pool_args: RunnerArguments):
-        repo_path = pool_args.source_root.joinpath(pool_args.repo_name)
+        repo_path = pool_args.args.source_root.joinpath(pool_args.repo_name)
         return Git.run(repo_path, ["status", "--short"], fatal=True)

@@ -98,7 +98,7 @@ class ParallelRunner:
         self._output_prefix = pool_args[0].output_prefix
         self._nb_repos = len(pool_args)
         self._stop_event = Event()
-        self._verbose = pool_args[0].verbose
+        self._verbose = pool_args[0].args.verbose
         if not self._verbose:
             self._task_tracker = TaskTracker()
             self._monitored_fn = MonitoredFunction(self._fn, self._task_tracker)
