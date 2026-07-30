@@ -64,18 +64,16 @@ class FindCapturedVars : public ASTWalker {
   OpaqueValueExpr *OpaqueValue = nullptr;
   SourceLoc CaptureLoc;
   DeclContext *CurDC;
-  bool NoEscape, ObjC;
+  bool NoEscape, ObjC, CalledOnce;
   bool HasGenericParamCaptures;
   bool HasUsesOfCurrentIsolation = false;
 
 public:
-  FindCapturedVars(SourceLoc CaptureLoc,
-                   DeclContext *CurDC,
-                   bool NoEscape,
-                   bool ObjC,
-                   bool IsGenericFunction)
+  FindCapturedVars(SourceLoc CaptureLoc, DeclContext *CurDC, bool NoEscape,
+                   bool ObjC, bool IsGenericFunction, bool IsCalledOnce)
       : Context(CurDC->getASTContext()), CaptureLoc(CaptureLoc), CurDC(CurDC),
-        NoEscape(NoEscape), ObjC(ObjC), HasGenericParamCaptures(IsGenericFunction) {}
+        NoEscape(NoEscape), ObjC(ObjC), CalledOnce(IsCalledOnce),
+        HasGenericParamCaptures(IsGenericFunction) {}
 
   CaptureInfo getCaptureInfo() const {
     DynamicSelfType *dynamicSelfToRecord = nullptr;
@@ -249,6 +247,9 @@ public:
       // then the result is escaping.
       auto existing = Captures[entryNumber-1];
       unsigned flags = existing.getFlags() & capture.getFlags();
+      // One consuming use makes the capture consuming.
+      if (existing.isConsumed() || capture.isConsumed())
+        flags |= CapturedValue::IsConsumed;
       capture = CapturedValue(VD, flags, existing.getLoc());
       Captures[entryNumber-1] = capture;
     }
@@ -406,6 +407,15 @@ public:
                                       : AccessKind::Read,
               CurDC->getParentModule(), CurDC->getResilienceExpansion()))
         Flags |= CapturedValue::IsDirect;
+
+      // `@called(once)` captures can be moved into `@called(once)` closures
+      // because the closure itself cannot be called more than once.
+      if (CalledOnce) {
+        if (auto fnType = var->getInterfaceType()->getAs<AnyFunctionType>()) {
+          if (fnType->isCalledOnce())
+            Flags |= CapturedValue::IsConsumed;
+        }
+      }
     }
 
     // If the closure is noescape, then we can capture the decl as noescape.
@@ -453,6 +463,10 @@ public:
       // escaping, even if they are coming from an inner noescape closure.
       if (!NoEscape)
         Flags &= ~CapturedValue::IsNoEscape;
+
+      // Regular closures cannot consume their captures.
+      if (!CalledOnce)
+        Flags &= ~CapturedValue::IsConsumed;
 
       addCapture(capture.mergeFlags(Flags));
     }
@@ -823,9 +837,11 @@ CaptureInfo CaptureInfoRequest::evaluate(Evaluator &evaluator,
   if (type->is<ErrorType>())
     return CaptureInfo::empty();
 
-  bool isNoEscape = type->castTo<AnyFunctionType>()->isNoEscape();
-  FindCapturedVars finder(AFD->getLoc(), AFD, isNoEscape,
-                          AFD->isObjC(), AFD->hasGenericParamList());
+  auto fnType = type->castTo<AnyFunctionType>();
+  bool isNoEscape = fnType->isNoEscape();
+  bool isCalledOnce = fnType->isCalledOnce();
+  FindCapturedVars finder(AFD->getLoc(), AFD, isNoEscape, AFD->isObjC(),
+                          AFD->hasGenericParamList(), isCalledOnce);
 
   if (auto *body = AFD->getTypecheckedBody())
     body->walk(finder);
@@ -888,9 +904,11 @@ void TypeChecker::computeCaptures(AbstractClosureExpr *ACE) {
     return;
   }
 
-  bool isNoEscape = type->castTo<FunctionType>()->isNoEscape();
+  auto fnType = type->castTo<FunctionType>();
+  bool isNoEscape = fnType->isNoEscape();
+  bool isCalledOnce = fnType->isCalledOnce();
   FindCapturedVars finder(ACE->getLoc(), ACE, isNoEscape,
-                          /*isObjC=*/false, /*isGeneric=*/false);
+                          /*isObjC=*/false, /*isGeneric=*/false, isCalledOnce);
   body->walk(finder);
 
   finder.checkType(type, ACE->getLoc());
@@ -910,11 +928,15 @@ CaptureInfo ParamCaptureInfoRequest::evaluate(Evaluator &evaluator,
   // A generic function always captures outer generic parameters.
   bool isGeneric = DC->isInnermostContextGeneric();
 
-  FindCapturedVars finder(E->getLoc(),
-                          DC,
+  bool isCalledOnce = false;
+  if (auto *closure = dyn_cast<AbstractClosureExpr>(E)) {
+    isCalledOnce = closure->isCalledOnce();
+  }
+
+  FindCapturedVars finder(E->getLoc(), DC,
                           /*isNoEscape=*/false,
                           /*isObjC=*/false,
-                          /*IsGeneric*/isGeneric);
+                          /*IsGeneric*/ isGeneric, isCalledOnce);
   E->walk(finder);
 
   if (!DC->getParent()->isLocalContext() &&
@@ -942,7 +964,8 @@ CaptureInfo PatternBindingCaptureInfoRequest::evaluate(Evaluator &evaluator,
   FindCapturedVars finder(init->getLoc(), DC,
                           /*NoEscape=*/false,
                           /*ObjC=*/false,
-                          /*IsGenericFunction*/ false);
+                          /*IsGenericFunction*/ false,
+                          /*IsCalledOnce=*/false);
   init->walk(finder);
 
   auto &ctx = DC->getASTContext();
