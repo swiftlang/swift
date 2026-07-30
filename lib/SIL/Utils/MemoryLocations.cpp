@@ -341,9 +341,7 @@ bool MemoryLocations::analyzeLocationUsesRecursively(SILValue V, unsigned locIdx
         break;
       }
       case SILInstructionKind::DebugValueInst:
-        if (cast<DebugValueInst>(user)->hasAddrVal())
-          break;
-        return false;
+        break;
       case SILInstructionKind::ApplyInst: {
         auto *apply = cast<ApplyInst>(user);
         if (apply->hasAddressResult()) {

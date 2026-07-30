@@ -2405,9 +2405,7 @@ swift::getSingleInitAllocStackUse(AllocStackInst *asi,
         destroyingUses->push_back(use);
       continue;
     case SILInstructionKind::DebugValueInst:
-      if (cast<DebugValueInst>(user)->hasAddrVal())
-        continue;
-      break;
+      continue;
     case SILInstructionKind::DeallocStackInst:
     case SILInstructionKind::LoadBorrowInst:
       continue;

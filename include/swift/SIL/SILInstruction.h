@@ -5861,19 +5861,6 @@ public:
       *getTrailingObjects<const SILDebugScope *>() = NewDS;
   }
 
-  /// Whether the SSA value associated with the current debug_value
-  /// instruction has an address type.
-  bool hasAddrVal() const {
-    return getOperand()->getType().isAddress();
-  }
-
-  /// An utility to check if \p I is DebugValueInst and
-  /// whether it's associated with address type SSA value.
-  static DebugValueInst *hasAddrVal(SILInstruction *I) {
-    auto *DVI = dyn_cast_or_null<DebugValueInst>(I);
-    return DVI && DVI->hasAddrVal()? DVI : nullptr;
-  }
-
   /// Whether this debug value has a DIExpr with a deref.
   /// For address-only types with a debug reconstruction block, the deref
   /// applies after the BB's result. Otherwise, this is incompatible with
