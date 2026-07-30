@@ -1235,7 +1235,18 @@ private:
           return;
       }
 
+      // Bindings for throwing functions are only usable when the consumer
+      // opted into the experimental Swift error handling support; the
+      // C declaration is guarded here, the C++ thunks are guarded by the
+      // method printers themselves.
+      bool needsThrowsGuard = AFD->hasThrows();
+      if (needsThrowsGuard)
+        ClangSyntaxPrinter(AFD->getASTContext(), owningPrinter.prologueOS)
+            .printSwiftErrorBindingsGuardBegin();
       owningPrinter.prologueOS << cFuncPrologueOS.str();
+      if (needsThrowsGuard)
+        ClangSyntaxPrinter(AFD->getASTContext(), owningPrinter.prologueOS)
+            .printSwiftErrorBindingsGuardEnd();
 
       printDocumentationComment(AFD);
       DeclAndTypeClangFunctionPrinter declPrinter(
@@ -2019,8 +2030,23 @@ private:
       }
       if (!canPrintOverloadOfFunction(FD))
         return;
+      // Bindings for throwing functions are only usable when the consumer
+      // opted into the experimental Swift error handling support.
+      bool needsThrowsGuard = FD->hasThrows();
+      if (needsThrowsGuard) {
+        ClangSyntaxPrinter(FD->getASTContext(), owningPrinter.prologueOS)
+            .printSwiftErrorBindingsGuardBegin();
+        ClangSyntaxPrinter(FD->getASTContext(), os)
+            .printSwiftErrorBindingsGuardBegin();
+      }
       owningPrinter.prologueOS << cFuncPrologueOS.str();
+      if (needsThrowsGuard)
+        ClangSyntaxPrinter(FD->getASTContext(), owningPrinter.prologueOS)
+            .printSwiftErrorBindingsGuardEnd();
       printAbstractFunctionAsCxxFunctionThunk(FD, *funcABI);
+      if (needsThrowsGuard)
+        ClangSyntaxPrinter(FD->getASTContext(), os)
+            .printSwiftErrorBindingsGuardEnd();
       recordEmittedDeclInCurrentCxxLexicalScope(FD);
       return;
     }

@@ -4,6 +4,12 @@
 
 // RUN: %check-interop-cxx-header-in-clang(%t/methods.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY -DSWIFT_CXX_INTEROP_EXPERIMENTAL_SWIFT_ERROR -Wno-unused-function)
 
+// The header must also compile for consumers that do not opt into the
+// experimental Swift error handling support (the throwing bindings are
+// guarded out in that case).
+// RUN: %check-interop-cxx-header-in-clang(%t/methods.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY -Wno-unused-function)
+// RUN: %check-interop-cxx-header-in-clang(%t/methods.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY -DSWIFT_CXX_INTEROP_EXPERIMENTAL_SWIFT_ERROR -DSWIFT_CXX_INTEROP_HIDE_SWIFT_ERROR -Wno-unused-function)
+
 // REQUIRES: swift_feature_GenerateBindingsForThrowingFunctionsInCXX
 
 public enum MethodError: Error {

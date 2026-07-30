@@ -4,6 +4,12 @@
 
 // RUN: %check-interop-cxx-header-in-clang(%t/functions.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY -DSWIFT_CXX_INTEROP_EXPERIMENTAL_SWIFT_ERROR -Wno-unused-function)
 
+// The header must also compile for consumers that do not opt into the
+// experimental Swift error handling support, and for consumers that
+// explicitly hide it: the throwing bindings are guarded out in both cases.
+// RUN: %check-interop-cxx-header-in-clang(%t/functions.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY -Wno-unused-function)
+// RUN: %check-interop-cxx-header-in-clang(%t/functions.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY -DSWIFT_CXX_INTEROP_EXPERIMENTAL_SWIFT_ERROR -DSWIFT_CXX_INTEROP_HIDE_SWIFT_ERROR -Wno-unused-function)
+
 // REQUIRES: swift_feature_GenerateBindingsForThrowingFunctionsInCXX
 
 // NOTE: The generated header emits the function thunks in alphabetical
@@ -108,6 +114,7 @@ public func emptyThrowFunction() throws { print("passEmptyThrowFunction") }
 // CHECK-NEXT: return swift::Expected<void>();
 // CHECK-NEXT: #endif
 // CHECK-NEXT: }
+// CHECK-NEXT: #endif // defined(SWIFT_CXX_INTEROP_EXPERIMENTAL_SWIFT_ERROR) && !defined(SWIFT_CXX_INTEROP_HIDE_SWIFT_ERROR)
 
 @_expose(Cxx)
 public func genericThrowFunction<T>(_ x: T) throws {
@@ -332,7 +339,10 @@ public func throwFunctionWithStringReturn(_ shouldThrow: Bool) throws -> String 
     return "Hello from Swift"
 }
 
-// CHECK: SWIFT_INLINE_THUNK swift::ThrowingResult<swift::String> throwFunctionWithStringReturn(bool shouldThrow) SWIFT_SYMBOL("s:9Functions29throwFunctionWithStringReturnySSSbKF") SWIFT_WARN_UNUSED_RESULT {
+// Each throwing thunk is wrapped in the guard for the experimental Swift
+// error handling support.
+// CHECK: #if defined(SWIFT_CXX_INTEROP_EXPERIMENTAL_SWIFT_ERROR) && !defined(SWIFT_CXX_INTEROP_HIDE_SWIFT_ERROR)
+// CHECK-NEXT: SWIFT_INLINE_THUNK swift::ThrowingResult<swift::String> throwFunctionWithStringReturn(bool shouldThrow) SWIFT_SYMBOL("s:9Functions29throwFunctionWithStringReturnySSSbKF") SWIFT_WARN_UNUSED_RESULT {
 // CHECK-NEXT: void* opaqueError = nullptr;
 // CHECK-NEXT: void* _ctx = nullptr;
 // CHECK-NEXT: auto returnValue = Functions::_impl::$s9Functions29throwFunctionWithStringReturnySSSbKF(shouldThrow, _ctx, &opaqueError);

@@ -464,6 +464,16 @@ void ClangSyntaxPrinter::printIncludeForShimHeader(StringRef headerName) {
   });
 }
 
+void ClangSyntaxPrinter::printSwiftErrorBindingsGuardBegin() {
+  os << "#if defined(SWIFT_CXX_INTEROP_EXPERIMENTAL_SWIFT_ERROR) && "
+        "!defined(SWIFT_CXX_INTEROP_HIDE_SWIFT_ERROR)\n";
+}
+
+void ClangSyntaxPrinter::printSwiftErrorBindingsGuardEnd() {
+  os << "#endif // defined(SWIFT_CXX_INTEROP_EXPERIMENTAL_SWIFT_ERROR) && "
+        "!defined(SWIFT_CXX_INTEROP_HIDE_SWIFT_ERROR)\n";
+}
+
 void ClangSyntaxPrinter::printDefine(StringRef macroName) {
   os << "#define " << macroName << "\n";
 }
