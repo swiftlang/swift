@@ -163,7 +163,7 @@ Swift functions can be called from C++, with some restrictions. See this table f
 | Fixed layout structs           | Yes                                                      |
 | Resilient / opaque structs     | Yes                                                      |
 | Copy and destroy semantics     | Yes                                                      |
-| Initializers                   | Yes (except for throwing initializers)                   |
+| Initializers                   | Yes, including throwing initializers (throwing requires the `GenerateBindingsForThrowingFunctionsInCXX` feature) |
 
 **Enums**
 
@@ -183,7 +183,7 @@ Swift functions can be called from C++, with some restrictions. See this table f
 |--------------------------------|----------------------------------------------------------|
 | Class reference values         | Yes                                                      |
 | ARC semantics                  | Yes (C++ copy constructor,assignment operator, destructor perform ARC operations)  |
-| Initializers                   | Yes (except for throwing initializers) |
+| Initializers                   | Yes, including throwing initializers (throwing requires the `GenerateBindingsForThrowingFunctionsInCXX` feature) |
 
 **Methods**
 
