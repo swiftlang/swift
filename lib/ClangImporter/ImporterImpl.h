@@ -2292,6 +2292,20 @@ getCxxValueSemanticsKind(const clang::Type *type,
 
 bool isViewType(const clang::CXXRecordDecl *decl);
 
+/// Determine whether \p type is a "direct view": a pointer or reference to a
+/// self-contained pointee, or a record (including a class template
+/// specialization) in which every field and base is either self-contained or
+/// itself a direct view. Here "self-contained" means escapable
+/// (SWIFT_ESCAPABLE), a foreign reference type, or a type annotated
+/// SWIFT_SELF_CONTAINED (import_owned); a type explicitly marked unsafe is
+/// never self-contained. Incomplete/forward-declared types, `void` pointees,
+/// and function pointees are never direct views.
+///
+/// This is meant to be called on types that are imported as views, i.e. types
+/// that are non-escapable.
+bool isDirectViewType(const clang::Type *type, Evaluator &eval);
+bool isDirectViewType(const clang::Decl *decl, ASTContext &swiftCtx);
+
 inline const clang::Type *desugarIfElaborated(const clang::Type *type) {
   if (auto elaborated = dyn_cast<clang::ElaboratedType>(type))
     return elaborated->desugar().getTypePtr();

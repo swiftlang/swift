@@ -9095,12 +9095,24 @@ ExplicitSafety ClangDeclExplicitSafety::evaluate(
       continue;
     }
 
-    // Escapability annotations imply that the declaration is safe
-    if (evaluateOrDefault(
-            evaluator,
-            ClangTypeEscapability({recordDecl->getTypeForDecl(), nullptr}),
-            CxxEscapability::Unknown) != CxxEscapability::Unknown)
+    // Escapability tells us how to treat this record's safety.
+    switch (evaluateOrDefault(
+        evaluator,
+        ClangTypeEscapability({recordDecl->getTypeForDecl(), nullptr}),
+        CxxEscapability::Unknown)) {
+    case CxxEscapability::Escapable:
+      // A self-contained (escapable) type is safe.
       continue;
+    case CxxEscapability::NonEscapable:
+      // A non-escapable "view" is safe only if it is a *direct* view. Views
+      // with more complex lifetime dependencies are imported as unsafe.
+      if (importer::isDirectViewType(recordDecl->getTypeForDecl(), evaluator))
+        continue;
+      return ExplicitSafety::Unsafe;
+    case CxxEscapability::Unknown:
+      // Fall through to the field/base and template-argument checks below.
+      break;
+    }
 
     // A template class is unsafe if any of its type arguments are unsafe.
     // Note that this does not rely on the record being defined.

@@ -9,6 +9,7 @@
 #include "clang/AST/RecordLayout.h"
 #include "clang/AST/Type.h"
 #include "clang/Basic/Specifiers.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 
@@ -24,6 +25,120 @@ bool importer::hasImportAsOpaquePointerAttr(const clang::RecordDecl *decl) {
              return swiftAttr->getAttribute() == "import_opaque_pointer";
            return false;
          });
+}
+
+//===----------------------------------------------------------------------===//
+// Direct view analysis
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+/// Whether \p type is "self-contained" for the purpose of direct-view
+/// inference: it is escapable (SWIFT_ESCAPABLE), a foreign reference type
+/// (SWIFT_SHARED_REFERENCE / SWIFT_IMMORTAL_REFERENCE), or a record explicitly
+/// annotated SWIFT_SELF_CONTAINED (import_owned). A record explicitly marked
+/// unsafe is never self-contained, which also excludes
+/// SWIFT_UNSAFE_REFERENCE.
+bool isSelfContainedForDirectView(const clang::Type *type, Evaluator &eval) {
+  type = type->getUnqualifiedDesugaredType();
+
+  // A function (pointer) refers to code, and a pointer to member is an offset
+  // rather than an address, so neither can dangle.
+  if (type->isFunctionPointerType() || type->isFunctionType() ||
+      type->isMemberPointerType())
+    return true;
+
+  if (const auto *recordType = type->getAs<clang::RecordType>()) {
+    auto *definition = recordType->getDecl()->getDefinition();
+    if (!definition)
+      return false;
+    // An explicitly unsafe type is never self-contained, so its unsafety is
+    // not silently dropped by an enclosing view.
+    if (importer::hasSwiftAttribute(definition, {"unsafe"}))
+      return false;
+    // Reference types are managed by Swift, so a pointer to one does not
+    // introduce a lifetime dependency. Use the request rather than a raw
+    // attribute lookup, so that reference-ness inherited from a base class is
+    // taken into account.
+    if (evaluateOrDefault(eval, ForeignReferenceTypeInfoRequest({definition}),
+                          ForeignReferenceTypeInfo())
+            .isReference())
+      return true;
+    if (importer::hasOwnedValueAttr(definition))
+      return true;
+  }
+
+  return evaluateOrDefault(eval, ClangTypeEscapability({type, nullptr}),
+                           CxxEscapability::Unknown) ==
+         CxxEscapability::Escapable;
+}
+
+bool isDirectViewTypeImpl(const clang::Type *type, Evaluator &eval,
+                          llvm::SmallDenseSet<const clang::Decl *, 4> &seen) {
+  type = type->getUnqualifiedDesugaredType();
+
+  // (A) A pointer or reference is a direct view if its pointee is
+  // self-contained. Block and ObjC-object pointers are not "pointers into a
+  // buffer of self-contained objects", so they are deliberately not matched
+  // here.
+  if (type->isPointerType() || type->isReferenceType()) {
+    clang::QualType pointee = type->getPointeeType();
+    // We do not know what is stored at the pointed-to memory, so a `void *`
+    // cannot be a pointer into a buffer of self-contained objects.
+    if (pointee->isFunctionType() || pointee->isVoidType())
+      return false;
+    return isSelfContainedForDirectView(pointee.getTypePtr(), eval);
+  }
+
+  // (B) A record is a direct view if every field and base is either
+  // self-contained or itself a direct view. A record with no indirection at
+  // all is treated as having a single level of indirection, so that a
+  // non-escapable marker type (`struct SWIFT_NONESCAPABLE Token { long id; };`)
+  // stays a direct view: it holds no pointer, so nothing in it can dangle.
+  if (const auto *recordType = type->getAs<clang::RecordType>()) {
+    auto *recordDecl = recordType->getDecl()->getDefinition();
+    if (!recordDecl)
+      return false;
+    if (importer::hasSwiftAttribute(recordDecl, {"unsafe"}))
+      return false;
+    if (!seen.insert(recordDecl).second)
+      return true;
+
+    auto isSelfContainedOrDirectView = [&](clang::QualType t) {
+      const clang::Type *ty = t.getTypePtr();
+      return isSelfContainedForDirectView(ty, eval) ||
+             isDirectViewTypeImpl(ty, eval, seen);
+    };
+
+    if (const auto *cxxRecordDecl =
+            dyn_cast<clang::CXXRecordDecl>(recordDecl)) {
+      for (auto base : cxxRecordDecl->bases())
+        if (!isSelfContainedOrDirectView(base.getType()))
+          return false;
+    }
+    for (auto *field : recordDecl->fields())
+      if (!isSelfContainedOrDirectView(field->getType()))
+        return false;
+    return true;
+  }
+
+  // (C) Anything else is not itself a direct view.
+  return false;
+}
+
+} // end anonymous namespace
+
+bool importer::isDirectViewType(const clang::Type *type, Evaluator &eval) {
+  llvm::SmallDenseSet<const clang::Decl *, 4> seen;
+  return isDirectViewTypeImpl(type, eval, seen);
+}
+
+bool importer::isDirectViewType(const clang::Decl *decl, ASTContext &swiftCtx) {
+  if (const auto *typeDecl = dyn_cast<clang::TypeDecl>(decl)) {
+    clang::QualType type = typeDecl->getASTContext().getTypeDeclType(typeDecl);
+    return isDirectViewType(type.getTypePtr(), swiftCtx.evaluator);
+  }
+  return false;
 }
 
 namespace {
