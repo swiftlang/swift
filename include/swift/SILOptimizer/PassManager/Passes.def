@@ -313,8 +313,6 @@ LEGACY_PASS(FunctionSignatureOpts, "function-signature-opts",
      "Function Signature Optimization")
 LEGACY_PASS(ARCSequenceOpts, "arc-sequence-opts",
      "ARC Sequence Optimization")
-LEGACY_PASS(ARCLoopOpts, "arc-loop-opts",
-     "ARC Loop Optimization")
 LEGACY_PASS(GenericSpecializer, "generic-specializer",
      "Generic Function Specialization on Static Types")
 LEGACY_PASS(ExistentialSpecializer, "existential-specializer",
