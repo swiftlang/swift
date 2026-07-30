@@ -456,7 +456,7 @@ ModuleDependencyScanner::getModuleImportIdentifier(StringRef moduleName) {
 
 SwiftDependencyTracker::SwiftDependencyTracker(
     std::shared_ptr<llvm::cas::ObjectStore> CAS, llvm::PrefixMapper *Mapper,
-    const CompilerInvocation &CI)
+    const CompilerInvocation &CI, ArrayRef<std::string> ClangBlocklists)
     : CAS(CAS), Mapper(Mapper) {
   auto &SearchPathOpts = CI.getSearchPathOptions();
 
@@ -492,6 +492,11 @@ SwiftDependencyTracker::SwiftDependencyTracker(
 
   // Add blocklist file.
   for (auto &File: CI.getFrontendOptions().BlocklistConfigFilePaths)
+    addCommonFile(File);
+
+  // Add files referenced by the Clang cc1 command line that will be needed at
+  // replay time (e.g. sanitizer ignorelists auto-injected by the Clang driver).
+  for (auto &File : ClangBlocklists)
     addCommonFile(File);
 
   // Add access notes.
@@ -623,6 +628,21 @@ ModuleDependencyScanner::ModuleDependencyScanner(
     CacheFS = cast<llvm::cas::CASBackedFileSystem>(
         llvm::cas::createCASProvidingFileSystem(
             CAS, ScanASTContext.SourceMgr.getFileSystem()));
+
+  // Collect paths referenced by cc1 args that the Clang driver implicitly
+  // injects (e.g. sanitizer ignorelists for `-fsanitize=...`). These are not
+  // named anywhere in the Swift invocation but must still land in the CAS
+  // input tree for cached `-compile-module-from-interface` replay.
+  if (CAS && ScanASTContext.ClangImporterOpts.ClangImporterDirectCC1Scan) {
+    auto *clangImporter =
+        static_cast<ClangImporter *>(ScanASTContext.getClangModuleLoader());
+    for (const auto &Arg : clangImporter->getSwiftExplicitModuleDirectCC1Args()) {
+      StringRef Path = Arg;
+      if (Path.consume_front("-fsanitize-ignorelist=") ||
+          Path.consume_front("-fsanitize-system-ignorelist="))
+        ClangBlocklists.push_back(Path.str());
+    }
+  }
 
   // TODO: Make num threads configurable
   for (size_t i = 0; i < NumThreads; ++i)
