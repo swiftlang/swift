@@ -5031,6 +5031,9 @@ void TypeChecker::checkFunctionEffects(AbstractFunctionDecl *fn) {
   PrettyStackTraceDecl debugStack("checking effects handling for", fn);
 #endif
 
+  if (fn->isBodySkipped())
+    return;
+
   auto context = Context::forFunction(fn);
   auto &ctx = fn->getASTContext();
   CheckEffectsCoverage checker(ctx, context);
