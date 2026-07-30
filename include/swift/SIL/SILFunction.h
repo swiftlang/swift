@@ -38,6 +38,7 @@ class ActorIsolation;
 enum class CodeGenerationModel: uint8_t;
 class SILInstruction;
 class SILModule;
+enum class SILStage;
 class SILFunctionBuilder;
 class SILProfiler;
 class BasicBlockBitfield;
@@ -501,6 +502,10 @@ private:
   /// Set when this function gives trivial values explicit ownership.
   unsigned HasOwnershipForTrivialValues : 1;
 
+  /// This function's pipeline stage. Seeded at creation to the module's stage
+  /// floor, so it is never below the floor. It may be ahead of the floor.
+  unsigned FunctionStage : 2;
+
   static void
   validateSubclassScope(SubclassScope scope, IsThunk_t isThunk,
                         const GenericSpecializationInformation *genericInfo) {
@@ -793,6 +798,14 @@ public:
   void setOwnershipForTrivialValues(bool val = true) {
     HasOwnershipForTrivialValues = val; 
   }
+
+  /// This function's SIL stage. Read this for a per-function legality query,
+  /// such as whether an instruction is still legal here. It is never below the
+  /// module's stage floor, and may be ahead of it.
+  SILStage getFunctionStage() const;
+
+  /// Advance this function's stage. A stage only ever moves forward.
+  void setFunctionStage(SILStage stage);
 
   ForceEnableLexicalLifetimes_t forceEnableLexicalLifetimes() const {
     return ForceEnableLexicalLifetimes_t(ForceEnableLexicalLifetimes);
