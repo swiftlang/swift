@@ -40,7 +40,7 @@ public struct DeriveEquatableMacro: DeclarationMacro {
     return
       """
       \(getAttributes())
-      static func \(getFunctionName())(_ a: Self, _ b: Self) -> Bool {
+      static func \(getFunctionName())(_ a: Self, _ b: Self) -> Swift::Bool {
         \(getBody())
       }
       """
@@ -63,7 +63,7 @@ public struct DeriveEquatableMacro: DeclarationMacro {
     return
       """
       \(raw: semantics)
-      @_implements(Equatable, ==(_:_:))
+      @_implements(Swift::Equatable, ==(_:_:))
       """
   }
 
@@ -232,7 +232,7 @@ func getDiscriminant(
 
   return
     """
-    var \(raw: discrName): Int
+    var \(raw: discrName): Swift::Int
     switch \(raw: scrutinee) {
     \(raw: cases.joined(separator: "\n"))
     }
@@ -262,6 +262,6 @@ func getEnumElementPayloadPattern(
 /// site (e.g. pruned by availability).
 func getUnreachableStatement() -> CodeBlockItemSyntax {
   """
-  fatalError("Unavailable code reached")
+  Swift::fatalError("Unavailable code reached")
   """
 }
