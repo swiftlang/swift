@@ -451,8 +451,6 @@ LEGACY_PASS(MoveOnlyTempAllocationFromLetTester, "sil-move-only-temp-allocation-
      "Pass that allows us to run separately SIL test cases for the eliminateTemporaryAllocationsFromLet utility")
 LEGACY_PASS(ConsumeOperatorCopyableValuesChecker, "sil-consume-operator-copyable-values-checker",
      "Pass that performs checking of the consume operator for copyable values")
-LEGACY_PASS(TrivialMoveOnlyTypeEliminator, "sil-trivial-move-only-type-eliminator",
-     "Pass that rewrites SIL to remove move only types from values of trivial type")
 LEGACY_PASS(MoveOnlyTypeEliminator, "sil-move-only-type-eliminator",
      "Pass that rewrites SIL to remove move only types from all values")
 LEGACY_PASS(LexicalLifetimeEliminator, "sil-lexical-lifetime-eliminator",

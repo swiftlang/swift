@@ -169,12 +169,6 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   // Check noImplicitCopy and move only types for objects and addresses.
   P.addMoveOnlyChecker();
 
-  // FIXME: rdar://122701694 (`consuming` keyword causes verification error on
-  //        invalid SIL types)
-  //
-  // Lower move only wrapped trivial types.
-  //   P.addTrivialMoveOnlyTypeEliminator();
-
   // Check no uses after consume operator of a value in an address.
   P.addConsumeOperatorCopyableAddressesChecker();
   // No uses after consume operator of copyable value.
