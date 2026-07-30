@@ -1929,6 +1929,19 @@ void DeclAndTypeClangFunctionPrinter::printCxxMethod(
     Type resultTy, bool isStatic, bool isDefinition,
     std::optional<IRABIDetailsProvider::MethodDispatchInfo> dispatchInfo) {
   bool isConstructor = isa<ConstructorDecl>(FD);
+
+  // The C++ bindings for a throwing function are only usable when the
+  // consumer opted into the experimental Swift error handling support.
+  bool needsThrowsGuard = FD->hasThrows();
+  if (needsThrowsGuard)
+    ClangSyntaxPrinter(FD->getASTContext(), os)
+        .printSwiftErrorBindingsGuardBegin();
+  auto printThrowsGuardEnd = [&]() {
+    if (needsThrowsGuard)
+      ClangSyntaxPrinter(FD->getASTContext(), os)
+          .printSwiftErrorBindingsGuardEnd();
+  };
+
   os << "  ";
 
   FunctionSignatureModifiers modifiers;
@@ -1944,8 +1957,10 @@ void DeclAndTypeClangFunctionPrinter::printCxxMethod(
   auto result = printFunctionSignature(
       FD, signature, cxx_translation::getNameForCxx(FD), resultTy,
       FunctionSignatureKind::CxxInlineThunk, modifiers);
-  if (result.isUnsupported())
+  if (result.isUnsupported()) {
+    printThrowsGuardEnd();
     return;
+  }
 
   printCxxReturnsRetainedAttribute(os, resultTy);
   declAndTypePrinter.printAvailability(os, FD);
@@ -1953,6 +1968,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxMethod(
     os << ";\n";
     if (result.isObjCxxOnly())
       os << "#endif // defined(__OBJC__)\n";
+    printThrowsGuardEnd();
     return;
   }
 
@@ -1966,6 +1982,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxMethod(
   os << "  }\n";
   if (result.isObjCxxOnly())
     os << "#endif // defined(__OBJC__)\n";
+  printThrowsGuardEnd();
 }
 
 /// Returns true if the given property name like `isEmpty` can be remapped
@@ -2006,6 +2023,13 @@ void DeclAndTypeClangFunctionPrinter::printCxxPropertyAccessorMethod(
   assert(accessor->isSetter() || accessor->getParameters()->size() == 0);
   std::string accessorName = remapPropertyName(accessor, resultTy);
 
+  // The C++ bindings for a throwing accessor are only usable when the
+  // consumer opted into the experimental Swift error handling support.
+  bool needsThrowsGuard = accessor->hasThrows();
+  if (needsThrowsGuard)
+    ClangSyntaxPrinter(accessor->getASTContext(), os)
+        .printSwiftErrorBindingsGuardBegin();
+
   os << "  ";
 
   FunctionSignatureModifiers modifiers;
@@ -2027,6 +2051,9 @@ void DeclAndTypeClangFunctionPrinter::printCxxPropertyAccessorMethod(
     os << ";\n";
     if (result.isObjCxxOnly())
       os << "#endif\n";
+    if (needsThrowsGuard)
+      ClangSyntaxPrinter(accessor->getASTContext(), os)
+          .printSwiftErrorBindingsGuardEnd();
     return;
   }
   os << " {\n";
@@ -2038,6 +2065,9 @@ void DeclAndTypeClangFunctionPrinter::printCxxPropertyAccessorMethod(
   os << "  }\n";
   if (result.isObjCxxOnly())
     os << "#endif\n";
+  if (needsThrowsGuard)
+    ClangSyntaxPrinter(accessor->getASTContext(), os)
+        .printSwiftErrorBindingsGuardEnd();
 }
 
 void DeclAndTypeClangFunctionPrinter::printCxxSubscriptAccessorMethod(
@@ -2047,6 +2077,12 @@ void DeclAndTypeClangFunctionPrinter::printCxxSubscriptAccessorMethod(
     Type resultTy, bool isDefinition,
     std::optional<IRABIDetailsProvider::MethodDispatchInfo> dispatchInfo) {
   assert(accessor->isGetter());
+  // The C++ bindings for a throwing subscript are only usable when the
+  // consumer opted into the experimental Swift error handling support.
+  bool needsThrowsGuard = accessor->hasThrows();
+  if (needsThrowsGuard)
+    ClangSyntaxPrinter(accessor->getASTContext(), os)
+        .printSwiftErrorBindingsGuardBegin();
   // operator[] with multiple parameters only supported C++23 and up.
   bool multiParam = accessor->getParameters()->size() > 1;
   if (multiParam)
@@ -2068,6 +2104,9 @@ void DeclAndTypeClangFunctionPrinter::printCxxSubscriptAccessorMethod(
       os << "#endif\n";
     if (multiParam)
       os << "#endif // #if __cplusplus >= 202302L\n";
+    if (needsThrowsGuard)
+      ClangSyntaxPrinter(accessor->getASTContext(), os)
+          .printSwiftErrorBindingsGuardEnd();
     return;
   }
   os << " {\n";
@@ -2081,6 +2120,9 @@ void DeclAndTypeClangFunctionPrinter::printCxxSubscriptAccessorMethod(
     os << "#endif\n";
   if (multiParam)
     os << "#endif // #if __cplusplus >= 202302L\n";
+  if (needsThrowsGuard)
+    ClangSyntaxPrinter(accessor->getASTContext(), os)
+        .printSwiftErrorBindingsGuardEnd();
 }
 
 bool DeclAndTypeClangFunctionPrinter::hasKnownOptionalNullableCxxMapping(

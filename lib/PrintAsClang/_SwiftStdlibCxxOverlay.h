@@ -153,7 +153,8 @@ SWIFT_INLINE_THUNK cxxOverlay::IterationEndSentinel end(const Array<T> &) {
   return {};
 }
 
-#ifdef SWIFT_CXX_INTEROP_EXPERIMENTAL_SWIFT_ERROR
+#if defined(SWIFT_CXX_INTEROP_EXPERIMENTAL_SWIFT_ERROR) &&                     \
+    !defined(__EmbeddedSwift__)
 
 extern "C" void *_Nonnull swift_errorRetain(void *_Nonnull swiftError) noexcept;
 
@@ -535,6 +536,6 @@ template <class T> using ThrowingResult = swift::Expected<T>;
 #endif
 
 #endif // SWIFT_CXX_INTEROP_HIDE_SWIFT_ERROR
-#endif // SWIFT_CXX_INTEROP_EXPERIMENTAL_SWIFT_ERROR
+#endif // SWIFT_CXX_INTEROP_EXPERIMENTAL_SWIFT_ERROR && !__EmbeddedSwift__
 
 #endif
