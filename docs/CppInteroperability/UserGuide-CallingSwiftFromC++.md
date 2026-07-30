@@ -21,7 +21,6 @@ design for the Swift to C++ interoperability layer.
 * Type casting
 * Recursive/indirect enums
 * Associated types in generic where clauses
-* Error handling
 * Opaque return type `-> some P` (should we not support it)
 * Character type & character literal
 
@@ -1380,6 +1379,67 @@ auto swiftIntArray = swift::Array<int>(cxxVector);
 ```
 
 This constructor copies over the elements from the C++ vector into the constructed Swift array.
+
+## Handling Swift Errors In C++
+
+Swift functions, methods, initializers and throwing accessors marked with
+`throws` can be exposed to C++ when the Swift module is compiled with the
+`GenerateBindingsForThrowingFunctionsInCXX` feature
+(`-enable-experimental-feature GenerateBindingsForThrowingFunctionsInCXX`),
+and the C++ code that includes the generated header defines the
+`SWIFT_CXX_INTEROP_EXPERIMENTAL_SWIFT_ERROR` macro.
+
+For example, the following Swift function:
+
+```swift
+enum FileError: Error {
+    case notFound
+}
+
+@_expose(Cxx)
+public func readFile(at path: String) throws -> String {
+    throw FileError.notFound
+}
+```
+
+can be called from C++ like this when C++ exceptions are enabled:
+
+```c++
+try {
+  auto contents = Module::readFile(swift::String("/tmp/file.txt"));
+} catch (const swift::Error &error) {
+  printf("caught: %s\n", error.what());
+  if (auto fileError = error.as<Module::FileError>()) {
+    // Inspect the concrete error value.
+  }
+}
+```
+
+A thrown Swift error is rethrown in C++ as a `swift::Error` exception value.
+`swift::Error` derives from `std::exception`, so a Swift error can also be
+caught with `catch (const std::exception &)`. Its `what()` method returns the
+UTF-8 encoded result of `String(describing:)` for the thrown error value, and
+its `as<T>()` method dynamically casts the error to a concrete `@_expose`d
+Swift error type, returning `swift::Optional<T>`.
+
+Typed throws (`throws(MyError)`, SE-0413) uses a different ABI than untyped
+throws, and functions using it cannot be exposed to C++ yet.
+
+When C++ exceptions are disabled (`-fno-exceptions`), a throwing Swift
+function instead returns `swift::Expected<T>`, which holds either the
+returned value or the thrown `swift::Error`:
+
+```c++
+auto contents = Module::readFile(swift::String("/tmp/file.txt"));
+if (!contents.has_value()) {
+  const swift::Error &error = contents.error();
+}
+```
+
+The generated C++ signature of a throwing Swift function uses the
+`swift::ThrowingResult<T>` alias as its return type, which is an alias for
+`T` when C++ exceptions are enabled, and `swift::Expected<T>` when they are
+disabled.
 
 ## Appendix A: Type Traits That Model Swift’s Type System In C++
 
