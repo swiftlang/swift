@@ -1825,6 +1825,7 @@ bool swift::tryEliminateOnlyOwnershipUsedForwardingInst(
   }
 
   SmallVector<Operand *, 32> worklist(getNonDebugUses(forwardingInst));
+  SmallVector<SILInstruction *, 4> forwardingUsers;
   while (!worklist.empty()) {
     auto *use = worklist.pop_back_val();
     auto *user = use->getUser();
@@ -1834,6 +1835,7 @@ bool swift::tryEliminateOnlyOwnershipUsedForwardingInst(
       continue;
 
     if (isa<CopyValueInst>(user) || isa<BeginBorrowInst>(user)) {
+      forwardingUsers.push_back(user);
       for (auto result : user->getResults())
         for (auto *resultUse : getNonDebugUses(result))
           worklist.push_back(resultUse);
@@ -1843,9 +1845,12 @@ bool swift::tryEliminateOnlyOwnershipUsedForwardingInst(
     return false;
   }
 
-  // Rewrite debug uses separately (they might need salvaging logic).
-  // Note: We know that `forwardingInst` is salvageable as this function is
-  // only called with convert_function instructions.
+  // Rewrite all debug uses separately (they might need salvaging logic).
+  // Note: We know that `forwardingInst` and its users are salvageable as this
+  // function is only called with convert_function instructions, and
+  // begin_borrow and copy_value are salvageable as well.
+  for (auto *inst : llvm::reverse(forwardingUsers))
+    salvageDebugInfo(inst);
   salvageDebugInfo(forwardingInst);
 
   // Now that we know we can perform our transform, set all uses of
