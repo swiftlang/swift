@@ -804,16 +804,25 @@ static void addClosureSpecializePassPipeline(SILPassPipelinePlan &P) {
 }
 
 static void addLowLevelPassPipeline(SILPassPipelinePlan &P) {
-  P.startPipeline("LowLevel,Function", true /*isFunctionPassPipeline*/);
-
-  // Should be after FunctionSignatureOpts and before the last inliner.
-  P.addReleaseDevirtualizer();
+  P.startPipeline("LowLevelPrepare", true /*isFunctionPassPipeline*/);
 
   // In OSSA we cannot do all kind of redundant load elimination, yet.
   // Therefore do it now at the beginning of the non-OSSA pipeline.
   // TODO: we should be able to remove this RLE run once we can represent all kind
   //       of eliminated redundant loads in OSSA.
   P.addRedundantLoadElimination();
+
+  // Make sure there are no redundant stores which prevent ObjectOutlining. This pass
+  // must run before the ReleaseDevirtualizer (in a separate pipeline, because of
+  // possible pipeline-restarts) to avoid removing stores to class fields - which can
+  // also prevent ObjectOutlining.
+  // TODO: we should be able to remove this pass once we have OSSA throughout the pipeline.
+  P.addDeadStoreElimination();
+
+  P.startPipeline("LowLevel,Function", true /*isFunctionPassPipeline*/);
+
+  // Should be after FunctionSignatureOpts and before the last inliner.
+  P.addReleaseDevirtualizer();
 
   addFunctionPasses(P, OptimizationLevelKind::LowLevel);
 
