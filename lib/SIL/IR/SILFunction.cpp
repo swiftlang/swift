@@ -291,9 +291,9 @@ void SILFunction::init(
   // born after the module advances past Raw are reported lowered by the
   // stage term in hasLoweredAddresses(), so no creation-time seed is needed.
   this->HasLoweredAddresses = false;
-  // A function is born at the module's stage. Content created after the module
-  // advances is built to that stage's rules.
-  this->FunctionStage = unsigned(Module.getStage());
+  // A function is born at the stage floor. Content created after the module
+  // commits to a stage is built to that stage's rules.
+  this->FunctionStage = unsigned(Module.getStageFloor());
   this->stackProtection = false;
   this->Inlined = false;
   this->Zombie = false;
@@ -317,7 +317,7 @@ bool SILFunction::hasLoweredAddresses() const {
   // - Module has committed past Raw SIL stage 
   return HasLoweredAddresses || WasDeserializedCanonical ||
          !getModule().usesOpaqueValues() ||
-         getModule().getStage() != SILStage::Raw;
+         getModule().getStageFloor() != SILStage::Raw;
 }
 
 SILStage SILFunction::getFunctionStage() const {
@@ -329,8 +329,8 @@ void SILFunction::setFunctionStage(SILStage stage) {
   // Its skip test reads hasLoweredAddresses(), whose stage term would then
   // report address form for a body that still holds opaque values.
   assert(stage >= getFunctionStage() && "regressing per-function stage?!");
-  assert(stage >= getModule().getStage() &&
-         "per-function stage below the module stage?!");
+  assert(stage >= getModule().getStageFloor() &&
+         "per-function stage below the module stage floor?!");
   FunctionStage = unsigned(stage);
 }
 

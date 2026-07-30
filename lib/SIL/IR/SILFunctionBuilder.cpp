@@ -318,11 +318,11 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
     // functions are mistakenly mapped to the same name (e.g. with @_cdecl).
     // We want to issue a regular error in this case and not crash with an
     // assert.
-    assert(mod.getStage() == SILStage::Raw ||
+    assert(mod.getStageFloor() == SILStage::Raw ||
            fn->getLoweredFunctionType() == constantType);
     auto linkageForDef = constant.getLinkage(ForDefinition_t::ForDefinition);
     auto fnLinkage = fn->getLinkage();
-    assert(mod.getStage() == SILStage::Raw || fn->getLinkage() == linkage ||
+    assert(mod.getStageFloor() == SILStage::Raw || fn->getLinkage() == linkage ||
            (forDefinition == ForDefinition_t::NotForDefinition &&
             (fnLinkage == linkageForDef ||
              (linkageForDef == SILLinkage::PublicNonABI ||
