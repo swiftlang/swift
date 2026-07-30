@@ -118,8 +118,7 @@ static bool hasSingletonMetatype(CanType instanceType) {
 
 CaptureKind
 TypeConverter::getDeclCaptureKind(CapturedValue capture,
-                                  TypeExpansionContext expansion,
-                                  const FunctionTypeInfo *closureInfo) {
+                                  TypeExpansionContext expansion) {
   if (auto *expr = capture.getPackElement()) {
     auto contextTy = expr->getType();
     auto props = getTypeProperties(
@@ -145,10 +144,6 @@ TypeConverter::getDeclCaptureKind(CapturedValue capture,
   auto props = getTypeProperties(
       contextTy, TypeExpansionContext::noOpaqueTypeArchetypesSubstitution(
                           expansion.getResilienceExpansion()));
-
-  bool isInOutCapture = false;
-  if (auto *param = dyn_cast<ParamDecl>(var))
-    isInOutCapture = param->isInOut();
 
   // If this is a noncopyable 'let' constant that is not a shared paramdecl or
   // used by a noescape capture, then we know it is boxed and want to pass it in

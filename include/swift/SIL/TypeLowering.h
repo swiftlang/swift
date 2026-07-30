@@ -790,8 +790,7 @@ public:
 
   /// Return the CaptureKind to use when capturing a decl.
   CaptureKind getDeclCaptureKind(CapturedValue capture,
-                                 TypeExpansionContext expansion,
-                                 const FunctionTypeInfo *closureInfo);
+                                 TypeExpansionContext expansion);
 
   /// Return a most-general-possible abstraction pattern.
   AbstractionPattern getMostGeneralAbstraction() {
