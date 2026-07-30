@@ -427,6 +427,7 @@ NODE(ConstValue)
 // Added in Swift 6.TBD
 CONTEXT_NODE(BorrowAccessor)
 CONTEXT_NODE(MutateAccessor)
+NODE(AsyncMainEntryPoint)
 NODE(CalledOnceFunctionType)
 
 #undef CONTEXT_NODE
