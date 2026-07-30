@@ -43,7 +43,7 @@ public struct DeriveComparableMacro: DeclarationMacro {
     return
       """
       \(getAttributes())
-      static func \(getFunctionName())(_ a: Self, _ b: Self) -> Bool {
+      static func \(getFunctionName())(_ a: Self, _ b: Self) -> Swift::Bool {
         \(getBody())
       }
       """
@@ -57,7 +57,7 @@ public struct DeriveComparableMacro: DeclarationMacro {
       ""
     } else {
       """
-      @_implements(Comparable, <(_:_:))
+      @_implements(Swift::Comparable, <(_:_:))
       """
     }
   }

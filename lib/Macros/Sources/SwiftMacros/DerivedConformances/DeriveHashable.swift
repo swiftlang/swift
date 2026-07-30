@@ -96,8 +96,8 @@ public struct DeriveHashableMacro: DeclarationMacro {
     let unsafeMark = isUnsafe ? "unsafe " : ""
     return
       """
-      var hashValue: Int {
-        return \(raw: unsafeMark)_hashValue(for: self)
+      var hashValue: Swift::Int {
+        return \(raw: unsafeMark)Swift::_hashValue(for: self)
       }
       """
   }
@@ -105,7 +105,7 @@ public struct DeriveHashableMacro: DeclarationMacro {
   /// Returns the signature of the `hash(into:)` method.
   static func getHashSignature() -> DeclSyntax {
     """
-    func hash(into hasher: inout Hasher)
+    func hash(into hasher: inout Swift::Hasher)
     """
   }
 
