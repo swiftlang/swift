@@ -4,12 +4,7 @@
 
 // CHECK-LABEL: internal enum Simple : Hashable
 enum Simple: Hashable {
-  // CHECK:        case a
-  case a
-  // CHECK:        case b
-  case b
-
-  // CHECK:        @_implements(Equatable, ==(_:_:)) internal static func __derived_enum_equals(_ a: `Self`, _ b: `Self`) -> Bool {
+  // CHECK:        @_semantics("derived_enum_equals") @_implements(Equatable, ==(_:_:)) internal static func __derived_enum_equals(_ a: `Self`, _ b: `Self`) -> Bool {
   // CHECK-NEXT:     var index_a: Int
   // CHECK-EMPTY:
   // CHECK-NEXT:     switch a {
@@ -28,6 +23,11 @@ enum Simple: Hashable {
   // CHECK-NEXT:     }
   // CHECK-NEXT:     return index_a == index_b
   // CHECK-NEXT:   }
+
+  // CHECK:        case a
+  case a
+  // CHECK:        case b
+  case b
 
   // CHECK:        internal func hash(into hasher: inout Hasher) {
   // CHECK-NEXT:     var discriminator: Int
@@ -49,14 +49,7 @@ enum Simple: Hashable {
 
 // CHECK-LABEL: internal enum HasAssociatedValues : Hashable
 enum HasAssociatedValues: Hashable {
-  // CHECK:        case a(Int)
-  case a(Int)
-  // CHECK:        case b(String)
-  case b(String)
-  // CHECK:        case c
-  case c
-
-  // CHECK:        @_implements(Equatable, ==(_:_:)) internal static func __derived_enum_equals(_ a: `Self`, _ b: `Self`) -> Bool {
+  // CHECK:        @_semantics("derived_enum_equals") @_implements(Equatable, ==(_:_:)) internal static func __derived_enum_equals(_ a: `Self`, _ b: `Self`) -> Bool {
   // CHECK-NEXT:     switch (a, b) {
   // CHECK-NEXT:     case (.a(let l0), .a(let r0)):
   // CHECK-NEXT:       guard l0 == r0 else {
@@ -74,6 +67,13 @@ enum HasAssociatedValues: Hashable {
   // CHECK-NEXT:       return false
   // CHECK-NEXT:     }
   // CHECK-NEXT:   }
+
+  // CHECK:        case a(Int)
+  case a(Int)
+  // CHECK:        case b(String)
+  case b(String)
+  // CHECK:        case c
+  case c
 
   // CHECK:        internal func hash(into hasher: inout Hasher) {
   // CHECK-NEXT:     switch self {
@@ -97,14 +97,7 @@ enum HasAssociatedValues: Hashable {
 
 // CHECK-LABEL: internal enum HasUnavailableElement : Hashable
 enum HasUnavailableElement: Hashable {
-  // CHECK:       case a
-  case a
-  // CHECK:       @available(*, unavailable)
-  // CHECK-NEXT:  case b
-  @available(*, unavailable)
-  case b
-
-  // CHECK:       @_implements(Equatable, ==(_:_:)) internal static func __derived_enum_equals(_ a: `Self`, _ b: `Self`) -> Bool {
+  // CHECK:       @_semantics("derived_enum_equals") @_implements(Equatable, ==(_:_:)) internal static func __derived_enum_equals(_ a: `Self`, _ b: `Self`) -> Bool {
   // CHECK-NEXT:    var index_a: Int
   // CHECK-EMPTY:
   // CHECK-NEXT:    switch a {
@@ -123,6 +116,13 @@ enum HasUnavailableElement: Hashable {
   // CHECK-NEXT:    }
   // CHECK-NEXT:    return index_a == index_b
   // CHECK-NEXT:  }
+
+  // CHECK:       case a
+  case a
+  // CHECK:       @available(*, unavailable)
+  // CHECK-NEXT:  case b
+  @available(*, unavailable)
+  case b
 
   // CHECK:       internal func hash(into hasher: inout Hasher) {
   // CHECK-NEXT:    var discriminator: Int
@@ -144,14 +144,7 @@ enum HasUnavailableElement: Hashable {
 
 // CHECK-LABEL: internal enum HasAssociatedValuesAndUnavailableElement : Hashable
 enum HasAssociatedValuesAndUnavailableElement: Hashable {
-  // CHECK:        case a(Int)
-  case a(Int)
-  // CHECK:       @available(*, unavailable)
-  // CHECK-NEXT:  case b(String)
-  @available(*, unavailable)
-  case b(String)
-
-  // CHECK:       @_implements(Equatable, ==(_:_:)) internal static func __derived_enum_equals(_ a: `Self`, _ b: `Self`) -> Bool {
+  // CHECK:       @_semantics("derived_enum_equals") @_implements(Equatable, ==(_:_:)) internal static func __derived_enum_equals(_ a: `Self`, _ b: `Self`) -> Bool {
   // CHECK-NEXT:    switch (a, b) {
   // CHECK-NEXT:    case (.a(let l0), .a(let r0)):
   // CHECK-NEXT:      guard l0 == r0 else {
@@ -165,6 +158,12 @@ enum HasAssociatedValuesAndUnavailableElement: Hashable {
   // CHECK-NEXT:    }
   // CHECK-NEXT:  }
 
+  // CHECK:        case a(Int)
+  case a(Int)
+  // CHECK:       @available(*, unavailable)
+  // CHECK-NEXT:  case b(String)
+  @available(*, unavailable)
+  case b(String)
 
   // CHECK:       internal func hash(into hasher: inout Hasher) {
   // CHECK-NEXT:    switch self {
@@ -186,12 +185,7 @@ enum HasAssociatedValuesAndUnavailableElement: Hashable {
 // CHECK-LABEL: internal enum UnavailableEnum : Hashable
 @available(*, unavailable)
 enum UnavailableEnum: Hashable {
-  // CHECK:        case a
-  case a
-  // CHECK:        case b
-  case b
-
-  // CHECK:        @_implements(Equatable, ==(_:_:)) internal static func __derived_enum_equals(_ a: `Self`, _ b: `Self`) -> Bool {
+  // CHECK:        @_semantics("derived_enum_equals") @_implements(Equatable, ==(_:_:)) internal static func __derived_enum_equals(_ a: `Self`, _ b: `Self`) -> Bool {
   // CHECK-NEXT:     var index_a: Int
   // CHECK-EMPTY:
   // CHECK-NEXT:     switch a {
@@ -210,6 +204,11 @@ enum UnavailableEnum: Hashable {
   // CHECK-NEXT:     }
   // CHECK-NEXT:     return index_a == index_b
   // CHECK-NEXT:   }
+
+  // CHECK:        case a
+  case a
+  // CHECK:        case b
+  case b
 
   // CHECK:        internal func hash(into hasher: inout Hasher) {
   // CHECK-NEXT:     var discriminator: Int
