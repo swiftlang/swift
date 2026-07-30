@@ -428,8 +428,6 @@ LEGACY_PASS(OwnershipVerifierTextualErrorDumper, "ownership-verifier-textual-err
      "Run ownership verification on all functions, emitting FileCheck-able textual errors instead of asserting")
 LEGACY_PASS(SemanticARCOpts, "semantic-arc-opts",
      "Semantic ARC Optimization")
-LEGACY_PASS(SimplifyUnreachableContainingBlocks, "simplify-unreachable-containing-blocks",
-     "Utility pass. Removes all non-term insts from blocks with unreachable terms")
 LEGACY_PASS(SerializeSILPass, "serialize-sil",
      "Utility pass. Serializes the current SILModule")
 LEGACY_PASS(UnitTestRunner, "test-runner",
