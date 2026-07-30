@@ -1132,12 +1132,25 @@ ValueDecl *swift::deriveRequirementViaMacro(DerivedConformance &derived,
     access = AccessLevel::FilePrivate;
   witness->overwriteAccess(access);
 
+  // A witness of a '@usableFromInline' type must itself be usable from inline,
+  // otherwise it cannot satisfy the requirement it witnesses.
+  auto inheritUsableFromInline = [&](ValueDecl *vDecl) {
+    if (!derived.Nominal->getAttrs().hasAttribute<UsableFromInlineAttr>() ||
+        vDecl->getAttrs().hasAttribute<UsableFromInlineAttr>() ||
+        vDecl->hasAttributeWithInlinableSemantics() ||
+        !DeclAttribute::canAttributeAppearOnDecl(DeclAttrKind::UsableFromInline,
+                                                 vDecl))
+      return;
+    vDecl->addAttribute(new (C) UsableFromInlineAttr(/*implicit=*/true));
+  };
+
   expansion->forEachExpandedNode([&](ASTNode node) {
     auto *decl = node.dyn_cast<Decl*>();
     if (!decl) return;
     auto *vDecl = dyn_cast<ValueDecl>(decl);
     if (!vDecl) return;
-    derived.addMemberToConformanceContext(vDecl, nullptr);
+    inheritUsableFromInline(vDecl);
+    derived.addMemberToConformanceContext(vDecl, /*insertAtHead=*/true);
   });
 
   return witness;
