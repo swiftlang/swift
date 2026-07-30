@@ -3508,15 +3508,22 @@ function Patch-mimalloc() {
   $Tools = @(
     "swift.exe",
     "swiftc.exe",
+    "swift-api-digester.exe",
+    "swift-autolink-extract.exe",
     "swift-driver.exe",
     "swift-frontend.exe",
+    "swift-symbolgraph-extract.exe",
+    "swift-synthesize-interface.exe",
     "clang.exe",
     "clang++.exe",
+    "clang-cache.exe",
     "clang-cl.exe",
+    "clang-cpp.exe",
     "lld.exe",
     "lld-link.exe",
     "ld.lld.exe",
-    "ld64.lld.exe"
+    "ld64.lld.exe",
+    "wasm-ld.exe"
   )
   $Binaries = $Tools | ForEach-Object {[IO.Path]::Combine($Platform.ToolchainInstallRoot, "usr", "bin", $_)}
   if ($IncludeNoAsserts) {
