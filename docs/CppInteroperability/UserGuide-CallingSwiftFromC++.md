@@ -97,6 +97,7 @@ public enum Direction {
 are exposed to C++ as:
 
 ```c++
+/// Swift name: '`hello world`()'
 void hello_u0020world();
 
 class Direction {
@@ -104,6 +105,9 @@ class Direction {
   ...
 };
 ```
+
+A C++ declaration whose name was sanitized carries a doc comment that states
+the original Swift name.
 
 Swift operator functions whose spelling is also a valid C++ operator, like
 `==`, are exposed as that C++ operator. Operator functions that have no C++

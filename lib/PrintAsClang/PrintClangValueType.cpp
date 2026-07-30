@@ -284,6 +284,7 @@ void ClangValueTypePrinter::printValueTypeDecl(
     };
 
     // Print out the C++ class itself.
+    ClangSyntaxPrinter(Context, os).printSwiftNameCommentIfNeeded(typeDecl);
     printGenericSignature(os);
     os << "class";
     declAndTypePrinter.printAvailability(os, typeDecl);

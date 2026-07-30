@@ -869,7 +869,10 @@ private:
           llvm::interleave(
               elementTagMapping, os,
               [&](const auto &pair) {
-                os << "\n    ";
+                os << "\n";
+                syntaxPrinter.printSwiftNameCommentIfNeeded(pair.first,
+                                                            /*indent=*/"    ");
+                os << "    ";
                 syntaxPrinter.printIdentifier(
                     cxx_translation::getNameForCxx(pair.first));
                 syntaxPrinter.printSymbolUSRAttribute(pair.first);
@@ -1241,6 +1244,13 @@ private:
       owningPrinter.prologueOS << cFuncPrologueOS.str();
 
       printDocumentationComment(AFD);
+      // For an accessor, the name exposed to C++ is derived from the name of
+      // the storage it accesses.
+      const ValueDecl *namedDecl = AFD;
+      if (const auto *accessor = dyn_cast<AccessorDecl>(AFD))
+        namedDecl = accessor->getStorage();
+      ClangSyntaxPrinter(AFD->getASTContext(), os)
+          .printSwiftNameCommentIfNeeded(namedDecl, /*indent=*/"  ");
       DeclAndTypeClangFunctionPrinter declPrinter(
           os, owningPrinter.prologueOS, owningPrinter.typeMapping,
           owningPrinter.interopContext, owningPrinter);
@@ -1749,6 +1759,8 @@ private:
       FuncDecl *FD, const FunctionSwiftABIInformation &funcABI) {
     assert(outputLang == OutputLanguageMode::Cxx);
     printDocumentationComment(FD);
+    ClangSyntaxPrinter(FD->getASTContext(), os)
+        .printSwiftNameCommentIfNeeded(FD);
 
     std::optional<ForeignAsyncConvention> asyncConvention =
         FD->getForeignAsyncConvention();

@@ -70,6 +70,21 @@ void ClangSyntaxPrinter::printBaseName(const ValueDecl *decl) const {
   printIdentifier(cxx_translation::getNameForCxx(decl));
 }
 
+void ClangSyntaxPrinter::printSwiftNameCommentIfNeeded(const ValueDecl *decl,
+                                                       StringRef indent) const {
+  // An operator either keeps its C++ spelling or is not exposed at all.
+  if (decl->isOperator())
+    return;
+  auto baseName = decl->getName().getBaseName();
+  if (baseName.isSpecial() || baseName.getIdentifier().empty() ||
+      cxx_translation::isValidCxxIdentifier(baseName.getIdentifier().str()))
+    return;
+  os << indent << "/// Swift name: '";
+  decl->getName().print(os, /*skipEmptyArgumentNames=*/false,
+                        /*escapeIfNeeded=*/true);
+  os << "'\n";
+}
+
 void ClangSyntaxPrinter::printModuleNameCPrefix(const ModuleDecl &mod) {
   os << cxx_translation::sanitizeNameForCxx(mod.getName().str()) << '_';
 }
