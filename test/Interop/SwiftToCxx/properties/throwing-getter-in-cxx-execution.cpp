@@ -17,6 +17,7 @@
 
 #include <cassert>
 #include <cstdio>
+#include <exception>
 #include "properties.h"
 
 int main() {
@@ -32,8 +33,8 @@ int main() {
   try {
     (void)throwingProps.getComputed();
     puts("no exception");
-  } catch (const swift::Error &e) {
-    puts("getter threw");
+  } catch (const std::exception &e) {
+    printf("getter threw: %s\n", e.what());
   }
   try {
     (void)throwingProps[4];
@@ -49,6 +50,6 @@ int main() {
 // CHECK-NEXT: passThrowingSubscript
 // CHECK-NEXT: subscript: 8
 // CHECK-NEXT: passThrowingGetter
-// CHECK-NEXT: getter threw
+// CHECK-NEXT: getter threw: failure
 // CHECK-NEXT: passThrowingSubscript
 // CHECK-NEXT: subscript threw

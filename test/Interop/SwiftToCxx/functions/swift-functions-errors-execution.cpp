@@ -17,13 +17,18 @@
 
 #include <cassert>
 #include <cstdio>
+#include <cstring>
+#include <exception>
 #include <string>
+#include <type_traits>
 #include "functions.h"
 
 int main() {
   static_assert(!noexcept(Functions::emptyThrowFunction()), "noexcept function");
   static_assert(!noexcept(Functions::throwFunction()), "noexcept function");
   static_assert(!noexcept(Functions::throwFunctionWithReturn()), "noexcept function");
+  static_assert(std::is_base_of<std::exception, swift::Error>::value,
+                "swift::Error must derive from std::exception");
 
   try {
     Functions::emptyThrowFunction();
@@ -53,6 +58,26 @@ int main() {
   try {
     Functions::testDestroyedError();
   } catch(const swift::Error &e) { }
+
+  // Catch a thrown Swift error as a std::exception and check its
+  // description.
+  try {
+    Functions::throwFunction();
+  } catch (const std::exception &e) {
+    printf("std::exception: %s\n", e.what());
+  }
+  // what() is cached; repeated calls return the same buffer.
+  try {
+    Functions::throwFunction();
+  } catch (swift::Error &e) {
+    const char *first = e.what();
+    assert(strcmp(first, e.what()) == 0);
+    assert(first == e.what());
+    // A copy recomputes the description.
+    swift::Error copy(e);
+    assert(strcmp(copy.what(), first) == 0);
+    printf("cached what: %s\n", first);
+  }
 
   // Throwing functions returning a struct with direct/indirect returns and
   // a String.
@@ -117,6 +142,15 @@ int main() {
     puts("generic struct threw");
   }
 
+  // what() uses String(describing:), which picks up
+  // CustomStringConvertible conformances.
+  try {
+    Functions::throwCustomDescriptionError();
+    puts("no exception");
+  } catch (const std::exception &e) {
+    printf("custom what: %s\n", e.what());
+  }
+
   return 0;
 }
 
@@ -128,6 +162,10 @@ int main() {
 // CHECK-NEXT: passThrowFunctionWithNeverReturn
 // CHECK-NEXT: Exception
 // CHECK-NEXT: Test destroyed
+// CHECK-NEXT: passThrowFunction
+// CHECK-NEXT: std::exception: throwError
+// CHECK-NEXT: passThrowFunction
+// CHECK-NEXT: cached what: throwError
 // CHECK-NEXT: passThrowFunctionWithDirectStructReturn
 // CHECK-NEXT: direct struct: 42
 // CHECK-NEXT: passThrowFunctionWithIndirectStructReturn
@@ -150,3 +188,5 @@ int main() {
 // CHECK-NEXT: generic primitive threw
 // CHECK-NEXT: passGenericThrowFunctionWithReturn
 // CHECK-NEXT: generic struct threw
+// CHECK-NEXT: passThrowCustomDescriptionError
+// CHECK-NEXT: custom what: custom error description

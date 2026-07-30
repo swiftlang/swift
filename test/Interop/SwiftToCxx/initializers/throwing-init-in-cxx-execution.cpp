@@ -17,6 +17,7 @@
 
 #include <cassert>
 #include <cstdio>
+#include <exception>
 #include "inits.h"
 
 int main() {
@@ -49,8 +50,8 @@ int main() {
   try {
     (void)RefHolderWithThrowingInit::init(true);
     puts("no exception");
-  } catch (const swift::Error &e) {
-    puts("ref holder init threw");
+  } catch (const std::exception &e) {
+    printf("ref holder init threw: %s\n", e.what());
   }
   try {
     (void)LargeStructWithThrowingInit::init(-1);
@@ -82,7 +83,7 @@ int main() {
 // CHECK-NEXT: passStructThrowingInit
 // CHECK-NEXT: struct init threw
 // CHECK-NEXT: passRefHolderThrowingInit
-// CHECK-NEXT: ref holder init threw
+// CHECK-NEXT: ref holder init threw: failure
 // CHECK-NEXT: passLargeStructThrowingInit
 // CHECK-NEXT: large struct init threw
 // CHECK-NEXT: passClassThrowingInit

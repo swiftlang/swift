@@ -63,6 +63,19 @@ public struct SmallResult {
 }
 
 @_expose(Cxx)
+public struct DescriptiveError: Error, CustomStringConvertible {
+    public let code: Int
+    public init(code: Int) { self.code = code }
+    public var description: String { "custom error description" }
+}
+
+@_expose(Cxx)
+public func throwCustomDescriptionError() throws {
+    print("passThrowCustomDescriptionError")
+    throw DescriptiveError(code: 7)
+}
+
+@_expose(Cxx)
 public struct LargeResult {
     public let a: Int
     public let b: Int

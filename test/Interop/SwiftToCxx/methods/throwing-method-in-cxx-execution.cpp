@@ -17,6 +17,7 @@
 
 #include <cassert>
 #include <cstdio>
+#include <exception>
 #include "methods.h"
 
 int main() {
@@ -51,8 +52,8 @@ int main() {
   try {
     value.throwingVoidMethod(true);
     puts("no exception");
-  } catch (const swift::Error &e) {
-    puts("throwingVoidMethod threw");
+  } catch (const std::exception &e) {
+    printf("throwingVoidMethod threw: %s\n", e.what());
   }
   try {
     value.throwingMutatingMethod(true);
@@ -124,7 +125,7 @@ int main() {
 // CHECK-NEXT: passThrowingMethod
 // CHECK-NEXT: throwingMethod threw
 // CHECK-NEXT: passThrowingVoidMethod
-// CHECK-NEXT: throwingVoidMethod threw
+// CHECK-NEXT: throwingVoidMethod threw: failure
 // CHECK-NEXT: passThrowingMutatingMethod
 // CHECK-NEXT: throwingMutatingMethod threw
 // CHECK-NEXT: passThrowingMethod
