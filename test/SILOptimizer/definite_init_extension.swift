@@ -10,7 +10,7 @@ extension S where T == (Int, String) {
     t.1 = "hi"
   }
 
-  init(y: ()) {
+  init(y: ()) {// expected-error {{return from initializer without initializing all stored properties}} {{15:3-3=self.t = t\n}} {{13-13=, t: T}}
     t.0 = 1
-  } // expected-error {{return from initializer without initializing all stored properties}}
+  }
 }
