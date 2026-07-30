@@ -1161,7 +1161,7 @@ static bool doesNotNeedStackAllocation(SILValue value) {
   // It is, however, valid in OSSA to have uses of an owned value produced by a
   // begin_apply outside of the coroutine range.  So in that case, it is
   // necessary to introduce new storage and move to it.
-  if (isa<LoadBorrowInst>(defInst) ||
+  if (isa<LoadBorrowInst>(defInst) || isa<DereferenceBorrowInst>(defInst) ||
       (isa<BeginApplyInst>(defInst) &&
        value->getOwnershipKind() == OwnershipKind::Guaranteed))
     return true;
@@ -3682,6 +3682,13 @@ protected:
     pass.deleter.forceDelete(fli);
   }
 
+  void visitMakeBorrowInst(MakeBorrowInst *mbi) {
+    SILValue addr = addrMat.materializeAddress(use->get());
+    auto* makeAddrBorrow = builder.createMakeAddrBorrow(mbi->getLoc(), addr);
+    mbi->replaceAllUsesWith(makeAddrBorrow);
+    pass.deleter.forceDelete(mbi);
+  }
+
   void visitMarkDependenceInst(MarkDependenceInst *mdi) {
     if (use->getOperandNumber() == MarkDependenceInst::Base) {
       SILValue baseAddr = addrMat.materializeAddress(use->get());
@@ -3808,6 +3815,11 @@ protected:
         builder.createMoveOnlyWrapperToCopyableAddr(inst->getLoc(), srcAddr);
 
     markRewritten(inst, destAddr);
+  }
+
+  void visitReturnBorrowInst(ReturnBorrowInst *rbi) {
+    SILValue addr = addrMat.materializeAddress(use->get());
+    rbi->setOperand(use->getOperandNumber(), addr);
   }
 
   void visitReturnInst(ReturnInst *returnInst) {
@@ -4424,6 +4436,11 @@ protected:
       bi->dump();
       llvm::report_fatal_error("^^^ Unimplemented builtin opaque value def.");
     }
+  }
+
+  void visitDereferenceBorrowInst(DereferenceBorrowInst *dbi) {
+    auto *addr = builder.createDereferenceAddrBorrow(dbi->getLoc(), dbi->getOperand());
+    pass.valueStorageMap.setStorageAddress(dbi, addr);
   }
 
   // Rewrite the apply for an indirect result.
