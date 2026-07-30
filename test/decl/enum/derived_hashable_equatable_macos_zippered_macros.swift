@@ -4,38 +4,7 @@
 
 // CHECK-LABEL: internal enum HasElementsWithAvailability : Hashable
 enum HasElementsWithAvailability: Hashable {
-  // CHECK:       case alwaysAvailable
-  case alwaysAvailable
-  // CHECK:       @available(*, unavailable)
-  // CHECK-NEXT:  case neverAvailable
-  @available(*, unavailable)
-  case neverAvailable
-  // CHECK:       @available(macOS, unavailable)
-  // CHECK-NEXT:  case unavailableMacOS
-  @available(macOS, unavailable)
-  case unavailableMacOS
-  // CHECK:       @available(iOS, unavailable)
-  // CHECK-NEXT:  case unavailableiOS
-  @available(iOS, unavailable)
-  case unavailableiOS
-  // CHECK:       @available(macCatalyst, unavailable)
-  // CHECK-NEXT:  case unavailableMacCatalyst
-  @available(macCatalyst, unavailable)
-  case unavailableMacCatalyst
-  // CHECK:       @available(macOS, unavailable)
-  // CHECK-NEXT:  @available(iOS, unavailable)
-  // CHECK-NEXT:  case unavailableMacOSAndiOS
-  @available(macOS, unavailable)
-  @available(iOS, unavailable)
-  case unavailableMacOSAndiOS
-  // CHECK:       @available(macOS, unavailable)
-  // CHECK-NEXT:  @available(macCatalyst, unavailable)
-  // CHECK-NEXT:  case unavailableMacOSAndMacCatalyst
-  @available(macOS, unavailable)
-  @available(macCatalyst, unavailable)
-  case unavailableMacOSAndMacCatalyst
-
-  // CHECK:       @_implements(Equatable, ==(_:_:)) internal static func __derived_enum_equals(_ a: `Self`, _ b: `Self`) -> Bool {
+  // CHECK:       @_semantics("derived_enum_equals") @_implements(Equatable, ==(_:_:)) internal static func __derived_enum_equals(_ a: `Self`, _ b: `Self`) -> Bool {
   // CHECK-NEXT:    var index_a: Int
   // CHECK-EMPTY:
   // CHECK-NEXT:    switch a {
@@ -74,6 +43,37 @@ enum HasElementsWithAvailability: Hashable {
   // CHECK-NEXT:    }
   // CHECK-NEXT:    return index_a == index_b
   // CHECK-NEXT:  }
+
+  // CHECK:       case alwaysAvailable
+  case alwaysAvailable
+  // CHECK:       @available(*, unavailable)
+  // CHECK-NEXT:  case neverAvailable
+  @available(*, unavailable)
+  case neverAvailable
+  // CHECK:       @available(macOS, unavailable)
+  // CHECK-NEXT:  case unavailableMacOS
+  @available(macOS, unavailable)
+  case unavailableMacOS
+  // CHECK:       @available(iOS, unavailable)
+  // CHECK-NEXT:  case unavailableiOS
+  @available(iOS, unavailable)
+  case unavailableiOS
+  // CHECK:       @available(macCatalyst, unavailable)
+  // CHECK-NEXT:  case unavailableMacCatalyst
+  @available(macCatalyst, unavailable)
+  case unavailableMacCatalyst
+  // CHECK:       @available(macOS, unavailable)
+  // CHECK-NEXT:  @available(iOS, unavailable)
+  // CHECK-NEXT:  case unavailableMacOSAndiOS
+  @available(macOS, unavailable)
+  @available(iOS, unavailable)
+  case unavailableMacOSAndiOS
+  // CHECK:       @available(macOS, unavailable)
+  // CHECK-NEXT:  @available(macCatalyst, unavailable)
+  // CHECK-NEXT:  case unavailableMacOSAndMacCatalyst
+  @available(macOS, unavailable)
+  @available(macCatalyst, unavailable)
+  case unavailableMacOSAndMacCatalyst
 
   // CHECK:       internal func hash(into hasher: inout Hasher) {
   // CHECK-NEXT:    var discriminator: Int
