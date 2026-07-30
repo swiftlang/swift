@@ -2295,42 +2295,6 @@ namespace {
       }
     }
 
-    std::pair<CustomRefCountingOperationResult,
-              CustomRefCountingOperationResult>
-    addRefCountOperationsIfRequired(ClassDecl *nominal,
-                                    clang::RecordDecl *clangType) {
-      auto &context = Impl.SwiftContext;
-      auto nonInheritedRefCountingOperations = [&] {
-        auto retainResult = evaluateOrDefault(
-            context.evaluator,
-            CustomRefCountingOperation(
-                {nominal, CustomRefCountingOperationKind::retain}),
-            {});
-        auto releaseResult = evaluateOrDefault(
-            context.evaluator,
-            CustomRefCountingOperation(
-                {nominal, CustomRefCountingOperationKind::release}),
-            {});
-        return std::make_pair(retainResult, releaseResult);
-      };
-      auto clangDecl = dyn_cast<clang::CXXRecordDecl>(clangType);
-      if (!clangDecl)
-        return nonInheritedRefCountingOperations();
-
-      auto frtInfo = evaluateOrDefault(
-          context.evaluator, ForeignReferenceTypeInfoRequest({clangDecl}), {});
-      auto *baseClangDecl =
-          dyn_cast_or_null<clang::CXXRecordDecl>(frtInfo.getDecl());
-      if (!baseClangDecl || baseClangDecl == clangDecl)
-        return nonInheritedRefCountingOperations();
-
-      auto baseSwiftDecl = cast<ClassDecl>(
-          Impl.importDecl(baseClangDecl, getActiveSwiftVersion()));
-
-      return synthesizer.addRefCountOperations(nominal, clangDecl,
-                                               baseSwiftDecl, baseClangDecl);
-    }
-
     void addSuppressedProtocol(TypeDecl *D, KnownProtocolKind kind) const {
       auto inheritedTypes = D->getInherited();
       SmallVector<InheritedEntry> entries(inheritedTypes.getEntries());
@@ -2974,11 +2938,8 @@ namespace {
       }
 
       if (auto classDecl = dyn_cast<ClassDecl>(result)) {
-        auto operations = addRefCountOperationsIfRequired(
-            classDecl, const_cast<clang::RecordDecl *>(decl));
-
-        validateForeignReferenceType(decl, classDecl, operations.first,
-                                     operations.second);
+        importer::checkRetainReleaseFunctions(
+            classDecl, const_cast<clang::RecordDecl *>(decl), Impl);
 
         auto availability = Impl.SwiftContext.getSwift58Availability();
         if (!availability.isAlwaysAvailable()) {
@@ -3044,148 +3005,6 @@ namespace {
                             suggestion);
           }
         }
-      }
-    }
-
-    void validateForeignReferenceType(
-        const clang::RecordDecl *decl, ClassDecl *classDecl,
-        CustomRefCountingOperationResult retainOperation,
-        CustomRefCountingOperationResult releaseOperation) {
-
-      if (retainOperation.kind ==
-              CustomRefCountingOperationResult::unreachable ||
-          releaseOperation.kind ==
-              CustomRefCountingOperationResult::unreachable) {
-        Impl.diagnose(HeaderLoc(decl->getLocation()),
-                      diag::foreign_reference_type_unreachable,
-                      classDecl->getNameStr());
-        return;
-      }
-
-      HeaderLoc loc(decl->getLocation());
-
-      if (retainOperation.kind ==
-          CustomRefCountingOperationResult::noAttribute) {
-        Impl.diagnose(loc, diag::reference_type_must_have_retain_release_attr,
-                      false, decl->getNameAsString());
-      } else if (retainOperation.kind ==
-                 CustomRefCountingOperationResult::tooManyAttributes) {
-        Impl.diagnose(loc, diag::too_many_reference_type_retain_release_attr,
-                      false, decl->getNameAsString());
-      } else if (retainOperation.kind ==
-                 CustomRefCountingOperationResult::notFound) {
-        Impl.diagnose(loc,
-                      diag::foreign_reference_types_cannot_find_retain_release,
-                      false, retainOperation.name, decl->getNameAsString());
-        if (!Impl.SwiftContext.LangOpts
-                 .DisableExperimentalClangImporterDiagnostics) {
-          Impl.diagnoseTopLevelValue(
-              DeclName(Impl.SwiftContext.getIdentifier(retainOperation.name)));
-        }
-      } else if (retainOperation.kind ==
-                 CustomRefCountingOperationResult::tooManyFound) {
-        Impl.diagnose(loc,
-                      diag::too_many_reference_type_retain_release_operations,
-                      false, retainOperation.name, decl->getNameAsString());
-      } else if (retainOperation.kind ==
-                 CustomRefCountingOperationResult::foundOperation) {
-        RetainReleaseOperationKind operationKind =
-            importer::checkRetainReleaseOperationValidity(
-                classDecl, retainOperation.operation,
-                CustomRefCountingOperationKind::retain);
-        switch (operationKind) {
-        case RetainReleaseOperationKind::notAfunction:
-          Impl.diagnose(
-              loc,
-              diag::foreign_reference_types_retain_release_not_a_function_decl,
-              false, retainOperation.name);
-          break;
-        case RetainReleaseOperationKind::notAnInstanceFunction:
-          Impl.diagnose(
-              loc,
-              diag::foreign_reference_types_retain_release_not_an_instance_function,
-              false, retainOperation.name);
-          break;
-        case RetainReleaseOperationKind::invalidReturnType:
-          Impl.diagnose(
-              loc,
-              diag::foreign_reference_types_retain_non_void_or_self_return_type,
-              retainOperation.name);
-          break;
-        case RetainReleaseOperationKind::invalidParameters:
-          Impl.diagnose(loc,
-                        diag::foreign_reference_types_invalid_retain_release,
-                        false, retainOperation.name, classDecl->getNameStr());
-          break;
-        case RetainReleaseOperationKind::valid:
-          break;
-        }
-      } else {
-        // Nothing to do.
-        assert(retainOperation.kind ==
-               CustomRefCountingOperationResult::immortal);
-      }
-
-      if (releaseOperation.kind ==
-          CustomRefCountingOperationResult::noAttribute) {
-        Impl.diagnose(loc, diag::reference_type_must_have_retain_release_attr,
-                      true, decl->getNameAsString());
-      } else if (releaseOperation.kind ==
-                 CustomRefCountingOperationResult::tooManyAttributes) {
-        Impl.diagnose(loc, diag::too_many_reference_type_retain_release_attr,
-                      true, decl->getNameAsString());
-      } else if (releaseOperation.kind ==
-                 CustomRefCountingOperationResult::notFound) {
-        Impl.diagnose(loc,
-                      diag::foreign_reference_types_cannot_find_retain_release,
-                      true, releaseOperation.name, decl->getNameAsString());
-        if (!Impl.SwiftContext.LangOpts
-                 .DisableExperimentalClangImporterDiagnostics) {
-          Impl.diagnoseTopLevelValue(
-              DeclName(Impl.SwiftContext.getIdentifier(releaseOperation.name)));
-        }
-      } else if (releaseOperation.kind ==
-                 CustomRefCountingOperationResult::tooManyFound) {
-        Impl.diagnose(loc,
-                      diag::too_many_reference_type_retain_release_operations,
-                      true, releaseOperation.name, decl->getNameAsString());
-      } else if (releaseOperation.kind ==
-                 CustomRefCountingOperationResult::foundOperation) {
-        RetainReleaseOperationKind operationKind =
-            importer::checkRetainReleaseOperationValidity(
-                classDecl, releaseOperation.operation,
-                CustomRefCountingOperationKind::release);
-        switch (operationKind) {
-        case RetainReleaseOperationKind::notAfunction:
-          Impl.diagnose(
-              loc,
-              diag::foreign_reference_types_retain_release_not_a_function_decl,
-              true, releaseOperation.name);
-          break;
-        case RetainReleaseOperationKind::notAnInstanceFunction:
-          Impl.diagnose(
-              loc,
-              diag::foreign_reference_types_retain_release_not_an_instance_function,
-              true, releaseOperation.name);
-          break;
-        case RetainReleaseOperationKind::invalidReturnType:
-          Impl.diagnose(
-              loc,
-              diag::foreign_reference_types_release_non_void_return_type,
-              releaseOperation.name);
-          break;
-        case RetainReleaseOperationKind::invalidParameters:
-          Impl.diagnose(loc,
-                        diag::foreign_reference_types_invalid_retain_release,
-                        true, releaseOperation.name, classDecl->getNameStr());
-          break;
-        case RetainReleaseOperationKind::valid:
-          break;
-        }
-      } else {
-        // Nothing to do.
-        assert(releaseOperation.kind ==
-               CustomRefCountingOperationResult::immortal);
       }
     }
 

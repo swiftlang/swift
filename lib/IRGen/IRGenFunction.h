@@ -39,6 +39,10 @@ namespace llvm {
   class Function;
 }
 
+namespace clang {
+  class FunctionDecl;
+}
+
 namespace swift {
   class ArchetypeType;
   class IRGenOptions;
@@ -750,7 +754,7 @@ public:
   llvm::Value *emitBlockCopyCall(llvm::Value *value);
   void emitBlockRelease(llvm::Value *value);
 
-  void emitForeignReferenceTypeLifetimeOperation(ValueDecl *fn,
+  void emitForeignReferenceTypeLifetimeOperation(const clang::FunctionDecl *fn,
                                                  llvm::Value *value,
                                                  bool needsNullCheck = false);
 

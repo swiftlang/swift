@@ -7412,11 +7412,16 @@ bool ClassDecl::isForeignReferenceType() const {
 }
 
 bool ClassDecl::hasRefCountingAnnotations() const {
-  return evaluateOrDefault(getASTContext().evaluator,
-                           CustomRefCountingOperation(
-                               {this, CustomRefCountingOperationKind::release}),
-                           {})
-             .kind != CustomRefCountingOperationResult::immortal;
+  auto *Importer = getASTContext().getClangModuleLoader();
+  if (!Importer)
+    return false;
+
+  auto *RD = dyn_cast_or_null<clang::RecordDecl>(getClangDecl());
+  if (!RD)
+    return false;
+
+  auto [retain, release] = Importer->getForeignReferenceTypeOperations(RD);
+  return retain != nullptr || release != nullptr;
 }
 
 ReferenceCounting ClassDecl::getObjectModel() const {

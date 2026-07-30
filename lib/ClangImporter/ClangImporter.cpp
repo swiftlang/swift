@@ -6074,7 +6074,7 @@ enum ReferenceReturnTypeBehaviorForBaseAccessorSynthesis {
 static clang::CXXMethodDecl *synthesizeCxxBaseGetterAccessorMethod(
     ClangImporter &impl, const clang::CXXRecordDecl *derivedClass,
     const clang::CXXRecordDecl *baseClass, const clang::FieldDecl *field,
-    ValueDecl *retainOperationFn,
+    const clang::FunctionDecl *retainFn,
     ReferenceReturnTypeBehaviorForBaseAccessorSynthesis behavior) {
   auto &clangCtx = impl.getClangASTContext();
   auto &clangSema = impl.getClangSema();
@@ -6120,7 +6120,7 @@ static clang::CXXMethodDecl *synthesizeCxxBaseGetterAccessorMethod(
   newMethod->setImplicit();
   newMethod->setImplicitlyInline();
   newMethod->setAccess(clang::AccessSpecifier::AS_public);
-  if (retainOperationFn) {
+  if (retainFn) {
     // Return an FRT field at +1.
     newMethod->addAttr(clang::CFReturnsRetainedAttr::CreateImplicit(clangCtx));
   }
@@ -6165,24 +6165,19 @@ static clang::CXXMethodDecl *synthesizeCxxBaseGetterAccessorMethod(
   };
 
   llvm::SmallVector<clang::Stmt *, 2> body;
-  if (retainOperationFn) {
+  if (retainFn) {
     // Check if the returned value needs to be retained. This might occur if the
     // field getter is returning a shared reference type using, as it needs to
     // perform the retain to match the expected @owned convention.
-    auto *retainClangFn =
-        dyn_cast<clang::FunctionDecl>(retainOperationFn->getClangDecl());
-    if (!retainClangFn) {
-      return nullptr;
-    }
     auto *fnRef = new (clangCtx) clang::DeclRefExpr(
-        clangCtx, const_cast<clang::FunctionDecl *>(retainClangFn), false,
-        retainClangFn->getType(), clang::ExprValueKind::VK_LValue,
+        clangCtx, const_cast<clang::FunctionDecl *>(retainFn), false,
+        retainFn->getType(), clang::ExprValueKind::VK_LValue,
         clang::SourceLocation());
     auto fieldExpr = createFieldAccess();
     if (!fieldExpr)
       return nullptr;
     auto retainCall = clangSema.BuildResolvedCallExpr(
-        fnRef, const_cast<clang::FunctionDecl *>(retainClangFn),
+        fnRef, const_cast<clang::FunctionDecl *>(retainFn),
         clang::SourceLocation(), {fieldExpr}, clang::SourceLocation());
     if (!retainCall.isUsable())
       return nullptr;
@@ -6263,19 +6258,17 @@ synthesizeBaseClassFieldGetterOrAddressGetterBody(AbstractFunctionDecl *afd,
                                  RemoveReference),
                 /*forceConstQualifier=*/kind != AccessorKind::MutableAddress);
   } else if (auto *fd = dyn_cast_or_null<clang::FieldDecl>(baseClangDecl)) {
-    ValueDecl *retainOperationFn = nullptr;
+    const clang::FunctionDecl *retainFn = nullptr;
     // Check if this field getter is returning a retainable FRT.
     if (getterDecl->getResultInterfaceType()->isForeignReferenceType()) {
-      auto retainOperation = evaluateOrDefault(
-          ctx.evaluator,
-          CustomRefCountingOperation({getterDecl->getResultInterfaceType()
-                                          ->lookThroughAllOptionalTypes()
-                                          ->getClassOrBoundGenericClass(),
-                                      CustomRefCountingOperationKind::retain}),
-          {});
-      if (retainOperation.kind ==
-          CustomRefCountingOperationResult::foundOperation) {
-        retainOperationFn = retainOperation.operation;
+      auto *frtClass = getterDecl->getResultInterfaceType()
+                           ->lookThroughAllOptionalTypes()
+                           ->getClassOrBoundGenericClass();
+      if (auto *frtClangDecl = dyn_cast_or_null<clang::RecordDecl>(
+              frtClass ? frtClass->getClangDecl() : nullptr)) {
+        retainFn = ctx.getClangModuleLoader()
+                       ->getForeignReferenceTypeOperations(frtClangDecl)
+                       .first;
       }
     }
     // Field getter is represented through a generated
@@ -6284,7 +6277,7 @@ synthesizeBaseClassFieldGetterOrAddressGetterBody(AbstractFunctionDecl *afd,
         *static_cast<ClangImporter *>(ctx.getClangModuleLoader()),
         cast<clang::CXXRecordDecl>(derivedStruct->getClangDecl()),
         cast<clang::CXXRecordDecl>(baseStruct->getClangDecl()), fd,
-        retainOperationFn,
+        retainFn,
         kind == AccessorKind::Get
             ? ReferenceReturnTypeBehaviorForBaseAccessorSynthesis::ReturnByValue
             : (kind == AccessorKind::Address
@@ -8195,6 +8188,12 @@ bool ClangImporter::isMemberSynthesizedPerType(const ValueDecl *decl) {
   return Impl.isMemberSynthesizedPerType(decl);
 }
 
+std::pair<const clang::FunctionDecl *, const clang::FunctionDecl *>
+ClangImporter::getForeignReferenceTypeOperations(
+    const clang::RecordDecl *decl) {
+  return Impl.getForeignReferenceTypeOperations(decl);
+}
+
 void ClangImporter::diagnoseTopLevelValue(const DeclName &name) {
   Impl.diagnoseTopLevelValue(name);
 }
@@ -8728,132 +8727,6 @@ void swift::simple_display(llvm::raw_ostream &out,
 
 SourceLoc swift::extractNearestSourceLoc(ClangDeclExplicitSafetyDescriptor desc) {
   return SourceLoc();
-}
-
-RetainReleaseOperationKind importer::checkRetainReleaseOperationValidity(
-    const ClassDecl *classDecl, ValueDecl *operation,
-    CustomRefCountingOperationKind operationKind) {
-  auto operationFn = dyn_cast<FuncDecl>(operation);
-  if (!operationFn)
-    return RetainReleaseOperationKind::notAfunction;
-
-  if (operationFn->isStatic())
-    return RetainReleaseOperationKind::notAnInstanceFunction;
-
-  if (operationFn->isInstanceMember()) {
-    if (operationFn->getParameters()->size() != 0)
-      return RetainReleaseOperationKind::invalidParameters;
-  } else {
-    if (operationFn->getParameters()->size() != 1)
-      return RetainReleaseOperationKind::invalidParameters;
-  }
-
-  Type paramType;
-  NominalTypeDecl *paramDecl = nullptr;
-  if (!operationFn->isInstanceMember()) {
-    paramType = operationFn->getParameters()
-                    ->get(0)
-                    ->getInterfaceType()
-                    ->lookThroughSingleOptionalType();
-
-    paramDecl = paramType->getAnyNominal();
-  } else {
-    paramDecl = cast<NominalTypeDecl>(operationFn->getParent());
-    paramType = paramDecl->getDeclaredInterfaceType();
-  }
-
-  // The return type should be void (for release functions), or void
-  // or the parameter type (for retain functions).
-  auto resultInterfaceType = operationFn->getResultInterfaceType();
-  if (!resultInterfaceType->isVoid() && !resultInterfaceType->isUInt() &&
-      !resultInterfaceType->isUInt8() && !resultInterfaceType->isUInt16() &&
-      !resultInterfaceType->isUInt32() && !resultInterfaceType->isUInt64() &&
-      !resultInterfaceType->isInt() && !resultInterfaceType->isInt8() &&
-      !resultInterfaceType->isInt16() && !resultInterfaceType->isInt32() &&
-      !resultInterfaceType->isInt64()) {
-    if (operationKind == CustomRefCountingOperationKind::release ||
-        !resultInterfaceType->lookThroughSingleOptionalType()->isEqual(
-            paramType))
-      return RetainReleaseOperationKind::invalidReturnType;
-  }
-
-  // The parameter of the retain/release function should be pointer to the
-  // same FRT or a base FRT.
-  if (paramDecl != classDecl) {
-    if (auto cxxDecl =
-            dyn_cast<clang::CXXRecordDecl>(classDecl->getClangDecl())) {
-      if (const clang::Decl *paramClangDecl = paramDecl->getClangDecl()) {
-        if (const auto *paramTypeDecl =
-                dyn_cast<clang::CXXRecordDecl>(paramClangDecl)) {
-          if (cxxDecl->isDerivedFrom(paramTypeDecl)) {
-            return RetainReleaseOperationKind::valid;
-          }
-        }
-      }
-    }
-    return RetainReleaseOperationKind::invalidParameters;
-  }
-
-  return RetainReleaseOperationKind::valid;
-}
-
-CustomRefCountingOperationResult CustomRefCountingOperation::evaluate(
-    Evaluator &evaluator, CustomRefCountingOperationDescriptor desc) const {
-  auto swiftDecl = desc.decl;
-  auto operation = desc.kind;
-
-  StringRef operationStr = operation == CustomRefCountingOperationKind::retain
-                               ? "retain:"
-                               : "release:";
-
-  auto decl = cast<clang::RecordDecl>(swiftDecl->getClangDecl());
-  if (!decl->hasAttrs())
-    return {CustomRefCountingOperationResult::noAttribute, nullptr, ""};
-
-  llvm::SmallVector<const clang::SwiftAttrAttr *, 1> retainReleaseAttrs;
-  for (auto *attr : decl->getAttrs()) {
-    if (auto swiftAttr = llvm::dyn_cast<clang::SwiftAttrAttr>(attr)) {
-      if (swiftAttr->getAttribute().starts_with(operationStr)) {
-        retainReleaseAttrs.push_back(swiftAttr);
-      }
-    }
-  }
-
-  if (retainReleaseAttrs.empty())
-    return {CustomRefCountingOperationResult::noAttribute, nullptr, ""};
-
-  if (retainReleaseAttrs.size() > 1)
-    return {CustomRefCountingOperationResult::tooManyAttributes, nullptr, ""};
-
-  auto name = retainReleaseAttrs.front()->getAttribute().drop_front(
-      operationStr.size());
-
-  if (name == "immortal")
-    return {CustomRefCountingOperationResult::immortal, nullptr, name};
-
-  auto results = getValueDeclsForName(const_cast<ClassDecl *>(swiftDecl), name);
-
-  TinyPtrVector<ValueDecl *> validResults;
-  if (results.size() > 1) {
-    // If we have ambiguous retain/release operations, try to disambiguate.
-    for (auto *candidate : results) {
-      if (importer::checkRetainReleaseOperationValidity(swiftDecl, candidate,
-                                                        operation) ==
-          RetainReleaseOperationKind::valid)
-        validResults.push_back(candidate);
-    }
-  } else if (results.size() == 1) {
-    validResults.push_back(results.front());
-  }
-
-  if (validResults.size() == 1)
-    return {CustomRefCountingOperationResult::foundOperation,
-            validResults.front(), name};
-
-  if (validResults.empty())
-    return {CustomRefCountingOperationResult::notFound, nullptr, name};
-
-  return {CustomRefCountingOperationResult::tooManyFound, nullptr, name};
 }
 
 ExplicitSafety ClangDeclExplicitSafety::evaluate(
