@@ -799,7 +799,7 @@ namespace {
     const override {
       if (!getSingleton()) {
         // Any empty value is a valid value.
-        return llvm::ConstantInt::getSigned(IGF.IGM.Int32Ty, -1);
+        return llvm::ConstantInt::getAllOnesValue(IGM.Int32Ty);
       }
 
       return getFixedSingleton()->getExtraInhabitantIndex(IGF,
@@ -1275,8 +1275,8 @@ namespace {
       auto valid
         = IGF.Builder.CreateICmpSLT(val,
                                     llvm::ConstantInt::get(IGF.IGM.Int32Ty, 0));
-      val = IGF.Builder.CreateSelect(valid,
-                        llvm::ConstantInt::getSigned(IGF.IGM.Int32Ty, -1), val);
+      val = IGF.Builder.CreateSelect(
+          valid, llvm::ConstantInt::getAllOnesValue(IGM.Int32Ty), val);
 
       return val;
     }
@@ -3649,9 +3649,8 @@ namespace {
          llvm::ConstantInt::get(IGM.Int32Ty, ElementsWithNoPayload.size()));
       auto valid = IGF.Builder.CreateICmpSLT(index,
                                    llvm::ConstantInt::get(IGM.Int32Ty, 0));
-      index = IGF.Builder.CreateSelect(valid,
-                              llvm::ConstantInt::getSigned(IGM.Int32Ty, -1),
-                              index);
+      index = IGF.Builder.CreateSelect(
+          valid, llvm::ConstantInt::getAllOnesValue(IGM.Int32Ty), index);
       return index;
     }
 
