@@ -37,7 +37,6 @@ add_library(swift_Concurrency
   AsyncPrefixWhileSequence.swift
   AsyncSequence.swift
   AsyncStream.swift
-  AsyncStreamShims.swift
   AsyncStreamBuffer.swift
   AsyncThrowingCompactMapSequence.swift
   AsyncThrowingDropWhileSequence.swift
