@@ -232,7 +232,7 @@ private struct InstructionScanner {
         if ds.isStackDeallocation(of: storePath.base) {
           return .dead
         }
-      case is FixLifetimeInst, is EndAccessInst:
+      case is FixLifetimeInst, is EndAccessInst, is DebugValueInst:
         break
       case let term as TermInst:
         if term.isFunctionExiting {
