@@ -250,9 +250,6 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
     P.addDiagnoseLifetimeIssues();
   }
 
-  // Canonical swift requires all non cond_br critical edges to be split.
-  P.addSplitNonCondBrCriticalEdges();
-
   // This is needed to clean up SIL after MandatoryDeadObjectElimination for
   // OSLogOptimization (in the next function up the call tree). It must happen
   // before the next module-pass (= MandatoryPerformanceOptimizations) after

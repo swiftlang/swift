@@ -562,13 +562,7 @@ bool SimplifyCFG::dominatorBasedSimplify(DominanceAnalysis *DA) {
   if (!EnableOSSADominatorBasedSimplify && Fn.hasOwnership())
     return false;
 
-  // Split all critical edges such that we can move code onto edges. This is
-  // also required for SSA construction in dominatorBasedSimplifications' jump
-  // threading. It only splits new critical edges it creates by jump threading.
   bool Changed = false;
-  if (!Fn.hasOwnership() && EnableJumpThread) {
-    Changed = splitAllCriticalEdges(Fn, DT, nullptr);
-  }
   unsigned MaxIter = MaxIterationsOfDominatorBasedSimplify;
   SmallVector<SILBasicBlock *, 16> BlocksForWorklist;
 
@@ -3966,30 +3960,6 @@ SILTransform *swift::createJumpThreadSimplifyCFG() {
 
 namespace {
 
-// Used to test critical edge splitting with sil-opt.
-class SplitCriticalEdges : public SILFunctionTransform {
-  bool OnlyNonCondBrEdges;
-
-public:
-  SplitCriticalEdges(bool SplitOnlyNonCondBrEdges)
-      : OnlyNonCondBrEdges(SplitOnlyNonCondBrEdges) {}
-
-  void run() override {
-    auto &Fn = *getFunction();
-
-    if (OnlyNonCondBrEdges && Fn.getModule().getOptions().VerifyAll)
-      Fn.verifyCriticalEdges();
-
-    // Split all critical edges from all or non only cond_br terminators.
-    bool Changed = splitAllCriticalEdges(Fn, nullptr, nullptr);
-
-    if (Changed) {
-      invalidateAnalysis(SILAnalysis::InvalidationKind::BranchesAndInstructions);
-    }
-  }
-
-};
-
 // Used to test SimplifyCFG::simplifyArgs with sil-opt.
 class SimplifyBBArgs : public SILFunctionTransform {
 public:
@@ -4034,16 +4004,6 @@ public:
 };
 
 } // end anonymous namespace
-
-/// Splits all critical edges in a function.
-SILTransform *swift::createSplitAllCriticalEdges() {
-  return new SplitCriticalEdges(false);
-}
-
-/// Splits all critical edges from non cond_br terminators in a function.
-SILTransform *swift::createSplitNonCondBrCriticalEdges() {
-  return new SplitCriticalEdges(true);
-}
 
 // Simplifies basic block arguments.
 SILTransform *swift::createSROABBArgs() { return new SROABBArgs(); }
