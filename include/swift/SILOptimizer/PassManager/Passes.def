@@ -346,8 +346,6 @@ LEGACY_PASS(LoopInfoPrinter, "loop-info-printer",
      "Print Loop Information for Testing")
 LEGACY_PASS(LoopRegionViewText, "loop-region-view-text",
      "Print Loop Region Information for Testing")
-LEGACY_PASS(LoopRegionViewCFG, "loop-region-view-cfg",
-     "View Loop Region CFG")
 LEGACY_PASS(LoopRotate, "loop-rotate",
      "Loop Rotation")
 LEGACY_PASS(LoopUnroll, "loop-unroll",
