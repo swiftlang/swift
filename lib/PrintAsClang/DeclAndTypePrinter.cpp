@@ -1758,7 +1758,8 @@ private:
         owningPrinter.interopContext, owningPrinter);
     DeclAndTypeClangFunctionPrinter::FunctionSignatureModifiers modifiers;
     modifiers.isInline = true;
-    // FIXME: Support throwing exceptions for Swift errors.
+    // Thunks for throwing functions are allowed to throw a `swift::Error`
+    // C++ exception.
     modifiers.isNoexcept = !funcTy->isThrowing();
     auto result = funcPrinter.printFunctionSignature(
         FD, funcABI.getSignature(), cxx_translation::getNameForCxx(FD),
