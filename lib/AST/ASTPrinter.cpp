@@ -3904,7 +3904,11 @@ void swift::printWithCompatibilityFeatureChecks(ASTPrinter &printer,
   // these Swift stdlib protocols even though they don't exist in the SDK's
   // stdlib. To handle this, we guard them behind a Swift version.
   if (isCxxIterableOrBorrowingIterator(decl)) {
-    printer << "#if canImport(Swift, _version: 6.4.0.30)\n";
+    // Iterable exists on 6.4.0.30+ and 6.5.0.7+,
+    // but it is absent in [6.5, 6.5.0.7).
+    printer << "#if canImport(Swift, _version: 6.5.0.7) || "
+                  "(canImport(Swift, _version: 6.4.0.30) && "
+                  "!canImport(Swift, _version: 6.5))\n";
     printBody();
     printer.printNewline();
     printer << "#endif";
