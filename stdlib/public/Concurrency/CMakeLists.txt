@@ -413,7 +413,9 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
 
       CooperativeGlobalExecutor.cpp
 
-      C_COMPILE_FLAGS ${extra_c_compile_flags}
+      C_COMPILE_FLAGS
+        ${extra_c_compile_flags}
+        -DSWIFT_CONCURRENCY_EMBEDDED=1 -DSWIFT_RUNTIME_EMBEDDED=1
       INSTALL_IN_COMPONENT stdlib
       )
   endforeach()
