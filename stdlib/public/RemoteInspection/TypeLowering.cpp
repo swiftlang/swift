@@ -2365,7 +2365,10 @@ public:
     //  * Has at least two cases with non-zero payload size
     //  * Has a descriptor stored as BuiltinTypeInfo
     Size = FixedDescriptor->Size;
-    Alignment = FixedDescriptor->Alignment;
+    // If the descriptor doesn't know its alignment, let EnumTypeInfoBuilder
+    // calculate it.
+    if (FixedDescriptor->hasKnownAlignment())
+      Alignment = FixedDescriptor->Alignment;
     NumExtraInhabitants = FixedDescriptor->NumExtraInhabitants;
     Borrowability = FixedDescriptor->Borrowability;
     // Builtin descriptors don't record addressable-for-dependencies, but we
