@@ -1058,6 +1058,14 @@ handleASTNodeForDerivation(ASTContext &C, DerivedConformance &derived,
       varDecl->setImplInfo(StorageImplInfo::getImmutableComputed());
     else 
       varDecl->getImplInfo();
+
+    // The derived property of an actor must be nonisolated, otherwise it
+    // cannot satisfy the nonisolated requirement it witnesses.
+    if (addNonIsolated &&
+        !varDecl->getAttrs().hasAttribute<NonisolatedAttr>() &&
+        !addNonIsolatedToSynthesized(derived, varDecl) &&
+        derived.Nominal->isActor())
+      varDecl->addAttribute(NonisolatedAttr::createImplicit(C));
   }
 
   return vDecl;
