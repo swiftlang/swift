@@ -1000,13 +1000,26 @@ public:
       const ClassDecl *decl, SILLinkage linkage,
       ArrayRef<SILDefaultOverrideTable::Entry> entries);
 
-  /// Return the stage of processing this module is at.
+  /// Return a lower bound on the stage of every function in the function list.
+  /// SILFunction::create() seeds a new function from it and setStage() sweeps
+  /// the list up to it.
+  ///
+  /// For a per-function query, read SILFunction::getFunctionStage(), which may
+  /// be ahead of this.
   SILStage getStage() const { return Stage; }
 
-  /// Advance the module to a further stage of processing.
+  /// Advance the module to s and sweep every function behind it up to it.
+  /// The stage only ever moves forward.
+  ///
+  /// The sweep is what makes the floor a lower bound over the function list. A
+  /// per-function query therefore never has to be reconciled against the
+  /// module.
   void setStage(SILStage s) {
     assert(s >= Stage && "regressing stage?!");
     Stage = s;
+    for (SILFunction &f : *this)
+      if (f.getFunctionStage() < s)
+        f.setFunctionStage(s);
   }
 
   /// True if -enable-sil-opaque-values was passed. Address-only types are
