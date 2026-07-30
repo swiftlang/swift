@@ -452,8 +452,7 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
     // from that base: they are reachable via the Swift superclass chain
     // instead.
     const clang::RecordDecl *superclassClangDecl = nullptr;
-    if (!inheritance &&
-        ctx.LangOpts.hasFeature(Feature::ForeignReferenceTypeInheritance)) {
+    if (!inheritance) {
       auto derivedInfo = evaluateOrDefault(
           ctx.evaluator, ForeignReferenceTypeInfoRequest({cxxRecord}), {});
       if (auto primaryBase = derivedInfo.getPrimarySuperclass())
@@ -884,13 +883,9 @@ ClangImporter::Implementation::lookupAndImportSubscripts(
   // declaring class is that superclass (or a Clang base of it) are reachable
   // via the Swift superclass chain and should not be synthesized here again.
   const clang::CXXRecordDecl *superclassClangDecl = nullptr;
-  if (SwiftContext.LangOpts.hasFeature(
-          Feature::ForeignReferenceTypeInheritance)) {
-    auto frtInfo =
-        evaluateOrDefault(SwiftContext.evaluator,
-                          ForeignReferenceTypeInfoRequest({CXXRecord}), {});
-    superclassClangDecl = frtInfo.getPrimarySuperclass();
-  }
+  auto frtInfo = evaluateOrDefault(
+      SwiftContext.evaluator, ForeignReferenceTypeInfoRequest({CXXRecord}), {});
+  superclassClangDecl = frtInfo.getPrimarySuperclass();
 
   llvm::SmallMapVector<CXXOverloadArgTypes,
                        std::pair<CXXOverload, CXXOverload>, 1>
