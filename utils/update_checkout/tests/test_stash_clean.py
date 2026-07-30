@@ -43,10 +43,6 @@ class StashAndCleanTestCase(scheme_mock.SchemeMockTestCase):
         update that follows the stash/clean step is a no-op; only the working
         tree is later made dirty. Requires `_clone()` to have run first."""
         repo = self._repo1_path()
-        # update-checkout's own clone of source_root has no git identity (only
-        # the harness's local_path clones get one), so configure it before the
-        # seed commit. See scheme_mock.configure_git_identity.
-        scheme_mock.configure_git_identity(repo)
         with open(os.path.join(repo, "tracked.txt"), "w") as f:
             f.write("committed content\n")
         with open(os.path.join(repo, ".gitignore"), "w") as f:
