@@ -1281,6 +1281,11 @@ EmittedClangHeaderDependencyInfo swift::printModuleContentsAsCxx(
     os << "#include <string>\n";
     os << "#endif\n";
     os << "#include <new>\n";
+    // swift::Error derives from std::exception.
+    os << "#if defined(SWIFT_CXX_INTEROP_EXPERIMENTAL_SWIFT_ERROR) && "
+          "!defined(SWIFT_CXX_INTEROP_HIDE_SWIFT_ERROR)\n";
+    os << "#include <exception>\n";
+    os << "#endif\n";
     if (context.LangOpts.hasFeature(Feature::Embedded))
       os << "#define __EmbeddedSwift__\n";
     // Embed an overlay for the standard library.
