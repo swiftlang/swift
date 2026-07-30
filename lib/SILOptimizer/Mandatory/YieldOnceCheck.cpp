@@ -11,7 +11,8 @@
 //===----------------------------------------------------------------------===//
 
 // This pass statically verifies that yield-once coroutines, such as the
-// generalized accessors `read` and `modify`, yield exactly once in every
+// generalized accessors `_read` and `_modify` and the coroutine accessors
+// `yielding borrow` and `yielding mutate`, yield exactly once in every
 // invocation, and diagnoses any violation of this property. This pass uses a
 // linear-time, data-flow analysis to check that every path in the control-flow
 // graph of the coroutine has a yield instruction before a return instruction.
@@ -524,9 +525,14 @@ class YieldOnceCheck : public SILFunctionTransform {
   void run() override {
     auto *fun = getFunction();
 
-    if (fun->getLoweredFunctionType()->getCoroutineKind() !=
-        SILCoroutineKind::YieldOnce)
+    switch (fun->getLoweredFunctionType()->getCoroutineKind()) {
+    case SILCoroutineKind::YieldOnce:
+    case SILCoroutineKind::YieldOnce2:
+      break;
+    case SILCoroutineKind::None:
+    case SILCoroutineKind::YieldMany:
       return;
+    }
 
     diagnoseYieldOnceUsage(*fun);
   }
