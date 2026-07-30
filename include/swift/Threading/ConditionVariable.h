@@ -89,8 +89,14 @@ public:
   /// After this method returns, the associated mutex will be locked.
   ///
   /// Precondition: ConditionVariable locked by this thread.
-  template <class Rep, class Period>
-  bool wait(std::chrono::duration<Rep, Period> duration) {
+  ///
+  /// \p Duration is normally a std::chrono duration type; it's a deduced
+  /// template parameter rather than std::chrono::duration<Rep, Period> so that
+  /// this header works in freestanding builds, where <chrono> may not be
+  /// available (see the comment on cond_wait in Impl/Nothreads.h).  The
+  /// selected threading implementation decides which timeout types it accepts.
+  template <class Duration>
+  bool wait(Duration duration) {
     return threading_impl::cond_wait(Handle, duration);
   }
 
