@@ -4470,6 +4470,9 @@ namespace {
       auto retType = decl->getReturnType();
       auto warnForEscapableReturnType = [&] {
         if (isEscapableAnnotatedType(retType.getTypePtr())) {
+          // Swift drops lifetime dependencies on Escapable targets, so this
+          // annotation is not enforced. Import the API as @unsafe.
+          hasSkippedLifetimeAnnotation = true;
           Impl.addImportDiagnostic(
               decl,
               Diagnostic(diag::return_escapable_with_lifetimebound,

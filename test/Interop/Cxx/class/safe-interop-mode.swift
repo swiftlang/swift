@@ -87,6 +87,11 @@ private:
 
 View returnsViewLifetimebound(const Owner &o [[clang::lifetimebound]]);
 
+// A lifetime dependency whose target is Escapable is dropped, so the annotation
+// is not enforced: import the function as unsafe.
+// expected-warning@+1{{the returned type 'Owner' is annotated as escapable; it cannot have lifetime dependencies}}
+Owner returnsOwnerLifetimebound(const View &v [[clang::lifetimebound]]);
+
 __attribute__((swift_attr("@lifetime(borrow o)")))
 // expected-warning@+1{{the returned type 'View' is annotated as non-escapable; its lifetime dependencies must be annotated}}
 View returnsViewHandWrittenLifetime(const Owner &o);
@@ -262,6 +267,11 @@ func useAnnotatedLifetimeDependency(o: Owner) {
     let _ = returnsViewLifetimebound(o)
     let _ = returnsViewHandWrittenLifetime(o)
     let _ = returnsViewAuditedSafe(o)
+}
+
+func useEscapableLifetimeDependency(v: View) {
+    // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+    let _ = returnsOwnerLifetimebound(v) // expected-note{{reference to unsafe global function 'returnsOwnerLifetimebound'}}
 }
 
 @available(SwiftStdlib 5.8, *)
