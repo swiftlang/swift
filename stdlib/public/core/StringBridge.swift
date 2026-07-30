@@ -791,6 +791,7 @@ internal func _SwiftCreateBridgedString_DoNotCall(
 ) -> String? {
   if buffer.count == 0 {
     return ""
+  }
   if isASCII {
     return unsafe _allASCII(buffer) ?
       String(_StringGuts(buffer, isASCII: true)) :
