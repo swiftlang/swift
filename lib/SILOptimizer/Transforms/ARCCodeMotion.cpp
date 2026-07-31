@@ -1223,14 +1223,6 @@ public:
 
     PostOrderAnalysis *POA = PM->getAnalysis<PostOrderAnalysis>();
 
-    // Split all critical edges.
-    //
-    // TODO: maybe we can do this lazily or maybe we should disallow SIL passes
-    // to create critical edges.
-    bool EdgeChanged = splitAllCriticalEdges(*F, nullptr, nullptr);
-    if (EdgeChanged)
-      POA->invalidateFunction(F);
-
     auto *PO = POA->get(F);
     auto *AA = PM->getAnalysis<AliasAnalysis>(F);
     auto *RCFI = PM->getAnalysis<RCIdentityAnalysis>()->get(F);
@@ -1262,11 +1254,6 @@ public:
       eliminateRetainsPrecedingProgramTerminationPoints(F);
     }
 
-    if (EdgeChanged) {
-      // We splitted critical edges.
-      invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
-      return;
-    }
     if (InstChanged) {
       // We moved instructions.
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);

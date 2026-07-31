@@ -63,33 +63,8 @@ class LoopRegionViewText : public SILModuleTransform {
   }
 };
 
-class LoopRegionViewCFG : public SILModuleTransform {
-  void run() override {
-    invalidateAll();
-    auto *lra = PM->getAnalysis<LoopRegionAnalysis>();
-
-    for (auto &fn : *getModule()) {
-      if (fn.isExternalDeclaration())
-        continue;
-      if (!SILViewCFGOnlyFun.empty() && fn.getName() != SILViewCFGOnlyFun)
-        continue;
-      if (!SILViewCFGOnlyFuns.empty() &&
-          !fn.getName().contains(SILViewCFGOnlyFuns))
-        continue;
-
-      // Ok, we are going to analyze this function. Invalidate all state
-      // associated with it so we recompute the loop regions.
-      lra->get(&fn)->viewLoopRegions();
-    }
-  }
-};
-
 } // end anonymous namespace
 
 SILTransform *swift::createLoopRegionViewText() {
   return new LoopRegionViewText();
-}
-
-SILTransform *swift::createLoopRegionViewCFG() {
-  return new LoopRegionViewCFG();
 }
