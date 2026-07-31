@@ -1546,6 +1546,7 @@ def update_test_file(filename, diag_errors, prefix, updated_test_files):
 
     expansion_context = []
     children_context = None
+    unmatched_closers = []
     for line in lines:
         dprint(f"parsing line {line.render()}")
         diag = parse_diag(line, filename, prefix, all_prefixes=True)
@@ -1570,6 +1571,20 @@ def update_test_file(filename, diag_errors, prefix, updated_test_files):
             else:
                 line._children_literal = children_context
             continue
+        if diag and diag.category == "closing":
+            if not expansion_context:
+                # A `// }}` with no matching `expected-expansion` opener above
+                # it. The verifier ignores such a stray closer, so it is
+                # punctuation left over from an expansion directive that is no
+                # longer there. Drop the whole line. `lines` is being iterated,
+                # so defer the removal until the file has been fully parsed.
+                dprint(f"  unmatched closer, dropping line")
+                unmatched_closers.append(line)
+                continue
+            dprint(f"  parsed closer {diag.render()}")
+            line.diag = diag
+            diag.parent = expansion_context.pop()
+            continue
         if diag:
             dprint(f"  parsed diag {diag.render()}")
             line.diag = diag
@@ -1586,12 +1601,13 @@ def update_test_file(filename, diag_errors, prefix, updated_test_files):
                 # than crashing here on an out-of-range line index.
             if diag.category == "expansion":
                 expansion_context.append(diag)
-            elif diag.category == "closing":
-                expansion_context.pop()
             elif _opens_children_block(line.content):
                 children_context = diag
         else:
             dprint(f"  no diag")
+
+    for closer_line in unmatched_closers:
+        remove_line(closer_line, lines)
 
     # Fold `{{children:...}}` blocks before expansions so that child notes
     # nested inside an `expected-expansion` are pulled onto their parent nested
