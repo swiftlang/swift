@@ -3348,6 +3348,24 @@ void ReturnRewriter::rewriteThrow(ThrowInst *throwInst) {
   pass.deleter.forceDelete(throwInst);
 }
 
+// Find the address that a @guaranteed_address result's returned value was
+// borrowed from. If the value is opaque, it has an entry in the value-storage
+// map recording the address it was rewritten to. Otherwise (e.g. the loadable
+// referent of an @_addressableForDependencies `Builtin.Borrow`, or a trivial
+// referent), it was never entered into that map, so its address is simply the
+// operand it was loaded from.
+static SILValue getGuaranteedAddressResultAddress(SILValue oldResult,
+                                                  AddressLoweringState &pass) {
+  if (pass.valueStorageMap.contains(oldResult)) {
+    ValueStorage &storage = pass.valueStorageMap.getStorage(oldResult);
+    assert(storage.isRewritten);
+    return storage.storageAddress;
+  }
+  if (auto *lbi = dyn_cast<LoadBorrowInst>(oldResult))
+    return lbi->getOperand();
+  return cast<LoadInst>(oldResult)->getOperand();
+}
+
 void ReturnRewriter::rewriteReturn(ReturnInst *returnInst) {
   auto &astCtx = pass.getModule()->getASTContext();
   auto typeCtx = pass.function->getTypeExpansionContext();
@@ -3380,10 +3398,8 @@ void ReturnRewriter::rewriteReturn(ReturnInst *returnInst) {
                // A @guaranteed_address's lowering directly returns an address.
                if (pass.loweredFnConv.isAddressResult(resultInfo) &&
                    oldResult->getType().isObject()) {
-                 ValueStorage &storage =
-                     pass.valueStorageMap.getStorage(oldResult);
-                 assert(storage.isRewritten);
-                 newDirectResults.push_back(storage.storageAddress);
+                 newDirectResults.push_back(
+                     getGuaranteedAddressResultAddress(oldResult, pass));
                  return;
                }
                newDirectResults.push_back(oldResult);
@@ -3433,11 +3449,10 @@ void ReturnRewriter::rewriteReturnBorrow(ReturnBorrowInst *returnBorrowInst) {
   assert(pass.loweredFnConv.hasGuaranteedAddressResult() &&
          "return_borrow requires a @guaranteed_address result");
   SILValue oldResult = returnBorrowInst->getReturnValue();
-  ValueStorage &storage = pass.valueStorageMap.getStorage(oldResult);
-  assert(storage.isRewritten);
+  SILValue resultAddr = getGuaranteedAddressResultAddress(oldResult, pass);
 
   auto returnBuilder = pass.getBuilder(returnBorrowInst->getIterator());
-  returnBuilder.createReturn(returnBorrowInst->getLoc(), storage.storageAddress);
+  returnBuilder.createReturn(returnBorrowInst->getLoc(), resultAddr);
   pass.deleter.forceDelete(returnBorrowInst);
 }
 
