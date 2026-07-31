@@ -13,6 +13,7 @@
 #include "swift/Runtime/Concurrency.h"
 #include "swift/Runtime/Once.h"
 
+#include <errno.h>
 #include <time.h>
 #if defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN

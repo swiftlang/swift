@@ -19,7 +19,6 @@
 
 #include <atomic>
 #include <iterator>
-#include <string>
 #include <type_traits>
 #include <utility>
 #include <string.h>
@@ -34,7 +33,14 @@
 #include "swift/ABI/TargetLayout.h"
 #include "swift/ABI/TrailingObjects.h"
 #include "swift/ABI/ValueWitnessTable.h"
+// Malloc.h (AlignedAlloc/AlignedFree) is not used by anything in this file;
+// it's included here only for the benefit of clients that don't include it
+// themselves. Its posix_memalign/aligned_alloc usage is hosted-only, and all
+// real callers of AlignedAlloc/AlignedFree are hosted-only compiler code
+// (lib/AST, lib/SIL, lib/SILOptimizer), so keep this hosted-only.
+#if __STDC_HOSTED__
 #include "swift/Basic/Malloc.h"
+#endif
 #include "swift/Basic/FlaggedPointer.h"
 #include "swift/Basic/RelativePointer.h"
 #include "swift/Demangling/Demangle.h"
