@@ -2071,6 +2071,36 @@ static std::string getCodableTypeInfoString(DerivedConformance &derived,
   return res;
 }
 
+static bool shouldDeriveCodableViaMacro(DerivedConformance &derived) {
+  if (isa<ClassDecl>(derived.Nominal))
+    return false;
+
+  auto &pluginLoader = derived.Context.getPluginLoader();
+  auto &entry = pluginLoader.lookupPluginByModuleName(
+      derived.Context.getIdentifier("SwiftMacros"));
+  return !entry.libraryPath.empty() && !::getenv("DONT_DERIVE_VIA_MACROS");
+}
+
+static ValueDecl *deriveEncodableViaMacro(DerivedConformance &derived,
+                                          ValueDecl *requirement) {
+  std::string macro;
+  auto os = llvm::raw_string_ostream(macro);
+  os << "#_deriveEncodable("
+     << QuotedString(getCodableTypeInfoString(derived, /*forDecode=*/false))
+     << ")";
+  return deriveRequirementViaMacro(derived, requirement, macro);
+}
+
+static ValueDecl *deriveDecodableViaMacro(DerivedConformance &derived,
+                                          ValueDecl *requirement) {
+  std::string macro;
+  auto os = llvm::raw_string_ostream(macro);
+  os << "#_deriveDecodable("
+     << QuotedString(getCodableTypeInfoString(derived, /*forDecode=*/true))
+     << ")";
+  return deriveRequirementViaMacro(derived, requirement, macro);
+}
+
 /// Returns whether the given type is valid for synthesizing {En,De}codable.
 ///
 /// Checks to see whether the given type has a valid \c CodingKeys enum, and if
@@ -2277,6 +2307,9 @@ ValueDecl *DerivedConformance::deriveEncodable(ValueDecl *requirement) {
   }
   assert(delayedNotes.empty());
 
+  if (shouldDeriveCodableViaMacro(*this))
+    return deriveEncodableViaMacro(*this, requirement);
+
   return deriveEncodable_encode(*this);
 }
 
@@ -2308,6 +2341,9 @@ ValueDecl *DerivedConformance::deriveDecodable(ValueDecl *requirement) {
     return nullptr;
   }
   assert(delayedNotes.empty());
+
+  if (shouldDeriveCodableViaMacro(*this))
+    return deriveDecodableViaMacro(*this, requirement);
 
   return deriveDecodable_init(*this);
 }
