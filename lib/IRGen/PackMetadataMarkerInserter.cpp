@@ -177,17 +177,12 @@ class PackMetadataMarkerInserter : public SILFunctionTransform {
 
     auto *dominance = getAnalysis<DominanceAnalysis>();
     auto *tree = dominance->get(function);
-    auto split = splitAllCriticalEdges(*function, /*domInfo=*/tree,
-                                       /*loopInfo=*/nullptr);
     auto *deadEnds = getAnalysis<DeadEndBlocksAnalysis>();
-    if (split) {
-      deadEnds->invalidateFunction(function);
-    }
     auto *deBlocks = deadEnds->get(function);
     inserter.insert(tree, deBlocks);
     auto changes = StackNesting::fixNesting(function);
     invalidateAnalysis(
-        (split || changes == StackNesting::Changes::CFG)
+        (changes == StackNesting::Changes::CFG)
             ? SILAnalysis::InvalidationKind::BranchesAndInstructions
             : SILAnalysis::InvalidationKind::Instructions);
   }

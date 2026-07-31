@@ -102,7 +102,7 @@ private func optimizeObjectAllocation(allocRef: AllocRefInstBase, _ context: Fun
     return nil
   }
 
-  guard let (storesToClassFields, storesToTailElements, redundantStores) = getInitialization(of: allocRef,
+  guard let (storesToClassFields, storesToTailElements) = getInitialization(of: allocRef,
                                                                             ignore: endOfInitInst,
                                                                             context) else
   {
@@ -120,10 +120,6 @@ private func optimizeObjectAllocation(allocRef: AllocRefInstBase, _ context: Fun
   constructObject(of: allocRef, inInitializerOf: outlinedGlobal, storesToClassFields, storesToTailElements, context)
   context.erase(instructions: storesToClassFields)
   context.erase(instructions: storesToTailElements)
-  // These stores are dead: they are always superseded by a later store of the fully
-  // initialized object (see `isValidUseOfObject`). Remove them so that later passes,
-  // like InitializeStaticGlobals, don't see two stores into the same global.
-  context.erase(instructions: redundantStores)
 
   return replace(object: allocRef, with: outlinedGlobal, context)
 }
@@ -164,7 +160,7 @@ private func findEndOfInitialization(of object: Value, canStoreToGlobal: Bool) -
 
 private func getInitialization(of allocRef: AllocRefInstBase, ignore ignoreInst: Instruction,
                                _ context: FunctionPassContext)
-  -> (storesToClassFields: [StoreInst], storesToTailElements: [StoreInst], redundantStores: [StoreInst])?
+  -> (storesToClassFields: [StoreInst], storesToTailElements: [StoreInst])?
 {
   guard let numTailElements = allocRef.numTailElements else {
     return nil
@@ -180,9 +176,8 @@ private func getInitialization(of allocRef: AllocRefInstBase, ignore ignoreInst:
   //   store %1 to %4
   let tailCount = numTailElements != 0 ? numTailElements * allocRef.numStoresPerTailElement : 0
   var tailStores = Array<StoreInst?>(repeating: nil, count: tailCount)
-  var redundantStores = [StoreInst]()
 
-  if !findInitStores(of: allocRef, &fieldStores, &tailStores, ignore: ignoreInst, &redundantStores, context) {
+  if !findInitStores(of: allocRef, &fieldStores, &tailStores, ignore: ignoreInst, context) {
     return nil
   }
 
@@ -190,14 +185,13 @@ private func getInitialization(of allocRef: AllocRefInstBase, ignore ignoreInst:
   if fieldStores.contains(nil) || tailStores.contains(nil) {
     return nil
   }
-  return (fieldStores.map { $0! }, tailStores.map { $0! }, redundantStores)
+  return (fieldStores.map { $0! }, tailStores.map { $0! })
 }
 
 private func findInitStores(of object: Value,
                             _ fieldStores: inout [StoreInst?],
                             _ tailStores: inout [StoreInst?],
                             ignore ignoreInst: Instruction,
-                            _ redundantStores: inout [StoreInst],
                             _ context: FunctionPassContext) -> Bool
 {
   for use in object.uses {
@@ -208,22 +202,22 @@ private func findInitStores(of object: Value,
          is MoveValueInst,
          is EndInitLetRefInst,
          is BeginBorrowInst:
-      if !findInitStores(of: user as! SingleValueInstruction, &fieldStores, &tailStores, ignore: ignoreInst, &redundantStores, context) {
+      if !findInitStores(of: user as! SingleValueInstruction, &fieldStores, &tailStores, ignore: ignoreInst, context) {
         return false
       }
     case let rea as RefElementAddrInst:
-      if !findStores(inUsesOf: rea, index: rea.fieldIndex, stores: &fieldStores, &redundantStores, context) {
+      if !findStores(inUsesOf: rea, index: rea.fieldIndex, stores: &fieldStores, context) {
         return false
       }
     case let rta as RefTailAddrInst:
-      if !findStores(toTailAddress: rta, tailElementIndex: 0, stores: &tailStores, &redundantStores, context) {
+      if !findStores(toTailAddress: rta, tailElementIndex: 0, stores: &tailStores, context) {
         return false
       }
     case ignoreInst,
          is EndBorrowInst:
       break
     default:
-      if !isValidUseOfObject(use, &redundantStores) {
+      if !isValidUseOfObject(use) {
         return false
       }
     }
@@ -232,7 +226,6 @@ private func findInitStores(of object: Value,
 }
 
 private func findStores(toTailAddress tailAddr: Value, tailElementIndex: Int, stores: inout [StoreInst?],
-                        _ redundantStores: inout [StoreInst],
                         _ context: FunctionPassContext) -> Bool {
   for use in tailAddr.uses {
     switch use.instruction {
@@ -242,26 +235,26 @@ private func findStores(toTailAddress tailAddr: Value, tailElementIndex: Int, st
       {
         return false
       }
-      if !findStores(toTailAddress: indexAddr, tailElementIndex: tailElementIndex + tailIdx, stores: &stores, &redundantStores, context) {
+      if !findStores(toTailAddress: indexAddr, tailElementIndex: tailElementIndex + tailIdx, stores: &stores, context) {
         return false
       }
     case let tea as TupleElementAddrInst:
       // The tail elements are tuples. There is a separate store for each tuple element.
       let numTupleElements = tea.tuple.type.tupleElements.count
       let tupleIdx = tea.fieldIndex
-      if !findStores(inUsesOf: tea, index: tailElementIndex * numTupleElements + tupleIdx, stores: &stores, &redundantStores, context) {
+      if !findStores(inUsesOf: tea, index: tailElementIndex * numTupleElements + tupleIdx, stores: &stores, context) {
         return false
       }
     case let atp as AddressToPointerInst:
-      if !findStores(toTailAddress: atp, tailElementIndex: tailElementIndex, stores: &stores, &redundantStores, context) {
+      if !findStores(toTailAddress: atp, tailElementIndex: tailElementIndex, stores: &stores, context) {
         return false
       }
     case let mdi as MarkDependenceInst:
-      if !findStores(toTailAddress: mdi, tailElementIndex: tailElementIndex, stores: &stores, &redundantStores, context) {
+      if !findStores(toTailAddress: mdi, tailElementIndex: tailElementIndex, stores: &stores, context) {
         return false
       }
     case let pta as PointerToAddressInst:
-      if !findStores(toTailAddress: pta, tailElementIndex: tailElementIndex, stores: &stores, &redundantStores, context) {
+      if !findStores(toTailAddress: pta, tailElementIndex: tailElementIndex, stores: &stores, context) {
         return false
       }
     case let store as StoreInst:
@@ -274,7 +267,7 @@ private func findStores(toTailAddress tailAddr: Value, tailElementIndex: Int, st
         return false
       }
     default:
-      if !isValidUseOfObject(use, &redundantStores) {
+      if !isValidUseOfObject(use) {
         return false
       }
     }
@@ -283,7 +276,6 @@ private func findStores(toTailAddress tailAddr: Value, tailElementIndex: Int, st
 }
 
 private func findStores(inUsesOf address: Value, index: Int, stores: inout [StoreInst?],
-                        _ redundantStores: inout [StoreInst],
                         _ context: FunctionPassContext) -> Bool
 {
   for use in address.uses {
@@ -291,7 +283,7 @@ private func findStores(inUsesOf address: Value, index: Int, stores: inout [Stor
       if !handleStore(store, index: index, stores: &stores, context) {
         return false
       }
-    } else if !isValidUseOfObject(use, &redundantStores) {
+    } else if !isValidUseOfObject(use) {
       return false
     }
   }
@@ -310,7 +302,7 @@ private func handleStore(_ store: StoreInst, index: Int, stores: inout [StoreIns
   return false
 }
 
-private func isValidUseOfObject(_ use: Operand, _ redundantStores: inout [StoreInst]) -> Bool {
+private func isValidUseOfObject(_ use: Operand) -> Bool {
   let inst = use.instruction
   switch inst {
   case is DebugValueInst,
@@ -328,7 +320,7 @@ private func isValidUseOfObject(_ use: Operand, _ redundantStores: inout [StoreI
       return true;
     }
     for mdiUse in mdi.uses {
-      if !isValidUseOfObject(mdiUse, &redundantStores) {
+      if !isValidUseOfObject(mdiUse) {
         return false
       }
     }
@@ -336,17 +328,11 @@ private func isValidUseOfObject(_ use: Operand, _ redundantStores: inout [StoreI
 
   case let store as StoreInst:
     // Tolerate a redundant store of the (not yet fully initialized) object into
-    // the global variable this function is initializing. The store is dead (it's
-    // always superseded by a later store of the fully initialized object), so
-    // remember it to be erased once outlining is committed to.
-    guard use == store.sourceOperand,
-          let ga = store.destination as? GlobalAddrInst,
-          ga.global.isLet, ga.parentFunction.initializedGlobal == ga.global
-    else {
-      return false
-    }
-    redundantStores.append(store)
-    return true
+    // the global variable this function is initializing.
+    return use == store.sourceOperand &&
+           (store.destination as? GlobalAddrInst).map {
+             $0.global.isLet && $0.parentFunction.initializedGlobal == $0.global
+           } ?? false
 
   case is StructElementAddrInst,
        is AddressToPointerInst,
@@ -361,7 +347,7 @@ private func isValidUseOfObject(_ use: Operand, _ redundantStores: inout [StoreI
        is RefTailAddrInst,
        is RefElementAddrInst:
     for instUse in (inst as! SingleValueInstruction).uses {
-      if !isValidUseOfObject(instUse, &redundantStores) {
+      if !isValidUseOfObject(instUse) {
         return false
       }
     }

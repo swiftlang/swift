@@ -569,12 +569,6 @@ areEquivalentConditionsAlongPaths(CheckedCastBranchInst *DomCCBI) {
       if (BlocksToEdit.contains(PredBB))
         return false;
 
-      // Don't allow critical edges from PredBB to BB. This ensures that
-      // splitAllCriticalEdges() will not invalidate our predecessor lists.
-      if (!BB->getSinglePredecessorBlock() &&
-          !PredBB->getSingleSuccessorBlock())
-        return false;
-
       SILBasicBlock *DomSuccessBB = DomCCBI->getSuccessBB();
       bool SuccessDominates =
           DT->dominates(DomSuccessBB, PredBB) || DomSuccessBB == BB;
