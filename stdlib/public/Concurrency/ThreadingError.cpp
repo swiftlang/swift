@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Threading/Errors.h"
-#include <cstdio>
 
 #include "Error.h"
 

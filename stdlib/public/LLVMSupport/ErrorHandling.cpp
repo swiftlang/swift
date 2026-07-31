@@ -65,14 +65,9 @@ void __swift::__runtime::llvm::report_fatal_error(const char *Reason,
   abort();
 }
 
-void __swift::__runtime::llvm::report_fatal_error(const std::string &Reason,
-                                                  bool GenCrashDiag) {
-  report_fatal_error(Reason.c_str(), GenCrashDiag);
-}
-
 void __swift::__runtime::llvm::report_fatal_error(StringRef Reason,
                                                   bool GenCrashDiag) {
-  report_fatal_error(Reason.str(), GenCrashDiag);
+  report_fatal_error(Reason.str().c_str(), GenCrashDiag);
 }
 
 void __swift::__runtime::llvm::report_bad_alloc_error(const char *Reason,

@@ -15,15 +15,10 @@
 #define LLVM_SUPPORT_ERRORHANDLING_H
 
 #include "llvm/Support/Compiler.h"
-#include <string>
 
 inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 class StringRef;
-/// An error handler callback.
-typedef void (*fatal_error_handler_t)(void *user_data,
-                                      const std::string& reason,
-                                      bool gen_crash_diag);
 
 /// Reports a serious error, calling any installed error handler. These
 /// functions are intended to be used for error conditions which are outside
@@ -34,8 +29,6 @@ typedef void (*fatal_error_handler_t)(void *user_data,
 /// After the error handler is called this function will call abort(), it
 /// does not return.
 LLVM_ATTRIBUTE_NORETURN void report_fatal_error(const char *reason,
-                                                bool gen_crash_diag = true);
-LLVM_ATTRIBUTE_NORETURN void report_fatal_error(const std::string &reason,
                                                 bool gen_crash_diag = true);
 LLVM_ATTRIBUTE_NORETURN void report_fatal_error(StringRef reason,
                                                 bool gen_crash_diag = true);
