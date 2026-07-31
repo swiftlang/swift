@@ -575,7 +575,7 @@ private:
       std::string declName, defName, name;
       llvm::raw_string_ostream declOS(declName), defOS(defName), nameOS(name);
       ClangSyntaxPrinter(elementDecl->getASTContext(), nameOS)
-          .printIdentifier(cxx_translation::getNameForCxx(elementDecl));
+          .printBaseName(elementDecl);
       name[0] = std::toupper(name[0]);
 
       clangFuncPrinter.printCustomCxxFunction(
@@ -873,8 +873,7 @@ private:
                 syntaxPrinter.printSwiftNameCommentIfNeeded(pair.first,
                                                             /*indent=*/"    ");
                 os << "    ";
-                syntaxPrinter.printIdentifier(
-                    cxx_translation::getNameForCxx(pair.first));
+                syntaxPrinter.printBaseName(pair.first);
                 syntaxPrinter.printSymbolUSRAttribute(pair.first);
               },
               ",");
@@ -926,8 +925,7 @@ private:
                  << cxx_synthesis::getCxxImplNamespaceName();
               os << "::" << pair.second.globalVariableName
                  << ") return cases::";
-              syntaxPrinter.printIdentifier(
-                  cxx_translation::getNameForCxx(pair.first));
+              syntaxPrinter.printBaseName(pair.first);
               os << ";\n";
             }
             os << "    return cases::" << resilientUnknownDefaultCaseName
@@ -936,8 +934,7 @@ private:
             os << "    switch (_getEnumTag()) {\n";
             for (const auto &pair : elementTagMapping) {
               os << "      case " << pair.second.tag << ": return cases::";
-              syntaxPrinter.printIdentifier(
-                  cxx_translation::getNameForCxx(pair.first));
+              syntaxPrinter.printBaseName(pair.first);
               os << ";\n";
             }
             // TODO: change to Swift's fatalError when it's available in C++
