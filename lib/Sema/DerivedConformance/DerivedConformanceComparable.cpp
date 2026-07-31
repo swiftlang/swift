@@ -287,7 +287,12 @@ static ValueDecl *deriveComparableViaMacros(DerivedConformance &derived,
  auto out = llvm::raw_string_ostream(macro);
  out << "#_deriveComparable(" << QuotedString(getEnumTypeInfoString(enumeration))
      << ", isResilient: "
-     << (parentDC->getParentModule()->isResilient() ? "true" : "false") << ")";
+     << (parentDC->getParentModule()->isResilient() ? "true" : "false")
+     << ", isNoncopyable: "
+     << (enumeration->canBeCopyable() == TypeDecl::CanBeInvertible::Never
+             ? "true"
+             : "false")
+     << ")";
  out.flush();
  return deriveRequirementViaMacro(derived, requirement, macro);
 }

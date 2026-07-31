@@ -23,27 +23,34 @@ public struct DeriveComparableMacro: DeclarationMacro {
 
   let info: EnumTypeInfo
   let isResilient: Bool
+  let isNoncopyable: Bool
 
   public static func expansion(
     of node: some FreestandingMacroExpansionSyntax,
     in context: some MacroExpansionContext
   ) throws -> [DeclSyntax] {
-    let (typeInfo, isResilient) = try node.arguments.expect(
+    let (typeInfo, isResilient, isNoncopyable) = try node.arguments.expect(
       .init(name: nil, parser: EnumTypeInfo.fromStringLit),
-      .boolArg("isResilient")
+      .boolArg("isResilient"),
+      .boolArg("isNoncopyable")
     )
 
     return [
-      Self(info: typeInfo, isResilient: isResilient).deriveComparable()
+      Self(
+        info: typeInfo, isResilient: isResilient, isNoncopyable: isNoncopyable
+      ).deriveComparable()
     ]
   }
 
   /// Builds the static `<` (or `__derived_enum_less_than`) function declaration.
   func deriveComparable() -> DeclSyntax {
+    // A parameter of noncopyable type must state its ownership. Both operands
+    // are only read, so borrow them.
+    let ownership = isNoncopyable ? "borrowing " : ""
     return
       """
       \(getAttributes())
-      static func \(getFunctionName())(_ a: Self, _ b: Self) -> Swift::Bool {
+      static func \(getFunctionName())(_ a: \(raw: ownership)Self, _ b: \(raw: ownership)Self) -> Swift::Bool {
         \(getBody())
       }
       """
