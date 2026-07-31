@@ -15,6 +15,7 @@
 #include "ManagedValue.h"
 #include "Scope.h"
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/SIL/FormalLinkage.h"
@@ -91,6 +92,13 @@ ManagedValue
 SILGenFunction::emitGlobalVariableRef(SILLocation loc, VarDecl *var,
                                       std::optional<ActorIsolation> actorIso) {
   assert(!VarLocs.count(var));
+
+  // A WebAssembly `.custom_section.` global is emitted as a custom section
+  // (metadata) with no runtime address, so it cannot be read or written.
+  if (auto *sectionAttr = var->getAttrs().getAttribute<SectionAttr>())
+    if (SGM.M.getASTContext().LangOpts.Target.isWasm() &&
+        SILGlobalVariable::isWasmCustomSectionName(sectionAttr->Name))
+      SGM.diagnose(loc, diag::wasm_custom_section_not_addressable, var);
   if (var->isLazilyInitializedGlobal()) {
     // Call the global accessor to get the variable's address.
     SILFunction *accessorFn = SGM.getFunction(
@@ -200,7 +208,17 @@ struct GenGlobalAccessors : public PatternVisitor<GenGlobalAccessors>
 
   // When we see a variable binding, emit its global accessor.
   void visitNamedPattern(NamedPattern *P) {
-    SGM.emitGlobalAccessor(P->getDecl(), OnceToken, OnceFunc);
+    auto *var = P->getDecl();
+    // On WebAssembly, a `.custom_section.`-prefixed @section global is emitted
+    // as a custom section (metadata) with no runtime address, so it has no
+    // addressable storage to accessor into. Emitting a global accessor would
+    // reference a global that is never defined and fail to link; any attempt to
+    // read or write the global is instead diagnosed at the use site.
+    if (auto *sectionAttr = var->getAttrs().getAttribute<SectionAttr>())
+      if (SGM.M.getASTContext().LangOpts.Target.isWasm() &&
+          SILGlobalVariable::isWasmCustomSectionName(sectionAttr->Name))
+        return;
+    SGM.emitGlobalAccessor(var, OnceToken, OnceFunc);
   }
 
 #define INVALID_PATTERN(Id, Parent) \

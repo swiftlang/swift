@@ -2744,25 +2744,13 @@ void IRGenModule::emitGlobalDecl(Decl *D) {
   llvm_unreachable("bad decl kind!");
 }
 
-/// The @section name prefix that, on WebAssembly, requests emission into a
-/// Wasm custom section instead of an ordinary data segment. This mirrors the
-/// convention understood by LLVM's Wasm assembly parser and object writer.
-static const StringRef WasmCustomSectionPrefix = ".custom_section.";
-
-/// Whether \p section is an @section name that requests a WebAssembly custom
-/// section (i.e. the target is Wasm and the name has the `.custom_section.`
-/// prefix). Such sections are emitted via `wasm.custom_sections` module
-/// metadata rather than as an ordinary section on a global.
-static bool isWasmCustomSectionName(IRGenModule &IGM, StringRef section) {
-  return IGM.Triple.isWasm() && section.starts_with(WasmCustomSectionPrefix);
-}
-
 bool IRGenModule::tryEmitWasmCustomSection(SILGlobalVariable *var) {
   // A `.custom_section.`-prefixed @section name on WebAssembly is emitted as a
   // Wasm custom section holding the global's constant bytes. This is metadata,
   // not an addressable global, so no `llvm::GlobalVariable` is created for it.
   if (!var->isDefinition() || var->isInitializedObject() ||
-      !isWasmCustomSectionName(*this, var->section()))
+      !Triple.isWasm() ||
+      !SILGlobalVariable::isWasmCustomSectionName(var->section()))
     return false;
 
   auto *initInst = dyn_cast_or_null<SingleValueInstruction>(
@@ -2780,7 +2768,8 @@ bool IRGenModule::tryEmitWasmCustomSection(SILGlobalVariable *var) {
     // emitting it as an ordinary global.
     return false;
 
-  StringRef name = var->section().drop_front(WasmCustomSectionPrefix.size());
+  StringRef name = var->section().drop_front(
+      SILGlobalVariable::getWasmCustomSectionPrefix().size());
   auto &ctx = getLLVMContext();
   llvm::Metadata *entry[] = {
       llvm::MDString::get(ctx, name),
