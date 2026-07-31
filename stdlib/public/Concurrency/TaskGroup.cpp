@@ -19,8 +19,13 @@
 #include "Debug.h"
 #include "TaskGroupPrivate.h"
 #include "TaskPrivate.h"
+// <bitset>/<string> cannot be included at all under -ffreestanding (their
+// own headers hard-error); they're only used below for hosted-only debug
+// status pretty-printing (statusString()/to_string()).
+#if !SWIFT_CONCURRENCY_EMBEDDED
 #include "bitset"
 #include "string"
+#endif
 #include "swift/ABI/HeapObject.h"
 #include "swift/ABI/Metadata.h"
 #include "swift/ABI/Task.h"

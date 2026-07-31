@@ -83,6 +83,7 @@ if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_REMOTE_MIRROR)
   # we cannot use `target_sources` and thus must resort to list manipulations to
   # adjust the source list.
   set(swiftDemanglingSources
+    "${SWIFT_SOURCE_DIR}/lib/Demangling/Ownership.cpp"
     "${SWIFT_SOURCE_DIR}/lib/Demangling/Context.cpp"
     "${SWIFT_SOURCE_DIR}/lib/Demangling/Demangler.cpp"
     "${SWIFT_SOURCE_DIR}/lib/Demangling/ManglingUtils.cpp"

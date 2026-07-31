@@ -9,6 +9,7 @@ if(SWIFT_RUNTIME_CRASH_REPORTER_CLIENT)
 endif()
 
 add_swift_host_library(swiftDemangling STATIC
+  Ownership.cpp
   Demangler.cpp
   Context.cpp
   ManglingUtils.cpp
