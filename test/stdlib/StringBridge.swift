@@ -105,6 +105,22 @@ StringBridgeTests.test("Shared String SPI")
     test(literal: "abcdëfghijklmnopqrstuvwxyz", isASCII: false)
 }
 
+StringBridgeTests.test("Shared String SPI/rejects non-terminated buffer")
+  .require(.stdlib_6_2)
+  .code {
+    guard #available(SwiftStdlib 6.2, *) else { return }
+    let n = 20
+    let buf = UnsafeMutableBufferPointer<UInt8>.allocate(capacity: n + 1)
+    for i in 0..<n { buf[i] = UInt8(ascii: "a") }
+    buf[n] = 0xFF
+    let base = UnsafePointer(buf.baseAddress!)
+    expectCrashLater()
+    _ = _SwiftCreateImmortalString_ForFoundation(
+      buffer: UnsafeBufferPointer(start: base, count: n),
+      isASCII: true
+    )
+}
+
 StringBridgeTests.test("Bridging") {
   // Test bridging retains small string form
   func bridge(_ small: _SmallString) -> String {
