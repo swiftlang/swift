@@ -72,7 +72,8 @@ void ClangSyntaxPrinter::printBaseName(const ValueDecl *decl) const {
 
 void ClangSyntaxPrinter::printSwiftNameCommentIfNeeded(const ValueDecl *decl,
                                                        StringRef indent) const {
-  // An operator either keeps its C++ spelling or is not exposed at all.
+  // An operator either keeps its Swift spelling, when that is also a valid
+  // C++ operator, or is not exposed at all.
   if (decl->isOperator())
     return;
   auto baseName = decl->getName().getBaseName();
