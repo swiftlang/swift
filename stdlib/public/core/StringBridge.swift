@@ -792,6 +792,14 @@ internal func _SwiftCreateBridgedString_DoNotCall(
   if buffer.count == 0 {
     return ""
   }
+  // Foundation promises to null-terminate all buffers it passes to this SPI
+  // So reading one-past-the-end to verify that will only crash on invalid
+  let bufferWithTerminator = unsafe UnsafeBufferPointer(
+    start: buffer.baseAddress._unsafelyUnwrappedUnchecked,
+    count: buffer.count + 1
+  )
+  unsafe _precondition(bufferWithTerminator[buffer.count] == 0,
+    "String buffers must be NUL-terminated")
   if isASCII {
     return unsafe _allASCII(buffer) ?
       String(_StringGuts(buffer, isASCII: true)) :
@@ -799,14 +807,6 @@ internal func _SwiftCreateBridgedString_DoNotCall(
   }
   switch unsafe validateUTF8(buffer) {
   case .success(let extraInfo):
-    // Foundation promises to null-terminate all buffers it passes to this SPI
-    // So reading one-past-the-end to verify that will only crash on invalid
-    let bufferWithTerminator = unsafe UnsafeBufferPointer(
-      start: buffer.baseAddress._unsafelyUnwrappedUnchecked,
-      count: buffer.count + 1
-    )
-    unsafe _precondition(bufferWithTerminator[buffer.count] == 0,
-      "String buffers must be NUL-terminated")
     return unsafe String(_StringGuts(buffer, isASCII: extraInfo.isASCII))
   default:
     return nil
