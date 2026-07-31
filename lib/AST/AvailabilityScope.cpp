@@ -269,8 +269,9 @@ void AvailabilityScope::addChild(AvailabilityScope *Child, ASTContext &Ctx) {
   Children.insert(iter, Child);
 }
 
-AvailabilityScope *
-AvailabilityScope::findMostRefinedSubContext(SourceLoc Loc, ASTContext &Ctx) {
+AvailabilityScope *AvailabilityScope::findMostRefinedSubContextImpl(
+    SourceLoc Loc, ASTContext &Ctx,
+    llvm::SmallVectorImpl<AvailabilityScope *> *ScopeStack) {
   DEBUG_ASSERT(Loc.isValid());
 
   if (SrcRange.isValid() && !Ctx.SourceMgr.containsTokenLoc(SrcRange, Loc))
@@ -279,6 +280,9 @@ AvailabilityScope::findMostRefinedSubContext(SourceLoc Loc, ASTContext &Ctx) {
   (void)evaluateOrDefault(Ctx.evaluator,
                           ExpandChildAvailabilityScopesRequest{this}, {});
   DEBUG_ASSERT(!getNeedsExpansion());
+
+  if (ScopeStack)
+    ScopeStack->push_back(this);
 
   // Do a binary search to find the first child with a source range that
   // ends after the given location.
@@ -291,13 +295,25 @@ AvailabilityScope::findMostRefinedSubContext(SourceLoc Loc, ASTContext &Ctx) {
   // Check whether the matching child or any of its descendants contain
   // the given location.
   if (iter != Children.end()) {
-    if (auto found = (*iter)->findMostRefinedSubContext(Loc, Ctx))
+    if (auto found =
+            (*iter)->findMostRefinedSubContextImpl(Loc, Ctx, ScopeStack))
       return found;
   }
 
   // The location is in this context's range but not in any child's, so this
   // context must be the innermost context.
   return this;
+}
+
+AvailabilityScope *
+AvailabilityScope::findMostRefinedSubContext(SourceLoc Loc, ASTContext &Ctx) {
+  return findMostRefinedSubContextImpl(Loc, Ctx, /*ScopeStack=*/nullptr);
+}
+
+AvailabilityScope *AvailabilityScope::findMostRefinedSubContext(
+    SourceLoc Loc, ASTContext &Ctx,
+    llvm::SmallVectorImpl<AvailabilityScope *> &ScopeStack) {
+  return findMostRefinedSubContextImpl(Loc, Ctx, &ScopeStack);
 }
 
 void AvailabilityScope::dump(SourceManager &SrcMgr) const {

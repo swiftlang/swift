@@ -847,14 +847,39 @@ static bool fixAvailabilityByNarrowingNearbyVersionCheck(
   if (!Domain.isPlatform())
     return false;
 
+  // Find the innermost enclosing scope that specifies an availability range for
+  // the domain in source. Scopes that don't specify one (such as the
+  // placeholder scopes of declarations in local contexts) are skipped.
+  auto loc = ReferenceRange.Start;
+  if (loc.isInvalid())
+    return false;
+
+  auto *sf =
+      ReferenceDC->getParentModule()->getSourceFileContainingLocation(loc);
+  if (!sf)
+    return false;
+
+  auto *rootScope = AvailabilityScope::getOrBuildForSourceFile(*sf);
+  if (!rootScope)
+    return false;
+
+  llvm::SmallVector<AvailabilityScope *, 8> scopeStack;
+  if (!rootScope->findMostRefinedSubContext(loc, Context, scopeStack))
+    return false;
+
   const AvailabilityScope *scope = nullptr;
-  (void)AvailabilityContext::forLocation(ReferenceRange.Start, ReferenceDC,
-                                         &scope);
+  std::optional<AvailabilityRange> ExplicitAvailability;
+  for (auto candidate : llvm::reverse(scopeStack)) {
+    if (auto range = candidate->getExplicitAvailabilityRange(Domain, Context)) {
+      ExplicitAvailability.emplace(*range);
+      scope = candidate;
+      break;
+    }
+  }
+
   if (!scope)
     return false;
 
-  auto ExplicitAvailability =
-      scope->getExplicitAvailabilityRange(Domain, Context);
   if (ExplicitAvailability && !RequiredAvailability.isAlwaysAvailable() &&
       scope->getReason() != AvailabilityScope::Reason::Root &&
       RequiredAvailability.isContainedIn(*ExplicitAvailability)) {
