@@ -12,9 +12,9 @@
 // The emission of runtime metadata for inverted requirements needs a 5.8+
 // target, so build the test targeting 5.8 and mark the tests as requiring 5.8.
 // RUN: %target-run-simple-swift(-target %target-swift-5.8-abi-triple -enable-experimental-feature Lifetimes)
+// RUN: %target-run-simple-swift(-target %target-swift-5.8-abi-triple -enable-experimental-feature Lifetimes -Xfrontend -enable-sil-opaque-values)
 // REQUIRES: executable_test
 // REQUIRES: swift_feature_Lifetimes
-// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 import StdlibUnittest
 
