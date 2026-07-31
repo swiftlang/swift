@@ -23,8 +23,9 @@ public macro _deriveError(_ infos: String) =
   #externalMacro(module: "SwiftMacros", type: "DeriveErrorMacro")
 
 @freestanding(declaration, names: arbitrary)
-public macro _deriveComparable(_ infos: String, isResilient: Bool) =
-  #externalMacro(module: "SwiftMacros", type: "DeriveComparableMacro")
+public macro _deriveComparable(
+  _ infos: String, isResilient: Bool, isNoncopyable: Bool
+) = #externalMacro(module: "SwiftMacros", type: "DeriveComparableMacro")
 
 @freestanding(declaration, names: arbitrary)
 public macro _deriveCaseIterable(_ infos: String, _ witness: String) =

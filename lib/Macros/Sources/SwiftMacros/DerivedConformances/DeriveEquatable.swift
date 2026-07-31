@@ -37,10 +37,13 @@ public struct DeriveEquatableMacro: DeclarationMacro {
 
   /// Builds the static `==` (or `__derived_*_equals`) function declaration.
   func deriveEquatable() -> DeclSyntax {
+    // A parameter of noncopyable type must state its ownership. Both operands
+    // are only read, so borrow them.
+    let ownership = info.isNoncopyable ? "borrowing " : ""
     return
       """
       \(getAttributes())
-      static func \(getFunctionName())(_ a: Self, _ b: Self) -> Swift::Bool {
+      static func \(getFunctionName())(_ a: \(raw: ownership)Self, _ b: \(raw: ownership)Self) -> Swift::Bool {
         \(getBody())
       }
       """
