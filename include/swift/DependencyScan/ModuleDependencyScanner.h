@@ -291,12 +291,7 @@ public:
 
   /// CAS Dependency Tracker.
   std::optional<SwiftDependencyTracker>
-  createSwiftDependencyTracker(const CompilerInvocation &CI) {
-    if (!CAS)
-      return std::nullopt;
-
-    return SwiftDependencyTracker(CAS, PrefixMapper.get(), CI, ClangBlocklists);
-  }
+  createSwiftDependencyTracker(const CompilerInvocation &CI);
 
   /// PrefixMapper for scanner.
   bool hasPathMapping() const {
@@ -474,11 +469,6 @@ private:
   /// File prefix mapper.
   std::unique_ptr<llvm::PrefixMapper> PrefixMapper;
   std::unique_ptr<llvm::PrefixMapper> ReversePrefixMapping;
-  /// Paths of files referenced by the Clang cc1 command line that the driver
-  /// implicitly injected (e.g. `-fsanitize-ignorelist=...` added when a
-  /// sanitizer is enabled). These must be part of the CAS input tree for a
-  /// cached `-compile-module-from-interface` job to open them at replay time.
-  std::vector<std::string> ClangBlocklists;
   /// CAS file system for loading file content.
   llvm::IntrusiveRefCntPtr<llvm::cas::CASBackedFileSystem> CacheFS;
   /// Protect worker access.

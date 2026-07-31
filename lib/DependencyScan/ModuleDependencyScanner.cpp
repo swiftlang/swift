@@ -23,6 +23,7 @@
 #include "swift/Basic/PrettyStackTrace.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/ClangImporter/ClangImporter.h"
+#include "clang/Frontend/CompilerInstance.h"
 #include "swift/DependencyScan/ModuleDependencyScanner.h"
 #include "swift/Frontend/ModuleInterfaceLoader.h"
 #include "swift/Serialization/ScanningLoaders.h"
@@ -628,21 +629,6 @@ ModuleDependencyScanner::ModuleDependencyScanner(
     CacheFS = cast<llvm::cas::CASBackedFileSystem>(
         llvm::cas::createCASProvidingFileSystem(
             CAS, ScanASTContext.SourceMgr.getFileSystem()));
-
-  // Collect paths referenced by cc1 args that the Clang driver implicitly
-  // injects (e.g. sanitizer ignorelists for `-fsanitize=...`). These are not
-  // named anywhere in the Swift invocation but must still land in the CAS
-  // input tree for cached `-compile-module-from-interface` replay.
-  if (CAS && ScanASTContext.ClangImporterOpts.ClangImporterDirectCC1Scan) {
-    auto *clangImporter =
-        static_cast<ClangImporter *>(ScanASTContext.getClangModuleLoader());
-    for (const auto &Arg : clangImporter->getSwiftExplicitModuleDirectCC1Args()) {
-      StringRef Path = Arg;
-      if (Path.consume_front("-fsanitize-ignorelist=") ||
-          Path.consume_front("-fsanitize-system-ignorelist="))
-        ClangBlocklists.push_back(Path.str());
-    }
-  }
 
   // TODO: Make num threads configurable
   for (size_t i = 0; i < NumThreads; ++i)
@@ -2172,6 +2158,21 @@ std::string ModuleDependencyScanner::remapPath(StringRef Path) const {
   if (!PrefixMapper)
     return Path.str();
   return PrefixMapper->mapToString(Path);
+}
+
+std::optional<SwiftDependencyTracker>
+ModuleDependencyScanner::createSwiftDependencyTracker(
+    const CompilerInvocation &CI) {
+  if (!CAS)
+    return std::nullopt;
+
+  // Files referenced by cc1 args that the Clang driver implicitly injects
+  // (e.g. sanitizer ignorelists for `-fsanitize=...`) live on the parsed
+  // Clang invocation and must be added to the CAS input tree.
+  const auto &clangLangOpts =
+      ScanASTContext.getClangModuleLoader()->getClangInstance().getLangOpts();
+  return SwiftDependencyTracker(CAS, PrefixMapper.get(), CI,
+                                clangLangOpts.NoSanitizeFiles);
 }
 
 LibraryLevel swift::libraryLevelFromPath(StringRef modulePath,
