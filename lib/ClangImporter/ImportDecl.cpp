@@ -612,6 +612,19 @@ static ImportedType rectifySubscriptTypes(Type getterType, bool getterIsIUO,
   return {OptionalType::get(setterType), true};
 }
 
+/// Returns the `@available` attribute on \p decl whose resolved domain is the
+/// platform \p platform, or null. Semantic availability is not resolved yet
+/// during import, so this matches on the parsed attribute's domain.
+static AvailableAttr *findAvailableAttrForPlatform(Decl *decl,
+                                                   PlatformKind platform) {
+  for (auto *attr : decl->getAttrs().getAttributes<AvailableAttr>()) {
+    auto domain = attr->getDomainOrIdentifier().getAsDomain();
+    if (domain && domain->isPlatform() && domain->getPlatformKind() == platform)
+      return attr;
+  }
+  return nullptr;
+}
+
 /// Add an AvailableAttr to the declaration for the given
 /// version range.
 static void applyAvailableAttribute(Decl *decl, AvailabilityRange &info,
@@ -9895,6 +9908,25 @@ void ClangImporter::Implementation::importAttributes(
       StringRef swiftReplacement = "";
       if (!replacement.empty())
         swiftReplacement = getSwiftNameFromClangName(replacement);
+
+      // If an earlier phase already introduced this platform (e.g. the
+      // synthesized Swift-runtime availability for foreign reference types),
+      // fold its introduction version into this attribute and drop it, rather
+      // than leaving two @available attributes for the same platform (which
+      // can render as an invalid short-form @available).
+      if (auto *prevAttr =
+              findAvailableAttrForPlatform(MappedDecl, *platformK)) {
+        if (auto prevIntroduced = prevAttr->getRawIntroduced()) {
+          // Only fold the introduction version into an attribute that actually
+          // introduces availability. For an unavailable attribute an
+          // introduction version would be meaningless (the platform is
+          // unavailable regardless), so just drop the earlier attribute.
+          if (AttrKind == AvailableAttr::Kind::Default &&
+              (introduced.empty() || *prevIntroduced > introduced))
+            introduced = *prevIntroduced;
+          MappedDecl->getAttrs().removeAttribute(prevAttr);
+        }
+      }
 
       auto AvAttr = new (C) AvailableAttr(
           SourceLoc(), SourceRange(),
