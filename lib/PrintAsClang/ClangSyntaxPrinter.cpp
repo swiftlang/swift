@@ -66,7 +66,9 @@ void ClangSyntaxPrinter::printIdentifier(StringRef name) const {
 }
 
 void ClangSyntaxPrinter::printBaseName(const ValueDecl *decl) const {
-  assert(decl->getName().isSimpleName());
+  // An enum element can have a compound name when it has a payload, but it is
+  // still exposed to C++ under its base name.
+  assert(decl->getName().isSimpleName() || isa<EnumElementDecl>(decl));
   printIdentifier(cxx_translation::getNameForCxx(decl));
 }
 
