@@ -363,7 +363,11 @@ __swift_size_t _swift_writeToStandardOutput(
     __swift_size_t count);
 
 /**
- * Reports a fatal error and terminates the program.
+ * Reports a fatal error before the program is terminated.
+ *
+ * A platform may implement this as an empty function. After returning from this
+ * function the standard library terminates the program using a unique trap
+ * whose debug info also carries the stop reason and source location.
  *
  * - Parameters:
  *   - message: The UTF-8 code points that make up the failure message. It is
@@ -376,10 +380,14 @@ void _swift_reportError(
     const unsigned char * EMBEDDED_SWIFT_NULLABLE EMBEDDED_SWIFT_COUNTED_BY(messageCount) message,
     __swift_size_t messageCount,
     __swift_options_t flags
-) EMBEDDED_SWIFT_NORETURN;
+);
 
 /**
- * Reports a fatal error at a given file/line and terminates the program.
+ * Reports a fatal error at a given file/line.
+ *
+ * A platform may implement this as an empty function. After returning from
+ * this function the standard library terminates the program using a unique trap
+ * whose debug info also carries the stop reason and source location.
  *
  * - Parameters:
  *   - message: The UTF-8 code points that make up the failure message. It is
@@ -399,7 +407,7 @@ void _swift_reportErrorAt(
     __swift_size_t fileNameCount,
     __swift_size_t line,
     __swift_options_t flags
-) EMBEDDED_SWIFT_NORETURN;
+);
 
 /**
  * Generates random bytes into the given buffer.
