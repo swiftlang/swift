@@ -2254,8 +2254,7 @@ static void populateMembersForLazyName(DeclName name, NominalTypeDecl *decl,
     } else if (auto *CD = dyn_cast<ClassDecl>(decl)) {
       if (name.isSimpleName(ctx.Id_CLSID) &&
           CD->isCOMImplementation() && CD->isInSwiftSourceFile()) {
-        evaluateOrDefault(ctx.evaluator,
-                          SynthesizeCOMImplementationIDRequest{CD}, nullptr);
+        evaluateOrDefault(ctx.evaluator, SynthesizeCOMCLSIDRequest{CD}, nullptr);
       }
     }
   }

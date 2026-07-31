@@ -548,8 +548,8 @@ VarDecl *SynthesizeCOMInterfaceIDRequest::evaluate(Evaluator &evaluator,
   return ::com::synthesizeIIDProperty(PD, ASTContext, info->getInterfaceID());
 }
 
-VarDecl *SynthesizeCOMImplementationIDRequest::evaluate(Evaluator &evaluator,
-                                                        ClassDecl *CD) const {
+VarDecl *SynthesizeCOMCLSIDRequest::evaluate(Evaluator &evaluator,
+                                             ClassDecl *CD) const {
   auto &ASTContext = CD->getASTContext();
   auto *info = CD->getCOMDeclInfo();
   if (!info)

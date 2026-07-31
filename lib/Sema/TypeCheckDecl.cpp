@@ -2978,8 +2978,8 @@ static ArrayRef<Decl *> evaluateMembersRequest(
                                 SynthesizeCOMInterfaceIDRequest{PD}, nullptr);
     } else if (auto *CD = dyn_cast_or_null<ClassDecl>(nominal)) {
       if (CD->isCOMImplementation())
-        (void)evaluateOrDefault(ctx.evaluator,
-                                SynthesizeCOMImplementationIDRequest{CD}, nullptr);
+        (void)evaluateOrDefault(ctx.evaluator, SynthesizeCOMCLSIDRequest{CD},
+                                nullptr);
     }
   }
 
