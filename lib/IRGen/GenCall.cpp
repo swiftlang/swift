@@ -5239,9 +5239,9 @@ void irgen::emitYieldOnce2CoroutineEntry(IRGenFunction &IGF,
   auto *typeID = IGF.getMallocTypeId();
   emitRetconCoroutineEntry(
       IGF, fnType, buffer, llvm::Intrinsic::coro_id_retcon_once_dynamic,
-      Size(-1) /*dynamic-to-IRGen size*/, IGF.IGM.getCoroStaticFrameAlignment(),
-      {cfp, allocator}, allocFn, deallocFn,
-      {allocFrameFn, deallocFrameFn, typeID});
+      Size(uint32_t(-1)) /*dynamic-to-IRGen size*/,
+      IGF.IGM.getCoroStaticFrameAlignment(), {cfp, allocator}, allocFn,
+      deallocFn, {allocFrameFn, deallocFrameFn, typeID});
 }
 void irgen::emitYieldOnce2CoroutineEntry(
     IRGenFunction &IGF, LinkEntity coroFunction, CanSILFunctionType fnType,

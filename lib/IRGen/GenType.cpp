@@ -744,13 +744,14 @@ llvm::Value *irgen::getFixedTypeEnumTagSinglePayload(
     result0 = getExtraInhabitantIndex(enumAddr);
     noExtraTagBitsBB = Builder.GetInsertBlock();
   } else {
-    result0 = llvm::ConstantInt::getSigned(IGM.Int32Ty, -1);
+    result0 = llvm::ConstantInt::getAllOnesValue(IGM.Int32Ty);
   }
   Builder.CreateBr(resultBB);
 
   Builder.emitBlock(singleCaseEnumBB);
   // Otherwise, we have a valid payload.
-  auto *result2 = llvm::ConstantInt::getSigned(IGM.Int32Ty, -1);
+
+  auto *result2 = llvm::ConstantInt::getAllOnesValue(IGM.Int32Ty);
   Builder.CreateBr(resultBB);
 
   Builder.emitBlock(resultBB);
@@ -759,7 +760,7 @@ llvm::Value *irgen::getFixedTypeEnumTagSinglePayload(
   result->addIncoming(result1, extraTagBitsBB);
   result->addIncoming(result2, singleCaseEnumBB);
 
-  return Builder.CreateAdd(result, llvm::ConstantInt::get(IGM.Int32Ty, 1));
+  return Builder.CreateAdd(result, Builder.getInt32(1));
 }
 
 void FixedTypeInfo::storeEnumTagSinglePayload(IRGenFunction &IGF,

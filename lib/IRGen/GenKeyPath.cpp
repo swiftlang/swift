@@ -1786,7 +1786,7 @@ llvm::Constant *IRGenModule::emitStaticKeyPathInstance(KeyPathInst *KPI) {
   if (!swiftImmortalRefCount) {
     // = HeapObject.immortalRefCount | HeapObject.doNotFreeBit
     // (all-ones on both 32-bit and 64-bit).
-    swiftImmortalRefCount = llvm::ConstantInt::get(IntPtrTy, -1);
+    swiftImmortalRefCount = llvm::ConstantInt::getAllOnesValue(IntPtrTy);
   }
 
   auto *ObjectHeaderTy = RefCountedStructTy;
