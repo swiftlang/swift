@@ -98,6 +98,15 @@
 // RUN: %target-swift-frontend-verify -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/same-line-different-column-partial.swift
 // RUN: %diff %t/same-line-different-column-partial.swift %t/same-line-different-column-partial.swift.expected
 
+// A stale expansion directive on the same line as a live expansion at a
+// different column. The stale directive must be deleted outright: it must not
+// absorb the live sibling, because absorbing only moves message state and would
+// leave an empty directive stranded at the stale anchor column.
+// RUN: not %target-swift-frontend-verify -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/stale-expansion-live-sibling.swift 2>%t/output.txt
+// RUN: %update-verify-tests < %t/output.txt
+// RUN: %target-swift-frontend-verify -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/stale-expansion-live-sibling.swift
+// RUN: %diff %t/stale-expansion-live-sibling.swift %t/stale-expansion-live-sibling.swift.expected
+
 // RUN: not %target-swift-frontend-verify -I %t -plugin-path %swift-plugin-dir -typecheck %t/unparsed.swift 2>%t/output.txt -Rmacro-expansions
 // RUN: not %update-verify-tests < %t/output.txt | %FileCheck --check-prefix CHECK-UNPARSED %s
 
@@ -790,6 +799,46 @@ macro unstringifyPeer(_ s: String) =
 //   expected-warning@2{{initialization of immutable value 'b' was never used; consider replacing with assignment to '_' or removing it}}
 // }}
 @unstringifyPeer("func aa(_ x: Int) { let a = x }") func aa() {}; @unstringifyPeer("func bb(_ y: Int) { let b = y }") func bb() {}
+
+//--- stale-expansion-live-sibling.swift
+// The first declaration on the shared line no longer produces any diagnostic,
+// so its expansion directive is stale, while the second declaration's expansion
+// is live and still needs a directive synthesized for it. Both anchors sit on
+// the same line, so the stale directive and the live one are siblings targeting
+// that line. Deleting the stale directive is the only correct outcome: an
+// expansion directive is identified by its anchor column and rendered from its
+// nested contents, neither of which is transferred when a dead directive
+// absorbs a live sibling, so absorbing here would strand an empty directive at
+// the stale column and discard the live directive's nested diagnostic.
+@attached(peer, names: overloaded)
+macro unstringifyPeer(_ s: String) =
+    #externalMacro(module: "UnstringifyMacroDefinition", type: "UnstringifyPeerMacro")
+
+// expected-note@+4{{in expansion of macro 'unstringifyPeer' on global function 'bb()' here}}
+// expected-expansion@+3:61{{
+//   expected-warning@2{{initialization of immutable value 'a' was never used; consider replacing with assignment to '_' or removing it}}
+// }}
+@unstringifyPeer("func aa(_ x: Int) { _ = x }") func aa() {}; @unstringifyPeer("func bb(_ y: Int) { let b = y }") func bb() {}
+
+//--- stale-expansion-live-sibling.swift.expected
+// The first declaration on the shared line no longer produces any diagnostic,
+// so its expansion directive is stale, while the second declaration's expansion
+// is live and still needs a directive synthesized for it. Both anchors sit on
+// the same line, so the stale directive and the live one are siblings targeting
+// that line. Deleting the stale directive is the only correct outcome: an
+// expansion directive is identified by its anchor column and rendered from its
+// nested contents, neither of which is transferred when a dead directive
+// absorbs a live sibling, so absorbing here would strand an empty directive at
+// the stale column and discard the live directive's nested diagnostic.
+@attached(peer, names: overloaded)
+macro unstringifyPeer(_ s: String) =
+    #externalMacro(module: "UnstringifyMacroDefinition", type: "UnstringifyPeerMacro")
+
+// expected-note@+4{{in expansion of macro 'unstringifyPeer' on global function 'bb()' here}}
+// expected-expansion@+3:127{{
+//   expected-warning@2{{initialization of immutable value 'b' was never used; consider replacing with assignment to '_' or removing it}}
+// }}
+@unstringifyPeer("func aa(_ x: Int) { _ = x }") func aa() {}; @unstringifyPeer("func bb(_ y: Int) { let b = y }") func bb() {}
 
 //--- unparsed.h
 // CHECK-UNPARSED: no files updated: found diagnostics in unparsed files TMP_DIR{{/|\\}}unparsed.h

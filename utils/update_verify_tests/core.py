@@ -927,9 +927,22 @@ def remove_dead_diags(lines, prefix):
         # Try absorbing a same-category sibling first so the dead diag's
         # formatting (whitespace, original_count_str) survives a content
         # rewrite. Nested expansion diags have no target, so skip.
+        #
+        # Expansion directives never absorb a sibling. take() transfers a
+        # diagnostic's *message* state, but an expansion directive carries no
+        # message: what identifies it is its anchor column, and what it renders
+        # is its nested_lines plus its closer, none of which take() moves. So
+        # absorbing a live sibling expansion would keep this directive's stale
+        # column while dropping the sibling's nested diagnostics along with its
+        # line, leaving an empty `expected-expansion` anchored at the wrong
+        # column. That is worse than simply deleting the dead directive and
+        # letting the live sibling render itself, and it does not converge:
+        # re-running on the mangled output reproduces the same shape forever.
         took = False
-        if line.diag.target is not None and not getattr(
-            line.diag, "is_child_note", False
+        if (
+            line.diag.target is not None
+            and line.diag.category != "expansion"
+            and not getattr(line.diag, "is_child_note", False)
         ):
             for other_diag in line.diag.target.targeting_diags:
                 if (
