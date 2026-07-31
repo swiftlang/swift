@@ -425,6 +425,10 @@ int main(int argc, char *argv[]) {
         break;
       case create_casfs:
         Ret += action_create_casfs(cas, Args, os);
+        break;
+      case list_supported_arguments:
+        // Already handled above.
+        break;
       }
     });
   }
