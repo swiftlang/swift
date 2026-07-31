@@ -2358,6 +2358,57 @@ def _nested_diag_key(nd):
     )
 
 
+def _merge_nested_diags(keeper, exp_list, prefix_to_runs, runs_to_prefixes):
+    """Merge the directives nested inside the expansion blocks in
+    *exp_list*, installing the result as *keeper*'s nested lines.
+
+    Directives from every block in the group are pooled, so one that
+    appears in several blocks collapses into a single directive whose
+    prefix covers all of their runs.  Directives that appear only once, or
+    whose prefixes have no single replacement, are kept as they are.
+
+    Returns True if any directives were actually merged.
+    """
+    all_nested = []
+    for d in exp_list:
+        all_nested.extend(d.nested_lines)
+
+    # Group nested diags by overlap key within the expansion.
+    nested_groups = {}
+    for nl in all_nested:
+        nested_groups.setdefault(_nested_diag_key(nl.diag), []).append(nl)
+
+    merged = False
+    merged_nested = []
+    for nl_list in nested_groups.values():
+        if len(nl_list) > 1:
+            np = _find_merge_prefix(
+                [nl.diag.prefix for nl in nl_list],
+                prefix_to_runs, runs_to_prefixes)
+            if np is not None:
+                nl_list[0].diag.prefix = np
+                merged_nested.append(nl_list[0])
+                merged = True
+                continue
+        # Single diag or unmergeable — keep all.
+        merged_nested.extend(nl_list)
+
+    if not merged and len(exp_list) == 1:
+        # Nothing changed, so leave the block's nested lines alone rather
+        # than reordering them gratuitously.
+        return False
+
+    # Sort by target line within expansion, then by category for
+    # stability.
+    merged_nested.sort(
+        key=lambda nl: (nl.diag.absolute_target(), nl.diag.category))
+
+    keeper.nested_lines = merged_nested
+    for i, nl in enumerate(keeper.nested_lines):
+        nl.line_n = i + 1
+    return merged
+
+
 def _merge_expansion_groups(expansion_diags, prefix_to_runs,
                             runs_to_prefixes, lines):
     """Merge expansion blocks that target the same source location.
@@ -2367,6 +2418,10 @@ def _merge_expansion_groups(expansion_diags, prefix_to_runs,
     nested directives are individually merged where an appropriate prefix
     exists; non-overlapping nested directives are kept with their original
     prefix.
+
+    Blocks that stay separate — because a location has only one block, or
+    because the group's prefixes have no single replacement — still get
+    their own contents minimized.
     """
     # Group by (absolute_target, col).
     groups = {}
@@ -2375,56 +2430,27 @@ def _merge_expansion_groups(expansion_diags, prefix_to_runs,
         groups.setdefault(key, []).append(d)
 
     changed = False
-    for key, exp_list in groups.items():
-        if len(exp_list) < 2:
-            continue
-
+    for exp_list in groups.values():
         # Find a prefix for the merged expansion block.
-        exp_prefix = _find_merge_prefix(
-            [d.prefix for d in exp_list], prefix_to_runs, runs_to_prefixes)
+        exp_prefix = None
+        if len(exp_list) > 1:
+            exp_prefix = _find_merge_prefix(
+                [d.prefix for d in exp_list], prefix_to_runs,
+                runs_to_prefixes)
+
         if exp_prefix is None:
+            # The blocks stay separate, so pooling their contents would
+            # move directives from one block into another.  Minimize each
+            # block's own contents instead.
+            for d in exp_list:
+                changed |= _merge_nested_diags(
+                    d, [d], prefix_to_runs, runs_to_prefixes)
             continue
 
         keeper = _pick_keeper(exp_list)
-
-        # Collect all nested lines from every block in the group.
-        all_nested = []
-        for d in exp_list:
-            all_nested.extend(d.nested_lines)
-
-        # Group nested diags by overlap key within the expansion.
-        nested_groups = {}
-        for nl in all_nested:
-            if not nl.diag:
-                continue
-            nk = _nested_diag_key(nl.diag)
-            nested_groups.setdefault(nk, []).append(nl)
-
-        # Merge overlapping nested diags where possible.
-        merged_nested = []
-        for nk, nl_list in nested_groups.items():
-            if len(nl_list) > 1:
-                np = _find_merge_prefix(
-                    [nl.diag.prefix for nl in nl_list],
-                    prefix_to_runs, runs_to_prefixes)
-                if np is not None:
-                    nl_list[0].diag.prefix = np
-                    merged_nested.append(nl_list[0])
-                    continue
-            # Single diag or unmergeable — keep all.
-            merged_nested.extend(nl_list)
-
-        # Sort by target line within expansion, then by category for
-        # stability.
-        merged_nested.sort(
-            key=lambda nl: (nl.diag.absolute_target() if nl.diag else 0,
-                            nl.diag.category if nl.diag else ""))
-
-        # Install merged content into the keeper.
+        _merge_nested_diags(keeper, exp_list, prefix_to_runs,
+                            runs_to_prefixes)
         keeper.prefix = exp_prefix
-        keeper.nested_lines = merged_nested
-        for i, nl in enumerate(keeper.nested_lines):
-            nl.line_n = i + 1
 
         # Remove the other expansion blocks from `lines`.
         for d in exp_list:

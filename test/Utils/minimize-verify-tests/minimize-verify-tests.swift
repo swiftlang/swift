@@ -37,6 +37,10 @@
 // RUN: %minimize-verify-tests %t/expansion.swift
 // RUN: %diff %t/expansion.swift %t/expansion.swift.expected
 
+// --- expansion-already-shared: Non-prefixed expansion block still has its contents merged
+// RUN: %minimize-verify-tests %t/expansion-already-shared.swift
+// RUN: %diff %t/expansion-already-shared.swift %t/expansion-already-shared.swift.expected
+
 //--- basic-merge.swift
 // RUN: true -verify -verify-additional-prefix swift5-
 // RUN: true -verify -verify-additional-prefix swift6-
@@ -225,3 +229,29 @@ let x = #myMacro
 //   expected-a-warning@2 {{a-only warning}}
 // }}
 // expected-error @-4 {{some error}}
+//--- expansion-already-shared.swift
+// RUN: true -verify -verify-additional-prefix a-
+// RUN: true -verify -verify-additional-prefix b-
+
+@freestanding(expression)
+macro myMacro() = #externalMacro(module: "M", type: "T")
+let x = #myMacro
+// expected-expansion@-1:9{{
+//   expected-a-warning@1 {{shared warning}}
+//   expected-a-warning@2 {{a-only warning}}
+//   expected-b-warning@1 {{shared warning}}
+// }}
+// expected-a-error @-6 {{some error}}
+// expected-b-error @-7 {{some error}}
+//--- expansion-already-shared.swift.expected
+// RUN: true -verify -verify-additional-prefix a-
+// RUN: true -verify -verify-additional-prefix b-
+
+@freestanding(expression)
+macro myMacro() = #externalMacro(module: "M", type: "T")
+let x = #myMacro
+// expected-expansion@-1:9{{
+//   expected-warning@1 {{shared warning}}
+//   expected-a-warning@2 {{a-only warning}}
+// }}
+// expected-error @-5 {{some error}}
