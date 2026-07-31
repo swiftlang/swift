@@ -2231,6 +2231,7 @@ namespace {
           UD->getSpecifiedAttributes(),
           [&](auto *attr, Label label) { printRec(attr, Ctx, DC, label); },
           Label::optional("specified_attrs"));
+      printFoot();
     }
 
     void visitExtensionDecl(ExtensionDecl *ED, Label label) {
@@ -4748,6 +4749,7 @@ public:
     printCommon("type_error", label);
     if (auto *originalExpr = T->getOriginalExpr())
       printRec(originalExpr, Label::optional("original_expr"));
+    printFoot();
   }
 
   void visitAttributedTypeRepr(AttributedTypeRepr *T, Label label) {
@@ -4755,6 +4757,7 @@ public:
     printFieldQuotedRaw([&](raw_ostream &OS) { T->printAttrs(OS); },
                         Label::always("attrs"));
     printRec(T->getTypeRepr(), Label::optional("type_repr"));
+    printFoot();
   }
 
   void visitDeclRefTypeRepr(DeclRefTypeRepr *T, Label label) {
