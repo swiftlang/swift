@@ -852,8 +852,8 @@ llvm::Value *IRGenFunction::getReferenceStorageExtraInhabitantIndex(Address src,
   llvm::Value *ptr = Builder.CreateLoad(src);
   llvm::Value *isNull = Builder.CreateIsNull(ptr);
   llvm::Value *result =
-    Builder.CreateSelect(isNull, Builder.getInt32(0),
-                         llvm::ConstantInt::getSigned(IGM.Int32Ty, -1));
+      Builder.CreateSelect(isNull, Builder.getInt32(0),
+                           llvm::ConstantInt::getAllOnesValue(IGM.Int32Ty));
   return result;
 }
 

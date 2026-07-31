@@ -5271,8 +5271,8 @@ mapTriviallyToInt(IRGenSILFunction &IGF, const EnumImplStrategy &EIS, SelectEnum
   for (unsigned i = 0, e = inst->getNumCases(); i < e; ++i) {
     auto casePair = inst->getCase(i);
 
-    int64_t index = EIS.getDiscriminatorIndex(casePair.first);
-    if (index < 0)
+    auto index = EIS.getDiscriminatorIndex(casePair.first);
+    if (!index)
       return nullptr;
     
     auto *intLit = dyn_cast<IntegerLiteralInst>(casePair.second);
@@ -5280,7 +5280,7 @@ mapTriviallyToInt(IRGenSILFunction &IGF, const EnumImplStrategy &EIS, SelectEnum
       return nullptr;
     
     APInt caseValue = intLit->getValue();
-    APInt offset = caseValue - index;
+    APInt offset = caseValue - index.value();
     if (offsetValid) {
       if (offset != commonOffset)
         return nullptr;

@@ -2915,6 +2915,14 @@ namespace {
 
       if (cxxRecordDecl) {
         if (auto structResult = dyn_cast<StructDecl>(result)) {
+          // If this class is abstract, any of its methods might use a pure
+          // virtual method.
+          if (cxxRecordDecl->isAbstract()) {
+            Impl.markUnavailable(
+                result,
+                "abstract C++ classes cannot be used as values in Swift");
+          }
+
           // Address-only type is a type that can't be passed in registers.
           // Address-only types are typically non-trivial, however some
           // non-trivial types can be loadable as well (although such types
