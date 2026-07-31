@@ -496,47 +496,6 @@ private:
   ValueDecl *evaluate(Evaluator &evaluator, CxxRecordSemanticsDescriptor) const;
 };
 
-struct SafeUseOfCxxDeclDescriptor final {
-  const clang::Decl *decl;
-  ASTContext& ctx;
-
-  SafeUseOfCxxDeclDescriptor(const clang::Decl *decl, ASTContext &ctx)
-      : decl(decl), ctx(ctx) {}
-
-  friend llvm::hash_code hash_value(const SafeUseOfCxxDeclDescriptor &desc) {
-    return llvm::hash_combine(desc.decl);
-  }
-
-  friend bool operator==(const SafeUseOfCxxDeclDescriptor &lhs,
-                         const SafeUseOfCxxDeclDescriptor &rhs) {
-    return lhs.decl == rhs.decl;
-  }
-
-  friend bool operator!=(const SafeUseOfCxxDeclDescriptor &lhs,
-                         const SafeUseOfCxxDeclDescriptor &rhs) {
-    return !(lhs == rhs);
-  }
-};
-
-void simple_display(llvm::raw_ostream &out, SafeUseOfCxxDeclDescriptor desc);
-SourceLoc extractNearestSourceLoc(SafeUseOfCxxDeclDescriptor desc);
-
-class IsSafeUseOfCxxDecl
-    : public SimpleRequest<IsSafeUseOfCxxDecl, bool(SafeUseOfCxxDeclDescriptor),
-                           RequestFlags::Uncached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-  // Source location
-  SourceLoc getNearestLoc() const { return SourceLoc(); };
-
-private:
-  friend SimpleRequest;
-
-  // Evaluation.
-  bool evaluate(Evaluator &evaluator, SafeUseOfCxxDeclDescriptor desc) const;
-};
-
 enum class CustomRefCountingOperationKind { retain, release };
 
 struct CustomRefCountingOperationDescriptor final {

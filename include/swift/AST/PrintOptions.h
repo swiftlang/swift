@@ -362,7 +362,7 @@ public:
   bool SkipUnderscoredSystemProtocols = false;
 
   /// Whether to skip unsafe C++ class methods that were renamed
-  /// (e.g. __fooUnsafe). See IsSafeUseOfCxxDecl.
+  /// (e.g. __fooUnsafe).
   bool SkipUnsafeCXXMethods = false;
 
   /// Whether to skip extensions that don't add protocols or no members.

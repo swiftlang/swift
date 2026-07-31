@@ -4725,9 +4725,7 @@ namespace {
       auto importedName = Impl.importFullName(clangDecl, Impl.CurrentVersion);
       if (!importedName || importedName.hasCustomName())
         return;
-      if (evaluateOrDefault(Impl.SwiftContext.evaluator,
-                            IsSafeUseOfCxxDecl({clangDecl, Impl.SwiftContext}),
-                            {}))
+      if (!shouldRenameCXXMethodAsUnsafe(clangDecl, Impl.SwiftContext))
         return;
 
       DeclName currentName = swiftDecl->getName();
@@ -9479,10 +9477,11 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
       importNontrivialAttribute(MappedDecl, swiftAttr->getAttribute());
     }
 
-    bool importUnsafeHeuristic =
-        isa<clang::CXXMethodDecl>(ClangDecl) &&
-        !evaluateOrDefault(SwiftContext.evaluator,
-                           IsSafeUseOfCxxDecl({ClangDecl, SwiftContext}), {});
+    bool importUnsafeHeuristic = false;
+    if (const auto *CXXMethod = dyn_cast<clang::CXXMethodDecl>(ClangDecl);
+        CXXMethod && shouldRenameCXXMethodAsUnsafe(CXXMethod, SwiftContext))
+      importUnsafeHeuristic = true;
+
     if (seenUnsafe || importUnsafeHeuristic) {
       auto attr = new (SwiftContext) UnsafeAttr(/*implicit=*/!seenUnsafe);
       MappedDecl->addAttribute(attr);
