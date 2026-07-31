@@ -5935,11 +5935,20 @@ CallEmission::applySpecializedEmitter(SpecializedEmitter &specializedEmitter,
   if (resultPlan.has_value())
     (*resultPlan)->gatherIndirectResultAddrs(SGF, loc, rawArgs);
 
+  // Polymorphic builtins only borrow their arguments, unlike the default
+  // +1/consuming convention assumed below. This is unobservable for their
+  // concrete, statically overloaded counterparts since those only operate
+  // on trivial types, but matters once opaque values give T real ownership.
+  const BuiltinInfo &builtinInfo = SGF.SGM.M.getBuiltinInfo(builtinName);
+  bool isPolymorphicBltn = builtinInfo.ID != BuiltinValueKind::None &&
+                       isPolymorphicBuiltin(builtinInfo.ID);
+
   // Then add all arguments to our array, copying them if they are not at +1
   // yet.
   for (auto arg : uncurriedArgs) {
-    // Nonescaping closures can't be forwarded so we pass them +0.
-    if (isTrivialNoEscapeType(arg.getType())) {
+    // Nonescaping closures can't be forwarded so we pass them +0. Polymorphic
+    // builtins only borrow their arguments, so they are passed +0 as well.
+    if (isTrivialNoEscapeType(arg.getType()) || isPolymorphicBltn) {
       rawArgs.push_back(arg.getValue());
     } else {
       // Named builtins are by default assumed to take other arguments at +1,
