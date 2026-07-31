@@ -82,6 +82,22 @@
 // RUN: %target-swift-frontend-verify -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/sibling-gone.swift
 // RUN: %diff %t/sibling-gone.swift %t/sibling-gone.swift.expected
 
+// Two expansions anchored on the same line but at different columns. Expansion
+// indices are numbered per anchor, so both of these are reported as expansion 0
+// and are distinguishable only by column.
+// RUN: not %target-swift-frontend-verify -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/same-line-different-column.swift 2>%t/output.txt
+// RUN: %update-verify-tests < %t/output.txt
+// RUN: %target-swift-frontend-verify -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/same-line-different-column.swift
+// RUN: %diff %t/same-line-different-column.swift %t/same-line-different-column.swift.expected
+
+// Same as above, except that the directive for the lower-column anchor is
+// already present. The newly synthesized directive for the higher-column anchor
+// must be placed below it rather than above it.
+// RUN: not %target-swift-frontend-verify -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/same-line-different-column-partial.swift 2>%t/output.txt
+// RUN: %update-verify-tests < %t/output.txt
+// RUN: %target-swift-frontend-verify -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/same-line-different-column-partial.swift
+// RUN: %diff %t/same-line-different-column-partial.swift %t/same-line-different-column-partial.swift.expected
+
 // RUN: not %target-swift-frontend-verify -I %t -plugin-path %swift-plugin-dir -typecheck %t/unparsed.swift 2>%t/output.txt -Rmacro-expansions
 // RUN: not %update-verify-tests < %t/output.txt | %FileCheck --check-prefix CHECK-UNPARSED %s
 
@@ -699,6 +715,81 @@ macro unstringifyPeer(_ s: String) =
 
 // The declaration these sibling directives targeted was deleted, so their
 // '@+N' offsets now dangle past the end of the file.
+
+//--- same-line-different-column.swift
+// Two separate declarations share one physical line, each with a peer macro
+// attached, so the two expansions have anchors on the same line but at
+// different columns. The verifier numbers expansions per anchor location, so
+// both are reported as "in expansion 0 from here" and are distinguishable only
+// by column. update-verify-tests must key its expansion bookkeeping on
+// (line, column) rather than on the line alone, or the two index-0 expansions
+// collapse into a single directive that claims both warnings. The synthesized
+// directives are also laid out in ascending column order, matching the order in
+// which their anchors appear on the target line.
+@attached(peer, names: overloaded)
+macro unstringifyPeer(_ s: String) =
+    #externalMacro(module: "UnstringifyMacroDefinition", type: "UnstringifyPeerMacro")
+
+@unstringifyPeer("func aa(_ x: Int) { let a = x }") func aa() {}; @unstringifyPeer("func bb(_ y: Int) { let b = y }") func bb() {}
+
+//--- same-line-different-column.swift.expected
+// Two separate declarations share one physical line, each with a peer macro
+// attached, so the two expansions have anchors on the same line but at
+// different columns. The verifier numbers expansions per anchor location, so
+// both are reported as "in expansion 0 from here" and are distinguishable only
+// by column. update-verify-tests must key its expansion bookkeeping on
+// (line, column) rather than on the line alone, or the two index-0 expansions
+// collapse into a single directive that claims both warnings. The synthesized
+// directives are also laid out in ascending column order, matching the order in
+// which their anchors appear on the target line.
+@attached(peer, names: overloaded)
+macro unstringifyPeer(_ s: String) =
+    #externalMacro(module: "UnstringifyMacroDefinition", type: "UnstringifyPeerMacro")
+
+// expected-note@+8{{in expansion of macro 'unstringifyPeer' on global function 'bb()' here}}
+// expected-note@+7{{in expansion of macro 'unstringifyPeer' on global function 'aa()' here}}
+// expected-expansion@+6:65{{
+//   expected-warning@2{{initialization of immutable value 'a' was never used; consider replacing with assignment to '_' or removing it}}
+// }}
+// expected-expansion@+3:131{{
+//   expected-warning@2{{initialization of immutable value 'b' was never used; consider replacing with assignment to '_' or removing it}}
+// }}
+@unstringifyPeer("func aa(_ x: Int) { let a = x }") func aa() {}; @unstringifyPeer("func bb(_ y: Int) { let b = y }") func bb() {}
+
+//--- same-line-different-column-partial.swift
+// The expansion directive for the lower-column anchor is already present and
+// complete; only the one for the higher-column anchor is missing. The
+// synthesized directive must be inserted below the pre-existing one so that the
+// two directives stay in ascending column order.
+@attached(peer, names: overloaded)
+macro unstringifyPeer(_ s: String) =
+    #externalMacro(module: "UnstringifyMacroDefinition", type: "UnstringifyPeerMacro")
+
+// expected-note@+5{{in expansion of macro 'unstringifyPeer' on global function 'bb()' here}}
+// expected-note@+4{{in expansion of macro 'unstringifyPeer' on global function 'aa()' here}}
+// expected-expansion@+3:65{{
+//   expected-warning@2{{initialization of immutable value 'a' was never used; consider replacing with assignment to '_' or removing it}}
+// }}
+@unstringifyPeer("func aa(_ x: Int) { let a = x }") func aa() {}; @unstringifyPeer("func bb(_ y: Int) { let b = y }") func bb() {}
+
+//--- same-line-different-column-partial.swift.expected
+// The expansion directive for the lower-column anchor is already present and
+// complete; only the one for the higher-column anchor is missing. The
+// synthesized directive must be inserted below the pre-existing one so that the
+// two directives stay in ascending column order.
+@attached(peer, names: overloaded)
+macro unstringifyPeer(_ s: String) =
+    #externalMacro(module: "UnstringifyMacroDefinition", type: "UnstringifyPeerMacro")
+
+// expected-note@+8{{in expansion of macro 'unstringifyPeer' on global function 'bb()' here}}
+// expected-note@+7{{in expansion of macro 'unstringifyPeer' on global function 'aa()' here}}
+// expected-expansion@+6:65{{
+//   expected-warning@2{{initialization of immutable value 'a' was never used; consider replacing with assignment to '_' or removing it}}
+// }}
+// expected-expansion@+3:131{{
+//   expected-warning@2{{initialization of immutable value 'b' was never used; consider replacing with assignment to '_' or removing it}}
+// }}
+@unstringifyPeer("func aa(_ x: Int) { let a = x }") func aa() {}; @unstringifyPeer("func bb(_ y: Int) { let b = y }") func bb() {}
 
 //--- unparsed.h
 // CHECK-UNPARSED: no files updated: found diagnostics in unparsed files TMP_DIR{{/|\\}}unparsed.h
