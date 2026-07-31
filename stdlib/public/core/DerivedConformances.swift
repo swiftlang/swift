@@ -30,3 +30,11 @@ public macro _deriveComparable(
 @freestanding(declaration, names: arbitrary)
 public macro _deriveCaseIterable(_ infos: String, _ witness: String) =
   #externalMacro(module: "SwiftMacros", type: "DeriveCaseIterableMacro")
+
+@freestanding(declaration, names: arbitrary)
+public macro _deriveEncodable(_ infos: String) =
+  #externalMacro(module: "SwiftMacros", type: "DeriveEncodableMacro")
+
+@freestanding(declaration, names: arbitrary)
+public macro _deriveDecodable(_ infos: String) =
+  #externalMacro(module: "SwiftMacros", type: "DeriveDecodableMacro")
