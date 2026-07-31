@@ -3906,6 +3906,14 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
     case PerformanceConstraints::ManualOwnership: OS << "[manual_ownership] "; break;
   }
 
+  uint8_t noSan = getNoSanitizeMask();
+  if (noSan & (1u << unsigned(NoSanitizeKind::Address)))
+    OS << "[no_sanitize_address] ";
+  if (noSan & (1u << unsigned(NoSanitizeKind::Thread)))
+    OS << "[no_sanitize_thread] ";
+  if (noSan & (1u << unsigned(NoSanitizeKind::MemTag)))
+    OS << "[no_sanitize_memtag] ";
+
   if (isPerformanceConstraint())
     OS << "[perf_constraint] ";
 

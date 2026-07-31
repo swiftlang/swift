@@ -1158,6 +1158,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
 #define SIMPLE_DECL_ATTR(X, CLASS, ...) case DeclAttrKind::CLASS:
 #include "swift/AST/DeclAttr.def"
   case DeclAttrKind::Inline:
+  case DeclAttrKind::NoSanitize:
   case DeclAttrKind::AccessControl:
   case DeclAttrKind::ReferenceOwnership:
   case DeclAttrKind::Effects:
@@ -2004,6 +2005,17 @@ StringRef DeclAttribute::getAttrName() const {
       return "inline(always)";
     }
     llvm_unreachable("Invalid inline kind");
+  }
+  case DeclAttrKind::NoSanitize: {
+    switch (cast<NoSanitizeAttr>(this)->getKind()) {
+    case NoSanitizeKind::Address:
+      return "_noSanitize(address)";
+    case NoSanitizeKind::Thread:
+      return "_noSanitize(thread)";
+    case NoSanitizeKind::MemTag:
+      return "_noSanitize(memtag)";
+    }
+    llvm_unreachable("Invalid no-sanitize kind");
   }
   case DeclAttrKind::NonSendable: {
     switch (cast<NonSendableAttr>(this)->Specificity) {

@@ -15,8 +15,11 @@
 #include "swift/SILOptimizer/Analysis/IsSelfRecursiveAnalysis.h"
 #include "swift/SILOptimizer/Utils/PerformanceInlinerUtils.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/SILOptions.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/AST/AttrKind.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/Sanitizers.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/Support/CommandLine.h"
 
@@ -807,6 +810,25 @@ SILFunction *swift::getEligibleFunction(FullApplySite AI,
   // Explicitly disabled inlining or optimization.
   if (Callee->getInlineStrategy() == NoInline) {
     return nullptr;
+  }
+
+  // Refuse to inline across @_noSanitize boundaries when a sanitizer active in
+  // this build would apply differently on either side. IRGen sets the LLVM
+  // sanitize_* function attributes per SILFunction; inlining the callee into
+  // the caller would silently re-instrument (or de-instrument) the callee's
+  // body, defeating the attribute.
+  if (uint8_t diff = Callee->getNoSanitizeMask() ^
+                     AI.getFunction()->getNoSanitizeMask()) {
+    const auto &enabled = Callee->getModule().getOptions().Sanitizers;
+    uint8_t enabledMask = 0;
+    if (enabled.contains(SanitizerKind::Address))
+      enabledMask |= 1u << unsigned(NoSanitizeKind::Address);
+    if (enabled.contains(SanitizerKind::Thread))
+      enabledMask |= 1u << unsigned(NoSanitizeKind::Thread);
+    if (enabled.contains(SanitizerKind::MemTagStack))
+      enabledMask |= 1u << unsigned(NoSanitizeKind::MemTag);
+    if (diff & enabledMask)
+      return nullptr;
   }
 
   if (!SILInlineNeverFuns.empty() &&
