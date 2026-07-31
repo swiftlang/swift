@@ -5,6 +5,7 @@
 // RUN: %target-run %t.out
 
 // REQUIRES: executable_test
+// REQUIRES: rdarXXXXXX
 
 // REQUIRES: objc_interop
 
