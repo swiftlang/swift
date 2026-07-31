@@ -50,8 +50,9 @@ getRootProtocol(std::optional<LangOptions::COMInteropModel> model) {
 
   switch (*model) {
   case LangOptions::COMInteropModel::Microsoft:
-  case LangOptions::COMInteropModel::CoreFoundation:
     return KnownProtocolKind::IUnknown;
+  case LangOptions::COMInteropModel::CoreFoundation:
+    return std::nullopt;
   }
   llvm_unreachable("unhandled COMInteropModel");
 }
@@ -551,6 +552,13 @@ VarDecl *SynthesizeCOMInterfaceIDRequest::evaluate(Evaluator &evaluator,
 VarDecl *SynthesizeCOMCLSIDRequest::evaluate(Evaluator &evaluator,
                                              ClassDecl *CD) const {
   auto &ASTContext = CD->getASTContext();
+
+  // CLSID is the Microsoft model's spelling and activation surface. Other
+  // models may consume the implementation UUID through their own policy, but
+  // must not acquire a synthetic Microsoft-named member.
+  if (ASTContext.LangOpts.COMModel != LangOptions::COMInteropModel::Microsoft)
+    return nullptr;
+
   auto *info = CD->getCOMDeclInfo();
   if (!info)
     return nullptr;

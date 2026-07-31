@@ -2967,10 +2967,13 @@ static ArrayRef<Decl *> evaluateMembersRequest(
     (void)nominal->getDistributedActorSystemProperty();
   }
 
-  // Synthesize the COM identity members -- a @com class's CLSID, a @com
-  // protocol's IID -- so they are always present in getAllMembers/getABIMembers
-  // for vtable emission, code completion, and ABI, not only when name lookup
-  // forces them.  For imported types the request finds the deserialized member.
+  // Synthesize the COM identity members:
+  //  - a @com protocol's IID
+  //  - under Microsoft's model, a @com class's CLSID
+  //
+  // so they are always present in getAllMembers/getABIMembers for vtable
+  // emission, code completion, and ABI, not only when name lookup forces them.
+  // For imported types the request finds the deserialized member.
   if (ctx.LangOpts.EnableCOMInterop) {
     if (auto *PD = dyn_cast_or_null<ProtocolDecl>(nominal)) {
       if (PD->isCOMInterface())
