@@ -2306,6 +2306,18 @@ bool isViewType(const clang::CXXRecordDecl *decl);
 bool isDirectViewType(const clang::Type *type, Evaluator &eval);
 bool isDirectViewType(const clang::Decl *decl, ASTContext &swiftCtx);
 
+/// Whether \p decl is a C++ record that is really a Swift class type exposed
+/// back to C++ (annotated with a Swift \c external_source_symbol attribute and
+/// derived from \c swift::RefCountedClass).
+bool isSwiftClassType(const clang::CXXRecordDecl *decl);
+
+/// Whether the C++ method \p method can be safely used in Swift, i.e. it is not
+/// a projection that could yield a dangling pointer/reference/iterator. Methods
+/// that are not safe are imported under a \c __<name>Unsafe name and/or marked
+/// \c @unsafe. See also PrintOptions::SkipUnsafeCXXMethods.
+bool shouldRenameCXXMethodAsUnsafe(const clang::CXXMethodDecl *method,
+                                   ASTContext &ctx);
+
 inline const clang::Type *desugarIfElaborated(const clang::Type *type) {
   if (auto elaborated = dyn_cast<clang::ElaboratedType>(type))
     return elaborated->desugar().getTypePtr();

@@ -1,9 +1,11 @@
+#include "ClangDerivedConformances.h"
 #include "ImporterImpl.h"
 #include "swift/AST/DiagnosticsClangImporter.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Defer.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
+#include "clang/AST/Attr.h"
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclObjC.h"
 #include "clang/AST/RecordLayout.h"
@@ -469,4 +471,161 @@ swift::importer::getOwnershipOfReturnedFRT(const clang::NamedDecl *decl) {
   }
 
   return std::nullopt;
+}
+
+//===----------------------------------------------------------------------===//
+// Unsafe projection ("__fooUnsafe") analysis
+//===----------------------------------------------------------------------===//
+
+/// Is \a type a pointer or reference to a foreign reference type?
+static bool clangTypeIsForeignReference(const clang::QualType type,
+                                        ASTContext &ctx) {
+  if (!type->isPointerOrReferenceType())
+    return false;
+  auto *pointee = type->getPointeeType().getCanonicalType()->getAsRecordDecl();
+  if (!pointee)
+    return false;
+  auto info = evaluateOrDefault(ctx.evaluator,
+                                ForeignReferenceTypeInfoRequest({pointee}), {});
+  return info.isReference();
+}
+
+static bool hasCustomCopyOrMoveConstructor(const clang::CXXRecordDecl *decl) {
+  return decl->hasUserDeclaredCopyConstructor() ||
+         decl->hasUserDeclaredMoveConstructor();
+}
+
+bool importer::isSwiftClassType(const clang::CXXRecordDecl *decl) {
+  // Swift type must be annotated with external_source_symbol attribute.
+  auto essAttr = decl->getAttr<clang::ExternalSourceSymbolAttr>();
+  if (!essAttr || essAttr->getLanguage() != "Swift" ||
+      essAttr->getDefinedIn().empty() || essAttr->getUSR().empty())
+    return false;
+
+  // Ensure that the baseclass is swift::RefCountedClass.
+  auto baseDecl = decl->getDefinition();
+  if (!baseDecl)
+    return false;
+  do {
+    if (baseDecl->getNumBases() != 1)
+      return false;
+    auto baseClassSpecifier = *baseDecl->bases_begin();
+    auto Ty = baseClassSpecifier.getType();
+    auto nextBaseDecl = Ty->getAsCXXRecordDecl();
+    if (!nextBaseDecl)
+      return false;
+    baseDecl = nextBaseDecl->getDefinition();
+    if (!baseDecl)
+      return false;
+  } while (baseDecl->getName() != "RefCountedClass");
+
+  return true;
+}
+
+static bool anySubobjectsSelfContained(const clang::CXXRecordDecl *decl) {
+  // std::pair and std::tuple might have copy and move constructors, or base
+  // classes with copy and move constructors, but they are not self-contained
+  // types, e.g. `std::pair<UnsafeType, T>`.
+  if (decl->isInStdNamespace() &&
+      (decl->getName() == "pair" || decl->getName() == "tuple"))
+    return false;
+
+  if (!decl->getDefinition())
+    return false;
+
+  if (hasCustomCopyOrMoveConstructor(decl) || importer::hasOwnedValueAttr(decl))
+    return true;
+
+  auto checkType = [](clang::QualType t) {
+    if (auto recordType = dyn_cast<clang::RecordType>(t.getCanonicalType())) {
+      if (auto cxxRecord =
+              dyn_cast<clang::CXXRecordDecl>(recordType->getDecl())) {
+        return anySubobjectsSelfContained(cxxRecord);
+      }
+    }
+
+    return false;
+  };
+
+  for (auto field : decl->fields()) {
+    if (checkType(field->getType()))
+      return true;
+  }
+
+  for (auto base : decl->bases()) {
+    if (checkType(base.getType()))
+      return true;
+  }
+
+  return false;
+}
+
+bool importer::shouldRenameCXXMethodAsUnsafe(const clang::CXXMethodDecl *method,
+                                             ASTContext &ctx) {
+  // The user explicitly explicitly acknowledged this method's unsafety
+  // and asked us to import it as is anyway. No renaming needed.
+  if (hasUnsafeAPIAttr(method))
+    return false;
+
+  // If it's a static method, it cannot project anything. It's fine.
+  if (method->isOverloadedOperator() || method->isStatic() ||
+      isa<clang::CXXConstructorDecl>(method))
+    return false;
+
+  // begin and end methods likely return an iterator, so they're unsafe.
+  // This is required so that automatic the conformance to RAC works properly.
+  if (method->getNameAsString() == "begin" ||
+      method->getNameAsString() == "end")
+    return true;
+
+  if (clangTypeIsForeignReference(method->getReturnType(), ctx))
+    return false;
+
+  auto parentQualType =
+      method->getParent()->getTypeForDecl()->getCanonicalTypeUnqualified();
+
+  bool parentIsSelfContained =
+      !clangTypeIsForeignReference(parentQualType, ctx) &&
+      anySubobjectsSelfContained(method->getParent());
+
+  // If it returns a pointer or reference from an owned parent, that's a
+  // projection (unsafe).
+  if (method->getReturnType()->isPointerType() ||
+      method->getReturnType()->isReferenceType())
+    return parentIsSelfContained;
+
+  // Check if it's one of the known unsafe methods we currently
+  // mark as safe by default.
+  if (isUnsafeStdMethod(method))
+    return true;
+
+  // Try to figure out the semantics of the return type. If it's a
+  // pointer/iterator, it's unsafe.
+  if (auto returnType = dyn_cast<clang::RecordType>(
+          method->getReturnType().getCanonicalType())) {
+    if (auto cxxRecordReturnType =
+            dyn_cast<clang::CXXRecordDecl>(returnType->getDecl())) {
+      if (isSwiftClassType(cxxRecordReturnType))
+        return false;
+
+      if (hasIteratorAPIAttr(cxxRecordReturnType) ||
+          hasIteratorCategory(cxxRecordReturnType))
+        return true;
+
+      // Mark this as safe to help our diganostics down the road.
+      if (!cxxRecordReturnType->getDefinition()) {
+        return false;
+      }
+
+      // A projection of a view type (such as a string_view) from a self
+      // contained parent is a proejction (unsafe).
+      if (!anySubobjectsSelfContained(cxxRecordReturnType) &&
+          isViewType(cxxRecordReturnType)) {
+        return parentIsSelfContained;
+      }
+    }
+  }
+
+  // Otherwise, it's safe.
+  return false;
 }
