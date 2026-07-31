@@ -1055,7 +1055,7 @@ func useValue<T>(_ t: T) {}
 // Reading a borrow accessor off an inout base: the base is an address, but the
 // accessor's self parameter is a by-value @guaranteed object under opaque
 // values, so self is loaded into an object to match.
-// CHECK-LABEL: sil hidden [ossa] @$s20opaque_values_silgen23readBorrowAccessorInoutyyAA0E7WrapperVyxGzlF : $@convention(thin) <T> (@inout BorrowWrapper<T>) -> () {
+// CHECK-LABEL: sil hidden [ossa] [opaque] @$s20opaque_values_silgen23readBorrowAccessorInoutyyAA0E7WrapperVyxGzlF : $@convention(thin) <T> (@inout BorrowWrapper<T>) -> () {
 // CHECK: bb0(%0 : $*BorrowWrapper<T>):
 // CHECK:   [[ACCESS:%[^,]+]] = begin_access [read] [unknown] %0 : $*BorrowWrapper<T>
 // CHECK:   [[BORROW_FN:%[^,]+]] = function_ref @$s20opaque_values_silgen13BorrowWrapperV4propxvb : $@convention(method) <τ_0_0> (@in_guaranteed BorrowWrapper<τ_0_0>) -> @guaranteed_address τ_0_0
