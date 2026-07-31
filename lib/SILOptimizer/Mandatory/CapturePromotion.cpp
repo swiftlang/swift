@@ -476,6 +476,8 @@ ClosureCloner::initCloned(SILOptFunctionBuilder &functionBuilder,
       orig->getEffectsKind(), orig, orig->getDebugScope());
   for (auto &attr : orig->getSemanticsAttrs())
     fn->addSemanticsAttr(attr);
+  // The cloned closure goes into the same section as the original closure.
+  fn->setSection(orig->section());
   return fn;
 }
 

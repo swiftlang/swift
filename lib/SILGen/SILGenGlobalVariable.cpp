@@ -77,9 +77,8 @@ SILGlobalVariable *SILGenModule::getSILGlobalVariable(VarDecl *gDecl,
       M, silLinkage, IsNotSerialized, mangledName, silTy, std::nullopt, gDecl);
   silGlobal->setDeclaration(!forDef);
 
-  if (auto sectionAttr = gDecl->getAttrs().getAttribute<SectionAttr>())
-    if (auto sectionName = sectionAttr->Name)
-      silGlobal->setSection(*sectionName);
+  if (auto sectionName = gDecl->getSection())
+    silGlobal->setSection(*sectionName);
 
   if (cExternAttr) {
     silGlobal->setAsmName(cExternAttr->getCName(gDecl));

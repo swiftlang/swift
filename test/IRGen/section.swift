@@ -42,6 +42,13 @@ func defaultSection() { }
 @section(default)
 var gDefault: Int = 7
 
+// A variable with '@section' may have property observers, which can have their
+// own '@section'.
+@section("__DATA,__mysection")
+var gObserved: Int = 9 {
+  @section("__TEXT,__mysection") didSet { }
+}
+
 // SIL: @section("__DATA,__mysection") @_hasStorage @_hasInitialValue var g0: Int { get set }
 // SIL: @section("__DATA,__mysection") @_hasStorage @_hasInitialValue var g1: (Int, Int) { get set }
 // SIL: @section("__DATA,__mysection") @_hasStorage @_hasInitialValue var g2: Bool { get set }
@@ -96,6 +103,11 @@ var gDefault: Int = 7
 // SIL: sil hidden [used] [section "__TEXT,__mysection"] @$s7section7MyClassCfD : $@convention(method)
 // SIL: sil hidden @$s7section6testityypypnF : $@convention(thin) (@in Any) -> @out Any {
 // SIL: sil hidden @$s7section14defaultSectionyyF : $@convention(thin) () -> () {
+
+// The 'didSet' has its own section, which is used for the synthesized 'set'.
+// SIL: sil private [section "__TEXT,__mysection"] @$s7section9gObservedSivW
+// SIL: sil hidden @$s7section9gObservedSivg
+// SIL: sil hidden [section "__TEXT,__mysection"] @$s7section9gObservedSivs
 
 // IR:  @"$s7section2g0Sivp" = hidden global %TSi <{ {{(i64|i32)}} 1 }>, section "__DATA,__mysection"
 // IR:  @"$s7section2g1Si_Sitvp" = hidden global <{ %TSi, %TSi }> <{ %TSi <{ {{(i64|i32)}} 42 }>, %TSi <{ {{(i64|i32)}} 43 }> }>, section "__DATA,__mysection"

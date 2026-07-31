@@ -2488,6 +2488,11 @@ Decl::getEffectiveCodeGenerationModel() const {
   return getModuleContext()->codeGenerationModel();
 }
 
+std::optional<StringRef> Decl::getSection() const {
+  return evaluateOrDefault(getASTContext().evaluator,
+                           SectionForDeclRequest{this}, std::nullopt);
+}
+
 PatternBindingDecl::PatternBindingDecl(SourceLoc StaticLoc,
                                        StaticSpellingKind StaticSpelling,
                                        SourceLoc VarLoc,

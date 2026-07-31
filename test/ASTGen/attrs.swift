@@ -137,6 +137,11 @@ class ExclusivityAttrClass {
 struct SectionStruct {
 	@section("__TEXT,__mysection") @used func foo() {}
 	@section(default) @used func bar() {}
+
+	func withClosures(_ body: () -> Void) {
+		withClosures { @section("__TEXT,__mysection") in }
+		withClosures { @section(default) in }
+	}
 }
 
 protocol ImplementsProto {

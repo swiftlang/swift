@@ -1151,6 +1151,14 @@ public:
   CodeGenerationModel
   getEffectiveCodeGenerationModel() const;
 
+  /// Determine the section into which this declaration should be placed,
+  /// based on an explicit `@section` attribute or the inference rules for
+  /// `@section`.
+  ///
+  /// \returns the name of the section, or \c std::nullopt if this declaration
+  /// belongs in the platform-appropriate default section.
+  std::optional<StringRef> getSection() const;
+
   using AuxiliaryDeclCallback = llvm::function_ref<void(Decl *)>;
 
   /// Iterate over the auxiliary declarations for this declaration,

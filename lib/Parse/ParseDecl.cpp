@@ -3289,11 +3289,8 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       return makeParserSuccess();
     }
 
-    // @section in a local scope is not allowed.
-    if (CurDeclContext->isLocalContext()) {
-      diagnose(Loc, diag::attr_name_only_at_non_local_scope, AttrName);
-    }
-
+    // @section in a local scope is only allowed on functions and closures,
+    // which is checked in Sema.
     if (!DiscardAttribute)
       Attributes.add(new (Context) SectionAttr(Name, AtLoc,
                                                AttrRange, /*Implicit=*/false));
