@@ -18,8 +18,12 @@ class CClass1 {
 func com<COMType: IUnknown>(_ interface: COMType) {
 }
 
+func swift<COMType: ISwiftObject>(_ interface: COMType) {
+}
+
 func implicit(_ object: CClass1) {
   com(object)
+  swift(object)
 }
 
 @com

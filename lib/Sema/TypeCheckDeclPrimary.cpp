@@ -21,6 +21,7 @@
 #include "MiscDiagnostics.h"
 #include "TypeCheckAccess.h"
 #include "TypeCheckAvailability.h"
+#include "TypeCheckCOM.h"
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckDecl.h"
 #include "TypeCheckEmbedded.h"
@@ -3583,6 +3584,8 @@ public:
     }
 
     checkInheritanceClause(CD);
+    if (Ctx.LangOpts.EnableCOMInterop)
+      com::validateImplementation(CD);
     diagnoseMissingExplicitSendable(CD);
 
     checkAccessControl(CD);

@@ -22,6 +22,7 @@
 #include "TypeCheckAccess.h"
 #include "TypeCheckAvailability.h"
 #include "TypeCheckBitwise.h"
+#include "TypeCheckCOM.h"
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckDistributed.h"
 #include "TypeCheckEffects.h"
@@ -6889,6 +6890,9 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
   bool hasDeprecatedUnsafeSendable = false;
   bool sendableConformancePreconcurrency = false;
   for (auto conformance : conformances) {
+    if (Context.LangOpts.EnableCOMInterop)
+      com::validateConformance(conformance);
+
     // Check and record normal conformances.
     if (auto normal = dyn_cast<NormalProtocolConformance>(conformance)) {
       groupChecker.addConformance(normal);
