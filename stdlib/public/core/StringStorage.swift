@@ -785,7 +785,6 @@ extension __StringStorage {
 @safe
 final internal class __SharedStringStorage
   : __SwiftNativeNSString, _AbstractStringStorage {
-  internal var _owner: AnyObject?
   internal var start: UnsafePointer<UInt8>
 
 #if _pointerBitWidth(_64)
@@ -804,17 +803,13 @@ final internal class __SharedStringStorage
 
   internal var _breadcrumbs: _StringBreadcrumbs? = nil
 
-  internal var immortal = false
-
   internal var count: Int { _countAndFlags.count }
 
   internal init(
     immortal ptr: UnsafePointer<UInt8>,
     countAndFlags: _StringObject.CountAndFlags
   ) {
-    self._owner = nil
     unsafe self.start = ptr
-    self.immortal = true
 #if _pointerBitWidth(_64)
     self._countAndFlags = countAndFlags
 #elseif _pointerBitWidth(_32) || _pointerBitWidth(_16)
@@ -845,12 +840,6 @@ final internal class __SharedStringStorage
   final internal var hasBreadcrumbs: Bool {
     _breadcrumbs != nil
   }
-
-  deinit {
-    if (_owner == nil) && !immortal {
-      unsafe start.deallocate()
-    }
-  }
 }
 
 extension __SharedStringStorage {
@@ -865,6 +854,7 @@ extension __SharedStringStorage {
     _countAndFlags._invariantCheck()
     _internalInvariant(!_countAndFlags.isNativelyStored)
     _internalInvariant(!_countAndFlags.isTailAllocated)
+    unsafe _internalInvariant(start[count] == 0, "not nul terminated")
     let str = asString
     _internalInvariant(!str._guts._object.isPreferredRepresentation)
   }
