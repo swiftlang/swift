@@ -168,32 +168,3 @@ struct LoopBlocks: BridgedRandomAccessCollection {
     return bridgedLoop.getBasicBlock(index).block
   }
 }
-
-func splitEdge(
-  from block: BasicBlock,
-  toEdgeIndex: Int,
-  dominatorTree: DominatorTree,
-  loopTree: LoopTree,
-  _ context: some MutatingContext
-) -> BasicBlock {
-  let result = loopTree.bridged.splitEdge(block.bridged, toEdgeIndex, dominatorTree.bridged).block
-  
-  context.notifyBranchesChanged()
-  return result
-}
-
-/// If the specified edge is critical, the function returns inserted block. Otherwise returns `nil`.
-@discardableResult
-func splitCriticalEdge(
-  from block: BasicBlock,
-  toEdgeIndex: Int,
-  dominatorTree: DominatorTree,
-  loopTree: LoopTree,
-  _ context: some MutatingContext
-) -> BasicBlock? {
-  guard block.isCriticalEdge(edgeIndex: toEdgeIndex) else {
-    return nil
-  }
-  
-  return splitEdge(from: block, toEdgeIndex: toEdgeIndex, dominatorTree: dominatorTree, loopTree: loopTree, context)
-}

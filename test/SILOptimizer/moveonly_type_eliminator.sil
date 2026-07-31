@@ -1,5 +1,4 @@
 // RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -sil-move-only-type-eliminator  %s | %FileCheck %s
-// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -sil-trivial-move-only-type-eliminator  %s | %FileCheck --check-prefix=TRIVIAL %s
 
 sil_stage raw
 
@@ -53,15 +52,6 @@ sil @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
 // CHECK-NEXT: } // end sil function 'simple_copy_borrow_value'
-
-// TRIVIAL-LABEL: sil [ossa] @simple_copy_borrow_value : $@convention(thin) (Trivial) -> () {
-// TRIVIAL: bb0(%0 : $Trivial):
-// TRIVIAL-NEXT: function_ref use_trivial
-// TRIVIAL-NEXT: %1 = function_ref @use_trivial : $@convention(thin) (Trivial) -> ()
-// TRIVIAL-NEXT: %2 = apply %1(%0) : $@convention(thin) (Trivial) -> ()
-// TRIVIAL-NEXT: tuple
-// TRIVIAL-NEXT: return
-// TRIVIAL-NEXT: } // end sil function 'simple_copy_borrow_value'
 sil [ossa] @simple_copy_borrow_value : $@convention(thin) (Trivial) -> () {
 bb0(%0 : $Trivial):
   %1 = copyable_to_moveonlywrapper [owned] %0 : $Trivial
@@ -92,22 +82,6 @@ bb0(%0 : $Trivial):
 // CHECK-NEXT:  tuple
 // CHECK-NEXT:  return
 // CHECK-NEXT: } // end sil function 'simple_load_store'
-
-// TRIVIAL-LABEL: sil [ossa] @simple_load_store : $@convention(thin) (Trivial) -> () {
-// TRIVIAL: bb0(%0 : $Trivial):
-// TRIVIAL-NEXT: function_ref use_trivial
-// TRIVIAL-NEXT:  %1 = function_ref @use_trivial : $@convention(thin) (Trivial) -> ()
-// TRIVIAL-NEXT:  %2 = alloc_stack [moveable_value_debuginfo] $Trivial
-// TRIVIAL-NEXT:  store %0 to [trivial] %2 : $*Trivial
-// TRIVIAL-NEXT:  %4 = load [trivial] %2 : $*Trivial
-// TRIVIAL-NEXT:  %5 = apply %1(%4) : $@convention(thin) (Trivial) -> ()
-// TRIVIAL-NEXT:  %6 = load [trivial] %2 : $*Trivial
-// TRIVIAL-NEXT:  %7 = apply %1(%6) : $@convention(thin) (Trivial) -> ()
-// TRIVIAL-NEXT:  destroy_addr %2 : $*Trivial
-// TRIVIAL-NEXT:  dealloc_stack %2 : $*Trivial
-// TRIVIAL-NEXT:  tuple
-// TRIVIAL-NEXT:  return
-// TRIVIAL-NEXT: } // end sil function 'simple_load_store'
 sil [ossa] @simple_load_store : $@convention(thin) (Trivial) -> () {
 bb0(%0 : $Trivial):
   %f = function_ref @use_trivial : $@convention(thin) (Trivial) -> ()
@@ -148,21 +122,6 @@ bb0(%0 : $Trivial):
 // CHECK-NEXT:  tuple
 // CHECK-NEXT:  return
 // CHECK-NEXT: } // end sil function 'simple_load_storeborrow'
-
-// TRIVIAL-LABEL: sil [ossa] @simple_load_storeborrow : $@convention(thin) (Trivial) -> () {
-// TRIVIAL: bb0(%0 : $Trivial):
-// TRIVIAL-NEXT: function_ref use_trivial
-// TRIVIAL-NEXT:  %1 = function_ref @use_trivial : $@convention(thin) (Trivial) -> ()
-// TRIVIAL-NEXT:  %2 = alloc_stack [moveable_value_debuginfo] $Trivial
-// TRIVIAL-NEXT:  store %0 to [trivial] %2 : $*Trivial
-// TRIVIAL-NEXT:  %4 = load [trivial] %2 : $*Trivial
-// TRIVIAL-NEXT:  %5 = apply %1(%4) : $@convention(thin) (Trivial) -> ()
-// TRIVIAL-NEXT:  %6 = load [trivial] %2 : $*Trivial
-// TRIVIAL-NEXT:  %7 = apply %1(%6) : $@convention(thin) (Trivial) -> ()
-// TRIVIAL-NEXT:  dealloc_stack %2 : $*Trivial
-// TRIVIAL-NEXT:  tuple
-// TRIVIAL-NEXT:  return
-// TRIVIAL-NEXT: } // end sil function 'simple_load_storeborrow'
 sil [ossa] @simple_load_storeborrow : $@convention(thin) (Trivial) -> () {
 bb0(%0 : $Trivial):
   %f = function_ref @use_trivial : $@convention(thin) (Trivial) -> ()
@@ -201,16 +160,6 @@ bb0(%0 : $Trivial):
 // CHECK-NEXT:   %5 = apply %2(%4) : $@convention(thin) (Trivial) -> ()
 // CHECK-NEXT:   return %3 : $Trivial
 // CHECK: } // end sil function 'simple_struct_aggregate_usage'
-
-// TRIVIAL-LABEL: sil [ossa] @simple_struct_aggregate_usage : $@convention(thin) (Trivial, Trivial) -> TrivialPair {
-// TRIVIAL: bb0(%0 : $Trivial, %1 : $Trivial):
-// TRIVIAL-NEXT:   // function_ref use_trivial
-// TRIVIAL-NEXT:   %2 = function_ref @use_trivial : $@convention(thin) (Trivial) -> ()
-// TRIVIAL-NEXT:   %3 = struct $TrivialPair (%0 : $Trivial, %1 : $Trivial)
-// TRIVIAL-NEXT:   %4 = struct_extract %3 : $TrivialPair, #TrivialPair.lhs
-// TRIVIAL-NEXT:   %5 = apply %2(%4) : $@convention(thin) (Trivial) -> ()
-// TRIVIAL-NEXT:   return %3 : $Trivial
-// TRIVIAL: } // end sil function 'simple_struct_aggregate_usage'
 sil [ossa] @simple_struct_aggregate_usage : $@convention(thin) (Trivial, Trivial) -> TrivialPair {
 bb0(%0 : $Trivial, %1 : $Trivial):
   %f = function_ref @use_trivial : $@convention(thin) (Trivial) -> ()
@@ -269,16 +218,6 @@ bb0(%0 : $Trivial, %1 : $Trivial):
 // CHECK-NEXT:   %4 = apply %1(%3) : $@convention(thin) (Trivial) -> ()
 // CHECK-NEXT:   return %2
 // CHECK: } // end sil function 'simple_enum_aggregate_usage'
-
-// TRIVIAL-LABEL: sil [ossa] @simple_enum_aggregate_usage : $@convention(thin) (Trivial) -> FakeOptional<Trivial> {
-// TRIVIAL: bb0(%0 : $Trivial):
-// TRIVIAL-NEXT:   // function_ref use_trivial
-// TRIVIAL-NEXT:   %1 = function_ref @use_trivial : $@convention(thin) (Trivial) -> ()
-// TRIVIAL-NEXT:   %2 = enum $FakeOptional<Trivial>, #FakeOptional.some!enumelt, %0 : $Trivial
-// TRIVIAL-NEXT:   %3 = unchecked_enum_data %2 : $FakeOptional<Trivial>, #FakeOptional.some!enumelt
-// TRIVIAL-NEXT:   %4 = apply %1(%3) : $@convention(thin) (Trivial) -> ()
-// TRIVIAL-NEXT:   return %2
-// TRIVIAL: } // end sil function 'simple_enum_aggregate_usage'
 sil [ossa] @simple_enum_aggregate_usage : $@convention(thin) (Trivial) -> FakeOptional<Trivial> {
 bb0(%0 : $Trivial):
   %f = function_ref @use_trivial : $@convention(thin) (Trivial) -> ()
@@ -304,13 +243,6 @@ bb0(%0 : $Trivial):
 // CHECK-NOT: @owned
 // CHECK-NOT: @moveOnly
 // CHECK: } // end sil function 'simple_switch_enum'
-
-// TRIVIAL-LABEL: sil [ossa] @simple_switch_enum : $@convention(thin) (Trivial) -> FakeOptional<Trivial> {
-// TRIVIAL: bb0(%0 : $Trivial):
-// TRIVIAL-NOT: copyable_to_moveonlywrapper
-// TRIVIAL-NOT: @owned
-// TRIVIAL-NOT: @moveOnly
-// TRIVIAL: } // end sil function 'simple_switch_enum'
 sil [ossa] @simple_switch_enum : $@convention(thin) (Trivial) -> FakeOptional<Trivial> {
 bb0(%0 : $Trivial):
   %f = function_ref @use_trivial : $@convention(thin) (Trivial) -> ()
@@ -343,12 +275,6 @@ bb3(%result : @owned $@moveOnly FakeOptional<Trivial>):
 // CHECK-NOT: copyable_to_moveonlywrapper
 // CHECK-NOT: moveonlywrapper_to_copyable
 // CHECK: } // end sil function 'simple_klass_copy_borrow_value'
-
-// TRIVIAL-LABEL: sil [ossa] @simple_klass_copy_borrow_value : $@convention(thin) (@guaranteed Klass) -> () {
-// TRIVIAL: bb0(%0 : @guaranteed $Klass):
-// TRIVIAL: copyable_to_moveonlywrapper
-// TRIVIAL: moveonlywrapper_to_copyable
-// TRIVIAL: } // end sil function 'simple_klass_copy_borrow_value'
 sil [ossa] @simple_klass_copy_borrow_value : $@convention(thin) (@guaranteed Klass) -> () {
 bb0(%0 : @guaranteed $Klass):
   %1aa = copy_value %0 : $Klass
@@ -371,12 +297,6 @@ bb0(%0 : @guaranteed $Klass):
 // CHECK-NOT: copyable_to_moveonlywrapper
 // CHECK-NOT: moveonlywrapper_to_copyable
 // CHECK: } // end sil function 'simple_klass_load_store'
-
-// TRIVIAL-LABEL: sil [ossa] @simple_klass_load_store : $@convention(thin) (@guaranteed Klass) -> () {
-// TRIVIAL: bb0(%0 : @guaranteed $Klass):
-// TRIVIAL: copyable_to_moveonlywrapper
-// TRIVIAL: moveonlywrapper_to_copyable
-// TRIVIAL: } // end sil function 'simple_klass_load_store'
 sil [ossa] @simple_klass_load_store : $@convention(thin) (@guaranteed Klass) -> () {
 bb0(%0 : @guaranteed $Klass):
   %f = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
@@ -410,12 +330,6 @@ bb0(%0 : @guaranteed $Klass):
 // CHECK-NOT: copyable_to_moveonlywrapper
 // CHECK-NOT: moveonlywrapper_to_copyable
 // CHECK: } // end sil function 'simple_klass_load_storeborrow'
-
-// TRIVIAL-LABEL: sil [ossa] @simple_klass_load_storeborrow : $@convention(thin) (@guaranteed Klass) -> () {
-// TRIVIAL: bb0(%0 : @guaranteed $Klass):
-// TRIVIAL: copyable_to_moveonlywrapper
-// TRIVIAL: moveonlywrapper_to_copyable
-// TRIVIAL: } // end sil function 'simple_klass_load_storeborrow'
 sil [ossa] @simple_klass_load_storeborrow : $@convention(thin) (@guaranteed Klass) -> () {
 bb0(%0 : @guaranteed $Klass):
   %f = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
@@ -451,11 +365,6 @@ bb0(%0 : @guaranteed $Klass):
 // CHECK-NOT: copyable_to_moveonlywrapper
 // CHECK-NOT: moveonlywrapper_to_copyable
 // CHECK: } // end sil function 'simple_klass_struct_aggregate_usage'
-
-// TRIVIAL-LABEL: sil [ossa] @simple_klass_struct_aggregate_usage : $@convention(thin) (@guaranteed Klass, @guaranteed Klass) -> @owned KlassPair {
-// TRIVIAL: copyable_to_moveonlywrapper
-// TRIVIAL: moveonlywrapper_to_copyable
-// TRIVIAL: } // end sil function 'simple_klass_struct_aggregate_usage'
 sil [ossa] @simple_klass_struct_aggregate_usage : $@convention(thin) (@guaranteed Klass, @guaranteed Klass) -> @owned KlassPair {
 bb0(%0 : @guaranteed $Klass, %1 : @guaranteed $Klass):
   %f = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
@@ -511,11 +420,6 @@ bb0(%0 : $Klass, %1 : $Klass):
 // CHECK-NOT: copyable_to_moveonlywrapper
 // CHECK-NOT: moveonlywrapper_to_copyable
 // CHECK: } // end sil function 'simple_klass_enum_aggregate_usage'
-
-// TRIVIAL-LABEL: sil [ossa] @simple_klass_enum_aggregate_usage : $@convention(thin) (@guaranteed Klass) -> @owned FakeOptional<Klass> {
-// TRIVIAL: copyable_to_moveonlywrapper
-// TRIVIAL: moveonlywrapper_to_copyable
-// TRIVIAL: } // end sil function 'simple_klass_enum_aggregate_usage'
 sil [ossa] @simple_klass_enum_aggregate_usage : $@convention(thin) (@guaranteed Klass) -> @owned FakeOptional<Klass> {
 bb0(%0 : @guaranteed $Klass):
   %f = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
@@ -540,11 +444,6 @@ bb0(%0 : @guaranteed $Klass):
 // CHECK-NOT: moveonlywrapper_to_copyable
 // CHECK-NOT: @moveOnly
 // CHECK: } // end sil function 'simple_klass_switch_enum'
-
-// TRIVIAL-LABEL: sil [ossa] @simple_klass_switch_enum : $@convention(thin) (@guaranteed Klass) -> @owned FakeOptional<Klass> {
-// TRIVIAL: copyable_to_moveonlywrapper
-// TRIVIAL: moveonlywrapper_to_copyable
-// TRIVIAL: } // end sil function 'simple_klass_switch_enum'
 sil [ossa] @simple_klass_switch_enum : $@convention(thin) (@guaranteed Klass) -> @owned FakeOptional<Klass> {
 bb0(%0 : @guaranteed $Klass):
   %f = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()

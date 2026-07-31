@@ -169,12 +169,6 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   // Check noImplicitCopy and move only types for objects and addresses.
   P.addMoveOnlyChecker();
 
-  // FIXME: rdar://122701694 (`consuming` keyword causes verification error on
-  //        invalid SIL types)
-  //
-  // Lower move only wrapped trivial types.
-  //   P.addTrivialMoveOnlyTypeEliminator();
-
   // Check no uses after consume operator of a value in an address.
   P.addConsumeOperatorCopyableAddressesChecker();
   // No uses after consume operator of copyable value.
@@ -249,9 +243,6 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   if (P.getOptions().CopyPropagation >= CopyPropagationOption::Optimizing) {
     P.addDiagnoseLifetimeIssues();
   }
-
-  // Canonical swift requires all non cond_br critical edges to be split.
-  P.addSplitNonCondBrCriticalEdges();
 
   // This is needed to clean up SIL after MandatoryDeadObjectElimination for
   // OSLogOptimization (in the next function up the call tree). It must happen
@@ -920,9 +911,6 @@ static void addLastChanceOptPassPipeline(SILPassPipelinePlan &P) {
 
   // In optimized builds, do the inter-procedural analysis in a module pass.
   P.addStackProtection();
-
-  // FIXME: rdar://72935649 (Miscompile on combining PruneVTables with WMO)
-  // P.addPruneVTables();
 }
 
 static void addSILDebugInfoGeneratorPipeline(SILPassPipelinePlan &P) {

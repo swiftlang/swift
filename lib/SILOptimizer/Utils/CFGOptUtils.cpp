@@ -297,28 +297,6 @@ bool swift::hasCriticalEdges(SILFunction &f, bool onlyNonCondBr) {
   return false;
 }
 
-/// Split all critical edges in the function updating the dominator tree and
-/// loop information (if they are not set to null).
-bool swift::splitAllCriticalEdges(SILFunction &f, DominanceInfo *domInfo,
-                                  SILLoopInfo *loopInfo) {
-  bool changed = false;
-
-  for (SILBasicBlock &bb : f) {
-    if (isa<BranchInst>(bb.getTerminator()))
-      continue;
-
-    for (unsigned idx = 0, e = bb.getSuccessors().size(); idx != e; ++idx) {
-      auto *newBB =
-          splitCriticalEdge(bb.getTerminator(), idx, domInfo, loopInfo);
-      assert(!newBB
-             || isa<CondBranchInst>(bb.getTerminator())
-                    && "Only cond_br may have a critical edge.");
-      changed |= (newBB != nullptr);
-    }
-  }
-  return changed;
-}
-
 /// Merge the basic block with its successor if possible. If dominance
 /// information or loop info is non null update it. Return true if block was
 /// merged.
