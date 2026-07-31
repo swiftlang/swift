@@ -1,9 +1,8 @@
 
 // RUN: rm -rf %t
 // RUN: split-file %s %t
-// RUN: %target-swift-frontend -typecheck -verify -Xcc -iapinotes-modules -Xcc %swift_src_root/stdlib/public/Cxx/std -Xcc -std=c++20 -I %t/Inputs  %t/test.swift -strict-memory-safety -enable-experimental-feature LifetimeDependence -cxx-interoperability-mode=default -diagnostic-style llvm -plugin-path %swift-plugin-dir -verify-additional-file %t/Inputs/nonescapable.h 2>&1
+// RUN: %target-swift-frontend -typecheck -verify -Xcc -iapinotes-modules -Xcc %swift_src_root/stdlib/public/Cxx/std -Xcc -std=c++20 -I %t%{fs-sep}Inputs  %t%{fs-sep}test.swift -strict-memory-safety -enable-experimental-feature LifetimeDependence -cxx-interoperability-mode=default -diagnostic-style llvm -plugin-path %swift-plugin-dir -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}nonescapable.h 2>&1
 
-// REQUIRES: objc_interop
 // REQUIRES: swift_feature_LifetimeDependence
 // REQUIRES: std_span
 
@@ -167,8 +166,10 @@ struct SWIFT_SAFE WrapsUnannotatedMember {
 //--- test.swift
 
 import Test
-import CoreFoundation
 import CxxStdlib
+#if canImport(CoreFoundation)
+import CoreFoundation
+#endif
 
 func useUnsafeParam(x: Unannotated) {
   // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
@@ -191,9 +192,11 @@ func useSafeParams(x: Owner, y: View, z: SafeEscapableAggregate, c: MyContainer)
     let _ = c.__beginUnsafe() // expected-note{{reference to unsafe instance method '__beginUnsafe()'}}
 }
 
+#if canImport(CoreFoundation)
 func useCfType(x: CFArray) {
   _ = x
 }
+#endif
 
 func useString(x: std.string) {
   _ = x
