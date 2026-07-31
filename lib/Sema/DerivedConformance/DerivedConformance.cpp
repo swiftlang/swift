@@ -1244,12 +1244,20 @@ std::string swift::getNominalTypeInfoString(DerivedConformance &derived) {
   bool isUnsafe =
       derived.Conformance->getExplicitSafety() == ExplicitSafety::Unsafe;
 
+  // A parameter of noncopyable type has to state its ownership explicitly.
+  // The old synthesis built parameters without a TypeRepr, which is the only
+  // thing `diagnoseMissingOwnership` checks, so it never had to say so; the
+  // source a macro writes does.
+  bool isNoncopyable = derived.Nominal->canBeCopyable() ==
+                       TypeDecl::CanBeInvertible::Never;
+
   std::string res;
   llvm::raw_string_ostream out(res);
   out << "NominalTypeInfo(name: " << QuotedString(derived.Nominal->getNameStr())
       << ", kind: ";
   printNominalTypeKind(out, derived.Nominal);
-  out << ", isUnsafe: " << (isUnsafe ? "true" : "false") << ")";
+  out << ", isUnsafe: " << (isUnsafe ? "true" : "false")
+      << ", isNoncopyable: " << (isNoncopyable ? "true" : "false") << ")";
   return res;
 }
 

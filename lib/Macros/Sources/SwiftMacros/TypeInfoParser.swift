@@ -22,6 +22,10 @@ public struct NominalTypeInfo {
   var name: String
   var kind: NominalTypeKind
   var isUnsafe: Bool
+
+  /// Whether the type is noncopyable, in which case a parameter of this type
+  /// has to state its ownership explicitly.
+  var isNoncopyable: Bool
 }
 
 /// Represents the kind of nominal type this is, for the moment only structs
@@ -324,26 +328,30 @@ extension NominalTypeInfo: TypeInfoProtocol {
     //   NominalTypeInfo(
     //       name: <String>,
     //       kind: <NominalTypeKind>,
-    //       isUnsafe: <Bool>)
+    //       isUnsafe: <Bool>,
+    //       isNoncopyable: <Bool>)
 
-    let (name, kind, isUnsafe) = try getNamedFuncallArgs(
+    let (name, kind, isUnsafe, isNoncopyable) = try getNamedFuncallArgs(
       node: node,
       name: "NominalTypeInfo"
     )
     .expect(
       .stringArg("name"),
       .init(name: "kind", parser: NominalTypeKind.fromSyntax),
-      .boolArg("isUnsafe")
+      .boolArg("isUnsafe"),
+      .boolArg("isNoncopyable")
     )
 
-    return Self(name: name, kind: kind, isUnsafe: isUnsafe)
+    return Self(
+      name: name, kind: kind, isUnsafe: isUnsafe, isNoncopyable: isNoncopyable)
   }
 
   public var syntax: ExprSyntax {
     """
-    NominalTypeInfo(name: \(stringlit(name)), 
-                    kind: \(kind.syntax), 
-                    isUnsafe: \(boollit(isUnsafe)))
+    NominalTypeInfo(name: \(stringlit(name)),
+                    kind: \(kind.syntax),
+                    isUnsafe: \(boollit(isUnsafe)),
+                    isNoncopyable: \(boollit(isNoncopyable)))
     """
   }
 }
