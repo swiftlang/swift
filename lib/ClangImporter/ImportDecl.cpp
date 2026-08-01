@@ -3266,8 +3266,12 @@ namespace {
       //
       //    template <> struct MyTemplate<int>;
       //
+      // N.B. Consult the redeclaration chain rather than this particular
+      // declaration: an explicit specialization may well be declared before it
+      // is defined, and `decl` can be any declaration of the specialization —
+      // notably, canonical tag types are formed with the first one.
       if (decl->getSpecializationKind() == clang::TSK_ExplicitSpecialization &&
-          !decl->isCompleteDefinition())
+          !decl->getDefinition())
         return nullptr;
 
       // `decl->getDefinition()` can return nullptr before the call to sema and
