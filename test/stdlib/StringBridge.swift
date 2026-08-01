@@ -105,19 +105,42 @@ StringBridgeTests.test("Shared String SPI")
     test(literal: "abcdëfghijklmnopqrstuvwxyz", isASCII: false)
 }
 
-StringBridgeTests.test("Shared String SPI/rejects non-terminated buffer")
+// Foundation promises the buffers it passes to this SPI are NUL-terminated, and
+// the String this produces claims isTailAllocated on the strength of that
+// promise, so a violation has to trap rather than produce a String that lies
+// about being NUL-terminated.
+@available(SwiftStdlib 6.2, *)
+func expectRejectsNonTerminated(_ contents: [UInt8], isASCII: Bool) {
+  let n = contents.count
+  let buf = UnsafeMutableBufferPointer<UInt8>.allocate(capacity: n + 1)
+  for i in 0..<n { buf[i] = contents[i] }
+  buf[n] = 0xFF
+  let base = UnsafePointer(buf.baseAddress!)
+  expectCrashLater()
+  _ = _SwiftCreateImmortalString_ForFoundation(
+    buffer: UnsafeBufferPointer(start: base, count: n),
+    isASCII: isASCII
+  )
+}
+
+StringBridgeTests.test("Shared String SPI/rejects non-terminated buffer/ASCII")
   .require(.stdlib_6_2)
   .code {
     guard #available(SwiftStdlib 6.2, *) else { return }
-    let n = 20
-    let buf = UnsafeMutableBufferPointer<UInt8>.allocate(capacity: n + 1)
-    for i in 0..<n { buf[i] = UInt8(ascii: "a") }
-    buf[n] = 0xFF
-    let base = UnsafePointer(buf.baseAddress!)
-    expectCrashLater()
-    _ = _SwiftCreateImmortalString_ForFoundation(
-      buffer: UnsafeBufferPointer(start: base, count: n),
+    expectRejectsNonTerminated(
+      Array("abcdefghijklmnopqrstuvwxyz".utf8),
       isASCII: true
+    )
+}
+
+StringBridgeTests.test("Shared String SPI/rejects non-terminated buffer/UTF8")
+  .require(.stdlib_6_2)
+  .code {
+    guard #available(SwiftStdlib 6.2, *) else { return }
+    // Valid UTF-8, so the missing terminator is the only reason to reject it
+    expectRejectsNonTerminated(
+      Array("abcdëfghijklmnopqrstuvwxyz".utf8),
+      isASCII: false
     )
 }
 
