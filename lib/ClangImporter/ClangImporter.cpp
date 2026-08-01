@@ -9026,10 +9026,12 @@ const clang::TypedefType *ClangImporter::getTypeDefForCXXCFOptionsDefinition(
     return nullptr;
 
   if (auto *typedefType = dyn_cast<clang::TypedefType>(integerType)) {
+    // Note that the C++ expansion of CF_OPTIONS attaches the
+    // `flag_enum`/`enum_extensibility` attributes to the anonymous enum, and
+    // `availability(swift, unavailable)` to the backing typedef.
     auto *enumExtensibilityAttr =
-        typedefType->getDecl()->getAttr<clang::EnumExtensibilityAttr>();
-    const bool hasFlagEnumAttr =
-        typedefType->getDecl()->hasAttr<clang::FlagEnumAttr>();
+        enumDecl->getAttr<clang::EnumExtensibilityAttr>();
+    const bool hasFlagEnumAttr = enumDecl->hasAttr<clang::FlagEnumAttr>();
 
     if (enumExtensibilityAttr &&
         enumExtensibilityAttr->getExtensibility() ==
