@@ -21,7 +21,10 @@ public func minusOne() {
 // DISABLED: define{{.*}} swifttailcc void @"$s5async6calleeyyYaF"(ptr swiftasync %0) [[ATTRS:#[0-9]+]]
 // DISABLED: define swifttailcc void @"$s5async6callerySiSbYaF"(ptr swiftasync %0, i1 %1) [[ATTRS]]
 
-// DISABLED: attributes [[ATTRS]] = { {{.*}}"frame-pointer"="non-leaf"
+// The exact non-leaf kind depends on whether the target reserves the frame
+// pointer register in leaf functions; all that matters here is that it is not
+// "all".
+// DISABLED: attributes [[ATTRS]] = { {{.*}}"frame-pointer"="non-leaf{{(-no-reserve)?}}"
 
 
 
