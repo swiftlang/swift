@@ -4156,6 +4156,9 @@ public:
   /// Whether this closure is Sendable.
   bool isSendable() const;
 
+  /// Whether this closure could be called at most once.
+  bool isCalledOnce() const;
+
   /// Whether this closure consists of a single expression.
   bool hasSingleExpressionBody() const;
 

@@ -118,8 +118,7 @@ static bool hasSingletonMetatype(CanType instanceType) {
 
 CaptureKind
 TypeConverter::getDeclCaptureKind(CapturedValue capture,
-                                  TypeExpansionContext expansion,
-                                  const FunctionTypeInfo *closureInfo) {
+                                  TypeExpansionContext expansion) {
   if (auto *expr = capture.getPackElement()) {
     auto contextTy = expr->getType();
     auto props = getTypeProperties(
@@ -133,6 +132,9 @@ TypeConverter::getDeclCaptureKind(CapturedValue capture,
     return CaptureKind::Immutable;
   }
 
+  if (capture.isConsumed())
+    return CaptureKind::Consuming;
+
   auto decl = capture.getDecl();
   auto *var = cast<VarDecl>(decl);
   assert(var->hasStorage() &&
@@ -142,21 +144,6 @@ TypeConverter::getDeclCaptureKind(CapturedValue capture,
   auto props = getTypeProperties(
       contextTy, TypeExpansionContext::noOpaqueTypeArchetypesSubstitution(
                           expansion.getResilienceExpansion()));
-
-  bool isInOutCapture = false;
-  if (auto *param = dyn_cast<ParamDecl>(var))
-    isInOutCapture = param->isInOut();
-
-  if (!isInOutCapture && !capture.isNoEscape()) {
-    // @called(once) capture of a @called(once) closure is supposed to
-    // be consumed by the closure because it's guaranteed to be called
-    // at most once.
-    if (auto *fnTy = contextTy->getAs<AnyFunctionType>()) {
-      if (fnTy->isCalledOnce() && closureInfo &&
-          closureInfo->ExpectedLoweredType->isCalledOnce())
-        return CaptureKind::Consuming;
-    }
-  }
 
   // If this is a noncopyable 'let' constant that is not a shared paramdecl or
   // used by a noescape capture, then we know it is boxed and want to pass it in
