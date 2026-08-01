@@ -136,6 +136,7 @@ void nonnull(int len, const void * __sized_by_or_null(len) __noescape _Nonnull p
 // }}
 void nullable(int len, const void * __sized_by_or_null(len) __noescape _Nullable p);
 
+// expected-warning@+7{{combining '__sized_by_or_null' and '_Nonnull'; did you mean '__sized_by' instead?}}
 // expected-expansion@+6:79{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func returnPointer(_ len: CInt) -> UnsafeRawBufferPointer {|}}
