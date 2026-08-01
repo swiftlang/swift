@@ -1221,7 +1221,6 @@ static void emitCaptureArguments(SILGenFunction &SGF,
                                  GenericSignature origGenericSig,
                                  CapturedValue capture,
                                  uint16_t ArgNo) {
-  auto closureInfo = SGF.TypeContext ? &*SGF.TypeContext : nullptr;
   if (auto *expr = capture.getPackElement()) {
     SILLocation Loc(expr);
     Loc.markAsPrologue();
@@ -1235,8 +1234,7 @@ static void emitCaptureArguments(SILGenFunction &SGF,
     SILValue arg;
 
     auto expansion = SGF.getTypeExpansionContext();
-    auto captureKind =
-        SGF.SGM.Types.getDeclCaptureKind(capture, expansion, closureInfo);
+    auto captureKind = SGF.SGM.Types.getDeclCaptureKind(capture, expansion);
     switch (captureKind) {
     case CaptureKind::Constant:
     case CaptureKind::StorageAddress:
@@ -1321,8 +1319,7 @@ static void emitCaptureArguments(SILGenFunction &SGF,
   SILFunctionArgument *box = nullptr;
 
   auto expansion = SGF.getTypeExpansionContext();
-  auto captureKind =
-      SGF.SGM.Types.getDeclCaptureKind(capture, expansion, closureInfo);
+  auto captureKind = SGF.SGM.Types.getDeclCaptureKind(capture, expansion);
   SILAccessEnforcement enforcement;
   switch (captureKind) {
   case CaptureKind::Constant: {

@@ -2073,52 +2073,38 @@ std::optional<Type> AbstractClosureExpr::getEffectiveThrownType() const {
   return std::nullopt;
 }
 
-bool AbstractClosureExpr::isBodyThrowing() const {
-  if (!getType() || getType()->hasError()) {
+static FunctionType::ExtInfo
+getOrComputeExtInfo(const AbstractClosureExpr *closure) {
+  auto closureType = closure->getType();
+  if (!closureType || closureType->hasError()) {
     // Scan the closure body to infer effects.
-    if (auto closure = dyn_cast<ClosureExpr>(this)) {
+    if (auto explicitClosure = dyn_cast<ClosureExpr>(closure)) {
       return evaluateOrDefault(
-          getASTContext().evaluator,
-          ClosureEffectsRequest{const_cast<ClosureExpr *>(closure)},
-          FunctionType::ExtInfo()).isThrowing();
+          closure->getASTContext().evaluator,
+          ClosureEffectsRequest{const_cast<ClosureExpr *>(explicitClosure)},
+          FunctionType::ExtInfo());
     }
 
-    return false;
+    return {};
   }
-  
-  return getType()->castTo<FunctionType>()->getExtInfo().isThrowing();
+
+  return closureType->castTo<FunctionType>()->getExtInfo();
+}
+
+bool AbstractClosureExpr::isBodyThrowing() const {
+  return getOrComputeExtInfo(this).isThrowing();
 }
 
 bool AbstractClosureExpr::isSendable() const {
-  if (!getType() || getType()->hasError()) {
-    // Scan the closure body to infer effects.
-    if (auto closure = dyn_cast<ClosureExpr>(this)) {
-      return evaluateOrDefault(
-          getASTContext().evaluator,
-          ClosureEffectsRequest{const_cast<ClosureExpr *>(closure)},
-          FunctionType::ExtInfo()).isSendable();
-    }
-
-    return false;
-  }
-
-  return getType()->castTo<FunctionType>()->getExtInfo().isSendable();
+  return getOrComputeExtInfo(this).isSendable();
 }
 
 bool AbstractClosureExpr::isBodyAsync() const {
-  if (!getType() || getType()->hasError()) {
-    // Scan the closure body to infer effects.
-    if (auto closure = dyn_cast<ClosureExpr>(this)) {
-      return evaluateOrDefault(
-          getASTContext().evaluator,
-          ClosureEffectsRequest{const_cast<ClosureExpr *>(closure)},
-          FunctionType::ExtInfo()).isAsync();
-    }
+  return getOrComputeExtInfo(this).isAsync();
+}
 
-    return false;
-  }
-
-  return getType()->castTo<FunctionType>()->getExtInfo().isAsync();
+bool AbstractClosureExpr::isCalledOnce() const {
+  return getOrComputeExtInfo(this).isCalledOnce();
 }
 
 bool AbstractClosureExpr::hasSingleExpressionBody() const {
