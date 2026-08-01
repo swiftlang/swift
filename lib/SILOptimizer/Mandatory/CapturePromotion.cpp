@@ -1367,30 +1367,31 @@ examineAllocBoxInst(AllocBoxInst *abi, ReachabilityInfo &ri,
              << "Checking for any mutations that invalidate captures...\n");
   // Loop over all mutations to possibly invalidate captures.
   for (auto *use : state.accumulatedMutations) {
-    auto iter = im.begin();
-    while (iter != im.end()) {
-      auto *user = use->getUser();
-      auto *pai = iter->first;
+    auto *user = use->getUser();
+    // NOTE: We must not erase from \p im while iterating over it. Erasing from
+    // a DenseMap invalidates every iterator into it, since the surviving
+    // entries may be relocated to close the hole left behind. Use remove_if,
+    // which performs all of the erasures in a single pass, instead.
+    im.remove_if([&](const auto &entry) {
+      auto *pai = entry.first;
       // The mutation invalidates a capture if it occurs in a block reachable
       // from the block the partial_apply is in, or if it is in the same
       // block is after the partial_apply.
-      if (ri.isReachable(pai->getParent(), user->getParent()) ||
-          (pai->getParent() == user->getParent() && isAfter(pai, user))) {
-        // If our partial apply is concurrent and we can not promote this, emit
-        // a warning that shows the variable, where the variable is captured,
-        // and the mutation that we found.
-        if (pai->getFunctionType()->isSendable()) {
-          diagnoseInvalidCaptureByConcurrentClosure(abi, pai, state, user);
-        }
+      if (!ri.isReachable(pai->getParent(), user->getParent()) &&
+          !(pai->getParent() == user->getParent() && isAfter(pai, user)))
+        return false;
 
-        LLVM_DEBUG(llvm::dbgs() << "    Invalidating: " << *pai);
-        LLVM_DEBUG(llvm::dbgs() << "    Because of user: " << *user);
-        auto prev = iter++;
-        im.erase(prev);
-        continue;
+      // If our partial apply is concurrent and we can not promote this, emit a
+      // warning that shows the variable, where the variable is captured, and
+      // the mutation that we found.
+      if (pai->getFunctionType()->isSendable()) {
+        diagnoseInvalidCaptureByConcurrentClosure(abi, pai, state, user);
       }
-      ++iter;
-    }
+
+      LLVM_DEBUG(llvm::dbgs() << "    Invalidating: " << *pai);
+      LLVM_DEBUG(llvm::dbgs() << "    Because of user: " << *user);
+      return true;
+    });
 
     // If there are no valid captures left, then stop.
     if (im.empty()) {
