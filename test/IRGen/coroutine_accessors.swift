@@ -243,7 +243,7 @@ public var irm: Int {
 // CHECK:             [[UNWIND]]:
 // CHECK:               br label %coro.end
 // CHECK:             coro.end:
-// CHECK:               call i1 @llvm.coro.end(
+// CHECK:               call void @llvm.coro.end(
 // CHECK-SAME:              ptr [[HANDLE]],
 // CHECK-SAME:              i1 false,
 // CHECK-SAME:              token none
@@ -286,7 +286,7 @@ public var irm: Int {
 // CHECK:             [[UNWIND]]:
 // CHECK:               br label %coro.end
 // CHECK:             coro.end:
-// CHECK:               [[REGISTER_8:%[^,]+]] = call i1 @llvm.coro.end(ptr [[HANDLE]], i1 false, token none)
+// CHECK:               call void @llvm.coro.end(ptr [[HANDLE]], i1 false, token none)
 // CHECK:               unreachable
 // CHECK:           }
   yielding mutate {
