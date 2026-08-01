@@ -697,7 +697,7 @@ static Decl *findExplicitParentForImplicitDecl(ValueDecl *decl) {
 
 static InFlightDiagnostic
 noteTypoCorrection(DeclNameLoc loc, ValueDecl *decl,
-                   bool wasClaimed) {
+                   bool wasClaimed, bool showFullName) {
   if (auto var = dyn_cast<VarDecl>(decl)) {
     // Suggest 'self' at the use point instead of pointing at the start
     // of the function.
@@ -723,6 +723,9 @@ noteTypoCorrection(DeclNameLoc loc, ValueDecl *decl,
 
   if (wasClaimed) {
     return decl->diagnose(diag::decl_declared_here_base, decl);
+  } else if (showFullName) {
+    return decl->diagnose(diag::note_typo_candidate_compound_name,
+                          DeclNameRef(decl->getName()));
   } else {
     return decl->diagnose(diag::note_typo_candidate,
                           decl->getBaseName().userFacingName());
@@ -732,7 +735,8 @@ noteTypoCorrection(DeclNameLoc loc, ValueDecl *decl,
 void TypoCorrectionResults::noteAllCandidates() const {
   for (auto candidate : Candidates) {
     auto &&diagnostic =
-      noteTypoCorrection(Loc, candidate, ClaimedCorrection);
+      noteTypoCorrection(Loc, candidate, ClaimedCorrection,
+                         WrittenName.isCompoundName());
 
     // Don't add fix-its if we claimed the correction for the primary
     // diagnostic.
