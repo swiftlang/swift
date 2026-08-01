@@ -54,10 +54,13 @@ sil @callee : $@convention(thin) <each T> () -> () {
 // CHECK:         call void @llvm.stackrestore.p0(ptr [[STACK_BEFORE_FIRST_ALLOCA]])
 // CHECK:         br label %[[HEADER]]
 // CHECK:       [[EXIT]]:
-// CHECK:         [[STACK_BEFORE_SECOND_ALLOCAlcssa:%.*]] = phi ptr [ [[STACK_BEFORE_SECOND_ALLOCA]], %{{.*}} ]
-// CHECK:         [[STACK_BEFORE_FIRST_ALLOCAlcssa:%.*]] = phi ptr [ [[STACK_BEFORE_FIRST_ALLOCA]], %{{.*}} ]
-// CHECK:         call void @llvm.stackrestore.p0(ptr [[STACK_BEFORE_SECOND_ALLOCAlcssa]])
-// CHECK:         call void @llvm.stackrestore.p0(ptr [[STACK_BEFORE_FIRST_ALLOCAlcssa]])
+// Both saved stack pointers must be restored on the loop-exit path as well, in
+// reverse order of the saves.  Whether the exit block refers to them directly
+// or through trivial single-entry LCSSA phis depends on whether the loop
+// happens to be canonicalized by the LLVM pass pipeline (at -Onone that is not
+// guaranteed), so accept either spelling.
+// CHECK:         call void @llvm.stackrestore.p0(ptr [[STACK_BEFORE_SECOND_ALLOCA]]{{(\.lcssa)?}})
+// CHECK:         call void @llvm.stackrestore.p0(ptr [[STACK_BEFORE_FIRST_ALLOCA]]{{(\.lcssa)?}})
 // CHECK:         ret void
 // CHECK:       }
 sil @looper : $@convention(thin) <each T_1, each T_2> () -> () {
