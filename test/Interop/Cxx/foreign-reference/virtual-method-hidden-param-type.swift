@@ -11,7 +11,7 @@
 // RUN: cp %t/FailingInputs/test.h %t/PassingInputs/test.h
 
 // RUN: %target-swift-frontend -typecheck -I %t%{fs-sep}Inputs -I %t%{fs-sep}PassingInputs \
-// RUN:   -cxx-interoperability-mode=default %t/test.swift -verify
+// RUN:   -cxx-interoperability-mode=default %t%{fs-sep}test.swift -verify
 
 // Importing a virtual method of a foreign reference type synthesizes a C++
 // thunk that calls the method, and building that call requires the parameter
