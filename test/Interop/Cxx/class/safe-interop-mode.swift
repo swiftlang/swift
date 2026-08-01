@@ -17,6 +17,7 @@ module Test {
 #include <span>
 #include <vector>
 #include <tuple>
+#include <memory>
 
 struct SWIFT_NONESCAPABLE View {
     __attribute__((swift_attr("@lifetime(immortal)")))
@@ -45,6 +46,24 @@ struct SafeEscapableAggregate {
 struct UnknownEscapabilityAggregate {
     SafeEscapableAggregate agg;
     Unannotated unann;
+};
+
+template <typename T> struct SWIFT_ESCAPABLE_IF(T) EscapableIfT { T t; };
+using SafeEscapableIf = EscapableIfT<int>;
+
+struct ConditionalMemberBeforePointer {
+    SafeEscapableIf cond;
+    int *pointer;
+};
+
+struct ConditionalMemberAfterPointer {
+    int *pointer;
+    SafeEscapableIf cond;
+};
+
+struct SharedPtrBeforePointer {
+    std::shared_ptr<int> shared;
+    int *pointer;
 };
 
 struct MyContainer {
@@ -190,6 +209,25 @@ func useUnsafeParam2(x: UnsafeReference) {
 func useUnsafeParam3(x: UnknownEscapabilityAggregate) {
   // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
   _ = x // expected-note{{reference to parameter 'x' involves unsafe type}}
+}
+
+func useConditionalMemberBeforePointer(x: ConditionalMemberBeforePointer) {
+  // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  _ = x // expected-note{{reference to parameter 'x' involves unsafe type}}
+}
+
+func useConditionalMemberAfterPointer(x: ConditionalMemberAfterPointer) {
+  // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  _ = x // expected-note{{reference to parameter 'x' involves unsafe type}}
+}
+
+func useSharedPtrBeforePointer(x: SharedPtrBeforePointer) {
+  // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  _ = x // expected-note{{reference to parameter 'x' involves unsafe type}}
+}
+
+func useSafeEscapableIf(x: SafeEscapableIf) {
+  _ = x
 }
 
 func useSafeParams(x: Owner, y: View, z: SafeEscapableAggregate, c: MyContainer) {
