@@ -202,19 +202,45 @@ public:
   using const_iterator = FieldRecordIterator;
 
   bool isEnum() const {
-    return (Kind == FieldDescriptorKind::Enum ||
-            Kind == FieldDescriptorKind::MultiPayloadEnum);
+    switch (Kind) {
+    case FieldDescriptorKind::Enum:
+    case FieldDescriptorKind::MultiPayloadEnum:
+      return true;
+    case FieldDescriptorKind::Class:
+    case FieldDescriptorKind::ObjCClass:
+    case FieldDescriptorKind::Protocol:
+    case FieldDescriptorKind::ClassProtocol:
+    case FieldDescriptorKind::ObjCProtocol:
+      return false;
+    }
   }
 
   bool isClass() const {
-    return (Kind == FieldDescriptorKind::Class ||
-            Kind == FieldDescriptorKind::ObjCClass);
+    switch (Kind) {
+    case FieldDescriptorKind::Class:
+    case FieldDescriptorKind::ObjCClass:
+      return true;
+    case FieldDescriptorKind::Enum:
+    case FieldDescriptorKind::MultiPayloadEnum:
+    case FieldDescriptorKind::Protocol:
+    case FieldDescriptorKind::ClassProtocol:
+    case FieldDescriptorKind::ObjCProtocol:
+      return false;
+    }
   }
 
   bool isProtocol() const {
-    return (Kind == FieldDescriptorKind::Protocol ||
-            Kind == FieldDescriptorKind::ClassProtocol ||
-            Kind == FieldDescriptorKind::ObjCProtocol);
+    switch (Kind) {
+    case FieldDescriptorKind::Protocol:
+    case FieldDescriptorKind::ClassProtocol:
+    case FieldDescriptorKind::ObjCProtocol:
+      return true;
+    case FieldDescriptorKind::Enum:
+    case FieldDescriptorKind::MultiPayloadEnum:
+    case FieldDescriptorKind::Class:
+    case FieldDescriptorKind::ObjCClass:
+      return false;
+    }
   }
 
   bool isStruct() const {
