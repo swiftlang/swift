@@ -67,10 +67,12 @@ public struct Sunavailable {
 
 public class Base {
   public func foo() {}
+  public class func foo() {}
   public func bar() {}
 }
 public class Derived: Base {
   override public func foo() {}
+  override public class func foo() {}
   public override func bar() {}
 }
 
@@ -129,10 +131,10 @@ public extension C {
   final func call_ope_C(_ x: Swift::Int) -> Swift::Int {
     return ope(x)
   }
-  final func call_clas_C(x: Swift::Int) -> Swift::Int {
+  final func call_clas_C_classmethod(x: Swift::Int) -> Swift::Int {
     return C.clas(x: x)
   }
-  final func call_clas2_C(x: Swift::Int) -> Swift::Int {
+  final func call_clas2_C_classmethod(x: Swift::Int) -> Swift::Int {
     return C.clas2(x: x)
   }
 }
@@ -140,6 +142,9 @@ public extension C {
 public extension Base {
   final func call_foo_Base() {
     return foo()
+  }
+  final func call_foo_Base_classmethod() {
+    return Base.foo()
   }
   final func call_bar_Base() {
     return bar()
@@ -149,6 +154,9 @@ public extension Base {
 public extension Derived {
   final func call_foo_Derived() {
     return foo()
+  }
+  final func call_foo_Derived_classmethod() {
+    return Derived.foo()
   }
   final func call_bar_Derived() {
     return bar()

@@ -39,7 +39,7 @@ extension Foo {
 }
 
 extension Bar {
-  final func call_classFunction_Bar(x: Int) -> Int {
+  final func call_classFunction_Bar_classmethod(x: Int) -> Int {
     return Bar.classFunction(x: x)
   }
 }

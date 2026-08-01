@@ -92,7 +92,8 @@ class SwiftMacroTestGen: SyntaxVisitor {
       .with(\.leadingTrivia, res.leadingTrivia.withoutComments)
     if let surroundingType {
       let superKw = selfParam?.text == "super" ? "_super" : ""
-      res.name = "\(res.name)_\(surroundingType)\(raw: superKw)"
+      let classmethod = res.isClassMethod ? "_classmethod" : ""
+      res.name = "\(res.name)_\(surroundingType)\(raw: superKw)\(raw: classmethod)"
       res =
         res
         .with(
