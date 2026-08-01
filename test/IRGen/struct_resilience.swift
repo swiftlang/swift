@@ -39,7 +39,8 @@ public func functionWithResilientTypesSize(_ s: __owned Size, f: (__owned Size) 
 // CHECK: [[WITNESS_PTR:%.*]] = getelementptr inbounds ptr, ptr [[VWT]], i32 1
 // CHECK: [[WITNESS:%.*]] = load ptr, ptr [[WITNESS_PTR]]
 // CHECK: call void [[WITNESS]](ptr noalias %1, ptr [[METADATA]])
-// CHECK-NEXT: call
+//   No lifetime marker: [[ALLOCA]] is a dynamic alloca, and lifetime markers
+//   are only valid on static allocas.
 // CHECK-NEXT: ret void
 
   return f(s)

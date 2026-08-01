@@ -395,7 +395,6 @@ void IRGenThunk::emit() {
     // WE ARE HERE:
     // call ptr (...) @llvm.coro.suspend.retcon(...callee's yields...)
     // call swiftcc void %continuation(ptr noalias %callee_frame, ptr %allocator)
-    // call void @llvm.lifetime.end.p0(i64 -1, ptr %allocation_handle)
     // call void @llvm.coro.alloca.free(token %allocation)
     // call void @llvm.coro.end(ptr %3, i1 false, token none)
     // unreachable

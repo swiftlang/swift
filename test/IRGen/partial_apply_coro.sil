@@ -50,14 +50,14 @@ bb2:
 // CHECK-NEXT:   %[[PA_ARG:.*]] = getelementptr inbounds{{.*}} %TSf, ptr %[[PA_CTX]], i32 0, i32 0
 // CHECK-NEXT:   store float %[[ARG]], ptr %[[PA_ARG]]
 // CHECK-NEXT:   %[[CTXPTR:.*]] = getelementptr inbounds{{.*}} [[[BUFFER_SIZE]] x i8], ptr %[[CTX]], i32 0, i32 0
-// CHECK-NEXT:   call void @llvm.lifetime.start.p0(ptr %[[CTXPTR]])
+// CHECK-NEXT:   call void @llvm.lifetime.start.p0(ptr %[[CTX]])
 // CHECK-NEXT:   %[[YIELD_PAIR:.*]] = call swiftcc { ptr, float } @"$s6yield1TA{{.*}}"(ptr noalias dereferenceable([[BUFFER_SIZE]]) %[[CTXPTR]], ptr swiftself %[[PA_CTX_BOX]])
 // CHECK-NEXT:   %[[RESUME:.*]] = extractvalue { ptr, float } %[[YIELD_PAIR]], 0
 // CHECK-NEXT:   %[[YIELD:.*]] = extractvalue { ptr, float } %[[YIELD_PAIR]], 1
 // CHECK-arm64e: %[[CTXVAL:.*]] = ptrtoint ptr %[[CTXPTR]] to i64
 // CHECK-arm64e-NEXT: %[[DISCR:.*]] call i64 @llvm.ptrauth.blend(i64 %[[CTXVAL]], i64 27838)
 // CHECK-NEXT:   call swiftcc void %[[RESUME]](ptr noalias dereferenceable([[BUFFER_SIZE]]) %[[CTXPTR]], i1 false)
-// CHECK-NEXT:   call void @llvm.lifetime.end.p0(ptr %[[CTXPTR]])
+// CHECK-NEXT:   call void @llvm.lifetime.end.p0(ptr %[[CTX]])
 // CHECK-NEXT:   call void @swift_release(ptr %[[PA_CTX_BOX]])
 // CHECK-NEXT:   ret void
 // CHECK-NEXT: }
@@ -182,13 +182,13 @@ bb2:
 // CHECK-NEXT:   %[[PA_ARG1:.*]] = getelementptr inbounds{{.*}} %TSf, ptr %[[PA_CTX1]], i32 0, i32 0
 // CHECK-NEXT:   store float %[[ARG1]], ptr %[[PA_ARG1]]
 // CHECK-NEXT:   %[[CTXPTR:.*]] = getelementptr inbounds{{.*}} [[[BUFFER_SIZE]] x i8], ptr %[[CTX]], i32 0, i32 0
-// CHECK-NEXT:   call void @llvm.lifetime.start.p0(ptr %[[CTXPTR]])
+// CHECK-NEXT:   call void @llvm.lifetime.start.p0(ptr %[[CTX]])
 // CHECK-NEXT:   %[[YIELD_PAIR:.*]] = call swiftcc { ptr, float } @"$s6yield2TA{{.*}}"(ptr noalias dereferenceable([[BUFFER_SIZE]]) %[[CTXPTR]], ptr swiftself %[[PA_CTX_BOX]])
 // CHECK-NEXT:   %[[RESUME:.*]] = extractvalue { ptr, float } %[[YIELD_PAIR]], 0
 // CHECK-NEXT:   %[[YIELD:.*]] = extractvalue { ptr, float } %[[YIELD_PAIR]], 1
 // CHECK-64:     %[[RESULT:.*]] = call swiftcc i64 %[[RESUME]](ptr noalias dereferenceable([[BUFFER_SIZE]]) %[[CTXPTR]], i1 false)
 // CHECK-32:     %[[RESULT:.*]] = call swiftcc i32 %[[RESUME]](ptr noalias dereferenceable([[BUFFER_SIZE]]) %[[CTXPTR]], i1 false)
-// CHECK-NEXT:   call void @llvm.lifetime.end.p0(ptr %[[CTXPTR]])
+// CHECK-NEXT:   call void @llvm.lifetime.end.p0(ptr %[[CTX]])
 // CHECK-NEXT:   call void @swift_release(ptr %[[PA_CTX_BOX]])
 // CHECK-NEXT:   ret void
 // CHECK-NEXT: }
@@ -299,12 +299,12 @@ bb2:
 // CHECK-NEXT: entry:
 // CHECK:   %[[CTX:.*]] = alloca [[[BUFFER_SIZE]] x i8]
 // CHECK:   %[[CTXPTR:.*]] = getelementptr inbounds{{.*}} [[[BUFFER_SIZE]] x i8], ptr %[[CTX]], i32 0, i32 0
-// CHECK:   call void @llvm.lifetime.start.p0(ptr %[[CTXPTR]])
+// CHECK:   call void @llvm.lifetime.start.p0(ptr %[[CTX]])
 // CHECK:   %[[YIELD_PAIR:.*]] = call swiftcc { ptr, ptr } @"$s9yieldgen1TA{{.*}}"(ptr noalias dereferenceable([[BUFFER_SIZE]]) %[[CTXPTR]], ptr swiftself
 // CHECK:   %[[RESUME:.*]] = extractvalue { ptr, ptr } %[[YIELD_PAIR]], 0
 // CHECK:   %[[YIELD:.*]] = extractvalue { ptr, ptr } %[[YIELD_PAIR]], 1
 // CHECK:   call swiftcc void %[[RESUME]](ptr noalias dereferenceable([[BUFFER_SIZE]]) %[[CTXPTR]], i1 false)
-// CHECK:   call void @llvm.lifetime.end.p0(ptr %[[CTXPTR]])
+// CHECK:   call void @llvm.lifetime.end.p0(ptr %[[CTX]])
 // CHECK:   call void @swift_release
 // CHECK:   ret void
 // CHECK: }
@@ -432,12 +432,12 @@ bb2:
 // CHECK-32:   call void @llvm.memcpy.p0.p0.i32(ptr align 4 %[[PA_CTX_ARG]], ptr align 4 %[[ARG_COPY]], i32 4, i1 false)
 // CHECK:   call void @llvm.lifetime.start.p0(ptr %[[INDIRECT_RET]])
 // CHECK:   %[[CTXPTR:.*]] = getelementptr inbounds{{.*}} [[[BUFFER_SIZE]] x i8], ptr %[[CTX]], i32 0, i32 0
-// CHECK:   call void @llvm.lifetime.start.p0(ptr %[[CTXPTR]])
+// CHECK:   call void @llvm.lifetime.start.p0(ptr %[[CTX]])
 // CHECK:   %[[YIELD_PAIR:.*]] = call swiftcc { ptr, ptr } @"$s9yieldgen2TA{{.*}}"(ptr noalias dereferenceable([[BUFFER_SIZE]]) %[[CTXPTR]], ptr %[[INDIRECT_RET]], ptr swiftself
 // CHECK:   %[[RESUME:.*]] = extractvalue { ptr, ptr } %[[YIELD_PAIR]], 0
 // CHECK:   %[[YIELD:.*]] = extractvalue { ptr, ptr } %[[YIELD_PAIR]], 1
 // CHECK:   call swiftcc void %[[RESUME]](ptr noalias dereferenceable([[BUFFER_SIZE]]) %[[CTXPTR]], i1 false)
-// CHECK:   call void @llvm.lifetime.end.p0(ptr %[[CTXPTR]])
+// CHECK:   call void @llvm.lifetime.end.p0(ptr %[[CTX]])
 // CHECK:   call void @swift_release
 // CHECK:   call void @llvm.lifetime.end.p0(ptr %[[INDIRECT_RET]])
 // CHECK:   call void @llvm.lifetime.end.p0(ptr %[[ARG_COPY]])
@@ -1439,7 +1439,7 @@ entry(%c : $SwiftClass, %a : $*A, %i : $Int):
 // CHECK:   %[[ARG2PTR1:.*]] = getelementptr inbounds{{.*}} %TSi, ptr %[[ARG2PTR0]], i32 0, i32 0
 // CHECK:   %[[ARG2:.*]] = load [[ARG_TYPE]], ptr %[[ARG2PTR1]]
 // CHECK:   %[[CTXPTR:.*]] = getelementptr inbounds{{.*}} [[[BUFFER_SIZE]] x i8], ptr %[[FRAME]], i32 0, i32 0
-// CHECK:   call void @llvm.lifetime.start.p0(ptr %[[CTXPTR]])
+// CHECK:   call void @llvm.lifetime.start.p0(ptr %[[CTX]])
 // CHECK:   %[[RESUME:.*]] = call swiftcc ptr @captured_fixed_and_dependent_params(ptr noalias dereferenceable([[BUFFER_SIZE]]) %[[CTXPTR]], ptr %[[ARG0]], ptr noalias %[[ARG1]], [[ARG_TYPE]] %[[ARG2]], ptr %T)
 // CHECK:   %[[SPILL2:.*]] = getelementptr inbounds %"$s35captured_fixed_and_dependent_paramsTA.Frame", ptr %[[SPILL]], i32 0, i32 1
 // CHECK:   store ptr %[[RESUME]], ptr %[[SPILL2]]
@@ -1527,7 +1527,7 @@ bb0(%a : $SwiftClass, %b : $*T, %c : $Int):
 // CHECK:   %[[INIT:.*]] = load ptr, ptr %[[INIT_PTR]]
 // CHECK:   call ptr %[[INIT]](ptr noalias %[[ARG_COPY]], ptr noalias %[[PA_CTX2]], ptr %[[TY]])
 // CHECK:   %[[CTXPTR:.*]] = getelementptr inbounds{{.*}} [[[BUFFER_SIZE]] x i8], ptr %[[FRAME]], i32 0, i32 0
-// CHECK:   call void @llvm.lifetime.start.p0(ptr %[[CTXPTR]])
+// CHECK:   call void @llvm.lifetime.start.p0(ptr %[[CTX]])
 // CHECK:   %[[YIELD_PAIR:.*]] = call swiftcc { ptr, ptr } @captured_dependent_out_param(ptr noalias dereferenceable([[BUFFER_SIZE]]) %[[CTXPTR]], ptr %[[INDIRECT_RET]], ptr noalias %[[ARG_COPY]], ptr %[[TY]])
 // CHECK:   %[[RESUME:.*]] = extractvalue { ptr, ptr } %[[YIELD_PAIR]], 0
 // CHECK:   %[[SPILL1:.*]] = getelementptr inbounds %"$s28captured_dependent_out_paramTA.Frame", ptr %[[SPILL]], i32 0, i32 1
@@ -1672,17 +1672,17 @@ bb2:
 // CHECK:   %[[CTX0:.*]] = alloca [[[BUFFER_SIZE]] x i8]
 // CHECK:   %[[CTX1:.*]] = alloca [[[BUFFER_SIZE]] x i8]
 // CHECK:   %[[CTX0PTR:.*]] = getelementptr inbounds{{.*}} [[[BUFFER_SIZE]] x i8], ptr %[[CTX0]], i32 0, i32 0
-// CHECK:   call void @llvm.lifetime.start.p0(ptr %[[CTX0PTR]])
+// CHECK:   call void @llvm.lifetime.start.p0(ptr %[[CTX0]])
 // CHECK:   %[[MDRESP:.*]] = call swiftcc %swift.metadata_response @"$s18partial_apply_coro3SubCMa"
 // CHECK:   %[[MD:.*]] = extractvalue %swift.metadata_response %[[MDRESP]], 0
 // CHECK:   %[[RESUME0:.*]] = call swiftcc ptr @receive_closure(ptr noalias dereferenceable([[BUFFER_SIZE]]) %[[CTX0PTR]], ptr @"$s26parametric_casting_closureTA.{{[0-9]+}}{{.*}}", ptr %[[ARG0]], ptr %[[MD]])
 // CHECK:   call swiftcc void %[[RESUME0]](ptr noalias dereferenceable([[BUFFER_SIZE]]) %[[CTX0PTR]], i1 false)
-// CHECK:   call void @llvm.lifetime.end.p0(ptr %[[CTX0PTR]])
+// CHECK:   call void @llvm.lifetime.end.p0(ptr %[[CTX0]])
 // CHECK:   %[[CTX1PTR:.*]] = getelementptr inbounds{{.*}} [[[BUFFER_SIZE]] x i8], ptr %[[CTX1]], i32 0, i32 0
-// CHECK:   call void @llvm.lifetime.start.p0(ptr %[[CTX1PTR]])
+// CHECK:   call void @llvm.lifetime.start.p0(ptr %[[CTX1]])
 // CHECK:   %[[RESUME1:.*]] = call swiftcc ptr @receive_closure2(ptr noalias dereferenceable([[BUFFER_SIZE]]) %[[CTX1PTR]], ptr @"$s26parametric_casting_closureTA{{.*}}", ptr null, ptr %[[MD]])
 // CHECK:   call swiftcc void %[[RESUME1]](ptr noalias dereferenceable([[BUFFER_SIZE]]) %[[CTX1PTR]], i1 false)
-// CHECK:   call void @llvm.lifetime.end.p0(ptr %[[CTX1PTR]])
+// CHECK:   call void @llvm.lifetime.end.p0(ptr %[[CTX1]])
 // CHECK:   ret void
 // CHECK: }
 //
@@ -1815,12 +1815,12 @@ protocol P2 { associatedtype Y : P1 }
 // CHECK:   %[[PA_ARG_PTR:.*]] = getelementptr inbounds{{.*}} %TSi, ptr %[[PA_ARG]], i32 0, i32 0
 // CHECK:   store [[ARG_TYPE]] %[[ARG]], ptr %[[PA_ARG_PTR]]
 // CHECK:   %[[CTXPTR:.*]] = getelementptr inbounds{{.*}} [[[BUFFER_SIZE]] x i8], ptr %[[CTX]], i32 0, i32 0
-// CHECK:   call void @llvm.lifetime.start.p0(ptr %[[CTXPTR]])
+// CHECK:   call void @llvm.lifetime.start.p0(ptr %[[CTX]])
 // CHECK:   %[[YIELD_PAIR:.*]] = call swiftcc { ptr, ptr } @"$s24complex_generic_functionTA{{.*}}"(ptr noalias {{.*}} %[[CTXPTR]], ptr swiftself %[[PA_CTX_BOX]])
 // CHECK:   %[[RESUME:.*]] = extractvalue { ptr, ptr } %[[YIELD_PAIR]], 0
 // CHECK:   %[[YIELD:.*]] = extractvalue { ptr, ptr } %[[YIELD_PAIR]], 1
 // CHECK:   call swiftcc void %[[RESUME]](ptr noalias {{.*}} %[[CTXPTR]], i1 false)
-// CHECK:   call void @llvm.lifetime.end.p0(ptr %[[CTXPTR]])
+// CHECK:   call void @llvm.lifetime.end.p0(ptr %[[CTX]])
 // CHECK:   ret void
 // CHECK: }
 
@@ -1877,12 +1877,12 @@ bb0(%0 : $Int):
 // CHECK:   %[[MD:.*]] = extractvalue %swift.metadata_response %[[MD_RES]], 0
 // CHECK:   store ptr %[[MD]], ptr %[[PA_CTX]]
 // CHECK:   %[[CTXPTR:.*]] = getelementptr inbounds{{.*}} [[[BUFFER_SIZE]] x i8], ptr %[[CTX]], i32 0, i32 0
-// CHECK:   call void @llvm.lifetime.start.p0(ptr %[[CTXPTR]])
+// CHECK:   call void @llvm.lifetime.start.p0(ptr %[[CTX]])
 // CHECK:   %[[YIELD_PAIR:.*]] = call swiftcc { ptr, ptr } @"$s16generic_functionTA{{.*}}"(ptr noalias {{.*}} %[[CTXPTR]], ptr swiftself %[[PA_CTX_BOX]])
 // CHECK:   %[[RESUME:.*]] = extractvalue { ptr, ptr } %[[YIELD_PAIR]], 0
 // CHECK:   %[[YIELD:.*]] = extractvalue { ptr, ptr } %[[YIELD_PAIR]], 1
 // CHECK:   call swiftcc void %[[RESUME]](ptr noalias {{.*}} %[[CTXPTR]], i1 false)
-// CHECK:   call void @llvm.lifetime.end.p0(ptr %[[CTXPTR]])
+// CHECK:   call void @llvm.lifetime.end.p0(ptr %[[CTX]])
 // CHECK:   ret void
 // CHECK: }
 
@@ -2208,12 +2208,12 @@ sil public_external @use_closure2 : $@yield_once @convention(thin) (@noescape @y
 // CHECK:   %[[BOXPTR:.*]] = getelementptr inbounds{{.*}} <{ %swift.refcounted, ptr }>, ptr %[[BOX]], i32 0, i32 1
 // CHECK:   store ptr %[[ARG]], ptr %[[BOXPTR]]
 // CHECK:   %[[CTXPTR:.*]] = getelementptr inbounds{{.*}} [[[BUFFER_SIZE]] x i8], ptr %[[CTX]], i32 0, i32 0
-// CHECK:   call void @llvm.lifetime.start.p0(ptr %[[CTXPTR]])
+// CHECK:   call void @llvm.lifetime.start.p0(ptr %[[CTX]])
 // CHECK:   %[[YIELD_PAIR:.*]] = call swiftcc { ptr, [[RES_TYPE:(i32|i64)]] } @use_closure2(ptr noalias dereferenceable([[BUFFER_SIZE]]) %[[CTXPTR]], ptr @"$s45indirect_guaranteed_captured_class_pair_paramTA.{{[0-9]+}}{{.*}}", ptr %[[BOX]])
 // CHECK:   %[[RESUME:.*]] = extractvalue { ptr, [[RES_TYPE]] } %[[YIELD_PAIR]], 0
 // CHECK:   %[[YIELD:.*]] = extractvalue { ptr, [[RES_TYPE]] } %[[YIELD_PAIR]], 1
 // CHECK:   call swiftcc void %[[RESUME]](ptr noalias dereferenceable([[BUFFER_SIZE]]) %[[CTXPTR]], i1 false)
-// CHECK:   call void @llvm.lifetime.end.p0(ptr %[[CTXPTR]])
+// CHECK:   call void @llvm.lifetime.end.p0(ptr %[[CTX]])
 // CHECK:   ret void
 // CHECK: }
 //
@@ -2291,12 +2291,12 @@ entry(%i : $Int, %p : $*SwiftClassPair):
 // CHECK:   %[[BOXPTR:.*]] = getelementptr inbounds{{.*}} <{ %swift.refcounted, ptr }>, ptr %[[BOX]], i32 0, i32 1
 // CHECK:   store ptr %[[ARG]], ptr %[[BOXPTR]]
 // CHECK:   %[[CTXPTR:.*]] = getelementptr inbounds{{.*}} [[[BUFFER_SIZE]] x i8], ptr %[[CTX]], i32 0, i32 0
-// CHECK:   call void @llvm.lifetime.start.p0(ptr %[[CTXPTR]])
+// CHECK:   call void @llvm.lifetime.start.p0(ptr %[[CTX]])
 // CHECK:   %[[YIELD_PAIR:.*]] = call swiftcc { ptr, [[ARG_TYPE]] } @use_closure2(ptr noalias dereferenceable([[BUFFER_SIZE]]) %[[CTXPTR]], ptr @"$s37indirect_in_captured_class_pair_paramTA{{.*}}", ptr %[[BOX]])
 // CHECK:   %[[RESUME:.*]] = extractvalue { ptr, [[ARG_TYPE]] } %[[YIELD_PAIR]], 0
 // CHECK:   %[[YIELD:.*]] = extractvalue { ptr, [[ARG_TYPE]] } %[[YIELD_PAIR]], 1
 // CHECK:   call swiftcc void %[[RESUME]](ptr noalias dereferenceable([[BUFFER_SIZE]]) %[[CTXPTR]], i1 false)
-// CHECK:   call void @llvm.lifetime.end.p0(ptr %[[CTXPTR]])
+// CHECK:   call void @llvm.lifetime.end.p0(ptr %[[CTX]])
 // CHECK:   call ptr @"$s18partial_apply_coro14SwiftClassPairVWOh"(ptr %[[ARG]])
 // CHECK:   ret void
 // CHECK: }
@@ -2492,12 +2492,12 @@ entry(%i : $Int, %ic : $*SwiftClassPair):
 // CHECK:   %[[BOXPTR:.*]] = getelementptr inbounds{{.*}} <{ %swift.refcounted, ptr }>, ptr %[[BOX]], i32 0, i32 1
 // CHECK:   store ptr %[[ARG]], ptr %[[BOXPTR]]
 // CHECK:   %[[CTXPTR:.*]] = getelementptr inbounds{{.*}} [[[BUFFER_SIZE]] x i8], ptr %[[CTX]], i32 0, i32 0
-// CHECK:   call void @llvm.lifetime.start.p0(ptr %[[CTXPTR]])
+// CHECK:   call void @llvm.lifetime.start.p0(ptr %[[CTX]])
 // CHECK:   %[[YIELD_PAIR:.*]] = call swiftcc { ptr, [[ARG_TYPE]] } @use_closure2(ptr noalias dereferenceable([[BUFFER_SIZE]]) %[[CTXPTR]], ptr @"$s46indirect_in_constant_captured_class_pair_paramTA{{.*}}", ptr %[[BOX]])
 // CHECK:   %[[RESUME:.*]] = extractvalue { ptr, [[ARG_TYPE]] } %[[YIELD_PAIR]], 0
 // CHECK:   %[[YIELD:.*]] = extractvalue { ptr, [[ARG_TYPE]] } %[[YIELD_PAIR]], 1
 // CHECK:   call swiftcc void %[[RESUME]](ptr noalias dereferenceable([[BUFFER_SIZE]]) %[[CTXPTR]], i1 false)
-// CHECK:   call void @llvm.lifetime.end.p0(ptr %[[CTXPTR]])
+// CHECK:   call void @llvm.lifetime.end.p0(ptr %[[CTX]])
 // CHECK:   call ptr @"$s18partial_apply_coro14SwiftClassPairVWOh"(ptr %[[ARG]])
 // CHECK:   ret void
 // CHECK: }
