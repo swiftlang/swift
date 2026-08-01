@@ -14,6 +14,33 @@ import Swift
 
 #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 
+/// Holds the termination handler an adopter installed through the public
+/// `Continuation.onTermination` setter.
+@safe
+internal final class _AsyncStreamTerminationHandlerBox<
+  Element, Failure: Error, TerminationType
+>: Sendable {
+  typealias StorageTermination =
+    _AsyncStreamStorage<Element, Failure, TerminationType>.Continuation.Termination
+
+  let handler: @Sendable (TerminationType) -> Void
+  private let invokeHandler: @Sendable (StorageTermination) -> Void
+
+  /// `map` translates the storage's `Termination` and is installed once, when
+  /// the box is created, so no wrapper is ever appended to `handler` itself
+  init(
+    handler: @escaping @Sendable (TerminationType) -> Void,
+    map: @escaping @Sendable (StorageTermination) -> TerminationType
+  ) {
+    self.handler = handler
+    self.invokeHandler = { termination in handler(map(termination)) }
+  }
+
+  func invoke(_ termination: StorageTermination) {
+    self.invokeHandler(termination)
+  }
+}
+
 // MARK: - AsyncStream Shims
 
 // BufferingPolicy
