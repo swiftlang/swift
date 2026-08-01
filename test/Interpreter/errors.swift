@@ -268,7 +268,7 @@ extension Gesture {
   }
 }
 
-ErrorHandlingTests.test("GenericLet") {
+ErrorHandlingTests.test("GenericLetGesture") {
   expectEqual(1, Gesture.pan(1).valueLet as! Int)
   expectEqual(2, Gesture.pinch(2).valueLet as! Int)
 
@@ -277,7 +277,7 @@ ErrorHandlingTests.test("GenericLet") {
   expectTrue(l === Gesture.pinch(l).valueLet as! LifetimeTracked)
 }
 
-ErrorHandlingTests.test("GenericVar") {
+ErrorHandlingTests.test("GenericVarGesture") {
   expectEqual(1, Gesture.pan(1).valueVar as! Int)
   expectEqual(2, Gesture.pinch(2).valueVar as! Int)
 

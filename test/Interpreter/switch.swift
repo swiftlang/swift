@@ -150,7 +150,7 @@ extension Gesture {
   }
 }
 
-SwitchTestSuite.test("GenericLet") {
+SwitchTestSuite.test("GenericLetGesture") {
   expectEqual(1, Gesture.pan(1).valueLet as! Int)
   expectEqual(2, Gesture.pinch(2).valueLet as! Int)
 
@@ -159,7 +159,7 @@ SwitchTestSuite.test("GenericLet") {
   expectTrue(l === Gesture.pinch(l).valueLet as! LifetimeTracked)
 }
 
-SwitchTestSuite.test("GenericVar") {
+SwitchTestSuite.test("GenericVarGesture") {
   expectEqual(1, Gesture.pan(1).valueVar as! Int)
   expectEqual(2, Gesture.pinch(2).valueVar as! Int)
 

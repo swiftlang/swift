@@ -155,28 +155,6 @@ Assert.test("fatalError/StringInterpolation")
 // characters, and that use NSString-backed String.
 // We had to rewrite a part of fatalError() in the indexing effort.
 
-Assert.test("precondition")
-  .xfail(.custom(
-    { _isFastAssertConfiguration() },
-    reason: "preconditions are disabled in Unchecked mode"))
-  .crashOutputMatches(_isDebugAssertConfiguration() ? "this should fail" : "")
-  .code {
-  var x = 2
-  precondition(x * 21 == 42, "should not fail")
-  expectCrashLater()
-  precondition(x == 42, "this should fail")
-}
-
-Assert.test("preconditionFailure")
-  .skip(.custom(
-    { _isFastAssertConfiguration() },
-    reason: "optimizer assumes that the code path is unreachable"))
-  .crashOutputMatches(_isDebugAssertConfiguration() ? "this should fail" : "")
-  .code {
-  expectCrashLater()
-  preconditionFailure("this should fail")
-}
-
 Assert.test("_precondition")
   .xfail(.custom(
     { _isFastAssertConfiguration() },
@@ -244,4 +222,3 @@ Assert.test("_internalInvariantFailure")
 }
 
 runAllTests()
-

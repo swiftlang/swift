@@ -41,7 +41,7 @@ PassAsParameterTestSuite.test("pass as const reference to pointer") {
   expectEqual(aValue, 456)
 }
 
-PassAsParameterTestSuite.test("pass as const reference to pointer") {
+PassAsParameterTestSuite.test("pass mutable value as const reference to pointer") {
   var a = IntBox.create(654)
   let aValue = extractValueFromConstRefToPtr(a)
   expectEqual(aValue, 654)

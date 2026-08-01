@@ -645,7 +645,7 @@ struct Runner {
             return await f(&x)
         }
 
-        exclusivityTests.test("case8") { @MainActor in
+        exclusivityTests.test("case8 with access between awaits") { @MainActor in
             debugLog("==> Before handle")
             let handle = Task { @MyMainActor in
                 debugLog("==> Main: In handle!")

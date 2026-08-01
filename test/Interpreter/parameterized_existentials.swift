@@ -53,10 +53,9 @@ ParameterizedProtocolsTestSuite.test("casting") {
 struct ErasingHolder<T> {
   let box: any Holder<T>
 }
-ParameterizedProtocolsTestSuite.test("casting") {
+ParameterizedProtocolsTestSuite.test("casting through type erasure") {
   let a = ErasingHolder(box: IntHolder(value: 5))
   expectEqual(a.box.value, 5)
 }
 
 runAllTests()
-

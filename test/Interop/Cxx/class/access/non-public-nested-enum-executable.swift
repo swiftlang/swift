@@ -54,7 +54,7 @@ import StdlibUnittest
 import CxxModule
 
 var Suite = TestSuite("NotBlessedForBase")
-Suite.test("Use private nested enum in base class") {
+Suite.test("Use private nested enum from base class instance") {
   let b = Base()
   let e1 = b.makeEnum()
   let e2 = b.makeEnum()
@@ -90,7 +90,7 @@ import StdlibUnittest
 import CxxModule
 
 var Suite = TestSuite("NotBlessedForDerive")
-Suite.test("Use private nested enum inherited from base class") {
+Suite.test("Use inherited private nested enum from derived class instance") {
   let d = Derived()
   let e1 = d.makeEnum()
   let e2 = d.makeEnum()
