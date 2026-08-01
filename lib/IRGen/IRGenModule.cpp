@@ -792,6 +792,8 @@ namespace RuntimeConstants {
   const auto ArgMemOnly = llvm::MemoryEffects::argMemOnly();
   const auto ArgMemReadOnly = llvm::MemoryEffects::argMemOnly(llvm::ModRefInfo::Ref);
   const auto InaccessibleMemOnly = llvm::MemoryEffects::inaccessibleMemOnly();
+  const auto InaccessibleOrArgMemOnly =
+      llvm::MemoryEffects::inaccessibleOrArgMemOnly();
   const auto NoReturn = llvm::Attribute::NoReturn;
   const auto NoUnwind = llvm::Attribute::NoUnwind;
   const auto ZExt = llvm::Attribute::ZExt;
