@@ -670,8 +670,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
       Diags.diagnose(capture.getLoc(), diag::value_captured_here);
 
       // Emit an 'undef' of the correct type.
-      auto captureKind = SGM.Types.getDeclCaptureKind(
-          capture, expansion, SGM.Types.getClosureTypeInfo(closure));
+      auto captureKind = SGM.Types.getDeclCaptureKind(capture, expansion);
       switch (captureKind) {
       case CaptureKind::Constant:
       case CaptureKind::Consuming:
@@ -785,8 +784,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
     auto &Entry = found->second;
     auto val = Entry.value;
 
-    switch (SGM.Types.getDeclCaptureKind(
-        capture, expansion, SGM.Types.getClosureTypeInfo(closure))) {
+    switch (SGM.Types.getDeclCaptureKind(capture, expansion)) {
     case CaptureKind::Constant: {
       assert(!isPack);
 

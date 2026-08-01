@@ -2528,7 +2528,7 @@ lowerCaptureContextParameters(TypeConverter &TC, SILDeclRef function,
         TC.getTypeLowering(AbstractionPattern(genericSig, interfaceType),
                            interfaceType, expansion);
     auto loweredTy = loweredTL.getLoweredType();
-    switch (TC.getDeclCaptureKind(capture, expansion, closureInfo)) {
+    switch (TC.getDeclCaptureKind(capture, expansion)) {
     case CaptureKind::Constant: {
       // Constants are captured by value.
       ParameterConvention convention;
