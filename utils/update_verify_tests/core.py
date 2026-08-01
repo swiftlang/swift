@@ -927,9 +927,22 @@ def remove_dead_diags(lines, prefix):
         # Try absorbing a same-category sibling first so the dead diag's
         # formatting (whitespace, original_count_str) survives a content
         # rewrite. Nested expansion diags have no target, so skip.
+        #
+        # Expansion directives never absorb a sibling. take() transfers a
+        # diagnostic's *message* state, but an expansion directive carries no
+        # message: what identifies it is its anchor column, and what it renders
+        # is its nested_lines plus its closer, none of which take() moves. So
+        # absorbing a live sibling expansion would keep this directive's stale
+        # column while dropping the sibling's nested diagnostics along with its
+        # line, leaving an empty `expected-expansion` anchored at the wrong
+        # column. That is worse than simply deleting the dead directive and
+        # letting the live sibling render itself, and it does not converge:
+        # re-running on the mangled output reproduces the same shape forever.
         took = False
-        if line.diag.target is not None and not getattr(
-            line.diag, "is_child_note", False
+        if (
+            line.diag.target is not None
+            and line.diag.category != "expansion"
+            and not getattr(line.diag, "is_child_note", False)
         ):
             for other_diag in line.diag.target.targeting_diags:
                 if (
@@ -1091,6 +1104,39 @@ def find_other_targeting(lines, orig_lines, is_nested, diag_error, prefix):
     return other_diags
 
 
+def find_last_expansion_left_of(orig_lines, is_nested, diag_error, prefix):
+    """Return the source-order-last `expected-expansion` directive targeting
+    `diag_error`'s line at a strictly lower anchor column, or None.
+
+    Expansion anchors are identified by (line, column), so one target line can
+    carry several unrelated expansion directives. Laying a new directive out
+    below every directive whose anchor column precedes its own keeps expansion
+    directives that share a target line sorted by ascending column, matching the
+    left-to-right order of the anchors on the line they describe.
+
+    The comparison is strict so that siblings at the *same* anchor are left to
+    the expansion-index layout rules instead.
+    """
+    # `insert_after` is only honoured for top-level directives; inside a nested
+    # expansion `add_diag` places directives by target line within the expansion
+    # buffer. `diag_error.line` also indexes that buffer rather than orig_lines.
+    if is_nested or not diag_error.col:
+        return None
+    target = orig_lines[diag_error.line - 1]
+    to_the_left = [
+        d
+        for d in target.targeting_diags
+        if d.category == "expansion"
+        and (not d.prefix or d.prefix == prefix)
+        and d.col()
+        and d.col() < diag_error.col
+    ]
+    if not to_the_left:
+        return None
+    # targeting_diags is in creation order, not source order.
+    return max(to_the_left, key=lambda d: d.line.line_n)
+
+
 def update_lines(
     diag_errors, lines, orig_lines, prefix, filename, nested_context,
     orig_filename=None
@@ -1186,22 +1232,31 @@ def update_lines(
     diag_errors.sort(reverse=True, key=_sort_key)
 
     # Snapshot the sibling expected-expansion directives already present at
-    # each expansion target line, in source order, before synthesizing any new
+    # each expansion anchor, in source order, before synthesizing any new
     # ones. The verifier's expansion index is positional in this order, so
     # capturing it up front keeps index->directive routing stable even as we
     # add missing siblings during this pass. `synthesized_expansions` records
-    # siblings we create here, keyed by (target line, index), so a later nested
-    # diag for a different index at the same location reuses or extends the set
-    # instead of mis-filing into an existing sibling.
+    # siblings we create here, so a later nested diag for a different index at
+    # the same anchor reuses or extends the set instead of mis-filing into an
+    # existing sibling.
+    #
+    # Both maps are keyed by (line, column), not by line alone: a single source
+    # line can be the site of several unrelated expansions distinguished only
+    # by column (e.g. a Clang declaration whose synthesized macro attribute
+    # expands at column 1 while the macro's own output is anchored at the end
+    # of the declaration). The verifier numbers expansions per anchor, so each
+    # column has its own index-0 expansion, and keying by line alone would
+    # collapse those distinct expansions into one directive.
     preexisting_expansions = {}
     synthesized_expansions = {}
     for diag_error in diag_errors:
+        anchor = (diag_error.line, diag_error.col)
         if (
             isinstance(diag_error, NestedDiag)
             and diag_error.expansion_index is not None
-            and diag_error.line not in preexisting_expansions
+            and anchor not in preexisting_expansions
         ):
-            preexisting_expansions[diag_error.line] = find_other_targeting(
+            preexisting_expansions[anchor] = find_other_targeting(
                 lines, orig_lines, bool(nested_context), diag_error, prefix
             )
 
@@ -1214,27 +1269,45 @@ def update_lines(
         is_indexed_expansion = (
             isinstance(diag_error, NestedDiag) and expansion_index is not None
         )
+        anchor = (diag_error.line, diag_error.col)
         sibling_anchor = None
         if is_indexed_expansion and expansion_index is not None:
             # Route the nested diag to the specific sibling expansion the
             # verifier reported by its expansion index. Indices below the count
             # of pre-existing siblings map positionally onto them; higher
             # indices belong to siblings we synthesize during this pass.
-            preexisting = preexisting_expansions.get(diag_error.line, [])
+            preexisting = preexisting_expansions.get(anchor, [])
             if expansion_index < len(preexisting):
                 diag = preexisting[expansion_index]
             else:
-                diag = synthesized_expansions.get(
-                    (diag_error.line, expansion_index)
-                )
+                diag = synthesized_expansions.get(anchor + (expansion_index,))
                 # A synthesized sibling has a higher index than every
-                # pre-existing sibling, so it must be laid out after them for
-                # source order to match expansion-index order. Anchor it below
-                # the last pre-existing sibling instead of stacking it above.
-                # Siblings are processed highest-index-first, so anchoring each
-                # to the same line still lays them out in ascending order.
+                # pre-existing sibling at this anchor, so it must be laid out
+                # after them for source order to match expansion-index order.
+                # It must also be laid out after every expansion directive
+                # anchored further left on the same line, so that directives
+                # sharing a target line read in ascending column order. Anchor
+                # to whichever of those candidates sits lowest in the file
+                # instead of stacking above them.
+                #
+                # Siblings at one anchor are processed highest-index-first, and
+                # each is anchored to the same line, so they still end up in
+                # ascending index order. Distinct anchors resolve independently
+                # of processing order: whichever column is handled first, a
+                # later lower column stacks above it and a later higher column
+                # anchors below it.
+                anchor_candidates = []
                 if preexisting:
-                    sibling_anchor = preexisting[-1].line
+                    anchor_candidates.append(preexisting[-1].line)
+                left = find_last_expansion_left_of(
+                    orig_lines, bool(nested_context), diag_error, prefix
+                )
+                if left is not None:
+                    anchor_candidates.append(left.line)
+                if anchor_candidates:
+                    sibling_anchor = max(
+                        anchor_candidates, key=lambda line: line.line_n
+                    )
         else:
             other_diags = find_other_targeting(
                 lines, orig_lines, bool(nested_context), diag_error, prefix
@@ -1255,9 +1328,7 @@ def update_lines(
                 insert_after=sibling_anchor,
             )
             if is_indexed_expansion:
-                synthesized_expansions[
-                    (diag_error.line, expansion_index)
-                ] = diag
+                synthesized_expansions[anchor + (expansion_index,)] = diag
         if isinstance(diag_error, NestedDiag):
             if not diag.closer:
                 whitespace = (
@@ -1475,6 +1546,7 @@ def update_test_file(filename, diag_errors, prefix, updated_test_files):
 
     expansion_context = []
     children_context = None
+    unmatched_closers = []
     for line in lines:
         dprint(f"parsing line {line.render()}")
         diag = parse_diag(line, filename, prefix, all_prefixes=True)
@@ -1499,6 +1571,20 @@ def update_test_file(filename, diag_errors, prefix, updated_test_files):
             else:
                 line._children_literal = children_context
             continue
+        if diag and diag.category == "closing":
+            if not expansion_context:
+                # A `// }}` with no matching `expected-expansion` opener above
+                # it. The verifier ignores such a stray closer, so it is
+                # punctuation left over from an expansion directive that is no
+                # longer there. Drop the whole line. `lines` is being iterated,
+                # so defer the removal until the file has been fully parsed.
+                dprint(f"  unmatched closer, dropping line")
+                unmatched_closers.append(line)
+                continue
+            dprint(f"  parsed closer {diag.render()}")
+            line.diag = diag
+            diag.parent = expansion_context.pop()
+            continue
         if diag:
             dprint(f"  parsed diag {diag.render()}")
             line.diag = diag
@@ -1515,12 +1601,13 @@ def update_test_file(filename, diag_errors, prefix, updated_test_files):
                 # than crashing here on an out-of-range line index.
             if diag.category == "expansion":
                 expansion_context.append(diag)
-            elif diag.category == "closing":
-                expansion_context.pop()
             elif _opens_children_block(line.content):
                 children_context = diag
         else:
             dprint(f"  no diag")
+
+    for closer_line in unmatched_closers:
+        remove_line(closer_line, lines)
 
     # Fold `{{children:...}}` blocks before expansions so that child notes
     # nested inside an `expected-expansion` are pulled onto their parent nested
