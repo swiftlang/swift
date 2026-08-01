@@ -267,6 +267,9 @@ ERROR(self_inside_catch_superselfinit,none,
 ERROR(return_from_init_without_initing_stored_properties,none,
       "return from initializer without initializing all"
       " stored properties", ())
+ERROR(return_from_failable_init_without_nil,none,
+      "return from failable initializer before initializing all stored "
+      "properties; did you mean to return 'nil'?", ())
 
 ERROR(explicit_store_of_compilerinitialized,none,
       "illegal assignment to '@_compilerInitialized' storage", ())
