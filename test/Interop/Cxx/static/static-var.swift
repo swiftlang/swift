@@ -21,7 +21,7 @@ StaticVarTestSuite.test("static-int-write-from-swift") {
   expectEqual(3, getStaticVarFromCxx())
 }
 
-StaticVarTestSuite.test("static-int") {
+StaticVarTestSuite.test("static-int-write-from-cxx") {
   expectNotEqual(4, staticVar)
   setStaticVarFromCxx(4)
   expectEqual(4, staticVar)

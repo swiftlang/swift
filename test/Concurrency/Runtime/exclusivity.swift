@@ -361,7 +361,7 @@ struct Runner {
 
         // These are additional tests that used to be FileChecked but FileCheck
         // was too hard to use in a concurrent context.
-        exclusivityTests.test("case1") { @MainActor in
+        exclusivityTests.test("case1 with nested task") { @MainActor in
             @inline(never)
             @Sendable func callee2(_ x: inout Int, _ y: inout Int, _ z: inout Int) -> Void {
                 debugLog("==> Enter callee2")

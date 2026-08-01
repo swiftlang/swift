@@ -137,7 +137,7 @@ func adoreIfYouCan(_ value: Any) -> String {
   return "bah humbug"
 }
 
-ProtocolReorderRequirementsTest.test("ReorderProtocolRequirements") {
+ProtocolReorderRequirementsTest.test("ConditionalConformanceAfterReordering") {
   let adult1 = Adult<SillyBaby>()
   let exclamation1 = adoreIfYouCan(adult1)
   expectEqual(exclamation1, "awwwwwww")
@@ -148,4 +148,3 @@ ProtocolReorderRequirementsTest.test("ReorderProtocolRequirements") {
 }
 
 runAllTests()
-

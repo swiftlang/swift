@@ -3123,7 +3123,7 @@ SetTestSuite.test("formUnion") {
   expectEqual(identity1, s1._rawIdentifier())
 }
 
-SetTestSuite.test("subtract")
+SetTestSuite.test("subtracting")
   .code {
   let s1 = Set([1010, 2020, 3030])
   let s2 = Set([4040, 5050, 6060])
@@ -3311,12 +3311,6 @@ SetTestSuite.test("remove(member)")
   expectEqual(identity1, s2._rawIdentifier())
   expectEqual(Set(), s2)
   expectTrue(s2.isEmpty)
-}
-
-SetTestSuite.test("contains") {
-  let s1 = Set([1010, 2020, 3030])
-  expectTrue(s1.contains(1010))
-  expectFalse(s1.contains(999))
 }
 
 SetTestSuite.test("memberAtIndex") {

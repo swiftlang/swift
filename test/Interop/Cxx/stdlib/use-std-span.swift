@@ -515,7 +515,7 @@ StdSpanTestSuite.test("Span inside C++ struct") {
   expectEqual(sfilterResult, ["ab", "abc"])
 }
 
-StdSpanTestSuite.test("Span inside C++ struct") {
+StdSpanTestSuite.test("Const span inside C++ struct") {
   let spb = getStructSpanBox()
   expectEqual(spb.icspan.size(), 3)
   expectFalse(spb.icspan.empty())

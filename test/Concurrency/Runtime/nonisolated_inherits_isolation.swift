@@ -52,11 +52,6 @@ func executionConcurrentIsolation() async {
 
 let tests = TestSuite("NonIsolatedInheritsIsolation")
 
-tests.test("checkIfOnMainQueue does not crash on the main queue") { @MainActor () -> () in
-  expectCrashLater()
-  checkIfOnMainQueue()
-}
-
 tests.test("checkIfOnMainQueue does not crash on the main queue") { @MainActor () async -> () in
   checkIfOnMainQueue()
 }

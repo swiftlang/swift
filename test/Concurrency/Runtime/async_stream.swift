@@ -398,7 +398,7 @@ class NotSendable {}
         expectTrue(expectation.fulfilled)
       }
 
-      tests.test("cancellation behavior on deinit with no values being awaited") {
+      tests.test("cancellation reason on deinit with no values being awaited") {
         let expectation = Expectation()
 
         func scopedLifetime(_ expectation: Expectation) {

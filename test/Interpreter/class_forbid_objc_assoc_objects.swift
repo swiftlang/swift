@@ -186,13 +186,13 @@ final class GenericUnableToHaveAssocObjectsSubClass<T> : GenericAbleToHaveAssocO
 }
 
 if #available(SwiftStdlib 5.0, *) {
-  Tests.test("no crash when set assoc object set only on child subclass, but assoc to parent")
+  Tests.test("no crash when set assoc object on generic parent with marked child")
   .code {
     let x = GenericAbleToHaveAssocObjectsParentClass(state: 5)
     objc_setAssociatedObject(x, "myKey", "myValue", .OBJC_ASSOCIATION_RETAIN)
   }
 
-  Tests.test("crash when set assoc object set only on child subclass")
+  Tests.test("crash when set assoc object on marked generic child")
   .crashOutputMatches("objc_setAssociatedObject called on instance")
   .code {
     expectCrashLater()
@@ -215,7 +215,7 @@ final class GenericUnableToHaveAssocObjectsSubClass2<T> : GenericAbleToHaveAssoc
 }
 
 if #available(SwiftStdlib 5.0, *) {
-  Tests.test("crash when set assoc object set only on parent class")
+  Tests.test("crash when set assoc object on generic child with marked parent")
   .crashOutputMatches("objc_setAssociatedObject called on instance")
   .code {
     expectCrashLater()
@@ -229,7 +229,7 @@ class GenericUnableToHaveAssocObjectsSubClass3<T> : GenericAbleToHaveAssocObject
 }
 
 if #available(SwiftStdlib 5.0, *) {
-  Tests.test("crash when set assoc object set only on parent class, child not final")
+  Tests.test("crash when set assoc object on non-final generic child with marked parent")
   .crashOutputMatches("objc_setAssociatedObject called on instance")
   .code {
     expectCrashLater()

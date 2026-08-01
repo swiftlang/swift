@@ -243,7 +243,7 @@ extension AsyncSequence where Element: Equatable {
       }
     }
 
-    AsyncSequenceTests.test("contains throws upstream") {
+    AsyncSequenceTests.test("contains predicate throws upstream") {
       do {
         _ = try await [1, 2, 3].async
           .throw(Failure(value: 42), on: 2)
@@ -307,7 +307,7 @@ extension AsyncSequence where Element: Equatable {
       expectFalse(result)
     }
 
-    AsyncSequenceTests.test("contains throws upstream") {
+    AsyncSequenceTests.test("contains element throws upstream") {
       do {
         _ = try await [1, 2, 3].async.throw(Failure(value: 42), on: 2).contains(4)
         expectUnreachable()

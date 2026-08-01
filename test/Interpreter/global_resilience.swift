@@ -76,7 +76,7 @@ let myLargeGlobalUninitialized: MyLargeResilientStruct
 
 myLargeGlobalUninitialized = MyLargeResilientStruct(w: 9, x: 10, y: 11, z: 12)
 
-ResilientGlobalTestSuite.test("MyLargeGlobal") {
+ResilientGlobalTestSuite.test("MyLargeGlobalUninitialized") {
   expectEqual(9, myLargeGlobalUninitialized.w)
   expectEqual(10, myLargeGlobalUninitialized.x)
   expectEqual(11, myLargeGlobalUninitialized.y)

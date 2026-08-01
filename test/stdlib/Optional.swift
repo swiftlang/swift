@@ -144,7 +144,7 @@ OptionalTests.test("initializers") {
   let _: C? = C()
 }
 
-OptionalTests.test("nil comparison") {
+OptionalTests.test("nil equality") {
   let v0: Int? = nil
   let v1: Int? = 1
 

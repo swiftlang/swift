@@ -95,7 +95,7 @@ FunctionTemplateClosuresTestSuite.test("indirectlyCallFunction<T> where T == () 
   expectEqual(value, 222)
 }
 
-FunctionTemplateClosuresTestSuite.test("indirectlyCallFunction<T> where T == () -> ()") {
+FunctionTemplateClosuresTestSuite.test("indirectlyCallFunction<T> with arguments") {
   var value: CInt = 0
 
   indirectlyCallFunctionWith42({(x: CInt) in value = x});
