@@ -71,7 +71,7 @@ entry(%flag : $Builtin.Int1):
   //   Allocate the buffer.
   // CHECK:         [[T0:%.*]] = alloca {{\[}}[[BUFFER_SIZE]] x i8], align [[BUFFER_ALIGN]]
   // CHECK-NEXT:    [[BUFFER:%.*]] = getelementptr inbounds{{.*}} {{\[}}[[BUFFER_SIZE]] x i8], ptr [[T0]], i32 0, i32 0
-  // CHECK-NEXT:    call void @llvm.lifetime.start.p0(i64 [[BUFFER_SIZE]], ptr [[BUFFER]])
+  // CHECK-NEXT:    call void @llvm.lifetime.start.p0(ptr [[BUFFER]])
 
   //   Prepare the continuation function pointer to block analysis.
   // CHECK-NEXT:    [[T0:%.*]] = call ptr @llvm.coro.prepare.retcon(ptr @test_simple)
@@ -88,7 +88,7 @@ yes:
   // CHECK-64-ptrauth: ptrtoint
   // CHECK-64-ptrauth-NEXT: ptrauth.blend
   // CHECK:    call swiftcc void [[CONTINUATION]](ptr noalias dereferenceable([[BUFFER_SIZE]]) [[BUFFER]], i1 false)
-  // CHECK-NEXT:    call void @llvm.lifetime.end.p0(i64 [[BUFFER_SIZE]], ptr [[BUFFER]])
+  // CHECK-NEXT:    call void @llvm.lifetime.end.p0(ptr [[BUFFER]])
   end_apply %token as $()
 
   // CHECK-NEXT:    br label
@@ -98,7 +98,7 @@ no:
   // CHECK-64-ptrauth: ptrtoint
   // CHECK-64-ptrauth-NEXT: ptrauth.blend
   // CHECK:    call swiftcc void [[CONTINUATION]](ptr noalias dereferenceable([[BUFFER_SIZE]]) [[BUFFER]], i1 true)
-  // CHECK-NEXT:    call void @llvm.lifetime.end.p0(i64 [[BUFFER_SIZE]], ptr [[BUFFER]])
+  // CHECK-NEXT:    call void @llvm.lifetime.end.p0(ptr [[BUFFER]])
   abort_apply %token
 
   // CHECK-NEXT:    br label
@@ -120,7 +120,7 @@ entry:
   //   Allocate the buffer.
   // CHECK:         [[T0:%.*]] = alloca {{\[}}[[BUFFER_SIZE]] x i8], align [[BUFFER_ALIGN]]
   // CHECK-NEXT:    [[BUFFER:%.*]] = getelementptr inbounds{{.*}} {{\[}}[[BUFFER_SIZE]] x i8], ptr [[T0]], i32 0, i32 0
-  // CHECK-NEXT:    call void @llvm.lifetime.start.p0(i64 [[BUFFER_SIZE]], ptr [[BUFFER]])
+  // CHECK-NEXT:    call void @llvm.lifetime.start.p0(ptr [[BUFFER]])
 
   //   Prepare the continuation function pointer to block analysis.
   // CHECK-NEXT:    [[T0:%.*]] = call ptr @llvm.coro.prepare.retcon(ptr @yields_pair)
@@ -138,7 +138,7 @@ entry:
   // CHECK-64-ptrauth-NEXT: ptrtoint
   // CHECK-64-ptrauth-NEXT: ptrauth.blend
   // CHECK-NEXT:    call swiftcc void [[CONTINUATION]](ptr noalias dereferenceable([[BUFFER_SIZE]]) [[BUFFER]], i1 false)
-  // CHECK-NEXT:    call void @llvm.lifetime.end.p0(i64 [[BUFFER_SIZE]], ptr [[BUFFER]])
+  // CHECK-NEXT:    call void @llvm.lifetime.end.p0(ptr [[BUFFER]])
   end_apply %token as $()
 
   // CHECK-NEXT:    call swiftcc void @marker(i32 [[SECOND]])

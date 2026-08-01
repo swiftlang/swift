@@ -97,7 +97,7 @@ public func functionWithMyResilientTypesSize(_ s: __owned MySize, f: (__owned My
 // CHECK: [[H:%.*]] = load [[INT]], ptr [[H_PTR]]
 
 
-// CHECK: call void @llvm.lifetime.start.p0({{i32|i64}} {{8|16}}, ptr [[DST]])
+// CHECK: call void @llvm.lifetime.start.p0(ptr [[DST]])
 
 // CHECK: [[W_ADDR:%.*]] = getelementptr inbounds{{.*}} %T17struct_resilience6MySizeV, ptr [[DST]], i32 0, i32 0
 // CHECK: [[W_PTR:%.*]] = getelementptr inbounds{{.*}} %TSi, ptr [[W_ADDR]], i32 0, i32 0
@@ -109,7 +109,7 @@ public func functionWithMyResilientTypesSize(_ s: __owned MySize, f: (__owned My
 
 
 // CHECK: call swiftcc void %2(ptr noalias sret({{.*}}) captures(none) %0, ptr noalias captures(none) dereferenceable({{8|16}}) [[DST]], ptr swiftself %3)
-// CHECK: call void @llvm.lifetime.end.p0({{i32|i64}} {{8|16}}, ptr [[DST]])
+// CHECK: call void @llvm.lifetime.end.p0(ptr [[DST]])
 
 // CHECK: ret void
 
