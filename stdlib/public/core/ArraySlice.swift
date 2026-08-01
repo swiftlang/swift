@@ -1080,8 +1080,9 @@ extension ArraySlice: RangeReplaceableCollection {
   public mutating func removeAll(keepingCapacity keepCapacity: Bool = false) {
     if !keepCapacity {
       _buffer = _Buffer()
-    }
-    else if _buffer.isMutableAndUniquelyReferenced() {
+    } else if isEmpty {
+      return
+    } else if _buffer.isMutableAndUniquelyReferenced() {
       self.replaceSubrange(indices, with: EmptyCollection())
     }
     else {
