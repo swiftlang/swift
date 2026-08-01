@@ -529,6 +529,24 @@ ImportPath::Module getRealModulePath(ImportPath::Builder &builder, ImportPath::M
   return builder.get().getModulePath(false);
 }
 
+/// Returns the name of a visible top-level module that differs from \p name
+/// only in capitalization, if there is exactly one such module.
+static Identifier findModuleNameDifferingOnlyInCase(ASTContext &ctx,
+                                                    Identifier name) {
+  SmallVector<Identifier, 16> visibleNames;
+  ctx.getVisibleTopLevelModuleNames(visibleNames);
+
+  Identifier result;
+  for (Identifier candidate : visibleNames) {
+    if (candidate == name || !candidate.str().equals_insensitive(name.str()))
+      continue;
+    if (!result.empty())
+      return Identifier();
+    result = candidate;
+  }
+  return result;
+}
+
 static void diagnoseNoSuchModule(ModuleDecl *importingModule,
                                  SourceLoc importLoc,
                                  ImportPath::Module modulePath,
@@ -555,6 +573,19 @@ static void diagnoseNoSuchModule(ModuleDecl *importingModule,
     if (realFront != sourceFront)
       ctx.Diags.diagnose(importLoc, diag::sema_module_aliased, sourceFront,
                          realFront);
+
+    // Suggest a module that differs from the written name only in
+    // capitalization. Skip this when the import was rewritten by
+    // -module-alias, since the fix-it would edit the aliased spelling.
+    const SourceLoc frontLoc = modulePath.front().Loc;
+    if (realFront == sourceFront && frontLoc.isValid()) {
+      Identifier corrected =
+          findModuleNameDifferingOnlyInCase(ctx, modulePath.front().Item);
+      if (!corrected.empty())
+        ctx.Diags
+            .diagnose(frontLoc, diag::sema_no_import_case_mismatch, corrected)
+            .fixItReplace(frontLoc, corrected.str());
+    }
   }
 
   if (ctx.SearchPathOpts.getSDKPath().empty() &&
