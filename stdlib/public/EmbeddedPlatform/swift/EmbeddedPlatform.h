@@ -47,7 +47,7 @@ typedef unsigned long long __swift_typeid_t;
  */
 typedef unsigned long long __swift_options_t;
 
-typedef __swift_ptrdiff_t swift_tls_key_t;
+typedef __swift_ptrdiff_t __swift_tls_key_t;
 
 /**
  * Number of reserved TLS keys used by Embedded Swift runtime components.
@@ -576,7 +576,7 @@ void _swift_mutexRecursive_unlock(void * EMBEDDED_SWIFT_NONNULL mutex);
  * described by `SWIFT_TLS_KEY_COUNT`. `destructor` may be NULL. This function
  * is called at most once for each key that needs a destructor.
  */
-void _swift_tls_init(swift_tls_key_t key,
+void _swift_tls_init(__swift_tls_key_t key,
                      __swift_tls_dtor_t EMBEDDED_SWIFT_NULLABLE destructor);
 
 /**
@@ -588,7 +588,7 @@ void _swift_tls_init(swift_tls_key_t key,
  *
  * Precondition: `key < SWIFT_TLS_KEY_COUNT`.
  */
-void * EMBEDDED_SWIFT_NULLABLE _swift_tls_get(swift_tls_key_t key);
+void * EMBEDDED_SWIFT_NULLABLE _swift_tls_get(__swift_tls_key_t key);
 
 /**
  * Stores a value for a TLS key in the current execution context.
@@ -598,7 +598,7 @@ void * EMBEDDED_SWIFT_NULLABLE _swift_tls_get(swift_tls_key_t key);
  *
  * Precondition: `key < SWIFT_TLS_KEY_COUNT`.
  */
-void _swift_tls_set(swift_tls_key_t key,
+void _swift_tls_set(__swift_tls_key_t key,
                     void * EMBEDDED_SWIFT_NULLABLE value);
 
 /**
@@ -618,7 +618,7 @@ __swift_ptrdiff_t _swift_thread_isMain(void);
  * This function can be implemented directly with a call to the POSIX exit()
  * function.
  */
-void _swift_exit(__swift_ptrdiff_t code);
+void _swift_exit(int code);
 
 #if defined(__cplusplus)
 }
