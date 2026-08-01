@@ -20,7 +20,7 @@ import Swift
 
 extension AsyncStream.Continuation.BufferingPolicy {
   func asStorageBufferingPolicy()
-  -> _AsyncStreamStorage<Element, Never>.Continuation.BufferingPolicy {
+  -> AsyncStream<Element>.Continuation.Storage.Continuation.BufferingPolicy {
     switch self {
     case .unbounded:
       return .unbounded
@@ -33,18 +33,6 @@ extension AsyncStream.Continuation.BufferingPolicy {
 }
 
 // Termination
-
-extension AsyncStream.Continuation.Termination {
-  func asStorageTermination()
-  -> _AsyncStreamStorage<Element, Never>.Continuation.Termination {
-    switch self {
-    case .finished:
-      return .finished(nil)
-    case .cancelled:
-      return .cancelled
-    }
-  }
-}
 
 extension _AsyncStreamStorage.Continuation.Termination {
   func asStreamTermination()
@@ -61,34 +49,19 @@ extension _AsyncStreamStorage.Continuation.Termination {
 // TerminationHandler
 
 extension AsyncStream.Continuation {
-  internal typealias StorageTerminationHandler =
-  @Sendable (_AsyncStreamStorage<Element, Never>.Continuation.Termination) -> Void
+  internal typealias TerminationHandlerBox =
+    _AsyncStreamTerminationHandlerBox<Element, Never, Termination>
 
-  internal typealias StreamTerminationHandler =
-  @Sendable (Termination) -> Void
+  func box(_ onTermination: (@Sendable (Termination) -> Void)?) -> TerminationHandlerBox? {
+    guard let onTermination else { return nil }
 
-  func adaptToStreamTerminationHandler(
-    _ onTermination: StorageTerminationHandler?
-  ) -> StreamTerminationHandler? {
-    guard
-      let onTermination
-    else { return nil }
-
-    return { @Sendable termination in
-      onTermination(termination.asStorageTermination())
+    return TerminationHandlerBox(handler: onTermination) { termination in
+      termination.asStreamTermination()
     }
   }
 
-  func adaptToStorageTerminationHandler(
-    _ onTermination: StreamTerminationHandler?
-  ) -> StorageTerminationHandler? {
-    guard
-      let onTermination
-    else { return nil }
-
-    return { @Sendable termination in
-      onTermination(termination.asStreamTermination())
-    }
+  func unbox(_ box: TerminationHandlerBox?) -> (@Sendable (Termination) -> Void)? {
+    return box?.handler
   }
 }
 
@@ -114,7 +87,7 @@ extension _AsyncStreamStorage.Continuation.YieldResult {
 
 extension AsyncThrowingStream.Continuation.BufferingPolicy {
   func asStorageBufferingPolicy()
-  -> _AsyncStreamStorage<Element, Failure>.Continuation.BufferingPolicy {
+  -> AsyncThrowingStream<Element, Failure>.Continuation.Storage.Continuation.BufferingPolicy {
     switch self {
     case .unbounded:
       return .unbounded
@@ -127,18 +100,6 @@ extension AsyncThrowingStream.Continuation.BufferingPolicy {
 }
 
 // Termination
-
-extension AsyncThrowingStream.Continuation.Termination {
-  func asStorageTermination()
-  -> _AsyncStreamStorage<Element, Failure>.Continuation.Termination {
-    switch self {
-    case .finished:
-      return .finished(nil)
-    case .cancelled:
-      return .cancelled
-    }
-  }
-}
 
 extension _AsyncStreamStorage.Continuation.Termination {
   func asStreamTermination()
@@ -155,34 +116,19 @@ extension _AsyncStreamStorage.Continuation.Termination {
 // TerminationHandler
 
 extension AsyncThrowingStream.Continuation {
-  internal typealias StorageTerminationHandler =
-  @Sendable (_AsyncStreamStorage<Element, Failure>.Continuation.Termination) -> Void
+  internal typealias TerminationHandlerBox =
+    _AsyncStreamTerminationHandlerBox<Element, Failure, Termination>
 
-  internal typealias StreamTerminationHandler =
-  @Sendable (Termination) -> Void
+  func box(_ onTermination: (@Sendable (Termination) -> Void)?) -> TerminationHandlerBox? {
+    guard let onTermination else { return nil }
 
-  func adaptToStreamTerminationHandler(
-    _ onTermination: StorageTerminationHandler?
-  ) -> StreamTerminationHandler? {
-    guard
-      let onTermination
-    else { return nil }
-
-    return { @Sendable termination in
-      onTermination(termination.asStorageTermination())
+    return TerminationHandlerBox(handler: onTermination) { termination in
+      termination.asStreamTermination()
     }
   }
 
-  func adaptToStorageTerminationHandler(
-    _ onTermination: StreamTerminationHandler?
-  ) -> StorageTerminationHandler? {
-    guard
-      let onTermination
-    else { return nil }
-
-    return { @Sendable termination in
-      onTermination(termination.asStreamTermination())
-    }
+  func unbox(_ box: TerminationHandlerBox?) -> (@Sendable (Termination) -> Void)? {
+    return box?.handler
   }
 }
 
