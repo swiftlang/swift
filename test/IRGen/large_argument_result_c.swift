@@ -18,7 +18,7 @@
 // CHECK:  [[BOX:%.*]] = call noalias ptr @swift_allocObject(
 // CHECK:  [[ADDR_IN_BOX:%.*]] = getelementptr inbounds{{.*}} i8, ptr [[BOX]], i64 16
 // CHECK:  call void @llvm.memcpy.p0.p0.i64(ptr {{.*}} [[ADDR_IN_BOX]], ptr {{.*}} [[CALL_ALLOCA]], i64 128, i1 false)
-// CHECK:  call void @llvm.lifetime.end.p0(i64 128, ptr nonnull [[CALL_ALLOCA]])
+// CHECK:  call void @llvm.lifetime.end.p0(ptr nonnull [[CALL_ALLOCA]])
 public func runTest(_ l : large_thing) {
   let r = pass_and_return(l, l)
   print(r)
