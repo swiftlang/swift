@@ -1025,12 +1025,11 @@ static bool anySubobjectsSelfContained(const clang::CXXRecordDecl *decl) {
     return true;
 
   auto checkType = [](clang::QualType t) {
-    if (auto recordType = dyn_cast<clang::RecordType>(t.getCanonicalType())) {
-      if (auto cxxRecord =
-              dyn_cast<clang::CXXRecordDecl>(recordType->getDecl())) {
-        return anySubobjectsSelfContained(cxxRecord);
-      }
-    }
+    // N.B. Use Type::getAsCXXRecordDecl() rather than reaching for
+    // RecordType::getDecl(): the latter can be any declaration of the record,
+    // and Swift attributes are not propagated across redeclarations.
+    if (auto *cxxRecord = t->getAsCXXRecordDecl())
+      return anySubobjectsSelfContained(cxxRecord);
 
     return false;
   };
@@ -1089,28 +1088,25 @@ bool importer::shouldRenameCXXMethodAsUnsafe(const clang::CXXMethodDecl *method,
 
   // Try to figure out the semantics of the return type. If it's a
   // pointer/iterator, it's unsafe.
-  if (auto returnType = dyn_cast<clang::RecordType>(
-          method->getReturnType().getCanonicalType())) {
-    if (auto cxxRecordReturnType =
-            dyn_cast<clang::CXXRecordDecl>(returnType->getDecl())) {
-      if (isSwiftClassType(cxxRecordReturnType))
-        return false;
+  if (auto *cxxRecordReturnType =
+          method->getReturnType()->getAsCXXRecordDecl()) {
+    if (isSwiftClassType(cxxRecordReturnType))
+      return false;
 
-      if (hasIteratorAPIAttr(cxxRecordReturnType) ||
-          hasIteratorCategory(cxxRecordReturnType))
-        return true;
+    if (hasIteratorAPIAttr(cxxRecordReturnType) ||
+        hasIteratorCategory(cxxRecordReturnType))
+      return true;
 
-      // Mark this as safe to help our diganostics down the road.
-      if (!cxxRecordReturnType->getDefinition()) {
-        return false;
-      }
+    // Mark this as safe to help our diganostics down the road.
+    if (!cxxRecordReturnType->getDefinition()) {
+      return false;
+    }
 
-      // A projection of a view type (such as a string_view) from a self
-      // contained parent is a proejction (unsafe).
-      if (!anySubobjectsSelfContained(cxxRecordReturnType) &&
-          isViewType(cxxRecordReturnType)) {
-        return parentIsSelfContained;
-      }
+    // A projection of a view type (such as a string_view) from a self
+    // contained parent is a proejction (unsafe).
+    if (!anySubobjectsSelfContained(cxxRecordReturnType) &&
+        isViewType(cxxRecordReturnType)) {
+      return parentIsSelfContained;
     }
   }
 
