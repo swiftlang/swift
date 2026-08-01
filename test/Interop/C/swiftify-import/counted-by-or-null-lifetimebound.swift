@@ -99,7 +99,7 @@ int * __counted_by_or_null(len - offset) complexExpr(int len, int offset, int le
 // }}
 int * __counted_by_or_null(len) _Null_unspecified nullUnspecified(int len, int len2, int * _Null_unspecified p __counted_by_or_null(len2) __lifetimebound);
 
-// expected-experimental-warning@+14{{combining '__counted_by_or_null' and '_Nonnull'; did you mean '__counted_by' instead?}}
+// expected-experimental-warning@+14 2 {{combining '__counted_by_or_null' and '_Nonnull'; did you mean '__counted_by' instead?}}
 // expected-experimental-expansion@+13:85{{
 //   expected-experimental-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-experimental-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_lifetime(p: copy p) @_disfavoredOverload public func nonnull(_ len: CInt, _ p: inout MutableSpan<CInt>) -> MutableSpan<CInt> {|}}
