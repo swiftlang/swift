@@ -266,33 +266,6 @@ internal final class _AsyncStreamStorage<
   }
 }
 
-/// Holds the termination handler an adopter installed through the public
-/// `Continuation.onTermination` setter.
-@safe
-internal final class _AsyncStreamTerminationHandlerBox<
-  Element, Failure: Error, TerminationType
->: Sendable {
-  typealias StorageTermination =
-    _AsyncStreamStorage<Element, Failure, TerminationType>.Continuation.Termination
-
-  let handler: @Sendable (TerminationType) -> Void
-  private let invokeHandler: @Sendable (StorageTermination) -> Void
-
-  /// `map` translates the storage's `Termination` and is installed once, when
-  /// the box is created, so no wrapper is ever appended to `handler` itself
-  init(
-    handler: @escaping @Sendable (TerminationType) -> Void,
-    map: @escaping @Sendable (StorageTermination) -> TerminationType
-  ) {
-    self.handler = handler
-    self.invokeHandler = { termination in handler(map(termination)) }
-  }
-
-  func invoke(_ termination: StorageTermination) {
-    self.invokeHandler(termination)
-  }
-}
-
 extension _AsyncStreamStorage.StateMachine {
   enum BufferingNewestDecision {
     case append
@@ -326,11 +299,8 @@ extension _AsyncStreamStorage.StateMachine {
     }
   }
 
-  /// Set a termination handler.
-  ///
-  /// - Returns: the previous handler, if there was one.
   mutating func setOnTermination(_ newValue: TerminationHandler?) -> TerminationHandler? {
-    var previous: TerminationHandler? = nil
+    let previous: TerminationHandler?
 
     switch unsafe consume self.state { // TODO: Set a TerminationHandler only in certain states
     case .idle(var idle):
