@@ -543,6 +543,10 @@ SwiftDependencyScanningService::SwiftDependencyScanningService()
   // the optimization safely. Swift can handle the working directory
   // optimizaiton already so it is safe to turn on all optimizations.
   opts.OptimizeArgs = clang::dependencies::ScanningOptimizations::All;
+  // The Swift scanner relies on the set of Clang modules visible from each
+  // by-name module lookup to resolve Swift overlay and cross-import overlay
+  // dependencies, so opt into having Clang report them.
+  opts.ReportVisibleModules = true;
   opts.MakeVFS = ClangScanningFSFactory;
 
   ClangScanningService.emplace(std::move(opts));
@@ -692,6 +696,8 @@ bool SwiftDependencyScanningService::setupCachingDependencyScanningService(
     // impact CAS. We set the optization to all to be consistent with the
     // non-CAS case.
     opts.OptimizeArgs = clang::dependencies::ScanningOptimizations::All;
+    // See the non-CAS case above.
+    opts.ReportVisibleModules = true;
     opts.Compilation = clang::dependencies::IncludeTreeCompilation{
         CASOpts, Instance.getSharedCASInstance(),
         Instance.getSharedCacheInstance()};
