@@ -5762,7 +5762,10 @@ ClangTypeEscapability::evaluate(Evaluator &evaluator,
     auto type = stack.back();
     stack.pop_back();
     if (const auto *recordType = type->getAs<clang::RecordType>()) {
-      auto recordDecl = recordType->getDecl();
+      // N.B. RecordType::getDecl() can be any declaration of the record, and
+      // Swift attributes are not propagated across redeclarations, so look at
+      // the definition.
+      auto recordDecl = recordType->getDecl()->getDefinitionOrSelf();
       if (hasNonEscapableAttr(recordDecl))
         return CxxEscapability::NonEscapable;
       if (hasEscapableAttr(recordDecl))
@@ -8414,19 +8417,19 @@ static bool hasPointerInSubobjects(const clang::CXXRecordDecl *decl) {
     if (t->isPointerType())
       return true;
 
-    if (auto recordType = dyn_cast<clang::RecordType>(t.getCanonicalType())) {
-      if (auto cxxRecord =
-              dyn_cast<clang::CXXRecordDecl>(recordType->getDecl())) {
-        if (hasImportReferenceAttr(cxxRecord) || hasOwnedValueAttr(cxxRecord) ||
-            hasUnsafeAPIAttr(cxxRecord))
-          return false;
+    // N.B. Use Type::getAsCXXRecordDecl() rather than reaching for
+    // RecordType::getDecl(): the latter can be any declaration of the record,
+    // and Swift attributes are not propagated across redeclarations.
+    if (auto *cxxRecord = t->getAsCXXRecordDecl()) {
+      if (hasImportReferenceAttr(cxxRecord) || hasOwnedValueAttr(cxxRecord) ||
+          hasUnsafeAPIAttr(cxxRecord))
+        return false;
 
-        if (hasIteratorAPIAttr(cxxRecord) || hasIteratorCategory(cxxRecord))
-          return true;
+      if (hasIteratorAPIAttr(cxxRecord) || hasIteratorCategory(cxxRecord))
+        return true;
 
-        if (hasPointerInSubobjects(cxxRecord))
-          return true;
-      }
+      if (hasPointerInSubobjects(cxxRecord))
+        return true;
     }
 
     return false;
@@ -8590,7 +8593,7 @@ CxxValueSemantics::evaluate(Evaluator &evaluator,
     if (!recordType)
       return;
 
-    auto recordDecl = recordType->getDecl();
+    auto recordDecl = recordType->getDecl()->getDefinitionOrSelf();
     if (seen.insert({recordDecl, isBase}).second) {
       // When a reference type is copied, the pointer’s value is copied rather
       // than the object’s storage. This means reference types can be imported
