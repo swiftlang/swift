@@ -511,6 +511,25 @@ ManagedValue Transform::transform(ManagedValue v,
   if (v.getType() == loweredResultTy)
     return v;
 
+  // Unwrap MoveOnlyWrapped if the output type is not wrapped.
+  if (v.getType().isMoveOnlyWrapped() && !loweredResultTy.isMoveOnlyWrapped()) {
+    if (v.getType().isAddress()) {
+      v = SGF.B.createMoveOnlyWrapperToCopyableAddr(Loc, v);
+    } else {
+      if (v.hasCleanup()) {
+        v = SGF.B.createOwnedMoveOnlyWrapperToCopyableValue(Loc, v);
+      } else {
+        v = SGF.B.createGuaranteedMoveOnlyWrapperToCopyableValue(Loc, v);
+      }
+    }
+    
+    if (v.getType() == loweredResultTy)
+      return v;
+      
+    return transform(v, inputOrigType, inputSubstType->getWithoutSpecifierType()->getCanonicalType(),
+                     outputOrigType, outputSubstType, loweredResultTy, ctxt);
+  }
+
   CanType inputObjectType = inputSubstType.getOptionalObjectType();
   bool inputIsOptional = (bool) inputObjectType;
 
