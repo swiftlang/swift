@@ -147,7 +147,7 @@ public distributed actor MyOtherActor {
 // CHECK-NEXT: [[TASK_REF:%.*]] = extractvalue { i8*, %swift.error* } [[THUNK_RESULT]], 0
 // CHECK-NEXT: [[CALLER_ASYNC_CTXT:%.*]] = load ptr, ptr [[TASK_REF]]
 // CHECK-NEXT:  store ptr [[CALLER_ASYNC_CTXT]], ptr
-// CHECK: {{.*}} = call i1 (i8*, i1, ...) @llvm.coro.end.async({{.*}}, %swift.context* {{.*}}, %swift.error* {{.*}})
+// CHECK: call void (i8*, i1, ...) @llvm.coro.end.async({{.*}}, %swift.context* {{.*}}, %swift.error* {{.*}})
 
 /// ---> Thunk and distributed method accessor for `simple2`
 
@@ -189,7 +189,7 @@ public distributed actor MyOtherActor {
 // CHECK: store i8 {{.*}}, i8* %._guts2._object._discriminator._value
 // CHECK: store i16 {{.*}}, i16* %._guts2._object._flags._value, align 2
 
-// CHECK: {{.*}} = call i1 (i8*, i1, ...) @llvm.coro.end.async({{.*}}, %swift.context* {{.*}}, %swift.error* {{.*}})
+// CHECK: call void (i8*, i1, ...) @llvm.coro.end.async({{.*}}, %swift.context* {{.*}}, %swift.error* {{.*}})
 
 /// ---> Thunk and distributed method accessor for `simple3`
 
@@ -254,7 +254,7 @@ public distributed actor MyOtherActor {
 // CHECK: [[INT_RES:%.*]] = extractvalue { i8*, i32, %swift.error* } [[THUNK_RESULT]], 1
 // CHECK: %._value = getelementptr inbounds %TSi, %TSi* [[TYPED_RESULT_BUFF]], i32 0, i32 0
 // CHECK: store i32 [[INT_RES]], i32* %._value
-// CHECK: {{.*}} = call i1 (i8*, i1, ...) @llvm.coro.end.async({{.*}}, %swift.context* {{.*}}, %swift.error* {{.*}})
+// CHECK: call void (i8*, i1, ...) @llvm.coro.end.async({{.*}}, %swift.context* {{.*}}, %swift.error* {{.*}})
 
 /// --> Thunk and distributed method accessor for `single_case_enum`
 
@@ -266,7 +266,7 @@ public distributed actor MyOtherActor {
 
 // SKIP: [[THUNK_REF:%.*]] = bitcast void (%swift.context*, %T27distributed_actor_accessors7MyActorC*)* {{.*}} to i8*
 // SKIP: {{.*}} = call { i8*, %swift.error* } (i32, i8*, i8*, ...) @llvm.coro.suspend.async.sl_p0i8p0s_swift.errorss({{.*}}, i8* [[THUNK_REF]], %swift.context* {{.*}}, %T27distributed_actor_accessors7MyActorC* {{.*}})
-// SKIP: {{.*}} = call i1 (i8*, i1, ...) @llvm.coro.end.async({{.*}}, i8* {{.*}}, %swift.context* {{.*}}, %swift.error* {{.*}})
+// SKIP: call void (i8*, i1, ...) @llvm.coro.end.async({{.*}}, i8* {{.*}}, %swift.context* {{.*}}, %swift.error* {{.*}})
 
 /// --> Thunk and distributed method accessor for `with_indirect_enums`
 
@@ -301,7 +301,7 @@ public distributed actor MyOtherActor {
 // CHECK: [[NATIVE_RESULT_PTR:%.*]] = bitcast %T27distributed_actor_accessors9IndirectEO* [[TYPED_RESULT_BUFF]] to i32*
 // CHECK-NEXT: store i32 [[ENUM_RESULT]], i32* [[NATIVE_RESULT_PTR]]
 
-// CHECK: {{.*}} = call i1 (i8*, i1, ...) @llvm.coro.end.async({{.*}}, %swift.context* {{.*}}, %swift.error* {{.*}})
+// CHECK: call void (i8*, i1, ...) @llvm.coro.end.async({{.*}}, %swift.context* {{.*}}, %swift.error* {{.*}})
 
 /// ---> Thunk and distributed method for `complex`
 
@@ -361,7 +361,7 @@ public distributed actor MyOtherActor {
 
 /// RESULT is returned indirectly so there is nothing to pass to `end`
 
-// CHECK: {{.*}} = call i1 (i8*, i1, ...) @llvm.coro.end.async({{.*}}, %swift.context* {{.*}}, %swift.error* {{.*}})
+// CHECK: call void (i8*, i1, ...) @llvm.coro.end.async({{.*}}, %swift.context* {{.*}}, %swift.error* {{.*}})
 
 
 /// ---> Accessor for `genericArgs`
