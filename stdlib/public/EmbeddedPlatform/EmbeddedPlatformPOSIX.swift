@@ -84,8 +84,8 @@ public func _swift_writeToStandardOutput(
 
 @export(interface)
 @implementation @c
-public func _swift_exit(_ code: Int) {
-  exit(CInt(code))
+public func _swift_exit(_ code: CInt) {
+  exit(code)
 }
 
 /// The human-readable prefix that precedes an error message, chosen by the
