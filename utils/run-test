@@ -15,7 +15,7 @@ import shutil
 import sys
 
 from build_swift.build_swift import argparse
-from build_swift.build_swift.constants import SWIFT_SOURCE_ROOT
+from build_swift.build_swift.constants import SWIFT_BUILD_ROOT, SWIFT_SOURCE_ROOT
 
 from swift_build_support.swift_build_support import shell
 from swift_build_support.swift_build_support.targets import StdlibDeploymentTarget
@@ -41,6 +41,13 @@ TEST_SUBSETS = [
 SWIFT_SOURCE_DIR = os.path.join(SWIFT_SOURCE_ROOT, 'swift')
 TEST_SOURCE_DIR = os.path.join(SWIFT_SOURCE_DIR, 'test')
 VALIDATION_TEST_SOURCE_DIR = os.path.join(SWIFT_SOURCE_DIR, 'validation-test')
+
+BUILD_VARIANT_SUBDIRS = {
+    'Debug': 'Ninja-DebugAssert',
+    'RelWithDebInfo': 'Ninja-RelWithDebInfoAssert',
+    'Release': 'Ninja-ReleaseAssert',
+    'MinSizeRel': 'Ninja-MinSizeRelAssert',
+}
 
 
 def _get_default_llvm_source_dir():
@@ -121,6 +128,20 @@ def main():
                         help="run test with verbose output")
     parser.add_argument("--build-dir", type=os.path.realpath, metavar="PATH",
                         help="Swift build directory")
+    build_variant = parser.add_mutually_exclusive_group()
+    build_variant.add_argument("-d", "--debug", dest="build_variant",
+                               action="store_const", const="Debug",
+                               help="use the Debug build")
+    build_variant.add_argument("-r", "--release-debuginfo",
+                               dest="build_variant", action="store_const",
+                               const="RelWithDebInfo",
+                               help="use the RelWithDebInfo build")
+    build_variant.add_argument("-R", "--release", dest="build_variant",
+                               action="store_const", const="Release",
+                               help="use the Release build")
+    build_variant.add_argument("--min-size-release", dest="build_variant",
+                               action="store_const", const="MinSizeRel",
+                               help="use the MinSizeRel build")
     parser.add_argument("--build",
                         choices=["true", "verbose", "skip"], default='true',
                         help="build test dependencies before running tests "
@@ -178,7 +199,13 @@ def main():
 
     paths = []
 
+    if args.build_dir is not None and args.build_variant is not None:
+        parser.error("--build-dir cannot be combined with a build variant")
+
     build_dir = args.build_dir
+    if args.build_variant is not None:
+        build_dir = os.path.join(
+            SWIFT_BUILD_ROOT, BUILD_VARIANT_SUBDIRS[args.build_variant])
     if build_dir is not None:
         # Fixup build directory.
         # build_dir can be:
