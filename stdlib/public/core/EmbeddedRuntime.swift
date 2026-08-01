@@ -706,7 +706,8 @@ public func swift_bridgeObjectRetain(object: Builtin.RawPointer) -> Builtin.RawP
 public func swift_bridgeObjectRetain_n(object: Builtin.RawPointer, n: UInt32) -> Builtin.RawPointer {
   let objectBits = UInt(Builtin.ptrtoint_Word(object))
   let untaggedObject = unsafe Builtin.inttoptr_Word((objectBits & HeapObject.bridgeObjectToPlainObjectMask)._builtinWordValue)
-  return swift_retain_n(object: untaggedObject, n: n)
+  _ = swift_retain_n(object: untaggedObject, n: n)
+  return object
 }
 
 @c
