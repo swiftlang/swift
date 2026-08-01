@@ -5769,7 +5769,7 @@ ClangTypeEscapability::evaluate(Evaluator &evaluator,
       auto conditionalParams = getConditionalEscapableAttrParams(recordDecl);
 
       if (!STLParams.empty() || !conditionalParams.empty()) {
-        hasUnknown &= checkConditionalParams<CxxEscapability>(
+        hasUnknown |= checkConditionalParams<CxxEscapability>(
             recordDecl, desc.impl, STLParams, conditionalParams,
             maybePushToStack);
         continue;
@@ -8615,7 +8615,7 @@ CxxValueSemantics::evaluate(Evaluator &evaluator,
       if (!STLParams.empty() || !conditionalParams.empty()) {
         if (isa<clang::ClassTemplateSpecializationDecl>(recordDecl) &&
             importerImpl) {
-          hasUnknown &= checkConditionalParams<CxxValueSemanticsKind>(
+          hasUnknown |= checkConditionalParams<CxxValueSemanticsKind>(
               recordDecl, importerImpl, STLParams, conditionalParams,
               maybePushToStack);
         }
