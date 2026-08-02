@@ -4,7 +4,6 @@ add_library(swiftStdlibStubs OBJECT
   LibcShims.cpp
   Random.cpp
   Stubs.cpp
-  ThreadLocalStorage.cpp
   MathStubs.cpp
   Unicode/UnicodeData.cpp
   Unicode/UnicodeEmoji.cpp
