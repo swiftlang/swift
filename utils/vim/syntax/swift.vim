@@ -98,6 +98,7 @@ syn keyword swiftScope
 
 syn keyword swiftFuncAttribute skipwhite skipempty nextgroup=swiftFuncDefinition
       \ borrowing
+      \ consuming
       \ mutating
 syn keyword swiftFuncDefinition skipwhite skipempty nextgroup=swiftTypeName,swiftOperator
       \ func
