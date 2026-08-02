@@ -44,6 +44,12 @@ syn keyword swiftCoreTypes
       \ Any
       \ AnyObject
 
+syn keyword swiftExistentialType contained skipwhite skipempty nextgroup=swiftType
+      \ any
+
+syn keyword swiftOpaqueType contained skipwhite skipempty nextgroup=swiftType
+      \ some
+
 syn keyword swiftImport skipwhite skipempty nextgroup=swiftImportModule
       \ import
 
@@ -69,7 +75,9 @@ syn keyword swiftDefinitionModifier
       \ throws
       \ weak
 
-syn keyword swiftInOutKeyword skipwhite skipempty nextgroup=swiftTypeName
+syn keyword swiftTypeSpecifier contained skipwhite skipempty nextgroup=swiftTypeSpecifier,swiftExistentialType,swiftOpaqueType,swiftTypeName
+      \ borrowing
+      \ consuming
       \ inout
 
 syn keyword swiftIdentifierKeyword
@@ -145,27 +153,27 @@ syn match swiftImplicitVarName
 syn match swiftType contained skipwhite skipempty nextgroup=swiftTypeParameters
       \ /\<[A-Za-z_][A-Za-z_0-9\.]*\>[!?]\?/
 " [Type:Type] (dictionary) or [Type] (array)
-syn region swiftType contained contains=swiftTypePair,swiftType
+syn region swiftType contained contains=swiftTypePair,swiftType,swiftOpaqueType,swiftExistentialType
       \ matchgroup=Delimiter start=/\[/ end=/\]/
 syn match swiftTypePair contained skipwhite skipempty nextgroup=swiftTypeParameters,swiftTypeDeclaration
       \ /\<[A-Za-z_][A-Za-z_0-9\.]*\>[!?]\?/
 " (Type[, Type]) (tuple)
 " FIXME: we should be able to use skip="," and drop swiftParamDelim
-syn region swiftType contained contains=swiftType,swiftParamDelim
+syn region swiftType contained contains=swiftType,swiftParamDelim,swiftTypeSpecifier,swiftExistentialType,swiftOpaqueType
       \ matchgroup=Delimiter start="[^@]\?(" end=")" matchgroup=NONE skip=","
 syn match swiftParamDelim contained
       \ /,/
 " <Generic Clause> (generics)
-syn region swiftTypeParameters contained contains=swiftVarName,swiftConstraint
+syn region swiftTypeParameters contained contains=swiftVarName,swiftConstraint,swiftOpaqueType,swiftExistentialType
       \ matchgroup=Delimiter start="<" end=">" matchgroup=NONE skip=","
 syn keyword swiftConstraint contained
       \ where
 
-syn match swiftTypeAliasValue skipwhite skipempty nextgroup=swiftType
+syn match swiftTypeAliasValue skipwhite skipempty nextgroup=swiftExistentialType,swiftType
       \ /=/
-syn match swiftTypeDeclaration skipwhite skipempty nextgroup=swiftType,swiftInOutKeyword
+syn match swiftTypeDeclaration skipwhite skipempty nextgroup=swiftTypeSpecifier,swiftExistentialType,swiftOpaqueType,swiftOpaqueType,swiftType
       \ /:/
-syn match swiftTypeDeclaration skipwhite skipempty nextgroup=swiftType
+syn match swiftTypeDeclaration skipwhite skipempty nextgroup=swiftExistentialType,swiftOpaqueType,swiftType
       \ /->/
 
 syn match swiftKeyword
@@ -224,9 +232,9 @@ syn match swiftAttribute
 
 syn keyword swiftTodo MARK TODO FIXME contained
 
-syn match swiftCastOp skipwhite skipempty nextgroup=swiftType,swiftCoreTypes
+syn match swiftCastOp skipwhite skipempty nextgroup=swiftExistentialType,swiftType,swiftCoreTypes
       \ "\<is\>"
-syn match swiftCastOp skipwhite skipempty nextgroup=swiftType,swiftCoreTypes
+syn match swiftCastOp skipwhite skipempty nextgroup=swiftExistentialType,swiftType,swiftCoreTypes
       \ "\<as\>[!?]\?"
 
 syn match swiftNilOps
@@ -250,7 +258,7 @@ hi def link swiftTypeName Function
 hi def link swiftConstraint Special
 hi def link swiftFuncDefinition Define
 hi def link swiftDefinitionModifier Operator
-hi def link swiftInOutKeyword Define
+hi def link swiftExistentialType Type
 hi def link swiftFuncAttribute Statement
 hi def link swiftFuncKeyword Function
 hi def link swiftFuncKeywordGeneral Function
@@ -262,6 +270,7 @@ hi def link swiftIdentifierKeyword Identifier
 hi def link swiftTypeAliasValue Delimiter
 hi def link swiftTypeDeclaration Delimiter
 hi def link swiftTypeParameters Delimiter
+hi def link swiftTypeSpecifier Define
 hi def link swiftBoolean Boolean
 hi def link swiftString String
 hi def link swiftInterpolation Special
@@ -272,6 +281,7 @@ hi def link swiftHex Number
 hi def link swiftOct Number
 hi def link swiftBin Number
 hi def link swiftOperator Function
+hi def link swiftOpaqueType Type
 hi def link swiftChar Character
 hi def link swiftLabel Operator
 hi def link swiftPreproc PreCondit
