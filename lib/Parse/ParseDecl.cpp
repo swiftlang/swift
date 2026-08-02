@@ -2282,12 +2282,12 @@ struct Field {
   void append(Identifier argument, SourceLoc argumentLoc) {
     if (arguments.empty()) {
       argumentsRange.Start = argumentLoc;
-    } else {
-      argumentsRange.End = argumentLoc;
     }
+    argumentsRange.End = argumentLoc;
     arguments.push_back(argument);
   }
   
+  /// The count of arguments
   int size() {
     return arguments.size();
   }
@@ -2300,9 +2300,39 @@ struct Field {
     SourceRange range;
     if (!fieldName.empty()) {
       range.Start = fieldNameLoc;
+      range.End = fieldNameEndLoc();
     }
-    range.widen(argumentsRange);
+    if (argumentsRange.isValid()) {
+      range.widen(argumentsRange);
+    }
     return range;
+  }
+  
+  SourceLoc fieldNameEndLoc() {
+    unsigned nameLength = fieldName.getLength();
+    return fieldNameLoc.getAdvancedLoc(nameLength);
+  }
+  
+  StringRef getSourceText(SourceManager &sourceManager) {
+    return getSourceText(sourceManager, range());
+  }
+  
+  StringRef getSourceTextForArguments(SourceManager &sourceManager) {
+    return getSourceText(sourceManager, argumentsRange);
+  }
+  
+  StringRef getSourceText(SourceManager &sourceManager, SourceRange range) {
+    assert(range.isValid());
+    SourceLoc start = range.Start;
+    SourceLoc end = Lexer::getLocForEndOfToken(sourceManager, range.End);
+    
+    unsigned bufferID = sourceManager.findBufferContainingLoc(start);
+    assert(bufferID != 0 && "Buffer not found for range");
+    assert(sourceManager.findBufferContainingLoc(end) == bufferID
+                         && "Start and End of range are in different buffers");
+
+    CharSourceRange charRange = CharSourceRange(sourceManager, start, end);
+    return sourceManager.extractText(charRange, bufferID);
   }
 };
 
@@ -2335,6 +2365,7 @@ Parser::parseMacroRoleAttribute(
   SourceLoc lParenLoc = consumeAttributeLParen();
   SourceLoc rParenLoc;
   std::optional<MacroRole> role;
+  SourceLoc roleNameLoc;
   bool sawRole = false;
   bool sawConformances = false;
   bool sawNames = false;
@@ -2412,7 +2443,6 @@ Parser::parseMacroRoleAttribute(
               isAttached ? diag::macro_role_attr_expected_attached_kind
                          : diag::macro_role_attr_expected_freestanding_kind;
           Identifier roleName;
-          SourceLoc roleNameLoc;
           if (Tok.is(tok::kw_extension)) {
             roleNameLoc = consumeToken();
             role = MacroRole::Extension;
@@ -2486,8 +2516,13 @@ Parser::parseMacroRoleAttribute(
               this->CodeCompletionCallbacks->completeDeclAttrParam(
                   getParameterizedDeclAttributeKind(isAttached), /*index*/1, /*HasLabel=*/true);
             }
-          } else if (parseIdentifier(initializationContextIdentifier, initializationContextLoc,
-                                     diag::macro_attribute_initializer_unknown_argument, /*diagnoseDollarPrefix=*/true)) {
+          } else if (Tok.is(tok::comma)) {
+            // If there is a comma without identifier, the argument is missing.
+            return status;
+          } else if (parseIdentifier(
+                       initializationContextIdentifier, initializationContextLoc,
+                       diag::macro_attribute_initializer_unknown_argument, /*diagnoseDollarPrefix=*/true
+          )) {
             status.setIsParseError();
             return status;
           }
@@ -2597,20 +2632,62 @@ Parser::parseMacroRoleAttribute(
     if (initializationField) {
       int size = initializationField->size();
       if (size == 0) {
-        // TODO: Diagnose missing argument
+        SourceLoc argsLoc = initializationField->fieldNameEndLoc();
+        diagnose(argsLoc, diag::macro_attribute_initializer_missing_argument);
+        auto suggestInsertLazy = diagnose(argsLoc, diag::suggest_insert_argument, "lazy");
+        suggestInsertLazy.fixItInsert(argsLoc, " lazy");
+        auto suggestInsertEager = diagnose(argsLoc, diag::suggest_insert_argument, "eager");
+        suggestInsertEager.fixItInsert(argsLoc, " eager");
+        auto suggestRemoveParam = diagnose(argsLoc, diag::suggest_remove_param_for_default, initializationField->getSourceText(SourceMgr), "eager");
+        suggestRemoveParam.fixItRemove(initializationField->range());
         argumentsStatus.setIsParseError();
-        return argumentsStatus;
-      }
-      
-      if (size > 1) {
-        // TODO: Diagnose too many arguments
+        
+      } else if (size > 1) {
+        SourceRange argsRange = initializationField->argumentsRange.Start;
+        SourceLoc loc = argsRange.Start;
+        auto diag = diagnose(loc, diag::macro_attribute_initializer_multiple_arguments);
+        diag.highlight(argsRange);
+        bool foundCandidate = false;
+        for (Identifier arg : initializationField->arguments) {
+          if (arg.str() == "lazy") {
+            foundCandidate = true;
+            auto suggestLazy = diagnose(loc, diag::suggest_keep_argument, "lazy");
+            suggestLazy.fixItReplace(argsRange, "lazy");
+          } else if (arg.str() == "eager") {
+            foundCandidate = true;
+            auto suggestEager = diagnose(loc, diag::suggest_keep_argument, "eager");
+            suggestEager.fixItReplace(argsRange, "eager");
+          }
+        }
+        if (!foundCandidate) {
+          auto suggestReplaceWithLazy = diagnose(
+              loc, diag::suggest_replace_arguments,
+              initializationField->getSourceTextForArguments(SourceMgr), "lazy"
+          );
+          suggestReplaceWithLazy.fixItReplace(argsRange, "lazy");
+          auto suggestReplaceWithEager = diagnose(
+              loc, diag::suggest_replace_arguments,
+              initializationField->getSourceTextForArguments(SourceMgr), "eager"
+          );
+          suggestReplaceWithEager.fixItReplace(argsRange, "eager");
+          auto suggestRemove = diagnose(loc, diag::suggest_remove_param_for_default, initializationField->getSourceText(SourceMgr), "eager");
+          suggestRemove.fixItRemove(initializationField->range());
+        }
         argumentsStatus.setIsParseError();
-        return argumentsStatus;
-      }
-      
-      initializerContext = getMacroInitializerContextKind(initializationField->arguments[0]);
-      if (!initializerContext) {
-        diagnose(initializationField->argumentsRange.Start, diag::macro_attribute_initializer_unknown_argument);
+        
+      } else {
+        Identifier identifier = initializationField->arguments[0];
+        initializerContext = getMacroInitializerContextKind(identifier);
+        if (!initializerContext) {
+          SourceRange argRange = initializationField->argumentsRange;
+          diagnose(argRange.Start, diag::macro_attribute_initializer_unknown_argument);
+          auto suggestLazy = diagnose(argRange.Start, diag::suggest_replace_argument, identifier, "lazy");
+          suggestLazy.fixItReplace(argRange, "lazy");
+          auto suggestEager = diagnose(argRange.Start, diag::suggest_replace_argument, identifier, "eager");
+          suggestEager.fixItReplace(argRange, "eager");
+          auto suggestRemoveParam = diagnose(argRange.Start, diag::suggest_remove_param_for_default, initializationField->getSourceText(SourceMgr), "eager");
+          suggestRemoveParam.fixItRemove(initializationField->range());
+        }
       }
     }
     
@@ -2622,12 +2699,21 @@ Parser::parseMacroRoleAttribute(
     }
   } else if (initializationField) {
     // 'initialization:' is not supported unless macro role is 'accessor'.
-    auto diag = diagnose(initializationField->fieldNameLoc,
+    SourceLoc loc = initializationField->fieldNameLoc;
+    auto diag = diagnose(loc,
                          diag::macro_attribute_unsupported_label,
-                         initializationField->fieldName, "accessor", swift::getMacroRoleString(*role));
+                         initializationField->fieldName, swift::getMacroRoleString(*role));
     SourceRange range = initializationField->range();
     diag.highlight(range);
-    diag.fixItRemove(range);
+    
+    auto suggestRemove = diagnose(loc,
+                                  diag::suggest_remove_param,
+                                  initializationField->getSourceText(SourceMgr));
+    suggestRemove.fixItRemove(range);
+    
+    auto suggestAccessorRole = diagnose(roleNameLoc, diag::suggest_accessor_role);
+    suggestAccessorRole.fixItReplace(SourceRange(roleNameLoc, roleNameLoc), "accessor");
+    
     argumentsStatus.setIsParseError();
     return argumentsStatus;
   }
