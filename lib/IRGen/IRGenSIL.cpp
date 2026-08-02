@@ -3723,19 +3723,25 @@ static llvm::Value *getStackAllocationSize(IRGenSILFunction &IGF,
   // Get the byte count (the product of capacity and stride.)
   llvm::Value *result = nullptr;
   if (capacityValue && strideValue) {
+    // For architectures narrower than 64 bits, the byte count must also fit in
+    // a (signed) size value.
+    auto maxByteCount = llvm::APInt::getSignedMaxValue(
+      IGF.IGM.SizeTy->getBitWidth()).getSExtValue();
+
     int64_t byteCount = 0;
-    auto overflow = llvm::MulOverflow(*capacityValue, *strideValue, byteCount);
-    if (overflow) {
+    if (llvm::MulOverflow(*capacityValue, *strideValue, byteCount) ||
+        byteCount > maxByteCount) {
       Diags.diagnose(loc, diag::temporary_allocation_size_overflow);
-    } else {
-      // For architectures narrower than 64 bits, check if the byte count fits
-      // in a (signed) size value.
-      auto maxByteCount = llvm::APInt::getSignedMaxValue(
-        IGF.IGM.SizeTy->getBitWidth()).getSExtValue();
-      if (byteCount > maxByteCount) {
-        Diags.diagnose(loc, diag::temporary_allocation_size_overflow);
-      }
+      byteCount = 0;
+    } else if (byteCount < 0) {
+      // A negative byte count implies a negative capacity, which has already
+      // been diagnosed above.
+      byteCount = 0;
     }
+
+    // The byte count is always representable as a size value here: an invalid
+    // one has been replaced with zero after being diagnosed, so we never ask
+    // APInt to hold a value that is out of range for SizeTy.
     result = llvm::ConstantInt::get(IGF.IGM.SizeTy, byteCount);
 
   } else {
