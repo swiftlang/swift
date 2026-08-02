@@ -2772,15 +2772,17 @@ VarDecl *PatternBindingInitializer::getInitializedLazyVar() const {
       if (var->getAttrs().hasAttribute<LazyAttr>())
         return var;
       
-      // Check if a macro subsumes an initializer lazily
-      bool macroSubsumesInitializerLazily = false;
+      // Check if a macro moves the initalizer to a context
+      // where `self` is available. These can be type-checked
+      // as if they were `lazy`.
+      bool selfAvailableAfterMacroExpansion = false;
       namelookup::forEachPotentialAttachedMacro(var, MacroRole::Accessor,
         [&](MacroDecl *macro, const MacroRoleAttr *attr) {
-        if (attr->isInitializerContextLazy()) {
-          macroSubsumesInitializerLazily = true;
+        if (attr->isSelfAvailableForInitializer()) {
+          selfAvailableAfterMacroExpansion = true;
         }
       });
-      if (macroSubsumesInitializerLazily)
+      if (selfAvailableAfterMacroExpansion)
         return var;
     }
   }

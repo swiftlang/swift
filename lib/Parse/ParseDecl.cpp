@@ -2245,8 +2245,8 @@ static std::optional<MacroInitializerContextKind>
 getMacroInitializerContextKind(Identifier context) {
   return llvm::StringSwitch<std::optional<MacroInitializerContextKind>>(
              context.str())
-      .Case("lazy", MacroInitializerContextKind::Lazy)
-      .Case("eager", MacroInitializerContextKind::Eager)
+      .Case("selfAvailable", MacroInitializerContextKind::SelfAvailable)
+      .Case("selfUnavailable", MacroInitializerContextKind::SelfUnavailable)
       .Default(std::nullopt);
 }
 
@@ -2275,8 +2275,8 @@ struct Field {
   
   /// The range of arguments of the field, excluding the fieldName
   ///
-  ///     @attached(accessor, initialization: lazy, eager, whatever, names: ...)
-  ///                                         ˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜
+  ///     @attached(accessor, initialization: selfAvailable, selfUnavailable, whatever, names: ...)
+  ///                                         ˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜
   SourceRange argumentsRange;
   
   void append(Identifier argument, SourceLoc argumentLoc) {
@@ -2294,8 +2294,8 @@ struct Field {
   
   /// The range of the field, including the fieldName
   ///
-  ///     @attached(accessor, initialization: lazy, eager, whatever, names: ...)
-  ///                         ˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜
+  ///     @attached(accessor, initialization: selfAvailable, selfUnavailable, whatever, names: ...)
+  ///                         ˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜
   SourceRange range() {
     SourceRange range;
     if (!fieldName.empty()) {
@@ -2497,11 +2497,7 @@ Parser::parseMacroRoleAttribute(
           return status;
         }
         
-        // Accessor macros have an optional `initialization` argument.
-        // It may be either `lazy` or `eager`. For example:
-        //
-        //     @attached(accessor, initialization: lazy, names: ...)
-        //
+        // Accessor macros have an optional `initialization` parameter.
         if (field.fieldName.is("initialization")) {
           Identifier initializationContextIdentifier;
           SourceLoc initializationContextLoc;
@@ -2634,11 +2630,11 @@ Parser::parseMacroRoleAttribute(
       if (size == 0) {
         SourceLoc argsLoc = initializationField->fieldNameEndLoc();
         diagnose(argsLoc, diag::macro_attribute_initializer_missing_argument);
-        auto suggestInsertLazy = diagnose(argsLoc, diag::suggest_insert_argument, "lazy");
-        suggestInsertLazy.fixItInsert(argsLoc, " lazy");
-        auto suggestInsertEager = diagnose(argsLoc, diag::suggest_insert_argument, "eager");
-        suggestInsertEager.fixItInsert(argsLoc, " eager");
-        auto suggestRemoveParam = diagnose(argsLoc, diag::suggest_remove_param_for_default, initializationField->getSourceText(SourceMgr), "eager");
+        auto suggestInsertSelfAvailable = diagnose(argsLoc, diag::suggest_insert_argument, "selfAvailable");
+        suggestInsertSelfAvailable.fixItInsert(argsLoc, " selfAvailable");
+        auto suggestInsertSelfUnavailable = diagnose(argsLoc, diag::suggest_insert_argument, "selfUnavailable");
+        suggestInsertSelfUnavailable.fixItInsert(argsLoc, " selfUnavailable");
+        auto suggestRemoveParam = diagnose(argsLoc, diag::suggest_remove_param_for_default, initializationField->getSourceText(SourceMgr), "selfUnavailable");
         suggestRemoveParam.fixItRemove(initializationField->range());
         argumentsStatus.setIsParseError();
         
@@ -2649,28 +2645,28 @@ Parser::parseMacroRoleAttribute(
         diag.highlight(argsRange);
         bool foundCandidate = false;
         for (Identifier arg : initializationField->arguments) {
-          if (arg.str() == "lazy") {
+          if (arg.str() == "selfAvailable") {
             foundCandidate = true;
-            auto suggestLazy = diagnose(loc, diag::suggest_keep_argument, "lazy");
-            suggestLazy.fixItReplace(argsRange, "lazy");
-          } else if (arg.str() == "eager") {
+            auto suggestSelfAvailable = diagnose(loc, diag::suggest_keep_argument, "selfAvailable");
+            suggestSelfAvailable.fixItReplace(argsRange, "selfAvailable");
+          } else if (arg.str() == "selfUnavailable") {
             foundCandidate = true;
-            auto suggestEager = diagnose(loc, diag::suggest_keep_argument, "eager");
-            suggestEager.fixItReplace(argsRange, "eager");
+            auto suggestSelfUnavailable = diagnose(loc, diag::suggest_keep_argument, "selfUnavailable");
+            suggestSelfUnavailable.fixItReplace(argsRange, "selfUnavailable");
           }
         }
         if (!foundCandidate) {
-          auto suggestReplaceWithLazy = diagnose(
+          auto suggestReplaceWithSelfAvailable = diagnose(
               loc, diag::suggest_replace_arguments,
-              initializationField->getSourceTextForArguments(SourceMgr), "lazy"
+              initializationField->getSourceTextForArguments(SourceMgr), "selfAvailable"
           );
-          suggestReplaceWithLazy.fixItReplace(argsRange, "lazy");
-          auto suggestReplaceWithEager = diagnose(
+          suggestReplaceWithSelfAvailable.fixItReplace(argsRange, "selfAvailable");
+          auto suggestReplaceWithSelfUnavailable = diagnose(
               loc, diag::suggest_replace_arguments,
-              initializationField->getSourceTextForArguments(SourceMgr), "eager"
+              initializationField->getSourceTextForArguments(SourceMgr), "selfUnavailable"
           );
-          suggestReplaceWithEager.fixItReplace(argsRange, "eager");
-          auto suggestRemove = diagnose(loc, diag::suggest_remove_param_for_default, initializationField->getSourceText(SourceMgr), "eager");
+          suggestReplaceWithSelfUnavailable.fixItReplace(argsRange, "selfUnavailable");
+          auto suggestRemove = diagnose(loc, diag::suggest_remove_param_for_default, initializationField->getSourceText(SourceMgr), "selfUnavailable");
           suggestRemove.fixItRemove(initializationField->range());
         }
         argumentsStatus.setIsParseError();
@@ -2681,21 +2677,20 @@ Parser::parseMacroRoleAttribute(
         if (!initializerContext) {
           SourceRange argRange = initializationField->argumentsRange;
           diagnose(argRange.Start, diag::macro_attribute_initializer_unknown_argument);
-          auto suggestLazy = diagnose(argRange.Start, diag::suggest_replace_argument, identifier, "lazy");
-          suggestLazy.fixItReplace(argRange, "lazy");
-          auto suggestEager = diagnose(argRange.Start, diag::suggest_replace_argument, identifier, "eager");
-          suggestEager.fixItReplace(argRange, "eager");
-          auto suggestRemoveParam = diagnose(argRange.Start, diag::suggest_remove_param_for_default, initializationField->getSourceText(SourceMgr), "eager");
+          auto suggestSelfAvailable = diagnose(argRange.Start, diag::suggest_replace_argument, identifier, "selfAvailable");
+          suggestSelfAvailable.fixItReplace(argRange, "selfAvailable");
+          auto suggestSelfUnavailable = diagnose(argRange.Start, diag::suggest_replace_argument, identifier, "selfUnavailable");
+          suggestSelfUnavailable.fixItReplace(argRange, "selfUnavailable");
+          auto suggestRemoveParam = diagnose(argRange.Start, diag::suggest_remove_param_for_default, initializationField->getSourceText(SourceMgr), "selfUnavailable");
           suggestRemoveParam.fixItRemove(initializationField->range());
         }
       }
     }
     
-    // Initializer context of accessor macros are `eager` by default.
-    // Existing macros will behave the same as before initialization context
-    // was introduced.
+    // By default, `self` is unavailable for property initializers when
+    // re-contextualized by an accessor macro.
     if (!initializerContext.has_value()) {
-      initializerContext = MacroInitializerContextKind::Eager;
+      initializerContext = MacroInitializerContextKind::SelfUnavailable;
     }
   } else if (initializationField) {
     // 'initialization:' is not supported unless macro role is 'accessor'.

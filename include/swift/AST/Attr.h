@@ -3480,8 +3480,8 @@ public:
   ArrayRef<Expr *> getConformances() const;
   MutableArrayRef<Expr *> getConformances();
   bool hasNameKind(MacroIntroducedDeclNameKind kind) const;
-  bool isInitializerContextLazy() const {
-    return initializerContext == MacroInitializerContextKind::Lazy;
+  bool isSelfAvailableForInitializer() const {
+    return initializerContext == MacroInitializerContextKind::SelfAvailable;
   };
 
   static bool classof(const DeclAttribute *DA) {
