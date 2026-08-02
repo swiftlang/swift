@@ -86,8 +86,8 @@ enum class MacroIntroducedDeclNameKind {
 };
 
 enum class MacroInitializerContextKind {
-  Lazy,
-  Eager,
+  SelfAvailable,
+  SelfUnavailable,
 };
 
 /// Returns an enumeratable list of all macro introduced decl name kinds.
