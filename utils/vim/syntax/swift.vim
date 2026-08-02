@@ -79,6 +79,10 @@ syn keyword swiftTypeSpecifier contained skipwhite skipempty nextgroup=swiftType
       \ borrowing
       \ consuming
       \ inout
+      \ isolated
+
+syn keyword swiftConcurrencySpecifier contained skipwhite skipempty nextgroup=swiftTypeSpecifier,swiftOpaqueType,swiftExistentialType,swiftType
+      \ sending
 
 syn keyword swiftIdentifierKeyword
       \ Self
@@ -160,7 +164,7 @@ syn match swiftTypePair contained skipwhite skipempty nextgroup=swiftTypeParamet
       \ /\<[A-Za-z_][A-Za-z_0-9\.]*\>[!?]\?/
 " (Type[, Type]) (tuple)
 " FIXME: we should be able to use skip="," and drop swiftParamDelim
-syn region swiftType contained contains=swiftType,swiftParamDelim,swiftTypeSpecifier,swiftExistentialType,swiftOpaqueType
+syn region swiftType contained contains=swiftType,swiftParamDelim,swiftTypeSpecifier,swiftConcurrencySpecifier,swiftExistentialType,swiftOpaqueType
       \ matchgroup=Delimiter start="[^@]\?(" end=")" matchgroup=NONE skip=","
 syn match swiftParamDelim contained
       \ /,/
@@ -172,9 +176,9 @@ syn keyword swiftConstraint contained
 
 syn match swiftTypeAliasValue skipwhite skipempty nextgroup=swiftExistentialType,swiftType
       \ /=/
-syn match swiftTypeDeclaration skipwhite skipempty nextgroup=swiftTypeSpecifier,swiftExistentialType,swiftOpaqueType,swiftOpaqueType,swiftType
+syn match swiftTypeDeclaration skipwhite skipempty nextgroup=swiftConcurrencySpecifier,swiftTypeSpecifier,swiftExistentialType,swiftOpaqueType,swiftOpaqueType,swiftType
       \ /:/
-syn match swiftTypeDeclaration skipwhite skipempty nextgroup=swiftExistentialType,swiftOpaqueType,swiftType
+syn match swiftTypeDeclaration skipwhite skipempty nextgroup=swiftConcurrencySpecifier,swiftExistentialType,swiftOpaqueType,swiftType
       \ /->/
 
 syn match swiftKeyword
@@ -272,6 +276,7 @@ hi def link swiftTypeAliasValue Delimiter
 hi def link swiftTypeDeclaration Delimiter
 hi def link swiftTypeParameters Delimiter
 hi def link swiftTypeSpecifier Define
+hi def link swiftConcurrencySpecifier Define
 hi def link swiftBoolean Boolean
 hi def link swiftString String
 hi def link swiftInterpolation Special
