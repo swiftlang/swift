@@ -2254,3 +2254,457 @@ def check_expectations(tool_output, prefix):
         return update_test_files(top_level, prefix, unparsed_files)
     else:
         return ("no mismatching diagnostics found", None)
+
+
+# ---------------------------------------------------------------------------
+# minimize-verify-tests: merge redundant prefixed expected-* directives
+# ---------------------------------------------------------------------------
+
+# Regex to extract `-verify-additional-prefix <prefix>` from a RUN command.
+_additional_prefix_re = re.compile(r"-verify-additional-prefix\s+(\S+)")
+
+# Detects that a RUN command involves the diagnostic verifier.  Matches
+# `-verify` as a standalone flag (not part of `-verify-additional-prefix`,
+# `-verify-ignore-unrelated`, etc.) or known lit substitutions that imply it.
+_verify_flag_re = re.compile(
+    r"(?:-verify(?![-\w])|%-*target-typecheck-verify-swift\b|"
+    r"%-*target-swift-frontend-verify\b)"
+)
+
+
+def _parse_run_lines(raw_lines):
+    """Return a list of full RUN-line command strings with continuations
+    joined.  Each entry is a single logical RUN command."""
+    runs = []
+    current = None
+    for raw in raw_lines:
+        text = raw.rstrip("\n")
+        m = re.match(r"^\s*//\s*RUN:\s*(.*)", text)
+        if m:
+            part = m.group(1)
+            if current is not None:
+                current += " " + part
+            else:
+                current = part
+            if current.endswith("\\"):
+                current = current[:-1]
+            else:
+                runs.append(current)
+                current = None
+        else:
+            if current is not None:
+                runs.append(current)
+                current = None
+    if current is not None:
+        runs.append(current)
+    return runs
+
+
+def _collect_verify_prefixes(raw_lines):
+    """Parse every verify-RUN line and return two structures:
+
+    * ``run_prefixes``: a list of ``frozenset`` where each element is the
+      set of active prefixes for that verify-RUN line (always includes the
+      default ``""``).
+    * ``prefix_to_runs``: a dict mapping each prefix to the
+      ``frozenset`` of verify-RUN indices where it is active.
+
+    Non-verify RUN lines are silently skipped.
+    """
+    commands = _parse_run_lines(raw_lines)
+    run_prefixes = []
+    for cmd in commands:
+        if not _verify_flag_re.search(cmd):
+            continue
+        prefixes = {""}
+        for m in _additional_prefix_re.finditer(cmd):
+            prefixes.add(m.group(1))
+        run_prefixes.append(frozenset(prefixes))
+
+    prefix_to_runs = {}
+    for run_idx, pset in enumerate(run_prefixes):
+        for p in pset:
+            prefix_to_runs.setdefault(p, set()).add(run_idx)
+    # Freeze the sets so they are hashable / easily comparable.
+    prefix_to_runs = {p: frozenset(s) for p, s in prefix_to_runs.items()}
+    return run_prefixes, prefix_to_runs
+
+
+def _trailing_content(diag):
+    """Return the portion of the line content after the ``{{DIAG}}``
+    placeholder.  This captures ``{{children:...}}`` blocks and any other
+    trailing text that is semantically part of the directive."""
+    marker = "{{DIAG}}"
+    idx = diag.line.content.find(marker)
+    if idx < 0:
+        return ""
+    return diag.line.content[idx + len(marker):]
+
+
+# Matches `@-N` or `@+N` that follow an `expected-*` directive prefix
+# inside a ``{{children:...}}`` block.
+_children_ref_re = re.compile(
+    r"(expected-[a-zA-Z0-9-]*(?:note|warning|error|remark)(?:-re)?\s*)@([+-])(\d+)"
+)
+
+
+def _normalized_trailing(diag):
+    """Like ``_trailing_content`` but with relative ``@-N`` / ``@+N``
+    references inside ``{{children:...}}`` blocks resolved to absolute
+    line numbers.  This allows two directives on different lines to be
+    recognised as overlapping when their children blocks reference the
+    same target lines."""
+    trailing = _trailing_content(diag)
+    line_n = diag.line.line_n
+
+    def _resolve(m):
+        prefix = m.group(1)
+        sign = m.group(2)
+        offset = int(m.group(3))
+        abs_n = line_n + (-offset if sign == "-" else offset)
+        return f"{prefix}@={abs_n}"
+
+    return _children_ref_re.sub(_resolve, trailing)
+
+
+def _overlap_key(diag):
+    """Return a hashable key that groups directives which could potentially
+    be merged: same target line, same category, same content, same count,
+    same regex flag, same fix-it annotations, and same trailing content
+    (which includes ``{{children:...}}`` blocks with offsets normalised
+    to absolute line numbers).
+
+    For multi-line ``{{children:`` blocks the continuation lines have been
+    folded into ``nested_lines``; those are included as a content
+    fingerprint so that blocks with different child notes stay separate."""
+    nested_key = ()
+    if diag.nested_lines:
+        parts = []
+        for nl in diag.nested_lines:
+            nd = nl.diag
+            if nd:
+                parts.append((nd.absolute_target(), nd.category,
+                              nd.diag_content, nd.count, nd.is_re,
+                              nd.fixits_raw_str))
+        nested_key = tuple(parts)
+    return (
+        diag.absolute_target(),
+        diag.category,
+        diag.diag_content,
+        diag.count,
+        diag.is_re,
+        diag.fixits_raw_str,
+        _normalized_trailing(diag),
+        nested_key,
+    )
+
+
+def _pick_keeper(diags):
+    """From a list of mergeable ``Diag`` objects choose the one to keep.
+
+    Preference order:
+    1. On the same line as the target (relative offset 0) — avoids ``@+N``.
+    2. Closest to the target (smallest absolute relative offset).
+    3. Earliest in the file (smallest ``line.line_n``).
+    """
+    def sort_key(d):
+        rel = abs(d.relative_target())
+        return (rel != 0, rel, d.line.line_n)
+
+    return min(diags, key=sort_key)
+
+
+def _find_merge_prefix(prefixes, prefix_to_runs, runs_to_prefixes):
+    """Given a list of prefixes, compute their combined RUN-line coverage
+    and return a single prefix that covers exactly that set, or ``None``
+    if no such prefix exists.  Prefers the default (empty) prefix."""
+    coverage = set()
+    for p in prefixes:
+        rset = prefix_to_runs.get(p)
+        if rset is None:
+            return None
+        coverage |= rset
+    candidates = runs_to_prefixes.get(frozenset(coverage))
+    if not candidates:
+        return None
+    if "" in candidates:
+        return ""
+    return min(candidates, key=lambda p: (len(p), p))
+
+
+def _nested_diag_key(nd):
+    """Overlap key for a directive nested inside an expansion block."""
+    return (
+        nd.absolute_target(),
+        nd.category,
+        nd.diag_content,
+        nd.count,
+        nd.is_re,
+        nd.fixits_raw_str,
+        _trailing_content(nd),
+    )
+
+
+def _merge_nested_diags(keeper, exp_list, prefix_to_runs, runs_to_prefixes):
+    """Merge the directives nested inside the expansion blocks in
+    *exp_list*, installing the result as *keeper*'s nested lines.
+
+    Directives from every block in the group are pooled, so one that
+    appears in several blocks collapses into a single directive whose
+    prefix covers all of their runs.  Directives that appear only once, or
+    whose prefixes have no single replacement, are kept as they are.
+
+    Returns True if any directives were actually merged.
+    """
+    all_nested = []
+    for d in exp_list:
+        all_nested.extend(d.nested_lines)
+
+    # Group nested diags by overlap key within the expansion.
+    nested_groups = {}
+    for nl in all_nested:
+        nested_groups.setdefault(_nested_diag_key(nl.diag), []).append(nl)
+
+    merged = False
+    merged_nested = []
+    for nl_list in nested_groups.values():
+        if len(nl_list) > 1:
+            np = _find_merge_prefix(
+                [nl.diag.prefix for nl in nl_list],
+                prefix_to_runs, runs_to_prefixes)
+            if np is not None:
+                nl_list[0].diag.prefix = np
+                merged_nested.append(nl_list[0])
+                merged = True
+                continue
+        # Single diag or unmergeable — keep all.
+        merged_nested.extend(nl_list)
+
+    if not merged and len(exp_list) == 1:
+        # Nothing changed, so leave the block's nested lines alone rather
+        # than reordering them gratuitously.
+        return False
+
+    # Sort by target line within expansion, then by category for
+    # stability.
+    merged_nested.sort(
+        key=lambda nl: (nl.diag.absolute_target(), nl.diag.category))
+
+    keeper.nested_lines = merged_nested
+    for i, nl in enumerate(keeper.nested_lines):
+        nl.line_n = i + 1
+    return merged
+
+
+def _merge_expansion_groups(expansion_diags, prefix_to_runs,
+                            runs_to_prefixes, lines):
+    """Merge expansion blocks that target the same source location.
+
+    Two expansion blocks at the same ``(absolute_target, column)`` are
+    combined into one whose prefix covers the union of runs.  Their
+    nested directives are individually merged where an appropriate prefix
+    exists; non-overlapping nested directives are kept with their original
+    prefix.
+
+    Blocks that stay separate — because a location has only one block, or
+    because the group's prefixes have no single replacement — still get
+    their own contents minimized.
+    """
+    # Group by (absolute_target, col).
+    groups = {}
+    for d in expansion_diags:
+        key = (d.absolute_target(), d.col())
+        groups.setdefault(key, []).append(d)
+
+    changed = False
+    for exp_list in groups.values():
+        # Find a prefix for the merged expansion block.
+        exp_prefix = None
+        if len(exp_list) > 1:
+            exp_prefix = _find_merge_prefix(
+                [d.prefix for d in exp_list], prefix_to_runs,
+                runs_to_prefixes)
+
+        if exp_prefix is None:
+            # The blocks stay separate, so pooling their contents would
+            # move directives from one block into another.  Minimize each
+            # block's own contents instead.
+            for d in exp_list:
+                changed |= _merge_nested_diags(
+                    d, [d], prefix_to_runs, runs_to_prefixes)
+            continue
+
+        keeper = _pick_keeper(exp_list)
+        _merge_nested_diags(keeper, exp_list, prefix_to_runs,
+                            runs_to_prefixes)
+        keeper.prefix = exp_prefix
+
+        # Remove the other expansion blocks from `lines`.
+        for d in exp_list:
+            if d is keeper:
+                continue
+            if d.target is not None:
+                d.unset_target()
+            remove_line(d.line, lines)
+        changed = True
+
+    return changed
+
+
+def _has_multiline_children_open(diag):
+    """Return True if *diag*'s line opens a multi-line ``{{children:``
+    block (the block continues on subsequent lines rather than closing
+    on the same line)."""
+    trailing = _trailing_content(diag)
+    # Look for {{children: that is NOT closed by }} on the same line.
+    idx = trailing.find("{{children:")
+    if idx < 0:
+        return False
+    after = trailing[idx:]
+    # Count braces: the block is multi-line if we never see the matching }}.
+    depth = 0
+    i = 0
+    while i < len(after):
+        if after[i:i+2] == "{{":
+            depth += 1
+            i += 2
+        elif after[i:i+2] == "}}":
+            depth -= 1
+            if depth == 0:
+                return False  # closed on the same line
+            i += 2
+        else:
+            i += 1
+    return True  # never closed — multi-line
+
+
+def minimize_verify_test(filename):
+    """Read *filename*, merge redundant prefixed expected-* directives where
+    a single prefix can replace a set of overlapping ones, and write the
+    result back.  Returns an error string on failure, or ``None`` on
+    success."""
+    with open(filename, "r") as f:
+        raw_lines = f.readlines()
+
+    run_prefixes, prefix_to_runs = _collect_verify_prefixes(raw_lines)
+    if not run_prefixes:
+        return None  # no verify-RUN lines — nothing to do
+
+    # Build the inverse mapping: frozenset-of-runs → list of prefixes that
+    # cover exactly that set.
+    runs_to_prefixes = {}
+    for pfx, rset in prefix_to_runs.items():
+        runs_to_prefixes.setdefault(rset, []).append(pfx)
+
+    lines = [Line(line, i + 1) for i, line in enumerate(raw_lines + [""])]
+    orig_lines = list(lines)
+
+    # Parse every expected-* directive (all prefixes).
+    # Both expansion_context (for expected-expansion blocks) and
+    # children_context (for multi-line {{children: blocks) track nesting
+    # so that continuation lines get a parent reference and are later
+    # folded out of the main line list.
+    expansion_context = []
+    children_context = []
+    for line in lines:
+        diag = parse_diag(line, filename, "", all_prefixes=True)
+        if diag:
+            line.diag = diag
+            # Pick the innermost active context.
+            parent_ctx = (children_context or expansion_context)
+            if isinstance(diag, ExpansionDiagClose):
+                if children_context:
+                    diag.parent = children_context[-1]
+                    children_context.pop()
+                elif expansion_context:
+                    diag.parent = expansion_context[-1]
+                    expansion_context.pop()
+            elif diag.category == "expansion":
+                if parent_ctx:
+                    diag.parent = parent_ctx[-1]
+                else:
+                    diag.set_target(lines[diag.absolute_target() - 1])
+                expansion_context.append(diag)
+            else:
+                if parent_ctx:
+                    diag.parent = parent_ctx[-1]
+                    # Notes inside multi-line {{children: blocks still
+                    # need their target resolved before folding, so that
+                    # absolute_target() works after line renumbering.
+                    if children_context:
+                        diag.set_target(
+                            lines[diag.absolute_target() - 1])
+                else:
+                    diag.set_target(lines[diag.absolute_target() - 1])
+                # Check if this diag opens a multi-line children block.
+                if (not parent_ctx
+                        and not isinstance(diag, ExpansionDiagClose)
+                        and _has_multiline_children_open(diag)):
+                    children_context.append(diag)
+
+    # Fold expansion blocks *and* multi-line children blocks so nested
+    # lines live inside the parent diag.
+    fold_expansions(lines)
+
+    # Separate expansion and regular diags.
+    expansion_diags = []
+    regular_diags = []
+    for line in lines:
+        if line.diag and not isinstance(line.diag, ExpansionDiagClose):
+            if line.diag.category == "expansion":
+                expansion_diags.append(line.diag)
+            else:
+                regular_diags.append(line.diag)
+
+    changed = False
+
+    # --- Pass 1: merge expansion blocks at the same location. ---
+    changed |= _merge_expansion_groups(
+        expansion_diags, prefix_to_runs, runs_to_prefixes, lines)
+
+    # --- Pass 2: merge regular (non-expansion) diags. ---
+    groups = {}
+    for diag in regular_diags:
+        key = _overlap_key(diag)
+        groups.setdefault(key, []).append(diag)
+
+    for key, diag_list in groups.items():
+        if len(diag_list) < 2:
+            continue
+
+        merge_prefix = _find_merge_prefix(
+            [d.prefix for d in diag_list], prefix_to_runs, runs_to_prefixes)
+        if merge_prefix is None:
+            continue
+
+        keeper = _pick_keeper(diag_list)
+        keeper.prefix = merge_prefix
+        for d in diag_list:
+            if d is keeper:
+                continue
+            if d.target is not None:
+                d.unset_target()
+            remove_line(d.line, lines)
+        changed = True
+
+    if changed:
+        # Re-insert nested lines for both expansion blocks and multi-line
+        # children blocks.
+        expand_expansions(lines)
+        # Also expand children-block nested lines on non-expansion diags.
+        i = 0
+        while i < len(lines):
+            line = lines[i]
+            if (line.diag
+                    and not isinstance(line.diag, ExpansionDiagClose)
+                    and line.diag.category != "expansion"
+                    and line.diag.nested_lines):
+                for j, nested in enumerate(
+                        line.diag.nested_lines + [line.diag.closer]):
+                    nested.line_n = line.line_n + j + 1
+                    add_line(nested, lines)
+            i += 1
+        with open(filename, "w") as f:
+            for line in lines:
+                f.write(line.render())
+    return None
