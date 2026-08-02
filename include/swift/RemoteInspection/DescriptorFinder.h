@@ -97,6 +97,7 @@ struct FieldDescriptorBase {
     case FieldDescriptorKind::Protocol:
     case FieldDescriptorKind::ObjCProtocol:
     case FieldDescriptorKind::ClassProtocol:
+    case FieldDescriptorKind::COMProtocol:
       return false;
     }
   }
@@ -110,6 +111,7 @@ struct FieldDescriptorBase {
     case FieldDescriptorKind::Protocol:
     case FieldDescriptorKind::ObjCProtocol:
     case FieldDescriptorKind::ClassProtocol:
+    case FieldDescriptorKind::COMProtocol:
     case FieldDescriptorKind::Enum:
     case FieldDescriptorKind::MultiPayloadEnum:
       return false;
@@ -121,6 +123,7 @@ struct FieldDescriptorBase {
     case FieldDescriptorKind::Protocol:
     case FieldDescriptorKind::ClassProtocol:
     case FieldDescriptorKind::ObjCProtocol:
+    case FieldDescriptorKind::COMProtocol:
       return true;
     case FieldDescriptorKind::Enum:
     case FieldDescriptorKind::MultiPayloadEnum:

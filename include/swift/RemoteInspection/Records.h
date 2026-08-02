@@ -178,7 +178,10 @@ enum class FieldDescriptorKind : uint16_t {
   // An Objective-C class, which may be imported or defined in Swift.
   // In the former case, field type metadata is not emitted, and
   // must be obtained from the Objective-C runtime.
-  ObjCClass
+  ObjCClass,
+
+  // A COM interface protocol. Its existential is a single interface pointer.
+  COMProtocol,
 };
 
 // Field descriptors contain a collection of field records for a single
@@ -234,6 +237,7 @@ public:
     case FieldDescriptorKind::Protocol:
     case FieldDescriptorKind::ClassProtocol:
     case FieldDescriptorKind::ObjCProtocol:
+    case FieldDescriptorKind::COMProtocol:
       return true;
     case FieldDescriptorKind::Enum:
     case FieldDescriptorKind::MultiPayloadEnum:
