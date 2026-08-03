@@ -1592,9 +1592,39 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic,
 
   auto formatString =
       getFormatStringForDiagnostic(diagnostic, includeDiagnosticName);
+  DiagID emitID = diagnostic.getID();
+  ArrayRef<DiagnosticArgument> formatArgs = diagnostic.getArgs();
 
-  return DiagnosticInfo(diagnostic.getID(), loc, toDiagnosticKind(behavior),
-                        formatString, diagnostic.getArgs(), CategoryName,
+  // If a language-mode downgrade wrapped this diagnostic and it was later
+  // upgraded back to an error (e.g. -warnings-as-errors), drop the
+  // "; this will be an error in…" wrapper text. Claiming a future error when
+  // it is already an error is incorrect (#90933).
+  if ((behavior == DiagnosticBehavior::Error ||
+       behavior == DiagnosticBehavior::Fatal) &&
+      (diagnostic.is(diag::error_in_a_future_swift_lang_mode) ||
+       diagnostic.is(diag::error_in_swift_lang_mode))) {
+    if (auto wrapped = diagnostic.getWrappedDiagnostic()) {
+      emitID = (*wrapped)->ID;
+      formatString = (*wrapped)->FormatString;
+      formatArgs = (*wrapped)->FormatArgs;
+      if (includeDiagnosticName &&
+          printDiagnosticNamesMode == PrintDiagnosticNamesMode::Identifier) {
+        const int additionalCharsLength = 3; // ' ', '[', ']'
+        auto name = diagnosticIDStringFor(emitID);
+        std::string messageWithName;
+        messageWithName.reserve(formatString.size() + name.size() +
+                                additionalCharsLength);
+        messageWithName += formatString;
+        messageWithName += " [";
+        messageWithName += name;
+        messageWithName += "]";
+        formatString = DiagnosticStringsSaver.save(messageWithName);
+      }
+    }
+  }
+
+  return DiagnosticInfo(emitID, loc, toDiagnosticKind(behavior),
+                        formatString, formatArgs, CategoryName,
                         getDefaultDiagnosticLoc(),
                         /*child note info*/ {}, diagnostic.getRanges(), fixIts,
                         diagnostic.isChildNote());
