@@ -28,6 +28,7 @@ public typealias ClazzAlias = Clazz
 
 public import Aliases
 
-// expected-error@+1 {{'ClazzAlias' aliases 'Original.Clazz' and cannot be used in a public or '@usableFromInline' conformance because 'Original' was not imported by this file}}
+// expected-error@+2 {{'ClazzAlias' aliases 'Original.Clazz' and cannot be used in a public or '@usableFromInline' conformance because 'Original' was not imported by this file}}
+// expected-note@+1 {{add import of module 'Original'}}
 public class InheritsFromClazzAlias: ClazzAlias {}
 

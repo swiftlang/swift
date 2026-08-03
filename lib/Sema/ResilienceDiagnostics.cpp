@@ -26,6 +26,8 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeDeclFinder.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/Feature.h"
+#include "llvm/ADT/SmallString.h"
 
 using namespace swift;
 
@@ -201,9 +203,13 @@ static bool diagnoseTypeAliasDeclRefExportability(SourceLoc loc,
   // As an exception, if the import of the module that defines the desugared
   // decl is just missing (as opposed to imported explicitly with reduced
   // visibility) then we should only diagnose if we're building a resilient
-  // module.
+  // module — unless MemberImportVisibility is enabled. That feature makes
+  // import visibility part of the language model, and member-import
+  // diagnostics do not cover top-level typealias desugaring (#91096).
   if (originKind == DisallowedOriginKind::MissingImport &&
-      !exportingModule->isResilient())
+      !exportingModule->isResilient() &&
+      !ctx.LangOpts.hasFeature(Feature::MemberImportVisibility,
+                               /*allowMigration=*/true))
     return false;
 
   auto definingModule = D->getModuleContext();
@@ -235,6 +241,21 @@ static bool diagnoseTypeAliasDeclRefExportability(SourceLoc loc,
       originKind == DisallowedOriginKind::MissingImport &&
       !ctx.isLanguageModeAtLeast(LanguageMode::v6))
     addMissingImport(loc, D, where);
+
+  // Offer a source-level import fix-it for a missing module (#91096).
+  if (originKind == DisallowedOriginKind::MissingImport) {
+    if (auto *SF = DC->getParentSourceFile()) {
+      SourceLoc bestLoc = ctx.Diags.getBestAddImportFixItLoc(SF);
+      if (bestLoc.isValid()) {
+        llvm::SmallString<64> importText;
+        importText += "import ";
+        importText += definingModule->getName().str();
+        importText += "\n";
+        ctx.Diags.diagnose(bestLoc, diag::candidate_add_import, definingModule)
+            .fixItInsert(bestLoc, importText);
+      }
+    }
+  }
 
   // If limited by an import, note which one.
   if (originKind == DisallowedOriginKind::NonPublicImport) {

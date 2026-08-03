@@ -79,29 +79,34 @@ import Aliases
 
 // CHECK-NON-RESILIENT-NOT: was not imported by this file
 
-// expected-warning@+2 {{'ClazzAlias' aliases 'Original.Clazz' and cannot be used in a public or '@usableFromInline' conformance because 'Original' was not imported by this file; this is an error in the Swift 6 language mode}}
-// expected-note@+1 {{The missing import of module 'Original' will be added implicitly}}
+// expected-warning@+3 {{'ClazzAlias' aliases 'Original.Clazz' and cannot be used in a public or '@usableFromInline' conformance because 'Original' was not imported by this file; this is an error in the Swift 6 language mode}}
+// expected-note@+2 {{The missing import of module 'Original' will be added implicitly}}
+// expected-note@+1 {{add import of module 'Original'}} {{1-1=import Original\n}}
 public class InheritsFromClazzAlias: ClazzAlias {}
 
 @inlinable public func inlinableFunc() {
-  // expected-warning@+2 {{'StructAlias' aliases 'Original.Struct' and cannot be used in an '@inlinable' function because 'Original' was not imported by this file; this is an error in the Swift 6 language mode}}
-  // expected-note@+1 {{The missing import of module 'Original' will be added implicitly}}
+  // expected-warning@+3 {{'StructAlias' aliases 'Original.Struct' and cannot be used in an '@inlinable' function because 'Original' was not imported by this file; this is an error in the Swift 6 language mode}}
+  // expected-note@+2 {{The missing import of module 'Original' will be added implicitly}}
+  // expected-note@+1 {{add import of module 'Original'}}
   _ = StructAlias.self
 }
 
-// expected-warning@+2 {{'ProtoAlias' aliases 'Original.Proto' and cannot be used here because 'Original' was not imported by this file; this is an error in the Swift 6 language mode}}
-// expected-note@+1 {{The missing import of module 'Original' will be added implicitly}}
+// expected-warning@+3 {{'ProtoAlias' aliases 'Original.Proto' and cannot be used here because 'Original' was not imported by this file; this is an error in the Swift 6 language mode}}
+// expected-note@+2 {{The missing import of module 'Original' will be added implicitly}}
+// expected-note@+1 {{add import of module 'Original'}}
 public func takesGeneric<T: ProtoAlias>(_ t: T) {}
 
 public struct HasMembers {
-  // expected-warning@+3 {{cannot use property 'wrappedValue' here; 'Original' was not imported by this file}}
-  // expected-warning@+2 {{'WrapperAlias' aliases 'Original.Wrapper' and cannot be used as property wrapper here because 'Original' was not imported by this file; this is an error in the Swift 6 language mode}}
- // expected-note@+1 {{The missing import of module 'Original' will be added implicitly}}
+  // expected-warning@+4 {{cannot use property 'wrappedValue' here; 'Original' was not imported by this file}}
+  // expected-warning@+3 {{'WrapperAlias' aliases 'Original.Wrapper' and cannot be used as property wrapper here because 'Original' was not imported by this file; this is an error in the Swift 6 language mode}}
+  // expected-note@+2 {{The missing import of module 'Original' will be added implicitly}}
+  // expected-note@+1 {{add import of module 'Original'}}
   @WrapperAlias public var wrapped: Int
 }
 
-// expected-warning@+2 {{'StructAlias' aliases 'Original.Struct' and cannot be used in an extension with public or '@usableFromInline' members because 'Original' was not imported by this file; this is an error in the Swift 6 language mode}}
-// expected-note@+1 {{The missing import of module 'Original' will be added implicitly}}
+// expected-warning@+3 {{'StructAlias' aliases 'Original.Struct' and cannot be used in an extension with public or '@usableFromInline' members because 'Original' was not imported by this file; this is an error in the Swift 6 language mode}}
+// expected-note@+2 {{The missing import of module 'Original' will be added implicitly}}
+// expected-note@+1 {{add import of module 'Original'}}
 extension StructAlias {
   public func someFunc() {}
 }
