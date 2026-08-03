@@ -674,12 +674,7 @@ static void swift_task_popTaskExecutorPreferenceImpl(
 /******************************** DEADLINES *******************************/
 /**************************************************************************/
 
-// `withDeadline` is unavailable in Embedded Swift (`#if !$Embedded` on the
-// Swift side); these functions manipulate `TaskDeadlineStatusRecord` and
-// take `Metadata`/`WitnessTable` pointers, neither of which are usable in
-// Embedded Swift builds. `_swift_task_hasActiveDeadline` and
-// `AsyncTask::inheritDeadlineFlagFrom` below only touch the `HasDeadline`
-// status flag (no `Metadata` involved), so they stay unguarded.
+// Task deadlines are unavailable in Embedded Swift
 #if !SWIFT_CONCURRENCY_EMBEDDED
 
 /// Bridged Swift-side helper. Called by the runtime for each candidate

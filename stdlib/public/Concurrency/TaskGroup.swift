@@ -1144,6 +1144,7 @@ func _taskGroupAddPendingTask(
 @_silgen_name("swift_taskGroup_cancelAll")
 func _taskGroupCancelAll(group: Builtin.RawPointer)
 
+@usableFromInline
 @available(StdlibDeploymentTarget 6.5, *)
 @_silgen_name("swift_taskGroup_cancelAllWithReason")
 func _taskGroupCancelAllWithReason(group: Builtin.RawPointer, reason: UInt)

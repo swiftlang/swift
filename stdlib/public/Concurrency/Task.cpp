@@ -1837,7 +1837,7 @@ bool swift::swift_task_isCancelledWithFlags(AsyncTask *task,
 size_t swift::swift_task_getCancellationReason(AsyncTask *task) {
   auto status = task->_private()._status().load(std::memory_order_relaxed);
   // Whole-task cancel wins: the reason bit was set at cancel time and
-  // dominates any per-scope reason on the chain.
+  // dominates any per-scope reason.
   if (status.isCancelledIgnoringShield())
     return status.getCancellationReason();
   // Otherwise the innermost cancelled scope (if any) supplies the reason,

@@ -285,6 +285,4 @@ func scenario_6_ambient_task_cancel_propagates_into_scope() async {
   }.value
 }
 
-// Matches the "done" line printed at the end of Main.main; must appear as
-// the last CHECK in source order because FileCheck matches sequentially.
 // CHECK: done

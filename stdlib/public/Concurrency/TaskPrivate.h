@@ -563,9 +563,10 @@ class alignas(2 * sizeof(void*)) ActiveTaskStatus {
     HasRetainForIntrusiveLinkage = 0x40000,
 
     /// Whether the task has at least one `TaskCancellationScopeRecord` in its
-    /// status record list. By storing this flag we can avoid taking the task
-    /// record lock and walking the record chain when checking for
-    /// cancellation, which is a hot path.
+    /// status record list. We use this to avoid scanning for a scope in
+    /// records storage if we know for certain there is none. This matters
+    /// because cancellation checking may happen on hot-paths, so it is worth
+    /// the flag.
     HasTaskCancellationScope = 0x80000,
 
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
@@ -596,6 +597,15 @@ class alignas(2 * sizeof(void*)) ActiveTaskStatus {
     /// Meaningless unless `IsCancelled` is set. First-cancel-wins on the reason;
     /// once set it is not modified by subsequent cancels.
     CancelReasonDeadlineExpired = 0x2000000,
+  };
+
+  /// Mirrors `CancellationError.Reason`'s raw values on the Swift side.
+  /// Kept as an enum (rather than bare integers) so that adding a new
+  /// reason forces a `-Wswitch` warning at the `withCancelled(size_t)`
+  /// call site below.
+  enum class CancellationReason : size_t {
+    Unspecified = 0,
+    DeadlineExpired = 1,
   };
 
   // Note: this structure is mirrored by ActiveTaskStatusWithEscalation and
@@ -690,9 +700,15 @@ public:
   ActiveTaskStatus withCancelled(size_t reason) const {
     // Reasons are set only once, when transitioning from not-cancelled to
     // cancelled. Callers should have checked `!isCancelled()` first.
-    uintptr_t bit = (reason == /*deadlineExpired*/ 1)
-      ? uintptr_t(CancelReasonDeadlineExpired) : 0;
-    return withFlags(Flags | IsCancelled | bit);
+    uintptr_t reasonBits = 0;
+    switch (CancellationReason(reason)) {
+    case CancellationReason::Unspecified:
+      break;
+    case CancellationReason::DeadlineExpired:
+      reasonBits = uintptr_t(CancelReasonDeadlineExpired);
+      break;
+    }
+    return withFlags(Flags | IsCancelled | reasonBits);
   }
 
   // CancellationReason
@@ -1218,15 +1234,14 @@ inline const AsyncTask::PrivateStorage &AsyncTask::_private() const {
 
 inline bool AsyncTask::isCancelled(bool ignoreShield = false) const {
   auto status = _private()._status().load(std::memory_order_relaxed);
+  // Is the whole task cancelled?
   if (status.isCancelled(ignoreShield))
     return true;
-  // Slow path: only entered when a `TaskCancellationScopeRecord` is on the
-  // chain. The walker (`_swift_task_getCancellationScope`) is chain-aware:
-  // if a `TaskCancellationShieldRecord` sits above the innermost cancelled
-  // scope, the walker returns nullptr - the shield masks the scope at this
-  // call site, matching the "as-if child task" semantics of `withDeadline`.
-  // No shield-bit early-return here: the bit alone can't distinguish
-  // shield-inside-scope (must mask) from shield-outside-scope (must not).
+  // Slow path: only entered when a `TaskCancellationScopeRecord` is present.
+  // The walker (`_swift_task_getCancellationScope`) is chain-aware: if a
+  // `TaskCancellationShieldRecord` sits above the innermost cancelled scope,
+  // the walker returns nullptr - the shield masks the scope at this call
+  // site, matching the "as-if child task" semantics of `withDeadline`.
   if (SWIFT_UNLIKELY(status.hasTaskCancellationScope())) {
     if (auto scope = _swift_task_getCancellationScope(const_cast<AsyncTask *>(this)))
       return scope->isCancelled();
