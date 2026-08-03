@@ -253,3 +253,19 @@ func buildWidget(_ w: ProjectionWrapper<Int>) -> Widget {
 // when matching default arguments with parameters.
 func testCallerSideDefault(@Wrapper x: Int? = nil) {}
 testCallerSideDefault() // expected-error {{nil default argument value cannot be converted to type 'Wrapper<Int?>'}}
+
+// https://github.com/swiftlang/swift/issues/90985
+// Without init(wrappedValue:), passing the wrapper type itself must not
+// diagnose a tautological "Wrapper → Wrapper, use wrapper instead".
+@propertyWrapper
+struct ProjectedOnlyWrapper {
+  var wrappedValue: Int
+  var projectedValue: Self { self }
+  init(projectedValue: Self) { self.wrappedValue = projectedValue.wrappedValue }
+}
+
+func takesProjectedOnly(@ProjectedOnlyWrapper _ x: Int) {}
+func passProjectedOnlyWrapper(_ x: ProjectedOnlyWrapper) {
+  takesProjectedOnly(x)
+  // expected-error@-1 {{cannot convert value of type 'ProjectedOnlyWrapper' to expected argument type 'Int'}}
+}

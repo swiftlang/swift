@@ -4096,8 +4096,26 @@ bool ExtraneousPropertyWrapperUnwrapFailure::diagnoseAsError() {
     return true;
   }
 
+  // When init(wrappedValue:) is missing, CSGen records UsePropertyWrapper with
+  // (argType, wrapperType). If the argument is already the wrapper type, that
+  // produces the tautological "Wrapper → Wrapper, use wrapper instead"
+  // message (#90985). Diagnose as a conversion to the wrapped value type
+  // instead, matching the diagnostic when init(wrappedValue:) exists.
+  auto fromType = getFromType();
+  auto toType = getToType();
+  if (fromType->isEqual(toType)) {
+    if (auto *param = dyn_cast<ParamDecl>(getProperty())) {
+      if (auto wrappedValueType =
+              computeWrappedValueType(param, toType)) {
+        emitDiagnostic(diag::cannot_convert_argument_value, fromType,
+                       wrappedValueType);
+        return true;
+      }
+    }
+  }
+
   emitDiagnostic(diag::incorrect_property_wrapper_reference, getPropertyName(),
-                 getFromType(), getToType(), false)
+                 fromType, toType, false)
       .fixItInsert(getLoc(), newPrefix);
   return true;
 }
