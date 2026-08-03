@@ -78,6 +78,10 @@ enum class ExistentialRepresentation {
   /// The container may be able to directly adopt a class reference using
   /// init_existential_ref for some class types.
   Boxed,
+  /// The container is a single COM interface pointer. Copies and destroys
+  /// dispatch `AddRef` and `Release` through slots 1 and 2 of the interface
+  /// vtable. It carries netiher Swift type metadata nor witness tables.
+  COM,
 };
 
 /// The value category.
