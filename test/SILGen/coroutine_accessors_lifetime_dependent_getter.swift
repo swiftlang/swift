@@ -7,12 +7,14 @@
 // RUN: %target-swift-emit-silgen %s                          \
 // RUN:     -enable-experimental-feature CoroutineAccessors   \
 // RUN:     -enable-experimental-feature Lifetimes            \
+// RUN:     -enable-callee-allocated-coro-abi                 \
 // RUN:     -module-name m                                    \
 // RUN:   | %FileCheck %s
 
 // RUN: %target-swift-emit-silgen %s                          \
 // RUN:     -enable-experimental-feature CoroutineAccessors   \
 // RUN:     -enable-experimental-feature Lifetimes            \
+// RUN:     -enable-callee-allocated-coro-abi                 \
 // RUN:     -enable-library-evolution                         \
 // RUN:     -module-name m                                    \
 // RUN:   | %FileCheck %s
