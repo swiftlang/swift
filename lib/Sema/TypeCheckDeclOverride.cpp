@@ -270,11 +270,14 @@ static bool isUnavailableInAllVersions(ValueDecl *decl) {
 /// Perform basic checking to determine whether a declaration can override a
 /// declaration in a superclass.
 static bool areOverrideCompatibleSimple(ValueDecl *decl,
-                                        ValueDecl *parentDecl) {
+                                        ValueDecl *parentDecl,
+                                        bool allowDifferentArity = false) {
   // If the number of argument labels does not match, these overrides cannot
-  // be compatible.
-  if (decl->getName().getArgumentNames().size() !=
-        parentDecl->getName().getArgumentNames().size())
+  // be compatible. BaseName attempts may keep arity mismatches as near-matches
+  // so diagnostics can offer a Fix-It (see https://github.com/swiftlang/swift/issues/55828).
+  if (!allowDifferentArity &&
+      decl->getName().getArgumentNames().size() !=
+          parentDecl->getName().getArgumentNames().size())
     return false;
 
   // If the parent declaration is not in a class (or extension thereof) or
@@ -561,6 +564,124 @@ namespace {
   };
 }
 
+/// Whether \p derivedDecl and \p baseDecl share a compatible parameter prefix
+/// when their arities differ. Used to collect arity near-matches for Fix-Its.
+static bool partialParameterMatch(const ValueDecl *derivedDecl,
+                                  const ValueDecl *baseDecl,
+                                  TypeMatchOptions matchMode) {
+  auto *derivedParams = derivedDecl->getParameterList();
+  auto *baseParams = baseDecl->getParameterList();
+  if (!derivedParams || !baseParams)
+    return false;
+
+  if (baseParams->size() == derivedParams->size())
+    return false;
+
+  auto subs = SubstitutionMap::getOverrideSubstitutions(baseDecl, derivedDecl);
+  unsigned common =
+      std::min(derivedParams->size(), baseParams->size());
+
+  for (unsigned i = 0; i != common; ++i) {
+    auto *baseParam = baseParams->get(i);
+    auto *derivedParam = derivedParams->get(i);
+
+    if (baseParam->getArgumentName() != derivedParam->getArgumentName() ||
+        baseParam->getParameterName() != derivedParam->getParameterName())
+      return false;
+
+    if (baseParam->isInOut() != derivedParam->isInOut() ||
+        baseParam->isVariadic() != derivedParam->isVariadic()) {
+      return false;
+    }
+
+    auto baseParamTy = baseParam->getInterfaceType();
+    if (baseParam->isInOut())
+      baseParamTy = baseParamTy->getInOutObjectType();
+    baseParamTy = baseParamTy.subst(subs);
+    auto derivedParamTy = derivedParam->getInterfaceType();
+    if (derivedParam->isInOut())
+      derivedParamTy = derivedParamTy->getInOutObjectType();
+
+    if (baseParam->isInOut() || baseParam->isVariadic()) {
+      if (baseParamTy->isEqual(derivedParamTy))
+        continue;
+    } else {
+      if (baseParamTy->matchesParameter(derivedParamTy, matchMode))
+        continue;
+
+      if (baseParam->isImplicitlyUnwrappedOptional() &&
+          matchMode.contains(TypeMatchFlags::AllowNonOptionalForIUOParam)) {
+        baseParamTy = baseParamTy->getOptionalObjectType();
+        if (baseParamTy->matches(derivedParamTy, matchMode))
+          continue;
+      }
+    }
+
+    return false;
+  }
+
+  return true;
+}
+
+/// Build a Fix-It that replaces the derived parameter list with the base one.
+static bool fixParameterListToMatchBase(InFlightDiagnostic &diag,
+                                        ValueDecl *decl, ValueDecl *baseDecl) {
+  auto *derivedParams = decl->getParameterList();
+  auto *baseParams = baseDecl->getParameterList();
+  if (!derivedParams || !baseParams)
+    return false;
+
+  auto range = derivedParams->getSourceRange();
+  if (!range.isValid())
+    return false;
+
+  auto subs = SubstitutionMap::getOverrideSubstitutions(baseDecl, decl);
+
+  SmallString<64> scratch;
+  llvm::raw_svector_ostream out(scratch);
+  out << '(';
+  for (unsigned i = 0, n = baseParams->size(); i != n; ++i) {
+    if (i != 0)
+      out << ", ";
+
+    auto *baseParam = baseParams->get(i);
+    auto baseParamTy = baseParam->getInterfaceType();
+    if (baseParam->isInOut())
+      baseParamTy = baseParamTy->getInOutObjectType();
+    baseParamTy = baseParamTy.subst(subs);
+
+    auto argName = baseParam->getArgumentName();
+    auto paramName = baseParam->getParameterName();
+    if (argName.empty()) {
+      out << '_';
+      if (!paramName.empty())
+        out << ' ' << paramName.str();
+    } else if (argName == paramName || paramName.empty()) {
+      out << argName.str();
+    } else {
+      out << argName.str() << ' ' << paramName.str();
+    }
+    out << ": ";
+
+    if (baseParam->isInOut())
+      out << "inout ";
+
+    if (auto *funcTy = baseParamTy->getAs<FunctionType>()) {
+      if (!funcTy->isNoEscape())
+        out << "@escaping ";
+    }
+
+    if (baseParam->isVariadic())
+      out << baseParam->getVarargBaseTy() << "...";
+    else
+      out << baseParamTy;
+  }
+  out << ')';
+
+  diag.fixItReplace(range, out.str());
+  return true;
+}
+
 static void diagnoseGeneralOverrideFailure(ValueDecl *decl,
                                            ArrayRef<OverrideMatch> matches,
                                            OverrideCheckingAttempt attempt) {
@@ -638,7 +759,12 @@ static void diagnoseGeneralOverrideFailure(ValueDecl *decl,
     auto diag = diags.diagnose(matchDecl, diag::overridden_near_match_here,
                                matchDecl);
     if (attempt == OverrideCheckingAttempt::BaseName) {
-      fixDeclarationName(diag, decl, matchDecl->getName());
+      bool arityMismatch = decl->getName().getArgumentNames().size() !=
+                           matchDecl->getName().getArgumentNames().size();
+      // Same-arity label mismatches can still get a rename Fix-It.
+      // Multiple arity near-matches get notes only (swiftlang/swift#55828).
+      if (!arityMismatch)
+        fixDeclarationName(diag, decl, matchDecl->getName());
     }
   }
 }
@@ -979,7 +1105,10 @@ SmallVector<OverrideMatch, 2> OverrideMatcher::match(
   for (auto parentDecl : members) {
     // Check whether there are any obvious reasons why the two given
     // declarations do not have an overriding relationship.
-    if (!areOverrideCompatibleSimple(decl, parentDecl))
+    bool allowDifferentArity =
+        attempt == OverrideCheckingAttempt::BaseName ||
+        attempt == OverrideCheckingAttempt::BaseNameWithMismatchedOptional;
+    if (!areOverrideCompatibleSimple(decl, parentDecl, allowDifferentArity))
       continue;
 
     // Check whether the derived declaration has a `@differentiable` attribute
@@ -1058,6 +1187,23 @@ SmallVector<OverrideMatch, 2> OverrideMatcher::match(
                                         paramsAndResultMatch)) {
         matches.push_back({parentDecl, false});
         continue;
+      }
+
+      // Same base name, different arity: keep as a near-match when the shared
+      // parameter prefix and result type are compatible.
+      if (allowDifferentArity &&
+          decl->getName().getArgumentNames().size() !=
+              parentDecl->getName().getArgumentNames().size()) {
+        auto partialParamsAndResultMatch = [=]() -> bool {
+          return partialParameterMatch(decl, parentDecl, matchMode) &&
+                 declFnTy->getResult()->matches(parentDeclFnTy->getResult(),
+                                                matchMode);
+        };
+        if (declFnTy->matchesFunctionType(parentDeclFnTy, matchMode,
+                                          partialParamsAndResultMatch)) {
+          matches.push_back({parentDecl, false});
+          continue;
+        }
       }
     } else if (getDeclComparisonType()->matches(parentDeclTy, matchMode)) {
       matches.push_back({parentDecl, false});
@@ -1193,11 +1339,27 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
   // If the name of our match differs from the name we were looking for,
   // complain.
   if (decl->getName() != baseDecl->getName()) {
-    auto diag = diags.diagnose(decl, diag::override_argument_name_mismatch,
-                               isa<ConstructorDecl>(decl),
-                               decl->getName(),
-                               baseDecl->getName());
-    fixDeclarationName(diag, decl, baseDecl->getName());
+    bool arityMismatch = decl->getName().getArgumentNames().size() !=
+                         baseDecl->getName().getArgumentNames().size();
+    if (arityMismatch &&
+        (attempt == OverrideCheckingAttempt::BaseName ||
+         attempt == OverrideCheckingAttempt::BaseNameWithMismatchedOptional)) {
+      auto isClassContext =
+          decl->getDeclContext()->getSelfClassDecl() != nullptr;
+      auto diagKind = diag::method_does_not_override;
+      if (isa<ConstructorDecl>(decl))
+        diagKind = diag::initializer_does_not_override;
+      else if (isa<SubscriptDecl>(decl))
+        diagKind = diag::subscript_does_not_override;
+      auto diag = diags.diagnose(decl, diagKind, isClassContext);
+      fixParameterListToMatchBase(diag, decl, baseDecl);
+      diags.diagnose(baseDecl, diag::overridden_near_match_here, baseDecl);
+    } else {
+      auto diag = diags.diagnose(decl, diag::override_argument_name_mismatch,
+                                 isa<ConstructorDecl>(decl), decl->getName(),
+                                 baseDecl->getName());
+      fixDeclarationName(diag, decl, baseDecl->getName());
+    }
     emittedMatchError = true;
   }
 
@@ -1456,9 +1618,12 @@ checkPotentialOverrides(ValueDecl *decl,
       break;
     case OverrideCheckingAttempt::BaseName:
       // Don't keep looking if this is already a simple name, or if there
-      // are no arguments.
-      if (decl->getName() == decl->getBaseName() ||
-          decl->getName().getArgumentNames().empty())
+      // are no arguments - unless the declaration is marked `override`, in
+      // which case we still look for arity near-matches (e.g. foo() vs
+      // foo(a:b:)).
+      if ((decl->getName() == decl->getBaseName() ||
+           decl->getName().getArgumentNames().empty()) &&
+          !decl->getAttrs().hasAttribute<OverrideAttr>())
         return false;
       break;
     case OverrideCheckingAttempt::BaseNameWithMismatchedOptional:

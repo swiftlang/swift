@@ -160,6 +160,26 @@ class H : G {
   override init(b: Double) {} // expected-error{{initializer does not override a designated initializer from its superclass}} {{none}}
 }
 
+// Parameter-count near-matches should produce notes and (when unique) Fix-Its.
+// See https://github.com/swiftlang/swift/issues/55828
+class ArityBase {
+  func f1(_: Int, int1: Int) { } // expected-note {{potential overridden instance method 'f1(_:int1:)' here}}
+  func g1(_: Int, int1: inout Int, _ a: Int..., d: String) { } // expected-note {{potential overridden instance method 'g1(_:int1:_:d:)' here}}
+  func empty(a: Int, b: Int) { } // expected-note {{potential overridden instance method 'empty(a:b:)' here}}
+  init(a: Int, string: String) {} // expected-note {{potential overridden initializer 'init(a:string:)' here}}
+
+  func multi(a: Int, b: Int) { } // expected-note {{potential overridden instance method 'multi(a:b:)' here}} {{none}}
+  func multi(a: Int, b: Int, c: Int) { } // expected-note {{potential overridden instance method 'multi(a:b:c:)' here}} {{none}}
+}
+
+class ArityDerived: ArityBase {
+  override func f1(_: Int) { } // expected-error{{method does not override any method from its superclass}} {{19-26=(_: Int, int1: Int)}}
+  override func g1(_: Int) { } // expected-error{{method does not override any method from its superclass}} {{19-26=(_: Int, int1: inout Int, _ a: Int..., d: String)}}
+  override func empty() { } // expected-error{{method does not override any method from its superclass}} {{22-23=(a: Int, b: Int)}}
+  override init(a: Int) {} // expected-error{{initializer does not override a designated initializer from its superclass}} {{16-23=(a: Int, string: String)}}
+  override func multi(a: Int) { } // expected-error{{declaration 'multi(a:)' has different argument labels from any potential overrides}} {{none}}
+}
+
 @objc class IUOTestBaseClass {
   @objc func none() {}
 
