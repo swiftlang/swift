@@ -4,6 +4,7 @@
 
 // REQUIRES: CPU=x86_64
 // REQUIRES: objc_interop
+// REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
 
 import gizmo
 
