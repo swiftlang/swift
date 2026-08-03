@@ -148,38 +148,82 @@ bool importer::isDirectViewType(const clang::Decl *decl, ASTContext &swiftCtx) {
 }
 
 namespace {
-
-/// The immortality of a foreign reference type's retain:/release: attributes.
-/// A type is immortal iff *every* ref-count op it specifies is "immortal".
-enum class Immortality {
-  /// No "immortal" ops: an ordinary shared reference type.
-  None,
-  /// Every ref-count op that is specified is "immortal".
-  All,
-  /// Some ops are "immortal" and some are not (a malformed annotation).
-  Mixed,
-};
-
-/// Classify the retain:/release: Swift attributes written directly on \p decl.
-/// A record with no such attributes classifies as \c None.
-Immortality classifyImmortality(const clang::RecordDecl *decl) {
-  bool sawImmortal = false, sawNonImmortal = false;
-  for (auto *attr : decl->getAttrs()) {
-    auto *swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr);
-    if (!swiftAttr)
-      continue;
-    StringRef value = swiftAttr->getAttribute();
-    if (!value.consume_front("retain:") && !value.consume_front("release:"))
-      continue;
-    if (value == "immortal")
-      sawImmortal = true;
-    else
-      sawNonImmortal = true;
+/// The retain:/release: attributes written directly on a record.
+struct RetainReleaseInfo {
+  RetainReleaseInfo(const clang::RecordDecl *decl) : decl(decl) {
+    if (!decl->hasAttrs())
+      return;
+    for (auto *attr : decl->specific_attrs<clang::SwiftAttrAttr>()) {
+      StringRef attrStr = attr->getAttribute();
+      if (attrStr.consume_front("retain:")) {
+        ++retainCount;
+        retain = attrStr;
+      } else if (attrStr.consume_front("release:")) {
+        ++releaseCount;
+        release = attrStr;
+      }
+    }
   }
-  if (sawImmortal && sawNonImmortal)
-    return Immortality::Mixed;
-  return sawImmortal ? Immortality::All : Immortality::None;
-}
+
+  /// The name of the last retain: operation (empty if none).
+  StringRef getRetain() const { return retain; }
+
+  /// The name of the last release: operation (empty if none).
+  StringRef getRelease() const { return release; }
+
+  unsigned numRetain() const { return retainCount; }
+
+  unsigned numRelease() const { return releaseCount; }
+
+  bool isImmortal() const {
+    return retainCount == 1 && releaseCount == 1 && retain == "immortal" &&
+           release == "immortal";
+  }
+
+  bool hasMixedImmortality() const {
+    bool retainImmortal = retain == "immortal";
+    bool releaseImmortal = release == "immortal";
+    return retainImmortal != releaseImmortal;
+  }
+
+  bool isValid() const {
+    return numRetain() == 1 && numRelease() == 1 && !hasMixedImmortality();
+  }
+
+  /// Diagnose a missing/duplicated retain:/release: attribute or a mixed
+  /// immortal/non-immortal annotation via \p Impl (if non-null). Returns
+  /// whether the annotations are structurally well-formed.
+  bool checkShape(ClangImporter::Implementation *Impl) const {
+    HeaderLoc loc(decl->getLocation());
+    auto checkCount = [&](unsigned count, bool isRelease) {
+      if (count == 1)
+        return true;
+      if (Impl)
+        Impl->diagnose(loc,
+                       count == 0
+                           ? diag::reference_type_must_have_retain_release_attr
+                           : diag::too_many_reference_type_retain_release_attr,
+                       isRelease, decl->getNameAsString());
+      return false;
+    };
+    bool retainOk = checkCount(retainCount, /*isRelease=*/false);
+    bool releaseOk = checkCount(releaseCount, /*isRelease=*/true);
+    if (!retainOk || !releaseOk)
+      return false;
+
+    if (hasMixedImmortality()) {
+      if (Impl)
+        Impl->diagnose(loc, diag::reference_type_mixed_immortal_marker, decl);
+      return false;
+    }
+    return true;
+  }
+
+private:
+  const clang::RecordDecl *decl;
+  StringRef retain, release;
+  unsigned retainCount = 0, releaseCount = 0;
+};
 
 class ForeignReferenceTypeChecker {
   /// We are checking this to determine whether it is a foreign reference type.
@@ -273,22 +317,15 @@ public:
       // checkedDecl is explicitly annotated as a foreign reference type.
       // Do not let it have a primarySuperclass, to prevent upcasting past the
       // annotation boundary in the class hierarchy.
-      switch (classifyImmortality(checkedDecl)) {
-      case Immortality::All:
-        return ForeignReferenceTypeInfo::Immortal(
-            checkedDecl,
-            /*primarySuperclass=*/nullptr);
-      case Immortality::None:
-        return ForeignReferenceTypeInfo::Shared(checkedDecl,
-                                                /*primarySuperclass=*/nullptr);
-      case Immortality::Mixed:
-        // Some ops are immortal and some are not: a non-immortal, invalid FRT.
-        // The mismatch is diagnosed in checkRetainReleaseFunctions, alongside
-        // the other retain:/release: annotation checks.
+      auto rrInfo = RetainReleaseInfo(checkedDecl);
+      if (rrInfo.isImmortal())
+        return ForeignReferenceTypeInfo::Immortal(checkedDecl,
+                                                  /*primarySuperclass=*/nullptr,
+                                                  /*isValid=*/rrInfo.isValid());
+      else
         return ForeignReferenceTypeInfo::Shared(checkedDecl,
                                                 /*primarySuperclass=*/nullptr,
-                                                /*isValid=*/false);
-      }
+                                                /*isValid=*/rrInfo.isValid());
     }
 
     const clang::CXXRecordDecl *uniqueDirectFRTBase = visitBases(checkedDecl);
@@ -308,26 +345,20 @@ public:
 
     const clang::CXXRecordDecl *FRTBase = nullptr;
     bool seenShared = false, seenMultipleShared = false, seenImmortal = false,
-         seenMixed = false;
+         seenInvalidOps = false;
 
     for (auto *base : FRTBases) {
-      switch (classifyImmortality(base)) {
-      case Immortality::All:
+      auto rrInfo = RetainReleaseInfo(base);
+      seenInvalidOps |= !rrInfo.isValid();
+      if (rrInfo.isImmortal()) {
         seenImmortal = true;
-        break;
-      case Immortality::Mixed:
-        // A malformed (Mixed) base is diagnosed at its own definition; here we
-        // treat it as shared but record seeing a malformed base.
-        seenMixed = true;
-        LLVM_FALLTHROUGH;
-      case Immortality::None:
+      } else {
         if (!FRTBase) {
           FRTBase = base;
           seenShared = true;
         } else {
           seenMultipleShared = true;
         }
-        break;
       }
     }
 
@@ -337,7 +368,7 @@ public:
       FRTBase = FRTBases.front();
     }
 
-    if (seenMultipleShared || (seenShared && seenImmortal) || seenMixed) {
+    if (seenMultipleShared || (seenShared && seenImmortal) || seenInvalidOps) {
       // checkedDecl is an invalid FRT, either because it has multiple shared
       // FRT bases (ambiguous retain/release ops), or because it has mixed
       // ancestry between shared and immortal bases.
@@ -392,18 +423,15 @@ ForeignReferenceTypeInfo ForeignReferenceTypeInfoRequest::evaluate(
   // associated complications) to worry about. Just look for ref attributes.
 
   if (importer::hasImportReferenceAttr(decl)) {
-    switch (classifyImmortality(decl)) {
-    case Immortality::All:
+    auto rrInfo = RetainReleaseInfo(decl);
+    if (rrInfo.isImmortal())
       return ForeignReferenceTypeInfo::Immortal(decl,
-                                                /*primarySuperclass=*/nullptr);
-    case Immortality::None:
-      return ForeignReferenceTypeInfo::Shared(decl,
-                                              /*primarySuperclass=*/nullptr);
-    case Immortality::Mixed:
+                                                /*primarySuperclass=*/nullptr,
+                                                /*isValid=*/rrInfo.isValid());
+    else
       return ForeignReferenceTypeInfo::Shared(decl,
                                               /*primarySuperclass=*/nullptr,
-                                              /*isValid=*/false);
-    }
+                                              /*isValid=*/rrInfo.isValid());
   }
 
   return ForeignReferenceTypeInfo::Value();
@@ -636,88 +664,23 @@ static bool checkRefCountOperation(const ClassDecl *classDecl, ValueDecl *op,
   return true;
 }
 
-/// Structural check for a foreign reference type's retain/release attrs.
-/// The record \p decl must carry exactly one \c retain: and one \c release:
-/// Swift attribute, and either both or neither must be "immortal".
-///
-/// Returns false to indicate there was some structural issue, and emits
-/// diagnostics if \p Impl is non-null.
-///
-/// N.B. the check here needs to be kept in sync with classifyImmortality().
-static bool checkRefCountAttrShape(const clang::RecordDecl *decl,
-                                   ClangImporter::Implementation *Impl) {
-  unsigned numRetain = 0, numRelease = 0;
-  bool retainImmortal = false, releaseImmortal = false;
-  for (auto *attr : decl->getAttrs()) {
-    auto *swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr);
-    if (!swiftAttr)
-      continue;
-    StringRef value = swiftAttr->getAttribute();
-    if (value.consume_front("retain:")) {
-      ++numRetain;
-      retainImmortal |= (value == "immortal");
-    } else if (value.consume_front("release:")) {
-      ++numRelease;
-      releaseImmortal |= (value == "immortal");
-    }
-  }
-
-  HeaderLoc loc(decl->getLocation());
-  auto checkCount = [&](unsigned count, bool isRelease) {
-    if (count == 1)
-      return true;
-    if (!Impl)
-      return false;
-    if (count == 0)
-      Impl->diagnose(loc, diag::reference_type_must_have_retain_release_attr,
-                     isRelease, decl->getNameAsString());
-    else
-      Impl->diagnose(loc, diag::too_many_reference_type_retain_release_attr,
-                     isRelease, decl->getNameAsString());
-    return false;
-  };
-
-  bool ok = true;
-  ok &= checkCount(numRetain, /*isRelease=*/false);
-  ok &= checkCount(numRelease, /*isRelease=*/true);
-  if (retainImmortal != releaseImmortal) {
-    ok = true;
-    if (Impl)
-      Impl->diagnose(loc, diag::reference_type_mixed_immortal_marker, decl);
-  }
-  return ok;
-}
-
 /// Resolve and diagnose the retain (\p isRetain) or release operation for the
 /// foreign reference type \p classDecl, based on the annotation read from
 /// \p annotatedDecl. Returns null on any (semantic) error.
 ///
 /// This performs semantic checking only: the caller guarantees, via
-/// \c checkRefCountAttrShape, that \p annotatedDecl has exactly one \c retain:
-/// and one \c release: attribute, and (via the FRT request) that neither is
-/// immortal.
+/// \c RetainReleaseInfo::checkShape, that \p annotatedDecl has exactly one
+/// \c retain: and one \c release: attribute, and (via the FRT request) that
+/// neither is immortal.
 static ValueDecl *
 resolveRefCountOperation(const ClassDecl *classDecl,
-                         const ClassDecl *annotatedDecl, bool isRetain,
-                         ClangImporter::Implementation &Impl) {
-  StringRef prefix = isRetain ? "retain:" : "release:";
+                         const ClassDecl *annotatedDecl, StringRef name,
+                         bool isRetain, ClangImporter::Implementation &Impl) {
   auto *record = cast<clang::RecordDecl>(classDecl->getClangDecl());
   HeaderLoc loc(record->getLocation());
 
-  // The structural check guarantees a single retain:/release: attribute.
-  auto *annotatedRecord =
-      cast<clang::RecordDecl>(annotatedDecl->getClangDecl());
-  const clang::SwiftAttrAttr *attr = nullptr;
-  for (auto *a : annotatedRecord->getAttrs()) {
-    if (auto *swiftAttr = dyn_cast<clang::SwiftAttrAttr>(a);
-        swiftAttr && swiftAttr->getAttribute().starts_with(prefix)) {
-      attr = swiftAttr;
-      break;
-    }
-  }
-  ASSERT(attr && "structural check should guarantee a retain/release attr");
-
-  StringRef name = attr->getAttribute().drop_front(prefix.size());
+  ASSERT(!name.empty() &&
+         "structural check should guarantee a retain/release attr");
   ASSERT(name != "immortal" && "immortal FRTs are handled before resolution");
 
   auto results = importer::getValueDeclsForName(
@@ -890,13 +853,14 @@ void importer::checkRetainReleaseFunctions(
   else
     baseCxxRecordDecl = nullptr;
 
-  // Check that the record carrying the retain:/release: attributes must
-  // have exactly one of each. Only diagnose when those attributes are on this
-  // type, to avoid repeating diagnostics once per dervied type.
+  // Check that the record carrying the retain:/release: attributes has exactly
+  // one of each. Only diagnose when those attributes are on this type, to avoid
+  // repeating diagnostics once per derived type.
   const clang::RecordDecl *annotatedDecl =
       baseCxxRecordDecl ? baseCxxRecordDecl : recordDecl;
-  if (!checkRefCountAttrShape(annotatedDecl,
-                              /*Impl=*/baseCxxRecordDecl ? nullptr : &Impl))
+
+  auto rrInfo = RetainReleaseInfo(annotatedDecl);
+  if (!rrInfo.checkShape(/*Impl=*/baseCxxRecordDecl ? nullptr : &Impl))
     return;
 
   if (!frtInfo.isValid())
@@ -932,8 +896,10 @@ void importer::checkRetainReleaseFunctions(
 
   // Resolve (and semantically diagnose) the retain/release operations.
   ValueDecl *retainOp = resolveRefCountOperation(classDecl, annotatedClassDecl,
+                                                 rrInfo.getRetain(),
                                                  /*isRetain=*/true, Impl);
   ValueDecl *releaseOp = resolveRefCountOperation(classDecl, annotatedClassDecl,
+                                                  rrInfo.getRelease(),
                                                   /*isRetain=*/false, Impl);
 
   const clang::FunctionDecl *retainFn = nullptr;
