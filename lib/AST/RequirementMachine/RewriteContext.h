@@ -51,6 +51,9 @@ class RewriteContext final {
   /// The singleton storage for pack element symbols.
   Symbol::Storage *ThePackElementSymbol;
 
+  /// The singleton storage for metatype symbols.
+  Symbol::Storage *TheMetatypeSymbol;
+
   /// Folding set for uniquing terms.
   llvm::FoldingSet<Term::Storage> Terms;
 
