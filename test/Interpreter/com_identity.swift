@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift-dylib(%t/%target-library-name(COM)) -emit-module-path %t/COM.swiftmodule -module-name COM -Xfrontend -enable-experimental-com-interop %S/../Inputs/COM.swift
-// RUN: %target-build-swift-dylib(%t/%target-library-name(Widget)) -emit-module-path %t/Widget.swiftmodule -module-name Widget -Xfrontend -enable-experimental-com-interop -I %t -L %t -lCOM %target-rpath(%t) %S/Inputs/com_widget.swift
-// RUN: %target-build-swift %s -o %t/a.out -module-name main -Xfrontend -enable-experimental-com-interop -I %t -L %t -lCOM -lWidget %target-rpath(%t)
+// RUN: %target-build-swift-dylib(%t/%target-library-name(COM)) -emit-module-path %t/COM.swiftmodule -module-name COM -Xfrontend -enable-experimental-com-interop -Xfrontend -com-interop-model=microsoft %S/../Inputs/COM.swift
+// RUN: %target-build-swift-dylib(%t/%target-library-name(Widget)) -emit-module-path %t/Widget.swiftmodule -module-name Widget -Xfrontend -enable-experimental-com-interop -Xfrontend -com-interop-model=microsoft -I %t -L %t -lCOM %target-rpath(%t) %S/Inputs/com_widget.swift
+// RUN: %target-build-swift %s -o %t/a.out -module-name main -Xfrontend -enable-experimental-com-interop -Xfrontend -com-interop-model=microsoft -I %t -L %t -lCOM -lWidget %target-rpath(%t)
 // RUN: %target-codesign %t/a.out %t/%target-library-name(COM) %t/%target-library-name(Widget)
 // RUN: %target-run %t/a.out %t/%target-library-name(COM) %t/%target-library-name(Widget) | %FileCheck %s
 // REQUIRES: executable_test
