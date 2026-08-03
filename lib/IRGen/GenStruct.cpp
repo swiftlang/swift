@@ -540,12 +540,7 @@ namespace {
     void addToAggLowering(IRGenModule &, SwiftAggLowering &lowering,
                           Size offset) const override {
       for (const auto &input : AggLoweringInputs) {
-        auto begin = offset.asCharUnits() + input.Begin;
-        auto end = offset.asCharUnits() + input.End;
-        if (input.Type)
-          lowering.addTypedData(input.Type, begin, end);
-        else
-          lowering.addOpaqueData(begin, end);
+        lowering.addDecomposedData(input, offset.asCharUnits());
       }
     }
 
