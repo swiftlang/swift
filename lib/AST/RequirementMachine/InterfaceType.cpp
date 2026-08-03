@@ -299,6 +299,9 @@ getTypeForSymbolRange(const Symbol *begin, const Symbol *end,
       case Symbol::Kind::ConcreteType:
       case Symbol::Kind::ConcreteConformance:
       case Symbol::Kind::Shape:
+        // A metatype symbol requires a type term before it, so it cannot appear
+        // first.
+      case Symbol::Kind::Metatype:
         ABORT([&](auto &out) {
           out << "Invalid root symbol: " << MutableTerm(begin, end);
         });
