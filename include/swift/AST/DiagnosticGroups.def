@@ -77,6 +77,7 @@ GROUP(OptionObsoletedByModuleSelectors,none,"option-obsoleted-by-module-selector
 GROUP(ModuleNotTestable,none,"module-not-testable")
 GROUP(ModuleSelfImport,none,"module-self-import")
 GROUP(ModuleVersionMissing,none,"module-version-missing")
+GROUP(MissingRuntimeFailureMessage,DefaultIgnoreWarnings,"")
 GROUP(MultipleInheritance,none,"multiple-inheritance")
 GROUP(MutableGlobalVariable,none,"mutable-global-variable")
 GROUP(NominalTypes,none,"nominal-types")
