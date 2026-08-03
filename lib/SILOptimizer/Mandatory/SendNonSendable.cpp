@@ -564,7 +564,19 @@ private:
     bool rhsIsIsolatedSource;
   };
 
-  SmallVector<NoteToEmit, 8> notes;
+  /// The chain the walk settled on, one entry per note to emit. Filled in from
+  /// \c walkNotes once a path explains the chain.
+  SmallVector<NoteToEmit, 0> notes;
+
+  /// The notes the walk has discovered, shared by every path.
+  ///
+  /// Along one path this is append-only, but a path does two things to it that
+  /// the next one must not see: it appends notes of its own, and it fills in
+  /// locations on notes it inherited. Both are undone when the walk backtracks
+  /// onto another path, using that path's \c State::noteMark and
+  /// \c State::pendingStart. Sharing one buffer is what keeps State small
+  /// enough to copy per path without dragging a note vector along.
+  SmallVector<NoteToEmit, 0> walkNotes;
 
   /// An unanswered "how does \c from reach \c to" question.
   ///
@@ -605,10 +617,9 @@ private:
   ///
   /// A CFG history join leaves the walk several paths to try, since the chain
   /// may continue in any of the joined predecessors, and each path carries a
-  /// copy of this. That is why the walk's state lives here rather than on the
-  /// emitter: a path that turns out to be a dead end drops its copy, leaving
-  /// behind neither its half-answered questions nor notes about a branch that
-  /// did not isolate anything.
+  /// copy of this. So this is copied once per candidate predecessor and wants
+  /// to stay small. The notes themselves live in \c walkNotes rather than here;
+  /// a state refers to its share of them by the two marks below.
   struct State {
     /// The partition to keep rewinding. For the initial state this is the
     /// partition at the moment of the send; for a later path it is the joined
@@ -619,20 +630,32 @@ private:
     /// sent element come to be in an isolated region -- and answering a
     /// question can split it in two, so this grows as well as shrinks. The
     /// chain is fully explained when it drains.
-    SmallVector<ChainQuestion, 8> openQuestions;
+    ///
+    /// Unlike the notes this cannot be shared: \c processState rewrites it
+    /// wholesale for every merge it answers, so it is not append-only. One
+    /// question is always in flight, so keep room for that one inline.
+    SmallVector<ChainQuestion, 1> openQuestions;
 
-    /// The links discovered so far, in discovery order.
-    SmallVector<NoteToEmit, 8> notes;
+    /// Size of \c walkNotes when this state was created, i.e. the notes it
+    /// inherited. Backtracking onto this path drops everything the path tried
+    /// before it appended past this point.
+    unsigned noteMark = 0;
 
-    /// Indices into \c notes of links still waiting for a location. A
-    /// PartitionOp pushes its sequence boundary before its nodes, so rewinding
-    /// reaches a merge before the boundary that names the instruction behind
-    /// it: a link's location is not known when the link is created and is
-    /// filled in when the boundary arrives.
-    SmallVector<unsigned, 4> pendingNotes;
+    /// Index in \c walkNotes of the first inherited note still waiting for a
+    /// location, so the inherited pending notes are [pendingStart, noteMark).
+    ///
+    /// A PartitionOp pushes its sequence boundary before its nodes, so
+    /// rewinding reaches a merge before the boundary that names the instruction
+    /// behind it: a note's location is not known when the note is created and
+    /// is filled in when the boundary arrives. A merge the dataflow join
+    /// performed has no boundary in this block at all, so its notes stay
+    /// pending across the join and are located only once the walk takes a path
+    /// into the predecessor. Backtracking onto this path un-locates this range,
+    /// undoing whatever the path tried before it wrote there.
+    unsigned pendingStart = 0;
 
     /// Set once \c openQuestions drains. The walk cannot stop the moment that
-    /// happens: the links the answering merge created are still waiting for the
+    /// happens: the notes the answering merge created are still waiting for the
     /// location of the instruction behind them.
     bool allQuestionsAnswered = false;
   };
@@ -811,9 +834,9 @@ private:
 
   /// Rewind \p state's partition until the chain is explained or the state's
   /// history runs out. Returns true when the chain was explained, in which case
-  /// the state's links have been moved onto \c notes. Otherwise records a path
-  /// on \p states for each joined predecessor the chain may continue in and
-  /// returns false.
+  /// the chain has been copied from \c walkNotes onto \c notes. Otherwise
+  /// records a path on \p states for each joined predecessor the chain may
+  /// continue in and returns false.
   bool processState(State &&state, SmallVectorImpl<State> &states);
 
   void emitNotes();
@@ -920,7 +943,7 @@ void IsolationHistoryNoteEmitter::collectIsolationHistoryNotes() {
   // and does not maintain the send information alongside it. For a joined
   // predecessor's exit partition that happens where the path is recorded; the
   // send-time partition we start from is stripped here.
-  State initial{inputPartition.removingSendingOperandState()};
+  State initial{inputPartition.removingSendingOperandState(), {}};
   initial.openQuestions.push_back(
       ChainQuestion{inputSentElement, std::nullopt, std::nullopt});
 
@@ -932,6 +955,13 @@ void IsolationHistoryNoteEmitter::collectIsolationHistoryNotes() {
   while (!states.empty()) {
     State state = std::move(states.back());
     states.pop_back();
+
+    // Put the shared note buffer back the way this path left it. A path tried
+    // in the meantime appended notes of its own and located notes this one
+    // inherited, and neither belongs here.
+    walkNotes.truncate(state.noteMark);
+    for (unsigned i = state.pendingStart, e = state.noteMark; i != e; ++i)
+      walkNotes[i].mergeLoc = SILLocation::invalid();
 
     ISOLATION_HISTORY_LOG(log() << "Rewinding a partition (" << states.size()
                                 << " other path(s) still to try): ";
@@ -960,10 +990,12 @@ bool IsolationHistoryNoteEmitter::processState(State &&state,
   // nodes being rewound right now are undoing. Only read by the logging below.
   SILInstruction *currentBoundaryInst = nullptr;
 
-  auto &pendingNotes = state.pendingNotes;
   auto &openQuestions = state.openQuestions;
-  auto &links = state.notes;
   bool &allQuestionsAnswered = state.allQuestionsAnswered;
+
+  // Index of the first note still waiting for a location. Everything from here
+  // to the end of walkNotes is pending; everything before it is located.
+  unsigned pendingStart = state.pendingStart;
 
   // Scratch for rebuilding the open questions while answering them against a
   // single merge. Declared out here so the loop below does not reallocate.
@@ -1087,10 +1119,12 @@ bool IsolationHistoryNoteEmitter::processState(State &&state,
               << " are the same value spelled two ways, so this merge is an "
                  "artifact of lowering and gets no note.\n");
         } else {
-          noteIndex = links.size();
-          pendingNotes.push_back(*noteIndex);
-          links.push_back(NoteToEmit{nearElt, farElt, SILLocation::invalid(),
-                                     question.parentNote, farIsIsolatedSource});
+          // A new note is pending by construction: it goes on the end, and
+          // pendingStart already points at or before the end.
+          noteIndex = walkNotes.size();
+          walkNotes.push_back(
+              NoteToEmit{nearElt, farElt, SILLocation::invalid(),
+                         question.parentNote, farIsIsolatedSource});
         }
 
         // The question splits in two: how does the sent-value end reach the
@@ -1140,19 +1174,19 @@ bool IsolationHistoryNoteEmitter::processState(State &&state,
       currentBoundaryInst = node->getHistoryBoundaryInst();
 
       // This boundary names the instruction behind every merge rewound since
-      // the last one, so it is the location of the links they created.
+      // the last one, so it is the location of the notes they created.
       auto loc = node->getHistoryBoundaryLoc();
       assert(loc);
-      for (unsigned i : pendingNotes)
-        links[i].mergeLoc = *loc;
-      pendingNotes.clear();
+      for (unsigned i = pendingStart, e = walkNotes.size(); i != e; ++i)
+        walkNotes[i].mergeLoc = *loc;
+      pendingStart = walkNotes.size();
 
       // Every question has been answered and the last notes now have their
       // locations, so there is nothing older worth rewinding for.
       if (allQuestionsAnswered) {
         ISOLATION_HISTORY_LOG(log(2)
                               << "Done: the whole chain is explained.\n");
-        notes = std::move(links);
+        notes = walkNotes;
         return true;
       }
       continue;
@@ -1171,11 +1205,11 @@ bool IsolationHistoryNoteEmitter::processState(State &&state,
 
   ISOLATION_HISTORY_LOG(
       log(1) << "Ran out of history here. Questions still unanswered: "
-             << openQuestions.size() << ", links found: " << links.size()
+             << openQuestions.size() << ", notes found: " << walkNotes.size()
              << ", branches to continue into: " << joinedBlocks.size() << '\n');
 
-  // Every question was answered, so nothing older can add a link. What can
-  // still be missing is a location: a link is left waiting when the merge
+  // Every question was answered, so nothing older can add a note. What can
+  // still be missing is a location: a note is left waiting when the merge
   // behind it was performed by the dataflow join rather than by a PartitionOp,
   // so no boundary in this block names it. The instruction to blame for such a
   // merge is the last one in the branch where the two ends actually came
@@ -1186,7 +1220,7 @@ bool IsolationHistoryNoteEmitter::processState(State &&state,
   // here when there is no path left to try.
   if (allQuestionsAnswered) {
     if (notes.empty())
-      notes = links;
+      notes = walkNotes;
     if (joinedBlocks.empty()) {
       ISOLATION_HISTORY_LOG(
           log(1) << "The chain is explained as far as the history goes.\n");
@@ -1194,7 +1228,7 @@ bool IsolationHistoryNoteEmitter::processState(State &&state,
     }
   }
 
-  // The chain -- or the location of its last links -- is in the predecessors
+  // The chain -- or the location of its last notes -- is in the predecessors
   // whose exit partitions were joined into this one at a CFG merge point.
   struct PredExit {
     SILBasicBlock *block;
@@ -1224,15 +1258,15 @@ bool IsolationHistoryNoteEmitter::processState(State &&state,
   }
 
   // What the walk still wants from a predecessor: the open questions when there
-  // are any, and otherwise the ends of the links that are waiting for a
+  // are any, and otherwise the ends of the notes that are waiting for a
   // location.
   SmallVector<ChainQuestion, 4> wanted;
   if (!openQuestions.empty()) {
     wanted.append(openQuestions.begin(), openQuestions.end());
   } else {
-    for (unsigned i : pendingNotes)
-      wanted.push_back(
-          ChainQuestion{links[i].lhsElt, links[i].rhsElt, std::nullopt});
+    for (unsigned i = pendingStart, e = walkNotes.size(); i != e; ++i)
+      wanted.push_back(ChainQuestion{walkNotes[i].lhsElt, walkNotes[i].rhsElt,
+                                     std::nullopt});
   }
 
   // Only some of those predecessors can be where what we want happened, and
@@ -1267,8 +1301,12 @@ bool IsolationHistoryNoteEmitter::processState(State &&state,
 
     ISOLATION_HISTORY_LOG(log(1) << "Will continue the walk into bb"
                                  << preds[i].block->getDebugID() << ".\n");
-    states.push_back(State{std::move(preds[i].exit), openQuestions, links,
-                           pendingNotes, allQuestionsAnswered});
+    // Every path inherits the notes as they stand now, and the pending run
+    // within them. Backtracking onto the path restores walkNotes to exactly
+    // this.
+    states.push_back(State{std::move(preds[i].exit), openQuestions,
+                           unsigned(walkNotes.size()), pendingStart,
+                           allQuestionsAnswered});
   }
 
   return false;
@@ -1305,7 +1343,7 @@ bool IsolationHistoryNoteEmitter::couldAnswer(
 /// Emit the collected chain, one note per link, anchored at the merge that
 /// created the link.
 ///
-/// The links are reported in the order the walk discovered them, which is not
+/// The notes are reported in the order the walk discovered them, which is not
 /// the order the chain reads in: a merge that separates the two ends of a
 /// question is rewound before the merges that explain either half. Nothing
 /// depends on that order -- every note names both of its ends and points at its
