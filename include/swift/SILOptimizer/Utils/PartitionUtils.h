@@ -1009,7 +1009,7 @@ public:
   /// then comparing for exact equality.
   ///
   /// Runs in linear time.
-  static bool equals(Partition &fst, Partition &snd) {
+  static bool equals(const Partition &fst, const Partition &snd) {
     fst.canonicalize();
     snd.canonicalize();
 
