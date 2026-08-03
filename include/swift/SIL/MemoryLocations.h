@@ -228,6 +228,16 @@ public:
   /// Returns the root location of \p index.
   const Location *getRootLocation(unsigned index) const;
 
+  /// Returns true if the location with a given \p index has any tracked
+  /// sub-locations.
+  bool hasSubLocations(unsigned index) const {
+    const Location &loc = locations[index];
+    // Either the location has sub-locations in addition to its "self" bit, or
+    // it's completely covered by its sub-locations, in which case the "self"
+    // bit is not set.
+    return loc.subLocations.count() > 1 || !loc.subLocations.test(index);
+  }
+
   /// Registers an address projection instruction for a location.
   void registerProjection(SILValue projection, unsigned locIdx) {
     addr2LocIdx[projection] = locIdx;
