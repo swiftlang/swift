@@ -22,6 +22,8 @@
 #include <optional>
 #include <string>
 
+#include "swift/AST/ReferenceCounting.h"
+
 namespace swift {
 
 class NominalTypeDecl;
@@ -33,6 +35,7 @@ struct AbstractTypeLayout {
   uint64_t stride;
   bool bitwiseCopyable;
   bool isOpaque;
+  std::optional<ReferenceCounting> referenceCountingSystem;
 };
 
 std::optional<AbstractTypeLayout>
