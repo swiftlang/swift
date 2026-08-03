@@ -1056,6 +1056,22 @@ func _embeddedReportExclusivityViolation(
   Builtin.int_trap()
 }
 
+@_extern(c)
+func _swift_tls_get(_ key: Int) -> UnsafeMutableRawPointer?
+
+@_extern(c)
+func _swift_tls_set(_ key: Int, _ pointer: UnsafeMutableRawPointer?)
+
+@c
+func _swift_getExclusivityTLS() -> UnsafeMutableRawPointer? {
+  return unsafe _swift_tls_get(/*exclusivity=*/7)
+}
+
+@c
+func _swift_setExclusivityTLS(_ pointer: UnsafeMutableRawPointer?) {
+  return unsafe _swift_tls_set(/*exclusivity=*/7, pointer)
+}
+
 private func intToFloatChunkFactor<T: ExpressibleByFloatLiteral>() -> T {
 #if _pointerBitWidth(_64)
   return 0x1p64
