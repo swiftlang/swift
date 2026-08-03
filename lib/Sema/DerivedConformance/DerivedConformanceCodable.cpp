@@ -1909,6 +1909,15 @@ static ValueDecl *deriveDecodable_init(DerivedConformance &derived) {
   return initDecl;
 }
 
+/// Prints \p type as source text for use inside a synthesized macro buffer.
+/// This aims to produce a full disambiguated type name, resilient against shadowing
+static std::string getTypeNameForCoding(Type type) {
+  PrintOptions options;
+  options.UseModuleSelectors = true;
+  options.PreferTypeRepr = false;
+  return type.getString(options);
+}
+
 static void printCodedProperty(llvm::raw_ostream &out, VarDecl *varDecl,
                                Type varType, EnumElementDecl *elt,
                                bool useIfPresentVariant) {
@@ -1918,7 +1927,7 @@ static void printCodedProperty(llvm::raw_ostream &out, VarDecl *varDecl,
       << ", memberName: "
       << QuotedString(identifierEscapingIfNeeded(varDecl->getNameStr(),
                                                  PrintNameContext::TypeMember))
-      << ", typeName: " << QuotedString(varType.getString())
+      << ", typeName: " << QuotedString(getTypeNameForCoding(varType))
       << ", useIfPresent: " << (useIfPresentVariant ? "true" : "false") << ")";
 }
 
@@ -1970,7 +1979,7 @@ static void printCodedPayload(llvm::raw_ostream &out, ParamDecl *paramDecl,
     out << "nil";
   }
 
-  out << ", typeName: " << QuotedString(varType.getString())
+  out << ", typeName: " << QuotedString(getTypeNameForCoding(varType))
       << ", useIfPresent: " << (useIfPresentVariant ? "true" : "false") << ")";
 }
 
