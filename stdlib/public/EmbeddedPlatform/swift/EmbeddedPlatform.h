@@ -441,42 +441,6 @@ void _swift_generateRandom(void * EMBEDDED_SWIFT_NONNULL EMBEDDED_SWIFT_SIZED_BY
 void _swift_generateRandomHashSeed(void * EMBEDDED_SWIFT_NONNULL EMBEDDED_SWIFT_SIZED_BY(nbytes) buffer, __swift_size_t nbytes);
 
 /**
- * Retrieve a pointer that will be used to retain information needed for Swift's
- * dynamic exclusivity checking.
- *
- * - Returns: The pointer most recently passed to `_swift_setExclusivityTLS` on
- *   this thread. If `_swift_setExclusivityTLS` has not been called on this
- *   thread, returns NULL.
- *
- * In a single-threaded environment, the `_swift_getExclusivityTLS` and
- * `_swift_setExclusivityTLS` functions can get and set a global variable that
- * is initialized to NULL. In a multi-threaded environment, the variable will
- * need to be in thread-local storage (e.g., using C11 `_Thread_local`) or a
- * similar facility.
- *
- * This function is required when using Swift's dynamic exclusivity checking,
- * which is enabled by the Swift compiler option `-enforce-exclusivity=checked`
- * and required when the compiler cannot statically prove that all accesses to a
- * given variable (such as a global variable or a stored instance property of a
- * class) respect the exclusivity model.
- */
-void * EMBEDDED_SWIFT_NULLABLE _swift_getExclusivityTLS(void);
-
-/**
- * Set the pointer that will be used to retain information needed for Swift's
- * dynamic exclusivity checking.
- *
- * - Parameters:
- *   - ptr: The pointer to set. A subsequent call to
- *     `_swift_getExclusivityTLS` on the same thread (without an intervening
- *     call to `_swift_setExclusivityTLS`) shall return `ptr`.
- *
- * See `_swift_getExclusivityTLS` for more information about dynamic exclusivity
- * checking.
- */
-void _swift_setExclusivityTLS(void * EMBEDDED_SWIFT_NULLABLE ptr);
-
-/**
  * Initializes a mutex.
  *
  * - Parameters:
