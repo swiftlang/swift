@@ -356,6 +356,33 @@ suite.test("Atomic${label} ${name} ${order}") {
 
 %     end
 %   end
+
+// Min/max must use Value's own comparison (SE-0410). Operands that cross the
+// sign bit make signed vs unsigned atomicrmw disagree, so exercise that here.
+%   for (name, _, _, _) in integerOperations:
+%     if name == "Min" or name == "Max":
+%       for (order, _, _, _, _) in updateOrderings:
+suite.test("Atomic${label} ${name} signBit ${order}") {
+%         if type.startswith("UInt"):
+  let high: ${type} = .max
+  let low: ${type} = 1
+%         else:
+  let high: ${type} = -1
+  let low: ${type} = 1
+%         end
+  let expected: ${type} = Swift.${lowerFirst(name)}(high, low)
+
+  let v = Atomic<${type}>(high)
+  let r = v.${lowerFirst(name)}(low, ordering: .${order})
+  expectEqual(r.oldValue, high)
+  expectEqual(r.newValue, expected)
+  expectEqual(v.load(ordering: .relaxed), expected)
+  expectEqual(r.newValue, v.load(ordering: .relaxed))
+}
+
+%       end
+%     end
+%   end
 % end
 } // if #available(SwiftStdlib 6.0, *)
 % end

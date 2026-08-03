@@ -123,9 +123,12 @@ def llvmToCaseName(ordering):
 
 
 def atomicOperationName(intType, operation):
-    if operation == "Min":
+    # Call sites pass the lowercase LLVM builtin name ("min"/"max"), not the
+    # capitalized Swift operation name ("Min"/"Max"). Unsigned integer types
+    # must use umin/umax so Atomic.min/max match Swift.min/max (SE-0410).
+    if operation == "min":
         return "umin" if intType.startswith("U") else "min"
-    if operation == "Max":
+    if operation == "max":
         return "umax" if intType.startswith("U") else "max"
     return operation
 
