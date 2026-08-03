@@ -823,7 +823,14 @@ Region Partition::merge(Element fst, Element snd, bool updateHistory) {
   return result;
 }
 
-void Partition::canonicalize() {
+void Partition::canonicalize() const {
+  // Canonicalization is a lazy normalization of the region labels, so running it
+  // from a const query does not change what the partition means. See the
+  // declaration.
+  const_cast<Partition *>(this)->canonicalizeImpl();
+}
+
+void Partition::canonicalizeImpl() {
   if (canonical)
     return;
   canonical = true;
