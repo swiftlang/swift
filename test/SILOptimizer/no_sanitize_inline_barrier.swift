@@ -1,22 +1,25 @@
 // Verify that the SIL performance inliner refuses to inline a
-// @_noSanitize(<kind>) callee into a caller with a different mask when the
+// @noSanitize(<kind>) callee into a caller without the same bit when the
 // corresponding sanitizer is enabled — inlining would otherwise cause the
-// callee's body to be (de)instrumented at IRGen time, defeating the attribute.
+// callee's body to be re-instrumented at IRGen time, defeating the attribute.
 
 // REQUIRES: asan_runtime
 // REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_NoSanitize
 
 // Baseline: without a sanitizer, the mismatch is inert; the callee is inlined
 // (verified indirectly by absence of a direct call in the caller's IR).
-// RUN: %target-swift-frontend -O -emit-sil -parse-as-library %s \
+// RUN: %target-swift-frontend -O -emit-sil -parse-as-library \
+// RUN:   -enable-experimental-feature NoSanitize %s \
 // RUN:   | %FileCheck %s --check-prefix=NOSAN
 
 // With ASan enabled, the mismatch blocks inlining, so the caller keeps the
 // direct call.
 // RUN: %target-swift-frontend -O -sanitize=address -emit-sil \
-// RUN:   -parse-as-library %s | %FileCheck %s --check-prefix=WITHSAN
+// RUN:   -enable-experimental-feature NoSanitize -parse-as-library %s \
+// RUN:   | %FileCheck %s --check-prefix=WITHSAN
 
-@_noSanitize(address)
+@noSanitize(address)
 public func skippedCallee(_ x: Int) -> Int {
   return x &+ 1
 }
@@ -32,4 +35,19 @@ public func skippedCallee(_ x: Int) -> Int {
 // WITHSAN: function_ref {{.*}}skippedCallee
 public func caller() -> Int {
   return skippedCallee(41)
+}
+
+// The reverse direction is fine: a regular callee has no sanitizer contract to
+// lose, so it can be inlined into a @noSanitize caller even with ASan on.
+public func plainCallee(_ x: Int) -> Int {
+  return x &+ 2
+}
+
+// NOSAN-LABEL: sil {{.*}} @$s26no_sanitize_inline_barrier0A9SanCallerSiyF
+// NOSAN-NOT: plainCallee
+// WITHSAN-LABEL: sil {{.*}} @$s26no_sanitize_inline_barrier0A9SanCallerSiyF
+// WITHSAN-NOT: plainCallee
+@noSanitize(address)
+public func noSanCaller() -> Int {
+  return plainCallee(41)
 }

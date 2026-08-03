@@ -812,13 +812,13 @@ SILFunction *swift::getEligibleFunction(FullApplySite AI,
     return nullptr;
   }
 
-  // Refuse to inline across @_noSanitize boundaries when a sanitizer active in
-  // this build would apply differently on either side. IRGen sets the LLVM
-  // sanitize_* function attributes per SILFunction; inlining the callee into
-  // the caller would silently re-instrument (or de-instrument) the callee's
-  // body, defeating the attribute.
-  if (uint8_t diff = Callee->getNoSanitizeMask() ^
-                     AI.getFunction()->getNoSanitizeMask()) {
+  // Refuse to inline a @noSanitize callee into a caller that doesn't opt out
+  // of the same sanitizer: IRGen would otherwise re-instrument the callee's
+  // body inside the caller's LLVM function, defeating the attribute. The
+  // reverse direction (a regular callee into a @noSanitize caller) is fine —
+  // the callee never asked to keep sanitizer instrumentation.
+  if (uint8_t calleeOnly = Callee->getNoSanitizeMask() &
+                           ~AI.getFunction()->getNoSanitizeMask()) {
     const auto &enabled = Callee->getModule().getOptions().Sanitizers;
     uint8_t enabledMask = 0;
     if (enabled.contains(SanitizerKind::Address))
@@ -827,7 +827,7 @@ SILFunction *swift::getEligibleFunction(FullApplySite AI,
       enabledMask |= 1u << unsigned(NoSanitizeKind::Thread);
     if (enabled.contains(SanitizerKind::MemTagStack))
       enabledMask |= 1u << unsigned(NoSanitizeKind::MemTag);
-    if (diff & enabledMask)
+    if (calleeOnly & enabledMask)
       return nullptr;
   }
 

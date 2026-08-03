@@ -939,11 +939,11 @@ DECL_ATTR(called, Called,
   177)
 DECL_ATTR_FEATURE_REQUIREMENT(Called, CalledAttribute)
 
-DECL_ATTR(_noSanitize, NoSanitize,
+DECL_ATTR(noSanitize, NoSanitize,
   OnAbstractFunction | OnSubscript,
-  UserInaccessible | AllowMultipleAttributes | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  AllowMultipleAttributes | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
   178)
-
+DECL_ATTR_FEATURE_REQUIREMENT(NoSanitize, NoSanitize)
 LAST_DECL_ATTR(NoSanitize)
 
 #undef DECL_ATTR_ALIAS

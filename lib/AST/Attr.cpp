@@ -2009,11 +2009,11 @@ StringRef DeclAttribute::getAttrName() const {
   case DeclAttrKind::NoSanitize: {
     switch (cast<NoSanitizeAttr>(this)->getKind()) {
     case NoSanitizeKind::Address:
-      return "_noSanitize(address)";
+      return "noSanitize(address)";
     case NoSanitizeKind::Thread:
-      return "_noSanitize(thread)";
+      return "noSanitize(thread)";
     case NoSanitizeKind::MemTag:
-      return "_noSanitize(memtag)";
+      return "noSanitize(memtag)";
     }
     llvm_unreachable("Invalid no-sanitize kind");
   }
