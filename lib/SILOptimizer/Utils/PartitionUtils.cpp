@@ -815,6 +815,11 @@ Region Partition::merge(Element fst, Element snd, bool updateHistory) {
   assert(elementToRegionMap.at(fst) == elementToRegionMap.at(snd));
 
   // Now that we are correct/canonicalized, add the merge to our history.
+  //
+  // horizontalUpdate moved snd's *entire* region into fstRegion, so the
+  // elements it carried along have to be recorded too: popHistoryOnce reverses
+  // a merge by extracting the recorded elements, and an unrecorded passenger is
+  // left stranded in fstRegion for the rest of the rewind.
   if (updateHistory)
     pushMergeElementRegions(fst, snd, mergedElements);
   return result;
@@ -998,10 +1003,11 @@ IsolationHistory::pushNewElementRegion(Element element) {
 }
 
 IsolationHistory::Node *
-IsolationHistory::pushHistorySequenceBoundary(SILLocation loc) {
+IsolationHistory::pushHistorySequenceBoundary(SILLocation loc,
+                                              SILInstruction *inst) {
   unsigned size = Node::totalSizeToAlloc<Element>(0);
   void *mem = factory->allocator.Allocate(size, alignof(Node));
-  head = new (mem) Node(Node::SequenceBoundary, head, loc);
+  head = new (mem) Node(Node::SequenceBoundary, head, loc, inst);
   return getHead();
 }
 
@@ -1117,4 +1123,48 @@ void IsolationHistory::Node::print(ASTContext &ctx, llvm::raw_ostream &os,
     getHistoryBoundaryLoc()->print(os);
     break;
   }
+}
+
+void IsolationHistory::Node::printOneLine(
+    llvm::raw_ostream &os, const SourceManager &sourceMgr) const {
+  switch (getKind()) {
+  case AddNewRegionForElement:
+    os << "AddNewRegionForElement: %%" << getFirstArgAsElement();
+    return;
+  case RemoveLastElementFromRegion:
+    os << "RemoveLastElementFromRegion: %%" << getFirstArgAsElement();
+    return;
+  case RemoveElementFromRegion:
+    os << "RemoveElementFromRegion: %%" << getAdditionalElementArgs()[0]
+       << " from region of %%" << getFirstArgAsElement();
+    return;
+  case MergeElementRegions: {
+    os << "MergeElementRegions: into region of %%" << getFirstArgAsElement()
+       << " merged [";
+    bool isFirst = true;
+    for (Element e : getAdditionalElementArgs()) {
+      if (!isFirst)
+        os << ", ";
+      isFirst = false;
+      os << "%%" << e;
+    }
+    os << ']';
+    return;
+  }
+  case CFGHistoryJoin:
+    os << "CFGHistoryJoin: pred ";
+    if (auto *predBlock = getFirstArgAsBlock())
+      os << "bb" << predBlock->getDebugID();
+    else
+      os << "<none>";
+    return;
+  case SequenceBoundary:
+    os << "SequenceBoundary: ";
+    if (auto loc = getHistoryBoundaryLoc())
+      loc->print(os, sourceMgr);
+    else
+      os << "<no loc>";
+    return;
+  }
+  llvm_unreachable("Covered switch isn't covered?!");
 }

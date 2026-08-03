@@ -299,7 +299,12 @@ public:
   ///
   /// \p loc the SILLocation that identifies the instruction that the "package"
   /// of history nodes that this sequence boundary ends is associated with.
-  Node *pushHistorySequenceBoundary(SILLocation loc);
+  ///
+  /// \p inst the instruction whose PartitionOp produced that package, when the
+  /// boundary is pushed on behalf of one. Retained so that a client rewinding
+  /// the history can report which instruction it is undoing.
+  Node *pushHistorySequenceBoundary(SILLocation loc,
+                                    SILInstruction *inst = nullptr);
 
   /// Push onto the history list that \p value should be added into its own
   /// independent region.
@@ -389,6 +394,18 @@ private:
   /// The next pointer of the linked list.
   Node *next;
 
+  /// The payload of a SequenceBoundary node: the location the "package" of
+  /// history nodes this boundary ends is attributed to, plus the instruction
+  /// the PartitionOp that produced the package came from.
+  ///
+  /// The location is tracked separately from the instruction because for
+  /// PartitionOps sourced from a specific apply argument it is that argument's
+  /// per-argument location rather than the instruction's own location.
+  struct SequenceBoundaryInfo {
+    SILLocation loc;
+    SILInstruction *inst;
+  };
+
   /// Contains:
   ///
   /// 1. A SILBasicBlock * if we have a CFGHistoryJoin — the predecessor block
@@ -396,9 +413,9 @@ private:
   ///    not stored; it is recovered on demand as the head of that block's exit
   ///    partition (from RegionAnalysis), which also gives the full partition to
   ///    keep rewinding across the join.
-  /// 2. A SILLocation if we have a SequenceBoundary.
+  /// 2. A SequenceBoundaryInfo if we have a SequenceBoundary.
   /// 3. An element otherwise.
-  std::variant<Element, SILBasicBlock *, SILLocation> data;
+  std::variant<Element, SILBasicBlock *, SequenceBoundaryInfo> data;
 
   /// Number of additional element arguments stored in the tail allocated array.
   unsigned numAdditionalElements;
@@ -409,8 +426,8 @@ private:
   }
 
   Node(Kind kind, Node *next) : kind(kind), next(next), data(nullptr) {}
-  Node(Kind kind, Node *next, SILLocation loc)
-      : kind(kind), next(next), data(loc) {}
+  Node(Kind kind, Node *next, SILLocation loc, SILInstruction *inst)
+      : kind(kind), next(next), data(SequenceBoundaryInfo{loc, inst}) {}
   Node(Kind kind, Node *next, Element value)
       : kind(kind), next(next), data(value), numAdditionalElements(0) {}
   Node(Kind kind, Node *next, Element primaryElement,
@@ -491,7 +508,34 @@ public:
   std::optional<SILLocation> getHistoryBoundaryLoc() const {
     if (kind != SequenceBoundary)
       return {};
-    return std::get<SILLocation>(data);
+    return std::get<SequenceBoundaryInfo>(data).loc;
+  }
+
+  /// If this node is a sequence boundary, the instruction whose PartitionOp
+  /// produced the package of history nodes it ends. Null when the boundary was
+  /// not pushed on behalf of a specific instruction (e.g. the initial partition
+  /// built by \c Partition::singleRegion).
+  SILInstruction *getHistoryBoundaryInst() const {
+    if (kind != SequenceBoundary)
+      return nullptr;
+    return std::get<SequenceBoundaryInfo>(data).inst;
+  }
+
+  /// Returns true if rewinding this node changes the partition it is popped
+  /// from. Sequence boundaries and CFG joins are pure markers: rewinding them
+  /// leaves the element-to-region mapping alone.
+  bool doesRewindingMutatePartition() const {
+    switch (kind) {
+    case AddNewRegionForElement:
+    case RemoveLastElementFromRegion:
+    case RemoveElementFromRegion:
+    case MergeElementRegions:
+      return true;
+    case CFGHistoryJoin:
+    case SequenceBoundary:
+      return false;
+    }
+    llvm_unreachable("Covered switch isn't covered?!");
   }
 
   void print(ASTContext &ctx, llvm::raw_ostream &os,
@@ -500,6 +544,10 @@ public:
     print(ctx, os, 0);
   }
   SWIFT_DEBUG_DUMPER(dump(ASTContext &ctx)) { print(ctx, llvm::dbgs()); }
+
+  /// Print this node on a single line without a trailing newline.
+  void printOneLine(llvm::raw_ostream &os,
+                    const SourceManager &sourceMgr) const;
 };
 
 class IsolationHistory::Factory {
@@ -1171,8 +1219,9 @@ public:
   void printHistory(llvm::raw_ostream &os) const;
 
   /// See docs on \p history.pushHistorySequenceBoundary().
-  IsolationHistoryNode *pushHistorySequenceBoundary(SILLocation loc) {
-    return history.pushHistorySequenceBoundary(loc);
+  IsolationHistoryNode *
+  pushHistorySequenceBoundary(SILLocation loc, SILInstruction *inst = nullptr) {
+    return history.pushHistorySequenceBoundary(loc, inst);
   }
 
 private:
@@ -1902,6 +1951,8 @@ public:
   /// Some evaluators pass in mock operands that one cannot call getUser()
   /// upon. So to allow for this, provide a routine that our impl can override
   /// if they need to.
+  static SILInstruction *getUser(Operand *op) { return Impl::getUser(op); }
+
   static SILIsolationInfo getIsolationInfo(const PartitionOp &partitionOp) {
     return Impl::getIsolationInfo(partitionOp);
   }
@@ -2011,12 +2062,15 @@ public:
     // the apply's anchor location, so behavior is unchanged for functions
     // that haven't opted in to isolation-history.
     SILLocation loc = SILLocation::invalid();
+    SILInstruction *boundaryInst = nullptr;
     if (op.hasSourceInst()) {
-      loc = getLoc(op.getSourceInst());
+      boundaryInst = op.getSourceInst();
+      loc = getLoc(boundaryInst);
     } else if (Operand *srcOp = op.getSourceOp()) {
+      boundaryInst = getUser(srcOp);
       loc = getLoc(srcOp);
     }
-    p.pushHistorySequenceBoundary(loc);
+    p.pushHistorySequenceBoundary(loc, boundaryInst);
 
     switch (op.getKind()) {
     case PartitionOpKind::AssignDirect: {
@@ -2676,6 +2730,7 @@ struct PartitionOpEvaluatorBaseImpl : PartitionOpEvaluator<Subclass> {
       return as.getArgumentLoc(op);
     return op->getUser()->getLoc();
   }
+  static SILInstruction *getUser(Operand *op) { return op->getUser(); }
   static SILInstruction *getSourceInst(const PartitionOp &partitionOp) {
     return partitionOp.getSourceInst();
   }

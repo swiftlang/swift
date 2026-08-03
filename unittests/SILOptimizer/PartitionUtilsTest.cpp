@@ -81,6 +81,8 @@ struct MockedPartitionOpEvaluatorWithFailureCallback final
 
   static SILLocation getLoc(Operand *op) { return SILLocation::invalid(); }
 
+  static SILInstruction *getUser(Operand *op) { return nullptr; }
+
   static SILIsolationInfo getIsolationInfo(const PartitionOp &partitionOp) {
     return {};
   }

@@ -745,6 +745,136 @@ TEST(IsolationHistory, JoiningEmptyAndNotEmpty) {
   EXPECT_TRUE(result.historySize() == 2);
 }
 
+// Partition::merge moves *every* element of snd's region into fst's region
+// (horizontalUpdate collects them into mergedElements), but the recorded
+// MergeElementRegions node names only the two operands. popHistoryOnce
+// reverses a merge by extracting additionalElementArgs, so an element that
+// came along as a passenger is left behind in fst's region.
+//
+// That stranding is not self-correcting. Extraction only ever moves
+// additionalElementArgs, never getFirstArgAsElement, and merge() orders the
+// node so the operand from the lower-labelled region is the survivor. So the
+// passenger is only pulled back out if some older node happens to name it as
+// its own snd -- and the node that put it in fst's region does not mention it
+// at all.
+//
+// Here {1, 2} is merged into {0}'s region using 2 as the operand, so the node
+// is (0, [2]) and element 1 is the passenger. Rewinding that merge must
+// restore {0} | {1, 2}.
+TEST(IsolationHistory, MergePassengerRoundTrip) {
+  llvm::BumpPtrAllocator allocator;
+  Partition::SendingOperandSetFactory factory(allocator);
+  IsolationHistory::Factory historyFactory(allocator);
+  SendingOperandToStateMap opToStateMap(historyFactory);
+  SmallVector<SILBasicBlock *, 8> joins;
+
+  // Two regions: {1, 2} and {0}. Region labels are the minimum element, so
+  // {1, 2} is labelled 1 and {0} is labelled 0.
+  Partition p(historyFactory.get());
+  {
+    MockedPartitionOpEvaluator eval(p, factory, opToStateMap);
+    eval.apply({PartitionOp::AssignFresh(Element(0)),
+                PartitionOp::AssignFresh(Element(1)),
+                PartitionOp::AssignFresh(Element(2)),
+                PartitionOp::Merge(Element(1), Element(2),
+                                   RegionMergeReason::Unknown)});
+  }
+  Partition snapshot = p;
+
+  {
+    PartitionTester before(p);
+    ASSERT_EQ(before.getRegion(1), before.getRegion(2));
+    ASSERT_NE(before.getRegion(0), before.getRegion(1));
+  }
+
+  // Merge {1, 2} into {0}'s region via operand 2. Since region(0) < region(1),
+  // 0 is the survivor and 2 is the extracted operand; 1 is carried along by
+  // horizontalUpdate without being named in the history node.
+  {
+    MockedPartitionOpEvaluator eval(p, factory, opToStateMap);
+    eval.apply({PartitionOp::Merge(Element(0), Element(2),
+                                   RegionMergeReason::Unknown)});
+  }
+
+  {
+    PartitionTester after(p);
+    ASSERT_EQ(after.getRegion(0), after.getRegion(1));
+    ASSERT_EQ(after.getRegion(0), after.getRegion(2));
+  }
+
+  popOnePartitionOp(p, joins);
+  EXPECT_TRUE(joins.empty());
+
+  PartitionTester rewound(p);
+  EXPECT_EQ(rewound.getRegion(1), rewound.getRegion(2))
+      << "Element 1 was a passenger of the merge and must return to element "
+         "2's region.";
+  EXPECT_NE(rewound.getRegion(0), rewound.getRegion(1))
+      << "Element 1 is stranded in element 0's region: Partition::merge "
+         "recorded only its two operands, so popHistoryOnce extracted 2 and "
+         "left 1 behind.";
+  EXPECT_TRUE(Partition::equals(p, snapshot))
+      << "Merge with a passenger element did not rewind cleanly.";
+}
+
+// The passengers must come back as *one* region, not as singletons. They were
+// region-mates of the extracted operand before the merge, so popHistoryOnce
+// re-merges each of them onto additionalElementArgs[0] after re-tracking it.
+// Dropping that re-merge splits a region the program never split: each
+// passenger would land in a fresh region of its own.
+//
+// Here {1, 2, 3} is merged into {0}'s region using 3 as the operand, so the
+// node is (0, [3, 1, 2]) and rewinding must restore {0} | {1, 2, 3}.
+TEST(IsolationHistory, MergePassengersRejoinOneRegion) {
+  llvm::BumpPtrAllocator allocator;
+  Partition::SendingOperandSetFactory factory(allocator);
+  IsolationHistory::Factory historyFactory(allocator);
+  SendingOperandToStateMap opToStateMap(historyFactory);
+  SmallVector<SILBasicBlock *, 8> joins;
+
+  Partition p(historyFactory.get());
+  {
+    MockedPartitionOpEvaluator eval(p, factory, opToStateMap);
+    eval.apply(
+        {PartitionOp::AssignFresh(Element(0)),
+         PartitionOp::AssignFresh(Element(1)),
+         PartitionOp::AssignFresh(Element(2)),
+         PartitionOp::AssignFresh(Element(3)),
+         PartitionOp::Merge(Element(1), Element(2), RegionMergeReason::Unknown),
+         PartitionOp::Merge(Element(1), Element(3),
+                            RegionMergeReason::Unknown)});
+  }
+  Partition snapshot = p;
+
+  {
+    PartitionTester before(p);
+    ASSERT_EQ(before.getRegion(1), before.getRegion(2));
+    ASSERT_EQ(before.getRegion(1), before.getRegion(3));
+    ASSERT_NE(before.getRegion(0), before.getRegion(1));
+  }
+
+  // 3 is the operand, so 1 and 2 ride along as passengers.
+  {
+    MockedPartitionOpEvaluator eval(p, factory, opToStateMap);
+    eval.apply({PartitionOp::Merge(Element(0), Element(3),
+                                   RegionMergeReason::Unknown)});
+  }
+
+  popOnePartitionOp(p, joins);
+  EXPECT_TRUE(joins.empty());
+
+  PartitionTester rewound(p);
+  EXPECT_EQ(rewound.getRegion(1), rewound.getRegion(2))
+      << "Passengers 1 and 2 were region-mates before the merge and must be "
+         "region-mates again.";
+  EXPECT_EQ(rewound.getRegion(1), rewound.getRegion(3))
+      << "Passengers must rejoin the extracted operand's region, not sit in "
+         "fresh regions of their own.";
+  EXPECT_NE(rewound.getRegion(0), rewound.getRegion(1));
+  EXPECT_TRUE(Partition::equals(p, snapshot))
+      << "Merge with multiple passengers did not rewind cleanly.";
+}
+
 // popHistoryOnce off-by-one when reversing RemoveElementFromRegion:
 // pushRemoveElementFromRegion stores the surviving sibling at
 // additionalElementArgs[0] (the only entry), but popHistoryOnce previously
