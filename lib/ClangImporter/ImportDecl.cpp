@@ -180,10 +180,6 @@ void ClangImporter::Implementation::makeComputed(AbstractStorageDecl *storage,
   }
 }
 
-bool importer::hasAnyImmortalAttr(const clang::RecordDecl *decl) {
-  return hasSwiftAttribute(decl, {"retain:immortal", "release:immortal"});
-}
-
 importer::ReturnOwnershipInfo::ReturnOwnershipInfo(
     const clang::NamedDecl *decl) {
   if (!decl->hasAttrs())
@@ -2330,23 +2326,29 @@ namespace {
       if (decl->isInterface())
         return nullptr;
 
-      bool incompleteTypeAsReference = false;
-      if (auto def = decl->getDefinition()) {
-        // Continue with the definition of the type.
+      if (auto def = decl->getDefinition())
         decl = def;
-      } else if (recordHasReferenceSemantics(decl)) {
-        // Incomplete types are okay if the resulting type has reference
-        // semantics.
-        incompleteTypeAsReference = true;
-      } else {
-        Impl.addImportDiagnostic(
-            decl,
-            Diagnostic(diag::incomplete_record, Impl.SwiftContext.AllocateCopy(
-                                                    decl->getNameAsString())),
-            decl->getLocation());
 
-        forwardDeclaration = true;
-        return nullptr;
+      auto frtInfo =
+          evaluateOrDefault(Impl.SwiftContext.evaluator,
+                            ForeignReferenceTypeInfoRequest({decl}), {});
+
+      bool incompleteTypeAsReference = false;
+
+      if (!decl->getDefinition()) {
+        if (frtInfo.isReference()) {
+          // Incomplete types are okay if the resulting type has reference
+          // semantics.
+          incompleteTypeAsReference = true;
+        } else {
+          Impl.addImportDiagnostic(decl,
+                                   Diagnostic(diag::incomplete_record,
+                                              Impl.SwiftContext.AllocateCopy(
+                                                  decl->getNameAsString())),
+                                   decl->getLocation());
+          forwardDeclaration = true;
+          return nullptr;
+        }
       }
 
       // TODO(https://github.com/apple/swift/issues/56206): Fix this once we support dependent types.
@@ -2463,7 +2465,7 @@ namespace {
         return nullptr;
       }
 
-      if (recordHasReferenceSemantics(decl))
+      if (frtInfo.isReference())
         result = Impl.createDeclWithClangNode<ClassDecl>(
             decl, importer::convertClangAccess(decl->getAccess()), loc, name,
             loc, ArrayRef<InheritedEntry>{}, nullptr, dc, false);
@@ -2530,9 +2532,6 @@ namespace {
 
           // If this is an inherited foreign reference type, check if it has a
           // suitable superclass.
-          auto frtInfo = evaluateOrDefault(
-              Impl.SwiftContext.evaluator,
-              ForeignReferenceTypeInfoRequest({cxxRecordDecl}), {});
           if (auto primaryBase = frtInfo.getPrimarySuperclass()) {
             if (auto baseDecl = cast_or_null<ClassDecl>(
                     Impl.importDecl(primaryBase, getVersion()))) {
@@ -2938,8 +2937,7 @@ namespace {
       }
 
       if (auto classDecl = dyn_cast<ClassDecl>(result)) {
-        importer::checkRetainReleaseFunctions(
-            classDecl, const_cast<clang::RecordDecl *>(decl), Impl);
+        importer::checkRetainReleaseFunctions(classDecl, Impl);
 
         auto availability = Impl.SwiftContext.getSwift58Availability();
         if (!availability.isAlwaysAvailable()) {
@@ -3637,8 +3635,14 @@ namespace {
       auto attrInfo = importer::ReturnOwnershipInfo(decl);
       HeaderLoc loc(decl->getLocation());
 
-      if (recordDecl && recordHasReferenceSemantics(recordDecl) &&
-          !hasAnyImmortalAttr(recordDecl)) {
+      // These diagnostics apply only to shared (non-immortal) reference types.
+      auto frtInfo =
+          recordDecl
+              ? evaluateOrDefault(Impl.SwiftContext.evaluator,
+                                  ForeignReferenceTypeInfoRequest({recordDecl}),
+                                  {})
+              : ForeignReferenceTypeInfo();
+      if (frtInfo.isReference() && !frtInfo.isImmortal()) {
         if (attrInfo.hasConflictingAttr()) {
           Impl.diagnose(loc, diag::both_returns_retained_returns_unretained,
                         decl);

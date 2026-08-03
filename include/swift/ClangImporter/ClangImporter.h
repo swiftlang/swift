@@ -780,10 +780,6 @@ getModuleCachePathFromClang(const clang::CompilerInstance &Instance);
 bool isCompletionHandlerParamName(StringRef paramName);
 
 namespace importer {
-/// Returns true if the given C/C++ reference type uses "immortal"
-/// retain/release functions.
-bool hasAnyImmortalAttr(const clang::RecordDecl *decl);
-
 struct ReturnOwnershipInfo {
   ReturnOwnershipInfo(const clang::NamedDecl *decl);
 

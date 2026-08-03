@@ -141,6 +141,13 @@ struct SharedB {
 
 // expected-warning@+1 {{unable to infer SWIFT_SHARED_REFERENCE}}
 struct SharedAB : SharedA, SharedB { SharedAB(int) {} };
+
+// MARK: Mixed immortal / non-immortal retain/release
+struct MixedImmortalRetainRelease {
+// expected-error@-1 {{reference type 'MixedImmortalRetainRelease' must mark both or neither of its 'retain:' and 'release:' Swift attributes 'immortal'}}
+  int value;
+  void doRelease() const {}
+} SWIFT_SHARED_REFERENCE(immortal, doRelease);
 #endif
 
 // Multiple retain/release operations,

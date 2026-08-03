@@ -2417,25 +2417,25 @@ getImplicitObjectParamAnnotation(const clang::FunctionDecl *FD) {
 bool diagnoseForeignReferenceType(const clang::CXXRecordDecl *decl,
                                   ClangImporter::Implementation &Impl);
 
+/// Validate the custom retain/release operations of the foreign reference type
+/// \p classDecl, emitting diagnostics for any problems.
+///
+/// For an FRT that inherits its reference-counting operations from a base FRT,
+/// this function synthesizes and imports forwarding methods into \p classDecl.
+///
+/// On success, this records the resolved (retain, release) Clang functions
+/// (or null functions, for an immortal type) via
+/// \c ClangImporter::Implementation::setForeignReferenceTypeOperations so that
+/// they can be looked up during IRGen.
+void checkRetainReleaseFunctions(ClassDecl *classDecl,
+                                 ClangImporter::Implementation &Impl);
+
 /// Returns the module \p Node comes from, or \c nullptr if \p Node does not
 /// have a valid owning module.
 ///
 /// Note that \p Node cannot itself be a clang::Module.
 const clang::Module *getClangOwningModule(ClangNode Node,
                                           const clang::ASTContext &ClangCtx);
-
-/// Validate the custom retain/release operations of the foreign reference type
-/// \p classDecl (imported from \p clangDecl), emitting diagnostics for any
-/// problems. For an FRT that inherits its reference-counting operations from a
-/// base FRT, this synthesizes and imports forwarding methods into \p classDecl.
-///
-/// On success, this records the resolved (retain, release) Clang functions (or
-/// null functions, for an immortal type) via
-/// \c ClangImporter::Implementation::setForeignReferenceTypeOperations so that
-/// they can be looked up during IRGen.
-void checkRetainReleaseFunctions(ClassDecl *classDecl,
-                                 const clang::RecordDecl *clangDecl,
-                                 ClangImporter::Implementation &Impl);
 } // end namespace importer
 } // end namespace swift
 
