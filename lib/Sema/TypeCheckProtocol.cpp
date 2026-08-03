@@ -4581,6 +4581,22 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
     const auto &best = matches[bestIdx];
     auto witness = best.Witness;
 
+    // A renamed near-miss inherited from another type (e.g. an NSObject
+    // member nearly matching an ObjC protocol requirement) is not an
+    // actionable rename for the adopter. Treat it as missing so we still
+    // emit a requirement stub alongside the rename diagnostic (SR-11420).
+    if (best.Kind == MatchKind::RenamedMatch &&
+        !witnessHasImplementsAttrForRequiredName(best.Witness, requirement)) {
+      auto *conformingNominal = Conformance->getType()->getAnyNominal();
+      auto *witnessNominal =
+          best.Witness->getDeclContext()->getSelfNominalTypeDecl();
+      if (witnessNominal != conformingNominal) {
+        getASTContext().addDelayedMissingWitness(Conformance,
+                                                 {requirement, matches});
+        return ResolveWitnessResult::Missing;
+      }
+    }
+
     // If the name didn't actually line up, complain.
     if (ignoringNames &&
         requirement->getName() != best.Witness->getName() &&
