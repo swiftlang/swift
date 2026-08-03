@@ -2214,13 +2214,9 @@ namespace {
     // `fd`. This also prevents the implicit single-parameter
     // lifetime-dependence inference from running for it.
     void cacheImmortalLifetime(AbstractFunctionDecl *fd) {
-      unsigned resultIndex = fd->getParameters()->size();
-      if (fd->isInstanceMethod()) {
-        ++resultIndex;
-      }
       SmallVector<LifetimeDependenceInfo, 1> lifetimeDependencies;
       LifetimeDependenceInfo immortalLifetime(
-          nullptr, nullptr, resultIndex,
+          nullptr, nullptr, fd->getLifetimeDependenceResultIndex(),
           LifetimeFlags().withImmortalSpecifier().withAnnotated());
       lifetimeDependencies.push_back(immortalLifetime);
       Impl.SwiftContext.evaluator.cacheOutput(
@@ -4460,10 +4456,7 @@ namespace {
         return false;
       };
 
-      auto swiftParams = result->getParameters();
-      bool hasSelf =
-          result->isInstanceMethod() && !isa<ConstructorDecl>(result);
-      auto returnIdx = swiftParams->size() + hasSelf;
+      auto returnIdx = result->getLifetimeDependenceResultIndex();
 
       if (inferSelfDependence(decl, result, returnIdx))
         return;
@@ -4647,10 +4640,13 @@ namespace {
         // synthesize a scoped dependency that would be invalid.
         cacheImmortalLifetime(result);
       } else if (resultIsNonEscapable) {
+        auto policy = Impl.getClangASTContext().getPrintingPolicy();
+        policy.SuppressTagKeyword = true;
         Impl.addImportDiagnostic(
             decl,
             Diagnostic(diag::return_nonescapable_without_lifetimebound,
-                       Impl.SwiftContext.AllocateCopy(retType.getAsString())),
+                       Impl.SwiftContext.AllocateCopy(
+                           resultTypeForEscapability.getAsString(policy))),
             decl->getLocation());
       }
 

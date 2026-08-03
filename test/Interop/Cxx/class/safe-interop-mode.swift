@@ -96,7 +96,7 @@ struct HasUnannotatedViewGetter {
   View getView() const;
 };
 
-// expected-warning@+2{{the returned type 'void' is annotated as non-escapable; its lifetime dependencies must be annotated}}
+// expected-warning@+2{{the returned type 'ViewWithUnannotatedCtor' is annotated as non-escapable; its lifetime dependencies must be annotated}}
 struct SWIFT_NONESCAPABLE ViewWithUnannotatedCtor {
     ViewWithUnannotatedCtor(const Owner &o);
 private:
