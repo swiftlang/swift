@@ -6,7 +6,9 @@
 
 // REQUIRES: swift_feature_CoroutineAccessors
 
-// REQUIRES: OS_FAMILY=darwin || OS=linux-gnu
+// The old ABI is additively emitted only on an ABI-stable platform; elsewhere
+// there is no prebuilt binary to stay compatible with.
+// REQUIRES: swift_stable_abi
 // REQUIRES: PTRSIZE=64
 
 // The library-evolution counterpart of coroutine_accessors_past.swift.  Here the

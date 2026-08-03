@@ -35,6 +35,9 @@
 // RUN:   | %FileCheck %t/Client.swift
 
 // REQUIRES: swift_feature_CoroutineAccessors
+// The old-ABI-provenance guarantee this test checks only applies on
+// ABI-stable platforms; non-ABI-stable platforms always call the new ABI.
+// REQUIRES: swift_stable_abi
 
 //--- LibOld.swiftinterface
 // swift-interface-format-version: 1.0

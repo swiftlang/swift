@@ -3125,12 +3125,14 @@ static bool requiresCorrespondingLegacyCoroutineAccessorImpl(
   if (!accessor)
     return false;
 
-  // Availability checks are only relevant on targets which support versioned
-  // availability.  Otherwise, since we're building with library evolution,
-  // conservatively assume that the binary must keep ABI compatibility with its
-  // prior versions, and emit the underscored variant.
+  // Availability-gated ABI compatibility only matters on targets that support
+  // versioned OS availability: there, a binary built before the feature
+  // shipped may run against a newer, already-built standard library, so the
+  // underscored accessor must stay available.  Targets without versioned
+  // availability (e.g. Linux, embedded) have no such prebuilt binary to stay
+  // compatible with, so always emit only the new ABI.
   if (!ctx.supportsVersionedAvailability())
-    return true;
+    return false;
 
   AvailabilityContext accessorAvailability = [&] {
     if (storage->getModuleContext()->isMainModule()) {

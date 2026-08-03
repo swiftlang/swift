@@ -1,11 +1,14 @@
 // Emission matrix for coroutine accessors under the CoroutineAccessors feature.
 //
-// Every coroutine accessor emits the new yield_once_2 ABI (vy/vx).  The old
-// yield_once ABI (vr/vM) is additionally emitted iff the storage is visible
-// outside its module (public or package) AND resilient AND available before the
-// feature's availability (SwiftStdlib 9999).  Otherwise only the new ABI is
-// emitted.  This test pins every cell of {public, package, internal} x
-// {resilient, fragile} x {before-feature, at-feature}.
+// Every coroutine accessor emits the new yield_once_2 ABI (vy/vx).  On an
+// ABI-stable platform, the old yield_once ABI (vr/vM) is additionally emitted
+// iff the storage is visible outside its module (public or package) AND
+// resilient AND available before the feature's availability.  Otherwise only
+// the new ABI is emitted.  This test exercises every combination of {public,
+// package, internal} x {resilient, fragile} x {before-feature, at-feature}.
+// (On a non-ABI-stable platform there is never an old binary to stay compatible
+// with, so only the new ABI is ever emitted -- hence this requires an
+// ABI-stable platform.)
 
 // Resilient: public/package before-feature get old+new; everything else new-only.
 // RUN: %target-swift-emit-silgen %s                          \
@@ -28,6 +31,7 @@
 // RUN:   | %FileCheck %s --check-prefix=FRAG-NEW-ONLY
 
 // REQUIRES: swift_feature_CoroutineAccessors
+// REQUIRES: swift_stable_abi
 
 public struct S {
   var _s = 0
@@ -36,6 +40,8 @@ public struct S {
   internal var int_: Int { _read { yield _s } _modify { yield &_s } }
 }
 
+// SwiftStdlib 9999 availability is guaranteed to be later than the actual
+// permanent availability of the new yielding accessor ABI.
 @available(SwiftStdlib 9999, *)
 public struct S9999 {
   var _s = 0

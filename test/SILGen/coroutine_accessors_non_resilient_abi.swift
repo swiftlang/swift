@@ -2,11 +2,14 @@
 // `_read`/`_modify` coroutine accessors are emitted *only* to preserve a stable
 // ABI. A module that is not built with library evolution has no stable ABI to
 // keep, so only the new callee-allocated (yield_once_2) accessors are emitted.
-// Under library evolution both the old and new accessors are emitted.
+// Under library evolution, an ABI-stable platform additionally emits the old
+// accessors; a non-ABI-stable platform has no prebuilt binary to stay
+// compatible with, so it still emits only the new accessors.
 
 // Non-resilient: the new yield_once_2 accessors are present...
 // RUN: %target-swift-emit-silgen %s                          \
 // RUN:     -enable-experimental-feature CoroutineAccessors   \
+// RUN:     -enable-callee-allocated-coro-abi                 \
 // RUN:     -module-name main                                 \
 // RUN:   | %FileCheck %s --check-prefix=FRAGILE
 
@@ -17,12 +20,23 @@
 // RUN:     -module-name main                                 \
 // RUN:   | %FileCheck %s --check-prefix=NOOLD
 
-// Resilient: both the old and new accessors are present.
+// Resilient: the new accessors are always present; the old accessors are
+// additionally present only on an ABI-stable platform.
+// RUN: %target-swift-emit-silgen %s                          \
+// RUN:     -enable-experimental-feature CoroutineAccessors   \
+// RUN:     -enable-callee-allocated-coro-abi                 \
+// RUN:     -enable-library-evolution                         \
+// RUN:     -module-name main                                 \
+// RUN:   | %FileCheck %s --check-prefixes=RESILIENT,RESILIENT-%target-abi-stability
+
+// On a non-ABI-stable platform, confirm the old accessors are still absent even
+// under library evolution (separate invocation, as above, so a lone CHECK-NOT
+// scans the whole input).
 // RUN: %target-swift-emit-silgen %s                          \
 // RUN:     -enable-experimental-feature CoroutineAccessors   \
 // RUN:     -enable-library-evolution                         \
 // RUN:     -module-name main                                 \
-// RUN:   | %FileCheck %s --check-prefix=RESILIENT
+// RUN:   | %FileCheck %s --check-prefix=NOOLD-RESILIENT-%target-abi-stability
 
 // REQUIRES: swift_feature_CoroutineAccessors
 
@@ -39,7 +53,15 @@ public struct S {
 
 // NOOLD-NOT: @yield_once @convention
 
-// RESILIENT-DAG: sil {{.*}}Sivr : $@yield_once @convention
 // RESILIENT-DAG: sil {{.*}}Sivy : $@yield_once_2 @convention
-// RESILIENT-DAG: sil {{.*}}SivM : $@yield_once @convention
 // RESILIENT-DAG: sil {{.*}}Sivx : $@yield_once_2 @convention
+// RESILIENT-stable-DAG: sil {{.*}}Sivr : $@yield_once @convention
+// RESILIENT-stable-DAG: sil {{.*}}SivM : $@yield_once @convention
+
+// NOOLD-RESILIENT-unstable-NOT: @yield_once @convention
+
+// On an ABI-stable platform this invocation has nothing new to verify (the
+// other RESILIENT invocation above already confirms both ABIs there); just
+// give the "stable" prefix a trivial match so FileCheck doesn't reject an
+// entirely-unmatched --check-prefix.
+// NOOLD-RESILIENT-stable-DAG: sil {{.*}}Sivy : $@yield_once_2 @convention
