@@ -460,7 +460,7 @@ SWIFT_REQUEST(TypeChecker, SynthesizeDefaultInitRequest,
               ConstructorDecl *(NominalTypeDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, SynthesizeCOMInterfaceIDRequest,
               VarDecl *(ProtocolDecl *), Cached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, SynthesizeCOMImplementationIDRequest,
+SWIFT_REQUEST(TypeChecker, SynthesizeCOMCLSIDRequest,
               VarDecl *(ClassDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, TypeCheckPrimaryFileRequest,
               bool(SouceFile *), SeparatelyCached, NoLocationInfo)

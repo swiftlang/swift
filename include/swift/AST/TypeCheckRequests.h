@@ -3070,11 +3070,12 @@ public:
   bool isCached() const { return true; }
 };
 
-/// Synthesizes the \c static \c var \c CLSID member on a \c @com class.  The
-/// GUID is read from the class's own \c COMAttr.
-class SynthesizeCOMImplementationIDRequest
-    : public SimpleRequest<SynthesizeCOMImplementationIDRequest,
-                           VarDecl *(ClassDecl *),
+/// Synthesizes the Microsoft COM model's \c static \c var \c CLSID member on a
+/// \c @com class. The GUID is read from the class's own \c COMAttr. Rootless
+/// models retian the implementation identity without introducing this
+/// Microsoft-specific API.
+class SynthesizeCOMCLSIDRequest
+    : public SimpleRequest<SynthesizeCOMCLSIDRequest, VarDecl *(ClassDecl *),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;

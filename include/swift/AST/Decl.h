@@ -4471,22 +4471,26 @@ private:
   Kind DeclKind;
   StringRef ID;
   std::optional<COMThreadingModel> ThreadingModel;
+  ProtocolDecl *RootInterface;
   ArrayRef<ProtocolDecl *> Interfaces;
+  ArrayRef<ProtocolDecl *> Slots;
 
   COMDeclInfo(Kind kind, StringRef id, std::optional<COMThreadingModel> model,
-              ArrayRef<ProtocolDecl *> interfaces)
-      : DeclKind(kind), ID(id), ThreadingModel(model), Interfaces(interfaces) {}
+              ProtocolDecl *root, ArrayRef<ProtocolDecl *> interfaces,
+              ArrayRef<ProtocolDecl *> slots)
+      : DeclKind(kind), ID(id), ThreadingModel(model), RootInterface(root),
+        Interfaces(interfaces), Slots(slots) {}
 
 public:
   static COMDeclInfo forInterface(StringRef iid) {
-    return {Kind::Interface, iid, std::nullopt, {}};
+    return {Kind::Interface, iid, std::nullopt, nullptr, {}, {}};
   }
 
   static COMDeclInfo
-  forImplementation(StringRef clsid,
-                    std::optional<COMThreadingModel> threadingModel,
-                    ArrayRef<ProtocolDecl *> interfaces) {
-    return {Kind::Implementation, clsid, threadingModel, interfaces};
+  forImplementation(StringRef clsid, std::optional<COMThreadingModel> model,
+                    ProtocolDecl *root, ArrayRef<ProtocolDecl *> interfaces,
+                    ArrayRef<ProtocolDecl *> slots) {
+    return {Kind::Implementation, clsid, model, root, interfaces, slots};
   }
 
   Kind getKind() const { return DeclKind; }
@@ -4515,10 +4519,28 @@ public:
     return ThreadingModel;
   }
 
+  ProtocolDecl *getRootInterface() const {
+    assert(isImplementation());
+    return RootInterface;
+  }
+
   /// The COM interfaces to which this implementation conforms.
   ArrayRef<ProtocolDecl *> getInterfaces() const {
     assert(isImplementation());
     return Interfaces;
+  }
+
+  /// The elements defining the maximal set for the implementation's COM
+  /// refinement order.
+  ///
+  /// The compiler-managed \c ISwiftObject interface is first. It is followed by
+  /// the maximal user interface from each independent refinement chain; their
+  /// ABI-base closures cover every supported interface. Subclasses preserve
+  /// inherited positions, replacing an entry only when they add a more-derived
+  /// interface in the same chain.
+  ArrayRef<ProtocolDecl *> getInterfaceSlots() const {
+    assert(isImplementation());
+    return Slots;
   }
 };
 

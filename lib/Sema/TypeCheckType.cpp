@@ -727,6 +727,8 @@ private:
                                    TypeResolutionOptions options);
   NeverNullType resolveTupleType(TupleTypeRepr *repr,
                                  TypeResolutionOptions options);
+  NeverNullType validateCOMExistential(Type constraintType, TypeRepr *repr,
+                                       TypeResolutionOptions options);
   NeverNullType resolveCompositionType(CompositionTypeRepr *repr,
                                        TypeResolutionOptions options);
   NeverNullType resolveExistentialType(ExistentialTypeRepr *repr,
@@ -5623,6 +5625,9 @@ TypeResolver::resolveDeclRefTypeRepr(DeclRefTypeRepr *repr,
 
   if (result->isConstraintType() &&
       options.isConstraintImplicitExistential()) {
+    result = validateCOMExistential(result, repr, options);
+    if (result->hasError())
+      return result;
     return ExistentialType::get(result);
   }
 
@@ -6555,6 +6560,53 @@ NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
 }
 
 NeverNullType
+TypeResolver::validateCOMExistential(Type constraintType, TypeRepr *repr,
+                                     TypeResolutionOptions options) {
+  auto &ctx = getASTContext();
+  if (!ctx.LangOpts.EnableCOMInterop ||
+      options.contains(TypeResolutionFlags::SilenceDiagnostics))
+    return constraintType;
+
+  if (auto existential = constraintType->getAs<ExistentialType>())
+    constraintType = existential->getConstraintType();
+  if (!constraintType->isConstraintType())
+    return constraintType;
+
+  auto layout = constraintType->getExistentialLayout();
+  auto resolution = layout.resolveCOMInterface();
+  if (resolution.containsCOMInterfaceProtocol) {
+    diagnose(repr->getLoc(), diag::com_cominterface_existential);
+    repr->setInvalid();
+    return ErrorType::get(ctx);
+  }
+
+  auto *interface = resolution.interface;
+  if (!interface)
+    return constraintType;
+
+  if (resolution.firstIncomparableInterface) {
+    diagnose(repr->getLoc(), diag::com_existential_multiple_interfaces,
+             interface->getName(),
+             resolution.firstIncomparableInterface->getName());
+  } else if (resolution.firstNonMarkerProtocol) {
+    diagnose(repr->getLoc(), diag::com_existential_non_marker_protocol,
+             interface->getName(),
+             resolution.firstNonMarkerProtocol->getName());
+  } else if (layout.hasExplicitAnyObject) {
+    diagnose(repr->getLoc(), diag::com_existential_anyobject,
+             interface->getName());
+  } else if (layout.explicitSuperclass) {
+    diagnose(repr->getLoc(), diag::com_existential_superclass,
+             interface->getName(), layout.explicitSuperclass);
+  } else {
+    return constraintType;
+  }
+
+  repr->setInvalid();
+  return ErrorType::get(ctx);
+}
+
+NeverNullType
 TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
                                      TypeResolutionOptions options) {
 
@@ -6693,6 +6745,9 @@ TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
   }
 
   if (options.isConstraintImplicitExistential()) {
+    composition = validateCOMExistential(composition, repr, options);
+    if (composition->hasError())
+      return composition;
     return ExistentialType::get(composition);
   }
 
@@ -6712,6 +6767,9 @@ TypeResolver::resolveExistentialType(ExistentialTypeRepr *repr,
     return ErrorType::get(getASTContext());
 
   if (constraintType->isConstraintType()) {
+    constraintType = validateCOMExistential(constraintType, repr, options);
+    if (constraintType->hasError())
+      return constraintType;
     return ExistentialType::get(constraintType);
   }
 
