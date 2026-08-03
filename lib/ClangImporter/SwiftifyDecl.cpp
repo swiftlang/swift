@@ -629,14 +629,6 @@ static bool getImplicitObjectParamAnnotation(const clang::ObjCMethodDecl* D) {
     return false; // Only C++ methods have implicit params
 }
 
-static size_t getNumParams(const clang::FunctionDecl* D) {
-    return D->getNumParams();
-}
-
-static size_t getNumParams(const clang::ObjCMethodDecl* D) {
-    return D->param_size();
-}
-
 static bool shouldSkipModule(ModuleDecl *M) {
   if (M->isClangBridgingHeaderImportModule()) {
     DLOG("is from bridging header (or C++ namespace)\n");
@@ -749,7 +741,7 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
       ASSERT(MappedDecl->isImportAsInstanceMember());
       swiftNumParams += 1;
     }
-    if (getNumParams(ClangDecl) != swiftNumParams) {
+    if (ClangDecl->param_size() != swiftNumParams) {
       DLOG("mismatching parameter lists");
       assert(
           ClangDecl->isVariadic() ||
@@ -762,7 +754,7 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
 
     size_t selfParamIndex = MappedDecl->isImportAsInstanceMember()
                                 ? MappedDecl->getSelfIndex()
-                                : getNumParams(ClangDecl);
+                                : ClangDecl->param_size();
     for (auto [index, clangParam] : llvm::enumerate(ClangDecl->parameters())) {
       clang::QualType clangParamTy = clangParam->getType();
       DLOG_SCOPE("Checking parameter '" << *clangParam << "' with type '"
