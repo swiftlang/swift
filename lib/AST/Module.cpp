@@ -2937,6 +2937,12 @@ void SourceFile::forEachImportOfModule(
 bool SourceFile::hasTestableOrPrivateImport(
     AccessLevel accessLevel, const swift::ValueDecl *ofDecl,
     SourceFile::ImportQueryKind queryKind) const {
+  // Parse-only actions (e.g. -dump-parse) never resolve imports, so Imports
+  // stays unset. Treat that as "no special import" rather than crashing when
+  // access checking runs while dumping a recovered AST (#91100).
+  if (!Imports)
+    return false;
+
   auto *module = ofDecl->getModuleContext();
   switch (accessLevel) {
   case AccessLevel::Internal:
