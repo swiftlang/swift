@@ -39,6 +39,10 @@ struct IntPair {
   var b: Int
 }
 
+struct NestedIntPair {
+  var p: IntPair
+}
+
 struct MyError : Error {
   var x: AnyObject
 }
@@ -923,6 +927,39 @@ bb0(%0 : $Int):
   dealloc_stack %1
   %7 = tuple ()
   return %7
+}
+
+sil [ossa] @read_p_a : $@convention(thin) (@inout NestedIntPair) -> () {
+[%0: read s0.s0.v**]
+}
+
+// The uninitialized `p.b` is not tracked as a location, but represented by the
+// "self" bit of the `p` sub-location.
+sil [ossa] @callee_reads_unknown_nested_subfield : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %1 = alloc_stack $NestedIntPair
+  %2 = struct_element_addr %1, #NestedIntPair.p
+  %3 = struct_element_addr %2, #IntPair.a
+  store %0 to [trivial] %3
+  %5 = function_ref @read_p_a : $@convention(thin) (@inout NestedIntPair) -> ()
+  %6 = apply %5(%1) : $@convention(thin) (@inout NestedIntPair) -> ()
+  dealloc_stack %1
+  %8 = tuple ()
+  return %8
+}
+
+sil [ossa] @callee_reads_known_nested_subfield : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %1 = alloc_stack $NestedIntPair
+  %2 = struct_element_addr %1, #NestedIntPair.p
+  %3 = struct_element_addr %2, #IntPair.a
+  %4 = struct_element_addr %2, #IntPair.b
+  store %0 to [trivial] %3
+  %6 = function_ref @read_p_a : $@convention(thin) (@inout NestedIntPair) -> ()
+  %7 = apply %6(%1) : $@convention(thin) (@inout NestedIntPair) -> ()
+  dealloc_stack %1
+  %9 = tuple ()
+  return %9
 }
 
 sil @dont_read_from_inout : $@convention(thin) (@inout Bool) -> ()
