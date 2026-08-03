@@ -513,6 +513,58 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValueHelper(
             if (auto debugVar = DebugVarCarryingInst(debugUse->getUser())) {
               assert(debugVar.getKind() ==
                      DebugVarCarryingInst::Kind::DebugValue);
+
+              // The variable being initialized is normally the better name,
+              // since it is what the user wrote for this value. A client that
+              // needs to explain where the value came from asks for the callee
+              // instead. Only override when this really is a call result whose
+              // callee can be named; otherwise there is nothing better to say.
+              if (options.contains(Flag::NameCallResultAfterCallee)) {
+                if (auto fas = CallResultNamer::getCallProducing(searchValue)) {
+                  auto cnd = namer.getCalleeNameAndDecl(fas);
+
+                  // An accessor's name is its storage's name, because in source
+                  // the user writes the property rather than a call. Spelling
+                  // that as 'slot()' would name something they never wrote, so
+                  // leave property reads to the normal naming path.
+                  bool calleeIsAccessor =
+                      cnd.decl && isa<AccessorDecl>(cnd.decl);
+
+                  if (!cnd.name.empty() && !calleeIsAccessor) {
+                    // Spell the component as a call, so the name reads as the
+                    // result of calling the function rather than as a value
+                    // that happens to share the function's name. Push it as
+                    // text rather than as the decl: the decl overload renders
+                    // the bare base name, which is exactly the ambiguity the
+                    // parens resolve. Interning keeps the StringRef alive past
+                    // this scope.
+                    SmallString<64> calleeCall;
+                    llvm::raw_svector_ostream calleeCallStream(calleeCall);
+
+                    // An initializer's base name is 'init', which names nothing
+                    // the reader can look for, and a type can have several
+                    // initializers. Qualify it with the type and keep the
+                    // argument labels -- 'KlassPair.init(_:_:)' -- so the
+                    // component names the initializer that actually ran.
+                    auto *ctor = dyn_cast_or_null<ConstructorDecl>(cnd.decl);
+                    auto *nominal =
+                        ctor ? ctor->getDeclContext()->getSelfNominalTypeDecl()
+                             : nullptr;
+                    if (ctor && nominal)
+                      calleeCallStream << nominal->getName() << '.'
+                                       << ctor->getName();
+                    else
+                      calleeCallStream << cnd.name << "()";
+
+                    pushPathComponent(
+                        astContext.getIdentifier(calleeCall).str(),
+                        fas.getLoc());
+                    nameIsCallResult = true;
+                    return searchValue;
+                  }
+                }
+              }
+
               pushPathComponent(debugVar.getName(), searchValue.getLoc());
 
               // We return the value, not the debug_info.
@@ -878,16 +930,21 @@ VariableNameInferrer::inferNameAndRoot(SILValue value) {
 }
 
 std::optional<std::pair<Identifier, SourceLoc>>
-VariableNameInferrer::inferNameAndFirstPathComponent(SILValue value) {
+VariableNameInferrer::inferNameAndFirstPathComponent(SILValue value,
+                                                     Options extraOptions,
+                                                     bool *nameIsCallResult) {
   auto *fn = value->getFunction();
   if (!fn)
     return {};
   VariableNameInferrer::Options options;
   options |= VariableNameInferrer::Flag::InferSelfThroughAllAccessors;
+  options |= extraOptions;
   SmallString<64> resultingName;
   VariableNameInferrer inferrer(fn, options, resultingName);
   if (!inferrer.inferByWalkingUsesToDefs(value))
     return {};
+  if (nameIsCallResult)
+    *nameIsCallResult = inferrer.isNameACallResult();
   return {{fn->getASTContext().getIdentifier(resultingName),
            inferrer.getFirstNameProvidingLoc()}};
 }
