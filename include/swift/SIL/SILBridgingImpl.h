@@ -770,6 +770,9 @@ BridgedLocation::FilenameAndLocation BridgedLocation::getFilenameAndLocation() c
 bool BridgedLocation::hasSameSourceLocation(BridgedLocation rhs) const {
   return getLoc().hasSameSourceLocation(rhs.getLoc());
 }
+OptionalBridgedDebugScope BridgedLocation::getScope() const {
+  return {getLoc().getScope()};
+}
 OptionalBridgedDeclObj BridgedLocation::getDecl() const {
   return {getLoc().getLocation().getAsASTNode<swift::Decl>()};
 }
@@ -778,6 +781,17 @@ BridgedLocation BridgedLocation::fromNominalTypeDecl(BridgedDeclObj decl) {
 }
 BridgedLocation BridgedLocation::getArtificialUnreachableLocation() {
   return swift::SILDebugLocation::getArtificialUnreachableLocation();
+}
+
+//===----------------------------------------------------------------------===//
+//                              BridgedDebugScope
+//===----------------------------------------------------------------------===//
+
+OptionalBridgedDebugScope BridgedDebugScope::getParentScope() const {
+  return {scope->Parent.dyn_cast<const swift::SILDebugScope *>()};
+}
+OptionalBridgedDebugScope BridgedDebugScope::getInlinedCallSite() const {
+  return {scope->InlinedCallSite};
 }
 
 //===----------------------------------------------------------------------===//
@@ -2071,6 +2085,10 @@ BridgedSILDebugVariable &BridgedSILDebugVariable::operator=(const BridgedSILDebu
 
 swift::SILDebugVariable BridgedSILDebugVariable::unbridge() const {
   return *reinterpret_cast<const swift::SILDebugVariable *>(&storage);
+}
+
+OptionalBridgedDebugScope BridgedSILDebugVariable::getScope() const {
+  return {unbridge().Scope};
 }
 
 OptionalBridgedDeclObj BridgedInstruction::DebugValue_getDecl() const {

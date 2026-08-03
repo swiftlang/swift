@@ -450,6 +450,16 @@ enum class BridgedMemoryBehavior {
   MayHaveSideEffects
 };
 
+struct OptionalBridgedDebugScope {
+  const swift::SILDebugScope * _Nullable scope;
+};
+
+struct BridgedDebugScope {
+  const swift::SILDebugScope * _Nonnull scope;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedDebugScope getParentScope() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedDebugScope getInlinedCallSite() const;
+};
+
 struct BridgedLocation {
   uint64_t storage[3];
 
@@ -475,6 +485,7 @@ struct BridgedLocation {
   BRIDGED_INLINE bool isFilenameAndLocation() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE FilenameAndLocation getFilenameAndLocation() const;
   BRIDGED_INLINE bool hasSameSourceLocation(BridgedLocation rhs) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedDebugScope getScope() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedDeclObj getDecl() const;
   static BRIDGED_INLINE BridgedLocation fromNominalTypeDecl(BridgedDeclObj decl);
   static BRIDGED_INLINE BridgedLocation getArtificialUnreachableLocation();
@@ -716,6 +727,7 @@ struct BridgedSILDebugVariable {
   BRIDGED_INLINE ~BridgedSILDebugVariable();
   BRIDGED_INLINE BridgedSILDebugVariable &operator=(const BridgedSILDebugVariable &rhs);
   BRIDGED_INLINE swift::SILDebugVariable unbridge() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedDebugScope getScope() const;
 };
 
 struct BridgedInstruction {

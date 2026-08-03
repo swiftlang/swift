@@ -593,6 +593,7 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   P.addRedundantPhiElimination();
   P.addCommonSubexpressionElimination();
   P.addDCE();
+  P.addDeadDebugVariableElimination();
   P.addDeadAccessScopeElimination();
 
   // Perform retain/release code motion and run the first ARC optimizer.
@@ -777,6 +778,7 @@ static void addClosureSpecializePassPipeline(SILPassPipelinePlan &P) {
   P.addConstantCapturePropagation();
 
   P.addClosureSpecialization();
+  P.addDeadDebugVariableElimination();
 
   // Do the second stack promotion on low-level SIL.
   P.addStackPromotion();
@@ -875,6 +877,7 @@ static void addLateLoopOptPassPipeline(SILPassPipelinePlan &P) {
   P.addDCE();
   P.addSILCombine();
   P.addSimplifyCFG();
+  P.addDeadDebugVariableElimination();
   P.addStripObjectHeaders();
 
   // Try to hoist all releases, including epilogue releases. This should be
