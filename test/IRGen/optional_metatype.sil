@@ -8,22 +8,22 @@ import Builtin
 import Swift
 import gizmo
 
-// x86_64-LABEL: define{{( protected)?}} swiftcc void @optional_objc_metatype(i64 %0)
-// x86_64:         icmp eq i64 %0, 0
-// i386-LABEL:   define{{( protected)?}} swiftcc void @optional_objc_metatype(i32 %0)
-// i386:           icmp eq i32 %0, 0
-// arm64-LABEL:  define{{( protected)?}} swiftcc void @optional_objc_metatype(i64 %0)
-// arm64:          icmp eq i64 %0, 0
-// arm64e-LABEL: define{{( protected)?}} swiftcc void @optional_objc_metatype(i64 %0)
-// arm64e:         icmp eq i64 %0, 0
-// armv7-LABEL:  define{{( protected)?}} swiftcc void @optional_objc_metatype(i32 %0)
-// armv7:           icmp eq i32 %0, 0
-// armv7s-LABEL: define{{( protected)?}} swiftcc void @optional_objc_metatype(i32 %0)
-// armv7s:          icmp eq i32 %0, 0
-// armv7k-LABEL: define{{( protected)?}} swiftcc void @optional_objc_metatype(i32 %0)
-// armv7k:          icmp eq i32 %0, 0
-// arm64_32-LABEL: define{{( protected)?}} swiftcc void @optional_objc_metatype(i32 %0)
-// arm64_32:          icmp eq i32 %0, 0
+// x86_64-LABEL: define{{( protected)?}} swiftcc void @optional_objc_metatype(ptr %0)
+// x86_64:         icmp eq ptr %0, null
+// i386-LABEL:   define{{( protected)?}} swiftcc void @optional_objc_metatype(ptr %0)
+// i386:           icmp eq ptr %0, null
+// arm64-LABEL:  define{{( protected)?}} swiftcc void @optional_objc_metatype(ptr %0)
+// arm64:          icmp eq ptr %0, null
+// arm64e-LABEL: define{{( protected)?}} swiftcc void @optional_objc_metatype(ptr %0)
+// arm64e:         icmp eq ptr %0, null
+// armv7-LABEL:  define{{( protected)?}} swiftcc void @optional_objc_metatype(ptr %0)
+// armv7:           icmp eq ptr %0, null
+// armv7s-LABEL: define{{( protected)?}} swiftcc void @optional_objc_metatype(ptr %0)
+// armv7s:          icmp eq ptr %0, null
+// armv7k-LABEL: define{{( protected)?}} swiftcc void @optional_objc_metatype(ptr %0)
+// armv7k:          icmp eq ptr %0, null
+// arm64_32-LABEL: define{{( protected)?}} swiftcc void @optional_objc_metatype(ptr %0)
+// arm64_32:          icmp eq ptr %0, null
 
 
 sil @optional_objc_metatype : $@convention(thin) (Optional<@objc_metatype Gizmo.Type>) -> () {
@@ -37,22 +37,22 @@ cont:
   return undef : $()
 }
 
-// x86_64-LABEL: define{{( protected)?}} swiftcc void @optional_swift_metatype(i64 %0)
-// x86_64:           icmp eq i64 %0, 0
-// i386-LABEL:   define{{( protected)?}} swiftcc void @optional_swift_metatype(i32 %0)
-// i386:             icmp eq i32 %0, 0
-// arm64-LABEL:  define{{( protected)?}} swiftcc void @optional_swift_metatype(i64 %0)
-// arm64:            icmp eq i64 %0, 0
-// arm64e-LABEL: define{{( protected)?}} swiftcc void @optional_swift_metatype(i64 %0)
-// arm64e:           icmp eq i64 %0, 0
-// armv7-LABEL:  define{{( protected)?}} swiftcc void @optional_swift_metatype(i32 %0)
-// armv7:            icmp eq i32 %0, 0
-// armv7s-LABEL: define{{( protected)?}} swiftcc void @optional_swift_metatype(i32 %0)
-// armv7s:           icmp eq i32 %0, 0
-// armv7k-LABEL: define{{( protected)?}} swiftcc void @optional_swift_metatype(i32 %0)
-// armv7k:           icmp eq i32 %0, 0
-// arm64_32-LABEL: define{{( protected)?}} swiftcc void @optional_swift_metatype(i32 %0)
-// arm64_32:           icmp eq i32 %0, 0
+// x86_64-LABEL: define{{( protected)?}} swiftcc void @optional_swift_metatype(ptr %0)
+// x86_64:           icmp eq ptr %0, null
+// i386-LABEL:   define{{( protected)?}} swiftcc void @optional_swift_metatype(ptr %0)
+// i386:             icmp eq ptr %0, null
+// arm64-LABEL:  define{{( protected)?}} swiftcc void @optional_swift_metatype(ptr %0)
+// arm64:            icmp eq ptr %0, null
+// arm64e-LABEL: define{{( protected)?}} swiftcc void @optional_swift_metatype(ptr %0)
+// arm64e:           icmp eq ptr %0, null
+// armv7-LABEL:  define{{( protected)?}} swiftcc void @optional_swift_metatype(ptr %0)
+// armv7:            icmp eq ptr %0, null
+// armv7s-LABEL: define{{( protected)?}} swiftcc void @optional_swift_metatype(ptr %0)
+// armv7s:           icmp eq ptr %0, null
+// armv7k-LABEL: define{{( protected)?}} swiftcc void @optional_swift_metatype(ptr %0)
+// armv7k:           icmp eq ptr %0, null
+// arm64_32-LABEL: define{{( protected)?}} swiftcc void @optional_swift_metatype(ptr %0)
+// arm64_32:           icmp eq ptr %0, null
 
 sil @optional_swift_metatype : $@convention(thin) (Optional<@thick Gizmo.Type>) -> () {
 bb0(%0 : $Optional<@thick Gizmo.Type>):
