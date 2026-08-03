@@ -2277,6 +2277,7 @@ static bool shouldSerializeMember(Decl *D) {
   case DeclKind::Module:
   case DeclKind::PrecedenceGroup:
   case DeclKind::Using:
+  case DeclKind::HiddenTypeLayoutInfo:
     if (D->getASTContext().LangOpts.AllowModuleWithCompilerErrors)
       return false;
     llvm_unreachable("decl should never be a member");
@@ -4395,6 +4396,11 @@ public:
   /// If this gets referenced, we forgot to handle a decl.
   void visitDecl(const Decl *) = delete;
 
+  void visitHiddenTypeLayoutInfoDecl(const HiddenTypeLayoutInfoDecl *) {
+    llvm_unreachable(
+        "hidden layout declaration serialization is not implemented yet");
+  }
+
   /// Add all of the inherited entries to the result vector.
   ///
   /// \returns the number of entries added.
@@ -4914,7 +4920,8 @@ public:
     if (auto mangledName = ctx.lookupTypeToHideWhenEmittingModule(
             ty->getCanonicalType())) {
       ty = HiddenType::get(ctx, *mangledName,
-                           var->getDeclContext()->getParentModule());
+                           var->getDeclContext()->getParentModule(), nullptr,
+                           CanType());
     }
     SmallVector<TypeID, 2> arrayFields;
     for (auto accessor : accessors.Decls)

@@ -157,6 +157,7 @@ public:
   UNINTERESTING(Accessor) // Handled by the Var or Subscript.
   UNINTERESTING(OpaqueType)
   UNINTERESTING(PrecedenceGroup)
+  UNINTERESTING(HiddenTypeLayoutInfo)
 
   // Handled at the PatternBinding level; if the pattern has a simple
   // "name: TheType" form, we can get better results by diagnosing the
