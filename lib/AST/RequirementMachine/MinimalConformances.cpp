@@ -289,6 +289,7 @@ static const ProtocolDecl *getParentConformanceForTerm(Term lhs) {
   case Symbol::Kind::ConcreteConformance:
   case Symbol::Kind::Shape:
   case Symbol::Kind::PackElement:
+  case Symbol::Kind::Metatype:
     break;
   }
 
