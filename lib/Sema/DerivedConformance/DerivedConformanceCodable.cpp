@@ -18,19 +18,24 @@
 #include "CodeSynthesis.h"
 #include "DerivedConformance.h"
 #include "TypeChecker.h"
+#include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/PluginLoader.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/SynthesizedDeclBuilder.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/QuotedString.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/StringExtras.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
 
@@ -1290,6 +1295,69 @@ static Expr *createDecodeCall(ASTContext &C, Type resultType,
   return tryExpr;
 }
 
+static bool diagnoseIfNotDecoded(ASTContext &C, NominalTypeDecl *targetDecl,
+                                 EnumDecl *codingKeysEnum, VarDecl *varDecl) {
+  if (!varDecl->isLet() || !varDecl->isParentInitialized())
+    return false;
+
+  auto lookupResult = codingKeysEnum->lookupDirect(varDecl->getBaseName());
+  auto keyExistsInCodingKeys =
+      llvm::any_of(lookupResult, [&](ValueDecl *VD) {
+        if (isa<EnumElementDecl>(VD)) {
+          return VD->getBaseName() == varDecl->getBaseName();
+        }
+        return false;
+      });
+  auto *encodableProto = C.getProtocol(KnownProtocolKind::Encodable);
+  bool conformsToEncodable =
+      (bool) lookupConformance(
+          targetDecl->getDeclaredInterfaceType(), encodableProto);
+
+  // Strategy to use for CodingKeys enum diagnostic part - this is to
+  // make the behaviour more explicit:
+  //
+  // 1. If we have an *implicit* CodingKeys enum:
+  // (a) If the type is Decodable only, explicitly define the enum and
+  //     remove the key from it. This makes it explicit that the key
+  //     will not be decoded.
+  // (b) If the type is Codable, explicitly define the enum and keep the
+  //     key in it. This is because removing the key will break encoding
+  //     which is mostly likely not what the user expects.
+  //
+  // 2. If we have an *explicit* CodingKeys enum:
+  // (a) If the type is Decodable only and the key exists in the enum,
+  //     then explicitly remove the key from the enum. This makes it
+  //     explicit that the key will not be decoded.
+  // (b) If the type is Decodable only and the key does not exist in
+  //     the enum, do nothing. This is because the user has explicitly
+  //     made it clear that they don't want the key to be decoded.
+  // (c) If the type is Codable, do nothing. This is because removing
+  //     the key will break encoding which is most likely not what the
+  //     user expects.
+  if (!codingKeysEnum->isImplicit()) {
+    if (conformsToEncodable || !keyExistsInCodingKeys) {
+      return true;
+    }
+  }
+
+  varDecl->diagnose(diag::decodable_property_will_not_be_decoded);
+  if (codingKeysEnum->isImplicit()) {
+    varDecl->diagnose(
+        diag::decodable_property_init_or_codingkeys_implicit,
+        conformsToEncodable ? 0 : 1, varDecl->getName());
+  } else {
+    varDecl->diagnose(
+        diag::decodable_property_init_or_codingkeys_explicit,
+        varDecl->getName());
+  }
+  if (auto *PBD = varDecl->getParentPatternBinding()) {
+    varDecl->diagnose(diag::decodable_make_property_mutable)
+        .fixItReplace(PBD->getLoc(), "var");
+  }
+
+  return true;
+}
+
 /// Synthesizes the body for `init(from decoder: Decoder) throws`.
 ///
 /// \param initDecl The function decl whose body to synthesize.
@@ -1382,66 +1450,8 @@ deriveBodyDecodable_init(AbstractFunctionDecl *initDecl, void *) {
           lookupVarDeclForCodingKeysCase(conformanceDC, elt, targetDecl);
 
       // Don't output a decode statement for a let with an initial value.
-      if (varDecl->isLet() && varDecl->isParentInitialized()) {
-        // But emit a warning to let the user know that it won't be decoded.
-        auto lookupResult =
-            codingKeysEnum->lookupDirect(varDecl->getBaseName());
-        auto keyExistsInCodingKeys =
-            llvm::any_of(lookupResult, [&](ValueDecl *VD) {
-              if (isa<EnumElementDecl>(VD)) {
-                return VD->getBaseName() == varDecl->getBaseName();
-              }
-              return false;
-            });
-        auto *encodableProto = C.getProtocol(KnownProtocolKind::Encodable);
-        bool conformsToEncodable =
-            (bool) lookupConformance(
-                targetDecl->getDeclaredInterfaceType(), encodableProto);
-
-        // Strategy to use for CodingKeys enum diagnostic part - this is to
-        // make the behaviour more explicit:
-        //
-        // 1. If we have an *implicit* CodingKeys enum:
-        // (a) If the type is Decodable only, explicitly define the enum and
-        //     remove the key from it. This makes it explicit that the key
-        //     will not be decoded.
-        // (b) If the type is Codable, explicitly define the enum and keep the
-        //     key in it. This is because removing the key will break encoding
-        //     which is mostly likely not what the user expects.
-        //
-        // 2. If we have an *explicit* CodingKeys enum:
-        // (a) If the type is Decodable only and the key exists in the enum,
-        //     then explicitly remove the key from the enum. This makes it
-        //     explicit that the key will not be decoded.
-        // (b) If the type is Decodable only and the key does not exist in
-        //     the enum, do nothing. This is because the user has explicitly
-        //     made it clear that they don't want the key to be decoded.
-        // (c) If the type is Codable, do nothing. This is because removing
-        //     the key will break encoding which is most likely not what the
-        //     user expects.
-        if (!codingKeysEnum->isImplicit()) {
-          if (conformsToEncodable || !keyExistsInCodingKeys) {
-            continue;
-          }
-        }
-
-        varDecl->diagnose(diag::decodable_property_will_not_be_decoded);
-        if (codingKeysEnum->isImplicit()) {
-          varDecl->diagnose(
-              diag::decodable_property_init_or_codingkeys_implicit,
-              conformsToEncodable ? 0 : 1, varDecl->getName());
-        } else {
-          varDecl->diagnose(
-              diag::decodable_property_init_or_codingkeys_explicit,
-              varDecl->getName());
-        }
-        if (auto *PBD = varDecl->getParentPatternBinding()) {
-          varDecl->diagnose(diag::decodable_make_property_mutable)
-              .fixItReplace(PBD->getLoc(), "var");
-        }
-
+      if (diagnoseIfNotDecoded(C, targetDecl, codingKeysEnum, varDecl))
         continue;
-      }
 
       auto *tryExpr = createDecodeCall(C, varType, codingKeysType, elt,
                                        containerExpr, useIfPresentVariant);
@@ -1897,6 +1907,168 @@ static ValueDecl *deriveDecodable_init(DerivedConformance &derived) {
   derived.addMembersToConformanceContext({initDecl});
 
   return initDecl;
+}
+
+static void printCodedProperty(llvm::raw_ostream &out, VarDecl *varDecl,
+                               Type varType, EnumElementDecl *elt,
+                               bool useIfPresentVariant) {
+  out << "CodedProperty(keyName: "
+      << QuotedString(identifierEscapingIfNeeded(elt->getNameStr(),
+                                                 PrintNameContext::TypeMember))
+      << ", memberName: "
+      << QuotedString(identifierEscapingIfNeeded(varDecl->getNameStr(),
+                                                 PrintNameContext::TypeMember))
+      << ", typeName: " << QuotedString(varType.getString())
+      << ", useIfPresent: " << (useIfPresentVariant ? "true" : "false") << ")";
+}
+
+static void printCodableStructShape(llvm::raw_ostream &out,
+                                    DerivedConformance &derived,
+                                    NominalTypeDecl *targetDecl,
+                                    EnumDecl *codingKeysEnum, bool forDecode) {
+  auto &C = derived.Context;
+  auto *conformanceDC = derived.getConformanceContext();
+
+  out << "structLike([";
+  bool isFirst = true;
+  for (auto *elt : codingKeysEnum->getAllElements()) {
+    VarDecl *varDecl;
+    Type varType;
+    bool useIfPresentVariant;
+    std::tie(varDecl, varType, useIfPresentVariant) =
+        lookupVarDeclForCodingKeysCase(conformanceDC, elt, targetDecl);
+
+    if (forDecode &&
+        diagnoseIfNotDecoded(C, targetDecl, codingKeysEnum, varDecl))
+      continue;
+
+    if (!isFirst)
+      out << ", ";
+    isFirst = false;
+    printCodedProperty(out, varDecl, varType, elt, useIfPresentVariant);
+  }
+  out << "])";
+}
+
+static void printCodedPayload(llvm::raw_ostream &out, ParamDecl *paramDecl,
+                              Type varType, EnumElementDecl *caseCodingKey,
+                              bool useIfPresentVariant) {
+  out << "CodedPayload(label: ";
+  auto label = paramDecl->getArgumentName();
+  if (label.empty()) {
+    out << "nil";
+  } else {
+    out << QuotedString(identifierEscapingIfNeeded(
+        label.str(), PrintNameContext::FunctionParameterExternal));
+  }
+
+  out << ", keyName: ";
+  if (caseCodingKey) {
+    out << QuotedString(identifierEscapingIfNeeded(
+        caseCodingKey->getNameStr(), PrintNameContext::TypeMember));
+  } else {
+    out << "nil";
+  }
+
+  out << ", typeName: " << QuotedString(varType.getString())
+      << ", useIfPresent: " << (useIfPresentVariant ? "true" : "false") << ")";
+}
+
+static void printCodableEnumShape(llvm::raw_ostream &out,
+                                  DerivedConformance &derived,
+                                  EnumDecl *targetEnum,
+                                  EnumDecl *codingKeysEnum) {
+  auto &C = derived.Context;
+  auto *conformanceDC = derived.getConformanceContext();
+
+  out << "enumLike([";
+  llvm::interleaveComma(
+      targetEnum->getAllElements(), out, [&](EnumElementDecl *elt) {
+        auto *codingKeyCase =
+            lookupEnumCase(C, codingKeysEnum, elt->getBaseIdentifier());
+        auto caseIdentifier = caseCodingKeysIdentifier(C, elt);
+        auto *caseCodingKeys =
+            codingKeyCase
+                ? lookupEvaluatedCodingKeysEnum(C, targetEnum, caseIdentifier)
+                : nullptr;
+
+        out << "CodedCase(name: "
+            << QuotedString(identifierEscapingIfNeeded(
+                   elt->getNameStr(), PrintNameContext::TypeMember))
+            << ", caseCodingKeysName: ";
+        if (caseCodingKeys) {
+          out << QuotedString(identifierEscapingIfNeeded(
+              caseCodingKeys->getNameStr(), PrintNameContext::TypeMember));
+        } else {
+          out << "nil";
+        }
+
+        out << ", keyName: ";
+        if (codingKeyCase) {
+          out << QuotedString(identifierEscapingIfNeeded(
+              codingKeyCase->getNameStr(), PrintNameContext::TypeMember));
+        } else {
+          out << "nil";
+        }
+
+        out << ", isUnavailable: " << (elt->isUnavailable() ? "true" : "false")
+            << ", payload: [";
+
+        if (caseCodingKeys && elt->hasAssociatedValues()) {
+          bool isFirst = true;
+          for (auto entry : llvm::enumerate(*elt->getParameterList())) {
+            auto *paramDecl = entry.value();
+            auto identifier = getVarNameForCoding(paramDecl, entry.index());
+            auto *caseCodingKey = lookupEnumCase(C, caseCodingKeys, identifier);
+
+            auto varType = conformanceDC->mapTypeIntoEnvironment(
+                paramDecl->getValueInterfaceType());
+            bool useIfPresentVariant = false;
+            if (auto objType = varType->getOptionalObjectType()) {
+              varType = objType;
+              useIfPresentVariant = true;
+            }
+
+            if (!isFirst)
+              out << ", ";
+            isFirst = false;
+            printCodedPayload(out, paramDecl, varType, caseCodingKey,
+                              useIfPresentVariant);
+          }
+        }
+
+        out << "])";
+      });
+  out << "])";
+}
+
+static std::string getCodableTypeInfoString(DerivedConformance &derived,
+                                            bool forDecode) {
+  auto &C = derived.Context;
+  auto *targetDecl = derived.Nominal;
+  auto *codingKeysEnum = lookupEvaluatedCodingKeysEnum(C, targetDecl);
+  // We should have bailed already if the type does not have CodingKeys.
+  ASSERT(codingKeysEnum && "Missing CodingKeys decl.");
+
+  bool isUnsafe =
+      derived.Conformance->getExplicitSafety() == ExplicitSafety::Unsafe ||
+      targetDecl->getExplicitSafety() == ExplicitSafety::Unsafe;
+
+  std::string res;
+  llvm::raw_string_ostream out(res);
+  out << "CodableTypeInfo(isUnsafe: " << (isUnsafe ? "true" : "false")
+      << ", hasCodingKeys: " << (codingKeysEnum->hasCases() ? "true" : "false")
+      << ", shape: ";
+
+  if (auto *targetEnum = dyn_cast<EnumDecl>(targetDecl)) {
+    printCodableEnumShape(out, derived, targetEnum, codingKeysEnum);
+  } else {
+    printCodableStructShape(out, derived, targetDecl, codingKeysEnum,
+                            forDecode);
+  }
+
+  out << ")";
+  return res;
 }
 
 /// Returns whether the given type is valid for synthesizing {En,De}codable.
