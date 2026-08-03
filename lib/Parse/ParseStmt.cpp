@@ -362,6 +362,30 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
       diagnose(EndOfPreviousLoc, diag::statement_same_line_without_semi)
         .fixItInsert(EndOfPreviousLoc, ";");
       // FIXME: Add semicolon to the AST?
+
+      // If the previous item was an expression and the next token looks like a
+      // member name, also suggest inserting '.' (SR-8507 / #51027).
+      auto previousWasExpr = [&]() -> bool {
+        if (Entries.empty())
+          return false;
+        ASTNode Prev = Entries.back();
+        if (Prev.is<Expr *>())
+          return true;
+        if (auto *D = Prev.dyn_cast<Decl *>()) {
+          if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
+            if (auto *Body = TLCD->getBody()) {
+              auto Elts = Body->getElements();
+              return !Elts.empty() && Elts.back().is<Expr *>();
+            }
+          }
+        }
+        return false;
+      };
+      if (previousWasExpr() && Tok.is(tok::identifier) &&
+          !isStartOfStmt(/*preferExpr*/ true) && !isStartOfSwiftDecl()) {
+        diagnose(EndOfPreviousLoc, diag::did_you_mean_member_access)
+            .fixItInsert(EndOfPreviousLoc, ".");
+      }
     }
 
     ParserPosition BeginParserPosition;

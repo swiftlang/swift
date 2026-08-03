@@ -1117,6 +1117,12 @@ Parser::parseListItem(ParserStatus &Status, tok RightK, SourceLoc LeftLoc,
 
   diagnose(Tok, diag::expected_separator, ",")
       .fixItInsertAfter(PreviousLoc, ",");
+  // If the next token looks like a member name, also suggest '.' (SR-8507).
+  if (Tok.is(tok::identifier) && !isStartOfStmt(/*preferExpr*/ true) &&
+      !isStartOfSwiftDecl()) {
+    diagnose(PreviousLoc, diag::did_you_mean_member_access)
+        .fixItInsertAfter(PreviousLoc, ".");
+  }
   Status.setIsParseError();
   return ParseListItemResult::Continue;
 }

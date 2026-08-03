@@ -70,3 +70,20 @@ enum Color {
 // At the top level
 var i, j : Int i = j j = i // expected-error{{consecutive statements}} {{15-15=;}} expected-error{{consecutive statements}} {{21-21=;}}
 
+// SR-8507 / #51027: missing '.' between an expression and an identifier should
+// also suggest inserting '.' (in addition to ';').
+struct MissingDotFoo {
+  var bar = 0
+}
+func testMissingDotMemberAccess() {
+  let foo = MissingDotFoo()
+  let _ = 1 + foo bar // expected-error{{consecutive statements}} {{19-19=;}} expected-note{{did you forget to write '.'?}} {{19-19=.}}
+  // expected-error@-1{{binary operator '+'}}
+  // expected-error@-2{{cannot find 'bar' in scope}}
+  foo bar = 1 // expected-error{{consecutive statements}} {{6-6=;}} expected-note{{did you forget to write '.'?}} {{6-6=.}}
+  // expected-warning@-1{{expression of type 'MissingDotFoo' is unused}}
+  // expected-error@-2{{cannot find 'bar' in scope}}
+  print(foo bar) // expected-error{{expected ',' separator}} {{13-13=,}} expected-note{{did you forget to write '.'?}} {{13-13=.}}
+  // expected-error@-1{{cannot find 'bar' in scope}}
+}
+

@@ -1091,6 +1091,8 @@ ERROR(statement_begins_with_closure,none,
       "top-level statement cannot begin with a closure expression", ())
 ERROR(statement_same_line_without_semi,none,
       "consecutive statements on a line must be separated by ';'", ())
+NOTE(did_you_mean_member_access,none,
+     "did you forget to write '.'?", ())
 ERROR(statement_same_line_without_newline,none,
       "consecutive statements on a line must be separated by a newline", ())
 ERROR(invalid_label_on_stmt,none,
