@@ -811,9 +811,18 @@ public class ReferenceWritableKeyPath<
           unsafe p = unsafe p.advanced(by: offset)
         case .class(let offset):
           let obj = unsafe p.load(as: AnyObject.self)
-          keepAlive = obj
-          unsafe p = unsafe UnsafeRawPointer(
+          let offsetAddress = unsafe UnsafeRawPointer(
             Builtin.bridgeToRawPointer(obj)).advanced(by: offset)
+          // Keep the class alive for the duration of the derived access and
+          // enforce exclusive access to the projected address.
+          //
+          // In embedded builds without dynamic exclusivity IRGen drops the
+          // `swift_beginAccess`/`swift_endAccess` calls entirely, leaving just
+          // the keep-alive.
+          keepAlive = unsafe ClassHolder<UInt8>._create(
+            previous: keepAlive, instance: obj,
+            accessingAddress: offsetAddress, type: UInt8.self)
+          unsafe p = unsafe offsetAddress
         case .mutatingGetSet(id: _, accessors: let accessors,
                              argument: let argument):
           let metadata: UnsafeRawPointer
