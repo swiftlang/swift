@@ -830,7 +830,7 @@ private:
   /// could continue through that predecessor. See the use site for what "could"
   /// means.
   bool couldAnswer(const ChainQuestion &question,
-                   PartitionWrapper &exitPartition) const;
+                   const PartitionWrapper &exitPartition) const;
 
   /// Rewind \p state's partition until the chain is explained or the state's
   /// history runs out. Returns true when the chain was explained, in which case
@@ -868,14 +868,13 @@ private:
 /// Partition cannot answer on its own since isolation lives in the value map
 /// rather than in the element-to-region mapping.
 struct IsolationHistoryNoteEmitter::PartitionWrapper {
-  Partition &partition;
+  const Partition &partition;
   RegionAnalysisValueMap &valueMap;
 
-  PartitionWrapper(Partition &partition, RegionAnalysisValueMap &valueMap)
+  PartitionWrapper(const Partition &partition, RegionAnalysisValueMap &valueMap)
       : partition(partition), valueMap(valueMap) {}
 
-  operator Partition &() { return partition; }
-  Partition *operator->() const { return &partition; }
+  const Partition *operator->() const { return &partition; }
 
   enum ElementIsolationStatus {
     Disconnected = 0,
@@ -979,6 +978,8 @@ bool IsolationHistoryNoteEmitter::processState(State &&state,
                                                SmallVectorImpl<State> &states) {
   using Node = IsolationHistory::Node;
 
+  // Read-only view of the state's partition, for the isolation queries. The
+  // rewind itself mutates state.partition directly.
   PartitionWrapper partition(state.partition, inputValueMap);
 
   // Predecessor blocks reached at CFG joins while rewinding this state.
@@ -1001,7 +1002,7 @@ bool IsolationHistoryNoteEmitter::processState(State &&state,
   // single merge. Declared out here so the loop below does not reallocate.
   SmallVector<ChainQuestion, 8> stillUnanswered;
 
-  while (const auto *node = partition->popHistoryOnce(joinedBlocks)) {
+  while (const auto *node = state.partition.popHistoryOnce(joinedBlocks)) {
     SWIFT_DEFER {
       ISOLATION_HISTORY_LOG(
           auto &os = log(1); os << "Rewound: ";
@@ -1230,9 +1231,14 @@ bool IsolationHistoryNoteEmitter::processState(State &&state,
 
   // The chain -- or the location of its last notes -- is in the predecessors
   // whose exit partitions were joined into this one at a CFG merge point.
+  //
+  // Point at those partitions rather than copying them. Deciding whether a
+  // predecessor is worth trying only reads its exit partition, and a Partition
+  // copy also copies its element-to-region map, so the copy waits until we know
+  // the walk is going there.
   struct PredExit {
     SILBasicBlock *block;
-    Partition exit;
+    const Partition *exit;
   };
   SmallVector<PredExit, 4> preds;
   for (SILBasicBlock *predBlock : joinedBlocks) {
@@ -1250,11 +1256,7 @@ bool IsolationHistoryNoteEmitter::processState(State &&state,
       continue;
     }
 
-    // The history is rewound over region membership alone, so the sending
-    // operands recorded in the exit partition have to go.
-    preds.push_back({predBlock, predBlockState.get()
-                                    ->getExitPartition()
-                                    .removingSendingOperandState()});
+    preds.push_back({predBlock, &predBlockState.get()->getExitPartition()});
   }
 
   // What the walk still wants from a predecessor: the open questions when there
@@ -1280,7 +1282,7 @@ bool IsolationHistoryNoteEmitter::processState(State &&state,
   SmallVector<bool, 4> isCandidate(preds.size(), false);
   bool anyCandidate = false;
   for (unsigned i = 0, e = preds.size(); i != e; ++i) {
-    PartitionWrapper predPartition(preds[i].exit, inputValueMap);
+    PartitionWrapper predPartition(*preds[i].exit, inputValueMap);
     for (const ChainQuestion &question : wanted) {
       if (couldAnswer(question, predPartition)) {
         isCandidate[i] = true;
@@ -1301,12 +1303,16 @@ bool IsolationHistoryNoteEmitter::processState(State &&state,
 
     ISOLATION_HISTORY_LOG(log(1) << "Will continue the walk into bb"
                                  << preds[i].block->getDebugID() << ".\n");
+    // Now the copy is worth making. The history is rewound over region
+    // membership alone, so the sending operands recorded in the exit partition
+    // have to go.
+    //
     // Every path inherits the notes as they stand now, and the pending run
     // within them. Backtracking onto the path restores walkNotes to exactly
     // this.
-    states.push_back(State{std::move(preds[i].exit), openQuestions,
-                           unsigned(walkNotes.size()), pendingStart,
-                           allQuestionsAnswered});
+    states.push_back(State{preds[i].exit->removingSendingOperandState(),
+                           openQuestions, unsigned(walkNotes.size()),
+                           pendingStart, allQuestionsAnswered});
   }
 
   return false;
@@ -1326,7 +1332,7 @@ bool IsolationHistoryNoteEmitter::processState(State &&state,
 ///     element's region is isolated there. A branch where it is disconnected is
 ///     not where its isolation came from.
 bool IsolationHistoryNoteEmitter::couldAnswer(
-    const ChainQuestion &question, PartitionWrapper &exitPartition) const {
+    const ChainQuestion &question, const PartitionWrapper &exitPartition) const {
   if (!exitPartition->isTrackingElement(question.from))
     return false;
 
