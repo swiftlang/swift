@@ -377,6 +377,12 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
     # the triple list visible to add_embedded_swift_target_library.
     set(EMBEDDED_STDLIB_TARGET_TRIPLES "${entry}")
 
+    # Record that embedded Concurrency is available for this triple, so that
+    # libraries built on top of it (e.g. Observation) can build for exactly the
+    # same set of triples instead of duplicating the filtering above.
+    set_property(GLOBAL APPEND PROPERTY
+      SWIFT_EMBEDDED_CONCURRENCY_TARGET_TRIPLES "${entry}")
+
     # lib/swift/embedded/_Concurrency.swiftmodule
     # lib/swift/embedded/<triple>/libswift_Concurrency.a
     add_embedded_swift_target_library(
