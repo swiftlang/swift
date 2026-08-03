@@ -426,6 +426,54 @@ bool ExistentialLayout::requiresClass() const {
   return false;
 }
 
+COMExistentialInterfaceResolution
+ExistentialLayout::resolveCOMInterface() const {
+  COMExistentialInterfaceResolution resolution;
+
+  for (ProtocolDecl *protocol : getProtocols()) {
+    if (protocol->isSpecificProtocol(KnownProtocolKind::COMInterface)) {
+      resolution.containsCOMInterfaceProtocol = true;
+      continue;
+    }
+
+    if (!protocol->isCOMInterface()) {
+      if (!protocol->isMarkerProtocol())
+        if (!resolution.firstNonMarkerProtocol)
+          resolution.firstNonMarkerProtocol = protocol;
+      continue;
+    }
+
+    auto *hierarchy = protocol->getCOMInterfaceHierarchy();
+    if (!hierarchy || hierarchy->isInvalid())
+      continue;
+
+    if (!resolution.interface) {
+      resolution.interface = protocol;
+      continue;
+    }
+
+    if (resolution.interface->inheritsFrom(protocol)) {
+      resolution.interface = protocol;
+      continue;
+    }
+
+    if (!resolution.firstIncomparableInterface)
+      resolution.firstIncomparableInterface = protocol;
+  }
+
+  return resolution;
+}
+
+ProtocolDecl *ExistentialLayout::getCOMInterface() const {
+  COMExistentialInterfaceResolution result = resolveCOMInterface();
+  if (hasExplicitAnyObject || explicitSuperclass ||
+      result.containsCOMInterfaceProtocol ||
+      result.firstIncomparableInterface ||
+      result.firstNonMarkerProtocol)
+    return nullptr;
+  return result.interface;
+}
+
 Type ExistentialLayout::getExplicitSuperclassOrProtocolSuperclass() const {
   if (explicitSuperclass)
     return explicitSuperclass;

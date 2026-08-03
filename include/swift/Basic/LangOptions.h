@@ -339,7 +339,7 @@ namespace swift {
     /// may override it. `ISwiftObject` is compiler-managed under every model.
     enum class COMInteropModel {
       Microsoft,      ///< Microsoft COM: `IUnknown` root.
-      CoreFoundation, ///< CoreFoundation CFPlugIn: `IUnknown` root.
+      CoreFoundation, ///< CoreFoundation CFPlugIn: no protocol root.
     };
     std::optional<COMInteropModel> COMModel = std::nullopt;
 

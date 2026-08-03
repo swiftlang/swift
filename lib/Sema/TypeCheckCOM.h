@@ -16,6 +16,7 @@
 #include <cstdint>
 
 namespace swift {
+class ClassDecl;
 class NominalTypeDecl;
 class ProtocolConformance;
 enum class KnownProtocolKind : uint8_t;
@@ -25,6 +26,12 @@ namespace com {
 /// is valid to do so.
 ProtocolConformance *
 deriveImplicitConformance(NominalTypeDecl *NTD, KnownProtocolKind KP);
+
+/// Diagnose declaration-level restrictions on a native COM implementation.
+void validateImplementation(ClassDecl *CD);
+
+/// Diagnose restrictions on an explicitly declared COM conformance.
+void validateConformance(ProtocolConformance *conformance);
 }
 } // end namespace swift
 
