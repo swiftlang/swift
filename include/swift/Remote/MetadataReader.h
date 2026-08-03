@@ -444,6 +444,11 @@ public:
   MetadataReader(const MetadataReader &other) = delete;
   MetadataReader &operator=(const MetadataReader &other) = delete;
 
+  /// Whether this reader is reading an Embedded Swift program.
+  bool isEmbedded() {
+    return Builder.getManglingFlavor() == Mangle::ManglingFlavor::Embedded;
+  }
+
   /// Clear all of the caches in this reader.
   void clear() {
     TypeCache.clear();
@@ -793,8 +798,9 @@ public:
       return std::nullopt;
     auto MetadataAddress =
         RemoteAddress(Container.Type, ExistentialAddress.getAddressSpace());
-    auto Metadata = readMetadata(MetadataAddress);
-    if (!Metadata)
+
+    // This is a sanity check that only makes sense for regular Swift programs.
+    if (!isEmbedded() && !readMetadata(MetadataAddress))
       return std::nullopt;
 
     auto VWT = readValueWitnessTable(MetadataAddress);
@@ -832,8 +838,8 @@ public:
     auto MetadataAddress =
         RemoteAddress(Container.Type, ExistentialAddress.getAddressSpace());
 
-    auto Metadata = readMetadata(MetadataAddress);
-    if (!Metadata)
+    // This is a sanity check that only makes sense for regular Swift programs.
+    if (!isEmbedded() && !readMetadata(MetadataAddress))
       return std::nullopt;
 
     auto VWT = readValueWitnessTable(MetadataAddress);
