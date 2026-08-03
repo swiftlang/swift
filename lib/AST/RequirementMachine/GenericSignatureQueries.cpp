@@ -277,6 +277,10 @@ RequirementMachine::getLongestValidPrefix(const MutableTerm &term) const {
       ABORT([&](auto &out) {
         out << "Invalid symbol in a type term: " << term;
       });
+
+    case Symbol::Kind::Metatype:
+      // T.[metatype] is always a valid type term: any type has a metatype.
+      break;
     }
 
     // This symbol is valid, add it to the longest prefix.
@@ -830,6 +834,7 @@ void RequirementMachine::verify(const MutableTerm &term) const {
       case Symbol::Kind::ConcreteType:
       case Symbol::Kind::ConcreteConformance:
       case Symbol::Kind::Shape:
+      case Symbol::Kind::Metatype:
         ABORT([&](auto &out) {
           out << "Bad initial symbol in " << term;
         });
@@ -848,6 +853,7 @@ void RequirementMachine::verify(const MutableTerm &term) const {
       break;
 
     case Symbol::Kind::Shape:
+    case Symbol::Kind::Metatype:
       erased.add(symbol);
       break;
 
