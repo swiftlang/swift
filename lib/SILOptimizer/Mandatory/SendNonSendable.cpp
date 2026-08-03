@@ -825,13 +825,6 @@ private:
 
   void collectIsolationHistoryNotes();
 
-  /// True when \p exitPartition -- the exit partition of a predecessor joined
-  /// at a CFG history join -- could answer \p question, i.e. when the chain
-  /// could continue through that predecessor. See the use site for what "could"
-  /// means.
-  bool couldAnswer(const ChainQuestion &question,
-                   const PartitionWrapper &exitPartition) const;
-
   /// Rewind \p state's partition until the chain is explained or the state's
   /// history runs out. Returns true when the chain was explained, in which case
   /// the chain has been copied from \c walkNotes onto \c notes. Otherwise
@@ -907,6 +900,35 @@ struct IsolationHistoryNoteEmitter::PartitionWrapper {
     if (isInIsolatedRegion(element))
       return ElementIsolationStatus::IndirectlyIsolated;
     return ElementIsolationStatus::Disconnected;
+  }
+
+  /// True when this partition -- the exit partition of a predecessor joined at
+  /// a CFG history join -- could answer \p question, i.e. when the chain could
+  /// continue through that predecessor.
+  ///
+  /// It could when what the question asks about has already come together here:
+  ///
+  ///   - For a question with both ends known, when the two ends are in one
+  ///     region. The merge that put them together is then somewhere in this
+  ///     predecessor's history. Where they are in different regions it was the
+  ///     join itself that brought them together, so that branch cannot explain
+  ///     the note.
+  ///
+  ///   - For a question still looking for whatever isolated its element, when
+  ///     that element's region is isolated here. A branch where it is
+  ///     disconnected is not where its isolation came from.
+  bool couldAnswer(const ChainQuestion &question) const {
+    if (!partition.isTrackingElement(question.from))
+      return false;
+
+    if (question.to) {
+      if (!partition.isTrackingElement(*question.to))
+        return false;
+      return partition.getRegion(question.from) ==
+             partition.getRegion(*question.to);
+    }
+
+    return isInIsolatedRegion(question.from);
   }
 };
 
@@ -1284,7 +1306,7 @@ bool IsolationHistoryNoteEmitter::processState(State &&state,
   for (unsigned i = 0, e = preds.size(); i != e; ++i) {
     PartitionWrapper predPartition(*preds[i].exit, inputValueMap);
     for (const ChainQuestion &question : wanted) {
-      if (couldAnswer(question, predPartition)) {
+      if (predPartition.couldAnswer(question)) {
         isCandidate[i] = true;
         anyCandidate = true;
         break;
@@ -1316,34 +1338,6 @@ bool IsolationHistoryNoteEmitter::processState(State &&state,
   }
 
   return false;
-}
-
-/// A predecessor could answer a question when what the question asks about has
-/// already come together at that predecessor's exit:
-///
-///   - For a question with both ends known, when the two ends are in one region
-///     there. The merge that put them together is then somewhere in that
-///     predecessor's history. Where they are in different regions it was the
-///     join itself that brought them together, so that branch cannot explain
-///     the link.
-///
-///   - For a question still looking for whatever isolated its element, when
-///   that
-///     element's region is isolated there. A branch where it is disconnected is
-///     not where its isolation came from.
-bool IsolationHistoryNoteEmitter::couldAnswer(
-    const ChainQuestion &question, const PartitionWrapper &exitPartition) const {
-  if (!exitPartition->isTrackingElement(question.from))
-    return false;
-
-  if (question.to) {
-    if (!exitPartition->isTrackingElement(*question.to))
-      return false;
-    return exitPartition->getRegion(question.from) ==
-           exitPartition->getRegion(*question.to);
-  }
-
-  return exitPartition.isInIsolatedRegion(question.from);
 }
 
 /// Emit the collected chain, one note per link, anchored at the merge that
