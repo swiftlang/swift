@@ -448,12 +448,6 @@ namespace {
 
     void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
                           Size offset) const override {
-      if (auto cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(ClangDecl)) {
-        for (auto base : getBasesAndOffsets(cxxRecordDecl)) {
-          lowering.addTypedData(base.decl, base.offset.asCharUnits());
-        }
-      }
-
       lowering.addTypedData(ClangDecl, offset.asCharUnits());
     }
 
