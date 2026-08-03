@@ -80,6 +80,7 @@
 #include "clang/Basic/Module.h"
 #include "clang/Basic/TargetInfo.h"
 #include "clang/AST/Attr.h"
+#include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclObjC.h"
 
 #include <algorithm>
@@ -11240,6 +11241,16 @@ ParamDecl *AbstractFunctionDecl::getImplicitSelfDecl(bool createIfNeeded) {
     (*selfDecl)->setAddressable(true);
   }
   return *selfDecl;
+}
+
+bool AbstractFunctionDecl::hasSelfInLifetimeDependenceIndices() const {
+  return isInstanceMethod() &&
+         !isa_and_nonnull<clang::CXXConstructorDecl>(getClangDecl());
+}
+
+unsigned AbstractFunctionDecl::getLifetimeDependenceResultIndex() const {
+  return getParameters()->size() +
+         (hasSelfInLifetimeDependenceIndices() ? 1 : 0);
 }
 
 void AbstractFunctionDecl::setParameters(ParameterList *BodyParams) {
