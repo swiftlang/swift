@@ -986,16 +986,12 @@ void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
     SwiftifyInfoFunctionPrinter printer(
         getClangASTContext(), SwiftContext, out, *SwiftifyImportDecl,
         typeMapping, DiagnosedMissingNullableAsEmptySpanParam);
-    if (ClangFuncDecl) {
-      if (!swiftifyImpl(*this, printer, MappedDecl, ClangFuncDecl)) {
-        DLOG("No relevant bounds or lifetime info found\n");
-        return;
-      }
-    } else {
-      if (!swiftifyImpl(*this, printer, MappedDecl, ClangObjCMethodDecl)) {
-        DLOG("No relevant bounds or lifetime info found\n");
-        return;
-      }
+    bool foundInfo = ClangFuncDecl ?
+      swiftifyImpl(*this, printer, MappedDecl, ClangFuncDecl) :
+      swiftifyImpl(*this, printer, MappedDecl, ClangObjCMethodDecl);
+    if (!foundInfo) {
+      DLOG("No relevant bounds or lifetime info found\n");
+      return;
     }
     printer.printAvailability();
     printer.printTypeMapping();
