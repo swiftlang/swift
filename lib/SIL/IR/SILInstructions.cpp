@@ -3492,8 +3492,6 @@ SILType KeyPathInst::getStaticInstanceClassType() const {
       // Reject captured subscript indices and external decl references.
       if (!comp.getArguments().empty() || comp.getExternalDecl())
         return SILType();
-      // Bail on generic accessors — we take their addresses via
-      // `getAddrOfSILFunction`, which doesn't apply substitutions.
       if (comp.getComputedPropertyForGettable()->isGeneric())
         return SILType();
       if (comp.getKind() == KeyPathPatternComponent::Kind::SettableProperty &&
@@ -3562,8 +3560,6 @@ SILType KeyPathInst::getStaticInstanceClassType() const {
       // handle statically yet.
       if (!comp.getArguments().empty() || comp.getExternalDecl())
         return SILType();
-      // Bail on generic accessors — we take their addresses via
-      // `getAddrOfSILFunction`, which doesn't apply substitutions.
       if (comp.getComputedPropertyForGettable()->isGeneric())
         return SILType();
       if (comp.getKind() == KeyPathPatternComponent::Kind::SettableProperty &&

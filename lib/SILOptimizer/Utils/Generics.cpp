@@ -2421,6 +2421,145 @@ cleanupCallArguments(SILBuilder &builder, SILLocation loc,
   }
 }
 
+/// Specialize \p thunk for \p subs, returning nullptr if that isn't possible.
+static SILFunction *specializeAccessorThunk(SILFunction *thunk,
+                                            SubstitutionMap subs,
+                                            SILOptFunctionBuilder &fb) {
+  if (!thunk->isGeneric())
+    return thunk;
+
+  SILModule &m = thunk->getModule();
+  // Key path accessor thunks have unusual conventions (indirect result plus a
+  // trailing argument-buffer pair). Never convert indirect parameters to direct
+  // ones: IRGen and the runtime walker both call these through the convention
+  // recorded in the pattern.
+  ReabstractionInfo reInfo(m.getSwiftModule(), m.isWholeModule(), ApplySite(),
+                           thunk, subs, thunk->getSerializedKind(),
+                           /*convertIndirectToDirect=*/false,
+                           /*dropUnusedArguments=*/false,
+                           /*isMandatory=*/true);
+  if (!reInfo.canBeSpecialized())
+    return nullptr;
+
+  GenericFuncSpecializer specializer(fb, thunk,
+                                     reInfo.getClonerParamSubstitutionMap(),
+                                     reInfo, /*isMandatory=*/true);
+  SILFunction *specialized = specializer.lookupSpecialization();
+  if (!specialized)
+    specialized = specializer.tryCreateSpecialization();
+  if (!specialized || specialized->getLoweredFunctionType()->hasError())
+    return nullptr;
+  return specialized;
+}
+
+bool swift::specializeKeyPathInst(KeyPathInst *kpi, SILTransform *transform) {
+  SubstitutionMap subs = kpi->getSubstitutions();
+  if (!subs.hasAnySubstitutableParams())
+    return false;
+  // Partial specialization would leave generic thunks behind, which is exactly
+  // what we're trying to avoid.
+  if (subs.getRecursiveProperties().hasArchetype())
+    return false;
+
+  KeyPathPattern *pattern = kpi->getPattern();
+  if (!pattern)
+    return false;
+
+  SILModule &m = kpi->getModule();
+  SILOptFunctionBuilder fb(*transform);
+
+  // Rebuild every component with the substitutions applied. Bail out entirely
+  // if any thunk resists specialization, so we never produce a pattern that is
+  // half-substituted.
+  SmallVector<KeyPathPatternComponent, 4> newComponents;
+  for (auto &comp : pattern->getComponents()) {
+    CanType newComponentTy =
+        comp.getComponentType().subst(subs)->getCanonicalType();
+
+    switch (comp.getKind()) {
+    case KeyPathPatternComponent::Kind::StoredProperty:
+      newComponents.push_back(KeyPathPatternComponent::forStoredProperty(
+          cast<VarDecl>(comp.getStoredPropertyDecl()), newComponentTy));
+      break;
+
+    case KeyPathPatternComponent::Kind::TupleElement:
+      newComponents.push_back(KeyPathPatternComponent::forTupleElement(
+          comp.getTupleIndex(), newComponentTy));
+      break;
+
+    case KeyPathPatternComponent::Kind::OptionalChain:
+    case KeyPathPatternComponent::Kind::OptionalForce:
+    case KeyPathPatternComponent::Kind::OptionalWrap:
+      newComponents.push_back(
+          KeyPathPatternComponent::forOptional(comp.getKind(), newComponentTy));
+      break;
+
+    case KeyPathPatternComponent::Kind::GettableProperty:
+    case KeyPathPatternComponent::Kind::SettableProperty:
+    case KeyPathPatternComponent::Kind::Method: {
+      // Captured indices would need their own substituted layout/equality/hash
+      // functions; the embedded static emitter rejects them anyway.
+      if (!comp.getArguments().empty())
+        return false;
+
+      SILFunction *getter =
+          specializeAccessorThunk(comp.getComputedPropertyForGettable(), subs, fb);
+      if (!getter)
+        return false;
+
+      SILFunction *setter = nullptr;
+      if (comp.getKind() == KeyPathPatternComponent::Kind::SettableProperty) {
+        setter = specializeAccessorThunk(comp.getComputedPropertyForSettable(),
+                                         subs, fb);
+        if (!setter)
+          return false;
+      }
+
+      auto id = comp.getComputedPropertyId();
+      if (comp.getKind() == KeyPathPatternComponent::Kind::Method) {
+        newComponents.push_back(KeyPathPatternComponent::forMethod(
+            id, getter, {}, nullptr, nullptr,
+            cast_or_null<AbstractFunctionDecl>(comp.getExternalDecl()),
+            comp.getExternalSubstitutions(), newComponentTy));
+      } else if (setter) {
+        newComponents.push_back(
+            KeyPathPatternComponent::forComputedSettableProperty(
+                id, getter, setter, {}, nullptr, nullptr,
+                cast_or_null<AbstractStorageDecl>(comp.getExternalDecl()),
+                comp.getExternalSubstitutions(), newComponentTy));
+      } else {
+        newComponents.push_back(
+            KeyPathPatternComponent::forComputedGettableProperty(
+                id, getter, {}, nullptr, nullptr,
+                cast_or_null<AbstractStorageDecl>(comp.getExternalDecl()),
+                comp.getExternalSubstitutions(), newComponentTy));
+      }
+      break;
+    }
+    }
+  }
+
+  // The new pattern is fully concrete, so it carries no generic signature and
+  // the instruction needs no substitutions.
+  auto *newPattern = KeyPathPattern::get(
+      m, /*signature=*/CanGenericSignature(),
+      pattern->getRootType().subst(subs)->getCanonicalType(),
+      pattern->getValueType().subst(subs)->getCanonicalType(), newComponents,
+      pattern->getObjCString());
+
+  SmallVector<SILValue, 4> operands;
+  for (Operand *op : kpi->getRealOperands())
+    operands.push_back(op->get());
+
+  SILBuilderWithScope builder(kpi);
+  auto *newKPI = builder.createKeyPath(kpi->getLoc(), newPattern,
+                                       SubstitutionMap(), operands,
+                                       kpi->getType());
+  kpi->replaceAllUsesWith(newKPI);
+  kpi->eraseFromParent();
+  return true;
+}
+
 bool swift::specializeClassMethodInst(ClassMethodInst *cm) {
   SILFunction *f = cm->getFunction();
   SILModule &m = f->getModule();

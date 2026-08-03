@@ -224,6 +224,11 @@ bool BridgedPassContext::specializeWitnessMethodInst(BridgedInstruction wm) cons
   return ::specializeWitnessMethodInst(wm.getAs<WitnessMethodInst>());
 }
 
+bool BridgedPassContext::specializeKeyPathInst(BridgedInstruction kpi) const {
+  return ::specializeKeyPathInst(kpi.getAs<KeyPathInst>(),
+                                 invocation->getTransform());
+}
+
 bool BridgedPassContext::specializeAppliesInFunction(BridgedFunction function, bool isMandatory) const {
   return ::specializeAppliesInFunction(*function.getFunction(), invocation->getTransform(), isMandatory);
 }

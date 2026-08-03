@@ -91,6 +91,19 @@ struct FunctionPassContext : MutatingContext {
     return false
   }
 
+  /// Rewrite `kpi`'s pattern so it no longer depends on the instruction's
+  /// substitution map, specializing the accessor thunks of any computed
+  /// component. Returns true if `kpi` was replaced, in which case the original
+  /// instruction has been erased.
+  func specializeKeyPathInst(_ kpi: KeyPathInst) -> Bool {
+    if bridgedPassContext.specializeKeyPathInst(kpi.bridged) {
+      notifyInstructionsChanged()
+      notifyCallsChanged()
+      return true
+    }
+    return false
+  }
+
   func specializeApplies(in function: Function, isMandatory: Bool) -> Bool {
     if bridgedPassContext.specializeAppliesInFunction(function.bridged, isMandatory) {
       notifyInstructionsChanged()
