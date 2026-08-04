@@ -2428,6 +2428,53 @@ static ValueDecl *getTaskRemovePriorityEscalationHandler(ASTContext &ctx,
       ctx, id, _thin, _parameters(_label("record", _unsafeRawPointer)), _void);
 }
 
+static ValueDecl *getTaskPushDeadline(ASTContext &ctx, Identifier id) {
+  // Non-generic:
+  //   (clockPtr: Builtin.RawPointer,
+  //    instantPtr: Builtin.RawPointer,
+  //    clockType: Any.Type,
+  //    instantType: Any.Type) -> UnsafeRawPointer
+  //
+  // Values first, metadata trailing (matches Swift's generic ABI).
+  //
+  // Non-generic keeps the SIL builtin's operands trivial. Passing the
+  // clock and instant by raw pointer into caller-owned storage
+  // (typically via `withUnsafePointer(to:)`) avoids the SILGen having
+  // to materialize alloc_stacks for `_typeparam` operands, which
+  // interfere with the stack-nesting invariant paired with
+  // `taskPopDeadline`.
+  //
+  // The runtime `vw_initializeWithCopy`s both values into the record's
+  // task-allocated tail storage. Caller retains ownership of the
+  // originals; they're destroyed when their lexical scope ends.
+  return getBuiltinFunction(
+      ctx, id, _thin,
+      _parameters(_label("clockPtr", _rawPointer),
+                  _label("instantPtr", _rawPointer),
+                  _label("clockType", _existentialMetatype(_unconstrainedAny)),
+                  _label("instantType", _existentialMetatype(_unconstrainedAny))),
+      _unsafeRawPointer);
+}
+
+static ValueDecl *getTaskPopDeadline(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(
+      ctx, id, _thin, _parameters(_label("record", _unsafeRawPointer)), _void);
+}
+
+static ValueDecl *getTaskCancellationScopePush(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin, _parameters(), _unsafeRawPointer);
+}
+
+static ValueDecl *getTaskCancellationScopePop(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(
+      ctx, id, _thin, _parameters(_label("record", _unsafeRawPointer)), _void);
+}
+
+static ValueDecl *getTaskCancellationScopeCancel(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(
+      ctx, id, _thin, _parameters(_label("record", _unsafeRawPointer)), _void);
+}
+
 static ValueDecl *getTaskLocalValuePush(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(ctx, id, _thin, _generics(_unrestricted),
                             _parameters(_rawPointer, _consuming(_typeparam(0))),
@@ -3593,6 +3640,21 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::TaskRemovePriorityEscalationHandler:
     return getTaskRemovePriorityEscalationHandler(Context, Id);
+
+  case BuiltinValueKind::TaskPushDeadline:
+    return getTaskPushDeadline(Context, Id);
+
+  case BuiltinValueKind::TaskPopDeadline:
+    return getTaskPopDeadline(Context, Id);
+
+  case BuiltinValueKind::TaskCancellationScopePush:
+    return getTaskCancellationScopePush(Context, Id);
+
+  case BuiltinValueKind::TaskCancellationScopePop:
+    return getTaskCancellationScopePop(Context, Id);
+
+  case BuiltinValueKind::TaskCancellationScopeCancel:
+    return getTaskCancellationScopeCancel(Context, Id);
 
   case BuiltinValueKind::TaskLocalValuePush:
     return getTaskLocalValuePush(Context, Id);

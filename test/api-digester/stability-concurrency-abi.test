@@ -138,6 +138,17 @@ Func TaskLocal.get() has mangled name changing from '_Concurrency.TaskLocal.get(
 Func _taskIsCancelled(_:) has mangled name changing from '_Concurrency._taskIsCancelled(Builtin.NativeObject) -> Swift.Bool' to '_Concurrency._taskIsCancelled(_Concurrency._AsyncTask) -> Swift.Bool'
 Func _taskIsCancelled(_:) has parameter 0 type change from Builtin.NativeObject to _Concurrency._AsyncTask
 
+// CancellationError's CustomStringConvertible conformance is tagged
+// @available(SwiftStdlib 5.1, *) rather than StdlibDeploymentTarget 6.5, so
+// it applies retroactively to every deployment target: without it, printing
+// a CancellationError() on an older-targeting client would fall back to the
+// auto-generated Mirror description and leak the internal
+// _reasonRawStorage field. That means it can't carry a StdlibDeploymentTarget
+// 6.5 tag like the other withDeadline / TaskCancellationScope additions, so
+// it still needs to be acknowledged here, same as Executor.enqueue(_:) and
+// pthread_main_np() above.
+Var CancellationError.description is a new API without '@available'
+
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)
 
 

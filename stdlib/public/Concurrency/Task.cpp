@@ -1172,13 +1172,35 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
     // chain walk `AsyncTask::isCancelled` does.
     //
     // Propagate the parent's cancellation reason so structured children
-    // see the same `Task.cancellationReason` the parent set.
+    // see the same `Task.cancellationReason` the parent set (typically
+    // `.deadlineExpired` from a `withDeadline` scope).
     auto parentStatus =
         parent->_private()._status().load(std::memory_order_relaxed);
+    // Also consider a cancelled cancellation scope on the parent's chain:
+    // structured children spawned inside a cancelled `__withTaskCancellationScope`
+    // (including `withDeadline` after its deadline elapsed) must observe as
+    // cancelled from creation, with the scope's reason.
+    TaskCancellationScopeRecord *cancelledScope = nullptr;
+    if (parentStatus.hasTaskCancellationScope())
+      cancelledScope = _swift_task_getCancellationScope(parent);
     if ((group && group->isCancelled()) ||
-        parentStatus.isCancelledIgnoringShield()) {
-      swift_task_cancelWithReason(task, swift_task_getCancellationReason(parent));
+        parentStatus.isCancelledIgnoringShield() ||
+        cancelledScope) {
+      size_t reason = parentStatus.isCancelledIgnoringShield()
+                          ? swift_task_getCancellationReason(parent)
+                          : (cancelledScope ? cancelledScope->getReason() : 0);
+      swift_task_cancelWithReason(task, reason);
     }
+
+    // Inherit the `HasDeadline` flag from the parent. Structured
+    // children (async let, task groups) run "within" the same deadline
+    // scope as their parent, so `Task.hasActiveDeadline` and
+    // `Task.activeDeadline(for:)` should observe the same deadlines on
+    // the child that the parent would. The actual lookup walks into
+    // the parent chain via `childFragment()->getParent()` on a miss,
+    // so we don't copy the records themselves - only the fast-path bit
+    // that stops the lookup from bailing out early on the child.
+    task->inheritDeadlineFlagFrom(parent);
 
     // Inside a task group, we may have to perform some defensive copying,
     // check if doing so is necessary, and initialize storage using partial
@@ -1814,8 +1836,16 @@ bool swift::swift_task_isCancelledWithFlags(AsyncTask *task,
 
 size_t swift::swift_task_getCancellationReason(AsyncTask *task) {
   auto status = task->_private()._status().load(std::memory_order_relaxed);
+  // Whole-task cancel wins: the reason bit was set at cancel time and
+  // dominates any per-scope reason on the chain.
   if (status.isCancelledIgnoringShield())
     return status.getCancellationReason();
+  // Otherwise the innermost cancelled scope (if any) supplies the reason,
+  // e.g. `.deadlineExpired` from a `withDeadline` timer firing.
+  if (status.hasTaskCancellationScope()) {
+    if (auto *scope = _swift_task_getCancellationScope(task))
+      return scope->getReason();
+  }
   return 0;
 }
 
@@ -1831,8 +1861,9 @@ swift_task_addCancellationHandlerImpl(
   auto *record = ::new (allocation)
       CancellationNotificationStatusRecord(unsigned_handler, context);
 
+  auto *task = swift_task_getCurrent();
   bool fireHandlerNow = false;
-  addStatusRecordToSelf(record, [&](ActiveTaskStatus oldStatus, ActiveTaskStatus& newStatus) {
+  addStatusRecord(task, record, [&](ActiveTaskStatus oldStatus, ActiveTaskStatus& newStatus) {
     if (oldStatus.isCancelled()) {
       // We don't fire the cancellation handler here since this function needs
       // to be idempotent
@@ -1844,6 +1875,21 @@ swift_task_addCancellationHandlerImpl(
     }
     return true; // add the record
   });
+
+  // A scope cancellation doesn't set the task's IsCancelled bit; check the
+  // scope walker so we fire the handler immediately if we're installing
+  // inside an already-cancelled scope (e.g. `withDeadline` past deadline).
+  if (!fireHandlerNow && task) {
+    auto status = task->_private()._status().load(std::memory_order_relaxed);
+    if (status.hasTaskCancellationScope()) {
+      if (auto *scope = _swift_task_getCancellationScope(task)) {
+        if (scope->isCancelled()) {
+          fireHandlerNow = true;
+          removeStatusRecord(task, record, [](ActiveTaskStatus, ActiveTaskStatus&){});
+        }
+      }
+    }
+  }
 
   if (fireHandlerNow) {
     record->run();

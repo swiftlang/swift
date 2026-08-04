@@ -140,6 +140,35 @@ llvm::Value *emitBuiltinTaskCancellationShieldPush(IRGenFunction &IGF);
 
 void emitBuiltinTaskCancellationShieldPop(IRGenFunction &IGF);
 
+/// Emit IR for the taskPushDeadline builtin.
+///
+/// Values first, metadata trailing (matches Swift's generic ABI shape).
+/// The runtime `vw_initializeWithCopy`s both values into task-allocated
+/// tail storage on the deadline record.
+///
+/// \returns the record pointer to hand back to emitBuiltinTaskPopDeadline.
+llvm::Value *emitBuiltinTaskPushDeadline(IRGenFunction &IGF,
+                                         llvm::Value *clockPtr,
+                                         llvm::Value *instantPtr,
+                                         llvm::Value *clockType,
+                                         llvm::Value *instantType);
+
+/// Emit IR for the taskPopDeadline builtin.
+void emitBuiltinTaskPopDeadline(IRGenFunction &IGF, llvm::Value *record);
+
+/// Emit IR for the taskCancellationScopePush builtin.
+///
+/// \returns the record pointer to hand back to
+/// emitBuiltinTaskCancellationScopePop.
+llvm::Value *emitBuiltinTaskCancellationScopePush(IRGenFunction &IGF);
+
+/// Emit IR for the taskCancellationScopePop builtin.
+void emitBuiltinTaskCancellationScopePop(IRGenFunction &IGF, llvm::Value *record);
+
+/// Emit IR for the taskCancellationScopeCancel builtin.
+void emitBuiltinTaskCancellationScopeCancel(IRGenFunction &IGF,
+                                        llvm::Value *record);
+
 } // end namespace irgen
 } // end namespace swift
 

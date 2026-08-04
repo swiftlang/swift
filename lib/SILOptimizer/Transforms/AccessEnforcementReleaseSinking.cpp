@@ -225,6 +225,11 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::RemoveTaskLocalValue:
     case BuiltinValueKind::TaskCancellationShieldPush:
     case BuiltinValueKind::TaskCancellationShieldPop:
+    case BuiltinValueKind::TaskCancellationScopePush:
+    case BuiltinValueKind::TaskCancellationScopePop:
+    case BuiltinValueKind::TaskCancellationScopeCancel:
+    case BuiltinValueKind::TaskPushDeadline:
+    case BuiltinValueKind::TaskPopDeadline:
       return true;
     }
   }

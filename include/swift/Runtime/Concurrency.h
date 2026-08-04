@@ -618,6 +618,125 @@ swift_task_pushTaskExecutorPreference(TaskExecutorRef executor);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_popTaskExecutorPreference(TaskExecutorPreferenceStatusRecord* record);
 
+// `withDeadline` is unavailable in Embedded Swift; these entry points take
+// `Metadata`/`WitnessTable` pointers, which are only forward-declared (not
+// available as complete types) in Embedded Swift builds.
+#if !SWIFT_CONCURRENCY_EMBEDDED
+
+/// Push a deadline status record onto the current task.
+///
+/// The clock instance and deadline instant are borrowed pointers into
+/// caller-owned storage. The runtime `vw_initializeWithCopy`s both into
+/// the record's task-allocated trailing storage; the caller retains
+/// ownership of the originals. Both are destroyed on pop via
+/// `vw_destroy`. No heap allocation is performed for the payload.
+///
+/// Values first, metadata + witness tables trailing (matches Swift's
+/// generic calling convention).
+///
+/// All subsumption logic (nesting a tighter deadline inside an outer one)
+/// is handled on the Swift side by `withDeadline` before it invokes push;
+/// this entry point is a straightforward install.
+///
+/// Runtime availability: Swift 6.5
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+TaskDeadlineStatusRecord *
+swift_task_pushDeadline(OpaqueValue *clock,
+                        OpaqueValue *instant,
+                        const Metadata *clockType,
+                        const Metadata *instantType,
+                        const WitnessTable *clockWT,      // reserved
+                        const WitnessTable *identifiableWT); // reserved
+
+/// Remove a single deadline record from the current task.
+///
+/// Must be passed the record intended to be removed (as returned by
+/// `swift_task_pushDeadline`). Passing nullptr is a no-op (defensive
+/// against pushes that returned nullptr because there was no current
+/// task). The trailing clock and instant values are destroyed via
+/// their value witnesses and the record's task-allocated storage is
+/// released.
+///
+/// Runtime availability: Swift 6.5
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_task_popDeadline(TaskDeadlineStatusRecord *record);
+
+/// Find the nearest active deadline installed for the given clock on the
+/// current task, if any.
+///
+/// The query clock is a borrowed pointer into caller-owned storage. The
+/// runtime filters candidate records by pointer-equality on `ClockType`
+/// (cheap) and, for each surviving candidate, dispatches into the
+/// bridged Swift function `_task_deadline_recordHasSameClock` to compare
+/// the clock identities.
+///
+/// Returns a borrowed +0 pointer into the matching record's tail storage
+/// aligned at the stored `C.Instant`, or nullptr if none. The caller
+/// must copy the instant out before the record is popped.
+///
+/// Runtime availability: Swift 6.5
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+OpaqueValue *
+swift_task_findNearestDeadlineForClock(
+    OpaqueValue *queryClock,
+    const Metadata *clockType,
+    const WitnessTable *clockWT,
+    const WitnessTable *identifiableWT);
+
+#endif // !SWIFT_CONCURRENCY_EMBEDDED
+
+/// Push a cancellation scope record onto the current task.
+///
+/// Unlike deadlines, cancellation scope records are never subsumed: every
+/// call always installs its own independent record. The returned pointer is
+/// owned by the runtime and must be handed back to
+/// `swift_task_popCancellationScope` when the scope exits.
+///
+/// Runtime availability: Swift 6.5
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+TaskCancellationScopeRecord * swift_task_pushCancellationScope();
+
+/// Remove a single cancellation scope record from the current task.
+///
+/// Must be passed the record intended to be removed (as returned by
+/// `swift_task_pushCancellationScope`).
+///
+/// Runtime availability: Swift 6.5
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_task_popCancellationScope(TaskCancellationScopeRecord *record);
+
+/// Cancel a cancellation scope.
+///
+/// This is a purely local operation on the scope's own state: it does not
+/// set the enclosing task's cancellation flag and does not invoke any
+/// `withTaskCancellationHandler` handlers registered outside the scope's
+/// dynamic extent. Handlers installed inside the scope's dynamic extent
+/// (i.e. between the scope record and the innermost record) do fire, so
+/// that operations like `Task.sleep` observe the scope cancellation.
+///
+/// May be called from any thread, any number of times.
+///
+/// Runtime availability: Swift 6.5
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_task_cancelCancellationScope(TaskCancellationScopeRecord *record);
+
+/// Cancel the given scope, tagging it with the given `size_t` reason value
+/// (matching `swift_task_cancelWithReason`'s reason encoding). Otherwise
+/// identical to `swift_task_cancelCancellationScope`.
+///
+/// Runtime availability: Swift 6.5
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_task_cancelCancellationScopeWithReason(
+    TaskCancellationScopeRecord *record, size_t reason);
+
+/// Return whether the given cancellation scope has been cancelled by
+/// reading its atomic flag directly. This bypasses whole-task cancellation
+/// state and any active cancellation shield on the enclosing task.
+///
+/// Runtime availability: Swift 6.5
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+bool swift_task_cancellationScopeIsCancelled(TaskCancellationScopeRecord *record);
+
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 size_t swift_task_getJobFlags(AsyncTask* task);
 

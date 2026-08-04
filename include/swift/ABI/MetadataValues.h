@@ -2919,6 +2919,22 @@ enum class TaskStatusRecordKind : uint8_t {
   /// Deprecated: A human-readable task name, replaced by `NameFragment`.
   // DEPRECATED: TaskName = 6,
 
+  /// A TaskDeadlineStatusRecord, which represents a point in time at which
+  /// the task should observe the deadline. Multiple deadlines for the same
+  /// clock are coalesced by the runtime and the tightest one wins
+  Deadline = 7,
+
+  /// A TaskCancellationScopeRecord, which represents a scoped cancellation
+  /// domain that is independent of whole-task cancellation.
+  TaskCancellationScope = 8,
+
+  /// A TaskCancellationShieldRecord, present on the chain iff a cancellation
+  /// shield is currently active. This is new in Swift 6.5, and allows to
+  /// handle nesting within cancellation scopes properly. Previously shields
+  /// were only a flag, but this is insufficient to handle nested scopes
+  /// within the same task.
+  CancellationShield = 9,
+
   // Kinds >= 192 are private to the implementation.
   First_Reserved = 192,
   Private_RecordLock = 192
