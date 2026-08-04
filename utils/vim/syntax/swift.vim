@@ -297,14 +297,14 @@ syn region swiftReservedIdentifier oneline
 hi def link swiftKeyword Statement
 hi def link swiftMultiwordKeyword Statement
 hi def link swiftIdentifierKeyword Identifier
-hi def link swiftScope PreProc
-hi def link swiftLabel Operator
+hi def link swiftScope Statement
+hi def link swiftLabel Label
 
 hi def link swiftModifierArgument Special
-hi def link swiftDefinitionModifier Operator
-hi def link swiftTypeSpecifier Define
-hi def link swiftConcurrencySpecifier Define
-hi def link swiftFuncAttribute Statement
+hi def link swiftDefinitionModifier Keyword
+hi def link swiftTypeSpecifier Keyword
+hi def link swiftConcurrencySpecifier Keyword
+hi def link swiftFuncAttribute Keyword
 
 hi def link swiftImport Include
 hi def link swiftImportModule Title
@@ -312,9 +312,9 @@ hi def link swiftImportComponent Identifier
 hi def link swiftFuncKeywordGeneral Function
 hi def link swiftFuncKeyword Function
 hi def link swiftFuncDefinition Define
-hi def link swiftTypeDefinition Define
-hi def link swiftMultiwordTypeDefinition Define
-hi def link swiftTypeAliasDefinition Define
+hi def link swiftTypeDefinition Structure
+hi def link swiftMultiwordTypeDefinition Structure
+hi def link swiftTypeAliasDefinition Typedef
 hi def link swiftVarDefinition Define
 
 hi def link swiftCoreTypes Type
@@ -342,10 +342,10 @@ hi def link swiftChar Character
 hi def link swiftString String
 hi def link swiftInterpolation Special
 
-hi def link swiftOperator Function
+hi def link swiftOperator Operator
 hi def link swiftNilOps Operator
 
-hi def link swiftAttribute Type
+hi def link swiftAttribute PreProc
 
 hi def link swiftPreproc PreCondit
 hi def link swiftPreprocFalse Comment
@@ -354,5 +354,7 @@ hi def link swiftFreestandingMacro Macro
 hi def link swiftComment Comment
 hi def link swiftLineComment Comment
 hi def link swiftTodo Todo
+
+hi def link swiftReservedIdentifier Identifier
 
 let b:current_syntax = "swift"
