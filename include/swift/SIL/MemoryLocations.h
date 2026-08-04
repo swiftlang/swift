@@ -141,9 +141,11 @@ public:
 
     /// True if this location should be trated as "trivial" location.
     /// This may differ from the location's type `isTrivial` property:
-    /// Conservatively treat enums and functions as trivial (even if their types
-    /// are not trivial). Memory locations of such types can be missing destroys
-    /// in case the enum is in fact a trivial case (like `Optional.none`).
+    /// Conservatively treat enums, functions and opened existentials as trivial
+    /// (even if their types are not trivial). Memory locations of such types
+    /// can be missing destroys in case the enum is in fact a trivial case (like
+    /// `Optional.none`) or the concrete type of the opened existential is
+    /// trivial.
     bool isTrivial;
 
     /// Returns true if the location with index \p idx is this location or a
