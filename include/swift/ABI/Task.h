@@ -374,10 +374,19 @@ public:
     static constexpr size_t ActiveTaskStatusSize = 2 * sizeof(void *);
 #endif
 
-    // Private storage is currently 8 pointers, 16 bytes of non-pointer data,
-    // 8 bytes of padding, the ActiveTaskStatus, and a RecursiveMutex.
+#if SWIFT_CONCURRENCY_EMBEDDED
+    static constexpr size_t TaskRegistryTaskSize = 0;
+#else
+    // registryNext and registryPrev pointers
+    static constexpr size_t TaskRegistryTaskSize = 2 * sizeof(void *);
+#endif
+
+    // Private storage is currently 6 pointers, 16 bytes of non-pointer data,
+    // 8 bytes of padding, the ActiveTaskStatus, a RecursiveMutex, and
+    // potentially 2 task registry pointers.
     static constexpr size_t PrivateStorageSize =
-      8 * sizeof(void *) + 16 + 8 + ActiveTaskStatusSize
+      6 * sizeof(void *) + 16 + 8 + ActiveTaskStatusSize
+      + TaskRegistryTaskSize
       + sizeof(RecursiveMutex);
 
     char Storage[PrivateStorageSize];
