@@ -180,7 +180,7 @@ func get_a_generic_tuple<This>(ty: This.Type) {
 // CHECK:         [[SRC_ADDR:%[^,]+]] = alloc_stack $AnyObject
 // CHECK:         store [[SRC]] to [[SRC_ADDR]]
 // CHECK:         [[DEST_ADDR:%[^,]+]] = alloc_stack $@thick any AnyObject.Type
-// CHECK:         unconditional_checked_cast_addr AnyObject in [[SRC_ADDR]] {{.*}} to @thick any AnyObject.Type in [[DEST_ADDR]]
+// CHECK:         unconditional_checked_cast_addr AnyObject in [[SRC_ADDR]] {{.*}} to any AnyObject.Type in [[DEST_ADDR]]
 // CHECK:         [[DEST:%[^,]+]] = load [[DEST_ADDR]]
 // CHECK:         dealloc_stack [[DEST_ADDR]]
 // CHECK:         dealloc_stack [[SRC_ADDR]]
@@ -196,7 +196,7 @@ func castAnyObjectToMeta(_ ao: any AnyObject) -> AnyObject.Type {
 // CHECK:         [[SRC_ADDR:%[^,]+]] = alloc_stack $T
 // CHECK:         copy_addr [[SRC]] to [init] [[SRC_ADDR]]
 // CHECK:         [[DEST_ADDR:%[^,]+]] = alloc_stack $@thick any AnyObject.Type
-// CHECK:         unconditional_checked_cast_addr T in [[SRC_ADDR]] {{.*}} to @thick any AnyObject.Type in [[DEST_ADDR]]
+// CHECK:         unconditional_checked_cast_addr T in [[SRC_ADDR]] {{.*}} to any AnyObject.Type in [[DEST_ADDR]]
 // CHECK:         [[DEST:%[^,]+]] = load [[DEST_ADDR]]
 // CHECK:         dealloc_stack [[DEST_ADDR]]
 // CHECK:         dealloc_stack [[SRC_ADDR]]
