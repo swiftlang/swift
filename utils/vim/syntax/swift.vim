@@ -45,6 +45,12 @@ syn keyword swiftCoreTypes
       \ Any
       \ AnyObject
 
+" Foo<Bar> in expression position, e.g. `MemoryLayout<any P>.size`. Must
+" precede the contained matches below so a declaration name like `Foo` in
+" `struct Foo<T>` still wins there, not this rule.
+syn match swiftType skipwhite skipempty nextgroup=swiftTypeParameters
+      \ /\<[A-Z][A-Za-z_0-9]*\>\ze</
+
 " Everything that can start a type; keeps the triggers below in sync.
 syn cluster swiftTypeContext contains=swiftTypeSpecifier,swiftConcurrencySpecifier,swiftExistentialType,swiftOpaqueType
 
