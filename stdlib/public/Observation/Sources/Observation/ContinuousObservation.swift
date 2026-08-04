@@ -183,9 +183,13 @@ extension ContinuousObservation.State {
             return
           }
           withObservationTracking(options: options) {
-            // This is safe since we have already been isolated to the tracking isolation.
-            // It can be asserted to be isolated by
+            // This is safe since we have already been isolated to the tracking
+            // isolation, which `assertIsolated` checks below. That assertion is
+            // only a debug aid and is unavailable in Embedded Swift, so it is
+            // skipped there.
+            #if !$Embedded
             apply.isolation?.assertIsolated()
+            #endif
             let fn = apply as @Sendable (borrowing ObservationTracking.Event) -> Void
             // This ends up also being how the `didSet` is called because this will occur
             // on the next iteration of the while loop from `trackingLoop` after the
