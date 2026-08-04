@@ -53,13 +53,12 @@ public class AnyKeyPath: _AppendKeyPath {
     return _rootAndValueType.value
   }
 
-#if !hasFeature(Embedded)
   /// Used to store the offset from the root to the value
   /// in the case of a pure struct KeyPath.
   /// It's a regular kvcKeyPathStringPtr otherwise.
   ///
-  /// With Embedded Swift, there is no KVC keypath string, and each key path has
-  /// 0 or 1 components, so there is no need for this field.
+  /// In Embedded Swift this only ever holds an offset, which is computed
+  /// at compile time.
   internal final var _kvcKeyPathStringPtr: UnsafePointer<CChar>?
 
   /*
@@ -126,6 +125,7 @@ public class AnyKeyPath: _AppendKeyPath {
 #endif
   }
 
+#if !hasFeature(Embedded)
   // SPI for the Foundation overlay to allow interop with KVC keypath-based
   // APIs.
   @_unavailableInEmbedded
@@ -380,18 +380,14 @@ public class KeyPath<Root, Value>: PartialKeyPath<Root> {
   internal final func _projectReadOnly(from root: Root) -> Value {
     let (rootType, valueType) = Self._rootAndValueType
 
-#if !hasFeature(Embedded)
     // One performance improvement is to skip right to Value
     // if this keypath traverses through structs only.
-    // In Embedded Swift, we only allow single-component key paths, so this
-    // optimization isn't worthwhile.
     if let offset = getOffsetFromStorage() {
       return unsafe _withUnprotectedUnsafeBytes(of: root) {
         let pointer = unsafe $0.baseAddress._unsafelyUnwrappedUnchecked + offset
         return unsafe pointer.assumingMemoryBound(to: Value.self).pointee
       }
     }
-#endif
 
     return unsafe withBuffer {
       var buffer = unsafe $0
@@ -605,7 +601,6 @@ public class WritableKeyPath<Root, Value>: KeyPath<Root, Value> {
     // One performance improvement is to skip right to Value
     // if this keypath traverses through structs only.
           
-#if !hasFeature(Embedded)
     // Don't declare "p" above this if-statement; it may slow things down.
     if let offset = getOffsetFromStorage()
     {
@@ -613,7 +608,6 @@ public class WritableKeyPath<Root, Value>: KeyPath<Root, Value> {
       return unsafe (pointer: UnsafeMutablePointer(
         mutating: p.assumingMemoryBound(to: Value.self)), owner: nil)
     }
-#endif
     var p = unsafe UnsafeRawPointer(base)
     var type: Any.Type = Root.self
     var keepAlive: AnyObject?

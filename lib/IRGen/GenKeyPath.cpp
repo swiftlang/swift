@@ -1678,11 +1678,23 @@ llvm::Constant *IRGenModule::emitStaticKeyPathInstance(KeyPathInst *KPI) {
   steps.reserve(numComponents);
 
   CanType currentRoot = rootTy->getCanonicalType();
+  // Running sum of field offsets, valid only while every component so far has
+  // been a struct member or tuple element. Any class or computed component
+  // makes a flat root-to-value offset meaningless (a class component
+  // dereferences, a computed one calls), so the offset is abandoned.
+  std::optional<uint32_t> flatOffset = 0;
   for (size_t i = 0; i < numComponents; ++i) {
     const auto &comp = components[i];
     auto layout =
         computeStaticKeyPathComponentLayout(*this, comp, currentRoot);
     auto [hdr, offsetWord] = encodeStaticKeyPathComponentHeader(layout);
+
+    if (layout.kind == StaticKeyPathComponentLayout::Kind::StructOrTuple) {
+      if (flatOffset)
+        *flatOffset += layout.offset;
+    } else {
+      flatOffset = std::nullopt;
+    }
 
     StepInfo step;
     step.header = hdr;
@@ -1758,6 +1770,7 @@ llvm::Constant *IRGenModule::emitStaticKeyPathInstance(KeyPathInst *KPI) {
   // Assemble the constant.
   //
   //   { { metadata_ptr, refcount_intptr },
+  //     ptr kvcKeyPathStringPtr,                     // encoded flat offset
   //     [ padding_bytes x i8 ],
   //     i32 bufferHeaderWord,
   //     [ pointer_alignment_skew_bytes x i8 ],       // buffer-level skew
@@ -1779,8 +1792,13 @@ llvm::Constant *IRGenModule::emitStaticKeyPathInstance(KeyPathInst *KPI) {
   // getter/nonmutating-setter/mutating-setter discriminators.  The id
   // field is stored raw because the runtime treats it as an opaque
   // identity value (`RawKeyPathComponent._computedIDValue`).
-  uint64_t bodySize = 2 * ptrSize; // isa + refcount
-  uint64_t paddingBytes = (16 - (bodySize % 16)) % 16;
+  // isa + refcount + `AnyKeyPath._kvcKeyPathStringPtr`.
+  //
+  // The component buffer starts where `Builtin.projectTailElems(self,
+  // Int32.self)` in `AnyKeyPath.withBuffer` looks for it, i.e. the instance
+  // size rounded up to `Int32`'s alignment.
+  uint64_t bodySize = 3 * ptrSize;
+  uint64_t paddingBytes = (4 - (bodySize % 4)) % 4;
 
   // Reuse the immortal-refcount constant from `emitConstantObject`.
   if (!swiftImmortalRefCount) {
@@ -1800,6 +1818,34 @@ llvm::Constant *IRGenModule::emitStaticKeyPathInstance(KeyPathInst *KPI) {
   auto fields = initBuilder.beginStruct();
 
   fields.add(objectHeader);
+
+  // `AnyKeyPath._kvcKeyPathStringPtr`. In Embedded Swift this only ever holds
+  // an encoded root-to-value byte offset, for key paths whose every component
+  // is a struct member or tuple element; anything else stores null and the
+  // runtime falls back to walking the component buffer. The encoding must match
+  // `AnyKeyPath.assignOffsetToStorage(offset:)` / `getOffsetFromStorage()`.
+  //
+  // 64-bit biases the offset negatively so it can never be mistaken for a real
+  // pointer. 32-bit can only encode small offsets, because it has to keep the
+  // low page free to distinguish offset 0 from the null pointer.
+  llvm::Constant *kvcOrOffset = llvm::ConstantPointerNull::get(Int8PtrTy);
+  if (flatOffset) {
+    if (ptrSize == 8) {
+      kvcOrOffset = llvm::ConstantExpr::getIntToPtr(
+          llvm::ConstantInt::get(IntPtrTy,
+                                 -static_cast<int64_t>(*flatOffset) - 1,
+                                 /*IsSigned=*/true),
+          Int8PtrTy);
+    } else {
+      // Keep in sync with `maximumOffsetOn32BitArchitecture` in KeyPath.swift.
+      const uint32_t maximumOffsetOn32BitArchitecture = 4094;
+      if (*flatOffset <= maximumOffsetOn32BitArchitecture) {
+        kvcOrOffset = llvm::ConstantExpr::getIntToPtr(
+            llvm::ConstantInt::get(IntPtrTy, *flatOffset + 1), Int8PtrTy);
+      }
+    }
+  }
+  fields.add(kvcOrOffset);
 
   if (paddingBytes != 0)
     fields.add(llvm::ConstantAggregateZero::get(
