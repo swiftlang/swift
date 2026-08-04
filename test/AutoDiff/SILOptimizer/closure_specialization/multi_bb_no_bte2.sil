@@ -176,7 +176,6 @@ bb0(%0 : $Float, %1 : @owned $@callee_guaranteed (@guaranteed Array<Float>.Diffe
 sil hidden [ossa] @$s4test4sum1ySfSaySfG_ACtFTJrSSpSr : $@convention(thin) (@guaranteed Array<Float>, @guaranteed Array<Float>) -> (Float, @owned @callee_guaranteed (Float) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView)) {
 bb0(%0 : @guaranteed $Array<Float>, %1 : @guaranteed $Array<Float>):
   // CHECK:         sil hidden [ossa] @$s4test4sum1ySfSaySfG_ACtFTJrSSpSr : $@convention(thin) (@guaranteed Array<Float>, @guaranteed Array<Float>) -> (Float, @owned @callee_guaranteed (Float) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView)) {
-  // CHECK:         bb0:
   // CHECK:           (%[[#]], %[[#E42:]]) = destructure_tuple %[[#]] : $(Array<Float>, @callee_guaranteed (@guaranteed Array<Float>.DifferentiableView) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView))
 
   %4 = alloc_stack [var_decl] $Array<Float>
