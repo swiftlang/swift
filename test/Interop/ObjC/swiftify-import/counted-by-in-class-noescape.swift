@@ -190,38 +190,30 @@ module Method {
 // }}
 - (void) nonnull:(int)len :(int * __counted_by(len) __noescape _Nonnull)p;
 
-// expected-expansion@+34:2{{
+// expected-expansion@+26:2{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-//   expected-experimental-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload public class final func nullable(_ p: inout MutableSpan<CInt>) {|}}
-//   expected-stable-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload public class final func nullable(_ p: inout MutableSpan<CInt>) {|}}
-//   expected-experimental-remark@3{{macro content: |    let len = CInt(exactly: p.count)!|}}
-//   expected-stable-remark@3{{macro content: |    let len = CInt(exactly: p.count)!|}}
-//   expected-experimental-remark@4{{macro content: |    let _pPtr = p.withUnsafeMutableBufferPointer {|}}
-//   expected-stable-remark@4{{macro content: |    let _pPtr = p.withUnsafeMutableBufferPointer {|}}
+//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload public class final func nullable(_ p: inout MutableSpan<CInt>) {|}}
+//   expected-remark@3{{macro content: |    let len = CInt(exactly: p.count)!|}}
+//   expected-remark@4{{macro content: |    let _pPtr = p.withUnsafeMutableBufferPointer {|}}
 //   expected-remark@5{{macro content: |        unsafe $0|}}
 //   expected-remark@6{{macro content: |    }|}}
 //   expected-remark@7{{macro content: |    defer {|}}
 //   expected-remark@8{{macro content: |        _fixLifetime(p)|}}
 //   expected-remark@9{{macro content: |    }|}}
-//   expected-experimental-remark@10{{macro content: |    return unsafe nullable(len, _pPtr.baseAddress)|}}
-//   expected-stable-remark@10{{macro content: |    return unsafe nullable(len, _pPtr.baseAddress)|}}
+//   expected-remark@10{{macro content: |    return unsafe nullable(len, _pPtr.baseAddress)|}}
 //   expected-remark@11{{macro content: |}|}}
 // }}
-// expected-expansion@+17:76{{
+// expected-expansion@+13:76{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-//   expected-experimental-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload public final func nullable(_ p: inout MutableSpan<CInt>) {|}}
-//   expected-stable-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload public final func nullable(_ p: inout MutableSpan<CInt>) {|}}
-//   expected-experimental-remark@3 {{macro content: |    let len = CInt(exactly: p.count)!|}}
-//   expected-stable-remark@3{{macro content: |    let len = CInt(exactly: p.count)!|}}
-//   expected-experimental-remark@4 {{macro content: |    let _pPtr = p.withUnsafeMutableBufferPointer {|}}
-//   expected-stable-remark@4{{macro content: |    let _pPtr = p.withUnsafeMutableBufferPointer {|}}
+//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload public final func nullable(_ p: inout MutableSpan<CInt>) {|}}
+//   expected-remark@3 {{macro content: |    let len = CInt(exactly: p.count)!|}}
+//   expected-remark@4 {{macro content: |    let _pPtr = p.withUnsafeMutableBufferPointer {|}}
 //   expected-remark@5{{macro content: |        unsafe $0|}}
 //   expected-remark@6{{macro content: |    }|}}
 //   expected-remark@7{{macro content: |    defer {|}}
 //   expected-remark@8{{macro content: |        _fixLifetime(p)|}}
 //   expected-remark@9{{macro content: |    }|}}
-//   expected-experimental-remark@10 {{macro content: |    return unsafe nullable(len, _pPtr.baseAddress)|}}
-//   expected-stable-remark@10{{macro content: |    return unsafe nullable(len, _pPtr.baseAddress)|}}
+//   expected-remark@10 {{macro content: |    return unsafe nullable(len, _pPtr.baseAddress)|}}
 //   expected-remark@11{{macro content: |}|}}
 // }}
 - (void) nullable:(int)len :(int * __counted_by(len) _Nullable __noescape)p;
