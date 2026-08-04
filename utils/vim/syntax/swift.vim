@@ -35,6 +35,7 @@ syn keyword swiftKeyword
       \ switch
       \ throw
       \ try
+      \ unsafe
       \ where
       \ while
 syn match swiftMultiwordKeyword
