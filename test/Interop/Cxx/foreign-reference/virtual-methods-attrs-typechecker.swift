@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -I %S/Inputs %s -strict-memory-safety -cxx-interoperability-mode=default -diagnostic-style llvm 2>&1
+// RUN: %target-typecheck-verify-swift -I %S/Inputs -strict-memory-safety -cxx-interoperability-mode=default -diagnostic-style llvm 2>&1
 
 import VirtualMethodAttrs
 
