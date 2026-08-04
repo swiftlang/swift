@@ -586,7 +586,7 @@ SILValue ClosureCloner::getProjectBoxMappedVal(SILValue operandValue) {
 /// if its operand is the promoted address argument then lower it to
 /// another debug_value, otherwise it is handled normally.
 void ClosureCloner::visitDebugValueInst(DebugValueInst *inst) {
-  if (SILValue value = getProjectBoxMappedVal(inst->getOperand())) {
+  if (SILValue value = getProjectBoxMappedVal(inst->getSingleOperand())) {
     getBuilder().setCurrentDebugScope(getOpScope(inst->getDebugScope()));
     auto varInfo = *inst->getVarInfo();
     if (varInfo.Scope)

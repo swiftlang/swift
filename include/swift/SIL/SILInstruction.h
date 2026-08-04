@@ -5735,12 +5735,11 @@ public:
 /// Define the start or update to a symbolic variable value (for loadable
 /// types).
 class DebugValueInst final
-    : public UnaryInstructionBase<SILInstructionKind::DebugValueInst,
-                                  NonValueInstruction>,
-      private SILDebugVariableSupplement,
-      private llvm::TrailingObjects<DebugValueInst, SILType, SILLocation,
-                                    const SILDebugScope *, SILDIExprElement,
-                                    char> {
+    : public InstructionBaseWithTrailingOperands<
+          SILInstructionKind::DebugValueInst, DebugValueInst,
+          NonValueInstruction, SILType, SILLocation, const SILDebugScope *,
+          SILDIExprElement, char>,
+      private SILDebugVariableSupplement {
   friend TrailingObjects;
   friend SILBuilder;
 
@@ -5750,20 +5749,36 @@ class DebugValueInst final
   /// Optional debug basic block holding reconstruction instructions.
   SILBasicBlock *ReconstructionBlock = nullptr;
 
-  DebugValueInst(SILDebugLocation DebugLoc, SILValue Operand,
-                 SILDebugVariable Var,
+  DebugValueInst(SILDebugLocation DebugLoc, ArrayRef<SILValue> Operands,
+                 SILModule &M, SILDebugVariable Var,
                  UsesMoveableValueDebugInfo_t operandWasMoved, bool trace,
                  bool prependDeref);
-  static DebugValueInst *create(SILDebugLocation DebugLoc, SILValue Operand,
-                                SILModule &M, SILDebugVariable Var,
+  static DebugValueInst *create(SILDebugLocation DebugLoc,
+                                ArrayRef<SILValue> Operands, SILModule &M,
+                                SILDebugVariable Var,
                                 UsesMoveableValueDebugInfo_t operandWasMoved,
                                 bool trace);
 
+  using InstructionBaseWithTrailingOperands::numTrailingObjects;
   SIL_DEBUG_VAR_SUPPLEMENT_TRAILING_OBJS_IMPL()
 
-  size_t numTrailingObjects(OverloadToken<char>) const { return 1; }
-
 public:
+  // FIXME: These following 2 functions are temporary, while debug_value
+  // transitions to being a multi-operand instruction.
+  SILValue getOperand() const { return getAllOperands()[0].get(); }
+  void setOperand(SILValue V) { getAllOperands()[0].set(V); }
+
+  /// Returns the single operand, asserting that there is exactly one.
+  /// Should only be used in contexts where it is known that there is no
+  /// debug reconstruction block.
+  SILValue getSingleOperand() const {
+    ASSERT(getAllOperands().size() == 1);
+    return getAllOperands()[0].get();
+  }
+
+  ArrayRef<Operand> getTypeDependentOperands() const { return {}; }
+  MutableArrayRef<Operand> getTypeDependentOperands() { return {}; }
+
   /// Sets a bool that states this debug_value is supposed to use the
   void setUsesMoveableValueDebugInfo() {
     sharedUInt8().DebugValueInst.usesMoveableValueDebugInfo =
@@ -5880,7 +5895,7 @@ public:
   /// an address type (when moved to the stack, for example).
   /// If a reconstruction block exists, a load is added at the beginning.
   /// Otherwise, it will be prepended to the DIExpr.
-  void prependDeref();
+  void prependDeref(unsigned operandIdx);
 
   /// Removes a deref operator to this debug_value in place.
   /// This must be called when the operand is changed from an address type to
@@ -5889,7 +5904,7 @@ public:
   /// If a reconstruction block exists, a load is removed at the beginning. If
   /// there is no load at the beginning, the operand is killed, marking the
   /// variable as optimized away.
-  void stripDeref();
+  void stripDeref(unsigned operandIdx);
 
   /// Validates the type chain of the DIExpr.
   /// Starting from VarType, narrows through fragments (outermost first)
@@ -5933,7 +5948,7 @@ public:
   /// reconstruction block.
   /// If \p varType is specified, the undef will use that type (in the
   /// appropriate address/object form) instead of the current operand's type.
-  void killOperand(SILType operandType = SILType());
+  void killOperand(unsigned operandIdx, SILType operandType = SILType());
 
   bool hasTrace() const { return sharedUInt8().DebugValueInst.trace; }
 
