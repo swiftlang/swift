@@ -76,6 +76,15 @@ syn keyword swiftDefinitionModifier
       \ throws
       \ weak
 
+syn keyword swiftModifierArgument contained
+      \ nonsending
+      \ unsafe
+syn region swiftModifierArguments contained transparent
+      \ matchgroup=Delimiter start=/(/ end=/)/
+      \ contains=swiftModifierArgument
+syn keyword swiftDefinitionModifier skipwhite skipempty nextgroup=swiftModifierArguments
+      \ nonisolated
+
 syn keyword swiftTypeSpecifier contained skipwhite skipempty nextgroup=swiftTypeSpecifier,swiftExistentialType,swiftOpaqueType,swiftTypeName
       \ borrowing
       \ consuming
@@ -264,6 +273,7 @@ hi def link swiftTypeName Function
 hi def link swiftConstraint Special
 hi def link swiftFuncDefinition Define
 hi def link swiftDefinitionModifier Operator
+hi def link swiftModifierArgument Special
 hi def link swiftExistentialType Type
 hi def link swiftFuncAttribute Statement
 hi def link swiftFuncKeyword Function
