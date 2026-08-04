@@ -22,8 +22,6 @@
 // REQUIRES: swift_feature_Embedded
 // REQUIRES: swift_feature_EmbeddedKeyPaths
 
-// XFAIL: swift_test_mode_optimize_none_with_opaque_values
-
 //--- ok.swift
 
 public struct Grid {
