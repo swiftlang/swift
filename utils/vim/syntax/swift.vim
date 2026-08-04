@@ -43,6 +43,13 @@ syn keyword swiftKeyword
 syn match swiftMultiwordKeyword
       \ "indirect case"
 
+" `copy`/`consume` are only the explicit-copy/move operators (`copy x`,
+" `consume x`) when immediately followed by an identifier/self/$ident on
+" the same line; otherwise they are ordinary identifiers (`copy()`,
+" `let copy = ...`, `x.copy`, and likewise for `consume`).
+syn match swiftKeyword /\<copy\>\ze\s\+[A-Za-z_$]/
+syn match swiftKeyword /\<consume\>\ze\s\+[A-Za-z_$]/
+
 syn keyword swiftIdentifierKeyword
       \ Self
       \ metatype
