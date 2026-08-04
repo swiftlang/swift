@@ -539,12 +539,11 @@ do {
   print(anyX == kpX ? "OK!" : "FAIL") // CHECK: OK!
   print(anyX != paths[1] ? "OK!" : "FAIL") // CHECK: OK!
 
-  // `AnyKeyPath` as a Dictionary key exercises `hash(into:)`.
-  var counts: [AnyKeyPath: Int] = [:]
-  counts[anyX, default: 0] += 1
-  counts[anyX, default: 0] += 1
-  counts[anyNested, default: 0] += 1
-  print(counts[anyX] == 2 && counts[anyNested] == 1 ? "OK!" : "FAIL") // CHECK: OK!
+  // `AnyKeyPath`'s `Hashable` conformance is covered separately, in
+  // `keypaths-hashable.swift`: using one as a `Dictionary` key pulls in
+  // `_HashTable` and the hash seed, which need `ceil` and `arc4random_buf`.
+  // This test's link recipe can't satisfy those on Linux, and restricting the
+  // whole file would cost the rest of its coverage there.
 }
 
 // -----------------------------------------------------------------------------

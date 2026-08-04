@@ -15,6 +15,10 @@
 // REQUIRES: PTRSIZE=64
 // REQUIRES: swift_feature_Embedded
 // REQUIRES: swift_feature_EmbeddedKeyPaths
+// Embedded key paths and SIL opaque values don't currently mix: the
+// combination trips `getSILArgumentConvention`. `keypaths-static.swift` and
+// `keypaths-exec.swift` carry the same XFAIL.
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 public struct Inner { public var a: Int32 = 0; public var b: Int32 = 0 }
 public struct Mid { public var pad: Int64 = 0; public var inner = Inner() }
