@@ -3488,8 +3488,8 @@ SILType KeyPathInst::getStaticInstanceClassType() const {
     case KeyPathPatternComponent::Kind::GettableProperty:
     case KeyPathPatternComponent::Kind::SettableProperty:
     case KeyPathPatternComponent::Kind::Method: {
-      // External decl references would need the original module's property
-      // descriptor, which embedded Swift does not emit.
+      // An external component defers the component's layout to a property
+      // descriptor in the defining module. These don't show up in embedded.
       if (comp.getExternalDecl())
         return SILType();
       if (comp.getComputedPropertyForGettable()->isGeneric())
@@ -3571,8 +3571,8 @@ SILType KeyPathInst::getStaticInstanceClassType() const {
     case KeyPathPatternComponent::Kind::GettableProperty:
     case KeyPathPatternComponent::Kind::SettableProperty:
     case KeyPathPatternComponent::Kind::Method: {
-      // External decl references would need the original module's property
-      // descriptor, which embedded Swift does not emit.
+      // An external component defers the component's layout to a property
+      // descriptor in the defining module. These don't show up in embedded.
       if (comp.getExternalDecl())
         return SILType();
       if (comp.getComputedPropertyForGettable()->isGeneric())
