@@ -1122,7 +1122,7 @@ void SILCloner<ImplClass>::commonFixUp(SILFunction *F) {
   if (asImpl().isWholeFunctionClone() && !getBuilder().isInsertingIntoGlobal())
     getBuilder().getFunction().setHasLoweredAddresses(F->hasLoweredAddresses());
   else
-    assert((getBuilder().isInsertingIntoGlobal() ||
+    ASSERT((getBuilder().isInsertingIntoGlobal() ||
             getBuilder().getFunction().hasLoweredAddresses() ==
                 F->hasLoweredAddresses()) &&
            "cloning between functions in different address-lowering forms");
