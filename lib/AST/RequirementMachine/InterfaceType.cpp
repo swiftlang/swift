@@ -156,12 +156,20 @@ using namespace rewriting;
 ///
 MutableTerm RewriteContext::getMutableTermForType(CanType paramType,
                                                   const ProtocolDecl *proto) {
-  ASSERT(paramType->isTypeParameter());
-
   // Collect zero or more nested type names in reverse order.
   bool innermostAssocTypeWasResolved = false;
 
   SmallVector<Symbol, 3> symbols;
+
+  // Append one [metatype] symbol for each metatype layer, so 'T.Type' becomes
+  // 'T.[meatype]'. Reversing the collected symbols below preserves the order of
+  // nested metatypes such as 'T.Type.Type'.
+  while (auto metatypeType = dyn_cast<AnyMetatypeType>(paramType)) {
+    symbols.push_back(Symbol::forMetatype(*this));
+    paramType = metatypeType.getInstanceType();
+  }
+
+  ASSERT(paramType->isTypeParameter());
   while (auto memberType = dyn_cast<DependentMemberType>(paramType)) {
     paramType = memberType.getBase();
 
@@ -306,6 +314,13 @@ getTypeForSymbolRange(const Symbol *begin, const Symbol *end,
           out << "Invalid root symbol: " << MutableTerm(begin, end);
         });
       }
+    }
+
+    // A [metatype] symbol turns the type accumulated into its metatype, so the
+    // term 'T.[metatype]' reconstructs as 'T.Type'.
+    if (symbol.getKind() == Symbol::Kind::Metatype) {
+      result = MetatypeType::get(result);
+      continue;
     }
 
     // An unresolved type can appear if we have invalid requirements.
