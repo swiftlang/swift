@@ -608,19 +608,13 @@ Partition Partition::join(const Partition &fst, Partition &mutableSnd,
 void Partition::print(llvm::raw_ostream &os,
                       std::function<bool(llvm::raw_ostream &, Region)>
                           printRegionIsolation) const {
-  // If we are asked to printRegionIsolation, we need to canonicalize before we
-  // can get the correct regions. So, check if we are canonicalized. If we are
-  // not then we can continue printing below. Otherwise, we copy ourselves,
-  // canonicalize the copy, and then print that. We do this since the whole
-  // point of printing this type of information is to help us understand how the
-  // program flowed normally and if we canonicalize this partition to print, we
-  // would change the compiler state.
-  if (printRegionIsolation && !canonical) {
-    auto other = *this;
-    other.canonicalize();
-    other.print(os, printRegionIsolation);
-    return;
-  }
+  // Group by region, so the region numbers have to be the canonical ones or the
+  // grouping is against labels that happen to be stale. Canonicalizing is safe
+  // from a const printer: it relabels regions without changing which elements
+  // share one, so it does not change what this partition means.
+  //
+  // Use dump_labels() to see the labels as they stand instead.
+  canonicalize();
 
   SmallFrozenMultiMap<Region, Element, 8> multimap;
 
@@ -657,6 +651,9 @@ void Partition::print(llvm::raw_ostream &os,
 }
 
 void Partition::printVerbose(llvm::raw_ostream &os) const {
+  // Canonical region numbers, for the same reason as print.
+  canonicalize();
+
   SmallFrozenMultiMap<Region, Element, 8> multimap;
 
   for (auto [eltNo, regionNo] : elementToRegionMap)
@@ -823,7 +820,14 @@ Region Partition::merge(Element fst, Element snd, bool updateHistory) {
   return result;
 }
 
-void Partition::canonicalize() {
+void Partition::canonicalize() const {
+  // Canonicalization is a lazy normalization of the region labels, so running it
+  // from a const query does not change what the partition means. See the
+  // declaration.
+  const_cast<Partition *>(this)->canonicalizeImpl();
+}
+
+void Partition::canonicalizeImpl() {
   if (canonical)
     return;
   canonical = true;
