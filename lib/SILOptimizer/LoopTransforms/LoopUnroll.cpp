@@ -525,6 +525,7 @@ class LoopUnrolling : public SILFunctionTransform {
       Changed |= tryToUnrollLoop(Loop, SRA, deb);
 
     if (Changed) {
+      updateAllGuaranteedPhis(PM, Fun);
       invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
       removeUnreachableBlocks(*Fun);
       if (Fun->needBreakInfiniteLoops())
