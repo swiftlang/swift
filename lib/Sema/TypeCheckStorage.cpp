@@ -3065,12 +3065,12 @@ RequiresOpaqueAccessorsRequest::evaluate(Evaluator &evaluator,
   return true;
 }
 
-/// When the CoroutineAccessors feature is available, the coroutine accessor
-/// _could_ be required.  That non-underscored accessor would be preferred to
-/// its underscored counterpart accessor.
+/// Do we need to emit a legacy coroutine accessor?
 ///
-/// The underscored accessor could, however, still be required for ABI
-/// stability.
+/// We generally prefer the newer ABI version but need to preserve ABI stability
+/// in many cases.  The details depend on the target platform, build
+/// configuration, whether this is a concrete or protocol type, and when the
+/// property in question became available.
 static bool requiresCorrespondingLegacyCoroutineAccessorImpl(
     AbstractStorageDecl const *storage, AccessorKind kind,
     AccessorDecl const *decl, AbstractStorageDecl const *derived) {
@@ -3078,11 +3078,8 @@ static bool requiresCorrespondingLegacyCoroutineAccessorImpl(
   assert(ctx.LangOpts.hasFeature(Feature::CoroutineAccessors));
   assert(kind == AccessorKind::YieldingMutate || kind == AccessorKind::YieldingBorrow);
 
-  // If any overridden decl requires the underscored version, then this decl
-  // does too.  Otherwise dispatch to the underscored version on a value
-  // statically the super but dynamically this subtype would not dispatch to an
-  // override of the underscored version but rather (incorrectly) the
-  // supertype's implementation.
+  // If any overridden decl emits the legacy version, then this decl must as
+  // well, in order to ensure callers always get the right implementation.
   if (storage == derived) {
     auto *current = storage;
     while ((current = current->getOverriddenDecl())) {
@@ -3095,14 +3092,8 @@ static bool requiresCorrespondingLegacyCoroutineAccessorImpl(
     }
   }
 
-  // Unless we're building with library evolution, there is no stable ABI to
-  // preserve: the underscored (yield_once_1) accessor is pure overhead, so emit
-  // only the new (yield_once_2) ABI.  This covers non-resilient modules on every
-  // platform as well as non-ABI-stable builds such as Embedded and the static
-  // (LINUX_STATIC) standard library.  Note this comes *after* the override walk
-  // above: a decl in a non-resilient module overriding a resilient superclass
-  // must still emit the underscored accessor to dispatch through the super's ABI
-  // slot (that recursive call evaluates the super's own module resilience).
+  // If this module is not resilient, we don't need to preserve a stable ABI,
+  // so emit only the new (yield_once_2) ABI.
   if (storage->getModuleContext()->getResilienceStrategy() !=
       ResilienceStrategy::Resilient)
     return false;
@@ -3119,19 +3110,23 @@ static bool requiresCorrespondingLegacyCoroutineAccessorImpl(
            .isPackage())
     return false;
 
-  // The non-underscored accessor is not present, the underscored accessor
-  // won't be either.
+  // The yielding accessor is not present, so we won't emit a legacy
+  // wrapper either.
   auto *accessor = decl ? decl : storage->getOpaqueAccessor(kind);
   if (!accessor)
     return false;
 
-  // Availability-gated ABI compatibility only matters on targets that support
-  // versioned OS availability: there, a binary built before the feature
-  // shipped may run against a newer, already-built standard library, so the
-  // underscored accessor must stay available.  Targets without versioned
-  // availability (e.g. Linux, embedded) have no such prebuilt binary to stay
-  // compatible with, so always emit only the new ABI.
-  if (!ctx.supportsVersionedAvailability())
+  // For concrete types only: Availability-gated ABI compatibility only matters
+  // on targets that support versioned OS availability: there, a binary built
+  // before the new yielding ABI become available may run against a newer
+  // framework, so the framework must preserve the old ABI accessor.  Targets
+  // without versioned availability (e.g. Linux, embedded) have no prebuilt
+  // binaries to stay compatible with, so always emit only the new ABI.
+  //
+  // (For protocols, witness-table stability requirements get
+  // checked later in this function.)
+  if (!isa<ProtocolDecl>(storage->getDeclContext()) &&
+      !ctx.supportsVersionedAvailability())
     return false;
 
   AvailabilityContext accessorAvailability = [&] {
@@ -3154,13 +3149,13 @@ static bool requiresCorrespondingLegacyCoroutineAccessorImpl(
     return retval;
   }();
   auto featureAvailability = ctx.getCoroutineAccessorsAvailability();
-  // If accessor was introduced only after the feature was, there's no old ABI
-  // to maintain.
+  // If the accessor became available after the new coroutine ABI did,
+  // we will never need the legacy ABI.
   if (accessorAvailability.getPlatformRange().isContainedIn(
           featureAvailability))
     return false;
 
-  // The underscored accessor is required for ABI stability.
+  // The legacy ("underscored") accessor is required for ABI stability.
   return true;
 }
 
