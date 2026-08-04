@@ -458,6 +458,67 @@ extension OutputSpan where Element: ~Copyable {
       try unsafe body(buffer, &initializedCount)
     }
   }
+
+  /// Call the given closure with an unsafe buffer pointer to the uninitialized memory
+  /// of this `OutputSpan` and a mutable reference to its count of newly initialized
+  /// elements, starting at zero. Unlike `withUnsafeMutableBufferPointer(_:)`,
+  /// the buffer passed to `body` covers only the uninitialized memory that follows this
+  /// `OutputSpan`'s initialized elements.
+  ///
+  /// This method provides a way to process or populate an `OutputSpan` using
+  /// unsafe operations, such as dispatching to code written in legacy
+  /// (memory-unsafe) languages.
+  ///
+  /// The supplied closure may process the buffer in any way it wants; however,
+  /// when it finishes (whether by returning or throwing), it must leave the
+  /// buffer in a state that satisfies the invariants of the `OutputSpan`:
+  ///
+  /// 1. The inout integer passed in as the second argument must be the exact
+  ///     number of newly initialized items in the buffer passed in as the first
+  ///     argument.
+  /// 2. These initialized elements must be located in a single contiguous
+  ///     region starting at the beginning of the buffer. The rest of the buffer
+  ///     must hold uninitialized memory.
+  ///
+  /// This function cannot verify these two invariants, and therefore
+  /// this is an unsafe operation. Violating the invariants of `OutputSpan`
+  /// may result in undefined behavior.
+  ///
+  /// - Note: The count of the newly initialized elements is recorded even if the
+  /// closure throws.
+  ///
+  /// - Parameter body: A closure that can read from and write to the
+  ///     buffer and record the newly initialized count.
+  /// - Returns: The return value of the `body` closure.
+  @export(implementation)
+  @_transparent
+  @_lifetime(self: copy self)
+  @unsafe
+  public mutating func withUnsafeUninitializedMemory<E: Error, R: ~Copyable>(
+    _ body: (
+      _ uninitializedMemory: UnsafeMutableBufferPointer<Element>,
+      _ newlyInitializedCount: inout Int
+    ) throws(E) -> R
+  ) throws(E) -> R {
+    let stride = MemoryLayout<Element>.stride
+    let free = self.freeCapacity
+    let bytes = unsafe UnsafeMutableRawBufferPointer(
+      start: self._pointer?.advanced(by: self._count &* stride),
+      count: free &* stride
+    )
+    var newlyInitializedCount = 0
+    defer {
+      _precondition(
+        0 <= newlyInitializedCount && newlyInitializedCount <= free,
+        "OutputSpan capacity overflow"
+      )
+      self._count &+= newlyInitializedCount
+    }
+    return try unsafe bytes.withMemoryRebound(to: Element.self) {
+      buffer throws(E) -> R in
+      try unsafe body(buffer, &newlyInitializedCount)
+    }
+  }
 }
 
 @available(SwiftCompatibilitySpan 5.0, *)

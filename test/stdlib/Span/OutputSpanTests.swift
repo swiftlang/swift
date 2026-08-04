@@ -282,6 +282,121 @@ suite.test("OutputSpan.withUnsafeMutableBufferPointer")
   }
 }
 
+suite.test("OutputSpan.withUnsafeUninitializedMemory partial initialization")
+.require(.stdlib_6_2).code {
+  let capacity = 10
+  var a = Allocation(of: capacity, Int.self)
+  let source = Array(0..<capacity*2)
+
+  a.initialize { ob in
+    let prefix = 2
+    for i in 0..<prefix { ob.append(i) }
+    expectEqual(ob.count, prefix)
+
+    var frameSize = 3
+    var startIndex = prefix
+
+    while !ob.isFull {
+      let free = ob.freeCapacity
+      unsafe ob.withUnsafeUninitializedMemory { buffer, newlyInitializedCount in
+        expectEqual(buffer.count, free)
+        
+        frameSize = min(frameSize, buffer.count)
+        startIndex += buffer.initialize(fromContentsOf: source[startIndex..<startIndex+frameSize])
+        newlyInitializedCount = frameSize
+      }
+
+      expectEqual(ob.count, startIndex)
+    }
+
+    expectEqual(ob.count, capacity)
+  }
+
+  a.withSpan { s in
+    expectEqual(s.count, capacity)
+    for i in s.indices {
+      expectEqual(s[i], source[i])
+    }
+  }
+}
+
+suite.test("OutputSpan.withUnsafeUninitializedMemory commits count on throw")
+.require(.stdlib_6_2).code {
+  let capacity = 10
+  let partial = 4
+  let allocation = UnsafeMutableBufferPointer<[Int]>.allocate(capacity: capacity)
+  defer { allocation.deallocate() }
+
+  var ob = unsafe OutputSpan(buffer: allocation, initializedCount: 0)
+
+  do throws(MyTestError) {
+    try unsafe ob.withUnsafeUninitializedMemory {
+      buffer, newlyInitializedCount throws(MyTestError) in
+      for i in 0..<partial {
+        unsafe buffer.initializeElement(at: i, to: .init(repeating: i, count: i))
+      }
+
+      newlyInitializedCount = partial
+      throw MyTestError.error
+    }
+
+    expectUnreachable()
+  } catch {
+    expectEqual(error, MyTestError.error)
+  }
+
+  expectEqual(ob.count, partial)
+
+  for i in 0..<partial {
+    expectEqual(ob.span[i], Array(repeating: i, count: i))
+  }
+}
+
+suite.test("OutputSpan.withUnsafeUninitializedMemory empty and full spans")
+.require(.stdlib_6_2).code {
+  var empty = OutputSpan<Int>()
+  unsafe empty.withUnsafeUninitializedMemory { buffer, _ in
+    expectEqual(buffer.count, 0)
+  }
+
+  let capacity = 10
+  var a = Allocation(of: capacity, Int.self)
+  a.initialize { ob in
+    ob.append(repeating: 1, count: capacity)
+    expectTrue(ob.isFull)
+
+    unsafe ob.withUnsafeUninitializedMemory { buffer, _ in
+      expectEqual(buffer.count, 0)
+    }
+  }
+}
+
+suite.test("OutputSpan.withUnsafeUninitializedMemory count overflow")
+.require(.crashTesting)
+.require(.stdlib_6_2).code {
+  var a = Allocation(of: 10, Int.self)
+  a.initialize { ob in
+    expectCrashLater()
+    unsafe ob.withUnsafeUninitializedMemory { buffer, newlyInitializedCount in
+      newlyInitializedCount = buffer.count + 1
+    }
+    expectUnreachable("OutputSpan.withUnsafeUninitializedMemory should have trapped on an overflowing count.")
+  }
+}
+
+suite.test("OutputSpan.withUnsafeUninitializedMemory negative count")
+.require(.crashTesting)
+.require(.stdlib_6_2).code {
+  var a = Allocation(of: 4, Int.self)
+  a.initialize { ob in
+    expectCrashLater()
+    unsafe ob.withUnsafeUninitializedMemory { _, newlyInitializedCount in
+      newlyInitializedCount = -1
+    }
+    expectUnreachable("OutputSpan.withUnsafeUninitializedMemory should have trapped on a negative count.")
+  }
+}
+
 private func send(_: borrowing some Sendable & ~Copyable & ~Escapable) {}
 
 private struct NCSendable: ~Copyable, Sendable {}
