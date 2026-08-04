@@ -389,7 +389,23 @@ static void desugarConformanceRequirement(
 
   // Fast path.
   if (constraintType->is<ProtocolType>()) {
-    if (req.getFirstType()->isTypeParameter()) {
+    // A type parameter or the metatype of one (e.g. 'T.Type: P', a metatype
+    // conformance) is a valid abstract subject.
+    auto subject = req.getFirstType();
+    bool subjectIsValid = subject->isTypeParameter();
+    if (auto *metatype = subject->getAs<AnyMetatypeType>()) {
+      // A metatype unconditionally conforms to the invertible protocols
+      // (Copyable, Escapable), so such a conformance requirement is vacuous.
+      // Drop it rather than recording a rewrite rule, matching how the
+      // always-satisfied default is elided for type parameters.
+      if (constraintType->castTo<ProtocolType>()
+                        ->getDecl()
+                        ->getInvertibleProtocolKind())
+        return;
+      subjectIsValid = metatype->getInstanceType()->isTypeParameter();
+    }
+
+    if (subjectIsValid) {
       result.push_back(req);
       return;
     }
