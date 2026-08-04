@@ -13,6 +13,16 @@
 #include "swift/Runtime/Concurrency.h"
 #include "swift/Runtime/Once.h"
 
+#include "Error.h"
+
+#if SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
+
+// Under the Embedded Swift platform abstraction layer the clocks come from
+// the platform, so the runtime keeps no direct dependency on a libc clock.
+#include "swift/EmbeddedPlatform.h"
+
+#else
+
 #include <errno.h>
 #include <time.h>
 #if defined(_WIN32)
@@ -32,17 +42,60 @@
 #endif
 #endif // __has_include(<chrono>)
 
-#include "Error.h"
-
 #ifndef NSEC_PER_SEC
 #define NSEC_PER_SEC 1000000000ull
 #endif
 
+#endif // SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
+
 using namespace swift;
 
-// The individual clocks, implemented on top of the platform's native clock
-// facilities. The runtime entry points below are thin wrappers that forward
-// to these.
+// The individual clocks. The runtime entry points below are thin wrappers
+// that forward to these.
+
+#if SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
+
+// The platform reports time as int64_t while the entry points hand out
+// long long. Those are the same width everywhere Swift runs, but not
+// necessarily the same type, so convert through a temporary.
+
+static void getContinuousTime(long long *seconds, long long *nanoseconds) {
+  __swift_int64_t s;
+  __swift_int64_t ns;
+  _swift_clockContinuous_getTime(&s, &ns);
+  *seconds = s;
+  *nanoseconds = ns;
+}
+
+static void getContinuousResolution(long long *seconds, long long *nanoseconds) {
+  __swift_int64_t s;
+  __swift_int64_t ns;
+  _swift_clockContinuous_getResolution(&s, &ns);
+  *seconds = s;
+  *nanoseconds = ns;
+}
+
+static void getSuspendingTime(long long *seconds, long long *nanoseconds) {
+  __swift_int64_t s;
+  __swift_int64_t ns;
+  _swift_clockSuspending_getTime(&s, &ns);
+  *seconds = s;
+  *nanoseconds = ns;
+}
+
+static void getSuspendingResolution(long long *seconds, long long *nanoseconds) {
+  __swift_int64_t s;
+  __swift_int64_t ns;
+  _swift_clockSuspending_getResolution(&s, &ns);
+  *seconds = s;
+  *nanoseconds = ns;
+}
+
+static void sleepFor(long long seconds, long long nanoseconds) {
+  _swift_clock_sleep(seconds, nanoseconds);
+}
+
+#else
 
 static void getContinuousTime(long long *seconds, long long *nanoseconds) {
   struct timespec continuous;
@@ -234,6 +287,8 @@ static void sleepFor(long long seconds, long long nanoseconds) {
 #endif
 }
 
+#endif // SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
+
 SWIFT_EXPORT_FROM(swift_Concurrency)
 SWIFT_CC(swift)
 void swift_get_time(
@@ -246,7 +301,13 @@ void swift_get_time(
     case swift_clock_id_suspending:
       return getSuspendingTime(seconds, nanoseconds);
     case swift_clock_id_wall:
+#if SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
+      // Embedded Swift has no producer for this clock ID.
+      // Treat it like any other invalid clock ID.
+      break;
+#else
       return getWallTime(seconds, nanoseconds);
+#endif
   }
   swift_Concurrency_fatalError(0, "Fatal error: invalid clock ID %d\n",
                                clock_id);
@@ -264,7 +325,13 @@ void swift_get_clock_res(
     case swift_clock_id_suspending:
       return getSuspendingResolution(seconds, nanoseconds);
     case swift_clock_id_wall:
+#if SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
+      // Embedded Swift has no producer for this clock ID.
+      // Treat it like any other invalid clock ID.
+      break;
+#else
       return getWallResolution(seconds, nanoseconds);
+#endif
   }
   swift_Concurrency_fatalError(0, "Fatal error: invalid clock ID %d\n",
                                clock_id);
