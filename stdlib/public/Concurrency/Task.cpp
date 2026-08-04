@@ -1164,8 +1164,21 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
     // In a task group we would not have allowed the `add` to create a child anymore,
     // however better safe than sorry and `async let` are not expressed as task groups,
     // so they may have been spawned in any case still.
-    if ((group && group->isCancelled()) || swift_task_isCancelled(parent))
-      swift_task_cancel(task);
+    //
+    // Only whole-task cancellation propagates - not TaskCancellationScope
+    // cancellation. Scopes are local to the parent's dynamic extent and
+    // must not implicitly cancel structured children created inside them.
+    // Read the parent's IsCancelled bit directly, bypassing the scope
+    // chain walk `AsyncTask::isCancelled` does.
+    //
+    // Propagate the parent's cancellation reason so structured children
+    // see the same `Task.cancellationReason` the parent set.
+    auto parentStatus =
+        parent->_private()._status().load(std::memory_order_relaxed);
+    if ((group && group->isCancelled()) ||
+        parentStatus.isCancelledIgnoringShield()) {
+      swift_task_cancelWithReason(task, swift_task_getCancellationReason(parent));
+    }
 
     // Inside a task group, we may have to perform some defensive copying,
     // check if doing so is necessary, and initialize storage using partial
@@ -1797,6 +1810,13 @@ bool swift::swift_task_isCancelledWithFlags(AsyncTask *task,
   bool ignoreCancellationShield =
       flags & swift_task_is_cancelled_flag_IgnoreCancellationShield;
   return task->isCancelled(ignoreCancellationShield);
+}
+
+size_t swift::swift_task_getCancellationReason(AsyncTask *task) {
+  auto status = task->_private()._status().load(std::memory_order_relaxed);
+  if (status.isCancelledIgnoringShield())
+    return status.getCancellationReason();
+  return 0;
 }
 
 SWIFT_CC(swift)
