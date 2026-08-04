@@ -335,6 +335,11 @@ OVERRIDE_TASK_GROUP(taskGroup_cancelAll, void,
                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
                     swift::, (TaskGroup *group), (group))
 
+OVERRIDE_TASK_GROUP(taskGroup_cancelAllWithReason, void,
+                    SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
+                    swift::, (TaskGroup *group, size_t reason),
+                    (group, reason))
+
 OVERRIDE_TASK_GROUP(taskGroup_addPending, bool,
                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
                     swift::, (TaskGroup *group, bool unconditionally),
@@ -401,6 +406,11 @@ OVERRIDE_TASK_STATUS(task_hasTaskGroupStatusRecord, bool,
 
 OVERRIDE_TASK_STATUS(task_cancel, void, SWIFT_EXPORT_FROM(swift_Concurrency),
                      SWIFT_CC(swift), swift::, (AsyncTask *task), (task))
+
+OVERRIDE_TASK_STATUS(task_cancelWithReason, void,
+                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
+                     swift::, (AsyncTask *task, size_t reason),
+                     (task, reason))
 
 OVERRIDE_TASK_GROUP(task_cancel_group_child_tasks, void,
                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),

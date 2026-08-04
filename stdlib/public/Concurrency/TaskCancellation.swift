@@ -258,17 +258,46 @@ extension Task where Success == Never, Failure == Never {
   }
 }
 
+@available(StdlibDeploymentTarget 6.5, *)
+extension Task where Success == Never, Failure == Never {
+  /// The reason for the current task's cancellation, or `nil` if the task is
+  /// not cancelled.
+  ///
+  /// Mirrors ``Task/isCancelled``: once this returns a non-nil value it will
+  /// consistently return the same value for the remaining life of the task.
+  ///
+  /// Reading this from outside the context of a task returns `nil`.
+  ///
+  /// - SeeAlso: ``Task/isCancelled``
+  /// - SeeAlso: ``CancellationError/Reason``
+  @export(implementation)
+  public static var cancellationReason: CancellationError.Reason? {
+    unsafe withUnsafeCurrentTask { task in
+      unsafe task?.cancellationReason
+    }
+  }
+}
+
 @available(SwiftStdlib 5.1, *)
 extension Task where Success == Never, Failure == Never {
   /// Throws an error if the task was canceled.
   ///
-  /// The error is always an instance of `CancellationError`.
+  /// The error is always an instance of `CancellationError`. Its `reason`
+  /// reports why the task was cancelled: for example, `.deadlineExpired`
+  /// when the current call site is inside a `withDeadline` block whose
+  /// deadline has elapsed; `.unspecified` otherwise.
   ///
   /// - SeeAlso: `isCancelled()`
+  /// - SeeAlso: ``CancellationError/Reason``
   @_unavailableInEmbedded
   public static func checkCancellation() throws {
     if Task<Never, Never>.isCancelled {
-      throw _Concurrency.CancellationError()
+      if #available(StdlibDeploymentTarget 6.5, *) {
+        throw _Concurrency.CancellationError(
+          reason: Task.cancellationReason ?? .unspecified)
+      } else {
+        throw _Concurrency.CancellationError()
+      }
     }
   }
 }
@@ -279,8 +308,68 @@ extension Task where Success == Never, Failure == Never {
 /// if the current task has been canceled.
 @available(SwiftStdlib 5.1, *)
 public struct CancellationError: Error {
+  // Raw storage for `Reason.rawValue`. `0xFF` sentinel means "unset";
+  // read back through `reason` yields `.unspecified` in that case. The
+  // struct is not `@frozen`, so growing it with a stored property is
+  // ABI-compatible for the resilient _Concurrency module.
+  internal var _reasonRawStorage: UInt8 = 0xFF
+
   // no extra information, cancellation is intended to be light-weight
   public init() {}
+}
+
+@available(SwiftStdlib 5.1, *)
+extension CancellationError: CustomStringConvertible {
+  /// Preserves the historical `CancellationError()` textual representation
+  /// so `print(CancellationError())` doesn't leak the internal
+  /// `_reasonRawStorage` field.
+  public var description: String {
+    if #available(StdlibDeploymentTarget 6.5, *), _reasonRawStorage != 0xFF {
+      return "CancellationError(reason: \(reason))"
+    }
+    return "CancellationError()"
+  }
+}
+
+@available(StdlibDeploymentTarget 6.5, *)
+extension CancellationError {
+  /// Describes why a task was cancelled.
+  ///
+  /// This enum is non-frozen, and additional cases may be added in future versions.
+  ///
+  /// - SeeAlso: `Task.cancellationReason`
+  /// - SeeAlso: `Task.cancel(reason:)`
+  public enum Reason: UInt8, Sendable {
+    /// The task was cancelled without a specific reason being provided.
+    ///
+    /// This is the reason produced by the plain `Task.cancel()` /
+    /// `UnsafeCurrentTask.cancel()` / `TaskGroup.cancelAll()` entry points,
+    /// as well as anything upstream that propagates cancellation without
+    /// supplying a reason.
+    case unspecified = 0
+
+    /// The task was cancelled because a `withDeadline` block's deadline
+    /// elapsed.
+    case deadlineExpired = 1
+  }
+
+  /// Create a `CancellationError` with a specific `Reason`.
+  ///
+  /// The `reason` is then accessible via the error's `reason` property.
+  public init(reason: Reason) {
+    self.init()
+    self._reasonRawStorage = reason.rawValue
+  }
+
+  /// The reason this task was cancelled.
+  ///
+  /// Errors constructed via the zero-argument `init()` (either directly or
+  /// by the runtime, e.g. when `Task.checkCancellation()` throws) report
+  /// `.unspecified`. Errors constructed via `init(reason:)` report the
+  /// specified reason.
+  public var reason: Reason {
+    Reason(rawValue: _reasonRawStorage) ?? .unspecified
+  }
 }
 
 @usableFromInline
@@ -341,7 +430,7 @@ func _taskRemoveCancellationHandler(
 ///   withUnsafeCurrentTask { $0?.cancel() } // cancel the task
 ///
 ///   await withTaskCancellationShield {
-///     // Child tasks created here do NOT observe the parent's cancellation
+///     // Child tasks created here do _not_ observe the parent's cancellation
 ///     // and therefore start as not cancelled. They can be individually cancelled though.
 ///     await withTaskGroup(of: Void.self) { group in
 ///       group.addTask {
@@ -364,7 +453,7 @@ func _taskRemoveCancellationHandler(
 /// await withTaskGroup(of: Void.self) { group in
 ///   group.cancelAll()
 ///   withTaskCancellationShield {
-///     group.addTask { print(Task.isCancelled) } // true - child IS cancelled
+///     group.addTask { print(Task.isCancelled) } // true - child is cancelled
 ///   }
 ///   group.addTask {
 ///     withTaskCancellationShield { print(Task.isCancelled) } // false - shielded inside child
@@ -435,7 +524,7 @@ public nonisolated(nonsending) func withTaskCancellationShield<Value, Failure>(
 ///   withUnsafeCurrentTask { $0?.cancel() } // cancel the task
 ///
 ///   await withTaskCancellationShield {
-///     // Child tasks created here do NOT observe the parent's cancellation
+///     // Child tasks created here do _not_ observe the parent's cancellation
 ///     // and therefore start as not cancelled. They can be individually cancelled though.
 ///     await withTaskGroup(of: Void.self) { group in
 ///       group.addTask {
@@ -458,7 +547,7 @@ public nonisolated(nonsending) func withTaskCancellationShield<Value, Failure>(
 /// await withTaskGroup(of: Void.self) { group in
 ///   group.cancelAll()
 ///   withTaskCancellationShield {
-///     group.addTask { print(Task.isCancelled) } // true - child IS cancelled
+///     group.addTask { print(Task.isCancelled) } // true - child is cancelled
 ///   }
 ///   group.addTask {
 ///     withTaskCancellationShield { print(Task.isCancelled) } // false - shielded inside child
