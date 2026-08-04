@@ -9,42 +9,17 @@
 // UNSUPPORTED: freestanding
 
 import _Concurrency
-#if canImport(Darwin)
-import Darwin
-#elseif canImport(Glibc)
-import Glibc
-#elseif canImport(Musl)
-import Musl
-#elseif os(Windows)
-import CRT
-#endif
+@_silgen_name("_swift_concurrency_debug_task_registryCount")
+func registryCount() -> Int
 
-let RTLD_DEFAULT = UnsafeMutableRawPointer(bitPattern: -2)
+@_silgen_name("_swift_concurrency_debug_task_getShardHead")
+func getShardHead(index: Int) -> UnsafeRawPointer?
 
-func registryCount() -> Int {
-  typealias Fn = @convention(c) () -> Int
-  guard let sym = dlsym(RTLD_DEFAULT, "_swift_concurrency_debug_task_registryCount") else { return -1 }
-  return unsafeBitCast(sym, to: Fn.self)()
-}
+@_silgen_name("_swift_concurrency_debug_task_getTaskNext")
+func getTaskNext(task: UnsafeRawPointer) -> UnsafeRawPointer?
 
-typealias GetShardHeadFn = @convention(c) (Int) -> UnsafeRawPointer?
-typealias GetTaskNextFn = @convention(c) (UnsafeRawPointer) -> UnsafeRawPointer?
-typealias GetTaskIdFn = @convention(c) (UnsafeRawPointer) -> UInt64
-
-func getShardHead(index: Int) -> UnsafeRawPointer? {
-  guard let sym = dlsym(RTLD_DEFAULT, "_swift_concurrency_debug_task_getShardHead") else { return nil }
-  return unsafeBitCast(sym, to: GetShardHeadFn.self)(index)
-}
-
-func getTaskNext(task: UnsafeRawPointer) -> UnsafeRawPointer? {
-  guard let sym = dlsym(RTLD_DEFAULT, "_swift_concurrency_debug_task_getTaskNext") else { return nil }
-  return unsafeBitCast(sym, to: GetTaskNextFn.self)(task)
-}
-
-func getTaskId(task: UnsafeRawPointer) -> UInt64 {
-  guard let sym = dlsym(RTLD_DEFAULT, "_swift_concurrency_debug_task_getId") else { return 0 }
-  return unsafeBitCast(sym, to: GetTaskIdFn.self)(task)
-}
+@_silgen_name("_swift_concurrency_debug_task_getId")
+func getTaskId(task: UnsafeRawPointer) -> UInt64
 
 actor Barrier {
   private var arrived = 0
