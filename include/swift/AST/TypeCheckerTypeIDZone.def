@@ -613,6 +613,11 @@ SWIFT_REQUEST(TypeChecker, IsCCompatibleDeclRequest,
 SWIFT_REQUEST(TypeChecker, SemanticDeclAttrsRequest,
               DeclAttributes(const Decl *),
               Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, SectionForDeclRequest,
+              std::optional<StringRef>(
+                  llvm::PointerUnion<const Decl *,
+                                     const AbstractClosureExpr *>),
+              Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, UniqueUnderlyingTypeSubstitutionsRequest,
               std::optional<SubstitutionMap>(const Decl *),
               SeparatelyCached, NoLocationInfo)

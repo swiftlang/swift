@@ -3263,20 +3263,25 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       return makeParserSuccess();
     }
 
-    if (Tok.isNot(tok::string_literal)) {
+    std::optional<StringRef> Name;
+    if (consumeIf(tok::kw_default)) {
+      // Leave the name empty to signal '@section(default)'.
+      AttrRange = SourceRange(Loc, Tok.getRange().getStart());
+    } else if (Tok.isNot(tok::string_literal)) {
       diagnose(Loc, diag::attr_expected_string_literal, AttrName);
       return makeParserSuccess();
+    } else {
+      // Parse the name as a string literal.
+      Name = getStringLiteralIfNotInterpolated(
+          Loc, ("'" + AttrName + "'").str());
+
+      consumeToken(tok::string_literal);
+
+      if (Name.has_value())
+        AttrRange = SourceRange(Loc, Tok.getRange().getStart());
+      else
+        DiscardAttribute = true;
     }
-
-    auto Name = getStringLiteralIfNotInterpolated(
-        Loc, ("'" + AttrName + "'").str());
-
-    consumeToken(tok::string_literal);
-
-    if (Name.has_value())
-      AttrRange = SourceRange(Loc, Tok.getRange().getStart());
-    else
-      DiscardAttribute = true;
 
     if (!consumeIf(tok::r_paren)) {
       diagnose(Loc, diag::attr_expected_rparen, AttrName,
@@ -3284,13 +3289,10 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       return makeParserSuccess();
     }
 
-    // @section in a local scope is not allowed.
-    if (CurDeclContext->isLocalContext()) {
-      diagnose(Loc, diag::attr_name_only_at_non_local_scope, AttrName);
-    }
-
+    // @section in a local scope is only allowed on functions and closures,
+    // which is checked in Sema.
     if (!DiscardAttribute)
-      Attributes.add(new (Context) SectionAttr(Name.value(), AtLoc,
+      Attributes.add(new (Context) SectionAttr(Name, AtLoc,
                                                AttrRange, /*Implicit=*/false));
 
     break;

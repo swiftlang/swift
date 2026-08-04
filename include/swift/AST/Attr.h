@@ -735,15 +735,18 @@ public:
 /// Defines the @section attribute.
 class SectionAttr : public DeclAttribute {
 public:
-  SectionAttr(StringRef Name, SourceLoc AtLoc, SourceRange Range, bool Implicit)
+  SectionAttr(std::optional<StringRef> Name, SourceLoc AtLoc, SourceRange Range,
+              bool Implicit)
       : DeclAttribute(DeclAttrKind::Section, AtLoc, Range, Implicit),
         Name(Name) {}
 
-  SectionAttr(StringRef Name, bool Implicit)
+  SectionAttr(std::optional<StringRef> Name, bool Implicit)
     : SectionAttr(Name, SourceLoc(), SourceRange(), Implicit) {}
 
-  /// The section name.
-  const StringRef Name;
+  /// The section name, or std::nullopt if this represents @section(default).
+  const std::optional<StringRef> Name;
+
+  bool isDefault() const { return !Name.has_value(); }
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::Section;

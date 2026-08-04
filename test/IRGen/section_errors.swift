@@ -17,7 +17,7 @@ struct MyStruct2 {
 struct MyStruct3<T> {
   static var member1: Int = 1 // expected-error {{static stored properties not supported in generic types}}
 
-  @section("__TEXT,__mysection") func foo() {} // expected-error {{attribute @section cannot be used in a generic context}}
+  @section("__TEXT,__mysection") func foo() {} // ok, functions can go in a section anywhere
 }
 
 struct MyStruct4<T> {
@@ -27,7 +27,7 @@ struct MyStruct4<T> {
     @section("__TEXT,__mysection") static var member3: Int = 1 // expected-error {{static stored properties not supported in generic types}}
     // expected-error@-1 {{attribute @section cannot be used in a generic context}}
 
-    @section("__TEXT,__mysection") func foo() {} // expected-error {{attribute @section cannot be used in a generic context}}
+    @section("__TEXT,__mysection") func foo() {} // ok
   }
 }
 
@@ -43,14 +43,25 @@ struct SomeStruct {}
 
 @section("") var g1: Int = 1 // expected-error {{'@section' section name cannot be empty}}
 
+@section("") func emptySection() {} // expected-error {{'@section' section name cannot be empty}}
+
+func emptySectionInClosure() {
+  _ = { @section("") in } // expected-error {{'@section' section name cannot be empty}}
+}
+
 func function() {
-  @section("__TEXT,__mysection") var l0: Int = 1 // expected-error {{attribute 'section' can only be used in a non-local scope}}
+  @section("__TEXT,__mysection") var l0: Int = 1 // expected-error {{attribute @section can only be used in a non-local scope}}
   l0 += 1
   _ = l0
 
   @used var l1: Int = 1 // expected-error {{attribute @used can only be used in a non-local scope}}
   l1 += 1
   _ = l1
+
+  @section("__TEXT,__mysection") func l2() {} // ok, functions can have a section in a local scope
+  l2()
+
+  _ = { @section("__TEXT,__mysection") in } // ok, closures can have a section
 }
 
 func function_with_type() {

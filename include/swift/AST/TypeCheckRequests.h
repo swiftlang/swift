@@ -5344,6 +5344,33 @@ public:
   void cacheResult(DeclAttributes) const;
 };
 
+/// Determine the section into which the given declaration or closure should be
+/// placed, based on an explicit `@section` attribute or the inference rules
+/// for `@section`.
+///
+/// Produces the name of the section, or `std::nullopt` if the entity belongs in
+/// the platform-appropriate default section.
+class SectionForDeclRequest
+    : public SimpleRequest<SectionForDeclRequest,
+                           std::optional<StringRef>(
+                               llvm::PointerUnion<const Decl *,
+                                                  const AbstractClosureExpr *>),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  std::optional<StringRef>
+  evaluate(Evaluator &evaluator,
+           llvm::PointerUnion<const Decl *, const AbstractClosureExpr *>
+               declOrClosure) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
 class UniqueUnderlyingTypeSubstitutionsRequest
     : public SimpleRequest<UniqueUnderlyingTypeSubstitutionsRequest,
                            std::optional<SubstitutionMap>(

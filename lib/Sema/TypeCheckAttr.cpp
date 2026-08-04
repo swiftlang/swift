@@ -2768,24 +2768,27 @@ void AttributeChecker::visitUsedAttr(UsedAttr *attr) {
 
 void AttributeChecker::visitSectionAttr(SectionAttr *attr) {
   // The name must not be empty.
-  if (attr->Name.empty())
+  if (attr->Name && attr->Name->empty())
     diagnose(attr->getLocation(), diag::section_empty_name);
 
-  if (D->getDeclContext()->isLocalContext())
-    return; // already diagnosed
+  // All of the remaining restrictions apply only to variables. Functions can
+  // have a '@section' anywhere, because all functions go into a text section.
+  auto *VarD = dyn_cast<VarDecl>(D);
+  if (!VarD)
+    return;
 
-  if (D->getDeclContext()->isGenericContext() &&
-      !D->getDeclContext()
-           ->getGenericSignatureOfContext()
-           ->areAllParamsConcrete())
+  if (D->getDeclContext()->isLocalContext()) {
+    diagnose(attr->getLocation(), diag::attr_only_at_non_local_scope, attr);
+  } else if (D->getDeclContext()->isGenericContext() &&
+             !D->getDeclContext()
+                  ->getGenericSignatureOfContext()
+                  ->areAllParamsConcrete()) {
     diagnose(attr->getLocation(), diag::attr_only_at_non_generic_scope, attr);
-  else if (auto *VarD = dyn_cast<VarDecl>(D)) {
-    if (!VarD->isStatic() && !D->getDeclContext()->isModuleScopeContext()) {
-      diagnose(attr->getLocation(), diag::attr_only_on_static_properties, attr);
-    } else if (!VarD->hasStorageOrWrapsStorage()) {
-      diagnose(attr->getLocation(), diag::attr_not_on_computed_properties,
-               attr);
-    }
+  } else if (!VarD->isStatic() &&
+             !D->getDeclContext()->isModuleScopeContext()) {
+    diagnose(attr->getLocation(), diag::attr_only_on_static_properties, attr);
+  } else if (!VarD->hasStorageOrWrapsStorage()) {
+    diagnose(attr->getLocation(), diag::attr_not_on_computed_properties, attr);
   }
 }
 
@@ -3438,6 +3441,13 @@ SynthesizeMainFunctionRequest::evaluate(Evaluator &evaluator,
   // It's never useful to provide a dynamic replacement of this function--it is
   // just a pass-through to MainType.main.
   func->setIsDynamic(false);
+
+  // The entry points the compiler emits for the '@main' type go into the same
+  // section as the 'main' function they call.
+  if (auto *sectionAttr =
+          mainFunction->getAttrs().getAttribute<SectionAttr>()) {
+    func->getAttrs().add(sectionAttr->clone(context));
+  }
 
   auto *params = context.Allocate<MainTypeAttrParams>();
   params->mainFunction = mainFunction;
@@ -9143,6 +9153,12 @@ public:
 
   void visitSendableAttr(SendableAttr *attr) {
     // Nothing else to check.
+  }
+
+  void visitSectionAttr(SectionAttr *attr) {
+    // The name must not be empty.
+    if (attr->Name && attr->Name->empty())
+      ctx.Diags.diagnose(attr->getLocation(), diag::section_empty_name);
   }
 
   void checkExecutionBehaviorAttribute(DeclAttribute *attr) {
