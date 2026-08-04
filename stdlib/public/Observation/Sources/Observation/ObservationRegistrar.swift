@@ -330,16 +330,20 @@ public struct ObservationRegistrar: Sendable {
   }
 }
 
+// Codable is not available in Embedded Swift. The conformance only exists so
+// that Codable types can contain a registrar; it deliberately encodes nothing.
+#if !$Embedded
 @available(SwiftStdlib 5.9, *)
 extension ObservationRegistrar: Codable {
   public init(from decoder: any Decoder) throws {
     self.init()
   }
-  
+
   public func encode(to encoder: any Encoder) {
     // Don't encode a registrar's transient state.
   }
 }
+#endif
 
 @available(SwiftStdlib 5.9, *)
 extension ObservationRegistrar: Hashable {
