@@ -4,7 +4,7 @@ set(SWIFT_SCAN_LIB_NAME "_InternalSwiftScan")
 set(LLVM_EXPORTED_SYMBOL_FILE
     ${CMAKE_CURRENT_SOURCE_DIR}/libSwiftScan.exports)
 
-add_swift_host_library(swiftScanImpl STATIC
+add_swift_host_library(swiftScanImpl OBJECT
   libSwiftScan.cpp
   SwiftCaching.cpp)
 
@@ -32,7 +32,7 @@ if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
 endif()
 
 target_link_libraries(libSwiftScan PRIVATE
-    "$<LINK_LIBRARY:WHOLE_ARCHIVE,swiftScanImpl>")
+    swiftScanImpl)
 
 set_target_properties(libSwiftScan
     PROPERTIES

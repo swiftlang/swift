@@ -19,9 +19,9 @@
 #endif
 
 #ifndef SWIFTSCAN_PUBLIC
-# ifdef SWIFTSCAN_NO_EXPORTS
+# ifdef SWIFTSCAN_STATIC
 #  define SWIFTSCAN_PUBLIC
-# else  // SWIFTSCAN_NO_EXPORTS
+# else  // SWIFTSCAN_STATIC
 #  ifdef _WIN32
 #   ifdef SWIFTSCAN_EXPORTS
 #     define SWIFTSCAN_PUBLIC __declspec(dllexport)
@@ -31,5 +31,5 @@
 #  else  // _WIN32
 #   define SWIFTSCAN_PUBLIC
 #  endif  // _WIN32
-# endif  // SWIFTSCAN_NO_EXPORTS
+# endif  // SWIFTSCAN_STATIC
 #endif  // SWIFTSCAN_PUBLIC

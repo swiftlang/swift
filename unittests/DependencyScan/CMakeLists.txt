@@ -11,4 +11,4 @@ target_link_libraries(swiftScanTests
 
 target_compile_definitions(swiftScanTests PRIVATE
   SWIFTLIB_DIR="${SWIFTLIB_DIR}"
-  SWIFTSCAN_NO_EXPORTS)
+  SWIFTSCAN_STATIC)
