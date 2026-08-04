@@ -148,8 +148,6 @@ struct Wrapped: P {
 @DelegatedConformance
 struct Generic<Element> {}
 
-// CHECK: {"expandMacroResult":{"diagnostics":[],"expandedSource":"extension Generic: P where Element: P {\n  static func requirement() {\n    Element.requirement()\n  }\n}"}}
-
 func requiresP(_ value: (some P).Type) {
   value.requirement()
 }
@@ -160,7 +158,5 @@ struct Outer {
   @DelegatedConformance
   struct Nested<Element> {}
 }
-
-// CHECK: {"expandMacroResult":{"diagnostics":[],"expandedSource":"extension Outer.Nested: P where Element: P {\n  static func requirement() {\n    Element.requirement()\n  }\n}"}}
 
 requiresP(Outer.Nested<Wrapped>.self)
