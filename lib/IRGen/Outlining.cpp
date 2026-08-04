@@ -294,6 +294,19 @@ irgen::getTypeAndGenericSignatureForManglingOutlineFunction(SILType type) {
           env->getGenericSignature().getCanonicalSignature()};
 }
 
+bool TypeInfo::canUseOutlinedValueOperation(SILType T) const {
+  // Unimported Clang fields use opaque storage with an empty SILType, so there
+  // is no AST type with which to identify an outlined function or call a value
+  // witness.
+  if (!T)
+    return false;
+
+  // Handling a constrained existential through an outlined function or value
+  // witness could require swift_getExtendedExistentialTypeMetadata(), which is
+  // unavailable when back-deploying to older runtimes.
+  return !T.hasParameterizedExistential();
+}
+
 bool TypeInfo::withWitnessableMetadataCollector(
     IRGenFunction &IGF, SILType T,
     DeinitIsNeeded_t needsDeinit,
@@ -309,7 +322,6 @@ bool TypeInfo::withWitnessableMetadataCollector(
   } else if (!T.hasArchetype()) {
     needsCollector = true;
     // The implementation will call vwt in this case.
-    needsLayout = LayoutIsNotNeeded;
   }
 
   if (needsCollector) {

@@ -606,15 +606,18 @@ namespace {
     }
 
     void initializeWithCopy(IRGenFunction &IGF, Address dest, Address src,
-                            SILType T, bool isOutlined) const override {
+                            SILType T,
+                            bool suppressOutlinedValueOperationCalls) const override {
       if (!getSingleton()) return;
       if (!ElementsAreABIAccessible) {
         emitInitializeWithCopyCall(IGF, T, dest, src);
-      } else if (isOutlined || T.hasParameterizedExistential()) {
+      } else if (suppressOutlinedValueOperationCalls ||
+                 !getTypeInfo().canUseOutlinedValueOperation(T)) {
         dest = getSingletonAddress(IGF, dest);
         src = getSingletonAddress(IGF, src);
-        getSingleton()->initializeWithCopy(
-            IGF, dest, src, getSingletonType(IGF.IGM, T), isOutlined);
+        getSingleton()->initializeWithCopy(IGF, dest, src,
+                                           getSingletonType(IGF.IGM, T),
+                                           /*suppressOutlinedValueOperationCalls=*/ false);
       } else {
         callOutlinedCopy(IGF, dest, src, T, IsInitialization, IsNotTake);
       }
@@ -3363,9 +3366,15 @@ namespace {
 
           // Here, the source value has a payload. Initialize the destination
           // with it, and set the extra tag if any to zero.
-          getPayloadTypeInfo().initialize(IGF, destData, srcData, isTake,
-                                          getPayloadType(IGM, T),
-                                          isOutlined);
+          if (isTake) {
+            getPayloadTypeInfo().initializeWithTake(
+                IGF, destData, srcData, getPayloadType(IGM, T), isOutlined,
+                /*zeroizeIfSensitive=*/ true);
+          } else {
+            getPayloadTypeInfo().initializeWithCopy(
+                IGF, destData, srcData, getPayloadType(IGM, T),
+                /*suppressOutlinedValueOperationCalls=*/ false);
+          }
           emitInitializeExtraTagBitsForPayload(IGF, dest, T);
           IGF.Builder.CreateBr(endBB);
         }
@@ -3403,8 +3412,15 @@ namespace {
         dest =
             IGF.Builder.CreateElementBitCast(dest, payloadTI.getStorageType());
         src = IGF.Builder.CreateElementBitCast(src, payloadTI.getStorageType());
-        payloadTI.initialize(IGF, dest, src, isTake,
-                             getPayloadType(IGF.IGM, T), isOutlined);
+        if (isTake) {
+          payloadTI.initializeWithTake(
+              IGF, dest, src, getPayloadType(IGF.IGM, T), isOutlined,
+              /*zeroizeIfSensitive=*/ true);
+        } else {
+          payloadTI.initializeWithCopy(
+              IGF, dest, src, getPayloadType(IGF.IGM, T),
+              /*suppressOutlinedValueOperationCalls=*/ false);
+        }
         return;
       }
       }
@@ -3434,11 +3450,14 @@ namespace {
     }
 
     void initializeWithCopy(IRGenFunction &IGF, Address dest, Address src,
-                            SILType T, bool isOutlined) const override {
+                            SILType T,
+                            bool suppressOutlinedValueOperationCalls) const override {
       if (!ElementsAreABIAccessible) {
         emitInitializeWithCopyCall(IGF, T, dest, src);
-      } else if (isOutlined || T.hasParameterizedExistential()) {
-        emitIndirectInitialize(IGF, dest, src, T, IsNotTake, isOutlined);
+      } else if (suppressOutlinedValueOperationCalls ||
+                 !getTypeInfo().canUseOutlinedValueOperation(T)) {
+        emitIndirectInitialize(IGF, dest, src, T, IsNotTake,
+                               suppressOutlinedValueOperationCalls);
       } else {
         callOutlinedCopy(IGF, dest, src, T, IsInitialization, IsNotTake);
       }
@@ -5297,7 +5316,7 @@ namespace {
                                          isOutlined, /*zeroizeIfSensitive=*/ true);
           else
             payloadTI.initializeWithCopy(IGF, destData, srcData, PayloadT,
-                                         isOutlined);
+                                         /*suppressOutlinedValueOperationCalls=*/ false);
 
           // Plant spare bit tag bits, if any, into the new value.
           llvm::Value *tag = llvm::ConstantInt::get(IGM.Int32Ty, tagIndex);
@@ -5357,11 +5376,14 @@ namespace {
     }
 
     void initializeWithCopy(IRGenFunction &IGF, Address dest, Address src,
-                            SILType T, bool isOutlined) const override {
+                            SILType T,
+                            bool suppressOutlinedValueOperationCalls) const override {
       if (!ElementsAreABIAccessible) {
         emitInitializeWithCopyCall(IGF, T, dest, src);
-      } else if (isOutlined || T.hasParameterizedExistential()) {
-        emitIndirectInitialize(IGF, dest, src, T, IsNotTake, isOutlined);
+      } else if (suppressOutlinedValueOperationCalls ||
+                 !getTypeInfo().canUseOutlinedValueOperation(T)) {
+        emitIndirectInitialize(IGF, dest, src, T, IsNotTake,
+                               suppressOutlinedValueOperationCalls);
       } else {
         callOutlinedCopy(IGF, dest, src, T, IsInitialization, IsNotTake);
       }
@@ -6308,7 +6330,8 @@ namespace {
     }
 
     void initializeWithCopy(IRGenFunction &IGF, Address dest, Address src,
-                            SILType T, bool isOutlined) const override {
+                            SILType T,
+                            bool suppressOutlinedValueOperationCalls) const override {
       emitInitializeWithCopyCall(IGF, T,
                                  dest, src);
     }
@@ -6762,8 +6785,10 @@ namespace {
       return Strategy.initializeFromParams(IGF, params, dest, T, isOutlined);
     }
     void initializeWithCopy(IRGenFunction &IGF, Address dest, Address src,
-                            SILType T, bool isOutlined) const override {
-      return Strategy.initializeWithCopy(IGF, dest, src, T, isOutlined);
+                            SILType T,
+                            bool suppressOutlinedValueOperationCalls) const override {
+      return Strategy.initializeWithCopy(
+          IGF, dest, src, T, suppressOutlinedValueOperationCalls);
     }
     void initializeWithTake(IRGenFunction &IGF, Address dest, Address src,
                             SILType T, bool isOutlined,

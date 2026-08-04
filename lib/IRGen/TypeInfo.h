@@ -404,7 +404,7 @@ public:
   /// Perform a copy-initialization from the given object.
   virtual void initializeWithCopy(IRGenFunction &IGF, Address destAddr,
                                   Address srcAddr, SILType T,
-                                  bool isOutlined) const = 0;
+                                  bool suppressOutlinedValueOperationCalls) const = 0;
 
   /// Perform a copy-initialization from the given fixed-size buffer
   /// into an uninitialized fixed-size buffer, allocating the buffer if
@@ -598,6 +598,10 @@ public:
   /// operations on this type.
   virtual void collectMetadataForOutlining(OutliningMetadataCollector &collector,
                                            SILType T) const;
+
+  /// Whether this type can use outlined value operation dispatch. The
+  /// dispatcher may fall back to a value witness call.
+  bool canUseOutlinedValueOperation(SILType T) const;
 
   /// Get the native (abi) convention for a return value of this type.
   const NativeConventionSchema &nativeReturnValueSchema(IRGenModule &IGM) const;
