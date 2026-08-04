@@ -2380,7 +2380,7 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     // immutable, so it is fine if we see debug_values or other uses that aren't
     // directly related to the current marked use; they will have to behave
     // compatibly anyway.
-    if (di->getOperand() == getRootAddress()) {
+    if (di->getSingleOperand() == getRootAddress()) {
       useState.debugValue = di;
     }
     return true;

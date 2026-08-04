@@ -81,10 +81,10 @@ private extension AllocStackInst {
         uteda.replace(with: newAlloc, context)
       case let dv as DebugValueInst:
         if let caseIndex {
-          dv.salvageEnumPayload(caseIndex: caseIndex, enumType: oldAllocType.objectType, context)
+          dv.salvageEnumPayload(index: use.index, caseIndex: caseIndex, enumType: oldAllocType.objectType, context)
         } else {
           // Kill the operand, and fix the type to be the enum type rather than the payload type.
-          dv.killOperand(withType: oldAllocType)
+          dv.killOperand(index: use.index, withType: oldAllocType)
         }
       case is DestroyAddrInst, is DeallocStackInst, is StoreInst:
         break
@@ -558,19 +558,19 @@ private struct EnumCaseUseBlocks : AddressDefUseWalker {
 private extension DebugValueInst {
   /// Salvages debug info when an enum `alloc_stack` is replaced with a payload
   /// `alloc_stack`.
-  func salvageEnumPayload(caseIndex: Int, enumType: Type, _ context: SimplifyContext) {
-    let operandType = self.operand.value.type
+  func salvageEnumPayload(index: Int, caseIndex: Int, enumType: Type, _ context: SimplifyContext) {
+    let operandType = self.operands[index].value.type
 
     // Address-only types can't be represented in DWARF expressions.
     guard operandType.objectType.isLoadable(in: self.parentFunction),
           enumType.isLoadable(in: self.parentFunction) else {
       // Kill the operand, and fix the type to be the enum type rather than the payload type.
-      self.killOperand(withType: enumType)
+      self.killOperand(index: index, withType: enumType)
       return
     }
 
     // Strip deref: removes the enum load it becomes an object type.
-    self.stripDeref()
+    self.stripDeref(index: index)
 
     let debugBB = self.getOrCreateDebugReconstructionBlock()
     guard debugBB.arguments.count > 0 else {
