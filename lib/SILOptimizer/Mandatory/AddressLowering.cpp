@@ -277,8 +277,8 @@ static bool isPseudoReturnValue(SILValue value) {
   if (value->getFunction()->getConventions().getNumDirectSILResults() < 2)
     return false;
 
-  if (auto *tuple = dyn_cast<TupleInst>(value)) {
-    Operand *singleUse = tuple->getSingleUse();
+  if (value->getType().getAs<TupleType>()) {
+    Operand *singleUse = value->getSingleUse();
     return singleUse && isa<ReturnInst>(singleUse->getUser());
   }
   return false;
