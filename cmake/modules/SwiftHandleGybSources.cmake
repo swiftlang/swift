@@ -119,6 +119,7 @@ function(handle_gyb_sources dependency_out_var_name sources_var_name)
   set(de_gybbed_sources)
   set(gyb_extra_sources
       "${SWIFT_SOURCE_DIR}/utils/GYBUnicodeDataUtils.py"
+      "${SWIFT_SOURCE_DIR}/utils/SwiftAtomics.py"
       "${SWIFT_SOURCE_DIR}/utils/SwiftIntTypes.py"
       "${SWIFT_SOURCE_DIR}/utils/SwiftFloatingPointTypes.py"
       "${SWIFT_SOURCE_DIR}/utils/UnicodeData/GraphemeBreakProperty.txt"

@@ -30,6 +30,7 @@ function(gyb_expand source output)
   list(APPEND GYB_DEPENDS
     "${source}"
     "${utils_dir}/GYBUnicodeDataUtils.py"
+    "${utils_dir}/SwiftAtomics.py"
     "${utils_dir}/SwiftIntTypes.py"
     "${utils_dir}/SwiftFloatingPointTypes.py"
     "${utils_dir}/UnicodeData/GraphemeBreakProperty.txt"
