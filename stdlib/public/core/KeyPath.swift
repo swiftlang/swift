@@ -429,10 +429,16 @@ public class KeyPath<Root, Value>: PartialKeyPath<Root> {
       // present in the buffer), invoking the getter thunk with the sret
       // ABI via a C shim, and destroying the temporary after the tail of
       // the chain is done.
-      func project(current: UnsafeRawPointer) -> Value {
+      func project(current: UnsafeRawPointer,
+                   currentType: Any.Type) -> Value {
         var current = unsafe current
+        var currentType = currentType
         while unsafe !buffer.data.isEmpty {
           let (rawComponent, optNextType) = unsafe buffer.next()
+          // The type of the value this component produces. Only the final
+          // component has no recorded type, and there the result is `Value`.
+          let nextOrLeafType = optNextType ?? Value.self
+          defer { currentType = nextOrLeafType }
           switch rawComponent.value {
           case .struct(let offset):
             unsafe current = unsafe current.advanced(by: offset)
@@ -478,17 +484,59 @@ public class KeyPath<Root, Value>: PartialKeyPath<Root> {
               defer {
                 unsafe _swift_embedded_metadata_destroy(metadata, scratch)
               }
-              return unsafe project(current: UnsafeRawPointer(scratch))
+              return unsafe project(current: UnsafeRawPointer(scratch),
+                                    currentType: nextType)
             }
-          default:
-            fatalError(
-              "Embedded Swift multi-component key path component kind not supported")
+          case .optionalChain:
+            // `current` addresses an `Optional<Wrapped>`; this component's
+            // recorded type is `Wrapped`, which is exactly the payload
+            // metadata the enum-tag witness wants.
+            let payloadMeta = unsafe unsafeBitCast(nextOrLeafType,
+                to: UnsafeRawPointer.self)
+            if unsafe _swift_embedded_metadata_get_enum_tag_single_payload(
+                 payloadMeta, current, 1) != 0 {
+              // Found nil: the rest of the chain is skipped and the whole key
+              // path evaluates to `nil`. A chain forces the leaf to be
+              // optional, and `Value` is statically known here, so the result
+              // can be built directly.
+              return Builtin.emplace { (outPtr: Builtin.RawPointer) in
+                let out = unsafe UnsafeMutablePointer<Value>(outPtr)
+                unsafe Builtin.injectEnumTag(&out.pointee, UInt32(1)._value)
+              }
+            }
+            // `.some`: `Optional` lays its payload out at offset zero, so the
+            // unwrapped value is at the same address.
+
+          case .optionalForce:
+            let payloadMeta = unsafe unsafeBitCast(nextOrLeafType,
+                to: UnsafeRawPointer.self)
+            if unsafe _swift_embedded_metadata_get_enum_tag_single_payload(
+                 payloadMeta, current, 1) != 0 {
+              fatalError("unwrapped nil optional")
+            }
+            // As above, the payload is at the same address.
+
+          case .optionalWrap:
+            // The reverse of a chain: wrap the value at `current` in `.some`.
+            // Here the payload type is the type *before* this component, and a
+            // wrap is only ever the final component, so the result is `Value`.
+            let payloadMeta = unsafe unsafeBitCast(currentType,
+                to: UnsafeRawPointer.self)
+            return Builtin.emplace { (outPtr: Builtin.RawPointer) in
+              let out = UnsafeMutableRawPointer(outPtr)
+              unsafe _swift_embedded_metadata_initialize_with_copy(
+                payloadMeta, out, current)
+              unsafe _swift_embedded_metadata_store_enum_tag_single_payload(
+                payloadMeta, out, 0, 1)
+            }
+
           }
         }
         return unsafe current.load(as: Value.self)
       }
       return withUnsafePointer(to: root) { rootPtr in
-        return unsafe project(current: UnsafeRawPointer(rootPtr))
+        return unsafe project(current: UnsafeRawPointer(rootPtr),
+                              currentType: Root.self)
       }
 #else
       let maxSize = unsafe buffer.maxSize
@@ -686,7 +734,21 @@ public class WritableKeyPath<Root, Value>: KeyPath<Root, Value> {
             accessors: accessors, argument: argument,
             valueMetadata: metadata, mutating: true, keepAlive: &keepAlive)
 
+        case .optionalForce:
+          // Force-unwrap passes the preceding mutability through, so this can
+          // appear in a writable chain. `Optional` puts its payload at offset
+          // zero, so on `.some` the address is unchanged; on `.none` this traps
+          // just as `!` would.
+          let payloadMeta = unsafe unsafeBitCast(optNextType ?? Value.self,
+              to: UnsafeRawPointer.self)
+          if unsafe _swift_embedded_metadata_get_enum_tag_single_payload(
+               payloadMeta, p, 1) != 0 {
+            fatalError("unwrapped nil optional")
+          }
+
         default:
+          // `.optionalChain` / `.optionalWrap` force a key path read-only, so
+          // they cannot appear here.
           fatalError(
             "Embedded Swift WritableKeyPath chain component kind not supported")
         }
@@ -845,7 +907,21 @@ public class ReferenceWritableKeyPath<
             basePtr: UnsafeMutableRawPointer(mutating: p),
             accessors: accessors, argument: argument,
             valueMetadata: metadata, mutating: false, keepAlive: &keepAlive)
+        case .optionalForce:
+          // Force-unwrap passes the preceding mutability through, so this can
+          // appear in a writable chain. `Optional` puts its payload at offset
+          // zero, so on `.some` the address is unchanged; on `.none` this traps
+          // just as `!` would.
+          let payloadMeta = unsafe unsafeBitCast(optNextType ?? Value.self,
+              to: UnsafeRawPointer.self)
+          if unsafe _swift_embedded_metadata_get_enum_tag_single_payload(
+               payloadMeta, p, 1) != 0 {
+            fatalError("unwrapped nil optional")
+          }
+
         default:
+          // `.optionalChain` / `.optionalWrap` force a key path read-only, so
+          // they cannot appear here.
           fatalError(
             "Embedded Swift RWK chain component kind not supported")
         }

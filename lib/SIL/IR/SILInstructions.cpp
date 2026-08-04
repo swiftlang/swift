@@ -3510,9 +3510,17 @@ SILType KeyPathInst::getStaticInstanceClassType() const {
       break;
     }
     case KeyPathPatternComponent::Kind::OptionalChain:
-    case KeyPathPatternComponent::Kind::OptionalForce:
     case KeyPathPatternComponent::Kind::OptionalWrap:
-      return SILType();
+      // Chaining and wrapping force the whole key path read-only, matching
+      // `visitOptionalChainComponent` / `visitOptionalWrapComponent` in the
+      // runtime instantiator.
+      keyPathClass = ctx.getKeyPathDecl();
+      break;
+    case KeyPathPatternComponent::Kind::OptionalForce:
+      // Force-unwrapping passes the preceding mutability through; with no
+      // preceding component that is the initial writable capability.
+      keyPathClass = ctx.getWritableKeyPathDecl();
+      break;
     }
     assert(keyPathClass && "unhandled component kind above?");
     auto concreteTy = BoundGenericType::get(keyPathClass,
@@ -3583,11 +3591,17 @@ SILType KeyPathInst::getStaticInstanceClassType() const {
       }
       break;
     }
-    default:
-      // Optional components aren't representable in an embedded
-      // multi-component chain: the runtime walker doesn't have a way to
-      // read the Optional tag from raw memory of an unknown type.
-      return SILType();
+    case KeyPathPatternComponent::Kind::OptionalChain:
+    case KeyPathPatternComponent::Kind::OptionalWrap:
+      // Chaining and wrapping force the whole key path read-only, even if a
+      // later component would otherwise be reference-writable. The demotion is
+      // permanent, because the class-boundary promotion above only fires while
+      // the chain is still `WritableKeyPath`.
+      keyPathClass = ctx.getKeyPathDecl();
+      break;
+    case KeyPathPatternComponent::Kind::OptionalForce:
+      // Force-unwrapping passes the preceding mutability through unchanged.
+      break;
     }
 
     // Advance to the next root type by substituting the pattern

@@ -102,8 +102,19 @@ typedef struct {
   void* _Nonnull (* _Nonnull initializeWithTakeFn)(void *, void*, const void*);
 #endif
   void  *assignWithTakeFn;
-  void  *getEnumTagSinglePayloadFn;
-  void  *storeEnumTagSinglePayload;
+#if __has_feature(ptrauth_calls)
+  unsigned (* __ptrauth(0, 1, 0x60f0) getEnumTagSinglePayloadFn)(
+      const void *, unsigned, const void *);
+#else
+  unsigned (*getEnumTagSinglePayloadFn)(const void *, unsigned, const void *);
+#endif
+#if __has_feature(ptrauth_calls)
+  void (* __ptrauth(0, 1, 0xa0d1) storeEnumTagSinglePayloadFn)(
+      void *, unsigned, unsigned, const void *);
+#else
+  void (*storeEnumTagSinglePayloadFn)(void *, unsigned, unsigned,
+                                      const void *);
+#endif
   __swift_size_t size;
   __swift_size_t stride;
   unsigned flags;
@@ -243,6 +254,39 @@ static inline void
 _swift_embedded_metadata_destroy(const void *metadata, void *value) {
   EmbeddedMetaDataPrefix *fullmeta = _swift_embedded_get_full_metadata(metadata);
   fullmeta->vwt->destroyFn(value, metadata);
+}
+
+// Read the tag of a single-payload enum (in practice, an `Optional`) held at
+// `enumValue`, without knowing the enum's type statically.
+//
+// Both of these witnesses live on the *payload* type's value witness table and
+// take the payload type's metadata — see `ValueWitness.def` and
+// `swift_getEnumTagSinglePayloadGeneric`. So `payloadMetadata` is the metadata
+// for `Wrapped`, not for `Optional<Wrapped>`.
+//
+// For `Optional`, `emptyCases` is 1 and the result is 0 for `.some` or 1 for
+// `.none`, which is the same numbering the non-embedded key path walker gets
+// from `Builtin.getEnumTag`.
+static inline unsigned
+_swift_embedded_metadata_get_enum_tag_single_payload(
+    const void *payloadMetadata, const void *enumValue, unsigned emptyCases) {
+  EmbeddedMetaDataPrefix *fullmeta =
+      _swift_embedded_get_full_metadata(payloadMetadata);
+  return fullmeta->vwt->getEnumTagSinglePayloadFn(enumValue, emptyCases,
+                                                  payloadMetadata);
+}
+
+// Companion to `_swift_embedded_metadata_get_enum_tag_single_payload`. Writing
+// tag 0 means "the payload case is now initialized"; a nonzero `whichCase`
+// initializes the corresponding empty case (for `Optional`, 1 is `.none`).
+static inline void
+_swift_embedded_metadata_store_enum_tag_single_payload(
+    const void *payloadMetadata, void *enumValue, unsigned whichCase,
+    unsigned emptyCases) {
+  EmbeddedMetaDataPrefix *fullmeta =
+      _swift_embedded_get_full_metadata(payloadMetadata);
+  fullmeta->vwt->storeEnumTagSinglePayloadFn(enumValue, whichCase, emptyCases,
+                                             payloadMetadata);
 }
 
 // Calling-convention bridge for invoking a key-path accessor thunk from

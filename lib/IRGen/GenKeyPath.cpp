@@ -1457,7 +1457,14 @@ struct StaticKeyPathComponentLayout {
     /// (`_SwiftKeyPathComponentHeader_ComputedTag`).  See `computedKind`
     /// for the get-only vs settable-mutating vs settable-nonmutating split.
     Computed,
+    /// Optional chain / force / wrap
+    /// (`_SwiftKeyPathComponentHeader_OptionalTag`).  See `optionalKind`.
+    Optional,
   };
+
+  /// For `Optional`: which of the three optional operations this is.
+  enum class OptionalKind { Chain, Force, Wrap };
+  OptionalKind optionalKind = OptionalKind::Chain;
 
   Kind kind;
 
@@ -1548,6 +1555,18 @@ computeStaticKeyPathComponentLayout(IRGenModule &IGM,
     layout.offset = static_cast<uint32_t>(elementOffset->getValue());
     return layout;
   }
+  case KeyPathPatternComponent::Kind::OptionalChain:
+    layout.kind = StaticKeyPathComponentLayout::Kind::Optional;
+    layout.optionalKind = StaticKeyPathComponentLayout::OptionalKind::Chain;
+    return layout;
+  case KeyPathPatternComponent::Kind::OptionalForce:
+    layout.kind = StaticKeyPathComponentLayout::Kind::Optional;
+    layout.optionalKind = StaticKeyPathComponentLayout::OptionalKind::Force;
+    return layout;
+  case KeyPathPatternComponent::Kind::OptionalWrap:
+    layout.kind = StaticKeyPathComponentLayout::Kind::Optional;
+    layout.optionalKind = StaticKeyPathComponentLayout::OptionalKind::Wrap;
+    return layout;
   case KeyPathPatternComponent::Kind::GettableProperty:
   case KeyPathPatternComponent::Kind::SettableProperty:
   case KeyPathPatternComponent::Kind::Method: {
@@ -1608,6 +1627,17 @@ encodeStaticKeyPathComponentHeader(
     return {KeyPathComponentHeader::forClassComponentWithOutOfLineOffset(
                 layout.isLet),
             layout.offset};
+
+  case StaticKeyPathComponentLayout::Kind::Optional:
+    switch (layout.optionalKind) {
+    case StaticKeyPathComponentLayout::OptionalKind::Chain:
+      return {KeyPathComponentHeader::forOptionalChain(), std::nullopt};
+    case StaticKeyPathComponentLayout::OptionalKind::Force:
+      return {KeyPathComponentHeader::forOptionalForce(), std::nullopt};
+    case StaticKeyPathComponentLayout::OptionalKind::Wrap:
+      return {KeyPathComponentHeader::forOptionalWrap(), std::nullopt};
+    }
+    llvm_unreachable("unhandled optional kind");
 
   case StaticKeyPathComponentLayout::Kind::Computed:
     // Static instantiation: use the getter function pointer as the
