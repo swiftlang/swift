@@ -2935,6 +2935,19 @@ bool GlobalLivenessChecker::testInstVectorLiveness(
   for (auto takeInstAndValue : instsToTest) {
     LLVM_DEBUG(llvm::dbgs() << "    Checking: " << *takeInstAndValue.first);
 
+    // The value is consumed and used at the same instruction (e.g. passed both
+    // @in and @in_guaranteed to one apply).
+    if (addressUseState.isLivenessUse(takeInstAndValue.first,
+                                      takeInstAndValue.second)) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "        Consumed and used at the same instruction!\n");
+      hadAnyErrorUsers = true;
+      diagnosticEmitter.emitAddressInstConsumesAndUsesValue(
+          addressUseState.address, takeInstAndValue.first);
+      emittedDiagnostic = true;
+      continue;
+    }
+
     // Check if we are in the boundary...
 
     // If the bit vector does not contain any set bits, then we know that we did
