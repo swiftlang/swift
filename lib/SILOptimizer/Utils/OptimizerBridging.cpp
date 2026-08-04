@@ -479,6 +479,10 @@ createSpecializedFunctionDeclaration(BridgedStringRef specializedName,
   for (auto &Attr : original->getSemanticsAttrs())
     specializedApplySiteCallee->addSemanticsAttr(Attr);
 
+  // A specialization of a function goes into the same section as the original
+  // function.
+  specializedApplySiteCallee->setSection(original->section());
+
   return {specializedApplySiteCallee};
 }
 

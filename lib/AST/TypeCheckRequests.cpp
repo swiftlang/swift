@@ -2663,6 +2663,137 @@ void SemanticDeclAttrsRequest::cacheResult(DeclAttributes attrs) const {
 }
 
 //----------------------------------------------------------------------------//
+// SectionForDeclRequest computation.
+//----------------------------------------------------------------------------//
+
+/// The set of accessors that provide read-only access to storage. A synthesized
+/// accessor in this set infers its section from an accessor in this set that
+/// was written explicitly.
+static const AccessorKind ReadAccessorKinds[] = {
+  AccessorKind::Get,
+  AccessorKind::DistributedGet,
+  AccessorKind::Read,
+  AccessorKind::YieldingBorrow,
+  AccessorKind::Borrow,
+  AccessorKind::Address
+};
+
+/// The set of accessors that provide write or read-write access to storage. A
+/// synthesized accessor in this set infers its section from an accessor in this
+/// set that was written explicitly.
+static const AccessorKind WriteAccessorKinds[] = {
+  AccessorKind::Set,
+  AccessorKind::Modify,
+  AccessorKind::YieldingMutate,
+  AccessorKind::Mutate,
+  AccessorKind::MutableAddress,
+  AccessorKind::Init,
+  AccessorKind::WillSet,
+  AccessorKind::DidSet
+};
+
+/// Find the explicitly-written accessor from which the given synthesized
+/// accessor infers its section, or nullptr if there is none.
+///
+/// An accessor that provides read-only access infers from an explicitly-written
+/// accessor that provides read-only access, and an accessor that writes infers
+/// from an explicitly-written accessor that writes.
+static AccessorDecl *
+findAccessorForSectionInference(const AccessorDecl *accessor) {
+  auto isKindIn = [&](ArrayRef<AccessorKind> kinds) {
+    return llvm::is_contained(kinds, accessor->getAccessorKind());
+  };
+
+  ArrayRef<AccessorKind> kinds;
+  if (isKindIn(WriteAccessorKinds))
+    kinds = WriteAccessorKinds;
+  else if (isKindIn(ReadAccessorKinds))
+    kinds = ReadAccessorKinds;
+  else
+    return nullptr;
+
+  auto storage = accessor->getStorage();
+  for (auto kind : kinds) {
+    auto parsed = storage->getParsedAccessor(kind);
+    if (parsed && parsed->getAttrs().hasAttribute<SectionAttr>())
+      return parsed;
+  }
+
+  return nullptr;
+}
+
+/// Infer the section for an entity based on the function or closure that
+/// encloses it, if there is one.
+static std::optional<StringRef>
+inferSectionFromEnclosingContext(const DeclContext *dc) {
+  while (dc) {
+    // A function or closure provides its own section for inference.
+    if (auto afd = dyn_cast<AbstractFunctionDecl>(dc))
+      return afd->getSection();
+    if (auto ace = dyn_cast<AbstractClosureExpr>(dc))
+      return ace->getSection();
+
+    // Look through an initializer context to the entity it initializes. This
+    // matters for the default argument of a function: the code of the default
+    // argument generator is emitted with the section of the function, so a
+    // closure written in that default argument belongs there too.
+    //
+    // For the initializer of a variable, this walks to the type or file that
+    // contains the variable, where the search then terminates: a section is
+    // never inferred from a variable to code, nor into a type.
+    if (isa<Initializer>(dc)) {
+      dc = dc->getParent();
+      continue;
+    }
+
+    break;
+  }
+
+  return std::nullopt;
+}
+
+std::optional<StringRef> SectionForDeclRequest::evaluate(
+    Evaluator &evaluator,
+    llvm::PointerUnion<const Decl *, const AbstractClosureExpr *>
+        declOrClosure) const {
+  if (auto closure = declOrClosure.dyn_cast<const AbstractClosureExpr *>()) {
+    // An explicit '@section' on the closure wins.
+    if (auto explicitClosure = dyn_cast<ClosureExpr>(closure)) {
+      if (auto attr = explicitClosure->getAttrs().getAttribute<SectionAttr>())
+        return attr->Name;
+    }
+
+    // Otherwise, infer from the enclosing function or closure.
+    return inferSectionFromEnclosingContext(closure->getParent());
+  }
+
+  auto decl = cast<const Decl *>(declOrClosure);
+
+  // An explicit '@section' wins. Note that '@section(default)' has no name,
+  // which suppresses any inference that would otherwise occur.
+  if (auto attr = decl->getAttrs().getAttribute<SectionAttr>())
+    return attr->Name;
+
+  // A synthesized accessor infers its section from an accessor that was written
+  // explicitly. Note that this includes '@section(default)', which suppresses
+  // the inference below.
+  if (auto accessor = dyn_cast<AccessorDecl>(decl)) {
+    if (accessor->isImplicit()) {
+      if (auto source = findAccessorForSectionInference(accessor))
+        return source->getSection();
+    }
+  }
+
+  // A local function (or the accessor of a local variable) infers its section
+  // from the function or closure that encloses it. Nothing else infers a
+  // section, because code and data tend to go in different sections.
+  if (isa<AbstractFunctionDecl>(decl))
+    return inferSectionFromEnclosingContext(decl->getDeclContext());
+
+  return std::nullopt;
+}
+
+//----------------------------------------------------------------------------//
 // UniqueUnderlyingTypeSubstitutionsRequest computation.
 //----------------------------------------------------------------------------//
 

@@ -1357,11 +1357,16 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
 
-  case DeclAttrKind::Section:
+  case DeclAttrKind::Section: {
     Printer.printAttrName("@section");
-    Printer << "(\"" << cast<SectionAttr>(this)->Name << "\")";
+    auto sectionAttr = cast<SectionAttr>(this);
+    if (sectionAttr->isDefault())
+      Printer << "(default)";
+    else
+      Printer << "(\"" << *sectionAttr->Name << "\")";
     break;
-      
+  }
+
   case DeclAttrKind::Diagnose: {
     auto diagnoseAttr = cast<DiagnoseAttr>(this);
     Printer.printAttrName("@diagnose(");
