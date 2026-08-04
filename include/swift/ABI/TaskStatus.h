@@ -237,12 +237,19 @@ private:
   FunctionType *__ptrauth_swift_cancellation_notification_function Function;
   void *Argument;
 
+  /// FIXME: Investigate whether this at-most-once flag is actually needed.
+  std::atomic<bool> Fired{false};
+
 public:
   CancellationNotificationStatusRecord(FunctionType *fn, void *arg)
       : TaskStatusRecord(TaskStatusRecordKind::CancellationNotification),
         Function(fn), Argument(arg) {}
 
   void run() {
+    bool expected = false;
+    if (!Fired.compare_exchange_strong(expected, true,
+                                       std::memory_order_relaxed))
+      return;
     Function(Argument);
   }
 
@@ -438,6 +445,151 @@ public:
 
   // Assumes that this record is of kind WaitingOnTask
   AsyncTask *&getNextWaitingTask();
+};
+
+// `withDeadline` is unavailable in Embedded Swift (`#if !$Embedded` on the
+// Swift side), and this record's layout relies on `Metadata::vw_size()` /
+// `vw_alignment()`, which don't exist in Embedded Swift's `TargetMetadata`
+// (only forward-declared there, see swift/ABI/Task.h). Guard accordingly.
+#if !SWIFT_CONCURRENCY_EMBEDDED
+
+/// A status record that represents a task deadline. Multiple deadlines may
+/// be installed on the same task, however they may differ by clock identity.
+///
+/// The innermost record for any given clock identity always is the "nearest"
+/// deadline, because by construction we only install deadlines which are
+/// more narrow than an already existing one. I.e. a search for nearest
+/// deadline can always stop at first matching record.
+class TaskDeadlineStatusRecord : public TaskStatusRecord {
+  /// Clock type.
+  const Metadata *ClockType;
+
+  /// Metatype of the Clock.Instant (where Clock is our ClockType).
+  const Metadata *InstantType;
+
+  /// True iff the record is the first task in this entire task hierarchy,
+  /// including any parent tasks. This allows short-circuting lookups, and
+  /// resetting the HasDeadline flag used for avoiding slow-path deadline
+  /// lookups in `isCancelled`.
+  bool IsOutermostDeadline;
+
+  // Trailing tail-allocated storage (uninitialized in this class body):
+  //   [pad to ClockType.vw_alignment()]
+  //   C bytes                            <- getClockStorage()
+  //   [pad to InstantType.vw_alignment()]
+  //   C.Instant bytes                    <- getInstantStorage()
+
+public:
+  TaskDeadlineStatusRecord(const Metadata *clockType,
+                           const Metadata *instantType,
+                           bool isOutermostDeadline)
+      : TaskStatusRecord(TaskStatusRecordKind::Deadline),
+        ClockType(clockType), InstantType(instantType),
+        IsOutermostDeadline(isOutermostDeadline) {}
+
+  const Metadata *getClockType() const { return ClockType; }
+  const Metadata *getInstantType() const { return InstantType; }
+  bool isOutermostDeadline() const { return IsOutermostDeadline; }
+  void setOutermostDeadline(bool value) { IsOutermostDeadline = value; }
+
+  /// Offset from the base of the record where the clock value lives.
+  static size_t clockOffset(const Metadata *clockType) {
+    size_t align = clockType->vw_alignment();
+    return (sizeof(TaskDeadlineStatusRecord) + align - 1) & ~(align - 1);
+  }
+
+  /// Offset from the base of the record where the deadline instant lives.
+  static size_t instantOffset(const Metadata *clockType,
+                              const Metadata *instantType) {
+    size_t off = clockOffset(clockType) + clockType->vw_size();
+    size_t align = instantType->vw_alignment();
+    return (off + align - 1) & ~(align - 1);
+  }
+
+  /// Total allocation size for a record with the given generic types.
+  static size_t recordSize(const Metadata *clockType,
+                           const Metadata *instantType) {
+    return instantOffset(clockType, instantType) + instantType->vw_size();
+  }
+
+  OpaqueValue *getClockStorage() {
+    return reinterpret_cast<OpaqueValue *>(
+        reinterpret_cast<char *>(this) + clockOffset(ClockType));
+  }
+  OpaqueValue *getInstantStorage() {
+    return reinterpret_cast<OpaqueValue *>(
+        reinterpret_cast<char *>(this) + instantOffset(ClockType, InstantType));
+  }
+
+  static bool classof(const TaskStatusRecord *record) {
+    return record->getKind() == TaskStatusRecordKind::Deadline;
+  }
+};
+
+#endif // !SWIFT_CONCURRENCY_EMBEDDED
+
+/// A status record which represents a scoped cancellation domain that is
+/// independent of whole-task cancellation. Cancelling the scope does not set
+/// the task's own cancellation flag; only handlers registered _inside_ the
+/// scope's dynamic extent are fired.
+class TaskCancellationScopeRecord : public TaskStatusRecord {
+  /// The task that installed this scope.
+  AsyncTask *OwningTask;
+
+  /// Packed state: bit 0 is the cancelled flag; the remaining bits hold
+  /// the cancellation reason (matching the `size_t reason` ABI used by
+  /// `swift_task_cancelWithReason`). The pair is written together via a
+  /// single CAS in `cancel()`, first-cancel-wins, so readers always observe
+  /// a consistent pair.
+  std::atomic<uintptr_t> State{0};
+
+  static constexpr uintptr_t CancelledBit = 1;
+
+public:
+  explicit TaskCancellationScopeRecord(AsyncTask *owningTask)
+      : TaskStatusRecord(TaskStatusRecordKind::TaskCancellationScope),
+        OwningTask(owningTask) {}
+
+  AsyncTask *getOwningTask() const { return OwningTask; }
+  bool isCancelled() const {
+    return (State.load(std::memory_order_relaxed) & CancelledBit) != 0;
+  }
+  size_t getReason() const {
+    return State.load(std::memory_order_relaxed) >> 1;
+  }
+  /// Cancel the scope, recording `reason`. First-cancel-wins: if the scope
+  /// is already cancelled, this is a no-op and the originally-recorded
+  /// reason is preserved.
+  void cancel(size_t reason = 0) {
+    auto oldState = State.load(std::memory_order_relaxed);
+    while (!(oldState & CancelledBit)) {
+      auto newState = (static_cast<uintptr_t>(reason) << 1) | CancelledBit;
+      if (State.compare_exchange_weak(oldState, newState,
+                                       std::memory_order_relaxed,
+                                       std::memory_order_relaxed)) {
+        return;
+      }
+      // CAS failed: `oldState` was refreshed with the current value: retry,
+      // unless a concurrent cancel() already won.
+    }
+  }
+
+  static bool classof(const TaskStatusRecord *record) {
+    return record->getKind() == TaskStatusRecordKind::TaskCancellationScope;
+  }
+};
+
+/// A status record representing an active `withTaskCancellationShield` block.
+/// Its position in the LIFO chain relative to any `TaskCancellationScopeRecord`
+/// determines whether a scope's cancellation is masked at a given call site.
+class TaskCancellationShieldRecord : public TaskStatusRecord {
+public:
+  TaskCancellationShieldRecord()
+      : TaskStatusRecord(TaskStatusRecordKind::CancellationShield) {}
+
+  static bool classof(const TaskStatusRecord *record) {
+    return record->getKind() == TaskStatusRecordKind::CancellationShield;
+  }
 };
 
 } // end namespace swift

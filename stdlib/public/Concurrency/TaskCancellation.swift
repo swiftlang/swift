@@ -270,6 +270,7 @@ extension Task where Success == Never, Failure == Never {
   ///
   /// - SeeAlso: ``Task/isCancelled``
   /// - SeeAlso: ``CancellationError/Reason``
+  @available(StdlibDeploymentTarget 6.5, *)
   @export(implementation)
   public static var cancellationReason: CancellationError.Reason? {
     unsafe withUnsafeCurrentTask { task in
@@ -339,6 +340,7 @@ extension CancellationError {
   ///
   /// - SeeAlso: `Task.cancellationReason`
   /// - SeeAlso: `Task.cancel(reason:)`
+  @available(StdlibDeploymentTarget 6.5, *)
   public enum Reason: UInt8, Sendable {
     /// The task was cancelled without a specific reason being provided.
     ///
@@ -356,6 +358,7 @@ extension CancellationError {
   /// Create a `CancellationError` with a specific `Reason`.
   ///
   /// The `reason` is then accessible via the error's `reason` property.
+  @available(StdlibDeploymentTarget 6.5, *)
   public init(reason: Reason) {
     self.init()
     self._reasonRawStorage = reason.rawValue
@@ -367,6 +370,7 @@ extension CancellationError {
   /// by the runtime, e.g. when `Task.checkCancellation()` throws) report
   /// `.unspecified`. Errors constructed via `init(reason:)` report the
   /// specified reason.
+  @available(StdlibDeploymentTarget 6.5, *)
   public var reason: Reason {
     Reason(rawValue: _reasonRawStorage) ?? .unspecified
   }

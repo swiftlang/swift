@@ -670,6 +670,481 @@ static void swift_task_popTaskExecutorPreferenceImpl(
   swift_task_dealloc(record);
 }
 
+/**************************************************************************/
+/******************************** DEADLINES *******************************/
+/**************************************************************************/
+
+// `withDeadline` is unavailable in Embedded Swift (`#if !$Embedded` on the
+// Swift side); these functions manipulate `TaskDeadlineStatusRecord` and
+// take `Metadata`/`WitnessTable` pointers, neither of which are usable in
+// Embedded Swift builds. `_swift_task_hasActiveDeadline` and
+// `AsyncTask::inheritDeadlineFlagFrom` below only touch the `HasDeadline`
+// status flag (no `Metadata` involved), so they stay unguarded.
+#if !SWIFT_CONCURRENCY_EMBEDDED
+
+/// Bridged Swift-side helper. Called by the runtime for each candidate
+/// record whose `ClockType` metadata already pointer-equals the query
+/// clock's type. Reads the record's inline-stored clock through the
+/// runtime-supplied `C` (matched via metadata identity) and compares
+/// identities.
+///
+/// Swift-side definition (in `Task+Deadline.swift`):
+///
+///     internal func _task_deadline_recordHasSameClock<C: Clock & Identifiable>(
+///       recordClockStorage: UnsafeMutableRawPointer, queryClock: C) -> Bool
+///
+/// The runtime passes `(recordClockStorage, queryClock, C metadata,
+/// Clock witness, Identifiable witness)` following Swift's generic
+/// calling convention. `recordClockStorage` is a pointer into the
+/// record's task-allocated tail; it holds a valid `C` because push
+/// installed it via `clockType->vw_initializeWithCopy`.
+extern "C" SWIFT_CC(swift)
+bool _task_deadline_recordHasSameClock(
+    OpaqueValue *recordClockStorage,
+    OpaqueValue *queryClock,
+    const Metadata *clockType,
+    const WitnessTable *clockWT,
+    const WitnessTable *identifiableWT);
+
+SWIFT_CC(swift)
+static TaskDeadlineStatusRecord *
+swift_task_pushDeadlineImpl(OpaqueValue *clock,
+                            OpaqueValue *instant,
+                            const Metadata *clockType,
+                            const Metadata *instantType,
+                            const WitnessTable *clockWT,
+                            const WitnessTable *identifiableWT) {
+  (void)clockWT;
+  (void)identifiableWT;
+  auto task = swift_task_getCurrent();
+  assert(task && "Currently, withDeadline must be used from an async context; We may relax this in the future");
+
+  // Task-allocate one contiguous chunk holding the record header + the
+  // trailing clock and instant payloads. Both incoming values are
+  // borrowed (+0); COPY them in via value witnesses so the caller keeps
+  // ownership of the originals. Pop mirrors this with vw_destroy and
+  // swift_task_dealloc.
+  size_t size = TaskDeadlineStatusRecord::recordSize(clockType, instantType);
+  void *allocation = _swift_task_alloc_specific(task, size);
+
+  // `IsOutermostDeadline` is decided under the status-record lock inside
+  // `addStatusRecord`'s update closure and stored on the record: the
+  // outermost record is the one whose push flipped `HasDeadline` from
+  // false to true. The bookkeeping lets `swift_task_popDeadline` clear
+  // `HasDeadline` in O(1) without walking the chain.
+  auto record = ::new (allocation) TaskDeadlineStatusRecord(
+      clockType, instantType, /*isOutermostDeadline=*/false);
+  clockType->vw_initializeWithCopy(record->getClockStorage(), clock);
+  instantType->vw_initializeWithCopy(record->getInstantStorage(), instant);
+
+  SWIFT_TASK_DEBUG_LOG("[Deadline] Create deadline record:%p for task:%p "
+                       "(clockType:%p, instantType:%p, size:%zu)",
+                       allocation, task, clockType, instantType, size);
+
+  addStatusRecord(task, record,
+                  [&](ActiveTaskStatus oldStatus, ActiveTaskStatus &newStatus) {
+                    if (!oldStatus.hasDeadline()) {
+                      // We are the outermost deadline on this task; remember
+                      // it so the matching pop can flip the flag back off.
+                      record->setOutermostDeadline(true);
+                      newStatus = newStatus.withDeadline();
+                    }
+                    return true; // always add the record
+                  });
+
+  return record;
+}
+
+SWIFT_CC(swift)
+static void swift_task_popDeadlineImpl(TaskDeadlineStatusRecord *record) {
+  if (!record)
+    return;
+
+  auto task = swift_task_getCurrent();
+  SWIFT_TASK_DEBUG_LOG("[Deadline] Remove deadline record:%p from task:%p",
+                       record, task);
+  if (!task)
+    return;
+
+  // If we're removing the "outermost" deadline, we must clear the HasDeadline,
+  // as we know for sure there's no more deadline records present.
+  bool clearHasDeadlineFlag = record->isOutermostDeadline();
+  removeStatusRecordWhere(
+      task,
+      /*condition=*/[&](ActiveTaskStatus status, TaskStatusRecord *cur) {
+        assert(status.hasDeadline() && "does not have deadline record!");
+        return cur == record;
+      },
+      /*updateStatus=*/[&](ActiveTaskStatus oldStatus,
+                            ActiveTaskStatus &newStatus) {
+        if (clearHasDeadlineFlag) {
+          assert(oldStatus.hasDeadline() && "Can't clear HasDeadline flag from task without deadline.");
+          newStatus = newStatus.withoutDeadline();
+        }
+      });
+
+  // Destroy the inline payload values before releasing the storage.
+  record->getInstantType()->vw_destroy(record->getInstantStorage());
+  record->getClockType()->vw_destroy(record->getClockStorage());
+  swift_task_dealloc(record);
+}
+
+/// Search a single task's status record chain for a deadline record
+/// whose clock matches the given query. Returns a borrowed pointer into
+/// the matching record's instant storage, or nullptr if none.
+///
+/// Takes the task's status-record lock.
+static OpaqueValue *
+findDeadlineOnSingleTask(AsyncTask *task,
+                         OpaqueValue *queryClock,
+                         const Metadata *clockType,
+                         const WitnessTable *clockWT,
+                         const WitnessTable *identifiableWT) {
+  OpaqueValue *foundInstant = nullptr;
+  withStatusRecordLock(task, [&](ActiveTaskStatus status) {
+    for (auto _record : status.records()) {
+      if (_record->getKind() != TaskStatusRecordKind::Deadline)
+        continue;
+      auto record = cast<TaskDeadlineStatusRecord>(_record);
+      // Fast-check: clock types must be pointer-equal.
+      if (record->getClockType() != clockType)
+        continue;
+
+      // Same-clock identity check via Swift callout.
+      if (_task_deadline_recordHasSameClock(record->getClockStorage(), queryClock,
+          clockType, clockWT, identifiableWT)) {
+        foundInstant = record->getInstantStorage();
+        return;
+      }
+    }
+  });
+  return foundInstant; // Return opaque, caller will know to treat this as C.Instant
+}
+
+SWIFT_CC(swift)
+static OpaqueValue *
+swift_task_findNearestDeadlineForClockImpl(
+    OpaqueValue *queryClock,
+    const Metadata *clockType,
+    const WitnessTable *clockWT,
+    const WitnessTable *identifiableWT) {
+  auto task = swift_task_getCurrent();
+  if (!task)
+    return nullptr;
+
+  auto cur = task;
+  while (cur) {
+    auto status = cur->_private()._status().load(std::memory_order_relaxed);
+    // We can stop our search early if the cur task definitely has no deadline,
+    // since this means its parent tasks also don't have any deadline set.
+    // See: AsyncTask::inheritDeadlineFlagFrom.
+    if (!status.hasDeadline())
+      break;
+
+    if (auto found = findDeadlineOnSingleTask(cur,
+      queryClock, clockType, clockWT, identifiableWT)) {
+      // Return borrowed (+0). The Swift caller in `_findNearestDeadline`
+      // copies the instant out immediately; the record continues to own the
+      // storage until pop.
+      return found;
+    }
+
+    // Check the parent task next
+    if (!cur->hasChildFragment())
+      return nullptr;
+    cur = cur->childFragment()->getParent();
+  }
+
+  return nullptr;
+}
+
+#endif // !SWIFT_CONCURRENCY_EMBEDDED
+
+/// Fast-path check for `Task.hasActiveDeadline`.
+/// We know just based off task status flags if it has "any" deadline installed.
+SWIFT_CC(swift)
+SWIFT_EXPORT_FROM(swift_Concurrency)
+bool _swift_task_hasActiveDeadline() {
+  auto task = swift_task_getCurrent();
+  if (!task)
+    return false;
+  auto status = task->_private()._status().load(std::memory_order_relaxed);
+  return status.hasDeadline();
+}
+
+void AsyncTask::inheritDeadlineFlagFrom(AsyncTask *parent) {
+  assert(parent && "must have a parent to inherit deadline flag from");
+
+  // Fast-path: parent has no deadline installed at all.
+  auto parentStatus =
+      parent->_private()._status().load(std::memory_order_relaxed);
+  if (!parentStatus.hasDeadline())
+    return;
+
+  // Set the flag on the child so `Task.hasActiveDeadline` observes it
+  // without walking any parent chain, and so
+  // `swift_task_findNearestDeadlineForClock`'s fast-path
+  // `if (!status.hasDeadline()) return nullptr` doesn't bail out
+  // prematurely. The actual lookup will walk into the parent chain via
+  // `childFragment()->getParent()` when it doesn't find a matching
+  // record locally.
+  //
+  // The child's status is not observable by other threads yet (we're
+  // inside swift_task_create_common before the task is enqueued), so
+  // this is a plain unlocked update.
+  auto &status = _private()._status();
+  auto old = status.load(std::memory_order_relaxed);
+  status.store(old.withDeadline(), std::memory_order_relaxed);
+  SWIFT_TASK_DEBUG_LOG(
+      "[Deadline] Inherited HasDeadline flag from parent:%p onto child:%p",
+      parent, this);
+}
+
+/**************************************************************************/
+/************************** CANCELLATION SCOPES **************************/
+/**************************************************************************/
+
+SWIFT_CC(swift)
+SWIFT_EXPORT_FROM(swift_Concurrency)
+TaskCancellationScopeRecord *
+swift_task_pushCancellationScope() {
+  auto task = swift_task_getCurrent();
+  if (!task) {
+    // No current task means no scope for the record to be attached to.
+    return nullptr;
+  }
+
+  void *allocation =
+      _swift_task_alloc_specific(task, sizeof(class TaskCancellationScopeRecord));
+  auto record = ::new (allocation) TaskCancellationScopeRecord(task);
+  SWIFT_TASK_DEBUG_LOG("[TaskCancellationScope] Create scope record:%p for task:%p",
+                       record, task);
+
+  addStatusRecord(task, record,
+                  [&](ActiveTaskStatus oldStatus, ActiveTaskStatus &newStatus) {
+                    // Set the "has cancellation scope" flag so isCancelled()
+                    // can bail out without walking the record chain when
+                    // there are no scopes installed.
+                    newStatus = newStatus.withTaskCancellationScope();
+                    return true; // always add the record
+                  });
+
+  return record;
+}
+
+SWIFT_CC(swift)
+static void
+swift_task_popCancellationScopeImpl(TaskCancellationScopeRecord *record) {
+  auto task = swift_task_getCurrent();
+  if (!task || !record)
+    return;
+
+  SWIFT_TASK_DEBUG_LOG("[TaskCancellationScope] Remove scope record:%p from task:%p",
+                       record, task);
+
+  // Track how many scope records are still installed after removing the
+  // target one, so we can clear the fast-path flag once none remain.
+  int remainingScopes = 0;
+  removeStatusRecordWhere(
+      task,
+      /*condition=*/[&](ActiveTaskStatus status, TaskStatusRecord *cur) {
+        assert(status.hasTaskCancellationScope() && "does not have record!");
+        if (cur->getKind() != TaskStatusRecordKind::TaskCancellationScope)
+          return false;
+
+        if (cur == record)
+          return true; // remove this record
+
+        remainingScopes += 1;
+        return false;
+      },
+      /*updateStatus=*/[&](ActiveTaskStatus oldStatus,
+                            ActiveTaskStatus &newStatus) {
+        if (remainingScopes == 0) {
+          assert(oldStatus.hasTaskCancellationScope());
+          newStatus = newStatus.withoutTaskCancellationScope();
+        }
+      });
+
+  swift_task_dealloc(record);
+}
+
+// ==== Cancellation Shields --------------------------------------------------
+
+bool AsyncTask::cancellationShieldPush() {
+  // Always install a fresh shield record. The record's position in the
+  // LIFO record chain is what the scope walker consults, so nested and
+  // interleaved shields (e.g. `scope { shield { scope { shield { ... } } } }`)
+  // must each get their own record even when an outer shield's bit is
+  // already set. The `HasActiveTaskCancellationShield` bit remains a
+  // fast-path signal for "any shield present" and is only cleared once
+  // every shield record has popped (see `cancellationShieldPop`).
+  //
+  // Status records are only ever pushed/popped by the owning task itself,
+  // so no CAS retry loop is needed for the bit toggle - `addStatusRecord`
+  // takes the record lock for us.
+  void *allocation =
+      _swift_task_alloc_specific(this, sizeof(class TaskCancellationShieldRecord));
+  auto record = ::new (allocation) TaskCancellationShieldRecord();
+  SWIFT_TASK_DEBUG_LOG("[TaskCancellationShield] Create shield record:%p for task:%p",
+                       record, this);
+
+  addStatusRecord(
+      this, record,
+      [&](ActiveTaskStatus oldStatus, ActiveTaskStatus &newStatus) {
+        if (!oldStatus.hasCancellationShield())
+          newStatus = newStatus.withCancellationShield();
+        return true; // always add the record
+      });
+
+  return true;
+}
+
+void AsyncTask::cancellationShieldPop() {
+  // Remove the innermost shield record. If it was the last one, clear the
+  // `HasActiveTaskCancellationShield` fast-path bit; otherwise leave the
+  // bit set so nested shields keep the bit active.
+  int remainingShields = 0;
+  TaskCancellationShieldRecord *toDealloc = nullptr;
+  removeStatusRecordWhere(
+      this,
+      /*condition=*/[&](ActiveTaskStatus status, TaskStatusRecord *cur) {
+        if (cur->getKind() != TaskStatusRecordKind::CancellationShield)
+          return false;
+        if (toDealloc == nullptr) {
+          toDealloc = cast<TaskCancellationShieldRecord>(cur);
+          return true; // remove this innermost shield record
+        }
+        remainingShields += 1;
+        return false;
+      },
+      /*updateStatus=*/[&](ActiveTaskStatus oldStatus,
+                            ActiveTaskStatus &newStatus) {
+        if (remainingShields == 0) {
+          assert(oldStatus.hasCancellationShield());
+          newStatus = newStatus.withoutCancellationShield();
+        }
+      });
+
+  if (toDealloc)
+    swift_task_dealloc(toDealloc);
+}
+
+
+SWIFT_CC(swift)
+static void
+swift_task_cancelCancellationScopeImpl(TaskCancellationScopeRecord *record) {
+  swift_task_cancelCancellationScopeWithReason(record, /*unspecified=*/0);
+}
+
+SWIFT_CC(swift)
+static void
+swift_task_cancelCancellationScopeWithReasonImpl(
+    TaskCancellationScopeRecord *record, size_t reason) {
+  // Cancelling a scope is a local operation on the scope's own atomic flag.
+  // Unlike `swift_task_cancel`, it does not set the task's own IsCancelled
+  // flag. We fire any `CancellationNotificationStatusRecord`s installed
+  // inside the scope's dynamic extent so `withTaskCancellationHandler`-based
+  // operations (`Task.sleep`, URLSession handlers, etc.) wake up.
+  //
+  // Callable from any thread/task context, so we use the record's stored
+  // `OwningTask` pointer rather than `swift_task_getCurrent()`.
+  if (!record)
+    return;
+
+  record->cancel(reason);
+
+  auto task = record->getOwningTask();
+  if (!task)
+    return;
+
+  // Walk the chain under the record lock. The chain is push-ordered
+  // (innermost first); stop when we hit the scope itself.
+  withStatusRecordLock(task, [&](ActiveTaskStatus status) {
+    for (auto cur : status.records()) {
+      if (cur == record)
+        break; // reached the scope; anything past this pre-dates the scope
+
+      switch (cur->getKind()) {
+      case TaskStatusRecordKind::CancellationNotification: {
+        // A cancellation shield is a within-task feature and only makes sense
+        // for whole-task cancellation. Scope cancellation always fires
+        // handlers registered inside the scope.
+        auto notification =
+            cast<CancellationNotificationStatusRecord>(cur);
+        notification->run();
+        break;
+      }
+      case TaskStatusRecordKind::TaskCancellationScope: {
+        // An inner scope, nested inside the scope being cancelled. Mark
+        // it cancelled too (idempotent), carrying the same reason as the
+        // outer cancel. Its own inner notification handlers were already
+        // fired above as we walked past them.
+        cast<TaskCancellationScopeRecord>(cur)->cancel(reason);
+        break;
+      }
+      case TaskStatusRecordKind::ChildTask: {
+        // Structured child tasks (async let) spawned inside the scope
+        // cascade with the scope's reason.
+        auto childRecord = cast<ChildTaskStatusRecord>(cur);
+        for (AsyncTask *child : childRecord->children())
+          swift_task_cancelWithReason(child, reason);
+        break;
+      }
+      case TaskStatusRecordKind::TaskGroup: {
+        // TaskGroup children spawned inside the scope also cascade.
+        auto groupRecord = cast<TaskGroupTaskStatusRecord>(cur);
+        _swift_taskGroup_cancel(groupRecord->getGroup(), reason);
+        break;
+      }
+      default:
+        break;
+      }
+    }
+  });
+}
+
+SWIFT_CC(swift)
+static bool
+swift_task_cancellationScopeIsCancelledImpl(TaskCancellationScopeRecord *record) {
+  // Read the record's own atomic flag directly. Safe from any thread.
+  if (!record)
+    return false;
+  return record->isCancelled();
+}
+
+TaskCancellationScopeRecord *
+swift::_swift_task_getCancellationScope(AsyncTask *task) {
+  // The `HasTaskCancellationScope` flag must have been checked by the caller;
+  // this walker takes the record lock unconditionally.
+  //
+  // Walk innermost-first. A `TaskCancellationShieldRecord` seen before any
+  // cancelled scope means the call site is inside a shield deeper than the
+  // innermost cancelled scope - return nullptr so `isCancelled()` reads
+  // false, matching "as-if child task" semantics.
+  TaskCancellationScopeRecord *found = nullptr;
+  ::withStatusRecordLock(task, [&](ActiveTaskStatus status) {
+    for (auto record : status.records()) {
+      switch (record->getKind()) {
+      case TaskStatusRecordKind::CancellationShield:
+        // Shield above any cancelled scope masks it; short-circuit.
+        return;
+      case TaskStatusRecordKind::TaskCancellationScope: {
+        auto *scope = cast<TaskCancellationScopeRecord>(record);
+        if (scope->isCancelled()) {
+          found = scope;
+          return;
+        }
+        break;
+      }
+      default:
+        break;
+      }
+    }
+  });
+  return found;
+}
+
 // Since the header would have incomplete declarations, we instead instantiate a concrete version of the function here
 template SWIFT_CC(swift)
 CancellationNotificationStatusRecord* swift::popStatusRecordOfType<CancellationNotificationStatusRecord>(AsyncTask *);
@@ -963,6 +1438,23 @@ static void performCancellationAction(ActiveTaskStatus status,
   case TaskStatusRecordKind::TaskExecutorPreference:
     break;
 
+  // Deadline records themselves take no cancellation action.
+  case TaskStatusRecordKind::Deadline:
+    break;
+
+  // Whole-task cancellation must not implicitly cancel independent
+  // cancellation scopes; scopes are only cancelled via their own
+  // `TaskCancellationScope.cancel()`.
+  case TaskStatusRecordKind::TaskCancellationScope:
+    break;
+
+  // Shield records are pure positional markers; they take no cancellation
+  // action. The shield's masking effect on `Task.isCancelled` is handled
+  // elsewhere via the `HasActiveTaskCancellationShield` bit and the
+  // scope-walker's shield-first short-circuit.
+  case TaskStatusRecordKind::CancellationShield:
+    break;
+
   // This should never be found, but the compiler complains if we don't check.
   case TaskStatusRecordKind::First_Reserved:
     break;
@@ -1069,6 +1561,15 @@ static void performEscalationAction(AsyncTask *task, TaskStatusRecord *record,
     return;
   /// Executor preference we can ignore.
   case TaskStatusRecordKind::TaskExecutorPreference:
+    return;
+  // Deadline records do not participate in priority escalation.
+  case TaskStatusRecordKind::Deadline:
+    return;
+  // Cancellation scopes do not participate in priority escalation.
+  case TaskStatusRecordKind::TaskCancellationScope:
+    return;
+  // Cancellation shields do not participate in priority escalation.
+  case TaskStatusRecordKind::CancellationShield:
     return;
   // This should never be found, but the compiler complains if we don't check.
   case TaskStatusRecordKind::First_Reserved:
