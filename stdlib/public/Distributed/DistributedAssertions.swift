@@ -51,6 +51,10 @@ extension DistributedActor {
       return
     }
 
+    precondition(__isLocalActor(self),
+        "Incorrect actor executor assumption; Cannot be isolated to remote distributed actor reference of type '\(self)'. \(message())",
+        file: file, line: line)
+
     let unownedExecutor = unsafe self.unownedExecutor
     let expectationCheck = unsafe _taskIsCurrentExecutor(unownedExecutor._executor)
 
@@ -96,6 +100,13 @@ extension DistributedActor {
       file: StaticString = #fileID, line: UInt = #line
   ) {
     guard _isDebugAssertConfiguration() else {
+      return
+    }
+
+    guard __isLocalActor(self) else {
+      assertionFailure(
+          "Incorrect actor executor assumption; Cannot be isolated to remote distributed actor reference of type '\(self)'. \(message())",
+          file: file, line: line)
       return
     }
 
