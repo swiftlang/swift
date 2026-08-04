@@ -1,5 +1,8 @@
 // RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -closure-specialization %s | %FileCheck %s
 
+// Fails on wasm32 because of 32/64 mismatch on stdlib function operating on String
+// REQUIRES: PTRSIZE=64
+
 // The SIL corresponds to the following Swift source:
 //
 // @inline(never)
