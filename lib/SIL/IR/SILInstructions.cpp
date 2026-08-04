@@ -436,9 +436,11 @@ SILType AllocBoxInst::getAddressType() const {
 }
 
 DebugValueInst::DebugValueInst(
-    SILDebugLocation DebugLoc, SILValue Operand, SILDebugVariable Var,
-    UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo, bool trace, bool prependDeref)
-    : UnaryInstructionBase(DebugLoc, Operand),
+    SILDebugLocation DebugLoc, ArrayRef<SILValue> Operands, SILModule &M,
+    SILDebugVariable Var,
+    UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo, bool trace,
+    bool prependDeref)
+    : InstructionBaseWithTrailingOperands(Operands, DebugLoc),
       SILDebugVariableSupplement(Var.DIExpr.getNumElements(),
                                  Var.Type.has_value(), Var.Loc.has_value(),
                                  Var.Scope),
@@ -446,16 +448,19 @@ DebugValueInst::DebugValueInst(
               getTrailingObjects<SILLocation>(),
               getTrailingObjects<const SILDebugScope *>(),
               getTrailingObjects<SILDIExprElement>()) {
-  if (usesMoveableValueDebugInfo || Operand->getType().isMoveOnly())
+  if (usesMoveableValueDebugInfo ||
+      llvm::any_of(Operands, [](SILValue op) {
+        return op->getType().isMoveOnly();
+      }))
     setUsesMoveableValueDebugInfo();
   setTrace(trace);
   if (prependDeref)
-    this->prependDeref();
+    this->prependDeref(0);
 }
 
 DebugValueInst *DebugValueInst::create(SILDebugLocation DebugLoc,
-                                       SILValue Operand, SILModule &M,
-                                       SILDebugVariable Var,
+                                       ArrayRef<SILValue> Operands,
+                                       SILModule &M, SILDebugVariable Var,
                                        UsesMoveableValueDebugInfo_t wasMoved,
                                        bool trace) {
   // Don't store the same information twice.
@@ -463,7 +468,8 @@ DebugValueInst *DebugValueInst::create(SILDebugLocation DebugLoc,
     Var.Loc = {};
   if (Var.Scope == DebugLoc.getScope())
     Var.Scope = nullptr;
-  if (Var.Type == Operand->getType().getObjectType() &&
+  if (Operands.size() == 1 &&
+      Var.Type == Operands[0]->getType().getObjectType() &&
       !Var.DIExpr.getFragmentPart())
     Var.Type = {};
   // Use the prependDeref bit rather than storing it in the DIExpr.
@@ -471,27 +477,29 @@ DebugValueInst *DebugValueInst::create(SILDebugLocation DebugLoc,
   if (prependDeref) {
     Var.DIExpr.eraseElement(Var.DIExpr.element_begin());
   }
-  void *buf = allocateDebugVarCarryingInst<DebugValueInst>(M, Var);
+  void *buf = allocateDebugVarCarryingInst<DebugValueInst>(M, Var, Operands);
   return ::new (buf)
-    DebugValueInst(DebugLoc, Operand, Var, wasMoved, trace, prependDeref);
+    DebugValueInst(DebugLoc, Operands, M, Var, wasMoved, trace, prependDeref);
 }
 
-void DebugValueInst::prependDeref() {
+void DebugValueInst::prependDeref(unsigned operandIdx) {
+  SILValue operand = getAllOperands()[operandIdx].get();
   if (!ReconstructionBlock) {
     ASSERT(!hasDeref() && "Debug value cannot have two derefs!");
     sharedUInt8().DebugValueInst.prependDeref = true;
     return;
   }
+
   // If we have an undef, the reconstruction block shouldn't have an argument.
   // Nothing to do.
-  if (isa<SILUndef>(getOperand()))
+  if (isa<SILUndef>(operand))
     return;
 
   // If the type is address-only (not loadable or opaque), we cannot insert
   // a load into the reconstruction block. Kill the operand instead.
-  SILArgument *oldArg = ReconstructionBlock->getArgument(0);
+  SILArgument *oldArg = ReconstructionBlock->getArgument(operandIdx);
   if (!oldArg->getType().isLoadableOrOpaque(*getFunction()))
-    return killOperand();
+    return killOperand(operandIdx);
 
   // If we have a reconstruction block, add a load at the beginning.
   SILBuilder builder(ReconstructionBlock->begin());
@@ -501,7 +509,7 @@ void DebugValueInst::prependDeref() {
                                       LoadOwnershipQualifier::Unqualified);
   oldArg->replaceAllUsesWith(load);
   SILArgument *newArg =
-      ReconstructionBlock->replacePhiArgument(0, addrType, OwnershipKind::None);
+      ReconstructionBlock->replacePhiArgument(operandIdx, addrType, OwnershipKind::None);
   load->setOperand(newArg);
 }
 
@@ -518,11 +526,12 @@ void DebugValueInst::convertDerefToLoad() {
   sharedUInt8().DebugValueInst.prependDeref = false;
 }
 
-void DebugValueInst::stripDeref() {
+void DebugValueInst::stripDeref(unsigned operandIdx) {
+  SILValue operand = getAllOperands()[operandIdx].get();
   // If we have an undef, nothing to do.
-  if (isa<SILUndef>(getOperand()))
+  if (isa<SILUndef>(operand))
     return;
-  ASSERT(getOperand()->getType().isLoadableOrOpaque(*getFunction()) &&
+  ASSERT(operand->getType().isLoadableOrOpaque(*getFunction()) &&
          "cannot strip deref for address-only types");
   if (!ReconstructionBlock) {
     ASSERT(hasDeref() && "Cannot strip deref without one!");
@@ -532,7 +541,7 @@ void DebugValueInst::stripDeref() {
 
   // Replace all uses of the operand with undef.
   // Load users are salvaged to use the direct value.
-  SILArgument *oldArg = ReconstructionBlock->getArgument(0);
+  SILArgument *oldArg = ReconstructionBlock->getArgument(operandIdx);
   SILType objType = oldArg->getType().getObjectType();
   SILValue undefAddr = SILUndef::get(oldArg);
   SmallVector<LoadInst *, 16> loads;
@@ -548,11 +557,11 @@ void DebugValueInst::stripDeref() {
 
   // If there are no loads, this operand is no longer used. Kill it.
   if (loads.empty())
-    return killOperand();
+    return killOperand(operandIdx);
 
   // Otherwise, replace the arguments and all uses
   SILArgument *newArg =
-      ReconstructionBlock->replacePhiArgument(0, objType, OwnershipKind::None);
+      ReconstructionBlock->replacePhiArgument(operandIdx, objType, OwnershipKind::None);
 
   for (LoadInst *load : loads) {
     load->replaceAllUsesWith(newArg);
@@ -568,7 +577,7 @@ SILBasicBlock *DebugValueInst::getOrCreateDebugReconstructionBlock() {
   auto *block = getFunction()->createEmptyDebugReconstructionBlock();
   SILBuilder builder(block);
 
-  SILValue operand = getOperand();
+  SILValue operand = getSingleOperand();
   bool addressOnly = !operand->getType().isLoadableOrOpaque(*getFunction());
   SILValue retVal;
   if (isa<SILUndef>(operand)) {
@@ -609,19 +618,21 @@ void DebugValueInst::cloneReconstructionBlockFrom(DebugValueInst *src) {
     .cloneDebugReconstructionBlockContent(srcBB, newBB);
 }
 
-void DebugValueInst::killOperand(SILType operandType) {
-  if (isa<SILUndef>(getOperand())) {
+void DebugValueInst::killOperand(unsigned operandIdx, SILType operandType) {
+  Operand &operandRef = getAllOperands()[operandIdx];
+  SILValue operand = operandRef.get();
+  if (isa<SILUndef>(operand)) {
     // Already undef: no operand to kill.
     return;
   }
 
-  SILType origType = operandType ? operandType : getOperand()->getType();
+  SILType origType = operandType ? operandType : operand->getType();
 
   // Non-undef debug_values on alloc_box are allowed and fixed by IRGen to
   // refer to the project_box. Undef debug_values, however, should always
   // have the type of the variable.
   if (!operandType)
-    if (auto *abi = dyn_cast<AllocBoxInst>(getOperand()))
+    if (auto *abi = dyn_cast<AllocBoxInst>(operand))
       origType = abi->getAddressType().getObjectType();
 
   bool addressOnly = !origType.isLoadableOrOpaque(*getFunction());
@@ -631,7 +642,7 @@ void DebugValueInst::killOperand(SILType operandType) {
   SILValue undef =
       SILUndef::get(getFunction(), addressOnly ? origType.getAddressType()
                                                : origType.getObjectType());
-  setOperand(undef);
+  operandRef.set(undef);
 
   // Strip prependDeref (unless address-only).
   // The stored DIExpr only contains fragments, which we want to keep.
@@ -641,10 +652,14 @@ void DebugValueInst::killOperand(SILType operandType) {
   // Rather than completely removing the debug reconstruction block, remove its
   // argument, as a part of the variable might be constant and recoverable.
   if (auto bb = getDebugReconstructionBlock()) {
-    ASSERT(bb->getNumArguments() == 1);
-    auto argument = bb->getArgument(0);
+    ASSERT(operandIdx < bb->getNumArguments());
+    ASSERT(bb->getNumArguments() == 1 && "Multi operand support not ready");
+    auto argument = bb->getArgument(operandIdx);
     argument->replaceAllUsesWithUndef();
-    bb->eraseArgument(0);
+    // FIXME: For correct multi operand support, the operand must also be
+    // removed from the debug_value instruction's operand list, or the
+    // indices will not match.
+    bb->eraseArgument(operandIdx);
   }
 }
 
@@ -654,11 +669,15 @@ SILType DebugValueInst::getVarType() const {
   if (auto *debugBB = getDebugReconstructionBlock())
     return cast<ReturnInst>(debugBB->getTerminator())
         ->getOperand()->getType().getObjectType();
-  return getOperand()->getType().getObjectType();
+  return getSingleOperand()->getType().getObjectType();
 }
 
 bool DebugValueInst::isExprTypeValid() const {
   auto varInfo = getCompleteVarInfo();
+
+  // TODO: Multiple operands are not yet supported.
+  if (getAllOperands().size() != 1)
+    return false;
 
   // Ignore trace debug values.
   if (hasTrace())
@@ -668,11 +687,12 @@ bool DebugValueInst::isExprTypeValid() const {
   if (!F)
     return false;
 
-  SILType valueType = getOperand()->getType();
+  SILValue operand = getSingleOperand();
+  SILType valueType = operand->getType();
 
   // Special case: a DebugValueInst with an alloc_box operand is equivalent to
   // the alloc_box.
-  if (auto *box = dyn_cast<AllocBoxInst>(getOperand()))
+  if (auto *box = dyn_cast<AllocBoxInst>(operand))
     if (varInfo.DIExpr.elements().empty() &&
         getDebugReconstructionBlock() == nullptr &&
         varInfo.Type == box->getAddressType().getObjectType())

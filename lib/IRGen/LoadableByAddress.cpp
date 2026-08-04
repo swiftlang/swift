@@ -624,9 +624,9 @@ struct StructLoweringState {
   SmallVector<MakeBorrowInst *, 16> makeBorrowInstsToMod;
   // All dereference_borrow instrs that should be converted to dereference_addr_borrow
   SmallVector<DereferenceBorrowInst *, 16> dereferenceBorrowInstsToMod;
-  // All debug instructions.
+  // All debug uses.
   // to be modified *only if* the operands are used in "real" instructions
-  SmallVector<DebugValueInst *, 16> debugInstsToMod;
+  SmallVector<Operand *, 16> debugUsesToMod;
 
   StructLoweringState(SILFunction *F, irgen::IRGenModule &Mod,
                       LargeSILTypeMapper &Mapper)
@@ -1024,7 +1024,7 @@ void LargeValueVisitor::visitDebugValueInst(DebugValueInst *instr) {
   for (Operand &operand : instr->getAllOperands()) {
     if (std::find(pass.largeLoadableArgs.begin(), pass.largeLoadableArgs.end(),
                   operand.get()) != pass.largeLoadableArgs.end()) {
-      pass.debugInstsToMod.push_back(instr);
+      pass.debugUsesToMod.push_back(&operand);
     }
   }
 }
@@ -1267,8 +1267,7 @@ void LoadableStorageAllocation::replaceLoadWithCopyAddr(
       break;
     }
     case SILInstructionKind::DebugValueInst: {
-      auto *insToInsert = cast<DebugValueInst>(userIns);
-      pass.debugInstsToMod.push_back(insToInsert);
+      pass.debugUsesToMod.push_back(user);
       break;
     }
     case SILInstructionKind::DestroyValueInst: {
@@ -1430,8 +1429,7 @@ void LoadableStorageAllocation::replaceLoadWithCopyAddrForModifiable(
       break;
     }
     case SILInstructionKind::DebugValueInst: {
-      auto *insToInsert = cast<DebugValueInst>(userIns);
-      pass.debugInstsToMod.push_back(insToInsert);
+      pass.debugUsesToMod.push_back(use);
       usesToMod.push_back(use);
       break;
     }
@@ -1900,8 +1898,8 @@ static void rewriteUsesOfScalar(StructLoweringState &pass, SILValue address,
       storeUser->eraseFromParent();
     } else if (auto *dbgInst = dyn_cast<DebugValueInst>(user)) {
       // Update the debug_value to point to the variable in the alloca.
-      dbgInst->setOperand(address);
-      dbgInst->prependDeref();
+      scalarUse->set(address);
+      dbgInst->prependDeref(scalarUse->getOperandNumber());
     }
   }
 }
@@ -2409,22 +2407,19 @@ static void rewriteFunction(StructLoweringState &pass,
     instr->getParent()->erase(instr);
   }
 
-  for (DebugValueInst *instr : pass.debugInstsToMod) {
-    assert(instr->getAllOperands().size() == 1 &&
-           "Debug instructions have one operand");
-    for (Operand &operand : instr->getAllOperands()) {
-      auto currOperand = operand.get();
-      if (pass.argsToLoadedValueMap.find(currOperand) !=
-          pass.argsToLoadedValueMap.end()) {
-        SILValue newOperand = pass.argsToLoadedValueMap[currOperand];
-        assert(newOperand != currOperand &&
-               "Did not allocate storage and convert operand");
-        operand.set(newOperand);
-      } else {
-        assert(currOperand->getType().isAddress() &&
-               "Expected an address type");
-        instr->prependDeref();
-      }
+  for (Operand *operand : pass.debugUsesToMod) {
+    auto *instr = cast<DebugValueInst>(operand->getUser());
+    auto currOperand = operand->get();
+    if (pass.argsToLoadedValueMap.find(currOperand) !=
+        pass.argsToLoadedValueMap.end()) {
+      SILValue newOperand = pass.argsToLoadedValueMap[currOperand];
+      assert(newOperand != currOperand &&
+             "Did not allocate storage and convert operand");
+      operand->set(newOperand);
+    } else {
+      assert(currOperand->getType().isAddress() &&
+             "Expected an address type");
+      instr->prependDeref(operand->getOperandNumber());
     }
   }
 
@@ -4772,20 +4767,29 @@ protected:
   }
 
   void visitDebugValueInst(DebugValueInst *dbg) {
-    // Undef debug values have a special meaning. Don't allocate stack space
-    // for those.
-    // Rewriting them would also break nullary debug reconstruction blocks.
-    if (isa<SILUndef>(dbg->getOperand()))
-      return;
-    if (!dbg->getOperand()->getType().isAddress() &&
-        (assignment.isPotentiallyCArray(dbg->getOperand()->getType()) ||
-         overlapsWithOnStackDebugLoc(dbg->getOperand()))) {
-      assignment.markForDeletion(dbg);
-      return;
+    for (auto &operand : dbg->getAllOperands()) {
+      SILValue operandVal = operand.get();
+      // The same conditions as in `AddressAssignment::assign` need to be
+      // done for each operand: rewrite all operands that need rewriting.
+      if (!operandVal->getType().isObject())
+        continue;
+      if (!assignment.isLargeLoadableType(operandVal->getType()))
+        continue;
+      // Undef debug values have a special meaning. Don't allocate stack space
+      // for those.
+      // Rewriting them would also break nullary debug reconstruction blocks.
+      if (isa<SILUndef>(operandVal))
+        continue;
+      if (!operandVal->getType().isAddress() &&
+          (assignment.isPotentiallyCArray(operandVal->getType()) ||
+           overlapsWithOnStackDebugLoc(operandVal))) {
+        assignment.markForDeletion(dbg);
+        return;
+      }
+      SILValue addr = assignment.getAddressForValue(operandVal);
+      operand.set(addr);
+      dbg->prependDeref(operand.getOperandNumber());
     }
-    SILValue addr = assignment.getAddressForValue(dbg->getOperand());
-    dbg->setOperand(addr);
-    dbg->prependDeref();
   }
 
   void visitRetainValueInst(RetainValueInst *r) {

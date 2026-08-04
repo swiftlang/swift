@@ -1817,8 +1817,14 @@ SILCloner<ImplClass>::visitDebugValueInst(DebugValueInst *Inst) {
   std::optional<SILDebugVariable> VarInfo = Inst->getVarInfo();
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   remapDebugVariable(VarInfo);
+
+  // Remap all operands.
+  SmallVector<SILValue, 4> remappedOperands;
+  for (auto &op : Inst->getAllOperands())
+    remappedOperands.push_back(getOpValue(op.get()));
+
   auto *NewInst = getBuilder().createDebugValue(
-      Inst->getLoc(), getOpValue(Inst->getOperand()), *VarInfo,
+      Inst->getLoc(), remappedOperands, *VarInfo,
       Inst->usesMoveableValueDebugInfo(), Inst->hasTrace());
 
   // Clone the debug-only reconstruction block if present.
