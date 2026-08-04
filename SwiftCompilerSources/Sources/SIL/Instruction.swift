@@ -1604,6 +1604,9 @@ final public class EndCOWMutationInst : SingleValueInstruction, UnaryInstruction
 final public class EndCOWMutationAddrInst : Instruction, UnaryInstruction {
   public var address: Value { operand.value }
 }
+final public class EndFormalScopeInst : Instruction, UnaryInstruction {
+  public var address: Value { operand.value }
+}
 
 final public
 class ClassifyBridgeObjectInst : SingleValueInstruction, UnaryInstruction {}

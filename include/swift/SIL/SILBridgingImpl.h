@@ -3290,6 +3290,12 @@ BridgedBuilder::createEndCOWMutationAddr(BridgedValue instance) const {
                                                instance.getSILValue())};
 }
 
+BridgedInstruction
+BridgedBuilder::createEndFormalScope(BridgedValue instance) const {
+  return {unbridged().createEndFormalScope(regularLoc(),
+                                               instance.getSILValue())};
+}
+
 BridgedInstruction BridgedBuilder::createMarkDependence(BridgedValue value, BridgedValue base, BridgedInstruction::MarkDependenceKind kind) const {
   return {unbridged().createMarkDependence(regularLoc(), value.getSILValue(), base.getSILValue(), swift::MarkDependenceKind(kind))};
 }
