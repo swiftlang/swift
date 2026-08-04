@@ -740,6 +740,23 @@ void DiagnosticEmitter::emitObjectInstConsumesAndUsesValue(
   registerDiagnosticEmitted(markedValue);
 }
 
+void DiagnosticEmitter::emitAddressInstConsumesAndUsesValue(
+    MarkUnresolvedNonCopyableValueInst *markedValue, SILInstruction *user) {
+  LLVM_DEBUG(llvm::dbgs() << "Emitting address consumed and used error!\n");
+  LLVM_DEBUG(llvm::dbgs() << "    Mark: " << *markedValue);
+  LLVM_DEBUG(llvm::dbgs() << "    User: " << *user);
+
+  auto &astContext = markedValue->getModule().getASTContext();
+  SmallString<64> varName;
+  getVariableNameForValue(markedValue, varName);
+  diagnose(astContext, markedValue,
+           diag::sil_movechecking_owned_value_consumed_and_used_at_same_time,
+           varName);
+  diagnose(astContext, user,
+           diag::sil_movechecking_consuming_and_non_consuming_uses_here);
+  registerDiagnosticEmitted(markedValue);
+}
+
 bool DiagnosticEmitter::emitGlobalOrClassFieldLoadedAndConsumed(
     MarkUnresolvedNonCopyableValueInst *markedValue) {
   SmallString<64> varName;
