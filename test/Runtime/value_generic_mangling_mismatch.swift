@@ -6,21 +6,33 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
-// A mangled type name may place an integer (value) generic argument where a
-// type is expected, e.g. `_typeByName("$99_Sg")` asks for `Optional<99>`. The
-// runtime represents metadata and values the same way, so without validation
-// the integer is misinterpreted as a type metadata pointer and dereferenced,
-// crashing. Such names must instead fail the lookup gracefully, while genuine
-// value generics (an integer in a value parameter) keep working.
+// Ensure that a mangled type name binding a generic argument of one sort to a
+// generic parameter of the other, in either direction, fails the lookup
+// gracefully rather than confusing a metadata pointer with an integer value,
+// and that genuine value generics keep resolving. A mangled `$N_` is the value
+// N + 1, and rejected integers come in pairs: an even value is
+// indistinguishable from a metadata pointer, while an odd one is caught by the
+// runtime's metadata/pack discriminator.
 
 import Swift
 import StdlibUnittest
 
+#if _runtime(_ObjC)
+import Foundation
+#endif
+
 struct ValG<let N: Int> {}
 struct OuterG<T> { struct ValInner<let M: Int> {} }
 struct PairG<T, U> {}
+struct Holder<let N: Int, T> { var storage: InlineArray<N, T>? = nil }
+struct A<T> { struct B<let M: Int> { struct C<U> { struct D<let K: Int> {} } } }
+struct ValOuter<let N: Int> { struct TypeInner<T> {} }
 protocol P {}
 struct S: P {}
+
+#if _runtime(_ObjC)
+class ValClass<T, let N: Int> {}
+#endif
 
 let tests = TestSuite("ValueGenericManglingMismatch")
 
@@ -105,5 +117,104 @@ tests.test("integer where a Builtin.FixedArray element type is expected fails gr
   expectNil(_typeByName("$2_$99_BV"))
   expectNil(_typeByName("$2_$98_BV"))
 }
+
+tests.test("type where a Builtin.FixedArray count is expected fails gracefully") {
+  expectNil(_typeByName("SiSiBV"))
+  expectNil(_typeByName("SdSiBV"))
+  expectNil(_typeByName("$2_SiBVSiBV"))
+}
+
+tests.test("type bound to a value generic parameter fails gracefully") {
+  expectNil(_typeByName("s11InlineArrayVySiSiG"))
+  expectNil(_typeByName("s11InlineArrayVySSSiG"))
+  expectNil(_typeByName("4main4ValGVySiG"))
+  expectNil(_typeByName("4main6OuterGV8ValInnerVySi_SiG"))
+  expectNil(_typeByName("4main1AV1BVySi_SiG"))
+  expectNil(_typeByName("4main1AV1BV1CV1DVySi_$2__SS_SiG"))
+  expectNil(_typeByName("4main1AV1BVy$2__$2_G"))
+  expectNil(_typeByName("4main1AV1BV1CV1DVySi_$2__$9__$6_G"))
+}
+
+// A mangled name may bind either just the innermost type's own parameters, as
+// above, or the complete set across every level of nesting in one argument
+// list. The two shapes index different parameter lists.
+tests.test("wrong argument sort in a whole-nesting argument list fails gracefully") {
+  expectNil(_typeByName("4main8ValOuterV9TypeInnerVySiSSG"))
+  expectNil(_typeByName("4main1AV1BVySiSiG"))
+  expectNil(_typeByName("4main1AV1BV1CV1DVySi$2_SSSiG"))
+  expectNil(_typeByName("4main1AV1BVy$2_$2_G"))
+  expectNil(_typeByName("4main1AV1BV1CV1DVySi$2_$9_$6_G"))
+}
+
+tests.test("unresolved Builtin.FixedArray element type fails gracefully") {
+  expectNil(_typeByName("$3_xBV"))
+  expectNil(_typeByName("$3_qd__BV"))
+  expectNil(_typeByName("SixBV"))
+}
+
+tests.test("pack in a Builtin.FixedArray position fails gracefully") {
+  expectNil(_typeByName("$2_Si_SSQPBV"))
+  expectNil(_typeByName("Si_SSQPSiBV"))
+}
+
+tests.test("genuine Builtin.FixedArray manglings still resolve") {
+  func sizeOf<T>(_: T.Type) -> Int { MemoryLayout<T>.size }
+  if let t = expectNotNil(_typeByName("$3_SiBV")) {
+    expectEqual(4 * MemoryLayout<Int>.stride, _openExistential(t, do: sizeOf))
+  }
+  // A negative count and an unresolved dependent count both lay out like the
+  // empty tuple.
+  if let t = expectNotNil(_typeByName("$n0_SiBV")) {
+    expectEqual(0, _openExistential(t, do: sizeOf))
+  }
+  if let t = expectNotNil(_typeByName("xSiBV")) {
+    expectEqual(0, _openExistential(t, do: sizeOf))
+  }
+}
+
+tests.test("genuine value generic manglings still resolve") {
+  expectEqual(InlineArray<4, String>.self,
+              _typeByName("s11InlineArrayVy$3_SSG")!)
+  expectEqual(InlineArray<0, Int>.self, _typeByName("s11InlineArrayVy$_SiG")!)
+  expectEqual(InlineArray<2, InlineArray<3, Int>>.self,
+              _typeByName("s11InlineArrayVy$1_ABy$2_SiGG")!)
+  expectEqual([InlineArray<3, Double>].self,
+              _typeByName("Says11InlineArrayVy$2_SdGG")!)
+  expectEqual(Optional<InlineArray<7, UInt8>>.self,
+              _typeByName("s11InlineArrayVy$6_s5UInt8VGSg")!)
+  expectEqual(Holder<3, Int>.self, _typeByName("4main6HolderVy$2_SiG")!)
+  expectEqual(Holder<9, InlineArray<2, Int>>.self,
+              _typeByName("4main6HolderVy$8_s11InlineArrayVy$1_SiGG")!)
+  expectEqual(A<Int>.B<3>.self, _typeByName("4main1AV1BVySi_$2_G")!)
+  expectEqual(A<Int>.B<3>.C<String>.D<7>.self,
+              _typeByName("4main1AV1BV1CV1DVySi_$2__SS_$6_G")!)
+}
+
+tests.test("genuine value generics in a whole-nesting argument list still resolve") {
+  expectEqual(ValOuter<3>.TypeInner<String>.self,
+              _typeByName("4main8ValOuterV9TypeInnerVy$2_SSG")!)
+  expectEqual(A<Int>.B<3>.self, _typeByName("4main1AV1BVySi$2_G")!)
+  expectEqual(A<Int>.B<3>.C<String>.D<7>.self,
+              _typeByName("4main1AV1BV1CV1DVySi$2_SS$6_G")!)
+}
+
+// The runtime mangles metadata using a symbolic reference to the innermost
+// nominal type, which produces the whole-nesting shape.
+tests.test("metadata for a nested value generic round-trips through its mangled name") {
+  expectEqual("main.ValOuter<3>.TypeInner<Swift.String>",
+              _typeName(ValOuter<3>.TypeInner<String>.self))
+  expectEqual(ValOuter<3>.TypeInner<String>.self,
+              _typeByName(_mangledTypeName(ValOuter<3>.TypeInner<String>.self)!)!)
+  expectEqual(A<Int>.B<3>.C<String>.D<7>.self,
+              _typeByName(_mangledTypeName(A<Int>.B<3>.C<String>.D<7>.self)!)!)
+}
+
+#if _runtime(_ObjC)
+// objc_getClass routes an unprefixed mangled name through the same lookup.
+tests.test("type bound to a value generic parameter fails gracefully through objc_getClass") {
+  expectNotNil(NSClassFromString(_mangledTypeName(ValClass<Int, 5>.self)!))
+  expectNil(NSClassFromString("4main8ValClassCySiSiG"))
+}
+#endif
 
 runAllTests()
