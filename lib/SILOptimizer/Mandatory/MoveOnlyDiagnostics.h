@@ -189,6 +189,10 @@ public:
       MarkUnresolvedNonCopyableValueInst *markedValue, Operand *consumingUse,
       Operand *nonConsumingUse);
 
+  /// Address-checker analogue of \c emitObjectInstConsumesAndUsesValue.
+  void emitAddressInstConsumesAndUsesValue(
+      MarkUnresolvedNonCopyableValueInst *markedValue, SILInstruction *user);
+
   /// Emit a diagnostic for a case where we have one of the following cases:
   ///
   /// 1. A partial_apply formed from a borrowed address only value.
