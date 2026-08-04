@@ -661,6 +661,18 @@ bb0(%0 : $*U):
   return %5 : $()
 }
 
+// An optimization may have removed the destroys of opened existentials if the
+// concrete type of the existential turned out to be trivial.
+sil [ossa] @test_missing_destroys_of_opened_existential : $@convention(thin) (@in P) -> () {
+bb0(%0 : $*P):
+  %o = open_existential_addr mutable_access %0 : $*P to $*@opened(2, P) Self
+  %s = alloc_stack $@opened(2, P) Self
+  copy_addr %o to [init] %s : $*@opened(2, P) Self
+  dealloc_stack %s : $*@opened(2, P) Self
+  %r = tuple ()
+  return %r : $()
+}
+
 sil [ossa] @test_init_two_existentials : $@convention(thin) <U: P, V: P> (@in_guaranteed U, @in_guaranteed V) -> () {
 bb0(%0 : $*U, %1 : $*V):
   %s = alloc_stack $P
