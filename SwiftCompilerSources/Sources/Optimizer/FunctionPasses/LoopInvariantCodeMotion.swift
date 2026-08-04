@@ -431,7 +431,10 @@ private extension AnalyzedInstructions {
       switch sideEffect {
       case let storeInst as StoreInst:
         if storeInst.storesTo(accessPath) {
-          return false
+          // TODO: Add support for `store [assign]`. Moving such a store out of the loop
+          //       requires to insert a `destroy_value` for the overwritten value at the
+          //       original store location.
+          return storeInst.storeOwnership == .assign
         }
       case let loadInst as LoadInst:
         if loadInst.loadsFrom(accessPath) {
