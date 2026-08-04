@@ -18,10 +18,6 @@
 #ifndef SWIFT_CONCURRENCY_TASKREGISTRY_H
 #define SWIFT_CONCURRENCY_TASKREGISTRY_H
 
-#ifndef SWIFT_CONCURRENCY_ENABLE_TASK_REGISTRY
-#define SWIFT_CONCURRENCY_ENABLE_TASK_REGISTRY 1
-#endif
-
 #include "swift/ABI/Task.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Threading/Mutex.h"

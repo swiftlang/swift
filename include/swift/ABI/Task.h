@@ -23,6 +23,14 @@
 #include "swift/ABI/MetadataValues.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/VoucherShims.h"
+
+#ifndef SWIFT_CONCURRENCY_ENABLE_TASK_REGISTRY
+#if SWIFT_CONCURRENCY_EMBEDDED
+#define SWIFT_CONCURRENCY_ENABLE_TASK_REGISTRY 0
+#else
+#define SWIFT_CONCURRENCY_ENABLE_TASK_REGISTRY 1
+#endif
+#endif
 #include "swift/Basic/STLExtras.h"
 #include "swift/Threading/ConditionVariable.h"
 #include "swift/Threading/Mutex.h"
@@ -374,7 +382,7 @@ public:
     static constexpr size_t ActiveTaskStatusSize = 2 * sizeof(void *);
 #endif
 
-#if SWIFT_CONCURRENCY_EMBEDDED
+#if !SWIFT_CONCURRENCY_ENABLE_TASK_REGISTRY
     static constexpr size_t TaskRegistryTaskSize = 0;
 #else
     // registryNext and registryPrev pointers

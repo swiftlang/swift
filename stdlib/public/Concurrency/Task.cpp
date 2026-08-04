@@ -345,7 +345,7 @@ AsyncTask::~AsyncTask() {
     #endif
   }
 
-#if !SWIFT_CONCURRENCY_EMBEDDED
+#if SWIFT_CONCURRENCY_ENABLE_TASK_REGISTRY
   taskRegistryRemove(this);
 #endif
 
@@ -1195,7 +1195,7 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
       task->Flags.task_hasInitialTaskExecutorPreference(),
       taskName);
 
-#if !SWIFT_CONCURRENCY_EMBEDDED
+#if SWIFT_CONCURRENCY_ENABLE_TASK_REGISTRY
   taskRegistryInsert(task);
 #endif
 
