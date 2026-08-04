@@ -35,6 +35,7 @@
 #include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
 #include "swift/SILOptimizer/PassManager/PrettyStackTrace.h"
 #include "swift/SILOptimizer/Utils/DifferentiationMangler.h"
+#include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "llvm/ADT/DenseMap.h"
 
@@ -94,14 +95,12 @@ private:
   /// tangent buffers.
   llvm::DenseMap<std::pair<SILBasicBlock *, SILValue>, SILValue> bufferMap;
 
-  /// Mapping from differential basic blocks to differential struct arguments.
-  llvm::DenseMap<SILBasicBlock *, SILArgument *> differentialStructArguments;
-
   /// Mapping from differential struct field declarations to differential struct
   /// elements destructured from the linear map basic block argument. In the
   /// beginning of each differential basic block, the block's differential
   /// struct is destructured into the individual elements stored here.
-  llvm::DenseMap<SILBasicBlock *, SILInstructionResultArray> differentialTupleElements;
+  llvm::DenseMap<SILBasicBlock *, SmallVector<SILValue, 4>>
+      differentialTupleElements;
 
   /// An auxiliary differential local allocation builder.
   TangentBuilder diffLocalAllocBuilder;
@@ -122,16 +121,14 @@ private:
   const AutoDiffConfig getConfig() const { return witness->getConfig(); }
   TangentBuilder &getDifferentialBuilder() { return differentialBuilder; }
   SILFunction &getDifferential() { return differentialBuilder.getFunction(); }
-  SILArgument *getDifferentialStructArgument(SILBasicBlock *origBB) {
-    return differentialStructArguments[origBB];
-  }
 
   //--------------------------------------------------------------------------//
   // Differential tuple mapping
   //--------------------------------------------------------------------------//
 
-  void initializeDifferentialTupleElements(SILBasicBlock *origBB,
-                                           SILInstructionResultArray values);
+  void
+  initializeDifferentialTupleElements(SILBasicBlock *origBB,
+                                      llvm::ArrayRef<SILArgument *> values);
 
   SILValue getDifferentialTupleElement(ApplyInst *ai);
 
@@ -156,7 +153,16 @@ private:
 
   /// Build a differential struct value for the original block corresponding to
   /// the given terminator.
-  TupleInst *buildDifferentialValueStructValue(TermInst *termInst) {
+  llvm::SmallVector<SILValue, 8> getDifferentialValues(SILBasicBlock *origBB) {
+    auto *jvpBB = BBMap[origBB];
+    auto bbDifferentialValues = differentialValues[origBB];
+    if (!origBB->isEntry()) {
+      auto *enumArg = jvpBB->getArguments().back();
+      bbDifferentialValues.insert(bbDifferentialValues.begin(), enumArg);
+    }
+    return bbDifferentialValues;
+  }
+  TupleInst *buildDifferentialValueTupleValue(TermInst *termInst) {
     assert(termInst->getFunction() == original);
     auto loc = termInst->getFunction()->getLocation();
     auto *origBB = termInst->getParent();
@@ -164,11 +170,7 @@ private:
     assert(jvpBB && "Basic block mapping should exist");
     auto tupleLoweredTy =
       remapType(differentialInfo.getLinearMapTupleLoweredType(origBB));
-    auto bbDifferentialValues = differentialValues[origBB];
-    if (!origBB->isEntry()) {
-      auto *enumArg = jvpBB->getArguments().back();
-      bbDifferentialValues.insert(bbDifferentialValues.begin(), enumArg);
-    }
+    auto bbDifferentialValues = getDifferentialValues(origBB);
     return getBuilder().createTuple(loc, tupleLoweredTy,
                                     bbDifferentialValues);
   }
@@ -303,6 +305,47 @@ private:
   // Tangent buffer mapping
   //--------------------------------------------------------------------------//
 
+  /// Returns a next insertion point for creating a local allocation: either
+  /// before the previous local allocation, or at the start of the pullback
+  /// entry if no local allocations exist.
+  ///
+  /// Helper for `createFunctionLocalAllocation`.
+  SILBasicBlock::iterator getNextFunctionLocalAllocationInsertionPoint() {
+    // If there are no local allocations, insert at the pullback entry start.
+    if (differentialLocalAllocations.empty())
+      return getDifferential().getEntryBlock()->begin();
+    // Otherwise, insert before the last local allocation. Inserting before
+    // rather than after ensures that allocation and zero initialization
+    // instructions are grouped together.
+    auto lastLocalAlloc = differentialLocalAllocations.back();
+    return lastLocalAlloc->getDefiningInstruction()->getIterator();
+  }
+
+  /// Creates and returns a local allocation with the given type.
+  ///
+  /// Local allocations are created uninitialized in the pullback entry and
+  /// deallocated in the pullback exit. All local allocations not in
+  /// `destroyedLocalAllocations` are also destroyed in the pullback exit.
+  ///
+  /// Helper for `getAdjointBuffer`.
+  AllocStackInst *createFunctionLocalAllocation(
+      SILType type, SILLocation loc, bool zeroInitialize = false,
+      std::optional<SILDebugVariable> varInfo = std::nullopt) {
+    // Set insertion point for local allocation builder: before the last local
+    // allocation, or at the start of the pullback function's entry if no local
+    // allocations exist yet.
+    diffLocalAllocBuilder.setInsertionPoint(
+        getDifferential().getEntryBlock(),
+        getNextFunctionLocalAllocationInsertionPoint());
+    // Create and return local allocation.
+    auto *alloc = diffLocalAllocBuilder.createAllocStack(loc, type, varInfo);
+    differentialLocalAllocations.push_back(alloc);
+    // Zero-initialize if requested.
+    if (zeroInitialize)
+      diffLocalAllocBuilder.emitZeroIntoBuffer(loc, alloc, IsInitialization);
+    return alloc;
+  }
+
   /// Sets the tangent buffer for the original buffer. Asserts that the
   /// original buffer does not already have a tangent buffer.
   void setTangentBuffer(SILBasicBlock *origBB, SILValue originalBuffer,
@@ -314,14 +357,49 @@ private:
     (void)insertion;
   }
 
-  /// Returns the tangent buffer for the original buffer. Asserts that the
-  /// original buffer has a tangent buffer.
+  /// Returns the tangent buffer for the original buffer.
   SILValue &getTangentBuffer(SILBasicBlock *origBB, SILValue originalBuffer) {
     assert(originalBuffer->getType().isAddress());
     assert(originalBuffer->getFunction() == original);
-    auto it = bufferMap.find({origBB, originalBuffer});
-    assert(it != bufferMap.end() && "Tangent buffer should already exist");
-    return it->getSecond();
+    auto insertion =
+        bufferMap.try_emplace({origBB, originalBuffer}, SILValue());
+    if (!insertion.second) // not inserted
+      return insertion.first->getSecond();
+
+    LLVM_DEBUG(getADDebugStream()
+               << "Creating new tangent buffer for " << originalBuffer
+               << "in bb" << origBB->getDebugID() << '\n');
+
+    auto bufType = getRemappedTangentType(originalBuffer->getType());
+    // Set insertion point for local allocation builder: before the last local
+    // allocation, or at the start of the pullback function's entry if no local
+    // allocations exist yet.
+    auto debugInfo = findDebugLocationAndVariable(originalBuffer);
+    SILLocation loc = debugInfo ? debugInfo->first.getLocation()
+                                : RegularLocation::getAutoGeneratedLocation();
+    llvm::SmallString<32> tanName;
+    auto *newBuf = createFunctionLocalAllocation(
+        bufType, loc, /*zeroInitialize*/ true,
+        swift::transform(debugInfo, [&](AdjointValue::DebugInfo di) {
+          llvm::raw_svector_ostream tanNameStream(tanName);
+          SILDebugVariable &dv = di.second;
+          dv.ArgNo = 0;
+          tanNameStream << "derivative of '" << dv.Name << "'";
+          if (SILDebugLocation origBBLoc = origBB->front().getDebugLocation()) {
+            tanNameStream << " in scope at ";
+            origBBLoc.getLocation().print(tanNameStream,
+                                          getASTContext().SourceMgr);
+          }
+          tanNameStream << " (scope #" << origBB->getDebugID() << ")";
+          dv.Name = tanName;
+          // We have no meaningful debug location, and the type is different.
+          dv.Scope = nullptr;
+          dv.Loc = {};
+          dv.Type = {};
+          dv.DIExpr = {};
+          return dv;
+        }));
+    return (insertion.first->getSecond() = newBuf);
   }
 
   //--------------------------------------------------------------------------//
@@ -432,13 +510,12 @@ public:
   void visitInstructionsInBlock(SILBasicBlock *bb) {
     // Destructure the differential struct to get the elements.
     auto &diffBuilder = getDifferentialBuilder();
-    auto diffLoc = getDifferential().getLocation();
+    auto *diffTupleTyple = differentialInfo.getLinearMapTupleType(bb);
+    unsigned numVals = diffTupleTyple->getNumElements();
     auto *diffBB = diffBBMap.lookup(bb);
-    auto *mainDifferentialStruct = diffBB->getArguments().back();
     diffBuilder.setInsertionPoint(diffBB);
-    auto *dsi =
-        diffBuilder.createDestructureTuple(diffLoc, mainDifferentialStruct);
-    initializeDifferentialTupleElements(bb, dsi->getResults());
+    initializeDifferentialTupleElements(
+        bb, diffBB->getArguments().take_back(numVals));
     TypeSubstCloner::visitInstructionsInBlock(bb);
   }
 
@@ -691,7 +768,6 @@ public:
     auto loc = ri->getOperand().getLoc();
     auto *origExit = ri->getParent();
     auto &builder = getBuilder();
-    auto *diffStructVal = buildDifferentialValueStructValue(ri);
 
     // Get the JVP value corresponding to the original functions's return value.
     auto *origRetInst = cast<ReturnInst>(origExit->getTerminator());
@@ -703,7 +779,7 @@ public:
     auto jvpSubstMap = jvp->getForwardingSubstitutionMap();
     auto *differentialRef = builder.createFunctionRef(loc, &getDifferential());
     auto *differentialPartialApply = builder.createPartialApply(
-        loc, differentialRef, jvpSubstMap, {diffStructVal},
+        loc, differentialRef, jvpSubstMap, getDifferentialValues(origExit),
         ParameterConvention::Direct_Guaranteed);
 
     auto differentialType = jvp->mapTypeIntoEnvironment(
@@ -1375,6 +1451,13 @@ public:
       retElts.push_back(tanVal);
     }
 
+    for (auto alloc : differentialLocalAllocations) {
+      // Assert that local allocations have at least one use.
+      // Buffers should not be allocated needlessly.
+      assert(!alloc->use_empty());
+      diffBuilder.createDeallocStack(diffLoc, alloc);
+    }
+
     diffBuilder.createReturn(diffLoc,
                              joinElements(retElts, diffBuilder, diffLoc));
   }
@@ -1451,12 +1534,13 @@ JVPCloner::~JVPCloner() { delete &impl; }
 //--------------------------------------------------------------------------//
 
 void JVPCloner::Implementation::initializeDifferentialTupleElements(
-  SILBasicBlock *origBB, SILInstructionResultArray values) {
+    SILBasicBlock *origBB, llvm::ArrayRef<SILArgument *> values) {
   auto *diffTupleTyple = differentialInfo.getLinearMapTupleType(origBB);
   assert(diffTupleTyple->getNumElements() == values.size() &&
          "The number of differential tuple fields must equal the number of "
          "differential struct element values");
-  auto res = differentialTupleElements.insert({origBB, values});
+  auto res = differentialTupleElements.insert(
+      {origBB, {values.begin(), values.end()}});
   (void)res;
   assert(res.second && "A pullback struct element already exists!");
 }
@@ -1493,13 +1577,6 @@ void JVPCloner::Implementation::prepareForDifferentialGeneration() {
     if (&origBB == origEntry) {
       assert(diffBB->isEntry());
       createEntryArguments(&differential);
-      auto *lastArg = diffBB->getArguments().back();
-#ifndef NDEBUG
-      auto diffTupleLoweredType = remapSILTypeInDifferential(
-          differentialInfo.getLinearMapTupleLoweredType(&origBB));
-      assert(lastArg->getType() == diffTupleLoweredType);
-#endif
-      differentialStructArguments[&origBB] = lastArg;
     }
 
     LLVM_DEBUG({
@@ -1519,10 +1596,14 @@ void JVPCloner::Implementation::prepareForDifferentialGeneration() {
 
   // The differential function has type:
   // (arg0', ..., argn', entry_df_struct) -> result'.
-  auto diffParamArgs =
-      differential.getArgumentsWithoutIndirectResults().drop_back();
-  assert(diffParamArgs.size() ==
-         witness->getConfig().parameterIndices->getNumIndices());
+  auto diffTupleLoweredType =
+      remapType(differentialInfo.getLinearMapTupleLoweredType(origEntry));
+  unsigned numVals = diffTupleLoweredType.getAs<TupleType>()->getNumElements();
+
+  auto diffParamArgs = differential.getArgumentsWithoutIndirectResults();
+  assert(witness->getConfig().parameterIndices->getNumIndices() ==
+             diffParamArgs.size() - numVals &&
+         diffParamArgs.size() >= 1);
   auto origParamArgs = original->getArgumentsWithoutIndirectResults();
 
   // TODO(TF-788): Re-enable non-varied result warning.
@@ -1550,7 +1631,7 @@ void JVPCloner::Implementation::prepareForDifferentialGeneration() {
 
   // Initialize tangent mapping for parameters.
   auto diffParamsIt = getConfig().parameterIndices->begin();
-  for (auto index : range(diffParamArgs.size())) {
+  for (auto index : range(diffParamArgs.size() - numVals)) {
     auto *diffArg = diffParamArgs[index];
     auto *origArg = origParamArgs[*diffParamsIt];
     ++diffParamsIt;
@@ -1686,8 +1767,9 @@ void JVPCloner::Implementation::prepareForDifferentialGeneration() {
   // the returned differential's closure context.
   auto *origEntry = original->getEntryBlock();
   auto dfTupleType =
-    linearMapInfo->getLinearMapTupleLoweredType(origEntry).getASTType();
-  dfParams.push_back({dfTupleType, ParameterConvention::Direct_Owned});
+      linearMapInfo->getLinearMapTupleLoweredType(origEntry).getAs<TupleType>();
+  for (Type eltTy : dfTupleType->getElementTypes())
+    dfParams.emplace_back(CanType(eltTy), ParameterConvention::Direct_Owned);
 
   Mangle::DifferentiationMangler mangler(module.getASTContext());
   auto diffName = mangler.mangleLinearMap(
@@ -1743,6 +1825,12 @@ bool JVPCloner::Implementation::run() {
   LLVM_DEBUG(getADDebugStream()
              << "Generated differential for " << original->getName() << ":\n"
              << getDifferential());
+  if (!errorOccurred) {
+    auto *pm = &context.getPassManager();
+    pm->getSwiftPassInvocation()->initializeNestedSwiftPassInvocation(jvp);
+    completeAllLifetimes(pm, jvp);
+    pm->getSwiftPassInvocation()->deinitializeNestedSwiftPassInvocation();
+  }
   return errorOccurred;
 }
 
