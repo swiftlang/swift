@@ -13,6 +13,7 @@
 // RUN:   -verify-ignore-macro-note -verify-child-notes
 
 // REQUIRES: swift_feature_SafeInteropWrappers
+// REQUIRES: swift_feature_SafeInteropWrappersNullAsEmptySpan
 // REQUIRES: swift_feature_Lifetimes
 
 //--- Inputs/module.modulemap
