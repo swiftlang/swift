@@ -3116,17 +3116,20 @@ static bool requiresCorrespondingLegacyCoroutineAccessorImpl(
   if (!accessor)
     return false;
 
-  // For concrete types only: Availability-gated ABI compatibility only matters
-  // on targets that support versioned OS availability: there, a binary built
-  // before the new yielding ABI become available may run against a newer
-  // framework, so the framework must preserve the old ABI accessor.  Targets
-  // without versioned availability (e.g. Linux, embedded) have no prebuilt
-  // binaries to stay compatible with, so always emit only the new ABI.
-  //
-  // (For protocols, witness-table stability requirements get
-  // checked later in this function.)
-  if (!isa<ProtocolDecl>(storage->getDeclContext()) &&
-      !ctx.supportsVersionedAvailability())
+  // Always emit an old-ABI wrapper for protocols.  This ensures that
+  // protocol witness-table layout remains frozen and identical across every
+  // platform and deployment target, so that an old, never-recompiled
+  // conformance or caller can always link against the same slot.
+  if (storage->getDeclContext()->getSelfProtocolDecl())
+    return true;
+
+  // Availability-gated ABI compatibility only matters on targets that support
+  // versioned OS availability: there, a binary built before the new yielding
+  // ABI became available may run against a newer framework, so the framework
+  // must preserve the old ABI accessor.  Targets without versioned
+  // availability (e.g. Linux, embedded) have no prebuilt binaries to stay
+  // compatible with, so always emit only the new ABI.
+  if (!ctx.supportsVersionedAvailability())
     return false;
 
   AvailabilityContext accessorAvailability = [&] {

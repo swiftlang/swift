@@ -374,12 +374,18 @@ public struct ImplBLegacyCoroutineAccessors : ~Copyable & P2 {
       yield &_i
     }
   }
-// ImplB is introduced at the feature's own availability, so there is no old ABI
-// to preserve: only the yield_once_2 accessors are emitted, no yield_once vr/vM.
+// ImplB is introduced at the feature's own availability, so on its own its
+// concrete accessor set would skip the legacy ABI (only yield_once_2 vy/vx).
+// But it conforms to P2, whose `!read`/`!modify` witness slots are frozen and
+// required unconditionally with no default implementation (see P2's default
+// witness table above) -- so satisfying the conformance forces the additive
+// yield_once vr/vM here too, forwarding to vy/vx just like ImplA's.
 // CHECK-LABEL: sil{{.*}} @$s17read_requirements29ImplBLegacyCoroutineAccessorsV3ursAA1UVvy : $@yield_once_2 @convention
 // CHECK-LABEL: sil{{.*}} @$s17read_requirements29ImplBLegacyCoroutineAccessorsV3ursAA1UVvx : $@yield_once_2 @convention
-// CHECK-NOT:   @$s17read_requirements29ImplBLegacyCoroutineAccessorsV3ursAA1UVvr :
-// CHECK-NOT:   @$s17read_requirements29ImplBLegacyCoroutineAccessorsV3ursAA1UVvM :
+// CHECK-LABEL: sil{{.*}} @$s17read_requirements29ImplBLegacyCoroutineAccessorsV3ursAA1UVvr : $@yield_once @convention
+// CHECK:         function_ref @$s17read_requirements29ImplBLegacyCoroutineAccessorsV3ursAA1UVvy
+// CHECK-LABEL: sil{{.*}} @$s17read_requirements29ImplBLegacyCoroutineAccessorsV3ursAA1UVvM : $@yield_once @convention
+// CHECK:         function_ref @$s17read_requirements29ImplBLegacyCoroutineAccessorsV3ursAA1UVvx
 }
 
 @frozen
@@ -1225,12 +1231,14 @@ public struct ImplCUnsafeAddressors : P3 {
 // CHECK-NEXT:  }
 
 // CHECK-LABEL: sil_witness_table{{.*}} ImplBStored: P2 module read_requirements {
-// CHECK-unstable:    method #P2.urs!read
+// CHECK-NEXT:    method #P2.urs!read
+// CHECK-SAME:      : @$s17read_requirements11ImplBStoredVAA2P2A2aDP3ursAA1UVvrTW
 // CHECK-NEXT:    method #P2.urs!yielding_borrow
 // CHECK-SAME:      : @$s17read_requirements11ImplBStoredVAA2P2A2aDP3ursAA1UVvyTW
 // CHECK-NEXT:    method #P2.urs!setter
 // CHECK-SAME:        : @$s17read_requirements11ImplBStoredVAA2P2A2aDP3ursAA1UVvsTW
-// CHECK-unstable:    method #P2.urs!modify
+// CHECK-NEXT:    method #P2.urs!modify
+// CHECK-SAME:      : @$s17read_requirements11ImplBStoredVAA2P2A2aDP3ursAA1UVvMTW
 // CHECK-NEXT:    method #P2.urs!yielding_mutate
 // CHECK-SAME:      : @$s17read_requirements11ImplBStoredVAA2P2A2aDP3ursAA1UVvxTW
 // CHECK-NEXT:  }
@@ -1256,12 +1264,14 @@ public struct ImplCUnsafeAddressors : P3 {
 // CHECK-NEXT:  }
 
 // CHECK-LABEL: sil_witness_table{{.*}} ImplBLegacyCoroutineAccessors: P2 module read_requirements {
-// CHECK-unstable:    method #P2.urs!read
+// CHECK-NEXT:    method #P2.urs!read
+// CHECK-SAME:        : @$s17read_requirements29ImplBLegacyCoroutineAccessorsVAA2P2A2aDP3ursAA1UVvrTW
 // CHECK-NEXT:    method #P2.urs!yielding_borrow
 // CHECK-SAME:      : @$s17read_requirements29ImplBLegacyCoroutineAccessorsVAA2P2A2aDP3ursAA1UVvyTW
 // CHECK-NEXT:    method #P2.urs!setter
 // CHECK-SAME:        : @$s17read_requirements29ImplBLegacyCoroutineAccessorsVAA2P2A2aDP3ursAA1UVvsTW
-// CHECK-unstable:    method #P2.urs!modify
+// CHECK-NEXT:    method #P2.urs!modify
+// CHECK-SAME:        : @$s17read_requirements29ImplBLegacyCoroutineAccessorsVAA2P2A2aDP3ursAA1UVvMTW
 // CHECK-NEXT:    method #P2.urs!yielding_mutate
 // CHECK-SAME:      : @$s17read_requirements29ImplBLegacyCoroutineAccessorsVAA2P2A2aDP3ursAA1UVvxTW
 // CHECK-NEXT:  }
@@ -1287,12 +1297,14 @@ public struct ImplCUnsafeAddressors : P3 {
 // CHECK-NEXT:  }
 
 // CHECK-LABEL: sil_witness_table{{.*}} ImplBCoroutineAccessors: P2 module read_requirements {
-// CHECK-unstable:    method #P2.urs!read
+// CHECK-NEXT:    method #P2.urs!read
+// CHECK-SAME:        : @$s17read_requirements23ImplBCoroutineAccessorsVAA2P2A2aDP3ursAA1UVvrTW
 // CHECK-NEXT:    method #P2.urs!yielding_borrow
 // CHECK-SAME:      : @$s17read_requirements23ImplBCoroutineAccessorsVAA2P2A2aDP3ursAA1UVvyTW
 // CHECK-NEXT:    method #P2.urs!setter
 // CHECK-SAME:        : @$s17read_requirements23ImplBCoroutineAccessorsVAA2P2A2aDP3ursAA1UVvsTW
-// CHECK-unstable:    method #P2.urs!modify
+// CHECK-NEXT:    method #P2.urs!modify
+// CHECK-SAME:        : @$s17read_requirements23ImplBCoroutineAccessorsVAA2P2A2aDP3ursAA1UVvMTW
 // CHECK-NEXT:    method #P2.urs!yielding_mutate
 // CHECK-SAME:      : @$s17read_requirements23ImplBCoroutineAccessorsVAA2P2A2aDP3ursAA1UVvxTW
 // CHECK-NEXT:  }
@@ -1318,12 +1330,14 @@ public struct ImplCUnsafeAddressors : P3 {
 // CHECK-NEXT:  }
 
 // CHECK-LABEL: sil_witness_table{{.*}} ImplBGetSet: P2 module read_requirements {
-// CHECK-unstable:    method #P2.urs!read
+// CHECK-NEXT:    method #P2.urs!read
+// CHECK-SAME:        : @$s17read_requirements11ImplBGetSetVAA2P2A2aDP3ursAA1UVvrTW
 // CHECK-NEXT:  method #P2.urs!yielding_borrow
 // CHECK-SAME:      : @$s17read_requirements11ImplBGetSetVAA2P2A2aDP3ursAA1UVvyTW
 // CHECK-NEXT:    method #P2.urs!setter
 // CHECK-SAME:        : @$s17read_requirements11ImplBGetSetVAA2P2A2aDP3ursAA1UVvsTW
-// CHECK-unstable:    method #P2.urs!modify
+// CHECK-NEXT:    method #P2.urs!modify
+// CHECK-SAME:        : @$s17read_requirements11ImplBGetSetVAA2P2A2aDP3ursAA1UVvMTW
 // CHECK-NEXT:  method #P2.urs!yielding_mutate
 // CHECK-SAME:      : @$s17read_requirements11ImplBGetSetVAA2P2A2aDP3ursAA1UVvxTW
 // CHECK-NEXT:  }
@@ -1349,12 +1363,14 @@ public struct ImplCUnsafeAddressors : P3 {
 // CHECK-NEXT:  }
 
 // CHECK-LABEL: sil_witness_table{{.*}} ImplBUnsafeAddressors: P2 module read_requirements {
-// CHECK-unstable:    method #P2.urs!read
+// CHECK-NEXT:    method #P2.urs!read
+// CHECK-SAME:        : @$s17read_requirements21ImplBUnsafeAddressorsVAA2P2A2aDP3ursAA1UVvrTW
 // CHECK-NEXT:    method #P2.urs!yielding_borrow
 // CHECK-SAME:      : @$s17read_requirements21ImplBUnsafeAddressorsVAA2P2A2aDP3ursAA1UVvyTW
 // CHECK-NEXT:    method #P2.urs!setter
 // CHECK-SAME:        : @$s17read_requirements21ImplBUnsafeAddressorsVAA2P2A2aDP3ursAA1UVvsTW
-// CHECK-unstable:    method #P2.urs!modify
+// CHECK-NEXT:    method #P2.urs!modify
+// CHECK-SAME:        : @$s17read_requirements21ImplBUnsafeAddressorsVAA2P2A2aDP3ursAA1UVvMTW
 // CHECK-NEXT:    method #P2.urs!yielding_mutate
 // CHECK-SAME:      : @$s17read_requirements21ImplBUnsafeAddressorsVAA2P2A2aDP3ursAA1UVvxTW
 // CHECK-NEXT:  }
@@ -1378,10 +1394,12 @@ public struct ImplCUnsafeAddressors : P3 {
 
 // CHECK-LABEL: sil_default_witness_table P2 {
 // CHECK-NEXT:    no_default
-// CHECK-unstable-NEXT:  method #P2.urs!yielding_borrow
+// CHECK-NEXT:  method #P2.urs!yielding_borrow
+// CHECK-SAME:      : @$s17read_requirements2P2P3ursAA1UVvy
 // CHECK-NEXT:    no_default
 // CHECK-NEXT:    no_default
-// CHECK-unstable-NEXT:  method #P2.urs!yielding_mutate
+// CHECK-NEXT:  method #P2.urs!yielding_mutate
+// CHECK-SAME:      : @$s17read_requirements2P2P3ursAA1UVvx
 // CHECK-NEXT:  }
 
 // CHECK-LABEL: sil_default_witness_table P3 {
