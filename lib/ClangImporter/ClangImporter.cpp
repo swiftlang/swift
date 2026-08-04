@@ -1710,7 +1710,7 @@ std::unique_ptr<ClangImporter> ClangImporter::create(
                                                 /*SkipFunctionBodies=*/false));
 
   clangPP.EnterMainSourceFile();
-  importer->Impl.Parser->Initialize();
+  importer->Impl.Parser->ConsumeToken();
 
   importer->Impl.nameImporter.reset(new NameImporter(
       importer->Impl.SwiftContext, importer->Impl.platformAvailability,
