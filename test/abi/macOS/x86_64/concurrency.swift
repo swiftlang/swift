@@ -462,3 +462,11 @@ Added: _$sSct8_rawTasks06_AsyncB0VvpMV
 
 /// Expose async task name offset in debug header.
 Added: __swift_concurrency_debug_asyncTaskNameOffset
+
+// Task Registry debug symbols
+Added: __swift_concurrency_debug_task_getId
+Added: __swift_concurrency_debug_task_getShardHead
+Added: __swift_concurrency_debug_task_getTaskNext
+Added: __swift_concurrency_debug_task_registryCount
+Added: __swift_concurrency_debug_task_registryWalk
+Added: __swift_concurrency_task_registry

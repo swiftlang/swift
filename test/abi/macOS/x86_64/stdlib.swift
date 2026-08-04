@@ -1340,3 +1340,6 @@ Added: _swift_retainReturningCount
 // String.UTF16View / Substring.UTF16View bulk _copyContents
 Added: _$sSS9UTF16ViewV13_copyContents12initializingAB8IteratorV_SitSrys6UInt16VG_tF
 Added: _$sSs9UTF16ViewV13_copyContents12initializings16IndexingIteratorVyABG_SitSrys6UInt16VG_tF
+
+// Task Registry
+Added: _concurrencyEnableTaskRegistry
