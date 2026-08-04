@@ -302,7 +302,13 @@ ASTSourceFileScope::ASTSourceFileScope(SourceFile *SF,
         SF->Kind == SourceFileKind::SyntheticMacro) {
       auto genInfo = *SF->getASTContext().SourceMgr.getGeneratedSourceInfo(
           SF->getBufferID());
-      parentLoc = ASTNode::getFromOpaqueValue(genInfo.astNode).getStartLoc();
+      auto node = ASTNode::getFromOpaqueValue(genInfo.astNode);
+      parentLoc = node.getStartLoc();
+      if (auto *D = node.dyn_cast<Decl *>()) {
+        if (auto *ext = dyn_cast<ExtensionDecl>(D)) {
+          parentLoc = ext->getBraces().Start;
+        }
+      }
       if (auto parentScope =
               findStartingScopeForLookup(enclosingSF, parentLoc)) {
         parentAndWasExpanded.setPointer(
