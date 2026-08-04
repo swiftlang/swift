@@ -11243,13 +11243,18 @@ void ClangImporter::Implementation::insertMembersAndAlternates(
 
     // If there are auxiliary declarations (e.g., produced by macros), load
     // those.
-    member->visitAuxiliaryDecls([&](Decl *aux) {
-      if (auto auxValue = dyn_cast<ValueDecl>(aux)) {
-        if (auxValue->getDeclContext() == expectedDC &&
-            knownAlternateMembers.insert(auxValue).second)
-          members.push_back(auxValue);
-      }
-    });
+    auto addAuxiliaryDecls = [&](Decl *forDecl) {
+      forDecl->visitAuxiliaryDecls([&](Decl *aux) {
+        if (auto auxValue = dyn_cast<ValueDecl>(aux)) {
+          if (auxValue->getDeclContext() == expectedDC &&
+              knownAlternateMembers.insert(auxValue).second)
+            members.push_back(auxValue);
+        }
+      });
+    };
+    addAuxiliaryDecls(member);
+    for (auto alternate : getAlternateDecls(member))
+      addAuxiliaryDecls(alternate);
 
     // If this declaration shouldn't be visible, don't add it to
     // the list.
