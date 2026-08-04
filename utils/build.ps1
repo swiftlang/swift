@@ -259,14 +259,14 @@ if ($UseHostToolchain -is [string]) {
 
 $DefaultPinned = @{
   AMD64 = @{
-    PinnedBuild = "https://download.swift.org/development/windows10/swift-DEVELOPMENT-SNAPSHOT-2026-03-16-a/swift-DEVELOPMENT-SNAPSHOT-2026-03-16-a-windows10.exe";
-    PinnedSHA256 = "34C90B5535A2D137C874A12D591201D2C3E324FB437CE51B6D057B8A8BA2CC4E";
-    PinnedVersion = "0.0.0";
+    PinnedBuild = "https://download.swift.org/swift-6.4.x-branch/windows10/swift-6.4.x-DEVELOPMENT-SNAPSHOT-2026-08-01-a/swift-6.4.x-DEVELOPMENT-SNAPSHOT-2026-08-01-a-windows10.exe";
+    PinnedSHA256 = "C9C3E64A05E5ED0857C2DF5B099113251F326CE73A05E1C88D0AB6F8EFE04BA2";
+    PinnedVersion = "6.4.0";
   };
   ARM64 = @{
-    PinnedBuild = "https://download.swift.org/development/windows10-arm64/swift-DEVELOPMENT-SNAPSHOT-2026-03-16-a/swift-DEVELOPMENT-SNAPSHOT-2026-03-16-a-windows10-arm64.exe"
-    PinnedSHA256 = "A60198647128269812AA00179801725BBD58D714AE52F2D19E7D0133DC035BF2";
-    PinnedVersion = "0.0.0";
+    PinnedBuild = "https://download.swift.org/swift-6.4.x-branch/windows10-arm64/swift-6.4.x-DEVELOPMENT-SNAPSHOT-2026-08-01-a/swift-6.4.x-DEVELOPMENT-SNAPSHOT-2026-08-01-a-windows10-arm64.exe"
+    PinnedSHA256 = "9481876E76B42A4FFA7B5394EA47C664FA899CBD6F1986E4770E8D9F3E21F773";
+    PinnedVersion = "6.4.0";
   };
 }
 
@@ -970,15 +970,13 @@ function Get-TargetInfo([Hashtable] $Platform) {
   # Cache the result of "swiftc -print-target-info" as $Platform.Cache.TargetInfo
   $CacheKey = "TargetInfo"
   if (-not $Platform.Cache.ContainsKey($CacheKey)) {
-    [void](Invoke-IsolatingEnvVars {
-      $env:Path = "$(Get-PinnedToolchainRuntime);$(Get-PinnedToolchainToolsDir);${env:Path}"
-      $TargetInfo = & swiftc -target $Platform.Triple -print-target-info
-      if ($LastExitCode -ne 0) {
-        throw "Unable to print target info for '$($Platform.Triple)'"
-      }
-      $TargetInfo = $TargetInfo | ConvertFrom-JSON
-      $Platform.Cache[$CacheKey] = $TargetInfo.target
-    })
+    $SwiftCompiler = Join-Path (Get-PinnedToolchainToolsDir) "swiftc.exe"
+    $TargetInfo = & $SwiftCompiler -target $Platform.Triple -print-target-info
+    if ($LastExitCode -ne 0) {
+      throw "Unable to print target info for '$($Platform.Triple)'"
+    }
+    $TargetInfo = $TargetInfo | ConvertFrom-JSON
+    $Platform.Cache[$CacheKey] = $TargetInfo.target
   }
   return $Platform.Cache[$CacheKey]
 }
@@ -1583,16 +1581,14 @@ function Get-Dependencies {
 
       # Write-Output "Extracting '$InstallerExeName' ..."
 
-      # The new runtime MSI is built to expand files into the immediate directory. So, setup the installation location.
-      New-Item -ItemType Directory -ErrorAction Ignore $BinaryCache\toolchains\$ToolchainName\LocalApp\Programs\Swift\Runtimes\$PinnedVersion\usr\bin | Out-Null
       Invoke-WithDotNetRuntime {
         Invoke-Program (Get-DotNet) "$($WiX.Path)\wix.dll" -- burn extract -acceptEula $WiX.EulaIdentifier $BinaryCache\$InstallerExeName -out $BinaryCache\toolchains\ -outba $BinaryCache\toolchains\
       }
+      New-Item -ItemType Directory -Path $destination -Force | Out-Null
       subst X: "$BinaryCache\toolchains\$ToolchainName"
       Get-ChildItem "$BinaryCache\toolchains\WixAttachedContainer" -Filter "*.msi" | ForEach-Object {
         $LogFile = [System.IO.Path]::ChangeExtension($_.Name, "log")
-        $TARGETDIR = if ($_.Name -eq "rtl.msi") { "X:\LocalApp\Programs\Swift\Runtimes\$PinnedVersion\usr\bin" } else { "X:\" }
-        Invoke-Program -OutNull msiexec.exe /lvx! $BinaryCache\toolchains\$LogFile /qn /a $BinaryCache\toolchains\WixAttachedContainer\$($_.Name) ALLUSERS=0 TARGETDIR=$TARGETDIR
+        Invoke-Program -OutNull msiexec.exe /lvx! $BinaryCache\toolchains\$LogFile /qn /a $BinaryCache\toolchains\WixAttachedContainer\$($_.Name) ALLUSERS=0 TARGETDIR=X:\
       }
       subst /d X:
     }
@@ -1784,12 +1780,6 @@ function Get-PinnedToolchainSDK([OS] $OS = $BuildPlatform.OS, [string] $Identifi
   return [IO.Path]::Combine("$BinaryCache\", "toolchains", $ToolchainVersionIdentifier,
     "LocalApp", "Programs", "Swift", "Platforms", $PinnedVersion,
     "$($OS.ToString()).platform", "Developer", "SDKs", "$Identifier.sdk")
-}
-
-function Get-PinnedToolchainRuntime() {
-  return [IO.Path]::Combine("$BinaryCache\", "toolchains", $ToolchainVersionIdentifier,
-    "LocalApp", "Programs", "Swift", "Runtimes", $PinnedVersion,
-    "usr", "bin")
 }
 
 function Add-KeyValueIfNew([hashtable]$Hashtable, [string]$Key, [string]$Value) {
@@ -2604,7 +2594,8 @@ function Copy-CMarkRuntimeToToolchain([Hashtable] $Platform, [string] $Toolchain
 
 function Copy-WindowsRuntimeToToolchain([Hashtable] $Platform,
                                         [string]    $ToolchainRoot,
-                                        [string]    $RuntimeLocation) {
+                                        [string]    $RuntimeLocation,
+                                        [switch]    $PrivateSxSRuntime) {
   if ($Platform.OS -ne [OS]::Windows) {
     return
   }
@@ -2616,7 +2607,20 @@ function Copy-WindowsRuntimeToToolchain([Hashtable] $Platform,
   $BinDir = [IO.Path]::Combine($ToolchainRoot, "usr", "bin")
   New-Item -ItemType Directory -Path $BinDir -Force | Out-Null
 
-  $RuntimeFiles = @(Get-ChildItem -Path $RuntimeLocation -File | Sort-Object Name)
+  $RuntimeFiles = if ($PrivateSxSRuntime) {
+    @(
+      Get-ChildItem -Path $RuntimeLocation -Directory |
+        ForEach-Object {
+          $DLL = Join-Path $_.FullName "$($_.Name).dll"
+          if (Test-Path $DLL -PathType Leaf) {
+            Get-Item $DLL
+          }
+        } |
+        Sort-Object Name
+    )
+  } else {
+    @(Get-ChildItem -Path $RuntimeLocation -File | Sort-Object Name)
+  }
   $DLLCount = @($RuntimeFiles | Where-Object { $_.Extension -ieq ".dll" }).Count
   if ($DLLCount -eq 0) {
     throw "Copy-WindowsRuntimeToToolchain: no DLLs found under '$RuntimeLocation'."
@@ -2670,36 +2674,30 @@ function Build-BuildTools([Hashtable] $Platform) {
 }
 
 function Build-EarlySwiftDriver([Hashtable] $Platform) {
-  # `-static-stdlib` requires static-stdlib content under `lib/swift_static/`,
-  # which only the experimental SDK in pinned ships; the resilient `Windows
-  # .sdk` only has the dynamic stdlib.  Hence the explicit `-Identifier`.
-  Invoke-IsolatingEnvVars {
-    $env:Path = "$(Get-PinnedToolchainRuntime);${env:Path}"
-    Build-CMakeProject `
-      -Src $SourceCache\swift-driver `
-      -Bin (Get-ProjectBinaryCache $Platform EarlySwiftDriver) `
-      -Platform $Platform `
-      -CCompiler $Compilers.Pinned.C `
-      -CXXCompiler $Compilers.Pinned.CXX `
-      -SwiftCompiler $Compilers.Pinned.Swift `
-      -SwiftSDK (Get-PinnedToolchainSDK -OS $Platform.OS -Identifier "$($Platform.OS)Experimental") `
-      -BuildTargets default `
-      -Defines @{
-        BUILD_SHARED_LIBS = "NO";
-        BUILD_TESTING = "NO";
-        CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
-        # TODO(compnerd) - remove `-Xfrontend -use-static-resource-dir` - this is inferred by the `-static-stdlib`.
-        CMAKE_Swift_FLAGS = @("-static-stdlib", "-Xfrontend", "-use-static-resource-dir");
-        SWIFT_DRIVER_BUILD_TOOLS = "NO";
-        SQLite3_INCLUDE_DIR = "$SourceCache\swift-toolchain-sqlite\Sources\CSQLite\include";
-        SQLite3_LIBRARY = "$(Get-ProjectBinaryCache $Platform EarlySwiftDriverSQLite)\SQLite3.lib";
+  Build-CMakeProject `
+    -Src $SourceCache\swift-driver `
+    -Bin (Get-ProjectBinaryCache $Platform EarlySwiftDriver) `
+    -Platform $Platform `
+    -CCompiler $Compilers.Pinned.C `
+    -CXXCompiler $Compilers.Pinned.CXX `
+    -SwiftCompiler $Compilers.Pinned.Swift `
+    -SwiftSDK (Get-PinnedToolchainSDK -OS $Platform.OS) `
+    -BuildTargets default `
+    -Defines @{
+      BUILD_SHARED_LIBS = "NO";
+      BUILD_TESTING = "NO";
+      CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+      # TODO(compnerd) - remove `-Xfrontend -use-static-resource-dir` - this is inferred by the `-static-stdlib`.
+      CMAKE_Swift_FLAGS = @("-static-stdlib", "-Xfrontend", "-use-static-resource-dir");
+      SWIFT_DRIVER_BUILD_TOOLS = "NO";
+      SQLite3_INCLUDE_DIR = "$SourceCache\swift-toolchain-sqlite\Sources\CSQLite\include";
+      SQLite3_LIBRARY = "$(Get-ProjectBinaryCache $Platform EarlySwiftDriverSQLite)\SQLite3.lib";
 
-        # Prevent re-cloning the sources
-        FETCHCONTENT_SOURCE_DIR_ARGUMENTPARSER = "$SourceCache\swift-argument-parser";
-        FETCHCONTENT_SOURCE_DIR_LLBUILD = "$SourceCache\llbuild";
-        FETCHCONTENT_SOURCE_DIR_TOOLSSUPPORTCORE = "$SourceCache\swift-tools-support-core";
-      }
-  }
+      # Prevent re-cloning the sources
+      FETCHCONTENT_SOURCE_DIR_ARGUMENTPARSER = "$SourceCache\swift-argument-parser";
+      FETCHCONTENT_SOURCE_DIR_LLBUILD = "$SourceCache\llbuild";
+      FETCHCONTENT_SOURCE_DIR_TOOLSSUPPORTCORE = "$SourceCache\swift-tools-support-core";
+    }
 }
 
 function Write-PList {
@@ -2879,32 +2877,27 @@ function Build-Compilers([Hashtable] $Platform,
                          [string]    $SwiftSDK         = (Get-PinnedToolchainSDK -OS $Platform.OS),
                          [string]    $ToolchainRoot    = "$(Get-InstallDir $Platform)\Toolchains\$ProductVersion+$Variant",
                          [string]    $RuntimeLocation  = $null,
+                         [switch]    $PrivateSxSRuntime,
                          [string]    $DispatchPackage  = $null,
                          [string]    $CacheScript      = "$SourceCache\swift\cmake\caches\Windows-$($Platform.Architecture.LLVMName).cmake") {
   New-Item -ItemType Directory -Path $BinaryCache\$($HostPlatform.Triple) -ErrorAction Ignore | Out-Null
 
-  Invoke-IsolatingEnvVars {
-    if ($SwiftCompiler -and $SwiftCompiler.Executable -eq $Compilers.Pinned.Swift.Executable) {
-      $env:Path = "$(Get-PinnedToolchainRuntime);${env:Path}"
-    }
-
-    Build-CMakeProject `
-      -Src $SourceCache\llvm-project\llvm `
-      -Bin (Get-ProjectBinaryCache $Platform $Project) `
-      -InstallTo "$ToolchainRoot\usr" `
-      -Platform $Platform `
-      -CCompiler $CCompiler `
-      -CXXCompiler $CXXCompiler `
-      -SwiftCompiler $SwiftCompiler `
-      -SwiftSDK $SwiftSDK `
-      -BuildTargets @("install-distribution") `
-      -CacheScript $CacheScript `
-      -Defines (Get-CompilersDefines $Platform $Variant -SwiftSDK $SwiftSDK -DispatchPackage $DispatchPackage)
-  }
+  Build-CMakeProject `
+    -Src $SourceCache\llvm-project\llvm `
+    -Bin (Get-ProjectBinaryCache $Platform $Project) `
+    -InstallTo "$ToolchainRoot\usr" `
+    -Platform $Platform `
+    -CCompiler $CCompiler `
+    -CXXCompiler $CXXCompiler `
+    -SwiftCompiler $SwiftCompiler `
+    -SwiftSDK $SwiftSDK `
+    -BuildTargets @("install-distribution") `
+    -CacheScript $CacheScript `
+    -Defines (Get-CompilersDefines $Platform $Variant -SwiftSDK $SwiftSDK -DispatchPackage $DispatchPackage)
 
   Copy-CMarkRuntimeToToolchain $Platform $ToolchainRoot
   if ($RuntimeLocation) {
-    Copy-WindowsRuntimeToToolchain $Platform $ToolchainRoot $RuntimeLocation
+    Copy-WindowsRuntimeToToolchain $Platform $ToolchainRoot $RuntimeLocation -PrivateSxSRuntime:$PrivateSxSRuntime
   }
 }
 
@@ -5710,7 +5703,8 @@ if ($Toolchain) {
     SwiftCompiler   = $Compilers.Pinned.Swift;
     SwiftSDK        = Get-PinnedToolchainSDK -OS $BuildPlatform.OS;
     ToolchainRoot   = Get-ProjectToolchainRoot $BuildPlatform Stage0Compilers;
-    RuntimeLocation = Get-PinnedToolchainRuntime;
+    RuntimeLocation = Get-PinnedToolchainToolsDir;
+    PrivateSxSRuntime = $true;
   }
 
   # ── Bootstrap SDK ─────────────────────────────────────────────────────────
