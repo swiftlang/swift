@@ -203,6 +203,7 @@ import StringComparison
 import StringDistance
 import StringEdits
 import StringEnum
+import StringInsert
 import StringInterpolation
 import StringMatch
 import StringRemoveDupes
@@ -417,6 +418,7 @@ register(StringComparison.benchmarks)
 register(StringDistance.benchmarks)
 register(StringEdits.benchmarks)
 register(StringEnum.benchmarks)
+register(StringInsert.benchmarks)
 register(StringInterpolation.benchmarks)
 register(StringMatch.benchmarks)
 register(StringRemoveDupes.benchmarks)
