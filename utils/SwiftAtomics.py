@@ -122,14 +122,10 @@ def llvmToCaseName(ordering):
         return "sequentiallyConsistent"
 
 
-# Note: 'operation' is the LLVM name from the second column of
-# integerOperations, so the comparisons below must be against the lowercase
-# spelling. Comparing against the capitalized Swift name silently selects the
-# signed builtin for unsigned types.
 def atomicOperationName(intType, operation):
-    if operation == "min":
+    if operation == "Min":
         return "umin" if intType.startswith("U") else "min"
-    if operation == "max":
+    if operation == "Max":
         return "umax" if intType.startswith("U") else "max"
     return operation
 
