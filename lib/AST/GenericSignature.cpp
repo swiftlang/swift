@@ -894,6 +894,22 @@ static int compareDependentTypesRec(Type type1, Type type2) {
   // Fast-path check for equality.
   if (type1->isEqual(type2)) return 0;
 
+  // Metatypes are ordered by their instance type, with a bare type parameter
+  // ordered before its metatype (so 'T' < 'T.Type'). This lets a metatype be
+  // the subject of a requirement, e.g. 'T.Type: P'.
+  auto meta1 = type1->getAs<AnyMetatypeType>();
+  auto meta2 = type2->getAs<AnyMetatypeType>();
+  if (meta1 || meta2) {
+    auto instance1 = meta1 ? meta1->getInstanceType() : type1;
+    auto instance2 = meta2 ? meta2->getInstanceType() : type2;
+    if (int comparison = compareDependentTypesRec(instance1, instance2))
+      return comparison;
+    // Equal instance types: the bare type parameter orders before the metatype.
+    if (static_cast<bool>(meta1) != static_cast<bool>(meta2))
+      return meta1 ? +1 : -1;
+    return 0;
+  }
+
   // Ordering is as follows:
   // - Generic params
   auto gp1 = type1->getAs<GenericTypeParamType>();
@@ -929,8 +945,16 @@ static int compareDependentTypesRec(Type type1, Type type2) {
 
 /// Canonical ordering for type parameters.
 int swift::compareDependentTypes(Type type1, Type type2) {
-  auto *root1 = type1->getRootGenericParam();
-  auto *root2 = type2->getRootGenericParam();
+  // Look through metatypes to the underlying type parameter when determining
+  // the generic-parameter weight; the metatype itself is ordered within
+  // `compareDependentTypesRec` (so 'T.Type: P' can be a requirement).
+  auto rootParamType = [](Type type) -> GenericTypeParamType * {
+    while (auto meta = type->getAs<AnyMetatypeType>())
+      type = meta->getInstanceType();
+    return type->getRootGenericParam();
+  };
+  auto *root1 = rootParamType(type1);
+  auto *root2 = rootParamType(type2);
   if (root1->getWeight() != root2->getWeight()) {
     return root2->getWeight() ? -1 : +1;
   }
@@ -974,7 +998,14 @@ void GenericSignature::verify(ArrayRef<Requirement> reqts) const {
 
     // Left-hand side must be a canonical type parameter.
     if (reqt.getKind() != RequirementKind::SameType) {
-      if (!reqt.getFirstType()->isTypeParameter()) {
+      auto subjectType = reqt.getFirstType();
+
+      // A metatype subject (e.g. 'T.Type: P') is permitted; in that case its
+      // instance type must be the type parameter.
+      if (auto *metatype = subjectType->getAs<AnyMetatypeType>())
+        subjectType = metatype->getInstanceType();
+
+      if (!subjectType->isTypeParameter()) {
         dumpAndAbort([&](auto &out) {
           out << "Left-hand side must be a type parameter: ";
           reqt.dump(out);
@@ -1495,6 +1526,12 @@ void GenericSignatureImpl::getRequirementsWithInversesImpl(
 
     auto subject = req.getFirstType();
     auto *proto = req.getProtocolDecl();
+
+    // A metatype subject (e.g. 'T.Type: P') does not participate in primary
+    // associatedtype inverse defaulting and has no member types to suppress, so
+    // skip it.
+    if (subject->is<AnyMetatypeType>())
+      continue;
 
     // Only consider conformance requirements whose subject is rooted in
     // a generic parameter that is within this signature's depth.
