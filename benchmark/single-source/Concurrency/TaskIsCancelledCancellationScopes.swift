@@ -99,8 +99,8 @@ public func run_InScopeOuterShield(n: Int) async {
   await withTaskCancellationShield {
     await __withTaskCancellationScope { scope in
       scope.cancel()
-      // Shield is OUTSIDE the scope on the chain: walker sees SCOPE
-      // (cancelled) first, returns true. Positional walk still runs.
+      // Shield is OUTSIDE the scope: walker sees SCOPE (cancelled) first,
+      // returns true. Positional walk still runs.
       blackHole(hotLoop(n * 1000))
     }
   }
