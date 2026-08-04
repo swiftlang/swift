@@ -15,8 +15,12 @@
 
 // ...and the old yield_once accessors are absent (separate invocation so the
 // CHECK-NOT scans the whole input regardless of accessor emission order).
+// The new accessors' own convention is pinned explicitly: the NOT check below
+// distinguishes old from new by the literal absence of "_2", so it needs the
+// new accessors to actually use the yield_once_2 convention here too.
 // RUN: %target-swift-emit-silgen %s                          \
 // RUN:     -enable-experimental-feature CoroutineAccessors   \
+// RUN:     -enable-callee-allocated-coro-abi                 \
 // RUN:     -module-name main                                 \
 // RUN:   | %FileCheck %s --check-prefix=NOOLD
 
@@ -31,9 +35,10 @@
 
 // On a non-ABI-stable platform, confirm the old accessors are still absent even
 // under library evolution (separate invocation, as above, so a lone CHECK-NOT
-// scans the whole input).
+// scans the whole input; same reason for pinning the convention explicitly).
 // RUN: %target-swift-emit-silgen %s                          \
 // RUN:     -enable-experimental-feature CoroutineAccessors   \
+// RUN:     -enable-callee-allocated-coro-abi                 \
 // RUN:     -enable-library-evolution                         \
 // RUN:     -module-name main                                 \
 // RUN:   | %FileCheck %s --check-prefix=NOOLD-RESILIENT-%target-abi-stability

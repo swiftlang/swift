@@ -25,9 +25,11 @@
 
 // On a non-ABI-stable platform, confirm the old accessors are still absent even
 // under library evolution (separate invocation so a lone CHECK-NOT scans the
-// whole input).
+// whole input).  The NOT check below distinguishes old from new by the literal
+// absence of "_2", so the new accessors' own convention must be pinned here too.
 // RUN: %target-swift-emit-silgen %s                          \
 // RUN:     -enable-experimental-feature CoroutineAccessors   \
+// RUN:     -enable-callee-allocated-coro-abi                 \
 // RUN:     -enable-library-evolution                         \
 // RUN:     -module-name m                                    \
 // RUN:   | %FileCheck %s --check-prefix=NO-OLD-ABI-RESILIENT-%target-abi-stability
