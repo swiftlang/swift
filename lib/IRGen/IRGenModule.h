@@ -1251,15 +1251,25 @@ public:
                                    ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfKeyPathPattern(KeyPathPattern *pattern,
                                           SILLocation diagLoc);
-  /// In embedded Swift, statically instantiate a key path object as an
-  /// immortal constant global instead of calling `swift_getKeyPath` at
-  /// runtime.  Returns a bitcast pointer to the key path class, or null if
-  /// this instruction's pattern isn't statically instantiable.
-  llvm::Constant *emitStaticKeyPathInstance(KeyPathInst *KPI);
-  /// True if `KPI` can be emitted as a static immortal constant in the
-  /// current compilation.  Currently limited to Embedded Swift, keypaths
-  /// with a single StoredProperty component, no substitutions, and no
-  /// captured operands.
+  /// In embedded Swift, describe a key path object at compile time instead of
+  /// calling `swift_getKeyPath` at runtime.  Returns a bitcast pointer to the
+  /// key path class, or null if this instruction's pattern can't be described
+  /// this way.
+  ///
+  /// If the key path captures values, the result is a *template*: its argument
+  /// areas are zeroed and the caller must allocate a copy and fill them in (see
+  /// `KeyPathInst::needsRuntimeInstantiation`).  Passing `argDataOffsets`
+  /// collects the byte offset of each capturing component's argument data
+  /// within the object, in component order.
+  llvm::Constant *
+  emitStaticKeyPathInstance(KeyPathInst *KPI,
+                            SmallVectorImpl<uint32_t> *argDataOffsets = nullptr);
+  /// True if `KPI` can be described at compile time in the current
+  /// compilation, rather than instantiated by `swift_getKeyPath`.  Currently
+  /// limited to Embedded Swift; `KeyPathInst::getStaticInstanceClassType` is
+  /// the single policy point for which patterns qualify.  Note that qualifying
+  /// does not imply the result is an immortal constant: see
+  /// `emitStaticKeyPathInstance` for capturing key paths.
   bool canEmitStaticKeyPathInstance(KeyPathInst *KPI);
   llvm::Constant *getAddrOfOpaqueTypeDescriptor(OpaqueTypeDecl *opaqueType,
                                                 ConstantInit forDefinition);
@@ -1622,6 +1632,12 @@ public:
   llvm::Constant *
   getDeletedCalleeAllocatedCoroutineMethodErrorCoroFunctionPointer();
 
+  /// Get (creating if necessary) a single shared local stub function which
+  /// calls swift_deletedMethodError(). Used to fill function-pointer slots
+  /// whose witness can never be reached, so that reaching one traps instead of
+  /// requiring us to emit a real (dead) implementation.
+  llvm::Function *getOrCreateDeadMethodErrorStub();
+
 private:
   llvm::Constant *EmptyTupleMetadata = nullptr;
   llvm::Constant *AnyExistentialMetadata = nullptr;
@@ -1650,7 +1666,6 @@ private:                                                                       \
   /// A local stub function that simply calls swift_deletedMethodError(),
   /// used to fill dead-method vtable/witness slots (see emitVTableStubs()).
   llvm::Function *DeadMethodErrorStub = nullptr;
-  llvm::Function *getOrCreateDeadMethodErrorStub();
   /// A Coroutine Function Pointer wrapping the above, suited for
   /// filling vtable/witness slots that point to "callee-allocated"
   /// (new ABI) coroutines.

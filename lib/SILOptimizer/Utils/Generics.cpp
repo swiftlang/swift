@@ -2497,11 +2497,6 @@ bool swift::specializeKeyPathInst(KeyPathInst *kpi, SILTransform *transform) {
     case KeyPathPatternComponent::Kind::GettableProperty:
     case KeyPathPatternComponent::Kind::SettableProperty:
     case KeyPathPatternComponent::Kind::Method: {
-      // Captured indices would need their own substituted layout/equality/hash
-      // functions; the embedded static emitter rejects them anyway.
-      if (!comp.getArguments().empty())
-        return false;
-
       SILFunction *getter =
           specializeAccessorThunk(comp.getComputedPropertyForGettable(), subs, fb);
       if (!getter)
@@ -2515,22 +2510,60 @@ bool swift::specializeKeyPathInst(KeyPathInst *kpi, SILTransform *transform) {
           return false;
       }
 
+      // Captured subscript arguments are described against the *pattern's*
+      // generic signature, the same one `subs` replaces, so they substitute
+      // with the same map as the accessors. This matters because the
+      // specialized pattern has no signature at all: leaving a `τ_0_0` behind
+      // in an index would make the verifier's `index.LoweredType.subst(M,
+      // patternSubs)` substitute through an empty map and produce a null type.
+      //
+      // The equals/hash thunks are generic over the same signature too, and
+      // are ordinary key path accessor thunks, so they specialize the same way
+      // the getter and setter do.
+      SmallVector<KeyPathPatternComponent::Index, 4> newIndices;
+      SILFunction *indicesEquals = nullptr;
+      SILFunction *indicesHash = nullptr;
+      if (!comp.getArguments().empty()) {
+        for (auto &index : comp.getArguments()) {
+          KeyPathPatternComponent::Index newIndex;
+          newIndex.Operand = index.Operand;
+          newIndex.FormalType =
+              index.FormalType.subst(subs)->getCanonicalType();
+          newIndex.LoweredType = index.LoweredType.subst(m, subs);
+          newIndex.Hashable = index.Hashable.subst(subs);
+          if (newIndex.Hashable.isInvalid())
+            return false;
+          newIndices.push_back(newIndex);
+        }
+
+        indicesEquals = specializeAccessorThunk(comp.getIndexEquals(), subs, fb);
+        if (!indicesEquals)
+          return false;
+        indicesHash = specializeAccessorThunk(comp.getIndexHash(), subs, fb);
+        if (!indicesHash)
+          return false;
+      }
+      // `Index`es are held by reference, and the pattern only copies the
+      // component structs, so this needs to outlive the local vector.
+      ArrayRef<KeyPathPatternComponent::Index> indices =
+          m.allocateCopy(llvm::ArrayRef(newIndices));
+
       auto id = comp.getComputedPropertyId();
       if (comp.getKind() == KeyPathPatternComponent::Kind::Method) {
         newComponents.push_back(KeyPathPatternComponent::forMethod(
-            id, getter, {}, nullptr, nullptr,
+            id, getter, indices, indicesEquals, indicesHash,
             cast_or_null<AbstractFunctionDecl>(comp.getExternalDecl()),
             comp.getExternalSubstitutions(), newComponentTy));
       } else if (setter) {
         newComponents.push_back(
             KeyPathPatternComponent::forComputedSettableProperty(
-                id, getter, setter, {}, nullptr, nullptr,
+                id, getter, setter, indices, indicesEquals, indicesHash,
                 cast_or_null<AbstractStorageDecl>(comp.getExternalDecl()),
                 comp.getExternalSubstitutions(), newComponentTy));
       } else {
         newComponents.push_back(
             KeyPathPatternComponent::forComputedGettableProperty(
-                id, getter, {}, nullptr, nullptr,
+                id, getter, indices, indicesEquals, indicesHash,
                 cast_or_null<AbstractStorageDecl>(comp.getExternalDecl()),
                 comp.getExternalSubstitutions(), newComponentTy));
       }

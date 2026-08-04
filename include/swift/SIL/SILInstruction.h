@@ -4447,12 +4447,22 @@ public:
 
   SubstitutionMap getSubstitutions() const { return Substitutions; }
 
-  /// If this `keypath_inst` can be emitted as a statically-instantiated
-  /// immortal instance in Embedded Swift, returns the concrete key path
-  /// class SILType (e.g. `$KeyPath<Foo, Bar>`, `$WritableKeyPath<Foo,
-  /// Bar>`, or `$ReferenceWritableKeyPath<Foo, Bar>`) that IRGen would use
-  /// as the object's isa.  Returns an invalid SILType otherwise.
+  /// If this `keypath_inst` can be described entirely at compile time in
+  /// Embedded Swift, returns the concrete key path class SILType (e.g.
+  /// `$KeyPath<Foo, Bar>`, `$WritableKeyPath<Foo, Bar>`, or
+  /// `$ReferenceWritableKeyPath<Foo, Bar>`) that IRGen would use as the
+  /// object's isa.  Returns an invalid SILType otherwise.
+  ///
+  /// A result here does not by itself mean the instance is a constant: if the
+  /// key path captures values, IRGen emits a template plus code to fill the
+  /// captures in.  See `needsRuntimeInstantiation`.
   SILType getStaticInstanceClassType() const;
+
+  /// Whether an Embedded Swift instance of this key path has to be allocated
+  /// and populated at runtime rather than referenced as an immortal constant.
+  /// True exactly when the key path captures values, i.e. when some component
+  /// has subscript arguments.
+  bool needsRuntimeInstantiation() const { return !getAllOperands().empty(); }
 
   void dropReferencedPattern();
   

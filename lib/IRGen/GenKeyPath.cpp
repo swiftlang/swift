@@ -270,7 +270,13 @@ getWitnessTableForComputedComponent(IRGenModule &IGM,
   if (isTrivial) {
     // We can use prefab witnesses for handling trivial copying and destruction.
     // A null destructor witness signals that the payload is trivial.
-    copy = IGM.getCopyKeyPathTrivialIndicesFn();
+    if (IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
+      // Embedded Swift never clones key path components, so put in a dead
+      // method stub.
+      copy = IGM.getOrCreateDeadMethodErrorStub();
+    } else {
+      copy = IGM.getCopyKeyPathTrivialIndicesFn();
+    }
   } else {
     // Generate a destructor for this set of indices.
     {
@@ -1466,6 +1472,15 @@ struct StaticKeyPathComponentLayout {
   enum class OptionalKind { Chain, Force, Wrap };
   OptionalKind optionalKind = OptionalKind::Chain;
 
+  /// For `Computed` with captured subscript arguments: the size in bytes of
+  /// the argument area, the padding that precedes it, and the witness table
+  /// that knows how to destroy/copy/compare/hash it.  `argWitnesses` is null
+  /// when the component captures nothing.
+  uint32_t argSize = 0;
+  uint32_t argPadding = 0;
+  uint32_t argAlignMask = 0;
+  llvm::Constant *argWitnesses = nullptr;
+
   Kind kind;
 
   /// For `StructOrTuple` / `Class`: whether the property is `let`.  Drives
@@ -1592,6 +1607,39 @@ computeStaticKeyPathComponentLayout(IRGenModule &IGM,
       layout.setter = IGM.getAddrOfSILFunction(
           comp.getComputedPropertyForSettable(), NotForDefinition);
     }
+
+    // Captured subscript arguments. Unlike the runtime-instantiated pattern,
+    // which has to compute the argument area's size with a layout function,
+    // everything here is fully specialized, so the size, alignment and padding
+    // are all compile-time constants.
+    if (!comp.getArguments().empty()) {
+      auto ptrSize = IGM.getPointerSize().getValue();
+      Size argSize(0);
+      Alignment argAlign(1);
+      for (auto &arg : comp.getArguments()) {
+        auto argTy = arg.LoweredType;
+        auto &argTI = IGM.getTypeInfo(argTy);
+        auto fixedTI = dyn_cast<FixedTypeInfo>(&argTI);
+        assert(fixedTI && "embedded key path capture must have a fixed layout");
+        argAlign = std::max(argAlign, fixedTI->getFixedAlignment());
+        argSize = argSize.roundUpToAlignment(fixedTI->getFixedAlignment());
+        argSize += fixedTI->getFixedSize();
+      }
+      layout.argSize = static_cast<uint32_t>(argSize.getValue());
+      // `RawKeyPathComponent` places the argument data after the size word and
+      // the witnesses pointer, i.e. at a pointer-aligned offset. Anything more
+      // aligned than a pointer needs explicit padding, which the size word
+      // records in units of pointers.
+      if (argAlign.getValue() > ptrSize) {
+        layout.argPadding =
+            static_cast<uint32_t>(argAlign.getValue() - ptrSize);
+        layout.argAlignMask = static_cast<uint32_t>(argAlign.getValue() - 1);
+      }
+      layout.argWitnesses = getWitnessTableForComputedComponent(
+          IGM, comp, /*genericEnv=*/nullptr, /*requirements=*/{});
+      assert(layout.argWitnesses &&
+             "a component with captures must have a witness table");
+    }
     return layout;
   }
   default:
@@ -1649,13 +1697,15 @@ encodeStaticKeyPathComponentHeader(
     // `RawKeyPathComponent._computedIDValue`), so we store it raw.
     return {KeyPathComponentHeader::forComputedProperty(
                 layout.computedKind, KeyPathComponentHeader::Pointer,
-                /*hasArguments=*/false, KeyPathComponentHeader::Resolved),
+                /*hasArguments=*/layout.argWitnesses != nullptr,
+                KeyPathComponentHeader::Resolved),
             std::nullopt};
   }
   llvm_unreachable("unhandled StaticKeyPathComponentLayout::Kind");
 }
 
-llvm::Constant *IRGenModule::emitStaticKeyPathInstance(KeyPathInst *KPI) {
+llvm::Constant *IRGenModule::emitStaticKeyPathInstance(
+    KeyPathInst *KPI, SmallVectorImpl<uint32_t> *argDataOffsets) {
   assert(canEmitStaticKeyPathInstance(KPI) &&
          "callers must check canEmitStaticKeyPathInstance() first");
 
@@ -1703,6 +1753,15 @@ llvm::Constant *IRGenModule::emitStaticKeyPathInstance(KeyPathInst *KPI) {
     // Metadata pointer for the intermediate type following this
     // component; null for the last component.
     llvm::Constant *nextTypeMetadata = nullptr;
+    // Captured-argument info, mirroring StaticKeyPathComponentLayout.
+    uint32_t argSize = 0;
+    uint32_t argPadding = 0;
+    uint32_t argAlignMask = 0;
+    llvm::Constant *argWitnesses = nullptr;
+    // Byte offset of this component's argument data within the emitted
+    // object, filled in during assembly and consumed by the caller so it can
+    // store the captured values.
+    uint32_t argDataOffset = 0;
   };
   SmallVector<StepInfo, 4> steps;
   steps.reserve(numComponents);
@@ -1734,6 +1793,10 @@ llvm::Constant *IRGenModule::emitStaticKeyPathInstance(KeyPathInst *KPI) {
     step.computedKind = layout.computedKind;
     step.getter = layout.getter;
     step.setter = layout.setter;
+    step.argSize = layout.argSize;
+    step.argPadding = layout.argPadding;
+    step.argAlignMask = layout.argAlignMask;
+    step.argWitnesses = layout.argWitnesses;
 
     // Advance to the next root by substituting the component's declared
     // component type.  The intermediate type metadata is emitted between
@@ -1780,6 +1843,13 @@ llvm::Constant *IRGenModule::emitStaticKeyPathInstance(KeyPathInst *KPI) {
       componentBytes += ptrSize * 2; // id + getter
       if (step.setter)
         componentBytes += ptrSize; // setter
+      if (step.argWitnesses) {
+        // Argument size word + witnesses pointer, then any over-alignment
+        // padding, then the captured values themselves.
+        componentBytes += static_cast<uint32_t>(ptrSize * 2);
+        componentBytes += step.argPadding;
+        componentBytes += step.argSize;
+      }
     }
     if (step.nextTypeMetadata) {
       // Pad up to pointer alignment before the intermediate type ptr.
@@ -1893,7 +1963,7 @@ llvm::Constant *IRGenModule::emitStaticKeyPathInstance(KeyPathInst *KPI) {
   uint32_t bytesInData = 0;
 
   for (size_t i = 0; i < numComponents; ++i) {
-    const auto &step = steps[i];
+    auto &step = steps[i];
     fields.addInt32(step.header.getData());
     bytesInData += 4;
 
@@ -1926,6 +1996,43 @@ llvm::Constant *IRGenModule::emitStaticKeyPathInstance(KeyPathInst *KPI) {
         fields.addSignedPointer(step.setter, schema, setterAuth);
         bytesInData += ptrSize;
       }
+
+      if (step.argWitnesses) {
+        // `ComputedArgumentSize`: the byte size in the low bits, the padding
+        // in units of pointers, and an over-alignment flag. Keep in sync with
+        // `RawKeyPathComponent.ComputedArgumentSize` in KeyPath.swift.
+        uint64_t sizeWord = step.argSize;
+        unsigned paddingShift = (ptrSize == 8) ? 62 : 28;
+        unsigned alignShift = (ptrSize == 8) ? 63 : 30;
+        sizeWord |= uint64_t(step.argPadding / ptrSize) << paddingShift;
+        if (step.argAlignMask)
+          sizeWord |= uint64_t(1) << alignShift;
+        fields.addInt(IntPtrTy, sizeWord);
+        bytesInData += ptrSize;
+
+        // The witnesses pointer itself is unsigned; the four function pointers
+        // it points at are address-discriminated (see
+        // `ComputedArgumentWitnessesPtr`).
+        fields.add(llvm::ConstantExpr::getBitCast(step.argWitnesses,
+                                                 Int8PtrTy));
+        bytesInData += ptrSize;
+
+        if (step.argPadding) {
+          fields.add(llvm::ConstantAggregateZero::get(
+              llvm::ArrayType::get(Int8Ty, step.argPadding)));
+          bytesInData += step.argPadding;
+        }
+
+        // The captured values are filled in at runtime; the template just
+        // reserves zeroed space for them. Record where that space lands so the
+        // caller can store into it.
+        step.argDataOffset =
+            static_cast<uint32_t>(bodySize + paddingBytes + 4 +
+                                  pointerAlignmentSkewBytes + bytesInData);
+        fields.add(llvm::ConstantAggregateZero::get(
+            llvm::ArrayType::get(Int8Ty, step.argSize)));
+        bytesInData += step.argSize;
+      }
     }
 
     if (step.nextTypeMetadata) {
@@ -1945,6 +2052,12 @@ llvm::Constant *IRGenModule::emitStaticKeyPathInstance(KeyPathInst *KPI) {
     }
   }
   (void)bytesInData; // used for arithmetic above only
+
+  if (argDataOffsets) {
+    for (auto &step : steps)
+      if (step.argWitnesses)
+        argDataOffsets->push_back(step.argDataOffset);
+  }
 
   auto *global = fields.finishAndCreateGlobal(
       "keypath", Alignment(16), /*constant*/ true,

@@ -43,6 +43,7 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:clang-declaration-import>
 - <doc:inconsistent-import-access>
 - <doc:isolated-conformances>
+- <doc:key-path-allocation>
 - <doc:error-in-future-swift-version>
 - <doc:old-suppressed-associatedtypes>
 - <doc:canimport-missing-module>
@@ -99,6 +100,7 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:clang-declaration-import>
 - <doc:inconsistent-import-access>
 - <doc:isolated-conformances>
+- <doc:key-path-allocation>
 - <doc:error-in-future-swift-version>
 - <doc:old-suppressed-associatedtypes>
 - <doc:canimport-missing-module>

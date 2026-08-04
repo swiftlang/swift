@@ -3440,10 +3440,9 @@ SILType KeyPathInst::getStaticInstanceClassType() const {
   if (getSubstitutions().getRecursiveProperties().hasArchetype())
     return SILType();
 
-  // Captured operands would require dynamic materialization (indices
-  // copied from arguments).
-  if (!getAllOperands().empty())
-    return SILType();
+  // Captured operands (subscript indices) are fine: the instance can still be
+  // described at compile time, but as a *template* whose argument area IRGen
+  // fills in where the key path is formed.  See `needsRuntimeInstantiation`.
 
   auto *pattern = getPattern();
   if (!pattern)
@@ -3489,13 +3488,22 @@ SILType KeyPathInst::getStaticInstanceClassType() const {
     case KeyPathPatternComponent::Kind::GettableProperty:
     case KeyPathPatternComponent::Kind::SettableProperty:
     case KeyPathPatternComponent::Kind::Method: {
-      // Reject captured subscript indices and external decl references.
-      if (!comp.getArguments().empty() || comp.getExternalDecl())
+      // External decl references would need the original module's property
+      // descriptor, which embedded Swift does not emit.
+      if (comp.getExternalDecl())
         return SILType();
       if (comp.getComputedPropertyForGettable()->isGeneric())
         return SILType();
       if (comp.getKind() == KeyPathPatternComponent::Kind::SettableProperty &&
           comp.getComputedPropertyForSettable()->isGeneric())
+        return SILType();
+      // A capturing component also puts the equals/hash thunks in the
+      // argument witness table, so those have to be fully specialized too.
+      // They are generic whenever the pattern's signature is, even when the
+      // captured values themselves are concrete.
+      if (!comp.getArguments().empty() &&
+          (comp.getIndexEquals()->isGeneric() ||
+           comp.getIndexHash()->isGeneric()))
         return SILType();
 
       if (comp.getKind() == KeyPathPatternComponent::Kind::SettableProperty &&
@@ -3563,10 +3571,9 @@ SILType KeyPathInst::getStaticInstanceClassType() const {
     case KeyPathPatternComponent::Kind::GettableProperty:
     case KeyPathPatternComponent::Kind::SettableProperty:
     case KeyPathPatternComponent::Kind::Method: {
-      // Reject captured subscript indices and external decl references —
-      // they'd require additional pattern-instantiation state we don't
-      // handle statically yet.
-      if (!comp.getArguments().empty() || comp.getExternalDecl())
+      // External decl references would need the original module's property
+      // descriptor, which embedded Swift does not emit.
+      if (comp.getExternalDecl())
         return SILType();
       if (comp.getComputedPropertyForGettable()->isGeneric())
         return SILType();
