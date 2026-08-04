@@ -528,3 +528,4 @@ async_MainTY1_ ---> (2) suspend resume partial function for async main entry poi
 async_MainTQ0_ ---> (1) await resume partial function for async main entry point
 async_MainTu ---> async function pointer to async main entry point
 _async_MainTY1_ ---> (2) suspend resume partial function for async main entry point
+$s1M1fyyxmAA1PxmRQlF ---> M.f<A where A.Type: M.P>(A.Type) -> ()
