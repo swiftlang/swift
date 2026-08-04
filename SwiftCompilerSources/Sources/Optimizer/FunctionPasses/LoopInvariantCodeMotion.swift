@@ -227,13 +227,8 @@ private func collectMovableInstructions(
         loadInstCounter += 1
       case is UncheckedOwnershipConversionInst:
         break // TODO: Add support
-      case let storeInst as StoreInst:
-        switch storeInst.storeOwnership {
-        case .assign:
-          continue  // TODO: Add support
-        case .unqualified, .trivial, .initialize:
-          break
-        }
+      case is StoreInst:
+        break // Stores are moved out of the loop in `hoistAndSinkLoadsAndStores`
       case let condFailInst as CondFailInst:
         // We can (and must) hoist cond_fail instructions if the operand is
         // invariant. We must hoist them so that we preserve memory safety. A
@@ -322,7 +317,10 @@ private extension AnalyzedInstructions {
       switch sideEffect {
       case let storeInst as StoreInst:
         if storeInst.storesTo(accessPath) {
-          return false
+          // TODO: Add support for `store [assign]`. Moving such a store out of the loop
+          //       requires to insert a `destroy_value` for the overwritten value at the
+          //       original store location.
+          return storeInst.storeOwnership == .assign
         }
       case let loadInst as LoadInst:
         if loadInst.loadsFrom(accessPath) {

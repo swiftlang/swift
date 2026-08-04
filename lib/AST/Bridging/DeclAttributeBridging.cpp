@@ -738,9 +738,12 @@ BridgedReferenceOwnershipAttr_createParsed(BridgedASTContext cContext,
 BridgedSectionAttr BridgedSectionAttr_createParsed(BridgedASTContext cContext,
                                                    SourceLoc atLoc,
                                                    SourceRange range,
+                                                   bool isDefault,
                                                    BridgedStringRef cName) {
-  return new (cContext.unbridged()) SectionAttr(cName.unbridged(), atLoc, range,
-                                                /*Implicit=*/false);
+  return new (cContext.unbridged()) SectionAttr(
+      isDefault ? std::nullopt
+                : std::optional<StringRef>(cName.unbridged()),
+      atLoc, range, /*Implicit=*/false);
 }
 
 BridgedSemanticsAttr

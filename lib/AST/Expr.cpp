@@ -2114,6 +2114,11 @@ bool AbstractClosureExpr::hasSingleExpressionBody() const {
   return true;
 }
 
+std::optional<StringRef> AbstractClosureExpr::getSection() const {
+  return evaluateOrDefault(getASTContext().evaluator,
+                           SectionForDeclRequest{this}, std::nullopt);
+}
+
 Expr *AbstractClosureExpr::getSingleExpressionBody() const {
   if (auto closure = dyn_cast<ClosureExpr>(this))
     return closure->getSingleExpressionBody();
@@ -2977,11 +2982,25 @@ void swift::simple_display(llvm::raw_ostream &out,
   out << "expression";
 }
 
+void swift::simple_display(llvm::raw_ostream &out,
+                           const AbstractClosureExpr *CE) {
+  if (!CE) {
+    out << "(null)";
+    return;
+  }
+
+  out << "closure";
+}
+
 SourceLoc swift::extractNearestSourceLoc(const ClosureExpr *expr) {
   return expr->getLoc();
 }
 
 SourceLoc swift::extractNearestSourceLoc(const Expr *expr) {
+  return expr->getLoc();
+}
+
+SourceLoc swift::extractNearestSourceLoc(const AbstractClosureExpr *expr) {
   return expr->getLoc();
 }
 

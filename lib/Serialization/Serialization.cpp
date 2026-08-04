@@ -3582,9 +3582,10 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     case DeclAttrKind::Section: {
       auto *theAttr = cast<SectionAttr>(DA);
       auto abbrCode = S.DeclTypeAbbrCodes[SectionDeclAttrLayout::Code];
-      SectionDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-                                           theAttr->isImplicit(),
-                                           theAttr->Name);
+      bool isDefault = theAttr->isDefault();
+      SectionDeclAttrLayout::emitRecord(
+          S.Out, S.ScratchRecord, abbrCode, theAttr->isImplicit(), isDefault,
+          isDefault ? StringRef() : *theAttr->Name);
       return;
     }
 

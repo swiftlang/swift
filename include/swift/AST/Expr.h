@@ -4190,6 +4190,13 @@ public:
     this->actorIsolation = actorIsolation;
   }
 
+  /// Determine the section into which this closure should be placed, based on
+  /// an explicit `@section` attribute or the inference rules for `@section`.
+  ///
+  /// \returns the name of the section, or \c std::nullopt if this closure
+  /// belongs in the platform-appropriate default section.
+  std::optional<StringRef> getSection() const;
+
   static bool classof(const Expr *E) {
     return E->getKind() >= ExprKind::First_AbstractClosureExpr &&
            E->getKind() <= ExprKind::Last_AbstractClosureExpr;
@@ -6784,8 +6791,16 @@ void simple_display(llvm::raw_ostream &out, const ClosureExpr *CE);
 void simple_display(llvm::raw_ostream &out, const DefaultArgumentExpr *expr);
 void simple_display(llvm::raw_ostream &out, const Expr *expr);
 
+/// Disambiguate between the \c Expr and \c DeclContext overloads, both of
+/// which \c AbstractClosureExpr inherits.
+void simple_display(llvm::raw_ostream &out, const AbstractClosureExpr *CE);
+
 SourceLoc extractNearestSourceLoc(const ClosureExpr *expr);
 SourceLoc extractNearestSourceLoc(const Expr *expr);
+
+/// Disambiguate between the \c Expr and \c DeclContext overloads, both of
+/// which \c AbstractClosureExpr inherits.
+SourceLoc extractNearestSourceLoc(const AbstractClosureExpr *expr);
 
 } // end namespace swift
 
