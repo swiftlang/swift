@@ -388,8 +388,29 @@ ConcreteContraction::substRequirement(const Requirement &req) const {
   }
 
   case RequirementKind::Conformance: {
-    auto substFirstType = substTypeParameter(
-        firstType, Position::ConformanceRequirement);
+    Type substFirstType;
+    Type conformanceKeyType = firstType;
+
+    if (auto *metatype = firstType->getAs<AnyMetatypeType>()) {
+      auto substInstanceType =
+          substTypeParameter(metatype->getInstanceType(),
+                             Position::ConformanceRequirement);
+
+      std::optional<MetatypeRepresentation> representation;
+      if (metatype->hasRepresentation())
+        representation = metatype->getRepresentation();
+
+      substFirstType =
+          isa<ExistentialMetatypeType>(metatype)
+              ? static_cast<Type>(ExistentialMetatypeType::get(substInstanceType,
+                                                               representation))
+              : static_cast<Type>(MetatypeType::get(substInstanceType,
+                                                    representation));
+      conformanceKeyType = metatype->getInstanceType();
+    } else {
+      substFirstType =
+          substTypeParameter(firstType, Position::ConformanceRequirement);
+    }
 
     auto *proto = req.getProtocolDecl();
 
@@ -402,7 +423,8 @@ ConcreteContraction::substRequirement(const Requirement &req) const {
     // 'T : Sendable' would be incorrect; we want to ensure that we only admit
     // subclasses of 'C' which are 'Sendable'.
     bool allowMissing = false;
-    auto key = stripBoundDependentMemberTypes(firstType)->getCanonicalType();
+    auto key =
+        stripBoundDependentMemberTypes(conformanceKeyType)->getCanonicalType();
     if (ConcreteTypes.count(key) > 0)
       allowMissing = true;
 
@@ -420,8 +442,13 @@ ConcreteContraction::substRequirement(const Requirement &req) const {
         // Handle the case of <T where T : P, T : C> where C is a class and
         // C does not conform to P and only substitute the parent type of T
         // by pretending we have a same-type requirement here.
-        substFirstType = substTypeParameter(
-            firstType, Position::SameTypeRequirement);
+        if (firstType->is<AnyMetatypeType>()) {
+          if (!allowMissing)
+            substFirstType = firstType;
+        } else {
+          substFirstType =
+              substTypeParameter(firstType, Position::SameTypeRequirement);
+        }
       }
     }
 
@@ -545,6 +572,18 @@ bool ConcreteContraction::performConcreteContraction(
   // subject type is a generic parameter.
   for (auto req : requirements) {
     auto subjectType = req.req.getFirstType();
+
+    // A metatype subject ('T.Type: P') is not a candidate for concrete
+    // contraction. We never fold the metatype itself to a concrete type, so
+    // skip it here and let it flow through to the rewrite system unchanged.
+    if (subjectType->is<AnyMetatypeType>()) {
+      ASSERT(subjectType->castTo<AnyMetatypeType>()
+                        ->getInstanceType()
+                        ->isTypeParameter() &&
+              "forgot to call desugarRequirement()");
+      continue;
+    }
+
     ASSERT(subjectType->isTypeParameter() &&
            "Forgot to call desugarRequirement()");
 

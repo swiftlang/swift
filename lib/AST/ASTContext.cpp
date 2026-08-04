@@ -6401,7 +6401,13 @@ GenericSignature::get(ArrayRef<GenericTypeParamType *> params,
 
 #ifndef NDEBUG
   for (auto req : requirements) {
-    assert(req.getFirstType()->isTypeParameter());
+    // The subject is normally a type parameter; a metatype subject
+    // (e.g.  'T.Type: P') is also permitted, in which case its instance type
+    // must be a type parameter.
+    auto subject = req.getFirstType();
+    if (auto *metatype = subject->getAs<AnyMetatypeType>())
+      subject = metatype->getInstanceType();
+    assert(subject->isTypeParameter());
     assert(!req.getFirstType()->hasTypeVariable());
     assert(req.getKind() == RequirementKind::Layout ||
            !req.getSecondType()->hasTypeVariable());
