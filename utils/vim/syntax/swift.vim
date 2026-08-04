@@ -15,6 +15,8 @@ if exists("b:current_syntax")
     finish
 endif
 
+" ---- Keywords ----
+
 syn keyword swiftKeyword
       \ await
       \ break
@@ -41,27 +43,32 @@ syn keyword swiftKeyword
 syn match swiftMultiwordKeyword
       \ "indirect case"
 
-syn keyword swiftCoreTypes
-      \ Any
-      \ AnyObject
+syn keyword swiftIdentifierKeyword
+      \ Self
+      \ metatype
+      \ self
+      \ super
 
-" Foo<Bar> in expression position, e.g. `MemoryLayout<any P>.size`. Must
-" precede the contained matches below so a declaration name like `Foo` in
-" `struct Foo<T>` still wins there, not this rule.
-syn match swiftType skipwhite skipempty nextgroup=swiftTypeParameters
-      \ /\<[A-Z][A-Za-z_0-9]*\>\ze</
+syn keyword swiftScope
+      \ autoreleasepool
 
-" Everything that can start a type; keeps the triggers below in sync.
-syn cluster swiftTypeContext contains=swiftTypeSpecifier,swiftConcurrencySpecifier,swiftExistentialType,swiftOpaqueType
+syn keyword swiftLabel
+      \ get
+      \ set
+      \ didSet
+      \ willSet
 
-syn keyword swiftExistentialType contained skipwhite skipempty nextgroup=@swiftTypeContext
-      \ any
+" ---- Modifiers & specifiers ----
 
-syn keyword swiftOpaqueType contained skipwhite skipempty nextgroup=@swiftTypeContext
-      \ some
-
-syn keyword swiftImport skipwhite skipempty nextgroup=swiftImportModule
-      \ import
+" nonisolated(unsafe), nonisolated(nonsending)
+syn keyword swiftModifierArgument contained
+      \ nonsending
+      \ unsafe
+syn region swiftModifierArguments contained transparent
+      \ matchgroup=Delimiter start=/(/ end=/)/
+      \ contains=swiftModifierArgument
+syn keyword swiftDefinitionModifier skipwhite skipempty nextgroup=swiftModifierArguments
+      \ nonisolated
 
 syn keyword swiftDefinitionModifier
       \ async
@@ -85,15 +92,6 @@ syn keyword swiftDefinitionModifier
       \ throws
       \ weak
 
-syn keyword swiftModifierArgument contained
-      \ nonsending
-      \ unsafe
-syn region swiftModifierArguments contained transparent
-      \ matchgroup=Delimiter start=/(/ end=/)/
-      \ contains=swiftModifierArgument
-syn keyword swiftDefinitionModifier skipwhite skipempty nextgroup=swiftModifierArguments
-      \ nonisolated
-
 syn keyword swiftTypeSpecifier contained skipwhite skipempty nextgroup=@swiftTypeContext
       \ borrowing
       \ consuming
@@ -103,11 +101,19 @@ syn keyword swiftTypeSpecifier contained skipwhite skipempty nextgroup=@swiftTyp
 syn keyword swiftConcurrencySpecifier contained skipwhite skipempty nextgroup=@swiftTypeContext
       \ sending
 
-syn keyword swiftIdentifierKeyword
-      \ Self
-      \ metatype
-      \ self
-      \ super
+syn keyword swiftFuncAttribute skipwhite skipempty nextgroup=swiftFuncDefinition
+      \ borrowing
+      \ consuming
+      \ mutating
+
+" ---- Declarations ----
+
+syn keyword swiftImport skipwhite skipempty nextgroup=swiftImportModule
+      \ import
+syn match swiftImportModule contained nextgroup=swiftImportComponent
+      \ /\<[A-Za-z_][A-Za-z_0-9]*\>/
+syn match swiftImportComponent contained nextgroup=swiftImportComponent
+      \ /\.\<[A-Za-z_][A-Za-z_0-9]*\>/
 
 syn keyword swiftFuncKeywordGeneral skipwhite skipempty nextgroup=swiftTypeParameters
       \ init
@@ -116,13 +122,6 @@ syn keyword swiftFuncKeyword
       \ deinit
       \ subscript
 
-syn keyword swiftScope
-      \ autoreleasepool
-
-syn keyword swiftFuncAttribute skipwhite skipempty nextgroup=swiftFuncDefinition
-      \ borrowing
-      \ consuming
-      \ mutating
 syn keyword swiftFuncDefinition skipwhite skipempty nextgroup=swiftTypeName,swiftOperator
       \ func
 
@@ -134,35 +133,37 @@ syn keyword swiftTypeDefinition skipwhite skipempty nextgroup=swiftTypeName
       \ precedencegroup
       \ protocol
       \ struct
+syn match swiftMultiwordTypeDefinition skipwhite skipempty nextgroup=swiftTypeName
+      \ "indirect enum"
 
 syn keyword swiftTypeAliasDefinition skipwhite skipempty nextgroup=swiftTypeAliasName
       \ associatedtype
       \ typealias
 
-syn match swiftMultiwordTypeDefinition skipwhite skipempty nextgroup=swiftTypeName
-      \ "indirect enum"
-
 syn keyword swiftVarDefinition skipwhite skipempty nextgroup=swiftVarName
       \ let
       \ var
 
-syn keyword swiftLabel
-      \ get
-      \ set
-      \ didSet
-      \ willSet
+" ---- Types ----
 
-syn keyword swiftBoolean
-      \ false
-      \ true
+syn keyword swiftCoreTypes
+      \ Any
+      \ AnyObject
 
-syn keyword swiftNil
-      \ nil
+" Foo<Bar> in expression position, e.g. `MemoryLayout<any P>.size`. Must
+" precede the contained matches below so a declaration name like `Foo` in
+" `struct Foo<T>` still wins there, not this rule.
+syn match swiftType skipwhite skipempty nextgroup=swiftTypeParameters
+      \ /\<[A-Z][A-Za-z_0-9]*\>\ze</
 
-syn match swiftImportModule contained nextgroup=swiftImportComponent
-      \ /\<[A-Za-z_][A-Za-z_0-9]*\>/
-syn match swiftImportComponent contained nextgroup=swiftImportComponent
-      \ /\.\<[A-Za-z_][A-Za-z_0-9]*\>/
+" Everything that can start a type; keeps the triggers below in sync.
+syn cluster swiftTypeContext contains=swiftTypeSpecifier,swiftConcurrencySpecifier,swiftExistentialType,swiftOpaqueType
+
+syn keyword swiftExistentialType contained skipwhite skipempty nextgroup=@swiftTypeContext
+      \ any
+
+syn keyword swiftOpaqueType contained skipwhite skipempty nextgroup=@swiftTypeContext
+      \ some
 
 syn match swiftTypeAliasName contained skipwhite skipempty nextgroup=swiftTypeAliasValue
       \ /\<[A-Za-z_][A-Za-z_0-9]*\>/
@@ -193,7 +194,7 @@ syn region swiftTypeParameters contained contains=swiftVarName,swiftConstraint,s
 syn keyword swiftConstraint contained
       \ where
 
-" Added once swiftType itself is fully defined below.
+" Added once swiftType itself is fully defined above.
 syn cluster swiftTypeContext add=swiftType
 
 syn match swiftTypeAliasValue skipwhite skipempty nextgroup=@swiftTypeContext
@@ -203,24 +204,19 @@ syn match swiftTypeDeclaration skipwhite skipempty nextgroup=@swiftTypeContext
 syn match swiftTypeDeclaration skipwhite skipempty nextgroup=@swiftTypeContext
       \ /->/
 
-syn match swiftKeyword
-      \ /\<case\>/
-syn region swiftCaseLabelRegion
-      \ matchgroup=swiftKeyword start=/\<case\>/ matchgroup=Delimiter end=/:/ oneline contains=TOP
-syn region swiftDefaultLabelRegion
-      \ matchgroup=swiftKeyword start=/\<default\>/ matchgroup=Delimiter end=/:/ oneline
+syn match swiftCastOp skipwhite skipempty nextgroup=@swiftTypeContext,swiftCoreTypes
+      \ "\<is\>"
+syn match swiftCastOp skipwhite skipempty nextgroup=@swiftTypeContext,swiftCoreTypes
+      \ "\<as\>[!?]\?"
 
-syn region swiftParenthesisRegion contains=TOP
-      \ matchgroup=NONE start=/(/ end=/)/
+" ---- Literals ----
 
-syn region swiftString contains=swiftInterpolationRegion
-      \ start=/"/ skip=/\\\\\|\\"/ end=/"/
-syn region swiftInterpolationRegion contained contains=TOP
-      \ matchgroup=swiftInterpolation start=/\\(/ end=/)/
-syn region swiftComment contains=swiftComment,swiftTodo
-      \ start="/\*" end="\*/"
-syn region swiftLineComment contains=swiftTodo
-      \ start="//" end="$"
+syn keyword swiftBoolean
+      \ false
+      \ true
+
+syn keyword swiftNil
+      \ nil
 
 syn match swiftDecimal
       \ /[+\-]\?\<\([0-9][0-9_]*\)\([.][0-9_]*\)\?\([eE][+\-]\?[0-9][0-9_]*\)\?\>/
@@ -231,18 +227,47 @@ syn match swiftOct
 syn match swiftBin
       \ /[+\-]\?\<0b[01][01_]*\>/
 
-syn match swiftOperator skipwhite skipempty nextgroup=swiftTypeParameters
-      \ "\.\@<!\.\.\.\@!\|[/=\-+*%<>!&|^~]\@<!\(/[/*]\@![/=\-+*%<>!&|^~]*\|*/\@![/=\-+*%<>!&|^~]*\|->\@![/=\-+*%<>!&|^~]*\|[=+%<>!&|^~][/=\-+*%<>!&|^~]*\)"
-syn match swiftOperator skipwhite skipempty nextgroup=swiftTypeParameters
-      \ "\.\.[<.]"
-
 syn match swiftChar
       \ /'\([^'\\]\|\\\(["'tnr0\\]\|x[0-9a-fA-F]\{2}\|u[0-9a-fA-F]\{4}\|U[0-9a-fA-F]\{8}\)\)'/
+
+syn region swiftString contains=swiftInterpolationRegion
+      \ start=/"/ skip=/\\\\\|\\"/ end=/"/
+syn region swiftInterpolationRegion contained contains=TOP
+      \ matchgroup=swiftInterpolation start=/\\(/ end=/)/
 
 syn match swiftTupleIndexNumber contains=swiftDecimal
       \ /\.[0-9]\+/
 syn match swiftDecimal contained
       \ /[0-9]\+/
+
+" ---- Case labels ----
+
+syn match swiftKeyword
+      \ /\<case\>/
+syn region swiftCaseLabelRegion
+      \ matchgroup=swiftKeyword start=/\<case\>/ matchgroup=Delimiter end=/:/ oneline contains=TOP
+syn region swiftDefaultLabelRegion
+      \ matchgroup=swiftKeyword start=/\<default\>/ matchgroup=Delimiter end=/:/ oneline
+
+" ---- Operators & delimiters ----
+
+syn region swiftParenthesisRegion contains=TOP
+      \ matchgroup=NONE start=/(/ end=/)/
+
+syn match swiftOperator skipwhite skipempty nextgroup=swiftTypeParameters
+      \ "\.\@<!\.\.\.\@!\|[/=\-+*%<>!&|^~]\@<!\(/[/*]\@![/=\-+*%<>!&|^~]*\|*/\@![/=\-+*%<>!&|^~]*\|->\@![/=\-+*%<>!&|^~]*\|[=+%<>!&|^~][/=\-+*%<>!&|^~]*\)"
+syn match swiftOperator skipwhite skipempty nextgroup=swiftTypeParameters
+      \ "\.\.[<.]"
+
+syn match swiftNilOps
+      \ "??"
+
+" ---- Attributes ----
+
+syn match swiftAttribute
+      \ /@\<\w\+\>/ skipwhite skipempty nextgroup=swiftAttribute,swiftDefinitionModifier,swiftImport,swiftType,swiftTypeAliasDefinition,swiftTypeDefinition
+
+" ---- Preprocessor & macros ----
 
 " This is a superset of the Preproc macros below, so it must come FIRST
 syn match swiftFreestandingMacro
@@ -254,73 +279,80 @@ syn match swiftPreproc
 syn region swiftPreprocFalse
       \ start="^\s*#\<if\>\s\+\<false\>" end="^\s*#\(\<else\>\|\<elseif\>\|\<endif\>\)"
 
-syn match swiftAttribute
-      \ /@\<\w\+\>/ skipwhite skipempty nextgroup=swiftAttribute,swiftDefinitionModifier,swiftImport,swiftType,swiftTypeAliasDefinition,swiftTypeDefinition
+" ---- Comments ----
 
+syn region swiftComment contains=swiftComment,swiftTodo
+      \ start="/\*" end="\*/"
+syn region swiftLineComment contains=swiftTodo
+      \ start="//" end="$"
 syn keyword swiftTodo MARK TODO FIXME contained
 
-syn match swiftCastOp skipwhite skipempty nextgroup=@swiftTypeContext,swiftCoreTypes
-      \ "\<is\>"
-syn match swiftCastOp skipwhite skipempty nextgroup=@swiftTypeContext,swiftCoreTypes
-      \ "\<as\>[!?]\?"
-
-syn match swiftNilOps
-      \ "??"
+" ---- Misc ----
 
 syn region swiftReservedIdentifier oneline
       \ start=/`/ end=/`/
 
+" ---- Highlighting links ----
+
+hi def link swiftKeyword Statement
+hi def link swiftMultiwordKeyword Statement
+hi def link swiftIdentifierKeyword Identifier
+hi def link swiftScope PreProc
+hi def link swiftLabel Operator
+
+hi def link swiftModifierArgument Special
+hi def link swiftDefinitionModifier Operator
+hi def link swiftTypeSpecifier Define
+hi def link swiftConcurrencySpecifier Define
+hi def link swiftFuncAttribute Statement
+
 hi def link swiftImport Include
 hi def link swiftImportModule Title
 hi def link swiftImportComponent Identifier
-hi def link swiftKeyword Statement
-hi def link swiftCoreTypes Type
-hi def link swiftMultiwordKeyword Statement
+hi def link swiftFuncKeywordGeneral Function
+hi def link swiftFuncKeyword Function
+hi def link swiftFuncDefinition Define
 hi def link swiftTypeDefinition Define
 hi def link swiftMultiwordTypeDefinition Define
-hi def link swiftType Type
-hi def link swiftTypePair Type
-hi def link swiftTypeAliasName Identifier
-hi def link swiftTypeName Function
-hi def link swiftConstraint Special
-hi def link swiftFuncDefinition Define
-hi def link swiftDefinitionModifier Operator
-hi def link swiftModifierArgument Special
-hi def link swiftExistentialType Type
-hi def link swiftFuncAttribute Statement
-hi def link swiftFuncKeyword Function
-hi def link swiftFuncKeywordGeneral Function
 hi def link swiftTypeAliasDefinition Define
 hi def link swiftVarDefinition Define
+
+hi def link swiftCoreTypes Type
+hi def link swiftType Type
+hi def link swiftTypePair Type
+hi def link swiftExistentialType Type
+hi def link swiftOpaqueType Type
+hi def link swiftTypeAliasName Identifier
+hi def link swiftTypeName Function
 hi def link swiftVarName Identifier
 hi def link swiftImplicitVarName Identifier
-hi def link swiftIdentifierKeyword Identifier
+hi def link swiftConstraint Special
 hi def link swiftTypeAliasValue Delimiter
 hi def link swiftTypeDeclaration Delimiter
 hi def link swiftTypeParameters Delimiter
-hi def link swiftTypeSpecifier Define
-hi def link swiftConcurrencySpecifier Define
+hi def link swiftCastOp Operator
+
 hi def link swiftBoolean Boolean
-hi def link swiftString String
-hi def link swiftInterpolation Special
-hi def link swiftComment Comment
-hi def link swiftLineComment Comment
+hi def link swiftNil Constant
 hi def link swiftDecimal Number
 hi def link swiftHex Number
 hi def link swiftOct Number
 hi def link swiftBin Number
-hi def link swiftOperator Function
-hi def link swiftOpaqueType Type
 hi def link swiftChar Character
-hi def link swiftLabel Operator
+hi def link swiftString String
+hi def link swiftInterpolation Special
+
+hi def link swiftOperator Function
+hi def link swiftNilOps Operator
+
+hi def link swiftAttribute Type
+
 hi def link swiftPreproc PreCondit
 hi def link swiftPreprocFalse Comment
 hi def link swiftFreestandingMacro Macro
-hi def link swiftAttribute Type
+
+hi def link swiftComment Comment
+hi def link swiftLineComment Comment
 hi def link swiftTodo Todo
-hi def link swiftNil Constant
-hi def link swiftCastOp Operator
-hi def link swiftNilOps Operator
-hi def link swiftScope PreProc
 
 let b:current_syntax = "swift"
