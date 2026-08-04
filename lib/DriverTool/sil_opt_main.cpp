@@ -63,11 +63,11 @@ enum class OptGroup {
 
 std::optional<bool> toOptionalBool(llvm::cl::boolOrDefault defaultable) {
   switch (defaultable) {
-  case llvm::cl::BOU_TRUE:
+  case llvm::cl::boolOrDefault::BOU_TRUE:
     return true;
-  case llvm::cl::BOU_FALSE:
+  case llvm::cl::boolOrDefault::BOU_FALSE:
     return false;
-  case llvm::cl::BOU_UNSET:
+  case llvm::cl::boolOrDefault::BOU_UNSET:
     return std::nullopt;
   }
   llvm_unreachable("Bad case for llvm::cl::boolOrDefault!");
@@ -268,12 +268,13 @@ struct SILOptOptions {
 
   llvm::cl::opt<llvm::cl::boolOrDefault> EnableLexicalLifetimes =
       llvm::cl::opt<llvm::cl::boolOrDefault>(
-          "enable-lexical-lifetimes", llvm::cl::init(llvm::cl::BOU_UNSET),
+          "enable-lexical-lifetimes",
+          llvm::cl::init(llvm::cl::boolOrDefault::BOU_UNSET),
           llvm::cl::desc("Enable lexical lifetimes."));
 
   llvm::cl::opt<llvm::cl::boolOrDefault>
   EnableExperimentalMoveOnly = llvm::cl::opt<llvm::cl::boolOrDefault>(
-      "enable-experimental-move-only", llvm::cl::init(llvm::cl::BOU_UNSET),
+      "enable-experimental-move-only", llvm::cl::init(llvm::cl::boolOrDefault::BOU_UNSET),
       llvm::cl::desc("Enable experimental move-only semantics."));
 
   llvm::cl::opt<bool> EnablePackMetadataStackPromotion = llvm::cl::opt<bool>(

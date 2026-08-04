@@ -258,12 +258,12 @@ int sil_func_extractor_main(ArrayRef<const char *> argv, void *MainAddr) {
   Invocation.getLangOptions().EnableAccessControl = false;
   Invocation.getLangOptions().EnableObjCAttrRequiresFoundation = false;
 
-  if (options.EnableObjCInterop == llvm::cl::BOU_UNSET) {
+  if (options.EnableObjCInterop == llvm::cl::boolOrDefault::BOU_UNSET) {
     Invocation.getLangOptions().EnableObjCInterop =
         Invocation.getLangOptions().Target.isOSDarwin();
   } else {
     Invocation.getLangOptions().EnableObjCInterop =
-    options.EnableObjCInterop == llvm::cl::BOU_TRUE;
+        options.EnableObjCInterop == llvm::cl::boolOrDefault::BOU_TRUE;
   }
 
   SILOptions &Opts = Invocation.getSILOptions();
