@@ -14,7 +14,7 @@
 #include "TaskPrivate.h"
 #include "swift/Threading/Mutex.h"
 
-#if !SWIFT_CONCURRENCY_EMBEDDED
+#if SWIFT_CONCURRENCY_ENABLE_TASK_REGISTRY
 
 using namespace swift;
 
