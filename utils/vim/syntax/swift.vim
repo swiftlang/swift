@@ -45,10 +45,13 @@ syn keyword swiftCoreTypes
       \ Any
       \ AnyObject
 
-syn keyword swiftExistentialType contained skipwhite skipempty nextgroup=swiftType
+" Everything that can start a type; keeps the triggers below in sync.
+syn cluster swiftTypeContext contains=swiftTypeSpecifier,swiftConcurrencySpecifier,swiftExistentialType,swiftOpaqueType
+
+syn keyword swiftExistentialType contained skipwhite skipempty nextgroup=@swiftTypeContext
       \ any
 
-syn keyword swiftOpaqueType contained skipwhite skipempty nextgroup=swiftType
+syn keyword swiftOpaqueType contained skipwhite skipempty nextgroup=@swiftTypeContext
       \ some
 
 syn keyword swiftImport skipwhite skipempty nextgroup=swiftImportModule
@@ -85,13 +88,13 @@ syn region swiftModifierArguments contained transparent
 syn keyword swiftDefinitionModifier skipwhite skipempty nextgroup=swiftModifierArguments
       \ nonisolated
 
-syn keyword swiftTypeSpecifier contained skipwhite skipempty nextgroup=swiftTypeSpecifier,swiftExistentialType,swiftOpaqueType,swiftTypeName
+syn keyword swiftTypeSpecifier contained skipwhite skipempty nextgroup=@swiftTypeContext
       \ borrowing
       \ consuming
       \ inout
       \ isolated
 
-syn keyword swiftConcurrencySpecifier contained skipwhite skipempty nextgroup=swiftTypeSpecifier,swiftOpaqueType,swiftExistentialType,swiftType
+syn keyword swiftConcurrencySpecifier contained skipwhite skipempty nextgroup=@swiftTypeContext
       \ sending
 
 syn keyword swiftIdentifierKeyword
@@ -168,13 +171,13 @@ syn match swiftImplicitVarName
 syn match swiftType contained skipwhite skipempty nextgroup=swiftTypeParameters
       \ /\<[A-Za-z_][A-Za-z_0-9\.]*\>[!?]\?/
 " [Type:Type] (dictionary) or [Type] (array)
-syn region swiftType contained contains=swiftTypePair,swiftType,swiftOpaqueType,swiftExistentialType
+syn region swiftType contained contains=swiftTypePair,@swiftTypeContext
       \ matchgroup=Delimiter start=/\[/ end=/\]/
 syn match swiftTypePair contained skipwhite skipempty nextgroup=swiftTypeParameters,swiftTypeDeclaration
       \ /\<[A-Za-z_][A-Za-z_0-9\.]*\>[!?]\?/
 " (Type[, Type]) (tuple)
 " FIXME: we should be able to use skip="," and drop swiftParamDelim
-syn region swiftType contained contains=swiftType,swiftParamDelim,swiftTypeSpecifier,swiftConcurrencySpecifier,swiftExistentialType,swiftOpaqueType
+syn region swiftType contained contains=swiftParamDelim,@swiftTypeContext
       \ matchgroup=Delimiter start="[^@]\?(" end=")" matchgroup=NONE skip=","
 syn match swiftParamDelim contained
       \ /,/
@@ -184,11 +187,14 @@ syn region swiftTypeParameters contained contains=swiftVarName,swiftConstraint,s
 syn keyword swiftConstraint contained
       \ where
 
-syn match swiftTypeAliasValue skipwhite skipempty nextgroup=swiftExistentialType,swiftType
+" Added once swiftType itself is fully defined below.
+syn cluster swiftTypeContext add=swiftType
+
+syn match swiftTypeAliasValue skipwhite skipempty nextgroup=@swiftTypeContext
       \ /=/
-syn match swiftTypeDeclaration skipwhite skipempty nextgroup=swiftConcurrencySpecifier,swiftTypeSpecifier,swiftExistentialType,swiftOpaqueType,swiftOpaqueType,swiftType
+syn match swiftTypeDeclaration skipwhite skipempty nextgroup=@swiftTypeContext
       \ /:/
-syn match swiftTypeDeclaration skipwhite skipempty nextgroup=swiftConcurrencySpecifier,swiftExistentialType,swiftOpaqueType,swiftType
+syn match swiftTypeDeclaration skipwhite skipempty nextgroup=@swiftTypeContext
       \ /->/
 
 syn match swiftKeyword
@@ -247,9 +253,9 @@ syn match swiftAttribute
 
 syn keyword swiftTodo MARK TODO FIXME contained
 
-syn match swiftCastOp skipwhite skipempty nextgroup=swiftExistentialType,swiftType,swiftCoreTypes
+syn match swiftCastOp skipwhite skipempty nextgroup=@swiftTypeContext,swiftCoreTypes
       \ "\<is\>"
-syn match swiftCastOp skipwhite skipempty nextgroup=swiftExistentialType,swiftType,swiftCoreTypes
+syn match swiftCastOp skipwhite skipempty nextgroup=@swiftTypeContext,swiftCoreTypes
       \ "\<as\>[!?]\?"
 
 syn match swiftNilOps
