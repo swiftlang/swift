@@ -4817,63 +4817,6 @@ internal func _instantiateKeyPathBuffer(
 
 #if SWIFT_ENABLE_REFLECTION
 
-@available(SwiftStdlib 5.9, *)
-public func _createOffsetBasedKeyPath(
-  root: Any.Type,
-  value: Any.Type,
-  offset: Int
-) -> AnyKeyPath {
-  func openRoot<Root>(_: Root.Type) -> AnyKeyPath.Type {
-    func openValue<Value>(_: Value.Type) -> AnyKeyPath.Type {
-      KeyPath<Root, Value>.self
-    }
-
-    return _openExistential(value, do: openValue(_:))
-  }
-
-  let kpTy = _openExistential(root, do: openRoot(_:))
-
-  // The buffer header is 32 bits, but components must start on a word
-  // boundary.
-  let kpBufferSize = MemoryLayout<Int>.size + MemoryLayout<Int32>.size
-  let kp = unsafe kpTy._create(capacityInBytes: kpBufferSize) {
-    var builder = unsafe KeyPathBuffer.Builder($0)
-    let header = KeyPathBuffer.Header(
-      size: kpBufferSize - MemoryLayout<Int>.size,
-      trivial: true,
-      hasReferencePrefix: false,
-      isSingleComponent: true
-    )
-
-    unsafe builder.pushHeader(header)
-
-    let componentHeader = RawKeyPathComponent.Header(
-      stored: _MetadataKind(root) == .struct ? .struct : .class,
-      mutable: false,
-      inlineOffset: UInt32(offset)
-    )
-
-    let component = unsafe RawKeyPathComponent(
-      header: componentHeader,
-      body: UnsafeRawBufferPointer(start: nil, count: 0)
-    )
-
-    unsafe component.clone(
-      into: &builder.buffer,
-      endOfReferencePrefix: false,
-
-      // The keypath will have the same shape, it's just the types that differ.
-      adjustForAlignment: false
-    )
-  }
-
-  if _MetadataKind(root) == .struct {
-    kp.assignOffsetToStorage(offset: offset)
-  }
-
-  return kp
-}
-
 @_spi(ObservableRerootKeyPath)
 @available(SwiftStdlib 5.9, *)
 public func _rerootKeyPath<NewRoot>(
