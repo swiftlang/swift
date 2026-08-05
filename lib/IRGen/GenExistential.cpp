@@ -1984,6 +1984,8 @@ Address irgen::emitOpaqueExistentialContainerInit(IRGenFunction &IGF,
   llvm::Value *metadata = IGF.emitTypeMetadataRef(formalSrcType);
   IGF.Builder.CreateStore(metadata, destLayout.projectMetadataRef(IGF, dest));
 
+  if (IGF.IGM.isEmbeddedWithExistentials() && IGF.IGM.DebugInfo)
+    IGF.IGM.DebugInfo->emitExistentialPayloadType(formalSrcType);
 
   // Next, write the protocol witness tables.
   forEachProtocolWitnessTable(IGF, formalSrcType, &metadata,
