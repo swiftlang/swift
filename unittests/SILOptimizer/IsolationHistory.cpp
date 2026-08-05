@@ -116,7 +116,7 @@ bool popOnePartitionOp(Partition &p, SmallVectorImpl<SILBasicBlock *> &blocks) {
 // walker assumes when it commits pendingTargetMerge.
 TEST(IsolationHistory, BoundaryAtHead) {
   llvm::BumpPtrAllocator allocator;
-  IsolationHistory::Factory historyFactory(allocator);
+  IsolationHistory::Factory historyFactory(allocator, /*enabled=*/true);
 
   Partition p(historyFactory.get());
   EXPECT_FALSE(p.hasHistory());
@@ -133,7 +133,7 @@ TEST(IsolationHistory, BoundaryAtHead) {
 // the element stored at firstArg. The returned Node* is the new head.
 TEST(IsolationHistory, PushNewElementRegionPrimitive) {
   llvm::BumpPtrAllocator allocator;
-  IsolationHistory::Factory historyFactory(allocator);
+  IsolationHistory::Factory historyFactory(allocator, /*enabled=*/true);
 
   IsolationHistory history = historyFactory.get();
   auto *node = history.pushNewElementRegion(Element(7));
@@ -150,7 +150,7 @@ TEST(IsolationHistory, PushNewElementRegionPrimitive) {
 // additionalElementArgs.
 TEST(IsolationHistory, PushMergeElementRegionsPrimitive) {
   llvm::BumpPtrAllocator allocator;
-  IsolationHistory::Factory historyFactory(allocator);
+  IsolationHistory::Factory historyFactory(allocator, /*enabled=*/true);
 
   IsolationHistory history = historyFactory.get();
   history.pushMergeElementRegions(Element(0), Element(2), {Element(5)});
@@ -172,7 +172,7 @@ TEST(IsolationHistory, PushMergeElementRegionsPrimitive) {
 // An empty singleRegion records nothing — no boundary, no add, no merge.
 TEST(IsolationHistory, SingleRegionEmpty) {
   llvm::BumpPtrAllocator allocator;
-  IsolationHistory::Factory historyFactory(allocator);
+  IsolationHistory::Factory historyFactory(allocator, /*enabled=*/true);
 
   SILLocation loc = SILLocation::invalid();
   auto p = Partition::singleRegion(loc, {}, historyFactory.get());
@@ -184,7 +184,7 @@ TEST(IsolationHistory, SingleRegionEmpty) {
 // A single element: one boundary + one AddNewRegionForElement, no merges.
 TEST(IsolationHistory, SingleRegionOneElement) {
   llvm::BumpPtrAllocator allocator;
-  IsolationHistory::Factory historyFactory(allocator);
+  IsolationHistory::Factory historyFactory(allocator, /*enabled=*/true);
 
   SILLocation loc = SILLocation::invalid();
   auto p = Partition::singleRegion(loc, {Element(7)}, historyFactory.get());
@@ -210,7 +210,7 @@ TEST(IsolationHistory, SingleRegionOneElement) {
 // lived in their own region, so each peer needs its own merge node.
 TEST(IsolationHistory, SingleRegionRecordsOneMergePerPeer) {
   llvm::BumpPtrAllocator allocator;
-  IsolationHistory::Factory historyFactory(allocator);
+  IsolationHistory::Factory historyFactory(allocator, /*enabled=*/true);
 
   SILLocation loc = SILLocation::invalid();
   auto p = Partition::singleRegion(
@@ -229,7 +229,7 @@ TEST(IsolationHistory, SingleRegionRecordsOneMergePerPeer) {
 // nodes cover the non-rep elements without duplicates.
 TEST(IsolationHistory, SingleRegionMergeNodesAreSinglePeer) {
   llvm::BumpPtrAllocator allocator;
-  IsolationHistory::Factory historyFactory(allocator);
+  IsolationHistory::Factory historyFactory(allocator, /*enabled=*/true);
 
   SILLocation loc = SILLocation::invalid();
   auto p = Partition::singleRegion(
@@ -263,7 +263,7 @@ TEST(IsolationHistory, SingleRegionMergeNodesAreSinglePeer) {
 // already removed.
 TEST(IsolationHistory, SingleRegionRoundTrip) {
   llvm::BumpPtrAllocator allocator;
-  IsolationHistory::Factory historyFactory(allocator);
+  IsolationHistory::Factory historyFactory(allocator, /*enabled=*/true);
 
   SILLocation loc = SILLocation::invalid();
   auto p = Partition::singleRegion(
@@ -304,7 +304,7 @@ TEST(IsolationHistory, SingleRegionRoundTrip) {
 // know.
 TEST(IsolationHistory, SingleRegionParentChainShape) {
   llvm::BumpPtrAllocator allocator;
-  IsolationHistory::Factory historyFactory(allocator);
+  IsolationHistory::Factory historyFactory(allocator, /*enabled=*/true);
 
   SILLocation loc = SILLocation::invalid();
   auto p = Partition::singleRegion(
@@ -352,7 +352,7 @@ TEST(IsolationHistory, SingleRegionParentChainShape) {
 // the smallest element. Here indices[0] == 3 but the rep must be 0.
 TEST(IsolationHistory, SingleRegionUnsortedRepIsMinimum) {
   llvm::BumpPtrAllocator allocator;
-  IsolationHistory::Factory historyFactory(allocator);
+  IsolationHistory::Factory historyFactory(allocator, /*enabled=*/true);
 
   SILLocation loc = SILLocation::invalid();
   auto p = Partition::singleRegion(
@@ -391,7 +391,7 @@ TEST(IsolationHistory, SingleRegionUnsortedRepIsMinimum) {
 #ifndef NDEBUG
 TEST(IsolationHistoryDeathTest, SingleRegionDuplicateIndexAsserts) {
   llvm::BumpPtrAllocator allocator;
-  IsolationHistory::Factory historyFactory(allocator);
+  IsolationHistory::Factory historyFactory(allocator, /*enabled=*/true);
   SILLocation loc = SILLocation::invalid();
 
   // Element 1 listed twice — caller bug.
@@ -408,7 +408,7 @@ TEST(IsolationHistoryDeathTest, SingleRegionDuplicateIndexAsserts) {
 // that each lives in a distinct region.
 TEST(IsolationHistory, SeparateRegionsShape) {
   llvm::BumpPtrAllocator allocator;
-  IsolationHistory::Factory historyFactory(allocator);
+  IsolationHistory::Factory historyFactory(allocator, /*enabled=*/true);
 
   SILLocation loc = SILLocation::invalid();
   auto p = makePartitionWithSeparateRegions(
@@ -440,7 +440,7 @@ TEST(IsolationHistory, SeparateRegionsShape) {
 // with — so the round-trip works on today's tree (with distinct indices).
 TEST(IsolationHistory, SeparateRegionsRoundTrip) {
   llvm::BumpPtrAllocator allocator;
-  IsolationHistory::Factory historyFactory(allocator);
+  IsolationHistory::Factory historyFactory(allocator, /*enabled=*/true);
 
   SILLocation loc = SILLocation::invalid();
   auto p = makePartitionWithSeparateRegions(
@@ -465,7 +465,7 @@ TEST(IsolationHistory, SeparateRegionsRoundTrip) {
 // history is caught.
 TEST(IsolationHistory, JoinPreservesAncestorBoundaryForExistingMerges) {
   llvm::BumpPtrAllocator allocator;
-  IsolationHistory::Factory historyFactory(allocator);
+  IsolationHistory::Factory historyFactory(allocator, /*enabled=*/true);
 
   SILLocation loc = SILLocation::invalid();
 
@@ -499,7 +499,7 @@ TEST(IsolationHistory, JoinPreservesAncestorBoundaryForExistingMerges) {
 // added to existing region" path, both push the AddNewRegionForElement.
 TEST(IsolationHistory, JoinSecondBranchPushPopAsymmetry) {
   llvm::BumpPtrAllocator allocator;
-  IsolationHistory::Factory historyFactory(allocator);
+  IsolationHistory::Factory historyFactory(allocator, /*enabled=*/true);
   SILLocation loc = SILLocation::invalid();
 
   // fst tracks only element 0.
@@ -538,7 +538,7 @@ TEST(IsolationHistory, JoinSecondBranchPushPopAsymmetry) {
 TEST(IsolationHistory, CreateVariable) {
   llvm::BumpPtrAllocator allocator;
   Partition::SendingOperandSetFactory factory(allocator);
-  IsolationHistory::Factory historyFactory(allocator);
+  IsolationHistory::Factory historyFactory(allocator, /*enabled=*/true);
   SmallVector<SILBasicBlock *, 8> joinedHistories;
   SendingOperandToStateMap transferringOpToStateMap(historyFactory);
 
@@ -566,7 +566,7 @@ TEST(IsolationHistory, CreateVariable) {
 TEST(IsolationHistory, AssignRegion) {
   llvm::BumpPtrAllocator allocator;
   Partition::SendingOperandSetFactory factory(allocator);
-  IsolationHistory::Factory historyFactory(allocator);
+  IsolationHistory::Factory historyFactory(allocator, /*enabled=*/true);
   SendingOperandToStateMap transferringOpToStateMap(historyFactory);
   SmallVector<SILBasicBlock *, 8> joinedHistories;
 
@@ -606,7 +606,7 @@ TEST(IsolationHistory, AssignRegion) {
 TEST(IsolationHistory, BuildNewRegionRepIsMerge) {
   llvm::BumpPtrAllocator allocator;
   Partition::SendingOperandSetFactory factory(allocator);
-  IsolationHistory::Factory historyFactory(allocator);
+  IsolationHistory::Factory historyFactory(allocator, /*enabled=*/true);
   SendingOperandToStateMap transferringOpToStateMap(historyFactory);
   SmallVector<SILBasicBlock *, 8> joinedHistories;
 
@@ -655,7 +655,7 @@ TEST(IsolationHistory, BuildNewRegionRepIsMerge) {
 TEST(IsolationHistory, ReturnFalseWhenNoneLeft) {
   llvm::BumpPtrAllocator allocator;
   Partition::SendingOperandSetFactory factory(allocator);
-  IsolationHistory::Factory historyFactory(allocator);
+  IsolationHistory::Factory historyFactory(allocator, /*enabled=*/true);
   SmallVector<SILBasicBlock *, 8> joinedHistories;
   SendingOperandToStateMap transferringOpToStateMap(historyFactory);
 
@@ -681,7 +681,7 @@ TEST(IsolationHistory, JoiningTwoEmpty) {
   // Make sure that we do sane things when we join empty history.
   llvm::BumpPtrAllocator allocator;
   Partition::SendingOperandSetFactory factory(allocator);
-  IsolationHistory::Factory historyFactory(allocator);
+  IsolationHistory::Factory historyFactory(allocator, /*enabled=*/true);
   SmallVector<SILBasicBlock *, 8> joinedHistories;
 
   Partition p1(historyFactory.get());
@@ -697,7 +697,7 @@ TEST(IsolationHistory, JoiningNotEmptyAndEmpty) {
   // Make sure that we do sane things when we join empty history.
   llvm::BumpPtrAllocator allocator;
   Partition::SendingOperandSetFactory factory(allocator);
-  IsolationHistory::Factory historyFactory(allocator);
+  IsolationHistory::Factory historyFactory(allocator, /*enabled=*/true);
   SmallVector<SILBasicBlock *, 8> joinedHistories;
   SendingOperandToStateMap transferringOpToStateMap(historyFactory);
 
@@ -723,7 +723,7 @@ TEST(IsolationHistory, JoiningEmptyAndNotEmpty) {
   // Make sure that we do sane things when we join empty history.
   llvm::BumpPtrAllocator allocator;
   Partition::SendingOperandSetFactory factory(allocator);
-  IsolationHistory::Factory historyFactory(allocator);
+  IsolationHistory::Factory historyFactory(allocator, /*enabled=*/true);
   SendingOperandToStateMap transferringOpToStateMap(historyFactory);
   SmallVector<SILBasicBlock *, 8> joinedHistories;
 
@@ -764,7 +764,7 @@ TEST(IsolationHistory, JoiningEmptyAndNotEmpty) {
 TEST(IsolationHistory, MergePassengerRoundTrip) {
   llvm::BumpPtrAllocator allocator;
   Partition::SendingOperandSetFactory factory(allocator);
-  IsolationHistory::Factory historyFactory(allocator);
+  IsolationHistory::Factory historyFactory(allocator, /*enabled=*/true);
   SendingOperandToStateMap opToStateMap(historyFactory);
   SmallVector<SILBasicBlock *, 8> joins;
 
@@ -828,7 +828,7 @@ TEST(IsolationHistory, MergePassengerRoundTrip) {
 TEST(IsolationHistory, MergePassengersRejoinOneRegion) {
   llvm::BumpPtrAllocator allocator;
   Partition::SendingOperandSetFactory factory(allocator);
-  IsolationHistory::Factory historyFactory(allocator);
+  IsolationHistory::Factory historyFactory(allocator, /*enabled=*/true);
   SendingOperandToStateMap opToStateMap(historyFactory);
   SmallVector<SILBasicBlock *, 8> joins;
 
@@ -886,7 +886,7 @@ TEST(IsolationHistory, MergePassengersRejoinOneRegion) {
 TEST(IsolationHistory, AssignDirectMovesElementRoundTrip) {
   llvm::BumpPtrAllocator allocator;
   Partition::SendingOperandSetFactory factory(allocator);
-  IsolationHistory::Factory historyFactory(allocator);
+  IsolationHistory::Factory historyFactory(allocator, /*enabled=*/true);
   SendingOperandToStateMap opToStateMap(historyFactory);
   SmallVector<SILBasicBlock *, 8> joins;
 

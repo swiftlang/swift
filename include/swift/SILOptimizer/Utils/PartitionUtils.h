@@ -262,6 +262,15 @@ private:
 /// Partition must have no sends to use this. NOTE: There is a method that
 /// takes a Partition and produces a new Partition that does not have any
 /// sends.
+///
+/// Recording is opt-in per function. Only one client rewinds this history --
+/// the isolation-history notes on a sent-non-Sendable error -- and those notes
+/// are off unless the function asks for them (\c
+/// swift::shouldEmitIsolationHistoryFor). Recording anyway would push a node
+/// per PartitionOp per dataflow iteration for every function the region
+/// analysis runs on, so a Factory built with recording off makes every push a
+/// no-op and the history stays empty. Anything that rewinds asserts that
+/// recording was on, so the two gates cannot silently drift apart.
 class IsolationHistory {
 public:
   class Factory;
@@ -292,6 +301,10 @@ public:
   }
 
   Node *getHead() const { return head; }
+
+  /// True when the Factory backing this history records nodes. Every push is a
+  /// no-op when this is false.
+  bool isEnabled() const;
 
   /// Push a node that signals the end of a new sequence of history nodes that
   /// should execute together. Must be explicitly ended by a push sequence
@@ -556,17 +569,32 @@ class IsolationHistory::Factory {
 
   llvm::BumpPtrAllocator &allocator;
 
+  /// Whether the histories this hands out record anything. See the note on
+  /// \c IsolationHistory for why this is opt-in.
+  bool enabled;
+
 public:
-  Factory(llvm::BumpPtrAllocator &allocator) : allocator(allocator) {}
+  /// \p enabled whether the histories this hands out record nodes. Pass
+  /// \c swift::shouldEmitIsolationHistoryFor(fn) for the function being
+  /// analyzed; pass true only when the client is going to rewind the history
+  /// regardless, as the unit tests do.
+  Factory(llvm::BumpPtrAllocator &allocator, bool enabled)
+      : allocator(allocator), enabled(enabled) {}
 
   Factory(IsolationHistory::Factory &&other) = delete;
   Factory &operator=(IsolationHistory::Factory &&other) = delete;
   Factory(const IsolationHistory::Factory &other) = delete;
   Factory &operator=(const IsolationHistory::Factory &other) = delete;
 
+  bool isEnabled() const { return enabled; }
+
   /// Returns a new isolation history without any history.
   IsolationHistory get() { return IsolationHistory(this); }
 };
+
+inline bool IsolationHistory::isEnabled() const {
+  return factory && factory->enabled;
+}
 
 /// A struct that represents a specific "sending" operand of an ApplySite.
 struct SendingOperandState {

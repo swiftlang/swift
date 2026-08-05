@@ -915,6 +915,16 @@ void Partition::horizontalUpdate(
 
 const IsolationHistory::Node *
 Partition::popHistoryOnce(SmallVectorImpl<SILBasicBlock *> &foundJoinedBlocks) {
+  // Rewinding a history that was never recorded silently finds nothing, which
+  // would read as "this value was never merged" rather than as a missing
+  // feature. Recording is gated on swift::shouldEmitIsolationHistoryFor and so
+  // is the only client that rewinds, so the two agreeing is an invariant, not a
+  // thing to handle.
+  assert(history.isEnabled() &&
+         "Rewinding an isolation history that was never recorded. The Factory "
+         "was built with recording off, but something is walking the history "
+         "anyway -- the recording gate and the consumer gate have drifted.");
+
   const auto *head = history.pop();
   if (!head)
     return nullptr;
@@ -996,6 +1006,9 @@ Partition::popHistoryOnce(SmallVectorImpl<SILBasicBlock *> &foundJoinedBlocks) {
 // independent region.
 IsolationHistory::Node *
 IsolationHistory::pushNewElementRegion(Element element) {
+  if (!isEnabled())
+    return nullptr;
+
   unsigned size = Node::totalSizeToAlloc<Element>(0);
   void *mem = factory->allocator.Allocate(size, alignof(Node));
   head = new (mem) Node(Node::AddNewRegionForElement, head, element);
@@ -1005,6 +1018,9 @@ IsolationHistory::pushNewElementRegion(Element element) {
 IsolationHistory::Node *
 IsolationHistory::pushHistorySequenceBoundary(SILLocation loc,
                                               SILInstruction *inst) {
+  if (!isEnabled())
+    return nullptr;
+
   unsigned size = Node::totalSizeToAlloc<Element>(0);
   void *mem = factory->allocator.Allocate(size, alignof(Node));
   head = new (mem) Node(Node::SequenceBoundary, head, loc, inst);
@@ -1014,6 +1030,9 @@ IsolationHistory::pushHistorySequenceBoundary(SILLocation loc,
 // Push onto the history that \p value should be removed from any region that it
 // is apart of and placed within its own separate region.
 void IsolationHistory::pushRemoveLastElementFromRegion(Element element) {
+  if (!isEnabled())
+    return;
+
   unsigned size = Node::totalSizeToAlloc<Element>(0);
   void *mem = factory->allocator.Allocate(size, alignof(Node));
   head = new (mem) Node(Node::RemoveLastElementFromRegion, head, element);
@@ -1021,6 +1040,9 @@ void IsolationHistory::pushRemoveLastElementFromRegion(Element element) {
 
 void IsolationHistory::pushRemoveElementFromRegion(
     Element otherElementInOldRegion, Element element) {
+  if (!isEnabled())
+    return;
+
   unsigned size = Node::totalSizeToAlloc<Element>(1);
   void *mem = factory->allocator.Allocate(size, alignof(Node));
   head = new (mem) Node(Node::RemoveElementFromRegion, head, element,
@@ -1030,6 +1052,9 @@ void IsolationHistory::pushRemoveElementFromRegion(
 void IsolationHistory::pushMergeElementRegions(Element elementInNewRegion,
                                                Element elementInOldRegion,
                                                ArrayRef<Element> eltsToMerge) {
+  if (!isEnabled())
+    return;
+
   assert(elementInNewRegion != elementInOldRegion);
   assert(llvm::none_of(eltsToMerge, [&](Element elt) {
     return elt == elementInNewRegion || elt == elementInOldRegion;
@@ -1044,6 +1069,9 @@ void IsolationHistory::pushMergeElementRegions(Element elementInNewRegion,
 // control-flow merge point. The joined history is not copied in; it is
 // recovered on demand as predBlock's exit-partition isolation history.
 void IsolationHistory::pushCFGHistoryJoin(SILBasicBlock *predBlock) {
+  if (!isEnabled())
+    return;
+
   // Without a predecessor block there is nothing to recover the joined history
   // from later, so there is nothing to record.
   if (!predBlock)
