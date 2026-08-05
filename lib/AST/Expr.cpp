@@ -1626,6 +1626,10 @@ static ValueDecl *getCalledValue(Expr *E, bool skipFunctionConversions) {
   }
 
   Expr *E2 = E->getValueProvidingExpr();
+
+  if (auto *L = dyn_cast<LoadExpr>(E2))
+    E2 = L->getSubExpr()->getValueProvidingExpr();
+
   if (E != E2)
     return getCalledValue(E2, skipFunctionConversions);
 
