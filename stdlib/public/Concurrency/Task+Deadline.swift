@@ -140,6 +140,7 @@ public nonisolated(nonsending) func withDeadline<Return, Failure, C>(
   // FIXME: The shape of this builtin is a workaround,
   //        since stack nesting SIL checking couldn't handle a generic builtin
   //        that would take clock and expiration directly; Something to improve for sure.
+#if $BuiltinTaskDeadline
   let deadlineRecord = unsafe Builtin.taskPushDeadline(
     clockPtr: Builtin.addressOfBorrow(clock),
     instantPtr: Builtin.addressOfBorrow(expiration),
@@ -184,6 +185,9 @@ public nonisolated(nonsending) func withDeadline<Return, Failure, C>(
     defer { timer.cancel() }
     return try await operation()
   }
+#else
+  fatalError("Swift compiler is incompatible with this SDK version")
+#endif
 }
 
 // ==== -----------------------------------------------------------------------

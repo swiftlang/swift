@@ -496,14 +496,7 @@ struct ClassInstantClock: Clock, Identifiable {
       expectEqual(1, innerHandlerCount)
     }
     
-    // The outer `withTaskCancellationHandler` is registered before either
-    // `withDeadline` scope is entered, so it is never "inside" either scope's
-    // dynamic extent; neither scope's local cancellation should reach it.
-    // Regression check for the `CancellationNotificationStatusRecord`'s
-    // at-most-once `Fired` guard: even if something were to cause the outer
-    // handler to be visited by both scope-cancel walks, it must still only
-    // run once.
-    tests.test("outer cancellation handler must trigger exactly once, even if separate deadlines trigger twice") {
+    tests.test("outer cancellation handler is unaffected by nested deadline scopes cancelling locally") {
       let handlerCount = Atomic<Int>(0)
       do {
         try await withTaskCancellationHandler {
@@ -519,7 +512,38 @@ struct ClassInstantClock: Clock, Identifiable {
       } catch {
         expectUnreachableCatch(error)
       }
-      expectTrue(handlerCount.load(ordering: .relaxed) <= 1)
+      expectEqual(0, handlerCount.load(ordering: .relaxed))
+    }
+
+    final class ContinuationBox: @unchecked Sendable {
+      var continuation: CheckedContinuation<Void, Never>?
+    }
+    tests.test("cancellation handler inside a scope fires only once even if the scope and the whole task both cancel") {
+      let handlerCount = Atomic<Int>(0)
+      let box = ContinuationBox()
+      let task = Task {
+        _ = try? await withDeadline(in: .milliseconds(50)) {
+          try? await withTaskCancellationHandler {
+            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+              box.continuation = continuation
+            }
+          } onCancel: {
+            handlerCount.wrappingAdd(1, ordering: .relaxed)
+          }
+        }
+      }
+      // Let the deadline (50ms) elapse, firing the scope-cancel walk.
+      try? await Task.sleep(for: .milliseconds(150))
+      // The handler record is still installed (`operation` is suspended on
+      // the continuation, not yet returned), so this whole-task cancel walk
+      // visits it too.
+      task.cancel()
+      // Give the whole-task cancel walk a chance to run before releasing
+      // `operation`.
+      try? await Task.sleep(for: .milliseconds(50))
+      box.continuation?.resume()
+      _ = await task.value
+      expectEqual(1, handlerCount.load(ordering: .relaxed))
     }
 
     // Two-clock composition: an outer deadline on ContinuousClock and an inner
