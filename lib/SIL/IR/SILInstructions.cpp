@@ -3460,10 +3460,9 @@ SILType KeyPathInst::getStaticInstanceClassType() const {
   if (getSubstitutions().getRecursiveProperties().hasArchetype())
     return SILType();
 
-  // Captured operands would require dynamic materialization (indices
-  // copied from arguments).
-  if (!getAllOperands().empty())
-    return SILType();
+  // Captured operands (subscript indices) are fine: the instance can still be
+  // described at compile time, but as a *template* whose argument area IRGen
+  // fills in where the key path is formed.  See `needsRuntimeInstantiation`.
 
   auto *pattern = getPattern();
   if (!pattern)
@@ -3509,15 +3508,45 @@ SILType KeyPathInst::getStaticInstanceClassType() const {
     case KeyPathPatternComponent::Kind::GettableProperty:
     case KeyPathPatternComponent::Kind::SettableProperty:
     case KeyPathPatternComponent::Kind::Method: {
-      // Reject captured subscript indices and external decl references.
-      if (!comp.getArguments().empty() || comp.getExternalDecl())
+      // An external component defers the component's layout to a property
+      // descriptor in the defining module. These don't show up in embedded.
+      if (comp.getExternalDecl())
         return SILType();
-      // Bail on generic accessors — we take their addresses via
-      // `getAddrOfSILFunction`, which doesn't apply substitutions.
       if (comp.getComputedPropertyForGettable()->isGeneric())
         return SILType();
       if (comp.getKind() == KeyPathPatternComponent::Kind::SettableProperty &&
           comp.getComputedPropertyForSettable()->isGeneric())
+        return SILType();
+      // The component's `id` -- the opaque identity the runtime compares in
+      // `==` and `hash(into:)` -- has to be something we can name as a
+      // constant now. A function reference and a class method descriptor both
+      // are. A protocol requirement is not: it resolves to a witness-table
+      // offset when the pattern is instantiated, and a foreign (ObjC) one goes
+      // through a selector reference that dyld fills in.
+      {
+        auto id = comp.getComputedPropertyId();
+        switch (id.getKind()) {
+        case KeyPathPatternComponent::ComputedPropertyId::Function:
+          break;
+        case KeyPathPatternComponent::ComputedPropertyId::DeclRef: {
+          auto declRef = id.getDeclRef();
+          if (declRef.isForeign)
+            return SILType();
+          if (!isa<ClassDecl>(declRef.getDecl()->getDeclContext()))
+            return SILType();
+          break;
+        }
+        case KeyPathPatternComponent::ComputedPropertyId::Property:
+          return SILType();
+        }
+      }
+      // A capturing component also puts the equals/hash thunks in the
+      // argument witness table, so those have to be fully specialized too.
+      // They are generic whenever the pattern's signature is, even when the
+      // captured values themselves are concrete.
+      if (!comp.getArguments().empty() &&
+          (comp.getIndexEquals()->isGeneric() ||
+           comp.getIndexHash()->isGeneric()))
         return SILType();
 
       if (comp.getKind() == KeyPathPatternComponent::Kind::SettableProperty &&
@@ -3532,9 +3561,17 @@ SILType KeyPathInst::getStaticInstanceClassType() const {
       break;
     }
     case KeyPathPatternComponent::Kind::OptionalChain:
-    case KeyPathPatternComponent::Kind::OptionalForce:
     case KeyPathPatternComponent::Kind::OptionalWrap:
-      return SILType();
+      // Chaining and wrapping force the whole key path read-only, matching
+      // `visitOptionalChainComponent` / `visitOptionalWrapComponent` in the
+      // runtime instantiator.
+      keyPathClass = ctx.getKeyPathDecl();
+      break;
+    case KeyPathPatternComponent::Kind::OptionalForce:
+      // Force-unwrapping passes the preceding mutability through; with no
+      // preceding component that is the initial writable capability.
+      keyPathClass = ctx.getWritableKeyPathDecl();
+      break;
     }
     assert(keyPathClass && "unhandled component kind above?");
     auto concreteTy = BoundGenericType::get(keyPathClass,
@@ -3574,12 +3611,70 @@ SILType KeyPathInst::getStaticInstanceClassType() const {
       // introduce a class boundary either (tuples live inline in their
       // parent).
       break;
-    default:
-      // Computed / method / optional components aren't representable in
-      // an embedded multi-component chain, because the runtime walker
-      // only knows how to advance by a fixed offset or dereference a
-      // class reference.
-      return SILType();
+    case KeyPathPatternComponent::Kind::GettableProperty:
+    case KeyPathPatternComponent::Kind::SettableProperty:
+    case KeyPathPatternComponent::Kind::Method: {
+      // An external component defers the component's layout to a property
+      // descriptor in the defining module. These don't show up in embedded.
+      if (comp.getExternalDecl())
+        return SILType();
+      if (comp.getComputedPropertyForGettable()->isGeneric())
+        return SILType();
+      if (comp.getKind() == KeyPathPatternComponent::Kind::SettableProperty &&
+          comp.getComputedPropertyForSettable()->isGeneric())
+        return SILType();
+      // The component's `id` -- the opaque identity the runtime compares in
+      // `==` and `hash(into:)` -- has to be something we can name as a
+      // constant now. A function reference and a class method descriptor both
+      // are. A protocol requirement is not: it resolves to a witness-table
+      // offset when the pattern is instantiated, and a foreign (ObjC) one goes
+      // through a selector reference that dyld fills in.
+      {
+        auto id = comp.getComputedPropertyId();
+        switch (id.getKind()) {
+        case KeyPathPatternComponent::ComputedPropertyId::Function:
+          break;
+        case KeyPathPatternComponent::ComputedPropertyId::DeclRef: {
+          auto declRef = id.getDeclRef();
+          if (declRef.isForeign)
+            return SILType();
+          if (!isa<ClassDecl>(declRef.getDecl()->getDeclContext()))
+            return SILType();
+          break;
+        }
+        case KeyPathPatternComponent::ComputedPropertyId::Property:
+          return SILType();
+        }
+      }
+
+      // Get-only / method components demote the chain to read-only
+      // `KeyPath`.  Settable-computed intermediates preserve writable
+      // capability via the embedded writeback machinery in
+      // `_projectMutableAddress`:
+      //   * mutating setter (struct default): stays WritableKeyPath (or
+      //     inherits ReferenceWritableKeyPath if already crossed a class
+      //     boundary)
+      //   * nonmutating setter (class default, or `nonmutating set` on a
+      //     struct): promotes WritableKeyPath → ReferenceWritableKeyPath
+      if (comp.getKind() != KeyPathPatternComponent::Kind::SettableProperty) {
+        keyPathClass = ctx.getKeyPathDecl();
+      } else if (!comp.isComputedSettablePropertyMutating() &&
+                 keyPathClass == ctx.getWritableKeyPathDecl()) {
+        keyPathClass = ctx.getReferenceWritableKeyPathDecl();
+      }
+      break;
+    }
+    case KeyPathPatternComponent::Kind::OptionalChain:
+    case KeyPathPatternComponent::Kind::OptionalWrap:
+      // Chaining and wrapping force the whole key path read-only, even if a
+      // later component would otherwise be reference-writable. The demotion is
+      // permanent, because the class-boundary promotion above only fires while
+      // the chain is still `WritableKeyPath`.
+      keyPathClass = ctx.getKeyPathDecl();
+      break;
+    case KeyPathPatternComponent::Kind::OptionalForce:
+      // Force-unwrapping passes the preceding mutability through unchanged.
+      break;
     }
 
     // Advance to the next root type by substituting the pattern

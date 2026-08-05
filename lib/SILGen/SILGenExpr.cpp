@@ -4838,6 +4838,12 @@ KeyPathPatternComponent SILGenModule::emitKeyPathComponentForDecl(
     /// Returns true if a key path component for the given property or
     /// subscript should be externally referenced.
     auto shouldUseExternalKeyPathComponent = [&]() -> bool {
+      // Embedded Swift does not emit property descriptors, and it can't need
+      // them because there is no resilience.
+      if (getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
+        return false;
+      }
+
       // The property descriptor has the canonical key path component
       // information so doesn't have to refer to another external descriptor.
       if (forPropertyDescriptor) {

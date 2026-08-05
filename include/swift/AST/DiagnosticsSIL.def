@@ -401,6 +401,9 @@ GROUPED_ERROR(embedded_swift_metatype_type,EmbeddedRestrictions,none,
       "cannot use metatype of type %0 in embedded Swift", (Type))
 GROUPED_ERROR(embedded_swift_keypath,EmbeddedRestrictions,none,
       "cannot use key path in embedded Swift", ())
+GROUPED_WARNING(perf_hint_keypath_captures_values,KeyPathAllocation,none,
+      "a key path that captures %0 value%s0 requires a heap allocation",
+      (unsigned))
 GROUPED_ERROR(embedded_swift_dynamic_cast,EmbeddedRestrictions,none,
       "cannot do dynamic casting in embedded Swift", ())
 GROUPED_ERROR(embedded_capture_of_generic_value_with_deinit,EmbeddedRestrictions,none,

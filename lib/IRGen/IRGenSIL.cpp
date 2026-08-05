@@ -8076,9 +8076,88 @@ void IRGenSILFunction::visitKeyPathInst(swift::KeyPathInst *I) {
   // instantiated at runtime through `swift_getKeyPath` (which isn't
   // available in embedded builds anyway).
   if (IGM.canEmitStaticKeyPathInstance(I)) {
-    llvm::Constant *staticInstance = IGM.emitStaticKeyPathInstance(I);
+    if (!I->needsRuntimeInstantiation()) {
+      llvm::Constant *staticInstance = IGM.emitStaticKeyPathInstance(I);
+      Explosion e;
+      e.add(staticInstance);
+      setLoweredExplosion(I, e);
+      return;
+    }
+
+    // The key path captures values (subscript arguments), so it can't be a
+    // shared immortal constant. Everything except those values is still known
+    // at compile time, so emit a template, allocate a real refcounted instance,
+    // copy the template over it, and store the captures into the argument
+    // areas the template reserved.
+    SmallVector<uint32_t, 2> argDataOffsets;
+    llvm::Constant *templateInstance =
+        IGM.emitStaticKeyPathInstance(I, &argDataOffsets);
+    assert(!argDataOffsets.empty() &&
+           "a capturing key path must reserve argument space");
+
+    // The template's first word is the metadata pointer and the second is an
+    // immortal refcount; `swift_allocObject` writes a real header, so copy only
+    // what follows it.
+    auto ptrSize = IGM.getPointerSize();
+    auto headerSize = Size(2 * ptrSize.getValue());
+    auto *templateGlobal = cast<llvm::GlobalVariable>(
+        templateInstance->stripPointerCasts());
+    auto totalSize = Size(
+        IGM.DataLayout.getTypeAllocSize(templateGlobal->getValueType()));
+
+    auto classTy = I->getStaticInstanceClassType();
+    auto *metadata = IGM.getAddrOfTypeMetadata(classTy.getASTType());
+
+    llvm::Value *instance = emitAllocObjectCall(
+        llvm::ConstantExpr::getBitCast(metadata, IGM.TypeMetadataPtrTy),
+        llvm::ConstantInt::get(IGM.SizeTy, totalSize.getValue()),
+        llvm::ConstantInt::get(IGM.SizeTy, ptrSize.getValue() - 1),
+        /*mallocTypeId=*/std::nullopt, "keypath.instance");
+
+    llvm::Value *instanceBytes = Builder.CreateBitCast(instance, IGM.Int8PtrTy);
+    llvm::Value *dst = Builder.CreateConstInBoundsGEP1_32(
+        IGM.Int8Ty, instanceBytes, headerSize.getValue());
+    llvm::Value *src = Builder.CreateConstInBoundsGEP1_32(
+        IGM.Int8Ty, llvm::ConstantExpr::getBitCast(templateInstance,
+                                                   IGM.Int8PtrTy),
+        headerSize.getValue());
+    Builder.CreateMemCpy(dst, llvm::MaybeAlign(ptrSize.getValue()),
+                         src, llvm::MaybeAlign(ptrSize.getValue()),
+                         totalSize.getValue() - headerSize.getValue());
+
+    // Initialize each captured operand into its slot. The operands appear in
+    // component order, matching the offsets the template reported.
+    unsigned operandIdx = 0;
+    for (uint32_t argDataOffset : argDataOffsets) {
+      Size slot(argDataOffset);
+      // Walk the operands belonging to this component in declaration order.
+      // Each component's arguments are laid out back-to-back with their natural
+      // alignment, mirroring `computeStaticKeyPathComponentLayout`.
+      for (; operandIdx < I->getAllOperands().size(); ++operandIdx) {
+        auto operand = I->getAllOperands()[operandIdx].get();
+        auto operandTy = operand->getType();
+        auto &ti = getTypeInfo(operandTy);
+        auto &fixedTI = cast<FixedTypeInfo>(ti);
+        slot = slot.roundUpToAlignment(fixedTI.getFixedAlignment());
+        llvm::Value *slotPtr = Builder.CreateConstInBoundsGEP1_32(
+            IGM.Int8Ty, instanceBytes, slot.getValue());
+        auto addr = ti.getAddressForPointer(
+            Builder.CreateBitCast(slotPtr, IGM.PtrTy));
+        if (operandTy.isAddress()) {
+          ti.initializeWithTake(*this, addr, getLoweredAddress(operand),
+                                operandTy, /*isOutlined=*/false,
+                                /*zeroizeIfSensitive=*/true);
+        } else {
+          Explosion operandValue = getLoweredExplosion(operand);
+          cast<LoadableTypeInfo>(ti).initialize(*this, operandValue, addr,
+                                                /*isOutlined=*/false);
+        }
+        slot += fixedTI.getFixedSize();
+      }
+    }
+
     Explosion e;
-    e.add(staticInstance);
+    e.add(Builder.CreateBitCast(instance, IGM.RefCountedPtrTy));
     setLoweredExplosion(I, e);
     return;
   }
