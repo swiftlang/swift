@@ -3497,6 +3497,29 @@ SILType KeyPathInst::getStaticInstanceClassType() const {
       if (comp.getKind() == KeyPathPatternComponent::Kind::SettableProperty &&
           comp.getComputedPropertyForSettable()->isGeneric())
         return SILType();
+      // The component's `id` -- the opaque identity the runtime compares in
+      // `==` and `hash(into:)` -- has to be something we can name as a
+      // constant now. A function reference and a class method descriptor both
+      // are. A protocol requirement is not: it resolves to a witness-table
+      // offset when the pattern is instantiated, and a foreign (ObjC) one goes
+      // through a selector reference that dyld fills in.
+      {
+        auto id = comp.getComputedPropertyId();
+        switch (id.getKind()) {
+        case KeyPathPatternComponent::ComputedPropertyId::Function:
+          break;
+        case KeyPathPatternComponent::ComputedPropertyId::DeclRef: {
+          auto declRef = id.getDeclRef();
+          if (declRef.isForeign)
+            return SILType();
+          if (!isa<ClassDecl>(declRef.getDecl()->getDeclContext()))
+            return SILType();
+          break;
+        }
+        case KeyPathPatternComponent::ComputedPropertyId::Property:
+          return SILType();
+        }
+      }
       // A capturing component also puts the equals/hash thunks in the
       // argument witness table, so those have to be fully specialized too.
       // They are generic whenever the pattern's signature is, even when the
@@ -3580,6 +3603,29 @@ SILType KeyPathInst::getStaticInstanceClassType() const {
       if (comp.getKind() == KeyPathPatternComponent::Kind::SettableProperty &&
           comp.getComputedPropertyForSettable()->isGeneric())
         return SILType();
+      // The component's `id` -- the opaque identity the runtime compares in
+      // `==` and `hash(into:)` -- has to be something we can name as a
+      // constant now. A function reference and a class method descriptor both
+      // are. A protocol requirement is not: it resolves to a witness-table
+      // offset when the pattern is instantiated, and a foreign (ObjC) one goes
+      // through a selector reference that dyld fills in.
+      {
+        auto id = comp.getComputedPropertyId();
+        switch (id.getKind()) {
+        case KeyPathPatternComponent::ComputedPropertyId::Function:
+          break;
+        case KeyPathPatternComponent::ComputedPropertyId::DeclRef: {
+          auto declRef = id.getDeclRef();
+          if (declRef.isForeign)
+            return SILType();
+          if (!isa<ClassDecl>(declRef.getDecl()->getDeclContext()))
+            return SILType();
+          break;
+        }
+        case KeyPathPatternComponent::ComputedPropertyId::Property:
+          return SILType();
+        }
+      }
 
       // Get-only / method components demote the chain to read-only
       // `KeyPath`.  Settable-computed intermediates preserve writable

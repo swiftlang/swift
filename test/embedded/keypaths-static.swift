@@ -196,7 +196,10 @@ public func kpMethod() -> KeyPath<HasMethod, () -> Int> {
 // Buffer size = 4 (comp header) + 4 (skew) + 8 (id) + 8 (getter) + 8 (setter) = 32.
 // Buffer header 0xA0000020 = -1610612704 (trivial + singleComponent + size=32).
 // Comp   header 0x02400000 = 37748736 (computedTag + settable, non-mutating).
-// The id field is the raw getter pointer; the getter and setter fields are
+// The id field is the component's identity: the getter *method* for a struct
+// member, or the key path accessor thunk when the identity would otherwise
+// require a method descriptor (which Embedded Swift does not emit) -- see
+// `\Cell.value` above. The getter and setter fields are
 // (address-discriminated) ptr-auth-signed on arm64e — the layout still
 // contains three ptr slots regardless.
 //
@@ -206,7 +209,7 @@ public func kpMethod() -> KeyPath<HasMethod, () -> Int> {
 // `\Wrap.doubled` — struct settable mutating computed → WritableKeyPath.
 // Comp header 0x02C00000 = 46137344 (computedTag + settable + mutating).
 //
-// CHECK-IR-DAG: @keypath{{[.0-9]*}} = private constant { %swift.refcounted, ptr, i32, [4 x i8], i32, [4 x i8], ptr, ptr, ptr } { %swift.refcounted { ptr {{.*}}"$es15WritableKeyPathCy4main4WrapVs5Int32VGMf"{{.*}}, i64 -1 }, ptr null, i32 -1610612704, [4 x i8] zeroinitializer, i32 46137344, [4 x i8] zeroinitializer, ptr @"$e4main4WrapV7doubleds5Int32VvpACTK", ptr @"$e4main4WrapV7doubleds5Int32VvpACTK", ptr @"$e4main4WrapV7doubleds5Int32VvpACTk" }
+// CHECK-IR-DAG: @keypath{{[.0-9]*}} = private constant { %swift.refcounted, ptr, i32, [4 x i8], i32, [4 x i8], ptr, ptr, ptr } { %swift.refcounted { ptr {{.*}}"$es15WritableKeyPathCy4main4WrapVs5Int32VGMf"{{.*}}, i64 -1 }, ptr null, i32 -1610612704, [4 x i8] zeroinitializer, i32 46137344, [4 x i8] zeroinitializer, ptr @"$e4main4WrapV7doubleds5Int32Vvg", ptr @"$e4main4WrapV7doubleds5Int32VvpACTK", ptr @"$e4main4WrapV7doubleds5Int32VvpACTk" }
 
 //
 // `\Ro.v` — get-only struct computed → KeyPath.
@@ -215,13 +218,13 @@ public func kpMethod() -> KeyPath<HasMethod, () -> Int> {
 // Comp   header 0x02000000 = 33554432 (computedTag + getOnly).  Only two ptr
 // slots (id, getter) — no setter.
 //
-// CHECK-IR-DAG: @keypath{{[.0-9]*}} = private constant { %swift.refcounted, ptr, i32, [4 x i8], i32, [4 x i8], ptr, ptr } { %swift.refcounted { ptr {{.*}}"$es7KeyPathCy4main2RoVs5Int32VGMf"{{.*}}, i64 -1 }, ptr null, i32 -1610612712, [4 x i8] zeroinitializer, i32 33554432, [4 x i8] zeroinitializer, ptr @"$e4main2RoV1vs5Int32VvpACTK", ptr @"$e4main2RoV1vs5Int32VvpACTK" }
+// CHECK-IR-DAG: @keypath{{[.0-9]*}} = private constant { %swift.refcounted, ptr, i32, [4 x i8], i32, [4 x i8], ptr, ptr } { %swift.refcounted { ptr {{.*}}"$es7KeyPathCy4main2RoVs5Int32VGMf"{{.*}}, i64 -1 }, ptr null, i32 -1610612712, [4 x i8] zeroinitializer, i32 33554432, [4 x i8] zeroinitializer, ptr @"$e4main2RoV1vs5Int32Vvg", ptr @"$e4main2RoV1vs5Int32VvpACTK" }
 
 //
 // `\HasMethod.doThing` — instance method → same shape as a get-only
 // computed component (no setter), value type is `() -> Int`.
 //
-// CHECK-IR-DAG: @keypath{{[.0-9]*}} = private constant { %swift.refcounted, ptr, i32, [4 x i8], i32, [4 x i8], ptr, ptr } { %swift.refcounted { ptr {{.*}}"$es7KeyPathCy4main9HasMethodVSiycGMf"{{.*}}, i64 -1 }, ptr null, i32 -1610612712, [4 x i8] zeroinitializer, i32 33554432, [4 x i8] zeroinitializer, ptr @"$e4main9HasMethodV7doThingSiyFACTkmu", ptr @"$e4main9HasMethodV7doThingSiyFACTkmu" }
+// CHECK-IR-DAG: @keypath{{[.0-9]*}} = private constant { %swift.refcounted, ptr, i32, [4 x i8], i32, [4 x i8], ptr, ptr } { %swift.refcounted { ptr {{.*}}"$es7KeyPathCy4main9HasMethodVSiycGMf"{{.*}}, i64 -1 }, ptr null, i32 -1610612712, [4 x i8] zeroinitializer, i32 33554432, [4 x i8] zeroinitializer, ptr @"$e4main9HasMethodV7doThingSiyF", ptr @"$e4main9HasMethodV7doThingSiyFACTkmu" }
 
 
 // Runtime behavior: applying the keypath yields the right offset / value.
