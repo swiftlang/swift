@@ -1819,6 +1819,13 @@ tryCastUnwrappingExistentialSource(
     srcInnerValue = const_cast<OpaqueValue *>(srcErrorValue);
     break;
   }
+  case ExistentialTypeRepresentation::COM:
+    // QueryInterface-backed COM casts are supplied by the COM runtime. Until
+    // that path is connected, do not reinterpret an interface pointer as a
+    // Swift existential payload.
+    srcFailureType = srcType;
+    destFailureType = destType;
+    return DynamicCastResult::Failure;
   }
 
   srcFailureType = srcInnerType;
@@ -2249,6 +2256,20 @@ tryCastToExistentialMetatype(
   }
 }
 
+static DynamicCastResult
+tryCastToCOMExistential(OpaqueValue *destLocation, const Metadata *destType,
+                        OpaqueValue *srcValue, const Metadata *srcType,
+                        const Metadata *&destFailureType,
+                        const Metadata *&srcFailureType,
+                        bool takeOnSuccess, bool mayDeferChecks,
+                        bool prohibitIsolatedConformances) {
+  // The representation alone cannot implement a COM cast: doing so requires
+  // the interface IID and QueryInterface entry point.
+  srcFailureType = srcType;
+  destFailureType = destType;
+  return DynamicCastResult::Failure;
+}
+
 /******************************************************************************/
 /********************************** Dispatch **********************************/
 /******************************************************************************/
@@ -2320,6 +2341,8 @@ static tryCastFunctionType *selectCasterForDest(const Metadata *destType) {
       return tryCastToClassExistential; // => AnyObject, with or without protocol constraints
     case ExistentialTypeRepresentation::Error: // => Error existential
       return tryCastToErrorExistential;
+    case ExistentialTypeRepresentation::COM:
+      return tryCastToCOMExistential;
     }
     swift_unreachable(
       "Unknown existential type representation in dynamic cast dispatch");
