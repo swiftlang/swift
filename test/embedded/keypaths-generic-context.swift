@@ -4,15 +4,21 @@
 // instance. See `KeyPathInst::getStaticInstanceClassType`.
 
 // RUN: %target-swift-emit-sil %s -module-name kpgc -enable-experimental-feature Embedded -enable-experimental-feature EmbeddedKeyPaths -wmo -o - | %FileCheck -check-prefix=CHECK-SIL %s
-// RUN: %target-run-simple-swift(-O -enable-experimental-feature Embedded -enable-experimental-feature EmbeddedKeyPaths -wmo -runtime-compatibility-version none %target-embedded-posix-shim) | %FileCheck -check-prefix=CHECK-OUT %s
+
+// The capturing key paths below hash their captured index, which pulls in the
+// hash-seed initializer and so `arc4random_buf`. Ubuntu 22.04's glibc predates
+// that, so link through `%target-embedded-link` -- it injects the local RNG
+// shim on Linux -- rather than `%target-run-simple-swift`, which would cost
+// this test its Linux coverage the way `keypaths-hashable.swift` had to.
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend %s -O -enable-experimental-feature Embedded -enable-experimental-feature EmbeddedKeyPaths -wmo -c -o %t/main.o
+// RUN: %target-embedded-link %target-clang-resource-dir-opt %t/main.o -o %t/a.out -dead_strip
+// RUN: %target-run %t/a.out | %FileCheck -check-prefix=CHECK-OUT %s
 
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
 // REQUIRES: swift_feature_Embedded
 // REQUIRES: swift_feature_EmbeddedKeyPaths
-// Embedded key paths and SIL opaque values don't currently mix: the
-// combination trips `getSILArgumentConvention`. `keypaths-static.swift` and
-// `keypaths-exec.swift` carry the same XFAIL.
 // XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 public struct G<T> {
