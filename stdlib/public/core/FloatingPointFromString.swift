@@ -878,7 +878,7 @@ fileprivate func fastParse64(
   // but that's too long for a variable name, so...
   var nonZeroDigitCount = 0
   // Collect digits into "leadingDigits"
-  var t = unsafe input[unchecked: i] &- 0x30
+  let t = unsafe input[unchecked: i] &- 0x30
   if t < 10 {
     leadingDigits = UInt64(t)
     i &+= 1
