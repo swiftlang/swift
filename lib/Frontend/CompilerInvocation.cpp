@@ -4597,10 +4597,16 @@ CompilerInvocation::setUpInputForSILTool(
   bool hasSerializedAST = result.status == serialization::Status::Valid;
 
   if (hasSerializedAST) {
-    const StringRef stem = !moduleNameArg.empty()
-                               ? moduleNameArg
-                               : llvm::sys::path::stem(inputFilename);
-    setModuleName(stem);
+    // Prefer the module name which is recorded in the module file itself over
+    // the file name: the file name is not necessarily the module name, e.g. for
+    // modules in a `<module-name>.swiftmodule` directory, where the file is
+    // named after the target.
+    StringRef moduleName = moduleNameArg;
+    if (moduleName.empty() && Lexer::isIdentifier(result.name))
+      moduleName = result.name;
+    if (moduleName.empty())
+      moduleName = llvm::sys::path::stem(inputFilename);
+    setModuleName(moduleName);
     getFrontendOptions().InputMode =
         FrontendOptions::ParseInputMode::SwiftLibrary;
   } else {
