@@ -496,6 +496,34 @@ static ProtocolConformanceRef getBuiltinMetaTypeTypeConformance(
     }
   }
 
+  Type instanceType = metatypeType->getInstanceType();
+
+  // Type parameters have abstract conformances. Preserve that behavior when
+  // the type parameter's metatype is the subject of the requirement.
+  if (instanceType->isTypeParameter())
+    return ProtocolConformanceRef::forAbstract(type, protocol);
+
+  // For a metatype of an archetype (e.g. 'T.Type' in a generic context), an
+  // abstract metatype conformance is provided by the generic environment's
+  // 'T.Type: P' requirement, which the RequirementMachine records with a
+  // metatype subject ('T.[metatype]').
+  if (auto *archetype = instanceType->getAs<ArchetypeType>()) {
+    if (auto *gamma = archetype->getGenericEnvironment()) {
+      for (const auto &requirement : gamma->getGenericSignature()
+                                        .getRequirements()) {
+        if (requirement.getKind() != RequirementKind::Conformance ||
+            !requirement.getFirstType()->is<AnyMetatypeType>())
+          continue;
+        if (!gamma->mapTypeIntoEnvironment(requirement.getFirstType())
+                  ->isEqual(type))
+          continue;
+        auto *refined = requirement.getProtocolDecl();
+        if (refined == protocol || refined->inheritsFrom(protocol))
+          return ProtocolConformanceRef::forAbstract(type, protocol);
+      }
+    }
+  }
+
   return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
 }
 
