@@ -35,6 +35,7 @@
 #include "IRGenModule.h"
 #include "LoadableTypeInfo.h"
 #include "MetadataLayout.h"
+#include "MetadataRequest.h"
 #include "ProtocolInfo.h"
 #include "StructLayout.h"
 #include "TypeInfo.h"
@@ -1422,12 +1423,149 @@ std::pair<llvm::Value *, llvm::Value *> irgen::emitKeyPathArgument(
 //     │   doesn't fit inline ]   │
 //     └──────────────────────────┘
 
-bool IRGenModule::canEmitStaticKeyPathInstance(KeyPathInst *KPI) {
-  // Only in embedded Swift.
-  if (!Context.LangOpts.hasFeature(Feature::Embedded))
+/// Does this key path object's isa have to be filled in at runtime?
+///
+/// Embedded Swift always has a constant class metadata symbol. Outside
+/// embedded, a specialization like `WritableKeyPath<Point, Int32>` generally
+/// doesn't: its metadata is uniqued by the runtime. In that case the object
+/// goes in `__DATA` with a null isa and is completed on first use.
+///
+/// A capturing key path is exempt: its constant is only a *template*, and the
+/// instance is freshly allocated with `swift_allocObject`, which writes a
+/// correct isa itself.
+static bool staticKeyPathNeedsLazyMetadata(IRGenModule &IGM,
+                                           KeyPathInst *KPI) {
+  if (IGM.Context.LangOpts.hasFeature(Feature::Embedded))
+    return false;
+  if (KPI->needsRuntimeInstantiation())
+    return false;
+  auto instanceTy = KPI->getStaticInstanceClassType().getASTType();
+  return !isCanonicalCompleteTypeMetadataStaticallyAddressable(IGM, instanceTy);
+}
+
+/// Can every part of `KPI`'s constant be pinned down at compile time?
+///
+/// Embedded Swift gets this for free: no resilience, no runtime generic
+/// instantiation, and `KeyPathInst::getStaticInstanceClassType` has already
+/// vetted the pattern's shape. Outside embedded, the *shape* being fine isn't
+/// enough -- the constant also names a metadata pointer and a set of field
+/// offsets, any of which may only be knowable at runtime. Check each one here
+/// rather than in the emitter, which asserts these hold.
+static bool staticKeyPathLayoutIsStatic(IRGenModule &IGM, KeyPathInst *KPI) {
+  // A capturing key path allocates a real instance with `swift_allocObject`,
+  // which needs a metadata pointer in hand at the formation site. Embedded
+  // Swift always has one; outside embedded we generally don't, and the
+  // lazy-isa trick doesn't apply because the object isn't the static constant.
+  // Leave these on the `swift_getKeyPath` path for now.
+  if (KPI->needsRuntimeInstantiation())
     return false;
 
-  return (bool)KPI->getStaticInstanceClassType();
+  // The key path object's isa pointer. For a generic class like
+  // `WritableKeyPath<Root, Value>` this is a specialization whose metadata
+  // usually has to be built and uniqued at runtime, so it is *not* a constant.
+  // That doesn't disqualify the object: `staticKeyPathNeedsLazyMetadata` says
+  // we emit a null isa into `__DATA` and fill it in the first time the key path
+  // is formed. Everything else in the object is still a compile-time constant.
+  auto rootTy = KPI->getKeyPathType()->getGenericArgs()[0]->getCanonicalType();
+  CanType currentRoot = rootTy;
+  auto subs = KPI->getSubstitutions();
+
+  for (const auto &comp : KPI->getPattern()->getComponents()) {
+    // A formal type isn't always legal in SIL -- an optional of a metatype,
+    // for instance -- and both SILType construction and type lowering assert
+    // on those. The emitter handles the cases it supports; rather than
+    // duplicate that reasoning, decline. Conservative, not a correctness
+    // requirement.
+    if (!currentRoot->isLegalSILType())
+      return false;
+    auto rootSILTy =
+        IGM.getLoweredType(AbstractionPattern::getOpaque(), currentRoot);
+
+    switch (comp.getKind()) {
+    case KeyPathPatternComponent::Kind::StoredProperty: {
+      auto *property = cast<VarDecl>(comp.getStoredPropertyDecl());
+      // A resilient struct or a class with a resiliently-sized superclass has
+      // no compile-time field offset; the runtime walker reads one from the
+      // metadata instead. Both helpers answer null in exactly those cases.
+      if (currentRoot->getStructOrBoundGenericStruct()) {
+        if (!emitPhysicalStructMemberFixedOffset(IGM, rootSILTy, property))
+          return false;
+      } else if (currentRoot->getClassOrBoundGenericClass()) {
+        if (!tryEmitConstantClassFragilePhysicalMemberOffset(IGM, rootSILTy,
+                                                             property))
+          return false;
+      } else {
+        return false;
+      }
+      break;
+    }
+
+    case KeyPathPatternComponent::Kind::TupleElement:
+      if (!getFixedTupleElementOffset(IGM, rootSILTy, comp.getTupleIndex()))
+        return false;
+      break;
+
+    case KeyPathPatternComponent::Kind::GettableProperty:
+    case KeyPathPatternComponent::Kind::SettableProperty:
+    case KeyPathPatternComponent::Kind::Method:
+      // The id has to resolve to the *same* identity a runtime-instantiated
+      // pattern would produce, or an equal key path built by `appending` would
+      // compare unequal. A generic accessor doesn't qualify: the emitter falls
+      // back to the getter there, which the runtime would not.
+      {
+        auto id = comp.getComputedPropertyId();
+        if (id.getKind() ==
+                KeyPathPatternComponent::ComputedPropertyId::Function &&
+            id.getFunction()->isGeneric())
+          return false;
+      }
+      // Captured arguments are laid out with compile-time constant sizes and
+      // alignments, so they need fixed layouts.
+      for (auto &arg : comp.getArguments()) {
+        if (!isa<FixedTypeInfo>(IGM.getTypeInfo(arg.LoweredType)))
+          return false;
+      }
+      break;
+
+    case KeyPathPatternComponent::Kind::OptionalChain:
+    case KeyPathPatternComponent::Kind::OptionalForce:
+    case KeyPathPatternComponent::Kind::OptionalWrap:
+      break;
+    }
+
+    // The constant embeds a metadata pointer for each intermediate type, so
+    // those have to be static references too.
+    currentRoot = comp.getComponentType().subst(subs)->getCanonicalType();
+    // A component's formal type isn't always legal in SIL -- an optional of a
+    // metatype, for instance. Those need lowering to reason about, which the
+    // emitter does for the cases it handles; rather than duplicate that here,
+    // decline. This is conservative, not a correctness requirement.
+    if (!currentRoot->isLegalSILType())
+      return false;
+    if (!isCanonicalCompleteTypeMetadataStaticallyAddressable(IGM, currentRoot))
+      return false;
+  }
+
+  return true;
+}
+
+bool IRGenModule::keyPathInstanceNeedsLazyMetadata(KeyPathInst *KPI) {
+  return staticKeyPathNeedsLazyMetadata(*this, KPI);
+}
+
+bool IRGenModule::canEmitStaticKeyPathInstance(KeyPathInst *KPI) {
+  // Embedded Swift always takes this path when the pattern allows it.
+  // Outside embedded, it's opt-in and additionally requires that everything
+  // the constant refers to be statically knowable -- see
+  // `staticKeyPathLayoutIsStatic`.
+  bool embedded = Context.LangOpts.hasFeature(Feature::Embedded);
+  if (!embedded && !Context.LangOpts.hasFeature(Feature::StaticKeyPaths))
+    return false;
+
+  if (!KPI->getStaticInstanceClassType())
+    return false;
+
+  return embedded || staticKeyPathLayoutIsStatic(*this, KPI);
 }
 
 /// Pick the concrete `KeyPath` subclass this keypath instruction resolves
@@ -1617,14 +1755,14 @@ computeStaticKeyPathComponentLayout(IRGenModule &IGM,
 
     // The component's identity, mirroring how the runtime pattern resolves it
     // (see the `ComputedPropertyId` switch in `getAddrOfKeyPathPattern`) but
-    // without any instantiation-time step.
-    // `KeyPathInst::getStaticInstanceClassType` has already rejected the forms
-    // that would need resolving.
+    // without any instantiation-time step: a direct function reference, or a
+    // class method descriptor. `KeyPathInst::getStaticInstanceClassType` has
+    // already rejected the forms that need resolving.
     auto id = comp.getComputedPropertyId();
     switch (id.getKind()) {
     case KeyPathPatternComponent::ComputedPropertyId::Function: {
       auto *idFn = id.getFunction();
-      // The id can name a *generic* accessor: it is deliberately carried
+      // The id can name a *generic* accessor: the id is deliberately carried
       // across specialization unchanged so that key paths to the same property
       // stay equal. Embedded Swift can't reference a generic function at all,
       // and elsewhere its address isn't a useful identity. Fall back to the
@@ -1784,7 +1922,12 @@ llvm::Constant *IRGenModule::emitStaticKeyPathInstance(
   auto concreteKeyPathTy =
       BoundGenericType::get(keyPathClass, Type(), {rootTy, valueTy})
           ->getCanonicalType();
-  llvm::Constant *metadata = getAddrOfTypeMetadata(concreteKeyPathTy);
+  // When the specialization's metadata isn't statically addressable, leave the
+  // isa null; `visitKeyPathInst` fills it in on first use. Asking for the
+  // address here anyway would force a definition that doesn't exist.
+  bool lazyMetadata = staticKeyPathNeedsLazyMetadata(*this, KPI);
+  llvm::Constant *metadata =
+      lazyMetadata ? nullptr : getAddrOfTypeMetadata(concreteKeyPathTy);
 
   // Compute the per-component layout (semantic form) and encode it into
   // the header word + optional out-of-line offset word for each
@@ -1839,8 +1982,8 @@ llvm::Constant *IRGenModule::emitStaticKeyPathInstance(
   //
   // The runtime relies on this for `ReferenceWritableKeyPath` mutation, and
   // `AnyKeyPath.==` compares both the buffer-level flag and the per-component
-  // bit, so a static object that disagrees with what the instantiator would
-  // have produced compares unequal to an otherwise-identical key path.
+  // bit, so getting it wrong makes an otherwise-correct key path compare
+  // unequal to the same path built by `appending`.
   std::optional<size_t> endOfReferencePrefix;
   for (size_t i = 0; i < numComponents; ++i) {
     const auto &comp = components[i];
@@ -2017,11 +2160,11 @@ llvm::Constant *IRGenModule::emitStaticKeyPathInstance(
   }
 
   auto *ObjectHeaderTy = RefCountedStructTy;
+  auto *isaTy = cast<llvm::PointerType>(ObjectHeaderTy->getElementType(0));
+  auto *isaField = metadata ? llvm::ConstantExpr::getBitCast(metadata, isaTy)
+                            : llvm::ConstantPointerNull::get(isaTy);
   auto *objectHeader = llvm::ConstantStruct::get(
-      ObjectHeaderTy,
-      {llvm::ConstantExpr::getBitCast(metadata,
-                                      ObjectHeaderTy->getElementType(0)),
-       swiftImmortalRefCount});
+      ObjectHeaderTy, {isaField, swiftImmortalRefCount});
 
   ConstantInitBuilder initBuilder(*this);
   auto fields = initBuilder.beginStruct();
@@ -2190,15 +2333,44 @@ llvm::Constant *IRGenModule::emitStaticKeyPathInstance(
         argDataOffsets->push_back(step.argDataOffset);
   }
 
+  // A lazily-completed object has its isa written on first use, so it can't go
+  // in read-only memory. It also has to sit inside a container that reserves a
+  // `swift_once_t` immediately *before* the object, which is where
+  // `swift_initStaticObject` looks for it.
   auto *global = fields.finishAndCreateGlobal(
-      "keypath", Alignment(16), /*constant*/ true,
-      llvm::GlobalValue::PrivateLinkage);
+      lazyMetadata ? "keypath_body" : "keypath", Alignment(16),
+      /*constant*/ !lazyMetadata, llvm::GlobalValue::PrivateLinkage);
+
+  llvm::Constant *objectAddr = global;
+  if (lazyMetadata) {
+    unsigned numTokens =
+        Alignment(16).getValue() / getPointerAlignment().getValue();
+    auto *containerTy = llvm::StructType::get(
+        getLLVMContext(), {llvm::ArrayType::get(OnceTy, numTokens),
+                           global->getValueType()});
+    auto *containerInit = llvm::ConstantStruct::get(
+        containerTy,
+        {llvm::ConstantAggregateZero::get(containerTy->getElementType(0)),
+         global->getInitializer()});
+    auto *container = new llvm::GlobalVariable(
+        Module, containerTy, /*constant*/ false,
+        llvm::GlobalValue::PrivateLinkage, containerInit, "keypath");
+    container->setAlignment(llvm::MaybeAlign(16));
+    global->eraseFromParent();
+
+    // The object starts just past the once-token block.
+    objectAddr = llvm::ConstantExpr::getInBoundsGetElementPtr(
+        containerTy, container,
+        llvm::ArrayRef<llvm::Constant *>{
+            llvm::ConstantInt::get(Int32Ty, 0),
+            llvm::ConstantInt::get(Int32Ty, 1)});
+  }
 
   // Cast to the concrete key path class pointer type so callers can use it
   // as a Swift class reference.
   auto &keyPathTI = getTypeInfo(getLoweredType(KPI->getKeyPathType()));
   auto *keyPathPtrTy = keyPathTI.getStorageType();
-  auto *result = llvm::ConstantExpr::getBitCast(global, keyPathPtrTy);
+  auto *result = llvm::ConstantExpr::getBitCast(objectAddr, keyPathPtrTy);
 
   StaticKeyPathInstances[pattern] = result;
   return result;

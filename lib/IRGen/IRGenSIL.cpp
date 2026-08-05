@@ -8078,6 +8078,37 @@ void IRGenSILFunction::visitKeyPathInst(swift::KeyPathInst *I) {
   if (IGM.canEmitStaticKeyPathInstance(I)) {
     if (!I->needsRuntimeInstantiation()) {
       llvm::Constant *staticInstance = IGM.emitStaticKeyPathInstance(I);
+
+      // Outside Embedded Swift the key path class is usually a generic
+      // specialization whose metadata the runtime uniques, so the object was
+      // emitted with a null isa. Complete it before handing it out.
+      //
+      // This has to go through `swift_initStaticObject` rather than an inline
+      // store: every other read of an object's isa -- method dispatch,
+      // `type(of:)`, casts -- is a plain non-atomic load, so even a
+      // same-value store racing with those is a data race, and the refcount
+      // has to be made immortal in the same step. `swift_initStaticObject`
+      // does both under a `swift_once_t` that `emitStaticKeyPathInstance`
+      // reserved immediately before the object.
+      if (IGM.keyPathInstanceNeedsLazyMetadata(I)) {
+        auto classTy = I->getStaticInstanceClassType().getASTType();
+        // Call the metadata accessor directly rather than going through
+        // `emitTypeMetadataRef`: for a multi-step generic specialization that
+        // emits an access-by-mangled-name, which carries its own demangling
+        // cache variable -- a second cache guarding what the once-token
+        // already guards.
+        auto *accessor = getOrCreateTypeMetadataAccessFunction(IGM, classTy);
+        auto *call = Builder.CreateCall(
+            accessor->getFunctionType(), accessor,
+            {llvm::ConstantInt::get(IGM.SizeTy,
+                                    (size_t)MetadataState::Complete)});
+        call->setDoesNotThrow();
+        call->setCallingConv(IGM.SwiftCC);
+        llvm::Value *metadata = Builder.CreateExtractValue(call, 0);
+
+        emitInitStaticObjectCall(metadata, staticInstance, "keypath.instance");
+      }
+
       Explosion e;
       e.add(staticInstance);
       setLoweredExplosion(I, e);

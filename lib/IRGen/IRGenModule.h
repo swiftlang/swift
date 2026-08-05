@@ -1265,12 +1265,19 @@ public:
   emitStaticKeyPathInstance(KeyPathInst *KPI,
                             SmallVectorImpl<uint32_t> *argDataOffsets = nullptr);
   /// True if `KPI` can be described at compile time in the current
-  /// compilation, rather than instantiated by `swift_getKeyPath`.  Currently
-  /// limited to Embedded Swift; `KeyPathInst::getStaticInstanceClassType` is
-  /// the single policy point for which patterns qualify.  Note that qualifying
-  /// does not imply the result is an immortal constant: see
-  /// `emitStaticKeyPathInstance` for capturing key paths.
+  /// compilation, rather than instantiated by `swift_getKeyPath`.  Always
+  /// available in Embedded Swift; elsewhere it requires the experimental
+  /// `StaticKeyPaths` feature and a layout that is fully known statically.
+  /// `KeyPathInst::getStaticInstanceClassType` is the single policy point for
+  /// which pattern *shapes* qualify.  Note that qualifying does not imply the
+  /// result is an immortal constant: see `emitStaticKeyPathInstance` for
+  /// capturing key paths, and `keyPathInstanceNeedsLazyMetadata` for objects
+  /// whose isa is filled in on first use.
   bool canEmitStaticKeyPathInstance(KeyPathInst *KPI);
+
+  /// True if the object `emitStaticKeyPathInstance` produces for `KPI` has a
+  /// null isa that must be initialized before the object is first used.
+  bool keyPathInstanceNeedsLazyMetadata(KeyPathInst *KPI);
   llvm::Constant *getAddrOfOpaqueTypeDescriptor(OpaqueTypeDecl *opaqueType,
                                                 ConstantInit forDefinition);
   llvm::Constant *
