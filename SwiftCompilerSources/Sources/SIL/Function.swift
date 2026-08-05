@@ -406,6 +406,10 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
       fatalError("unknown enum case")
     }
   }
+
+  public var isAutodiffSubsetParametersThunk: Bool {
+    bridged.isAutodiffSubsetParametersThunk()
+  }
 }
 
 public func == (lhs: Function, rhs: Function) -> Bool { lhs === rhs }
