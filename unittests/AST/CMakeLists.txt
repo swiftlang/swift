@@ -4,12 +4,13 @@ add_swift_unittest(SwiftASTTests
   ASTWalkerTests.cpp
   AvailabilityContextTests.cpp
   AvailabilityDomainTests.cpp
-  IndexSubsetTests.cpp
   DiagnosticBehaviorTests.cpp
   DiagnosticConsumerTests.cpp
   DiagnosticGroupsTests.cpp
   DiagnosticFormattingTests.cpp
   DiagnosticInfoTests.cpp
+  GenericSignatureTests.cpp
+  IndexSubsetTests.cpp
   SourceLocTests.cpp
   TestContext.cpp
   TypeMatchTests.cpp
