@@ -19,6 +19,7 @@
 #define SWIFT_TYPES_H
 
 #include "swift/AST/ASTAllocated.h"
+#include "swift/AST/AttrKind.h"
 #include "swift/AST/AutoDiff.h"
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/DiagnosticEngine.h"
@@ -769,6 +770,19 @@ public:
   bool isUnsafe() const {
     return getRecursiveProperties().isUnsafe();
   }
+
+  /// Find a type involved in this type whose declaration the given predicate
+  /// accepts, if there is one.
+  ///
+  /// This does not consider the "parent" types of a nominal type: the unsafety
+  /// of an enclosing type does not rub off on a type nested inside it. It does
+  /// consider generic arguments.
+  Type findUnsafeType(
+      llvm::function_ref<bool(NominalTypeDecl *)> isUnsafeDecl) const;
+
+  /// Find a type involved in this type that was marked '@unsafe(always)', if
+  /// there is one.
+  Type findAlwaysUnsafeType() const;
 
   /// Determine whether the type involves a primary, pack or local archetype.
   bool hasArchetype() const {

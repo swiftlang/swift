@@ -1283,6 +1283,18 @@ getExplicitSafetyFromAttrs(const Decl *decl) {
   return std::nullopt;
 }
 
+/// Look at the attributes to determine whether uses of the declaration must
+/// always be acknowledged, if the attributes specify its safety at all.
+static std::optional<bool> isAlwaysUnsafeFromAttrs(const Decl *decl) {
+  if (auto *attr = decl->getAttrs().getAttribute<UnsafeAttr>())
+    return attr->isAlways();
+
+  if (decl->getAttrs().hasAttribute<SafeAttr>())
+    return false;
+
+  return std::nullopt;
+}
+
 ExplicitSafety Decl::getExplicitSafety() const {
   // Check the attributes on the declaration itself.
   if (auto safety = getExplicitSafetyFromAttrs(this))
@@ -1324,6 +1336,46 @@ ExplicitSafety Decl::getExplicitSafety() const {
   }
 
   return ExplicitSafety::Unspecified;
+}
+
+bool Decl::isAlwaysUnsafe() const {
+  // Check the attributes on the declaration itself.
+  if (auto always = isAlwaysUnsafeFromAttrs(this))
+    return *always;
+
+  // A declaration imported from C is only ever always-unsafe by way of an
+  // explicit swift_attr("unsafe(always)"), which the ClangImporter turns into
+  // an '@unsafe(always)' attribute handled above. Unsafety that the importer
+  // infers (e.g., from a record's fields) is never always-unsafe.
+  if (getClangDecl())
+    return false;
+
+  // Inference: Check the enclosing context, unless this is a type.
+  if (!isa<TypeDecl>(this)) {
+    if (auto enclosingDC = getDeclContext()) {
+      // Is this an extension with @safe or @unsafe on it?
+      if (auto ext = dyn_cast<ExtensionDecl>(enclosingDC)) {
+        if (auto extAlways = isAlwaysUnsafeFromAttrs(ext))
+          return *extAlways;
+      }
+    }
+  }
+
+  // An extension of an unsafe nominal type inherits its strength.
+  if (auto ext = dyn_cast<ExtensionDecl>(this)) {
+    if (auto nominal = ext->getExtendedNominal())
+      if (nominal->getExplicitSafety() == ExplicitSafety::Unsafe)
+        return nominal->isAlwaysUnsafe();
+  }
+
+  // If this is a pattern binding declaration, check the first variable we find.
+  if (auto patternBinding = dyn_cast<PatternBindingDecl>(this)) {
+    for (auto index : range(patternBinding->getNumPatternEntries()))
+      if (auto var = patternBinding->getAnchoringVarDecl(index))
+        return var->isAlwaysUnsafe();
+  }
+
+  return false;
 }
 
 Type AbstractFunctionDecl::getThrownInterfaceType() const {

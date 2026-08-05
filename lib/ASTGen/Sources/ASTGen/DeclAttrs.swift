@@ -210,6 +210,8 @@ extension ASTGenVisitor {
         return handle(self.generateTypeEraserAttr(attribute: node)?.asDeclAttribute)
       case .UnavailableFromAsync:
         return handle(self.generateUnavailableFromAsyncAttr(attribute: node)?.asDeclAttribute)
+      case .Unsafe:
+        return handle(self.generateUnsafeAttr(attribute: node)?.asDeclAttribute)
       case .Reasync:
         return handle(self.generateSimpleDeclAttr(attribute: node, kind: .AtReasync))
       case .Rethrows:
@@ -317,7 +319,6 @@ extension ASTGenVisitor {
         .Testable,
         .Transparent,
         .UIApplicationMain,
-        .Unsafe,
         .UnsafeInheritExecutor,
         .UnsafeNoObjCTaggedPointer,
         .UnsafeNonEscapableResult,
@@ -2433,6 +2434,33 @@ extension ASTGenVisitor {
       atLoc: self.generateSourceLoc(node.atSign),
       range: self.generateAttrSourceRange(node),
       message: self.ctx.allocateCopy(string: message ?? "")
+    )
+  }
+
+  /// E.g.
+  ///   ```
+  ///   @unsafe
+  ///   @unsafe(always)
+  ///   ```
+  func generateUnsafeAttr(attribute node: AttributeSyntax) -> BridgedUnsafeAttr? {
+    let isAlways: Bool? = self.generateSingleAttrOption(
+      attribute: node,
+      {
+        switch $0.rawText {
+        case "always": return true
+        default: return nil
+        }
+      },
+      valueIfOmitted: false
+    )
+    guard let isAlways else {
+      return nil
+    }
+    return .createParsed(
+      self.ctx,
+      atLoc: self.generateSourceLoc(node.atSign),
+      range: self.generateAttrSourceRange(node),
+      isAlways: isAlways
     )
   }
 

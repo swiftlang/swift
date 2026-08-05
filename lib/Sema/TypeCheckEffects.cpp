@@ -4667,19 +4667,31 @@ private:
     // Unsafety in the next/nextElement call is covered by an "unsafe" effect.
     if (classification.hasUnsafe()) {
       // If there is no such effect, complain.
-      if (S->getUnsafeLoc().isInvalid() &&
-          Ctx.LangOpts.hasFeature(Feature::StrictMemorySafety,
-                                  /*allowMigration=*/true)) {
-        auto insertionLoc = S->getPattern()->getStartLoc();
-        Ctx.Diags.diagnose(S->getForLoc(), diag::for_unsafe_without_unsafe)
-          .fixItInsert(insertionLoc, "unsafe ");
+      if (S->getUnsafeLoc().isInvalid()) {
+        auto unsafeUses = classification.getUnsafeUses();
+        SmallVector<UnsafeUse, 4> usesToDiagnose(unsafeUses.begin(),
+                                                 unsafeUses.end());
+        bool anyAlways = retainUnsafeUsesToDiagnose(
+            usesToDiagnose, /*includeMerelyUnsafe=*/Ctx.LangOpts.hasFeature(
+                Feature::StrictMemorySafety, /*allowMigration=*/true));
 
-        for (auto unsafeUse : classification.getUnsafeUses()) {
-          // If we don't have a source location for this use, use the
-          // location of the `for` instead.
-          if (unsafeUse.getLocation().isInvalid())
-            unsafeUse.replaceLocation(S->getForLoc());
-          diagnoseUnsafeUse(unsafeUse);
+        if (!usesToDiagnose.empty()) {
+          auto insertionLoc = S->getPattern()->getStartLoc();
+          Ctx.Diags.diagnose(S->getForLoc(),
+                             anyAlways
+                                 ? diag::for_always_unsafe_without_unsafe
+                                 : diag::for_unsafe_without_unsafe)
+            .fixItInsert(insertionLoc, "unsafe ")
+            // As above: the marker doesn't survive interface printing.
+            .warnInSwiftInterface(CurContext.getDeclContext());
+
+          for (auto unsafeUse : usesToDiagnose) {
+            // If we don't have a source location for this use, use the
+            // location of the `for` instead.
+            if (unsafeUse.getLocation().isInvalid())
+              unsafeUse.replaceLocation(S->getForLoc());
+            diagnoseUnsafeUse(unsafeUse);
+          }
         }
       }
     }
@@ -4978,15 +4990,57 @@ private:
     return false;
   }
 
+  /// Whether the code being checked was synthesized by the compiler, and so
+  /// cannot have an 'unsafe' marker written into it.
+  bool isSynthesizedContext() const {
+    auto dc = CurContext.getDeclContext();
+    while (dc) {
+      if (auto decl = dc->getAsDecl()) {
+        if (decl->isImplicit())
+          return true;
+      }
+
+      if (!dc->isLocalContext())
+        break;
+
+      dc = dc->getParent();
+    }
+
+    return false;
+  }
+
   void diagnoseUncoveredUnsafeSite(
       const Expr *anchor, ArrayRef<UnsafeUse> unsafeUses) {
-    if (!Ctx.LangOpts.hasFeature(Feature::StrictMemorySafety, /*allowMigration=*/true))
+    bool strictSafety = Ctx.LangOpts.hasFeature(Feature::StrictMemorySafety,
+                                                /*allowMigration=*/true);
+
+    // Compiler-synthesized code cannot be annotated with 'unsafe' by hand, so
+    // an always-unsafe use there isn't actionable. Treat it as merely unsafe,
+    // which keeps it out of the way unless strict memory safety checking asked
+    // to hear about unsafe code at all.
+    bool isSynthesized =
+        (anchor && anchor->isImplicit()) || isSynthesizedContext();
+    if (isSynthesized && !strictSafety)
+      return;
+
+    SmallVector<UnsafeUse, 4> usesToDiagnose(unsafeUses.begin(),
+                                             unsafeUses.end());
+    bool anyAlways = retainUnsafeUsesToDiagnose(
+        usesToDiagnose, /*includeMerelyUnsafe=*/strictSafety);
+    if (isSynthesized)
+      anyAlways = false;
+    if (usesToDiagnose.empty())
       return;
 
     const auto &[loc, insertText] = getFixItForUncoveredSite(anchor, "unsafe");
-    Ctx.Diags.diagnose(anchor->getStartLoc(), diag::unsafe_without_unsafe)
-      .fixItInsert(loc, insertText);
-    for (const auto &unsafeUse : unsafeUses) {
+    Ctx.Diags.diagnose(anchor->getStartLoc(),
+                       anyAlways ? diag::always_unsafe_without_unsafe
+                                 : diag::unsafe_without_unsafe)
+      .fixItInsert(loc, insertText)
+      // 'unsafe' markers are stripped from inlinable bodies printed into a
+      // .swiftinterface, so this cannot be an error there.
+      .warnInSwiftInterface(CurContext.getDeclContext());
+    for (const auto &unsafeUse : usesToDiagnose) {
       diagnoseUnsafeUse(unsafeUse);
     }
   }

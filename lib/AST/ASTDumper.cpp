@@ -5190,7 +5190,6 @@ public:
   TRIVIAL_ATTR_PRINTER(Testable, testable)
   TRIVIAL_ATTR_PRINTER(Transparent, transparent)
   TRIVIAL_ATTR_PRINTER(UIApplicationMain, ui_application_main)
-  TRIVIAL_ATTR_PRINTER(Unsafe, unsafe)
   TRIVIAL_ATTR_PRINTER(UnsafeInheritExecutor, unsafe_inherit_executor)
   TRIVIAL_ATTR_PRINTER(UnsafeNoObjCTaggedPointer, unsafe_no_objc_tagged_pointer)
   TRIVIAL_ATTR_PRINTER(UnsafeNonEscapableResult, unsafe_non_escapable_result)
@@ -5354,6 +5353,11 @@ public:
   void visitExclusivityAttr(ExclusivityAttr *Attr, Label label) {
     printCommon(Attr, "exclusivity_attr", label);
     printField(Attr->getMode(), Label::always("mode"));
+    printFoot();
+  }
+  void visitUnsafeAttr(UnsafeAttr *Attr, Label label) {
+    printCommon(Attr, "unsafe_attr", label);
+    printFlag(Attr->isAlways(), "always");
     printFoot();
   }
   void visitExposeAttr(ExposeAttr *Attr, Label label) {

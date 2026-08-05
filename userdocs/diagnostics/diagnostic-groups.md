@@ -77,6 +77,7 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:actors-cannot-conform-to-global-actor-protocols>
 - <doc:add-preconcurrency-import>
 - <doc:always-available-domain>
+- <doc:always-unsafe>
 - <doc:trailing-closure-matching>
 - <doc:actor-isolated-mutating-async>
 - <doc:actor-isolated-call>
