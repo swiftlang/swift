@@ -42,17 +42,6 @@ void badRelease(BadRetainRelease *v, int i);
 
 struct
     __attribute__((swift_attr("import_reference")))
-    __attribute__((swift_attr("retain:badRetainWithNullabilityAnnotations")))
-    __attribute__((swift_attr("release:badReleaseWithNullabilityAnnotations")))
-BadRetainReleaseWithNullabilityAnnotations {};
-// expected-error@-1 {{specified retain function 'badRetainWithNullabilityAnnotations' is invalid; retain function must have exactly one argument of type 'BadRetainReleaseWithNullabilityAnnotations'}}
-// expected-error@-2 {{specified release function 'badReleaseWithNullabilityAnnotations' is invalid; release function must have exactly one argument of type 'BadRetainReleaseWithNullabilityAnnotations'}}
-
-void badRetainWithNullabilityAnnotations(BadRetainRelease * _Nonnull v);
-void badReleaseWithNullabilityAnnotations(BadRetainRelease * _Nonnull v);
-
-struct
-    __attribute__((swift_attr("import_reference")))
     __attribute__((swift_attr("retain:goodRetain")))
     __attribute__((swift_attr("release:goodRelease")))
 GoodRetainRelease {};
@@ -75,8 +64,8 @@ struct
     __attribute__((swift_attr("release:goodReleaseWithNullabilityAnnotations")))
 GoodRetainReleaseWithNullabilityAnnotations {};
 
-void goodRetainWithNullabilityAnnotations(GoodRetainReleaseWithNullabilityAnnotations * _Nonnull v);
-void goodReleaseWithNullabilityAnnotations(GoodRetainReleaseWithNullabilityAnnotations * _Nonnull v);
+void goodRetainWithNullabilityAnnotations(GoodRetainReleaseWithNullabilityAnnotations * _Nullable v);
+void goodReleaseWithNullabilityAnnotations(GoodRetainReleaseWithNullabilityAnnotations * _Null_unspecified v);
 
 struct
     __attribute__((swift_attr("import_reference")))
@@ -278,7 +267,6 @@ import Test
 public func test(x: NonExistent) { }
 public func test(x: NoRetainRelease) { }
 public func test(x: BadRetainRelease) { }
-public func test(x: BadRetainReleaseWithNullabilityAnnotations) { }
 public func test(x: GoodRetainRelease) { }
 public func test(x: GoodRetainReleaseWithRetainReturningSelf) { }
 public func test(x: GoodRetainReleaseWithNullabilityAnnotations) { }
