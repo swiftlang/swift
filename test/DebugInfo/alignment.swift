@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-ir -g -o - | %FileCheck %s
+// RUN: %target-swift-frontend %s -emit-ir -gdwarf-types -o - | %FileCheck %s
 
 @_alignment(8)
 // CHECK: !DICompositeType(tag: DW_TAG_structure_type, name: "S8"
@@ -15,3 +15,31 @@ enum E16 {
 
 var s: S8
 var e: E16
+
+// CHECK: !DICompositeType(tag: DW_TAG_structure_type, name: "MultiPayload"
+// CHECK-SAME:             size: 40, align: 32,
+enum MultiPayload {
+  case a(Int32)
+  case b(Bool)
+  case c
+}
+
+
+// CHECK: !DICompositeType(tag: DW_TAG_structure_type, name: "SameAlignAsSize"
+// CHECK-SAME:             size: 64, align: 64,
+struct SameAlignAsSize { var x: Int64 }
+
+// CHECK: !DICompositeType(tag: DW_TAG_structure_type, name: "Empty"
+// CHECK-NOT: size:
+// CHECK-SAME: align: 8,
+struct Empty {}
+
+// CHECK: !DICompositeType(tag: DW_TAG_structure_type, name: "ZeroSizedPayload"
+// CHECK-NOT: size:
+// CHECK-SAME: align: 8,
+enum ZeroSizedPayload { case a(Empty) }
+
+var m: MultiPayload
+var a: SameAlignAsSize
+var t: Empty
+var z: ZeroSizedPayload
