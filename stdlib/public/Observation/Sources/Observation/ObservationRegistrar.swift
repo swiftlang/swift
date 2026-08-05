@@ -15,27 +15,6 @@
 /// the ``Observation/Observable()`` macro to indicate observability of a type.
 @available(SwiftStdlib 5.9, *)
 public struct ObservationRegistrar: Sendable {
-  internal class ValueObservationStorage {
-    func emit<Element>(_ element: Element) -> Bool { return false }
-    func cancel() { }
-  }
-  
-  private struct ValuesObserver {
-    private let storage: ValueObservationStorage
-    
-    internal init(storage: ValueObservationStorage) {
-      self.storage = storage
-    }
-    
-    internal func emit<Element>(_ element: Element) -> Bool {
-      storage.emit(element)
-    }
-    
-    internal func cancel() {
-      storage.cancel()
-    }
-  }
-
   private struct State: @unchecked Sendable {
     private enum ObservationKind {
       case willSetTracking(@Sendable (AnyKeyPath) -> Void)
