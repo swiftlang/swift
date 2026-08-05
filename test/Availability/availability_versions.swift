@@ -1674,6 +1674,26 @@ func testForFixitWithNestedMemberRefExpr() {
       
 }
 
+@available(OSX 51.1, *)
+func globalFuncAvailableOn51_1() -> Int { return 9 }
+
+func testForFixitNarrowingNearbyVersionCheck(_ i: Int) {
+  if #available(OSX 51, *) {
+    _ = globalFuncAvailableOn51_1()
+        // expected-error@-1 {{'globalFuncAvailableOn51_1()' is only available in macOS 51.1 or newer}} {{-1:21-23=51.1}}
+  }
+
+  if #available(OSX 51, *) {
+    switch i {
+    case 0:
+      _ = globalFuncAvailableOn51_1()
+          // expected-error@-1 {{'globalFuncAvailableOn51_1()' is only available in macOS 51.1 or newer}} {{-3:21-23=51.1}}
+    default:
+      break
+    }
+  }
+}
+
 // Protocol Conformances
 
 protocol ProtocolWithRequirementMentioningPotentiallyUnavailable {
