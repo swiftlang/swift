@@ -197,11 +197,9 @@ struct RetainReleaseInfo {
     auto checkOp = [&](unsigned count, StringRef name, bool isRelease) {
       if (count != 1) {
         if (Impl)
-          Impl->diagnose(
-              loc,
-              count == 0 ? diag::reference_type_must_have_retain_release_attr
-                         : diag::too_many_reference_type_retain_release_attr,
-              isRelease, allocateRecordName(*Impl));
+          Impl->diagnose(loc,
+                         diag::reference_type_exactly_one_retain_release_attr,
+                         isRelease, allocateRecordName(*Impl));
         return false;
       }
       if (name.empty()) {

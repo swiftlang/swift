@@ -258,14 +258,9 @@ ERROR(reference_type_mixed_immortal_marker, none,
       "reference type %0 must mark both or neither of its 'retain:' and "
       "'release:' Swift attributes 'immortal'",
       (const clang::NamedDecl *))
-ERROR(reference_type_must_have_retain_release_attr, none,
-      "reference type '%1' must have %select{'retain:'|'release:'}0 Swift "
-      "attribute",
-      (bool, StringRef))
-ERROR(too_many_reference_type_retain_release_attr, none,
-      "reference type '%1' must have only one %select{'retain:'|'release:'}0 "
-      "Swift "
-      "attribute",
+ERROR(reference_type_exactly_one_retain_release_attr, none,
+      "reference type '%1' must have exactly one '%select{retain|release}0:' "
+      "Swift attribute",
       (bool, StringRef))
 ERROR(reference_type_empty_retain_release_name, none,
       "reference type '%1' has an empty %select{retain|release}0 operation name",

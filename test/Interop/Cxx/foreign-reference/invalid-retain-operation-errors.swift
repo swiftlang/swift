@@ -26,8 +26,8 @@ NonExistent {};
 struct
         __attribute__((swift_attr("import_reference")))
 NoRetainRelease {};
-// expected-error@-1 {{reference type 'NoRetainRelease' must have 'retain:' Swift attribute}}
-// expected-error@-2 {{reference type 'NoRetainRelease' must have 'release:' Swift attribute}}
+// expected-error@-1 {{reference type 'NoRetainRelease' must have exactly one 'retain:' Swift attribute}}
+// expected-error@-2 {{reference type 'NoRetainRelease' must have exactly one 'release:' Swift attribute}}
 
 struct
     __attribute__((swift_attr("import_reference")))
@@ -221,8 +221,8 @@ struct
     __attribute__((swift_attr("release:release1")))
     __attribute__((swift_attr("release:release2")))
 MultipleRetainReleaseAttrFRT {};
-// expected-error@-1 {{reference type 'MultipleRetainReleaseAttrFRT' must have only one 'retain:' Swift attribute}}
-// expected-error@-2 {{reference type 'MultipleRetainReleaseAttrFRT' must have only one 'release:' Swift attribute}}
+// expected-error@-1 {{reference type 'MultipleRetainReleaseAttrFRT' must have exactly one 'retain:' Swift attribute}}
+// expected-error@-2 {{reference type 'MultipleRetainReleaseAttrFRT' must have exactly one 'release:' Swift attribute}}
 
 void retain1(MultipleRetainReleaseAttrFRT *v);
 void retain2(MultipleRetainReleaseAttrFRT *v);

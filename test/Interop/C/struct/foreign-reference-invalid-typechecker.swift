@@ -27,8 +27,8 @@ NonExistent { int value; };
 struct
   __attribute__((swift_attr("import_reference")))
 NoRetainRelease { int value; };
-// expected-error@-1 {{reference type 'NoRetainRelease' must have 'retain:' Swift attribute}}
-// expected-error@-2 {{reference type 'NoRetainRelease' must have 'release:' Swift attribute}}
+// expected-error@-1 {{reference type 'NoRetainRelease' must have exactly one 'retain:' Swift attribute}}
+// expected-error@-2 {{reference type 'NoRetainRelease' must have exactly one 'release:' Swift attribute}}
 
 struct
   __attribute__((swift_attr("import_reference")))
