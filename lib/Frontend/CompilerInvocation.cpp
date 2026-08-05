@@ -448,6 +448,11 @@ void CompilerInvocation::setRuntimeResourcePath(StringRef Path) {
   updateRuntimeLibraryPaths(SearchPathOpts, FrontendOpts, LangOpts, SDKInfo);
 }
 
+void CompilerInvocation::updateImplicitSearchPaths() {
+  updateRuntimeLibraryPaths(SearchPathOpts, FrontendOpts, LangOpts, SDKInfo);
+  updateImplicitFrameworkSearchPaths(SearchPathOpts, LangOpts, SDKInfo);
+}
+
 void CompilerInvocation::setTargetTriple(StringRef Triple) {
   setTargetTriple(llvm::Triple(Triple));
 }
