@@ -832,6 +832,21 @@ private:
   /// continue in and returns false.
   bool processState(State &&state, SmallVectorImpl<State> &states);
 
+  /// Record a path on \p states for each predecessor in \p joinedBlocks that
+  /// the chain may continue in.
+  ///
+  /// The chain -- or the location of its last notes -- is in the predecessors
+  /// whose exit partitions were joined into \p state's partition at a CFG merge
+  /// point. Only some of them can be where what the walk is looking for
+  /// happened, so a predecessor whose exit partition cannot answer anything we
+  /// want is skipped rather than rewound.
+  ///
+  /// \p pendingStart is the state's pending-note mark as it stands now, which
+  /// rewinding has moved past the mark the state itself carries.
+  void prepareStatesForPredecessors(
+      const State &state, ArrayRef<SILBasicBlock *> joinedBlocks,
+      unsigned pendingStart, SmallVectorImpl<State> &states);
+
   void emitNotes();
 
   /// Returns true when isolation-history emission is on for this function and
@@ -981,7 +996,7 @@ void IsolationHistoryNoteEmitter::collectIsolationHistoryNotes() {
     // in the meantime appended notes of its own and located notes this one
     // inherited, and neither belongs here.
     walkNotes.truncate(state.noteMark);
-    for (unsigned i = state.pendingStart, e = state.noteMark; i != e; ++i)
+    for (unsigned i : range(state.pendingStart, state.noteMark))
       walkNotes[i].mergeLoc = SILLocation::invalid();
 
     ISOLATION_HISTORY_LOG(log() << "Rewinding a partition (" << states.size()
@@ -1044,6 +1059,16 @@ bool IsolationHistoryNoteEmitter::processState(State &&state,
     };
 
     switch (node->getKind()) {
+    case Node::CFGHistoryJoin:
+      // popHistoryOnce has recorded the predecessor block for us; the branch
+      // that was joined in is rewound as its own state once this one runs out
+      // of history.
+      continue;
+    case Node::AddNewRegionForElement:
+    case Node::RemoveLastElementFromRegion:
+    case Node::RemoveElementFromRegion:
+      continue;
+
     case Node::MergeElementRegions: {
       // The two elements the program actually merged. Undoing the node has
       // already put them in separate regions, along with whatever each of them
@@ -1214,15 +1239,6 @@ bool IsolationHistoryNoteEmitter::processState(State &&state,
       }
       continue;
     }
-    case Node::CFGHistoryJoin:
-      // popHistoryOnce has recorded the predecessor block for us; the branch
-      // that was joined in is rewound as its own state once this one runs out
-      // of history.
-      continue;
-    case Node::AddNewRegionForElement:
-    case Node::RemoveLastElementFromRegion:
-    case Node::RemoveElementFromRegion:
-      continue;
     }
   }
 
@@ -1251,13 +1267,17 @@ bool IsolationHistoryNoteEmitter::processState(State &&state,
     }
   }
 
-  // The chain -- or the location of its last notes -- is in the predecessors
-  // whose exit partitions were joined into this one at a CFG merge point.
-  //
-  // Point at those partitions rather than copying them. Deciding whether a
-  // predecessor is worth trying only reads its exit partition, and a Partition
-  // copy also copies its element-to-region map, so the copy waits until we know
-  // the walk is going there.
+  prepareStatesForPredecessors(state, joinedBlocks, pendingStart, states);
+  return false;
+}
+
+void IsolationHistoryNoteEmitter::prepareStatesForPredecessors(
+    const State &state, ArrayRef<SILBasicBlock *> joinedBlocks,
+    unsigned pendingStart, SmallVectorImpl<State> &states) {
+  // Point at the predecessors' exit partitions rather than copying them.
+  // Deciding whether a predecessor is worth trying only reads its exit
+  // partition, and a Partition copy also copies its element-to-region map, so
+  // the copy waits until we know the walk is going there.
   struct PredExit {
     SILBasicBlock *block;
     const Partition *exit;
@@ -1285,37 +1305,35 @@ bool IsolationHistoryNoteEmitter::processState(State &&state,
   // are any, and otherwise the ends of the notes that are waiting for a
   // location.
   SmallVector<ChainQuestion, 4> wanted;
-  if (!openQuestions.empty()) {
-    wanted.append(openQuestions.begin(), openQuestions.end());
+  if (!state.openQuestions.empty()) {
+    wanted.append(state.openQuestions.begin(), state.openQuestions.end());
   } else {
     for (unsigned i = pendingStart, e = walkNotes.size(); i != e; ++i)
       wanted.push_back(ChainQuestion{walkNotes[i].lhsElt, walkNotes[i].rhsElt,
                                      std::nullopt});
   }
 
-  // Only some of those predecessors can be where what we want happened, and
-  // rewinding one of the others would report merges from a branch the isolation
-  // never came through -- the arm of a diamond that assigns a fresh value has a
-  // history full of merges, none of them an answer.
+  // Rewinding a predecessor the chain never came through would report merges
+  // from a branch that has nothing to do with the isolation -- the arm of a
+  // diamond that assigns a fresh value has a history full of merges, none of
+  // them an answer.
   //
   // A predecessor is a candidate when its exit partition can answer something
   // we want (see \c couldAnswer). If none of them can, the walk has lost track
   // of what it is looking for, so rather than guess we try them all.
-  SmallVector<bool, 4> isCandidate(preds.size(), false);
-  bool anyCandidate = false;
-  for (unsigned i = 0, e = preds.size(); i != e; ++i) {
+  SmallBitVector isCandidate(preds.size());
+  for (unsigned i : indices(preds)) {
     PartitionWrapper predPartition(*preds[i].exit, inputValueMap);
     for (const ChainQuestion &question : wanted) {
       if (predPartition.couldAnswer(question)) {
         isCandidate[i] = true;
-        anyCandidate = true;
         break;
       }
     }
   }
 
-  for (unsigned i = 0, e = preds.size(); i != e; ++i) {
-    if (anyCandidate && !isCandidate[i]) {
+  for (unsigned i : indices(preds)) {
+    if (isCandidate.any() && !isCandidate[i]) {
       ISOLATION_HISTORY_LOG(
           log(1) << "Nothing we are looking for came together in bb"
                  << preds[i].block->getDebugID()
@@ -1333,11 +1351,9 @@ bool IsolationHistoryNoteEmitter::processState(State &&state,
     // within them. Backtracking onto the path restores walkNotes to exactly
     // this.
     states.push_back(State{preds[i].exit->removingSendingOperandState(),
-                           openQuestions, unsigned(walkNotes.size()),
-                           pendingStart, allQuestionsAnswered});
+                           state.openQuestions, unsigned(walkNotes.size()),
+                           pendingStart, state.allQuestionsAnswered});
   }
-
-  return false;
 }
 
 /// Emit the collected chain, one note per link, anchored at the merge that
