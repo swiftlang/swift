@@ -290,6 +290,17 @@ public:
   void emitPackCountParameter(IRGenFunction &IGF, llvm::Value *Metadata,
                               SILDebugVariable VarInfo);
 
+  void emitExistentialPayloadType(swift::Type Ty) {
+    if (Opts.DebugInfoLevel <= IRGenDebugInfoLevel::ASTTypes)
+      return;
+    if (!Ty || Ty->hasTypeParameter() || Ty->hasArchetype())
+      return;
+
+    auto DbgTy = DebugTypeInfo::getFromTypeInfo(
+        Ty, IGM.getTypeInfoForUnlowered(Ty), IGM);
+    anchorType(getOrCreateType(DbgTy));
+  }
+
   /// Return flags which enable debug info emission for call sites, provided
   /// that it is supported and enabled.
   llvm::DINode::DIFlags getCallSiteRelatedAttrs() const;
@@ -2241,16 +2252,25 @@ private:
 
       llvm::DINodeArray Annotations = nullptr;
       if (auto *PD = dyn_cast_or_null<ProtocolDecl>(Decl)) {
-        if (PD->isMarkerProtocol()) {
+        SmallVector<llvm::Metadata *, 2> Annots;
+        auto addFlag = [&](StringRef Name) {
           llvm::Metadata *Ops[2] = {
-              llvm::MDString::get(IGM.getLLVMContext(),
-                                  StringRef("swift.MarkerProtocol")),
+              llvm::MDString::get(IGM.getLLVMContext(), Name),
               llvm::ConstantAsMetadata::get(llvm::ConstantInt::get(
                   llvm::Type::getInt1Ty(IGM.getLLVMContext()), true))};
-          SmallVector<llvm::Metadata *, 1> Annots = {
-              llvm::MDNode::get(IGM.getLLVMContext(), Ops)};
+          Annots.push_back(llvm::MDNode::get(IGM.getLLVMContext(), Ops));
+        };
+
+        if (PD->isMarkerProtocol())
+          addFlag("swift.MarkerProtocol");
+
+        if (PD->isObjC())
+          addFlag("swift.ObjCProtocol");
+        else if (PD->requiresClass())
+          addFlag("swift.ClassConstrainedProtocol");
+
+        if (!Annots.empty())
           Annotations = DBuilder.getOrCreateArray(Annots);
-        }
       }
 
       return createOpaqueStruct(Scope, Decl ? Decl->getNameStr() : MangledName,
@@ -4489,6 +4509,10 @@ void IRGenDebugInfo::emitPackCountParameter(IRGenFunction &IGF,
                                             SILDebugVariable VarInfo) {
   static_cast<IRGenDebugInfoImpl *>(this)->emitPackCountParameter(IGF, Metadata,
                                                                   VarInfo);
+}
+
+void IRGenDebugInfo::emitExistentialPayloadType(swift::Type Ty) {
+  static_cast<IRGenDebugInfoImpl *>(this)->emitExistentialPayloadType(Ty);
 }
 
 llvm::DIBuilder &IRGenDebugInfo::getBuilder() {
