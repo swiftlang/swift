@@ -8227,6 +8227,7 @@ static bool isAllowedWhenParsingLimitedSyntax(AccessorKind kind, bool forSIL) {
   case AccessorKind::YieldingBorrow:
   case AccessorKind::Borrow:
   case AccessorKind::Mutate:
+  case AccessorKind::YieldingMutate:
     return true;
 
   case AccessorKind::Address:
@@ -8235,7 +8236,6 @@ static bool isAllowedWhenParsingLimitedSyntax(AccessorKind kind, bool forSIL) {
   case AccessorKind::DidSet:
   case AccessorKind::Read:
   case AccessorKind::Modify:
-  case AccessorKind::YieldingMutate:
     return false;
 
   case AccessorKind::Init:

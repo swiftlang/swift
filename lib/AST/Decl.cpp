@@ -3660,6 +3660,11 @@ getOpaqueWriteAccessStrategy(const AbstractStorageDecl *storage, bool dispatch) 
     return AccessStrategy::getAccessor(AccessorKind::Init, dispatch);
   if (storage->requiresOpaqueMutateAccessor())
     return AccessStrategy::getAccessor(AccessorKind::Mutate, dispatch);
+  // A 'yielding mutate' requirement with no plain setter of its own (e.g. a
+  // protocol requirement spelled without 'set') has no setter to fall back to.
+  if (storage->requiresOpaqueYieldingMutateCoroutine() &&
+      !storage->requiresOpaqueSetter())
+    return AccessStrategy::getAccessor(AccessorKind::YieldingMutate, dispatch);
   return AccessStrategy::getAccessor(AccessorKind::Set, dispatch);
 }
 
@@ -3830,6 +3835,14 @@ bool AbstractStorageDecl::requiresOpaqueSetter() const {
     return false;
   }
   if (getParsedAccessor(AccessorKind::Mutate)) {
+    return false;
+  }
+  if (getParsedAccessor(AccessorKind::YieldingMutate) &&
+      !getParsedAccessor(AccessorKind::Set) &&
+      isa<ProtocolDecl>(getDeclContext())) {
+    // In a protocol, `yielding mutate` by itself suffices
+    // to provide write support and we don't need `set` unless
+    // the protocol explicitly specifies it.
     return false;
   }
   return true;
