@@ -121,12 +121,25 @@ private struct FunctionChecker {
          if !checkedCast.supportedInEmbeddedSwift {
            throw Diagnostic(.embedded_swift_dynamic_cast, at: instruction.location)
          }
+         try checkCastTargetUniqueness(checkedCast.targetFormalType, at: instruction.location)
        } else {
          let checkedCast = instruction as! UnconditionalCheckedCastAddrInst
          if !checkedCast.supportedInEmbeddedSwift {
            throw Diagnostic(.embedded_swift_dynamic_cast, at: instruction.location)
          }
+         try checkCastTargetUniqueness(checkedCast.targetFormalType, at: instruction.location)
        }
+
+    // The value-form checked casts (e.g. a class-bound `any P` downcast to a
+    // concrete class, `x as? C`) are lowered to an isa/metadata-pointer
+    // comparison. If the target class has a non-unique definition, the
+    // allocating module and this module may see different metadata records, so
+    // the cast silently fails at runtime. Diagnose it.
+    case let ccb as CheckedCastBranchInst:
+      try checkCastTargetUniqueness(ccb.targetFormalType, at: instruction.location)
+
+    case let ucc as UnconditionalCheckedCastInst:
+      try checkCastTargetUniqueness(ucc.targetFormalType, at: instruction.location)
 
     case let abi as AllocBoxInst:
       // It needs a bit of work to support alloc_box of generic non-copyable structs/enums with deinit,
@@ -211,6 +224,30 @@ private struct FunctionChecker {
     default:
       break
     }
+  }
+
+  // A class `as?`/`as!` downcast compares type-metadata pointers at runtime.
+  // In Embedded Swift a type's metadata is emitted with a non-unique
+  // definition unless the type is `@export(interface)` (or defined in the main
+  // module), so an object allocated in one module and downcast in another can
+  // compare against a different metadata record and the cast silently fails.
+  // Reject casting to such a type here (rdar://179424428).
+  mutating func checkCastTargetUniqueness(_ targetType: CanonicalType, at location: Location) throws {
+    // Only class metadata identity is at stake: `swift_dynamicCastClass`
+    // compares isa pointers. Struct/enum casts don't rely on a unique metadata
+    // record the same way.
+    //
+    // Generic classes are exempt: their metadata is instantiated on demand
+    // through the runtime metadata accessor, which uniques it, so the redundant
+    // per-module definitions still resolve to a single record at runtime.
+    guard targetType.isClass,
+          !targetType.isGenericAtAnyLevel,
+          let nominal = targetType.nominal,
+          nominal.hasNonUniqueDefinition
+    else {
+      return
+    }
+    throw Diagnostic(.embedded_swift_cast_to_nonunique_type, targetType.rawType, at: location)
   }
 
   mutating func checkApply(apply: ApplySite) throws {

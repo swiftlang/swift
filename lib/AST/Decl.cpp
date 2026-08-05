@@ -2546,6 +2546,31 @@ std::optional<StringRef> Decl::getSection() const {
                            SectionForDeclRequest{this}, std::nullopt);
 }
 
+bool ValueDecl::hasNonUniqueDefinition() const {
+  // This only forces the issue in embedded Swift.
+  if (!getASTContext().LangOpts.hasFeature(Feature::Embedded))
+    return false;
+
+  auto *module = getModuleContext();
+  auto &ctx = module->getASTContext();
+
+  switch (getEffectiveCodeGenerationModel()) {
+  case CodeGenerationModel::Implementation:
+    // When deferring all code generation, declarations are emitted as late
+    // as possible, so they must have non-unique definitions.
+    return true;
+
+  case CodeGenerationModel::Inlinable:
+    // If the declaration is not from the main module, treat its definition as
+    // non-unique.
+    return module != ctx.MainModule && ctx.MainModule;
+
+  case CodeGenerationModel::Interface:
+    return false;
+  }
+  llvm_unreachable("covered switch");
+}
+
 PatternBindingDecl::PatternBindingDecl(SourceLoc StaticLoc,
                                        StaticSpellingKind StaticSpelling,
                                        SourceLoc VarLoc,
