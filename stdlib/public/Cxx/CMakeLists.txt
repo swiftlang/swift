@@ -15,7 +15,7 @@ set(SWIFT_CXX_SOURCES
     CxxSet.swift
     CxxRandomAccessCollection.swift
     CxxSequence.swift
-    CxxBorrowingSequence.swift
+    CxxIterable.swift
     CxxVector.swift
     CxxSpan.swift
     UnsafeCxxIterators.swift
