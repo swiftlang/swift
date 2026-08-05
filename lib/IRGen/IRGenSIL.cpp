@@ -8109,6 +8109,18 @@ void IRGenSILFunction::visitKeyPathInst(swift::KeyPathInst *I) {
         emitInitStaticObjectCall(metadata, staticInstance, "keypath.instance");
       }
 
+      // Intermediate type metadata that couldn't be named as a constant is
+      // filled in the same way, under its own `swift_once`. Separate from the
+      // isa's token because `swift_initStaticObject` owns that one.
+      if (auto lazyInit = IGM.getStaticKeyPathLazyInit(I)) {
+        auto *call = Builder.CreateCall(
+            IGM.getOnceFunctionPointer(),
+            {lazyInit.Token,
+             llvm::ConstantExpr::getBitCast(lazyInit.InitFn, IGM.Int8PtrTy),
+             llvm::ConstantPointerNull::get(IGM.Int8PtrTy)});
+        call->setCallingConv(IGM.DefaultCC);
+      }
+
       Explosion e;
       e.add(staticInstance);
       setLoweredExplosion(I, e);

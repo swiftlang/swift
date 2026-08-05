@@ -1533,8 +1533,10 @@ static bool staticKeyPathLayoutIsStatic(IRGenModule &IGM, KeyPathInst *KPI) {
       break;
     }
 
-    // The constant embeds a metadata pointer for each intermediate type, so
-    // those have to be static references too.
+    // The object embeds a metadata pointer for each intermediate type. It no
+    // longer has to be a *constant* -- a non-addressable one is emitted null
+    // and filled in by the once-initializer -- but we still have to be able to
+    // reason about the type, so an illegal SIL type is still declined above.
     currentRoot = comp.getComponentType().subst(subs)->getCanonicalType();
     // A component's formal type isn't always legal in SIL -- an optional of a
     // metatype, for instance. Those need lowering to reason about, which the
@@ -1542,11 +1544,18 @@ static bool staticKeyPathLayoutIsStatic(IRGenModule &IGM, KeyPathInst *KPI) {
     // decline. This is conservative, not a correctness requirement.
     if (!currentRoot->isLegalSILType())
       return false;
-    if (!isCanonicalCompleteTypeMetadataStaticallyAddressable(IGM, currentRoot))
-      return false;
+
   }
 
   return true;
+}
+
+IRGenModule::StaticKeyPathLazyInit
+IRGenModule::getStaticKeyPathLazyInit(KeyPathInst *KPI) {
+  auto found = StaticKeyPathLazyInits.find(KPI->getPattern());
+  if (found == StaticKeyPathLazyInits.end())
+    return {};
+  return found->second;
 }
 
 bool IRGenModule::keyPathInstanceNeedsLazyMetadata(KeyPathInst *KPI) {
@@ -1950,8 +1959,14 @@ llvm::Constant *IRGenModule::emitStaticKeyPathInstance(
     llvm::Constant *getter = nullptr;
     llvm::Constant *setter = nullptr;
     // Metadata pointer for the intermediate type following this
-    // component; null for the last component.
+    // component; null for the last component. When the metadata isn't
+    // statically addressable the pointer is emitted as null and
+    // `lazyNextType` records the type so the once-initializer can fill the
+    // slot in on first use.
     llvm::Constant *nextTypeMetadata = nullptr;
+    CanType lazyNextType;
+    // Byte offset of this slot within the object, for the lazy fill-in.
+    uint32_t nextTypeMetadataOffset = 0;
     // Captured-argument info, mirroring StaticKeyPathComponentLayout.
     uint32_t argSize = 0;
     uint32_t argPadding = 0;
@@ -2040,7 +2055,17 @@ llvm::Constant *IRGenModule::emitStaticKeyPathInstance(
     CanType nextType =
         comp.getComponentType().subst(subs)->getCanonicalType();
     if (i + 1 < numComponents) {
-      step.nextTypeMetadata = getAddrOfTypeMetadata(nextType);
+      // A class, a non-empty tuple, or an un-prespecialized generic has no
+      // metadata symbol we can name; the runtime uniques it. Leave the slot
+      // null and fill it in on first use, the same way the object's own isa is
+      // handled. Embedded Swift always has a constant here.
+      if (Context.LangOpts.hasFeature(Feature::Embedded) ||
+          isCanonicalCompleteTypeMetadataStaticallyAddressable(*this,
+                                                               nextType)) {
+        step.nextTypeMetadata = getAddrOfTypeMetadata(nextType);
+      } else {
+        step.lazyNextType = nextType;
+      }
     }
     steps.push_back(step);
     currentRoot = nextType;
@@ -2087,8 +2112,9 @@ llvm::Constant *IRGenModule::emitStaticKeyPathInstance(
         componentBytes += step.argSize;
       }
     }
-    if (step.nextTypeMetadata) {
-      // Pad up to pointer alignment before the intermediate type ptr.
+    if (step.nextTypeMetadata || step.lazyNextType) {
+      // Pad up to pointer alignment before the intermediate type ptr. A
+      // lazily-filled slot still occupies one.
       uint32_t pad =
           static_cast<uint32_t>((ptrSize - (componentBytes % ptrSize)) %
                                 ptrSize);
@@ -2309,7 +2335,7 @@ llvm::Constant *IRGenModule::emitStaticKeyPathInstance(
       }
     }
 
-    if (step.nextTypeMetadata) {
+    if (step.nextTypeMetadata || step.lazyNextType) {
       // Pad up to pointer alignment before writing the intermediate
       // type metadata pointer.
       uint32_t pad =
@@ -2320,8 +2346,16 @@ llvm::Constant *IRGenModule::emitStaticKeyPathInstance(
             llvm::ArrayType::get(Int8Ty, pad)));
         bytesInData += pad;
       }
-      fields.add(llvm::ConstantExpr::getBitCast(step.nextTypeMetadata,
-                                                Int8PtrTy));
+      if (step.nextTypeMetadata) {
+        fields.add(llvm::ConstantExpr::getBitCast(step.nextTypeMetadata,
+                                                  Int8PtrTy));
+      } else {
+        // Filled in by the once-initializer; record where it lands.
+        step.nextTypeMetadataOffset =
+            static_cast<uint32_t>(bodySize + paddingBytes + 4 +
+                                  pointerAlignmentSkewBytes + bytesInData);
+        fields.add(llvm::ConstantPointerNull::get(Int8PtrTy));
+      }
       bytesInData += ptrSize;
     }
   }
@@ -2337,12 +2371,20 @@ llvm::Constant *IRGenModule::emitStaticKeyPathInstance(
   // in read-only memory. It also has to sit inside a container that reserves a
   // `swift_once_t` immediately *before* the object, which is where
   // `swift_initStaticObject` looks for it.
+  // Any lazily-filled slot -- the isa, or an intermediate type's metadata --
+  // means the object is written to at runtime, so it can't be constant and
+  // needs the once-token container.
+  bool hasLazyIntermediate = false;
+  for (auto &step : steps)
+    hasLazyIntermediate |= (bool)step.lazyNextType;
+  bool needsLazyInit = lazyMetadata || hasLazyIntermediate;
+
   auto *global = fields.finishAndCreateGlobal(
-      lazyMetadata ? "keypath_body" : "keypath", Alignment(16),
-      /*constant*/ !lazyMetadata, llvm::GlobalValue::PrivateLinkage);
+      needsLazyInit ? "keypath_body" : "keypath", Alignment(16),
+      /*constant*/ !needsLazyInit, llvm::GlobalValue::PrivateLinkage);
 
   llvm::Constant *objectAddr = global;
-  if (lazyMetadata) {
+  if (needsLazyInit) {
     unsigned numTokens =
         Alignment(16).getValue() / getPointerAlignment().getValue();
     auto *containerTy = llvm::StructType::get(
@@ -2364,6 +2406,57 @@ llvm::Constant *IRGenModule::emitStaticKeyPathInstance(
         llvm::ArrayRef<llvm::Constant *>{
             llvm::ConstantInt::get(Int32Ty, 0),
             llvm::ConstantInt::get(Int32Ty, 1)});
+
+    if (hasLazyIntermediate) {
+      // Build the `swift_once` body that fills in the slots we left null.
+      // `swift_initStaticObject` takes the *last* token in the block (it looks
+      // at offset -1 from the object), so this one uses token[0].
+      auto *tokenAddr = llvm::ConstantExpr::getInBoundsGetElementPtr(
+          containerTy, container,
+          llvm::ArrayRef<llvm::Constant *>{
+              llvm::ConstantInt::get(Int32Ty, 0),
+              llvm::ConstantInt::get(Int32Ty, 0),
+              llvm::ConstantInt::get(Int32Ty, 0)});
+
+      auto *fnTy = llvm::FunctionType::get(VoidTy, {Int8PtrTy},
+                                           /*vararg*/ false);
+      auto *initFn = llvm::Function::Create(fnTy,
+                                            llvm::GlobalValue::PrivateLinkage,
+                                            "keypath_init_metadata",
+                                            getModule());
+      initFn->setAttributes(constructInitialAttributes());
+      initFn->setCallingConv(DefaultCC);
+      {
+        IRGenFunction IGF(*this, initFn);
+        if (DebugInfo)
+          DebugInfo->emitArtificialFunction(IGF, initFn);
+        auto *objBytes = llvm::ConstantExpr::getBitCast(objectAddr, Int8PtrTy);
+        for (auto &step : steps) {
+          if (!step.lazyNextType)
+            continue;
+          // Call the accessor directly rather than via `emitTypeMetadataRef`:
+          // for these types that would emit an access-by-mangled-name, whose
+          // own demangling cache would be a second guard on what this
+          // once-token already guards.
+          auto *accessor =
+              getOrCreateTypeMetadataAccessFunction(*this, step.lazyNextType);
+          auto *call = IGF.Builder.CreateCall(
+              accessor->getFunctionType(), accessor,
+              {llvm::ConstantInt::get(SizeTy,
+                                      (size_t)MetadataState::Complete)});
+          call->setDoesNotThrow();
+          call->setCallingConv(SwiftCC);
+          llvm::Value *md = IGF.Builder.CreateExtractValue(call, 0);
+
+          auto *slot = IGF.Builder.CreateConstInBoundsGEP1_32(
+              Int8Ty, objBytes, step.nextTypeMetadataOffset);
+          IGF.Builder.CreateStore(
+              md, Address(slot, TypeMetadataPtrTy, getPointerAlignment()));
+        }
+        IGF.Builder.CreateRetVoid();
+      }
+      StaticKeyPathLazyInits[pattern] = {tokenAddr, initFn};
+    }
   }
 
   // Cast to the concrete key path class pointer type so callers can use it
