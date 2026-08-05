@@ -15,6 +15,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/NameLookup.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include <optional>
@@ -31,15 +32,26 @@ static TypeDecl *findTypeInModuleByName(ASTContext &ctx, Identifier moduleName,
   // Find all of the declarations with this name in the Swift module.
   SmallVector<ValueDecl *, 1> results;
   module->lookupValue(typeName, NLKind::UnqualifiedLookup, results);
+  if (results.empty()) {
+    // A type that the module only re-exports is not found above, because
+    // lookupValue does not follow re-exports. This is how the Clang types of
+    // the module that a Swift overlay shadows are named, e.g. 'simd_float3'
+    // from the 'simd' module.
+    module->lookupQualified(module, DeclNameRef(typeName), SourceLoc(),
+                            NLOptions(NLFlags::QualifiedDefault) |
+                                NLFlags::OnlyTypes,
+                            results);
+  }
   assert(results.size() <= 1 &&
          "Expected at most one match for a primitive type");
-  for (auto result : results) {
-    if (auto nominal = dyn_cast<NominalTypeDecl>(result))
-      return nominal;
+  if (results.size() != 1)
+    return nullptr;
 
-    if (auto typealias = dyn_cast<TypeAliasDecl>(result))
-      return typealias;
-  }
+  if (auto nominal = dyn_cast<NominalTypeDecl>(results[0]))
+    return nominal;
+
+  if (auto typealias = dyn_cast<TypeAliasDecl>(results[0]))
+    return typealias;
 
   return nullptr;
 }

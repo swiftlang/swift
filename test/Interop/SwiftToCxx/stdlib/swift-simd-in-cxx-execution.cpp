@@ -9,7 +9,8 @@
 // RUN: %target-run %t/swift-simd-execution | %FileCheck %s
 
 // REQUIRES: executable_test
-// REQUIRES: rdar157848231
+// The 'simd' module ships with the Apple SDKs.
+// REQUIRES: sdk_min_version_26
 
 #include "simd.h"
 #include <assert.h>
