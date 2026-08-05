@@ -193,6 +193,14 @@ bool constraints::doesMemberRefApplyCurriedSelf(Type baseTy,
         baseTy->getRValueType()->is<AnyMetatypeType>()) {
       if (decl->getDeclContext()->isMetatypeExtension())
         return true;
+      // `T.f()` where `T.Type: P` applies the metatype as `self`. A missing
+      // conformacne denotes an unbound reference such as `Q.f`.
+      if (auto *PD = dyn_cast<ProtocolDecl>(decl->getDeclContext())) {
+        auto conformance = lookupConformance(baseTy->getRValueType(), PD,
+                                             /*allowMissing=*/true);
+        if (conformance && !conformance.hasMissingConformance())
+          return true;
+      }
       return false;
     }
   }
@@ -9043,6 +9051,11 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
   if (type->isTypeVariableOrMember())
     return formUnsolved();
 
+  // Wai tuntil the instance type of an unresolved metatype is known.
+  if (auto *metatype = type->getAs<AnyMetatypeType>())
+    if (metatype->getInstanceType()->isTypeVariableOrMember())
+      return formUnsolved();
+
   // If we have a function type and are checking for Sendable conformance we
   // need to delay if we have Sendable dependence.
   if (auto *fnTy = type->getAs<FunctionType>()) {
@@ -10671,6 +10684,10 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
   // have already been excluded.
   llvm::SmallPtrSet<ValueDecl *, 2> excludedDynamicMembers;
 
+  // Protocol requirements found through a metatype conformance are viable
+  // directly on the metatype base.
+  llvm::SmallPtrSet<ValueDecl *, 2> metatypeConformanceMembers;
+
   // Local function that adds the given declaration if it is a
   // reasonable choice.
   auto addChoice = [&](OverloadChoice candidate) {
@@ -10795,6 +10812,13 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
         // metatype type itself.  They are accessed directly on the protocol
         // metatype value (e.g. P.value), not on an instance of the protocol.
         if (decl->getDeclContext()->isMetatypeExtension()) {
+          result.addViable(candidate);
+          return;
+        }
+
+        // This requirement was found through a conformance of the metatype, so
+        // do not perform the usual adjustment to the instance type.
+        if (metatypeConformanceMembers.count(decl)) {
           result.addViable(candidate);
           return;
         }
@@ -11059,6 +11083,32 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
     addChoice(getOverloadChoice(result.getValueDecl(),
                                 /*isBridged=*/false,
                                 /*isUnwrappedOptional=*/false));
+
+  // Include requirements of protocols to which the metatype conforms.
+  if (baseObjTy->is<AnyMetatypeType>()) {
+    if (auto signature = DC->getGenericSignatureOfContext()) {
+      for (const auto &requirement : signature.getRequirements()) {
+        if (requirement.getKind() != RequirementKind::Conformance ||
+            !requirement.getFirstType()->is<AnyMetatypeType>())
+          continue;
+        if (!DC->mapTypeIntoEnvironment(requirement.getFirstType())
+               ->isEqual(baseObjTy))
+          continue;
+
+        SmallVector<ValueDecl *, 4> members;
+        DC->lookupQualified(requirement.getProtocolDecl(),
+                            DeclNameRef(lookupName.getFullName()), SourceLoc(),
+                            NLFlags::QualifiedDefault, members);
+        for (auto *member : members) {
+          if (auto *VD = dyn_cast<ValueDecl>(member)) {
+            metatypeConformanceMembers.insert(VD);
+            addChoice(getOverloadChoice(VD, /*isBridged=*/false,
+                                        /*isUnwrappedOptional=*/false));
+          }
+        }
+      }
+    }
+  }
 
   // Backward compatibility hack. In Swift 4, `init` and init were
   // the same name, so you could write "foo.init" to look up a
