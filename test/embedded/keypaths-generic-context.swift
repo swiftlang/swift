@@ -19,7 +19,6 @@
 // REQUIRES: optimized_stdlib
 // REQUIRES: swift_feature_Embedded
 // REQUIRES: swift_feature_EmbeddedKeyPaths
-// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 public struct G<T> {
   public var stored: T
