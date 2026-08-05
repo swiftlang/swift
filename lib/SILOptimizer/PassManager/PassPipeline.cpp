@@ -1153,6 +1153,11 @@ SILPassPipelinePlan
 SILPassPipelinePlan::getSerializeSILPassPipeline(const SILOptions &Options) {
   SILPassPipelinePlan P(Options);
   P.startPipeline("Serialize SIL");
+  if (Options.EmbeddedSwift) {
+    // CMO is required for embedded swift. Make sure to run it in case it didn't
+    // run in the regular pipeline because `-sil-opt-pass-count` was used.
+    P.addCrossModuleOptimization();
+  }
   P.addSerializeSILPass();
   return P;
 }
