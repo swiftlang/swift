@@ -114,6 +114,15 @@ private struct FunctionChecker {
       guard context.options.hasFeature(.EmbeddedKeyPaths), kpi.supportedInEmbeddedSwift else {
         throw Diagnostic(.embedded_swift_keypath, at: instruction.location)
       }
+      // A key path that captures values (subscript arguments) can't be a shared
+      // immortal constant: IRGen allocates an instance and fills the captures in
+      // every time the key path is formed. That is easy to write by accident in
+      // hot code, so hint about it.
+      if !kpi.operands.isEmpty {
+        context.diagnosticEngine.diagnose(.perf_hint_keypath_captures_values,
+                                          kpi.operands.count,
+                                          at: instruction.location)
+      }
 
     case is CheckedCastAddrBranchInst,
          is UnconditionalCheckedCastAddrInst:

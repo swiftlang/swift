@@ -578,6 +578,20 @@ IntegerLiteralInst *optimizeBuiltinCanBeObjCClass(BuiltinInst *bi,
 bool specializeClassMethodInst(ClassMethodInst *cm);
 bool specializeWitnessMethodInst(WitnessMethodInst *wm);
 
+/// Rewrite \p kpi so that its pattern no longer depends on the key path's
+/// substitution map: specialize the accessor thunks referenced by any computed
+/// component and rebuild the pattern with the substitutions applied.
+///
+/// This is what lets Embedded Swift emit a key path formed in a generic context
+/// as a static instance. IRGen takes the address of a pattern's accessor thunks
+/// directly, and every function it emits must be fully specialized, so a
+/// pattern that still names generic thunks cannot be statically instantiated.
+///
+/// Does nothing and returns false if \p kpi has no substitutions, if the
+/// substitutions still contain archetypes, or if any referenced thunk could not
+/// be specialized.
+bool specializeKeyPathInst(KeyPathInst *kpi, SILTransform *transform);
+
 bool specializeAppliesInFunction(SILFunction &F,
                                  SILTransform *transform,
                                  bool isMandatory);
