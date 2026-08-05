@@ -108,6 +108,15 @@ static bool applyCUnsignedIntegerCastExpr(llvm::APSInt &Value,
   return true;
 }
 
+static bool importedSwiftTypeIsUnsigned(Type type, const ASTContext &ctx) {
+  auto nominal = type->getAnyNominal();
+  if (!nominal)
+    return false;
+  return nominal == ctx.getUIntDecl()   || nominal == ctx.getUInt8Decl()  ||
+         nominal == ctx.getUInt16Decl() || nominal == ctx.getUInt32Decl() ||
+         nominal == ctx.getUInt64Decl() || nominal == ctx.getUInt128Decl();
+}
+
 static ValueDecl *
 createMacroConstant(ClangImporter::Implementation &Impl,
                     const clang::MacroInfo *macro,
@@ -191,8 +200,13 @@ static ValueDecl *importNumericLiteral(ClangImporter::Implementation &Impl,
           value.flipAllBits();
         }
       }
-      applyCUnsignedIntegerCastExpr(value, castType,
-                                    Impl.getClangASTContext());
+      // Only honor the C unsigned integer cast when the constant is actually
+      // imported as an unsigned Swift type. Several unsigned C types (e.g.
+      // NSUInteger, size_t) are imported as the signed 'Int', and forcing the
+      // value unsigned there would overflow the signed Swift type.
+      if (importedSwiftTypeIsUnsigned(constantType, ctx))
+        applyCUnsignedIntegerCastExpr(value, castType,
+                                      Impl.getClangASTContext());
 
       // Make sure the destination type actually conforms to the builtin literal
       // protocol or is Bool before attempting to import, otherwise we'll crash
@@ -919,14 +933,23 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
       return nullptr;
     }
 
-    if (applyCUnsignedIntegerCastExpr(resultValue, castType,
-                                      impl.getClangASTContext())) {
-      resultSwiftType = impl.importTypeIgnoreIUO(
+    // Honor an unsigned cast only when the cast type is imported as an unsigned
+    // Swift type. Several unsigned C types (e.g. NSUInteger, size_t) are
+    // imported as signed Int, and forcing the value unsigned would overflow.
+    if (!castType.isNull() && castType->isIntegerType() &&
+        !castType->isBooleanType() &&
+        castType->isUnsignedIntegerOrEnumerationType()) {
+      Type castSwiftType = impl.importTypeIgnoreIUO(
           castType, ImportTypeKind::Value,
           ImportDiagnosticAdder(impl, macro, macro->getDefinitionLoc()),
           isInSystemModule(DC), Bridgeability::None, ImportTypeAttrs());
-      if (!resultSwiftType)
+      if (!castSwiftType)
         return nullptr;
+      if (importedSwiftTypeIsUnsigned(castSwiftType, impl.SwiftContext)) {
+        applyCUnsignedIntegerCastExpr(resultValue, castType,
+                                      impl.getClangASTContext());
+        resultSwiftType = castSwiftType;
+      }
     }
 
     return createMacroConstant(impl, macro, II, name, DC,
