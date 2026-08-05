@@ -40,6 +40,7 @@ struct GenericGlobalActor<T> {
 }
 @MainActor class Copper {}
 @MainActor func iron() {}
+// expected-note@-1 {{calls to global function 'iron()' from outside of its actor context are implicitly asynchronous}}
 
 struct Carbon {
   @IntWrapper var atomicWeight: Int
@@ -464,6 +465,21 @@ actor ActorWithWrapper {
     _ = _synced // expected-error{{global actor 'OtherGlobalActor'-isolated property '_synced' can not be referenced on a different actor instance}}
 
     @WrapperWithMainActorDefaultInit var value: Int // expected-error {{call to main actor-isolated initializer 'init()' in a synchronous actor-isolated context}}
+  }
+}
+
+actor ActorWithMainActorWrapper {
+  @WrapperOnMainActorSendable var mainActorSynced: Int = 0
+
+  // Should not become @MainActor
+  static func staticMember() {
+    // expected-note@-1 {{add '@MainActor' to make static method 'staticMember()' part of global actor 'MainActor'}}
+    iron() // expected-error{{call to main actor-isolated global function 'iron()' in a synchronous nonisolated context}}
+  }
+
+  struct Nested { // Must infer @MainActor
+    @WrapperOnMainActorSendable var value: Int = 0
+    func onMain() { iron() }
   }
 }
 
