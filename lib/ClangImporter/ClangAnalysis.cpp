@@ -619,8 +619,8 @@ static bool checkRefCountOperation(const ClassDecl *classDecl, ValueDecl *op,
 
   // Instance operations take no parameters; free operations take one.
   if (fn->getParameters()->size() != (fn->isInstanceMember() ? 0 : 1)) {
-    diagnose(diag::foreign_reference_types_invalid_retain_release, !isRetain,
-             name, classDecl->getNameStr());
+    diagnose(diag::foreign_reference_retain_release_param_type, !isRetain, name,
+             classDecl->getNameStr());
     return false;
   }
 
@@ -648,11 +648,8 @@ static bool checkRefCountOperation(const ClassDecl *classDecl, ValueDecl *op,
   if (isRetain && !validReturn)
     validReturn = resultTy->lookThroughSingleOptionalType()->isEqual(paramType);
   if (!validReturn) {
-    diagnose(
-        isRetain
-            ? diag::foreign_reference_types_retain_non_void_or_self_return_type
-            : diag::foreign_reference_types_release_non_void_return_type,
-        name);
+    diagnose(diag::foreign_reference_retain_release_return_type, !isRetain,
+             name);
     return false;
   }
 
@@ -664,7 +661,7 @@ static bool checkRefCountOperation(const ClassDecl *classDecl, ValueDecl *op,
     if (cxxDecl && paramCxxDecl && cxxDecl->isDerivedFrom(paramCxxDecl)) {
       // The parameter may also be one of the FRT's bases
     } else {
-      diagnose(diag::foreign_reference_types_invalid_retain_release, !isRetain,
+      diagnose(diag::foreign_reference_retain_release_param_type, !isRetain,
                name, classDecl->getNameStr());
       return false;
     }

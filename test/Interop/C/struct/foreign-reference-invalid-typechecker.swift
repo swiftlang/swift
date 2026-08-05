@@ -35,8 +35,8 @@ struct
   __attribute__((swift_attr("retain:badRetain")))
   __attribute__((swift_attr("release:badRelease")))
 BadRetainRelease { int value; };
-// expected-error@-1 {{specified retain function 'badRetain' is invalid; retain function must either return have 'void', the reference count as an integer, or the parameter type}}
-// expected-error@-2 {{specified release function 'badRelease' is invalid; release function must have exactly one argument of type 'BadRetainRelease'}}
+// expected-error@-1 {{release function 'badRelease' must have exactly one argument of type 'BadRetainRelease'}}
+// expected-error@-2 {{retain function 'badRetain' must return an integer, its parameter type, or 'void'}}
 
 float badRetain(struct BadRetainRelease *v);
 void badRelease(struct BadRetainRelease *v, int i);

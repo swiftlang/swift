@@ -31,14 +31,14 @@ NoRetainRelease {};
 
 struct
     __attribute__((swift_attr("import_reference")))
-    __attribute__((swift_attr("retain:badRetain")))
-    __attribute__((swift_attr("release:badRelease")))
-BadRetainRelease {};
-// expected-error@-1 {{specified retain function 'badRetain' is invalid; retain function must either return have 'void', the reference count as an integer, or the parameter type}}
-// expected-error@-2 {{specified release function 'badRelease' is invalid; release function must have exactly one argument of type 'BadRetainRelease'}}
+    __attribute__((swift_attr("retain:badRetainReturn")))
+    __attribute__((swift_attr("release:badReleaseReturn")))
+BadRetainReleaseReturn {};
+// expected-error@-1 {{release function 'badReleaseReturn' must return an integer or 'void'}}
+// expected-error@-2 {{retain function 'badRetainReturn' must return an integer, its parameter type, or 'void'}}
 
-float badRetain(BadRetainRelease *v);
-void badRelease(BadRetainRelease *v, int i);
+float badRetainReturn(BadRetainReleaseReturn *v);
+void *badReleaseReturn(BadRetainReleaseReturn *v);
 
 struct
     __attribute__((swift_attr("import_reference")))
@@ -67,40 +67,40 @@ GoodRetainReleaseWithNullabilityAnnotations {};
 void goodRetainWithNullabilityAnnotations(GoodRetainReleaseWithNullabilityAnnotations * _Nullable v);
 void goodReleaseWithNullabilityAnnotations(GoodRetainReleaseWithNullabilityAnnotations * _Null_unspecified v);
 
-struct
-    __attribute__((swift_attr("import_reference")))
-    __attribute__((swift_attr("retain:badRetain2")))
-    __attribute__((swift_attr("release:badRelease2")))
-BadRetainRelease2 {};
-// expected-error@-1 {{specified retain function 'badRetain2' is invalid; retain function must have exactly one argument of type 'BadRetainRelease2'}}
-// expected-error@-2 {{specified release function 'badRelease2' is invalid; release function must have exactly one argument of type 'BadRetainRelease2'}}
-
-void badRetain2(int);
-void badRelease2(int);
-
-struct
-    __attribute__((swift_attr("import_reference")))
-    __attribute__((swift_attr("retain:badRetain3")))
-    __attribute__((swift_attr("release:badRelease3")))
-BadRetainRelease3 {};
-// expected-error@-1 {{specified retain function 'badRetain3' is invalid; retain function must have exactly one argument of type 'BadRetainRelease3'}}
-// expected-error@-2 {{specified release function 'badRelease3' is invalid; release function must have exactly one argument of type 'BadRetainRelease3'}}
-
-void badRetain3(BadRetainRelease2 *);
-void badRelease3(BadRetainRelease2 *);
-
 struct nonCXXFRT{};
 
 struct
     __attribute__((swift_attr("import_reference")))
-    __attribute__((swift_attr("retain:badRetain4")))
-    __attribute__((swift_attr("release:badRelease4")))
-BadRetainRelease4 {};
-// expected-error@-1 {{specified retain function 'badRetain4' is invalid; retain function must have exactly one argument of type 'BadRetainRelease4'}}
-// expected-error@-2 {{specified release function 'badRelease4' is invalid; release function must have exactly one argument of type 'BadRetainRelease4'}}
+    __attribute__((swift_attr("retain:badRetainParam1")))
+    __attribute__((swift_attr("release:badReleaseParam1")))
+BadRetainReleaseParam1 {};
+// expected-error@-1{{release function 'badReleaseParam1' must have exactly one argument of type 'BadRetainReleaseParam1'}}
+// expected-error@-2{{retain function 'badRetainParam1' must have exactly one argument of type 'BadRetainReleaseParam1'}}
 
-void badRetain4(nonCXXFRT *);
-void badRelease4(nonCXXFRT *);
+void badRetainParam1(nonCXXFRT *);
+void badReleaseParam1(nonCXXFRT *);
+
+struct
+    __attribute__((swift_attr("import_reference")))
+    __attribute__((swift_attr("retain:badRetainParam2")))
+    __attribute__((swift_attr("release:badReleaseParam2")))
+BadRetainReleaseParam2 {};
+// expected-error@-1 {{release function 'badReleaseParam2' must have exactly one argument of type 'BadRetainReleaseParam2'}}
+// expected-error@-2 {{retain function 'badRetainParam2' must have exactly one argument of type 'BadRetainReleaseParam2'}}
+
+void badRetainParam2(int);
+void badReleaseParam2(int);
+
+struct
+    __attribute__((swift_attr("import_reference")))
+    __attribute__((swift_attr("retain:badRetainParam3")))
+    __attribute__((swift_attr("release:badReleaseParam3")))
+BadRetainReleaseParam3 {};
+// expected-error@-1 {{release function 'badReleaseParam3' must have exactly one argument of type 'BadRetainReleaseParam3'}}
+// expected-error@-2 {{retain function 'badRetainParam3' must have exactly one argument of type 'BadRetainReleaseParam3'}}
+
+void badRetainParam3(BadRetainReleaseParam2 *);
+void badReleaseParam3(BadRetainReleaseParam2 *);
 
 struct
     __attribute__((swift_attr("import_reference")))
@@ -167,7 +167,7 @@ struct
     __attribute__((swift_attr("retain:base4FRTRetain")))
     __attribute__((swift_attr("release:base4FRTRelease")))
 Base4FRT : Base2FRT {};
-// expected-error@-1 {{specified retain function 'base4FRTRetain' is invalid; retain function must have exactly one argument of type 'Base4FRT'}}
+// expected-error@-1 {{retain function 'base4FRTRetain' must have exactly one argument of type 'Base4FRT'}}
 
 void base4FRTRetain(GoodRetainRelease *v);
 void base4FRTRelease(Base1FRT *v);
@@ -186,8 +186,8 @@ __attribute__((swift_attr("import_reference")))
 __attribute__((swift_attr("retain:badAnonymousStructRetain"))) 
 __attribute__((swift_attr("release:badAnonymousStructRelease"))) 
 {} BadAnonymousStruct;
-// expected-error@-5{{specified retain function 'badAnonymousStructRetain' is invalid; retain function must have exactly one argument of type 'BadAnonymousStruct'}}
-// expected-error@-6{{specified release function 'badAnonymousStructRelease' is invalid; release function must have exactly one argument of type 'BadAnonymousStruct'}}
+// expected-error@-5{{release function 'badAnonymousStructRelease' must have exactly one argument of type 'BadAnonymousStruct'}}
+// expected-error@-6{{retain function 'badAnonymousStructRetain' must have exactly one argument of type 'BadAnonymousStruct'}}
 
 void badAnonymousStructRetain(AnonymousStruct *v);
 void badAnonymousStructRelease(AnonymousStruct *v);
@@ -266,13 +266,13 @@ import Test
 
 public func test(x: NonExistent) { }
 public func test(x: NoRetainRelease) { }
-public func test(x: BadRetainRelease) { }
+public func test(x: BadRetainReleaseReturn) { }
 public func test(x: GoodRetainRelease) { }
 public func test(x: GoodRetainReleaseWithRetainReturningSelf) { }
 public func test(x: GoodRetainReleaseWithNullabilityAnnotations) { }
-public func test(x: BadRetainRelease2) { }
-public func test(x: BadRetainRelease3) { }
-public func test(x: BadRetainRelease4) { }
+public func test(x: BadRetainReleaseParam1) { }
+public func test(x: BadRetainReleaseParam2) { }
+public func test(x: BadRetainReleaseParam3) { }
 public func test(x: DerivedFRT) { }
 public func test(x: RefCountedDerived) { }
 public func test(x: Base3FRT) { }
