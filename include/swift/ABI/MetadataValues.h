@@ -534,6 +534,8 @@ enum class SpecialProtocol: uint8_t {
   None = 0,
   /// The Error protocol.
   Error = 1,
+  /// A COM interface protocol.
+  COM = 2,
 };
 
 /// Flags for protocol descriptors.

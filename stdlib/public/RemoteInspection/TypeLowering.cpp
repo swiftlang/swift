@@ -1241,6 +1241,9 @@ class ExistentialTypeInfoBuilder {
       }
 
       switch (FD->Kind) {
+        case FieldDescriptorKind::COMProtocol:
+          Representation = ExistentialTypeRepresentation::COM;
+          continue;
         case FieldDescriptorKind::ObjCProtocol:
           // Objective-C protocols do not have any witness tables.
           ObjC = true;
@@ -1395,11 +1398,17 @@ public:
     case ExistentialTypeRepresentation::Error:
       Kind = RecordKind::ErrorExistential;
       break;
+    case ExistentialTypeRepresentation::COM:
+      Kind = RecordKind::OpaqueExistential;
+      break;
     }
 
     RecordTypeInfoBuilder builder(TC, Kind);
 
     switch (Representation) {
+    case ExistentialTypeRepresentation::COM:
+      builder.addField("interface", TC.getRawPointerTypeRef(), ExternalTypeInfo);
+      break;
     case ExistentialTypeRepresentation::Class:
       // Class existentials consist of a single retainable pointer
       // followed by witness tables.
@@ -2550,6 +2559,7 @@ public:
                                      ReferenceCounting::Unknown);
     case FieldDescriptorKind::ObjCProtocol:
     case FieldDescriptorKind::ClassProtocol:
+    case FieldDescriptorKind::COMProtocol:
     case FieldDescriptorKind::Protocol:
       TC.setError("Invalid field descriptor", TR);
       return nullptr;
@@ -2909,6 +2919,7 @@ const RecordTypeInfo *TypeConverter::getClassInstanceTypeInfo(
   case FieldDescriptorKind::ObjCProtocol:
   case FieldDescriptorKind::ClassProtocol:
   case FieldDescriptorKind::Protocol:
+  case FieldDescriptorKind::COMProtocol:
     // Invalid field descriptor.
     setError("invalid field descriptor", TR);
     return nullptr;

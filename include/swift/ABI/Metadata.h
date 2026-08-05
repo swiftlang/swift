@@ -1944,6 +1944,8 @@ enum class ExistentialTypeRepresentation {
   Class,
   /// The type uses the Error boxed existential representation.
   Error,
+  /// The type is represented by a single COM interface pointer.
+  COM,
 };
 
 /// The structure of type metadata for simple existential types which
