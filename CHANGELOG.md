@@ -5,6 +5,26 @@
 
 ## Swift (next)
 
+* C++ interop: Swift functions, methods, initializers and throwing accessors
+  marked with `throws` can now be exposed to C++ via the experimental
+  `GenerateBindingsForThrowingFunctionsInCXX` feature, which is now available
+  in production compilers. The C++ code that includes the generated header
+  opts into the bindings by defining the
+  `SWIFT_CXX_INTEROP_EXPERIMENTAL_SWIFT_ERROR` macro. A thrown Swift error is
+  rethrown to C++ as a `swift::Error` exception (or returned as
+  `swift::Expected<T>` when C++ exceptions are disabled). `swift::Error` now
+  derives from `std::exception` and its `what()` method returns the result of
+  `String(describing:)` for the thrown error value. Typed throws (`throws(E)`)
+  cannot be exposed yet.
+
+  ```c++
+  try {
+    auto value = Module::throwingFunction();
+  } catch (const std::exception &error) {
+    printf("failed: %s\n", error.what());
+  }
+  ```
+
 * [SE-0522][]: Introduced the `@diagnose` declaration attribute for source-level
   control over compiler warning behavior. `@diagnose(GroupID, as: error|warning|ignored)`
   overrides diagnostic behavior for the specified warning group within the

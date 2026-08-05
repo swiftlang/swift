@@ -112,6 +112,43 @@ int main() {
   if (!testIntError.has_value())
     printf("testIntError doesn't have a value\n");
 
+  // A void function that returns without throwing produces a successful
+  // Expected<void>.
+  auto voidSuccess = Functions::emptyThrowFunction();
+  if (voidSuccess.has_value())
+    printf("Void success has a value\n");
+  auto voidError = Functions::throwFunction();
+  if (!voidError.has_value())
+    printf("Void error doesn't have a value\n");
+
+  // Throwing functions with struct returns.
+  auto structSuccess = Functions::throwFunctionWithDirectStructReturn(false);
+  if (structSuccess.has_value())
+    printf("Struct success: %zd\n",
+           static_cast<ptrdiff_t>(structSuccess.value().getValue()));
+  auto structError = Functions::throwFunctionWithDirectStructReturn(true);
+  if (!structError.has_value())
+    printf("Struct error doesn't have a value\n");
+  auto largeStructSuccess =
+      Functions::throwFunctionWithIndirectStructReturn(false);
+  if (largeStructSuccess.has_value())
+    printf("Large struct success: %zd\n",
+           static_cast<ptrdiff_t>(largeStructSuccess.value().getE()));
+  auto largeStructError =
+      Functions::throwFunctionWithIndirectStructReturn(true);
+  if (!largeStructError.has_value())
+    printf("Large struct error doesn't have a value\n");
+
+  // Throwing methods under -fno-exceptions.
+  auto smallStruct = Functions::SmallResult::init(3);
+  auto methodSuccess = smallStruct.doubled(false);
+  if (methodSuccess.has_value())
+    printf("Method success: %zd\n",
+           static_cast<ptrdiff_t>(methodSuccess.value().getValue()));
+  auto methodError = smallStruct.doubled(true);
+  if (!methodError.has_value())
+    printf("Method error doesn't have a value\n");
+
   return 0;
 }
 
@@ -130,3 +167,19 @@ int main() {
 // CHECK-NEXT: Test get T's Value
 // CHECK-NEXT: testIntValue has a value
 // CHECK-NEXT: testIntError doesn't have a value
+// CHECK-NEXT: passEmptyThrowFunction
+// CHECK-NEXT: Void success has a value
+// CHECK-NEXT: passThrowFunction
+// CHECK-NEXT: Void error doesn't have a value
+// CHECK-NEXT: passThrowFunctionWithDirectStructReturn
+// CHECK-NEXT: Struct success: 42
+// CHECK-NEXT: passThrowFunctionWithDirectStructReturn
+// CHECK-NEXT: Struct error doesn't have a value
+// CHECK-NEXT: passThrowFunctionWithIndirectStructReturn
+// CHECK-NEXT: Large struct success: 5
+// CHECK-NEXT: passThrowFunctionWithIndirectStructReturn
+// CHECK-NEXT: Large struct error doesn't have a value
+// CHECK-NEXT: passSmallResultDoubled
+// CHECK-NEXT: Method success: 6
+// CHECK-NEXT: passSmallResultDoubled
+// CHECK-NEXT: Method error doesn't have a value
