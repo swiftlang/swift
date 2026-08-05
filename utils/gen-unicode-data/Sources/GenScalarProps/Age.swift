@@ -61,9 +61,12 @@ func emitAge(
     uniqueAges.insert(age)
   }
 
+  // Sort the ages so the emitted array is deterministic. The index stored per
+  // scalar is computed against this same array below, so ordering does not
+  // affect the decoded value.
   let ages = uniqueAges.map {
     UInt16($0[0]) | (UInt16($0[1]) << 8)
-  }
+  }.sorted()
 
   result += """
   #define AGE_COUNT \(data.count)

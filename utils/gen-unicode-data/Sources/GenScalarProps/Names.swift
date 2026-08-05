@@ -72,7 +72,13 @@ func sortWords(
     }
   }
 
-  let sortedPopularity = Array(popularity).sorted { $0.value > $1.value }
+  // Sort by popularity (descending) so the most frequent words get the lowest
+  // indices, then by the word itself to break ties deterministically. Without
+  // the tiebreak, equal-popularity words fall back to dictionary hash order,
+  // which is not stable across runs.
+  let sortedPopularity = Array(popularity).sorted {
+    $0.value != $1.value ? $0.value > $1.value : $0.key < $1.key
+  }
 
 
   words = sortedPopularity.map { $0.key }
