@@ -3299,6 +3299,9 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
   }
 
   case DeclAttrKind::Diagnose: {
+    // Record that this file carries a syntactic warning control.
+    SF.setHasWarningControlAttr();
+
     if (!consumeIfAttributeLParen()) {
       diagnose(Loc, diag::attr_expected_lparen, AttrName,
                DeclAttribute::isDeclModifier(DK));
