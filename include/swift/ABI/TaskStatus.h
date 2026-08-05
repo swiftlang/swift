@@ -229,28 +229,54 @@ public:
 /// code may call `removeStatusRecord` and freely
 /// assume after it returns that this function will not be
 /// subsequently used.
+///
+/// ### Cancellation reasons
+/// Swift 6.5 introduced cancellation reason aware handlers, so the record must
+/// invoke the handler with or without the reason, depending which handler API was used.
 class CancellationNotificationStatusRecord : public TaskStatusRecord {
 public:
   using FunctionType = SWIFT_CC(swift) void(SWIFT_CONTEXT void *);
+  using FunctionTypeWithReason = SWIFT_CC(swift) void(size_t /*reason*/, SWIFT_CONTEXT void *);
 
 private:
-  FunctionType *__ptrauth_swift_cancellation_notification_function Function;
-  void *Argument;
+  enum class Flags : uint8_t {
+    /// Whether the type of the Function is ...WithReason.
+    HasReason = 1 << 0,
 
-  /// FIXME: Investigate whether this at-most-once flag is actually needed.
-  std::atomic<bool> Fired{false};
+    /// Atomic flag to prevent the handler firing multiple times.
+    /// Necessary because multiple cancellation scopes might otherwise
+    /// cause an outer handler to be triggered multiple times.
+    Fired = 1 << 1
+  };
+
+  union {
+    FunctionType *__ptrauth_swift_cancellation_notification_function
+        Function;
+    FunctionTypeWithReason *__ptrauth_swift_cancellation_notification_with_reason_function
+        FunctionWithReason;
+  };
+  void *Argument;
+  std::atomic<uint8_t> flags;
 
 public:
   CancellationNotificationStatusRecord(FunctionType *fn, void *arg)
       : TaskStatusRecord(TaskStatusRecordKind::CancellationNotification),
-        Function(fn), Argument(arg) {}
+        Function(fn), Argument(arg), flags(0) {}
 
-  void run() {
-    bool expected = false;
-    if (!Fired.compare_exchange_strong(expected, true,
-                                       std::memory_order_relaxed))
+  CancellationNotificationStatusRecord(FunctionTypeWithReason *fn, void *arg)
+      : TaskStatusRecord(TaskStatusRecordKind::CancellationNotification),
+        FunctionWithReason(fn), Argument(arg),
+        flags(static_cast<uint8_t>(Flags::HasReason)) {}
+
+  void run(size_t reason) {
+    uint8_t old = flags.fetch_or(static_cast<uint8_t>(Flags::Fired),
+                                      std::memory_order_relaxed);
+    if (old & static_cast<uint8_t>(Flags::Fired))
       return;
-    Function(Argument);
+    if (old & static_cast<uint8_t>(Flags::HasReason))
+      FunctionWithReason(reason, Argument);
+    else
+      Function(Argument);
   }
 
   static bool classof(const TaskStatusRecord *record) {
@@ -447,31 +473,37 @@ public:
   AsyncTask *&getNextWaitingTask();
 };
 
-// `withDeadline` is unavailable in Embedded Swift (`#if !$Embedded` on the
-// Swift side), and this record's layout relies on `Metadata::vw_size()` /
-// `vw_alignment()`, which don't exist in Embedded Swift's `TargetMetadata`
-// (only forward-declared there, see swift/ABI/Task.h). Guard accordingly.
 #if !SWIFT_CONCURRENCY_EMBEDDED
 
-/// A status record that represents a task deadline. Multiple deadlines may
-/// be installed on the same task, however they may differ by clock identity.
+/// A status record that represents a task deadline.
 ///
-/// The innermost record for any given clock identity always is the "nearest"
-/// deadline, because by construction we only install deadlines which are
-/// more narrow than an already existing one. I.e. a search for nearest
-/// deadline can always stop at first matching record.
+/// ### Deadline nesting
+/// Multiple deadlines may be installed on the same task, they may use the same or different clocks.
+///
+/// By construction, the innermost record for any given clock identity always is the "nearest".
+/// I.e. a search for nearest deadline can always stop at first matching record.
+///
+/// ### Clock identity
+/// Comparing clock identity is fast-pathed for our known system clocks,
+/// however needs to to a slow-path Identifiable comparison for any user defined clocks.
 class TaskDeadlineStatusRecord : public TaskStatusRecord {
-  /// Clock type.
-  const Metadata *ClockType;
+  static constexpr uintptr_t FlagsMask = ~uintptr_t(alignof(void*) - 1);
 
-  /// Metatype of the Clock.Instant (where Clock is our ClockType).
+  /// Clock type and `Flags` stored its spare low bits.
+  uintptr_t ClockTypeAndFlags;
+
+  /// Clock.Instant type, where Clock stored in ClockTypeAndFlags
   const Metadata *InstantType;
 
-  /// True iff the record is the first task in this entire task hierarchy,
-  /// including any parent tasks. This allows short-circuting lookups, and
-  /// resetting the HasDeadline flag used for avoiding slow-path deadline
-  /// lookups in `isCancelled`.
-  bool IsOutermostDeadline;
+  enum class Flags : uintptr_t {
+    /// True iff the record is the "outermost" deadline in this entire task hierarchy.
+    ///
+    /// This allows short-circuiting lookups; if we find the outermost record,
+    /// there's no reason to keep looking at parent tasks and records for other deadlines.
+    ///
+    /// This flag does NOT take into account clock identity.
+    IsOutermostDeadline = 1 << 0,
+  };
 
   // Trailing tail-allocated storage (uninitialized in this class body):
   //   [pad to ClockType.vw_alignment()]
@@ -484,13 +516,26 @@ public:
                            const Metadata *instantType,
                            bool isOutermostDeadline)
       : TaskStatusRecord(TaskStatusRecordKind::Deadline),
-        ClockType(clockType), InstantType(instantType),
-        IsOutermostDeadline(isOutermostDeadline) {}
+        ClockTypeAndFlags(reinterpret_cast<uintptr_t>(clockType) |
+                          (isOutermostDeadline
+                               ? static_cast<uintptr_t>(Flags::IsOutermostDeadline)
+                               : 0)),
+        InstantType(instantType) {}
 
-  const Metadata *getClockType() const { return ClockType; }
+  const Metadata *getClockType() const {
+    return reinterpret_cast<const Metadata *>(ClockTypeAndFlags & FlagsMask);
+  }
   const Metadata *getInstantType() const { return InstantType; }
-  bool isOutermostDeadline() const { return IsOutermostDeadline; }
-  void setOutermostDeadline(bool value) { IsOutermostDeadline = value; }
+
+  bool isOutermostDeadline() const {
+    return ClockTypeAndFlags & static_cast<uintptr_t>(Flags::IsOutermostDeadline);
+  }
+  void setOutermostDeadline(bool value) {
+    if (value)
+      ClockTypeAndFlags |= static_cast<uintptr_t>(Flags::IsOutermostDeadline);
+    else
+      ClockTypeAndFlags &= ~static_cast<uintptr_t>(Flags::IsOutermostDeadline);
+  }
 
   /// Offset from the base of the record where the clock value lives.
   static size_t clockOffset(const Metadata *clockType) {
@@ -514,11 +559,11 @@ public:
 
   OpaqueValue *getClockStorage() {
     return reinterpret_cast<OpaqueValue *>(
-        reinterpret_cast<char *>(this) + clockOffset(ClockType));
+        reinterpret_cast<char *>(this) + clockOffset(getClockType()));
   }
   OpaqueValue *getInstantStorage() {
     return reinterpret_cast<OpaqueValue *>(
-        reinterpret_cast<char *>(this) + instantOffset(ClockType, InstantType));
+        reinterpret_cast<char *>(this) + instantOffset(getClockType(), InstantType));
   }
 
   static bool classof(const TaskStatusRecord *record) {

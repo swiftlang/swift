@@ -1236,6 +1236,13 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(TaskAddCancellationHandler,
 BUILTIN_MISC_OPERATION(TaskRemoveCancellationHandler,
                        "taskRemoveCancellationHandler", "", Special)
 
+/// Equivalent to calling swift_task_addCancellationHandlerWithReason.
+///
+/// Signature: (handler: (UInt8) -> Void) -> UnsafeRawPointer
+BUILTIN_MISC_OPERATION_WITH_SILGEN(TaskAddCancellationHandlerWithReason,
+                                  "taskAddCancellationHandlerWithReason", "",
+                                   Special)
+
 /// Equivalent to calling swift_task_addPriorityEscalationHandler.
 ///
 /// Signature: (handler: (UInt8, UInt8) -> Void) -> UnsafeRawPointer
@@ -1251,50 +1258,25 @@ BUILTIN_MISC_OPERATION(TaskRemovePriorityEscalationHandler,
 
 /// Equivalent to calling swift_task_pushDeadline.
 ///
-/// Pushes a deadline status record for the given clock onto the current
-/// task, returning the record pointer that must be handed back to
-/// taskPopDeadline.
-///
-/// `clockType` is the metatype of the caller's generic Clock type `C`.
-/// `box` is a retained (+1) `_ClockBox<C>` (a Swift class instance
-/// storing both the clock instance and the deadline instant); the runtime
-/// takes ownership and releases the reference in taskPopDeadline.
-///
-/// Signature: (clockType: Any.Type, box: __owned Builtin.NativeObject)
+/// Signature: (clockPtr: Builtin.RawPointer, instantPtr: Builtin.RawPointer,
+///             clockType: Any.Type, instantType: Any.Type)
 ///           -> UnsafeRawPointer
 BUILTIN_MISC_OPERATION(TaskPushDeadline, "taskPushDeadline", "", Special)
 
 /// Equivalent to calling swift_task_popDeadline.
-///
-/// Removes the deadline record previously installed by taskPushDeadline
-/// and releases the record's held `_ClockBox<C>` reference. Passing nil
-/// is a defensive no-op (matches the case where push returned nil because
-/// there was no current task).
 ///
 /// Signature: (record: UnsafeRawPointer) -> ()
 BUILTIN_MISC_OPERATION(TaskPopDeadline, "taskPopDeadline", "", Special)
 
 /// Equivalent to calling swift_task_pushCancellationScope.
 ///
-/// Pushes a cancellation scope record onto the current task, returning the
-/// record pointer that must be handed back to taskCancellationScopePop. Unlike
-/// deadlines, this is never subsumed - every call always installs its own
-/// independent record.
-///
 /// Signature: () -> UnsafeRawPointer
 BUILTIN_MISC_OPERATION(TaskCancellationScopePush, "taskCancellationScopePush", "", Special)
+
+/// Equivalent to calling swift_task_popCancellationScope.
 ///
 /// Signature: (record: UnsafeRawPointer) -> ()
 BUILTIN_MISC_OPERATION(TaskCancellationScopePop, "taskCancellationScopePop", "", Special)
-
-/// Equivalent to calling swift_task_cancelCancellationScope.
-///
-/// Cancels the given scope only - does not affect the enclosing task's own
-/// cancellation state and does not invoke withTaskCancellationHandler
-/// handlers. May be called from any thread, any number of times.
-///
-/// Signature: (record: UnsafeRawPointer) -> ()
-BUILTIN_MISC_OPERATION(TaskCancellationScopeCancel, "taskCancellationScopeCancel", "", Special)
 
 /// Equivalent to calling swift_task_localValuePush. Deprecated because
 /// it doesn't properly pair the allocation and deallocation with a

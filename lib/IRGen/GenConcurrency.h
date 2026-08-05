@@ -117,7 +117,8 @@ llvm::Value *clearImplicitIsolatedActorBits(IRGenFunction &IGF,
 ///
 /// \returns the record that can be used to refer to and cancel the handler.
 ///
-/// Currently supports TaskAddCancellationHandler and
+/// Currently supports TaskAddCancellationHandler,
+/// TaskAddCancellationHandlerWithReason, and
 /// TaskAddPriorityEscalationHandler.
 llvm::Value *emitBuiltinTaskAddHandler(IRGenFunction &IGF,
                                        BuiltinValueKind kind, llvm::Value *func,
@@ -164,10 +165,6 @@ llvm::Value *emitBuiltinTaskCancellationScopePush(IRGenFunction &IGF);
 
 /// Emit IR for the taskCancellationScopePop builtin.
 void emitBuiltinTaskCancellationScopePop(IRGenFunction &IGF, llvm::Value *record);
-
-/// Emit IR for the taskCancellationScopeCancel builtin.
-void emitBuiltinTaskCancellationScopeCancel(IRGenFunction &IGF,
-                                        llvm::Value *record);
 
 } // end namespace irgen
 } // end namespace swift

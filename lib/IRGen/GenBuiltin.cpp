@@ -1579,6 +1579,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     return;
   }
   case BuiltinValueKind::TaskAddCancellationHandler:
+  case BuiltinValueKind::TaskAddCancellationHandlerWithReason:
   case BuiltinValueKind::TaskAddPriorityEscalationHandler: {
     auto func = args.claimNext();
     auto context = args.claimNext();
@@ -1592,11 +1593,6 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
   case BuiltinValueKind::TaskCancellationScopePop: {
     auto *record = args.claimNext();
     emitBuiltinTaskCancellationScopePop(IGF, record);
-    return;
-  }
-  case BuiltinValueKind::TaskCancellationScopeCancel: {
-    auto *record = args.claimNext();
-    emitBuiltinTaskCancellationScopeCancel(IGF, record);
     return;
   }
   case BuiltinValueKind::TaskPushDeadline: {

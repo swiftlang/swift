@@ -2407,6 +2407,20 @@ static ValueDecl *getTaskRemoveCancellationHandler(ASTContext &ctx,
       ctx, id, _thin, _parameters(_label("record", _unsafeRawPointer)), _void);
 }
 
+static ValueDecl *getTaskAddCancellationHandlerWithReason(ASTContext &ctx,
+                                                           Identifier id) {
+  // (UInt8) -> ()
+  std::array<AnyFunctionType::Param, 1> params = {
+      AnyFunctionType::Param(ctx.getUInt8Type()),
+  };
+  auto extInfo = ASTExtInfoBuilder().withNoEscape().build();
+  auto *functionType =
+      FunctionType::get(params, ctx.TheEmptyTupleType, extInfo);
+  return getBuiltinFunction(ctx, id, _thin,
+                            _parameters(_label("handler", functionType)),
+                            _unsafeRawPointer);
+}
+
 static ValueDecl *getTaskAddPriorityEscalationHandler(ASTContext &ctx,
                                                       Identifier id) {
   std::array<AnyFunctionType::Param, 2> params = {
@@ -2466,11 +2480,6 @@ static ValueDecl *getTaskCancellationScopePush(ASTContext &ctx, Identifier id) {
 }
 
 static ValueDecl *getTaskCancellationScopePop(ASTContext &ctx, Identifier id) {
-  return getBuiltinFunction(
-      ctx, id, _thin, _parameters(_label("record", _unsafeRawPointer)), _void);
-}
-
-static ValueDecl *getTaskCancellationScopeCancel(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(
       ctx, id, _thin, _parameters(_label("record", _unsafeRawPointer)), _void);
 }
@@ -3637,6 +3646,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::TaskRemoveCancellationHandler:
     return getTaskRemoveCancellationHandler(Context, Id);
 
+  case BuiltinValueKind::TaskAddCancellationHandlerWithReason:
+    return getTaskAddCancellationHandlerWithReason(Context, Id);
+
   case BuiltinValueKind::TaskAddPriorityEscalationHandler:
     return getTaskAddPriorityEscalationHandler(Context, Id);
 
@@ -3654,9 +3666,6 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::TaskCancellationScopePop:
     return getTaskCancellationScopePop(Context, Id);
-
-  case BuiltinValueKind::TaskCancellationScopeCancel:
-    return getTaskCancellationScopeCancel(Context, Id);
 
   case BuiltinValueKind::TaskLocalValuePush:
     return getTaskLocalValuePush(Context, Id);

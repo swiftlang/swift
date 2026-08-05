@@ -216,6 +216,7 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::UnprotectedAddressOfBorrowOpaque:
     case BuiltinValueKind::DistributedActorAsAnyActor:
     case BuiltinValueKind::TaskAddCancellationHandler:
+    case BuiltinValueKind::TaskAddCancellationHandlerWithReason:
     case BuiltinValueKind::TaskRemoveCancellationHandler:
     case BuiltinValueKind::TaskAddPriorityEscalationHandler:
     case BuiltinValueKind::TaskRemovePriorityEscalationHandler:
@@ -227,7 +228,6 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::TaskCancellationShieldPop:
     case BuiltinValueKind::TaskCancellationScopePush:
     case BuiltinValueKind::TaskCancellationScopePop:
-    case BuiltinValueKind::TaskCancellationScopeCancel:
     case BuiltinValueKind::TaskPushDeadline:
     case BuiltinValueKind::TaskPopDeadline:
       return true;

@@ -9,6 +9,7 @@
 
 @_spi(Concurrency) import _Concurrency
 import StdlibUnittest
+import Synchronization
 
 struct MyError: Error {}
 
@@ -464,7 +465,7 @@ struct ClassInstantClock: Clock, Identifiable {
       expectEqual(1, innerHandlerCount)
     }
 
-    // Example 4: same nesting shape as Example 3, but the inner `sleep` is
+    // Same nesting shape as before, but the inner `sleep` is
     // shorter than the inner deadline. Outer is still the tighter deadline, so
     // both handlers still fire when outer fires (and the inner sleep never
     // gets to return on its own).
@@ -493,6 +494,56 @@ struct ClassInstantClock: Clock, Identifiable {
       expectTrue(elapsed < .seconds(2))
       expectEqual(1, outerHandlerCount)
       expectEqual(1, innerHandlerCount)
+    }
+    
+    tests.test("outer cancellation handler is unaffected by nested deadline scopes cancelling locally") {
+      let handlerCount = Atomic<Int>(0)
+      do {
+        try await withTaskCancellationHandler {
+          try await withDeadline(in: .seconds(-60)) {
+            expectTrue(Task.isCancelled)
+          }
+          try await withDeadline(in: .seconds(-60)) {
+            expectTrue(Task.isCancelled)
+          }
+        } onCancel: {
+          handlerCount.wrappingAdd(1, ordering: .relaxed)
+        }
+      } catch {
+        expectUnreachableCatch(error)
+      }
+      expectEqual(0, handlerCount.load(ordering: .relaxed))
+    }
+
+    final class ContinuationBox: @unchecked Sendable {
+      var continuation: CheckedContinuation<Void, Never>?
+    }
+    tests.test("cancellation handler inside a scope fires only once even if the scope and the whole task both cancel") {
+      let handlerCount = Atomic<Int>(0)
+      let box = ContinuationBox()
+      let task = Task {
+        _ = try? await withDeadline(in: .milliseconds(50)) {
+          try? await withTaskCancellationHandler {
+            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+              box.continuation = continuation
+            }
+          } onCancel: {
+            handlerCount.wrappingAdd(1, ordering: .relaxed)
+          }
+        }
+      }
+      // Let the deadline (50ms) elapse, firing the scope-cancel walk.
+      try? await Task.sleep(for: .milliseconds(150))
+      // The handler record is still installed (`operation` is suspended on
+      // the continuation, not yet returned), so this whole-task cancel walk
+      // visits it too.
+      task.cancel()
+      // Give the whole-task cancel walk a chance to run before releasing
+      // `operation`.
+      try? await Task.sleep(for: .milliseconds(50))
+      box.continuation?.resume()
+      _ = await task.value
+      expectEqual(1, handlerCount.load(ordering: .relaxed))
     }
 
     // Two-clock composition: an outer deadline on ContinuousClock and an inner

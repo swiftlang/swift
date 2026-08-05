@@ -90,6 +90,104 @@ public nonisolated(nonsending) func withTaskCancellationHandler<Return, Failure>
   return try await operation()
 }
 
+/// Execute an operation with a cancellation handler that's immediately
+/// invoked with the cancellation reason when the current task is canceled.
+///
+/// - Parameters:
+///   - operation: The operation to perform.
+///   - handler: A closure to execute on cancellation, passed the reason the
+///     task was cancelled.
+///     If the task is canceled, this closure is called at most once;
+///     otherwise, it isn't called.
+///
+/// This differs from the operation cooperatively checking for cancellation
+/// and reacting to it in that the cancellation handler is _always_ and
+/// _immediately_ invoked when the task is canceled. For example, even if the
+/// operation is running code that never checks for cancellation, a cancellation
+/// handler still runs and provides a chance to run some cleanup code:
+///
+/// ```
+/// await withTaskCancellationHandler {
+///   var sum = 0
+///   while condition {
+///     sum += 1
+///   }
+///   return sum
+/// } onCancel: { reason in
+///   // This onCancel closure might execute concurrently with the operation.
+///   condition.cancel()
+/// }
+/// ```
+///
+/// ### Execution order and semantics
+/// The `operation` closure is always invoked, even when the
+/// `withTaskCancellationHandler(operation:onCancel:)` method is called from a task
+/// that was already canceled.
+///
+/// When `withTaskCancellationHandler(operation:onCancel:)` is used in a task that has already been
+/// canceled, the cancellation handler will be executed
+/// immediately before the `operation` closure gets to execute.
+///
+/// This allows the cancellation handler to set some external "canceled" flag
+/// that the operation may be *atomically* checking for in order to avoid
+/// performing any actual work once the operation gets to run.
+///
+/// The `operation` closure executes on the calling execution context, and doesn't
+/// suspend or change execution context unless code contained within the closure
+/// does so. In other words, the potential suspension point of the
+/// `withTaskCancellationHandler(operation:onCancel:)` never suspends by itself before
+/// executing the operation.
+///
+/// If cancellation occurs while the operation is running, the cancellation
+/// handler executes *concurrently* with the operation.
+///
+/// The reason passed to `handler` is the same value that `Task.cancellationReason`
+/// would report on the task being cancelled. However, the handler is invoked
+/// from the *cancelling* context, not from the cancelled task's own context,
+/// so checking `Task.cancellationReason` from inside the `onCancel` closure
+/// would report the cancellation status of the cancelling context rather than
+/// that of the task being cancelled; use the passed-in `reason` parameter,
+/// which does represent the cancelled task's status.
+///
+/// ### Cancellation handlers and locks
+///
+/// Cancellation handlers which acquire locks must take care to avoid deadlock.
+/// The cancellation handler may be invoked while holding internal locks
+/// associated with the task or other tasks.  Other operations on the task, such
+/// as resuming a continuation, may acquire these same internal locks.
+/// Therefore, if a cancellation handler must acquire a lock, other code should
+/// not cancel tasks or resume continuations while holding that lock.
+@available(StdlibDeploymentTarget 6.5, *)
+@export(implementation)
+public nonisolated(nonsending) func withTaskCancellationHandler<Return, Failure>(
+  operation: nonisolated(nonsending) () async throws(Failure) -> Return,
+  onCancel handler: sending (CancellationError.Reason) -> Void
+) async throws(Failure) -> Return {
+  return try await __withTaskCancellationHandlerWithReason0(
+    operation: operation,
+    onCancel: {
+      handler(CancellationError.Reason(rawValue: $0) ?? .unspecified)
+    })
+}
+
+// Method necessary in order to avoid the handler0 to be destroyed too eagerly.
+@available(StdlibDeploymentTarget 6.5, *)
+@export(implementation)
+nonisolated(nonsending) func __withTaskCancellationHandlerWithReason0<Return, Failure>(
+  operation: nonisolated(nonsending) () async throws(Failure) -> Return,
+  onCancel handler0: sending (UInt8) -> Void
+) async throws(Failure) -> Return {
+  // unconditionally add the cancellation record to the task.
+  // if the task was already cancelled, it will be executed right away.
+#if $BuiltinCancellationHandlerWithReason
+  let record = unsafe Builtin.taskAddCancellationHandlerWithReason(handler: handler0)
+  defer { unsafe Builtin.taskRemoveCancellationHandler(record: record) }
+  return try await operation()
+#else
+  fatalError("Swift compiler is incompatible with this SDK version")
+#endif
+}
+
 #if !$Embedded
 /// Execute an operation with a cancellation handler that's immediately
 /// invoked if the current task is canceled.
@@ -309,26 +407,19 @@ extension Task where Success == Never, Failure == Never {
 /// if the current task has been canceled.
 @available(SwiftStdlib 5.1, *)
 public struct CancellationError: Error {
-  // Raw storage for `Reason.rawValue`. `0xFF` sentinel means "unset";
-  // read back through `reason` yields `.unspecified` in that case. The
-  // struct is not `@frozen`, so growing it with a stored property is
-  // ABI-compatible for the resilient _Concurrency module.
-  internal var _reasonRawStorage: UInt8 = 0xFF
+  /// Raw storage containing the reason's `CancellationError.Reason.rawValue`;
+  /// We cannot store the enum directly because of its availability.
+  internal var _reasonRawStorage: UInt8 = 0x00
 
   // no extra information, cancellation is intended to be light-weight
   public init() {}
 }
 
-@available(SwiftStdlib 5.1, *)
+@available(StdlibDeploymentTarget 6.5, *)
 extension CancellationError: CustomStringConvertible {
-  /// Preserves the historical `CancellationError()` textual representation
-  /// so `print(CancellationError())` doesn't leak the internal
-  /// `_reasonRawStorage` field.
+  @available(StdlibDeploymentTarget 6.5, *)
   public var description: String {
-    if #available(StdlibDeploymentTarget 6.5, *), _reasonRawStorage != 0xFF {
-      return "CancellationError(reason: \(reason))"
-    }
-    return "CancellationError()"
+    "CancellationError(reason: \(reason))"
   }
 }
 
@@ -384,9 +475,7 @@ func _taskAddCancellationHandler(handler: () -> Void) -> UnsafeRawPointer /*Canc
 @usableFromInline
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_task_removeCancellationHandler")
-func _taskRemoveCancellationHandler(
-  record: UnsafeRawPointer /*CancellationNotificationStatusRecord*/
-)
+func _taskRemoveCancellationHandler(record: UnsafeRawPointer /*any cancellation notification record*/)
 
 
 // ==== Task Cancellation Shielding -------------------------------------------

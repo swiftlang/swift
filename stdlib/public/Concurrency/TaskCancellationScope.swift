@@ -113,7 +113,7 @@ public struct TaskCancellationScope: ~Copyable, ~Escapable {
 public nonisolated(nonsending) func __withTaskCancellationScope<Return, Failure>(
   _ operation: nonisolated(nonsending) (borrowing TaskCancellationScope) async throws(Failure) -> Return
 ) async throws(Failure) -> Return where Return: ~Copyable, Failure: Error {
-#if $BuiltinConcurrencyStackNesting
+#if $BuiltinTaskCancellationScope
   let record = unsafe Builtin.taskCancellationScopePush()
   defer { unsafe Builtin.taskCancellationScopePop(record: record) }
 #else

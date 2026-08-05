@@ -1399,6 +1399,7 @@ SILInstruction::getStackAllocation() const {
       BUILTIN_CASE(TaskAddPriorityEscalationHandler,
                    TaskAddPriorityEscalationHandler)
       BUILTIN_CASE(TaskAddCancellationHandler, TaskAddCancellationHandler)
+      BUILTIN_CASE(TaskAddCancellationHandlerWithReason, TaskAddCancellationHandler)
       BUILTIN_CASE(TaskPushDeadline, TaskPushDeadline)
       BUILTIN_CASE(TaskCancellationScopePush, TaskCancellationScopePush)
 #undef BUILTIN_CASE

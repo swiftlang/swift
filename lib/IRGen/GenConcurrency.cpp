@@ -321,6 +321,9 @@ llvm::Value *irgen::emitBuiltinTaskAddHandler(IRGenFunction &IGF,
     if (kind == BuiltinValueKind::TaskAddCancellationHandler) {
       return IGF.IGM.getTaskAddCancellationHandlerFunctionPointer();
     }
+    if (kind == BuiltinValueKind::TaskAddCancellationHandlerWithReason) {
+      return IGF.IGM.getTaskAddCancellationHandlerWithReasonFunctionPointer();
+    }
     if (kind == BuiltinValueKind::TaskAddPriorityEscalationHandler) {
       return IGF.IGM.getTaskAddPriorityEscalationHandlerFunctionPointer();
     }
@@ -428,14 +431,6 @@ void irgen::emitBuiltinTaskCancellationScopePop(IRGenFunction &IGF,
                                             llvm::Value *record) {
   auto *call = IGF.Builder.CreateCall(
       IGF.IGM.getTaskPopCancellationScopeFunctionPointer(), {record});
-  call->setDoesNotThrow();
-  call->setCallingConv(IGF.IGM.SwiftCC);
-}
-
-void irgen::emitBuiltinTaskCancellationScopeCancel(IRGenFunction &IGF,
-                                               llvm::Value *record) {
-  auto *call = IGF.Builder.CreateCall(
-      IGF.IGM.getTaskCancelCancellationScopeFunctionPointer(), {record});
   call->setDoesNotThrow();
   call->setCallingConv(IGF.IGM.SwiftCC);
 }

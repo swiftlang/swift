@@ -527,3 +527,6 @@ Added: _swift_task_popDeadline
 Added: _swift_task_pushCancellationScope
 Added: _swift_task_pushDeadline
 Added: _swift_taskGroup_cancelAllWithReason
+
+// Reason-aware withTaskCancellationHandler(operation:onCancel:) overload.
+Added: _swift_task_addCancellationHandlerWithReason
