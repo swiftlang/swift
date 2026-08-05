@@ -2113,9 +2113,47 @@ void TaskGroupBase::waitAll(SwiftError* bodyError, AsyncTask *waitingTask,
 
   // ==== 2) Add to wait queue -------------------------------------------------
 
-  // ---- 2.1) Discarding task group may need to story the bodyError before we park
-  if (bodyError && isDiscardingResults() && readyQueue.isEmpty()) {
+  // ---- 2.1) Discarding task group must store the bodyError before we park
+  if (bodyError && isDiscardingResults()) {
     auto discardingGroup = asDiscardingImpl(this);
+
+    // The body thrown error always "wins" over an error stored by a child task,
+    // so we must discard any error a child had stored before we got here.
+    //
+    // This is not merely an optimization: throwing out of the body cancels the
+    // group, which routinely wakes up a child that then fails as well. Whether
+    // that child's error lands in the readyQueue before or after we get here is
+    // a race, and the body error must win either way.
+    ReadyQueueItem storedErrorItem;
+    while (readyQueue.dequeue(storedErrorItem)) {
+      switch (storedErrorItem.getStatus()) {
+      case ReadyStatus::Error: {
+        // We only kept the failed child task around in order to keep its error
+        // alive; since the body error wins we can detach and release it right
+        // away, balancing the retain performed when it was enqueued.
+        auto storedErrorTask = storedErrorItem.getTask();
+        SWIFT_TASK_GROUP_DEBUG_LOG(this,
+                                   "waitAll, bodyError wins, discard stored "
+                                   "error of child task:%p",
+                                   storedErrorTask);
+        _swift_taskGroup_detachChild(asAbstract(this), storedErrorTask);
+        swift_release(storedErrorTask);
+        break;
+      }
+      case ReadyStatus::RawError:
+        // The only raw error a discarding group ever stores is a body error,
+        // i.e. this very error, which we are about to store again. We do not
+        // own it -- it is kept alive by the task running the group body.
+        assert(storedErrorItem.getRawError(discardingGroup) == bodyError &&
+               "discarding group stored a raw error other than the body error");
+        break;
+      default:
+        swift_Concurrency_fatalError(
+            0, "only errors can be stored by a discarding task group, yet it "
+               "wasn't an error!");
+      }
+    }
+
     auto readyItem = ReadyQueueItem::getRawError(discardingGroup, bodyError);
     SWIFT_TASK_GROUP_DEBUG_LOG(this, "enqueue %#" PRIxPTR, readyItem.storage);
     readyQueue.enqueue(readyItem);
