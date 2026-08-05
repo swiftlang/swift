@@ -29,7 +29,7 @@ FINISH()
 
 
 // CHECK-LABEL: define {{.*}} @{{.*}}computed_property
-// CHECK-SAME:  ptr swiftself {{.*}} %[[self:.*]])
+// CHECK-SAME:  ptr noalias swiftself {{.*}} %[[self:.*]])
 // CHECK: %[[self_alloca:.*]] = alloca ptr
 // CHECK: #dbg_declare(ptr %[[self_alloca]], ![[SELF_DBG:.*]], !DIExpression(DW_OP_deref)
 // CHECK: call {{.*}} @llvm.coro.begin
