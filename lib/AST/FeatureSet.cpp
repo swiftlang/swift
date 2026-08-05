@@ -620,6 +620,13 @@ static bool usesFeatureInlineAlways(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureAlwaysUnsafeAttribute(Decl *decl) {
+  if (auto *unsafeAttr = decl->getAttrs().getAttribute<UnsafeAttr>()) {
+    return unsafeAttr->isAlways();
+  }
+  return false;
+}
+
 UNINTERESTING_FEATURE(SwiftRuntimeAvailability)
 UNINTERESTING_FEATURE(StandaloneSwiftAvailability)
 

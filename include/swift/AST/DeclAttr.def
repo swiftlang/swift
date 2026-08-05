@@ -847,7 +847,7 @@ SIMPLE_DECL_ATTR(sensitive, Sensitive,
   UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove | UnreachableInABIAttr,
   159)
 
-SIMPLE_DECL_ATTR(unsafe, Unsafe,
+DECL_ATTR(unsafe, Unsafe,
   OnAbstractFunction | OnSubscript | OnVar | OnMacro | OnNominalType | OnExtension | OnTypeAlias | OnEnumElement | OnImport,
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
   160)

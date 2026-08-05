@@ -1329,6 +1329,11 @@ public:
   /// unsafe.
   ExplicitSafety getExplicitSafety() const;
 
+  /// Whether uses of this declaration must be acknowledged with the 'unsafe'
+  /// keyword even when strict memory safety checking is disabled, i.e. whether
+  /// it was marked '@unsafe(always)'.
+  bool isAlwaysUnsafe() const;
+
 private:
   bool isUnsafeComputed() const {
     return Bits.Decl.IsUnsafeComputed;

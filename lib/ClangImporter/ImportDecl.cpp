@@ -9380,7 +9380,7 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
     //
     // __attribute__((swift_attr("attribute")))
     //
-    bool seenUnsafe = false;
+    std::optional<bool> seenUnsafe;
     for (auto swiftAttr : ClangDecl->specific_attrs<clang::SwiftAttrAttr>()) {
       // FIXME: Hard-code @MainActor and @UIActor, because we don't have a
       // point at which to do name lookup for imported entities.
@@ -9485,7 +9485,16 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
         continue;
       }
 
+      // A declaration can carry both spellings, and these attributes are also
+      // gathered from more than one Clang declaration. The strongest one wins,
+      // regardless of the order they appear in.
       if (swiftAttr->getAttribute() == "unsafe") {
+        if (!seenUnsafe)
+          seenUnsafe = false;
+        continue;
+      }
+
+      if (swiftAttr->getAttribute() == "unsafe(always)") {
         seenUnsafe = true;
         continue;
       }
@@ -9504,7 +9513,9 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
       importUnsafeHeuristic = true;
 
     if (seenUnsafe || importUnsafeHeuristic) {
-      auto attr = new (SwiftContext) UnsafeAttr(/*implicit=*/!seenUnsafe);
+      auto attr = new (SwiftContext)
+          UnsafeAttr(SourceLoc(), SourceRange(), seenUnsafe.value_or(false),
+                     /*implicit=*/!seenUnsafe.has_value());
       MappedDecl->addAttribute(attr);
     }
   };
