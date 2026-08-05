@@ -5757,7 +5757,7 @@ ClangTypeEscapability::evaluate(Evaluator &evaluator,
         return CxxEscapability::NonEscapable;
       if (hasEscapableAttr(recordDecl))
         continue;
-      if (hasSwiftAttribute(recordDecl, {"unsafe"}))
+      if (hasSwiftAttribute(recordDecl, {"unsafe", "unsafe(always)"}))
         return CxxEscapability::Unknown;
       SmallVector<int> STLParams;
       if (recordDecl->isInStdNamespace()) {
@@ -8863,8 +8863,9 @@ ExplicitSafety ClangDeclExplicitSafety::evaluate(
   if (desc.isClass)
     // Safety for class types is handled a bit differently than other types.
     // If it is not explicitly marked unsafe, it is always explicitly safe.
-    return hasSwiftAttribute(desc.decl, {"unsafe"}) ? ExplicitSafety::Unsafe
-                                                    : ExplicitSafety::Safe;
+    return hasSwiftAttribute(desc.decl, {"unsafe", "unsafe(always)"})
+               ? ExplicitSafety::Unsafe
+               : ExplicitSafety::Safe;
 
   // Clang record types are considered explicitly unsafe if any of their fields,
   // base classes, and template type parameters are unsafe. We use a stack for
@@ -8904,7 +8905,7 @@ ExplicitSafety ClangDeclExplicitSafety::evaluate(
 
     // Found unsafe; whether decl == desc.decl or not, desc.decl is unsafe
     // (see invariant, above)
-    if (hasSwiftAttribute(decl, {"unsafe"}))
+    if (hasSwiftAttribute(decl, {"unsafe", "unsafe(always)"}))
       return ExplicitSafety::Unsafe;
 
     if (hasSwiftAttribute(decl, {"safe"}))

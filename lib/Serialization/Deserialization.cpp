@@ -6677,6 +6677,15 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
         break;
       }
 
+      case decls_block::Unsafe_DECL_ATTR: {
+        bool isAlways{};
+        bool isImplicit{};
+        serialization::decls_block::UnsafeDeclAttrLayout::readRecord(
+            scratch, isAlways, isImplicit);
+        Attr = new (ctx) UnsafeAttr({}, {}, isAlways, isImplicit);
+        break;
+      }
+
       case decls_block::MacroRole_DECL_ATTR: {
         bool isImplicit;
         uint8_t rawMacroSyntax;

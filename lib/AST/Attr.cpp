@@ -1164,6 +1164,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   case DeclAttrKind::Export:
   case DeclAttrKind::Optimize:
   case DeclAttrKind::Exclusivity:
+  case DeclAttrKind::Unsafe:
   case DeclAttrKind::NonSendable:
   case DeclAttrKind::ObjCImplementation:
     if (getKind() == DeclAttrKind::Effects &&
@@ -1190,6 +1191,12 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
         Printer << ' ';
         // Add @inlinable
         Printer.printSimpleAttr("inlinable", /*needAt=*/true);
+      } else if (getKind() == DeclAttrKind::Unsafe &&
+                 cast<UnsafeAttr>(this)->isAlways() &&
+                 Options.SuppressUnsafeAlways) {
+        // Older compilers don't understand the argument, and plain '@unsafe'
+        // is the closest approximation they can check.
+        Printer.printSimpleAttr("unsafe", /*needAt=*/true);
       } else {
         Printer.printSimpleAttr(attrName, /*needAt=*/true);
       }
@@ -2040,6 +2047,8 @@ StringRef DeclAttribute::getAttrName() const {
     }
     llvm_unreachable("Invalid optimization kind");
   }
+  case DeclAttrKind::Unsafe:
+    return cast<UnsafeAttr>(this)->isAlways() ? "unsafe(always)" : "unsafe";
   case DeclAttrKind::Effects:
     switch (cast<EffectsAttr>(this)->getKind()) {
       case EffectsKind::ReadNone:
