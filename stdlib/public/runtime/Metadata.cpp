@@ -5125,6 +5125,8 @@ OpaqueExistentialValueWitnesses_0 =
 static const ValueWitnessTable
 OpaqueExistentialValueWitnesses_1 =
   ValueWitnessTableForBox<OpaqueExistentialBox<1>>::table;
+static const ValueWitnessTable COMExistentialValueWitnesses =
+  ValueWitnessTableForBox<COMExistentialBox>::table;
 
 /// The standard metadata for Any.
 const FullMetadata<ExistentialTypeMetadata> swift::
@@ -5289,7 +5291,10 @@ getExistentialValueWitnesses(ProtocolClassConstraint classConstraint,
     // Without ObjC interop, Error is native-refcounted.
     return &VALUE_WITNESS_SYM(Bo);
 #endif
-      
+
+  case SpecialProtocol::COM:
+    return &COMExistentialValueWitnesses;
+
   // Other existentials use standard representation.
   case SpecialProtocol::None:
     break;
@@ -5313,6 +5318,8 @@ ExistentialTypeMetadata::getRepresentation() const {
   switch (Flags.getSpecialProtocol()) {
   case SpecialProtocol::Error:
     return ExistentialTypeRepresentation::Error;
+  case SpecialProtocol::COM:
+    return ExistentialTypeRepresentation::COM;
   case SpecialProtocol::None:
     break;
   }
@@ -5347,6 +5354,8 @@ ExistentialTypeMetadata::mayTakeValue(const OpaqueValue *container) const {
       = *reinterpret_cast<const SwiftError * const *>(container);
     return errorBox->isPureNSError();
   }
+  case ExistentialTypeRepresentation::COM:
+    return true;
   }
 
   swift_unreachable(
@@ -5370,6 +5379,10 @@ const {
   case ExistentialTypeRepresentation::Error:
     // TODO: If we were able to claim the value from a uniquely-owned
     // existential box, we would want to deallocError here.
+    break;
+
+  case ExistentialTypeRepresentation::COM:
+    // Taking the interface pointer leaves no auxiliary container state.
     break;
   }
 }
@@ -5396,6 +5409,9 @@ ExistentialTypeMetadata::projectValue(const OpaqueValue *container) const {
       return container;
     return errorBox->getValue();
   }
+  case ExistentialTypeRepresentation::COM:
+    // The interface pointer is the existential value.
+    return container;
   }
 
   swift_unreachable(
@@ -5421,6 +5437,8 @@ ExistentialTypeMetadata::getDynamicType(const OpaqueValue *container) const {
       = *reinterpret_cast<const SwiftError * const *>(container);
     return errorBox->getType();
   }
+  case ExistentialTypeRepresentation::COM:
+    swift_unreachable("the dynamic Swift type of a COM existential is not directly projectable");
   }
 
   swift_unreachable(
@@ -5457,6 +5475,8 @@ ExistentialTypeMetadata::getWitnessTable(const OpaqueValue *container,
       = *reinterpret_cast<const SwiftError * const *>(container);
     return errorBox->getErrorConformance();
   }
+  case ExistentialTypeRepresentation::COM:
+    swift_unreachable("COM existentials do not store Swift witness tables");
   }
 
   // The return type here describes extra structure for the protocol
@@ -5526,19 +5546,30 @@ swift::swift_getExistentialTypeMetadata(
 }
 
 ExistentialCacheEntry::ExistentialCacheEntry(Key key) {
-  // Calculate the class constraint and number of witness tables for the
-  // protocol set.
-  unsigned numWitnessTables = 0;
-  for (auto p : make_range(key.Protocols, key.Protocols + key.NumProtocols)) {
-    if (p.needsWitnessTable())
-      ++numWitnessTables;
-  }
-
-  // Get the special protocol kind for an uncomposed protocol existential.
-  // Protocol compositions are currently never special.
+  // Get the special protocol kind. Marker protocols are omitted before this
+  // runtime entry is called. A refined COM-interface chain may contain more
+  // than one descriptor, but every remaining protocol still has the same COM
+  // representation.
   auto special = SpecialProtocol::None;
   if (key.NumProtocols == 1)
     special = key.Protocols[0].getSpecialProtocol();
+  else if (key.NumProtocols > 1 &&
+           llvm::all_of(
+               make_range(key.Protocols, key.Protocols + key.NumProtocols),
+               [](ProtocolDescriptorRef protocol) {
+                 return protocol.getSpecialProtocol() == SpecialProtocol::COM;
+               }))
+    special = SpecialProtocol::COM;
+
+  // Calculate the class constraint and number of witness tables for the
+  // protocol set.
+  unsigned numWitnessTables = 0;
+  if (special != SpecialProtocol::COM) {
+    for (auto p : make_range(key.Protocols, key.Protocols + key.NumProtocols)) {
+      if (p.needsWitnessTable())
+        ++numWitnessTables;
+    }
+  }
 
   Data.setKind(MetadataKind::Existential);
   Data.ValueWitnesses = getExistentialValueWitnesses(key.ClassConstraint,
