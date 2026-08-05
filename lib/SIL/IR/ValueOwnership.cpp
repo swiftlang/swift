@@ -685,6 +685,7 @@ CONSTANT_OWNERSHIP_BUILTIN(Guaranteed, ExtractFunctionIsolation) // unreachable
 CONSTANT_OWNERSHIP_BUILTIN(None, AddressOfRawLayout)
 
 CONSTANT_OWNERSHIP_BUILTIN(None, TaskAddCancellationHandler)
+CONSTANT_OWNERSHIP_BUILTIN(None, TaskAddCancellationHandlerWithReason)
 CONSTANT_OWNERSHIP_BUILTIN(None, TaskRemoveCancellationHandler)
 CONSTANT_OWNERSHIP_BUILTIN(None, TaskAddPriorityEscalationHandler)
 CONSTANT_OWNERSHIP_BUILTIN(None, TaskRemovePriorityEscalationHandler)

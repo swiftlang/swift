@@ -1067,7 +1067,7 @@ swift_task_cancelCancellationScopeWithReasonImpl(
         // handlers registered inside the scope.
         auto notification =
             cast<CancellationNotificationStatusRecord>(cur);
-        notification->run();
+        notification->run(reason);
         break;
       }
       case TaskStatusRecordKind::TaskCancellationScope: {
@@ -1417,7 +1417,7 @@ static void performCancellationAction(ActiveTaskStatus status,
       SWIFT_TASK_DEBUG_LOG("cancellation shielded: skip cancellation handler invocation in task = %p", swift_task_getCurrent());
       return; 
     }
-    notification->run();
+    notification->run(reason);
     return;
   }
 

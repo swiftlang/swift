@@ -799,6 +799,14 @@ swift_task_addCancellationHandler(
     CancellationNotificationStatusRecord::FunctionType handler,
     void *handlerContext);
 
+/// Create and add a cancellation record to the task, whose handler is passed
+/// the cancellation reason when it fires.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+CancellationNotificationStatusRecord*
+swift_task_addCancellationHandlerWithReason(
+    CancellationNotificationStatusRecord::FunctionTypeWithReason handler,
+    void *handlerContext);
+
 /// Remove the passed cancellation record from the task.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_removeCancellationHandler(

@@ -216,6 +216,7 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::UnprotectedAddressOfBorrowOpaque:
     case BuiltinValueKind::DistributedActorAsAnyActor:
     case BuiltinValueKind::TaskAddCancellationHandler:
+    case BuiltinValueKind::TaskAddCancellationHandlerWithReason:
     case BuiltinValueKind::TaskRemoveCancellationHandler:
     case BuiltinValueKind::TaskAddPriorityEscalationHandler:
     case BuiltinValueKind::TaskRemovePriorityEscalationHandler:

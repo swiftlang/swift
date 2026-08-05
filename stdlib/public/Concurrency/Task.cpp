@@ -1849,25 +1849,32 @@ size_t swift::swift_task_getCancellationReason(AsyncTask *task) {
   return 0;
 }
 
-SWIFT_CC(swift)
+/// Shared logic for `swift_task_addCancellationHandlerImpl` and
+/// `swift_task_addCancellationHandlerWithReasonImpl`: allocate and register
+/// the record, firing it immediately (and skipping registration) if the task
+/// or an enclosing cancellation scope is already cancelled at install time.
+/// `handler` picks which `CancellationNotificationStatusRecord` constructor
+/// (and therefore which union member/`HasReason` bit) is used; `discriminator`
+/// is the pointer-auth discriminator matching that same shape.
+template <typename FunctionPtrType>
 static CancellationNotificationStatusRecord*
-swift_task_addCancellationHandlerImpl(
-    CancellationNotificationStatusRecord::FunctionType handler,
-    void *context) {
+addCancellationHandlerCommon(FunctionPtrType handler, void *context,
+                             unsigned discriminator) {
   void *allocation =
       swift_task_alloc(sizeof(CancellationNotificationStatusRecord));
-  auto unsigned_handler = swift_auth_code(handler,
-      SpecialPointerAuthDiscriminators::CancellationNotificationFunction);
+  auto unsigned_handler = swift_auth_code(handler, discriminator);
   auto *record = ::new (allocation)
       CancellationNotificationStatusRecord(unsigned_handler, context);
 
   auto *task = swift_task_getCurrent();
   bool fireHandlerNow = false;
+  size_t immediateReason = 0;
   addStatusRecord(task, record, [&](ActiveTaskStatus oldStatus, ActiveTaskStatus& newStatus) {
     if (oldStatus.isCancelled()) {
       // We don't fire the cancellation handler here since this function needs
       // to be idempotent
       fireHandlerNow = true;
+      immediateReason = oldStatus.getCancellationReason();
 
       // don't add the record, because that would risk triggering it from
       // task_cancel, concurrently with the record->run() we're about to do below.
@@ -1885,6 +1892,7 @@ swift_task_addCancellationHandlerImpl(
       if (auto *scope = _swift_task_getCancellationScope(task)) {
         if (scope->isCancelled()) {
           fireHandlerNow = true;
+          immediateReason = scope->getReason();
           removeStatusRecord(task, record, [](ActiveTaskStatus, ActiveTaskStatus&){});
         }
       }
@@ -1892,7 +1900,7 @@ swift_task_addCancellationHandlerImpl(
   }
 
   if (fireHandlerNow) {
-    record->run();
+    record->run(immediateReason);
 
     // we have not added the record to the task because it has fired immediately,
     // and therefore we can clean it up immediately rather than wait until removeCancellationHandler
@@ -1901,6 +1909,24 @@ swift_task_addCancellationHandlerImpl(
     return nullptr; // indicate to the remove... method, that there was no task added
   }
   return record;
+}
+
+SWIFT_CC(swift)
+static CancellationNotificationStatusRecord*
+swift_task_addCancellationHandlerImpl(
+    CancellationNotificationStatusRecord::FunctionType handler,
+    void *context) {
+  return addCancellationHandlerCommon(handler, context,
+      SpecialPointerAuthDiscriminators::CancellationNotificationFunction);
+}
+
+SWIFT_CC(swift)
+static CancellationNotificationStatusRecord*
+swift_task_addCancellationHandlerWithReasonImpl(
+    CancellationNotificationStatusRecord::FunctionTypeWithReason handler,
+    void *context) {
+  return addCancellationHandlerCommon(handler, context,
+      SpecialPointerAuthDiscriminators::CancellationNotificationWithReasonFunction);
 }
 
 SWIFT_CC(swift)

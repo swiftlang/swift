@@ -1236,6 +1236,15 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(TaskAddCancellationHandler,
 BUILTIN_MISC_OPERATION(TaskRemoveCancellationHandler,
                        "taskRemoveCancellationHandler", "", Special)
 
+/// Equivalent to calling swift_task_addCancellationHandlerWithReason.
+///
+/// Signature: (handler: (UInt8) -> Void) -> UnsafeRawPointer
+///
+/// Introduced in Swift 6.5
+BUILTIN_MISC_OPERATION_WITH_SILGEN(TaskAddCancellationHandlerWithReason,
+                                  "taskAddCancellationHandlerWithReason", "",
+                                   Special)
+
 /// Equivalent to calling swift_task_addPriorityEscalationHandler.
 ///
 /// Signature: (handler: (UInt8, UInt8) -> Void) -> UnsafeRawPointer

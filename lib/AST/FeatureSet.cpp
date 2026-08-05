@@ -472,6 +472,7 @@ static bool usesFeatureCompileTimeValues(Decl *decl) {
 UNINTERESTING_FEATURE(ClosureBodyMacro)
 UNINTERESTING_FEATURE(BuiltinConcurrencyStackNesting)
 UNINTERESTING_FEATURE(BuiltinTaskCancellationShield)
+UNINTERESTING_FEATURE(BuiltinCancellationHandlerWithReason)
 UNINTERESTING_FEATURE(BuiltinAddTaskLocalValue)
 UNINTERESTING_FEATURE(BuiltinContinuationNonCopyableSuccess)
 UNINTERESTING_FEATURE(CompileTimeValuesPreview)

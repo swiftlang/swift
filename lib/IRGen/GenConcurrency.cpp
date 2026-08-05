@@ -321,6 +321,9 @@ llvm::Value *irgen::emitBuiltinTaskAddHandler(IRGenFunction &IGF,
     if (kind == BuiltinValueKind::TaskAddCancellationHandler) {
       return IGF.IGM.getTaskAddCancellationHandlerFunctionPointer();
     }
+    if (kind == BuiltinValueKind::TaskAddCancellationHandlerWithReason) {
+      return IGF.IGM.getTaskAddCancellationHandlerWithReasonFunctionPointer();
+    }
     if (kind == BuiltinValueKind::TaskAddPriorityEscalationHandler) {
       return IGF.IGM.getTaskAddPriorityEscalationHandlerFunctionPointer();
     }

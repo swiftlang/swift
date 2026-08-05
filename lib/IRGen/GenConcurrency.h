@@ -117,7 +117,8 @@ llvm::Value *clearImplicitIsolatedActorBits(IRGenFunction &IGF,
 ///
 /// \returns the record that can be used to refer to and cancel the handler.
 ///
-/// Currently supports TaskAddCancellationHandler and
+/// Currently supports TaskAddCancellationHandler,
+/// TaskAddCancellationHandlerWithReason, and
 /// TaskAddPriorityEscalationHandler.
 llvm::Value *emitBuiltinTaskAddHandler(IRGenFunction &IGF,
                                        BuiltinValueKind kind, llvm::Value *func,

@@ -1104,6 +1104,8 @@ BUILTIN_OPERAND_OWNERSHIP(TrivialUse, AutoDiffCreateLinearMapContextWithType)
 
 // InstantaneousUse since we take in a closure at +0.
 BUILTIN_OPERAND_OWNERSHIP(BitwiseEscape, TaskAddCancellationHandler)
+// InstantaneousUse since we take in a closure at +0.
+BUILTIN_OPERAND_OWNERSHIP(BitwiseEscape, TaskAddCancellationHandlerWithReason)
 // Trivial use since our operand is just an UnsafeRawPointer.
 BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskRemoveCancellationHandler)
 // InstantaneousUse since we take in a closure at +0.

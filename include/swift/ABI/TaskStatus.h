@@ -229,28 +229,54 @@ public:
 /// code may call `removeStatusRecord` and freely
 /// assume after it returns that this function will not be
 /// subsequently used.
+///
+/// Since Swift 6.5:
+/// Swift 6.5 introduced cancellation reasons, so the handler may be accepting a reason int.
+/// We must indicate if the handler is accepting the reason value or not.
 class CancellationNotificationStatusRecord : public TaskStatusRecord {
 public:
   using FunctionType = SWIFT_CC(swift) void(SWIFT_CONTEXT void *);
+  using FunctionTypeWithReason = SWIFT_CC(swift) void(size_t /*reason*/, SWIFT_CONTEXT void *);
 
 private:
-  FunctionType *__ptrauth_swift_cancellation_notification_function Function;
-  void *Argument;
+  enum class Flags : uint8_t {
+    /// Whether the type of the Function is ...WithReason.
+    HasReason = 1 << 0,
 
-  /// FIXME: Investigate whether this at-most-once flag is actually needed.
-  std::atomic<bool> Fired{false};
+    /// Atomic flag to prevent the handler firing multiple times. Necessary
+    /// because multiple cancellation scopes might otherwise cause an outer
+    /// handler to be triggered multiple times.
+    Fired = 1 << 1
+  };
+
+  union {
+    FunctionType *__ptrauth_swift_cancellation_notification_function
+        Function;
+    FunctionTypeWithReason *__ptrauth_swift_cancellation_notification_with_reason_function
+        FunctionWithReason;
+  };
+  void *Argument;
+  std::atomic<uint8_t> flags;
 
 public:
   CancellationNotificationStatusRecord(FunctionType *fn, void *arg)
       : TaskStatusRecord(TaskStatusRecordKind::CancellationNotification),
-        Function(fn), Argument(arg) {}
+        Function(fn), Argument(arg), flags(0) {}
 
-  void run() {
-    bool expected = false;
-    if (!Fired.compare_exchange_strong(expected, true,
-                                       std::memory_order_relaxed))
+  CancellationNotificationStatusRecord(FunctionTypeWithReason *fn, void *arg)
+      : TaskStatusRecord(TaskStatusRecordKind::CancellationNotification),
+        FunctionWithReason(fn), Argument(arg),
+        flags(static_cast<uint8_t>(Flags::HasReason)) {}
+
+  void run(size_t reason) {
+    uint8_t oldFlags = flags.fetch_or(static_cast<uint8_t>(Flags::Fired),
+                                      std::memory_order_relaxed);
+    if (oldFlags & static_cast<uint8_t>(Flags::Fired))
       return;
-    Function(Argument);
+    if (oldFlags & static_cast<uint8_t>(Flags::HasReason))
+      FunctionWithReason(reason, Argument);
+    else
+      Function(Argument);
   }
 
   static bool classof(const TaskStatusRecord *record) {

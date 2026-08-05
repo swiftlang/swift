@@ -9,6 +9,7 @@
 
 @_spi(Concurrency) import _Concurrency
 import StdlibUnittest
+import Synchronization
 
 struct MyError: Error {}
 
@@ -464,7 +465,7 @@ struct ClassInstantClock: Clock, Identifiable {
       expectEqual(1, innerHandlerCount)
     }
 
-    // Example 4: same nesting shape as Example 3, but the inner `sleep` is
+    // Same nesting shape as before, but the inner `sleep` is
     // shorter than the inner deadline. Outer is still the tighter deadline, so
     // both handlers still fire when outer fires (and the inner sleep never
     // gets to return on its own).
@@ -493,6 +494,32 @@ struct ClassInstantClock: Clock, Identifiable {
       expectTrue(elapsed < .seconds(2))
       expectEqual(1, outerHandlerCount)
       expectEqual(1, innerHandlerCount)
+    }
+    
+    // The outer `withTaskCancellationHandler` is registered before either
+    // `withDeadline` scope is entered, so it is never "inside" either scope's
+    // dynamic extent; neither scope's local cancellation should reach it.
+    // Regression check for the `CancellationNotificationStatusRecord`'s
+    // at-most-once `Fired` guard: even if something were to cause the outer
+    // handler to be visited by both scope-cancel walks, it must still only
+    // run once.
+    tests.test("outer cancellation handler must trigger exactly once, even if separate deadlines trigger twice") {
+      let handlerCount = Atomic<Int>(0)
+      do {
+        try await withTaskCancellationHandler {
+          try await withDeadline(in: .seconds(-60)) {
+            expectTrue(Task.isCancelled)
+          }
+          try await withDeadline(in: .seconds(-60)) {
+            expectTrue(Task.isCancelled)
+          }
+        } onCancel: {
+          handlerCount.wrappingAdd(1, ordering: .relaxed)
+        }
+      } catch {
+        expectUnreachableCatch(error)
+      }
+      expectTrue(handlerCount.load(ordering: .relaxed) <= 1)
     }
 
     // Two-clock composition: an outer deadline on ContinuousClock and an inner

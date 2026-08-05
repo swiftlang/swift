@@ -2752,6 +2752,19 @@ FUNCTION(TaskAddCancellationHandler,
         EFFECT(RuntimeEffect::Concurrency),
         UNKNOWN_MEMEFFECTS)
 
+// CancellationNotificationStatusRecord*
+// swift_task_addCancellationHandlerWithReason(
+//     CancellationNotificationStatusRecord::FunctionTypeWithReason handler,
+//     void *context);
+FUNCTION(TaskAddCancellationHandlerWithReason,
+        _Concurrency, swift_task_addCancellationHandlerWithReason, SwiftCC,
+        CancellationHandlerWithReasonAvailability,
+        RETURNS(Int8PtrTy),
+        ARGS(Int8PtrTy, Int8PtrTy),
+        ATTRS(NoUnwind),
+        EFFECT(RuntimeEffect::Concurrency),
+        UNKNOWN_MEMEFFECTS)
+
 // void swift_task_removeCancellationHandler(
 //   CancellationNotificationStatusRecord *record);
 FUNCTION(TaskRemoveCancellationHandler,
