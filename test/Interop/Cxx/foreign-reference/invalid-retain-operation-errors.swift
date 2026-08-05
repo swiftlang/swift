@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
-// RUN: %target-swift-frontend -typecheck -verify -suppress-notes \
+// RUN: %target-swift-frontend -typecheck -verify \
 // RUN:   -cxx-interoperability-mode=default -disable-availability-checking \
 // RUN:   -I %t%{fs-sep}Inputs -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}test.h \
 // RUN:   %t%{fs-sep}test.swift
@@ -247,16 +247,10 @@ EmptyReleaseName {};
 
 void emptyNameRetain(EmptyReleaseName *v);
 
-struct
-    __attribute__((swift_attr("import_reference")))
-    __attribute__((swift_attr("retain:Uretain")))
-    __attribute__((swift_attr("release:Urelease")))
-UnimportedRetainRelease {};
-// expected-error@-1 {{cannot find retain function 'Uretain' for reference type 'UnimportedRetainRelease'}}
-// expected-error@-2 {{cannot find release function 'Urelease' for reference type 'UnimportedRetainRelease'}}
-
-void Uretain(UnimportedRetainRelease v);
-UnimportedRetainRelease Urelease(UnimportedRetainRelease* v);
+void FRTParameterByValue(GoodRetainRelease v={});
+// expected-note@-1{{parameter takes foreign reference type 'GoodRetainRelease' by value which violates reference type contract}}
+GoodRetainRelease FRTReturnByValue(GoodRetainRelease* v);
+// expected-note@-1{{function returns foreign reference type 'GoodRetainRelease' by value which violates reference type contract}}
 
 #pragma clang assume_nonnull end
 
@@ -284,4 +278,8 @@ public func test(x: MultipleRetainReleaseFRT) {}
 public func test(x: MultipleRetainReleaseAttrFRT) {}
 public func test(x: EmptyRetainName) {}
 public func test(x: EmptyReleaseName) {}
-public func test(x: UnimportedRetainRelease) {}
+
+public func testCalls() {
+  FRTParameterByValue() // expected-error {{cannot find 'FRTParameterByValue' in scope}}
+  FRTReturnByValue() // expected-error {{cannot find 'FRTReturnByValue' in scope}}
+}

@@ -178,10 +178,10 @@ NOTE(record_over_aligned, none, "record '%0' is over aligned", (StringRef))
 NOTE(record_non_trivial_copy_destroy, none, "record '%0' is not trivial to copy or destroy", (StringRef))
 NOTE(record_is_dependent, none, "record '%0' is dependent", (StringRef))
 NOTE(record_parent_unimportable, none, "record %0's parent is not importable", (StringRef))
-NOTE(reference_passed_by_value, none, "function uses foreign reference type "
-                                      "'%0' as a value in %1 types which breaks "
-                                      "'swift_shared_reference' contract",
-     (StringRef, StringRef))
+NOTE(foreign_reference_type_by_value, none,
+    "%select{parameter takes|function returns}1 foreign reference type '%0' by value "
+    "which violates reference type contract",
+     (StringRef, bool))
 NOTE(record_not_automatically_importable, none, "record '%0' is not "
                                                 "automatically available: %1; "
                                                 "does this type have reference "
