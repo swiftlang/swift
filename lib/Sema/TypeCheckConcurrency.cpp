@@ -5468,6 +5468,11 @@ getIsolationFromConformances(NominalTypeDecl *nominal) {
   if (isa<ProtocolDecl>(nominal))
     return std::nullopt;
 
+  // We can infer isolation for witness in an actor, but the actor itself needs
+  // to stay instance isolated.
+  if (nominal->isAnyActor())
+    return std::nullopt;
+
   std::optional<InferredActorIsolation> foundIsolation;
   for (auto conformance :
        nominal->getLocalConformances(ConformanceLookupKind::NonStructural)) {
@@ -5583,11 +5588,16 @@ getIsolationFromInheritedProtocols(ProtocolDecl *protocol) {
   return foundIsolation;
 }
 
-/// Compute the isolation of a nominal type from the property wrappers on
-/// any stored properties.
+/// Compute the global actor isolation of a nominal type from the property
+/// wrappers on any stored properties.
 static std::optional<ActorIsolation>
 getIsolationFromWrappers(NominalTypeDecl *nominal) {
   if (!isa<StructDecl>(nominal) && !isa<ClassDecl>(nominal))
+    return std::nullopt;
+
+  // Actors are already instance isolated, and must not get a global actor
+  // isolation from their property wrappers.
+  if (nominal->isAnyActor())
     return std::nullopt;
 
   if (!nominal->getParentSourceFile())
@@ -5641,6 +5651,9 @@ getIsolationFromWrappers(NominalTypeDecl *nominal) {
       break;
     }
   }
+
+  // We never intend to return ActorIsolation besides a global actor.
+  ASSERT(!foundIsolation || foundIsolation->isGlobalActor());
 
   return foundIsolation;
 }
@@ -6056,6 +6069,10 @@ static void addAttributesForActorIsolation(Decl *decl,
     break;
   }
   case ActorIsolation::GlobalActor: {
+    // Don't place a global actor attribute onto an actor! Wrong and the
+    // swiftinterface won't typecheck.
+    ASSERT(!isa<ClassDecl>(decl) || !cast<ClassDecl>(decl)->isExplicitActor());
+
     auto typeExpr = TypeExpr::createImplicit(isolation.getGlobalActor(), ctx);
     auto attr = CustomAttr::create(ctx, SourceLoc(), typeExpr, /*owner=*/decl,
                                    /*implicit=*/true);

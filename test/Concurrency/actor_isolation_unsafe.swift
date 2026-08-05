@@ -132,12 +132,12 @@ class C7: C2 {
 }
 
 // expected-warning@+1 {{'(unsafe)' global actors are deprecated; use '@preconcurrency' instead}}
-@MainActor(unsafe) // expected-note {{'GloballyIsolatedProto' is isolated to global actor 'MainActor' here}}
+@MainActor(unsafe)
 protocol GloballyIsolatedProto {
 }
 
-// rdar://75849035 - trying to conform an actor to a global-actor-isolated protocol should result in an error
+// rdar://75849035 - an actor may conform to a global-actor-isolated protocol;
+// the actor itself stays isolated to its own instance.
 func test_conforming_actor_to_global_actor_protocol() {
   actor MyValue : GloballyIsolatedProto {}
-  // expected-error@-1 {{actor 'MyValue' cannot conform to global-actor-isolated protocol 'GloballyIsolatedProto'}}
 }
