@@ -2910,6 +2910,20 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     break;
   }
 
+  case DeclAttrKind::Unsafe: {
+    // Handle '@unsafe' and '@unsafe(always)'.
+    auto always = parseSingleAttrOption<bool>(
+        *this, Loc, AttrRange, AttrName, DK, {{Context.Id_always, true}},
+        /*valueIfOmitted=*/false);
+    if (!always.has_value())
+      return makeParserSuccess();
+
+    if (!DiscardAttribute)
+      Attributes.add(new (Context) UnsafeAttr(AtLoc, AttrRange, *always));
+
+    break;
+  }
+
   case DeclAttrKind::ReferenceOwnership: {
     // Handle weak/unowned/unowned(unsafe).
     auto Kind = AttrName == "weak" ? ReferenceOwnership::Weak

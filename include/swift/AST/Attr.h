@@ -1618,6 +1618,37 @@ public:
   }
 };
 
+/// Represents the '@unsafe' attribute, which indicates that an entity is
+/// not memory-safe.
+class UnsafeAttr : public DeclAttribute {
+  /// Whether uses must be acknowledged with 'unsafe' even when strict memory
+  /// safety checking is disabled, i.e. whether this is '@unsafe(always)'.
+  bool always;
+
+public:
+  UnsafeAttr(SourceLoc atLoc, SourceRange range, bool always,
+             bool implicit = false)
+      : DeclAttribute(DeclAttrKind::Unsafe, atLoc, range, implicit),
+        always(always) {}
+
+  UnsafeAttr(bool implicit = false)
+      : UnsafeAttr(SourceLoc(), SourceRange(), /*always=*/false, implicit) {}
+
+  bool isAlways() const { return always; }
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DeclAttrKind::Unsafe;
+  }
+
+  UnsafeAttr *clone(ASTContext &ctx) const {
+    return new (ctx) UnsafeAttr(AtLoc, Range, isAlways(), isImplicit());
+  }
+
+  bool isEquivalent(const UnsafeAttr *other, Decl *attachedTo) const {
+    return isAlways() == other->isAlways();
+  }
+};
+
 /// Represents the side effects attribute.
 class EffectsAttr : public DeclAttribute {
   StringRef customString;

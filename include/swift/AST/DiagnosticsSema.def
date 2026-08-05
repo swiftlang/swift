@@ -9040,7 +9040,7 @@ ERROR(safe_and_unsafe_attr,none,
       "%kindbase0 cannot be both '@safe' and '@unsafe'", (const Decl *))
 
 GROUPED_WARNING(unsafe_superclass,StrictMemorySafety,none,
-     "%kindbase0 has superclass involving unsafe type %1", 
+     "%kindbase0 has superclass involving unsafe type %1",
      (const ValueDecl *, Type))
 
 GROUPED_WARNING(conformance_involves_unsafe,StrictMemorySafety,none,
@@ -9065,6 +9065,12 @@ GROUPED_WARNING(unsafe_without_unsafe,StrictMemorySafety,none,
       "expression uses unsafe constructs but is not marked with 'unsafe'", ())
 GROUPED_WARNING(for_unsafe_without_unsafe,StrictMemorySafety,none,
       "for-in loop uses unsafe constructs but is not marked with 'unsafe'", ())
+GROUPED_ERROR(always_unsafe_without_unsafe,AlwaysUnsafe,none,
+      "expression uses constructs that are very hard to use correctly and must "
+      "be marked with 'unsafe'", ())
+GROUPED_ERROR(for_always_unsafe_without_unsafe,AlwaysUnsafe,none,
+      "for-in loop uses constructs that are very hard to use correctly and "
+      "must be marked with 'unsafe'", ())
 GROUPED_WARNING(no_unsafe_in_unsafe,UnnecessaryUnsafe,none,
         "no unsafe operations occur within 'unsafe' expression", ())
 GROUPED_WARNING(no_unsafe_in_unsafe_for,UnnecessaryUnsafe,none,
