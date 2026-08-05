@@ -91,7 +91,7 @@ public nonisolated(nonsending) func withTaskCancellationHandler<Return, Failure>
 }
 
 /// Execute an operation with a cancellation handler that's immediately
-/// invoked with the cancellation reason if the current task is canceled.
+/// invoked with the cancellation reason when the current task is canceled.
 ///
 /// - Parameters:
 ///   - operation: The operation to perform.
@@ -407,21 +407,19 @@ extension Task where Success == Never, Failure == Never {
 /// if the current task has been canceled.
 @available(SwiftStdlib 5.1, *)
 public struct CancellationError: Error {
-  // Raw storage for `Reason.rawValue`.
-  @usableFromInline
+  /// Raw storage containing the reason's `CancellationError.Reason.rawValue`;
+  /// We cannot store the enum directly because of its availability.
   internal var _reasonRawStorage: UInt8 = 0x00
 
   // no extra information, cancellation is intended to be light-weight
   public init() {}
 }
 
-@available(SwiftStdlib 5.1, *)
+@available(StdlibDeploymentTarget 6.5, *)
 extension CancellationError: CustomStringConvertible {
+  @available(StdlibDeploymentTarget 6.5, *)
   public var description: String {
-    if #available(StdlibDeploymentTarget 6.5, *) {
-      return "CancellationError(reason: \(reason))"
-    }
-    return "CancellationError()"
+    "CancellationError(reason: \(reason))"
   }
 }
 
