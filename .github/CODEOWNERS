@@ -117,7 +117,7 @@
 /include/swift/Sema/Constraint*                    @hborla @xedin @hamishknight @kathygray-pl
 /include/swift/Serialization/SerializedModuleLoader* @artemcm
 /include/swift/SwiftRemoteMirror/                  @slavapestov
-/include/swift/SymbolGraphGen/                     @QuietMisdreavus
+/include/swift/SymbolGraphGen/                     @QuietMisdreavus @snprajwal
 /include/swift/Threading                           @al45tair
 
 # lib
@@ -143,7 +143,7 @@
 /lib/DriverTool/autolink_extract_main.cpp           @MaxDesiatov @etcwilde
 /lib/DriverTool/sil*                                @jckarter
 /lib/DriverTool/sil_opt*                            @eeckstein
-/lib/DriverTool/swift_symbolgraph_extract_main.cpp  @QuietMisdreavus
+/lib/DriverTool/swift_symbolgraph_extract_main.cpp  @QuietMisdreavus @snprajwal
 /lib/Frontend*/                                     @artemcm @tshortli
 /lib/IDE/                                           @hamishknight @rintaro
 /lib/IDETool/                                       @hamishknight @rintaro
@@ -188,7 +188,7 @@
 /lib/Sema/TypeCheckType*                            @AnthonyLatsis @hborla @slavapestov @xedin @hamishknight
 /lib/Serialization/SerializedModuleLoader*          @artemcm
 /lib/SwiftRemoteMirror/                             @slavapestov
-/lib/SymbolGraphGen                                 @QuietMisdreavus
+/lib/SymbolGraphGen                                 @QuietMisdreavus @snprajwal
 /lib/Threading                                      @al45tair
 
 # localization
@@ -247,7 +247,7 @@
 /test/Sema/                                         @hborla @slavapestov @xedin @hamishknight
 /test/Sema/moveonly*                                @kavon
 /test/SourceKit/                                    @hamishknight @rintaro
-/test/SymbolGraph/                                  @QuietMisdreavus
+/test/SymbolGraph/                                  @QuietMisdreavus @snprajwal
 /test/abi/                                          @swiftlang/standard-librarians
 /test/decl/                                         @hborla @slavapestov
 /test/decl/protocol/                                @AnthonyLatsis @hborla @slavapestov
