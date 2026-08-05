@@ -706,7 +706,8 @@ public func swift_bridgeObjectRetain(object: Builtin.RawPointer) -> Builtin.RawP
 public func swift_bridgeObjectRetain_n(object: Builtin.RawPointer, n: UInt32) -> Builtin.RawPointer {
   let objectBits = UInt(Builtin.ptrtoint_Word(object))
   let untaggedObject = unsafe Builtin.inttoptr_Word((objectBits & HeapObject.bridgeObjectToPlainObjectMask)._builtinWordValue)
-  return swift_retain_n(object: untaggedObject, n: n)
+  _ = swift_retain_n(object: untaggedObject, n: n)
+  return object
 }
 
 @c
@@ -1053,6 +1054,22 @@ func _embeddedReportExclusivityViolation(
   Builtin.condfail_message(
     true._value, StaticString("dynamic exclusivity violation").unsafeRawPointer)
   Builtin.int_trap()
+}
+
+@_extern(c)
+func _swift_tls_get(_ key: Int) -> UnsafeMutableRawPointer?
+
+@_extern(c)
+func _swift_tls_set(_ key: Int, _ pointer: UnsafeMutableRawPointer?)
+
+@c
+func _swift_getExclusivityTLS() -> UnsafeMutableRawPointer? {
+  return unsafe _swift_tls_get(/*exclusivity=*/7)
+}
+
+@c
+func _swift_setExclusivityTLS(_ pointer: UnsafeMutableRawPointer?) {
+  return unsafe _swift_tls_set(/*exclusivity=*/7, pointer)
 }
 
 private func intToFloatChunkFactor<T: ExpressibleByFloatLiteral>() -> T {

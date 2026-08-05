@@ -19,7 +19,6 @@
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
-#include "swift/AST/PackConformance.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SourceFile.h"
@@ -29,6 +28,7 @@
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/SourceManager.h"
+#include "clang/AST/Decl.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/MapVector.h"
 
@@ -478,12 +478,6 @@ class LifetimeDependenceChecker {
   bool performedDiagnostics = false;
 
 public:
-  static unsigned getResultIndex(AbstractFunctionDecl *afd) {
-    return afd->isInstanceMethod()
-               ? (unsigned)(afd->getParameters()->size() + 1)
-               : (unsigned)afd->getParameters()->size();
-  }
-
   static unsigned getResultIndex(EnumElementDecl *eed) {
     auto *paramList = eed->getParameterList();
     return paramList ? (unsigned)(paramList->size() + 1) : 1;
@@ -507,7 +501,7 @@ public:
   }
 
   static std::optional<ParamInfo> getSelfParamInfo(AbstractFunctionDecl *afd) {
-    if (!afd->isInstanceMethod())
+    if (!afd->hasSelfInLifetimeDependenceIndices())
       return std::nullopt;
     auto *selfDecl = afd->getImplicitSelfDecl();
     if (!selfDecl)
@@ -601,7 +595,7 @@ public:
         escapableDecl(ctx.getProtocol(
             swift::getKnownProtocolKind(InvertibleProtocolKind::Escapable))),
         genericEnv(afd->getGenericEnvironment()),
-        resultIndex(getResultIndex(afd)),
+        resultIndex(afd->getLifetimeDependenceResultIndex()),
         resultTy(afd->mapTypeIntoEnvironment(getResultOrYieldInterface(afd))),
         returnLoc(getReturnLoc(afd)),
         implicitSelfParamInfo(getSelfParamInfo(afd)),
@@ -861,10 +855,12 @@ protected:
         return qualifier;
       }
     }
+    if (isInit) {
+      // An imported C++ constructor has no 'self' in the lifetime dependence
+      // index space, so this cannot rely on 'implicitSelfParamInfo'.
+      return "an initializer";
+    }
     if (implicitSelfParamInfo.has_value()) {
-      if (isInit) {
-        return "an initializer";
-      }
       if (implicitSelfParamInfo->param.isInOut()) {
         return "a mutating method";
       }
@@ -1849,6 +1845,39 @@ protected:
       return;
     }
     auto kind = LifetimeDependenceKind::Scope;
+    // A foreign function's parameter conventions are fixed by its C
+    // declaration. Imported C records are addressable-for-dependencies (see
+    // TypeConverter::getTypeProperties()), so a scoped dependency on one is
+    // lowered as an address dependency -- but a record that the callee receives
+    // as its own copy has no borrowable storage in the caller to form one on.
+    // Do not infer a dependency that cannot be lowered; an explicit annotation
+    // is required instead.
+    //
+    // A record passed by pointer or lvalue reference does have borrowable
+    // storage, so those keep their inferred dependency.
+    if (auto *clangFn =
+            dyn_cast_or_null<clang::FunctionDecl>(afd->getClangDecl())) {
+      // 'self' is not part of the Clang parameter list, and inference only
+      // reaches this point for a single Swift parameter.
+      if (clangFn->getNumParams() == 1) {
+        auto clangParamTy = clangFn->getParamDecl(0)->getType();
+        // An rvalue reference is imported as 'consuming', which likewise leaves
+        // nothing to borrow.
+        if (auto *rvalueRef = clangParamTy->getAs<clang::RValueReferenceType>())
+          clangParamTy = rvalueRef->getPointeeType();
+        if (clangParamTy->isRecordType()) {
+          // C++ allows unnamed parameters. Inference only reaches this point
+          // for a function with a single parameter, so name it positionally.
+          StringRef paramName =
+              paramInfo.name().empty() ? "parameter #1" : paramInfo.name();
+          diagnose(
+              returnLoc,
+              diag::lifetime_dependence_cannot_infer_scope_foreign_by_value,
+              paramName, diagnosticQualifier());
+          return;
+        }
+      }
+    }
     if (!isCompatibleWithOwnership(kind, paramInfo)) {
       diagnose(returnLoc,
                diag::lifetime_dependence_cannot_infer_scope_ownership,

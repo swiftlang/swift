@@ -80,6 +80,7 @@
 #include "clang/Basic/Module.h"
 #include "clang/Basic/TargetInfo.h"
 #include "clang/AST/Attr.h"
+#include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclObjC.h"
 
 #include <algorithm>
@@ -960,7 +961,7 @@ static ModuleDecl *getModuleContextForNameLookupForCxxDecl(const Decl *decl) {
 
   // We only need to look for the real parent module when the existing parent
   // is the imported header module.
-  if (!parentModule->isClangHeaderImportModule()) {
+  if (!parentModule->isClangBridgingHeaderImportModule()) {
     if (isClonedMember)
       return parentModule;
     return nullptr;
@@ -1282,6 +1283,18 @@ getExplicitSafetyFromAttrs(const Decl *decl) {
   return std::nullopt;
 }
 
+/// Look at the attributes to determine whether uses of the declaration must
+/// always be acknowledged, if the attributes specify its safety at all.
+static std::optional<bool> isAlwaysUnsafeFromAttrs(const Decl *decl) {
+  if (auto *attr = decl->getAttrs().getAttribute<UnsafeAttr>())
+    return attr->isAlways();
+
+  if (decl->getAttrs().hasAttribute<SafeAttr>())
+    return false;
+
+  return std::nullopt;
+}
+
 ExplicitSafety Decl::getExplicitSafety() const {
   // Check the attributes on the declaration itself.
   if (auto safety = getExplicitSafetyFromAttrs(this))
@@ -1323,6 +1336,46 @@ ExplicitSafety Decl::getExplicitSafety() const {
   }
 
   return ExplicitSafety::Unspecified;
+}
+
+bool Decl::isAlwaysUnsafe() const {
+  // Check the attributes on the declaration itself.
+  if (auto always = isAlwaysUnsafeFromAttrs(this))
+    return *always;
+
+  // A declaration imported from C is only ever always-unsafe by way of an
+  // explicit swift_attr("unsafe(always)"), which the ClangImporter turns into
+  // an '@unsafe(always)' attribute handled above. Unsafety that the importer
+  // infers (e.g., from a record's fields) is never always-unsafe.
+  if (getClangDecl())
+    return false;
+
+  // Inference: Check the enclosing context, unless this is a type.
+  if (!isa<TypeDecl>(this)) {
+    if (auto enclosingDC = getDeclContext()) {
+      // Is this an extension with @safe or @unsafe on it?
+      if (auto ext = dyn_cast<ExtensionDecl>(enclosingDC)) {
+        if (auto extAlways = isAlwaysUnsafeFromAttrs(ext))
+          return *extAlways;
+      }
+    }
+  }
+
+  // An extension of an unsafe nominal type inherits its strength.
+  if (auto ext = dyn_cast<ExtensionDecl>(this)) {
+    if (auto nominal = ext->getExtendedNominal())
+      if (nominal->getExplicitSafety() == ExplicitSafety::Unsafe)
+        return nominal->isAlwaysUnsafe();
+  }
+
+  // If this is a pattern binding declaration, check the first variable we find.
+  if (auto patternBinding = dyn_cast<PatternBindingDecl>(this)) {
+    for (auto index : range(patternBinding->getNumPatternEntries()))
+      if (auto var = patternBinding->getAnchoringVarDecl(index))
+        return var->isAlwaysUnsafe();
+  }
+
+  return false;
 }
 
 Type AbstractFunctionDecl::getThrownInterfaceType() const {
@@ -2486,6 +2539,11 @@ Decl::getEffectiveCodeGenerationModel() const {
 
   // Otherwise, apply the module-level default.
   return getModuleContext()->codeGenerationModel();
+}
+
+std::optional<StringRef> Decl::getSection() const {
+  return evaluateOrDefault(getASTContext().evaluator,
+                           SectionForDeclRequest{this}, std::nullopt);
 }
 
 PatternBindingDecl::PatternBindingDecl(SourceLoc StaticLoc,
@@ -7430,15 +7488,26 @@ ReferenceCounting ClassDecl::getObjectModel() const {
   return ReferenceCounting::Native;
 }
 
-bool ClassDecl::isCOMObject() const {
+const COMDeclInfo *NominalTypeDecl::getCOMDeclInfo() const {
   // COM is only in play when the experimental interop is enabled; keep the
   // common case free and never touch the evaluator cache for it.
   if (!getASTContext().LangOpts.EnableCOMInterop)
-    return false;
+    return nullptr;
 
-  auto *mutableThis = const_cast<ClassDecl *>(this);
+  auto *mutableThis = const_cast<NominalTypeDecl *>(this);
   return evaluateOrDefault(getASTContext().evaluator,
-                           IsCOMObjectRequest{mutableThis}, false);
+                           COMDeclInfoRequest{mutableThis}, nullptr);
+}
+
+const COMInterfaceHierarchy *ProtocolDecl::getCOMInterfaceHierarchy() const {
+  // Preserve the non-COM fast path and, in particular, do not make early COM
+  // identity lookup resolve protocol inheritance.
+  if (!isCOMInterface())
+    return nullptr;
+
+  auto *mutableThis = const_cast<ProtocolDecl *>(this);
+  return evaluateOrDefault(getASTContext().evaluator,
+                           COMInterfaceHierarchyRequest{mutableThis}, nullptr);
 }
 
 EnumCaseDecl *EnumCaseDecl::create(SourceLoc CaseLoc,
@@ -11229,6 +11298,16 @@ ParamDecl *AbstractFunctionDecl::getImplicitSelfDecl(bool createIfNeeded) {
     (*selfDecl)->setAddressable(true);
   }
   return *selfDecl;
+}
+
+bool AbstractFunctionDecl::hasSelfInLifetimeDependenceIndices() const {
+  return isInstanceMethod() &&
+         !isa_and_nonnull<clang::CXXConstructorDecl>(getClangDecl());
+}
+
+unsigned AbstractFunctionDecl::getLifetimeDependenceResultIndex() const {
+  return getParameters()->size() +
+         (hasSelfInLifetimeDependenceIndices() ? 1 : 0);
 }
 
 void AbstractFunctionDecl::setParameters(ParameterList *BodyParams) {

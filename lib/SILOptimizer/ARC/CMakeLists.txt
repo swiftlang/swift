@@ -1,6 +1,5 @@
 target_sources(swiftSILOptimizer PRIVATE
   ARCBBState.cpp
-  ARCLoopOpts.cpp
   ARCMatchingSet.cpp
   ARCRegionState.cpp
   ARCSequenceOpts.cpp

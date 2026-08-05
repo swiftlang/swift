@@ -339,9 +339,18 @@ namespace swift {
     /// may override it. `ISwiftObject` is compiler-managed under every model.
     enum class COMInteropModel {
       Microsoft,      ///< Microsoft COM: `IUnknown` root.
-      CoreFoundation, ///< CoreFoundation CFPlugIn: `IUnknown` root.
+      CoreFoundation, ///< CoreFoundation CFPlugIn: no protocol root.
     };
     std::optional<COMInteropModel> COMModel = std::nullopt;
+
+    /// Return the compiler-owned conditional-compilation identifier for the
+    /// selected COM interop model, or an empty string when COM interop is
+    /// disabled.
+    StringRef getCOMInteropModelConditionalCompilationFlag() const;
+
+    /// Whether \p Name is reserved for a COM interop model's
+    /// conditional-compilation identifier.
+    static bool isCOMInteropModelConditionalCompilationFlag(StringRef Name);
 
     /// Enable C++ interop code generation and build configuration
     /// options. Disabled by default because there is no way to control the

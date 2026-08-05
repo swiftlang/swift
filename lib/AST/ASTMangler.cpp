@@ -2351,6 +2351,9 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn,
     break;
   }
 
+  if (fn->isCalledOnce())
+    OpArgs.push_back('O');
+
   // Differentiability kind.
   auto diffKind = fn->getExtInfo().getDifferentiabilityKind();
   if (diffKind != DifferentiabilityKind::NonDifferentiable) {
@@ -2904,6 +2907,12 @@ void ASTMangler::appendProtocolName(const ProtocolDecl *protocol,
     return;
   }
 
+  // As we're mangling a plain (non-symbolic) name for this protocol,
+  // the enclosing context mangled below must not use a symbolic
+  // reference either so that it will be resolvable at
+  // runtime. Temporarily disable symbolic references.
+  llvm::SaveAndRestore<bool> X(AllowSymbolicReferences, false);
+
   BaseEntitySignature base(protocol);
   appendContextOf(protocol, base);
   auto *clangDecl = protocol->getClangDecl();
@@ -3377,6 +3386,8 @@ void ASTMangler::appendFunctionType(AnyFunctionType *fn, GenericSignature sig,
         return appendOperator("XA");
     } else if (fn->isNoEscape()) {
       return appendOperator("XE");
+    } else if (fn->isCalledOnce()) {
+      return appendOperator("XO");
     }
     return appendOperator("c");
 

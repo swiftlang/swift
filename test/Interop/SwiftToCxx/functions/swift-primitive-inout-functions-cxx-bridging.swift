@@ -4,29 +4,29 @@
 
 // RUN: %check-interop-cxx-header-in-clang(%t/functions.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY)
 
-// CHECK: SWIFT_EXTERN void $s9Functions8inOutIntyySizF(ptrdiff_t * _Nonnull x) SWIFT_NOEXCEPT SWIFT_CALL; // inOutInt(_:)
-// CHECK: SWIFT_EXTERN void $s9Functions11inOutTwoIntyySiz_SiztF(ptrdiff_t * _Nonnull x, ptrdiff_t * _Nonnull y) SWIFT_NOEXCEPT SWIFT_CALL; // inOutTwoInt(_:_:)
-// CHECK: SWIFT_EXTERN void $s9Functions13inOutTwoParamyySbz_SdztF(bool * _Nonnull x, double * _Nonnull y) SWIFT_NOEXCEPT SWIFT_CALL; // inOutTwoParam(_:_:)
-// CHECK: SWIFT_EXTERN void $s9Functions24inoutTypeWithNullabilityyySVzF(void const * _Nonnull * _Nonnull x) SWIFT_NOEXCEPT SWIFT_CALL; // inoutTypeWithNullability(_:)
-// CHECK: SWIFT_EXTERN void $s9Functions25inoutUnsafeGenericPointeryySPys5Int32VGzF(int32_t const * _Nonnull * _Nonnull x) SWIFT_NOEXCEPT SWIFT_CALL; // inoutUnsafeGenericPointer(_:)
+// CHECK: SWIFT_EXTERN void $s9Functions8inOutIntyySizF(ptrdiff_t * _Nonnull SWIFT_NOESCAPE x) SWIFT_NOEXCEPT SWIFT_CALL; // inOutInt(_:)
+// CHECK: SWIFT_EXTERN void $s9Functions11inOutTwoIntyySiz_SiztF(ptrdiff_t * _Nonnull SWIFT_NOESCAPE x, ptrdiff_t * _Nonnull SWIFT_NOESCAPE y) SWIFT_NOEXCEPT SWIFT_CALL; // inOutTwoInt(_:_:)
+// CHECK: SWIFT_EXTERN void $s9Functions13inOutTwoParamyySbz_SdztF(bool * _Nonnull SWIFT_NOESCAPE x, double * _Nonnull SWIFT_NOESCAPE y) SWIFT_NOEXCEPT SWIFT_CALL; // inOutTwoParam(_:_:)
+// CHECK: SWIFT_EXTERN void $s9Functions24inoutTypeWithNullabilityyySVzF(void const * _Nonnull * _Nonnull SWIFT_NOESCAPE x) SWIFT_NOEXCEPT SWIFT_CALL; // inoutTypeWithNullability(_:)
+// CHECK: SWIFT_EXTERN void $s9Functions25inoutUnsafeGenericPointeryySPys5Int32VGzF(int32_t const * _Nonnull * _Nonnull SWIFT_NOESCAPE x) SWIFT_NOEXCEPT SWIFT_CALL; // inoutUnsafeGenericPointer(_:)
 
-// CHECK:      SWIFT_INLINE_THUNK void inOutInt(swift::Int & x) noexcept SWIFT_SYMBOL({{.*}}) {
+// CHECK:      SWIFT_INLINE_THUNK void inOutInt(swift::Int & SWIFT_NOESCAPE x) noexcept SWIFT_SYMBOL({{.*}}) {
 // CHECK-NEXT:   _impl::$s9Functions8inOutIntyySizF(&x);
 // CHECK-NEXT: }
 
-// CHECK:      SWIFT_INLINE_THUNK void inOutTwoInt(swift::Int & x, swift::Int & y) noexcept SWIFT_SYMBOL({{.*}}) {
+// CHECK:      SWIFT_INLINE_THUNK void inOutTwoInt(swift::Int & SWIFT_NOESCAPE x, swift::Int & SWIFT_NOESCAPE y) noexcept SWIFT_SYMBOL({{.*}}) {
 // CHECK-NEXT:   _impl::$s9Functions11inOutTwoIntyySiz_SiztF(&x, &y);
 // CHECK-NEXT: }
 
-// CHECK:      SWIFT_INLINE_THUNK void inOutTwoParam(bool & x, double & y) noexcept SWIFT_SYMBOL({{.*}}) {
+// CHECK:      SWIFT_INLINE_THUNK void inOutTwoParam(bool & SWIFT_NOESCAPE x, double & SWIFT_NOESCAPE y) noexcept SWIFT_SYMBOL({{.*}}) {
 // CHECK-NEXT:   _impl::$s9Functions13inOutTwoParamyySbz_SdztF(&x, &y);
 // CHECK-NEXT: }
 
-// CHECK:      SWIFT_INLINE_THUNK void inoutTypeWithNullability(void const * _Nonnull & x) noexcept SWIFT_SYMBOL({{.*}}) {
+// CHECK:      SWIFT_INLINE_THUNK void inoutTypeWithNullability(void const * _Nonnull & SWIFT_NOESCAPE x) noexcept SWIFT_SYMBOL({{.*}}) {
 // CHECK-NEXT:   _impl::$s9Functions24inoutTypeWithNullabilityyySVzF(&x);
 // CHECK-NEXT: }
 
-// CHECK:      SWIFT_INLINE_THUNK void inoutUnsafeGenericPointer(int32_t const * _Nonnull & x) noexcept SWIFT_SYMBOL({{.*}}) {
+// CHECK:      SWIFT_INLINE_THUNK void inoutUnsafeGenericPointer(int32_t const * _Nonnull & SWIFT_NOESCAPE x) noexcept SWIFT_SYMBOL({{.*}}) {
 // CHECK-NEXT:   _impl::$s9Functions25inoutUnsafeGenericPointeryySPys5Int32VGzF(&x);
 // CHECK-NEXT: }
 

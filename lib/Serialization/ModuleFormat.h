@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 1013; // default requirement derivatives
+const uint16_t SWIFTMODULE_VERSION_MINOR = 1016; // @unsafe(always)
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -1411,7 +1411,8 @@ namespace decls_block {
     TypeIDField,                     // thrown error
     DifferentiabilityKindField,      // differentiability kind
     FunctionTypeIsolationField,      // isolation
-    BCFixed<1>                       // has sending result
+    BCFixed<1>,                      // has sending result
+    BCFixed<1>                       // called once
     // trailed by parameters
     // Optionally lifetime dependence info
   );
@@ -1512,7 +1513,8 @@ namespace decls_block {
     TypeIDField,                     // thrown error
     DifferentiabilityKindField,      // differentiability kind
     FunctionTypeIsolationField,      // isolation
-    BCFixed<1>,                      // has sending result
+    BCFixed<1>,                      // has sending result,
+    BCFixed<1>,                      // called once
     GenericSignatureIDField          // generic signature
 
     // trailed by parameters
@@ -1529,6 +1531,7 @@ namespace decls_block {
     BCFixed<1>,                         // pseudogeneric?
     BCFixed<1>,                         // noescape?
     BCFixed<1>,                         // unimplementable?
+    BCFixed<1>,                         // @called(once)?
     SILFunctionTypeIsolationField,      // isolation
     DifferentiabilityKindField,         // differentiability kind
     BCFixed<1>,                         // error result?
@@ -2320,6 +2323,7 @@ namespace decls_block {
   using SectionDeclAttrLayout = BCRecordLayout<
     Section_DECL_ATTR,
     BCFixed<1>, // implicit flag
+    BCFixed<1>, // default flag
     BCBlob      // _section
   >;
 
@@ -2674,6 +2678,12 @@ namespace decls_block {
                      BCFixed<1>  // implicit flag
                      >;
 
+  using UnsafeDeclAttrLayout =
+      BCRecordLayout<Unsafe_DECL_ATTR,
+                     BCFixed<1>, // whether this is '@unsafe(always)'
+                     BCFixed<1>  // implicit flag
+                     >;
+
   using MacroRoleDeclAttrLayout = BCRecordLayout<
     MacroRole_DECL_ATTR,
     BCFixed<1>,                // implicit flag
@@ -2708,6 +2718,11 @@ namespace decls_block {
                                            BCFixed<1>,  // interface
                                            BCFixed<3>,  // threading model
                                            BCBlob>;     // IID/CLSID
+
+  using CalledDeclAttrLayout = BCRecordLayout<
+    Called_DECL_ATTR,
+    BCFixed<2> // execution semantics
+  >;
 
   // clang-format on
 

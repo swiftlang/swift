@@ -2494,10 +2494,10 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
     if (getContext().LangOpts.EnableWorkaroundBrokenModules &&
         errorKind == ModularizationError::Kind::DeclMoved &&
         (baseModule->findUnderlyingClangModule() ||
-         baseModule->isClangHeaderImportModule()) &&
+         baseModule->isClangBridgingHeaderImportModule()) &&
         foundIn->findUnderlyingClangModule() &&
         !values.empty()) {
-      if (baseModule->isClangHeaderImportModule()) {
+      if (baseModule->isClangBridgingHeaderImportModule()) {
         // C++ namespaces are placed in the '__ObjC' header import module
         // but are found in their actual Clang module during deserialization.
         // This is expected, so recover silently.
@@ -6677,6 +6677,15 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
         break;
       }
 
+      case decls_block::Unsafe_DECL_ATTR: {
+        bool isAlways{};
+        bool isImplicit{};
+        serialization::decls_block::UnsafeDeclAttrLayout::readRecord(
+            scratch, isAlways, isImplicit);
+        Attr = new (ctx) UnsafeAttr({}, {}, isAlways, isImplicit);
+        break;
+      }
+
       case decls_block::MacroRole_DECL_ATTR: {
         bool isImplicit;
         uint8_t rawMacroSyntax;
@@ -6736,9 +6745,12 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
 
       case decls_block::Section_DECL_ATTR: {
         bool isImplicit;
+        bool isDefault;
         serialization::decls_block::SectionDeclAttrLayout::readRecord(
-            scratch, isImplicit);
-        Attr = new (ctx) SectionAttr(blobData, isImplicit);
+            scratch, isImplicit, isDefault);
+        Attr = new (ctx) SectionAttr(
+            isDefault ? std::nullopt : std::optional<StringRef>(blobData),
+            isImplicit);
         break;
       }
 
@@ -7457,7 +7469,7 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
                                            StringRef blobData, bool isGeneric) {
   TypeID resultID;
   uint8_t rawRepresentation, rawDiffKind;
-  bool noescape = false, sendable, async, throws, hasSendingResult;
+  bool noescape = false, sendable, async, throws, hasSendingResult, calledOnce;
   TypeID thrownErrorID;
   GenericSignature genericSig;
   TypeID clangTypeID;
@@ -7467,12 +7479,12 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
     decls_block::FunctionTypeLayout::readRecord(
         scratch, resultID, rawRepresentation, clangTypeID, noescape, sendable,
         async, throws, thrownErrorID, rawDiffKind, rawIsolation,
-        hasSendingResult);
+        hasSendingResult, calledOnce);
   } else {
     GenericSignatureID rawGenericSig;
     decls_block::GenericFunctionTypeLayout::readRecord(
         scratch, resultID, rawRepresentation, sendable, async, throws,
-        thrownErrorID, rawDiffKind, rawIsolation, hasSendingResult,
+        thrownErrorID, rawDiffKind, rawIsolation, hasSendingResult, calledOnce,
         rawGenericSig);
     genericSig = MF.getGenericSignature(rawGenericSig);
     clangTypeID = 0;
@@ -7525,7 +7537,7 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
   auto info = FunctionType::ExtInfoBuilder(
                   *representation, noescape, throws, thrownError, *diffKind,
                   clangFunctionType, isolation,
-                  /*LifetimeDependenceInfo */ {}, hasSendingResult)
+                  /*LifetimeDependenceInfo */ {}, hasSendingResult, calledOnce)
                   .withSendable(sendable)
                   .withAsync(async)
                   .build();
@@ -8050,6 +8062,7 @@ Expected<Type> DESERIALIZE_TYPE(SIL_FUNCTION_TYPE)(
   bool unimplementable;
   bool sendable;
   bool noescape;
+  bool calledOnce;
   uint8_t rawIsolation;
   bool hasErrorResult;
   unsigned numParams;
@@ -8064,7 +8077,7 @@ Expected<Type> DESERIALIZE_TYPE(SIL_FUNCTION_TYPE)(
   decls_block::SILFunctionTypeLayout::readRecord(
       scratch, sendable, async, rawCoroutineKind, rawCalleeConvention,
       rawRepresentation, pseudogeneric, noescape, unimplementable,
-      rawIsolation, rawDiffKind, hasErrorResult,
+      calledOnce, rawIsolation, rawDiffKind, hasErrorResult,
       numParams, numYields, numResults, rawInvocationGenericSig,
       rawInvocationSubs, rawPatternSubs, clangFunctionTypeID, variableData);
 
@@ -8090,11 +8103,12 @@ Expected<Type> DESERIALIZE_TYPE(SIL_FUNCTION_TYPE)(
   if (!isolation)
     return MF.diagnoseFatal();
 
-  auto extInfo = SILFunctionType::ExtInfoBuilder(
-                     *representation, pseudogeneric, noescape, sendable, async,
-                     unimplementable, *isolation, *diffKind, clangFunctionType,
-                     /*LifetimeDependenceInfo*/ {})
-                     .build();
+  auto extInfo =
+      SILFunctionType::ExtInfoBuilder(
+          *representation, pseudogeneric, noescape, sendable, async,
+          unimplementable, calledOnce, *isolation, *diffKind, clangFunctionType,
+          /*LifetimeDependenceInfo*/ {})
+          .build();
 
   // Process the coroutine kind.
   auto coroutineKind = getActualSILCoroutineKind(rawCoroutineKind);

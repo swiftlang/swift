@@ -1,6 +1,5 @@
 // RUN: %target-run-stdlib-swift
 // REQUIRES: executable_test
-// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 import StdlibUnittest
 

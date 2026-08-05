@@ -19,8 +19,15 @@
 
 #include "swift/ABI/Executor.h"
 #include "swift/ABI/HeapObject.h"
-#include "swift/ABI/Metadata.h"
 #include "swift/ABI/MetadataValues.h"
+// The full Metadata.h is only needed for ResultTypeInfo's non-embedded
+// representation below, which calls value witness methods on Metadata.
+// Everywhere else in this header, Metadata/HeapMetadata are used as opaque
+// pointers, satisfied by the forward declarations in MetadataValues.h and
+// HeapObject.h.
+#if !SWIFT_CONCURRENCY_EMBEDDED
+#include "swift/ABI/Metadata.h"
+#endif
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/VoucherShims.h"
 
@@ -34,8 +41,7 @@
 #include "swift/Basic/STLExtras.h"
 #include "swift/Threading/ConditionVariable.h"
 #include "swift/Threading/Mutex.h"
-#include "bitset"
-#include "queue" // TODO: remove and replace with our own mpsc
+#include "llvm/ADT/PointerIntPair.h"
 
 // Does the runtime integrate with libdispatch?
 #if defined(SWIFT_CONCURRENCY_USES_DISPATCH)
@@ -779,6 +785,18 @@ public:
   private:
     TaskGroup* Group;
 
+    /// The next task in the intrusive singly-linked list of tasks that have
+    /// completed and are ready to be consumed by the owning group's ready
+    /// queue, in FIFO order, with the low bit stealing storage for whether
+    /// this task completed with an error (the ready queue only has access
+    /// to the task itself, not the group's own bookkeeping, when dequeuing).
+    /// A task-group child is only ever offered to (and thus only ever
+    /// linked into the ready queue of) its own group, and only once, so
+    /// it's safe to store this link directly in the task rather than in a
+    /// separately allocated queue node. Only meaningful while this task is
+    /// actually enqueued; see `NaiveTaskGroupQueue` in TaskGroup.cpp.
+    llvm::PointerIntPair<AsyncTask *, 1, bool> NextReadyTaskAndErrorFlag;
+
     friend class AsyncTask;
     friend class TaskGroup;
 
@@ -789,6 +807,20 @@ public:
     /// Return the group this task should offer into when it completes.
     TaskGroup* getGroup() {
       return Group;
+    }
+
+    AsyncTask *getNextReadyTask() const {
+      return NextReadyTaskAndErrorFlag.getPointer();
+    }
+    void setNextReadyTask(AsyncTask *task) {
+      NextReadyTaskAndErrorFlag.setPointer(task);
+    }
+
+    bool getReadyHadErrorResult() const {
+      return NextReadyTaskAndErrorFlag.getInt();
+    }
+    void setReadyHadErrorResult(bool hadError) {
+      NextReadyTaskAndErrorFlag.setInt(hadError);
     }
   };
 

@@ -1,6 +1,5 @@
 // RUN: %target-run-simple-swift(-strict-memory-safety)
 // REQUIRES: executable_test
-// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 import StdlibUnittest
 import SwiftShims

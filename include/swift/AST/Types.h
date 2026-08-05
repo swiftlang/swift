@@ -19,6 +19,7 @@
 #define SWIFT_TYPES_H
 
 #include "swift/AST/ASTAllocated.h"
+#include "swift/AST/AttrKind.h"
 #include "swift/AST/AutoDiff.h"
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/DiagnosticEngine.h"
@@ -405,8 +406,8 @@ class alignas(1 << TypeAlignInBits) TypeBase
   }
 
 protected:
-  enum { NumAFTExtInfoBits = 16 };
-  enum { NumSILExtInfoBits = 15 };
+  enum { NumAFTExtInfoBits = 17 };
+  enum { NumSILExtInfoBits = 16 };
 
   // clang-format off
   union { uint64_t OpaqueBits;
@@ -769,6 +770,19 @@ public:
   bool isUnsafe() const {
     return getRecursiveProperties().isUnsafe();
   }
+
+  /// Find a type involved in this type whose declaration the given predicate
+  /// accepts, if there is one.
+  ///
+  /// This does not consider the "parent" types of a nominal type: the unsafety
+  /// of an enclosing type does not rub off on a type nested inside it. It does
+  /// consider generic arguments.
+  Type findUnsafeType(
+      llvm::function_ref<bool(NominalTypeDecl *)> isUnsafeDecl) const;
+
+  /// Find a type involved in this type that was marked '@unsafe(always)', if
+  /// there is one.
+  Type findAlwaysUnsafeType() const;
 
   /// Determine whether the type involves a primary, pack or local archetype.
   bool hasArchetype() const {
@@ -4027,6 +4041,8 @@ public:
     return getExtInfo().getDifferentiabilityKind();
   }
 
+  bool isCalledOnce() const { return getExtInfo().isCalledOnce(); }
+
   /// Returns a new function type exactly like this one but with the ExtInfo
   /// replaced.
   AnyFunctionType *withExtInfo(ExtInfo info) const;
@@ -5501,6 +5517,7 @@ public:
   bool isSendable() const { return getExtInfo().isSendable(); }
   bool isUnimplementable() const { return getExtInfo().isUnimplementable(); }
   bool isAsync() const { return getExtInfo().isAsync(); }
+  bool isCalledOnce() const { return getExtInfo().isCalledOnce(); }
   bool hasNonisolatedNonsendingIsolation() const {
     return getExtInfo().hasNonisolatedNonsendingIsolation();
   }

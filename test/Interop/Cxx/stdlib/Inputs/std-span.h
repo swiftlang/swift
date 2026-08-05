@@ -74,7 +74,7 @@ struct DependsOnSelf {
 // CHECK:     struct DependsOnSelf {
 // CHECK:       @safe borrowing func get() -> ConstSpanOfInt
 // CHECK-LEGACY:       @_lifetime(borrow self)
-// CHECK-LEGACY-NEXT:  @_alwaysEmitIntoClient @_disfavoredOverload public borrowing func get() -> Span<CInt>
+// CHECK-LEGACY-NEXT:  @safe @_alwaysEmitIntoClient @_disfavoredOverload public borrowing func get() -> Span<CInt>
 // CHECK:     }
 
 inline struct SpanBox getStructSpanBox() { return {iarray, iarray, sarray, sarray}; }

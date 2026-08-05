@@ -36,6 +36,7 @@ namespace swift {
 class AnyPattern;
 class ASTContext;
 class ASTWalker;
+class AvailabilityScope;
 class AvailabilitySpec;
 class Decl;
 class DeclContext;
@@ -516,6 +517,10 @@ class alignas(8) PoundAvailableInfo final :
   /// The type-checked availability query information.
   std::optional<const AvailabilityQuery> Query;
 
+  /// The availability scope that the query introduces for the code that it
+  /// guards, or `nullptr` if it does not refine availability.
+  AvailabilityScope *IntroducedScope = nullptr;
+
   struct {
     unsigned isInvalid : 1;
 
@@ -567,6 +572,18 @@ public:
   }
   void setAvailabilityQuery(const AvailabilityQuery &query) {
     Query.emplace(query);
+  }
+
+  /// Returns the availability scope that this query introduces for the code
+  /// that it guards. Returns `nullptr` if the query does not refine
+  /// availability, which is the case when the availability that it checks for is
+  /// already guaranteed at the position that the query appears in, and for
+  /// statements that haven't been type-checked.
+  AvailabilityScope *getIntroducedAvailabilityScope() const {
+    return IntroducedScope;
+  }
+  void setIntroducedAvailabilityScope(AvailabilityScope *scope) {
+    IntroducedScope = scope;
   }
 
   bool isUnavailability() const { return Flags.isUnavailability; }

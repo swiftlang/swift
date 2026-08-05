@@ -362,7 +362,7 @@ public:
   bool SkipUnderscoredSystemProtocols = false;
 
   /// Whether to skip unsafe C++ class methods that were renamed
-  /// (e.g. __fooUnsafe). See IsSafeUseOfCxxDecl.
+  /// (e.g. __fooUnsafe).
   bool SkipUnsafeCXXMethods = false;
 
   /// Whether to skip extensions that don't add protocols or no members.
@@ -426,6 +426,9 @@ public:
 
   /// Suppress @inline(always) attribute and emit @inline(__always) instead.
   bool SuppressInlineAlways = false;
+
+  /// Suppress the argument of @unsafe(always) and emit @unsafe instead.
+  bool SuppressUnsafeAlways = false;
 
   /// Suppress printing of ~Sendable in inheritance and requirement lists.
   bool SuppressTildeSendable = false;

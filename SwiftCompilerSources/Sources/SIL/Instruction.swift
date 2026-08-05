@@ -704,7 +704,7 @@ public protocol DebugVariableInstruction : VarDeclInstruction {
 @_semantics("fast_cast")
 public protocol MetaInstruction: Instruction {}
 
-final public class DebugValueInst : Instruction, UnaryInstruction, DebugVariableInstruction, MetaInstruction {
+final public class DebugValueInst : Instruction, DebugVariableInstruction, MetaInstruction {
   public var varDecl: VarDecl? {
     bridged.DebugValue_getDecl().getAs(VarDecl.self)
   }
@@ -721,10 +721,10 @@ final public class DebugValueInst : Instruction, UnaryInstruction, DebugVariable
     bridged.DebugValue_getOrCreateDebugReconstructionBlock().block
   }
 
-  public func stripDeref() { bridged.DebugValue_stripDeref() }
-  public func prependDeref() { bridged.DebugValue_prependDeref() }
-  public func killOperand(withType type: Type? = nil) {
-    bridged.DebugValue_killOperand(type?.bridged ?? BridgedType())
+  public func stripDeref(index: Int) { bridged.DebugValue_stripDeref(index) }
+  public func prependDeref(index: Int) { bridged.DebugValue_prependDeref(index) }
+  public func killOperand(index: Int, withType type: Type? = nil) {
+    bridged.DebugValue_killOperand(index, type?.bridged ?? BridgedType())
   }
 }
 

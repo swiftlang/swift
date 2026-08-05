@@ -1752,7 +1752,8 @@ NodePointer Demangler::popFunctionParamLabels(NodePointer Type) {
     FuncType = FuncType->getChild(1)->getFirstChild();
 
   if (FuncType->getKind() != Node::Kind::FunctionType &&
-      FuncType->getKind() != Node::Kind::NoEscapeFunctionType)
+      FuncType->getKind() != Node::Kind::NoEscapeFunctionType &&
+      FuncType->getKind() != Node::Kind::CalledOnceFunctionType)
     return nullptr;
 
   unsigned FirstChildIdx = 0;
@@ -2434,6 +2435,9 @@ NodePointer Demangler::demangleImplFunctionType() {
   if (nextIf('N'))
     type->addChild(createNode(Node::Kind::ImplNonisolatedNonsendingIsolation),
                    *this);
+
+  if (nextIf('O'))
+    type->addChild(createNode(Node::Kind::ImplCalledOnceFunction), *this);
 
   switch ((MangledDifferentiabilityKind)peekChar()) {
   case MangledDifferentiabilityKind::Normal:  // 'd'
@@ -3953,6 +3957,8 @@ NodePointer Demangler::demangleSpecialType() {
       return popFunctionType(Node::Kind::ObjCBlock);
     case 'C':
       return popFunctionType(Node::Kind::CFunctionPointer);
+    case 'O':
+      return popFunctionType(Node::Kind::CalledOnceFunctionType);
     case 'g':
     case 'G':
       return demangleExtendedExistentialShape(specialChar);

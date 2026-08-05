@@ -2872,8 +2872,7 @@ namespace {
               if (isUnavailability) {
                 // Invert the result of "at least" check by xor'ing resulting
                 // boolean with `-1`.
-                success =
-                    IGF.Builder.CreateXor(success, IGF.Builder.getIntN(1, -1));
+                success = IGF.Builder.CreateXor(success, IGF.Builder.getTrue());
               }
 
               auto nextCondOrRet = queryIndex == queries.size() - 1
@@ -7701,6 +7700,7 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::ConvertibleFromBytes:
   case KnownProtocolKind::IUnknown:
   case KnownProtocolKind::ISwiftObject:
+  case KnownProtocolKind::COMInterface:
     return SpecialProtocol::None;
   }
 

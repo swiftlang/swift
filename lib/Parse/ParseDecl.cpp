@@ -2910,6 +2910,20 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     break;
   }
 
+  case DeclAttrKind::Unsafe: {
+    // Handle '@unsafe' and '@unsafe(always)'.
+    auto always = parseSingleAttrOption<bool>(
+        *this, Loc, AttrRange, AttrName, DK, {{Context.Id_always, true}},
+        /*valueIfOmitted=*/false);
+    if (!always.has_value())
+      return makeParserSuccess();
+
+    if (!DiscardAttribute)
+      Attributes.add(new (Context) UnsafeAttr(AtLoc, AttrRange, *always));
+
+    break;
+  }
+
   case DeclAttrKind::ReferenceOwnership: {
     // Handle weak/unowned/unowned(unsafe).
     auto Kind = AttrName == "weak" ? ReferenceOwnership::Weak
@@ -3263,20 +3277,25 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       return makeParserSuccess();
     }
 
-    if (Tok.isNot(tok::string_literal)) {
+    std::optional<StringRef> Name;
+    if (consumeIf(tok::kw_default)) {
+      // Leave the name empty to signal '@section(default)'.
+      AttrRange = SourceRange(Loc, Tok.getRange().getStart());
+    } else if (Tok.isNot(tok::string_literal)) {
       diagnose(Loc, diag::attr_expected_string_literal, AttrName);
       return makeParserSuccess();
+    } else {
+      // Parse the name as a string literal.
+      Name = getStringLiteralIfNotInterpolated(
+          Loc, ("'" + AttrName + "'").str());
+
+      consumeToken(tok::string_literal);
+
+      if (Name.has_value())
+        AttrRange = SourceRange(Loc, Tok.getRange().getStart());
+      else
+        DiscardAttribute = true;
     }
-
-    auto Name = getStringLiteralIfNotInterpolated(
-        Loc, ("'" + AttrName + "'").str());
-
-    consumeToken(tok::string_literal);
-
-    if (Name.has_value())
-      AttrRange = SourceRange(Loc, Tok.getRange().getStart());
-    else
-      DiscardAttribute = true;
 
     if (!consumeIf(tok::r_paren)) {
       diagnose(Loc, diag::attr_expected_rparen, AttrName,
@@ -3284,19 +3303,19 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       return makeParserSuccess();
     }
 
-    // @section in a local scope is not allowed.
-    if (CurDeclContext->isLocalContext()) {
-      diagnose(Loc, diag::attr_name_only_at_non_local_scope, AttrName);
-    }
-
+    // @section in a local scope is only allowed on functions and closures,
+    // which is checked in Sema.
     if (!DiscardAttribute)
-      Attributes.add(new (Context) SectionAttr(Name.value(), AtLoc,
+      Attributes.add(new (Context) SectionAttr(Name, AtLoc,
                                                AttrRange, /*Implicit=*/false));
 
     break;
   }
 
   case DeclAttrKind::Diagnose: {
+    // Record that this file carries a syntactic warning control.
+    SF.setHasWarningControlAttr();
+
     if (!consumeIfAttributeLParen()) {
       diagnose(Loc, diag::attr_expected_lparen, AttrName,
                DeclAttribute::isDeclModifier(DK));
@@ -4345,6 +4364,19 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
 
     break;
   }
+
+  case DeclAttrKind::Called: {
+    auto semantics = parseSingleAttrOption<ExecutionSemantics>(
+        *this, Loc, AttrRange, AttrName, DK,
+        {{Context.Id_once, ExecutionSemantics::Once}});
+    if (!semantics)
+      return makeParserSuccess();
+
+    if (!DiscardAttribute)
+      Attributes.add(new (Context) CalledAttr(AtLoc, AttrRange, *semantics));
+
+    break;
+  }
   }
 
   if (DuplicateAttribute) {
@@ -5300,6 +5332,46 @@ ParserStatus Parser::parseTypeAttribute(TypeOrCustomAttr &result,
                                                         {beginLoc, endLoc},
                                                         {mangling, manglingLoc},
                                                         {index, indexLoc});
+    }
+    return makeParserSuccess();
+  }
+
+  case TypeAttrKind::Called: {
+    SourceLoc lpLoc = Tok.getLoc(), semanticsLoc, rpLoc;
+    if (!consumeIfAttributeLParen()) {
+      if (!justChecking) {
+        diagnose(Tok, diag::attr_expected_lparen);
+      }
+      return makeParserError();
+    }
+
+    bool invalid = false;
+    std::optional<CalledTypeAttr::Semantics> semantics;
+    if (isIdentifier(Tok, "once")) {
+      semanticsLoc = consumeToken(tok::identifier);
+      semantics = CalledTypeAttr::Semantics::Once;
+    } else {
+      if (!justChecking) {
+        diagnose(Tok, diag::attr_called_expected_semantics)
+            .fixItReplace(Tok.getLoc(), "once");
+      }
+      invalid = true;
+      consumeIf(tok::identifier);
+    }
+
+    if (justChecking && !Tok.is(tok::r_paren))
+      return makeParserError();
+    if (parseMatchingToken(tok::r_paren, rpLoc,
+                           diag::attr_called_expected_rparen, lpLoc))
+      return makeParserError();
+
+    if (invalid)
+      return makeParserError();
+    assert(semantics);
+
+    if (!justChecking) {
+      result = new (Context) CalledTypeAttr(AtLoc, attrLoc, {lpLoc, rpLoc},
+                                            {*semantics, semanticsLoc});
     }
     return makeParserSuccess();
   }

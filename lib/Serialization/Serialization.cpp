@@ -763,7 +763,7 @@ IdentifierID Serializer::addContainingModuleRef(const DeclContext *DC,
     return CURRENT_MODULE_ID;
   if (M == this->M->getASTContext().TheBuiltinModule)
     return BUILTIN_MODULE_ID;
-  if (M->isClangHeaderImportModule())
+  if (M->isClangBridgingHeaderImportModule())
     return OBJC_HEADER_MODULE_ID;
 
   // Reject references to hidden dependencies.
@@ -3064,6 +3064,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     case DeclAttrKind::PrivateImport:
     case DeclAttrKind::AllowFeatureSuppression:
     case DeclAttrKind::Diagnose:
+    case DeclAttrKind::Called:
       llvm_unreachable("cannot serialize attribute");
 
 #define SIMPLE_DECL_ATTR(_, CLASS, ...)                                        \
@@ -3581,9 +3582,10 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     case DeclAttrKind::Section: {
       auto *theAttr = cast<SectionAttr>(DA);
       auto abbrCode = S.DeclTypeAbbrCodes[SectionDeclAttrLayout::Code];
-      SectionDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-                                           theAttr->isImplicit(),
-                                           theAttr->Name);
+      bool isDefault = theAttr->isDefault();
+      SectionDeclAttrLayout::emitRecord(
+          S.Out, S.ScratchRecord, abbrCode, theAttr->isImplicit(), isDefault,
+          isDefault ? StringRef() : *theAttr->Name);
       return;
     }
 
@@ -3620,6 +3622,15 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       InheritActorContextDeclAttrLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode,
           static_cast<uint8_t>(theAttr->getModifier()), theAttr->isImplicit());
+      return;
+    }
+
+    case DeclAttrKind::Unsafe: {
+      auto *theAttr = cast<UnsafeAttr>(DA);
+      auto abbrCode = S.DeclTypeAbbrCodes[UnsafeDeclAttrLayout::Code];
+      UnsafeDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                       theAttr->isAlways(),
+                                       theAttr->isImplicit());
       return;
     }
 
@@ -6180,7 +6191,8 @@ public:
         S.addTypeRef(fnTy->getThrownError()),
         getRawStableDifferentiabilityKind(fnTy->getDifferentiabilityKind()),
         isolation,
-        fnTy->hasSendingResult());
+        fnTy->hasSendingResult(),
+        fnTy->isCalledOnce());
 
     serializeFunctionTypeParams(fnTy);
 
@@ -6202,7 +6214,7 @@ public:
         fnTy->isSendable(), fnTy->isAsync(), fnTy->isThrowing(),
         S.addTypeRef(fnTy->getThrownError()),
         getRawStableDifferentiabilityKind(fnTy->getDifferentiabilityKind()),
-        isolation, fnTy->hasSendingResult(),
+        isolation, fnTy->hasSendingResult(), fnTy->isCalledOnce(),
         S.addGenericSignatureRef(genericSig));
 
     serializeFunctionTypeParams(fnTy);
@@ -6290,10 +6302,10 @@ public:
 
     unsigned abbrCode = S.DeclTypeAbbrCodes[SILFunctionTypeLayout::Code];
     SILFunctionTypeLayout::emitRecord(
-        S.Out, S.ScratchRecord, abbrCode, fnTy->isSendable(),
-        fnTy->isAsync(), stableCoroutineKind, stableCalleeConvention,
-        stableRepresentation, fnTy->isPseudogeneric(), fnTy->isNoEscape(),
-        fnTy->isUnimplementable(), fnTy->getIsolation().getKind(),
+        S.Out, S.ScratchRecord, abbrCode, fnTy->isSendable(), fnTy->isAsync(),
+        stableCoroutineKind, stableCalleeConvention, stableRepresentation,
+        fnTy->isPseudogeneric(), fnTy->isNoEscape(), fnTy->isUnimplementable(),
+        fnTy->isCalledOnce(), fnTy->getIsolation().getKind(),
         stableDiffKind, fnTy->hasErrorResult(),
         fnTy->getParameters().size(),
         fnTy->getNumYields(), fnTy->getNumResults(),

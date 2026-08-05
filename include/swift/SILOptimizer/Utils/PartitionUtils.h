@@ -1009,7 +1009,7 @@ public:
   /// then comparing for exact equality.
   ///
   /// Runs in linear time.
-  static bool equals(Partition &fst, Partition &snd) {
+  static bool equals(const Partition &fst, const Partition &snd) {
     fst.canonicalize();
     snd.canonicalize();
 
@@ -1046,21 +1046,24 @@ public:
   /// Assigns \p oldElt to the region associated with \p newElt.
   void assignElement(Element oldElt, Element newElt, bool updateHistory = true);
 
-  bool areElementsInSameRegion(Element firstElt, Element secondElt) {
+  bool areElementsInSameRegion(Element firstElt, Element secondElt) const {
     canonicalize();
     return elementToRegionMap.at(firstElt) == elementToRegionMap.at(secondElt);
   }
 
-  Region getRegion(Element elt) {
+  Region getRegion(Element elt) const {
     canonicalize();
     return elementToRegionMap.at(elt);
   }
 
   using iterator = std::map<Element, Region>::iterator;
+  using const_iterator = std::map<Element, Region>::const_iterator;
 
 private:
   iterator begin() { return elementToRegionMap.begin(); }
   iterator end() { return elementToRegionMap.end(); }
+  const_iterator begin() const { return elementToRegionMap.begin(); }
+  const_iterator end() const { return elementToRegionMap.end(); }
 
 public:
   /// Return an iterator over the element/range in this partition. Will
@@ -1070,7 +1073,7 @@ public:
   /// NOTE: To work with iterators without canonicalizing, please use begin/end
   /// directly. This should only be done internally to the Partition
   /// implementation. We never want to expose
-  llvm::iterator_range<iterator> range() {
+  llvm::iterator_range<const_iterator> range() const {
     canonicalize();
     return {begin(), end()};
   }
@@ -1173,8 +1176,11 @@ public:
   }
 
 private:
+  /// The non-const body behind \c canonicalize.
+  void canonicalizeImpl();
+
   /// Return region if we have it. Will canonicalize the partition b
-  std::optional<Region> maybeGetRegion(Element elt) {
+  std::optional<Region> maybeGetRegion(Element elt) const {
     canonicalize();
     auto iter = elementToRegionMap.find(elt);
     if (iter == elementToRegionMap.end())
@@ -1237,7 +1243,13 @@ private:
   /// partition state to restore this property.
   ///
   /// This runs in linear time.
-  void canonicalize();
+  ///
+  /// Const because canonicalization only relabels regions: it never changes
+  /// which elements share a region, so it does not change what this partition
+  /// means. Being callable on a const partition lets a read-only query run
+  /// against a partition the caller does not own, instead of copying it first
+  /// just to be allowed to ask.
+  void canonicalize() const;
 
   /// Walk the elementToRegionMap updating all elements in the region of \p
   /// targetElement will be changed to now point at \p newRegion.

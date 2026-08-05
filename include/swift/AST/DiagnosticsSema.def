@@ -2244,6 +2244,52 @@ ERROR(attr_com_missing_module, none,
       "'COM' module not imported, required for '@com'", ())
 ERROR(com_module_missing_type, none,
       "type '%0' not found in the 'COM' module", (StringRef))
+ERROR(com_interface_inherits_non_marker, none,
+      "COM interface %0 cannot inherit non-COM, non-marker protocol %1",
+      (DeclName, DeclName))
+ERROR(com_interface_inherits_non_protocol, none,
+      "COM interface %0 cannot inherit non-protocol type %1",
+      (DeclName, Type))
+ERROR(com_interface_multiple_abi_bases, none,
+      "COM interface %0 cannot inherit unrelated COM interfaces %1 and %2",
+      (DeclName, DeclName, DeclName))
+ERROR(com_interface_refinement_requires_identity, none,
+      "protocol %0 refines COM interface %1 and must declare its own "
+      "'@com(interface:)' identity", (DeclName, DeclName))
+ERROR(com_interface_repeated_iid, none,
+      "COM interface %0 and inherited interface %1 use the same interface "
+      "identifier '%2'", (DeclName, DeclName, StringRef))
+ERROR(com_cominterface_existential, none,
+      "'any COMInterface' is invalid because 'COMInterface' does not identify a COM interface",
+      ())
+ERROR(com_existential_multiple_interfaces, none,
+      "COM existential cannot contain interfaces %0 and %1 because neither refines the other",
+      (DeclName, DeclName))
+ERROR(com_existential_non_marker_protocol, none,
+      "COM existential containing interface %0 cannot also contain non-marker protocol %1",
+      (DeclName, DeclName))
+ERROR(com_existential_anyobject, none,
+      "COM existential containing interface %0 cannot also contain 'AnyObject'",
+      (DeclName))
+ERROR(com_existential_superclass, none,
+      "COM existential containing interface %0 cannot also contain class constraint %1",
+      (DeclName, Type))
+ERROR(com_conformance_requires_class, none,
+      "non-class type %0 cannot conform to COM interface %1", (Type, Type))
+ERROR(com_conformance_must_be_in_type_module, none,
+      "conformance of %0 to COM interface %1 must be declared in the same module as %0",
+      (Type, Type))
+ERROR(com_conditional_conformance, none,
+      "conditional conformance of %0 to COM interface %1 is not supported",
+      (Type, Type))
+ERROR(com_actor_implementation, none,
+      "actor %0 cannot provide a COM implementation", (DeclName))
+ERROR(com_non_native_implementation, none,
+      "class %0 cannot provide a COM implementation because it does not use the native Swift object model",
+      (DeclName))
+ERROR(com_generic_activatable_implementation, none,
+      "generic class %0 cannot declare a COM implementation identifier",
+      (DeclName))
 
 ERROR(metatype_extension_com_only, none,
       "protocol metatype extensions are reserved for COM interop", ())
@@ -2506,6 +2552,13 @@ ERROR(originally_definedin_must_not_before_available_version,none,
 WARNING(spi_preferred_over_spi_available,none,
         "symbols that are '@_spi_available' on all platforms should use "
         "'@_spi' instead", ())
+
+// @called(once)
+ERROR(called_once_cannot_be_used_with_borrowing,none,
+      "'@called(once)' cannot be used together with 'borrowing'", ())
+ERROR(called_once_function_type_mismatch,none,
+      "invalid conversion from '@called(once)' function of type %0 "
+      "to function type %1", (Type, Type))
 
 // Alignment attribute
 ERROR(alignment_not_power_of_two,none,
@@ -6205,11 +6258,6 @@ NOTE(shared_state_nonisolated_unsafe,none,
 NOTE(note_actor_isolated_witness,none,
      "%0 %kind1 cannot satisfy %2 requirement",
      (ActorIsolation, const ValueDecl *, ActorIsolation))
-GROUPED_ERROR(actor_cannot_conform_to_global_actor_protocol,ActorConformanceToGlobalActorProtocol,none,
-      "actor %0 cannot conform to global-actor-isolated protocol %1",
-      (Type, Type))
-NOTE(protocol_isolated_to_global_actor_here,none,
-     "%0 is isolated to global actor %1 here", (Type, Type))
 GROUPED_ERROR(conformance_mismatched_isolation,ConformanceIsolation,none,
       "conformance of %0 to %kind1 involves isolation mismatches "
       "and can cause data races",
@@ -6797,6 +6845,9 @@ ERROR(unsupported_convention,none,
 ERROR(invalid_isolated_and_convention_attributes,none,
       "'@convention(%0)' attribute is not allowed on '@isolated' types",
       (StringRef))
+ERROR(invalid_called_and_attr_attributes,none,
+      "%0 attribute is not allowed on '@called' types",
+      (TypeAttribute *))
 GROUPED_ERROR(unreferenced_generic_parameter,NoUsage,NoUsage,
       "generic parameter '%0' is not used in function signature", (StringRef))
 ERROR(non_inferrable_opaque_generic_parameter,none,
@@ -7265,6 +7316,9 @@ ERROR(borrowed_on_objc_protocol_requirement,none,
       "%kindonly0 cannot be '@_borrowed' if it is an '@objc' protocol "
       "requirement",
       (const AbstractStorageDecl *))
+ERROR(objc_borrowing_accessor,none,
+      "'borrow' and 'yielding borrow' accessors are not supported in "
+      "Objective-C", ())
 ERROR(borrowed_with_effect,none,
       "%kindonly0 cannot be '@_borrowed' if it is 'async' or 'throws'",
       (const AccessorDecl *))
@@ -8885,6 +8939,9 @@ ERROR(lifetime_dependence_cannot_infer_kind, none,
 ERROR(lifetime_dependence_cannot_infer_scope_ownership, none,
       "cannot borrow the lifetime of '%0', which has consuming ownership on %1",
       (StringRef, StringRef))
+ERROR(lifetime_dependence_cannot_infer_scope_foreign_by_value, none,
+      "cannot borrow the lifetime of '%0', which is passed by value on %1",
+      (StringRef, StringRef))
 NOTE(lifetime_dependence_cannot_infer_inout_suggest, none,
      "use '@_lifetime(%0: copy %0) to forward the inout dependency",
      (StringRef))
@@ -8978,7 +9035,7 @@ ERROR(safe_and_unsafe_attr,none,
       "%kindbase0 cannot be both '@safe' and '@unsafe'", (const Decl *))
 
 GROUPED_WARNING(unsafe_superclass,StrictMemorySafety,none,
-     "%kindbase0 has superclass involving unsafe type %1", 
+     "%kindbase0 has superclass involving unsafe type %1",
      (const ValueDecl *, Type))
 
 GROUPED_WARNING(conformance_involves_unsafe,StrictMemorySafety,none,
@@ -9003,6 +9060,12 @@ GROUPED_WARNING(unsafe_without_unsafe,StrictMemorySafety,none,
       "expression uses unsafe constructs but is not marked with 'unsafe'", ())
 GROUPED_WARNING(for_unsafe_without_unsafe,StrictMemorySafety,none,
       "for-in loop uses unsafe constructs but is not marked with 'unsafe'", ())
+GROUPED_ERROR(always_unsafe_without_unsafe,AlwaysUnsafe,none,
+      "expression uses constructs that are very hard to use correctly and must "
+      "be marked with 'unsafe'", ())
+GROUPED_ERROR(for_always_unsafe_without_unsafe,AlwaysUnsafe,none,
+      "for-in loop uses constructs that are very hard to use correctly and "
+      "must be marked with 'unsafe'", ())
 GROUPED_WARNING(no_unsafe_in_unsafe,UnnecessaryUnsafe,none,
         "no unsafe operations occur within 'unsafe' expression", ())
 GROUPED_WARNING(no_unsafe_in_unsafe_for,UnnecessaryUnsafe,none,

@@ -786,14 +786,52 @@ private func isClosureApplied(_ closure: Value) -> Bool {
 }
 
 private func checkRecursivelyIfClosureIsApplied(_ closure: Value, _ handledFuncs: inout Set<Function>) -> Bool {
+  let recursionBudget = 8
   for use in closure.uses {
     switch use.instruction {
+
+    case is ConvertFunctionInst,
+         is ConvertEscapeToNoEscapeInst,
+         is MoveValueInst,
+         is CopyValueInst:
+      if checkRecursivelyIfClosureIsApplied(use.instruction as! SingleValueInstruction, &handledFuncs) {
+        return true
+      }
+
+    case let pai as PartialApplyInst:
+      if pai.isPartialApplyOfThunk {
+        // `pai.isPartialApplyOfThunk` implies that the captured closure (`closure` here) is applied in the thunk.
+        // If the thunk closure (`pai` here) is applied by itself as well, the closure captured by
+        // the thunk closure also becomes effectively applied transitively.
+        return checkRecursivelyIfClosureIsApplied(pai, &handledFuncs)
+      }
+
+      guard let callee = pai.referencedFunction,
+            callee.isDefinition,
+            handledFuncs.insert(callee).inserted,
+            handledFuncs.count <= recursionBudget,
+            let calleeArg = pai.calleeArgument(of: use, in: callee)
+      else {
+        continue
+      }
+
+      // Check if the captured closure (`closure` here) is applied in context of wrapper closure (`pai` here).
+      if checkRecursivelyIfClosureIsApplied(calleeArg, &handledFuncs) {
+        // If the wrapper closure (`pai` here) is applied by itself complementary to the captured closure applied
+        // in context of wrapper closure, the captured closure also becomes effectively applied transitively.
+        // For example, treat `%closure1` as applied in `@foo`:
+        //   sil @wrapper(%0, %1, %closure) { apply %closure(%1, %0) }
+        //   sil @foo(%closure1, %arg1, %arg2) {
+        //     %closure2 = partial_apply @wrapper(%closure1)
+        //     apply %closure2(%arg1, %arg2)
+        //   }
+        return checkRecursivelyIfClosureIsApplied(pai, &handledFuncs)
+      }
 
     case let apply as FullApplySite:
       if apply.callee == closure {
         return true
       }
-      let recursionBudget = 8
 
       // Recurse into called function
       if let callee = apply.referencedFunction,
@@ -805,11 +843,6 @@ private func checkRecursivelyIfClosureIsApplied(_ closure: Value, _ handledFuncs
         if checkRecursivelyIfClosureIsApplied(calleeArg, &handledFuncs) {
           return true
         }
-      }
-
-    case is CopyValueInst, is MoveValueInst:
-      if checkRecursivelyIfClosureIsApplied(use.instruction as! SingleValueInstruction, &handledFuncs) {
-        return true
       }
 
     default:
@@ -908,7 +941,7 @@ private extension PartialApplyInst {
   var isPartialApplyOfThunk: Bool {
     if self.numArguments == 1,
       let fun = self.referencedFunction,
-      fun.thunkKind == .reabstractionThunk || fun.thunkKind == .thunk,
+      fun.thunkKind == .reabstractionThunk || fun.isAutodiffSubsetParametersThunk,
       self.arguments[0].type.isLoweredFunction,
       self.arguments[0].type.isReferenceCounted(in: self.parentFunction) || self.callee.type.isThickFunction
     {
@@ -1227,7 +1260,7 @@ private extension Instruction {
     guard let pai = self as? PartialApplyInst,
           pai.argumentOperands.singleElement != nil,
           let function = pai.referencedFunction,
-          function.bridged.isAutodiffSubsetParametersThunk()
+          function.isAutodiffSubsetParametersThunk
     else {
       return nil
     }

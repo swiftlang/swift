@@ -508,6 +508,11 @@ enum class FixKind : uint8_t {
   /// Ignore passing `WritableKeyPath` to `ReferenceWritableKeyPath` mismatch
   /// when trying to access a member using key path dynamic member lookup.
   IgnoreClassRequirementForDynamicMemberLookup,
+
+  /// Ignore an attempt to convert between function types with different
+  /// execution semantics i.e. go from `@called(once)` to a regular function
+  /// type.
+  ExecutionSemanticsMismatch,
 };
 
 enum class FixImpact : unsigned {
@@ -4105,6 +4110,27 @@ public:
   static bool classof(const ConstraintFix *fix) {
     return fix->getKind() ==
            FixKind::IgnoreClassRequirementForDynamicMemberLookup;
+  }
+};
+
+class ExecutionSemanticsMismatch final : public ContextualMismatch {
+  ExecutionSemanticsMismatch(ConstraintSystem &cs, FunctionType *fromType,
+                             FunctionType *toType, ConstraintLocator *locator)
+      : ContextualMismatch(cs, FixKind::ExecutionSemanticsMismatch, fromType,
+                           toType, locator) {}
+
+public:
+  std::string getName() const override { return "drop 'async' attribute"; }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  static ExecutionSemanticsMismatch *create(ConstraintSystem &cs,
+                                            FunctionType *fromType,
+                                            FunctionType *toType,
+                                            ConstraintLocator *locator);
+
+  static bool classof(const ConstraintFix *fix) {
+    return fix->getKind() == FixKind::ExecutionSemanticsMismatch;
   }
 };
 

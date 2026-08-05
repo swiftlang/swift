@@ -1,6 +1,7 @@
 # FIXME: Refactor demangling library so that we aren't pulling sources from
 #        the compiler.
 add_library(swiftDemangling OBJECT
+  "${SwiftCore_SWIFTC_SOURCE_DIR}/lib/Demangling/Ownership.cpp"
   "${SwiftCore_SWIFTC_SOURCE_DIR}/lib/Demangling/Context.cpp"
   "${SwiftCore_SWIFTC_SOURCE_DIR}/lib/Demangling/Demangler.cpp"
   "${SwiftCore_SWIFTC_SOURCE_DIR}/lib/Demangling/ManglingUtils.cpp"

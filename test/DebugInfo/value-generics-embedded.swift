@@ -14,7 +14,7 @@
 
 // CHECK-DAG: ![[ELTS]] = !{![[STORAGE_MEMBER:.*]]}
 // CHECK-DAG: ![[STORAGE_MEMBER]] = !DIDerivedType(tag: DW_TAG_member, name: "_storage",{{.*}}baseType: ![[ARRAY:[0-9]+]], size: 64
-// CHECK-DAG: ![[ARRAY]] = !DICompositeType(tag: DW_TAG_array_type, baseType: ![[ELEMENT_TYPE]], size: 64, elements: ![[SUBRANGES:[0-9]+]])
+// CHECK-DAG: ![[ARRAY]] = !DICompositeType(tag: DW_TAG_array_type, baseType: ![[ELEMENT_TYPE]], size: 64, align: 64, elements: ![[SUBRANGES:[0-9]+]])
 // CHECK-DAG: ![[SUBRANGES]] = !{![[DIM:[0-9]+]]}
 // CHECK-DAG: ![[DIM]] = !DISubrange(count: 1)
 

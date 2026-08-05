@@ -442,20 +442,14 @@ func call_refSubBasic(_ self: InheritRef, _ p: UnsafePointer<CInt>!, _ len: CInt
 }
 
 func call_refNoescape(_ self: InheritRef, _ p: Span<CInt>) {
-  // expected-error@+2{{missing argument for parameter #2 in call}}
-  // expected-error@+1{{cannot convert value of type 'Span<CInt>' (aka 'Span<Int32>') to expected argument type 'UnsafePointer<CInt>' (aka 'UnsafePointer<Int32>')}}
   return self.refNoescape(p)
 }
 
 func call_refBasic(_ self: InheritRef, _ p: UnsafeBufferPointer<CInt>) -> CInt {
-  // expected-error@+2{{missing argument for parameter #2 in call}}
-  // expected-error@+1{{cannot convert value of type 'UnsafeBufferPointer<CInt>' (aka 'UnsafeBufferPointer<Int32>') to expected argument type 'UnsafePointer<CInt>' (aka 'UnsafePointer<Int32>')}}
   return unsafe self.refBasic(p)
 }
 
 func call_refNonconstSelf(_ self: InheritRef, _ p: UnsafeBufferPointer<CInt>) {
-  // expected-error@+2{{missing argument for parameter #2 in call}}
-  // expected-error@+1{{cannot convert value of type 'UnsafeBufferPointer<CInt>' (aka 'UnsafeBufferPointer<Int32>') to expected argument type 'UnsafePointer<CInt>' (aka 'UnsafePointer<Int32>')}}
   return unsafe self.refNonconstSelf(p)
 }
 
@@ -495,8 +489,6 @@ func call_refPrivateSubBasic(_ self: InheritRefPrivate, _ p: UnsafePointer<CInt>
 }
 
 func call_refNoescape(_ self: InheritRefPrivate, _ p: Span<CInt>) {
-  // expected-error@+2{{missing argument for parameter #2 in call}}
-  // expected-error@+1{{cannot convert value of type 'Span<CInt>' (aka 'Span<Int32>') to expected argument type 'UnsafePointer<CInt>' (aka 'UnsafePointer<Int32>')}}
   return self.refNoescape(p)
 }
 
@@ -505,13 +497,9 @@ func call_refNoescape(_ self: InheritRefPrivate, _ p: Span<CInt>) {
 }
 
 func call_refBasic(_ self: InheritRefPrivate, _ p: UnsafeBufferPointer<CInt>) -> CInt {
-  // expected-error@+2{{missing argument for parameter #2 in call}}
-  // expected-error@+1{{cannot convert value of type 'UnsafeBufferPointer<CInt>' (aka 'UnsafeBufferPointer<Int32>') to expected argument type 'UnsafePointer<CInt>' (aka 'UnsafePointer<Int32>')}}
   return unsafe self.refBasic(p)
 }
 
 func call_refNonconstSelf(_ self: InheritRefPrivate, _ p: UnsafeBufferPointer<CInt>) {
-  // expected-error@+2{{missing argument for parameter #2 in call}}
-  // expected-error@+1{{cannot convert value of type 'UnsafeBufferPointer<CInt>' (aka 'UnsafeBufferPointer<Int32>') to expected argument type 'UnsafePointer<CInt>' (aka 'UnsafePointer<Int32>')}}
   return unsafe self.refNonconstSelf(p)
 }

@@ -298,6 +298,9 @@ private enum DwarfError: Error {
   case missingStrOffsetsBase
   case missingLocListsBase
   case unspecifiedAddressSize
+  case badRangeListEntry(Dwarf_Byte)
+  case missingRngListsSection
+  case missingRngListsBase
 }
 
 // .. Dwarf utilities for ImageSource ..........................................
@@ -534,6 +537,7 @@ class DwarfReader<S: DwarfSource & AnyObject> {
   var lineStrSection: ImageSource?
   var strOffsetsSection: ImageSource?
   var rangesSection: ImageSource?
+  var rngListsSection: ImageSource?
   var shouldSwap: Bool
 
   typealias DwarfAbbrev = UInt64
@@ -553,6 +557,7 @@ class DwarfReader<S: DwarfSource & AnyObject> {
     var addrBase: UInt64?
     var strOffsetsBase: UInt64?
     var loclistsBase: UInt64?
+    var rnglistsBase: UInt64?
 
     var abbrevs: [DwarfAbbrev: AbbrevInfo]
 
@@ -595,6 +600,7 @@ class DwarfReader<S: DwarfSource & AnyObject> {
     lineStrSection = source.getDwarfSection(.debugLineStr)
     strOffsetsSection = source.getDwarfSection(.debugStrOffsets)
     rangesSection = source.getDwarfSection(.debugRanges)
+    rngListsSection = source.getDwarfSection(.debugRngLists)
 
     self.source = source
     self.shouldSwap = shouldSwap
@@ -766,6 +772,10 @@ class DwarfReader<S: DwarfSource & AnyObject> {
       if let value = firstPass[.DW_AT_loclists_base],
          case let .sectionOffset(offset) = value {
         unit.loclistsBase = offset
+      }
+      if let value = firstPass[.DW_AT_rnglists_base],
+         case let .sectionOffset(offset) = value {
+        unit.rnglistsBase = offset
       }
       if let value = firstPass[.DW_AT_stmt_list],
          case let .sectionOffset(offset) = value {
@@ -1515,6 +1525,189 @@ class DwarfReader<S: DwarfSource & AnyObject> {
     return attributes
   }
 
+  private func readAddress(
+    at cursor: inout ImageSourceCursor,
+    addressSize: Int
+  ) throws -> Address {
+    switch addressSize {
+      case 4:
+        return Address(maybeSwap(try cursor.read(as: UInt32.self)))
+      case 8:
+        return maybeSwap(try cursor.read(as: UInt64.self))
+      default:
+        throw DwarfError.badAddressSize(addressSize)
+    }
+  }
+
+  private func fetchIndexedAddress(
+    _ index: UInt64,
+    unit: Unit
+  ) throws -> Address {
+    guard let addrSection = addrSection else {
+      throw DwarfError.missingAddrSection
+    }
+    guard let addrBase = unit.addrBase else {
+      throw DwarfError.missingAddrBase
+    }
+
+    switch unit.addressSize {
+      case 4:
+        return Address(maybeSwap(
+          try addrSection.fetch(from: index * 4 + addrBase, as: UInt32.self)))
+      case 8:
+        return maybeSwap(
+          try addrSection.fetch(from: index * 8 + addrBase, as: UInt64.self))
+      default:
+        throw DwarfError.badAddressSize(unit.addressSize)
+    }
+  }
+
+  /// Call `fn` with the (lowPC, highPC) of every range described by a
+  /// `DW_AT_ranges` value, resolving `.debug_rnglists` (DWARF 5+) or
+  /// `.debug_ranges` (DWARF ≤4) as appropriate for `unit`.
+  private func forEachRange(
+    of rangeVal: DwarfValue,
+    unit: Unit,
+    _ fn: (Address, Address) -> ()
+  ) throws {
+    if unit.version >= 5 {
+      guard let rngListsSection = rngListsSection else {
+        throw DwarfError.missingRngListsSection
+      }
+
+      let offset: Address
+      switch rangeVal {
+        case let .sectionOffset(off):
+          offset = off
+        case let .rangeList(index):
+          guard let rnglistsBase = unit.rnglistsBase else {
+            throw DwarfError.missingRngListsBase
+          }
+
+          let entryAddr: Address
+          let rawOffset: UInt64
+          if unit.isDwarf64 {
+            entryAddr = rnglistsBase + index * 8
+            rawOffset = maybeSwap(
+              try rngListsSection.fetch(from: entryAddr, as: UInt64.self))
+          } else {
+            entryAddr = rnglistsBase + index * 4
+            rawOffset = UInt64(maybeSwap(
+              try rngListsSection.fetch(from: entryAddr, as: UInt32.self)))
+          }
+
+          // Entries in the offsets table are relative to the base itself.
+          offset = rnglistsBase + rawOffset
+        default:
+          return
+      }
+
+      var cursor = ImageSourceCursor(source: rngListsSection, offset: offset)
+      var base: Address? = unit.lowPC
+
+      entries: while true {
+        let rawKind = try cursor.read(as: Dwarf_Byte.self)
+        guard let kind = Dwarf_RLE_Entry(rawValue: rawKind) else {
+          throw DwarfError.badRangeListEntry(rawKind)
+        }
+
+        switch kind {
+          case .DW_RLE_end_of_list:
+            break entries
+
+          case .DW_RLE_base_addressx:
+            let ndx = try cursor.readULEB128()
+            base = try fetchIndexedAddress(ndx, unit: unit)
+
+          case .DW_RLE_base_address:
+            base = try readAddress(at: &cursor, addressSize: unit.addressSize)
+
+          case .DW_RLE_startx_endx:
+            let startNdx = try cursor.readULEB128()
+            let endNdx = try cursor.readULEB128()
+            let start = try fetchIndexedAddress(startNdx, unit: unit)
+            let end = try fetchIndexedAddress(endNdx, unit: unit)
+            fn(start, end)
+
+          case .DW_RLE_startx_length:
+            let startNdx = try cursor.readULEB128()
+            let length = try cursor.readULEB128()
+            let start = try fetchIndexedAddress(startNdx, unit: unit)
+            fn(start, start + length)
+
+          case .DW_RLE_offset_pair:
+            let off0 = try cursor.readULEB128()
+            let off1 = try cursor.readULEB128()
+            let theBase = base ?? 0
+            fn(theBase + off0, theBase + off1)
+
+          case .DW_RLE_start_end:
+            let start = try readAddress(at: &cursor, addressSize: unit.addressSize)
+            let end = try readAddress(at: &cursor, addressSize: unit.addressSize)
+            fn(start, end)
+
+          case .DW_RLE_start_length:
+            let start = try readAddress(at: &cursor, addressSize: unit.addressSize)
+            let length = try cursor.readULEB128()
+            fn(start, start + length)
+
+          default:
+            throw DwarfError.badRangeListEntry(rawKind)
+        }
+      }
+    } else {
+      guard let rangesSection = rangesSection else {
+        return
+      }
+
+      let offset: UInt64
+      switch rangeVal {
+        case let .sectionOffset(off):
+          offset = off
+        case let .unsignedInt32(off):
+          offset = UInt64(off)
+        case let .unsignedInt64(off):
+          offset = off
+        default:
+          return
+      }
+
+      var rangeCursor = ImageSourceCursor(source: rangesSection,
+                                          offset: offset)
+      var rangeBase: Address = unit.lowPC ?? 0
+
+      while true {
+        let beginning: Address
+        let ending: Address
+
+        switch unit.addressSize {
+          case 4:
+            beginning = UInt64(maybeSwap(try rangeCursor.read(as: UInt32.self)))
+            ending = UInt64(maybeSwap(try rangeCursor.read(as: UInt32.self)))
+            if beginning == 0xffffffff {
+              rangeBase = ending
+              continue
+            }
+          case 8:
+            beginning = maybeSwap(try rangeCursor.read(as: UInt64.self))
+            ending = maybeSwap(try rangeCursor.read(as: UInt64.self))
+            if beginning == 0xffffffffffffffff {
+              rangeBase = ending
+              continue
+            }
+          default:
+            throw DwarfError.badAddressSize(unit.addressSize)
+        }
+
+        if beginning == 0 && ending == 0 {
+          break
+        }
+
+        fn(beginning + rangeBase, ending + rangeBase)
+      }
+    }
+  }
+
   struct CallSiteInfo {
     var depth: Int
     var rawName: String?
@@ -1634,49 +1827,14 @@ class DwarfReader<S: DwarfSource & AnyObject> {
            filename: filename,
            line: Int(callLine),
            column: Int(callColumn)))
-    } else if let rangeVal = attributes[.DW_AT_ranges],
-              let rangesSection = rangesSection,
-              case let .sectionOffset(offset) = rangeVal,
-              unit.version < 5 {
-      // We don't support .debug_rnglists at present (which is what we'd
-      // have if unit.version is 5 or higher).
-      var rangeCursor = ImageSourceCursor(source: rangesSection,
-                                          offset: offset)
-      var rangeBase: Address = unit.lowPC ?? 0
-
-      while true {
-        let beginning: Address
-        let ending: Address
-
-        switch unit.addressSize {
-          case 4:
-            beginning = UInt64(maybeSwap(try rangeCursor.read(as: UInt32.self)))
-            ending = UInt64(maybeSwap(try rangeCursor.read(as: UInt32.self)))
-            if beginning == 0xffffffff {
-              rangeBase = ending
-              continue
-            }
-          case 8:
-            beginning = maybeSwap(try rangeCursor.read(as: UInt64.self))
-            ending = maybeSwap(try rangeCursor.read(as: UInt64.self))
-            if beginning == 0xffffffffffffffff {
-              rangeBase = ending
-              continue
-            }
-          default:
-            throw DwarfError.badAddressSize(unit.addressSize)
-        }
-
-        if beginning == 0 && ending == 0 {
-          break
-        }
-
+    } else if let rangeVal = attributes[.DW_AT_ranges] {
+      try forEachRange(of: rangeVal, unit: unit) { lowPC, highPC in
         fn(CallSiteInfo(
              depth: depth,
              rawName: rawName,
              name: name,
-             lowPC: beginning + rangeBase,
-             highPC: ending + rangeBase,
+             lowPC: lowPC,
+             highPC: highPC,
              filename: filename,
              line: Int(callLine),
              column: Int(callColumn)))
@@ -1759,6 +1917,15 @@ class DwarfReader<S: DwarfSource & AnyObject> {
            name: name,
            lowPC: lowPC,
            highPC: highPC))
+    } else if let rangeVal = attributes[.DW_AT_ranges] {
+      try forEachRange(of: rangeVal, unit: unit) { lowPC, highPC in
+        fn(FunctionInfo(
+             depth: depth,
+             rawName: rawName,
+             name: name,
+             lowPC: lowPC,
+             highPC: highPC))
+      }
     }
   }
 
@@ -2229,6 +2396,9 @@ public func testDwarfReaderFor(path: String) -> Bool {
     print("Units:")
     print(reader.units)
 
+    print("Functions:")
+    print(reader.functions)
+
     print("Call Sites:")
     print(reader.inlineCallSites)
     return true
@@ -2252,6 +2422,9 @@ public func testDwarfReaderFor(path: String) -> Bool {
         print("  <unnamed>")
       }
     }
+
+    print("Functions:")
+    print(reader.functions)
 
     print("Call Sites:")
     print(reader.inlineCallSites)

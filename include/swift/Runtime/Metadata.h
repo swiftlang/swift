@@ -991,8 +991,14 @@ inline constexpr unsigned swift_getFunctionPointerExtraInhabitantCount() {
 }
 
 /// Return the type name for a given type metadata.
+///
+/// This returns std::string, so it's only usable (and only implemented, in
+/// Casting.cpp) in hosted builds; the embedded Concurrency runtime never
+/// calls it.
+#if __STDC_HOSTED__
 std::string nameForMetadata(const Metadata *type,
                             bool qualified = true);
+#endif
 
 /// Register a block of protocol records for dynamic lookup.
 SWIFT_RUNTIME_EXPORT

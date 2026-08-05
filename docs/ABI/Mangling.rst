@@ -755,6 +755,7 @@ Types
   FUNCTION-KIND ::= 'zC' C-TYPE              // C function pointer / C++ method type with non-canonical C type
   FUNCTION-KIND ::= 'A'                      // @auto_closure function type (escaping)
   FUNCTION-KIND ::= 'E'                      // function type (noescape)
+  FUNCTION-KIND ::= 'O'                      // `@called(once)` function type
 
   C-TYPE ::= NATURAL IDENTIFIER-STRING       // raw Itanium mangling
 
@@ -862,7 +863,7 @@ mangled in to disambiguate.
   impl-function-type ::= type* 'I' FUNC-ATTRIBUTES '_'
   impl-function-type ::= type* generic-signature 'I' FUNC-ATTRIBUTES '_'
 
-  FUNC-ATTRIBUTES ::= PATTERN-SUBS? INVOCATION-SUB? PSEUDO-GENERIC? CALLEE-ESCAPE? ISOLATION? DIFFERENTIABILITY-KIND? CALLEE-CONVENTION FUNC-REPRESENTATION? COROUTINE-KIND? SENDABLE? ASYNC? SENDING-RESULT? (PARAM-CONVENTION PARAM-DIFFERENTIABILITY?)* RESULT-CONVENTION* ('Y' PARAM-CONVENTION)* ('z' RESULT-CONVENTION RESULT-DIFFERENTIABILITY?)?
+  FUNC-ATTRIBUTES ::= PATTERN-SUBS? INVOCATION-SUB? PSEUDO-GENERIC? CALLEE-ESCAPE? ISOLATION? CALLED-ONCE? DIFFERENTIABILITY-KIND? CALLEE-CONVENTION FUNC-REPRESENTATION? COROUTINE-KIND? SENDABLE? ASYNC? SENDING-RESULT? (PARAM-CONVENTION PARAM-DIFFERENTIABILITY?)* RESULT-CONVENTION* ('Y' PARAM-CONVENTION)* ('z' RESULT-CONVENTION RESULT-DIFFERENTIABILITY?)?
 
   PATTERN-SUBS ::= 's'                       // has pattern substitutions
   INVOCATION-SUB ::= 'I'                     // has invocation substitutions
@@ -873,6 +874,10 @@ mangled in to disambiguate.
   ISOLATION ::= 'A'                          // @isolated(any)
 #if SWIFT_RUNTIME_VERSION >= 6.4
   ISOLATION ::= 'N'                          // nonisolated(nonsending)
+#endif
+
+#if SWIFT_RUNTIME_VERSION >= 6.5
+  CALLED-ONCE ::= 'O'                        // @called(once)
 #endif
 
   DIFFERENTIABILITY-KIND ::= 'd'             // @differentiable

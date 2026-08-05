@@ -207,6 +207,10 @@ private:
 
   void verify(const AvailabilityScope *parent, ASTContext &ctx) const;
 
+  AvailabilityScope *findMostRefinedSubContextImpl(
+      SourceLoc Loc, ASTContext &Ctx,
+      llvm::SmallVectorImpl<AvailabilityScope *> *ScopeStack);
+
   AvailabilityScope(ASTContext &Ctx, IntroNode Node, AvailabilityScope *Parent,
                     SourceRange SrcRange, const AvailabilityContext Info);
 
@@ -338,6 +342,14 @@ public:
   /// Returns the innermost AvailabilityScope descendant of this scope
   /// for the given source location.
   AvailabilityScope *findMostRefinedSubContext(SourceLoc Loc, ASTContext &Ctx);
+
+  /// Like `findMostRefinedSubContext()`, but also populates \p ScopeStack with
+  /// the chain of scopes that contain \p Loc, ordered outermost first and
+  /// ending with the returned scope. This allows callers to inspect the
+  /// enclosing scopes of the result.
+  AvailabilityScope *findMostRefinedSubContext(
+      SourceLoc Loc, ASTContext &Ctx,
+      llvm::SmallVectorImpl<AvailabilityScope *> &ScopeStack);
 
   bool getNeedsExpansion() const { return LazyInfo.needsExpansion; }
 

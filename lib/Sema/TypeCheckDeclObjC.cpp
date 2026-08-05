@@ -1162,6 +1162,36 @@ bool swift::isRepresentableInLanguage(
   return true;
 }
 
+/// Check whether the given declaration lacks an Objective-C-representable
+/// accessor -- Objective-C reaches storage through a getter, and a setter when
+/// it is mutable, so storage read through a 'borrow'/'yielding borrow' accessor
+/// (which has no getter) or written only through a 'mutate' accessor (which has
+/// no setter) has no Objective-C entry point and is not representable.
+/// ('_read'/'_modify' and 'yielding mutate' synthesize an ordinary
+/// getter/setter, and '@_borrowed' keeps its explicit getter, so those remain
+/// representable.)  Note: a missing getter always comes from a 'borrow'/
+/// 'yielding borrow' accessor (the only no-setter case, 'mutate', requires a
+/// 'borrow'), so the diagnostic names those; revisit its wording if another
+/// non-representable accessor is ever added.
+static bool
+checkObjCWithNoRepresentableAccessor(const AbstractStorageDecl *storage,
+                                     ObjCReason Reason) {
+  bool hasGetter = storage->requiresOpaqueGetter() ||
+                   storage->getParsedAccessor(AccessorKind::Get);
+  bool hasSetterIfNeeded = !storage->supportsMutation() ||
+                           storage->requiresOpaqueSetter() ||
+                           storage->getParsedAccessor(AccessorKind::Set);
+  if (hasGetter && hasSetterIfNeeded)
+    return false;
+
+  auto behavior = behaviorLimitForObjCReason(Reason, storage->getASTContext());
+  softenIfAccessNote(storage, Reason.getAttr(),
+                     storage->diagnose(diag::objc_borrowing_accessor)
+                         .limitBehavior(behavior));
+  Reason.describe(storage);
+  return true;
+}
+
 bool swift::isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason) {
   // If you change this function, you must add or modify a test in PrintAsClang.
   
@@ -1205,6 +1235,9 @@ bool swift::isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason) {
     Reason.describe(VD);
     return false;
   }
+
+  if (checkObjCWithNoRepresentableAccessor(VD, Reason))
+    return false;
 
   if (!Result) {
     SourceRange TypeRange = VD->getTypeSourceRangeForDiagnostics();
@@ -1251,6 +1284,9 @@ bool swift::isRepresentableInObjC(const SubscriptDecl *SD, ObjCReason Reason) {
     Reason.describe(SD);
     return false;
   }
+
+  if (checkObjCWithNoRepresentableAccessor(SD, Reason))
+    return false;
 
   // ObjC doesn't support class subscripts.
   if (!SD->isInstanceMember()) {

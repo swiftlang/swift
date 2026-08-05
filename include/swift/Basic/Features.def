@@ -277,6 +277,7 @@ LANGUAGE_FEATURE(LifetimeDependenceMutableAccessors, 0, "Support mutable accesso
 LANGUAGE_FEATURE(InoutLifetimeDependence, 0, "Support @_lifetime(&)")
 SUPPRESSIBLE_LANGUAGE_FEATURE(NonexhaustiveAttribute, 487, "Nonexhaustive Enums")
 LANGUAGE_FEATURE(ModuleSelector, 491, "Module selectors (`Module::name` syntax)")
+LANGUAGE_FEATURE(SymbolLinkageMarkers, 492, "Section placement control (`@section`, `@used`, `objectFormat`)")
 LANGUAGE_FEATURE(BuiltinConcurrencyStackNesting, 0, "Concurrency Stack Nesting Builtins")
 LANGUAGE_FEATURE(BuiltinTaskCancellationShield, 0, "Task Cancellation Shield Builtins")
 LANGUAGE_FEATURE(ClosureLifetimes, 0, "Support @_lifetime on function types")
@@ -529,7 +530,7 @@ EXPERIMENTAL_FEATURE(ImportCxxMembersLazily, true)
 
 /// Import a C++ foreign reference type's primary FRT base as a Swift
 /// superclass.
-EXPERIMENTAL_FEATURE(ForeignReferenceTypeInheritance, true)
+LANGUAGE_FEATURE(ForeignReferenceTypeInheritance, 0, "foreign reference type inheritance hierarchy")
 
 /// `yielding borrow`/`yielding mutate` single-yield coroutine accessors
 // TODO: When this is turned on by default, take care of:
@@ -595,6 +596,9 @@ LANGUAGE_FEATURE(BorrowingForLoop, 0, "borrowing for-in loops")
 /// Allow use of @inline(always) attribute
 SUPPRESSIBLE_LANGUAGE_FEATURE(InlineAlways, 496, "@inline(always) attribute")
 
+/// Allow use of the @unsafe(always) attribute
+SUPPRESSIBLE_LANGUAGE_FEATURE(AlwaysUnsafeAttribute, 0, "@unsafe(always) attribute")
+
 /// Allow use of 'Swift' (Swift runtime version) in @available attributes
 EXPERIMENTAL_FEATURE(SwiftRuntimeAvailability, true)
 
@@ -644,6 +648,9 @@ EXPERIMENTAL_FEATURE(AbstractStoredPropertyLayout, false)
 
 /// Allow use of macros to derive various conformances
 EXPERIMENTAL_FEATURE(DeriveConformancesViaMacros, false)
+
+/// Allow use of `@called(...)` on function types.
+EXPERIMENTAL_FEATURE(CalledAttribute, false)
 
 /// Allow `self` to be mutated or consumed inside of non-`Copyable` type `deinit`s.
 EXPERIMENTAL_FEATURE(MutateAndConsumeInDeinit, true)

@@ -490,7 +490,7 @@ Address IRGenFunction::emitAddressAtOffset(llvm::Value *base, Offset offset,
       // GEP to the slot, computing the index as a signed number.
       auto scaledIndex =
         int64_t(byteOffset.getValue()) / int64_t(objectSize.getValue());
-      auto indexValue = IGM.getSize(Size(scaledIndex));
+      auto indexValue = llvm::ConstantInt::getSigned(IGM.SizeTy, scaledIndex);
       auto slotPtr = Builder.CreateInBoundsGEP(objectTy, base, indexValue);
 
       return Address(slotPtr, objectTy, objectAlignment);

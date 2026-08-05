@@ -119,13 +119,9 @@ public func anchor() -> Bool {
 
 class ObjCTest {
   // CHECK-LABEL: define internal ptr @"$s7newtype8ObjCTestC19optionalPassThroughySo14SNTErrorDomainaSgAGFTo"
-  // CHECK: [[CASTED:%.+]] = ptrtoint ptr %2 to [[INT]]
-  // CHECK: [[RESULT:%.+]] = call swiftcc [[INT]] @"$s7newtype8ObjCTestC19optionalPassThroughySo14SNTErrorDomainaSgAGF"([[INT]] [[CASTED]], ptr swiftself {{%.+}})
-  // CHECK: [[CAST_RESULT:%.+]] = inttoptr [[INT]] [[RESULT]] to ptr
-  // CHECK: [[AUTORELEASE_RESULT:%.+]] = {{(tail )?}}call ptr @llvm.objc.autoreleaseReturnValue(ptr [[CAST_RESULT]])
-  // CHECK: [[CAST_AUTORELEASE_RESULT:%.+]] = ptrtoint ptr [[AUTORELEASE_RESULT]] to [[INT]]
-  // CHECK: [[OPAQUE_RESULT:%.+]] = inttoptr [[INT]] [[CAST_AUTORELEASE_RESULT]] to ptr
-  // CHECK: ret ptr [[OPAQUE_RESULT]]
+  // CHECK: [[RESULT:%.+]] = call swiftcc ptr @"$s7newtype8ObjCTestC19optionalPassThroughySo14SNTErrorDomainaSgAGF"(ptr {{%.+}}, ptr swiftself {{%.+}})
+  // CHECK: [[AUTORELEASE_RESULT:%.+]] = {{(tail )?}}call ptr @llvm.objc.autoreleaseReturnValue(ptr [[RESULT]])
+  // CHECK: ret ptr [[AUTORELEASE_RESULT]]
   // CHECK: {{^}$}}
 
   // OPT-LABEL: define internal ptr @"$s7newtype8ObjCTestC19optionalPassThroughySo14SNTErrorDomainaSgAGFTo"

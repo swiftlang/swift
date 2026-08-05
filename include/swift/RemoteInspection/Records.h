@@ -178,7 +178,10 @@ enum class FieldDescriptorKind : uint16_t {
   // An Objective-C class, which may be imported or defined in Swift.
   // In the former case, field type metadata is not emitted, and
   // must be obtained from the Objective-C runtime.
-  ObjCClass
+  ObjCClass,
+
+  // A COM interface protocol. Its existential is a single interface pointer.
+  COMProtocol,
 };
 
 // Field descriptors contain a collection of field records for a single
@@ -202,19 +205,46 @@ public:
   using const_iterator = FieldRecordIterator;
 
   bool isEnum() const {
-    return (Kind == FieldDescriptorKind::Enum ||
-            Kind == FieldDescriptorKind::MultiPayloadEnum);
+    switch (Kind) {
+    case FieldDescriptorKind::Enum:
+    case FieldDescriptorKind::MultiPayloadEnum:
+      return true;
+    case FieldDescriptorKind::Class:
+    case FieldDescriptorKind::ObjCClass:
+    case FieldDescriptorKind::Protocol:
+    case FieldDescriptorKind::ClassProtocol:
+    case FieldDescriptorKind::ObjCProtocol:
+      return false;
+    }
   }
 
   bool isClass() const {
-    return (Kind == FieldDescriptorKind::Class ||
-            Kind == FieldDescriptorKind::ObjCClass);
+    switch (Kind) {
+    case FieldDescriptorKind::Class:
+    case FieldDescriptorKind::ObjCClass:
+      return true;
+    case FieldDescriptorKind::Enum:
+    case FieldDescriptorKind::MultiPayloadEnum:
+    case FieldDescriptorKind::Protocol:
+    case FieldDescriptorKind::ClassProtocol:
+    case FieldDescriptorKind::ObjCProtocol:
+      return false;
+    }
   }
 
   bool isProtocol() const {
-    return (Kind == FieldDescriptorKind::Protocol ||
-            Kind == FieldDescriptorKind::ClassProtocol ||
-            Kind == FieldDescriptorKind::ObjCProtocol);
+    switch (Kind) {
+    case FieldDescriptorKind::Protocol:
+    case FieldDescriptorKind::ClassProtocol:
+    case FieldDescriptorKind::ObjCProtocol:
+    case FieldDescriptorKind::COMProtocol:
+      return true;
+    case FieldDescriptorKind::Enum:
+    case FieldDescriptorKind::MultiPayloadEnum:
+    case FieldDescriptorKind::Class:
+    case FieldDescriptorKind::ObjCClass:
+      return false;
+    }
   }
 
   bool isStruct() const {

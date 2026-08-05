@@ -116,8 +116,9 @@ static bool hasSingletonMetatype(CanType instanceType) {
   return HasSingletonMetatype().visit(instanceType);
 }
 
-CaptureKind TypeConverter::getDeclCaptureKind(CapturedValue capture,
-                                              TypeExpansionContext expansion) {
+CaptureKind
+TypeConverter::getDeclCaptureKind(CapturedValue capture,
+                                  TypeExpansionContext expansion) {
   if (auto *expr = capture.getPackElement()) {
     auto contextTy = expr->getType();
     auto props = getTypeProperties(
@@ -130,6 +131,9 @@ CaptureKind TypeConverter::getDeclCaptureKind(CapturedValue capture,
 
     return CaptureKind::Immutable;
   }
+
+  if (capture.isConsumed())
+    return CaptureKind::Consuming;
 
   auto decl = capture.getDecl();
   auto *var = cast<VarDecl>(decl);

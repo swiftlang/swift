@@ -1,9 +1,8 @@
 
 // RUN: rm -rf %t
 // RUN: split-file %s %t
-// RUN: %target-swift-frontend -typecheck -verify -Xcc -iapinotes-modules -Xcc %swift_src_root/stdlib/public/Cxx/std -Xcc -std=c++20 -I %t/Inputs  %t/test.swift -strict-memory-safety -enable-experimental-feature LifetimeDependence -cxx-interoperability-mode=default -diagnostic-style llvm -plugin-path %swift-plugin-dir 2>&1
+// RUN: %target-swift-frontend -typecheck -verify -Xcc -iapinotes-modules -Xcc %swift_src_root/stdlib/public/Cxx/std -Xcc -std=c++20 -I %t%{fs-sep}Inputs  %t%{fs-sep}test.swift -strict-memory-safety -enable-experimental-feature LifetimeDependence -cxx-interoperability-mode=default -diagnostic-style llvm -plugin-path %swift-plugin-dir -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}nonescapable.h 2>&1
 
-// REQUIRES: objc_interop
 // REQUIRES: swift_feature_LifetimeDependence
 // REQUIRES: std_span
 
@@ -18,6 +17,7 @@ module Test {
 #include <span>
 #include <vector>
 #include <tuple>
+#include <memory>
 
 struct SWIFT_NONESCAPABLE View {
     __attribute__((swift_attr("@lifetime(immortal)")))
@@ -48,6 +48,24 @@ struct UnknownEscapabilityAggregate {
     Unannotated unann;
 };
 
+template <typename T> struct SWIFT_ESCAPABLE_IF(T) EscapableIfT { T t; };
+using SafeEscapableIf = EscapableIfT<int>;
+
+struct ConditionalMemberBeforePointer {
+    SafeEscapableIf cond;
+    int *pointer;
+};
+
+struct ConditionalMemberAfterPointer {
+    int *pointer;
+    SafeEscapableIf cond;
+};
+
+struct SharedPtrBeforePointer {
+    std::shared_ptr<int> shared;
+    int *pointer;
+};
+
 struct MyContainer {
     int begin() const { return 0; }
     int end() const { return -1; }
@@ -63,6 +81,42 @@ using UnsafeTuple = std::tuple<int, int*, int>;
 View safeFunc(View v1 [[clang::noescape]], View v2 [[clang::lifetimebound]]);
 // Second non-escapable type is not annotated in any way.
 void unsafeFunc(View v1 [[clang::noescape]], View v2);
+
+// expected-warning@+1{{the returned type 'View' is annotated as non-escapable; its lifetime dependencies must be annotated}}
+View returnsViewNoAnnotation(const Owner &o);
+
+struct InferredNonEscapable {
+  View v;
+};
+InferredNonEscapable returnsInferredNonEscapable(const Owner &o);
+
+struct HasUnannotatedViewGetter {
+  // expected-warning@+2{{the returned type 'View' is annotated as non-escapable; its lifetime dependencies must be annotated}}
+  // expected-error@+1{{cannot infer lifetime dependence on a method because 'self' is BitwiseCopyable, specify '@_lifetime(borrow self)'}}
+  View getView() const;
+};
+
+// expected-warning@+2{{the returned type 'ViewWithUnannotatedCtor' is annotated as non-escapable; its lifetime dependencies must be annotated}}
+struct SWIFT_NONESCAPABLE ViewWithUnannotatedCtor {
+    ViewWithUnannotatedCtor(const Owner &o);
+private:
+    const int *member;
+};
+
+View returnsViewLifetimebound(const Owner &o [[clang::lifetimebound]]);
+
+// A lifetime dependency whose target is Escapable is dropped, so the annotation
+// is not enforced: import the function as unsafe.
+// expected-warning@+1{{the returned type 'Owner' is annotated as escapable; it cannot have lifetime dependencies}}
+Owner returnsOwnerLifetimebound(const View &v [[clang::lifetimebound]]);
+
+__attribute__((swift_attr("@lifetime(borrow o)")))
+// expected-warning@+1{{the returned type 'View' is annotated as non-escapable; its lifetime dependencies must be annotated}}
+View returnsViewHandWrittenLifetime(const Owner &o);
+
+__attribute__((swift_attr("safe")))
+// expected-warning@+1{{the returned type 'View' is annotated as non-escapable; its lifetime dependencies must be annotated}}
+View returnsViewAuditedSafe(const Owner &o);
 
 class SharedObject {
 public:
@@ -136,8 +190,10 @@ struct SWIFT_SAFE WrapsUnannotatedMember {
 //--- test.swift
 
 import Test
-import CoreFoundation
 import CxxStdlib
+#if canImport(CoreFoundation)
+import CoreFoundation
+#endif
 
 func useUnsafeParam(x: Unannotated) {
   // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
@@ -155,14 +211,35 @@ func useUnsafeParam3(x: UnknownEscapabilityAggregate) {
   _ = x // expected-note{{reference to parameter 'x' involves unsafe type}}
 }
 
+func useConditionalMemberBeforePointer(x: ConditionalMemberBeforePointer) {
+  // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  _ = x // expected-note{{reference to parameter 'x' involves unsafe type}}
+}
+
+func useConditionalMemberAfterPointer(x: ConditionalMemberAfterPointer) {
+  // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  _ = x // expected-note{{reference to parameter 'x' involves unsafe type}}
+}
+
+func useSharedPtrBeforePointer(x: SharedPtrBeforePointer) {
+  // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  _ = x // expected-note{{reference to parameter 'x' involves unsafe type}}
+}
+
+func useSafeEscapableIf(x: SafeEscapableIf) {
+  _ = x
+}
+
 func useSafeParams(x: Owner, y: View, z: SafeEscapableAggregate, c: MyContainer) {
     // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
     let _ = c.__beginUnsafe() // expected-note{{reference to unsafe instance method '__beginUnsafe()'}}
 }
 
+#if canImport(CoreFoundation)
 func useCfType(x: CFArray) {
   _ = x
 }
+#endif
 
 func useString(x: std.string) {
   _ = x
@@ -210,6 +287,32 @@ func useSafeLifetimeAnnotated(v: View) {
 func useUnsafeLifetimeAnnotated(v: View) {
     // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
     unsafeFunc(v, v) // expected-note{{reference to unsafe global function 'unsafeFunc'}}
+}
+
+func useInferredLifetimeDependency(o: Owner, g: HasUnannotatedViewGetter) {
+    // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+    let _ = returnsViewNoAnnotation(o) // expected-note{{reference to unsafe global function 'returnsViewNoAnnotation'}}
+    // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+    let _ = returnsInferredNonEscapable(o) // expected-note{{reference to unsafe global function 'returnsInferredNonEscapable'}}
+    // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+    let _ = g.getView() // expected-note{{reference to unsafe instance method 'getView()'}}
+    // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+    let _ = ViewWithUnannotatedCtor(o) // expected-note{{reference to unsafe initializer 'init(_:)'}}
+}
+
+func useDefaultConstructedView() {
+    let _ = View()
+}
+
+func useAnnotatedLifetimeDependency(o: Owner) {
+    let _ = returnsViewLifetimebound(o)
+    let _ = returnsViewHandWrittenLifetime(o)
+    let _ = returnsViewAuditedSafe(o)
+}
+
+func useEscapableLifetimeDependency(v: View) {
+    // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+    let _ = returnsOwnerLifetimebound(v) // expected-note{{reference to unsafe global function 'returnsOwnerLifetimebound'}}
 }
 
 @available(SwiftStdlib 5.8, *)

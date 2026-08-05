@@ -305,6 +305,23 @@ void IsolatedTypeAttr::printImpl(ASTPrinter &printer,
   printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
 }
 
+const char *
+CalledTypeAttr::getSemanticsName(CalledTypeAttr::Semantics semantics) {
+  switch (semantics) {
+  case CalledTypeAttr::Semantics::Once:
+    return "once";
+  }
+  llvm_unreachable("bad kind");
+}
+
+void CalledTypeAttr::printImpl(ASTPrinter &printer,
+                               const PrintOptions &options) const {
+  printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
+  printer.printAttrName("@called");
+  printer << "(" << getSemanticsName() << ")";
+  printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
+}
+
 /// Given a name like "inline", return the decl attribute ID that corresponds
 /// to it.  Note that this is a many-to-one mapping, and that the identifier
 /// passed in may only be the first portion of the attribute (e.g. in the case
@@ -1147,6 +1164,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   case DeclAttrKind::Export:
   case DeclAttrKind::Optimize:
   case DeclAttrKind::Exclusivity:
+  case DeclAttrKind::Unsafe:
   case DeclAttrKind::NonSendable:
   case DeclAttrKind::ObjCImplementation:
     if (getKind() == DeclAttrKind::Effects &&
@@ -1173,6 +1191,12 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
         Printer << ' ';
         // Add @inlinable
         Printer.printSimpleAttr("inlinable", /*needAt=*/true);
+      } else if (getKind() == DeclAttrKind::Unsafe &&
+                 cast<UnsafeAttr>(this)->isAlways() &&
+                 Options.SuppressUnsafeAlways) {
+        // Older compilers don't understand the argument, and plain '@unsafe'
+        // is the closest approximation they can check.
+        Printer.printSimpleAttr("unsafe", /*needAt=*/true);
       } else {
         Printer.printSimpleAttr(attrName, /*needAt=*/true);
       }
@@ -1340,11 +1364,16 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
 
-  case DeclAttrKind::Section:
+  case DeclAttrKind::Section: {
     Printer.printAttrName("@section");
-    Printer << "(\"" << cast<SectionAttr>(this)->Name << "\")";
+    auto sectionAttr = cast<SectionAttr>(this);
+    if (sectionAttr->isDefault())
+      Printer << "(default)";
+    else
+      Printer << "(\"" << *sectionAttr->Name << "\")";
     break;
-      
+  }
+
   case DeclAttrKind::Diagnose: {
     auto diagnoseAttr = cast<DiagnoseAttr>(this);
     Printer.printAttrName("@diagnose(");
@@ -2018,6 +2047,8 @@ StringRef DeclAttribute::getAttrName() const {
     }
     llvm_unreachable("Invalid optimization kind");
   }
+  case DeclAttrKind::Unsafe:
+    return cast<UnsafeAttr>(this)->isAlways() ? "unsafe(always)" : "unsafe";
   case DeclAttrKind::Effects:
     switch (cast<EffectsAttr>(this)->getKind()) {
       case EffectsKind::ReadNone:
@@ -2133,6 +2164,11 @@ StringRef DeclAttribute::getAttrName() const {
     return cast<LifetimeAttr>(this)->isUnderscored() ? "_lifetime" : "lifetime";
   case DeclAttrKind::Nonexhaustive:
     return "nonexhaustive";
+  case DeclAttrKind::Called:
+    switch (cast<CalledAttr>(this)->getSemantics()) {
+    case ExecutionSemantics::Once:
+      return "called(once)";
+    }
   }
   llvm_unreachable("bad DeclAttrKind");
 }

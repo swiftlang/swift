@@ -170,8 +170,12 @@ linkEmbeddedRuntimeFunctionByName(#NAME, EFFECT, StringRef(#CC) == "C_CC");    \
                                       bool byAsmName) {
     SILModule &M = *getModule();
 
-    // Bail if function is already loaded.
-    if (auto *Fn = M.lookUpFunction(name, byAsmName)) return Fn;
+    // Bail if function is already loaded, unless it's a zombie. Zombies
+    // will need to be re-loaded.
+    if (auto *Fn = M.lookUpFunction(name, byAsmName)) {
+      if (!Fn->isZombie())
+        return Fn;
+    }
 
     SILFunction *Fn =
         M.getSILLoader()->lookupSILFunction(name, Linkage,byAsmName);

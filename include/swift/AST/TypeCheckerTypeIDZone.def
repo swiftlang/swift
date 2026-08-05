@@ -113,8 +113,12 @@ SWIFT_REQUEST(TypeChecker, ResultBuilderTypeRequest, Type(ValueDecl *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, IsActorRequest, bool(NominalTypeDecl *),
               Cached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, IsCOMObjectRequest, bool(ClassDecl *),
+SWIFT_REQUEST(TypeChecker, COMDeclInfoRequest,
+              const COMDeclInfo *(NominalTypeDecl *),
               Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, COMInterfaceHierarchyRequest,
+              const COMInterfaceHierarchy *(ProtocolDecl *), Cached,
+              NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, IsDefaultActorRequest,
               bool(ClassDecl *, ModuleDecl *, ResilienceExpansion),
               Cached, NoLocationInfo)
@@ -456,7 +460,7 @@ SWIFT_REQUEST(TypeChecker, SynthesizeDefaultInitRequest,
               ConstructorDecl *(NominalTypeDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, SynthesizeCOMInterfaceIDRequest,
               VarDecl *(ProtocolDecl *), Cached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, SynthesizeCOMImplementationIDRequest,
+SWIFT_REQUEST(TypeChecker, SynthesizeCOMCLSIDRequest,
               VarDecl *(ClassDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, TypeCheckPrimaryFileRequest,
               bool(SouceFile *), SeparatelyCached, NoLocationInfo)
@@ -608,6 +612,11 @@ SWIFT_REQUEST(TypeChecker, IsCCompatibleDeclRequest,
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, SemanticDeclAttrsRequest,
               DeclAttributes(const Decl *),
+              Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, SectionForDeclRequest,
+              std::optional<StringRef>(
+                  llvm::PointerUnion<const Decl *,
+                                     const AbstractClosureExpr *>),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, UniqueUnderlyingTypeSubstitutionsRequest,
               std::optional<SubstitutionMap>(const Decl *),

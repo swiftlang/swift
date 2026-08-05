@@ -28,6 +28,11 @@ struct Mixed {
   var i: Int
 }
 
+struct IntPair {
+  var a: Int
+  var b: Int
+}
+
 enum E {
   case a(T)
   case b(T)
@@ -976,3 +981,19 @@ bb0(%0 : $*GenWrapper<T>):
   return %4
 }
 
+sil [ossa] @read_int_pair_a : $@convention(thin) (@inout IntPair) -> () {
+[%0: read s0.v**]
+}
+
+// CHECK: SIL memory lifetime failure in @callee_reads_completely_uninitialized: argument memory is not initialized, but should be
+// CHECK: memory location:   %0 = alloc_stack $IntPair
+// CHECK: at instruction:   %2 = apply %1(%0) : $@convention(thin) (@inout IntPair) -> ()
+sil [ossa] @callee_reads_completely_uninitialized : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $IntPair
+  %1 = function_ref @read_int_pair_a : $@convention(thin) (@inout IntPair) -> ()
+  %2 = apply %1(%0) : $@convention(thin) (@inout IntPair) -> ()
+  dealloc_stack %0
+  %4 = tuple ()
+  return %4
+}

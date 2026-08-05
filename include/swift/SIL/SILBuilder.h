@@ -1095,6 +1095,10 @@ public:
       SILLocation Loc, SILValue src, SILDebugVariable Var,
       UsesMoveableValueDebugInfo_t wasMoved = DoesNotUseMoveableValueDebugInfo,
       bool trace = false, bool overrideLoc = true);
+  DebugValueInst *createDebugValue(
+      SILLocation Loc, ArrayRef<SILValue> operands, SILDebugVariable Var,
+      UsesMoveableValueDebugInfo_t wasMoved = DoesNotUseMoveableValueDebugInfo,
+      bool trace = false, bool overrideLoc = true);
 
   DebugStepInst *createDebugStep(SILLocation Loc) {
     return insert(new (getModule()) DebugStepInst(getSILDebugLocation(Loc)));
@@ -2019,7 +2023,7 @@ public:
                       ValueOwnershipKind forwardingOwnershipKind) {
     return insert(new (getModule()) StructExtractInst(
         getSILDebugLocation(Loc), Operand, Field, ResultTy,
-        Operand->getOwnershipKind()));
+        forwardingOwnershipKind));
   }
 
   StructElementAddrInst *createStructElementAddr(SILLocation Loc,

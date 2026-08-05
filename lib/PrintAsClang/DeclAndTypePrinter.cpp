@@ -495,6 +495,24 @@ private:
     return false;
   }
 
+  /// Whether instances of this type can be copied with memcpy.
+  bool isTriviallyCopyable(const NominalTypeDecl *objectTypeDecl,
+                           OptionalTypeKind optKind) {
+    if (!objectTypeDecl)
+      return false;
+    auto knownCxxTypeInfo =
+        owningPrinter.typeMapping.getKnownCxxTypeInfo(objectTypeDecl);
+    // An optional payload bridges to a Swift `Optional` wrapper, unless the
+    // wrapped type maps to a nullable C++ type (e.g. a pointer), in which case
+    // the optionality is folded into that trivial representation.
+    bool resultIsSwiftOptional =
+        optKind != OTK_None &&
+        !(knownCxxTypeInfo && knownCxxTypeInfo->canBeNullable);
+    if (resultIsSwiftOptional)
+      return false;
+    return knownCxxTypeInfo || isClangPOD(objectTypeDecl);
+  }
+
   void visitEnumDeclCxx(EnumDecl *ED) {
     assert(owningPrinter.outputLang == OutputLanguageMode::Cxx);
 
@@ -607,10 +625,7 @@ private:
             auto objectTypeDecl = objectType->getNominalOrBoundGenericNominal();
             assert(objectTypeDecl != nullptr || paramType->isOptional());
 
-            if (objectTypeDecl &&
-                (owningPrinter.typeMapping.getKnownCxxTypeInfo(
-                     objectTypeDecl) ||
-                 isClangPOD(objectTypeDecl))) {
+            if (isTriviallyCopyable(objectTypeDecl, optKind)) {
               outOfLineOS << "    " << types[paramType] << " result;\n";
               outOfLineOS << "    "
                              "memcpy(&result, payloadFromDestruction, "
@@ -776,10 +791,7 @@ private:
                       objectType->getNominalOrBoundGenericNominal();
                   assert(objectTypeDecl != nullptr || paramType->isOptional());
 
-                  if (objectTypeDecl &&
-                      (owningPrinter.typeMapping.getKnownCxxTypeInfo(
-                           objectTypeDecl) ||
-                       isClangPOD(objectTypeDecl))) {
+                  if (isTriviallyCopyable(objectTypeDecl, optKind)) {
                     outOfLineOS
                         << "    memcpy(result._getOpaquePointer(), &val, "
                            "sizeof(val));\n";

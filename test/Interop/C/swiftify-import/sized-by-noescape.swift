@@ -199,7 +199,7 @@ module Test {
 
 //--- test.swift
 // GENERATED-BY: %target-swift-ide-test -print-module -module-to-print=Test -plugin-path %swift-plugin-dir -I %t -source-filename=x -enable-experimental-feature Lifetimes -Xcc -Wno-ignored-attributes -Xcc -Wno-nullability-completeness > %t/Test-interface.swift && %swift-function-caller-generator Test %t/Test-interface.swift
-// GENERATED-HASH: c34bcce829d0e1bd05210ae20cf42cf7d073c0bbfbc6e785111e4dc9360e6890
+// GENERATED-HASH: bde375302165d04691bbb612b91e2433944e192cba3443f545c010e74c894ab2
 import Test
 
 
@@ -208,31 +208,70 @@ func call_simple(_ len: CInt, _ p: UnsafeRawPointer!) {
   return unsafe simple(len, p)
 }
 
+@available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_simple(_ p: RawSpan) {
+  return simple(p)
+}
+
 func call_swiftAttr(_ len: CInt, _ p: UnsafeRawPointer!) {
   return unsafe swiftAttr(len, p)
+}
+
+@available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_swiftAttr(_ p: RawSpan) {
+  return swiftAttr(p)
 }
 
 func call_shared(_ len: CInt, _ p1: UnsafeRawPointer!, _ p2: UnsafeRawPointer!) {
   return unsafe shared(len, p1, p2)
 }
 
+@available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_shared(_ p1: RawSpan, _ p2: RawSpan) {
+  return shared(p1, p2)
+}
+
 func call_complexExpr(_ len: CInt, _ offset: CInt, _ p: UnsafeRawPointer!) {
   return unsafe complexExpr(len, offset, p)
+}
+
+@available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_complexExpr(_ len: CInt, _ offset: CInt, _ p: RawSpan) {
+  return complexExpr(len, offset, p)
 }
 
 func call_nullUnspecified(_ len: CInt, _ p: UnsafeRawPointer!) {
   return unsafe nullUnspecified(len, p)
 }
 
+@available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_nullUnspecified(_ p: RawSpan) {
+  return nullUnspecified(p)
+}
+
 func call_nonnull(_ len: CInt, _ p: UnsafeRawPointer) {
   return unsafe nonnull(len, p)
+}
+
+@available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_nonnull(_ p: RawSpan) {
+  return nonnull(p)
 }
 
 func call_nullable(_ len: CInt, _ p: UnsafeRawPointer?) {
   return unsafe nullable(len, p)
 }
 
+@available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_nullable(_ p: RawSpan) {
+  return nullable(p)
+}
+
 func call_returnPointer(_ len: CInt) -> UnsafeRawPointer {
+  return unsafe returnPointer(len)
+}
+
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_returnPointer(_ len: CInt) -> UnsafeRawBufferPointer {
   return unsafe returnPointer(len)
 }
 
@@ -240,21 +279,22 @@ func call_opaque(_ len: CInt, _ p: OpaquePointer!) {
   return unsafe opaque(len, p)
 }
 
+@available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_opaque(_ p: RawSpan) {
+  return opaque(p)
+}
+
 func call_bytesized(_ size: CInt, _ _bytesized_param1: UnsafePointer<UInt8>!) {
   return unsafe bytesized(size,  _bytesized_param1)
-}
-
-func call_charsized(_ _charsized_param0: UnsafeMutablePointer<CChar>!, _ size: CInt) {
-  return unsafe charsized( _charsized_param0, size)
-}
-
-func call_doublebytesized(_ _doublebytesized_param0: UnsafeMutablePointer<UInt16>!, _ size: CInt) {
-  return unsafe doublebytesized( _doublebytesized_param0, size)
 }
 
 @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 @_alwaysEmitIntoClient @_disfavoredOverload public func call_bytesized(_ _bytesized_param1: RawSpan) {
   return bytesized(_bytesized_param1)
+}
+
+func call_charsized(_ _charsized_param0: UnsafeMutablePointer<CChar>!, _ size: CInt) {
+  return unsafe charsized( _charsized_param0, size)
 }
 
 @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
@@ -263,46 +303,6 @@ func call_doublebytesized(_ _doublebytesized_param0: UnsafeMutablePointer<UInt16
   return charsized(&_charsized_param0)
 }
 
-@available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_complexExpr(_ len: CInt, _ offset: CInt, _ p: RawSpan) {
-  return complexExpr(len, offset, p)
-}
-
-@available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_nonnull(_ p: RawSpan) {
-  return nonnull(p)
-}
-
-@available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_nullUnspecified(_ p: RawSpan) {
-  return nullUnspecified(p)
-}
-
-@available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_nullable(_ p: RawSpan) {
-  return nullable(p)
-}
-
-@available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_opaque(_ p: RawSpan) {
-  return opaque(p)
-}
-
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_returnPointer(_ len: CInt) -> UnsafeRawBufferPointer {
-  return unsafe returnPointer(len)
-}
-
-@available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_shared(_ p1: RawSpan, _ p2: RawSpan) {
-  return shared(p1, p2)
-}
-
-@available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_simple(_ p: RawSpan) {
-  return simple(p)
-}
-
-@available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_swiftAttr(_ p: RawSpan) {
-  return swiftAttr(p)
+func call_doublebytesized(_ _doublebytesized_param0: UnsafeMutablePointer<UInt16>!, _ size: CInt) {
+  return unsafe doublebytesized( _doublebytesized_param0, size)
 }

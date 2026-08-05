@@ -500,7 +500,12 @@ enum class CaptureKind {
   /// A local value captured as a constant.
   Constant,
   /// A let constant captured as a pointer to storage
-  Immutable
+  Immutable,
+  /// A local value captured directly, moved (not boxed or copied) into the
+  /// closure's context. This is only used for `@called(once)` closures that
+  /// capture `@called(once)` values at the moment because such closures
+  /// cannot be copied or called multiple times.
+  Consuming,
 };
 
 /// Interesting information about the lowering of a function type.

@@ -298,11 +298,18 @@ void MemoryLifetimeVerifier::requireBitsSetForArgument(const Bits &bits, Operand
        errorLocIdx = missingBits.find_next(errorLocIdx)) {
     auto *errorLoc = locations.getLocation(errorLocIdx);
 
-    // We only have a valid address if this is not the "self" bit which represents
-    // unknown sub-fields.
+    // We only have a valid address if this is not the "self" bit of a
+    // partially covered location. In that case the "self" bit represents the
+    // untracked fields, but the representative value is the address of the
+    // whole location - which is too imprecise to check if the callee reads
+    // from the untracked fields.
     SILValue addr;
-    if (errorLocIdx != locIdx || !errorLoc->selfBitRepresentsUnknownSubFields())
+    if (!errorLoc->selfBitRepresentsUnknownSubFields() ||
+        // If the location has no sub-locations at all, its "self" bit represents
+        // the whole location and the representative value is its exact address.
+        !locations.hasSubLocations(errorLocIdx)) {
       addr = errorLoc->representativeValue;
+    }
 
     if (applyMayRead(argOp, addr)) {
       reportError("argument memory is not initialized, but should be",
@@ -786,13 +793,6 @@ void MemoryLifetimeVerifier::checkBlock(SILBasicBlock *block, Bits &bits) {
         requireBitsSet(bits, I.getOperand(0), &I);
         break;
       case SILInstructionKind::DebugValueInst:
-        // We don't want to check `debug_value` instructions that
-        // are used to mark variable declarations (e.g. its SSA value is
-        // an alloc_stack), which don't have any `op_deref` in its
-        // di-expression, because that memory doesn't need to be initialized
-        // when `debug_value` is referencing it.
-        if (!DebugValueInst::hasAddrVal(&I))
-          requireBitsSet(bits, I.getOperand(0), &I);
         break;
       case SILInstructionKind::UncheckedTakeEnumDataAddrInst: {
         auto enumInst = cast<UncheckedTakeEnumDataAddrInst>(&I);

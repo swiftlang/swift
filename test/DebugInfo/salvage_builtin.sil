@@ -117,3 +117,28 @@ bb0(%0 : $Builtin.Int64):
   %t = tuple ()
   return %t : $()
 }
+
+// Checked truncation from IntLiteral: the builtin creates branches at IRGen,
+// so it is constant-folded and the result is cloned into the debug BB.
+// The debug_value tracks a tuple_extract of the builtin result (the common
+// pattern after prior cascading salvage of the tuple_extract).
+
+// CHECK-LABEL: sil @test_checked_trunc_intliteral
+// CHECK:         debug_value undef : {{.*}}, let, name "truncated", {{.*}}transform {
+// CHECK:           %0 = integer_literal $Builtin.Int1, 0
+// CHECK:           %1 = integer_literal $Builtin.Int64, 42
+// CHECK:           %2 = tuple (%1 : $Builtin.Int64, %0 : $Builtin.Int1)
+// CHECK:           %3 = tuple_extract %2 : $(Builtin.Int64, Builtin.Int1), 0
+// CHECK:           return %3 : $Builtin.Int64
+// CHECK:         }
+// CHECK:         return
+// CHECK-LABEL: } // end sil function 'test_checked_trunc_intliteral'
+sil @test_checked_trunc_intliteral : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.IntLiteral, 42
+  %1 = builtin "s_to_s_checked_trunc_IntLiteral_Int64"(%0 : $Builtin.IntLiteral) : $(Builtin.Int64, Builtin.Int1)
+  %2 = tuple_extract %1 : $(Builtin.Int64, Builtin.Int1), 0
+  debug_value %2 : $Builtin.Int64, let, name "truncated"
+  %t = tuple ()
+  return %t : $()
+}

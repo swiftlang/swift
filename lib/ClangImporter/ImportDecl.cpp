@@ -612,6 +612,19 @@ static ImportedType rectifySubscriptTypes(Type getterType, bool getterIsIUO,
   return {OptionalType::get(setterType), true};
 }
 
+/// Returns the `@available` attribute on \p decl whose resolved domain is the
+/// platform \p platform, or null. Semantic availability is not resolved yet
+/// during import, so this matches on the parsed attribute's domain.
+static AvailableAttr *findAvailableAttrForPlatform(Decl *decl,
+                                                   PlatformKind platform) {
+  for (auto *attr : decl->getAttrs().getAttributes<AvailableAttr>()) {
+    auto domain = attr->getDomainOrIdentifier().getAsDomain();
+    if (domain && domain->isPlatform() && domain->getPlatformKind() == platform)
+      return attr;
+  }
+  return nullptr;
+}
+
 /// Add an AvailableAttr to the declaration for the given
 /// version range.
 static void applyAvailableAttribute(Decl *decl, AvailabilityRange &info,
@@ -2201,13 +2214,9 @@ namespace {
     // `fd`. This also prevents the implicit single-parameter
     // lifetime-dependence inference from running for it.
     void cacheImmortalLifetime(AbstractFunctionDecl *fd) {
-      unsigned resultIndex = fd->getParameters()->size();
-      if (fd->isInstanceMethod()) {
-        ++resultIndex;
-      }
       SmallVector<LifetimeDependenceInfo, 1> lifetimeDependencies;
       LifetimeDependenceInfo immortalLifetime(
-          nullptr, nullptr, resultIndex,
+          nullptr, nullptr, fd->getLifetimeDependenceResultIndex(),
           LifetimeFlags().withImmortalSpecifier().withAnnotated());
       lifetimeDependencies.push_back(immortalLifetime);
       Impl.SwiftContext.evaluator.cacheOutput(
@@ -2566,21 +2575,18 @@ namespace {
 
           // If this is an inherited foreign reference type, check if it has a
           // suitable superclass.
-          if (Impl.SwiftContext.LangOpts.hasFeature(
-                  Feature::ForeignReferenceTypeInheritance)) {
-            auto frtInfo = evaluateOrDefault(
-                Impl.SwiftContext.evaluator,
-                ForeignReferenceTypeInfoRequest({cxxRecordDecl}), {});
-            if (auto primaryBase = frtInfo.getPrimarySuperclass()) {
-              if (auto baseDecl = cast_or_null<ClassDecl>(
-                      Impl.importDecl(primaryBase, getVersion()))) {
-                auto classResult = cast<ClassDecl>(result);
-                Type superclassType = baseDecl->getDeclaredInterfaceType();
-                classResult->setSuperclass(superclassType);
-                classResult->setInherited(
-                    Impl.SwiftContext.AllocateCopy(ArrayRef<InheritedEntry>{
-                        TypeLoc::withoutLoc(superclassType)}));
-              }
+          auto frtInfo = evaluateOrDefault(
+              Impl.SwiftContext.evaluator,
+              ForeignReferenceTypeInfoRequest({cxxRecordDecl}), {});
+          if (auto primaryBase = frtInfo.getPrimarySuperclass()) {
+            if (auto baseDecl = cast_or_null<ClassDecl>(
+                    Impl.importDecl(primaryBase, getVersion()))) {
+              auto classResult = cast<ClassDecl>(result);
+              Type superclassType = baseDecl->getDeclaredInterfaceType();
+              classResult->setSuperclass(superclassType);
+              classResult->setInherited(
+                  Impl.SwiftContext.AllocateCopy(ArrayRef<InheritedEntry>{
+                      TypeLoc::withoutLoc(superclassType)}));
             }
           }
         }
@@ -2919,6 +2925,14 @@ namespace {
 
       if (cxxRecordDecl) {
         if (auto structResult = dyn_cast<StructDecl>(result)) {
+          // If this class is abstract, any of its methods might use a pure
+          // virtual method.
+          if (cxxRecordDecl->isAbstract()) {
+            Impl.markUnavailable(
+                result,
+                "abstract C++ classes cannot be used as values in Swift");
+          }
+
           // Address-only type is a type that can't be passed in registers.
           // Address-only types are typically non-trivial, however some
           // non-trivial types can be loadable as well (although such types
@@ -4442,10 +4456,7 @@ namespace {
         return false;
       };
 
-      auto swiftParams = result->getParameters();
-      bool hasSelf =
-          result->isInstanceMethod() && !isa<ConstructorDecl>(result);
-      auto returnIdx = swiftParams->size() + hasSelf;
+      auto returnIdx = result->getLifetimeDependenceResultIndex();
 
       if (inferSelfDependence(decl, result, returnIdx))
         return;
@@ -4470,6 +4481,9 @@ namespace {
       auto retType = decl->getReturnType();
       auto warnForEscapableReturnType = [&] {
         if (isEscapableAnnotatedType(retType.getTypePtr())) {
+          // Swift drops lifetime dependencies on Escapable targets, so this
+          // annotation is not enforced. Import the API as @unsafe.
+          hasSkippedLifetimeAnnotation = true;
           Impl.addImportDiagnostic(
               decl,
               Diagnostic(diag::return_escapable_with_lifetimebound,
@@ -4606,11 +4620,14 @@ namespace {
                 CxxEscapability::Unknown) == CxxEscapability::NonEscapable)
           lifetimeDependencies.push_back(immortalLifetime);
       }
-      bool resultIsNonEscapable =
-          isNonEscapableAnnotatedType(retType.getTypePtr());
+      clang::QualType resultTypeForEscapability = retType;
       if (auto *ctordecl = dyn_cast<clang::CXXConstructorDecl>(decl))
-        resultIsNonEscapable = isNonEscapableAnnotatedType(
-            ctordecl->getParent()->getTypeForDecl());
+        resultTypeForEscapability =
+            Impl.getClangASTContext().getRecordType(ctordecl->getParent());
+      bool resultIsNonEscapable =
+          isNonEscapableAnnotatedType(resultTypeForEscapability.getTypePtr());
+      bool resultDependenceIsAnnotated =
+          getLifetimeDependenceFor(lifetimeDependencies, returnIdx).has_value();
 
       if (!lifetimeDependencies.empty()) {
         Impl.SwiftContext.evaluator.cacheOutput(
@@ -4623,14 +4640,27 @@ namespace {
         // synthesize a scoped dependency that would be invalid.
         cacheImmortalLifetime(result);
       } else if (resultIsNonEscapable) {
+        auto policy = Impl.getClangASTContext().getPrintingPolicy();
+        policy.SuppressTagKeyword = true;
         Impl.addImportDiagnostic(
             decl,
             Diagnostic(diag::return_nonescapable_without_lifetimebound,
-                       Impl.SwiftContext.AllocateCopy(retType.getAsString())),
+                       Impl.SwiftContext.AllocateCopy(
+                           resultTypeForEscapability.getAsString(policy))),
             decl->getLocation());
       }
 
-      if (hasSkippedLifetimeAnnotation) {
+      // A ~Escapable result with no dependency spelled in C++ still gets one
+      // synthesized by Swift's implicit inference. Import it as @unsafe unless
+      // it has a hand-written '@lifetime(...)' or an explicit 'safe' as an
+      // author's audit.
+      bool resultDependenceIsInferred =
+          !resultDependenceIsAnnotated &&
+          !isEscapable(resultTypeForEscapability) &&
+          !result->getAttrs().hasAttribute<LifetimeAttr>() &&
+          !hasSwiftAttribute(decl, {"safe"});
+
+      if (hasSkippedLifetimeAnnotation || resultDependenceIsInferred) {
         result->addAttribute(new (ASTContext) UnsafeAttr(/*implicit=*/true));
       } else {
         for (auto [idx, param] : llvm::enumerate(decl->parameters())) {
@@ -4716,9 +4746,7 @@ namespace {
       auto importedName = Impl.importFullName(clangDecl, Impl.CurrentVersion);
       if (!importedName || importedName.hasCustomName())
         return;
-      if (evaluateOrDefault(Impl.SwiftContext.evaluator,
-                            IsSafeUseOfCxxDecl({clangDecl, Impl.SwiftContext}),
-                            {}))
+      if (!shouldRenameCXXMethodAsUnsafe(clangDecl, Impl.SwiftContext))
         return;
 
       DeclName currentName = swiftDecl->getName();
@@ -9352,7 +9380,7 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
     //
     // __attribute__((swift_attr("attribute")))
     //
-    bool seenUnsafe = false;
+    std::optional<bool> seenUnsafe;
     for (auto swiftAttr : ClangDecl->specific_attrs<clang::SwiftAttrAttr>()) {
       // FIXME: Hard-code @MainActor and @UIActor, because we don't have a
       // point at which to do name lookup for imported entities.
@@ -9457,7 +9485,16 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
         continue;
       }
 
+      // A declaration can carry both spellings, and these attributes are also
+      // gathered from more than one Clang declaration. The strongest one wins,
+      // regardless of the order they appear in.
       if (swiftAttr->getAttribute() == "unsafe") {
+        if (!seenUnsafe)
+          seenUnsafe = false;
+        continue;
+      }
+
+      if (swiftAttr->getAttribute() == "unsafe(always)") {
         seenUnsafe = true;
         continue;
       }
@@ -9470,12 +9507,15 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
       importNontrivialAttribute(MappedDecl, swiftAttr->getAttribute());
     }
 
-    bool importUnsafeHeuristic =
-        isa<clang::CXXMethodDecl>(ClangDecl) &&
-        !evaluateOrDefault(SwiftContext.evaluator,
-                           IsSafeUseOfCxxDecl({ClangDecl, SwiftContext}), {});
+    bool importUnsafeHeuristic = false;
+    if (const auto *CXXMethod = dyn_cast<clang::CXXMethodDecl>(ClangDecl);
+        CXXMethod && shouldRenameCXXMethodAsUnsafe(CXXMethod, SwiftContext))
+      importUnsafeHeuristic = true;
+
     if (seenUnsafe || importUnsafeHeuristic) {
-      auto attr = new (SwiftContext) UnsafeAttr(/*implicit=*/!seenUnsafe);
+      auto attr = new (SwiftContext)
+          UnsafeAttr(SourceLoc(), SourceRange(), seenUnsafe.value_or(false),
+                     /*implicit=*/!seenUnsafe.has_value());
       MappedDecl->addAttribute(attr);
     }
   };
@@ -9875,6 +9915,25 @@ void ClangImporter::Implementation::importAttributes(
       StringRef swiftReplacement = "";
       if (!replacement.empty())
         swiftReplacement = getSwiftNameFromClangName(replacement);
+
+      // If an earlier phase already introduced this platform (e.g. the
+      // synthesized Swift-runtime availability for foreign reference types),
+      // fold its introduction version into this attribute and drop it, rather
+      // than leaving two @available attributes for the same platform (which
+      // can render as an invalid short-form @available).
+      if (auto *prevAttr =
+              findAvailableAttrForPlatform(MappedDecl, *platformK)) {
+        if (auto prevIntroduced = prevAttr->getRawIntroduced()) {
+          // Only fold the introduction version into an attribute that actually
+          // introduces availability. For an unavailable attribute an
+          // introduction version would be meaningless (the platform is
+          // unavailable regardless), so just drop the earlier attribute.
+          if (AttrKind == AvailableAttr::Kind::Default &&
+              (introduced.empty() || *prevIntroduced > introduced))
+            introduced = *prevIntroduced;
+          MappedDecl->getAttrs().removeAttribute(prevAttr);
+        }
+      }
 
       auto AvAttr = new (C) AvailableAttr(
           SourceLoc(), SourceRange(),
@@ -10973,13 +11032,10 @@ void ClangRecordMemberLoader::load(const clang::RecordDecl *clangRecord,
   if ((cxxRecord = dyn_cast<clang::CXXRecordDecl>(clangRecord)) &&
       cxxRecord->isCompleteDefinition()) {
     const clang::RecordDecl *superclassClangDecl = nullptr;
-    if (Impl.SwiftContext.LangOpts.hasFeature(
-            Feature::ForeignReferenceTypeInheritance)) {
-      auto derivedInfo =
-          evaluateOrDefault(Impl.SwiftContext.evaluator,
-                            ForeignReferenceTypeInfoRequest({cxxRecord}), {});
-      superclassClangDecl = derivedInfo.getPrimarySuperclass();
-    }
+    auto derivedInfo =
+        evaluateOrDefault(Impl.SwiftContext.evaluator,
+                          ForeignReferenceTypeInfoRequest({cxxRecord}), {});
+    superclassClangDecl = derivedInfo.getPrimarySuperclass();
 
     for (auto base : cxxRecord->bases()) {
       if (skipIfNonPublic && base.getAccessSpecifier() != clang::AS_public)

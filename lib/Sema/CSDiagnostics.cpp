@@ -683,7 +683,9 @@ bool MissingConformanceFailure::diagnoseAsError() {
   }
 
   if (isExpr<KeyPathExpr>(anchor)) {
-    if (auto *P = dyn_cast<ProtocolDecl>(protocolType->getAnyNominal())) {
+    // Note that we may not have a nominal here for a layout constraint.
+    auto *NTD = protocolType->getAnyNominal();
+    if (auto *P = dyn_cast_or_null<ProtocolDecl>(NTD)) {
       if (P->isSpecificProtocol(KnownProtocolKind::Copyable)) {
         emitDiagnostic(diag::expr_keypath_noncopyable_type, nonConformingType);
         return true;
@@ -7597,6 +7599,13 @@ bool AsyncFunctionConversionFailure::diagnoseAsError() {
   }
 
   emitDiagnostic(diag::async_functiontype_mismatch, getFromType(),
+                 getToType());
+  return true;
+}
+
+bool ConversionBetweenFunctionsWithDifferentExecutionSemantics::
+    diagnoseAsError() {
+  emitDiagnostic(diag::called_once_function_type_mismatch, getFromType(),
                  getToType());
   return true;
 }

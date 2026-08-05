@@ -298,9 +298,7 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
   // This is important to get diagnostics for errors which are located in imported modules.
   // Such errors can sometimes only be detected when building the client module, because
   // the error can be in a generic function which is specialized in the client module.
-  if (serializationOpts.EmbeddedSwiftModule &&
-      // Except for the stdlib core. We don't want to get error locations inside stdlib internals.
-      !getParseStdlib()) {
+  if (serializationOpts.EmbeddedSwiftModule) {
     serializationOpts.SerializeDebugInfoSIL = true;
   }
 

@@ -1241,6 +1241,9 @@ class ExistentialTypeInfoBuilder {
       }
 
       switch (FD->Kind) {
+        case FieldDescriptorKind::COMProtocol:
+          Representation = ExistentialTypeRepresentation::COM;
+          continue;
         case FieldDescriptorKind::ObjCProtocol:
           // Objective-C protocols do not have any witness tables.
           ObjC = true;
@@ -1395,11 +1398,17 @@ public:
     case ExistentialTypeRepresentation::Error:
       Kind = RecordKind::ErrorExistential;
       break;
+    case ExistentialTypeRepresentation::COM:
+      Kind = RecordKind::OpaqueExistential;
+      break;
     }
 
     RecordTypeInfoBuilder builder(TC, Kind);
 
     switch (Representation) {
+    case ExistentialTypeRepresentation::COM:
+      builder.addField("interface", TC.getRawPointerTypeRef(), ExternalTypeInfo);
+      break;
     case ExistentialTypeRepresentation::Class:
       // Class existentials consist of a single retainable pointer
       // followed by witness tables.
@@ -2365,7 +2374,10 @@ public:
     //  * Has at least two cases with non-zero payload size
     //  * Has a descriptor stored as BuiltinTypeInfo
     Size = FixedDescriptor->Size;
-    Alignment = FixedDescriptor->Alignment;
+    // If the descriptor doesn't know its alignment, let EnumTypeInfoBuilder
+    // calculate it.
+    if (FixedDescriptor->hasKnownAlignment())
+      Alignment = FixedDescriptor->Alignment;
     NumExtraInhabitants = FixedDescriptor->NumExtraInhabitants;
     Borrowability = FixedDescriptor->Borrowability;
     // Builtin descriptors don't record addressable-for-dependencies, but we
@@ -2547,6 +2559,7 @@ public:
                                      ReferenceCounting::Unknown);
     case FieldDescriptorKind::ObjCProtocol:
     case FieldDescriptorKind::ClassProtocol:
+    case FieldDescriptorKind::COMProtocol:
     case FieldDescriptorKind::Protocol:
       TC.setError("Invalid field descriptor", TR);
       return nullptr;
@@ -2879,7 +2892,11 @@ const RecordTypeInfo *TypeConverter::getClassInstanceTypeInfo(
     std::vector<FieldTypeInfo> Fields;
     if (!getBuilder().getFieldTypeRefs(TR, *FD.get(), ExternalTypeInfo,
                                        Fields)) {
-      setError("cannot get fields", TR);
+      if (getBuilder().getLastDemangleFailure() ==
+          remote::DemangleFailureReason::AccessorFunctionReference)
+        setError("cannot get fields: accessor function symbolic reference", TR);
+      else
+        setError("cannot get fields", TR);
       return nullptr;
     }
 
@@ -2902,6 +2919,7 @@ const RecordTypeInfo *TypeConverter::getClassInstanceTypeInfo(
   case FieldDescriptorKind::ObjCProtocol:
   case FieldDescriptorKind::ClassProtocol:
   case FieldDescriptorKind::Protocol:
+  case FieldDescriptorKind::COMProtocol:
     // Invalid field descriptor.
     setError("invalid field descriptor", TR);
     return nullptr;

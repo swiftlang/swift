@@ -254,8 +254,8 @@ void SILFunctionBuilder::addFunctionAttributes(
 
   // Add section for anything that was originally a function.
   if (isa<AbstractFunctionDecl>(decl)) {
-    if (auto *SA = Attrs.getAttribute<SectionAttr>())
-      F->setSection(SA->Name);
+    if (auto sectionName = decl->getSection())
+      F->setSection(*sectionName);
   }
 
   // Only emit replacements for the objc entry point of objc methods.
@@ -442,6 +442,11 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
     addFunctionAttributes(F, decl->getAttrs(), mod, getOrCreateDeclaration,
                           constant);
   } else if (auto *ce = constant.getAbstractClosureExpr()) {
+    // Add the section for the closure, which can be specified explicitly or
+    // inferred from the enclosing function or closure.
+    if (auto sectionName = ce->getSection())
+      F->setSection(*sectionName);
+
     if (mod.getOptions().EnableGlobalAssemblyVision) {
       F->addSemanticsAttr(semantics::FORCE_EMIT_OPT_REMARK_PREFIX);
     } else {

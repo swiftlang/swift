@@ -432,7 +432,7 @@ writeImports(raw_ostream &out, llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
     if (bridgingHeader.empty())
       return import != &M && import->getName() == M.getName();
 
-    return import->isClangHeaderImportModule();
+    return import->isClangBridgingHeaderImportModule();
   };
 
   clang::FileSystemOptions fileSystemOptions;

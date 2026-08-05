@@ -21,6 +21,7 @@
 #include "swift/AST/ImportCache.h"
 #include "swift/AST/KnownProtocols.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -49,8 +50,9 @@ getRootProtocol(std::optional<LangOptions::COMInteropModel> model) {
 
   switch (*model) {
   case LangOptions::COMInteropModel::Microsoft:
-  case LangOptions::COMInteropModel::CoreFoundation:
     return KnownProtocolKind::IUnknown;
+  case LangOptions::COMInteropModel::CoreFoundation:
+    return std::nullopt;
   }
   llvm_unreachable("unhandled COMInteropModel");
 }
@@ -257,17 +259,332 @@ VarDecl *lookupCOMImplementationID(ClassDecl *CD) {
   return nullptr;
 }
 
+const COMAttr *getAttribute(const ClassDecl *CD) {
+  auto *attr = CD->getAttrs().getAttribute<COMAttr>();
+  if (!attr)
+    return nullptr;
+
+  ASSERT(attr->IID.empty());
+  ASSERT(!attr->CLSID || !attr->CLSID->empty());
+  return attr;
+}
+
+const COMAttr *getAttribute(const ProtocolDecl *PD) {
+  auto *attr = PD->getAttrs().getAttribute<COMAttr>();
+  if (!attr)
+    return nullptr;
+
+  ASSERT(!attr->IID.empty());
+  ASSERT(!attr->CLSID);
+  return attr;
+}
+
+/// Select the unique most-derived interface among a set of comparable COM
+/// bases. Unrelated bases cannot share one interface pointer and are invalid.
+std::optional<ProtocolDecl *>
+resolveABIBase(ProtocolDecl *protocol,
+               ArrayRef<std::pair<ProtocolDecl *, SourceLoc>> bases) {
+  ASSERT(!bases.empty());
+  ProtocolDecl *selection = nullptr;
+  bool invalid = false;
+  ASTContext &C = protocol->getASTContext();
+
+  for (auto [base, loc] : bases) {
+    auto *hierarchy = base->getCOMInterfaceHierarchy();
+    if (!hierarchy || hierarchy->isInvalid()) {
+      invalid = true;
+    } else if (!selection || base->inheritsFrom(selection)) {
+      selection = base;
+    } else if (selection != base && !selection->inheritsFrom(base)) {
+      C.Diags.diagnose(loc, diag::com_interface_multiple_abi_bases,
+                       protocol->getName(), selection->getName(),
+                       base->getName());
+      invalid = true;
+    }
+  }
+
+  if (invalid)
+    return std::nullopt;
+  ASSERT(selection);
+  return selection;
+}
+
+ProtocolDecl *findInterface(ArrayRef<ProtocolDecl *> chain,
+                            StringRef iid) {
+  for (auto *interface : chain) {
+    auto *info = interface->getCOMDeclInfo();
+    ASSERT(info && info->isInterface());
+    if (iid.equals_insensitive(info->getInterfaceID()))
+      return interface;
+  }
+  return nullptr;
+}
+
 }
 }
 
 namespace swift {
-bool IsCOMObjectRequest::evaluate(Evaluator &evaluator, ClassDecl *CD) const {
-  // A class participates in the COM object model when it conforms to a COM
-  // interface, a protocol marked @com.
-  for (auto *proto : CD->getAllProtocols())
-    if (proto->getAttrs().hasAttribute<COMAttr>())
-      return true;
-  return false;
+const COMDeclInfo *
+COMDeclInfoRequest::evaluate(Evaluator &evaluator,
+                             NominalTypeDecl *nominal) const {
+  auto &ctx = nominal->getASTContext();
+
+  if (auto *PD = dyn_cast<ProtocolDecl>(nominal)) {
+    auto *attr = ::com::getAttribute(PD);
+    if (!attr)
+      return nullptr;
+
+    return ctx.AllocateObjectCopy(COMDeclInfo::forInterface(attr->IID));
+  } else if (auto *CD = dyn_cast<ClassDecl>(nominal)) {
+    ProtocolDecl *root = nullptr;
+    if (auto interface = ::com::getRootProtocol(ctx.LangOpts.COMModel))
+      root = ctx.getProtocol(*interface);
+
+    SmallVector<ProtocolDecl *, 2> interfaces;
+    for (auto *proto : CD->getAllProtocols(/*sorted=*/true)) {
+      if (proto->isCOMInterface() && proto != root &&
+          !proto->isSpecificProtocol(KnownProtocolKind::ISwiftObject))
+        interfaces.push_back(proto);
+    }
+
+    const COMDeclInfo *superInfo = nullptr;
+    if (auto *superclass = CD->getSuperclassDecl()) {
+      auto *info = superclass->getCOMDeclInfo();
+      if (info && info->isImplementation())
+        superInfo = info;
+    }
+
+    auto *attr = ::com::getAttribute(CD);
+    if (!attr && interfaces.empty() && !superInfo)
+      return nullptr;
+
+    SmallVector<ProtocolDecl *, 2> antichain;
+    if (superInfo) {
+      llvm::append_range(antichain, superInfo->getInterfaceSlots());
+    } else {
+      // Keep the compiler-managed Swift identity interface at the stable
+      // position closest to the Swift heap-object address point.
+      ProtocolDecl *ISO = ctx.getProtocol(KnownProtocolKind::ISwiftObject);
+      ASSERT(ISO);
+      antichain.push_back(ISO);
+    }
+
+    // Preserve every superclass interface position. A more-derived interface
+    // in an existing refinement chain replaces that position; a new
+    // independent chain is appended. This keeps an interface value formed from
+    // a statically typed superclass reference valid for every subclass
+    // instance.
+    for (ProtocolDecl *interface : interfaces) {
+      if (llvm::any_of(interfaces, [&](const ProtocolDecl *PD) {
+                        return PD != interface && PD->inheritsFrom(interface);
+                       }))
+          continue;
+
+      bool inserted = false;
+      for (auto &PD : drop_begin(antichain)) {
+        if (interface == PD || PD->inheritsFrom(interface)) {
+          inserted = true;
+          break;
+        }
+        if (interface->inheritsFrom(PD)) {
+          PD = interface;
+          inserted = true;
+          break;
+        }
+      }
+
+      if (!inserted)
+        antichain.push_back(interface);
+    }
+
+    StringRef implementationID;
+    std::optional<COMThreadingModel> threadingModel;
+    if (attr) {
+      if (attr->CLSID)
+        implementationID = *attr->CLSID;
+      threadingModel = attr->getThreadingModel();
+    }
+
+    return ctx.AllocateObjectCopy(COMDeclInfo::forImplementation(
+        implementationID, threadingModel, root, ctx.AllocateCopy(interfaces),
+        ctx.AllocateCopy(antichain)));
+  }
+
+  return nullptr;
+}
+
+const COMInterfaceHierarchy *
+COMInterfaceHierarchyRequest::evaluate(Evaluator &evaluator,
+                                       ProtocolDecl *protocol) const {
+  auto &C = protocol->getASTContext();
+  auto *info = protocol->getCOMDeclInfo();
+
+  // Ordinary circular-inheritance checking owns the diagnostic. Do not start
+  // a recursive COM hierarchy walk in that case.
+  if (protocol->hasCircularInheritedProtocols()) {
+    if (!info)
+      return nullptr;
+    return C.AllocateObjectCopy(COMInterfaceHierarchy::invalid());
+  }
+
+  SmallVector<InheritedNominalEntry, 4> inherited;
+  if (protocol->wasDeserialized()) {
+    for (auto *base : protocol->getInheritedProtocols()) {
+      inherited.emplace_back(base, SourceLoc(), /*inheritedTypeRepr=*/nullptr,
+                             ConformanceAttributes(),
+                             /*isSuppressed=*/false);
+    }
+  } else {
+    // Class constraints do not participate in the COM interface hierarchy.
+    bool ignoredAnyObject = false;
+    InvertibleProtocolSet inverses;
+    inherited = getDirectlyInheritedNominalTypeDecls(protocol, inverses,
+                                                      ignoredAnyObject);
+  }
+
+  // A protocol that refines a COM interface must itself introduce a COM
+  // identity. A malformed @com attribute already has its own diagnostic, so
+  // do not obscure it with this follow-on error.
+  if (!info) {
+    if (protocol->getAttrs().hasAttribute<COMAttr>(
+            /*AllowInvalid=*/true))
+      return nullptr;
+
+    for (const auto &entry : inherited) {
+      auto *PD = dyn_cast<ProtocolDecl>(entry.Item);
+      if (PD && PD->isCOMInterface()) {
+        C.Diags.diagnose(entry.Loc,
+                         diag::com_interface_refinement_requires_identity,
+                         protocol->getName(), PD->getName());
+        break;
+      }
+    }
+
+    return nullptr;
+  }
+
+  bool invalid = false;
+
+  SmallVector<ProtocolDecl *, 4> markers;
+  auto record = [&](ProtocolDecl *marker) {
+    if (!llvm::is_contained(markers, marker))
+      markers.push_back(marker);
+  };
+
+  SmallVector<std::pair<ProtocolDecl *, SourceLoc>, 2> bases;
+
+  for (const auto &entry : inherited) {
+    auto *PD = dyn_cast<ProtocolDecl>(entry.Item);
+    if (!PD) {
+      C.Diags.diagnose(entry.Loc, diag::com_interface_inherits_non_protocol,
+                       protocol->getName(),
+                       entry.Item->getDeclaredInterfaceType());
+      invalid = true;
+    } else if (PD->isCOMInterface()) {
+      bases.emplace_back(PD, entry.Loc);
+    } else if (PD->isMarkerProtocol()) {
+      record(PD);
+      for (auto *marker : PD->getAllInheritedProtocols()) {
+        if (marker->isMarkerProtocol())
+          record(marker);
+      }
+    } else {
+      C.Diags.diagnose(entry.Loc, diag::com_interface_inherits_non_marker,
+                       protocol->getName(), PD->getName());
+      invalid = true;
+    }
+  }
+
+  ProtocolDecl *base = nullptr;
+  if (!bases.empty()) {
+    if (const auto resolved = ::com::resolveABIBase(protocol, bases))
+      base = *resolved;
+    else
+      invalid = true;
+  }
+
+  if (invalid)
+    return C.AllocateObjectCopy(COMInterfaceHierarchy::invalid());
+
+  SmallVector<ProtocolDecl *, 4> chain;
+  // A root interface has no COM base; its ABI chain starts with the current
+  // interface when it is appended below.
+  if (base) {
+    auto *hierarchy = base->getCOMInterfaceHierarchy();
+    ASSERT(hierarchy && !hierarchy->isInvalid());
+    for (auto *marker : hierarchy->getMarkerProtocols())
+      record(marker);
+    llvm::append_range(chain, hierarchy->getABIChain());
+  }
+  llvm::sort(markers, [](ProtocolDecl *lhs, ProtocolDecl *rhs) {
+    return TypeDecl::compare(lhs, rhs) < 0;
+  });
+
+  // An IID denotes one logical interface in an ABI chain. Reusing it for a
+  // derived declaration would make QueryInterface unable to distinguish the
+  // two layouts.
+  if (auto *interface = ::com::findInterface(chain, info->getInterfaceID())) {
+    auto *attr = protocol->getAttrs().getAttribute<COMAttr>();
+    SourceLoc loc = attr ? attr->getLocation() : protocol->getLoc();
+    C.Diags.diagnose(loc, diag::com_interface_repeated_iid, protocol->getName(),
+                     interface->getName(), info->getInterfaceID());
+    return C.AllocateObjectCopy(COMInterfaceHierarchy::invalid());
+  }
+
+  chain.push_back(protocol);
+  return C.AllocateObjectCopy(
+      COMInterfaceHierarchy(C.AllocateCopy(markers), C.AllocateCopy(chain)));
+}
+
+void com::validateImplementation(ClassDecl *CD) {
+  auto *info = CD->getCOMDeclInfo();
+  if (!info)
+    return;
+
+  if (CD->isActor())
+    CD->diagnose(diag::com_actor_implementation, CD->getName());
+
+  if (CD->getObjectModel() != ReferenceCounting::Native)
+    CD->diagnose(diag::com_non_native_implementation, CD->getName());
+
+  if (CD->isGenericContext() && info->getImplementationID())
+    CD->diagnose(diag::com_generic_activatable_implementation, CD->getName());
+}
+
+void com::validateConformance(ProtocolConformance *conformance) {
+  auto *normal = dyn_cast<NormalProtocolConformance>(conformance);
+  if (!normal ||
+      normal->getSourceKind() != ConformanceEntryKind::Explicit)
+    return;
+
+  auto *protocol = normal->getProtocol();
+  if (!protocol->isCOMInterface())
+    return;
+
+  Type type = normal->getType();
+  auto *nominal = type->getAnyNominal();
+  auto *CD = dyn_cast_or_null<ClassDecl>(nominal);
+  auto &context = normal->getDeclContext()->getASTContext();
+  if (!CD) {
+    context.Diags.diagnose(normal->getLoc(),
+                           diag::com_conformance_requires_class, type,
+                           protocol->getDeclaredInterfaceType());
+    return;
+  }
+
+  auto *typeModule = CD->getParentModule();
+  auto *conformanceModule = normal->getDeclContext()->getParentModule();
+  if (!typeModule->isSameModuleLookingThroughOverlays(conformanceModule)) {
+    context.Diags.diagnose(normal->getLoc(),
+                           diag::com_conformance_must_be_in_type_module, type,
+                           protocol->getDeclaredInterfaceType());
+  }
+
+  if (!normal->getConditionalRequirements().empty()) {
+    context.Diags.diagnose(normal->getLoc(),
+                           diag::com_conditional_conformance, type,
+                           protocol->getDeclaredInterfaceType());
+  }
 }
 
 ProtocolConformance *
@@ -276,7 +593,8 @@ com::deriveImplicitConformance(NominalTypeDecl *NTD, KnownProtocolKind KP) {
   if (CD == nullptr)
     return nullptr;
 
-  if (!CD->getAttrs().hasAttribute<COMAttr>())
+  auto *info = CD->getCOMDeclInfo();
+  if (!info || !info->isImplementation())
     return nullptr;
 
   ASTContext &context = NTD->getASTContext();
@@ -324,10 +642,8 @@ com::deriveImplicitConformance(NominalTypeDecl *NTD, KnownProtocolKind KP) {
 VarDecl *SynthesizeCOMInterfaceIDRequest::evaluate(Evaluator &evaluator,
                                                    ProtocolDecl *PD) const {
   auto &ASTContext = PD->getASTContext();
-  if (!ASTContext.LangOpts.EnableCOMInterop)
-    return nullptr;
-  auto *attr = PD->getAttrs().getAttribute<COMAttr>();
-  if (!attr || attr->isInvalid() || attr->IID.empty())
+  auto *info = PD->getCOMDeclInfo();
+  if (!info)
     return nullptr;
   // Only synthesize for a protocol defined in a source file of the module being
   // compiled.  A deserialized module or swiftinterface already carries the
@@ -335,21 +651,29 @@ VarDecl *SynthesizeCOMInterfaceIDRequest::evaluate(Evaluator &evaluator,
   // would duplicate it, or fabricate a member absent from an older interface.
   if (!PD->isInSwiftSourceFile())
     return ::com::lookupCOMInterfaceID(PD);
-  return ::com::synthesizeIIDProperty(PD, ASTContext, attr->IID);
+  return ::com::synthesizeIIDProperty(PD, ASTContext, info->getInterfaceID());
 }
 
-VarDecl *SynthesizeCOMImplementationIDRequest::evaluate(Evaluator &evaluator,
-                                                        ClassDecl *CD) const {
+VarDecl *SynthesizeCOMCLSIDRequest::evaluate(Evaluator &evaluator,
+                                             ClassDecl *CD) const {
   auto &ASTContext = CD->getASTContext();
-  if (!ASTContext.LangOpts.EnableCOMInterop)
+
+  // CLSID is the Microsoft model's spelling and activation surface. Other
+  // models may consume the implementation UUID through their own policy, but
+  // must not acquire a synthetic Microsoft-named member.
+  if (ASTContext.LangOpts.COMModel != LangOptions::COMInteropModel::Microsoft)
     return nullptr;
-  auto *attr = CD->getAttrs().getAttribute<COMAttr>();
-  if (!attr || attr->isInvalid() || !attr->CLSID || attr->CLSID->empty())
+
+  auto *info = CD->getCOMDeclInfo();
+  if (!info)
+    return nullptr;
+  auto implementationID = info->getImplementationID();
+  if (!implementationID)
     return nullptr;
   // Synthesize only for a source-file class; recover the imported member by
   // name lookup (see SynthesizeCOMInterfaceIDRequest).
   if (!CD->isInSwiftSourceFile())
     return ::com::lookupCOMImplementationID(CD);
-  return ::com::synthesizeCLSIDProperty(CD, ASTContext, *attr->CLSID);
+  return ::com::synthesizeCLSIDProperty(CD, ASTContext, *implementationID);
 }
 }

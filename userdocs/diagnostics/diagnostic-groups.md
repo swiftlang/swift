@@ -43,6 +43,7 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:clang-declaration-import>
 - <doc:inconsistent-import-access>
 - <doc:isolated-conformances>
+- <doc:key-path-allocation>
 - <doc:error-in-future-swift-version>
 - <doc:old-suppressed-associatedtypes>
 - <doc:canimport-missing-module>
@@ -74,9 +75,9 @@ Or upgrade all warnings except deprecated declaration to errors:
 
 ## Topics
 - <doc:dynamic-callable-requirements>
-- <doc:actors-cannot-conform-to-global-actor-protocols>
 - <doc:add-preconcurrency-import>
 - <doc:always-available-domain>
+- <doc:always-unsafe>
 - <doc:trailing-closure-matching>
 - <doc:actor-isolated-mutating-async>
 - <doc:actor-isolated-call>
@@ -99,6 +100,7 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:clang-declaration-import>
 - <doc:inconsistent-import-access>
 - <doc:isolated-conformances>
+- <doc:key-path-allocation>
 - <doc:error-in-future-swift-version>
 - <doc:old-suppressed-associatedtypes>
 - <doc:canimport-missing-module>
