@@ -2925,7 +2925,9 @@ void SwiftLangSupport::getObjCSelector(
       }
 
       unsigned BufferID = SF->getBufferID();
-      SourceLoc Loc = SM.getLocForOffset(BufferID, Offset);
+      // Snap the offset to the start of the token so that a cursor anywhere
+      // inside an identifier resolves, not just on its first character.
+      SourceLoc Loc = Lexer::getLocForStartOfToken(SM, BufferID, Offset);
 
       auto CursorInfo = evaluateOrDefault(
           SF->getASTContext().evaluator,
