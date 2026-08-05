@@ -190,24 +190,30 @@ struct RetainReleaseInfo {
     return numRetain() == 1 && numRelease() == 1 && !hasMixedImmortality();
   }
 
-  /// Diagnose a missing/duplicated retain:/release: attribute or a mixed
-  /// immortal/non-immortal annotation via \p Impl (if non-null). Returns
-  /// whether the annotations are structurally well-formed.
+  /// Diagnose malformed retain:/release: attributes via \p Impl (if non-null).
+  /// Returns whether the annotations are structurally well-formed.
   bool checkShape(ClangImporter::Implementation *Impl) const {
     HeaderLoc loc(decl->getLocation());
-    auto checkCount = [&](unsigned count, bool isRelease) {
-      if (count == 1)
-        return true;
-      if (Impl)
-        Impl->diagnose(loc,
-                       count == 0
-                           ? diag::reference_type_must_have_retain_release_attr
-                           : diag::too_many_reference_type_retain_release_attr,
-                       isRelease, decl->getNameAsString());
-      return false;
+    auto checkOp = [&](unsigned count, StringRef name, bool isRelease) {
+      if (count != 1) {
+        if (Impl)
+          Impl->diagnose(
+              loc,
+              count == 0 ? diag::reference_type_must_have_retain_release_attr
+                         : diag::too_many_reference_type_retain_release_attr,
+              isRelease, decl->getNameAsString());
+        return false;
+      }
+      if (name.empty()) {
+        if (Impl)
+          Impl->diagnose(loc, diag::reference_type_empty_retain_release_name,
+                         isRelease, decl->getNameAsString());
+        return false;
+      }
+      return true;
     };
-    bool retainOk = checkCount(retainCount, /*isRelease=*/false);
-    bool releaseOk = checkCount(releaseCount, /*isRelease=*/true);
+    bool retainOk = checkOp(retainCount, retain, /*isRelease=*/false);
+    bool releaseOk = checkOp(releaseCount, release, /*isRelease=*/true);
     if (!retainOk || !releaseOk)
       return false;
 

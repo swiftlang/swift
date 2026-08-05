@@ -267,6 +267,9 @@ ERROR(too_many_reference_type_retain_release_attr, none,
       "Swift "
       "attribute",
       (bool, StringRef))
+ERROR(reference_type_empty_retain_release_name, none,
+      "reference type '%1' has an empty %select{retain|release}0 operation name",
+      (bool, StringRef))
 ERROR(foreign_reference_types_cannot_find_retain_release, none,
       "cannot find %select{retain|release}0 function '%1' for reference type "
       "'%2'",
