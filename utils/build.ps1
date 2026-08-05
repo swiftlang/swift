@@ -260,12 +260,12 @@ if ($UseHostToolchain -is [string]) {
 $DefaultPinned = @{
   AMD64 = @{
     PinnedBuild = "https://download.swift.org/swift-6.4.x-branch/windows10/swift-6.4.x-DEVELOPMENT-SNAPSHOT-2026-08-01-a/swift-6.4.x-DEVELOPMENT-SNAPSHOT-2026-08-01-a-windows10.exe";
-    PinnedSHA256 = "C9C3E64A05E5ED0857C2DF5B099113251F326CE73A05E1C88D0AB6F8EFE04BA2";
+    PinnedSHA256 = "C287DD533A65A73D657B1B9F2305BE50552F89B46199A0F6162A287DEE547149";
     PinnedVersion = "6.4.0";
   };
   ARM64 = @{
     PinnedBuild = "https://download.swift.org/swift-6.4.x-branch/windows10-arm64/swift-6.4.x-DEVELOPMENT-SNAPSHOT-2026-08-01-a/swift-6.4.x-DEVELOPMENT-SNAPSHOT-2026-08-01-a-windows10-arm64.exe"
-    PinnedSHA256 = "9481876E76B42A4FFA7B5394EA47C664FA899CBD6F1986E4770E8D9F3E21F773";
+    PinnedSHA256 = "8C9F35E37DA08CC598E0CBC7821880D2282E4D02633DD78ECBB248370A5C9985";
     PinnedVersion = "6.4.0";
   };
 }
