@@ -537,18 +537,32 @@ void ModuleDependencyInfo::setOutputPathAndHash(StringRef outputPath,
 
 SwiftDependencyScanningService::SwiftDependencyScanningService()
     : Alloc(), Saver(Alloc) {
-  ClangScanningService.emplace(
-      clang::dependencies::ScanningMode::DependencyDirectivesScan,
-      clang::dependencies::ScanningOutputFormat::Full,
-      clang::CASOptions(),
-      /* CAS (llvm::cas::ObjectStore) */ nullptr,
-      /* Cache (llvm::cas::ActionCache) */ nullptr,
-      // ScanningOptimizations::Default excludes the current working
-      // directory optimization. Clang needs to communicate with
-      // the build system to handle the optimization safely.
-      // Swift can handle the working directory optimizaiton
-      // already so it is safe to turn on all optimizations.
-      clang::dependencies::ScanningOptimizations::All);
+  clang::dependencies::DependencyScanningServiceOptions opts;
+  // ScanningOptimizations::Default excludes the current working directory
+  // optimization. Clang needs to communicate with the build system to handle
+  // the optimization safely. Swift can handle the working directory
+  // optimizaiton already so it is safe to turn on all optimizations.
+  opts.OptimizeArgs = clang::dependencies::ScanningOptimizations::All;
+  // The Swift scanner relies on the set of Clang modules visible from each
+  // by-name module lookup to resolve Swift overlay and cross-import overlay
+  // dependencies, so opt into having Clang report them.
+  opts.ReportVisibleModules = true;
+  opts.MakeVFS = ClangScanningFSFactory;
+
+  ClangScanningService.emplace(std::move(opts));
+}
+
+void SwiftDependencyScanningService::setClangScanningFSFactory(
+    std::function<llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>()> factory) {
+  ClangScanningFSFactory = std::move(factory);
+  // The Clang scanning service now owns the base VFS factory (via
+  // DependencyScanningServiceOptions::MakeVFS) rather than each scanning tool,
+  // so re-create it to pick up the new factory while preserving all other
+  // options that were configured earlier (e.g. CAS compilation mode).
+  clang::dependencies::DependencyScanningServiceOptions opts =
+      ClangScanningService->getOpts();
+  opts.MakeVFS = ClangScanningFSFactory;
+  ClangScanningService.emplace(std::move(opts));
 }
 
 bool
@@ -676,15 +690,21 @@ bool SwiftDependencyScanningService::setupCachingDependencyScanningService(
   CASOpts.PluginPath = CASConfig->PluginPath;
   CASOpts.PluginOptions = CASConfig->PluginOptions;
 
-  ClangScanningService.emplace(
-      clang::dependencies::ScanningMode::DependencyDirectivesScan,
-      clang::dependencies::ScanningOutputFormat::FullIncludeTree,
-      CASOpts, Instance.getSharedCASInstance(),
-      Instance.getSharedCacheInstance(),
-      // The current working directory optimization (off by default)
-      // should not impact CAS. We set the optization to all to be
-      // consistent with the non-CAS case.
-      clang::dependencies::ScanningOptimizations::All);
+  {
+    clang::dependencies::DependencyScanningServiceOptions opts;
+    // The current working directory optimization (off by default) should not
+    // impact CAS. We set the optization to all to be consistent with the
+    // non-CAS case.
+    opts.OptimizeArgs = clang::dependencies::ScanningOptimizations::All;
+    // See the non-CAS case above.
+    opts.ReportVisibleModules = true;
+    opts.Compilation = clang::dependencies::IncludeTreeCompilation{
+        CASOpts, Instance.getSharedCASInstance(),
+        Instance.getSharedCacheInstance()};
+    opts.MakeVFS = ClangScanningFSFactory;
+
+    ClangScanningService.emplace(std::move(opts));
+  }
 
   return false;
 }

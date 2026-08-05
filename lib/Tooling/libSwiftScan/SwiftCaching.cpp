@@ -489,9 +489,11 @@ createCachedCompilation(SwiftScanCAS &CAS, const llvm::cas::CASID &ID,
     }
   }
   {
-    clang::cas::CompileJobResultSchema Schema(CAS.getCAS());
-    if (Schema.isRootNode(*Proxy)) {
-      auto Result = Schema.load(Proxy->getRef());
+    auto Schema = clang::cas::CompileJobResultSchema::create(CAS.getCAS());
+    if (!Schema)
+      return Schema.takeError();
+    if (Schema->isRootNode(*Proxy)) {
+      auto Result = Schema->load(Proxy->getRef());
       if (!Result)
         return Result.takeError();
       return new SwiftCachedCompilationHandle(*KeyRef, *Ref, std::move(*Result),

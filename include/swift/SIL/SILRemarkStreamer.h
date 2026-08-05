@@ -61,6 +61,8 @@ private:
 public:
   static std::unique_ptr<SILRemarkStreamer> create(SILModule &silModule);
 
+  ~SILRemarkStreamer();
+
 public:
   llvm::remarks::RemarkStreamer &getLLVMStreamer();
   const llvm::remarks::RemarkStreamer &getLLVMStreamer() const;

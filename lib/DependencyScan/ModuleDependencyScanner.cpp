@@ -29,6 +29,8 @@
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Subsystems.h"
 #include "clang/CAS/IncludeTree.h"
+#include "clang/Basic/DiagnosticOptions.h"
+#include "clang/Frontend/TextDiagnosticPrinter.h"
 #include "clang/Lex/HeaderSearchOptions.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/CAS/CASProvidingFileSystem.h"
@@ -221,9 +223,7 @@ ModuleDependencyScanningWorker::ModuleDependencyScanningWorker(
     : workerCompilerInvocation(
           std::make_unique<CompilerInvocation>(ScanCompilerInvocation)),
       workerSourceMgr(ScanASTContext.SourceMgr.getFileSystem()),
-      clangScanningTool(
-          *globalScanningService.ClangScanningService,
-          getClangScanningFS(globalScanningService, CAS, ScanASTContext)),
+      clangScanningTool(*globalScanningService.ClangScanningService),
       CAS(CAS), ActionCache(ActionCache),
       diagnosticReporter(DiagnosticReporter),
       ShareClangCompilerInstance(ShareClangCompilerInstance) {
@@ -311,15 +311,6 @@ ModuleDependencyScanningWorker::ModuleDependencyScanningWorker(
       workerCompilerInvocation->getSearchPathOptions().ExplicitSwiftModuleInputs);
 }
 
-llvm::Error ModuleDependencyScanningWorker::initializeClangScanningTool() {
-  return clangScanningTool.initializeCompilerInstanceWithContext(
-      clangScanningWorkingDirectoryPath, clangScanningModuleCommandLineArgs);
-}
-
-llvm::Error ModuleDependencyScanningWorker::finalizeClangScanningTool() {
-  return clangScanningTool.finalizeCompilerInstanceWithContext();
-}
-
 SwiftModuleScannerQueryResult
 ModuleDependencyScanningWorker::scanFilesystemForSwiftModuleDependency(
     Identifier moduleName, bool isTestableImport) {
@@ -334,14 +325,37 @@ ModuleDependencyScanningWorker::scanFilesystemForClangModuleDependency(
     const llvm::DenseSet<clang::dependencies::ModuleID>
         &alreadySeenModules) {
   diagnosticReporter.registerNamedClangModuleQuery();
+
+  // The action controller drives module-output lookups for this query. It only
+  // needs to live for the duration of the scan below: the by-name context APIs
+  // consult it while building/reusing the shared compiler instance and clone it
+  // internally for each individual query.
+  auto controller =
+      clangScanningTool.createActionController(lookupModuleOutput);
+
   auto clangModuleDependencies =
-      ShareClangCompilerInstance
-          ? clangScanningTool.computeDependenciesByNameWithContext(
-                moduleName.str(), alreadySeenModules, lookupModuleOutput)
-          : clangScanningTool.getModuleDependencies(
-                moduleName.str(), clangScanningModuleCommandLineArgs,
-                clangScanningWorkingDirectoryPath, alreadySeenModules,
-                lookupModuleOutput);
+      [&]() -> llvm::Expected<clang::dependencies::TranslationUnitDeps> {
+    if (ShareClangCompilerInstance) {
+      // Lazily create the persistent by-name scanning context on the first
+      // query. Behind the scenes it maintains a single Clang compiler instance
+      // that is reused across all subsequent by-name lookups performed by this
+      // worker.
+      if (!clangScanningContext) {
+        auto context =
+            clang::tooling::CompilerInstanceWithContext::initializeOrError(
+                clangScanningTool, clangScanningWorkingDirectoryPath,
+                clangScanningModuleCommandLineArgs, *controller);
+        if (!context)
+          return context.takeError();
+        clangScanningContext.emplace(std::move(*context));
+      }
+      return clangScanningContext->computeDependenciesByNameOrError(
+          moduleName.str(), alreadySeenModules, *controller);
+    }
+    return clangScanningTool.getModuleDependencies(
+        moduleName.str(), clangScanningModuleCommandLineArgs,
+        clangScanningWorkingDirectoryPath, alreadySeenModules, *controller);
+  }();
   if (!clangModuleDependencies) {
     llvm::handleAllErrors(
         clangModuleDependencies.takeError(),
@@ -369,27 +383,28 @@ ModuleDependencyScanningWorker::scanHeaderDependenciesOfSwiftModule(
     LookupModuleOutputCallback lookupModuleOutput,
     const llvm::DenseSet<clang::dependencies::ModuleID>
        &alreadySeenModules) {
+  // Capture any diagnostics the Clang scanner emits into a string so that we
+  // can surface them through the Swift diagnostic engine on failure. Unlike the
+  // by-name scan, the translation-unit scan reports errors via a diagnostic
+  // consumer rather than returning them as an llvm::Error.
+  std::string errorStr;
+  llvm::raw_string_ostream errorOS(errorStr);
+  clang::DiagnosticOptions diagOpts;
+  clang::TextDiagnosticPrinter diagConsumer(errorOS, diagOpts);
+
   // Scan the specified textual header file and collect its dependencies
-  auto scanHeaderDependencies = [&]()
-      -> llvm::Expected<clang::dependencies::TranslationUnitDeps> {
-    auto dependencies = clangScanningTool.getTranslationUnitDependencies(
-        inputSpecificClangScannerCommand(clangScanningBaseCommandLineArgs,
-                                         headerPath),
-        clangScanningWorkingDirectoryPath, alreadySeenModules,
-        lookupModuleOutput, sourceBuffer);
-    if (!dependencies)
-      return dependencies.takeError();
-    return dependencies;
-  };
+  auto clangModuleDependencies = clangScanningTool.getTranslationUnitDependencies(
+      inputSpecificClangScannerCommand(clangScanningBaseCommandLineArgs,
+                                       headerPath),
+      clangScanningWorkingDirectoryPath, diagConsumer, alreadySeenModules,
+      lookupModuleOutput, sourceBuffer);
 
   // - If a generated header is provided, scan the generated header.
   // - Textual module dependencies require us to process their bridging header.
   // - Binary module dependnecies may have arbitrary header inputs.
-  auto clangModuleDependencies = scanHeaderDependencies();
   if (!clangModuleDependencies) {
-    auto errorStr = toString(clangModuleDependencies.takeError());
     workerDiagnosticEngine->diagnose(
-        SourceLoc(), diag::clang_header_dependency_scan_error, errorStr);
+        SourceLoc(), diag::clang_header_dependency_scan_error, errorOS.str());
     return std::nullopt;
   }
 
@@ -567,19 +582,6 @@ ModuleDependencyScanner::create(SwiftDependencyScanningService &service,
               .getFrontendOptions()
               .EmitDependencyScannerRemarks));
 
-  if (scanner->ShareClangCompilerInstance) {
-    auto initError = scanner->initializeWorkerClangScanningTool();
-
-    if (initError) {
-      llvm::handleAllErrors(
-          std::move(initError), [&](const llvm::StringError &E) {
-            instance->getDiags().diagnose(
-                SourceLoc(), diag::clang_dependency_scan_error, E.getMessage());
-          });
-      return std::make_error_code(std::errc::invalid_argument);
-    }
-  }
-
   return scanner;
 }
 
@@ -603,8 +605,7 @@ ModuleDependencyScanner::ModuleDependencyScanner(
                      : 1),
       ScanningThreadPool(llvm::hardware_concurrency(NumThreads)),
       CAS(ScanningService.ClangScanningService->getCAS()),
-      ActionCache(ScanningService.ClangScanningService->getActionCache()),
-      ShareClangCompilerInstance(ShareClangCompilerInstance) {
+      ActionCache(ScanningService.ClangScanningService->getActionCache()) {
   // Setup prefix mapping.
   auto &ScannerPrefixMapper =
       ScanCompilerInvocation.getSearchPathOptions().ScannerPrefixMapper;
@@ -624,6 +625,16 @@ ModuleDependencyScanner::ModuleDependencyScanner(
         llvm::cas::createCASProvidingFileSystem(
             CAS, ScanASTContext.SourceMgr.getFileSystem()));
 
+  // The Clang dependency scanning service now owns the factory that produces
+  // each worker's base file system (rather than each scanning tool owning its
+  // own). Install it before creating any worker so that the tools pick it up.
+  // The factory creates a fresh file system per worker, as required for
+  // thread-safety.
+  ScanningService.setClangScanningFSFactory(
+      [&ScanningService, CAS = this->CAS, &ScanASTContext]() {
+        return getClangScanningFS(ScanningService, CAS, ScanASTContext);
+      });
+
   // TODO: Make num threads configurable
   for (size_t i = 0; i < NumThreads; ++i)
     Workers.emplace_front(std::make_unique<ModuleDependencyScanningWorker>(
@@ -632,28 +643,7 @@ ModuleDependencyScanner::ModuleDependencyScanner(
         PrefixMapper.get(), ShareClangCompilerInstance));
 }
 
-ModuleDependencyScanner::~ModuleDependencyScanner() {
-  if (ShareClangCompilerInstance) {
-    auto finError = finalizeWorkerClangScanningTool();
-    assert(!finError && "ClangScanningTool finalization must succeed.");
-  }
-}
-
-llvm::Error ModuleDependencyScanner::initializeWorkerClangScanningTool() {
-  for (auto &W : Workers) {
-    if (auto error = W->initializeClangScanningTool())
-      return error;
-  }
-  return llvm::Error::success();
-}
-
-llvm::Error ModuleDependencyScanner::finalizeWorkerClangScanningTool() {
-  for (auto &W : Workers) {
-    if (auto error = W->finalizeClangScanningTool())
-      return error;
-  }
-  return llvm::Error::success();
-}
+ModuleDependencyScanner::~ModuleDependencyScanner() = default;
 
 static std::set<ModuleDependencyID>
 collectBinarySwiftDeps(const ModuleDependenciesCache &cache) {
