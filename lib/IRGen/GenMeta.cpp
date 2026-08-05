@@ -7599,6 +7599,9 @@ void irgen::emitForeignTypeMetadata(IRGenModule &IGM, NominalTypeDecl *decl) {
 
 /// Get the runtime identifier for a special protocol, if any.
 SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
+  if (P->isCOMInterface())
+    return SpecialProtocol::COM;
+
   auto known = P->getKnownProtocolKind();
   if (!known)
     return SpecialProtocol::None;
