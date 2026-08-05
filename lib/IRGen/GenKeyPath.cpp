@@ -1471,13 +1471,6 @@ static bool staticKeyPathLayoutIsStatic(IRGenModule &IGM, KeyPathInst *KPI) {
   auto subs = KPI->getSubstitutions();
 
   for (const auto &comp : KPI->getPattern()->getComponents()) {
-    // A formal type isn't always legal in SIL -- an optional of a metatype,
-    // for instance -- and both SILType construction and type lowering assert
-    // on those. The emitter handles the cases it supports; rather than
-    // duplicate that reasoning, decline. Conservative, not a correctness
-    // requirement.
-    if (!currentRoot->isLegalSILType())
-      return false;
     auto rootSILTy =
         IGM.getLoweredType(AbstractionPattern::getOpaque(), currentRoot);
 
@@ -1538,12 +1531,6 @@ static bool staticKeyPathLayoutIsStatic(IRGenModule &IGM, KeyPathInst *KPI) {
     // and filled in by the once-initializer -- but we still have to be able to
     // reason about the type, so an illegal SIL type is still declined above.
     currentRoot = comp.getComponentType().subst(subs)->getCanonicalType();
-    // A component's formal type isn't always legal in SIL -- an optional of a
-    // metatype, for instance. Those need lowering to reason about, which the
-    // emitter does for the cases it handles; rather than duplicate that here,
-    // decline. This is conservative, not a correctness requirement.
-    if (!currentRoot->isLegalSILType())
-      return false;
 
   }
 
@@ -1680,8 +1667,12 @@ computeStaticKeyPathComponentLayout(IRGenModule &IGM,
                                     const KeyPathPatternComponent &comp,
                                     CanType rootTy) {
   StaticKeyPathComponentLayout layout;
+  // Lower rather than wrapping the formal type directly: a component's root
+  // can be a type that isn't legal in SIL unlowered (a metatype without a
+  // representation, say), and `SILType::getPrimitiveObjectType` asserts on
+  // those.
   auto rootSILTy =
-      SILType::getPrimitiveObjectType(rootTy->getCanonicalType());
+      IGM.getLoweredType(AbstractionPattern::getOpaque(), rootTy);
 
   switch (comp.getKind()) {
   case KeyPathPatternComponent::Kind::StoredProperty: {
