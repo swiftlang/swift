@@ -374,10 +374,21 @@ GenericEnvironment *GenericSignatureImpl::getGenericEnvironment() const {
   return GenericEnv;
 }
 
+/// Whether \p type is a valid subject for an abstract requirement query: a type
+/// parameter, or the metatype of one (e.g. the subject of `T.Type: P`). A
+/// metatype subject is threaded through the RequirementMachine tas the term
+/// `T.[metatype]`, so these queries answer correctly for it.
+namespace {
+bool isValidRequirementSubject(Type type) {
+  if (auto *metatype = type->getAs<AnyMetatypeType>())
+    type = metatype->getInstanceType();
+  return type->isTypeParameter();
+}
+}
+
 GenericSignature::LocalRequirements
 GenericSignatureImpl::getLocalRequirements(Type depType) const {
-  assert(depType->isTypeParameter() && "Expected a type parameter here");
-
+  assert(isValidRequirementSubject(depType) && "Expected a type parameter here");
   return getRequirementMachine()->getLocalRequirements(depType);
 }
 
@@ -410,15 +421,13 @@ Type GenericSignatureImpl::getSuperclassBound(Type type) const {
 /// required to conform.
 GenericSignature::RequiredProtocols
 GenericSignatureImpl::getRequiredProtocols(Type type) const {
-  assert(type->isTypeParameter() && "Expected a type parameter");
-
+  assert(isValidRequirementSubject(type) && "Expected a type parameter");
   return getRequirementMachine()->getRequiredProtocols(type);
 }
 
 bool GenericSignatureImpl::requiresProtocol(Type type,
                                             ProtocolDecl *proto) const {
-  assert(type->isTypeParameter() && "Expected a type parameter");
-
+  assert(isValidRequirementSubject(type) && "Expected a type parameter");
   return getRequirementMachine()->requiresProtocol(type, proto);
 }
 
