@@ -1,0 +1,226 @@
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -closure-specialization %s | %FileCheck %s
+
+// Fails on wasm32 because of 32/64 mismatch on stdlib function operating on String
+// REQUIRES: PTRSIZE=64
+
+// The SIL corresponds to the following Swift source:
+//
+// @inline(never)
+// public func rec<T>(_ v: T, depth: Int, f: (T) -> String) -> String {
+//   if depth <= 0 { return f(v) }
+//   return step(v, depth: depth, f: f)
+// }
+// @inline(never)
+// public func step<T>(_ v: T, depth: Int, f: (T) -> String) -> String {
+//   return rec(v, depth: depth - 1) { x in f(x) + "-t" }
+// }
+// @inline(never)
+// public func caller() -> String {
+//   return rec("X", depth: 3) { "[\($0)]" }
+// }
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+sil @$ss12_SmallStringV15_invariantCheckyyF : $@convention(method) (_SmallString) -> ()
+sil @$ss13_StringObjectV15_invariantCheckyyF : $@convention(method) (@guaranteed _StringObject) -> ()
+sil @$ss11_StringGutsV15_invariantCheckyyF : $@convention(method) (@guaranteed _StringGuts) -> ()
+sil @$sSS15_invariantCheckyyF : $@convention(method) (@guaranteed String) -> ()
+sil [transparent] [thunk] [ossa] @$s2s24step_5depth1fSSx_SiSSxXEtlFSSxXEfU_SS_TG5 : $@convention(thin) (@in_guaranteed String, @guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> @owned String for <String>) -> @owned String
+sil [ossa] @$s2s26callerSSyFS2SXEfU_ : $@convention(thin) @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> @owned String for <String>
+
+// CHECK: sil shared [noinline] [ossa] @$s2s23rec_5depth1fSSx_SiSSxXEtlFSS_Tg5025$s2s24step_5depth1fSSx_SiF19XEtlFSSxXEfU_SS_TG5xSSRi_zRi0_zlySSIsgno_Tf1nnc_n : $@convention(thin) (@guaranteed String, Int, @guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> @owned String for <String>) -> @owned String {
+// CHECK: bb0(%0 : @guaranteed $String, %1 : $Int, %2 : @guaranteed $@noescape @callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> @owned String for <String>):
+// CHECK:   // function_ref specialized closure #1 in step<A>(_:depth:f:)
+// CHECK:   %3 = function_ref @$s2s24step_5depth1fSSx_SiSSxXEtlFSSxXEfU_SS_TG5 : $@convention(thin) (@in_guaranteed String, @guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> @owned String for <String>) -> @owned String // user: %4
+// CHECK:   %4 = partial_apply [callee_guaranteed] [on_stack] %3(%2) : $@convention(thin) (@in_guaranteed String, @guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> @owned String for <String>) -> @owned String // user: %5
+// CHECK:   %5 = convert_function %4 : $@noescape @callee_guaranteed (@in_guaranteed String) -> @owned String to $@noescape @callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> @owned String for <String> // users: %22, %6
+// CHECK:   %6 = begin_borrow %5 : $@noescape @callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> @owned String for <String> // users: %21, %16, %13
+// CHECK:   %7 = alloc_stack $String                        // users: %20, %8
+// CHECK:   %8 = store_borrow %0 to %7 : $*String           // users: %19, %13
+// CHECK:   %9 = integer_literal $Builtin.Int64, 0          // user: %11
+// CHECK:   %10 = struct_extract %1 : $Int, #Int._value     // user: %11
+// CHECK:   %11 = builtin "cmp_sge_Int64"(%9 : $Builtin.Int64, %10 : $Builtin.Int64) : $Builtin.Int1 // user: %12
+// CHECK:   cond_br %11, bb1, bb2                           // id: %12
+
+// CHECK: bb1:                                              // Preds: bb0
+// CHECK:   %13 = apply %6(%8) : $@noescape @callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> @owned String for <String> // user: %14
+// CHECK:   br bb3(%13 : $String)                           // id: %14
+
+// CHECK: bb2:                                              // Preds: bb0
+// CHECK:   // function_ref specialized step<A>(_:depth:f:)
+// CHECK:   %15 = function_ref @$s2s24step_5depth1fSSx_SiSSxXEtlFSS_Tg5 : $@convention(thin) (@guaranteed String, Int, @guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> @owned String for <String>) -> @owned String // user: %16
+// CHECK:   %16 = apply %15(%0, %1, %6) : $@convention(thin) (@guaranteed String, Int, @guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> @owned String for <String>) -> @owned String // user: %17
+// CHECK:   br bb3(%16 : $String)                           // id: %17
+
+// CHECK: // %18                                            // user: %23
+// CHECK: bb3(%18 : @owned $String):                        // Preds: bb2 bb1
+// CHECK:   end_borrow %8 : $*String                        // id: %19
+// CHECK:   dealloc_stack %7 : $*String                     // id: %20
+// CHECK:   end_borrow %6 : $@noescape @callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> @owned String for <String> // id: %21
+// CHECK:   destroy_value %5 : $@noescape @callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> @owned String for <String> // id: %22
+// CHECK:   return %18 : $String                            // id: %23
+// CHECK: } // end sil function '$s2s23rec_5depth1fSSx_SiSSxXEtlFSS_Tg5025$s2s24step_5depth1fSSx_SiF19XEtlFSSxXEfU_SS_TG5xSSRi_zRi0_zlySSIsgno_Tf1nnc_n'
+
+// specialized rec<A>(_:depth:f:)
+sil shared [noinline] [ossa] @$s2s23rec_5depth1fSSx_SiSSxXEtlFSS_Tg5 : $@convention(thin) (@guaranteed String, Int, @guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> @owned String for <String>) -> @owned String {
+bb0(%0 : @guaranteed $String, %1 : $Int, %2 : @guaranteed $@noescape @callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> @owned String for <String>):
+  %3 = alloc_stack $String                        // users: %19, %4
+  %4 = store_borrow %0 to %3                      // users: %18, %12, %5
+  %8 = integer_literal $Builtin.Int64, 0          // user: %10
+  %9 = struct_extract %1, #Int._value             // user: %10
+  %10 = builtin "cmp_sge_Int64"(%8, %9) : $Builtin.Int1 // user: %11
+  cond_br %10, bb1, bb2                           // id: %11
+
+bb1:                                              // Preds: bb0
+  %12 = apply %2(%4) : $@noescape @callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> @owned String for <String> // user: %13
+  br bb3(%12)                                     // id: %13
+
+bb2:                                              // Preds: bb0
+  // function_ref specialized step<A>(_:depth:f:)
+  %14 = function_ref @$s2s24step_5depth1fSSx_SiSSxXEtlFSS_Tg5 : $@convention(thin) (@guaranteed String, Int, @guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> @owned String for <String>) -> @owned String // user: %15
+  %15 = apply %14(%0, %1, %2) : $@convention(thin) (@guaranteed String, Int, @guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> @owned String for <String>) -> @owned String // user: %16
+  br bb3(%15)                                     // id: %16
+
+// %17                                            // user: %20
+bb3(%17 : @owned $String):                        // Preds: bb2 bb1
+  end_borrow %4                                   // id: %18
+  dealloc_stack %3                                // id: %19
+  return %17                                      // id: %20
+} // end sil function '$s2s23rec_5depth1fSSx_SiSSxXEtlFSS_Tg5'
+
+// specialized step<A>(_:depth:f:)
+sil shared [noinline] [ossa] @$s2s24step_5depth1fSSx_SiSSxXEtlFSS_Tg5 : $@convention(thin) (@guaranteed String, Int, @guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> @owned String for <String>) -> @owned String {
+bb0(%0 : @guaranteed $String, %1 : $Int, %2 : @guaranteed $@noescape @callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> @owned String for <String>):
+
+// CHECK: sil shared [noinline] [ossa] @$s2s24step_5depth1fSSx_SiSSxXEtlFSS_Tg5 : $@convention(thin) (@guaranteed String, Int, @guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> @owned String for <String>) -> @owned String {
+// CHECK: bb0(%0 : @guaranteed $String, %1 : $Int, %2 : @guaranteed $@noescape @callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> @owned String for <String>):
+// CHECK:   %10 = struct $Int (%7 : $Builtin.Int64)         // user: %16
+// CHECK:   // function_ref specialized closure #1 in step<A>(_:depth:f:)
+// CHECK:   %11 = function_ref @$s2s24step_5depth1fSSx_SiSSxXEtlFSSxXEfU_SS_TG5 : $@convention(thin) (@in_guaranteed String, @guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> @owned String for <String>) -> @owned String // user: %12
+// CHECK:   %12 = partial_apply [callee_guaranteed] [on_stack] %11(%2) : $@convention(thin) (@in_guaranteed String, @guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> @owned String for <String>) -> @owned String // user: %13
+// CHECK:   %13 = convert_function %12 : $@noescape @callee_guaranteed (@in_guaranteed String) -> @owned String to $@noescape @callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> @owned String for <String> // user: %17
+// CHECK:   // function_ref specialized rec<A>(_:depth:f:)
+// CHECK:   %14 = function_ref @$s2s23rec_5depth1fSSx_SiSSxXEtlFSS_Tg5 : $@convention(thin) (@guaranteed String, Int, @guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> @owned String for <String>) -> @owned String
+// CHECK:   // function_ref specialized rec<A>(_:depth:f:)
+// CHECK:   %15 = function_ref @$s2s23rec_5depth1fSSx_SiSSxXEtlFSS_Tg5025$s2s24step_5depth1fSSx_SiF19XEtlFSSxXEfU_SS_TG5xSSRi_zRi0_zlySSIsgno_Tf1nnc_n : $@convention(thin) (@guaranteed String, Int, @guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> @owned String for <String>) -> @owned String // user: %16
+// CHECK:   %16 = apply %15(%0, %10, %2) : $@convention(thin) (@guaranteed String, Int, @guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> @owned String for <String>) -> @owned String // user: %18
+// CHECK:   destroy_value %13 : $@noescape @callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> @owned String for <String> // id: %17
+// CHECK:   return %16 : $String                            // id: %18
+
+  %6 = integer_literal $Builtin.Int64, 1          // user: %9
+  %7 = struct_extract %1, #Int._value             // user: %9
+  %8 = integer_literal $Builtin.Int1, -1          // user: %9
+  %9 = builtin "ssub_with_overflow_Int64"(%7, %6, %8) : $(Builtin.Int64, Builtin.Int1) // users: %11, %10
+  %10 = tuple_extract %9, 0                       // user: %13
+  %11 = tuple_extract %9, 1                       // user: %12
+  cond_fail %11, "arithmetic overflow"            // id: %12
+  %13 = struct $Int (%10)                         // user: %18
+  // function_ref specialized closure #1 in step<A>(_:depth:f:)
+  %14 = function_ref @$s2s24step_5depth1fSSx_SiSSxXEtlFSSxXEfU_SS_TG5 : $@convention(thin) (@in_guaranteed String, @guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> @owned String for <String>) -> @owned String // user: %15
+  %15 = partial_apply [callee_guaranteed] [on_stack] %14(%2) : $@convention(thin) (@in_guaranteed String, @guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> @owned String for <String>) -> @owned String // user: %16
+  %16 = convert_function %15 to $@noescape @callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> @owned String for <String> // users: %18, %19
+  // function_ref specialized rec<A>(_:depth:f:)
+  %17 = function_ref @$s2s23rec_5depth1fSSx_SiSSxXEtlFSS_Tg5 : $@convention(thin) (@guaranteed String, Int, @guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> @owned String for <String>) -> @owned String // user: %18
+  %18 = apply %17(%0, %13, %16) : $@convention(thin) (@guaranteed String, Int, @guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> @owned String for <String>) -> @owned String // user: %20
+  destroy_value %16                               // id: %19
+  return %18                                      // id: %20
+} // end sil function '$s2s24step_5depth1fSSx_SiSSxXEtlFSS_Tg5'
+
+// caller()
+sil [noinline] [ossa] @$s2s26callerSSyF : $@convention(thin) () -> @owned String {
+[global: read,write,copy,destroy,allocate,deinit_barrier]
+bb0:
+  %0 = integer_literal $Builtin.Int8, 2           // users: %53, %62, %25, %6
+  %1 = integer_literal $Builtin.Int32, 0          // users: %54, %63
+  %2 = integer_literal $Builtin.Word, 24          // user: %25
+  %3 = string_literal utf8 ""                     // user: %5
+  %4 = integer_literal $Builtin.Word, 0           // user: %6
+  %5 = builtin "ptrtoint_Word"(%3) : $Builtin.Word // user: %6
+  %6 = struct $StaticString (%5, %4, %0)          // users: %56, %65
+  %7 = integer_literal $Builtin.Int64, 0          // users: %45, %17
+  %8 = integer_literal $Builtin.Int1, -1          // users: %46, %33
+  %9 = integer_literal $Builtin.Int64, 88         // user: %10
+  %10 = struct $UInt64 (%9)                       // users: %35, %13
+  %11 = integer_literal $Builtin.Int64, -2233785415175766016 // users: %12, %32, %20
+  %12 = struct $UInt64 (%11)                      // user: %13
+  %13 = tuple (%10, %12)                          // user: %14
+  %14 = struct $_SmallString (%13)                // user: %16
+  // function_ref _SmallString._invariantCheck()
+  %15 = function_ref @$ss12_SmallStringV15_invariantCheckyyF : $@convention(method) (_SmallString) -> () // user: %16
+  %16 = apply %15(%14) : $@convention(method) (_SmallString) -> ()
+  %17 = value_to_bridge_object %7                 // user: %18
+  %18 = copy_value %17                            // user: %19
+  destroy_value %18                               // id: %19
+  %20 = value_to_bridge_object %11                // user: %21
+  %21 = copy_value %20                            // users: %49, %35, %29, %28, %22
+  %22 = copy_value %21                            // users: %48, %41, %40
+  %23 = string_literal utf8 "Swift/StringObject.swift" // user: %24
+  %24 = builtin "ptrtoint_Word"(%23) : $Builtin.Word // user: %25
+  %25 = struct $StaticString (%24, %2, %0)        // users: %56, %65
+  %26 = integer_literal $Builtin.Int64, 251       // user: %27
+  %27 = struct $UInt (%26)                        // user: %56
+  %28 = copy_value %21                            // user: %30
+  %29 = unchecked_trivial_bit_cast %21 to $UInt64 // user: %31
+  destroy_value %28                               // id: %30
+  %31 = struct_extract %29, #UInt64._value        // user: %32
+  %32 = builtin "cmp_eq_Int64"(%31, %11) : $Builtin.Int1 // user: %33
+  %33 = builtin "int_expect_Int1"(%32, %8) : $Builtin.Int1 // user: %34
+  cond_br %33, bb1, bb2                           // id: %34
+
+bb1:                                              // Preds: bb0
+  %35 = struct $_StringObject (%10, %21)          // users: %58, %67, %37
+  // function_ref _StringObject._invariantCheck()
+  %36 = function_ref @$ss13_StringObjectV15_invariantCheckyyF : $@convention(method) (@guaranteed _StringObject) -> () // user: %37
+  %37 = apply %36(%35) : $@convention(method) (@guaranteed _StringObject) -> ()
+  %38 = integer_literal $Builtin.Int64, 635       // user: %39
+  %39 = struct $UInt (%38)                        // user: %65
+  %40 = unchecked_trivial_bit_cast %22 to $UInt64 // user: %43
+  destroy_value %22                               // id: %41
+  %42 = integer_literal $Builtin.Int64, 2305843009213693952 // user: %44
+  %43 = struct_extract %40, #UInt64._value        // user: %44
+  %44 = builtin "and_Int64"(%43, %42) : $Builtin.Int64 // user: %45
+  %45 = builtin "cmp_ne_Int64"(%44, %7) : $Builtin.Int1 // user: %46
+  %46 = builtin "int_expect_Int1"(%45, %8) : $Builtin.Int1 // user: %47
+  cond_br %46, bb4, bb3                           // id: %47
+
+bb2:                                              // Preds: bb0
+  destroy_value %22                               // id: %48
+  destroy_value [dead_end] %21                    // id: %49
+  unreachable                                     // id: %57
+
+bb3:                                              // Preds: bb1
+  destroy_value [dead_end] %35                    // id: %58
+  unreachable                                     // id: %66
+
+// CHECK: bb4:                                              // Preds: bb1
+// CHECK:   %[[#E57:]] = struct $String (%[[#]] : $_StringGuts)
+// CHECK:   %[[#E62:]] = struct $Int (%[[#]] : $Builtin.Int64)
+// CHECK:   // function_ref specialized rec<A>(_:depth:f:)
+// CHECK:   %[[#E65:]] = function_ref @$s2s23rec_5depth1fSSx_SiSSxXEtlFSS_Tg524$s2s26callerSSyFS2SXEfU_Tf1nnc_n : $@convention(thin) (@guaranteed String, Int) -> @owned String
+// CHECK:   %[[#E66:]] = apply %[[#E65]](%[[#E57]], %[[#E62]]) : $@convention(thin) (@guaranteed String, Int) -> @owned String
+// CHECK:   destroy_value %[[#E57]] : $String
+// CHECK:   return %[[#E66]] : $String
+
+bb4:                                              // Preds: bb1
+  %67 = struct $_StringGuts (%35)                 // users: %70, %69
+  // function_ref _StringGuts._invariantCheck()
+  %68 = function_ref @$ss11_StringGutsV15_invariantCheckyyF : $@convention(method) (@guaranteed _StringGuts) -> () // user: %69
+  %69 = apply %68(%67) : $@convention(method) (@guaranteed _StringGuts) -> ()
+  %70 = struct $String (%67)                      // users: %79, %78, %72
+  // function_ref String._invariantCheck()
+  %71 = function_ref @$sSS15_invariantCheckyyF : $@convention(method) (@guaranteed String) -> () // user: %72
+  %72 = apply %71(%70) : $@convention(method) (@guaranteed String) -> ()
+  %73 = integer_literal $Builtin.Int64, 3         // user: %74
+  %74 = struct $Int (%73)                         // user: %78
+  // function_ref closure #1 in caller()
+  %75 = function_ref @$s2s26callerSSyFS2SXEfU_ : $@convention(thin) @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> @owned String for <String> // user: %76
+  %76 = thin_to_thick_function %75 to $@noescape @callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> @owned String for <String> // user: %78; ownership: none
+  // function_ref specialized rec<A>(_:depth:f:)
+  %77 = function_ref @$s2s23rec_5depth1fSSx_SiSSxXEtlFSS_Tg5 : $@convention(thin) (@guaranteed String, Int, @guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> @owned String for <String>) -> @owned String // user: %78
+  %78 = apply %77(%70, %74, %76) : $@convention(thin) (@guaranteed String, Int, @guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> @owned String for <String>) -> @owned String // user: %80
+  destroy_value %70                               // id: %79
+  return %78                                      // id: %80
+} // end sil function '$s2s26callerSSyF'
