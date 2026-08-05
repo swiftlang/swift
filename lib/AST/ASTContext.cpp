@@ -6328,6 +6328,10 @@ ProtocolConformanceRef ProtocolConformanceRef::forAbstract(
   case TypeKind::OpaqueTypeArchetype:
   case TypeKind::ExistentialArchetype:
   case TypeKind::ElementArchetype:
+  case TypeKind::Metatype:
+  case TypeKind::ExistentialMetatype:
+    // The metatype of n abstract type can carry an abstract conformance its
+    // instance type is a type parameter, e.g. from 'T.Type: P'.
     break;
 
   default:
