@@ -39,6 +39,9 @@
 TYPE("swift",               Swift,                     "swift",           "")
 TYPE("sil",                 SIL,                       "sil",             "")
 TYPE("sib",                 SIB,                       "sib",             "")
+TYPE("markdown",            Markdown,                  "md",              "")
+TYPE("restructured-text",   reStructuredText,          "rst",             "")
+TYPE("latex",               LaTeX,                     "tex",             "")
 
 // Output types
 TYPE("ast-dump",            ASTDump,                   "ast",             "")

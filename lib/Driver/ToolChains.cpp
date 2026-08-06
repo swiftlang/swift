@@ -816,6 +816,9 @@ const char *ToolChain::JobContext::computeFrontendModeForCompile() const {
       llvm_unreachable("We were told to perform a standard compile, "
                        "but no mode option was passed to the driver.");
   case file_types::TY_Swift:
+  case file_types::TY_Markdown:
+  case file_types::TY_reStructuredText:
+  case file_types::TY_LaTeX:
   case file_types::TY_dSYM:
   case file_types::TY_AutolinkFile:
   case file_types::TY_Dependencies:
@@ -1099,6 +1102,9 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     case file_types::TY_JSONPolyglotAST:
       llvm_unreachable("Cannot be output from backend job");
     case file_types::TY_Swift:
+    case file_types::TY_Markdown:
+    case file_types::TY_reStructuredText:
+    case file_types::TY_LaTeX:
     case file_types::TY_dSYM:
     case file_types::TY_AutolinkFile:
     case file_types::TY_Dependencies:

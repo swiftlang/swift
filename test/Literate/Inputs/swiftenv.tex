@@ -1,0 +1,30 @@
+\documentstyle{article}
+\usepackage{listings}
+\usepackage{color}
+
+\lstnewenvironment{swift}{\lstset{language=Swift,basicstyle=\small}}{}
+
+\title{Literate Swift in \LaTeX}
+
+\begin{document}
+
+We can write Swift code in a \LaTeX document using the \texttt{swift}
+environment:
+
+\begin{swift}
+  // CHECK: LATEX
+  print("LATEX")
+\end{swift}
+
+We can calculate $7!$ using the following code:
+
+\begin{swift}
+  // CHECK: 7! = 5040
+  var result = 1
+  for n in 2...7 {
+    result *= n
+  }
+  print("7! = \(result)")
+\end{swift}
+
+\end{document}
