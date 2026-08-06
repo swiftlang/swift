@@ -100,7 +100,7 @@ public struct Empty {}
 // When an empty struct is removed, the debug_value should be fully salvaged
 // into a debug BB by cloning the struct construction.
 // CHECK-LABEL: sil @salvage_empty_struct
-// CHECK: debug_value undef : $Empty, let, name "e", transform {
+// CHECK: debug_value (), let, name "e", transform {
 // CHECK:   bb0:
 // CHECK:     %[[S:[0-9]+]] = struct $Empty ()
 // CHECK:     return %[[S]] : $Empty
@@ -139,7 +139,7 @@ bb0(%0 : $Int64, %1 : $Int64):
 // When an empty tuple is removed, the debug_value should be fully salvaged
 // into a debug BB by cloning the tuple construction.
 // CHECK-LABEL: sil @salvage_empty_tuple
-// CHECK: debug_value undef : $(), let, name "e", transform {
+// CHECK: debug_value (), let, name "e", transform {
 // CHECK:   bb0:
 // CHECK:     %[[T:[0-9]+]] = tuple ()
 // CHECK:     return %[[T]] : $()

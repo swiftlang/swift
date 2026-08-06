@@ -155,16 +155,28 @@ collectTypeDependentOperands(SmallVectorImpl<SILValue> &typeDependentOperands,
 // SILInstruction Subclasses
 //===----------------------------------------------------------------------===//
 
+/// Returns the size of the debug variable data that is tail allocated after an
+/// instruction's operands.
+static size_t getDebugVarTrailingDataSize(size_t nameLength, bool hasType,
+                                       bool hasLoc, bool hasScope,
+                                       size_t numDIExprElements) {
+  return nameLength + (hasType ? sizeof(SILType) : 0) +
+         (hasLoc ? sizeof(SILLocation) : 0) +
+         (hasScope ? sizeof(const SILDebugScope *) : 0) +
+         sizeof(SILDIExprElement) * numDIExprElements;
+}
+
 template <typename INST>
 static void *allocateDebugVarCarryingInst(SILModule &M,
                                           std::optional<SILDebugVariable> Var,
                                           ArrayRef<SILValue> Operands = {}) {
   return M.allocateInst(
-      sizeof(INST) + (Var ? Var->Name.size() : 0) +
-          (Var && Var->Type ? sizeof(SILType) : 0) +
-          (Var && Var->Loc ? sizeof(SILLocation) : 0) +
-          (Var && Var->Scope ? sizeof(const SILDebugScope *) : 0) +
-          sizeof(SILDIExprElement) * (Var ? Var->DIExpr.getNumElements() : 0) +
+      sizeof(INST) +
+          (Var ? getDebugVarTrailingDataSize(
+                     Var->Name.size(), Var->Type.has_value(),
+                     Var->Loc.has_value(), Var->Scope != nullptr,
+                     Var->DIExpr.getNumElements())
+               : 0) +
           sizeof(Operand) * Operands.size(),
       alignof(INST));
 }
@@ -455,7 +467,7 @@ DebugValueInst::DebugValueInst(
     setUsesMoveableValueDebugInfo();
   setTrace(trace);
   if (prependDeref)
-    this->prependDeref(0);
+    sharedUInt8().DebugValueInst.prependDeref = true;
 }
 
 DebugValueInst *DebugValueInst::create(SILDebugLocation DebugLoc,
@@ -586,6 +598,8 @@ SILBasicBlock *DebugValueInst::getOrCreateDebugReconstructionBlock() {
     // Clear the op_deref, unless we have an address-only type.
     if (!addressOnly)
       sharedUInt8().DebugValueInst.prependDeref = false;
+    // As the block has no argument, drop the operand.
+    eraseLastOperand();
   } else if (hasDeref()) {
     SILArgument *arg = block->createPhiArgument(
         operand->getType().getAddressType(), OwnershipKind::None);
@@ -627,7 +641,43 @@ void DebugValueInst::cloneReconstructionBlockFrom(DebugValueInst *src) {
     .cloneDebugReconstructionBlockContent(srcBB, newBB);
 }
 
+void DebugValueInst::eraseLastOperand() {
+  // The variable data is tail allocated after the operands, so shrinking the
+  // operand list moves it by one operand. It is all trivially copyable, so
+  // using memmove is safe. Nothing keeps pointers on the varinfo.
+  size_t varinfoSize = getDebugVarTrailingDataSize(
+      VarInfo.getName(getTrailingObjects<char>()).size(),
+      HasAuxDebugVariableType, hasAuxDebugLocation(), hasAuxDebugScope(),
+      NumDIExprOperands);
+  char *varinfoBegin = reinterpret_cast<char *>(getAllOperands().end());
+
+  eraseLastOperandInPlace();
+  std::memmove(varinfoBegin - sizeof(Operand), varinfoBegin, varinfoSize);
+}
+
 void DebugValueInst::killOperand(unsigned operandIdx, SILType operandType) {
+  // If there is a debug reconstruction block, the operand doesn't describe the
+  // variable directly, the block does. Drop the operand, keeping the rest of
+  // the block, as a part of the variable might be constant and still recoverable.
+  if (auto *bb = getDebugReconstructionBlock()) {
+    ASSERT(bb->getNumArguments() == getAllOperands().size() &&
+           "debug reconstruction block arguments must match the operands");
+    ASSERT(operandIdx < bb->getNumArguments());
+    auto *argument = bb->getArgument(operandIdx);
+    argument->replaceAllUsesWithUndef();
+
+    // Only a trailing operand can be removed: erasing one in the middle would
+    // shift the following operands, invalidating existing Operand pointers.
+    if (operandIdx == getAllOperands().size() - 1) {
+      bb->eraseArgument(operandIdx);
+      eraseLastOperand();
+    } else {
+      // Keep an undef operand and its now unused block argument.
+      getAllOperands()[operandIdx].set(SILUndef::get(argument));
+    }
+    return;
+  }
+
   Operand &operandRef = getAllOperands()[operandIdx];
   SILValue operand = operandRef.get();
   if (isa<SILUndef>(operand)) {
@@ -657,19 +707,6 @@ void DebugValueInst::killOperand(unsigned operandIdx, SILType operandType) {
   // The stored DIExpr only contains fragments, which we want to keep.
   if (!addressOnly)
     sharedUInt8().DebugValueInst.prependDeref = false;
-
-  // Rather than completely removing the debug reconstruction block, remove its
-  // argument, as a part of the variable might be constant and recoverable.
-  if (auto bb = getDebugReconstructionBlock()) {
-    ASSERT(operandIdx < bb->getNumArguments());
-    ASSERT(bb->getNumArguments() == 1 && "Multi operand support not ready");
-    auto argument = bb->getArgument(operandIdx);
-    argument->replaceAllUsesWithUndef();
-    // FIXME: For correct multi operand support, the operand must also be
-    // removed from the debug_value instruction's operand list, or the
-    // indices will not match.
-    bb->eraseArgument(operandIdx);
-  }
 }
 
 SILType DebugValueInst::getVarType() const {
@@ -682,12 +719,6 @@ SILType DebugValueInst::getVarType() const {
 }
 
 bool DebugValueInst::isExprTypeValid() const {
-  auto varInfo = getCompleteVarInfo();
-
-  // TODO: Multiple operands are not yet supported.
-  if (getAllOperands().size() != 1)
-    return false;
-
   // Ignore trace debug values.
   if (hasTrace())
     return true;
@@ -696,23 +727,36 @@ bool DebugValueInst::isExprTypeValid() const {
   if (!F)
     return false;
 
-  SILValue operand = getSingleOperand();
-  SILType valueType = operand->getType();
+  // A debug_value with no operands need a debug reconstruction block.
+  if (getAllOperands().empty() && !getDebugReconstructionBlock())
+    return false;
 
-  // Special case: a DebugValueInst with an alloc_box operand is equivalent to
-  // the alloc_box.
-  if (auto *box = dyn_cast<AllocBoxInst>(operand))
-    if (varInfo.DIExpr.elements().empty() &&
-        getDebugReconstructionBlock() == nullptr &&
-        varInfo.Type == box->getAddressType().getObjectType())
-      return true;
+  auto varInfo = getCompleteVarInfo();
 
-  // Transform: debug BB transforms the SSA value to its return type.
-  if (auto *debugBB = getDebugReconstructionBlock()) {
-    if (debugBB->getNumArguments() > 0) {
-      if (debugBB->getNumArguments() > 1)
-        return false;
-      if (debugBB->getArgument(0)->getType() != valueType)
+  auto operands = getAllOperands();
+  auto *debugBB = getDebugReconstructionBlock();
+  SILType valueType;
+
+  if (!debugBB) {
+    // Without a debug reconstruction block, there must be exactly one operand.
+    if (operands.size() != 1)
+      return false;
+
+    SILValue operand = getSingleOperand();
+    valueType = operand->getType();
+
+    // Special case: a DebugValueInst with an alloc_box operand is equivalent to
+    // the alloc_box.
+    if (auto *box = dyn_cast<AllocBoxInst>(operand))
+      if (varInfo.DIExpr.elements().empty() &&
+          varInfo.Type == box->getAddressType().getObjectType())
+        return true;
+  } else {
+    // Transform: debug BB transforms the SSA values to its return type.
+    if (debugBB->getNumArguments() != operands.size())
+      return false;
+    for (unsigned idx : indices(operands)) {
+      if (debugBB->getArgument(idx)->getType() != operands[idx].get()->getType())
         return false;
     }
     auto *terminator = cast<ReturnInst>(debugBB->getTerminator());
