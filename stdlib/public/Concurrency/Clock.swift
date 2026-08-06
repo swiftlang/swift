@@ -133,10 +133,14 @@ enum _ClockID: Int32 {
 }
 
 /// Identifier for the standard-library clocks.
+///
+/// Raw values match the runtime's `_ClockID` (see `_ClockID` above), so a
+/// `SystemClockID` value can be passed to the C runtime directly without
+/// an intermediate translation step.
 @available(StdlibDeploymentTarget 6.5, *)
-public enum SystemClockID: Sendable, Hashable {
-  case continuous
-  case suspending
+public enum SystemClockID: UInt8, Sendable, Hashable {
+  case continuous = 1
+  case suspending = 2
 }
 
 @available(StdlibDeploymentTarget 5.7, *)
