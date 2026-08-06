@@ -14,14 +14,49 @@
 import Swift
 #endif
 
-/// `Span<Element>` represents a contiguous region of memory
-/// which contains initialized instances of `Element`.
+/// A safe, nonowning view of contiguous memory storing initialized elements.
 ///
-/// A `Span` instance is a non-owning, non-escaping view into memory.
-/// When a `Span` is created, it inherits the lifetime of the container
-/// owning the contiguous memory, ensuring temporal safety and avoiding
-/// use-after-free errors. Operations on `Span` are bounds-checked,
-/// ensuring spatial safety and avoiding buffer overflow errors.
+/// A `Span` provides direct, immutable access to initialized values in
+/// contiguous memory that is owned by another container. Many standard library
+/// types, such as `Array` and `InlineArray`, expose their storage without
+/// copying the elements through a `span` property of this type.
+///
+///     let numbers = [10, 20, 30, 40, 50]
+///     let span = numbers.span
+///     print(span.count) // Prints "5"
+/// 
+/// `Span` provides **temporal safety** as a non-escapable type with lifetime
+/// constraints that ensure the owning container can't be modified or destroyed
+/// while it exists. Like other types, it also provides **spatial safety** by
+/// performing bounds checking on every element access at runtime.
+///
+/// ### Accessing Elements
+/// 
+/// Since `Span` doesn't conform to protocols like `Sequence`, use the `indices`
+/// property to iterate over its elements in order.
+///
+///     func sum(_ values: Span<Int>) -> Int {
+///         var total = 0
+///         for index in values.indices {
+///             total += values[index]
+///         }
+///         return total
+///     }
+///     print(sum(span))  // Prints "150"
+///
+/// ### Extracted Spans 
+/// 
+/// To work with a portion of a `Span`, you can use the `extracting(_:)` method.
+/// Unlike slices, spans extracted from a larger span don't share indices with
+/// their parent. Instead, the first index of every span is always `0`.
+///
+///     let suffix = span.extracting(2..<5)
+///     print(suffix[0])  // Prints "30"
+///
+/// ### Related Types
+///
+/// For mutable access, use `MutableSpan`. For byte-level access to values that
+/// may be heterogeneously typed, use `RawSpan` or `MutableRawSpan`.
 @frozen
 @safe
 @available(SwiftCompatibilitySpan 5.0, *)
