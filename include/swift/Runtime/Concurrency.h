@@ -705,13 +705,7 @@ TaskCancellationScopeRecord * swift_task_pushCancellationScope();
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_popCancellationScope(TaskCancellationScopeRecord *record);
 
-/// Cancel a cancellation scope.
-///
-/// Runtime availability: Swift 6.5
-SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-void swift_task_cancelCancellationScope(TaskCancellationScopeRecord *record);
-
-/// Cancel the given scope, with additional flags.
+/// Cancel a cancellation scope, with additional flags.
 ///
 /// This is a purely local operation on the scope's own state,
 /// it does not affect the surrounding task's cancellation status.
@@ -725,7 +719,7 @@ void swift_task_cancelCancellationScope(TaskCancellationScopeRecord *record);
 ///
 /// Runtime availability: Swift 6.5
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-void swift_task_cancelCancellationScopeWithFlags(
+void swift_task_cancelCancellationScope(
     TaskCancellationScopeRecord *record, size_t flags);
 
 /// Return whether the given cancellation scope has been cancelled by

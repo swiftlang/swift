@@ -1016,13 +1016,7 @@ void AsyncTask::cancellationShieldPop() {
 
 SWIFT_CC(swift)
 static void
-swift_task_cancelCancellationScopeImpl(TaskCancellationScopeRecord *record) {
-  swift_task_cancelCancellationScopeWithFlags(record, /*unspecified=*/0);
-}
-
-SWIFT_CC(swift)
-static void
-swift_task_cancelCancellationScopeWithFlagsImpl(
+swift_task_cancelCancellationScopeImpl(
     TaskCancellationScopeRecord *record, size_t flags) {
   // Cancelling a scope is a local operation on the scope's own atomic flag.
   // Unlike `swift_task_cancel`, it does not set the task's own IsCancelled

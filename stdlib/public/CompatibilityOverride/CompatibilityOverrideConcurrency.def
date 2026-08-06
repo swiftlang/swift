@@ -497,11 +497,6 @@ OVERRIDE_TASK_STATUS(task_popCancellationScope, void,
 
 OVERRIDE_TASK_STATUS(task_cancelCancellationScope, void,
                      SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
-                     swift::, (TaskCancellationScopeRecord *record),
-                     (record))
-
-OVERRIDE_TASK_STATUS(task_cancelCancellationScopeWithFlags, void,
-                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
                      swift::, (TaskCancellationScopeRecord *record, size_t flags),
                      (record, flags))
 

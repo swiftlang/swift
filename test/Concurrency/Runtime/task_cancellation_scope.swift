@@ -404,7 +404,7 @@ func test_scope_async_let_child_is_cancelled() async {
   // enclosing `await` at the end of the scope's `operation` guarantees they
   // complete before the scope does. So cancelling the scope must cancel any
   // `async let` child too: ones already running (cascaded via the
-  // record-chain walk in swift_task_cancelCancellationScopeWithFlagsImpl)
+  // record-chain walk in swift_task_cancelCancellationScopeImpl)
   // and ones spawned after cancel (cancelled at creation, since their parent
   // already has a cancelled scope on its chain).
   await __withTaskCancellationScope { scope in
