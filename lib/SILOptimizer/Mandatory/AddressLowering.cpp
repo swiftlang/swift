@@ -3638,7 +3638,10 @@ protected:
   void visitBuiltinInst(BuiltinInst *bi) {
     switch (bi->getBuiltinKind().value_or(BuiltinValueKind::None)) {
     case BuiltinValueKind::ResumeNonThrowingContinuationReturning:
-    case BuiltinValueKind::ResumeThrowingContinuationReturning: {
+    case BuiltinValueKind::ResumeThrowingContinuationReturning:
+    case BuiltinValueKind::AddTaskLocalValue:
+    case BuiltinValueKind::TaskLocalValuePush:
+    case BuiltinValueKind::GetEnumTag: {
       SILValue opAddr = addrMat.materializeAddress(use->get());
       bi->setOperand(use->getOperandNumber(), opAddr);
       break;
@@ -3924,7 +3927,11 @@ protected:
         builder.emitLoadBorrowOperation(uncheckedCastInst->getLoc(), destAddr);
     uncheckedCastInst->replaceAllUsesWith(load);
     pass.deleter.forceDelete(uncheckedCastInst);
-    emitEndBorrows(load, pass);
+    // emitLoadBorrowOperation only produces a real borrow (needing an
+    // end_borrow) for non-trivial types; for trivial types it emits a plain
+    // load [trivial], which has no borrow scope to end.
+    if (!load->getType().isTrivial(*pass.function))
+      emitEndBorrows(load, pass);
   }
 
   void
@@ -3933,6 +3940,11 @@ protected:
   }
 
   void visitUncheckedValueCastInst(UncheckedValueCastInst *uncheckedCastInst) {
+    rewriteOpaqueUncheckedCastUse(uncheckedCastInst);
+  }
+
+  void visitUncheckedTrivialBitCastInst(
+      UncheckedTrivialBitCastInst *uncheckedCastInst) {
     rewriteOpaqueUncheckedCastUse(uncheckedCastInst);
   }
 
