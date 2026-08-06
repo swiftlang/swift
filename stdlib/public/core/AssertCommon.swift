@@ -152,9 +152,10 @@ internal func _assertionFailure(
     _embeddedReportFatalErrorInFile(prefix: prefix, message: message,
       file: file, line: line)
   }
-#endif
-  Builtin.condfail_message(false._value, message.unsafeRawPointer)
-  Builtin.int_trap()
+#endif  
+  Builtin.condfail_message(true._value, message.unsafeRawPointer)
+  // condfail doesn't return Never, hence the unreachable.
+  Builtin.unreachable()
 }
 
 /// Error-kind-based variant of the above, emitted into clients (rather than
@@ -178,8 +179,9 @@ internal func _assertionFailure(
     _embeddedReportFatalErrorInFile(kind: kind, message: message,
       file: file, line: line)
   }
-  Builtin.condfail_message(false._value, message.unsafeRawPointer)
-  Builtin.int_trap()
+  Builtin.condfail_message(true._value, message.unsafeRawPointer)
+  // condfail doesn't return Never, hence the unreachable.
+  Builtin.unreachable()
 #endif
 }
 
@@ -322,8 +324,8 @@ internal func _assertionFailure(
     _embeddedReportFatalError(prefix: prefix, message: message)
   }
 
-  Builtin.condfail_message(false._value, message.unsafeRawPointer)
-  Builtin.int_trap()
+  Builtin.condfail_message(true._value, message.unsafeRawPointer)
+  Builtin.unreachable()
 }
 
 /// Error-kind-based variant of the above, emitted into clients via
@@ -338,8 +340,8 @@ internal func _assertionFailure(
     _embeddedReportFatalError(kind: kind, message: message)
   }
 
-  Builtin.condfail_message(false._value, message.unsafeRawPointer)
-  Builtin.int_trap()
+  Builtin.condfail_message(true._value, message.unsafeRawPointer)
+  Builtin.unreachable()
 }
 #endif
 

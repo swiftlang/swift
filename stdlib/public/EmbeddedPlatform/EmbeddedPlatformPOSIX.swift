@@ -144,12 +144,11 @@ public func _swift_reportError(
   _ message: UnsafePointer<UInt8>?,
   _ messageCount: Int,
   _ flags: UInt64
-) -> Never {
+) {
   unsafe _reportError(
     prefix: _reportErrorPrefix(flags),
     fileName: nil, fileNameCount: 0, line: 0,
     message: message, messageCount: messageCount)
-  Builtin.int_trap()
 }
 
 @export(interface)
@@ -161,12 +160,11 @@ public func _swift_reportErrorAt(
   _ fileNameCount: Int,
   _ line: Int,
   _ flags: UInt64
-) -> Never {
+) {
   unsafe _reportError(
     prefix: _reportErrorPrefix(flags),
     fileName: fileName, fileNameCount: fileNameCount, line: line,
     message: message, messageCount: messageCount)
-  Builtin.int_trap()
 }
 
 #if SWIFT_STDLIB_HAS_MALLOC_TYPE
