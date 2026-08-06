@@ -406,6 +406,14 @@ inline bool isMangledName(llvm::StringRef mangledName) {
   return getManglingPrefixLength(mangledName) != 0;
 }
 
+/// Returns true if \p mangledName names ASYNC_MAIN_ENTRY_POINT_NAME or one of
+/// its async funclets. Not covered by isMangledName(), which requires a prefix.
+bool isAsyncMainEntryPointSymbol(llvm::StringRef mangledName);
+
+/// Returns the length of the ASYNC_MAIN_ENTRY_POINT_NAME at the start of
+/// \p mangledName, including any Mach-O underscore, or 0 if there is none.
+int getAsyncMainEntryPointNameLength(llvm::StringRef mangledName);
+
 /// Returns true if the mangledName starts with the swift mangling prefix.
 ///
 /// This includes the old (<= swift 3.x) mangling prefix "_T".

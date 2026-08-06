@@ -522,3 +522,8 @@ $sIeg_BAIegHgIL_TR ---> {T:} reabstraction thunk helper from @escaping @callee_g
 $sSiBW ---> Builtin.Borrow<Swift.Int>
 $sBAIeNghHgIL_BAytIeNghHgILr_TR ---> {T:} reabstraction thunk helper from @escaping @caller_isolated @callee_guaranteed @Sendable @async (@guaranteed Builtin.ImplicitActor) -> () to @escaping @caller_isolated @callee_guaranteed @Sendable @async (@guaranteed Builtin.ImplicitActor) -> (@out ())
 $s4main12testCallOnceyyyyXOnF ---> main.testCallOnce(__owned @called(once) () -> ()) -> ()
+async_Main ---> async main entry point
+async_MainTY1_ ---> (2) suspend resume partial function for async main entry point
+async_MainTQ0_ ---> (1) await resume partial function for async main entry point
+async_MainTu ---> async function pointer to async main entry point
+_async_MainTY1_ ---> (2) suspend resume partial function for async main entry point

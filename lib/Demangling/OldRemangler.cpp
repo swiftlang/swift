@@ -796,6 +796,9 @@ ManglingError
 Remangler::mangleAsyncSuspendResumePartialFunction(Node *node, unsigned depth) {
   return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
+ManglingError Remangler::mangleAsyncMainEntryPoint(Node *node, unsigned depth) {
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
+}
 
 ManglingError Remangler::mangleDirectness(Node *node, unsigned depth) {
   switch (node->getIndex()) {
