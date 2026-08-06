@@ -5747,6 +5747,7 @@ void PrintAST::visitBindOptionalExpr(BindOptionalExpr *expr) {
 }
 
 void PrintAST::visitBridgeToObjCExpr(BridgeToObjCExpr *expr) {
+  visit(expr->getSubExpr());
 }
 
 void PrintAST::visitObjCSelectorExpr(ObjCSelectorExpr *expr) {
@@ -5768,6 +5769,7 @@ void PrintAST::visitTupleElementExpr(TupleElementExpr *expr) {
 }
 
 void PrintAST::visitDerivedToBaseExpr(DerivedToBaseExpr *expr) {
+  visit(expr->getSubExpr());
 }
 
 void PrintAST::visitDotSyntaxCallExpr(DotSyntaxCallExpr *expr) {
@@ -5796,6 +5798,7 @@ void PrintAST::visitArrayToPointerExpr(ArrayToPointerExpr *expr) {
 }
 
 void PrintAST::visitBridgeFromObjCExpr(BridgeFromObjCExpr *expr) {
+  visit(expr->getSubExpr());
 }
 
 void PrintAST::visitCodeCompletionExpr(CodeCompletionExpr *expr) {
@@ -5822,6 +5825,7 @@ void PrintAST::visitOpenExistentialExpr(OpenExistentialExpr *expr) {
 }
 
 void PrintAST::visitStringToPointerExpr(StringToPointerExpr *expr) {
+  visit(expr->getSubExpr());
 }
 
 void PrintAST::visitVarargExpansionExpr(VarargExpansionExpr *expr) {
@@ -5841,6 +5845,7 @@ void PrintAST::visitPackElementExpr(PackElementExpr *expr) {
 }
 
 void PrintAST::visitArchetypeToSuperExpr(ArchetypeToSuperExpr *expr) {
+  visit(expr->getSubExpr());
 }
 
 void PrintAST::visitDestructureTupleExpr(DestructureTupleExpr *expr) {
@@ -5904,6 +5909,7 @@ void PrintAST::visitUnresolvedPatternExpr(UnresolvedPatternExpr *expr) {
 }
 
 void PrintAST::visitAnyHashableErasureExpr(AnyHashableErasureExpr *expr) {
+  visit(expr->getSubExpr());
 }
 
 void PrintAST::visitConstructorRefCallExpr(ConstructorRefCallExpr *expr) {
@@ -5915,9 +5921,11 @@ void PrintAST::visitConstructorRefCallExpr(ConstructorRefCallExpr *expr) {
 }
 
 void PrintAST::visitABISafeConversionExpr(ABISafeConversionExpr *expr) {
+  visit(expr->getSubExpr());
 }
 
 void PrintAST::visitFunctionConversionExpr(FunctionConversionExpr *expr) {
+  visit(expr->getSubExpr());
 }
 
 void PrintAST::visitInjectIntoOptionalExpr(InjectIntoOptionalExpr *expr) {
@@ -5973,6 +5981,7 @@ void PrintAST::visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *expr)
 }
 
 void PrintAST::visitForeignObjectConversionExpr(ForeignObjectConversionExpr *expr) {
+  visit(expr->getSubExpr());
 }
 
 void PrintAST::visitOtherConstructorDeclRefExpr(OtherConstructorDeclRefExpr *expr) {
@@ -5988,12 +5997,15 @@ void PrintAST::visitMakeTemporarilyEscapableExpr(MakeTemporarilyEscapableExpr *e
 }
 
 void PrintAST::visitProtocolMetatypeToObjectExpr(ProtocolMetatypeToObjectExpr *expr) {
+  visit(expr->getSubExpr());
 }
 
 void PrintAST::visitConditionalBridgeFromObjCExpr(ConditionalBridgeFromObjCExpr *expr) {
+  visit(expr->getSubExpr());
 }
 
 void PrintAST::visitCovariantReturnConversionExpr(CovariantReturnConversionExpr *expr) {
+  visit(expr->getSubExpr());
 }
 
 void PrintAST::visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *expr) {
@@ -6001,27 +6013,35 @@ void PrintAST::visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr 
 }
 
 void PrintAST::visitCollectionUpcastConversionExpr(CollectionUpcastConversionExpr *expr) {
+  visit(expr->getSubExpr());
 }
 
 void PrintAST::visitCovariantFunctionConversionExpr(CovariantFunctionConversionExpr *expr) {
+  visit(expr->getSubExpr());
 }
 
 void PrintAST::visitExistentialMetatypeToObjectExpr(ExistentialMetatypeToObjectExpr *expr) {
+  visit(expr->getSubExpr());
 }
 
 void PrintAST::visitUnresolvedMemberChainResultExpr(swift::UnresolvedMemberChainResultExpr *expr) {
+  visit(expr->getSubExpr());
 }
 
 void PrintAST::visitLinearFunctionExtractOriginalExpr(swift::LinearFunctionExtractOriginalExpr *expr) {
+  visit(expr->getSubExpr());
 }
 
 void PrintAST::visitLinearToDifferentiableFunctionExpr(swift::LinearToDifferentiableFunctionExpr *expr) {
+  visit(expr->getSubExpr());
 }
 
 void PrintAST::visitActorIsolationErasureExpr(ActorIsolationErasureExpr *expr) {
+  visit(expr->getSubExpr());
 }
 
 void PrintAST::visitUnsafeCastExpr(UnsafeCastExpr *expr) {
+  visit(expr->getSubExpr());
 }
 
 void PrintAST::visitExtractFunctionIsolationExpr(ExtractFunctionIsolationExpr *expr) {
@@ -6033,6 +6053,7 @@ void PrintAST::visitPropertyWrapperValuePlaceholderExpr(swift::PropertyWrapperVa
 }
 
 void PrintAST::visitDifferentiableFunctionExtractOriginalExpr(swift::DifferentiableFunctionExtractOriginalExpr *expr) {
+  visit(expr->getSubExpr());
 }
 
 void PrintAST::visitUnreachableExpr(UnreachableExpr *E) {
