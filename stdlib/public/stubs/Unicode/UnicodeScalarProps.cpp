@@ -432,6 +432,64 @@ __swift_uint8_t _swift_stdlib_getGeneralCategory(__swift_uint32_t scalar) {
 }
 
 SWIFT_RUNTIME_STDLIB_INTERNAL
+__swift_uint8_t _swift_stdlib_getBidiClass(__swift_uint32_t scalar) {
+#if !SWIFT_STDLIB_ENABLE_UNICODE_DATA
+  swift::swift_abortDisabledUnicodeSupport();
+#else
+  auto lowerBoundIndex = 0;
+  auto endIndex = BIDI_CLASS_COUNT;
+  auto upperBoundIndex = endIndex - 1;
+
+  while (upperBoundIndex >= lowerBoundIndex) {
+    auto index = lowerBoundIndex + (upperBoundIndex - lowerBoundIndex) / 2;
+
+    auto entry = _swift_stdlib_bidiClass[index];
+
+    // Shift the enum value out of the scalar.
+    auto lowerBoundScalar = (entry << 11) >> 11;
+
+    __swift_uint32_t upperBoundScalar = 0;
+
+    // This is a proper inversion list, so the range's upper bound is one less
+    // than the next entry's lower bound.
+    if (index != endIndex - 1) {
+      auto nextEntry = _swift_stdlib_bidiClass[index + 1];
+
+      auto nextLower = (nextEntry << 11) >> 11;
+
+      upperBoundScalar = nextLower - 1;
+    } else {
+      // Otherwise, the range count is the distance to 0x10FFFF
+      upperBoundScalar = 0x10FFFF;
+    }
+
+    // Shift the scalar out and get the enum value.
+    auto bidiClass = entry >> 21;
+
+    if (scalar >= lowerBoundScalar && scalar <= upperBoundScalar) {
+      return bidiClass;
+    }
+
+    if (scalar > upperBoundScalar) {
+      lowerBoundIndex = index + 1;
+      continue;
+    }
+
+    if (scalar < lowerBoundScalar) {
+      upperBoundIndex = index - 1;
+      continue;
+    }
+  }
+
+  // If we make it out of this loop, then it means the scalar was not found at
+  // all in the array. This should never happen because the array represents all
+  // scalars from 0x0 to 0x10FFFF, but if somehow this branch gets reached,
+  // return 255 to indicate a failure.
+  return UINT8_MAX;
+#endif
+}
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
 __swift_uint8_t _swift_stdlib_getScript(__swift_uint32_t scalar) {
 #if !SWIFT_STDLIB_ENABLE_UNICODE_DATA
   swift::swift_abortDisabledUnicodeSupport();

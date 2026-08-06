@@ -1153,6 +1153,223 @@ extension Unicode.Scalar.Properties {
   }
 }
 
+extension Unicode {
+
+  /// The classification of a scalar used by the Unicode Bidirectional
+  /// Algorithm.
+  ///
+  /// Every Unicode scalar has a bidirectional class that determines how it is
+  /// ordered relative to surrounding scalars when text is laid out. Scalars not
+  /// otherwise assigned a value take a default based on their code point, so
+  /// this classification is defined for every scalar.
+  @available(SwiftStdlib 6.5, *)
+  public enum BidiClass: Sendable {
+
+    /// A strong left-to-right character.
+    ///
+    /// This value corresponds to the bidirectional class `Left_To_Right`
+    /// (abbreviated `L`) in the
+    /// [Unicode Standard](https://unicode.org/reports/tr44/#Bidi_Class_Values).
+    case leftToRight
+
+    /// A strong right-to-left (non-Arabic-type) character.
+    ///
+    /// This value corresponds to the bidirectional class `Right_To_Left`
+    /// (abbreviated `R`) in the
+    /// [Unicode Standard](https://unicode.org/reports/tr44/#Bidi_Class_Values).
+    case rightToLeft
+
+    /// A strong right-to-left (Arabic-type) character.
+    ///
+    /// This value corresponds to the bidirectional class `Arabic_Letter`
+    /// (abbreviated `AL`) in the
+    /// [Unicode Standard](https://unicode.org/reports/tr44/#Bidi_Class_Values).
+    case arabicLetter
+
+    /// A European number.
+    ///
+    /// This value corresponds to the bidirectional class `European_Number`
+    /// (abbreviated `EN`) in the
+    /// [Unicode Standard](https://unicode.org/reports/tr44/#Bidi_Class_Values).
+    case europeanNumber
+
+    /// A European number separator.
+    ///
+    /// This value corresponds to the bidirectional class `European_Separator`
+    /// (abbreviated `ES`) in the
+    /// [Unicode Standard](https://unicode.org/reports/tr44/#Bidi_Class_Values).
+    case europeanSeparator
+
+    /// A European number terminator.
+    ///
+    /// This value corresponds to the bidirectional class `European_Terminator`
+    /// (abbreviated `ET`) in the
+    /// [Unicode Standard](https://unicode.org/reports/tr44/#Bidi_Class_Values).
+    case europeanTerminator
+
+    /// An Arabic number.
+    ///
+    /// This value corresponds to the bidirectional class `Arabic_Number`
+    /// (abbreviated `AN`) in the
+    /// [Unicode Standard](https://unicode.org/reports/tr44/#Bidi_Class_Values).
+    case arabicNumber
+
+    /// A common number separator.
+    ///
+    /// This value corresponds to the bidirectional class `Common_Separator`
+    /// (abbreviated `CS`) in the
+    /// [Unicode Standard](https://unicode.org/reports/tr44/#Bidi_Class_Values).
+    case commonSeparator
+
+    /// A nonspacing mark.
+    ///
+    /// This value corresponds to the bidirectional class `Nonspacing_Mark`
+    /// (abbreviated `NSM`) in the
+    /// [Unicode Standard](https://unicode.org/reports/tr44/#Bidi_Class_Values).
+    case nonspacingMark
+
+    /// A boundary neutral.
+    ///
+    /// This value corresponds to the bidirectional class `Boundary_Neutral`
+    /// (abbreviated `BN`) in the
+    /// [Unicode Standard](https://unicode.org/reports/tr44/#Bidi_Class_Values).
+    case boundaryNeutral
+
+    /// A paragraph separator.
+    ///
+    /// This value corresponds to the bidirectional class `Paragraph_Separator`
+    /// (abbreviated `B`) in the
+    /// [Unicode Standard](https://unicode.org/reports/tr44/#Bidi_Class_Values).
+    case paragraphSeparator
+
+    /// A segment separator.
+    ///
+    /// This value corresponds to the bidirectional class `Segment_Separator`
+    /// (abbreviated `S`) in the
+    /// [Unicode Standard](https://unicode.org/reports/tr44/#Bidi_Class_Values).
+    case segmentSeparator
+
+    /// A whitespace character.
+    ///
+    /// This value corresponds to the bidirectional class `White_Space`
+    /// (abbreviated `WS`) in the
+    /// [Unicode Standard](https://unicode.org/reports/tr44/#Bidi_Class_Values).
+    case whitespace
+
+    /// A neutral character of another type.
+    ///
+    /// This value corresponds to the bidirectional class `Other_Neutral`
+    /// (abbreviated `ON`) in the
+    /// [Unicode Standard](https://unicode.org/reports/tr44/#Bidi_Class_Values).
+    case otherNeutral
+
+    /// A left-to-right embedding format character.
+    ///
+    /// This value corresponds to the bidirectional class
+    /// `Left_To_Right_Embedding` (abbreviated `LRE`) in the
+    /// [Unicode Standard](https://unicode.org/reports/tr44/#Bidi_Class_Values).
+    case leftToRightEmbedding
+
+    /// A left-to-right override format character.
+    ///
+    /// This value corresponds to the bidirectional class
+    /// `Left_To_Right_Override` (abbreviated `LRO`) in the
+    /// [Unicode Standard](https://unicode.org/reports/tr44/#Bidi_Class_Values).
+    case leftToRightOverride
+
+    /// A right-to-left embedding format character.
+    ///
+    /// This value corresponds to the bidirectional class
+    /// `Right_To_Left_Embedding` (abbreviated `RLE`) in the
+    /// [Unicode Standard](https://unicode.org/reports/tr44/#Bidi_Class_Values).
+    case rightToLeftEmbedding
+
+    /// A right-to-left override format character.
+    ///
+    /// This value corresponds to the bidirectional class
+    /// `Right_To_Left_Override` (abbreviated `RLO`) in the
+    /// [Unicode Standard](https://unicode.org/reports/tr44/#Bidi_Class_Values).
+    case rightToLeftOverride
+
+    /// A pop directional format character.
+    ///
+    /// This value corresponds to the bidirectional class
+    /// `Pop_Directional_Format` (abbreviated `PDF`) in the
+    /// [Unicode Standard](https://unicode.org/reports/tr44/#Bidi_Class_Values).
+    case popDirectionalFormat
+
+    /// A left-to-right isolate format character.
+    ///
+    /// This value corresponds to the bidirectional class
+    /// `Left_To_Right_Isolate` (abbreviated `LRI`) in the
+    /// [Unicode Standard](https://unicode.org/reports/tr44/#Bidi_Class_Values).
+    case leftToRightIsolate
+
+    /// A right-to-left isolate format character.
+    ///
+    /// This value corresponds to the bidirectional class
+    /// `Right_To_Left_Isolate` (abbreviated `RLI`) in the
+    /// [Unicode Standard](https://unicode.org/reports/tr44/#Bidi_Class_Values).
+    case rightToLeftIsolate
+
+    /// A first strong isolate format character.
+    ///
+    /// This value corresponds to the bidirectional class `First_Strong_Isolate`
+    /// (abbreviated `FSI`) in the
+    /// [Unicode Standard](https://unicode.org/reports/tr44/#Bidi_Class_Values).
+    case firstStrongIsolate
+
+    /// A pop directional isolate format character.
+    ///
+    /// This value corresponds to the bidirectional class
+    /// `Pop_Directional_Isolate` (abbreviated `PDI`) in the
+    /// [Unicode Standard](https://unicode.org/reports/tr44/#Bidi_Class_Values).
+    case popDirectionalIsolate
+
+    internal init(rawValue: UInt8) {
+      switch rawValue {
+      case 0: self = .leftToRight
+      case 1: self = .rightToLeft
+      case 2: self = .arabicLetter
+      case 3: self = .europeanNumber
+      case 4: self = .europeanSeparator
+      case 5: self = .europeanTerminator
+      case 6: self = .arabicNumber
+      case 7: self = .commonSeparator
+      case 8: self = .nonspacingMark
+      case 9: self = .boundaryNeutral
+      case 10: self = .paragraphSeparator
+      case 11: self = .segmentSeparator
+      case 12: self = .whitespace
+      case 13: self = .otherNeutral
+      case 14: self = .leftToRightEmbedding
+      case 15: self = .leftToRightOverride
+      case 16: self = .rightToLeftEmbedding
+      case 17: self = .rightToLeftOverride
+      case 18: self = .popDirectionalFormat
+      case 19: self = .leftToRightIsolate
+      case 20: self = .rightToLeftIsolate
+      case 21: self = .firstStrongIsolate
+      case 22: self = .popDirectionalIsolate
+      default: fatalError("Unknown bidi class")
+      }
+    }
+  }
+}
+
+extension Unicode.Scalar.Properties {
+
+  /// The bidirectional class of the scalar.
+  ///
+  /// This property corresponds to the "Bidi_Class" property in the
+  /// [Unicode Standard](http://www.unicode.org/versions/latest/).
+  @available(SwiftStdlib 6.5, *)
+  public var bidiClass: Unicode.BidiClass {
+    let rawValue = _swift_stdlib_getBidiClass(_scalar.value)
+    return Unicode.BidiClass(rawValue: rawValue)
+  }
+}
+
 extension Unicode.Scalar.Properties {
   internal func _hangulName() -> String {
     // T = Hangul tail consonants

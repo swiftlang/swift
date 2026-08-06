@@ -11,6 +11,7 @@
 - ``Swift/Unicode/GeneralCategory``
 - ``Swift/Unicode/CanonicalCombiningClass``
 - ``Swift/Unicode/NumericType``
+- ``Swift/Unicode/BidiClass``
 
 ### Unicode Codecs
 

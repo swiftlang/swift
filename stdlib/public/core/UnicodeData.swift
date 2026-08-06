@@ -291,6 +291,9 @@ func _swift_stdlib_getAge(_ scalar: UInt32) -> UInt16
 func _swift_stdlib_getGeneralCategory(_ scalar: UInt32) -> UInt8
 
 @_extern(c)
+func _swift_stdlib_getBidiClass(_ scalar: UInt32) -> UInt8
+
+@_extern(c)
 func _swift_stdlib_getScript(_ scalar: UInt32) -> UInt8
 
 @_extern(c)
