@@ -21,6 +21,7 @@
 
 #include "SILBridging.h"
 #include "swift/AST/Builtins.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/StorageImpl.h"
@@ -430,6 +431,10 @@ bool BridgedType::mayHaveCustomDeinit(BridgedFunction f) const {
 
 SwiftInt BridgedType::getCaseIdxOfEnumType(BridgedStringRef name) const {
   return unbridged().getCaseIdxOfEnumType(name.unbridged());
+}
+
+SwiftInt BridgedType::getMaxNumFieldsToExpand() {
+  return swift::MaxNumFieldsToExpand;
 }
 
 SwiftInt BridgedType::getNumBoxFields(BridgedCanType boxTy) {

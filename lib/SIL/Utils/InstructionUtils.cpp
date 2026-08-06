@@ -1499,5 +1499,5 @@ bool swift::shouldExpand(SILModule &module, SILType ty) {
   }
 
   unsigned numFields = module.Types.countNumberOfFields(ty, expansion);
-  return (numFields <= 6);
+  return (numFields <= MaxNumFieldsToExpand);
 }
