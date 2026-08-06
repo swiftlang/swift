@@ -146,5 +146,24 @@ if #available(SwiftStdlib 5.5, *) {
   }
 }
 
+// Regression test for https://github.com/swiftlang/swift/issues/82985
+// Range.randomElement() should not crash on ranges larger than Int.max.
+RangeTraps.test("randomElement/LargeRange")
+  .code {
+  let range: Range<UInt> = 0 ..< UInt.max
+  let element = range.randomElement()
+  expectNotNil(element)
+  if let e = element {
+    expectTrue(range.contains(e))
+  }
+}
+
+RangeTraps.test("randomElement/EmptyRange")
+  .code {
+  let range: Range<UInt> = 0 ..< 0
+  let element = range.randomElement()
+  expectNil(element)
+}
+
 runAllTests()
 
