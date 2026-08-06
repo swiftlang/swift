@@ -594,7 +594,6 @@ class TaskCancellationScopeRecord : public TaskStatusRecord {
   std::atomic<uintptr_t> State{0};
 
   static constexpr uintptr_t CancelledBit = 1;
-  /// Low 3 bits of the reason field, matching `swift_task_cancelWithFlags`.
   static constexpr uintptr_t ReasonMask = 0b111;
 
 public:
@@ -611,6 +610,7 @@ public:
     return (State.load(std::memory_order_relaxed) >> 1) & ReasonMask;
   }
   /// Cancel the scope, recording `reason`.
+  /// Only 3 bits of the reason are used, remaining bits are reserved for future evolution.
   ///
   /// First-cancel-wins: if the scope is already cancelled, this is a no-op.
   void cancel(size_t reason) {
@@ -623,8 +623,7 @@ public:
                                        std::memory_order_relaxed)) {
         return;
       }
-      // CAS failed: `oldState` was refreshed with the current value: retry,
-      // unless a concurrent cancel() already won.
+      // CAS failed, retry
     }
   }
 
