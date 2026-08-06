@@ -25,6 +25,8 @@
 
 namespace swift {
 
+#if SWIFT_CONCURRENCY_ENABLE_TASK_REGISTRY
+
 #if defined(__APPLE__) && defined(__aarch64__)
 #define SWIFT_CACHE_LINE_SIZE 128
 #else
@@ -42,21 +44,13 @@ struct alignas(SWIFT_CACHE_LINE_SIZE) TaskRegistryShard {
 /// Head pointers for the global live-task registry shards.
 /// Walk each shard via task->_private().registryNext.
 SWIFT_EXPORT_FROM(swift_Concurrency)
-TaskRegistryShard _swift_concurrency_task_registry[TaskRegistryShardCount];
+extern TaskRegistryShard _swift_concurrency_task_registry[TaskRegistryShardCount];
 
 /// Register a newly created task. Must be called after full initialization.
-#if SWIFT_CONCURRENCY_ENABLE_TASK_REGISTRY
 void taskRegistryInsert(AsyncTask *task);
-#else
-inline void taskRegistryInsert(AsyncTask *task) {}
-#endif
 
 /// Deregister a task. Must be called before swift_slowDealloc frees it.
-#if SWIFT_CONCURRENCY_ENABLE_TASK_REGISTRY
 void taskRegistryRemove(AsyncTask *task);
-#else
-inline void taskRegistryRemove(AsyncTask *task) {}
-#endif
 
 /// Returns the count of currently registered tasks. For testing and debugging.
 SWIFT_EXPORT_FROM(swift_Concurrency) size_t _swift_concurrency_debug_task_registryCount();
@@ -72,6 +66,13 @@ void *_swift_concurrency_debug_task_getTaskNext(void *task);
 
 SWIFT_EXPORT_FROM(swift_Concurrency)
 uint64_t _swift_concurrency_debug_task_getId(void *task);
+
+#else // !SWIFT_CONCURRENCY_ENABLE_TASK_REGISTRY
+
+inline void taskRegistryInsert(AsyncTask *task) {}
+inline void taskRegistryRemove(AsyncTask *task) {}
+
+#endif // SWIFT_CONCURRENCY_ENABLE_TASK_REGISTRY
 
 } // namespace swift
 
