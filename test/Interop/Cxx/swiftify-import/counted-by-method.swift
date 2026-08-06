@@ -435,6 +435,7 @@ extension InheritRef {
     return unsafe super.refBasicVirt(p, len)
   }
   @_alwaysEmitIntoClient @_disfavoredOverload final func call_refBasicVirt_RefType_super(_ p: UnsafeBufferPointer<CInt>) -> CInt {
+    // expected-error@+1{{calling safe interop wrapper 'refBasicVirt' in foreign reference type 'RefType' using 'super' is not supported}}
     return unsafe super.refBasicVirt(p)
   }
   final func call_refLifetimeboundVirtual_RefType_super(_ p: UnsafePointer<CInt>!, _ len: CInt) -> UnsafePointer<CInt>! {
@@ -444,6 +445,7 @@ extension InheritRef {
     return unsafe super.refBasic(p, len)
   }
   @_alwaysEmitIntoClient @_disfavoredOverload final func call_refBasic_RefType_super(_ p: UnsafeBufferPointer<CInt>) -> CInt {
+    // expected-error@+1{{calling safe interop wrapper 'refBasic' in foreign reference type 'RefType' using 'super' is not supported}}
     return unsafe super.refBasic(p)
   }
   final func call_refNoescape_RefType_super(_ p: UnsafePointer<CInt>!, _ len: CInt) {
@@ -452,12 +454,14 @@ extension InheritRef {
   // expected-apple-error@+1{{instance method cannot be more available than enclosing scope}}
   @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
     @_alwaysEmitIntoClient @_disfavoredOverload final func call_refNoescape_RefType_super(_ p: Span<CInt>) {
+    // expected-error@+1{{calling safe interop wrapper 'refNoescape' in foreign reference type 'RefType' using 'super' is not supported}}
     return super.refNoescape(p)
   }
   final func call_refNonconstSelf_RefType_super(_ p: UnsafePointer<CInt>!, _ len: CInt) {
     return unsafe super.refNonconstSelf(p, len)
   }
   @_alwaysEmitIntoClient @_disfavoredOverload final func call_refNonconstSelf_RefType_super(_ p: UnsafeBufferPointer<CInt>) {
+    // expected-error@+1{{calling safe interop wrapper 'refNonconstSelf' in foreign reference type 'RefType' using 'super' is not supported}}
     return unsafe super.refNonconstSelf(p)
   }
   final func call_refLifetimebound_RefType_super(_ p: UnsafeMutablePointer<CInt>!, _ len: CInt) -> UnsafeMutablePointer<CInt>! {
@@ -483,6 +487,7 @@ extension InheritRefPrivate {
     return unsafe super.refBasicVirt(p, len)
   }
   @_alwaysEmitIntoClient @_disfavoredOverload final func call_refBasicVirt_RefType_super(_ p: UnsafeBufferPointer<CInt>) -> CInt {
+    // expected-error@+1{{calling safe interop wrapper 'refBasicVirt' in foreign reference type 'RefType' using 'super' is not supported}}
     return unsafe super.refBasicVirt(p)
   }
   final func call_refLifetimeboundVirtual_RefType_super(_ p: UnsafePointer<CInt>!, _ len: CInt) -> UnsafePointer<CInt>! {
@@ -492,6 +497,7 @@ extension InheritRefPrivate {
     return unsafe super.refBasic(p, len)
   }
   @_alwaysEmitIntoClient @_disfavoredOverload final func call_refBasic_RefType_super(_ p: UnsafeBufferPointer<CInt>) -> CInt {
+    // expected-error@+1{{calling safe interop wrapper 'refBasic' in foreign reference type 'RefType' using 'super' is not supported}}
     return unsafe super.refBasic(p)
   }
   final func call_refNoescape_RefType_super(_ p: UnsafePointer<CInt>!, _ len: CInt) {
@@ -500,12 +506,14 @@ extension InheritRefPrivate {
   // expected-apple-error@+1{{instance method cannot be more available than enclosing scope}}
   @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
     @_alwaysEmitIntoClient @_disfavoredOverload final func call_refNoescape_RefType_super(_ p: Span<CInt>) {
+    // expected-error@+1{{calling safe interop wrapper 'refNoescape' in foreign reference type 'RefType' using 'super' is not supported}}
     return super.refNoescape(p)
   }
   final func call_refNonconstSelf_RefType_super(_ p: UnsafePointer<CInt>!, _ len: CInt) {
     return unsafe super.refNonconstSelf(p, len)
   }
   @_alwaysEmitIntoClient @_disfavoredOverload final func call_refNonconstSelf_RefType_super(_ p: UnsafeBufferPointer<CInt>) {
+    // expected-error@+1{{calling safe interop wrapper 'refNonconstSelf' in foreign reference type 'RefType' using 'super' is not supported}}
     return unsafe super.refNonconstSelf(p)
   }
   final func call_refLifetimebound_RefType_super(_ p: UnsafeMutablePointer<CInt>!, _ len: CInt) -> UnsafeMutablePointer<CInt>! {

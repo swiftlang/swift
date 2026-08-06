@@ -452,6 +452,31 @@ let values: [CInt] = [1, 2, 3]
 
 #if NOT_YET_SUPPORTED
 // If any of these stop being an error, upgrade it to a proper runtime test case.
+
+// FIXME: calling a wrapper through 'super' is rejected: only a wrapper for the
+// virtual dispatch thunk currently exists, so there is no static dispatch
+// version of the safe wrapper to remap the call to.
+extension Cube {
+  func callKindIndirectViaSuper(_ values: Span<CInt>) -> Impl {
+    // expected-error@+1 {{calling safe interop wrapper 'callKindIndirect' in foreign reference type 'Shape' using 'super' is not supported}}
+    super.callKindIndirect(values)
+  }
+}
+
+extension Cube {
+  func callKindDirectViaSuper(_ values: Span<CInt>) -> Impl {
+    // expected-error@+1 {{calling safe interop wrapper 'callKindDirect' in foreign reference type 'Shape' using 'super' is not supported}}
+    super.callKindDirect(values)
+  }
+}
+
+extension Cube {
+  func derivedCallKindIndirectViaSuper(_ values: Span<CInt>) -> Impl {
+    // expected-error@+1 {{calling safe interop wrapper 'derivedCallKindIndirect' in foreign reference type 'Prism' using 'super' is not supported}}
+    super.derivedCallKindIndirect(values)
+  }
+}
+
 Suite.test("hidden wrapper is ambiguous") {
   // FIXME: Cube's own wrapper and the one it inherits from Prism are both
   // visible, so the call cannot be resolved.
@@ -506,33 +531,6 @@ Suite.test("virtual dispatch through a wrapper on the base class") {
 
 Suite.test("wrapper declared on a derived class") {
   expectEqual(.prismKind, Prism.create().derivedCallKindIndirect(values.span))
-}
-
-extension Cube {
-  func callKindIndirectViaSuper(_ values: Span<CInt>) -> Impl {
-    super.callKindIndirect(values)
-  }
-  func callKindDirectViaSuper(_ values: Span<CInt>) -> Impl {
-    super.callKindDirect(values)
-  }
-  func derivedCallKindIndirectViaSuper(_ values: Span<CInt>) -> Impl {
-    super.derivedCallKindIndirect(values)
-  }
-}
-
-Suite.test("super. reaches the base class implementation of a wrapper") {
-  // Calling Shape's wrapper non-virtually still dispatches virtually inside it,
-  // so the kind is Cube's.
-  expectEqual(.cubeKind, Cube.create().callKindIndirectViaSuper(values.span))
-  // Cube hides Prism's member of the same name, and super. is currently the only
-  // way to call the hidden wrapper: see the ambiguity in the guarded test below.
-  expectEqual(.cubeKind, Cube.create().derivedCallKindIndirectViaSuper(values.span))
-
-  // FIXME: super.foo() cannot reach the base class implementation of a wrapped
-  // virtual method. The wrapper is not itself virtual, so super. only selects
-  // the base class wrapper, whose body still calls the virtual method and lands
-  // back in Cube's override. Prism::callKindDirect is unreachable from Swift.
-  expectEqual(.cubeKind, Cube.create().callKindDirectViaSuper(values.span))
 }
 
 Suite.test("multiple inheritance") {
