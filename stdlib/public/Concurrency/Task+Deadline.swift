@@ -382,8 +382,7 @@ public func _findNearestDeadline<C: Clock & Identifiable>(clock: C) -> C.Instant
   // `.pointee` loads-with-copy through the record's storage, producing an
   // owned +1 `C.Instant` for the caller (for class-typed Instants this
   // bumps the refcount). The record continues to own its copy.
-  return unsafe UnsafeRawPointer(matched)
-    .assumingMemoryBound(to: C.Instant.self).pointee
+  return unsafe matched.pointee
 }
 
 /// Runtime shim declared purely for Swift's generic ABI: the compiler
@@ -402,7 +401,7 @@ public func _findNearestDeadline<C: Clock & Identifiable>(clock: C) -> C.Instant
 @_silgen_name("swift_task_findNearestDeadlineForClock")
 internal func _swift_task_findNearestDeadlineForClock<C: Clock & Identifiable>(
   queryClock: C
-) -> UnsafeMutableRawPointer?
+) -> UnsafePointer<C.Instant>?
 
 
 @usableFromInline
