@@ -53,18 +53,19 @@ void taskRegistryInsert(AsyncTask *task);
 void taskRegistryRemove(AsyncTask *task);
 
 /// Returns the count of currently registered tasks. For testing and debugging.
-SWIFT_EXPORT_FROM(swift_Concurrency) size_t _swift_concurrency_debug_task_registryCount();
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+size_t _swift_concurrency_debug_task_registryCount();
 
-SWIFT_EXPORT_FROM(swift_Concurrency)
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void _swift_concurrency_debug_task_registryWalk(void (*callback)(void *, void *), void *context);
 
-SWIFT_EXPORT_FROM(swift_Concurrency)
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void *_swift_concurrency_debug_task_getShardHead(size_t shardIndex);
 
-SWIFT_EXPORT_FROM(swift_Concurrency)
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void *_swift_concurrency_debug_task_getTaskNext(void *task);
 
-SWIFT_EXPORT_FROM(swift_Concurrency)
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 uint64_t _swift_concurrency_debug_task_getId(void *task);
 
 #else // !SWIFT_CONCURRENCY_ENABLE_TASK_REGISTRY

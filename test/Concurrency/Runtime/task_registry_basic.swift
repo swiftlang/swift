@@ -57,10 +57,13 @@ func test_perTaskIncrementAndDecrement() async {
     _ = await task!.result
     task = nil
 
-    // Wait a little bit for the task to be destroyed and unregistered
-    try? await Task.sleep(nanoseconds: 500_000_000)
-
-    let countAfterDestroy = registryCount()
+    var countAfterDestroy = registryCount()
+    var retries = 0
+    while countAfterDestroy > baseline && retries < 10 {
+      try? await Task.sleep(nanoseconds: 100_000_000)
+      countAfterDestroy = registryCount()
+      retries += 1
+    }
     assert(countAfterDestroy <= baseline, "after task \(i+1) finished: expected count <= \(baseline), got \(countAfterDestroy)")
   }
 }

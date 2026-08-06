@@ -92,7 +92,7 @@ void swift::taskRegistryRemove(AsyncTask *task) {
 }
 #endif // SWIFT_CONCURRENCY_ENABLE_TASK_REGISTRY
 
-SWIFT_EXPORT_FROM(swift_Concurrency)
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 size_t swift::_swift_concurrency_debug_task_registryCount() {
   size_t count = 0;
   for (size_t i = 0; i < TaskRegistryShardCount; ++i) {
@@ -102,7 +102,7 @@ size_t swift::_swift_concurrency_debug_task_registryCount() {
   return count;
 }
 
-SWIFT_EXPORT_FROM(swift_Concurrency)
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift::_swift_concurrency_debug_task_registryWalk(void (*callback)(void *,
                                                                         void *),
                                                        void *context) {
@@ -142,7 +142,7 @@ void swift::_swift_concurrency_debug_task_registryWalk(void (*callback)(void *,
   }
 }
 
-SWIFT_EXPORT_FROM(swift_Concurrency)
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void *swift::_swift_concurrency_debug_task_getShardHead(size_t shardIndex) {
   if (shardIndex >= TaskRegistryShardCount)
     return nullptr;
@@ -150,7 +150,7 @@ void *swift::_swift_concurrency_debug_task_getShardHead(size_t shardIndex) {
       std::memory_order_acquire);
 }
 
-SWIFT_EXPORT_FROM(swift_Concurrency)
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void *swift::_swift_concurrency_debug_task_getTaskNext(void *task) {
   if (!task)
     return nullptr;
@@ -158,7 +158,7 @@ void *swift::_swift_concurrency_debug_task_getTaskNext(void *task) {
       std::memory_order_acquire);
 }
 
-SWIFT_EXPORT_FROM(swift_Concurrency)
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 uint64_t swift::_swift_concurrency_debug_task_getId(void *task) {
   return static_cast<AsyncTask *>(task)->getTaskId();
 }
