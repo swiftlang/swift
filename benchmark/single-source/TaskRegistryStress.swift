@@ -34,10 +34,23 @@ public var benchmarks: [BenchmarkInfo] {
     ),
     BenchmarkInfo(
       name: "TaskRegistryStress.SlidingWindow",
-      runFunction: run_slidingWindow(windowSize: 100, iterations: 10000),
-      tags: [.concurrency, .runtime]
+      runFunction: run_slidingWindow(windowSize: 100, iterations: 1000),
+      tags: [.concurrency, .runtime],
+      setUpFunction: {
+        if #available(macOS 14, iOS 17, watchOS 10.0, tvOS 17.0, *) {
+          setup_concurrency()
+        }
+      }
     ),
   ]
+}
+
+@available(macOS 14, iOS 17, watchOS 10.0, tvOS 17.0, *)
+private func setup_concurrency() {
+  let g = DispatchGroup()
+  g.enter()
+  Task { g.leave() }
+  g.wait()
 }
 
 @available(macOS 14, iOS 17, watchOS 10.0, tvOS 17.0, *)
