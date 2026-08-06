@@ -268,6 +268,15 @@ syn region swiftString contains=swiftInterpolationRegion
 syn region swiftInterpolationRegion contained contains=TOP
       \ matchgroup=swiftInterpolation start=/\\(/ end=/)/
 
+" #"..."#  Raw string: no escape processing at all except `\#(` for
+" interpolation. Only the single-`#` delimiter is handled; `##"..."##`
+" and higher would need matching delimiter counts on both ends, which a
+" plain start/end pair cannot enforce.
+syn region swiftString contains=swiftInterpolationRegion
+      \ start=/#"/ end=/"#/
+syn region swiftInterpolationRegion contained contains=TOP
+      \ matchgroup=swiftInterpolation start=/\\#(/ end=/)/
+
 syn match swiftTupleIndexNumber contains=swiftDecimal
       \ /\.[0-9]\+/
 
