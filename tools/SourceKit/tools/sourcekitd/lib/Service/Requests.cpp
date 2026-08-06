@@ -1838,6 +1838,75 @@ handleRequestCollectExpressionType(const RequestDict &Req,
 }
 
 static void
+reportInferredIsolations(const RequestResult<InferredIsolationsInFile> &Result,
+                         ResponseReceiver Rec) {
+  if (Result.isCancelled())
+    return Rec(createErrorRequestCancelled());
+  if (Result.isError())
+    return Rec(createErrorRequestFailed(Result.getError()));
+
+  const InferredIsolationsInFile &Info = Result.value();
+  StringRef Strings = Info.StringBuffer;
+  auto stringAt = [&](unsigned Off) -> StringRef {
+    if (Off >= Strings.size())
+      return StringRef();
+    return Strings.drop_front(Off).take_until([](char c) { return c == '\0'; });
+  };
+
+  ResponseBuilder Builder;
+  auto Arr = Builder.getDictionary().setArray(KeyResults);
+  for (auto &R : Info.Results) {
+    auto Elem = Arr.appendDictionary();
+    Elem.set(KeyOffset, R.Offset);
+    Elem.set(KeyLength, R.Length);
+    Elem.set(KeyActorIsolation, stringAt(R.IsolationOffset));
+    Elem.set(KeyKind, stringAt(R.KindOffset));
+  }
+  Rec(Builder.createResponse());
+}
+
+static void handleRequestCollectInferredIsolation(
+    const RequestDict &Req, SourceKitCancellationToken CancellationToken,
+    ResponseReceiver Rec) {
+  if (checkVFSNotSupported(Req, Rec))
+    return;
+
+  handleSemanticRequest(Req, Rec, [Req, CancellationToken, Rec]() {
+    LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
+
+    std::optional<StringRef> PrimaryFilePath =
+        getPrimaryFilePathForRequestOrEmitError(Req, Rec);
+    if (!PrimaryFilePath)
+      return;
+
+    StringRef InputBufferName = getInputBufferNameForRequest(Req, Rec);
+
+    SmallVector<const char *, 8> Args;
+    if (getCompilerArgumentsForRequestOrEmitError(Req, Args, Rec))
+      return;
+
+    std::optional<unsigned> Offset =
+        swift::transform(Req.getOptionalInt64(KeyOffset),
+                         [](int64_t v) -> unsigned { return v; });
+    std::optional<unsigned> Length =
+        swift::transform(Req.getOptionalInt64(KeyLength),
+                         [](int64_t v) -> unsigned { return v; });
+
+    // TODO: copied this from collect-variable-type. Is it the right default?
+    int64_t CancelOnSubsequentRequest = 1;
+    Req.getInt64(KeyCancelOnSubsequentRequest, CancelOnSubsequentRequest,
+                 /*isOptional=*/true);
+
+    return Lang.collectInferredIsolations(
+        *PrimaryFilePath, InputBufferName, Args, Offset, Length,
+        CancelOnSubsequentRequest, CancellationToken,
+        [Rec](const RequestResult<InferredIsolationsInFile> &Result) {
+          reportInferredIsolations(Result, Rec);
+        });
+  });
+}
+
+static void
 handleRequestCollectVariableType(const RequestDict &Req,
                                  SourceKitCancellationToken CancellationToken,
                                  ResponseReceiver Rec) {
@@ -2315,6 +2384,8 @@ void handleRequestImpl(sourcekitd_object_t ReqObj,
   HANDLE_REQUEST(RequestCollectExpressionType,
                  handleRequestCollectExpressionType)
   HANDLE_REQUEST(RequestCollectVariableType, handleRequestCollectVariableType)
+  HANDLE_REQUEST(RequestCollectInferredIsolation,
+                 handleRequestCollectInferredIsolation)
   HANDLE_REQUEST(RequestFindLocalRenameRanges,
                  handleRequestFindLocalRenameRanges)
   HANDLE_REQUEST(RequestNameTranslation, handleRequestNameTranslation)
