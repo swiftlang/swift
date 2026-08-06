@@ -2168,9 +2168,16 @@ private:
     }
 
     // Tuples get expanded unless they're inout.
-    if (origType.isTuple() && ownership != ValueOwnership::InOut) {
-      expandTuple(ownership, formalParamIndex,
-                  forSelf, origType, substType, origFlags);
+    //
+    // However, a C++ reference to an aggregate imported as a tuple is
+    // passed as a single indirect value rather than exploded into its
+    // elements, so fall through to the indirect handling below.
+    bool isClangReference =
+        origType.isClangType() && origType.getClangType()->isReferenceType();
+    if (origType.isTuple() && ownership != ValueOwnership::InOut &&
+        !isClangReference) {
+      expandTuple(ownership, formalParamIndex, forSelf, origType, substType,
+                  origFlags);
       return;
     }
 

@@ -109,4 +109,15 @@ ReferenceTestSuite.test("rvalue reference of trivial type") {
   expectEqual(2, getStaticInt())
 }
 
+ReferenceTestSuite.test("const reference to array") {
+  let tuple: (UInt8, UInt8, UInt8, UInt8) = (10, 20, 30, 40)
+  expectEqual(100, sumArrayRef4(tuple))
+}
+
+ReferenceTestSuite.test("const reference to array typealias") {
+  let bytes: ByteArray16Typealias = (7, 0, 0, 0, 0, 0, 0, 0,
+                                     0, 0, 0, 0, 0, 0, 0, 0)
+  expectEqual(7, firstByteOfArrayRefTypealias(bytes))
+}
+
 runAllTests()
