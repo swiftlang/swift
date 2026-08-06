@@ -183,8 +183,14 @@ syn match swiftVarName contained skipwhite skipempty nextgroup=swiftTypeDeclarat
 syn match swiftImplicitVarName
       \ /\$\<[A-Za-z_0-9]\+\>/
 
+" Codable & Equatable (protocol composition). contained, so it only ever
+" chains off an already-recognized type -- it can't be confused with the
+" bitwise-and operator in ordinary expressions.
+syn match swiftProtocolComposition contained skipwhite skipempty nextgroup=@swiftTypeContext
+      \ /&/
+
 " TypeName[Optionality]?
-syn match swiftType contained skipwhite skipempty nextgroup=swiftTypeParameters
+syn match swiftType contained skipwhite skipempty nextgroup=swiftTypeParameters,swiftProtocolComposition
       \ /\<[A-Za-z_][A-Za-z_0-9\.]*\>[!?]\?/
 " [Type:Type] (dictionary) or [Type] (array)
 syn region swiftType contained contains=swiftTypePair,@swiftTypeContext
@@ -350,6 +356,7 @@ hi def link swiftConstraint Special
 hi def link swiftTypeAliasValue Delimiter
 hi def link swiftTypeDeclaration Delimiter
 hi def link swiftTypeParameters Delimiter
+hi def link swiftProtocolComposition Operator
 hi def link swiftCastOp Operator
 
 hi def link swiftBoolean Boolean
