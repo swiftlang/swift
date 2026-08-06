@@ -90,6 +90,7 @@ FEATURE(CustomGlobalExecutors,                          FUTURE)
 FEATURE(Differentiation,                                FUTURE)
 FEATURE(ClearSensitive,                                 FUTURE)
 FEATURE(UpdatePureObjCClassMetadata,                    FUTURE)
+FEATURE(PreservemostRetainRelease,                      (6, 4))
 // TODO: CoroutineAccessors: Change to correct version number.
 FEATURE(CoroutineAccessors,                             FUTURE)
 FEATURE(GetObjCMetatypeFromMetadata,                    FUTURE)
