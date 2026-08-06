@@ -126,11 +126,32 @@ ManagedValue SILGenBuilder::createConvertEscapeToNoEscape(
          !fnType->isNoEscape() && resultFnType->isNoEscape() &&
          "Expect a escaping to noescape conversion");
   (void)fnType;
-  (void)resultFnType;
+
+  // For a `@called(once)` function value, the conversion is a
+  // ownership-consuming forwarding operation, so forward `fn`'s cleanup onto
+  // the result, exactly like the sibling `createConvertFunction` above does for
+  // other function conversions. Mark the conversion's lifetime as already
+  // guaranteed so that `ClosureLifetimeFixup` leaves it alone; the operand's
+  // lifetime is already exactly as long as it needs to be, by construction.
+  //
+  // `OperandOwnershipClassifier` treats `ConvertEscapeToNoEscapeInst` as
+  // `ForwardingConsume` as well when the result type is `@called(once)`.
+  if (resultFnType->isCalledOnce()) {
+    CleanupCloner cloner(*this, fn);
+    SILValue result =
+        createConvertEscapeToNoEscape(loc, fn.forward(getSILGenFunction()),
+                                      resultTy, /*lifetimeGuaranteed=*/true);
+    return cloner.clone(result);
+  }
+
+  // For an ordinary (copyable) escaping closure, the conversion doesn't
+  // consume its operand -- the original escaping value may still be used
+  // again afterwards -- so keep it alive with its own independent cleanup.
+
   SILValue fnValue = fn.getValue();
   SILValue result =
       createConvertEscapeToNoEscape(loc, fnValue, resultTy, false);
-  
+
   return SGF.emitManagedRValueWithCleanup(result);
 }
 

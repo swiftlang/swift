@@ -6159,7 +6159,8 @@ public:
   /// Thick swift noescape function types are trivial.
   bool isTrivialNoEscape() const {
     return isNoEscape() &&
-           getRepresentation() == SILFunctionTypeRepresentation::Thick;
+           getRepresentation() == SILFunctionTypeRepresentation::Thick &&
+           !isCalledOnce();
   }
 
   bool isDifferentiable() const { return getExtInfo().isDifferentiable(); }
