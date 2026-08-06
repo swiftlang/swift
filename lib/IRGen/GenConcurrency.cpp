@@ -395,13 +395,15 @@ llvm::Value *irgen::emitBuiltinTaskPushDeadline(IRGenFunction &IGF,
   //   swift_task_pushDeadline(OpaqueValue *clock, OpaqueValue *instant,
   //                           const Metadata *clockType,
   //                           const Metadata *instantType,
-  //                           const WitnessTable *clockWT,
-  //                           const WitnessTable *identifiableWT)
+  //                           const WitnessTable *identifiableWT,
+  //                           const WitnessTable *clockWT)
   //
-  // clockWT and identifiableWT are reserved for future runtime use;
-  // pass null for now (Swift-side identity comparison is dispatched via
-  // the `_task_isEqualIdentifiableID` bridge which threads
-  // its own generic-arg witnesses).
+  // Swift's canonical generic-sig ordering places `Identifiable` before
+  // `Clock`, so the WT slots follow that order.
+  // Both WTs are reserved for future runtime use; pass null for now
+  // (Swift-side identity comparison is dispatched via the
+  // `_task_isEqualIdentifiableID` bridge which threads its own
+  // generic-arg witnesses).
   auto *null = llvm::ConstantPointerNull::get(IGF.IGM.Int8PtrTy);
   auto *call = IGF.Builder.CreateCall(
       IGF.IGM.getTaskPushDeadlineFunctionPointer(),

@@ -349,14 +349,19 @@ public func _findNearestDeadline<C: Clock & Identifiable>(clock: C) -> C.Instant
     return nil
   }
 
-  return unsafe matched.pointee // will retain or copy if necessary, record retains its copy
+  // The runtime returns a borrowed +0 pointer into the record's tail
+  // storage. Load through `assumingMemoryBound` + `.pointee` which lowers
+  // to the value witness `initializeWithCopy` on `C.Instant`, producing
+  // an owned +1 while the record retains its copy until pop.
+  return unsafe UnsafeRawPointer(matched)
+    .assumingMemoryBound(to: C.Instant.self).pointee
 }
 
 @available(StdlibDeploymentTarget 6.5, *)
 @_silgen_name("swift_task_findNearestDeadlineForClock")
 internal func _swift_task_findNearestDeadlineForClock<C: Clock & Identifiable>(
   queryClock: C
-) -> UnsafePointer<C.Instant>?
+) -> UnsafeMutableRawPointer?
 
 
 @usableFromInline

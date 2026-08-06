@@ -644,8 +644,8 @@ swift_task_pushDeadline(OpaqueValue *clock,
                         OpaqueValue *instant,
                         const Metadata *clockType,
                         const Metadata *instantType,
-                        const WitnessTable *clockWT,      // reserved
-                        const WitnessTable *identifiableWT); // reserved
+                        const WitnessTable *identifiableWT, // reserved
+                        const WitnessTable *clockWT);       // reserved
 
 /// Remove the passed in deadline record from the current task.
 /// Record push/push must observe stack-discipline, enforced by the task local allocator.
@@ -667,8 +667,8 @@ OpaqueValue *
 swift_task_findNearestDeadlineForClock(
     OpaqueValue *queryClock,
     const Metadata *clockType,
-    const WitnessTable *clockWT,
-    const WitnessTable *identifiableWT);
+    const WitnessTable *identifiableWT,
+    const WitnessTable *clockWT);
 
 #endif // !SWIFT_CONCURRENCY_EMBEDDED
 

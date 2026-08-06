@@ -454,10 +454,10 @@ OVERRIDE_TASK_STATUS(task_pushDeadline,
                       OpaqueValue *instant,
                       const Metadata *clockType,
                       const Metadata *instantType,
-                      const WitnessTable *clockWT,
-                      const WitnessTable *identifiableWT),
+                      const WitnessTable *identifiableWT,
+                      const WitnessTable *clockWT),
                      (clock, instant, clockType, instantType,
-                      clockWT, identifiableWT))
+                      identifiableWT, clockWT))
 
 OVERRIDE_TASK_STATUS(task_popDeadline, void,
                      SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
@@ -470,9 +470,9 @@ OVERRIDE_TASK_STATUS(task_findNearestDeadlineForClock,
                      swift::,
                      (OpaqueValue *queryClock,
                       const Metadata *clockType,
-                      const WitnessTable *clockWT,
-                      const WitnessTable *identifiableWT),
-                     (queryClock, clockType, clockWT, identifiableWT))
+                      const WitnessTable *identifiableWT,
+                      const WitnessTable *clockWT),
+                     (queryClock, clockType, identifiableWT, clockWT))
 
 #endif // !SWIFT_CONCURRENCY_EMBEDDED
 
