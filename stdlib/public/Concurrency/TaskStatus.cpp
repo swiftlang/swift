@@ -680,25 +680,24 @@ static void swift_task_popTaskExecutorPreferenceImpl(
 /// Bridged Swift-side helper. Called by the runtime for each candidate
 /// record whose `ClockType` metadata already pointer-equals the query
 /// clock's type. Reads the record's inline-stored clock through the
-/// runtime-supplied `C` (matched via metadata identity) and compares
+/// runtime-supplied `I` (matched via metadata identity) and compares
 /// identities.
 ///
 /// Swift-side definition (in `Task+Deadline.swift`):
 ///
-///     internal func _task_deadline_recordHasSameClock<C: Clock & Identifiable>(
-///       recordClockStorage: UnsafeMutableRawPointer, queryClock: C) -> Bool
+///     internal func _task_isEqualIdentifiableID<I: Identifiable>(
+///       recordClockStorage: UnsafeMutableRawPointer, queryClock: I) -> Bool
 ///
-/// The runtime passes `(recordClockStorage, queryClock, C metadata,
-/// Clock witness, Identifiable witness)` following Swift's generic
-/// calling convention. `recordClockStorage` is a pointer into the
-/// record's task-allocated tail; it holds a valid `C` because push
-/// installed it via `clockType->vw_initializeWithCopy`.
+/// The runtime passes `(recordClockStorage, queryClock, I metadata,
+/// Identifiable witness)` following Swift's generic calling convention.
+/// `recordClockStorage` is a pointer into the record's task-allocated
+/// tail; it holds a valid `I` because push installed it via
+/// `clockType->vw_initializeWithCopy`.
 extern "C" SWIFT_CC(swift)
-bool _task_deadline_recordHasSameClock(
+bool _task_isEqualIdentifiableID(
     OpaqueValue *recordClockStorage,
     OpaqueValue *queryClock,
     const Metadata *clockType,
-    const WitnessTable *clockWT,
     const WitnessTable *identifiableWT);
 
 SWIFT_CC(swift)
@@ -793,7 +792,6 @@ static OpaqueValue *
 findDeadlineOnSingleTask(AsyncTask *task,
                          OpaqueValue *queryClock,
                          const Metadata *clockType,
-                         const WitnessTable *clockWT,
                          const WitnessTable *identifiableWT) {
   OpaqueValue *foundInstant = nullptr;
   withStatusRecordLock(task, [&](ActiveTaskStatus status) {
@@ -806,8 +804,11 @@ findDeadlineOnSingleTask(AsyncTask *task,
         continue;
 
       // Same-clock identity check via Swift callout.
-      if (_task_deadline_recordHasSameClock(record->getClockStorage(), queryClock,
-          clockType, clockWT, identifiableWT)) {
+      if (_task_isEqualIdentifiableID(
+        /*recordClockStorage=*/record->getClockStorage(),
+        /*queryClock=*/queryClock,
+        /*clockType=*/clockType,
+        /*identifiableWT=*/identifiableWT)) {
         foundInstant = record->getInstantStorage();
         return;
       }
@@ -823,6 +824,10 @@ swift_task_findNearestDeadlineForClockImpl(
     const Metadata *clockType,
     const WitnessTable *clockWT,
     const WitnessTable *identifiableWT) {
+  // `clockWT` is unused - the bridge only needs `Identifiable` - but the
+  // Swift-side generic signature <C: Clock & Identifiable> forces us into
+  // accepting both WT.
+  (void)clockWT;
   auto task = swift_task_getCurrent();
   if (!task)
     return nullptr;
@@ -837,7 +842,7 @@ swift_task_findNearestDeadlineForClockImpl(
       break;
 
     if (auto found = findDeadlineOnSingleTask(cur,
-      queryClock, clockType, clockWT, identifiableWT)) {
+      queryClock, clockType, identifiableWT)) {
       // Return borrowed (+0). The Swift caller in `_findNearestDeadline`
       // copies the instant out immediately; the record continues to own the
       // storage until pop.
