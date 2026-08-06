@@ -400,8 +400,8 @@ llvm::Value *irgen::emitBuiltinTaskPushDeadline(IRGenFunction &IGF,
   //
   // clockWT and identifiableWT are reserved for future runtime use;
   // pass null for now (Swift-side identity comparison is dispatched via
-  // the `_task_deadline_recordHasSameClock` bridge which threads its
-  // own generic-arg witnesses).
+  // the `_task_isEqualIdentifiableID` bridge which threads
+  // its own generic-arg witnesses).
   auto *null = llvm::ConstantPointerNull::get(IGF.IGM.Int8PtrTy);
   auto *call = IGF.Builder.CreateCall(
       IGF.IGM.getTaskPushDeadlineFunctionPointer(),

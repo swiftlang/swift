@@ -217,6 +217,7 @@ public nonisolated(nonsending) func withDeadline<Return, Failure, C>(
 /// - Returns: The result of the operation.
 /// - Throws: The error thrown by the operation.
 @available(StdlibDeploymentTarget 6.5, *)
+@export(implementation)
 public nonisolated(nonsending) func withDeadline<Return, Failure, C>(
   in timeout: C.Instant.Duration,
   tolerance: C.Instant.Duration? = nil,
@@ -235,14 +236,7 @@ public nonisolated(nonsending) func withDeadline<Return, Failure, C>(
 }
 
 /// Executes an operation with the expectation it completes within the given
-/// relative timeout, measured against `ContinuousClock().now` at the point
-/// of call.
-///
-/// This concrete overload disambiguates call sites like
-/// `withDeadline(in: .seconds(5)) { ... }`: because `Swift.Duration` is the
-/// `Instant.Duration` of more than one built-in clock, the generic overload
-/// alone cannot infer `C` from `timeout` when the `clock:` argument is
-/// defaulted.
+/// relative timeout, measured by ``ContinuousClock``.
 ///
 /// See ``withDeadline(_:tolerance:clock:operation:)`` for full behavior.
 ///
@@ -327,31 +321,27 @@ extension Task where Success == Never, Failure == Never {
 // MARK: Internals
 
 /// Swift-side helper called by the runtime for each deadline record whose
-/// `ClockType` metadata pointer-equals the caller's `C`. Reads the record's
-/// inline-stored clock as a `C` value and compares identities via
-/// `Identifiable`.
+/// `ClockType` metadata pointer-equals the caller's `I`. Reads the record's
+/// inline-stored clock as an `I` value and compares identities.
 ///
-/// The runtime pointer-equality checks `record->ClockType == C-metadata`
+/// The runtime pointer-equality checks `record->ClockType == I-metadata`
 /// before calling this bridge, so `recordClockStorage` is guaranteed to
-/// hold a valid `C`.
+/// hold a valid `I`. Only `Identifiable` is needed here - the clock-ness
+/// of the type doesn't enter the comparison.
 @available(StdlibDeploymentTarget 6.5, *)
-@_silgen_name("_task_deadline_recordHasSameClock")
-internal func _task_deadline_recordHasSameClock<C: Clock & Identifiable>(
+@_silgen_name("_task_isEqualIdentifiableID")
+internal func _task_isEqualIdentifiableID<I: Identifiable>(
   recordClockStorage: UnsafeMutableRawPointer,
-  queryClock: C
+  queryClock: I
 ) -> Bool {
-  // TODO: This should be simplified to be between two Identifiable things. No need to make it clock specific.
-  //       AND it should be well typed on both sides, some I, some I, should be fine;
-  // TODO: I guess that's why we need to store Metadata and WT in the record, to implement this callout well typed
   let stored = unsafe recordClockStorage
-    .assumingMemoryBound(to: C.self).pointee
+    .assumingMemoryBound(to: I.self).pointee
   return stored.id == queryClock.id
 }
 
 /// Find the innermost active deadline installed on the current task for
 /// the given clock, or nil if none.
 @_spi(Concurrency)
-@export(implementation)
 @available(StdlibDeploymentTarget 6.5, *)
 public func _findNearestDeadline<C: Clock & Identifiable>(clock: C) -> C.Instant? {
   guard let matched =
