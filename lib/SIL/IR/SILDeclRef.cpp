@@ -60,6 +60,12 @@ swift::getMethodDispatch(AbstractFunctionDecl *method) {
     if (method->isFinal())
       return MethodDispatch::Static;
 
+    // Embedded Swift cannot put a generic method in a vtable, so these are
+    // dispatched statically. The type checker rejects the cases where that
+    // would be observable (`open`, or an override).
+    if (method->mustBeStaticallyDispatchedInEmbedded())
+      return MethodDispatch::Static;
+
     // Imported class methods are dynamically dispatched.
     if (method->isObjC() && method->hasClangNode())
       return MethodDispatch::Class;
