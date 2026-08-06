@@ -578,7 +578,7 @@ public:
   /// Returns whether there was an appropriate emitter (and whether \p
   /// invocation was called).
   bool withWitnessableMetadataCollector(
-      IRGenFunction &IGF, SILType T, LayoutIsNeeded_t needsLayout,
+      IRGenFunction &IGF, SILType T,
       DeinitIsNeeded_t needsDeinit,
       llvm::function_ref<void(OutliningMetadataCollector &)> invocation) const;
 
