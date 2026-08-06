@@ -132,7 +132,6 @@ SHOULD_NEVER_VISIT_INST(SpecifyTest)
 SHOULD_NEVER_VISIT_INST(ScalarPackIndex)
 SHOULD_NEVER_VISIT_INST(Vector)
 SHOULD_NEVER_VISIT_INST(TypeValue)
-SHOULD_NEVER_VISIT_INST(EndFormalScope)
 
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)            \
   SHOULD_NEVER_VISIT_INST(StrongRetain##Name)                                  \
@@ -220,9 +219,12 @@ OPERAND_OWNERSHIP(TrivialUse, DereferenceBorrow)
 OPERAND_OWNERSHIP(TrivialUse, DereferenceAddrBorrow)
 OPERAND_OWNERSHIP(TrivialUse, DereferenceBorrowAddr)
 
-// The dealloc_stack_ref operand needs to have NonUse ownership because
-// this use comes after the last consuming use (which is usually a dealloc_ref).
+// A dealloc_stack_ref or end_formal_scope operand needs to have NonUse
+// ownership because this use comes after the last consuming use (which is
+// usually a dealloc_ref).
 OPERAND_OWNERSHIP(NonUse, DeallocStackRef)
+OPERAND_OWNERSHIP(NonUse, EndFormalScope)
+
 OPERAND_OWNERSHIP(InstantaneousUse, IgnoredUse)
 
 // Use an owned or guaranteed value only for the duration of the operation.

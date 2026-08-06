@@ -1205,11 +1205,13 @@ func testMultiPatternsWithOuterScopeSameNamedVar(base: Int?, filter: Int?) {
   case (.some(let base), .none), (.none, .some(let base)):
     // CHECK: bb3:
     // CHECK-NEXT: [[MV_BASE_PATTERN:%.*]] = move_value [var_decl] [[BASE]] : $Int
+    // CHECK-NEXT: end_formal_scope
     // CHECK-NEXT: extend_lifetime [[MV_BASE_PATTERN]] : $Int
     // CHECK-NEXT: br bb6([[MV_BASE_PATTERN]] : $Int)
 
     // CHECK: bb5([[OTHER_BASE:%.*]] : $Int)
     // CHECK-NEXT: [[MV_OTHER_BASE:%.*]] = move_value [var_decl] [[OTHER_BASE]] : $Int
+    // CHECK-NEXT: end_formal_scope
     // CHECK-NEXT: extend_lifetime [[MV_OTHER_BASE]] : $Int
     // CHECK-NEXT: br bb6([[MV_OTHER_BASE]] : $Int)
 
@@ -1392,6 +1394,7 @@ func partial_address_only_tuple_dispatch(_ name: Klass, _ value: Any?) {
 // CHECK-NEXT:   [[ANYOBJECT:%.*]] = load [take] [[ANYOBJECT_ADDR]]
 // CHECK-NEXT:   [[MOVED:%.*]] = move_value
 // CHECK-NEXT:   debug_value
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT:   destroy_value [[MOVED]]
 // CHECK-NEXT:   dealloc_stack [[ANYOBJECT_ADDR]]
 // CHECK-NEXT:   destroy_addr [[SOME_ANY_ADDR]]

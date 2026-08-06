@@ -36,6 +36,7 @@ func genericMakeCalledOnce<T>(_ f: @escaping (T) -> Void) -> @called(once) (T) -
 // CHECK-LABEL: sil hidden [ossa] @$s17called_once_thunk22makeCalledOnceEscapingyyAA3BigVXOyADcF : $@convention(thin) (@guaranteed @callee_guaranteed (Big) -> ()) -> @owned @called(once) @callee_owned (Big) -> () {
 // CHECK: [[LAST_THUNK:%.*]] = function_ref @$s17called_once_thunk3BigVIegy_ACIeOxy_TR : $@convention(thin) (Big, @guaranteed @callee_guaranteed (Big) -> ()) -> ()
 // CHECK-NEXT: [[RESULT:%.*]] = partial_apply [called_once] [[LAST_THUNK]]({{%.*}}) : $@convention(thin) (Big, @guaranteed @callee_guaranteed (Big) -> ()) -> ()
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT: return [[RESULT]] : $@called(once) @callee_owned (Big) -> ()
 // CHECK: } // end sil function '$s17called_once_thunk22makeCalledOnceEscapingyyAA3BigVXOyADcF'
 //

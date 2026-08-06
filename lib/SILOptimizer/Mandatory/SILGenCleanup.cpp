@@ -243,6 +243,21 @@ bool SILGenCleanup::removeAccessToNonDestructiveEnumProjection(
   return changed;
 }
 
+static void removeEndFormalScopeMarkers(SILFunction &f) {
+  // TODO: Skip this when lifetime resolution is enabled, since that pass
+  // will make use of these markers, and remove them in the course of its own
+  // lowering.
+  
+  for (SILBasicBlock &block: f) {
+    for (auto i = block.begin(), e = block.end(); i != e; ) {
+      auto cur = i++;
+      if (auto efs = dyn_cast<EndFormalScopeInst>(&*cur)) {
+        efs->eraseFromParent();
+      }
+    }
+  }
+}
+
 void SILGenCleanup::run() {
   SILFunction *function = getFunction();
   if (!function->isDefinition())
@@ -253,6 +268,7 @@ void SILGenCleanup::run() {
   LLVM_DEBUG(llvm::dbgs()
              << "\nRunning SILGenCleanup on " << function->getName() << "\n");
 
+  removeEndFormalScopeMarkers(*function);
   removeUnreachableBlocks(*function);
   bool changed = fixupBorrowAccessors(function);
   changed |= removeAccessToNonDestructiveEnumProjection(function);

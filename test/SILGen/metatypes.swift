@@ -99,6 +99,7 @@ func existential_metatype_from_thin() -> Any.Type {
 // CHECK-NEXT: [[T0:%.*]] = metatype $@thin SomeStruct.Type
 // CHECK-NEXT: [[T1:%.*]] = metatype $@thick SomeStruct.Type
 // CHECK-NEXT: [[T2:%.*]] = init_existential_metatype [[T1]] : $@thick SomeStruct.Type, $@thick any Any.Type
+// CHECK-NEXT: end_formal_scope
 // CHECK-NEXT: extend_lifetime [[MV]] : $SomeStruct
 // CHECK-NEXT: return [[T2]] : $@thick any Any.Type
 func existential_metatype_from_thin_value() -> Any.Type {

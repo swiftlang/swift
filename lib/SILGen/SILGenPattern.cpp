@@ -3038,6 +3038,8 @@ void PatternMatchEmission::emitSharedCaseBlocks(
       // for the pattern match.
       SILDebugVariable dbgVar(vd->isLet(), /*ArgNo=*/0);
       SGF.B.emitDebugDescription(vd, mv.getValue(), dbgVar);
+      
+      SGF.enterFormalScopeCleanup(vd, mv.getValue());
 
       if (vd->isLet()) {
         // Just emit a let and leave the cleanup alone.
@@ -4129,4 +4131,3 @@ void SILGenFunction::emitCatchDispatch(DoCatchStmt *S, ManagedValue exn,
   }
 
 }
-
