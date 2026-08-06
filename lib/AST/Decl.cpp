@@ -12430,21 +12430,15 @@ Type ConstructorDecl::getInitializerInterfaceType() {
   return InitializerInterfaceType;
 }
 
-CtorInitializerKind ConstructorDecl::getInitKind() const {
-  const auto *ED =
-      dyn_cast_or_null<ExtensionDecl>(getDeclContext()->getAsDecl());
-  if (ED && !ED->hasBeenBound()) {
-    // When the declaration context is an extension and this is called when the
-    // extended nominal hasn't be bound yet, e.g. dumping pre-typechecked AST,
-    // there is not enough information about extended nominal to use for
-    // computing init kind on InitKindRequest as bindExtensions is done at
-    // typechecking, so in that case just look to parsed attribute in init
-    // declaration.
-    return getAttrs().hasAttribute<ConvenienceAttr>()
-               ? CtorInitializerKind::Convenience
-               : CtorInitializerKind::Designated;
-  }
+std::optional<CtorInitializerKind> ConstructorDecl::getCachedInitKind() const {
+  auto &eval = getASTContext().evaluator;
+  auto *mutableThis = const_cast<ConstructorDecl *>(this);
+  if (!eval.hasCachedResult(InitKindRequest{mutableThis}))
+    return std::nullopt;
+  return getInitKind();
+}
 
+CtorInitializerKind ConstructorDecl::getInitKind() const {
   return evaluateOrDefault(getASTContext().evaluator,
     InitKindRequest{const_cast<ConstructorDecl *>(this)},
     CtorInitializerKind::Designated);
