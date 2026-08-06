@@ -928,6 +928,38 @@ void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
     }
   }
 
+  // A method that overrides a virtual method needs no wrapper of its own if it
+  // inherits one: the base class wrapper calls the virtual method, so it already
+  // dispatches to this override, and a second wrapper here would only add an
+  // overload that cannot be resolved against the inherited one.
+  //
+  // The wrapper is only inherited when the C++ base class is imported as the
+  // Swift superclass. Reached any other way - through a value type base, or a
+  // base that is not the primary one - the base class wrapper is cloned rather
+  // than inherited and cannot be called, so this override does need its own. Ask
+  // for the primary superclass in Clang terms rather than looking at the Swift
+  // superclass, which is not necessarily set up yet while importing a member.
+  if (auto *CxxMethod = dyn_cast<clang::CXXMethodDecl>(ClangDecl)) {
+    auto primarySuperclassOf = [&](const clang::CXXRecordDecl *Record) {
+      return evaluateOrDefault(SwiftContext.evaluator,
+                               ForeignReferenceTypeInfoRequest({Record}), {})
+          .getPrimarySuperclass();
+    };
+    for (auto *Overridden : CxxMethod->overridden_methods()) {
+      auto *BaseRecord = Overridden->getParent()->getCanonicalDecl();
+      for (auto *Super = primarySuperclassOf(CxxMethod->getParent()); Super;
+           Super = primarySuperclassOf(Super)) {
+        if (Super->getCanonicalDecl() == BaseRecord) {
+          // FIXME: We should still generate a safe wrapper if the superclass is
+          // missing one, or if this one would produce a different signature.
+          DLOG("Inherits the wrapper of an overridden virtual method, which "
+               "dispatches here\n");
+          return;
+        }
+      }
+    }
+  }
+
   // For projects adopting SafeInteropWrappers we preserve the original
   // Optional-propagating signature unless they opt-in to the new one.
   const bool LegacyOptionalRequested =

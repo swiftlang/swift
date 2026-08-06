@@ -261,14 +261,6 @@ struct InheritRef : public RefType {
   int refSubBasic(const int * __counted_by(len) p, int len) const;
   
   // no lifetimebound annotation on override
-  // expected-expansion@+8:97{{
-  //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-  //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload|}}
-  //   expected-remark@3{{macro content: |public final func refLifetimeboundVirtual(_ p: UnsafeBufferPointer<CInt>) -> UnsafeBufferPointer<CInt> {|}}
-  //   expected-remark@4{{macro content: |    let len = CInt(exactly: p.count)!|}}
-  //   expected-remark@5{{macro content: |    return unsafe UnsafeBufferPointer<CInt>(start: unsafe refLifetimeboundVirtual(p.baseAddress, len), count: Int(len))|}}
-  //   expected-remark@6{{macro content: |}|}}
-  // }}
   const int * __counted_by(len) refLifetimeboundVirtual(const int * __counted_by(len) p, int len) const override;
 };
 
@@ -284,27 +276,6 @@ struct InheritRefPrivate : RefType {
   int refPrivateSubBasic(const int * __counted_by(len) p, int len) const;
   
   // with lifetimebound annotation on override
-  // expected-expansion@+21:122{{
-  //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-  //   expected-apple-error@2{{instance method cannot be more available than enclosing scope}}
-  //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_disfavoredOverload|}}
-  //   expected-error@3{{instance method overrides a 'final' instance method}}
-  //   expected-remark@3{{macro content: |public final func refLifetimeboundVirtual(_ p: Span<CInt>) -> Span<CInt> {|}}
-  //   expected-remark@4{{macro content: |    let len = CInt(exactly: p.count)!|}}
-  //   expected-remark@5{{macro content: |    let _pPtr = p.withUnsafeBufferPointer {|}}
-  //   expected-remark@6{{macro content: |        unsafe $0|}}
-  //   expected-remark@7{{macro content: |    }|}}
-  //   expected-remark@8{{macro content: |    defer {|}}
-  //   expected-remark@9{{macro content: |        _fixLifetime(p)|}}
-  //   expected-remark@10{{macro content: |    }|}}
-  //   expected-remark@11{{macro content: |    let _resultValue: UnsafePointer<CInt>? = unsafe refLifetimeboundVirtual(_pPtr.baseAddress, len)|}}
-  //   expected-remark@12{{macro content: |    if unsafe _resultValue == nil {|}}
-  //   expected-remark@13{{macro content: |      precondition(len == 0, "counted_by may only be null if count is 0 (unlike counted_by_or_null)")|}}
-  //   expected-remark@14{{macro content: |      return Span<CInt>()|}}
-  //   expected-remark@15{{macro content: |    }|}}
-  //   expected-remark@16{{macro content: |    return unsafe _swiftifyOverrideLifetime(Span<CInt>(_unsafeStart: _resultValue!, count: Int(len)), copying: ())|}}
-  //   expected-remark@17{{macro content: |}|}}
-  // }}
   const int * __counted_by(len) refLifetimeboundVirtual(const int * __counted_by(len) p [[clang::lifetimebound]], int len) const override;
 };
 
@@ -316,7 +287,7 @@ module Test {
 
 //--- test.swift
 // GENERATED-BY: %target-swift-ide-test -print-module -module-to-print=Test -plugin-path %swift-plugin-dir -cxx-interoperability-mode=default -I %t -source-filename=x -Xcc -Wno-nullability-completeness > %t/Test-interface.swift && %swift-function-caller-generator Test %t/Test-interface.swift | sed -e 's/@available(macOS 13\.3\.0, \*)/@available(SwiftStdlib 5.8, *)/'
-// GENERATED-HASH: 403e609312afef578c43734ef19593bd4e9d6f6ee829930d750a4f40361617a7
+// GENERATED-HASH: a5d61faf4a14adb37e59220e887bdb0722bc41f0e742e193fc68b600cec455e1
 import Test
 
 
@@ -453,9 +424,6 @@ extension RefType {
 extension InheritRef {
   final func call_refLifetimeboundVirtual_InheritRef(_ p: UnsafePointer<CInt>!, _ len: CInt) -> UnsafePointer<CInt>! {
     return unsafe refLifetimeboundVirtual(p, len)
-  }
-  @_alwaysEmitIntoClient @_disfavoredOverload final func call_refLifetimeboundVirtual_InheritRef(_ p: UnsafeBufferPointer<CInt>) -> UnsafeBufferPointer<CInt> {
-    return unsafe refLifetimeboundVirtual(p)
   }
   final func call_refSubBasic_InheritRef(_ p: UnsafePointer<CInt>!, _ len: CInt) -> CInt {
     return unsafe refSubBasic(p, len)

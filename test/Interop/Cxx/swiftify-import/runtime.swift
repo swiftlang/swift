@@ -452,52 +452,12 @@ let values: [CInt] = [1, 2, 3]
 
 #if NOT_YET_SUPPORTED
 // If any of these stop being an error, upgrade it to a proper runtime test case.
-extension Cube {
-  func callKindDirectViaSuper(_ values: Span<CInt>) -> Impl {
-    // FIXME: super.foo() calls to safe wrappers not supported
-    // expected-error@+1 {{ambiguous use of 'callKindDirect'}}
-    super.callKindDirect(values)
-  }
-}
-
-Suite.test("super. reaches a virtual base class implementation") {
-  // Prism::callKindDirect returns its own kind, so reaching it non-virtually
-  // through super. must not run Cube's override.
-  expectEqual(.prismKind, Cube.create().callKindDirectViaSuper(values.span))
-}
-
 Suite.test("hidden wrapper is ambiguous") {
   // FIXME: Cube's own wrapper and the one it inherits from Prism are both
   // visible, so the call cannot be resolved.
   // expected-error@+2 {{ambiguous use of 'derivedCallKindIndirect'}}
   expectEqual(.cubeHiddenKind,
               Cube.create().derivedCallKindIndirect(values.span))
-}
-
-Suite.test("ambiguous wrapper: virtual method of a reference type") {
-  // FIXME: the wrapper generated for Shape::callKindDirect and the one generated
-  // for this class's override are both visible and are not related by
-  // overriding, so neither wins. Macro-expanded peers never get an OverrideAttr,
-  // which is what lets the underlying methods resolve.
-  // Every ...Direct call below is blocked on this.
-  // expected-error@+1 {{ambiguous use of 'callKindDirect'}}
-  expectEqual(.slabKind, Slab.create().callKindDirect(values.span))
-}
-
-Suite.test("ambiguous wrapper: virtual method inherited two levels down") {
-  // expected-error@+1 {{ambiguous use of 'callKindDirect'}}
-  expectEqual(.cubeKind, Cube.create().callKindDirect(values.span))
-}
-
-Suite.test("ambiguous wrapper: virtual method with multiple inheritance") {
-  // expected-error@+1 {{ambiguous use of 'callKindDirect'}}
-  expectEqual(.multiKind, MultiDerived.create().callKindDirect(values.span))
-}
-
-Suite.test("ambiguous wrapper: virtual method of a class template") {
-  // expected-error@+2 {{ambiguous use of 'callKindDirect'}}
-  expectEqual(.templatedDerivedKind,
-              TemplatedDerivedInt.create().callKindDirect(values.span))
 }
 
 Suite.test("cloned wrapper: base that is not the primary base") {
@@ -552,6 +512,9 @@ extension Cube {
   func callKindIndirectViaSuper(_ values: Span<CInt>) -> Impl {
     super.callKindIndirect(values)
   }
+  func callKindDirectViaSuper(_ values: Span<CInt>) -> Impl {
+    super.callKindDirect(values)
+  }
   func derivedCallKindIndirectViaSuper(_ values: Span<CInt>) -> Impl {
     super.derivedCallKindIndirect(values)
   }
@@ -564,6 +527,12 @@ Suite.test("super. reaches the base class implementation of a wrapper") {
   // Cube hides Prism's member of the same name, and super. is currently the only
   // way to call the hidden wrapper: see the ambiguity in the guarded test below.
   expectEqual(.cubeKind, Cube.create().derivedCallKindIndirectViaSuper(values.span))
+
+  // FIXME: super.foo() cannot reach the base class implementation of a wrapped
+  // virtual method. The wrapper is not itself virtual, so super. only selects
+  // the base class wrapper, whose body still calls the virtual method and lands
+  // back in Cube's override. Prism::callKindDirect is unreachable from Swift.
+  expectEqual(.cubeKind, Cube.create().callKindDirectViaSuper(values.span))
 }
 
 Suite.test("multiple inheritance") {
@@ -594,18 +563,20 @@ Suite.test("curiously recurring template pattern") {
 }
 
 Suite.test("wrapper on a virtual method of a reference type") {
-  // These are the hierarchies where only one wrapper for the virtual method is
-  // visible at the call site, so the call resolves. Where the base class and the
-  // override each contribute one, it does not: see the guarded tests below.
-  //
+  // An override does not get a wrapper of its own when it inherits one, so there
+  // is a single wrapper per hierarchy and it dispatches to the override.
+  expectEqual(.slabKind, Slab.create().callKindDirect(values.span))
+  expectEqual(.cubeKind, Cube.create().callKindDirect(values.span))
+  expectEqual(.multiKind, MultiDerived.create().callKindDirect(values.span))
+  expectEqual(.templatedDerivedKind,
+              TemplatedDerivedInt.create().callKindDirect(values.span))
+
   // CRTPBase is a value type, so its wrapper is cloned rather than inherited and
-  // CRTPConcrete's override is the only candidate.
+  // CRTPConcrete's override keeps one of its own.
   expectEqual(.crtpKind, CRTPConcrete.create().baseCallKindDirect(values.span))
-  // Called on the base class itself, which only has its own wrapper. The dynamic
-  // type is still CRTPRefConcrete, so its override runs.
+  // Called on the base class, whose wrapper dispatches to the override.
   expectEqual(.crtpRefKind, makeCRTPRefBase()!.baseCallKindDirect(values.span))
-  // ValueBase is a value type, so again only RefDerived's override is a
-  // candidate.
+  // ValueBase is a value type, so again RefDerived's override keeps its own.
   expectEqual(.refDerivedKind, RefDerived.create().callKindDirect(values.span))
 }
 
