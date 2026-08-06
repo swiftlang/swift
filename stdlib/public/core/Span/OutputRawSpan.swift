@@ -318,6 +318,7 @@ extension OutputRawSpan {
     unsafe _append(value, as: T.self)
   }
 
+#if !SPAN_COMPATIBILITY_STUB
   /// Appends the given value's bytes to this span's bytes.
   ///
   /// There must be at least `MemoryLayout<T>.size` bytes available
@@ -339,6 +340,7 @@ extension OutputRawSpan {
     }
     unsafe _append(rawValue, as: T.self)
   }
+#endif
 }
 
 // MARK: bulk-append functions
@@ -397,6 +399,7 @@ extension OutputRawSpan {
     unsafe _append(repeating: repeatedValue, count: count, as: T.self)
   }
 
+#if !SPAN_COMPATIBILITY_STUB
   /// Appends the given value's bytes repeatedly to this span's bytes.
   ///
   /// There must be at least `count * MemoryLayout<T>.stride` bytes
@@ -423,6 +426,7 @@ extension OutputRawSpan {
     }
     unsafe _append(repeating: rawValue, count: count, as: T.self)
   }
+#endif
 }
 
 @available(SwiftCompatibilitySpan 5.0, *)

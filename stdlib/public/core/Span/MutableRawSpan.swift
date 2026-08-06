@@ -491,6 +491,7 @@ extension MutableRawSpan {
     unsafe unsafeLoadUnaligned(fromByteOffset: offset, as: T.self)
   }
 
+#if !SPAN_COMPATIBILITY_STUB
   /// Returns a value constructed from the raw memory at the specified offset.
   ///
   /// The range of bytes required to construct a value of type `T` starting at
@@ -516,6 +517,7 @@ extension MutableRawSpan {
     case .littleEndian: rawValue.littleEndian
     }
   }
+#endif
 
   /// Stores the given value's bytes into the span's raw memory at the
   /// specified byte offset.
@@ -586,6 +588,7 @@ extension MutableRawSpan {
     unsafe _storeBytes(of: value, toByteOffset: offset, as: T.self)
   }
 
+#if !SPAN_COMPATIBILITY_STUB
   /// Stores the given value's bytes to the specified offset into
   /// the span's memory.
   ///
@@ -617,6 +620,7 @@ extension MutableRawSpan {
       storeBytes(of: value.littleEndian, toByteOffset: offset, as: T.self)
     }
   }
+#endif
 
   /// Stores the given value's bytes repeatedly into this span's memory.
   ///
@@ -670,6 +674,7 @@ extension MutableRawSpan {
     unsafe _storeBytes(repeating: repeatedValue, count: count, as: T.self)
   }
 
+#if !SPAN_COMPATIBILITY_STUB
   /// Stores the given value's bytes repeatedly into this span's memory.
   ///
   /// There must be at least `count * MemoryLayout<T>.stride` bytes
@@ -698,6 +703,7 @@ extension MutableRawSpan {
     }
     storeBytes(repeating: value, count: count, as: T.self)
   }
+#endif
 }
 
 // MARK: sub-spans
