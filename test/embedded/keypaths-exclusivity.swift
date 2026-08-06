@@ -27,9 +27,11 @@
 // by IRGen when it is off. Check this on conflict.swift: in ok.swift the
 // accesses are provably non-conflicting, so at -O the access-enforcement
 // optimizer removes them and the check would pass vacuously.
-// RUN: %target-swift-frontend -enable-experimental-feature Embedded -enable-experimental-feature EmbeddedDynamicExclusivity -enforce-exclusivity=checked -parse-as-library -wmo -O %t/conflict.swift -module-name conflict -emit-ir -o - | %FileCheck -check-prefix=CHECK-EXCL %s
-// CHECK-EXCL: call void @swift_beginAccess
-// CHECK-EXCL: call void @swift_endAccess
+// RUN: %target-swift-frontend -enable-experimental-feature Embedded -enable-experimental-feature EmbeddedDynamicExclusivity -enforce-exclusivity=checked -parse-as-library -wmo -O %t/conflict.swift -module-name conflict -emit-ir -o %t/conflict.ll
+// RUN: %FileCheck -check-prefix=CHECK-EXCL-BEGIN %s < %t/conflict.ll
+// RUN: %FileCheck -check-prefix=CHECK-EXCL-END %s < %t/conflict.ll
+// CHECK-EXCL-BEGIN: call void @swift_beginAccess
+// CHECK-EXCL-END: call void @swift_endAccess
 
 // RUN: %target-swift-frontend -enable-experimental-feature Embedded -parse-as-library -wmo -O %t/conflict.swift -module-name conflict -emit-ir -o - | %FileCheck -check-prefix=CHECK-NOEXCL %s
 // CHECK-NOEXCL-NOT: swift_beginAccess
