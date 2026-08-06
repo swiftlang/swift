@@ -488,7 +488,7 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
 
 extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   /// Constructs a standalone buffer pointer over the items within the supplied
-  /// range of positions in the memory region addressed by this buffer pointer.
+  /// range of indices in the memory region addressed by this buffer pointer.
   ///
   /// The returned buffer's first item is always at index 0; unlike buffer
   /// slices, extracted buffers do not share their indices with the
@@ -528,7 +528,7 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   }
 
   /// Constructs a standalone buffer pointer over the items within the supplied
-  /// range of positions in the memory region addressed by this buffer pointer.
+  /// range of indices in the memory region addressed by this buffer pointer.
   ///
   /// The returned buffer's first item is always at index 0; unlike buffer
   /// slices, extracted buffers do not share their indices with the
@@ -590,7 +590,7 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   }
 
   /// Constructs a standalone buffer pointer over the items within the supplied
-  /// range of positions in the memory region addressed by this buffer pointer.
+  /// range of indices in the memory region addressed by this buffer pointer.
   ///
   /// The returned buffer's first item is always at index 0; unlike buffer
   /// slices, extracted buffers do not share their indices with the
@@ -609,7 +609,7 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   }
 
   /// Constructs a standalone buffer pointer over the items within the supplied
-  /// range of positions in the memory region addressed by this buffer pointer.
+  /// range of indices in the memory region addressed by this buffer pointer.
   ///
   /// The returned buffer's first item is always at index 0; unlike buffer
   /// slices, extracted buffers do not share their indices with the
