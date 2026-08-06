@@ -832,7 +832,7 @@ swift_task_findNearestDeadlineForClockImpl(
     auto status = cur->_private()._status().load(std::memory_order_relaxed);
     // We can stop our search early if the cur task definitely has no deadline,
     // since this means its parent tasks also don't have any deadline set.
-    // See: AsyncTask::inheritDeadlineFlagFrom.
+    // See: AsyncTask::inheritDeadlineFrom.
     if (!status.hasDeadline())
       break;
 
@@ -867,26 +867,14 @@ bool _swift_task_hasActiveDeadline() {
   return status.hasDeadline();
 }
 
-void AsyncTask::inheritDeadlineFlagFrom(AsyncTask *parent) {
+void AsyncTask::inheritDeadlineFrom(AsyncTask *parent) {
   assert(parent && "must have a parent to inherit deadline flag from");
 
-  // Fast-path: parent has no deadline installed at all.
   auto parentStatus =
       parent->_private()._status().load(std::memory_order_relaxed);
   if (!parentStatus.hasDeadline())
     return;
 
-  // Set the flag on the child so `Task.hasActiveDeadline` observes it
-  // without walking any parent chain, and so
-  // `swift_task_findNearestDeadlineForClock`'s fast-path
-  // `if (!status.hasDeadline()) return nullptr` doesn't bail out
-  // prematurely. The actual lookup will walk into the parent chain via
-  // `childFragment()->getParent()` when it doesn't find a matching
-  // record locally.
-  //
-  // The child's status is not observable by other threads yet (we're
-  // inside swift_task_create_common before the task is enqueued), so
-  // this is a plain unlocked update.
   auto &status = _private()._status();
   auto old = status.load(std::memory_order_relaxed);
   status.store(old.withDeadline(), std::memory_order_relaxed);

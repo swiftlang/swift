@@ -1200,7 +1200,7 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
     // the parent chain via `childFragment()->getParent()` on a miss,
     // so we don't copy the records themselves - only the fast-path bit
     // that stops the lookup from bailing out early on the child.
-    task->inheritDeadlineFlagFrom(parent);
+    task->inheritDeadlineFrom(parent);
 
     // Inside a task group, we may have to perform some defensive copying,
     // check if doing so is necessary, and initialize storage using partial

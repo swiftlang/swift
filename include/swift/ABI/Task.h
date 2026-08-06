@@ -618,7 +618,7 @@ public:
   /// parent chain via `childFragment()->getParent()` on a miss.
   ///
   /// We do NOT copy the parent's deadline records themselves.
-  void inheritDeadlineFlagFrom(AsyncTask *parent);
+  void inheritDeadlineFrom(AsyncTask *parent);
 
   // ==== Task Local Values ----------------------------------------------------
 
