@@ -3689,15 +3689,33 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     }
 
     SILBasicBlock *DebugBB = nullptr;
-    if (parseTypedValueRef(Val, B) || parseSILDebugVar(VarInfo) ||
+
+    // Parse operands: either a single typed value or a parenthesized list.
+    SmallVector<SILValue, 4> Operands;
+    if (P.Tok.is(tok::l_paren)) {
+      P.consumeToken(tok::l_paren);
+      if (!P.Tok.is(tok::r_paren)) {
+        do {
+          SILValue Operand;
+          if (parseTypedValueRef(Operand, B))
+            return true;
+          Operands.push_back(Operand);
+        } while (P.consumeIf(tok::comma));
+      }
+      if (P.parseToken(tok::r_paren, diag::expected_tok_in_sil_instr, ")"))
+        return true;
+    } else {
+      if (parseTypedValueRef(Val, B))
+        return true;
+      Operands.push_back(Val);
+    }
+
+    if (parseSILDebugVar(VarInfo) ||
         parseSILDebugTransformBlock(DebugBB, B) ||
         parseSILDebugLocation(InstLoc, B))
       return true;
 
-    if (Val->getType().isMoveOnly())
-      usesMoveableValueDebugInfo = UsesMoveableValueDebugInfo;
-
-    ResultVal = B.createDebugValue(InstLoc, Val, VarInfo,
+    ResultVal = B.createDebugValue(InstLoc, Operands, VarInfo,
                                    usesMoveableValueDebugInfo, hasTrace);
 
     if (DebugBB)
