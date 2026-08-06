@@ -67,15 +67,17 @@ syn keyword swiftLabel
 
 " ---- Modifiers & specifiers ----
 
-" nonisolated(unsafe), nonisolated(nonsending)
+" nonisolated(unsafe), nonisolated(nonsending), unowned(safe), unowned(unsafe)
 syn keyword swiftModifierArgument contained
       \ nonsending
+      \ safe
       \ unsafe
 syn region swiftModifierArguments contained transparent
       \ matchgroup=Delimiter start=/(/ end=/)/
       \ contains=swiftModifierArgument
 syn keyword swiftDefinitionModifier skipwhite skipempty nextgroup=swiftModifierArguments
       \ nonisolated
+      \ unowned
 
 syn keyword swiftDefinitionModifier
       \ async
