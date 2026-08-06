@@ -31,6 +31,7 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/CodeGenerationModel.h"
 #include "swift/Basic/Mangler.h"
+#include "swift/Basic/UUID.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/Parse/Lexer.h"
@@ -925,6 +926,7 @@ namespace {
       NumRequirementsInSignature = B.addPlaceholderWithSize(IGM.Int32Ty);
       NumRequirements = B.addPlaceholderWithSize(IGM.Int32Ty);
       asImpl().addAssociatedTypeNames();
+      asImpl().addCOMInterfaceID();
       asImpl().addRequirementSignature();
       asImpl().addRequirements();
       auto addr = IGM.getAddrOfProtocolDescriptor(Proto,
@@ -939,6 +941,38 @@ namespace {
       auto nameStr = IGM.getAddrOfGlobalIdentifierString(Proto->getName().str(),
                                            /*willBeRelativelyAddressed*/ true);
       B.addRelativeAddress(nameStr);
+    }
+
+    void addCOMInterfaceID() {
+      if (!Proto->isCOMInterface())
+        return;
+
+      const COMDeclInfo *info = Proto->getCOMDeclInfo();
+      ASSERT(info && info->isInterface());
+
+      std::string string = info->getInterfaceID().str();
+      std::optional<UUID> uuid = UUID::fromString(string.c_str());
+      ASSERT(uuid && "COM interface ID should have been validated by Sema");
+
+      unsigned char bytes[UUID::Size];
+      uuid->getCanonicalBytes(bytes);
+
+      // COMInterface.IID is a GUID value, so encode its integer fields in the
+      // target's native byte order rather than the UUID string's canonical byte
+      // order.
+      if (IGM.Triple.isLittleEndian()) {
+        std::reverse(bytes + 0, bytes + 4);
+        std::reverse(bytes + 4, bytes + 6);
+        std::reverse(bytes + 6, bytes + 8);
+      }
+
+      llvm::Constant *initializer =
+          llvm::ConstantDataArray::get(IGM.getLLVMContext(),
+                                       llvm::ArrayRef(bytes));
+
+      // SpecialProtocol::COM is the presence discriminator. Keep the IID inline
+      // so the descriptor owns the sole addressable representation.
+      B.add(initializer);
     }
 
     void addRequirementSignature() {
