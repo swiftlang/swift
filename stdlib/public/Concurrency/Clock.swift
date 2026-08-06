@@ -120,8 +120,12 @@ extension Clock {
   public func sleep(
     for duration: Instant.Duration,
     tolerance: Instant.Duration? = nil
-  ) async throws {
-    try await sleep(until: now.advanced(by: duration), tolerance: tolerance)
+  ) async throws(_Concurrency.CancellationError) {
+    do {
+      try await sleep(until: now.advanced(by: duration), tolerance: tolerance)
+    } catch {
+      throw error as! _Concurrency.CancellationError
+    }
   }
 }
 #endif
