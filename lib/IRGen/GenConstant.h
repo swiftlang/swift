@@ -42,6 +42,15 @@ Explosion emitConstantValue(IRGenModule &IGM, SILValue value,
 /// containing constant values.
 llvm::Constant *emitConstantObject(IRGenModule &IGM, ObjectInst *OI,
                                    StructLayout *ClassLayout);
+
+/// Flatten a constant into its in-memory byte representation, appending the
+/// bytes to \p bytes. Reuses LLVM's own layout logic (endianness, padding,
+/// element stride) by reading each byte back out of \p C. Padding bytes are
+/// emitted as zero. Returns false if any byte cannot be determined statically
+/// (e.g. the constant contains a relocatable pointer), in which case \p bytes
+/// is left in an unspecified state.
+bool tryFlattenConstantBytes(IRGenModule &IGM, llvm::Constant *C,
+                             llvm::SmallVectorImpl<char> &bytes);
 }
 }
 

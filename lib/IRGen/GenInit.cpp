@@ -54,6 +54,11 @@ void IRGenModule::emitSILGlobalVariable(SILGlobalVariable *var) {
     return;
   }
 
+  // A WebAssembly `@section(".custom_section.*")` global becomes a Wasm custom
+  // section (metadata only), with no addressable global variable.
+  if (tryEmitWasmCustomSection(var))
+    return;
+
   /// Create the global variable.
   getAddrOfSILGlobalVariable(var, ti,
                      var->isDefinition() ? ForDefinition : NotForDefinition);
