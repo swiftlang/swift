@@ -194,12 +194,13 @@ public:
     return new FixedSizeArchetypeTypeInfo(type, size, align, spareBits);
   }
 };
-} // end anonymous namespace
 
-/// Emit a single protocol witness table reference.
-llvm::Value *irgen::emitArchetypeWitnessTableRef(IRGenFunction &IGF,
-                                                 CanArchetypeType archetype,
-                                                 ProtocolDecl *protocol) {
+/// Emit a single protocol witness table reference for an abstract type.
+llvm::Value *
+emitAbstractWitnessTableRef(IRGenFunction &IGF, CanType type,
+                            CanType dependentType,
+                            GenericEnvironment *environment,
+                            ProtocolDecl *protocol) {
   assert(Lowering::TypeConverter::protocolRequiresWitnessTable(protocol) &&
          "looking up witness table for protocol that doesn't have one");
 
@@ -210,14 +211,12 @@ llvm::Value *irgen::emitArchetypeWitnessTableRef(IRGenFunction &IGF,
   // that protocol listed as a direct requirement.
 
   auto localDataKind =
-    LocalTypeDataKind::forAbstractProtocolWitnessTable(protocol);
+      LocalTypeDataKind::forAbstractProtocolWitnessTable(protocol);
 
   // Check immediately for an existing cache entry.
   // TODO: don't give this absolute precedence over other access paths.
-  auto wtable = IGF.tryGetLocalTypeData(archetype, localDataKind);
+  auto wtable = IGF.tryGetLocalTypeData(type, localDataKind);
   if (wtable) return wtable;
-
-  auto environment = archetype->getGenericEnvironment();
 
   // Otherwise, ask the generic signature for the best path to the conformance.
   // TODO: this isn't necessarily optimal if the direct conformance isn't
@@ -225,17 +224,16 @@ llvm::Value *irgen::emitArchetypeWitnessTableRef(IRGenFunction &IGF,
   // to this conformance from concrete sources.
 
   auto signature = environment->getGenericSignature().getCanonicalSignature();
-  auto archetypeDepType = archetype->getInterfaceType();
 
-  auto astPath = signature->getConformancePath(archetypeDepType, protocol);
+  auto astPath = signature->getConformancePath(dependentType, protocol);
 
   auto i = astPath.begin(), e = astPath.end();
   assert(i != e && "empty path!");
 
   // The first entry in the path is a direct requirement of the signature,
   // for which we should always have local type data available.
-  CanType rootArchetype =
-    environment->mapTypeIntoEnvironment(i->first)->getCanonicalType();
+  CanType rootType =
+      environment->mapTypeIntoEnvironment(i->first)->getCanonicalType();
   ProtocolDecl *rootProtocol = i->second;
 
   // Turn the rest of the path into a MetadataPath.
@@ -268,14 +266,13 @@ llvm::Value *irgen::emitArchetypeWitnessTableRef(IRGenFunction &IGF,
   }
   assert(lastProtocol == protocol);
 
-  auto rootWTable = IGF.tryGetLocalTypeData(rootArchetype,
-              LocalTypeDataKind::forAbstractProtocolWitnessTable(rootProtocol));
+  auto kind = LocalTypeDataKind::forAbstractProtocolWitnessTable(rootProtocol);
+  auto rootWTable = IGF.tryGetLocalTypeData(rootType, kind);
   // Fetch an opaque type's witness table if it wasn't cached yet.
   if (!rootWTable) {
-    if (auto opaqueRoot = dyn_cast<OpaqueTypeArchetypeType>(rootArchetype)) {
-      rootWTable = emitOpaqueTypeWitnessTableRef(IGF, opaqueRoot,
-                                                 rootProtocol);
-    }
+    if (auto opaqueRoot = dyn_cast<OpaqueTypeArchetypeType>(rootType))
+      rootWTable = emitOpaqueTypeWitnessTableRef(IGF, opaqueRoot, rootProtocol);
+
 #ifndef NDEBUG
     if (!rootWTable) {
       llvm::errs()
@@ -284,13 +281,12 @@ llvm::Value *irgen::emitArchetypeWitnessTableRef(IRGenFunction &IGF,
              "to be passed to the function.\n"
           << "  Or the witness table is present and not bound in which case "
              "setScopedLocalTypeData or similar must be called.\n";
-      llvm::errs() << "Root archetype for conformance: " << rootArchetype
-                   << "\n";
-      rootArchetype->dump(llvm::errs());
+      llvm::errs() << "Root type for conformance: " << rootType << "\n";
+      rootType->dump(llvm::errs());
       llvm::errs() << "Root protocol without wtable: " << rootProtocol << "\n";
       rootProtocol->dump(llvm::errs());
-      llvm::errs() << "Archetype for conformance: " << archetype << "\n";
-      archetype->dump(llvm::errs());
+      llvm::errs() << "Abstract type for conformance: " << type << "\n";
+      type->dump(llvm::errs());
       llvm::errs() << "Protocol for conformance: " << protocol << "\n";
       protocol->dump(llvm::errs());
       llvm::errs() << "Function:\n";
@@ -306,16 +302,41 @@ llvm::Value *irgen::emitArchetypeWitnessTableRef(IRGenFunction &IGF,
     assert(rootWTable && "root witness table not bound in local context!");
   }
 
-  auto conformance = ProtocolConformanceRef::forAbstract(
-      rootArchetype, rootProtocol);
-  wtable = path.followFromWitnessTable(IGF, rootArchetype,
-                                       conformance,
+  auto conformance =
+      ProtocolConformanceRef::forAbstract(rootType, rootProtocol);
+  wtable = path.followFromWitnessTable(IGF, rootType, conformance,
                                        MetadataResponse::forComplete(rootWTable),
                                        /*request*/ MetadataState::Complete,
                                        nullptr).getMetadata();
 
-  IGF.setScopedLocalTypeData(archetype, localDataKind, wtable);
+  IGF.setScopedLocalTypeData(type, localDataKind, wtable);
   return wtable;
+}
+
+} // end anonymous namespace
+
+/// Emit a single protocol witness table reference.
+llvm::Value *irgen::emitArchetypeWitnessTableRef(IRGenFunction &IGF,
+                                                 CanArchetypeType archetype,
+                                                 ProtocolDecl *protocol) {
+  CanType dependentType = archetype->getInterfaceType()->getCanonicalType();
+  return emitAbstractWitnessTableRef(IGF, archetype, dependentType,
+                                     archetype->getGenericEnvironment(),
+                                     protocol);
+}
+
+llvm::Value *
+irgen::emitArchetypeMetatypeWitnessTableRef(IRGenFunction &IGF,
+                                            CanType metatype,
+                                            ProtocolDecl *protocol) {
+  CanType instanceType =
+      cast<AnyMetatypeType>(metatype)->getInstanceType()->getCanonicalType();
+  CanArchetypeType archetype = cast<ArchetypeType>(instanceType);
+  CanType dependentType =
+      MetatypeType::get(archetype->getInterfaceType())->getCanonicalType();
+  return emitAbstractWitnessTableRef(IGF, metatype, dependentType,
+                                     archetype->getGenericEnvironment(),
+                                     protocol);
 }
 
 MetadataResponse
