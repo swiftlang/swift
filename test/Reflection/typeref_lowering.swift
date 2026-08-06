@@ -1078,6 +1078,12 @@
 // CHECK-32-NEXT:       (field name=u offset=4
 // CHECK-32-NEXT:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1)))))
 
+12TypeLowering13SingletonEnumO
+// CHECK-64: (enum TypeLowering.SingletonEnum)
+// CHECK-64-NEXT: (single_payload_enum size=8 alignment=8 stride=8 num_extra_inhabitants=[[PTR_XI]] bitwise_takable=1
+// CHECK-64-NEXT:   (case name=Payload index=0 offset=0
+// CHECK-64-NEXT:     (reference kind=strong refcounting=native)))
+
 12TypeLowering10EnumStructV
 // CHECK-64: (struct TypeLowering.EnumStruct)
 // CHECK-64-NEXT: (struct size=81 alignment=8 stride=88 num_extra_inhabitants=[[PTR_XI]] bitwise_takable=1
@@ -1098,7 +1104,9 @@
 // CHECK-64-NEXT:      (case name=C index=2)
 // CHECK-64-NEXT:      (case name=D index=3)))
 // CHECK-64-NEXT:   (field name=singleton offset=8
-// CHECK-64-NEXT:     (reference kind=strong refcounting=native))
+// CHECK-64-NEXT:     (single_payload_enum size=8 alignment=8 stride=8 num_extra_inhabitants=[[PTR_XI]] bitwise_takable=1
+// CHECK-64-NEXT:       (case name=Payload index=0 offset=0
+// CHECK-64-NEXT:         (reference kind=strong refcounting=native))))
 // CHECK-64-NEXT:   (field name=singlePayload offset=16
 // CHECK-64-NEXT:     (single_payload_enum size=8 alignment=8 stride=8 num_extra_inhabitants=[[PTR_XI_SUB_1]] bitwise_takable=1
 // CHECK-64-NEXT:       (case name=Indirect index=0 offset=0
