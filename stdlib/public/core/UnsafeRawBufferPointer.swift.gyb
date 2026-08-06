@@ -1310,10 +1310,6 @@ extension Unsafe${Mutable}RawBufferPointer {
   /// If the maximum length exceeds the length of this buffer,
   /// the result contains all the bytes.
   ///
-  /// The returned buffer's first byte is always at offset 0; unlike buffer
-  /// slices, extracted buffers do not share their indices with the
-  /// original buffer pointer.
-  ///
   /// - Parameter maxLength: The maximum number of bytes to return.
   ///   `maxLength` must be greater than or equal to zero.
   /// - Returns: A buffer pointer with at most `maxLength` bytes.
@@ -1331,10 +1327,6 @@ extension Unsafe${Mutable}RawBufferPointer {
   ///
   /// If the number of bytes to drop exceeds the number of bytes in the buffer,
   /// the result is an empty buffer.
-  ///
-  /// The returned buffer's first byte is always at offset 0; unlike buffer
-  /// slices, extracted buffers do not share their indices with the
-  /// original buffer pointer.
   ///
   /// - Parameter k: The number of bytes to drop off the end of the buffer.
   ///   `k` must be greater than or equal to zero.

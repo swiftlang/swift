@@ -635,10 +635,6 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   /// If the maximum length exceeds the length of this buffer,
   /// the result contains all the elements.
   ///
-  /// The returned buffer's first item is always at index 0; unlike buffer
-  /// slices, extracted buffers do not share their indices with the
-  /// original buffer pointer.
-  ///
   /// - Parameter maxLength: The maximum number of elements to return.
   ///   `maxLength` must be greater than or equal to zero.
   /// - Returns: A buffer pointer with at most `maxLength` elements.
@@ -657,10 +653,6 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   ///
   /// If the number of elements to drop exceeds the number of elements in
   /// the buffer, the result is an empty buffer.
-  ///
-  /// The returned buffer's first item is always at index 0; unlike buffer
-  /// slices, extracted buffers do not share their indices with the
-  /// original buffer pointer.
   ///
   /// - Parameter k: The number of elements to drop off the end of the buffer.
   ///   `k` must be greater than or equal to zero.

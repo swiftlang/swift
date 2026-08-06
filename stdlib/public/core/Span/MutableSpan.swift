@@ -1008,10 +1008,6 @@ extension MutableSpan where Element: ~Copyable {
   ///
   /// The returned span represents a mutation of this span.
   ///
-  /// The returned span's first item is always at offset 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
-  ///
   /// - Parameter maxLength: The maximum number of elements to return.
   ///   `maxLength` must be greater than or equal to zero.
   /// - Returns: A span with at most `maxLength` elements.
@@ -1038,10 +1034,6 @@ extension MutableSpan where Element: ~Copyable {
   ///
   /// The returned span represents a mutation of this span.
   ///
-  /// The returned span's first item is always at offset 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
-  ///
   /// - Parameter maxLength: The maximum number of elements to return.
   ///   `maxLength` must be greater than or equal to zero.
   /// - Returns: A span with at most `maxLength` elements.
@@ -1059,10 +1051,6 @@ extension MutableSpan where Element: ~Copyable {
   ///
   /// If the maximum length exceeds the length of this span,
   /// the result contains all the elements.
-  ///
-  /// The returned span's first item is always at offset 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
   ///
   /// - Parameter maxLength: The maximum number of elements to return.
   ///   `maxLength` must be greater than or equal to zero.
@@ -1088,10 +1076,6 @@ extension MutableSpan where Element: ~Copyable {
   /// the span, the result is an empty span.
   ///
   /// The returned span represents a mutation of this span.
-  ///
-  /// The returned span's first item is always at offset 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
   ///
   /// - Parameter k: The number of elements to drop off the end of
   ///   the span. `k` must be greater than or equal to zero.
@@ -1119,10 +1103,6 @@ extension MutableSpan where Element: ~Copyable {
   ///
   /// The returned span represents a mutation of this span.
   ///
-  /// The returned span's first item is always at offset 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
-  ///
   /// - Parameter k: The number of elements to drop off the end of
   ///   the span. `k` must be greater than or equal to zero.
   /// - Returns: A span leaving off the specified number of elements at the end.
@@ -1139,10 +1119,6 @@ extension MutableSpan where Element: ~Copyable {
   ///
   /// If the number of elements to drop exceeds the number of elements in
   /// the span, the result is an empty span.
-  ///
-  /// The returned span's first item is always at offset 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
   ///
   /// - Parameter k: The number of elements to drop off the end of
   ///   the span. `k` must be greater than or equal to zero.

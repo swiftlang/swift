@@ -865,10 +865,6 @@ extension RawSpan {
   /// If the maximum length exceeds the length of this span,
   /// the result contains all the bytes.
   ///
-  /// The returned span's first byte is always at offset 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
-  ///
   /// - Parameter maxLength: The maximum number of bytes to return.
   ///   `maxLength` must be greater than or equal to zero.
   /// - Returns: A span with at most `maxLength` bytes.
@@ -894,10 +890,6 @@ extension RawSpan {
   ///
   /// If the number of bytes to drop exceeds the number of bytes in
   /// the span, the result is an empty span.
-  ///
-  /// The returned span's first byte is always at offset 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
   ///
   /// - Parameter k: The number of bytes to drop off the end of
   ///   the span. `k` must be greater than or equal to zero.
