@@ -305,6 +305,39 @@ bool BridgedASTContext_testCanImport(BridgedASTContext cContext,
 SWIFT_NAME("getter:BridgedASTContext.staticBuildConfigurationPtr(self:)")
 void * _Nonnull BridgedASTContext_staticBuildConfiguration(BridgedASTContext cContext);
 
+/// Describes the declaration that lexically encloses a macro expansion buffer.
+///
+/// The syntax tree of a macro expansion buffer is rooted at the buffer itself,
+/// so walking up its parent nodes never reaches the code the macro was
+/// expanded within. This describes where to resume that walk.
+struct BridgedMacroExpansionEnclosingDecl {
+  /// The `ExportedSourceFile` for the buffer containing the enclosing
+  /// declaration, or null if there is no enclosing declaration, i.e. the
+  /// expansion is at file scope.
+  void *_Nullable exportedSourceFile;
+
+  /// The start location of the enclosing declaration, within
+  /// \c exportedSourceFile.
+  swift::SourceLoc location;
+};
+
+/// Given a source location within a macro expansion buffer, find the
+/// declaration that lexically encloses that buffer.
+///
+/// The enclosing declaration is the innermost declaration context the buffer
+/// logically resides in, which accounts for how each macro role splices its
+/// expansion into the enclosing code. For example, a peer macro's expansion is
+/// a sibling of the declaration the macro is attached to, so the enclosing
+/// declaration is that declaration's context rather than the declaration
+/// itself.
+///
+/// Returns a result with a null \c exportedSourceFile if \p location is not
+/// within a macro expansion buffer, or if the buffer resides at file scope.
+SWIFT_NAME("BridgedASTContext.macroExpansionEnclosingDecl(self:at:)")
+BridgedMacroExpansionEnclosingDecl
+BridgedASTContext_macroExpansionEnclosingDecl(BridgedASTContext cContext,
+                                              swift::SourceLoc location);
+
 //===----------------------------------------------------------------------===//
 // MARK: AST nodes
 //===----------------------------------------------------------------------===//
