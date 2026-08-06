@@ -8,9 +8,9 @@ class A {}
 
 // CHECK:      [[A_NAME:@.*]] = private constant [2 x i8] c"A\00"
 // CHECK-LABEL: @"$s14class_metadata1ACMn" =
-//   Flags. 0x8000_0050 == HasVTable | Unique | Class
-// CHECK-DIRECT-SAME: <i32 0x8000_0050>,
-// CHECK-INDIRECT-SAME: <i32 0x8001_0050>,
+//   Flags. 0x8008_0050 == HasVTable | HasSingletonMetadataPointer | Unique | Class
+// CHECK-DIRECT-SAME: <i32 0x8008_0050>,
+// CHECK-INDIRECT-SAME: <i32 0x8009_0050>,
 //   Parent.
 // CHECK-SAME: i32 {{.*}} @"$s14class_metadataMXM"
 //   Name.
@@ -49,9 +49,9 @@ class B : A {}
 
 // CHECK:      [[B_NAME:@.*]] = private constant [2 x i8] c"B\00"
 // CHECK-LABEL: @"$s14class_metadata1BCMn" =
-//   Flags. 0x4000_0050 == HasOverrideTable | Unique | Class
-// CHECK-DIRECT-SAME: <i32 0x4000_0050>,
-// CHECK-INDIRECT-SAME: <i32 0x4001_0050>,
+//   Flags. 0x4008_0050 == HasOverrideTable | HasSingletonMetadataPointer | Unique | Class
+// CHECK-DIRECT-SAME: <i32 0x4008_0050>,
+// CHECK-INDIRECT-SAME: <i32 0x4009_0050>,
 //   Parent.
 // CHECK-SAME: i32 {{.*}} @"$s14class_metadataMXM"
 //   Name.
@@ -151,9 +151,9 @@ class D : E {}
 
 // CHECK:      [[D_NAME:@.*]] = private constant [2 x i8] c"D\00"
 // CHECK-LABEL: @"$s14class_metadata1DCMn" =
-//   Flags. 0x4200_0050 == HasOverrideTable | Unique | Class
-// CHECK-DIRECT-SAME: <i32 0x4000_0050>,
-// CHECK-INDIRECT-SAME: <i32 0x4001_0050>,
+//   Flags. 0x4008_0050 == HasOverrideTable | HasSingletonMetadataPointer | Unique | Class
+// CHECK-DIRECT-SAME: <i32 0x4008_0050>,
+// CHECK-INDIRECT-SAME: <i32 0x4009_0050>,
 //   Parent.
 // CHECK-SAME: i32 {{.*}} @"$s14class_metadataMXM"
 //   Name.
