@@ -1258,16 +1258,6 @@ BUILTIN_MISC_OPERATION(TaskRemovePriorityEscalationHandler,
 
 /// Equivalent to calling swift_task_pushDeadline.
 ///
-/// Pushes a deadline status record for the given clock onto the current
-/// task, returning the record pointer that must be handed back to
-/// taskPopDeadline.
-///
-/// `clockPtr`/`instantPtr` point at caller-owned storage holding the clock
-/// instance and the deadline instant (typically via `withUnsafePointer(to:)`);
-/// `clockType`/`instantType` are their metatypes. The runtime
-/// `vw_initializeWithCopy`s both values into the record's task-allocated
-/// tail storage; the caller retains ownership of the originals.
-///
 /// Signature: (clockPtr: Builtin.RawPointer, instantPtr: Builtin.RawPointer,
 ///             clockType: Any.Type, instantType: Any.Type)
 ///           -> UnsafeRawPointer
@@ -1275,25 +1265,15 @@ BUILTIN_MISC_OPERATION(TaskPushDeadline, "taskPushDeadline", "", Special)
 
 /// Equivalent to calling swift_task_popDeadline.
 ///
-/// Removes the deadline record previously installed by taskPushDeadline
-/// and destroys the clock/instant values held in its tail storage.
-/// Passing nil is a noop.
-///
 /// Signature: (record: UnsafeRawPointer) -> ()
 BUILTIN_MISC_OPERATION(TaskPopDeadline, "taskPopDeadline", "", Special)
 
 /// Equivalent to calling swift_task_pushCancellationScope.
 ///
-/// Pushes a cancellation scope record onto the current task, returning the
-/// record pointer that must be handed back to taskCancellationScopePop.
-///
 /// Signature: () -> UnsafeRawPointer
 BUILTIN_MISC_OPERATION(TaskCancellationScopePush, "taskCancellationScopePush", "", Special)
 
 /// Equivalent to calling swift_task_popCancellationScope.
-///
-/// Pops a record previously installed by taskCancellationScopePush.
-/// Passing nil is a noop.
 ///
 /// Signature: (record: UnsafeRawPointer) -> ()
 BUILTIN_MISC_OPERATION(TaskCancellationScopePop, "taskCancellationScopePop", "", Special)

@@ -140,14 +140,7 @@ void swift_job_deallocate(Job *job, void *ptr);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_cancel(AsyncTask *task);
 
-/// Cancel a task with a specific `CancellationError.Reason`, encoded as a
-/// small integer (0 = unspecified, 1 = deadlineExpired). The reason is stored
-/// on the task's status flags and is observable via `Task.cancellationReason`
-/// from inside the task. First-cancel-wins on the reason: if the task is
-/// already cancelled, this is a no-op with respect to the reason.
-///
-/// The parameter is `size_t` to give future evolution room for more
-/// reasons without an ABI break.
+/// Cancel a task with a specific `CancellationError.Reason` (raw value).
 ///
 /// This can be called from any thread.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
