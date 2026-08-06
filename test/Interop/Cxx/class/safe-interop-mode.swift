@@ -132,6 +132,36 @@ inline void releaseSharedObject(SharedObject *) {}
 
 struct DerivedFromSharedObject : SharedObject {};
 
+// Unsafety of a reference type is inherited by the types derived from it, just
+// like for value types.
+struct HasUnsafeReferenceBase : UnsafeReference {};
+struct HasUnsafeReferenceBaseTransitively : HasUnsafeReferenceBase {};
+struct SWIFT_SAFE WrapsUnsafeReferenceBase : UnsafeReference {};
+struct DerivedFromWrapsUnsafeReferenceBase : WrapsUnsafeReferenceBase {};
+
+class SWIFT_UNSAFE ExplicitlyUnsafeSharedObject {
+} SWIFT_SHARED_REFERENCE(retainExplicitlyUnsafeSharedObject,
+                         releaseExplicitlyUnsafeSharedObject);
+
+inline void retainExplicitlyUnsafeSharedObject(ExplicitlyUnsafeSharedObject *) {}
+inline void releaseExplicitlyUnsafeSharedObject(ExplicitlyUnsafeSharedObject *) {}
+
+struct HasExplicitlyUnsafeSharedObjectBase : ExplicitlyUnsafeSharedObject {};
+
+// The base class may be a class template specialization, as in CRTP.
+template <class Derived>
+struct SWIFT_UNSAFE_REFERENCE CRTPBase {};
+
+struct HasCRTPBase : CRTPBase<HasCRTPBase> {};
+struct SWIFT_SAFE WrapsCRTPBase : CRTPBase<WrapsCRTPBase> {};
+
+template <class T> struct DerivedFromParam : T {};
+using HasUnsafeReferenceParamBase = DerivedFromParam<UnsafeReference>;
+
+template <class T> struct MiddleTemplate : CRTPBase<MiddleTemplate<T>> {};
+template <class T> struct BottomTemplate : MiddleTemplate<T> {};
+using HasCRTPBaseTransitively = BottomTemplate<int>;
+
 struct OwnedData {
   SpanOfInt getView() const [[clang::lifetimebound]];
   void takeSharedObject(SharedObject *) const;
@@ -329,6 +359,36 @@ func useSharedReference(frt: SharedObject, x: OwnedData) {
 func useSharedReference(frt: DerivedFromSharedObject, h: HoldsShared) {
   let _ = frt
   let _ = h.getObj()
+}
+
+@available(SwiftStdlib 5.8, *)
+func unsafeReferenceBases(a: HasUnsafeReferenceBase,
+                          b: HasUnsafeReferenceBaseTransitively,
+                          c: WrapsUnsafeReferenceBase,
+                          d: DerivedFromWrapsUnsafeReferenceBase,
+                          e: ExplicitlyUnsafeSharedObject,
+                          f: HasExplicitlyUnsafeSharedObjectBase,
+                          g: HasCRTPBase,
+                          h: WrapsCRTPBase,
+                          i: HasUnsafeReferenceParamBase,
+                          j: HasCRTPBaseTransitively) {
+  // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  _ = a // expected-note{{reference to parameter 'a' involves unsafe type}}
+  // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  _ = b // expected-note{{reference to parameter 'b' involves unsafe type}}
+  _ = c
+  _ = d
+  // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  _ = e // expected-note{{reference to parameter 'e' involves unsafe type}}
+  // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  _ = f // expected-note{{reference to parameter 'f' involves unsafe type}}
+  // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  _ = g // expected-note{{reference to parameter 'g' involves unsafe type}}
+  _ = h
+  // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  _ = i // expected-note{{reference to parameter 'i' involves unsafe type}}
+  // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  _ = j // expected-note{{reference to parameter 'j' involves unsafe type}}
 }
 
 func useTTakeInt(x: TTakeInt) {

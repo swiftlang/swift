@@ -8860,16 +8860,12 @@ ExplicitSafety ClangDeclExplicitSafety::evaluate(
     Evaluator &evaluator, ClangDeclExplicitSafetyDescriptor desc) const {
   // FIXME: Also similar to hasPointerInSubobjects
 
-  if (desc.isClass)
-    // Safety for class types is handled a bit differently than other types.
-    // If it is not explicitly marked unsafe, it is always explicitly safe.
-    return hasSwiftAttribute(desc.decl, {"unsafe", "unsafe(always)"})
-               ? ExplicitSafety::Unsafe
-               : ExplicitSafety::Safe;
-
   // Clang record types are considered explicitly unsafe if any of their fields,
-  // base classes, and template type parameters are unsafe. We use a stack for
-  // this recursive traversal.
+  // base classes, and template type parameters are unsafe. Types imported as
+  // classes are treated differently: the lifetime of their storage is managed
+  // automatically and safely by reference counting, so their fields do not make
+  // them unsafe; only annotations on themselves and on their base classes do.
+  // We use a stack for this recursive traversal.
   //
   // Invariant: if any Decl in the stack is unsafe, then desc.decl is unsafe.
   llvm::SmallVector<const clang::Decl *, 4> stack;
@@ -8910,6 +8906,28 @@ ExplicitSafety ClangDeclExplicitSafety::evaluate(
 
     if (hasSwiftAttribute(decl, {"safe"}))
       continue;
+
+    if (desc.isClass) {
+      // Safety for class types is handled a bit differently than other types:
+      // unsafety is inherited from the base classes, but nothing else makes a
+      // class unsafe. Note that the bases of a type imported as a class are
+      // imported as classes as well.
+      auto *cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(decl);
+      if (!cxxRecordDecl || !cxxRecordDecl->hasDefinition())
+        continue;
+      for (auto base : cxxRecordDecl->getDefinition()->bases()) {
+        // The base may be a `clang::TemplateSpecializationType`, which has no
+        // record decl to check.
+        auto *baseDecl = base.getType()->getAsCXXRecordDecl();
+        if (!baseDecl)
+          continue;
+        if (auto *baseDefinition = baseDecl->getDefinition())
+          baseDecl = baseDefinition;
+        if (seen.insert(baseDecl).second)
+          stack.push_back(baseDecl);
+      }
+      continue;
+    }
 
     // Enums are always safe
     if (isa<clang::EnumDecl>(decl))
