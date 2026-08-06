@@ -62,3 +62,16 @@ check() // CHECK-NEXT: .swift:[[@LINE]]
 
 
 check() // CHECK-NEXT: {{^}}k.swift:1002
+
+#sourceLocation(file: #"C:\l.swift"#, line: 1100)
+check() // CHECK-NEXT: {{^}}C:\l.swift:1100
+
+#sourceLocation(file: """
+   m.swift
+   n.swift
+   """,
+   line: 1200
+)
+check()
+// CHECK-NEXT: {{^}}m.swift
+// CHECK-NEXT: {{^}}n.swift:1200
