@@ -38,7 +38,6 @@ syn keyword swiftKeyword
       \ throw
       \ try
       \ unsafe
-      \ where
       \ while
 syn match swiftMultiwordKeyword
       \ "indirect case"
@@ -189,8 +188,13 @@ syn match swiftImplicitVarName
 syn match swiftProtocolComposition contained skipwhite skipempty nextgroup=@swiftTypeContext
       \ /&/
 
+" `, subject ==` continues a same-type requirement after a comma; the
+" lookahead keeps ordinary tuple/parameter-list commas unaffected.
+syn match swiftWhereConstraintComma contained skipwhite skipempty nextgroup=swiftWhereConstraintSubject
+      \ /,\ze\s*[A-Za-z_][A-Za-z_0-9.]*\s*==/
+
 " TypeName[Optionality]?
-syn match swiftType contained skipwhite skipempty nextgroup=swiftTypeParameters,swiftProtocolComposition
+syn match swiftType contained skipwhite skipempty nextgroup=swiftTypeParameters,swiftProtocolComposition,swiftWhereConstraintComma
       \ /\<[A-Za-z_][A-Za-z_0-9\.]*\>[!?]\?/
 " [Type:Type] (dictionary) or [Type] (array)
 syn region swiftType contained contains=swiftTypePair,@swiftTypeContext
@@ -223,6 +227,15 @@ syn match swiftCastOp skipwhite skipempty nextgroup=@swiftTypeContext,swiftCoreT
       \ "\<is\>"
 syn match swiftCastOp skipwhite skipempty nextgroup=@swiftTypeContext,swiftCoreTypes
       \ "\<as\>[!?]\?"
+
+" where T == Int (same-type requirement); `:` conformance already works
+" without this, since swiftTypeDeclaration is not `contained`.
+syn match swiftWhereSameType contained skipwhite skipempty nextgroup=@swiftTypeContext
+      \ /==/
+syn match swiftWhereConstraintSubject contained skipwhite skipempty nextgroup=swiftWhereSameType
+      \ /\<[A-Za-z_][A-Za-z_0-9]*\>\%(\.[A-Za-z_][A-Za-z_0-9]*\)*/
+syn keyword swiftKeyword skipwhite skipempty nextgroup=swiftWhereConstraintSubject
+      \ where
 
 " ---- Literals ----
 
@@ -358,6 +371,8 @@ hi def link swiftTypeDeclaration Delimiter
 hi def link swiftTypeParameters Delimiter
 hi def link swiftProtocolComposition Operator
 hi def link swiftCastOp Operator
+hi def link swiftWhereConstraintSubject Identifier
+hi def link swiftWhereSameType Operator
 
 hi def link swiftBoolean Boolean
 hi def link swiftNil Constant
