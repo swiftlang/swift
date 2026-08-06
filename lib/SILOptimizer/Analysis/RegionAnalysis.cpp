@@ -2805,19 +2805,35 @@ public:
     // gather our non-sending parameters.
     SmallVector<Operand *, 8> nonSendingParameters;
     SmallVector<Operand *, 8> sendingIndirectResults;
+    std::optional<Operand *> calleeOpToMerge;
 
     // NOTE: We want to process indirect parameters as if they are
     // parameters... so we process them in nonSendingParameters.
     for (auto &op : fas->getAllOperands()) {
-      // If op is the callee operand or type dependent operand, skip it.
+      // If op is a type dependent operand, skip it.
       if (op.isTypeDependent())
         continue;
 
       if (fas.isCalleeOperand(op)) {
         if (auto calleeResult = tryToTrackValue(op.get())) {
-          builder.addRequire(*calleeResult);
+          // For direct function/method calls, just require the callee
+          // if it's tracked.
+          if (isa<FunctionRefBaseInst, MethodInst>(fas.getCalleeOrigin())) {
+            builder.addRequire(*calleeResult);
+          } else {
+            // Otherwise, conservatively treat the callee as a source for the
+            // multi-assign. We do this because the callee might be (or alias)
+            // a closure which has captured tracked state and we need to ensure
+            // that the return value represents potential aliasing correctly.
+
+            // We defer the inclusion in nonSendingParameters until after all
+            // "regular" arguments are handled to avoid regressing existing
+            // diagnostic behavior.
+            // TODO: better explanation or more principled solution
+            calleeOpToMerge = &op;
+          }
+          continue;
         }
-        continue;
       }
 
       // If our parameter is not sending, just add it to the non-sending
@@ -2840,6 +2856,10 @@ public:
         builder.addRequire(*lookupResult);
         builder.addSend(lookupResult->value, &op);
       }
+    }
+
+    if (calleeOpToMerge) {
+      nonSendingParameters.push_back(calleeOpToMerge.value());
     }
 
     SWIFT_DEFER {
