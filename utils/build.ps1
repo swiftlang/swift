@@ -2060,7 +2060,9 @@ $Assemblers = @{
       if ($Platform.Architecture.VSName -eq "x86") { "ml.exe" } else { "ml64.exe" }
     }
     Dialect           = "ASM_MASM"
-    Flags             = { param([Hashtable] $Platform) @("/nologo", "/quiet") }
+    Flags             = { param([Hashtable] $Platform)
+      @("/nologo", "/quiet")
+    }
     DebugFlags        = { param([string] $Format)
       @()
     }
@@ -2073,7 +2075,9 @@ $Assemblers = @{
     }
     Dialect           = "ASM"
     DriverStyle       = [DriverStyle]::ClangCL
-    Flags             = { param([Hashtable] $Platform) @("--target=$($Platform.Triple)") }
+    Flags             = { param([Hashtable] $Platform)
+      @("--target=$($Platform.Triple)")
+    }
     DebugFlags        = { param([string] $Format)
       if ($Format -eq "dwarf") { @("-clang:-gdwarf") } else { @("-clang:-gcodeview") }
     }
@@ -2086,7 +2090,9 @@ $Assemblers = @{
     }
     Dialect           = "ASM"
     DriverStyle       = [DriverStyle]::ClangCL
-    Flags             = { param([Hashtable] $Platform) @("--target=$($Platform.Triple)") }
+    Flags             = { param([Hashtable] $Platform)
+      @("--target=$($Platform.Triple)")
+    }
     DebugFlags        = { param([string] $Format)
       if ($Format -eq "dwarf") { @("-clang:-gdwarf") } else { @("-clang:-gcodeview") }
     }
