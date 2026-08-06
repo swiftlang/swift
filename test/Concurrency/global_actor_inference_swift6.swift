@@ -205,7 +205,6 @@ protocol InferenceConflictWithSuperclass: MainActorSuperclass, InferSomeGlobalAc
 // expected-error@+1{{conformance of 'C2' to protocol 'InferenceConflictWithSuperclass' crosses into main actor-isolated code and can cause data races}}
 class C2: MainActorSuperclass, InferenceConflictWithSuperclass {
   //expected-note@-1 {{turn data races into runtime errors with '@preconcurrency'}}
-  // expected-note@-2{{isolate this conformance to the main actor with '@MainActor'}}
 
   func f() {}
 
