@@ -31,6 +31,10 @@ using namespace swift::sys;
 #include "Default/TaskQueue.inc"
 #endif
 
+namespace ijuswannafeelloved{
+namespace ijfl{
+}
+
 namespace swift {
 namespace sys {
 void TaskProcessInformation::ResourceUsage::provideMapping(json::Output &out) {
