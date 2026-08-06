@@ -2804,8 +2804,8 @@ FUNCTION(TaskRemovePriorityEscalationHandler,
 // swift_task_pushDeadline(OpaqueValue *clock, OpaqueValue *instant,
 //                         const Metadata *clockType,
 //                         const Metadata *instantType,
-//                         const WitnessTable *clockWT,
-//                         const WitnessTable *identifiableWT);
+//                         const WitnessTable *identifiableWT,
+//                         const WitnessTable *clockWT);
 FUNCTION(TaskPushDeadline,
         _Concurrency, swift_task_pushDeadline, SwiftCC,
         TaskDeadlineAvailability,
@@ -2828,13 +2828,14 @@ FUNCTION(TaskPopDeadline,
 // swift_task_findNearestDeadlineForClock is generic over
 // `C: Clock & Identifiable` in Swift, so we're matching
 // the calling convention with the Type and WT passed after
-// the explicit parameters.
+// the explicit parameters. Swift's canonical generic-sig ordering
+// places `Identifiable` before `Clock`, which drives WT slot order.
 //
 // OpaqueValue *
 // swift_task_findNearestDeadlineForClock(OpaqueValue *queryClock,
 //                                        const Metadata *clockType,
-//                                        const WitnessTable *clockWT,
-//                                        const WitnessTable *identifiableWT);
+//                                        const WitnessTable *identifiableWT,
+//                                        const WitnessTable *clockWT);
 FUNCTION(TaskFindNearestDeadlineForClock,
          _Concurrency, swift_task_findNearestDeadlineForClock, SwiftCC,
          TaskDeadlineAvailability,

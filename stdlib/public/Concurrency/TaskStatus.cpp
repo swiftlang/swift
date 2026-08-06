@@ -706,10 +706,10 @@ swift_task_pushDeadlineImpl(OpaqueValue *clock,
                             OpaqueValue *instant,
                             const Metadata *clockType,
                             const Metadata *instantType,
-                            const WitnessTable *clockWT,
-                            const WitnessTable *identifiableWT) {
-  (void)clockWT;
+                            const WitnessTable *identifiableWT,
+                            const WitnessTable *clockWT) {
   (void)identifiableWT;
+  (void)clockWT;
   auto task = swift_task_getCurrent();
   assert(task && "Currently, withDeadline must be used from an async context; We may relax this in the future");
 
@@ -822,11 +822,12 @@ static OpaqueValue *
 swift_task_findNearestDeadlineForClockImpl(
     OpaqueValue *queryClock,
     const Metadata *clockType,
-    const WitnessTable *clockWT,
-    const WitnessTable *identifiableWT) {
+    const WitnessTable *identifiableWT,
+    const WitnessTable *clockWT) {
   // `clockWT` is unused - the bridge only needs `Identifiable` - but the
   // Swift-side generic signature <C: Clock & Identifiable> forces us into
-  // accepting both WT.
+  // accepting both WT. Slot ordering follows Swift's canonical generic-sig
+  // order: `Identifiable` comes before `Clock`.
   (void)clockWT;
   auto task = swift_task_getCurrent();
   if (!task)
