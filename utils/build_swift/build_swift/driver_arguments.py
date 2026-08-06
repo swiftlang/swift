@@ -623,7 +623,7 @@ def create_argument_parser():
            help='print the commands executed during the build')
 
     option('--lto', store('lto_type'),
-           choices=['thin', 'full'],
+           choices=['thin', 'full', ''],
            const='full',
            default=None,
            metavar='LTO_TYPE',

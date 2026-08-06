@@ -516,8 +516,8 @@ class TestDriverArgumentParser(
             self.parse_default_args(['--watchos-all'])
 
     def test_swift_stdlib_strict_availability(self):
-        self.parse_default_args('--swift-stdlib-strict-availability')
-        self.parse_default_args('--no-swift-stdlib-strict-availability')
+        self.parse_default_args(['--swift-stdlib-strict-availability'])
+        self.parse_default_args(['--no-swift-stdlib-strict-availability'])
 
     def test_swift_pedantic_diagnostics(self):
         def expectation(args, expected_value):
@@ -548,6 +548,19 @@ class TestDriverArgumentParser(
         expectation(
             [ '--no-swift-assertions', '--no-swift-pedantic-diagnostics'],
             False)
+
+    def test_lto(self):
+        self.assertEqual(self.parse_default_args(['--lto']).lto_type, 'full')
+        self.assertEqual(self.parse_default_args(['--lto=full']).lto_type, 'full')
+        self.assertEqual(self.parse_default_args(['--lto=thin']).lto_type, 'thin')
+
+        # We don't care about the specific value used to signal
+        # LTO is disabled
+        self.assertFalse(self.parse_default_args([]).lto_type)
+        self.assertFalse(self.parse_default_args(['--lto=']).lto_type)
+
+        self.assertFalse(self.parse_default_args(['--lto=full', '--lto=']).lto_type)
+        self.assertEqual(self.parse_default_args(['--lto=', '--lto=thin']).lto_type, 'thin')
 
     # -------------------------------------------------------------------------
     # Implied defaults tests
