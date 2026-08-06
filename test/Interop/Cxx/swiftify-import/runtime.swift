@@ -455,7 +455,7 @@ let values: [CInt] = [1, 2, 3]
 extension Cube {
   func callKindDirectViaSuper(_ values: Span<CInt>) -> Impl {
     // FIXME: super.foo() calls to safe wrappers not supported
-    // expected-error@+1 {{cannot convert value of type 'Span<CInt>' (aka 'Span<Int32>') to expected argument type 'IntSpan'}}
+    // expected-error@+1 {{ambiguous use of 'callKindDirect'}}
     super.callKindDirect(values)
   }
 }
@@ -474,42 +474,30 @@ Suite.test("hidden wrapper is ambiguous") {
               Cube.create().derivedCallKindIndirect(values.span))
 }
 
-Suite.test("no wrapper: virtual method of a reference type") {
-  // FIXME: a virtual method of a reference type gets no
-  // wrapper. Every ...Direct member below is blocked on this one bug.
-  // expected-error@+1 {{cannot convert value of type 'Span<CInt>' (aka 'Span<Int32>') to expected argument type 'IntSpan'}}
+Suite.test("ambiguous wrapper: virtual method of a reference type") {
+  // FIXME: the wrapper generated for Shape::callKindDirect and the one generated
+  // for this class's override are both visible and are not related by
+  // overriding, so neither wins. Macro-expanded peers never get an OverrideAttr,
+  // which is what lets the underlying methods resolve.
+  // Every ...Direct call below is blocked on this.
+  // expected-error@+1 {{ambiguous use of 'callKindDirect'}}
   expectEqual(.slabKind, Slab.create().callKindDirect(values.span))
 }
 
-Suite.test("no wrapper: virtual method inherited two levels down") {
-  // expected-error@+1 {{cannot convert value of type 'Span<CInt>' (aka 'Span<Int32>') to expected argument type 'IntSpan'}}
+Suite.test("ambiguous wrapper: virtual method inherited two levels down") {
+  // expected-error@+1 {{ambiguous use of 'callKindDirect'}}
   expectEqual(.cubeKind, Cube.create().callKindDirect(values.span))
 }
 
-Suite.test("no wrapper: virtual method with multiple inheritance") {
-  // expected-error@+1 {{cannot convert value of type 'Span<CInt>' (aka 'Span<Int32>') to expected argument type 'IntSpan'}}
+Suite.test("ambiguous wrapper: virtual method with multiple inheritance") {
+  // expected-error@+1 {{ambiguous use of 'callKindDirect'}}
   expectEqual(.multiKind, MultiDerived.create().callKindDirect(values.span))
 }
 
-Suite.test("no wrapper: virtual method of a class template") {
-  // expected-error@+2 {{cannot convert value of type 'Span<CInt>' (aka 'Span<Int32>') to expected argument type 'IntSpan'}}
+Suite.test("ambiguous wrapper: virtual method of a class template") {
+  // expected-error@+2 {{ambiguous use of 'callKindDirect'}}
   expectEqual(.templatedDerivedKind,
               TemplatedDerivedInt.create().callKindDirect(values.span))
-}
-
-Suite.test("no wrapper: virtual method of a CRTP base") {
-  // expected-error@+1 {{cannot convert value of type 'Span<CInt>' (aka 'Span<Int32>') to expected argument type 'IntSpan'}}
-  expectEqual(.crtpKind, CRTPConcrete.create().baseCallKindDirect(values.span))
-}
-
-Suite.test("no wrapper: virtual method of a reference type CRTP base") {
-  // expected-error@+1 {{cannot convert value of type 'Span<CInt>' (aka 'Span<Int32>') to expected argument type 'IntSpan'}}
-  expectEqual(.crtpRefKind, makeCRTPRefBase()!.baseCallKindDirect(values.span))
-}
-
-Suite.test("no wrapper: virtual method overridden by a reference type") {
-  // expected-error@+1 {{cannot convert value of type 'Span<CInt>' (aka 'Span<Int32>') to expected argument type 'IntSpan'}}
-  expectEqual(.refDerivedKind, RefDerived.create().callKindDirect(values.span))
 }
 
 Suite.test("cloned wrapper: base that is not the primary base") {
@@ -603,6 +591,22 @@ Suite.test("curiously recurring template pattern") {
   // on a derived object handed back as the base. Its static_cast back down to
   // CRTPRefConcrete finds the right object.
   expectEqual(.crtpRefKind, makeCRTPRefBase()!.baseCallKindIndirect(values.span))
+}
+
+Suite.test("wrapper on a virtual method of a reference type") {
+  // These are the hierarchies where only one wrapper for the virtual method is
+  // visible at the call site, so the call resolves. Where the base class and the
+  // override each contribute one, it does not: see the guarded tests below.
+  //
+  // CRTPBase is a value type, so its wrapper is cloned rather than inherited and
+  // CRTPConcrete's override is the only candidate.
+  expectEqual(.crtpKind, CRTPConcrete.create().baseCallKindDirect(values.span))
+  // Called on the base class itself, which only has its own wrapper. The dynamic
+  // type is still CRTPRefConcrete, so its override runs.
+  expectEqual(.crtpRefKind, makeCRTPRefBase()!.baseCallKindDirect(values.span))
+  // ValueBase is a value type, so again only RefDerived's override is a
+  // candidate.
+  expectEqual(.refDerivedKind, RefDerived.create().callKindDirect(values.span))
 }
 
 Suite.test("non-const this") {

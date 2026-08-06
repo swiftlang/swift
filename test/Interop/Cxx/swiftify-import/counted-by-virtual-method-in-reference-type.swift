@@ -4,12 +4,6 @@
 // RUN: %target-swift-frontend -typecheck -plugin-path %swift-plugin-dir -I %t -cxx-interoperability-mode=default \
 // RUN:   %t/test.swift -verify -verify-additional-file %t%{fs-sep}test.h -Rmacro-expansions -verify-ignore-macro-note -eager-macro-checking
 
-// Check that ClangImporter infers and expands safe wrappers for C++
-// methods with __counted_by parameters.
-
-// FIXME: a virtual method on an imported reference type does not
-// currently get a safe wrapper, so RefType.sumVirtual below has no expansion.
-
 //--- test.h
 #define __counted_by(x) __attribute__((__counted_by__(x)))
 
@@ -51,7 +45,14 @@ struct SWIFT_REFERENCE RefType {
   // }}
   int sumNonVirtual(const int * __counted_by(len) values, int len) const;
 
-  // A virtual method on a reference type does NOT get a safe wrapper yet.
+  // expected-expansion@+8:71{{
+  //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
+  //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload|}}
+  //   expected-remark@3{{macro content: |public final func sumVirtual(_ values: UnsafeBufferPointer<CInt>) -> CInt {|}}
+  //   expected-remark@4{{macro content: |    let len = CInt(exactly: values.count)!|}}
+  //   expected-remark@5{{macro content: |    return unsafe sumVirtual(values.baseAddress, len)|}}
+  //   expected-remark@6{{macro content: |}|}}
+  // }}
   virtual int sumVirtual(const int * __counted_by(len) values, int len) const;
 };
 

@@ -32,6 +32,7 @@
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/Decl.h"
+#include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclObjC.h"
 #include "clang/AST/DeclTemplate.h"
 #include "clang/AST/DeclarationName.h"
@@ -916,6 +917,15 @@ void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
   if (!SwiftifyImportDecl) {
     DLOG("_SwiftifyImport macro not found\n");
     return;
+  }
+
+  if (ClangDecl->isImplicit()) {
+    if (auto *F = dyn_cast<FuncDecl>(MappedDecl)) {
+      if (const FuncDecl *Orig = getOriginalForVirtualThunk(F)) {
+        DLOG("Remapping virtual thunk to original clang decl\n");
+        ClangDecl = dyn_cast<clang::FunctionDecl>(Orig->getClangDecl());
+      }
+    }
   }
 
   // For projects adopting SafeInteropWrappers we preserve the original
