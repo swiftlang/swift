@@ -516,9 +516,9 @@ Added: _$sScTss5NeverORszABRs_rlE14activeDeadline3for7Instants5ClockPQyd__Sgqd__
 Added: _$sScTss5NeverORszABRs_rlE17hasActiveDeadlineSbvpZMV
 Added: _$sScTss5NeverORszABRs_rlE18cancellationReasonScE0C0OSgvpZMV
 Added: _swift_task_cancelCancellationScope
-Added: _swift_task_cancelCancellationScopeWithReason
+Added: _swift_task_cancelCancellationScopeWithFlags
 Added: _swift_task_cancellationScopeIsCancelled
-Added: _swift_task_cancelWithReason
+Added: _swift_task_cancelWithFlags
 Added: _swift_task_findNearestDeadlineForClock
 Added: _swift_task_getCancellationReason
 Added: __swift_task_hasActiveDeadline
@@ -526,7 +526,7 @@ Added: _swift_task_popCancellationScope
 Added: _swift_task_popDeadline
 Added: _swift_task_pushCancellationScope
 Added: _swift_task_pushDeadline
-Added: _swift_taskGroup_cancelAllWithReason
+Added: _swift_taskGroup_cancelAllWithFlags
 
 // Reason-aware withTaskCancellationHandler(operation:onCancel:) overload.
 Added: _swift_task_addCancellationHandlerWithReason

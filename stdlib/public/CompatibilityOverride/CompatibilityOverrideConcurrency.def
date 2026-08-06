@@ -342,10 +342,10 @@ OVERRIDE_TASK_GROUP(taskGroup_cancelAll, void,
                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
                     swift::, (TaskGroup *group), (group))
 
-OVERRIDE_TASK_GROUP(taskGroup_cancelAllWithReason, void,
+OVERRIDE_TASK_GROUP(taskGroup_cancelAllWithFlags, void,
                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
-                    swift::, (TaskGroup *group, size_t reason),
-                    (group, reason))
+                    swift::, (TaskGroup *group, size_t flags),
+                    (group, flags))
 
 OVERRIDE_TASK_GROUP(taskGroup_addPending, bool,
                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
@@ -414,10 +414,10 @@ OVERRIDE_TASK_STATUS(task_hasTaskGroupStatusRecord, bool,
 OVERRIDE_TASK_STATUS(task_cancel, void, SWIFT_EXPORT_FROM(swift_Concurrency),
                      SWIFT_CC(swift), swift::, (AsyncTask *task), (task))
 
-OVERRIDE_TASK_STATUS(task_cancelWithReason, void,
+OVERRIDE_TASK_STATUS(task_cancelWithFlags, void,
                      SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
-                     swift::, (AsyncTask *task, size_t reason),
-                     (task, reason))
+                     swift::, (AsyncTask *task, size_t flags),
+                     (task, flags))
 
 OVERRIDE_TASK_GROUP(task_cancel_group_child_tasks, void,
                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
@@ -500,10 +500,10 @@ OVERRIDE_TASK_STATUS(task_cancelCancellationScope, void,
                      swift::, (TaskCancellationScopeRecord *record),
                      (record))
 
-OVERRIDE_TASK_STATUS(task_cancelCancellationScopeWithReason, void,
+OVERRIDE_TASK_STATUS(task_cancelCancellationScopeWithFlags, void,
                      SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
-                     swift::, (TaskCancellationScopeRecord *record, size_t reason),
-                     (record, reason))
+                     swift::, (TaskCancellationScopeRecord *record, size_t flags),
+                     (record, flags))
 
 OVERRIDE_TASK_STATUS(task_cancellationScopeIsCancelled, bool,
                      SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),

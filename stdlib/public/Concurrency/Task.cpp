@@ -1189,7 +1189,7 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
       size_t reason = parentStatus.isCancelledIgnoringShield()
                           ? swift_task_getCancellationReason(parent)
                           : (cancelledScope ? cancelledScope->getReason() : 0);
-      swift_task_cancelWithReason(task, reason);
+      swift_task_cancelWithFlags(task, reason);
     }
 
     // Inherit the `HasDeadline` flag from the parent. Structured

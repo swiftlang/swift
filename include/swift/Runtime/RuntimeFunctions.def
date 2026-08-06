@@ -2418,9 +2418,9 @@ FUNCTION(TaskCancel,
          EFFECT(RuntimeEffect::Concurrency),
          MEMEFFECTS(InaccessibleMemOnly))
 
-// void swift_task_cancelWithReason(AsyncTask *task, size_t reason);
-FUNCTION(TaskCancelWithReason,
-         _Concurrency, swift_task_cancelWithReason, SwiftCC,
+// void swift_task_cancelWithFlags(AsyncTask *task, size_t flags);
+FUNCTION(TaskCancelWithFlags,
+         _Concurrency, swift_task_cancelWithFlags, SwiftCC,
          ConcurrencyAvailability,
          RETURNS(VoidTy),
          ARGS(SwiftTaskPtrTy, SizeTy),
@@ -2864,9 +2864,9 @@ FUNCTION(TaskPopCancellationScope,
          EFFECT(RuntimeEffect::Concurrency),
          UNKNOWN_MEMEFFECTS)
 
-// void swift_task_cancelCancellationScopeWithReason(TaskCancellationScopeRecord *record, size_t reason);
-FUNCTION(TaskCancelCancellationScopeWithReason,
-         _Concurrency, swift_task_cancelCancellationScopeWithReason, SwiftCC,
+// void swift_task_cancelCancellationScopeWithFlags(TaskCancellationScopeRecord *record, size_t flags);
+FUNCTION(TaskCancelCancellationScopeWithFlags,
+         _Concurrency, swift_task_cancelCancellationScopeWithFlags, SwiftCC,
          TaskCancellationScopeAvailability,
          RETURNS(VoidTy),
          ARGS(Int8PtrTy, SizeTy),
