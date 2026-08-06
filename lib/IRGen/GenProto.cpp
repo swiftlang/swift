@@ -3904,6 +3904,16 @@ llvm::Value *irgen::emitWitnessTableRef(IRGenFunction &IGF,
   // requirements of the archetype. Look at what's locally bound.
   ProtocolConformance *concreteConformance;
   if (conformance.isAbstract()) {
+    // An abstract conformance whose conforming type is a metatype rather than
+    // an archetype arises from a `where T.Type: P` requirement. Its root
+    // witness table is supplied as a generic argument and bound against the
+    // metatype itself. Derive inherited protocol tables through the signature's
+    // conformance access path.
+    if (!isa<ArchetypeType>(srcType)) {
+      assert(srcType->is<AnyMetatypeType>());
+      return emitArchetypeMetatypeWitnessTableRef(IGF, srcType, proto);
+    }
+
     auto archetype = cast<ArchetypeType>(srcType);
     return emitArchetypeWitnessTableRef(IGF, archetype, proto);
 
