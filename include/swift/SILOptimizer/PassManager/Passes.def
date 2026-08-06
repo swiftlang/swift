@@ -110,6 +110,10 @@ PASS(LifetimeDependenceInsertion,
 PASS(LifetimeDependenceScopeFixup,
      "lifetime-dependence-scope-fixup",
      "Fixup scope for lifetime dependence")
+PASS(RemoveSILGenLifetimes, "remove-silgen-lifetimes",
+     "Remove SILGen's lifetimes in preparation for LifetimeResolution")
+PASS(LifetimeResolution, "lifetime-resolution",
+     "Resolve lifetimes based on uses")
 PASS(MergeBorrowScopes, "merge-borrow-scopes",
      "Merge borrow scopes")
 PASS(MergeCondFails, "merge-cond_fails",

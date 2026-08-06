@@ -1533,6 +1533,13 @@ def disable_lifetime_dependence_diagnostics :
   Flag<["-"], "disable-lifetime-dependence-diagnostics">,
   HelpText<"Disable lifetime dependence diagnostics for Nonescapable types.">;
 
+def enable_lifetime_resolution :
+  Flag<["-"], "enable-lifetime-resolution">,
+  HelpText<"Enable lifetime resolution in SIL.">;
+def disable_lifetime_resolution :
+  Flag<["-"], "disable-lifetime-resolution">,
+  HelpText<"Disable lifetime resolution in SIL.">;
+
 def enable_aggressive_reg2mem :
   Flag<["-"], "enable-aggressive-reg2mem">,
   HelpText<"Enable a more aggressive reg2mem heuristic">;
