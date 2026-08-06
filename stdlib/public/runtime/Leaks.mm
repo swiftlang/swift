@@ -83,6 +83,15 @@ static id __swift_leaks_allocWithZone(id self, SEL _cmd, id zone) {
 void _swift_leaks_startTrackingObjects(const char *name) {
   pthread_mutex_lock(&LeaksMutex);
 
+  // If tracking is already active, just clear the tracked objects and return.
+  // This prevents overwriting the original IMPs with already-swizzled ones.
+  if (ShouldTrackObjects) {
+    TrackedSwiftObjects->clear();
+    TrackedObjCObjects->clear();
+    pthread_mutex_unlock(&LeaksMutex);
+    return;
+  }
+
   // First clear our tracked objects set.
   TrackedSwiftObjects->clear();
   TrackedObjCObjects->clear();
