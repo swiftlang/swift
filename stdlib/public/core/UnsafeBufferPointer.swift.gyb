@@ -507,7 +507,7 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   /// slicing the buffer then rebasing the resulting buffer slice:
   ///
   ///     let a = buffer.extracting(i ..< j)
-  ///     let b = UnsafeBufferPointer(rebasing: buffer[i ..< j])
+  ///     let b = ${Self}(rebasing: buffer[i ..< j])
   ///     // `a` and `b` are now holding the same buffer
   ///
   /// However, unlike slicing, the `extracting` operation remains available even
@@ -544,8 +544,8 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   /// When `Element` is copyable, the `extracting` operation is equivalent to
   /// slicing the buffer then rebasing the resulting buffer slice:
   ///
-  ///     let a = buffer.extracting(i ..< j)
-  ///     let b = UnsafeBufferPointer(rebasing: buffer[i ..< j])
+  ///     let a = buffer.extracting(i...)
+  ///     let b = ${Self}(rebasing: buffer[i...])
   ///     // `a` and `b` are now holding the same buffer
   ///
   /// However, unlike slicing, the `extracting` operation remains available even
@@ -566,7 +566,7 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   ///
   ///     let a = buffer
   ///     let b = buffer.extracting(...)
-  ///     let c = UnsafeBufferPointer(rebasing: buffer[...])
+  ///     let c = ${Self}(rebasing: buffer[...])
   ///     // `a`, `b` and `c` are now all referring to the same buffer
   ///
   /// Note that unlike slicing, the `extracting` operation remains available
