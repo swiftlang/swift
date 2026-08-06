@@ -2,6 +2,7 @@
 
 @Metadata {
    @TechnologyRoot
+   @TitleHeading("References")
 }
 
 Documentation on diagnostics emitted by the compiler and settings that control them.
