@@ -60,9 +60,9 @@ public func vjpCallerWithControlFlow(_ x: Float) -> Float {
 /// no nested pullback closure is passed to the specialized pullback of `vjpCallerWithControlFlow`
 
 // CHECK3:      // reverse-mode derivative of vjpCallerWithControlFlow(_:)
-// CHECK3-NEXT: // Isolation: unspecified
-// CHECK3-NEXT: sil @$s4main24vjpCallerWithControlFlowyS2fFTJrSpSr : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
+// CHECK3:      sil @$s4main24vjpCallerWithControlFlowyS2fFTJrSpSr : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
 // CHECK3:        // function_ref specialized pullback of vjpCallerWithControlFlow(_:)
-// CHECK3-NEXT:   %[[#F:]] = function_ref @$s4main24vjpCallerWithControlFlowyS2fFTJpSpSr26$s4main6squareyS2fFTJpSpSrS3fIegydd_026$sSf16_DifferentiationE12_b44Multiply3lhs3rhsSf5value_Sf_SftSfc8pullbacktr1_s5FZSf_S6SfcfU_S2fTf1nnEE_n013$s4main4mul2yh1_si3SSpK0S3fIegydd_Tf1nnEnn_nADS2fTf1nnnnE_n : $@convention(thin) (Float, @owned _AD__$s4main24vjpCallerWithControlFlowyS2fF_bb3__Pred__src_0_wrt_0, Float, Float, Float, Float) -> Float
+// CHECK3:        %[[#F:]] = function_ref @$s4main24vjpCallerWithControlFlowyS2fFTJpSpSr26$s4main6squareyS2fFTJpSpSrS3fIegydd_026$sSf16_DifferentiationE12_b44Multiply3lhs3rhsSf5value_Sf_SftSfc8pullbacktr1_s5FZSf_S6SfcfU_S2fTf1nnEE_n013$s4main4mul2yh1_si3SSpK0S3fIegydd_Tf1nnEnn_nADS2fTf1nnnnE_n : $@convention(thin) (Float, @owned _AD__$s4main24vjpCallerWithControlFlowyS2fF_bb3__Pred__src_0_wrt_0, Float, Float, Float, Float) -> Float
+
 // CHECK3-NEXT:   partial_apply [callee_guaranteed] %[[#F]](%[[#]], %[[#]], %[[#]], %0, %0) : $@convention(thin) (Float, @owned _AD__$s4main24vjpCallerWithControlFlowyS2fF_bb3__Pred__src_0_wrt_0, Float, Float, Float, Float) -> Float
 // CHECK3:      } // end sil function '$s4main24vjpCallerWithControlFlowyS2fFTJrSpSr'

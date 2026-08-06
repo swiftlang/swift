@@ -3457,6 +3457,12 @@ NodePointer Demangler::demangleFunctionSpecialization() {
           }
           break;
         }
+        case FunctionSigSpecializationParamKind::AutoDiffBranchTracingEnum: {
+          while (NodePointer Ty = popNode(Node::Kind::Type)) {
+            paramToAdd = addChild(paramToAdd, Ty);
+          }
+          break;
+        }
         case FunctionSigSpecializationParamKind::ConstantPropKeyPath:
           paramToAdd = addChild(paramToAdd, popNode(Node::Kind::Type));
           paramToAdd = addChild(paramToAdd, popNode(Node::Kind::Type));
@@ -3511,6 +3517,12 @@ NodePointer Demangler::demangleFuncSpecParam(Node::Kind Kind) {
       return addChild(Param, createNode(
          Node::Kind::FunctionSignatureSpecializationParamPayload, (Node::IndexType)prevArgIdx));
     }
+    case 'b':
+      return addChild(
+          Param,
+          createNode(Node::Kind::FunctionSignatureSpecializationParamKind,
+                     uint64_t(FunctionSigSpecializationParamKind::
+                                  AutoDiffBranchTracingEnum)));
     case 'p': {
       for (;;) {
         switch (nextChar()) {

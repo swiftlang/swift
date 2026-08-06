@@ -1,0 +1,233 @@
+/// Multi basic block VJP, pullback accepting branch tracing enum argument.
+
+// RUN: %target-sil-opt -sil-print-types -autodiff-closure-specialization -sil-combine %s -o -
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+import _Differentiation
+
+sil @$sSf16_DifferentiationE7_vjpAdd3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZSf_SftSfcfU_ : $@convention(thin) (Float) -> (Float, Float)
+sil @$sSf16_DifferentiationE12_vjpSubtract3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZSf_SftSfcfU_ : $@convention(thin) (Float) -> (Float, Float)
+sil @$sSf16_DifferentiationE12_vjpMultiply3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZSf_SftSfcfU_ : $@convention(thin) (Float, Float, Float) -> (Float, Float)
+sil @$sSf16_DifferentiationE10_vjpDivide3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZSf_SftSfcfU_ : $@convention(thin) (Float, Float, Float) -> (Float, Float)
+sil @$sSf16_DifferentiationE10_vjpNegate1xSf5value_S2fc8pullbacktSf_tFZS2fcfU_ : $@convention(thin) (Float) -> Float
+
+sil [transparent] [thunk] @$sS3fIegydd_TJSpSSUpSrUSUP : $@convention(thin) (Float, @guaranteed @callee_guaranteed (Float) -> (Float, Float)) -> Float
+
+extension Dictionary : Differentiable where Value : Differentiable {
+  public typealias TangentVector = [Key : Value.TangentVector]
+  public mutating func move(by direction: [Key : Value.TangentVector])
+  public var zeroTangentVectorInitializer: () -> [Key : Value.TangentVector] { get }
+}
+
+extension Dictionary : AdditiveArithmetic where Value : AdditiveArithmetic {
+  public static func + (_ lhs: [Key : Value], _ rhs: [Key : Value]) -> [Key : Value]
+  public static func - (_ lhs: [Key : Value], _ rhs: [Key : Value]) -> [Key : Value]
+  public static var zero: [Key : Value] { get }
+}
+
+extension Dictionary where Value : Differentiable {
+  @usableFromInline
+  @derivative(of: subscript(_:))
+  func vjpSubscriptGet(key: Key) -> (value: Value?, pullback: (Optional<Value>.TangentVector) -> [Key : Value.TangentVector])
+}
+
+extension Dictionary where Value : Differentiable {
+  @differentiable(reverse, wrt: (self, newValue))
+  public mutating func set(_ key: Key, to newValue: Value)
+
+  @derivative(of: set)
+  public mutating func vjpUpdated(_ key: Key, to newValue: Value) -> (value: (), pullback: (inout [Key : Value.TangentVector]) -> Value.TangentVector)
+}
+
+sil @$sSTsSQ7ElementRpzrlE8containsySbABFSD4KeysVySSSd_G_Tg5 : $@convention(method) (@guaranteed String, @guaranteed Dictionary<String, Double>.Keys) -> Bool // user: %7
+sil @$sSDyq_SgxcigSS_SdTG5 : $@convention(method) (@in_guaranteed String, @guaranteed Dictionary<String, Double>) -> @out Optional<Double> // user: %13
+sil @$sSDyq_SgxcigSHRz16_Differentiation14DifferentiableR_r0_lTJfUSpSrSS_SdTG5 : $@convention(method) (@in_guaranteed String, @guaranteed Dictionary<String, Double>) -> (@out Optional<Double>, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@guaranteed τ_0_0) -> @out τ_0_1 for <Dictionary<String, Double>, Optional<Double>.TangentVector>) // user: %15
+sil @$sSDyq_SgxcigSHRz16_Differentiation14DifferentiableR_r0_lTJrUSpSrSS_SdTG5 : $@convention(method) (@in_guaranteed String, @guaranteed Dictionary<String, Double>) -> (@out Optional<Double>, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @owned τ_0_1 for <Optional<Double>.TangentVector, Dictionary<String, Double>>) // user: %17
+sil @$sSDyq_SgxcigSS_SdTg5 : $@convention(method) (@guaranteed String, @guaranteed Dictionary<String, Double>) -> Optional<Double> // user: %24
+sil @$sSD3out16_Differentiation14DifferentiableR_rlE15vjpSubscriptGet3keyq_Sg5value_SDyx13TangentVectorQy_GSqA2bCRzlEAHVyq__Gc8pullbacktx_tFAjLcfU_SS_SdTG5 : $@convention(thin) (@in_guaranteed Optional<Double>.TangentVector, @in_guaranteed String) -> @owned Dictionary<String, Double> // user: %30
+sil @$sSq16_DifferentiationAA14DifferentiableRzlE13TangentVectorVyq__GSDyxAcaBPQy_GIegno_AeHIegno_SHRzAaBR_r0_lTRSS_SdTG5 : $@convention(thin) (@in_guaranteed Optional<Double>.TangentVector, @guaranteed @callee_guaranteed (@in_guaranteed Optional<Double>.TangentVector) -> @owned Dictionary<String, Double>) -> @owned Dictionary<String, Double> // user: %33
+sil @$sSq16_DifferentiationAA14DifferentiableRzlE13TangentVectorVySd_GSDySSSdGIegno_AeFIegyo_TR : $@convention(thin) (Optional<Double>.TangentVector, @guaranteed @callee_guaranteed (@in_guaranteed Optional<Double>.TangentVector) -> @owned Dictionary<String, Double>) -> @owned Dictionary<String, Double> // user: %35
+sil @$sSa22_allocateUninitializedySayxG_SpyxGtSiFZSS_Sdt_Tt0g5 : $@convention(thin) (Int) -> (@owned Array<(String, Double)>, UnsafeMutablePointer<(String, Double)>) // user: %8
+sil @$sSD17dictionaryLiteralSDyxq_Gx_q_td_tcfCSS_SdTt0g5 : $@convention(thin) (@owned Array<(String, Double)>) -> @owned Dictionary<String, Double> // user: %12
+sil @$sSD3outs18AdditiveArithmeticR_rlE1poiySDyxq_GAD_ADtFZq_q__q_tcfu_SS_SdTt3G5 : $@convention(thin) (@in_guaranteed Double, @in_guaranteed Double) -> (@out Double, @error_indirect Never) // user: %32
+sil @$sSD5merge_16uniquingKeysWithySDyxq_Gn_q_q__q_tqd__YKXEtqd__YKs5ErrorRd__lFx_q_tx_q_tcfU_SS_Sds5NeverOTG5 : $@convention(thin) (@in_guaranteed String, @in_guaranteed Double) -> (@out String, @out Double) // user: %38
+sil @$sxq_xq_Iegnnrr_x3key_q_5valuetx_q_tIegnr_SHRzs5ErrorRd__r0__lTRSS_Sds5NeverOTG5 : $@convention(thin) (@in_guaranteed (key: String, value: Double), @guaranteed @callee_guaranteed (@in_guaranteed String, @in_guaranteed Double) -> (@out String, @out Double)) -> @out (String, Double) // user: %40
+sil @$sSD8_VariantV5merge_16uniquingKeysWithyqd__n_q_q__q_tqd_0_YKXEtqd_0_YKSTRd__s5ErrorRd_0_x_q_t7ElementRtd__r0_lFSS_Sds15LazyMapSequenceVySDySSSdGSS_SdtGs5NeverOTg5 : $@convention(method) (@owned LazyMapSequence<Dictionary<String,Double>, (String, Double)>, @guaranteed @noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2, τ_0_3> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> (@out τ_0_3, @error_indirect τ_0_2) for <Double, Double, Never, Double>, @inout Dictionary<String, Double>._Variant) -> @error Never // user: %44
+
+enum _AD__$s3outyycfU12_7myfoo16L_4from2atSdSgSDySSSdG_SStF_bb1__Pred__src_0_wrt_0 {
+  case bb0(())
+}
+enum _AD__$s3outyycfU12_7myfoo16L_4from2atSdSgSDySSSdG_SStF_bb2__Pred__src_0_wrt_0 {
+  case bb0(())
+}
+enum _AD__$s3outyycfU12_7myfoo16L_4from2atSdSgSDySSSdG_SStF_bb3__Pred__src_0_wrt_0 {
+  case bb2((predecessor: _AD__$s3outyycfU12_7myfoo16L_4from2atSdSgSDySSSdG_SStF_bb2__Pred__src_0_wrt_0, ()))
+  case bb1((predecessor: _AD__$s3outyycfU12_7myfoo16L_4from2atSdSgSDySSSdG_SStF_bb1__Pred__src_0_wrt_0, (Optional<Double>.TangentVector) -> Dictionary<String, Double>))
+}
+
+// reverse-mode derivative of myfoo16 #1 (from:at:) in closure #14 in 
+// Isolation: nonisolated
+sil private [ossa] @$s3outyycfU12_7myfoo16L_4from2atSdSgSDySSSdG_SStFTJrSUpSr : $@convention(thin) (@guaranteed Dictionary<String, Double>, @guaranteed String) -> (Optional<Double>, @owned @callee_guaranteed (Optional<Double>.TangentVector) -> @owned Dictionary<String, Double>) {
+[%0: read v**.c*.v**, write v**.c*.v**, copy v**.c*.v**, destroy v**.c*.v**]
+[%1: read v**.c*.v**, write v**.c*.v**, copy v**.**, destroy v**.c*.v**]
+[global: read,write,copy,destroy,allocate,deinit_barrier]
+// %0                                             // users: %24, %22, %4, %2
+// %1                                             // users: %27, %3, %7, %21, %24
+bb0(%0 : @guaranteed $Dictionary<String, Double>, %1 : @guaranteed $String):
+  %4 = struct_extract %0, #Dictionary._variant    // user: %5
+  %5 = struct $Dictionary<String, Double>.Keys (%4) // user: %7
+  // function_ref specialized Sequence<>.contains(_:)
+  %6 = function_ref @$sSTsSQ7ElementRpzrlE8containsySbABFSD4KeysVySSSd_G_Tg5 : $@convention(method) (@guaranteed String, @guaranteed Dictionary<String, Double>.Keys) -> Bool // user: %7
+  %7 = apply %6(%1, %5) : $@convention(method) (@guaranteed String, @guaranteed Dictionary<String, Double>.Keys) -> Bool // user: %8
+  %8 = struct_extract %7, #Bool._value            // user: %10
+  %9 = tuple ()                                   // users: %39, %11
+  cond_br %8, bb1, bb2                            // id: %10
+
+bb1:                                              // Preds: bb0
+  %11 = enum $_AD__$s3outyycfU12_7myfoo16L_4from2atSdSgSDySSSdG_SStF_bb1__Pred__src_0_wrt_0, #_AD__$s3outyycfU12_7myfoo16L_4from2atSdSgSDySSSdG_SStF_bb1__Pred__src_0_wrt_0.bb0!enumelt, %9 // user: %36
+  // function_ref specialized Dictionary.subscript.getter
+  %12 = function_ref @$sSDyq_SgxcigSS_SdTG5 : $@convention(method) (@in_guaranteed String, @guaranteed Dictionary<String, Double>) -> @out Optional<Double> // user: %13
+  %13 = partial_apply [callee_guaranteed] %12() : $@convention(method) (@in_guaranteed String, @guaranteed Dictionary<String, Double>) -> @out Optional<Double> // user: %19
+  // function_ref specialized forward-mode derivative of Dictionary.subscript.getter
+  %14 = function_ref @$sSDyq_SgxcigSHRz16_Differentiation14DifferentiableR_r0_lTJfUSpSrSS_SdTG5 : $@convention(method) (@in_guaranteed String, @guaranteed Dictionary<String, Double>) -> (@out Optional<Double>, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@guaranteed τ_0_0) -> @out τ_0_1 for <Dictionary<String, Double>, Optional<Double>.TangentVector>) // user: %15
+  %15 = partial_apply [callee_guaranteed] %14() : $@convention(method) (@in_guaranteed String, @guaranteed Dictionary<String, Double>) -> (@out Optional<Double>, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@guaranteed τ_0_0) -> @out τ_0_1 for <Dictionary<String, Double>, Optional<Double>.TangentVector>) // user: %19
+  // function_ref specialized reverse-mode derivative of Dictionary.subscript.getter
+  %16 = function_ref @$sSDyq_SgxcigSHRz16_Differentiation14DifferentiableR_r0_lTJrUSpSrSS_SdTG5 : $@convention(method) (@in_guaranteed String, @guaranteed Dictionary<String, Double>) -> (@out Optional<Double>, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @owned τ_0_1 for <Optional<Double>.TangentVector, Dictionary<String, Double>>) // user: %17
+  %17 = partial_apply [callee_guaranteed] %16() : $@convention(method) (@in_guaranteed String, @guaranteed Dictionary<String, Double>) -> (@out Optional<Double>, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @owned τ_0_1 for <Optional<Double>.TangentVector, Dictionary<String, Double>>) // users: %25, %18
+  %18 = copy_value %17                            // user: %19
+  %19 = differentiable_function [parameters 1] [results 0] %13 with_derivative {%15, %18} // user: %20
+  destroy_value %19                               // id: %20
+  // function_ref specialized Dictionary.subscript.getter
+  %23 = function_ref @$sSDyq_SgxcigSS_SdTg5 : $@convention(method) (@guaranteed String, @guaranteed Dictionary<String, Double>) -> Optional<Double> // user: %24
+  %24 = apply %23(%1, %0) : $@convention(method) (@guaranteed String, @guaranteed Dictionary<String, Double>) -> Optional<Double> // user: %38
+  destroy_value %17                               // id: %25
+  %26 = alloc_stack $String                       // users: %31, %30, %28
+  %27 = copy_value %1                             // user: %28
+  store %27 to [init] %26                         // id: %28
+  // function_ref specialized closure #1 in Dictionary<>.vjpSubscriptGet(key:)
+  %29 = function_ref @$sSD3out16_Differentiation14DifferentiableR_rlE15vjpSubscriptGet3keyq_Sg5value_SDyx13TangentVectorQy_GSqA2bCRzlEAHVyq__Gc8pullbacktx_tFAjLcfU_SS_SdTG5 : $@convention(thin) (@in_guaranteed Optional<Double>.TangentVector, @in_guaranteed String) -> @owned Dictionary<String, Double> // user: %30
+  %30 = partial_apply [callee_guaranteed] %29(%26) : $@convention(thin) (@in_guaranteed Optional<Double>.TangentVector, @in_guaranteed String) -> @owned Dictionary<String, Double> // user: %33
+  dealloc_stack %26                               // id: %31
+  // function_ref specialized thunk for @escaping @callee_guaranteed (@in_guaranteed B?<A>.TangentVector) -> (@owned [A : B.Differentiable.TangentVector])
+  %32 = function_ref @$sSq16_DifferentiationAA14DifferentiableRzlE13TangentVectorVyq__GSDyxAcaBPQy_GIegno_AeHIegno_SHRzAaBR_r0_lTRSS_SdTG5 : $@convention(thin) (@in_guaranteed Optional<Double>.TangentVector, @guaranteed @callee_guaranteed (@in_guaranteed Optional<Double>.TangentVector) -> @owned Dictionary<String, Double>) -> @owned Dictionary<String, Double> // user: %33
+  %33 = partial_apply [callee_guaranteed] %32(%30) : $@convention(thin) (@in_guaranteed Optional<Double>.TangentVector, @guaranteed @callee_guaranteed (@in_guaranteed Optional<Double>.TangentVector) -> @owned Dictionary<String, Double>) -> @owned Dictionary<String, Double> // user: %35
+  // function_ref thunk for @escaping @callee_guaranteed (@in_guaranteed Double?<A>.TangentVector) -> (@owned [String : Double])
+  %34 = function_ref @$sSq16_DifferentiationAA14DifferentiableRzlE13TangentVectorVySd_GSDySSSdGIegno_AeFIegyo_TR : $@convention(thin) (Optional<Double>.TangentVector, @guaranteed @callee_guaranteed (@in_guaranteed Optional<Double>.TangentVector) -> @owned Dictionary<String, Double>) -> @owned Dictionary<String, Double> // user: %35
+  %35 = partial_apply [callee_guaranteed] %34(%33) : $@convention(thin) (Optional<Double>.TangentVector, @guaranteed @callee_guaranteed (@in_guaranteed Optional<Double>.TangentVector) -> @owned Dictionary<String, Double>) -> @owned Dictionary<String, Double> // user: %36
+  %36 = tuple $(predecessor: _AD__$s3outyycfU12_7myfoo16L_4from2atSdSgSDySSSdG_SStF_bb1__Pred__src_0_wrt_0, @callee_guaranteed (Optional<Double>.TangentVector) -> @owned Dictionary<String, Double>) (%11, %35) // user: %37
+  %37 = enum $_AD__$s3outyycfU12_7myfoo16L_4from2atSdSgSDySSSdG_SStF_bb3__Pred__src_0_wrt_0, #_AD__$s3outyycfU12_7myfoo16L_4from2atSdSgSDySSSdG_SStF_bb3__Pred__src_0_wrt_0.bb1!enumelt, %36 // user: %38
+  br bb3(%24, %37)                                // id: %38
+
+bb2:                                              // Preds: bb0
+  %39 = enum $_AD__$s3outyycfU12_7myfoo16L_4from2atSdSgSDySSSdG_SStF_bb2__Pred__src_0_wrt_0, #_AD__$s3outyycfU12_7myfoo16L_4from2atSdSgSDySSSdG_SStF_bb2__Pred__src_0_wrt_0.bb0!enumelt, %9 // user: %41
+  %40 = enum $Optional<Double>, #Optional.none!enumelt // user: %43
+  %empty = tuple ()
+  %41 = tuple $(predecessor: _AD__$s3outyycfU12_7myfoo16L_4from2atSdSgSDySSSdG_SStF_bb2__Pred__src_0_wrt_0, ()) (%39, %empty) // user: %42
+  %42 = enum $_AD__$s3outyycfU12_7myfoo16L_4from2atSdSgSDySSSdG_SStF_bb3__Pred__src_0_wrt_0, #_AD__$s3outyycfU12_7myfoo16L_4from2atSdSgSDySSSdG_SStF_bb3__Pred__src_0_wrt_0.bb2!enumelt, %41 // user: %43; ownership: none
+  br bb3(%40, %42)                                // id: %43
+
+// %44                                            // user: %48
+// %45                                            // user: %47
+bb3(%44 : $Optional<Double>, %45 : @owned $_AD__$s3outyycfU12_7myfoo16L_4from2atSdSgSDySSSdG_SStF_bb3__Pred__src_0_wrt_0): // Preds: bb2 bb1
+  // function_ref pullback of myfoo16 #1 (from:at:) in closure #14 in 
+  %46 = function_ref @$s3outyycfU12_7myfoo16L_4from2atSdSgSDySSSdG_SStFTJpSUpSr : $@convention(thin) (Optional<Double>.TangentVector, @owned _AD__$s3outyycfU12_7myfoo16L_4from2atSdSgSDySSSdG_SStF_bb3__Pred__src_0_wrt_0) -> @owned Dictionary<String, Double> // user: %47
+  %47 = partial_apply [callee_guaranteed] %46(%45) : $@convention(thin) (Optional<Double>.TangentVector, @owned _AD__$s3outyycfU12_7myfoo16L_4from2atSdSgSDySSSdG_SStF_bb3__Pred__src_0_wrt_0) -> @owned Dictionary<String, Double> // user: %48
+  %48 = tuple (%44, %47)                          // user: %49
+  return %48                                      // id: %49
+} // end sil function '$s3outyycfU12_7myfoo16L_4from2atSdSgSDySSSdG_SStFTJrSUpSr'
+
+// pullback of myfoo16 #1 (from:at:) in closure #14 in 
+// Isolation: nonisolated
+sil private [ossa] @$s3outyycfU12_7myfoo16L_4from2atSdSgSDySSSdG_SStFTJpSUpSr : $@convention(thin) (Optional<Double>.TangentVector, @owned _AD__$s3outyycfU12_7myfoo16L_4from2atSdSgSDySSSdG_SStF_bb3__Pred__src_0_wrt_0) -> @owned Dictionary<String, Double> {
+[%1: noescape v**, read v**.c*.v**, write v**.c*.v**, copy v**.c*.v**, destroy v**.c*.v**]
+[global: read,write,copy,destroy,allocate,deinit_barrier]
+// %0                                             // user: %21
+// %1                                             // user: %14
+bb0(%0 : $Optional<Double>.TangentVector, %1 : @owned $_AD__$s3outyycfU12_7myfoo16L_4from2atSdSgSDySSSdG_SStF_bb3__Pred__src_0_wrt_0):
+  %2 = float_literal $Builtin.FPIEEE64, 0x0 // 0  // users: %49, %3
+  %3 = struct $Double (%2)                        // user: %4
+  %4 = enum $Optional<Double>, #Optional.some!enumelt, %3 // user: %45
+  %5 = integer_literal $Builtin.Int64, 0          // user: %6
+  %6 = struct $Int (%5)                           // user: %8
+  // function_ref specialized static Array._allocateUninitialized(_:)
+  %7 = function_ref @$sSa22_allocateUninitializedySayxG_SpyxGtSiFZSS_Sdt_Tt0g5 : $@convention(thin) (Int) -> (@owned Array<(String, Double)>, UnsafeMutablePointer<(String, Double)>) // user: %8
+  %8 = apply %7(%6) : $@convention(thin) (Int) -> (@owned Array<(String, Double)>, UnsafeMutablePointer<(String, Double)>) // user: %9
+  (%9, %10) = destructure_tuple %8                // user: %12
+  // function_ref specialized Dictionary.init(dictionaryLiteral:)
+  %11 = function_ref @$sSD17dictionaryLiteralSDyxq_Gx_q_td_tcfCSS_SdTt0g5 : $@convention(thin) (@owned Array<(String, Double)>) -> @owned Dictionary<String, Double> // user: %12
+  %12 = apply %11(%9) : $@convention(thin) (@owned Array<(String, Double)>) -> @owned Dictionary<String, Double> // users: %64, %55, %29, %30, %17, %16, %13
+  switch_enum %1, case #_AD__$s3outyycfU12_7myfoo16L_4from2atSdSgSDySSSdG_SStF_bb3__Pred__src_0_wrt_0.bb2!enumelt: bb1, case #_AD__$s3outyycfU12_7myfoo16L_4from2atSdSgSDySSSdG_SStF_bb3__Pred__src_0_wrt_0.bb1!enumelt: bb2 // id: %14
+
+bb1(%15 : $(predecessor: _AD__$s3outyycfU12_7myfoo16L_4from2atSdSgSDySSSdG_SStF_bb2__Pred__src_0_wrt_0, ())): // Preds: bb0
+  br bb8(%12)                                     // id: %17
+
+// %18                                            // user: %19
+bb2(%18 : @owned $(predecessor: _AD__$s3outyycfU12_7myfoo16L_4from2atSdSgSDySSSdG_SStF_bb1__Pred__src_0_wrt_0, @callee_guaranteed (Optional<Double>.TangentVector) -> @owned Dictionary<String, Double>)): // Preds: bb0
+  (%19, %20) = destructure_tuple %18              // users: %25, %26
+  %21 = struct_extract %0, #Optional.TangentVector.value // users: %22, %47
+  switch_enum %21, case #Optional.none!enumelt: bb4, case #Optional.some!enumelt: bb5 // id: %22
+
+// %23                                            // user: %24
+bb3(%23 : $Optional<Double>):                     // Preds: bb5 bb4
+  %24 = struct $Optional<Double>.TangentVector (%23) // user: %25
+  %25 = apply %20(%24) : $@callee_guaranteed (Optional<Double>.TangentVector) -> @owned Dictionary<String, Double> // users: %28, %63, %54, %27
+  destroy_value %20                               // id: %26
+  %27 = copy_value %25                            // user: %35
+  %30 = copy_value %12                            // user: %43
+  // function_ref specialized implicit closure #1 in static Dictionary<>.+ infix(_:_:)
+  %31 = function_ref @$sSD3outs18AdditiveArithmeticR_rlE1poiySDyxq_GAD_ADtFZq_q__q_tcfu_SS_SdTt3G5 : $@convention(thin) (@in_guaranteed Double, @in_guaranteed Double) -> (@out Double, @error_indirect Never) // user: %32
+  %32 = thin_to_thick_function %31 to $@noescape @callee_guaranteed (@in_guaranteed Double, @in_guaranteed Double) -> (@out Double, @error_indirect Never) // user: %33; ownership: none
+  %33 = convert_function %32 to $@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2, τ_0_3> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> (@out τ_0_3, @error_indirect τ_0_2) for <Double, Double, Never, Double>, forwarding: @owned // users: %44, %65, %56
+  %34 = alloc_stack $Dictionary<String, Double>._Variant // users: %44, %68, %66, %59, %57, %36
+  %35 = destructure_struct %27                    // user: %36
+  store %35 to [init] %34                         // id: %36
+  // function_ref specialized closure #1 in Dictionary.merge<A>(_:uniquingKeysWith:)
+  %37 = function_ref @$sSD5merge_16uniquingKeysWithySDyxq_Gn_q_q__q_tqd__YKXEtqd__YKs5ErrorRd__lFx_q_tx_q_tcfU_SS_Sds5NeverOTG5 : $@convention(thin) (@in_guaranteed String, @in_guaranteed Double) -> (@out String, @out Double) // user: %38
+  %38 = thin_to_thick_function %37 to $@callee_guaranteed (@in_guaranteed String, @in_guaranteed Double) -> (@out String, @out Double) // user: %40; ownership: none
+  // function_ref specialized thunk for @escaping @callee_guaranteed (@in_guaranteed A, @in_guaranteed B) -> (@out A, @out B)
+  %39 = function_ref @$sxq_xq_Iegnnrr_x3key_q_5valuetx_q_tIegnr_SHRzs5ErrorRd__r0__lTRSS_Sds5NeverOTG5 : $@convention(thin) (@in_guaranteed (key: String, value: Double), @guaranteed @callee_guaranteed (@in_guaranteed String, @in_guaranteed Double) -> (@out String, @out Double)) -> @out (String, Double) // user: %40
+  %40 = partial_apply [callee_guaranteed] %39(%38) : $@convention(thin) (@in_guaranteed (key: String, value: Double), @guaranteed @callee_guaranteed (@in_guaranteed String, @in_guaranteed Double) -> (@out String, @out Double)) -> @out (String, Double) // user: %41
+  %41 = convert_function %40 to $@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <(key: String, value: Double), (String, Double)> // user: %43
+  // function_ref specialized Dictionary._Variant.merge<A, B>(_:uniquingKeysWith:)
+  %42 = function_ref @$sSD8_VariantV5merge_16uniquingKeysWithyqd__n_q_q__q_tqd_0_YKXEtqd_0_YKSTRd__s5ErrorRd_0_x_q_t7ElementRtd__r0_lFSS_Sds15LazyMapSequenceVySDySSSdGSS_SdtGs5NeverOTg5 : $@convention(method) (@owned LazyMapSequence<Dictionary<String, Double>, (String, Double)>, @guaranteed @noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2, τ_0_3> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> (@out τ_0_3, @error_indirect τ_0_2) for <Double, Double, Never, Double>, @inout Dictionary<String, Double>._Variant) -> @error Never // user: %44
+  %43 = struct $LazyMapSequence<Dictionary<String, Double>, (String, Double)> (%30, %41) // user: %44
+  try_apply %42(%43, %33, %34) : $@convention(method) (@owned LazyMapSequence<Dictionary<String, Double>, (String, Double)>, @guaranteed @noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2, τ_0_3> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> (@out τ_0_3, @error_indirect τ_0_2) for <Double, Double, Never, Double>, @inout Dictionary<String, Double>._Variant) -> @error Never, normal bb6, error bb7 // id: %44
+
+bb4:                                              // Preds: bb2
+  br bb3(%4)                                      // id: %45
+
+bb5(%46 : $Double):                               // Preds: bb2
+  %47 = unchecked_enum_data %21, #Optional.some!enumelt // user: %48
+  %48 = struct_extract %47, #Double._value        // user: %49
+  %49 = builtin "fadd_FPIEEE64"(%2, %48) : $Builtin.FPIEEE64 // user: %50
+  %50 = struct $Double (%49)                      // user: %51
+  %51 = enum $Optional<Double>, #Optional.some!enumelt, %50 // user: %52
+  br bb3(%51)                                     // id: %52
+
+bb6(%53 : $()):                                   // Preds: bb3
+  destroy_value %25                               // id: %54
+  destroy_value %12                               // id: %55
+  destroy_value %33                               // id: %56
+  %57 = load [take] %34                           // user: %58
+  %58 = struct $Dictionary<String, Double> (%57)  // users: %61, %60
+  dealloc_stack %34                               // id: %59
+  br bb8(%58)                                     // id: %61
+
+bb7(%62 : $Never):                                // Preds: bb3
+  destroy_value [dead_end] %25                    // id: %63
+  destroy_value [dead_end] %12                    // id: %64
+  destroy_value [dead_end] %33                    // id: %65
+  %66 = load [take] %34                           // user: %67
+  destroy_value %66                               // id: %67
+  dealloc_stack %34                               // id: %68
+  unreachable                                     // id: %69
+
+// %70                                            // users: %72, %71
+bb8(%70 : @owned $Dictionary<String, Double>):    // Preds: bb1 bb6
+  return %70                                      // id: %72
+} // end sil function '$s3outyycfU12_7myfoo16L_4from2atSdSgSDySSSdG_SStFTJpSUpSr'
