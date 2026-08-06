@@ -12,9 +12,9 @@
 
 /// Performs a traditional C-style assert with an optional message.
 ///
-/// Use this function for internal consistency checks that are active during testing
-/// but do not impact performance of shipping code. To check for invalid usage
-/// in Release builds, see `precondition(_:_:file:line:)`.
+/// Use this function for internal consistency checks that are active during
+/// testing but do not impact performance of shipping code. To check for invalid
+/// usage in Release builds, see `precondition(_:_:file:line:)`.
 ///
 /// * In playgrounds and `-Onone` builds (the default for Xcode's Debug
 ///   configuration): If `condition` evaluates to `false`, stop program
