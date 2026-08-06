@@ -34,7 +34,7 @@ public var benchmarks: [BenchmarkInfo] {
     ),
     BenchmarkInfo(
       name: "TaskRegistryStress.SlidingWindow",
-      runFunction: run_slidingWindow(windowSize: 100, iterations: 1000),
+      runFunction: run_slidingWindow(windowSize: 100, iterations: 5000),
       tags: [.concurrency, .runtime],
       setUpFunction: {
         if #available(macOS 14, iOS 17, watchOS 10.0, tvOS 17.0, *) {
