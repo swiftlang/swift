@@ -447,7 +447,10 @@ public:
     new(&storage->data()[count]) ElemTy(elem);
     storage->Count.store(count + 1, std::memory_order_release);
     
-    if (ReaderCount.load(std::memory_order_acquire) == 0)
+    // The standard says that std::memory_order_seq_cst only applies to
+    // read-modify-write operations, so we need an explicit fence:
+    std::atomic_thread_fence(std::memory_order_seq_cst);
+    if (ReaderCount.load(std::memory_order_relaxed) == 0)
       deallocateFreeList();
   }
   
