@@ -171,8 +171,9 @@ public func assertionFailure(
   file: StaticString = #file, line: UInt = #line
 ) {
   if _isDebugAssertConfiguration() {
-    _assertionFailure(kind: .fatal(), message(), file: file, line: line,
-      flags: _fatalErrorFlags())
+    _opaqueAssertionFailure(
+      kind: .fatal(), message(), file: file, line: line, flags: _fatalErrorFlags()
+    )
   }
   else if _isFastAssertConfiguration() {
     _conditionallyUnreachable()
@@ -186,8 +187,9 @@ public func assertionFailure(
   file: StaticString = #file, line: UInt = #line
 ) {
   if _isDebugAssertConfiguration() {
-    _assertionFailure(kind: .fatal(), message(), file: file, line: line,
-      flags: _fatalErrorFlags())
+    _assertionFailure(
+      kind: .fatal(), message(), file: file, line: line, flags: _fatalErrorFlags()
+    )
   }
   else if _isFastAssertConfiguration() {
     _conditionallyUnreachable()
