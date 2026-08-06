@@ -224,25 +224,43 @@ ProtocolDescriptor ProtocolError{
     .withSpecialProtocol(SpecialProtocol::Error)
 };
 
-ProtocolDescriptor ProtocolCOM{
-  "_TMp8Metadata11ProtocolCOM",
-  nullptr,
-  ProtocolDescriptorFlags()
-    .withSwift(true)
-    .withClassConstraint(ProtocolClassConstraint::Any)
-    .withDispatchStrategy(ProtocolDispatchStrategy::Swift)
-    .withSpecialProtocol(SpecialProtocol::COM)
+struct COMProtocolDescriptorStorage {
+  ProtocolDescriptor Descriptor;
+  TargetCOMInterfaceID<InProcess> InterfaceID;
+
+  COMProtocolDescriptorStorage(const char *name,
+                               const uint8_t (&interfaceID)[16])
+      : Descriptor{name, nullptr,
+                   ProtocolDescriptorFlags()
+                     .withSwift(true)
+                     .withClassConstraint(ProtocolClassConstraint::Any)
+                     .withDispatchStrategy(ProtocolDispatchStrategy::Swift)
+                     .withSpecialProtocol(SpecialProtocol::COM)} {
+    std::copy(std::begin(interfaceID), std::end(interfaceID),
+              std::begin(InterfaceID.Bytes));
+  }
 };
 
-ProtocolDescriptor ProtocolCOMBase{
-  "_TMp8Metadata15ProtocolCOMBase",
-  nullptr,
-  ProtocolDescriptorFlags()
-    .withSwift(true)
-    .withClassConstraint(ProtocolClassConstraint::Any)
-    .withDispatchStrategy(ProtocolDispatchStrategy::Swift)
-    .withSpecialProtocol(SpecialProtocol::COM)
+const uint8_t ProtocolCOMInterfaceID[16] = {
+  0x01, 0x01, 0x01, 0x01, 0x02, 0x02, 0x03, 0x03,
+  0x04, 0x04, 0x05, 0x05, 0x05, 0x05, 0x05, 0x05,
 };
+
+COMProtocolDescriptorStorage
+ProtocolCOMStorage{"_TMp8Metadata11ProtocolCOM", ProtocolCOMInterfaceID};
+
+ProtocolDescriptor &ProtocolCOM = ProtocolCOMStorage.Descriptor;
+
+const uint8_t ProtocolCOMBaseInterfaceID[16] = {
+  0x11, 0x11, 0x11, 0x11, 0x12, 0x12, 0x13, 0x13,
+  0x14, 0x14, 0x15, 0x15, 0x15, 0x15, 0x15, 0x15,
+};
+
+COMProtocolDescriptorStorage
+ProtocolCOMBaseStorage{"_TMp8Metadata15ProtocolCOMBase",
+                       ProtocolCOMBaseInterfaceID};
+
+ProtocolDescriptor &ProtocolCOMBase = ProtocolCOMBaseStorage.Descriptor;
 
 ProtocolDescriptor ProtocolClassConstrained{
   "_TMp8Metadata24ProtocolClassConstrained",
@@ -475,6 +493,12 @@ TEST(MetadataTest, getExistentialMetadata) {
                 special->getSuperclassConstraint());
       return special;
     });
+}
+
+TEST(MetadataTest, getCOMInterfaceID) {
+  EXPECT_EQ(ProtocolCOMInterfaceID, ProtocolCOM.getCOMInterfaceID());
+  EXPECT_EQ(ProtocolCOMBaseInterfaceID, ProtocolCOMBase.getCOMInterfaceID());
+  EXPECT_EQ(nullptr, ProtocolA.getCOMInterfaceID());
 }
 
 namespace {

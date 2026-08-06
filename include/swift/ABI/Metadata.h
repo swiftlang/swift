@@ -1846,6 +1846,11 @@ TargetTupleTypeMetadata<Runtime>::getOffsetToNumElements() -> StoredSize {
 }
 
 template <typename Runtime>
+struct TargetCOMInterfaceID {
+  uint8_t Bytes[16];
+};
+
+template <typename Runtime>
 struct swift_ptrauth_struct_context_descriptor(ProtocolDescriptor)
     TargetProtocolDescriptor;
 
@@ -3376,15 +3381,18 @@ struct swift_ptrauth_struct_context_descriptor(ProtocolDescriptor)
     : TargetContextDescriptor<Runtime>,
       swift::ABI::TrailingObjects<
         TargetProtocolDescriptor<Runtime>,
+        TargetCOMInterfaceID<Runtime>,
         TargetGenericRequirementDescriptor<Runtime>,
         TargetProtocolRequirement<Runtime>>
 {
 private:
-  using TrailingObjects
-    = swift::ABI::TrailingObjects<
-        TargetProtocolDescriptor<Runtime>,
-        TargetGenericRequirementDescriptor<Runtime>,
-        TargetProtocolRequirement<Runtime>>;
+  using COMInterfaceID = TargetCOMInterfaceID<Runtime>;
+
+  using TrailingObjects =
+      swift::ABI::TrailingObjects<TargetProtocolDescriptor<Runtime>,
+                                  COMInterfaceID,
+                                  TargetGenericRequirementDescriptor<Runtime>,
+                                  TargetProtocolRequirement<Runtime>>;
 
   friend TrailingObjects;
 
@@ -3392,6 +3400,12 @@ private:
   using OverloadToken = typename TrailingObjects::template OverloadToken<T>;
 
 public:
+  size_t numTrailingObjects(OverloadToken<COMInterfaceID>) const {
+    SpecialProtocol protocol =
+        getProtocolContextDescriptorFlags().getSpecialProtocol();
+    return protocol == SpecialProtocol::COM ? 1 : 0;
+  }
+
   size_t numTrailingObjects(
             OverloadToken<TargetGenericRequirementDescriptor<Runtime>>) const {
     return NumRequirementsInSignature;
@@ -3422,6 +3436,26 @@ public:
 
   ProtocolContextDescriptorFlags getProtocolContextDescriptorFlags() const {
     return ProtocolContextDescriptorFlags(this->Flags.getKindSpecificFlags());
+  }
+
+  /// Return the offset of a COM interface identifier from the start of its
+  /// protocol descriptor.
+  static constexpr size_t getOffsetToCOMInterfaceID() {
+    return sizeof(TargetProtocolDescriptor);
+  }
+
+  /// Retrieve the target-native 16-byte interface identifier for this COM
+  /// interface protocol.
+  ///
+  /// A COM protocol descriptor carries the bytes inline immediately after its
+  /// fixed header. Other protocol descriptors have no such trailing field,
+  /// preserving their existing layout.
+  const uint8_t *getCOMInterfaceID() const {
+    SpecialProtocol protocol =
+        getProtocolContextDescriptorFlags().getSpecialProtocol();
+    if (protocol == SpecialProtocol::COM)
+      return this->template getTrailingObjects<COMInterfaceID>()->Bytes;
+    return nullptr;
   }
 
   /// Retrieve the requirements that make up the requirement signature of
