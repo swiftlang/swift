@@ -1017,13 +1017,13 @@ void AsyncTask::cancellationShieldPop() {
 SWIFT_CC(swift)
 static void
 swift_task_cancelCancellationScopeImpl(TaskCancellationScopeRecord *record) {
-  swift_task_cancelCancellationScopeWithReason(record, /*unspecified=*/0);
+  swift_task_cancelCancellationScopeWithFlags(record, /*unspecified=*/0);
 }
 
 SWIFT_CC(swift)
 static void
-swift_task_cancelCancellationScopeWithReasonImpl(
-    TaskCancellationScopeRecord *record, size_t reason) {
+swift_task_cancelCancellationScopeWithFlagsImpl(
+    TaskCancellationScopeRecord *record, size_t flags) {
   // Cancelling a scope is a local operation on the scope's own atomic flag.
   // Unlike `swift_task_cancel`, it does not set the task's own IsCancelled
   // flag. We fire any `CancellationNotificationStatusRecord`s installed
@@ -1035,6 +1035,9 @@ swift_task_cancelCancellationScopeWithReasonImpl(
   if (!record)
     return;
 
+  // The low 3 bits of `flags` carry `CancellationError.Reason`'s raw value;
+  // the remaining bits are reserved for future evolution and ignored here.
+  size_t reason = flags & 0b111;
   record->cancel(reason);
 
   auto task = record->getOwningTask();
@@ -1071,7 +1074,7 @@ swift_task_cancelCancellationScopeWithReasonImpl(
         // cascade with the scope's reason.
         auto childRecord = cast<ChildTaskStatusRecord>(cur);
         for (AsyncTask *child : childRecord->children())
-          swift_task_cancelWithReason(child, reason);
+          swift_task_cancelWithFlags(child, reason);
         break;
       }
       case TaskStatusRecordKind::TaskGroup: {
@@ -1349,7 +1352,7 @@ void swift::_swift_taskGroup_cancel(TaskGroup *group, size_t reason) {
   // while holding the owning task's status record lock, we do not need
   // any additional synchronization within this function.
   for (auto childTask : group->getTaskRecord()->children())
-    swift_task_cancelWithReason(childTask, reason);
+    swift_task_cancelWithFlags(childTask, reason);
 }
 
 /// Cancel the task group and all the child tasks that belong to `group`.
@@ -1384,7 +1387,7 @@ static void performCancellationAction(ActiveTaskStatus status,
   case TaskStatusRecordKind::ChildTask: {
     auto childRecord = cast<ChildTaskStatusRecord>(record);
     for (AsyncTask *child: childRecord->children())
-      swift_task_cancelWithReason(child, reason);
+      swift_task_cancelWithFlags(child, reason);
     return;
   }
 
@@ -1449,12 +1452,16 @@ static void performCancellationAction(ActiveTaskStatus status,
 
 SWIFT_CC(swift)
 static void swift_task_cancelImpl(AsyncTask *task) {
-  swift_task_cancelWithReason(task, /*unspecified=*/0);
+  swift_task_cancelWithFlags(task, /*unspecified=*/0);
 }
 
 SWIFT_CC(swift)
-static void swift_task_cancelWithReasonImpl(AsyncTask *task, size_t reason) {
-  SWIFT_TASK_DEBUG_LOG("cancel task = %p (reason=%zu)", task, reason);
+static void swift_task_cancelWithFlagsImpl(AsyncTask *task, size_t flags) {
+  // The low 3 bits of `flags` carry `CancellationError.Reason`'s raw value;
+  // the remaining bits are reserved for future evolution and ignored here.
+  size_t reason = flags & 0b111;
+  SWIFT_TASK_DEBUG_LOG("cancel task = %p (flags=%zu, reason=%zu)", task, flags,
+                       reason);
 
   auto oldStatus = task->_private()._status().load(std::memory_order_relaxed);
   auto newStatus = oldStatus;

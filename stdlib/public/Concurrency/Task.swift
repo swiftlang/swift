@@ -261,12 +261,11 @@ extension Task {
   /// call is a no-op with respect to both the cancelled state and the
   /// recorded reason.
   ///
-  /// Child tasks recursively cancelled as a result of this call inherit the
-  /// same reason.
-  @available(StdlibDeploymentTarget 6.5, *)
+  /// Child tasks recursively cancelled through this call inherit the same reason.
   @export(implementation)
+  @available(StdlibDeploymentTarget 6.5, *)
   public func cancel(reason: CancellationError.Reason) {
-    unsafe _taskCancelWithReason(_AsyncTask(_task), UInt(reason.rawValue))
+    unsafe _taskCancelWithFlags(_AsyncTask(_task), UInt(reason.rawValue))
   }
 }
 
@@ -961,7 +960,7 @@ public struct UnsafeCurrentTask {
   @available(StdlibDeploymentTarget 6.5, *)
   @export(implementation)
   public func cancel(reason: CancellationError.Reason) {
-    unsafe _taskCancelWithReason(_rawTask, UInt(reason.rawValue))
+    unsafe _taskCancelWithFlags(_rawTask, UInt(reason.rawValue))
   }
 
   /// The reason for the current task's cancellation, or `nil` if the task
@@ -1177,9 +1176,9 @@ public func _taskFutureGetThrowing<T>(_ task: Builtin.NativeObject) async throws
 internal func _taskCancel(_ task: _AsyncTask)
 
 @available(StdlibDeploymentTarget 6.5, *)
-@_silgen_name("swift_task_cancelWithReason")
+@_silgen_name("swift_task_cancelWithFlags")
 @usableFromInline
-internal func _taskCancelWithReason(_ task: _AsyncTask, _ reason: UInt)
+internal func _taskCancelWithFlags(_ task: _AsyncTask, _ flags: UInt)
 
 @available(StdlibDeploymentTarget 6.5, *)
 @_silgen_name("swift_task_getCancellationReason")

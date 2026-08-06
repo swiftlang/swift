@@ -64,8 +64,8 @@ public struct TaskCancellationScope: ~Copyable, ~Escapable {
   /// preserved.
   @export(implementation)
   public func cancel(reason: CancellationError.Reason = .unspecified) {
-    unsafe _taskCancelTaskCancellationScopeWithReason(
-      record: _record, reason: UInt(reason.rawValue))
+    unsafe _taskCancelTaskCancellationScopeWithFlags(
+      record: _record, flags: UInt(reason.rawValue))
   }
 
   /// Whether this scope has been cancelled.
@@ -147,10 +147,10 @@ internal func _taskCancelTaskCancellationScope(record: TaskCancellationScopeReco
 
 @usableFromInline
 @available(StdlibDeploymentTarget 6.5, *)
-@_silgen_name("swift_task_cancelCancellationScopeWithReason")
-internal func _taskCancelTaskCancellationScopeWithReason(
+@_silgen_name("swift_task_cancelCancellationScopeWithFlags")
+internal func _taskCancelTaskCancellationScopeWithFlags(
   record: TaskCancellationScopeRecordUnsafeRawPointer,
-  reason: UInt)
+  flags: UInt)
 
 @usableFromInline
 @available(StdlibDeploymentTarget 6.5, *)

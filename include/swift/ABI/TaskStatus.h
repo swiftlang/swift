@@ -582,10 +582,10 @@ class TaskCancellationScopeRecord : public TaskStatusRecord {
   AsyncTask *OwningTask;
 
   /// Packed state: bit 0 is the cancelled flag; the remaining bits hold
-  /// the cancellation reason (matching the `size_t reason` ABI used by
-  /// `swift_task_cancelWithReason`). The pair is written together via a
-  /// single CAS in `cancel()`, first-cancel-wins, so readers always observe
-  /// a consistent pair.
+  /// the cancellation reason (matching the `size_t flags` ABI used by
+  /// `swift_task_cancelWithFlags`, whose low 3 bits are the reason). The
+  /// pair is written together via a single CAS in `cancel()`,
+  /// first-cancel-wins, so readers always observe a consistent pair.
   std::atomic<uintptr_t> State{0};
 
   static constexpr uintptr_t CancelledBit = 1;

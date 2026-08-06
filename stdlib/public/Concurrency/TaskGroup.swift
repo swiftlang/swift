@@ -507,7 +507,7 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
   @available(StdlibDeploymentTarget 6.5, *)
   @export(implementation)
   public func cancelAll(reason: CancellationError.Reason) {
-    _taskGroupCancelAllWithReason(group: _group, reason: UInt(reason.rawValue))
+    _taskGroupCancelAllWithFlags(group: _group, flags: UInt(reason.rawValue))
   }
 
   /// A Boolean value that indicates whether the group was canceled.
@@ -875,7 +875,7 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   @available(StdlibDeploymentTarget 6.5, *)
   @export(implementation)
   public func cancelAll(reason: CancellationError.Reason) {
-    _taskGroupCancelAllWithReason(group: _group, reason: UInt(reason.rawValue))
+    _taskGroupCancelAllWithFlags(group: _group, flags: UInt(reason.rawValue))
   }
 
   /// A Boolean value that indicates whether the group was canceled.
@@ -1146,8 +1146,8 @@ func _taskGroupCancelAll(group: Builtin.RawPointer)
 
 @usableFromInline
 @available(StdlibDeploymentTarget 6.5, *)
-@_silgen_name("swift_taskGroup_cancelAllWithReason")
-func _taskGroupCancelAllWithReason(group: Builtin.RawPointer, reason: UInt)
+@_silgen_name("swift_taskGroup_cancelAllWithFlags")
+func _taskGroupCancelAllWithFlags(group: Builtin.RawPointer, flags: UInt)
 
 /// Checks ONLY if the group was specifically canceled.
 /// The task itself being canceled must be checked separately.

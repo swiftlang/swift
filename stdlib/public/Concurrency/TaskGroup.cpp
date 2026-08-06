@@ -2234,10 +2234,13 @@ static void swift_taskGroup_cancelAllImpl(TaskGroup *group) {
 }
 
 SWIFT_CC(swift)
-static void swift_taskGroup_cancelAllWithReasonImpl(TaskGroup *group,
-                                                    size_t reason) {
+static void swift_taskGroup_cancelAllWithFlagsImpl(TaskGroup *group,
+                                                   size_t flags) {
   // TaskGroup is not a Sendable type, so this can only be called from the
   // owning task.
+  // The low 3 bits of `flags` carry `CancellationError.Reason`'s raw value;
+  // the remaining bits are reserved for future evolution and ignored here.
+  size_t reason = flags & 0b111;
   asBaseImpl(group)->cancelAll(swift_task_getCurrent(), reason);
 }
 
