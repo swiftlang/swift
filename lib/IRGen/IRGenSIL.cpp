@@ -6198,11 +6198,9 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
     ConditionalDominanceScope condScope(*this);
 
     // Bind each block argument to its operand.
-    // There can be less arguments than operands because constant values are
-    // currently represented with one undef operand and zero bb arguments.
     auto Operands = i->getAllOperands();
-    assert(DebugBB->getNumArguments() <= Operands.size() &&
-           "debug block has more arguments than operands");
+    assert(DebugBB->getNumArguments() == Operands.size() &&
+           "debug block arguments must match the operands");
     for (auto Idx : indices(DebugBB->getArguments())) {
       SILValue operand = Operands[Idx].get();
       SILArgument *blockArg = DebugBB->getArgument(Idx);
