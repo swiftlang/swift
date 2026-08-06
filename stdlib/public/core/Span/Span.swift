@@ -571,17 +571,17 @@ extension Span where Element: ConvertibleToBytes {
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension Span where Element: ~Copyable {
 
-  /// Constructs a new span over the items within the supplied range of
+  /// Constructs a new span over the elements within the supplied range of
   /// indices within this span.
   ///
-  /// The returned span's first item is always at index 0; unlike buffer
+  /// The returned span's first element is always at index 0; unlike buffer
   /// slices, extracted spans do not share their indices with the
   /// span from which they are extracted.
   ///
   /// - Parameter bounds: A valid range of indices. Every index in
   ///     this range must be within the bounds of this `Span`.
   ///
-  /// - Returns: A `Span` over the items within `bounds`.
+  /// - Returns: A `Span` over the elements within `bounds`.
   ///
   /// - Complexity: O(1)
   @export(implementation)
@@ -602,10 +602,10 @@ extension Span where Element: ~Copyable {
     extracting(bounds)
   }
 
-  /// Constructs a new span over the items within the supplied range of
+  /// Constructs a new span over the elements within the supplied range of
   /// indices within this span.
   ///
-  /// The returned span's first item is always at index 0; unlike buffer
+  /// The returned span's first element is always at index 0; unlike buffer
   /// slices, extracted spans do not share their indices with the
   /// span from which they are extracted.
   ///
@@ -614,7 +614,7 @@ extension Span where Element: ~Copyable {
   /// - Parameter bounds: A valid range of indices. Every index in
   ///     this range must be within the bounds of this `Span`.
   ///
-  /// - Returns: A `Span` over the items within `bounds`.
+  /// - Returns: A `Span` over the elements within `bounds`.
   ///
   /// - Complexity: O(1)
   @unsafe
@@ -637,17 +637,17 @@ extension Span where Element: ~Copyable {
     unsafe extracting(unchecked: bounds)
   }
 
-  /// Constructs a new span over the items within the supplied range of
+  /// Constructs a new span over the elements within the supplied range of
   /// indices within this span.
   ///
-  /// The returned span's first item is always at index 0; unlike buffer
+  /// The returned span's first element is always at index 0; unlike buffer
   /// slices, extracted spans do not share their indices with the
   /// span from which they are extracted.
   ///
   /// - Parameter bounds: A valid range of indices. Every index in
   ///     this range must be within the bounds of this `Span`.
   ///
-  /// - Returns: A `Span` over the items within `bounds`.
+  /// - Returns: A `Span` over the elements within `bounds`.
   ///
   /// - Complexity: O(1)
   @export(implementation)
@@ -665,10 +665,10 @@ extension Span where Element: ~Copyable {
     extracting(bounds)
   }
 
-  /// Constructs a new span over the items within the supplied range of
+  /// Constructs a new span over the elements within the supplied range of
   /// indices within this span.
   ///
-  /// The returned span's first item is always at index 0; unlike buffer
+  /// The returned span's first element is always at index 0; unlike buffer
   /// slices, extracted spans do not share their indices with the
   /// span from which they are extracted.
   ///
@@ -677,7 +677,7 @@ extension Span where Element: ~Copyable {
   /// - Parameter bounds: A valid range of indices. Every index in
   ///     this range must be within the bounds of this `Span`.
   ///
-  /// - Returns: A `Span` over the items within `bounds`.
+  /// - Returns: A `Span` over the elements within `bounds`.
   ///
   /// - Complexity: O(1)
   @unsafe
@@ -700,13 +700,13 @@ extension Span where Element: ~Copyable {
     unsafe extracting(unchecked: bounds)
   }
 
-  /// Constructs a new span over all the items of this span.
+  /// Constructs a new span over all the elements of this span.
   ///
-  /// The returned span's first item is always at index 0; unlike buffer
+  /// The returned span's first element is always at index 0; unlike buffer
   /// slices, extracted spans do not share their indices with the
   /// span from which they are extracted.
   ///
-  /// - Returns: A `Span` over all the items of this span.
+  /// - Returns: A `Span` over all the elements of this span.
   ///
   /// - Complexity: O(1)
   @export(implementation)
@@ -911,7 +911,7 @@ extension Span where Element: ~Copyable {
   /// If the maximum length exceeds the length of this span,
   /// the result contains all the elements.
   ///
-  /// The returned span's first item is always at index 0; unlike buffer
+  /// The returned span's first element is always at index 0; unlike buffer
   /// slices, extracted spans do not share their indices with the
   /// span from which they are extracted.
   ///
@@ -945,7 +945,7 @@ extension Span where Element: ~Copyable {
   /// If the number of elements to drop exceeds the number of elements in
   /// the span, the result is an empty span.
   ///
-  /// The returned span's first item is always at index 0; unlike buffer
+  /// The returned span's first element is always at index 0; unlike buffer
   /// slices, extracted spans do not share their indices with the
   /// span from which they are extracted.
   ///
