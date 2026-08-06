@@ -484,7 +484,7 @@ public:
 /// I.e. a search for nearest deadline can always stop at first matching record.
 ///
 /// ### Clock identity
-/// Comparing clock identity is fast-pathed for our known system clocks,
+/// Comparing clock identity is fast-pathed for known system clocks,
 /// however needs to to a slow-path Identifiable comparison for any user defined clocks.
 class TaskDeadlineStatusRecord : public TaskStatusRecord {
   static constexpr uintptr_t FlagsMask = ~uintptr_t(alignof(void*) - 1);
@@ -573,22 +573,29 @@ public:
 
 #endif // !SWIFT_CONCURRENCY_EMBEDDED
 
-/// A status record which represents a scoped cancellation domain that is
-/// independent of whole-task cancellation. Cancelling the scope does not set
-/// the task's own cancellation flag; only handlers registered _inside_ the
-/// scope's dynamic extent are fired.
+/// A status record which represents a scoped cancellation scope that is
+/// independent of whole-task cancellation.
+///
+/// Cancelling the scope does not set the task's own cancellation flag.
+/// Only handlers registered _inside_ the scope's dynamic extent are fired.
 class TaskCancellationScopeRecord : public TaskStatusRecord {
   /// The task that installed this scope.
+  /// Necessary to trigger cancellation handlers nested in the scope when cancelled.
+  ///
+  /// The scope does not retain the task, it is structurally guaranteed
+  /// to remain alive while the scope is active.
   AsyncTask *OwningTask;
 
-  /// Packed state: bit 0 is the cancelled flag; the remaining bits hold
-  /// the cancellation reason (matching the `size_t flags` ABI used by
-  /// `swift_task_cancelWithFlags`, whose low 3 bits are the reason). The
-  /// pair is written together via a single CAS in `cancel()`,
-  /// first-cancel-wins, so readers always observe a consistent pair.
+  /// Packed cancellation state
+  ///
+  /// bit 0:          the cancelled flag;
+  /// bits 1-3:       hold the cancellation reason (same shape as swift_task_cancelWithFlags).
+  /// remaining bits: reserved for future use.
   std::atomic<uintptr_t> State{0};
 
   static constexpr uintptr_t CancelledBit = 1;
+  /// Low 3 bits of the reason field, matching `swift_task_cancelWithFlags`.
+  static constexpr uintptr_t ReasonMask = 0b111;
 
 public:
   explicit TaskCancellationScopeRecord(AsyncTask *owningTask)
@@ -596,19 +603,21 @@ public:
         OwningTask(owningTask) {}
 
   AsyncTask *getOwningTask() const { return OwningTask; }
+
   bool isCancelled() const {
     return (State.load(std::memory_order_relaxed) & CancelledBit) != 0;
   }
   size_t getReason() const {
-    return State.load(std::memory_order_relaxed) >> 1;
+    return (State.load(std::memory_order_relaxed) >> 1) & ReasonMask;
   }
-  /// Cancel the scope, recording `reason`. First-cancel-wins: if the scope
-  /// is already cancelled, this is a no-op and the originally-recorded
-  /// reason is preserved.
-  void cancel(size_t reason = 0) {
+  /// Cancel the scope, recording `reason`.
+  ///
+  /// First-cancel-wins: if the scope is already cancelled, this is a no-op.
+  void cancel(size_t reason) {
     auto oldState = State.load(std::memory_order_relaxed);
     while (!(oldState & CancelledBit)) {
-      auto newState = (static_cast<uintptr_t>(reason) << 1) | CancelledBit;
+      auto newState =
+          ((static_cast<uintptr_t>(reason) & ReasonMask) << 1) | CancelledBit;
       if (State.compare_exchange_weak(oldState, newState,
                                        std::memory_order_relaxed,
                                        std::memory_order_relaxed)) {

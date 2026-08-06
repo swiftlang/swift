@@ -2923,7 +2923,7 @@ enum class TaskStatusRecordKind : uint8_t {
   // DEPRECATED: TaskName = 6,
 
   /// A TaskDeadlineStatusRecord, which represents a point in time at which
-  /// the deadline scope should trigger cancellation.
+  /// the deadline scope should trigger scope cancellation.
   ///
   /// Introduced in Swift 6.5
   Deadline = 7,
