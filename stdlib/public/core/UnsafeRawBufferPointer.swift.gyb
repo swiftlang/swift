@@ -1290,8 +1290,8 @@ extension Unsafe${Mutable}RawBufferPointer {
     return unsafe extracting(unchecked: range)
   }
 
-  /// Constructs a standalone buffer pointer over the initial bytes of
-  /// this buffer, up to the specified maximum length.
+  /// Returns a buffer pointer containing the initial bytes of this buffer,
+  /// up to the specified maximum length.
   ///
   /// If the maximum length exceeds the length of this buffer,
   /// the result contains all the bytes.
