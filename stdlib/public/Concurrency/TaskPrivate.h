@@ -76,14 +76,6 @@ void *_swift_task_alloc_specific(AsyncTask *task, size_t size);
 /// done on behalf of a child task.
 void _swift_task_dealloc_specific(AsyncTask *task, void *ptr);
 
-/// Slow-path helper for `AsyncTask::isCancelled()` when the task has at
-/// least one `TaskCancellationScopeRecord` installed (`HasTaskCancellationScope`
-/// flag set). Walks the record chain under `withStatusRecordLock` and
-/// returns the first cancelled scope record, or nullptr if none is cancelled.
-/// The caller must have already checked the flag.
-class TaskCancellationScopeRecord;
-TaskCancellationScopeRecord *_swift_task_getCancellationScope(AsyncTask *task);
-
 /// Given that we've already set the right executor as the active
 /// executor, run the given job.  This does additional bookkeeping
 /// related to the active task. actor and executorIdentity are used for emitting
@@ -108,6 +100,33 @@ void asyncLet_addImpl(AsyncTask *task, AsyncLet *asyncLet,
 AsyncTask *_swift_task_clearCurrent();
 /// Set the active task reference for the current thread.
 AsyncTask *_swift_task_setCurrent(AsyncTask *newTask);
+
+/// Options controlling `_swift_task_getCancellationScope`.
+enum class GetCancellationScopeFlags : uintptr_t {
+  None = 0,
+  /// Look past any `TaskCancellationShieldRecord` encountered before the
+  /// innermost scope. By default a shield installed above the innermost
+  /// scope masks it and the search returns nullptr.
+  IgnoringTaskCancellationShield = 1 << 0,
+};
+
+/// Return the innermost `TaskCancellationScopeRecord` in `task`'s records,
+/// respecting shield masking, or nullptr if none is visible.
+///
+/// The caller must have already checked `HasTaskCancellationScope` on the
+/// task's status; this function takes the record lock unconditionally.
+///
+/// A `TaskCancellationShieldRecord` seen before any cancellation scope
+/// means the call site is inside a shield deeper than the innermost scope
+/// - the search returns nullptr so callers observe the task "as-if" no
+/// scope were installed, matching "as-if child task" semantics for
+/// `withDeadline` etc. Pass `IgnoringTaskCancellationShield` to bypass
+/// that masking.
+class TaskCancellationScopeRecord;
+TaskCancellationScopeRecord *
+_swift_task_getCancellationScope(AsyncTask *task,
+                                 GetCancellationScopeFlags flags =
+                                     GetCancellationScopeFlags::None);
 
 /// Cancel the task group and all the child tasks that belong to `group`.
 ///
@@ -1238,10 +1257,11 @@ inline bool AsyncTask::isCancelled(bool ignoreShield = false) const {
   if (status.isCancelled(ignoreShield))
     return true;
   // Slow path: only entered when a `TaskCancellationScopeRecord` is present.
-  // The walker (`_swift_task_getCancellationScope`) is chain-aware: if a
-  // `TaskCancellationShieldRecord` sits above the innermost cancelled scope,
-  // the walker returns nullptr - the shield masks the scope at this call
-  // site, matching the "as-if child task" semantics of `withDeadline`.
+  // `_swift_task_getCancellationScope` is records-aware: if a
+  // `TaskCancellationShieldRecord` sits above the innermost scope, it
+  // returns nullptr - the shield masks the scope at this call site,
+  // matching the "as-if child task" semantics of `withDeadline`. We then
+  // query the returned scope's own cancelled flag.
   if (SWIFT_UNLIKELY(status.hasTaskCancellationScope())) {
     if (auto scope = _swift_task_getCancellationScope(const_cast<AsyncTask *>(this)))
       return scope->isCancelled();
@@ -2073,7 +2093,7 @@ inline bool AsyncTask::localValuePop() {
 // `cancellationShieldPush` / `cancellationShieldPop` are implemented in
 // TaskStatus.cpp because they push/pop a `TaskCancellationShieldRecord`
 // alongside the fast-path shield bit; the record makes shield-vs-scope
-// ordering visible to the scope walker in `_swift_task_getCancellationScope`.
+// ordering visible to the scope search in `_swift_task_getCancellationScope`.
 
 } // end namespace swift
 

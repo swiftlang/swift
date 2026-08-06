@@ -972,9 +972,12 @@ public struct UnsafeCurrentTask {
   @available(StdlibDeploymentTarget 6.5, *)
   @export(implementation)
   public var cancellationReason: CancellationError.Reason? {
-    let raw = unsafe _taskGetCancellationReason(_rawTask)
-    guard unsafe _taskIsCancelled(_rawTask) else { return nil }
-    return CancellationError.Reason(rawValue: UInt8(truncatingIfNeeded: raw)) ?? .unspecified
+    // Packed encoding: bit 0 is the isCancelled flag; bits 1..3 carry the
+    // `CancellationError.Reason` raw value. One runtime call returns both.
+    let packed = unsafe _taskGetIsCancelledWithReason(_rawTask)
+    guard packed & 1 != 0 else { return nil }
+    let raw = UInt8(truncatingIfNeeded: packed >> 1)
+    return CancellationError.Reason(rawValue: raw) ?? .unspecified
   }
 
   /// Checks if this task is executing in a scope with a task cancellation shield activated by the
@@ -1181,9 +1184,9 @@ internal func _taskCancel(_ task: _AsyncTask)
 internal func _taskCancelWithFlags(_ task: _AsyncTask, _ flags: UInt)
 
 @available(StdlibDeploymentTarget 6.5, *)
-@_silgen_name("swift_task_getCancellationReason")
+@_silgen_name("swift_task_getIsCancelledWithReason")
 @usableFromInline
-internal func _taskGetCancellationReason(_ task: _AsyncTask) -> UInt
+internal func _taskGetIsCancelledWithReason(_ task: _AsyncTask) -> UInt
 
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_task_isCancelled")

@@ -519,7 +519,7 @@ Added: _swift_task_cancelCancellationScope
 Added: _swift_task_cancellationScopeIsCancelled
 Added: _swift_task_cancelWithFlags
 Added: _swift_task_findNearestDeadlineForClock
-Added: _swift_task_getCancellationReason
+Added: _swift_task_getIsCancelledWithReason
 Added: __swift_task_hasActiveDeadline
 Added: _swift_task_popCancellationScope
 Added: _swift_task_popDeadline
