@@ -2658,6 +2658,8 @@ Type IntrinsicTypeDecoder::decodeImmediate() {
   IITDescriptor D = Table.front();
   Table = Table.slice(1);
   switch (D.Kind) {
+  case IITDescriptor::WasmExternref:
+  case IITDescriptor::WasmFuncref:
   case IITDescriptor::BFloat:
   case IITDescriptor::MMX:
   case IITDescriptor::AMX:
