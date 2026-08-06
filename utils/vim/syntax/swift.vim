@@ -241,6 +241,11 @@ syn match swiftChar
 
 syn region swiftString contains=swiftInterpolationRegion
       \ start=/"/ skip=/\\\\\|\\"/ end=/"/
+" """..."""  Must be defined after the single-line swiftString above so
+" it wins when both could start at the same `"`, per :syn-priority (the
+" item defined last has priority for matches starting at the same spot).
+syn region swiftString contains=swiftInterpolationRegion
+      \ start=/"""/ skip=/\\\\\|\\"/ end=/"""/
 syn region swiftInterpolationRegion contained contains=TOP
       \ matchgroup=swiftInterpolation start=/\\(/ end=/)/
 
