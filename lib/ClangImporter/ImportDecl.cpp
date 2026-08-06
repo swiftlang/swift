@@ -4837,7 +4837,7 @@ namespace {
             // SILGen can substitute it for super calls.
             if (result) {
               SmallString<64> staticCallName("__staticCall_");
-              staticCallName += swiftName;
+              staticCallName += funcDecl->getNameStr();
 
               // Rename the original method to make sure it gets a distinct
               // mangled name from the thunk.
