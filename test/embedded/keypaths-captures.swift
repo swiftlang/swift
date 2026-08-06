@@ -3,24 +3,23 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend -enable-experimental-feature Embedded -enable-experimental-feature EmbeddedKeyPaths -parse-as-library -wmo -O %t/ok.swift -module-name ok -c -o %t/ok-o.o
+// RUN: %target-swift-frontend -enable-experimental-feature Embedded -parse-as-library -wmo -O %t/ok.swift -module-name ok -c -o %t/ok-o.o
 // RUN: %target-embedded-link %t/ok-o.o -o %t/ok-o.out %target-clang-resource-dir-opt -dead_strip
 // RUN: %target-run %t/ok-o.out | %FileCheck %s
 
-// RUN: %target-swift-frontend -enable-experimental-feature Embedded -enable-experimental-feature EmbeddedKeyPaths -parse-as-library -wmo -Onone %t/ok.swift -module-name ok -c -o %t/ok-onone.o
+// RUN: %target-swift-frontend -enable-experimental-feature Embedded -parse-as-library -wmo -Onone %t/ok.swift -module-name ok -c -o %t/ok-onone.o
 // RUN: %target-embedded-link %t/ok-onone.o -o %t/ok-onone.out %target-clang-resource-dir-opt -dead_strip
 // RUN: %target-run %t/ok-onone.out | %FileCheck %s
 
 // The performance hint fires for every capturing key path. It's emitted from a
 // SIL pass, so this needs to get past type checking, and it's in the
 // `PerformanceHints` group, which is ignored by default, so ask for it.
-// RUN: %target-swift-frontend -enable-experimental-feature Embedded -enable-experimental-feature EmbeddedKeyPaths -parse-as-library -wmo -O -Wwarning PerformanceHints -emit-ir -o /dev/null -verify %t/hint.swift -module-name hint
+// RUN: %target-swift-frontend -enable-experimental-feature Embedded -parse-as-library -wmo -O -Wwarning PerformanceHints -emit-ir -o /dev/null -verify %t/hint.swift -module-name hint
 
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
 // REQUIRES: OS=macosx
 // REQUIRES: swift_feature_Embedded
-// REQUIRES: swift_feature_EmbeddedKeyPaths
 
 //--- ok.swift
 

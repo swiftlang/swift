@@ -6,15 +6,14 @@
 // `IRGenModule::emitStaticKeyPathInstance`.
 
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-emit-ir %s -module-name kpoff -enable-experimental-feature Embedded -enable-experimental-feature EmbeddedKeyPaths -wmo -Onone -o - | %FileCheck -check-prefix=CHECK-IR %s
-// RUN: %target-run-simple-swift(-O -enable-experimental-feature Embedded -enable-experimental-feature EmbeddedKeyPaths -wmo -runtime-compatibility-version none %target-embedded-posix-shim) | %FileCheck -check-prefix=CHECK-OUT %s
-// RUN: %target-run-simple-swift(-Onone -enable-experimental-feature Embedded -enable-experimental-feature EmbeddedKeyPaths -wmo -runtime-compatibility-version none %target-embedded-posix-shim) | %FileCheck -check-prefix=CHECK-OUT %s
+// RUN: %target-swift-emit-ir %s -module-name kpoff -enable-experimental-feature Embedded -wmo -Onone -o - | %FileCheck -check-prefix=CHECK-IR %s
+// RUN: %target-run-simple-swift(-O -enable-experimental-feature Embedded -wmo -runtime-compatibility-version none %target-embedded-posix-shim) | %FileCheck -check-prefix=CHECK-OUT %s
+// RUN: %target-run-simple-swift(-Onone -enable-experimental-feature Embedded -wmo -runtime-compatibility-version none %target-embedded-posix-shim) | %FileCheck -check-prefix=CHECK-OUT %s
 
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
 // REQUIRES: PTRSIZE=64
 // REQUIRES: swift_feature_Embedded
-// REQUIRES: swift_feature_EmbeddedKeyPaths
 // Embedded key paths and SIL opaque values don't currently mix: the
 // combination trips `getSILArgumentConvention`. `keypaths-static.swift` and
 // `keypaths-exec.swift` carry the same XFAIL.

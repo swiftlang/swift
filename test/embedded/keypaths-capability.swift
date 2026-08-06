@@ -1,9 +1,9 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -O -enable-experimental-feature Embedded -enable-experimental-feature EmbeddedKeyPaths -wmo -c -o %t/main.o
+// RUN: %target-swift-frontend %s -O -enable-experimental-feature Embedded -wmo -c -o %t/main.o
 // RUN: %target-embedded-link %target-clang-resource-dir-opt %t/main.o -o %t/a.out -dead_strip
 // RUN: %target-run %t/a.out | %FileCheck %s
 
-// RUN: %target-swift-frontend %s -Onone -enable-experimental-feature Embedded -enable-experimental-feature EmbeddedKeyPaths -wmo -c -o %t/main-onone.o
+// RUN: %target-swift-frontend %s -Onone -enable-experimental-feature Embedded -wmo -c -o %t/main-onone.o
 // RUN: %target-embedded-link %target-clang-resource-dir-opt %t/main-onone.o -o %t/a-onone.out -dead_strip
 // RUN: %target-run %t/a-onone.out | %FileCheck %s
 
@@ -11,7 +11,6 @@
 // REQUIRES: optimized_stdlib
 // REQUIRES: OS=macosx
 // REQUIRES: swift_feature_Embedded
-// REQUIRES: swift_feature_EmbeddedKeyPaths
 
 final class Ref { var v: Int32 = 0; var w: Int32 = 0 }
 

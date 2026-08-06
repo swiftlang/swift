@@ -9,17 +9,17 @@
 // RUN: split-file %s %t
 
 // With dynamic exclusivity enabled, a conflicting mutation traps.
-// RUN: %target-swift-frontend -enable-experimental-feature Embedded -enable-experimental-feature EmbeddedKeyPaths -enable-experimental-feature EmbeddedDynamicExclusivity -enforce-exclusivity=checked -parse-as-library -wmo -O %t/conflict.swift -module-name conflict -c -o %t/conflict.o
+// RUN: %target-swift-frontend -enable-experimental-feature Embedded -enable-experimental-feature EmbeddedDynamicExclusivity -enforce-exclusivity=checked -parse-as-library -wmo -O %t/conflict.swift -module-name conflict -c -o %t/conflict.o
 // RUN: %target-embedded-link %t/conflict.o -o %t/conflict.out %target-embedded-single-threaded-shim -dead_strip
 // RUN: %target-run not --crash %t/conflict.out
 
 // Legitimate mutations through a class boundary must not trap, at either
 // optimization level.
-// RUN: %target-swift-frontend -enable-experimental-feature Embedded -enable-experimental-feature EmbeddedKeyPaths -enable-experimental-feature EmbeddedDynamicExclusivity -enforce-exclusivity=checked -parse-as-library -wmo -O %t/ok.swift -module-name ok -c -o %t/ok-o.o
+// RUN: %target-swift-frontend -enable-experimental-feature Embedded -enable-experimental-feature EmbeddedDynamicExclusivity -enforce-exclusivity=checked -parse-as-library -wmo -O %t/ok.swift -module-name ok -c -o %t/ok-o.o
 // RUN: %target-embedded-link %t/ok-o.o -o %t/ok-o.out %target-embedded-single-threaded-shim -dead_strip
 // RUN: %target-run %t/ok-o.out | %FileCheck %s
 
-// RUN: %target-swift-frontend -enable-experimental-feature Embedded -enable-experimental-feature EmbeddedKeyPaths -enable-experimental-feature EmbeddedDynamicExclusivity -enforce-exclusivity=checked -parse-as-library -wmo -Onone %t/ok.swift -module-name ok -c -o %t/ok-onone.o
+// RUN: %target-swift-frontend -enable-experimental-feature Embedded -enable-experimental-feature EmbeddedDynamicExclusivity -enforce-exclusivity=checked -parse-as-library -wmo -Onone %t/ok.swift -module-name ok -c -o %t/ok-onone.o
 // RUN: %target-embedded-link %t/ok-onone.o -o %t/ok-onone.out %target-embedded-single-threaded-shim -dead_strip
 // RUN: %target-run %t/ok-onone.out | %FileCheck %s
 
@@ -27,18 +27,17 @@
 // by IRGen when it is off. Check this on conflict.swift: in ok.swift the
 // accesses are provably non-conflicting, so at -O the access-enforcement
 // optimizer removes them and the check would pass vacuously.
-// RUN: %target-swift-frontend -enable-experimental-feature Embedded -enable-experimental-feature EmbeddedKeyPaths -enable-experimental-feature EmbeddedDynamicExclusivity -enforce-exclusivity=checked -parse-as-library -wmo -O %t/conflict.swift -module-name conflict -emit-ir -o - | %FileCheck -check-prefix=CHECK-EXCL %s
+// RUN: %target-swift-frontend -enable-experimental-feature Embedded -enable-experimental-feature EmbeddedDynamicExclusivity -enforce-exclusivity=checked -parse-as-library -wmo -O %t/conflict.swift -module-name conflict -emit-ir -o - | %FileCheck -check-prefix=CHECK-EXCL %s
 // CHECK-EXCL: call void @swift_beginAccess
 // CHECK-EXCL: call void @swift_endAccess
 
-// RUN: %target-swift-frontend -enable-experimental-feature Embedded -enable-experimental-feature EmbeddedKeyPaths -parse-as-library -wmo -O %t/conflict.swift -module-name conflict -emit-ir -o - | %FileCheck -check-prefix=CHECK-NOEXCL %s
+// RUN: %target-swift-frontend -enable-experimental-feature Embedded -parse-as-library -wmo -O %t/conflict.swift -module-name conflict -emit-ir -o - | %FileCheck -check-prefix=CHECK-NOEXCL %s
 // CHECK-NOEXCL-NOT: swift_beginAccess
 
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
 // REQUIRES: OS=macosx
 // REQUIRES: swift_feature_Embedded
-// REQUIRES: swift_feature_EmbeddedKeyPaths
 // REQUIRES: swift_feature_EmbeddedDynamicExclusivity
 
 //--- conflict.swift

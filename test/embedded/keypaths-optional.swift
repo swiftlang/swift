@@ -12,16 +12,16 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend -enable-experimental-feature Embedded -enable-experimental-feature EmbeddedKeyPaths -parse-as-library -wmo -O %t/ok.swift -module-name ok -c -o %t/ok-o.o
+// RUN: %target-swift-frontend -enable-experimental-feature Embedded -parse-as-library -wmo -O %t/ok.swift -module-name ok -c -o %t/ok-o.o
 // RUN: %target-embedded-link %t/ok-o.o -o %t/ok-o.out %target-clang-resource-dir-opt -dead_strip
 // RUN: %target-run %t/ok-o.out | %FileCheck %s
 
-// RUN: %target-swift-frontend -enable-experimental-feature Embedded -enable-experimental-feature EmbeddedKeyPaths -parse-as-library -wmo -Onone %t/ok.swift -module-name ok -c -o %t/ok-onone.o
+// RUN: %target-swift-frontend -enable-experimental-feature Embedded -parse-as-library -wmo -Onone %t/ok.swift -module-name ok -c -o %t/ok-onone.o
 // RUN: %target-embedded-link %t/ok-onone.o -o %t/ok-onone.out %target-clang-resource-dir-opt -dead_strip
 // RUN: %target-run %t/ok-onone.out | %FileCheck %s
 
 // Force-unwrapping nil through a key path must trap, like `!` would.
-// RUN: %target-swift-frontend -enable-experimental-feature Embedded -enable-experimental-feature EmbeddedKeyPaths -parse-as-library -wmo -O %t/trap.swift -module-name trap -c -o %t/trap.o
+// RUN: %target-swift-frontend -enable-experimental-feature Embedded -parse-as-library -wmo -O %t/trap.swift -module-name trap -c -o %t/trap.o
 // RUN: %target-embedded-link %t/trap.o -o %t/trap.out %target-clang-resource-dir-opt -dead_strip
 // RUN: %target-run not --crash %t/trap.out
 
@@ -29,7 +29,6 @@
 // REQUIRES: optimized_stdlib
 // REQUIRES: OS=macosx
 // REQUIRES: swift_feature_Embedded
-// REQUIRES: swift_feature_EmbeddedKeyPaths
 
 //--- ok.swift
 

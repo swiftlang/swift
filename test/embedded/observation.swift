@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -enable-experimental-feature Embedded -enable-experimental-feature EmbeddedKeyPaths -plugin-path %swift-plugin-dir -parse-as-library %s -c -o %t/a.o
+// RUN: %target-swift-frontend -enable-experimental-feature Embedded -plugin-path %swift-plugin-dir -parse-as-library %s -c -o %t/a.o
 // RUN: %target-embedded-link %target-clang-resource-dir-opt %t/a.o -o %t/a.out -L%swift_obj_root/lib/swift/embedded/%module-target-triple -lc++ -lswift_Concurrency %target-swift-default-executor-opt %target-embedded-concurrency-threading-shim %target-embedded-observation -dead_strip
 // RUN: %target-run %t/a.out | %FileCheck %s
 
@@ -7,7 +7,6 @@
 // REQUIRES: optimized_stdlib
 // REQUIRES: OS=macosx
 // REQUIRES: swift_feature_Embedded
-// REQUIRES: swift_feature_EmbeddedKeyPaths
 
 import Observation
 
