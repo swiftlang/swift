@@ -2011,7 +2011,7 @@ void CompletionLookup::foundDecl(ValueDecl *D, DeclVisibilityKind Reason,
 
     if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
       addNominalTypeRef(NTD, Reason, dynamicLookupInfo);
-      addConstructorCallsForType(NTD->getDeclaredInterfaceType(),
+      addConstructorCallsForType(NTD->getDeclaredTypeInContext(),
                                  NTD->getName(), Reason, dynamicLookupInfo);
       return;
     }
