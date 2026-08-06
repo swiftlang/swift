@@ -298,6 +298,16 @@ SILPassPipelinePlan::getSILGenPassPipeline(const SILOptions &Options) {
   P.startPipeline("SILGen Passes");
 
   P.addSILGenCleanup();
+
+  if (P.getOptions().EnableLifetimeResolution) {
+    if (P.getOptions().EnableLifetimeDependenceDiagnostics)
+      P.addLifetimeDependenceInsertion();
+
+    P.addRemoveSILGenLifetimes();
+    P.addLifetimeResolution();
+    return P;
+  }
+
   if (P.getOptions().EnableLifetimeDependenceDiagnostics) {
     P.addLifetimeDependenceInsertion();
     P.addLifetimeDependenceScopeFixup();
