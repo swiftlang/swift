@@ -1126,8 +1126,6 @@ BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskCancellationShieldPop)
 BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskCancellationScopePush)
 // Trivial use since our operand is just an UnsafeRawPointer.
 BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskCancellationScopePop)
-// Trivial use since our operand is just an UnsafeRawPointer.
-BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskCancellationScopeCancel)
 
 // Trivial use since our operand is just an UnsafeRawPointer.
 BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskPopDeadline)

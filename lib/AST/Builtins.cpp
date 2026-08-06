@@ -2484,11 +2484,6 @@ static ValueDecl *getTaskCancellationScopePop(ASTContext &ctx, Identifier id) {
       ctx, id, _thin, _parameters(_label("record", _unsafeRawPointer)), _void);
 }
 
-static ValueDecl *getTaskCancellationScopeCancel(ASTContext &ctx, Identifier id) {
-  return getBuiltinFunction(
-      ctx, id, _thin, _parameters(_label("record", _unsafeRawPointer)), _void);
-}
-
 static ValueDecl *getTaskLocalValuePush(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(ctx, id, _thin, _generics(_unrestricted),
                             _parameters(_rawPointer, _consuming(_typeparam(0))),
@@ -3669,9 +3664,6 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::TaskCancellationScopePop:
     return getTaskCancellationScopePop(Context, Id);
-
-  case BuiltinValueKind::TaskCancellationScopeCancel:
-    return getTaskCancellationScopeCancel(Context, Id);
 
   case BuiltinValueKind::TaskLocalValuePush:
     return getTaskLocalValuePush(Context, Id);

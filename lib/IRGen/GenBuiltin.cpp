@@ -1595,11 +1595,6 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     emitBuiltinTaskCancellationScopePop(IGF, record);
     return;
   }
-  case BuiltinValueKind::TaskCancellationScopeCancel: {
-    auto *record = args.claimNext();
-    emitBuiltinTaskCancellationScopeCancel(IGF, record);
-    return;
-  }
   case BuiltinValueKind::TaskPushDeadline: {
     auto *clockPtr = args.claimNext();
     auto *instantPtr = args.claimNext();

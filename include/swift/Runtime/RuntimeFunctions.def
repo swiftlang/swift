@@ -2850,16 +2850,6 @@ FUNCTION(TaskPopCancellationScope,
          EFFECT(RuntimeEffect::Concurrency),
          UNKNOWN_MEMEFFECTS)
 
-// void swift_task_cancelCancellationScope(TaskCancellationScopeRecord *record);
-FUNCTION(TaskCancelCancellationScope,
-         _Concurrency, swift_task_cancelCancellationScope, SwiftCC,
-         ConcurrencyAvailability,
-         RETURNS(VoidTy),
-         ARGS(Int8PtrTy),
-         ATTRS(NoUnwind),
-         EFFECT(RuntimeEffect::Concurrency),
-         UNKNOWN_MEMEFFECTS)
-
 // void swift_task_cancelCancellationScopeWithReason(TaskCancellationScopeRecord *record, size_t reason);
 FUNCTION(TaskCancelCancellationScopeWithReason,
          _Concurrency, swift_task_cancelCancellationScopeWithReason, SwiftCC,
