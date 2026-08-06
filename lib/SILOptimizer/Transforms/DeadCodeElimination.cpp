@@ -245,23 +245,6 @@ void DCE::markOwnedDeadValueLive(SILValue v) {
   }
 }
 
-/// Gets the producing instruction of a cond_fail condition. Currently these
-/// are overflow builtins but may be extended to other instructions in the
-/// future.
-static BuiltinInst *getProducer(CondFailInst *CFI) {
-  // Check for the pattern:
-  //   %1 = builtin "some_operation_with_overflow"
-  //   %2 = tuple_extract %1
-  //   %3 = cond_fail %2
-  SILValue FailCond = CFI->getOperand();
-  if (auto *TEI = dyn_cast<TupleExtractInst>(FailCond)) {
-    if (auto *BI = dyn_cast<BuiltinInst>(TEI->getOperand())) {
-      return BI;
-    }
-  }
-  return nullptr;
-}
-
 void DCE::processBorrow(BorrowedValue borrow) {
   // Populate guaranteedPhiDependencies for this borrow
   findGuaranteedPhiDependencies(borrow);
@@ -317,11 +300,7 @@ void DCE::markLive() {
     for (auto &I : BB) {
       switch (I.getKind()) {
       case SILInstructionKind::CondFailInst: {
-        if (auto *Prod = getProducer(cast<CondFailInst>(&I))) {
-          addReverseDependency(Prod, &I);
-        } else {
-          markInstructionLive(&I);
-        }
+        markInstructionLive(&I);
         break;
       }
       // The side-effects of fix_lifetime effect all references to the same
