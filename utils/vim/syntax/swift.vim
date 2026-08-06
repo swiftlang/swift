@@ -246,6 +246,12 @@ syn region swiftInterpolationRegion contained contains=TOP
 
 syn match swiftTupleIndexNumber contains=swiftDecimal
       \ /\.[0-9]\+/
+
+" \Type.path or \.path (key path literal). The whole path is a single
+" token, since a plain regex cannot distinguish the leading type name
+" from the member names that follow it.
+syn match swiftKeyPath
+      \ /\\\%([A-Za-z_][A-Za-z_0-9]*\)\?\%(\.[A-Za-z_][A-Za-z_0-9]*[?!]\?\)\+/
 syn match swiftDecimal contained
       \ /[0-9]\+/
 
@@ -350,6 +356,7 @@ hi def link swiftBin Number
 hi def link swiftChar Character
 hi def link swiftString String
 hi def link swiftInterpolation Special
+hi def link swiftKeyPath Special
 
 hi def link swiftOperator Operator
 hi def link swiftNilOps Operator
