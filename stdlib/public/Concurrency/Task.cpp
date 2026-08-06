@@ -1176,18 +1176,21 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
     // `.deadlineExpired` from a `withDeadline` scope).
     auto parentStatus =
         parent->_private()._status().load(std::memory_order_relaxed);
-    // Also consider a cancelled cancellation scope on the parent's chain:
+    // Also consider a cancelled cancellation scope in the parent's records:
     // structured children spawned inside a cancelled `__withTaskCancellationScope`
     // (including `withDeadline` after its deadline elapsed) must observe as
     // cancelled from creation, with the scope's reason.
     TaskCancellationScopeRecord *cancelledScope = nullptr;
-    if (parentStatus.hasTaskCancellationScope())
-      cancelledScope = _swift_task_getCancellationScope(parent);
+    if (parentStatus.hasTaskCancellationScope()) {
+      if (auto *scope = _swift_task_getCancellationScope(parent))
+        if (scope->isCancelled())
+          cancelledScope = scope;
+    }
     if ((group && group->isCancelled()) ||
         parentStatus.isCancelledIgnoringShield() ||
         cancelledScope) {
       size_t reason = parentStatus.isCancelledIgnoringShield()
-                          ? swift_task_getCancellationReason(parent)
+                          ? parentStatus.getCancellationReason()
                           : (cancelledScope ? cancelledScope->getReason() : 0);
       swift_task_cancelWithFlags(task, reason);
     }
@@ -1834,19 +1837,25 @@ bool swift::swift_task_isCancelledWithFlags(AsyncTask *task,
   return task->isCancelled(ignoreCancellationShield);
 }
 
-size_t swift::swift_task_getCancellationReason(AsyncTask *task) {
+size_t swift::swift_task_getIsCancelledWithReason(AsyncTask *task) {
+  // The return value must encode the isCancelled and reason into one word.
+  // See Concurrency.h for more details.
+  constexpr size_t isCancelledBit = 1u;
   auto status = task->_private()._status().load(std::memory_order_relaxed);
-  // Whole-task cancel wins: the reason bit was set at cancel time and
-  // dominates any per-scope reason.
-  if (status.isCancelledIgnoringShield())
-    return status.getCancellationReason();
-  // Otherwise the innermost cancelled scope (if any) supplies the reason,
-  // e.g. `.deadlineExpired` from a `withDeadline` timer firing.
-  if (status.hasTaskCancellationScope()) {
-    if (auto *scope = _swift_task_getCancellationScope(task))
-      return scope->getReason();
+  if (!status.isCancelledIgnoringShield()) {
+    // Even when the whole task isn't cancelled, an enclosing cancellation
+    // scope might be. Look up the innermost visible scope; if
+    // it's actually cancelled, report that scope's reason.
+    if (status.hasTaskCancellationScope()) {
+      if (auto *scope = _swift_task_getCancellationScope(task)) {
+        if (scope->isCancelled())
+          return isCancelledBit | (scope->getReason() << 1);
+      }
+    }
+    return 0;
   }
-  return 0;
+  // Whole-task was cancelled
+  return isCancelledBit | (status.getCancellationReason() << 1);
 }
 
 /// Shared logic for `swift_task_addCancellationHandlerImpl` and
@@ -1884,7 +1893,7 @@ addCancellationHandlerCommon(FunctionPtrType handler, void *context,
   });
 
   // A scope cancellation doesn't set the task's IsCancelled bit; check the
-  // scope walker so we fire the handler immediately if we're installing
+  // scope search so we fire the handler immediately if we're installing
   // inside an already-cancelled scope (e.g. `withDeadline` past deadline).
   if (!fireHandlerNow && task) {
     auto status = task->_private()._status().load(std::memory_order_relaxed);
