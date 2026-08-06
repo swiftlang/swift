@@ -13,18 +13,17 @@ public func foobar(i: Int) {
 
 // CHECK: define {{.*}}@"$e4main6foobar1iySi_tF"{{.*}} {
 // CHECK: entry:
-// CHECK:   switch i64 %0, label %3 [
-// CHECK:     i64 1, label %1
-// CHECK:     i64 2, label %2
+// CHECK:   switch i64 %0, label %{{[0-9]+}} [
+// CHECK:     i64 1, label %[[ONE:[0-9]+]]
+// CHECK:     i64 2, label %[[TWO:[0-9]+]]
 // CHECK:   ]
-// CHECK: 1:
+// CHECK:   ret void
+// CHECK: [[ONE]]:
 // CHECK:   tail call void @llvm.trap() [[NOMERGE:#[0-9]+]]
 // CHECK:   unreachable
-// CHECK: 2:
+// CHECK: [[TWO]]:
 // CHECK:   tail call void @llvm.trap() [[NOMERGE]]
 // CHECK:   unreachable
-// CHECK: 3:
-// CHECK:   ret void
 // CHECK: }
 // CHECK: attributes [[NOMERGE]] = {{{.*}}nomerge{{.*}}}
 
