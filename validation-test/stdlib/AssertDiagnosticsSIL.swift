@@ -1,10 +1,7 @@
 // RUN: %target-swift-frontend %s -emit-sil -verify
 
-// assertionFailure() is now @_transparent (previously @inlinable), so the
-// compiler can see that it never returns, eliminating the "missing return" error.
-func assertionFailure_isNoreturn() -> Int {
-  _ = 0
+func assertionFailure_isNotNoreturn() -> Int {
+  _ = 0 // Don't implicitly return the assertionFailure call.
   assertionFailure("")
-  // No error expected - assertionFailure() is recognized as Never-returning
-}
+} // expected-error {{missing return in global function expected to return 'Int'}}
 
