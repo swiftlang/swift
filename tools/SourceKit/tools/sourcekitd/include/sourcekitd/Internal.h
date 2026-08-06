@@ -17,6 +17,7 @@
 #include "sourcekitd/plugin.h"
 #include "sourcekitd/sourcekitd.h"
 #include "llvm/ADT/STLExtras.h"
+#include <cstring>
 #include <functional>
 #include <optional>
 #include <string>
