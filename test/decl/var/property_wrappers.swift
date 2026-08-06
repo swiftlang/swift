@@ -652,6 +652,15 @@ struct UseBox {
   var x = 17 // expected-note{{'_x' declared here}}
 }
 
+struct UseBoxOutOfLineInit {
+  @Box
+  var x: Int
+
+  init(x: Int) {
+    self.x = x
+  }
+}
+
 func testBox(ub: UseBox) {
   _ = ub.x
   ub.x = 5 // expected-error{{cannot assign to property: 'x' is a get-only property}}
