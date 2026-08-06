@@ -1219,6 +1219,8 @@ extension Unsafe${Mutable}RawBufferPointer {
   ///
   /// - Parameter bounds: A valid range of byte offsets within this buffer.
   /// - Returns: A new buffer pointer over the bytes at `bounds`.
+  ///
+  /// - Complexity: O(1)
   @export(implementation)
   @safe
   public func extracting(_ bounds: Range<Int>) -> Self {
@@ -1239,6 +1241,8 @@ extension Unsafe${Mutable}RawBufferPointer {
   ///
   /// - Parameter bounds: A valid range of byte offsets within this buffer.
   /// - Returns: A new buffer pointer over the bytes at `bounds`.
+  ///
+  /// - Complexity: O(1)
   @export(implementation)
   @safe
   public func extracting(_ bounds: some RangeExpression<Int>) -> Self {
@@ -1248,6 +1252,8 @@ extension Unsafe${Mutable}RawBufferPointer {
   /// Extracts and returns a copy of the entire buffer.
   ///
   /// - Returns: The same buffer as `self`.
+  ///
+  /// - Complexity: O(1)
   @export(implementation)
   @safe
   public func extracting(_ bounds: UnboundedRange) -> Self {
@@ -1265,6 +1271,8 @@ extension Unsafe${Mutable}RawBufferPointer {
   ///
   /// - Parameter bounds: A valid range of byte offsets within this buffer.
   /// - Returns: A new buffer pointer over the bytes at `bounds`.
+  ///
+  /// - Complexity: O(1)
   @export(implementation)
   public func extracting(unchecked bounds: Range<Int>) -> Self {
     let newStart = unsafe baseAddress?.advanced(by: bounds.lowerBound)
@@ -1282,6 +1290,8 @@ extension Unsafe${Mutable}RawBufferPointer {
   ///
   /// - Parameter bounds: A valid range of byte offsets within this buffer.
   /// - Returns: A new buffer pointer over the bytes at `bounds`.
+  ///
+  /// - Complexity: O(1)
   @export(implementation)
   public func extracting(unchecked bounds: ClosedRange<Int>) -> Self {
     let range = unsafe Range(
@@ -1299,6 +1309,8 @@ extension Unsafe${Mutable}RawBufferPointer {
   /// - Parameter maxLength: The maximum number of bytes to return.
   ///   `maxLength` must be greater than or equal to zero.
   /// - Returns: A buffer pointer with at most `maxLength` bytes.
+  ///
+  /// - Complexity: O(1)
   @export(implementation)
   @safe
   public func extracting(first maxLength: Int) -> Self {
@@ -1316,6 +1328,8 @@ extension Unsafe${Mutable}RawBufferPointer {
   ///   `k` must be greater than or equal to zero.
   /// - Returns: A buffer pointer leaving off the specified number of trailing
   ///   bytes.
+  ///
+  /// - Complexity: O(1)
   @export(implementation)
   @safe
   public func extracting(droppingLast k: Int) -> Self {
@@ -1334,6 +1348,8 @@ extension Unsafe${Mutable}RawBufferPointer {
   /// - Parameter maxLength: The maximum number of bytes to return.
   ///   `maxLength` must be greater than or equal to zero.
   /// - Returns: A buffer pointer with at most `maxLength` bytes.
+  ///
+  /// - Complexity: O(1)
   @export(implementation)
   @safe
   public func extracting(last maxLength: Int) -> Self {
@@ -1351,6 +1367,8 @@ extension Unsafe${Mutable}RawBufferPointer {
   /// - Parameter k: The number of bytes to drop from the beginning of the
   ///   buffer. `k` must be greater than or equal to zero.
   /// - Returns: A buffer pointer starting after the specified number of bytes.
+  ///
+  /// - Complexity: O(1)
   @export(implementation)
   @safe
   public func extracting(droppingFirst k: Int) -> Self {

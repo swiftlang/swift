@@ -515,6 +515,8 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   ///
   /// - Parameter bounds: A valid range of indices within this buffer.
   /// - Returns: A new buffer pointer over the items at `bounds`.
+  ///
+  /// - Complexity: O(1)
   @export(implementation)
   @safe
   public func extracting(_ bounds: Range<Int>) -> Self {
@@ -553,6 +555,8 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   ///
   /// - Parameter bounds: A valid range of indices within this buffer.
   /// - Returns: A new buffer pointer over the items at `bounds`.
+  ///
+  /// - Complexity: O(1)
   @export(implementation)
   @safe
   public func extracting(_ bounds: some RangeExpression<Int>) -> Self {
@@ -573,6 +577,8 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   /// even if `Element` happens to be noncopyable.
   ///
   /// - Returns: The same buffer as `self`.
+  ///
+  /// - Complexity: O(1)
   @export(implementation)
   @safe
   public func extracting(_ bounds: UnboundedRange) -> Self {
@@ -590,6 +596,8 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   ///
   /// - Parameter bounds: A valid range of indices within this buffer.
   /// - Returns: A new buffer pointer over the items at `bounds`.
+  ///
+  /// - Complexity: O(1)
   @export(implementation)
   public func extracting(unchecked bounds: Range<Int>) -> Self {
     let newStart = unsafe _position?.advanced(by: bounds.lowerBound)
@@ -607,6 +615,8 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   ///
   /// - Parameter bounds: A valid range of indices within this buffer.
   /// - Returns: A new buffer pointer over the items at `bounds`.
+  ///
+  /// - Complexity: O(1)
   @export(implementation)
   public func extracting(unchecked bounds: ClosedRange<Int>) -> Self {
     let range = unsafe Range(
@@ -624,6 +634,8 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   /// - Parameter maxLength: The maximum number of elements to return.
   ///   `maxLength` must be greater than or equal to zero.
   /// - Returns: A buffer pointer with at most `maxLength` elements.
+  ///
+  /// - Complexity: O(1)
   @export(implementation)
   @safe
   public func extracting(first maxLength: Int) -> Self {
@@ -642,6 +654,8 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   ///   `k` must be greater than or equal to zero.
   /// - Returns: A buffer pointer leaving off the specified number of trailing
   ///   elements.
+  ///
+  /// - Complexity: O(1)
   @export(implementation)
   @safe
   public func extracting(droppingLast k: Int) -> Self {
@@ -659,6 +673,8 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   /// - Parameter maxLength: The maximum number of elements to return.
   ///   `maxLength` must be greater than or equal to zero.
   /// - Returns: A buffer pointer with at most `maxLength` elements.
+  ///
+  /// - Complexity: O(1)
   @export(implementation)
   @safe
   public func extracting(last maxLength: Int) -> Self {
@@ -678,6 +694,8 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   ///   buffer. `k` must be greater than or equal to zero.
   /// - Returns: A buffer pointer starting after the specified number of
   ///   elements.
+  ///
+  /// - Complexity: O(1)
   @export(implementation)
   @safe
   public func extracting(droppingFirst k: Int) -> Self {
