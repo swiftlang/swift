@@ -988,6 +988,31 @@ ConformanceLookupTable::getConformance(NominalTypeDecl *nominal,
       inheritedTypeRepr = entry->Source.getInheritedTypeRepr();
     }
 
+    // If this is a Sendable conformance on a class whose superclass is
+    // already Sendable, form an inherited conformance instead of a
+    // normal one. The superclass's implicit Sendable (e.g. from
+    // @MainActor isolation) may not have been in the conformance table
+    // when inherited conformances were collected, so the table may only
+    // have an Implied or Explicit entry. Fixing up here keeps
+    // isa<InheritedProtocolConformance> correct for downstream
+    // diagnostics regardless of entry kind.
+    if (protocol->isSpecificProtocol(KnownProtocolKind::Sendable)) {
+      if (auto *classDecl = dyn_cast<ClassDecl>(nominal)) {
+        if (auto *superclassDecl = classDecl->getSuperclassDecl()) {
+          Type superclassTy = type->getSuperclassForDecl(superclassDecl);
+          if (superclassTy) {
+            auto superConf = swift::lookupConformance(
+                superclassTy, protocol, /*allowMissing=*/false);
+            if (superConf.isConcrete()) {
+              entry->Conformance = ctx.getInheritedConformance(
+                  type, superConf.getConcrete());
+              return cast<ProtocolConformance *>(entry->Conformance);
+            }
+          }
+        }
+      }
+    }
+
     // Create or find the normal conformance.
     auto normalConf = ctx.getNormalConformance(
         conformingType, protocol, conformanceLoc, inheritedTypeRepr,
