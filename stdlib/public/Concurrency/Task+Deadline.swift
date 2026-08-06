@@ -334,16 +334,6 @@ extension Task where Success == Never, Failure == Never {
 /// The runtime pointer-equality checks `record->ClockType == C-metadata`
 /// before calling this bridge, so `recordClockStorage` is guaranteed to
 /// hold a valid `C`.
-///
-/// C++-side ABI signature (see TaskStatus.cpp):
-///
-///     extern "C" SWIFT_CC(swift)
-///     bool _task_deadline_recordHasSameClock(
-///         OpaqueValue *recordClockStorage,
-///         OpaqueValue *queryClock,
-///         const Metadata *clockType,
-///         const WitnessTable *clockWT,
-///         const WitnessTable *identifiableWT);
 @available(StdlibDeploymentTarget 6.5, *)
 @_silgen_name("_task_deadline_recordHasSameClock")
 internal func _task_deadline_recordHasSameClock<C: Clock & Identifiable>(
@@ -358,45 +348,20 @@ internal func _task_deadline_recordHasSameClock<C: Clock & Identifiable>(
   return stored.id == queryClock.id
 }
 
-/// Query the innermost active deadline installed on the current task for
+/// Find the innermost active deadline installed on the current task for
 /// the given clock, or nil if none.
-///
-/// Intended for the `withDeadline` fast-path and internal tests /
-/// diagnostics. Exposed as `@_spi(Concurrency)` so runtime tests can
-/// query the active deadline; not part of the general public API.
 @_spi(Concurrency)
+@export(implementation)
 @available(StdlibDeploymentTarget 6.5, *)
 public func _findNearestDeadline<C: Clock & Identifiable>(clock: C) -> C.Instant? {
-  // Swift's generic ABI passes (clock, C-metadata, Clock WT, Identifiable WT)
-  // into the C++ runtime symbol; the WTs reach the Swift bridge
-  // `_task_deadline_recordHasSameClock` so it can compare `.id`s.
-  //
-  // Returns a pointer into the matched record's tail storage aligned at
-  // `C.Instant`, or null. The record's copy stays live until the matching
-  // `swift_task_popDeadline` runs `vw_destroy` on it.
   guard let matched =
       unsafe _swift_task_findNearestDeadlineForClock(queryClock: clock) else {
     return nil
   }
 
-  // `.pointee` loads-with-copy through the record's storage, producing an
-  // owned +1 `C.Instant` for the caller (for class-typed Instants this
-  // bumps the refcount). The record continues to own its copy.
-  return unsafe matched.pointee
+  return unsafe matched.pointee // will retain or copy if necessary, record retains its copy
 }
 
-/// Runtime shim declared purely for Swift's generic ABI: the compiler
-/// synthesizes the (value, metadata, Clock WT, Identifiable WT) argument
-/// tuple and calls straight into the C++ runtime symbol.
-///
-/// C++-side signature (see Runtime/Concurrency.h and TaskStatus.cpp):
-///
-///     OpaqueValue *
-///     swift_task_findNearestDeadlineForClock(
-///         OpaqueValue *queryClock,
-///         const Metadata *clockType,
-///         const WitnessTable *clockWT,
-///         const WitnessTable *identifiableWT);
 @available(StdlibDeploymentTarget 6.5, *)
 @_silgen_name("swift_task_findNearestDeadlineForClock")
 internal func _swift_task_findNearestDeadlineForClock<C: Clock & Identifiable>(
