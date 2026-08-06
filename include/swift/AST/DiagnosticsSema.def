@@ -136,6 +136,10 @@ ERROR(expected_result_in_contextual_member,none,
 ERROR(unexpected_arguments_in_enum_case,none,
       "enum case %base0 has no associated values", (const ValueDecl *))
 
+ERROR(static_can_only_be_used_on_type_not_instance,none,
+      "static member %0 can only be used on the type %1, not on the instance %2",
+      (DeclNameRef, Type, StringRef))
+
 ERROR(could_not_use_type_member_on_instance,none,
       "static member %1 cannot be used on instance of type %0",
       (Type, DeclNameRef))

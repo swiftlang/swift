@@ -374,7 +374,7 @@ enum EnumWithStaticMember {
   static let staticVar = EmptyStruct()
 
   func foo() {
-    let _ = staticVar // expected-error {{static member 'staticVar' cannot be used on instance of type 'EnumWithStaticMember'}}
+    let _ = staticVar // expected-error {{static member 'staticVar' can only be used on the type 'EnumWithStaticMember', not on the instance self}}
   }
 }
 

@@ -95,7 +95,7 @@ extension S.A.B {
   private static let x: Int = 5
     
   func f() -> Int {
-    return x  // expected-error {{static member 'x' cannot be used on instance of type 'S.A.B'}} {{12-12=S.A.B.}}
+    return x  // expected-error {{static member 'x' can only be used on the type 'S.A.B', not on the instance self}} {{12-12=S.A.B.}}
   }
 }
 
@@ -106,7 +106,7 @@ extension P {
   static func f() {}
 
   func g() {
-    f() // expected-error {{static member 'f' cannot be used on instance of type 'Self'}} {{5-5=Self.}}
+    f() // expected-error {{static member 'f' can only be used on the type 'Self', not on the instance self}} {{5-5=Self.}}
   }
 }
 

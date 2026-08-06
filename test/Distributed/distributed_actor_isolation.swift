@@ -170,7 +170,7 @@ func test_outside(
   _ = distributed.actorSystem
 
   // ==== static functions
-  _ = distributed.staticFunc() // expected-error{{static member 'staticFunc' cannot be used on instance of type 'DistributedActor_1'}}
+  _ = distributed.staticFunc() // expected-error{{static member 'staticFunc' can only be used on the type 'DistributedActor_1', not on the instance distribute}}
   _ = DistributedActor_1.staticFunc()
 
   // ==== non-distributed functions
