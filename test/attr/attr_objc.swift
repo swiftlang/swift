@@ -159,8 +159,8 @@ class subject_staticVar1 {
   class var staticVar2: Int { return 42 }
 }
 
-@objc // bad-access-note-move{{subject_freeFunc()}} expected-error {{'@objc' can only be used with members of classes, '@objc' protocols, and concrete extensions of classes}} {{1-7=}}
-func subject_freeFunc() {
+@objc // access-note-move{{subject_freeFunc()}}
+func subject_freeFunc() { // A top-level @objc function is valid (SE-0495).
   @objc // expected-error {{'@objc' can only be used with members of classes, '@objc' protocols, and concrete extensions of classes}} {{3-9=}}
   var subject_localVar: Int
   // expected-warning@-1 {{variable 'subject_localVar' was never used; consider replacing with '_' or removing it}}
@@ -170,8 +170,8 @@ func subject_freeFunc() {
   }
 }
 
-@objc // bad-access-note-move{{subject_genericFunc(t:)}} expected-error {{'@objc' can only be used with members of classes, '@objc' protocols, and concrete extensions of classes}} {{1-7=}}
-func subject_genericFunc<T>(t: T) {
+@objc // expected-error@+1 {{global function cannot be marked '@objc' because it has generic parameters}}
+func subject_genericFunc<T>(t: T) { // A top-level @objc function cannot be generic.
   @objc // expected-error {{'@objc' can only be used with members of classes, '@objc' protocols, and concrete extensions of classes}} {{3-9=}}
   var subject_localVar: Int
   // expected-warning@-1 {{variable 'subject_localVar' was never used; consider replacing with '_' or removing it}}
