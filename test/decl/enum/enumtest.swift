@@ -302,7 +302,7 @@ func testSimpleEnum() {
 // https://github.com/apple/swift/issues/43127
 enum E_43127: String {
     case Thing = "thing"
-    case Bob = {"test"} // expected-error {{raw value for enum case must be a literal}}
+    case Bob = {"test"} // expected-error {{function produces expected type 'String'; did you mean to call it with '()'?}} expected-error {{raw value for enum case must be a literal}}
 }
 
 

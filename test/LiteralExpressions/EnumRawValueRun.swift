@@ -1,7 +1,6 @@
 // Enum case raw value expressions
-// REQUIRES: swift_feature_LiteralExpressions
 // REQUIRES: executable_test
-// RUN: %target-run-simple-swift(-enable-experimental-feature LiteralExpressions) | %FileCheck %s --dump-input=always
+// RUN: %target-run-simple-swift | %FileCheck %s --dump-input=always
 
 // CHECK: 1
 // CHECK-NEXT: 2

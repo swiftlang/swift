@@ -1,6 +1,5 @@
 // Constant globals using @section initialized with literal expressions
-// REQUIRES: swift_feature_LiteralExpressions
-// RUN: %target-swift-frontend -typecheck -dump-ast %s -enable-experimental-feature LiteralExpressions -verify | %FileCheck %s
+// RUN: %target-swift-frontend -typecheck -dump-ast %s -verify | %FileCheck %s
 
 // Simple arithmetic operators on integers
 @section("mysection") let intBinaryArithOp1 = 1 + 1
