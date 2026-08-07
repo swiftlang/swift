@@ -35,7 +35,7 @@ function(emit_swift_interface target)
 
   if(SwiftCore_ENABLE_SOURCE_INFO)
     target_compile_options(${target} PRIVATE
-      "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-emit-module-source-info-path "$<SHELL_PATH:${module_directory}/${SwiftCore_MODULE_TRIPLE}.swiftsourceinfo>">")
+      "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-emit-module-source-info-path $<SHELL_PATH:${module_directory}/${SwiftCore_MODULE_TRIPLE}.swiftsourceinfo>>")
   else()
     target_compile_options(${target} PRIVATE
       "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-avoid-emit-module-source-info>")
