@@ -2958,7 +2958,10 @@ namespace {
     void visitConstructorDecl(ConstructorDecl *CD, Label label) {
       printCommonAFD(CD, "constructor_decl", label);
       printFlag(CD->isRequired(), "required", DeclModifierColor);
-      printFlag(getDumpString(CD->getInitKind()), DeclModifierColor);
+      if (auto initKind =
+              isTypeChecked() ? CD->getInitKind() : CD->getCachedInitKind()) {
+        printFlag(getDumpString(*initKind), DeclModifierColor);
+      }
       if (CD->isFailable())
         printField((CD->isImplicitlyUnwrappedOptional()
                          ? "ImplicitlyUnwrappedOptional"

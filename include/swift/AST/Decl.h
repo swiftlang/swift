@@ -9544,6 +9544,10 @@ public:
     return getAttrs().hasAttribute<RequiredAttr>();
   }
 
+  /// Retrieve the initializer kind if it has been computed, \c nullopt
+  /// otherwise. Should only be used by the ASTDumper.
+  std::optional<CtorInitializerKind> getCachedInitKind() const;
+
   /// Determine the kind of initializer this is.
   CtorInitializerKind getInitKind() const;
 
