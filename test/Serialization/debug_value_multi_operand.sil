@@ -1,0 +1,58 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-build-swift -Xfrontend -experimental-serialize-debug-info -Xfrontend -sil-verify-none -emit-module -module-name debug_multi -o %t/debug_multi.swiftmodule %s
+// RUN: %target-sil-opt -sil-verify-none -sil-print-types %t/debug_multi.swiftmodule | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+// CHECK-LABEL: sil [serialized] [canonical] @test_single_operand_transform :
+// CHECK: debug_value %0 : $Builtin.Int64, let, name "salvaged", transform {
+// CHECK:   bb0(%0 : $Builtin.Int64):
+// CHECK:     return %0 : $Builtin.Int64
+// CHECK:   }
+// CHECK: } // end sil function 'test_single_operand_transform'
+sil [serialized] @test_single_operand_transform : $@convention(thin) (Builtin.Int64) -> () {
+bb0(%0 : $Builtin.Int64):
+  debug_value %0 : $Builtin.Int64, let, name "salvaged", transform {
+  bb0(%a : $Builtin.Int64):
+    return %a : $Builtin.Int64
+  }
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [serialized] [canonical] @test_zero_operand_transform :
+// CHECK: debug_value (), let, name "const", transform {
+// CHECK:   bb0:
+// CHECK:     [[LIT:%[0-9]+]] = integer_literal $Builtin.Int64, 42
+// CHECK:     return [[LIT]] : $Builtin.Int64
+// CHECK:   }
+// CHECK: } // end sil function 'test_zero_operand_transform'
+sil [serialized] @test_zero_operand_transform : $@convention(thin) () -> () {
+bb0:
+  debug_value (), let, name "const", transform {
+  bb0:
+    %0 = integer_literal $Builtin.Int64, 42
+    return %0 : $Builtin.Int64
+  }
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [serialized] [canonical] @test_multi_operand :
+// CHECK: debug_value (%0 : $Builtin.Int64, %1 : $Builtin.Int32), let, name "combined", transform {
+// CHECK:   bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int32):
+// CHECK:     return %0 : $Builtin.Int64
+// CHECK:   }
+// CHECK: } // end sil function 'test_multi_operand'
+sil [serialized] @test_multi_operand : $@convention(thin) (Builtin.Int64, Builtin.Int32) -> () {
+bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int32):
+  debug_value (%0 : $Builtin.Int64, %1 : $Builtin.Int32), let, name "combined", transform {
+  bb0(%a : $Builtin.Int64, %b : $Builtin.Int32):
+    return %a : $Builtin.Int64
+  }
+  %r = tuple ()
+  return %r : $()
+}
