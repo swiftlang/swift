@@ -286,12 +286,26 @@ Explosion irgen::emitConstantValue(IRGenModule &IGM, SILValue operand,
     switch (IGM.getSILModule().getBuiltinInfo(BI->getName()).ID) {
       case BuiltinValueKind::ZeroInitializer: {
         auto &resultTI = cast<LoadableTypeInfo>(IGM.getTypeInfo(BI->getType()));
-        auto schema = resultTI.getSchema();
-        Explosion out;
-        for (auto &elt : schema) {
-          out.add(llvm::Constant::getNullValue(elt.getScalarType()));
+        if (flatten) {
+          // Flattened constants are consumed in schema shape (e.g. by
+          // emitValueInjection when building an enum payload), so emit the
+          // scalar leaves of the type's schema.
+          auto schema = resultTI.getSchema();
+          Explosion out;
+          for (auto &elt : schema) {
+            out.add(llvm::Constant::getNullValue(elt.getScalarType()));
+          }
+          return out;
         }
-        return out;
+        // Emit a zero of the full storage type rather than of the schema.
+        // The storage type contains any explicit padding fields the schema
+        // omits: internal padding in native Swift layouts, and internal or
+        // trailing padding in imported Clang records, whose storage types are
+        // rounded up to the full C size. When such a zero-initialized value is
+        // embedded as a field of a larger constant, using the schema would
+        // drop that padding and shift the following fields to the wrong
+        // offsets (https://github.com/swiftlang/swift/issues/90414).
+        return llvm::Constant::getNullValue(resultTI.getStorageType());
       }
       case BuiltinValueKind::PtrToInt: {
         auto *ptr = emitConstantValue(IGM, args[0]).claimNextConstant();
