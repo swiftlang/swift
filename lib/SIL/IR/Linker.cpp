@@ -315,7 +315,12 @@ void SILLinkerVisitor::visitProtocolConformance(
 
   // Otherwise try and lookup a witness table for C.
   ProtocolConformance *C = ref.getConcrete();
-  
+
+  // Builtin conformances are implemented directly by the compiler and have no
+  // SIL witness table to deserialise.
+  if (isa<BuiltinProtocolConformance>(C))
+    return;
+
   if (!VisitedConformances.insert(C).second)
     return;
 
