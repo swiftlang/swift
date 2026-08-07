@@ -290,6 +290,23 @@ extension ASTGenVisitor {
       return nil
     }
 
+    // An 'associatedtype' is only meaningful in a protocol, and the AST verifier
+    // enforces that. The C++ parser reports a bad placement and produces no
+    // decl at all, rather than one the verifier will reject.
+    guard self.declContext.isProtocolContext else {
+      self.diagnose(
+        .associatedtype_outside_protocol,
+        at: node.associatedtypeKeyword,
+        fixIts: [
+          .init(
+            replace: self.generateCharSourceRange(node.associatedtypeKeyword),
+            with: "typealias"
+          )
+        ]
+      )
+      return nil
+    }
+
     let decl = BridgedAssociatedTypeDecl.createParsed(
       self.ctx,
       declContext: self.declContext,

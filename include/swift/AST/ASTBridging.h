@@ -656,6 +656,10 @@ BridgedDeclContext_isModuleScopeContext(BridgedDeclContext dc);
 SWIFT_NAME("getter:BridgedDeclContext.allowsDestructorDecl(self:)")
 bool BridgedDeclContext_allowsDestructorDecl(BridgedDeclContext dc);
 
+/// Whether this context is a protocol, where an 'associatedtype' is allowed.
+SWIFT_NAME("getter:BridgedDeclContext.isProtocolContext(self:)")
+bool BridgedDeclContext_isProtocolContext(BridgedDeclContext dc);
+
 SWIFT_NAME("getter:BridgedDeclContext.isClosureExpr(self:)")
 BRIDGED_INLINE bool BridgedDeclContext_isClosureExpr(BridgedDeclContext dc);
 

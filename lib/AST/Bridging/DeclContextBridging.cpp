@@ -67,3 +67,7 @@ bool BridgedDeclContext_allowsDestructorDecl(BridgedDeclContext cDeclContext) {
     return ED->isObjCImplementation();
   return false;
 }
+
+bool BridgedDeclContext_isProtocolContext(BridgedDeclContext cDeclContext) {
+  return isa<ProtocolDecl>(cDeclContext.unbridged());
+}

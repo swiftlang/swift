@@ -84,3 +84,13 @@ precedencegroup RepeatedAttribute {
 // attribute, so building it hit "not a simple attribute".
 @nonexhaustive public enum Exhaustive { case a }
 @nonexhaustive(warn) public enum ExhaustiveWarn { case a }
+
+// An 'associatedtype' outside a protocol. The AST verifier rejects such a decl,
+// so the C++ parser reports the placement and produces none; ASTGen used to
+// build one anyway.
+associatedtype Stray = Int
+// expected-error@-1 {{associated types can only be defined in a protocol; define a type or introduce a 'typealias' to satisfy an associated type requirement}}
+
+protocol HasAssociatedType {
+  associatedtype Element
+}
