@@ -9,15 +9,14 @@
 
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
-// RUN: %target-swift-frontend -enable-experimental-feature Embedded -enable-experimental-feature EmbeddedKeyPaths -parse-as-library -wmo -O %t/Lib.swift -module-name Lib -emit-module -emit-module-path %t/Lib.swiftmodule -c -o %t/Lib.o
-// RUN: %target-swift-frontend -enable-experimental-feature Embedded -enable-experimental-feature EmbeddedKeyPaths -parse-as-library -wmo -O -I %t %t/main.swift -module-name main -c -o %t/main.o
+// RUN: %target-swift-frontend -enable-experimental-feature Embedded -parse-as-library -wmo -O %t/Lib.swift -module-name Lib -emit-module -emit-module-path %t/Lib.swiftmodule -c -o %t/Lib.o
+// RUN: %target-swift-frontend -enable-experimental-feature Embedded -parse-as-library -wmo -O -I %t %t/main.swift -module-name main -c -o %t/main.o
 // RUN: %target-embedded-link %t/Lib.o %t/main.o -o %t/a.out %target-clang-resource-dir-opt -dead_strip
 // RUN: %target-run %t/a.out | %FileCheck %s
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
 // REQUIRES: OS=macosx
 // REQUIRES: swift_feature_Embedded
-// REQUIRES: swift_feature_EmbeddedKeyPaths
 
 //--- Lib.swift
 public struct Box {

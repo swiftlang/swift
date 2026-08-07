@@ -1697,8 +1697,6 @@ computeStaticKeyPathComponentLayout(IRGenModule &IGM,
     }
     return layout;
   }
-  default:
-    llvm_unreachable("caller should have filtered other kinds");
   }
 }
 
