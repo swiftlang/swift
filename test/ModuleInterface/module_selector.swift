@@ -282,6 +282,27 @@ public protocol AssociatedType3Protocol {
   associatedtype AssociatedType4
 }
 
+// CHECK-LABEL: struct PriorityQueue
+public struct PriorityQueue<Element: Comparable> {
+  // CHECK-LABEL: struct Iterator
+  public struct Iterator: IteratorProtocol {
+    // CHECK: var _queue:
+    // CHECK-ENABLED-SAME: TestCase::PriorityQueue<Element>
+    // CHECK-DISABLED-SAME: TestCase.PriorityQueue<Element>
+    // CHECK-PRESERVE-SAME: PriorityQueue<Element>
+    // CHECK-ALIAS-SAME: Module___TestCase.PriorityQueue<Element>
+    public var _queue: PriorityQueue<Element>
+
+    public mutating func next() -> Element? {
+      return nil
+    }
+  }
+
+  public func makeIterator() -> Iterator {
+    return Iterator(_queue: self)
+  }
+}
+
 // DIAG-PRESERVE-OVERRIDDEN: warning: ignoring '-module-interface-preserve-types-as-written'; this option has been obsoleted by module selectors (add '-disable-module-selectors-in-module-interface' to restore original behavior)
 // DIAG-PRESERVE-NOT-OVERRIDDEN-NOT: warning: ignoring '-module-interface-preserve-types-as-written'; this option has been obsoleted by module selectors (add '-disable-module-selectors-in-module-interface' to restore original behavior)
 
