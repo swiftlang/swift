@@ -60,7 +60,7 @@ typedef double MyDouble; // expected-note {{type declared here}}
 void canReferenceHiddenDependency(MyPoint, MyDouble);
 void stillUnusableFromInlinable(); // expected-note {{global function 'stillUnusableFromInlinable()' is not '@usableFromInline' or public}}
 
-@interface ObjCImplClass: NSObject // expected-note {{class declared here}}
+@interface ObjCImplClass: NSObject
 @property MyPoint point;
 - (nonnull instancetype)initWithPoint:(MyPoint)point;
 - (void)method:(MyDouble)a;
@@ -75,7 +75,6 @@ void stillUnusableFromInlinable(); // expected-note {{global function 'stillUnus
 #else
   internal import Lib // expected-note {{type alias 'MyDouble' imported as 'internal' from 'Lib' here}}
   // expected-note @-1 {{global function 'stillUnusableFromInlinable()' imported as 'internal' from 'Lib' here}}
-  // expected-note @-2 {{class 'ObjCImplClass' imported as 'internal' from 'Lib' here}}
 #endif
 
 @c @implementation
@@ -85,7 +84,7 @@ public func canReferenceHiddenDependency(_ a: MyPoint, _ b: MyDouble) { }
 public func stillUnusableFromInlinable() { }
 
 @objc @implementation
-extension ObjCImplClass { // expected-error {{cannot use class 'ObjCImplClass' in an extension with public or '@usableFromInline' members; 'Lib' was not imported publicly}}
+extension ObjCImplClass {
   var point: MyPoint
 
   public init(point: MyPoint) {
