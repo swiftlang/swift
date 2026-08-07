@@ -87,17 +87,25 @@ extension ASTGenVisitor {
     }
 
     let size: Int
-    guard let parsed = Int(sizeToken.text, radix: 10) else {
-      fatalError("(compiler bug) invalid size integer literal for a layout constraint")
+    if let parsed = Int(sizeToken.text, radix: 10) {
+      size = parsed
+    } else {
+      // A missing or non-numeric size token is parser recovery output, e.g.
+      // `_Trivial(, 8)`. Diagnose and carry on with 0 so the constraint is still
+      // well-formed.
+      self.diagnose(.layout_size_should_be_positive, at: sizeToken)
+      size = 0
     }
-    size = parsed
 
     let alignment: Int?
     if let alignmentToken = node.alignment {
-      guard let parsed = Int(alignmentToken.text, radix: 10) else {
-        fatalError("(compiler bug) invalid alignment integer literal for a layout constraint")
+      if let parsed = Int(alignmentToken.text, radix: 10) {
+        alignment = parsed
+      } else {
+        // E.g. `_Trivial(64, )`: the alignment is missing or not a number.
+        self.diagnose(.layout_alignment_should_be_positive, at: alignmentToken)
+        alignment = nil
       }
-      alignment = parsed
     } else {
       alignment = nil
     }

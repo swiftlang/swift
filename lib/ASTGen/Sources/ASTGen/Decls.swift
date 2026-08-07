@@ -870,9 +870,11 @@ extension ASTGenVisitor {
     }
     decl.asDecl.attachParsedAttrs(attrs.attributes)
     
-    guard signature.returnType == nil else {
-      // TODO: Diagnose.
-      fatalError("unexpected return type in initializer decl")
+    if let returnClause = node.signature.returnClause {
+      // `init() -> T`. The result type is ignored -- an initializer's result is
+      // implicit -- but it has to be reported, or this is accepted where the C++
+      // parser rejects it.
+      self.diagnose(.initializer_result_type, at: returnClause.type)
     }
 
     if let body = node.body {

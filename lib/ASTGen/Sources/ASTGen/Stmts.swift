@@ -235,10 +235,45 @@ extension ASTGenVisitor {
               loc: loc
             ).asExpr
         } else {
-          // FIXME: Implement.
-          // For `if let foo.bar {`, diagnose and convert it to `if let _ =  foo.bar`
-          // For `if let (a, b) {`, diagnose it and create an error expression.
-          fatalError("unimplemented (optional binding recovery)")
+          // Not a valid unwrap condition, e.g. `if let foo.bar { }` or
+          // `if let (a, b) { }`.
+          self.diagnose(
+            .conditional_var_valid_identifiers_only,
+            at: node.pattern,
+            fixIts: [
+              .init(
+                replace: self.generateCharSourceRange(
+                  start: node.pattern.positionAfterSkippingLeadingTrivia,
+                  length: SourceLength(utf8Length: 0)
+                ),
+                with: "<#identifier#> = "
+              )
+            ]
+          )
+
+          if let exprPattern = node.pattern.as(ExpressionPatternSyntax.self) {
+            // Recover the way the C++ parser does: take the expression as the
+            // initializer and bind it to an implicit '_'.
+            //
+            // Unlike the C++ parser this keeps the BindingPattern wrapper rather
+            // than building an implicit OptionalSomePattern, which is not
+            // bridged. The verdict is the same either way; only the shape of the
+            // AST for already-invalid code differs.
+            initializer = self.generate(expr: exprPattern.expression)
+            pat = BridgedBindingPattern.createParsed(
+              self.ctx,
+              keywordLoc: keywordLoc,
+              isLet: isLet,
+              subPattern: BridgedAnyPattern.createImplicit(self.ctx).asPattern
+            ).asPattern
+            pat.setImplicit()
+          } else {
+            // Nothing usable to unwrap, e.g. a tuple pattern.
+            initializer = BridgedErrorExpr.create(
+              self.ctx,
+              loc: self.generateSourceRange(node.pattern)
+            ).asExpr
+          }
         }
       }
       return .createPatternBinding(
