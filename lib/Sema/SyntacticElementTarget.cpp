@@ -172,12 +172,11 @@ SyntacticElementTarget SyntacticElementTarget::forInitialization(
 
 SyntacticElementTarget SyntacticElementTarget::forReturn(ReturnStmt *returnStmt,
                                                          Expr *returnExpr,
-                                                         Type contextTy,
+                                                         ContextualTypeInfo context,
                                                          DeclContext *dc) {
-  assert(contextTy);
+  assert(context.getType());
   assert(returnStmt->hasResult() && "Must have result to be type-checked");
-  ContextualTypeInfo contextInfo(contextTy, CTP_ReturnStmt);
-  SyntacticElementTarget target(returnExpr, dc, contextInfo,
+  SyntacticElementTarget target(returnExpr, dc, context,
                                 /*isDiscarded*/ false);
   target.expression.parentReturnStmt = returnStmt;
   return target;

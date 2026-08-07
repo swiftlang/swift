@@ -1171,11 +1171,12 @@ public class TestRebindingSelfIsDisallowed {
     return s.isEmpty
 }.filter { $0 }
 
-["foo"].map { s in
-    if s == "1" { return } // expected-error{{cannot convert value of type '()' to closure result type 'Bool'}}
+// TODO(diagnostics): We need a tailored diagnostic for cases when multiple result types cannot be joined.
+["foo"].map { s in // expected-error {{cannot convert value of type '()' to closure result type 'Bool'}}
+    if s == "1" { return }
     if s == "2" { return }
     if s == "3" { return }
-    return s.isEmpty
+    return s.isEmpty // expected-error {{cannot convert value of type 'Bool' to closure result type '()'}}
 }.filter { $0 }
 
 ["foo"].map { s in
