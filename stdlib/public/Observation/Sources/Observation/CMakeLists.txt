@@ -83,6 +83,8 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB
 
   set(_embedded_observation_all_triples "${EMBEDDED_STDLIB_TARGET_TRIPLES}")
 
+  list(APPEND LLVM_OPTIONAL_SOURCES ThreadLocal.cpp)
+
   foreach(entry ${_embedded_observation_triples})
     string(REGEX REPLACE "[ \t]+" ";" list "${entry}")
     list(GET list 1 mod)
