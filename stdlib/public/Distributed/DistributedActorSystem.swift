@@ -331,9 +331,20 @@ public protocol DistributedActorSystem<SerializationRequirement>: Sendable {
   /// Implementations of this method must ensure that the `Argument` type parameter conforms
   /// to the types' `SerializationRequirement`.
   ///
+  /// ### Nonisolated nonsending witnesses
+  /// It is possible to witness this requirement using a `nonisolated(nonsending)` function.
+  /// Doing so will result much of the generated code supporting remote call to also adopt
+  /// `nonisolated(nonsending)` resulting in improved latency due to less actor isolation
+  /// changes on remote call paths.
+  ///
+  /// > Tip: When writing a new `DistributedActorSystem` it is recommended to witness the
+  /// >      `remoteCall` functions using `nonisolated(nonsending)` witnesses.
+  ///
   /// ## Errors
   /// This method is allowed to throw because of underlying transport or serialization errors,
   /// as well as by re-throwing the error received from the remote callee (if able to).
+  ///
+  /// - SeeAlso: ``remoteCallVoid(on:target:invocation:throwing:)``
   @available(SwiftStdlib 6.0, *)
   func remoteCall<Act, Err, Res>(
       on actor: Act,
@@ -354,9 +365,20 @@ public protocol DistributedActorSystem<SerializationRequirement>: Sendable {
   ///
   /// This method should perform the actual remote function call, and await for its response.
   ///
+  /// ### Nonisolated nonsending witnesses
+  /// It is possible to witness this requirement using a `nonisolated(nonsending)` function.
+  /// Doing so will result much of the generated code supporting remote call to also adopt
+  /// `nonisolated(nonsending)` resulting in improved latency due to less actor isolation
+  /// changes on remote call paths.
+  ///
+  /// > Tip: When writing a new `DistributedActorSystem` it is recommended to witness the
+  /// >      `remoteCall` functions using `nonisolated(nonsending)` witnesses.
+  ///
   /// ## Errors
   /// This method is allowed to throw because of underlying transport or serialization errors,
   /// as well as by re-throwing the error received from the remote callee (if able to).
+  ///
+  /// - SeeAlso: ``remoteCall(on:target:invocation:throwing:)``
   @available(SwiftStdlib 6.0, *)
   func remoteCallVoid<Act, Err>(
       on actor: Act,

@@ -1,6 +1,7 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -target %target-swift-5.7-abi-triple %S/Inputs/FakeDistributedActorSystems.swift
-// RUN: %target-swift-frontend -emit-irgen -module-name distributed_actor_accessors -target %target-swift-5.7-abi-triple -I %t 2>&1 %s | %IRGenFileCheck %s
+// RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -target %target-swift-6.0-abi-triple %S/Inputs/FakeDistributedActorSystems.swift
+// RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeNonsendingActorSystems.swiftmodule -module-name FakeNonsendingActorSystems -target %target-swift-6.0-abi-triple -I %t %S/Inputs/FakeNonsendingActorSystems.swift
+// RUN: %target-swift-frontend -emit-irgen -module-name distributed_actor_accessors -target %target-swift-6.0-abi-triple -I %t 2>&1 %s | %IRGenFileCheck %s
 
 // UNSUPPORTED: back_deploy_concurrency
 // REQUIRES: concurrency
@@ -12,6 +13,7 @@
 
 import Distributed
 import FakeDistributedActorSystems
+import FakeNonsendingActorSystems
 
 @available(SwiftStdlib 5.5, *)
 typealias DefaultDistributedActorSystem = FakeActorSystem
@@ -88,6 +90,13 @@ public distributed actor MyOtherActor {
   }
 }
 
+@available(SwiftStdlib 6.0, *)
+public distributed actor LessActor {
+  public typealias ActorSystem = FakeNonsendingActorSystem
+  distributed func simple1(_: Int) {
+  }
+}
+
 
 /// ---> Let's check that distributed accessors and thunks are emitted as accessible functions
 
@@ -139,6 +148,17 @@ public distributed actor MyOtherActor {
 // CHECK-SAME: (%swift.async_func_pointer* @"$s27distributed_actor_accessors12MyOtherActorC5emptyyyYaKFTETFTu" to i{{32|64}})
 // CHECK-SAME: , section ".sw5acfn$B", {{.*}}
 
+/// -> `LessActor.simple1`: nonisolated(nonsending) distributed => flag i32 3
+///    (Distributed = bit 0, NonisolatedNonsending = bit 1)
+// CHECK:      @"$s27distributed_actor_accessors9LessActorC7simple1yySiYaKFTEHF" = private constant
+// CHECK-SAME: (%swift.async_func_pointer* @"$s27distributed_actor_accessors9LessActorC7simple1yySiYaKFTETFTu" to i{{32|64}})
+// Check the recorg flags:
+//   Bit 0: isDistributed
+// + Bit 1: isNonisolatedNonsending
+// ======== Flag must be `3`:
+// CHECK-SAME: i32 3
+// CHECK-SAME: , section ".sw5acfn$B", {{.*}}
+
 // CHECK:      @llvm.used = appending global [{{.*}} x i8*] [
 // CHECK-SAME: @"$s27distributed_actor_accessors7MyActorC7simple1yySiYaKFTEHF"
 // CHECK-SAME: @"$s27distributed_actor_accessors7MyActorC7simple2ySSSiYaKFTEHF"
@@ -147,4 +167,5 @@ public distributed actor MyOtherActor {
 // CHECK-SAME: @"$s27distributed_actor_accessors7MyActorC19with_indirect_enumsyAA9IndirectEOAF_SitYaKFTEHF"
 // CHECK-SAME: @"$s27distributed_actor_accessors7MyActorC7complexyAA11LargeStructVSaySiG_AA3ObjCSSSgAFtYaKFTEHF"
 // CHECK-SAME: @"$s27distributed_actor_accessors12MyOtherActorC5emptyyyYaKFTEHF"
+// CHECK-SAME: @"$s27distributed_actor_accessors9LessActorC7simple1yySiYaKFTEHF"
 // CHECK-SAME: ], section "llvm.metadata"

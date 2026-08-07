@@ -5370,6 +5370,11 @@ public:
     return (callee.kind == Callee::Kind::EnumElement);
   }
 
+  /// Is this call dispatched through a distributed thunk?
+  bool callsDistributedThunk() const {
+    return callee.getMethodName().isDistributedThunk();
+  }
+
   /// Sets a flag that indicates whether this call be treated as being 
   /// implicitly async, i.e., it requires a hop_to_executor prior to 
   /// invoking the sync callee, etc.
@@ -6113,7 +6118,17 @@ CallEmission CallEmission::forApplyExpr(SILGenFunction &SGF, ApplyExpr *e) {
 
     // For an implicitly-async call, record the target of the actor hop.
     if (auto target = call->isImplicitlyAsync()) {
-      emission.setImplicitlyAsync(target);
+      // ... unless the call is dispatched through a distributed thunk.
+      //
+      // The thunk is 'nonisolated' or 'nonisolated(nonsending)' and decides for
+      // itself whether to hop. It only hops onto 'self' in its local branch,
+      // and its remote branch never executes on the target actor at all.
+      //
+      // For a nonisolated(nonsending) thunk, it would even be incorrect to hop here,
+      // as it defeats the no-hops guarantee the thunk aims to provide.
+      if (!emission.callsDistributedThunk()) {
+        emission.setImplicitlyAsync(target);
+      }
     } else {
       // If we are emitting a call to an `async` variant of an ObjC completion
       // handler API, we need to hop at the call site because there is no
@@ -7887,7 +7902,10 @@ RValue SILGenFunction::emitGetAccessor(
   CanAnyFunctionType accessType = getter.getSubstFormalType();
 
   CallEmission emission(*this, std::move(getter), std::move(writebackScope));
-  if (implicitActorHopTarget)
+  // A distributed thunk accessor performs its own hop onto 'self' on the local
+  // branch, so hopping to the target actor here would be redundant. See the
+  // matching comment in CallEmission::forApplyExpr
+  if (implicitActorHopTarget && !get.isDistributedThunk())
     emission.setImplicitlyAsync(implicitActorHopTarget);
 
   // Self ->

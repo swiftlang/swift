@@ -20,6 +20,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/AccessRequests.h"
 #include "swift/AST/AccessScope.h"
+#include "swift/AST/ActorIsolation.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
@@ -1529,6 +1530,17 @@ swift::getRemoteCallOnDistributedActorSystem(NominalTypeDecl *actorOrSystem,
                            GetDistributedActorSystemRemoteCallFunctionRequest{
                                mutableSystem, /*isVoidReturn=*/isVoidReturn},
                            nullptr);
+}
+
+bool swift::isDistributedActorSystemRemoteCallWitnessNonisolatedNonsending(
+    NominalTypeDecl *actorOrSystem, bool isVoidReturn) {
+  if (!actorOrSystem)
+    return false;
+  auto *witness =
+      getRemoteCallOnDistributedActorSystem(actorOrSystem, isVoidReturn);
+  if (!witness)
+    return false;
+  return getActorIsolation(witness).isNonisolatedNonsending();
 }
 
 /******************************************************************************/

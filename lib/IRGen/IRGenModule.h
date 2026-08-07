@@ -671,6 +671,12 @@ public:
 
   bool isDistributed() const { return IsDistributed; }
 
+  /// Whether the recorded function is 'nonisolated(nonsending)'.
+  bool isNonisolatedNonsending() const {
+    auto isolated = Type->maybeGetIsolatedParameter();
+    return isolated && isolated->hasOption(SILParameterInfo::ImplicitLeading);
+  }
+
   CanSILFunctionType getType() const { return Type; }
 
   llvm::Constant *getAddress() const { return Address; }

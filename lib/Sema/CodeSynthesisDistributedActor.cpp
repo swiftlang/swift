@@ -592,6 +592,60 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
   return {body, /*isTypeChecked=*/false};
 }
 
+/// Look up the concrete `remoteCall` (or `remoteCallVoid`) witness for
+/// \p func's enclosing distributed actor and report whether the witness is
+/// declared `nonisolated(nonsending)`. Because the actor's `ActorSystem`
+/// is statically known here, the synthesized distributed thunk can mirror
+/// the witness's isolation and, when both are `nonisolated(nonsending)`,
+/// forward the caller's isolation straight into `system.remoteCall`
+/// without hopping off the caller
+static bool distributedThunkShouldBeNonisolatedNonsending(FuncDecl *func) {
+  auto *DC = func->getDeclContext();
+  auto *actorNominal = DC->getSelfNominalTypeDecl();
+  if (!actorNominal)
+    return false;
+
+  auto systemTy = getConcreteReplacementForProtocolActorSystemType(actorNominal);
+  if (!systemTy)
+    return false;
+
+  auto *systemNominal = systemTy->getNominalOrBoundGenericNominal();
+  if (!systemNominal)
+    return false;
+
+  bool isVoidReturn = false;
+  if (auto *accessor = dyn_cast<AccessorDecl>(func)) {
+    isVoidReturn = accessor->getStorage()
+                       ->getValueInterfaceType()
+                       ->isVoid();
+  } else {
+    isVoidReturn = func->getResultInterfaceType()->isVoid();
+  }
+
+  return isDistributedActorSystemRemoteCallWitnessNonisolatedNonsending(
+      systemNominal, isVoidReturn);
+}
+
+/// Attach the correct isolation attributes for a synthesized distributed thunk.
+///
+/// If the concrete system's `remoteCall` witness is `nonisolated(nonsending)`,
+/// emit the thunk as `nonisolated(nonsending)` so the caller's actor
+/// isolation is threaded into `system.remoteCall` without a hop.
+///
+/// Otherwise fall back to `nonisolated @concurrent`.
+static void addDistributedThunkIsolationAttributes(FuncDecl *thunk,
+                                                   FuncDecl *originalFunc) {
+  auto &C = thunk->getASTContext();
+
+  if (distributedThunkShouldBeNonisolatedNonsending(originalFunc)) {
+    thunk->addAttribute(
+        NonisolatedAttr::createImplicit(C, NonIsolatedModifier::NonSending));
+  } else {
+    thunk->addAttribute(NonisolatedAttr::createImplicit(C));
+    thunk->addAttribute(new (C) ConcurrentAttr(/*IsImplicit=*/true));
+  }
+}
+
 /// Create a new FuncDecl that has the same signature as the passed in func.
 /// This is used both to create stub witnesses as well as distributed thunks.
 ///
@@ -671,11 +725,7 @@ static FuncDecl *createSameSignatureDistributedThunkDecl(DeclContext *DC,
 
   thunk->setSynthesized(true);
   thunk->setDistributedThunk(true);
-  thunk->addAttribute(NonisolatedAttr::createImplicit(C));
-  // TODO(distributed): It would be nicer to make distributed thunks nonisolated(nonsending) instead;
-  //                    this way we would not hop off the caller when calling system.remoteCall;
-  //                    it'd need new ABI and the remoteCall also to become nonisolated(nonsending)
-  thunk->addAttribute(new (C) ConcurrentAttr(/*IsImplicit=*/true));
+  addDistributedThunkIsolationAttributes(thunk, func);
 
   return thunk;
 }
