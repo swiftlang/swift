@@ -49,6 +49,10 @@ void freeCxxFunction();
 
 using BuiltinIntTypealis = int;
 
+namespace NS {
+class CxxClassInNamespace {};
+}
+
 //--- test.swift
 
 import CxxModule
@@ -62,6 +66,9 @@ public func usesCxxSingletonReference() -> SingletonReference {
 }
 
 public func usesCxxStruct(_ x: CxxStruct) {
+}
+
+public func usesCxxClassInNamespace(_ x: NS.CxxClassInNamespace) {
 }
 
 public typealias EnumT = CxxEnum
