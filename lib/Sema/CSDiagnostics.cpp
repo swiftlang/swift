@@ -2317,7 +2317,7 @@ bool AssignmentFailure::diagnoseAsError() {
       }
       // If this is a simple variable marked with a 'let', emit a note to fixit
       // hint it to 'var'.
-      VD->emitLetToVarNoteIfSimple(DC);
+      VD->emitLetToVarNoteIfSimple(DC, Loc);
       return true;
     }
 

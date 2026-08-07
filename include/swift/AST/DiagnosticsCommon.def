@@ -112,6 +112,9 @@ ERROR(func_decl_no_body_expected,PointsToFirstBadToken,
 NOTE(convert_let_to_var,none,
      "change 'let' to 'var' to make it mutable", ())
 
+NOTE(add_var_shadow_to_param,none,
+     "add '%0' to make a mutable copy", (StringRef))
+
 NOTE(note_typo_candidate,none,
      "did you mean '%0'?", (StringRef))
 
