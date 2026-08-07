@@ -5792,12 +5792,14 @@ class DebugValueInst final
   using InstructionBaseWithTrailingOperands::numTrailingObjects;
   SIL_DEBUG_VAR_SUPPLEMENT_TRAILING_OBJS_IMPL()
 
+public:
   /// Removes the last operand, shrinking the tail allocated operand list.
   /// Only the last operand can be removed, to avoid invalidating other
   /// existing Operand pointers. Pointers to this last operand are invalidated.
+  /// This does not touch the debug reconstruction block: the caller has to erase
+  /// the matching block argument to keep the two in sync.
   void eraseLastOperand();
 
-public:
   /// Returns the single operand, asserting that there is exactly one.
   /// Should only be used in contexts where it is known that there is no
   /// debug reconstruction block.

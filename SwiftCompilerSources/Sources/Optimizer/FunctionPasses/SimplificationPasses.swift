@@ -30,8 +30,18 @@ protocol LateOnoneSimplifiable : Instruction {
   func simplifyLate(_ context: SimplifyContext)
 }
 
-/// Instructions whose `simplify()` is safe to run inside debug reconstruction blocks.
-protocol DebugReconstructionBlockSimplifiable : Simplifiable {}
+/// Instructions which can be simplified within a debug reconstruction block
+/// Some additional debug reconstruction specific simplifications, such as
+/// folding undef operands, are needed.
+protocol DebugReconstructionBlockSimplifiable : Instruction {
+  func simplifyForDebugReconstructionBlock(_ context: SimplifyContext)
+}
+
+extension DebugReconstructionBlockSimplifiable where Self: Simplifiable {
+  func simplifyForDebugReconstructionBlock(_ context: SimplifyContext) {
+    simplify(context)
+  }
+}
 
 //===--------------------------------------------------------------------===//
 //                        Simplification passes
@@ -168,35 +178,108 @@ private func runDebugReconstructionBlockSimplification(on function: Function, _ 
     worklist.pushIfNotVisited($0)
   })
 
-  // Collect all debug reconstruction blocks and push their instructions onto the worklist.
-  var debugBlocks: [BasicBlock] = []
-  for block in function.blocks {
-    for inst in block.instructions {
-      guard let debugValue = inst as? DebugValueInst,
-            let debugBB = debugValue.debugReconstructionBlock else {
+  for inst in function.instructions {
+    guard let debugValue = inst as? DebugValueInst,
+          let debugBB = debugValue.debugReconstructionBlock else {
+      continue
+    }
+    // Use a subpass for each debug_value (operand simplification) and for each instruction in the reconstruction block.
+    if !context.continueWithNextSubpassRun(for: debugValue) {
+      return
+    }
+
+    // Canonicalize the operand list first.
+    debugValue.mergeDuplicateOperands(context)
+    debugValue.propagateUndefOperands(context)
+
+    // Simplify the block's content.
+    for debugInst in debugBB.instructions.reversed() {
+      worklist.pushIfNotVisited(debugInst)
+    }
+    while let instruction = worklist.popAndForget() {
+      if instruction.isDeleted {
         continue
       }
-      debugBlocks.append(debugBB)
-      for debugInst in debugBB.instructions.reversed() {
-        worklist.pushIfNotVisited(debugInst)
+      if let simplifiable = instruction as? DebugReconstructionBlockSimplifiable {
+        if !context.continueWithNextSubpassRun(for: instruction) {
+          return
+        }
+        simplifiable.simplifyForDebugReconstructionBlock(simplifyCtxt)
+      }
+    }
+
+    // Cleanup dead instructions and operands.
+    for instruction in debugBB.instructions.reversed() where instruction.isTriviallyDead {
+      context.erase(instruction: instruction)
+    }
+    debugValue.eraseDeadOperands(context)
+    debugValue.collapseTrivialReconstruction(context)
+  }
+}
+
+private extension DebugValueInst {
+  /// Merges duplicate operands.
+  /// Duplicates are left dead to be cleaned up by `eraseDeadOperands`.
+  ///
+  /// ```
+  ///   debug_value (%0, %0), ..., transform { bb0(%a, %b): ... }
+  ///   -> debug_value %0, ..., transform { bb0(%a): ... }  // %b -> %a
+  /// ```
+  func mergeDuplicateOperands(_ context: FunctionPassContext) {
+    guard let debugBB = debugReconstructionBlock, operands.count > 1 else {
+      return
+    }
+    // Replace each operand with its first occurrence.
+    var firstArgument: [HashableValue: Argument] = [:]
+    for (argument, operand) in zip(debugBB.arguments, operands) {
+      if let original = firstArgument[operand.value.hashable] {
+        argument.uses.replaceAll(with: original, context)
+      } else {
+        firstArgument[operand.value.hashable] = argument
       }
     }
   }
 
-  // Core worklist loop.
-  while let instruction = worklist.popAndForget() {
-    if instruction.isDeleted { continue }
-    if let simplifiable = instruction as? DebugReconstructionBlockSimplifiable {
-      simplifiable.simplify(simplifyCtxt)
+  /// Propagate an undef operand to the debug reconstruction block content.
+  /// This allows more simplifications and folding to happen.
+  func propagateUndefOperands(_ context: FunctionPassContext) {
+    for index in operands.indices.reversed() where operands[index].value is Undef {
+      killOperand(index: index, context)
     }
   }
 
-  // Clean up trivially dead instructions in all debug BBs.
-  for debugBB in debugBlocks {
-    for inst in debugBB.instructions.reversed() {
-      if inst.isTriviallyDead {
-        context.erase(instruction: inst)
-      }
+  /// Drops all dead operands, to shorten the operand list.
+  func eraseDeadOperands(_ context: FunctionPassContext) {
+    guard let debugBB = debugReconstructionBlock else {
+      return
+    }
+    // Erase back to front, as erased operand will invalidate the next indices.
+    for index in operands.indices.reversed() where debugBB.arguments[index].uses.isEmpty {
+      eraseOperand(index: index, context)
+    }
+  }
+
+  /// Drops a reconstruction block which does nothing.
+  ///
+  /// ```
+  ///   debug_value %0, ..., transform { bb0(%a): return %a }  ->  debug_value %0
+  ///   debug_value (), ..., transform { bb0: return undef }   ->  debug_value undef
+  /// ```
+  func collapseTrivialReconstruction(_ context: FunctionPassContext) {
+    guard let debugBB = debugReconstructionBlock,
+          let returnInst = debugBB.terminator as? ReturnInst,
+          let debugVariable else {
+      return
+    }
+    if operands.count == 1, returnInst.returnedValue == debugBB.arguments[0] {
+      // Remove the no-op reconstruction block.
+      clearDebugReconstructionBlock(context)
+    } else if operands.isEmpty, let undef = returnInst.returnedValue as? Undef {
+      // This is just undef, no need for a reconstruction block.
+      // The operand list cannot grow back in place, so this needs a fresh instruction.
+      let builder = Builder(replacing: self, context)
+      builder.createDebugValue(value: undef, debugVariable: debugVariable)
+      context.erase(instruction: self)
     }
   }
 }

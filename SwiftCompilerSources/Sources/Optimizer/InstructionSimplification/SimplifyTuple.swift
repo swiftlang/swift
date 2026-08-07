@@ -54,6 +54,15 @@ extension TupleInst : OnoneSimplifiable {
   }
 }
 
+extension TupleInst : DebugReconstructionBlockSimplifiable {
+  /// Just folds an all-undef tuple to undef.
+  func simplifyForDebugReconstructionBlock(_ context: SimplifyContext) {
+    if !operands.isEmpty && operands.allSatisfy({ $0.value is Undef }) {
+      replaceWithUndef(context)
+    }
+  }
+}
+
 private func tryReplaceDestructConstructPair(destruct: MultipleValueInstruction & UnaryInstruction,
                                              construct: SingleValueInstruction,
                                              _ context: SimplifyContext) {

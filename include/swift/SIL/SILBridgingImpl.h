@@ -2158,6 +2158,9 @@ OptionalBridgedBasicBlock BridgedInstruction::DebugValue_getDebugReconstructionB
 BridgedBasicBlock BridgedInstruction::DebugValue_getOrCreateDebugReconstructionBlock() const {
   return {getAs<swift::DebugValueInst>()->getOrCreateDebugReconstructionBlock()};
 }
+void BridgedInstruction::DebugValue_clearDebugReconstructionBlock() const {
+  getAs<swift::DebugValueInst>()->setDebugReconstructionBlock(nullptr);
+}
 
 void BridgedInstruction::DebugValue_stripDeref(SwiftInt operandIdx) const {
   getAs<swift::DebugValueInst>()->stripDeref(operandIdx);
@@ -2167,6 +2170,9 @@ void BridgedInstruction::DebugValue_prependDeref(SwiftInt operandIdx) const {
 }
 void BridgedInstruction::DebugValue_killOperand(SwiftInt operandIdx, BridgedType operandType) const {
   getAs<swift::DebugValueInst>()->killOperand(operandIdx, operandType.unbridged());
+}
+void BridgedInstruction::DebugValue_eraseLastOperand() const {
+  getAs<swift::DebugValueInst>()->eraseLastOperand();
 }
 
 bool BridgedInstruction::AllocStack_hasVarInfo() const {
