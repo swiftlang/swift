@@ -18,23 +18,14 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/Edit.h"
-#include "swift/Basic/ParseableOutput.h"
 #include "swift/Basic/SourceManager.h"
-#include "swift/Frontend/AccumulatingDiagnosticConsumer.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/Frontend/SerializedDiagnosticConsumer.h"
 #include "swift/Migrator/FixitFilter.h"
 #include "llvm/Support/raw_ostream.h"
 
-#if __has_include(<unistd.h>)
-#include <unistd.h>
-#elif defined(_WIN32)
-#include <process.h>
-#endif
-
 using namespace swift;
-using namespace swift::parseable_output;
 
 class LLVM_LIBRARY_VISIBILITY DiagnosticHelper::Implementation {
   friend class DiagnosticHelper;
@@ -42,33 +33,19 @@ class LLVM_LIBRARY_VISIBILITY DiagnosticHelper::Implementation {
 public:
   Implementation(CompilerInstance &instance,
                  const CompilerInvocation &invocation,
-                 ArrayRef<const char *> args, llvm::raw_pwrite_stream &OS,
-                 bool useQuasiPID);
+                 llvm::raw_pwrite_stream &OS);
 
-  void beginMessage();
-  void endMessage(int retCode);
+  void initDiagnosticConsumers();
   void setSuppressOutput(bool suppressOutput);
 
   void diagnoseFatalError(const char *reason, bool shouldCrash);
 
 private:
-  ~Implementation() {
-    assert(!diagInProcess && "endMessage is not called after begin");
-  }
-
-  bool diagInProcess = false;
-  const int64_t OSPid;
-  const sys::TaskProcessInformation procInfo;
-
   CompilerInstance &instance;
   const CompilerInvocation &invocation;
-  ArrayRef<const char*> args;
-  llvm::raw_pwrite_stream &errOS;
 
   // potentially created diagnostic consumers.
   PrintingDiagnosticConsumer PDC;
-  llvm::StringMap<std::vector<std::string>> FileSpecificDiagnostics;
-  std::unique_ptr<DiagnosticConsumer> FileSpecificAccumulatingConsumer;
   std::unique_ptr<DiagnosticConsumer> SerializedConsumerDispatcher;
   std::unique_ptr<DiagnosticConsumer> FixItsConsumer;
 };
@@ -195,23 +172,6 @@ createSerializedDiagnosticConsumerIfNeeded(
       });
 }
 
-/// Creates a diagnostic consumer that accumulates all emitted diagnostics as
-/// compilation proceeds. The accumulated diagnostics are then emitted in the
-/// frontend's parseable-output.
-static std::unique_ptr<DiagnosticConsumer> createAccumulatingDiagnosticConsumer(
-    const FrontendInputsAndOutputs &InputsAndOutputs,
-    llvm::StringMap<std::vector<std::string>> &FileSpecificDiagnostics) {
-  return createDispatchingDiagnosticConsumerIfNeeded(
-      InputsAndOutputs,
-      [&](const InputFile &Input) -> std::unique_ptr<DiagnosticConsumer> {
-        FileSpecificDiagnostics.try_emplace(Input.getFileName(),
-                                            std::vector<std::string>());
-        auto &DiagBufferRef = FileSpecificDiagnostics[Input.getFileName()];
-        return std::make_unique<AccumulatingFileDiagnosticConsumer>(
-            DiagBufferRef);
-      });
-}
-
 /// Creates a diagnostic consumer that handles JSONFixIt diagnostics, based on
 /// the supplementary output paths specified in \p options.
 ///
@@ -232,132 +192,12 @@ createJSONFixItDiagnosticConsumerIfNeeded(
 
 DiagnosticHelper::Implementation::Implementation(
     CompilerInstance &instance, const CompilerInvocation &invocation,
-    ArrayRef<const char *> args, llvm::raw_pwrite_stream &OS, bool useQuasiPID)
-    : OSPid(useQuasiPID ? QUASI_PID_START : getpid()), procInfo(OSPid),
-      instance(instance), invocation(invocation), args(args), errOS(OS),
-      PDC(OS) {
+    llvm::raw_pwrite_stream &OS)
+    : instance(instance), invocation(invocation), PDC(OS) {
   instance.addDiagnosticConsumer(&PDC);
 }
 
-static const char *
-mapFrontendInvocationToAction(const CompilerInvocation &Invocation) {
-  FrontendOptions::ActionType ActionType =
-      Invocation.getFrontendOptions().RequestedAction;
-  switch (ActionType) {
-  case FrontendOptions::ActionType::REPL:
-    return "repl";
-  case FrontendOptions::ActionType::MergeModules:
-    return "merge-module";
-  case FrontendOptions::ActionType::Immediate:
-    return "interpret";
-  case FrontendOptions::ActionType::TypecheckModuleFromInterface:
-    return "verify-module-interface";
-  case FrontendOptions::ActionType::EmitPCH:
-    return "generate-pch";
-  case FrontendOptions::ActionType::EmitIR:
-  case FrontendOptions::ActionType::EmitBC:
-  case FrontendOptions::ActionType::EmitAssembly:
-  case FrontendOptions::ActionType::EmitObject:
-    // Whether or not these actions correspond to a "compile" job or a
-    // "backend" job, depends on the input kind.
-    if (Invocation.getFrontendOptions().InputsAndOutputs.shouldTreatAsLLVM())
-      return "backend";
-    else
-      return "compile";
-  case FrontendOptions::ActionType::EmitModuleOnly:
-    return "emit-module";
-  default:
-    return "compile";
-  }
-  // The following Driver/Parseable-output actions do not correspond to
-  // possible Frontend invocations:
-  // ModuleWrapJob, AutolinkExtractJob, GenerateDSYMJob, VerifyDebugInfoJob,
-  // StaticLinkJob, DynamicLinkJob
-}
-
-// TODO: Apply elsewhere in the compiler
-static swift::file_types::ID computeFileTypeForPath(const StringRef Path) {
-  if (!llvm::sys::path::has_extension(Path))
-    return swift::file_types::ID::TY_INVALID;
-
-  auto Extension = llvm::sys::path::extension(Path).str();
-  auto FileType = file_types::lookupTypeForExtension(Extension);
-  if (FileType == swift::file_types::ID::TY_INVALID) {
-    auto PathStem = llvm::sys::path::stem(Path);
-    // If this path has a multiple '.' extension (e.g. .abi.json),
-    // then iterate over all preceeding possible extension variants.
-    while (llvm::sys::path::has_extension(PathStem)) {
-      auto NextExtension = llvm::sys::path::extension(PathStem);
-      PathStem = llvm::sys::path::stem(PathStem);
-      Extension = NextExtension.str() + Extension;
-      FileType = file_types::lookupTypeForExtension(Extension);
-      if (FileType != swift::file_types::ID::TY_INVALID)
-        break;
-    }
-  }
-
-  return FileType;
-}
-
-static DetailedTaskDescription constructDetailedTaskDescription(
-    const CompilerInvocation &Invocation, ArrayRef<InputFile> PrimaryInputs,
-    ArrayRef<const char *> Args, bool isEmitModuleOnly = false) {
-  // Command line and arguments
-  std::string Executable = Invocation.getFrontendOptions().MainExecutablePath;
-  // If main executable path is never set, use `swift-frontend` as placeholder.
-  if (Executable.empty())
-    Executable = "swift-frontend";
-  SmallVector<std::string, 16> Arguments;
-  std::string CommandLine;
-  SmallVector<CommandInput, 4> Inputs;
-  SmallVector<OutputPair, 8> Outputs;
-  CommandLine += Executable;
-  for (const auto &A : Args) {
-    Arguments.push_back(A);
-    CommandLine += std::string(" ") + A;
-  }
-
-  // Primary Inputs
-  for (const auto &input : PrimaryInputs) {
-    Inputs.push_back(CommandInput(input.getFileName()));
-  }
-
-  for (const auto &input : PrimaryInputs) {
-    if (!isEmitModuleOnly) {
-      // Main per-input outputs
-      auto OutputFile = input.outputFilename();
-      if (!OutputFile.empty())
-        Outputs.push_back(
-            OutputPair(computeFileTypeForPath(OutputFile), OutputFile));
-    }
-
-    // Supplementary outputs
-    const auto &primarySpecificFiles = input.getPrimarySpecificPaths();
-    const auto &supplementaryOutputPaths =
-        primarySpecificFiles.SupplementaryOutputs;
-    supplementaryOutputPaths.forEachSetOutput([&](const std::string &output) {
-      Outputs.push_back(OutputPair(computeFileTypeForPath(output), output));
-    });
-  }
-  return DetailedTaskDescription{Executable, Arguments, CommandLine, Inputs,
-                                 Outputs};
-}
-
-void DiagnosticHelper::Implementation::beginMessage() {
-  if (invocation.getFrontendOptions().FrontendParseableOutput) {
-    // We need a diagnostic consumer that will, per-file, collect all
-    // diagnostics to be reported in parseable-output
-    FileSpecificAccumulatingConsumer = createAccumulatingDiagnosticConsumer(
-        invocation.getFrontendOptions().InputsAndOutputs,
-        FileSpecificDiagnostics);
-    instance.addDiagnosticConsumer(FileSpecificAccumulatingConsumer.get());
-
-    // If we got this far, we need to suppress the output of the
-    // PrintingDiagnosticConsumer to ensure that only the parseable-output
-    // is emitted
-    PDC.setSuppressOutput(true);
-  }
-
+void DiagnosticHelper::Implementation::initDiagnosticConsumers() {
   // Because the serialized diagnostics consumer is initialized here,
   // diagnostics emitted above, within CompilerInvocation::parseArgs, are never
   // serialized. This is a non-issue because, in nearly all cases, frontend
@@ -382,88 +222,6 @@ void DiagnosticHelper::Implementation::beginMessage() {
 
   PDC.setEmitMacroExpansionFiles(
       invocation.getDiagnosticOptions().EmitMacroExpansionFiles);
-
-  if (!invocation.getFrontendOptions().FrontendParseableOutput)
-    return;
-
-  diagInProcess = true;
-  const auto &IO = invocation.getFrontendOptions().InputsAndOutputs;
-  // Parseable output clients may not understand the idea of a batch
-  // compilation. We assign each primary in a batch job a quasi process id,
-  // making sure it cannot collide with a real PID (always positive). Non-batch
-  // compilation gets a real OS PID.
-  int64_t pid = IO.hasUniquePrimaryInput() ? OSPid : QUASI_PID_START;
-
-  if (IO.hasPrimaryInputs()) {
-    IO.forEachPrimaryInputWithIndex(
-        [&](const InputFile &Input, unsigned idx) -> bool {
-          ArrayRef<InputFile> Inputs(Input);
-          emitBeganMessage(
-              errOS, mapFrontendInvocationToAction(invocation),
-              constructDetailedTaskDescription(invocation, Inputs, args),
-              pid - idx, procInfo);
-          return false;
-        });
-  } else {
-    // If no primary inputs are present, we are in WMO or EmitModule.
-    bool isEmitModule = invocation.getFrontendOptions().RequestedAction ==
-                        FrontendOptions::ActionType::EmitModuleOnly;
-    emitBeganMessage(errOS, mapFrontendInvocationToAction(invocation),
-                     constructDetailedTaskDescription(
-                         invocation, IO.getAllInputs(), args, isEmitModule),
-                     OSPid, procInfo);
-  }
-}
-
-void DiagnosticHelper::Implementation::endMessage(int retCode) {
-  auto &invocation = instance.getInvocation();
-  if (!diagInProcess ||
-      !invocation.getFrontendOptions().FrontendParseableOutput)
-    return;
-
-  const auto &IO = invocation.getFrontendOptions().InputsAndOutputs;
-
-  // Parseable output clients may not understand the idea of a batch
-  // compilation. We assign each primary in a batch job a quasi process id,
-  // making sure it cannot collide with a real PID (always positive). Non-batch
-  // compilation gets a real OS PID.
-  int64_t pid = IO.hasUniquePrimaryInput() ? OSPid : QUASI_PID_START;
-
-  if (IO.hasPrimaryInputs()) {
-    IO.forEachPrimaryInputWithIndex([&](const InputFile &Input,
-                                        unsigned idx) -> bool {
-      assert(FileSpecificDiagnostics.count(Input.getFileName()) != 0 &&
-             "Expected diagnostic collection for input.");
-
-      // Join all diagnostics produced for this file into a single output.
-      auto PrimaryDiags = FileSpecificDiagnostics.lookup(Input.getFileName());
-      const char *const Delim = "";
-      std::ostringstream JoinedDiags;
-      std::copy(PrimaryDiags.begin(), PrimaryDiags.end(),
-                std::ostream_iterator<std::string>(JoinedDiags, Delim));
-
-      emitFinishedMessage(errOS,
-                          mapFrontendInvocationToAction(invocation),
-                          JoinedDiags.str(), retCode, pid - idx, procInfo);
-      return false;
-    });
-  } else {
-    // If no primary inputs are present, we are in WMO.
-    std::vector<std::string> AllDiagnostics;
-    for (const auto &FileDiagnostics : FileSpecificDiagnostics) {
-      AllDiagnostics.insert(AllDiagnostics.end(),
-                            FileDiagnostics.getValue().begin(),
-                            FileDiagnostics.getValue().end());
-    }
-    const char *const Delim = "";
-    std::ostringstream JoinedDiags;
-    std::copy(AllDiagnostics.begin(), AllDiagnostics.end(),
-              std::ostream_iterator<std::string>(JoinedDiags, Delim));
-    emitFinishedMessage(errOS, mapFrontendInvocationToAction(invocation),
-                        JoinedDiags.str(), retCode, OSPid, procInfo);
-  }
-
-  diagInProcess = false;
 }
 
 void DiagnosticHelper::Implementation::setSuppressOutput(bool suppressOutput) {
@@ -497,26 +255,20 @@ void DiagnosticHelper::Implementation::diagnoseFatalError(const char *reason,
 
 DiagnosticHelper DiagnosticHelper::create(CompilerInstance &instance,
                                           const CompilerInvocation &invocation,
-                                          ArrayRef<const char *> args,
-                                          llvm::raw_pwrite_stream &OS,
-                                          bool useQuasiPID) {
-  return DiagnosticHelper(instance, invocation, args, OS, useQuasiPID);
+                                          llvm::raw_pwrite_stream &OS) {
+  return DiagnosticHelper(instance, invocation, OS);
 }
 
 DiagnosticHelper::DiagnosticHelper(CompilerInstance &instance,
                                    const CompilerInvocation &invocation,
-                                   ArrayRef<const char *> args,
-                                   llvm::raw_pwrite_stream &OS,
-                                   bool useQuasiPID)
-    : Impl(*new Implementation(instance, invocation, args, OS, useQuasiPID)) {}
+                                   llvm::raw_pwrite_stream &OS)
+    : Impl(*new Implementation(instance, invocation, OS)) {}
 
 DiagnosticHelper::~DiagnosticHelper() { delete &Impl; }
 
-void DiagnosticHelper::beginMessage() {
-  Impl.beginMessage();
+void DiagnosticHelper::initDiagnosticConsumers() {
+  Impl.initDiagnosticConsumers();
 }
-
-void DiagnosticHelper::endMessage(int retCode) { Impl.endMessage(retCode); }
 
 void DiagnosticHelper::setSuppressOutput(bool suppressOutput) {
   Impl.setSuppressOutput(suppressOutput);

@@ -29,8 +29,6 @@
 
 namespace swift {
 
-class DiagnosticHelper;
-
 /// Create a swift caching output backend that stores the output from
 /// compiler into a CAS.
 llvm::IntrusiveRefCntPtr<cas::SwiftCASOutputBackend>
@@ -59,7 +57,6 @@ bool replayCachedCompilerOutputsForInput(llvm::cas::ObjectStore &CAS,
                                          const InputFile &Input,
                                          unsigned InputIndex,
                                          DiagnosticEngine &Diag,
-                                         DiagnosticHelper &DiagHelper,
                                          llvm::vfs::OutputBackend &OutBackend,
                                          const FrontendOptions &Opts,
                                          CachingDiagnosticsProcessor &CDP,

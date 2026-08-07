@@ -31,20 +31,15 @@ private:
 
 public:
   /// Create a DiagnosticHelper class to emit diagnostics from frontend actions.
-  /// OS is the stream to print diagnostics. useQuasiPID determines if using
-  /// real PID when priting parseable output.
+  /// OS is the stream to print diagnostics.
   static DiagnosticHelper create(CompilerInstance &instance,
                                  const CompilerInvocation &invocation,
-                                 ArrayRef<const char *> args,
-                                 llvm::raw_pwrite_stream &OS = llvm::errs(),
-                                 bool useQuasiPID = false);
+                                 llvm::raw_pwrite_stream &OS = llvm::errs());
 
-  /// Begin emitting the message, specifically the parseable output message.
-  void beginMessage();
-
-  /// End emitting all diagnostics. This has to be called if beginMessage() is
-  /// called.
-  void endMessage(int retCode);
+  /// Set up the diagnostic consumers that depend on supplementary output paths
+  /// (serialized diagnostics, JSON fix-its). Must be called once after the
+  /// CompilerInvocation has been parsed.
+  void initDiagnosticConsumers();
 
   /// Set if printing output should be suppressed.
   void setSuppressOutput(bool suppressOutput);
@@ -61,8 +56,7 @@ public:
 private:
   DiagnosticHelper(CompilerInstance &instance,
                    const CompilerInvocation &invocation,
-                   ArrayRef<const char *> args, llvm::raw_pwrite_stream &OS,
-                   bool useQuasiPID);
+                   llvm::raw_pwrite_stream &OS);
 };
 
 } // namespace swift

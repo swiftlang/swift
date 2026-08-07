@@ -46,22 +46,5 @@
 // CHECK-QUERY-NEXT: swiftmodule: llvmcas://
 // CHECK-QUERY-NEXT: cached-diagnostics: llvmcas://
 
-// RUN: %swift-scan-test -action replay_result -cas-path %t/cas -id @%t/key.casid -- \
-// RUN:   %target-swift-frontend-plain -cache-compile-job %s \
-// RUN:   -emit-module -emit-module-path %t/Test2.swiftmodule -c -emit-dependencies -module-name Test -o %t/test2.o -cas-path %t/cas \
-// RUN:   -frontend-parseable-output -serialize-diagnostics -serialize-diagnostics-path %t/test3.dia \
-// RUN:   @%t/MyApp.cmd 2>&1 | %FileCheck %s --check-prefix=PARSEABLE
-
-// RUN: diff %t/test.dia %t/test3.dia
-
-// PARSEABLE: {{[1-9][0-9]*}}
-// PARSEABLE-NEXT: {
-// PARSEABLE-NEXT:   "kind": "began",
-// PARSEABLE-NEXT:   "name": "compile",
-// PARSEABLE-NEXT:   "command": "swift-frontend
-
-// PARSEABLE:   "kind": "finished",
-// PARSEABLE-NEXT:   "name": "compile",
-
 
 #warning("This is a warning")
