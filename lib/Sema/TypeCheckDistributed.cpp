@@ -878,13 +878,11 @@ GetDistributedRemoteCallTargetInitFunctionRequest::evaluate(
 
     auto params = ctor->getParameters();
     if (params->size() != 1)
-      return nullptr;
+      continue;
 
     // _ identifier
     if (params->get(0)->getArgumentName().empty())
       return ctor;
-
-    return nullptr;
   }
 
   return nullptr;

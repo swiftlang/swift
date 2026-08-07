@@ -3625,6 +3625,15 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
+    case DeclAttrKind::RemoteCall: {
+      auto *theAttr = cast<RemoteCallAttr>(DA);
+      auto abbrCode = S.DeclTypeAbbrCodes[RemoteCallDeclAttrLayout::Code];
+      RemoteCallDeclAttrLayout::emitRecord(
+          S.Out, S.ScratchRecord, abbrCode,
+          static_cast<uint8_t>(theAttr->getMode()), theAttr->isImplicit());
+      return;
+    }
+
     case DeclAttrKind::Unsafe: {
       auto *theAttr = cast<UnsafeAttr>(DA);
       auto abbrCode = S.DeclTypeAbbrCodes[UnsafeDeclAttrLayout::Code];

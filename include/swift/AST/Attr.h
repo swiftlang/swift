@@ -152,6 +152,11 @@ enum : unsigned {
       static_cast<unsigned>(ExecutionSemantics::Last_ExecutionSemantics))
 };
 
+enum : unsigned {
+  NumRemoteCallModeBits = countBitsUsed(
+      static_cast<unsigned>(RemoteCallMode::Last_RemoteCallMode))
+};
+
 enum : unsigned { NumDeclAttrKindBits = countBitsUsed(NumDeclAttrKinds - 1) };
 
 enum : unsigned { NumTypeAttrKindBits = countBitsUsed(NumTypeAttrKinds - 1) };
@@ -305,6 +310,10 @@ protected:
 
     SWIFT_INLINE_BITFIELD(CalledAttr, DeclAttribute, NumExecutionSemanticsBits,
       Semantics : NumExecutionSemanticsBits
+    );
+
+    SWIFT_INLINE_BITFIELD(RemoteCallAttr, DeclAttribute, NumRemoteCallModeBits,
+      Mode : NumRemoteCallModeBits
     );
   } Bits;
   // clang-format on
@@ -3900,6 +3909,47 @@ public:
 
   bool isEquivalent(const CalledAttr *other, Decl *attachedTo) const {
     return getSemantics() == other->getSemantics();
+  }
+};
+
+/// Represents a '@remoteCall' attribute with any passed options.
+/// This attribute can only be used with 'distributed' declarations.
+class RemoteCallAttr : public DeclAttribute {
+public:
+  RemoteCallAttr(SourceLoc atLoc, SourceRange range, RemoteCallMode mode,
+                 bool implicit = false)
+      : DeclAttribute(DeclAttrKind::RemoteCall, atLoc, range, implicit) {
+    Bits.RemoteCallAttr.Mode = unsigned(mode);
+  }
+
+  RemoteCallAttr(RemoteCallMode mode)
+      : RemoteCallAttr(SourceLoc(), SourceRange(), mode) {}
+
+  RemoteCallMode getMode() const {
+    return RemoteCallMode(Bits.RemoteCallAttr.Mode);
+  }
+
+  bool isBlocking() const {
+    return getMode() == RemoteCallMode::SynchronousBlocking;
+  }
+
+  static RemoteCallAttr *
+  createImplicit(ASTContext &ctx,
+                 RemoteCallMode mode = RemoteCallMode::SynchronousBlocking) {
+    return new (ctx) RemoteCallAttr(/*atLoc*/ {}, /*range*/ {}, mode,
+                                    /*implicit=*/true);
+  }
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DeclAttrKind::RemoteCall;
+  }
+
+  RemoteCallAttr *clone(ASTContext &ctx) const {
+    return new (ctx) RemoteCallAttr(AtLoc, Range, getMode(), isImplicit());
+  }
+
+  bool isEquivalent(const RemoteCallAttr *other, Decl *attachedTo) const {
+    return getMode() == other->getMode();
   }
 };
 
