@@ -2,6 +2,7 @@ set(sources
   AssertionReporting.h
   CoreFoundationShims.h
   EmbeddedShims.h
+  FilePath.h
   FoundationShims.h
   GlobalObjects.h
   HeapObject.h
