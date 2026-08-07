@@ -628,13 +628,35 @@ extension DistributedActorSystem {
 public struct RemoteCallTarget: CustomStringConvertible, Hashable {
   private let _identifier: String
 
+  // Backing storage for 'isSynchronousBlockingCall'
+  private var _isSynchronousBlockingCall: Bool
+
   public init(_ identifier: String) {
     self._identifier = identifier
+    self._isSynchronousBlockingCall = false
   }
 
   /// The underlying identifier of the target, returned as-is.
   public var identifier: String {
     return _identifier
+  }
+
+  /// Whether the target was declared '@remoteCall(blocking)'.
+  ///
+  /// This is a runtime hint for the distributed actor system to prefer
+  /// a synchronous "blocking" method of performing the remote call.
+  /// For example, IPC systems may choose a synchronous form of IPC
+  /// over asynchronous communication if this hint is provided.
+  ///
+  /// It is _not_ recommended to use synchronous blocking calls unless
+  /// you are absolutely certain this is the right semantic for a call.
+  /// Synchronous calls block the calling thread rather than suspending the task
+  /// when the remote call is issued, and can yield to thread starvation problems
+  /// and similar issues unless used carefully.
+  @available(SwiftStdlib 6.5, *)
+  public var isSynchronousBlockingCall: Bool {
+    get { _isSynchronousBlockingCall }
+    set { _isSynchronousBlockingCall = newValue }
   }
 
   /// Attempts to pretty format the underlying target identifier.
@@ -645,6 +667,16 @@ public struct RemoteCallTarget: CustomStringConvertible, Hashable {
     } else {
       return "\(_identifier)"
     }
+  }
+
+  // A target's identity is its identifier;
+  // Flags do not participate in equality checks.
+  public static func ==(lhs: RemoteCallTarget, rhs: RemoteCallTarget) -> Bool {
+    lhs._identifier == rhs._identifier
+  }
+
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(_identifier)
   }
 }
 

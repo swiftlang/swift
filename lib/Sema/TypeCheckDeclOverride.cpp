@@ -1658,6 +1658,7 @@ namespace  {
     UNINTERESTING_ATTR(Override)
     UNINTERESTING_ATTR(RawDocComment)
     UNINTERESTING_ATTR(RawLayout)
+    UNINTERESTING_ATTR(RemoteCall)
     UNINTERESTING_ATTR(Required)
     UNINTERESTING_ATTR(Convenience)
     UNINTERESTING_ATTR(Semantics)

@@ -52,6 +52,7 @@ You use three main parts when writing code with distributed actors:
 ### Distributed actor system
 
 - <doc:implementing-a-custom-distributed-actor-system>
+- <doc:remote-call-semantics>
 - ``Distributed/DistributedActorSystem``
 - ``Distributed/RemoteCallTarget``
 - ``Distributed/RemoteCallArgument``

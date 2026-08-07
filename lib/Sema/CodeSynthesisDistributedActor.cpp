@@ -461,9 +461,21 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
   }
 
   // === Prepare the 'RemoteCallTarget'
-  VarDecl *targetVar = VarDeclBuilder(thunk, C.Id_target)
-                           .introducer(VarDecl::Introducer::Let)
-                           .type(remoteCallTargetTy);
+  // For a computed property the '@remoteCall' attribute is written on the
+  // storage 'var', not on the synthesized accessor, so look through to it.
+  const ValueDecl *remoteCallAttrDecl = func;
+  if (auto *accessor = dyn_cast<AccessorDecl>(func))
+    remoteCallAttrDecl = accessor->getStorage();
+  auto *remoteCallAttr = remoteCallAttrDecl->getDistributedRemoteCallAttr();
+  bool isBlocking = remoteCallAttr && remoteCallAttr->isBlocking();
+
+  // A '@remoteCall(blocking)' target needs to mutate the freshly constructed
+  // 'RemoteCallTarget', so it must be introduced as a 'var'.
+  VarDecl *targetVar =
+      VarDeclBuilder(thunk, C.Id_target)
+          .introducer(isBlocking ? VarDecl::Introducer::Var
+                                 : VarDecl::Introducer::Let)
+          .type(remoteCallTargetTy);
 
   {
     // --- Mangle the thunk name
@@ -474,7 +486,7 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
         new (C) StringLiteralExpr(mangledAccessorRecordName,
                                   SourceRange(), implicit);
 
-    // --- let target = RemoteCallTarget(<mangled name>)
+    // --- let/var target = RemoteCallTarget(<mangled name>)
     Pattern *targetPattern = NamedPattern::createImplicit(C, targetVar);
 
     auto remoteCallTargetInitDecl =
@@ -496,6 +508,18 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
 
     remoteBranchStmts.push_back(targetPB);
     remoteBranchStmts.push_back(targetVar);
+
+    // --- Set the synchronous blocking call flag on the target
+    if (isBlocking) {
+      auto *targetRef = new (C) DeclRefExpr(
+          ConcreteDeclRef(targetVar), dloc, implicit, AccessSemantics::Ordinary,
+          remoteCallTargetTy);
+      auto *isSyncRef = UnresolvedDotExpr::createImplicit(
+          C, targetRef, C.Id_isSynchronousBlockingCall);
+      auto *trueExpr = new (C) BooleanLiteralExpr(true, sloc, implicit);
+      auto *assign = new (C) AssignExpr(isSyncRef, sloc, trueExpr, implicit);
+      remoteBranchStmts.push_back(assign);
+    }
   }
 
   // === Make the 'remoteCall(Void)(...)'
@@ -506,9 +530,10 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
           DeclName(C, C.Id_remoteCallVoid,
                    {C.Id_on, C.Id_target, C.Id_invocation, C.Id_throwing});
     } else {
-      remoteCallName = DeclName(C, C.Id_remoteCall,
-                                {C.Id_on, C.Id_target, C.Id_invocation,
-                                 C.Id_throwing, C.Id_returning});
+      remoteCallName =
+          DeclName(C, C.Id_remoteCall,
+                   {C.Id_on, C.Id_target, C.Id_invocation,
+                    C.Id_throwing, C.Id_returning});
     }
 
     auto systemRemoteCallRef = UnresolvedDotExpr::createImplicit(

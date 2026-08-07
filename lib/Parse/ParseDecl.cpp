@@ -4382,6 +4382,19 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
 
     break;
   }
+
+  case DeclAttrKind::RemoteCall: {
+    auto mode = parseSingleAttrOption<RemoteCallMode>(
+        *this, Loc, AttrRange, AttrName, DK,
+        {{Context.Id_blocking, RemoteCallMode::SynchronousBlocking}});
+    if (!mode)
+      return makeParserSuccess();
+
+    if (!DiscardAttribute)
+      Attributes.add(new (Context) RemoteCallAttr(AtLoc, AttrRange, *mode));
+
+    break;
+  }
   }
 
   if (DuplicateAttribute) {

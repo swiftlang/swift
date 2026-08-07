@@ -150,6 +150,16 @@ enum class ENUM_EXTENSIBILITY_ATTR(closed) ExecutionSemantics : uint8_t {
   Last_ExecutionSemantics = Once
 };
 
+/// The mode of a '@remoteCall(...)' attribute on a distributed method.
+enum class ENUM_EXTENSIBILITY_ATTR(closed) RemoteCallMode : uint8_t {
+  /// The default async-only mode of distributed funcs.
+  Async SWIFT_NAME("async") = 0,
+  /// '@remoteCall(blocking)': hint the actor system to perform the remote
+  /// call as a synchronous, blocking IPC.
+  SynchronousBlocking SWIFT_NAME("blocking"),
+  Last_RemoteCallMode = SynchronousBlocking
+};
+
 enum class ENUM_EXTENSIBILITY_ATTR(closed) DeclAttrKind : unsigned {
 #define DECL_ATTR(_, CLASS, ...) CLASS,
 #define LAST_DECL_ATTR(CLASS) Last_DeclAttr = CLASS,

@@ -6541,6 +6541,11 @@ NOTE(distributed_actor_synchronous_access_distributed_computed_property,none,
       "access to %kind0 from outside the distributed actor %1 must be asynchronous",
       (const ValueDecl *, DeclName))
 
+ERROR(remotecall_blocking_requires_distributed,none,
+      "'@remoteCall' can only be applied to 'distributed' methods "
+      "and computed properties",
+      ())
+
 ERROR(concurrency_lib_missing,none,
       "missing '%0' declaration, probably because the '_Concurrency' "
       "module was not imported", (StringRef))
