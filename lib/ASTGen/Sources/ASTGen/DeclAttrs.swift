@@ -1356,8 +1356,12 @@ extension ASTGenVisitor {
   func generateLifetimeEntry(attribute node: AttributeSyntax) -> BridgedLifetimeEntry? {
     self.generateWithLabeledExprListArguments(attribute: node) { args in
       guard !args.isEmpty else {
-        // TODO: Diagnose
-        fatalError("expected arguments in @_lifetime attribute")
+        // `@_lifetime()`. The C++ parser reports the missing specifier here.
+        self.diagnose(
+          .expected_identifier_or_index_or_self_after_lifetime_dependence(false),
+          at: node.rightParen.map(Syntax.init) ?? Syntax(node.attributeName)
+        )
+        return nil
       }
 
       var target: BridgedLifetimeDescriptor? = nil
@@ -1899,18 +1903,33 @@ extension ASTGenVisitor {
   }
 
   func generatePreInverseGenericsAttr(attribute node: AttributeSyntax) -> BridgedPreInverseGenericsAttr? {
-    self.generateWithLabeledExprListArguments(attribute: node) { args in
-      switch args.first?.label?.rawText {
-        case "except":
-          fatalError("ASTGen does not yet support the except: argument")
-        default:
-          // TODO: Diagnose.
-          fatalError("invalid argument for @_preInverseGenerics attribute")
-      }
+    // Bare '@_preInverseGenerics' takes no arguments.
+    guard node.arguments != nil else {
       return .createParsed(
-          self.ctx,
-          atLoc: self.generateSourceLoc(node.atSign),
-          range: self.generateAttrSourceRange(node)
+        self.ctx,
+        atLoc: self.generateSourceLoc(node.atSign),
+        range: self.generateAttrSourceRange(node)
+      )
+    }
+
+    return self.generateWithLabeledExprListArguments(attribute: node) { args in
+      guard let arg = args.popFirst(), arg.label?.rawText == "except" else {
+        self.diagnose(.attr_pre_inverse_generics_expected_except, at: node.attributeName)
+        return nil
+      }
+      // The 'except:' argument is a type, e.g. '~Copyable', which the parser
+      // gives us in expression position.
+      guard let exceptType = self.generateTypeRepr(expr: arg.expression) else {
+        self.diagnose(.expected_type, at: arg.expression)
+        return nil
+      }
+      // Whether this form requires the PreInverseGenericsExcept feature is
+      // checked in Sema, by `AttributeChecker::visitPreInverseGenericsAttr`.
+      return .createParsed(
+        self.ctx,
+        atLoc: self.generateSourceLoc(node.atSign),
+        range: self.generateAttrSourceRange(node),
+        exceptType: exceptType
       )
     }
   }

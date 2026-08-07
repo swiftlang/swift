@@ -215,46 +215,69 @@ extension ASTGenVisitor {
   }
 
   func generateDifferentiableTypeAttr(attribute node: AttributeSyntax) -> BridgedDifferentiableTypeAttr? {
-    let differentiability: BridgedDifferentiabilityKind
-    let differentiabilityLoc: SourceLoc
+    // Mirrors `parseDifferentiableTypeAttributeArgument` and its caller in
+    // ParseDecl.cpp: an unknown or unsupported kind is an error, while omitting
+    // the kind entirely is only a warning and means 'reverse'.
+    var differentiability: BridgedDifferentiabilityKind = .normal
+    var differentiabilityLoc: SourceLoc = nil
+
     if let args = node.arguments {
-      guard let args = args.as(DifferentiableAttributeArgumentsSyntax.self) else {
-        fatalError("(compiler bug) invalid arguments for @differentiable attribute")
+      guard let args = args.as(DifferentiableAttributeArgumentsSyntax.self),
+        let kindSpecifier = args.kindSpecifier
+      else {
+        // Malformed argument clause; the parser has already diagnosed it.
+        return nil
       }
 
-      if let kindSpecifier = args.kindSpecifier {
-        differentiability = self.generateDifferentiabilityKind(text: kindSpecifier.rawText)
-        differentiabilityLoc = self.generateSourceLoc(kindSpecifier)
+      differentiability = self.generateDifferentiabilityKind(text: kindSpecifier.rawText)
+      differentiabilityLoc = self.generateSourceLoc(kindSpecifier)
+      let kindText = String(syntaxText: kindSpecifier.rawText)
+      let replaceWithReverse = CompilerDiagnosticFixIt(
+        replace: self.generateCharSourceRange(kindSpecifier),
+        with: "reverse"
+      )
 
-        guard differentiability != .nonDifferentiable else {
-          // TODO: Diagnose
-          fatalError("invalid kind for @differentiable type attribute")
-        }
-
-        guard kindSpecifier.nextToken(viewMode: .fixedUp) == node.rightParen else {
-          // TODO: Diagnose
-          fatalError("only expeceted 'reverse' in @differentiable type attribute")
-        }
-      } else {
-        // TODO: Diagnose
-        fatalError("expected @differentiable(reverse)")
+      switch differentiability {
+      case .nonDifferentiable:
+        self.diagnose(
+          .attr_differentiable_unknown_kind(kindText),
+          at: kindSpecifier,
+          fixIts: [replaceWithReverse]
+        )
+        return nil
+      case .forward:
+        // Only 'reverse' is formally supported today. '_linear' works for
+        // testing purposes. '_forward' is rejected.
+        self.diagnose(
+          .attr_differentiable_kind_not_supported(kindText),
+          at: kindSpecifier,
+          fixIts: [replaceWithReverse]
+        )
+        return nil
+      default:
+        break
       }
-    } else {
-      differentiability = .normal
-      differentiabilityLoc = nil
+
+      // Anything between the kind and the ')' is extra; the parser records it as
+      // unexpected code and has already diagnosed it. The C++ parser likewise
+      // builds the attribute and lets the surrounding parse report the leftovers.
     }
 
-    // Only 'reverse' is formally supported today. '_linear' works for testing
-    // purposes. '_forward' is rejected.
-    switch differentiability {
-    case .normal, .nonDifferentiable:
-      // TODO: Diagnose
-      fatalError("Only @differentiable(reverse) is supported")
-    case .forward:
-      // TODO: Diagnose
-      fatalError("Only @differentiable(reverse) is supported")
-    case .reverse, .linear:
-      break
+    if differentiability == .normal {
+      // Bare '@differentiable' means 'reverse', with a deprecation warning.
+      let insertReverse = CompilerDiagnosticFixIt(
+        replace: self.generateCharSourceRange(
+          start: node.attributeName.endPositionBeforeTrailingTrivia,
+          length: SourceLength(utf8Length: 0)
+        ),
+        with: "(reverse)"
+      )
+      self.diagnose(
+        .attr_differentiable_expected_reverse,
+        at: node.attributeName,
+        fixIts: [insertReverse]
+      )
+      differentiability = .reverse
     }
 
     return .createParsed(

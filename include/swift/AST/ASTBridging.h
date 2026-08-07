@@ -986,6 +986,12 @@ BridgedPreInverseGenericsAttr_createParsed(BridgedASTContext cContext,
                                            swift::SourceLoc atLoc,
                                            swift::SourceRange range);
 
+SWIFT_NAME("BridgedPreInverseGenericsAttr.createParsed(_:atLoc:range:exceptType:)")
+BridgedPreInverseGenericsAttr
+BridgedPreInverseGenericsAttr_createParsedWithExcept(
+    BridgedASTContext cContext, swift::SourceLoc atLoc,
+    swift::SourceRange range, BridgedTypeRepr cExceptType);
+
 SWIFT_NAME(
     "BridgedBackDeployedAttr.createParsed(_:atLoc:range:platform:version:)")
 BridgedBackDeployedAttr BridgedBackDeployedAttr_createParsed(

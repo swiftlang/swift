@@ -194,6 +194,15 @@ BridgedPreInverseGenericsAttr_createParsed(BridgedASTContext cContext,
   return new (cContext.unbridged()) PreInverseGenericsAttr(atLoc, range);
 }
 
+BridgedPreInverseGenericsAttr
+BridgedPreInverseGenericsAttr_createParsedWithExcept(BridgedASTContext cContext,
+                                                     SourceLoc atLoc,
+                                                     SourceRange range,
+                                                     BridgedTypeRepr cExceptType) {
+  return new (cContext.unbridged())
+      PreInverseGenericsAttr(atLoc, range, cExceptType.unbridged());
+}
+
 BridgedBackDeployedAttr BridgedBackDeployedAttr_createParsed(
     BridgedASTContext cContext, SourceLoc atLoc, SourceRange range,
     swift::PlatformKind platform, BridgedVersionTuple cVersion) {

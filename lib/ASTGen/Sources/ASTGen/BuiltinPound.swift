@@ -86,8 +86,20 @@ extension ASTGenVisitor {
       return .generated(nil)
 
     case ._hasSymbol, .available, .unavailable:
-      // TODO: Diagnose
-      fatalError("stmt condition outside control flow statement")
+      // These are conditions, not expressions. The C++ parser
+      // (`Parser::parseExprPrimary`) parses them here anyway for better
+      // recovery, rejects them, and yields an ErrorExpr; do the same.
+      self.diagnose(
+        .special_condition_outside_if_stmt_guard(
+          "#" + String(syntaxText: node.macroName.rawText)
+        ),
+        at: node.macroName
+      )
+      return .generated(
+        .expr(
+          BridgedErrorExpr.create(self.ctx, loc: self.generateSourceRange(node)).asExpr
+        )
+      )
       // return .generated(nil)
 
     case .none, .assert:
@@ -109,14 +121,15 @@ extension ASTGenVisitor {
   }
 
   func handlePoundDiagnostic(freestandingMacroExpansion node: some FreestandingMacroExpansionSyntax, kind: PoundDiagnosticKind) {
+    let isError = kind == .error
 
     switch node.parent?.kind {
     case .codeBlockItem, .memberBlockItem, .switchCaseList, nil:
       break
     default:
-      // TODO: Diagnose.
-      fatalError("#error/#warning must be declaration level")
-      // return
+      // Not at declaration level. The parser rejects this placement, so there is
+      // nothing to add here.
+      return
     }
 
     guard
@@ -124,22 +137,35 @@ extension ASTGenVisitor {
       node.trailingClosure == nil,
       node.additionalTrailingClosures.isEmpty
     else {
-      // TODO: Diagnose.
-      fatalError("#error/#warning with generic specialization")
+      // Recovery output; the parser has already diagnosed it.
+      return
     }
 
     guard node.arguments.count == 1,
-          let arg = node.arguments.first,
-          arg.label == nil,
-          let literal = arg.expression.as(StringLiteralExprSyntax.self),
-          let message = literal.representedLiteralValue
+      let arg = node.arguments.first,
+      arg.label == nil,
+      let literal = arg.expression.as(StringLiteralExprSyntax.self)
     else {
-      // TODO: Diagnose.
-      fatalError("expected single simple string literal in #error/#warning")
+      self.diagnose(
+        .pound_diagnostic_expected_string(isError),
+        at: node.arguments.first.map(Syntax.init) ?? Syntax(node.macroName)
+      )
+      return
+    }
+
+    guard literal.segments.allSatisfy({ $0.is(StringSegmentSyntax.self) }) else {
+      self.diagnose(.pound_diagnostic_interpolation(isError), at: literal)
+      return
+    }
+
+    guard let message = literal.representedLiteralValue else {
+      // A malformed literal, e.g. an unterminated multi-line string. The lexer
+      // has already reported it; there is no message to relay.
+      return
     }
 
     // Unconditionally emit the diagnostic. Inactive #if regions are not generated.
-    self.diagnose(.poundDiagnostic(literal, message: message, isError: kind == .error))
+    self.diagnose(.poundDiagnostic(literal, message: message, isError: isError))
   }
 
   func generatePoundAssertStmt(freestandingMacroExpansion node: some FreestandingMacroExpansionSyntax) -> BridgedPoundAssertStmt? {

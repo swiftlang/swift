@@ -599,6 +599,18 @@ extension ASTGenVisitor {
         )
       )
 
+    case .prefixOperatorExpr(let node) where node.operator.rawText == "~":
+      // '~Copyable' in a position where the parser was expecting an expression,
+      // e.g. the 'except:' argument of '@_preInverseGenerics'.
+      guard let constraint = self.generateTypeRepr(expr: node.expression) else {
+        break
+      }
+      return BridgedInverseTypeRepr.createParsed(
+        self.ctx,
+        tildeLoc: self.generateSourceLoc(node.operator),
+        constraint: constraint
+      ).asTypeRepr
+
     case .sequenceExpr(let node):
       // TODO: Support composition type?
       _ = node
