@@ -475,6 +475,37 @@ static ProtocolConformanceRef getBuiltinMetaTypeTypeConformance(
     Type type, const AnyMetatypeType *metatypeType, ProtocolDecl *protocol) {
   ASTContext &ctx = protocol->getASTContext();
 
+  // The metatype of an exact COM interface existential carries that interface's
+  // identity and therefore conforms to COMInterface. The existential value
+  // itself does not.
+  if (protocol->isSpecificProtocol(KnownProtocolKind::COMInterface)) {
+    Type instanceType = metatypeType->getInstanceType();
+    if (instanceType->isExistentialType()) {
+      auto layout = instanceType->getExistentialLayout();
+      if (layout.getCOMInterface()) {
+        auto conformance =
+            ctx.getBuiltinConformance(type, protocol,
+                                      BuiltinConformanceKind::COMIdentityMetatype);
+        return ProtocolConformanceRef(conformance);
+      }
+    }
+  }
+
+  // An activatable COM class metatype carries the class identity from its
+  // declaration.
+  if (protocol->isSpecificProtocol(KnownProtocolKind::COMActivatable)) {
+    if (auto *CD = metatypeType->getInstanceType()->getClassOrBoundGenericClass()) {
+      if (auto *info = CD->getCOMDeclInfo()) {
+        if (info->isImplementation() && info->getImplementationID()) {
+          auto conformance =
+              ctx.getBuiltinConformance(type, protocol,
+                                        BuiltinConformanceKind::COMIdentityMetatype);
+          return ProtocolConformanceRef(conformance);
+        }
+      }
+    }
+  }
+
   // All metatypes are Copyable, Escapable, and BitwiseCopyable.
   if (auto kp = protocol->getKnownProtocolKind()) {
     switch (*kp) {

@@ -29,3 +29,11 @@ public protocol ISwiftObject {
 public protocol COMInterface {
   var IID: IID { get }
 }
+
+#if $_MicrosoftCOM
+
+public protocol COMActivatable {
+  var CLSID: CLSID { get }
+}
+
+#endif
