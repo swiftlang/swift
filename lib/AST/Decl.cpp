@@ -1557,25 +1557,54 @@ LifetimeAnnotation Decl::getLifetimeAnnotation() const {
   return getLifetimeAnnotationFromAttributes();
 }
 
-AvailabilityRange Decl::getAvailabilityForLinkage() const {
-  ASTContext &ctx = getASTContext();
+/// Returns the lower bound for linkage availability of \p decl since it may be
+/// different than the decl's annotated availability in some rare circumstances.
+static std::optional<AvailabilityRange>
+minimumAvailabilityForLinkage(const Decl *decl) {
+  ASTContext &ctx = decl->getASTContext();
 
+  if (ctx.LangOpts.hasFeature(Feature::Embedded))
+    return std::nullopt;
+
+  // If this entity comes from the concurrency module, adjust its availability
+  // for linkage purposes up to Swift 5.5, so that we use weak references any
+  // time we reference those symbols when back-deploying concurrency.
+  if (decl->getModuleContext()->isConcurrencyModule())
+    return ctx.getConcurrencyAvailability();
+
+  if (!decl->getModuleContext()->isStdlibModule())
+    return std::nullopt;
+
+  // If the decl belongs to the Span back deployment compatibility library and
+  // weak linkage of that library's symbols was requested, adjust the
+  // availability for linkage to Swift 6.2 to force weak linkage for any
+  // deployment target prior to the introduction of these symbols in the
+  // operating system.
+  if (ctx.LangOpts.WeakLinkSpanCompatibilityLib) {
+    for (auto *attr :
+         decl->getAttrs().getAttributes<OriginallyDefinedInAttr>()) {
+      auto activePlatform = attr->isActivePlatform(ctx);
+      if (activePlatform &&
+          activePlatform->LinkerModuleName == "CompatibilitySpan")
+        return AvailabilityRange{activePlatform->Version};
+    }
+  }
+
+  return std::nullopt;
+}
+
+AvailabilityRange Decl::getAvailabilityForLinkage() const {
   // When computing availability for linkage, use the "before" version from
   // the @backDeployed attribute, if present.
   if (auto backDeployedAttrAndRange = getBackDeployedAttrAndRange())
     return backDeployedAttrAndRange->second;
 
-  auto containingContext = AvailabilityInference::annotatedAvailableRange(this);
-  if (containingContext.has_value()) {
-    // If this entity comes from the concurrency module, adjust its
-    // availability for linkage purposes up to Swift 5.5, so that we use
-    // weak references any time we reference those symbols when back-deploying
-    // concurrency.
-    if (getModuleContext()->getName() == ctx.Id_Concurrency) {
-      containingContext->intersectWith(ctx.getConcurrencyAvailability());
-    }
+  auto annotatedRange = AvailabilityInference::annotatedAvailableRange(this);
+  if (annotatedRange.has_value()) {
+    if (auto minRange = minimumAvailabilityForLinkage(this))
+      annotatedRange->intersectWith(*minRange);
 
-    return *containingContext;
+    return *annotatedRange;
   }
 
   // FIXME: Adopt Decl::parentDeclForAvailability()
