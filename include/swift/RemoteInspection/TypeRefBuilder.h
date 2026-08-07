@@ -986,9 +986,9 @@ public:
   // TypeRefs model generic values as distinct IntegerTypeRefs, so a value
   // argument is never misinterpreted as a type; the demangler's value/type
   // consistency check is unnecessary here.
-  std::optional<bool> isValueGenericParameter(const BuiltTypeDecl &,
-                                              unsigned index) {
-    return std::nullopt;
+  llvm::SmallVector<bool, 8>
+  getValueGenericParameterFlags(const BuiltTypeDecl &, unsigned numArgs) {
+    return {};
   }
 
   const TypeRef *createNegativeIntegerType(intptr_t value) {

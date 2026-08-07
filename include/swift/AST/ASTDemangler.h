@@ -168,11 +168,12 @@ public:
                               Type parent);
 
   // This is used by the runtime's type lookup to catch the case where a mangled
-  // name specifies a value argument where a type argument is supposed to go.
-  // The AST builder doesn't have that problem so we skip that check entirely.
-  std::optional<bool> isValueGenericParameter(GenericTypeDecl *decl,
-                                              unsigned index) {
-    return std::nullopt;
+  // name binds a value argument where a type argument is supposed to go, or the
+  // reverse. The AST builder doesn't have that problem so we skip that check
+  // entirely.
+  llvm::SmallVector<bool, 8>
+  getValueGenericParameterFlags(GenericTypeDecl *decl, unsigned numArgs) {
+    return {};
   }
 
   Type createTupleType(ArrayRef<Type> eltTypes, ArrayRef<StringRef> labels);
