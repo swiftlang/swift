@@ -3995,6 +3995,22 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Opts.EnableReflectionNames = true;
   }
 
+  // LLDB needs reflection metadata to inspect variables of non-embedded Swift
+  // programs. Embedded Swift promotes -g to -gdwarf-types and relies on the
+  // DWARF type information instead, so it is exempt from this warning.
+  if (Opts.ReflectionMetadata == ReflectionMetadataMode::None &&
+      Opts.DebugInfoLevel == IRGenDebugInfoLevel::ASTTypes &&
+      !LangOpts.hasFeature(Feature::Embedded)) {
+    const Arg *DebugInfoArg = Args.getLastArg(OPT_g_Group);
+    const Arg *NoReflectionArg =
+        Args.getLastArg(OPT_disable_reflection_metadata);
+    if (DebugInfoArg && NoReflectionArg)
+      Diags.diagnose(SourceLoc(),
+                     diag::warning_reflection_metadata_disabled_with_debug_info,
+                     DebugInfoArg->getAsString(Args),
+                     NoReflectionArg->getAsString(Args));
+  }
+
   if (Args.hasArg(OPT_enable_anonymous_context_mangled_names))
     Opts.EnableAnonymousContextMangledNames = true;
 
