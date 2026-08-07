@@ -759,6 +759,36 @@ ClosureIsolatedByPreconcurrency::operator()(const ClosureExpr *expr) const {
       cs.preconcurrencyClosures.count(expr);
 }
 
+Type ConstraintSystem::tryProduceLValueForReference(
+    VarDecl *value, Type requestedType, Type baseType, DeclContext *useDC,
+    ConstraintLocator *locator) {
+  if (requestedType->hasError())
+    return requestedType;
+
+  // Is `value` a closure argument with inferred ownership in the current solve?
+  // If so check mutability based on the ownership.
+  if (auto *param = dyn_cast<ParamDecl>(value)) {
+    if (auto inferred = getInferredParamSpecifier(param)) {
+
+      // inout arguments already have lvalue type.
+      // Don't wrap the type of this reference in an lvalue as that'd clash with
+      // the param already being an lvalue.
+      if (*inferred == ParamSpecifier::InOut)
+        return requestedType;
+
+      return ParamDecl::isSpecifierImmutableInFunctionBody(*inferred)
+                 ? requestedType
+                 : LValueType::get(requestedType);
+    }
+  }
+
+  // Otherwise check mutability based on the decl node itself.
+  if (doesStorageProduceLValue(value, baseType, useDC, *this, locator))
+    return LValueType::get(requestedType);
+
+  return requestedType;
+}
+
 Type ConstraintSystem::getUnopenedTypeOfReference(
     VarDecl *value, Type baseType, DeclContext *UseDC,
     ConstraintLocator *locator, bool wantInterfaceType) {
@@ -792,12 +822,8 @@ Type ConstraintSystem::getUnopenedTypeOfReference(
 
   // Qualify storage declarations with an lvalue when appropriate.
   // Otherwise, they yield rvalues (and the access must be a load).
-  if (doesStorageProduceLValue(value, baseType, UseDC, *this, locator) &&
-      !requestedType->hasError()) {
-    return LValueType::get(requestedType);
-  }
-
-  return requestedType;
+  return tryProduceLValueForReference(value, requestedType, baseType, UseDC,
+                                      locator);
 }
 
 void ConstraintSystem::recordOpenedType(

@@ -254,6 +254,10 @@ public:
     /// Create a change that recorded an isolated parameter.
     static Change RecordedIsolatedParam(ParamDecl *param);
 
+    /// Create a change that recorded an inferred ownership convention for a
+    /// closure parameter.
+    static Change RecordedInferredParamSpecifier(ParamDecl *param);
+
     /// Create a change that recorded a key path expression.
     static Change RecordedKeyPath(KeyPathExpr *expr);
 
