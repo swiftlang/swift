@@ -693,14 +693,3 @@ extension InlineArray where Element: ~Copyable & Hashable {
     span._hashContents(into: &hasher)
   }
 }
-  
-@available(SwiftStdlib 6.2, *)
-extension InlineArray where Element: ~Copyable {
-  @available(SwiftStdlib 6.2, *)
-  @_alwaysEmitIntoClient
-  public func isTriviallyIdentical(to other: borrowing Self) -> Bool {
-    unsafe _address == other._address
-  }
-}
-
-
