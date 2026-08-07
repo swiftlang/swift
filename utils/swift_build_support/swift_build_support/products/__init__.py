@@ -49,7 +49,7 @@ from .swiftsyntax import SwiftSyntax
 from .tsan_libdispatch import TSanLibDispatch
 from .wasisysroot import WASISysroot
 from .wasmkit import WasmKit
-from .wasistdlib import WASIStdlib, WASIThreadsStdlib
+from .wasistdlib import WASIStdlib, WASIThreadsStdlib, WASIP2Stdlib
 from .wasiswiftsdk import WASISwiftSDK
 from .xctest import XCTest
 from .zlib import Zlib
@@ -93,6 +93,7 @@ __all__ = [
     'WasmKit',
     'WASIStdlib',
     'WASIThreadsStdlib',
+    'WASIP2Stdlib',
     'WASISwiftSDK',
     'EmscriptenHostLLVM',
     'EmscriptenHostSwift',

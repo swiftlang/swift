@@ -1414,6 +1414,12 @@ if(swift_build_wasm AND NOT "${SWIFT_HOST_VARIANT_SDK}" STREQUAL "WASI")
   configure_sdk_unix(WASI wasm32)
 endif()
 
+# Should we cross-compile the standard library for WASI (preview 2)?
+is_sdk_requested(WASIP2 swift_build_wasip2)
+if(swift_build_wasip2 AND NOT "${SWIFT_HOST_VARIANT_SDK}" STREQUAL "WASIP2")
+  configure_sdk_unix(WASIP2 wasm32)
+endif()
+
 if("${SWIFT_SDKS}" STREQUAL "")
   set(SWIFT_SDKS "${SWIFT_CONFIGURED_SDKS}")
 endif()

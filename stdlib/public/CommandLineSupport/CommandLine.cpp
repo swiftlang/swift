@@ -477,6 +477,29 @@ static void swift::enumerateUnsafeArgv(const F& body) {
 }
 #elif defined(__wasi__)
 #include <stdlib.h>
+#if defined(__wasip2__)
+// wasip2 has no preview1 __wasi_args_get; args come via wasi:cli/environment.
+#include <string.h>
+#include <wasi/__generated_wasip2.h>
+
+static char **swift::getUnsafeArgvArgc(int *outArgLen) {
+  wasip2_list_string_t args;
+  environment_get_arguments(&args);
+
+  char **argv = static_cast<char **>(calloc(args.len + 1, sizeof(char *)));
+  for (size_t i = 0; i < args.len; ++i) {
+    // wasip2_string_t is not NUL-terminated.
+    size_t len = args.ptr[i].len;
+    char *arg = static_cast<char *>(malloc(len + 1));
+    memcpy(arg, args.ptr[i].ptr, len);
+    arg[len] = '\0';
+    argv[i] = arg;
+  }
+
+  *outArgLen = static_cast<int>(args.len);
+  return argv;
+}
+#else
 #include <wasi/api.h>
 #include <wasi/libc.h>
 
@@ -508,6 +531,7 @@ static char **swift::getUnsafeArgvArgc(int *outArgLen) {
 
   return argv;
 }
+#endif
 
 template <typename F>
 static void swift::enumerateUnsafeArgv(const F& body) { }
