@@ -8,3 +8,6 @@ let _ = SharedAB(123)
 
 let _ = AmbiguousReleaseMethods(321)
 let _ = AmbiguousFreeReleaseAndRetainMethods(456)
+
+func useMixedImmortalRetainRelease(_ x: MixedImmortalRetainRelease) {}
+let _ = DerivedFromMixedImmortal(123)

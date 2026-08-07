@@ -1741,14 +1741,10 @@ void IRGenFunction::emitBlockRelease(llvm::Value *value) {
 }
 
 void IRGenFunction::emitForeignReferenceTypeLifetimeOperation(
-    ValueDecl *fn, llvm::Value *value, bool needsNullCheck) {
-  auto loader = fn->getASTContext().getClangModuleLoader();
-  if (loader->getOriginalForClonedMember(fn))
-    fn = loader->getCalledBaseCxxMethod(fn);
+    const clang::FunctionDecl *clangFn, llvm::Value *value,
+    bool needsNullCheck) {
+  assert(clangFn);
 
-  assert(fn->getClangDecl() && isa<clang::FunctionDecl>(fn->getClangDecl()));
-
-  auto clangFn = cast<clang::FunctionDecl>(fn->getClangDecl());
   auto llvmFn = cast<llvm::Function>(
       IGM.getAddrOfClangGlobalDecl(clangFn, ForDefinition));
 

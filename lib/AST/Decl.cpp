@@ -7470,11 +7470,15 @@ bool ClassDecl::isForeignReferenceType() const {
 }
 
 bool ClassDecl::hasRefCountingAnnotations() const {
-  return evaluateOrDefault(getASTContext().evaluator,
-                           CustomRefCountingOperation(
-                               {this, CustomRefCountingOperationKind::release}),
-                           {})
-             .kind != CustomRefCountingOperationResult::immortal;
+  auto *RD = dyn_cast_or_null<clang::RecordDecl>(getClangDecl());
+  if (!RD)
+    return false;
+
+  // A shared (non-immortal) reference type uses custom retain/release.
+  auto info =
+      evaluateOrDefault(getASTContext().evaluator,
+                        ForeignReferenceTypeInfoRequest({RD}), {});
+  return info.isReference() && !info.isImmortal();
 }
 
 ReferenceCounting ClassDecl::getObjectModel() const {
