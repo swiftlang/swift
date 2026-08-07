@@ -67,6 +67,10 @@ ERROR(temporary_allocation_alignment_not_power_of_2,none,
 ERROR(explosion_size_oveflow,none,
       "explosion size too large", ())
 
+ERROR(fixed_array_size_overflow,none,
+      "size of value of type %0 exceeds the maximum supported size of 4 GiB",
+      (Type))
+
 NOTE(layout_strings_blocked,none,
      "Layout string value witnesses have been disabled for module '%0' "
      "through block list entry", (StringRef))
