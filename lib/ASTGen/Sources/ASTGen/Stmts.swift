@@ -467,8 +467,22 @@ extension ASTGenVisitor {
       return self.generateIfStmt(ifExpr: node).asStmt
     case .switchExpr(let node):
       return self.generateSwitchStmt(switchExpr: node).asStmt
+    case .doExpr(let node):
+      // With the DoExpressions feature the parser produces a DoExpr even where a
+      // statement is expected, e.g. `do throws(E) { … } catch { … }` as a
+      // statement. Generate it as a statement, the way the other
+      // statement-shaped expressions above are.
+      return self.generate(doStmtOrExpr: node)
     default:
-      fatalError("Unhandled case!")
+      // Any other expression here is a statement-shaped expression ASTGen does
+      // not know about yet. Generating it as an expression keeps the AST
+      // well-formed rather than halting.
+      return BridgedBraceStmt.createImplicit(
+        self.ctx,
+        lBraceLoc: self.generateSourceLoc(node),
+        element: .expr(self.generate(expr: node.expression)),
+        rBraceLoc: self.generateSourceLoc(node)
+      ).asStmt
     }
   }
 
