@@ -314,6 +314,12 @@ macro(add_sourcekit_library name)
     RUNTIME
       DESTINATION "bin"
       COMPONENT "${SOURCEKITLIB_INSTALL_IN_COMPONENT}")
+  if(MSVC)
+    swift_install_in_component(FILES $<TARGET_FILE_DIR:${name}>/$<TARGET_FILE_BASE_NAME:${name}>.pdb
+                               DESTINATION bin
+                               COMPONENT "${SOURCEKITLIB_INSTALL_IN_COMPONENT}"
+                               OPTIONAL)
+  endif()
 
   swift_install_in_component(FILES ${SOURCEKITLIB_HEADERS}
                              DESTINATION "include/SourceKit"
