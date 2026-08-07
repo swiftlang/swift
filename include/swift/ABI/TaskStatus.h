@@ -615,9 +615,9 @@ public:
   /// First-cancel-wins: if the scope is already cancelled, this is a no-op.
   void cancel(size_t reason) {
     auto oldState = State.load(std::memory_order_relaxed);
+    // bail if the scope was already cancelled - first-cancel-wins.
     while (!(oldState & CancelledBit)) {
-      auto newState =
-          ((static_cast<uintptr_t>(reason) & ReasonMask) << 1) | CancelledBit;
+      auto newState = ((reason & ReasonMask) << 1) | CancelledBit;
       if (State.compare_exchange_weak(oldState, newState,
                                        std::memory_order_relaxed,
                                        std::memory_order_relaxed)) {
@@ -633,7 +633,8 @@ public:
 };
 
 /// A status record representing an active `withTaskCancellationShield` block.
-/// Its position in the LIFO chain relative to any `TaskCancellationScopeRecord`
+/// 
+/// Its position in the records list relative to any `TaskCancellationScopeRecord`
 /// determines whether a scope's cancellation is masked at a given call site.
 class TaskCancellationShieldRecord : public TaskStatusRecord {
 public:
