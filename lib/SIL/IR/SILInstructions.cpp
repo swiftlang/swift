@@ -3600,8 +3600,11 @@ SILType KeyPathInst::getStaticInstanceClassType() const {
       auto *property = cast<VarDecl>(comp.getStoredPropertyDecl());
       if (property->isLet()) {
         keyPathClass = ctx.getKeyPathDecl();
-      } else if (rootIsClass &&
-                 keyPathClass == ctx.getWritableKeyPathDecl()) {
+      } else if (rootIsClass) {
+        // A mutable class property is a fresh root for reference mutation, so
+        // it promotes regardless of what came before -- a read-only prefix
+        // doesn't stick. Matches `visitStoredComponent` in KeyPath.swift,
+        // which assigns `capability = .reference` unconditionally here.
         keyPathClass = ctx.getReferenceWritableKeyPathDecl();
       }
       break;
@@ -3651,15 +3654,16 @@ SILType KeyPathInst::getStaticInstanceClassType() const {
       // `KeyPath`.  Settable-computed intermediates preserve writable
       // capability via the embedded writeback machinery in
       // `_projectMutableAddress`:
-      //   * mutating setter (struct default): stays WritableKeyPath (or
-      //     inherits ReferenceWritableKeyPath if already crossed a class
-      //     boundary)
+      //   * mutating setter (struct default): writable if the base is, so
+      //     leave the capability alone
       //   * nonmutating setter (class default, or `nonmutating set` on a
-      //     struct): promotes WritableKeyPath → ReferenceWritableKeyPath
+      //     struct): a fresh root for reference mutation, so it promotes
+      //     unconditionally -- a read-only prefix doesn't stick
+      // Matches the `(settable, mutating)` switch in `visitComputedComponent`
+      // in KeyPath.swift.
       if (comp.getKind() != KeyPathPatternComponent::Kind::SettableProperty) {
         keyPathClass = ctx.getKeyPathDecl();
-      } else if (!comp.isComputedSettablePropertyMutating() &&
-                 keyPathClass == ctx.getWritableKeyPathDecl()) {
+      } else if (!comp.isComputedSettablePropertyMutating()) {
         keyPathClass = ctx.getReferenceWritableKeyPathDecl();
       }
       break;

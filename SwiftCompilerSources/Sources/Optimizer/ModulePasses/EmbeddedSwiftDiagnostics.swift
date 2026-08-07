@@ -111,7 +111,7 @@ private struct FunctionChecker {
       }
 
     case let kpi as KeyPathInst:
-      guard context.options.hasFeature(.EmbeddedKeyPaths), kpi.supportedInEmbeddedSwift else {
+      guard kpi.supportedInEmbeddedSwift else {
         throw Diagnostic(.embedded_swift_keypath, at: instruction.location)
       }
       // A key path that captures values (subscript arguments) can't be a shared
