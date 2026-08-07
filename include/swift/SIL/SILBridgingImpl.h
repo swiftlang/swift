@@ -2700,6 +2700,11 @@ BridgedInstruction BridgedBuilder::createUncheckedRefCast(BridgedValue op, Bridg
                                              type.unbridged())};
 }
 
+BridgedInstruction BridgedBuilder::createRefToRawPointer(BridgedValue op, BridgedType type) const {
+  return {unbridged().createRefToRawPointer(regularLoc(), op.getSILValue(),
+                                            type.unbridged())};
+}
+
 BridgedInstruction BridgedBuilder::createUncheckedAddrCast(BridgedValue op, BridgedType type) const {
   return {unbridged().createUncheckedAddrCast(regularLoc(), op.getSILValue(),
                                               type.unbridged())};
