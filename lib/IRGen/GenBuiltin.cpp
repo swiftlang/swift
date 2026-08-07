@@ -1598,8 +1598,10 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
   case BuiltinValueKind::TaskPushDeadline: {
     auto *clockPtr = args.claimNext();
     auto *instantPtr = args.claimNext();
-    auto *clockType = args.claimNext();
-    auto *instantType = args.claimNext();
+    auto clockTy = substitutions.getReplacementTypes()[0]->getCanonicalType();
+    auto instantTy = substitutions.getReplacementTypes()[1]->getCanonicalType();
+    auto *clockType = IGF.emitTypeMetadataRef(clockTy);
+    auto *instantType = IGF.emitTypeMetadataRef(instantTy);
     out.add(emitBuiltinTaskPushDeadline(IGF, clockPtr, instantPtr,
                                         clockType, instantType));
     return;

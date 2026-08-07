@@ -133,22 +133,9 @@ public nonisolated(nonsending) func withDeadline<Return, Failure, C>(
   }
 
   // Push a deadline record on the current task.
-  // We need to borrow the clock and expiration, because we don't know the exact types.
-  // The record will initializeWithCopy them into the record's tail allocated storage,
-  // and destroy them when the record is popped.
-  //
-  // FIXME: The shape of this builtin is a workaround,
-  //        since stack nesting SIL checking couldn't handle a generic builtin
-  //        that would take clock and expiration directly; Something to improve for sure.
 #if $BuiltinTaskDeadline
-  let deadlineRecord = unsafe Builtin.taskPushDeadline(
-    clockPtr: Builtin.addressOfBorrow(clock),
-    instantPtr: Builtin.addressOfBorrow(expiration),
-    clockType: C.self,
-    instantType: C.Instant.self)
-  defer { withExtendedLifetime(clock) {} }
-  defer { withExtendedLifetime(expiration) {} }
-  defer { unsafe Builtin.taskPopDeadline(record: deadlineRecord) }
+  let record = unsafe Builtin.taskPushDeadline(clock: clock, instant: expiration)
+  defer { unsafe Builtin.taskPopDeadline(record: record) }
 
   return try await __withTaskCancellationScope { scope throws(Failure) in
     // `scope` is ~Escapable/~Copyable and cannot be captured by the

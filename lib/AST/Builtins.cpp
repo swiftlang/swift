@@ -2443,26 +2443,19 @@ static ValueDecl *getTaskRemovePriorityEscalationHandler(ASTContext &ctx,
 }
 
 static ValueDecl *getTaskPushDeadline(ASTContext &ctx, Identifier id) {
-  // Non-generic:
-  //   (clockPtr: Builtin.RawPointer,
-  //    instantPtr: Builtin.RawPointer,
-  //    clockType: Any.Type,
-  //    instantType: Any.Type) -> UnsafeRawPointer
+  // <C, I> (clock: consuming C, instant: consuming I) -> UnsafeRawPointer
   //
   // Values first, metadata trailing (matches Swift's generic ABI).
   //
-  // Non-generic keeps the SIL builtin's operands trivial. Passing the
-  // clock and instant by raw pointer into caller-owned storage
-  // (typically via `withUnsafePointer(to:)`) avoids the SILGen having
-  // to materialize alloc_stacks for `_typeparam` operands, which
-  // interfere with the stack-nesting invariant paired with
-  // `taskPopDeadline`.
+  // The stack-nesting invariant paired with `taskPopDeadline` is fixed up
+  // post-SILGen by `finalizeTaskPushDeadline` -> `StackNesting::fixNesting`,
+  // exactly mirroring the `AddTaskLocalValue` sibling. Without that hook,
+  // the operand `alloc_stack` temporaries would deallocate before the
+  // defer'd pop and trip the flow-sensitive verifier.
   return getBuiltinFunction(
-      ctx, id, _thin,
-      _parameters(_label("clockPtr", _rawPointer),
-                  _label("instantPtr", _rawPointer),
-                  _label("clockType", _existentialMetatype(_unconstrainedAny)),
-                  _label("instantType", _existentialMetatype(_unconstrainedAny))),
+      ctx, id, _thin, _generics(_unrestricted, _unrestricted),
+      _parameters(_label("clock", _consuming(_typeparam(0))),
+                  _label("instant", _consuming(_typeparam(1)))),
       _unsafeRawPointer);
 }
 
