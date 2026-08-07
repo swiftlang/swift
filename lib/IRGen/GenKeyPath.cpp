@@ -1561,7 +1561,18 @@ bool IRGenModule::canEmitStaticKeyPathInstance(KeyPathInst *KPI) {
   if (!KPI->getStaticInstanceClassType())
     return false;
 
-  return embedded || staticKeyPathLayoutIsStatic(*this, KPI);
+  if (embedded)
+    return true;
+
+  if (!staticKeyPathLayoutIsStatic(*this, KPI))
+    return false;
+
+  // An object whose isa is filled in lazily gets its refcount word from
+  // `swift_initStaticObject`.
+  if (!staticKeyPathNeedsLazyMetadata(*this, KPI) && !Triple.isOSDarwin())
+    return false;
+
+  return true;
 }
 
 /// Pick the concrete `KeyPath` subclass this keypath instruction resolves
@@ -2154,34 +2165,46 @@ llvm::Constant *IRGenModule::emitStaticKeyPathInstance(
   uint64_t bodySize = 3 * ptrSize;
   uint64_t paddingBytes = (4 - (bodySize % 4)) % 4;
 
-  // Reuse the immortal-refcount constant from `emitConstantObject`. The two
-  // representations are not interchangeable: embedded hard-codes the bit
-  // pattern, while the full runtime imports `_swiftImmortalRefCount` so it can
-  // pick the value that matches the deployed runtime. Since this constant is
-  // cached on the IRGenModule and shared with static arrays, it has to be
-  // built the same way here as it is there.
-  if (!swiftImmortalRefCount) {
-    if (Context.LangOpts.hasFeature(Feature::Embedded)) {
-      // = HeapObject.immortalRefCount | HeapObject.doNotFreeBit
-      // (all-ones on both 32-bit and 64-bit).
-      swiftImmortalRefCount = llvm::ConstantInt::getAllOnesValue(IntPtrTy);
-    } else {
-      swiftImmortalRefCount = llvm::ConstantExpr::getPtrToInt(
-          new llvm::GlobalVariable(Module, Int8Ty,
-                                   /*constant*/ true,
-                                   llvm::GlobalValue::ExternalLinkage,
-                                   /*initializer*/ nullptr,
-                                   "_swiftImmortalRefCount"),
-          IntPtrTy);
+  // The refcount word. When the isa is filled in lazily, `visitKeyPathInst`
+  // routes the object through `swift_initStaticObject`, which does
+  // `refCounts.initImmortal()` itself.
+  //
+  // Otherwise the object is immortal from load time and the word has to be
+  // right on its own.
+  //
+  // `_swiftImmortalRefCount` is why `canEmitStaticKeyPathInstance` restricts
+  // the non-lazy, non-embedded case to Darwin: the symbol is defined by an
+  // absolute-address `.set` in GlobalObjects.cpp that only works in Mach-O.
+  llvm::Constant *refCountField;
+  if (lazyMetadata) {
+    refCountField = llvm::ConstantInt::get(IntPtrTy, 0);
+  } else {
+    if (!swiftImmortalRefCount) {
+      if (Context.LangOpts.hasFeature(Feature::Embedded)) {
+        // = HeapObject.immortalRefCount | HeapObject.doNotFreeBit
+        // (all-ones on both 32-bit and 64-bit).
+        swiftImmortalRefCount = llvm::ConstantInt::getAllOnesValue(IntPtrTy);
+      } else {
+        assert(Triple.isOSDarwin() &&
+               "_swiftImmortalRefCount is only defined for Mach-O");
+        swiftImmortalRefCount = llvm::ConstantExpr::getPtrToInt(
+            new llvm::GlobalVariable(Module, Int8Ty,
+                                     /*constant*/ true,
+                                     llvm::GlobalValue::ExternalLinkage,
+                                     /*initializer*/ nullptr,
+                                     "_swiftImmortalRefCount"),
+            IntPtrTy);
+      }
     }
+    refCountField = swiftImmortalRefCount;
   }
 
   auto *ObjectHeaderTy = RefCountedStructTy;
   auto *isaTy = cast<llvm::PointerType>(ObjectHeaderTy->getElementType(0));
   auto *isaField = metadata ? llvm::ConstantExpr::getBitCast(metadata, isaTy)
                             : llvm::ConstantPointerNull::get(isaTy);
-  auto *objectHeader = llvm::ConstantStruct::get(
-      ObjectHeaderTy, {isaField, swiftImmortalRefCount});
+  auto *objectHeader =
+      llvm::ConstantStruct::get(ObjectHeaderTy, {isaField, refCountField});
 
   ConstantInitBuilder initBuilder(*this);
   auto fields = initBuilder.beginStruct();
