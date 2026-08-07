@@ -20,6 +20,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/TypeCheckRequests.h"
@@ -535,6 +536,13 @@ swift::isMemberAvailableOnExistential(Type baseTy, const ValueDecl *member) {
   if (dc->isMetatypeExtension())
     return ExistentialMemberAccessLimitation::None;
 
+  // A COM existential only stores its interface pointer. Protocol extension
+  // members use the ordinary generic calling convention and require a witness
+  // table for `Self` which the existential cannot provide.
+  if (dc->getExtendedProtocolDecl() && baseTy->isExistentialType() &&
+      baseTy->getExistentialLayout().getCOMInterface())
+    return ExistentialMemberAccessLimitation::Unsupported;
+
   auto &ctx = member->getASTContext();
   auto existentialSig = ctx.getOpenedExistentialSignature(baseTy);
 
@@ -712,6 +720,20 @@ bool swift::canOpenExistentialAt(ValueDecl *callee, unsigned paramIdx,
     return false;
 
   auto &ctx = callee->getASTContext();
+
+  // A `T.Type: COMInterface` requirement deliberately binds `T` to the exact
+  // interface existential. Opening that existential would replace its
+  // statically selected interface identity with an opened archetype.
+  Type metatypeParam = MetatypeType::get(genericParam);
+  for (auto *proto : genericSig->getRequiredProtocols(metatypeParam)) {
+    if (!proto->isSpecificProtocol(KnownProtocolKind::COMInterface))
+      continue;
+
+    Type existentialMetatype = MetatypeType::get(existentialTy);
+    auto conformance = lookupConformance(existentialMetatype, proto);
+    if (conformance && !conformance.hasMissingConformance())
+      return false;
+  }
 
   // If the existential argument conforms to all of protocol requirements on
   // the formal parameter's type, don't open unless ImplicitOpenExistentials is
