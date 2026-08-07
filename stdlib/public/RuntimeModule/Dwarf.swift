@@ -1703,7 +1703,15 @@ class DwarfReader<S: DwarfSource & AnyObject> {
           break
         }
 
-        fn(beginning + rangeBase, ending + rangeBase)
+        let (lowPC, lowOverflowed)
+          = beginning.addingReportingOverflow(rangeBase)
+        let (highPC, highOverflowed)
+          = ending.addingReportingOverflow(rangeBase)
+        if lowOverflowed || highOverflowed || highPC < lowPC {
+          continue
+        }
+
+        fn(lowPC, highPC)
       }
     }
   }
@@ -1829,51 +1837,8 @@ class DwarfReader<S: DwarfSource & AnyObject> {
            filename: filename,
            line: Int(callLine),
            column: Int(callColumn)))
-    } else if let rangeVal = attributes[.DW_AT_ranges],
-              let rangesSection = rangesSection,
-              case let .sectionOffset(offset) = rangeVal,
-              unit.version < 5 {
-      // We don't support .debug_rnglists at present (which is what we'd
-      // have if unit.version is 5 or higher).
-      var rangeCursor = ImageSourceCursor(source: rangesSection,
-                                          offset: offset)
-      var rangeBase: Address = unit.lowPC ?? 0
-
-      while true {
-        let beginning: Address
-        let ending: Address
-
-        switch unit.addressSize {
-          case 4:
-            beginning = UInt64(maybeSwap(try rangeCursor.read(as: UInt32.self)))
-            ending = UInt64(maybeSwap(try rangeCursor.read(as: UInt32.self)))
-            if beginning == 0xffffffff {
-              rangeBase = ending
-              continue
-            }
-          case 8:
-            beginning = maybeSwap(try rangeCursor.read(as: UInt64.self))
-            ending = maybeSwap(try rangeCursor.read(as: UInt64.self))
-            if beginning == 0xffffffffffffffff {
-              rangeBase = ending
-              continue
-            }
-          default:
-            throw DwarfError.badAddressSize(unit.addressSize)
-        }
-
-        if beginning == 0 && ending == 0 {
-          break
-        }
-
-        let (lowPC, lowOverflowed)
-          = beginning.addingReportingOverflow(rangeBase)
-        let (highPC, highOverflowed)
-          = ending.addingReportingOverflow(rangeBase)
-        if lowOverflowed || highOverflowed || highPC < lowPC {
-          continue
-        }
-
+    } else if let rangeVal = attributes[.DW_AT_ranges] {
+      try forEachRange(of: rangeVal, unit: unit) { lowPC, highPC in
         fn(CallSiteInfo(
              depth: depth,
              rawName: rawName,
