@@ -579,7 +579,7 @@ StdStringTestSuite.test("std::u32string as Swift.CustomStringConvertible") {
       .compactMap { Unicode.Scalar($0) }
     var cxx4 = std.u32string()
     for scalar: Unicode.Scalar in scalars2 {
-        cxx4.push_back(scalar)
+        cxx4.push_back(scalar.value)
     }
     expectEqual(cxx4.description, "Hello, 世界")
 }

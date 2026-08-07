@@ -1,8 +1,7 @@
 // RUN: %empty-directory(%t)
 
-// Test the behavior of printing Unicode.Scalar in the compatibility header.
-// This is wrong, it should either be rejected and considered non-representable
-// or actually be printed using a C / Objective-C compatible type.
+// Test the behavior of printing Unicode.Scalar / CChar32 / CWideChar in the
+// compatibility header.
 
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) \
 // RUN:   %s -emit-module -verify -o %t -emit-module-doc \
@@ -16,6 +15,10 @@ func referencesScalar() -> Unicode.Scalar { fatalError() }
 @_cdecl("referencesRelated")
 func x_referencesRelated(a: CChar32, b: CWideChar) { }
 // CHECK: SWIFT_EXTERN void referencesRelated(char32_t a, wchar_t b)
+// CWideChar is a typealias for Unicode.Scalar on non-Windows,
+// so we get a warning about using this instead of UInt32.
+// expected-warning@-4 * {{'Unicode.Scalar' parameter 'b' will be exposed as 'char32_t'}}
+// expected-note@-5 * {{use 'UInt32' and validate with 'Unicode.Scalar.init(_:)'}}
 
 #if !((os(macOS) || targetEnvironment(macCatalyst)) && arch(x86_64))
     // Actual test of Float16, on supported platforms.
