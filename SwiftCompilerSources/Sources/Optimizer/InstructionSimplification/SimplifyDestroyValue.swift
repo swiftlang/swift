@@ -73,17 +73,13 @@ extension DestroyValueInst : OnoneSimplifiable, SILCombineSimplifiable {
     }
 
     for incomingOp in phi.incomingOperands {
-      let oldBranch = incomingOp.instruction as! BranchInst
-      let builder = Builder(before: oldBranch, context)
-      builder.createDestroyValue(operand: incomingOp.value)
-      builder.createBranch(to: phiBlock, arguments: oldBranch.arguments(excluding: incomingOp))
-      context.erase(instruction: oldBranch)
+      Builder(before: incomingOp.instruction, context).createDestroyValue(operand: incomingOp.value)
     }
 
     // Users of `phi` include `debug_value` instructions and this `destroy_value`
     context.erase(instructions: phi.value.users)
 
-    phiBlock.eraseArgument(at: phi.value.index, context)
+    erasePhiArgument(phi: phi, context)
   }
 }
 
@@ -202,10 +198,4 @@ private func isDeinitBarrierInBlock(before instruction: Instruction, _ context: 
   return ReverseInstructionList(first: instruction.previous).contains(where: {
     $0.isDeinitBarrier(context.calleeAnalysis)
   })
-}
-
-private extension BranchInst {
-  func arguments(excluding excludeOp: Operand) -> [Value] {
-    return Array(operands.filter{ $0 != excludeOp }.values)
-  }
 }
