@@ -882,7 +882,7 @@ extension Span where Element: ~Copyable {
   ///
   /// - Parameter k: The number of elements to drop off the end of
   ///   the span. `k` must be greater than or equal to zero.
-  /// - Returns: A span leaving off the specified number of elements at the end.
+  /// - Returns: A span leaving off the specified number of trailing elements.
   ///
   /// - Complexity: O(1)
   @export(implementation)

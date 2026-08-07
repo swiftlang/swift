@@ -1134,7 +1134,7 @@ extension MutableRawSpan {
   ///
   /// - Parameter k: The number of bytes to drop off the end of
   ///   the span. `k` must be greater than or equal to zero.
-  /// - Returns: A span leaving off the specified number of bytes at the end.
+  /// - Returns: A span leaving off the specified number of trailing bytes.
   ///
   /// - Complexity: O(1)
   @export(implementation)
@@ -1160,7 +1160,7 @@ extension MutableRawSpan {
   ///
   /// - Parameter k: The number of bytes to drop off the end of
   ///   the span. `k` must be greater than or equal to zero.
-  /// - Returns: A span leaving off the specified number of bytes at the end.
+  /// - Returns: A span leaving off the specified number of trailing bytes.
   ///
   /// - Complexity: O(1)
   @available(*, deprecated, renamed: "_mutatingExtracting(droppingLast:)")
@@ -1177,7 +1177,7 @@ extension MutableRawSpan {
   ///
   /// - Parameter k: The number of bytes to drop off the end of
   ///   the span. `k` must be greater than or equal to zero.
-  /// - Returns: A span leaving off the specified number of bytes at the end.
+  /// - Returns: A span leaving off the specified number of trailing bytes.
   ///
   /// - Complexity: O(1)
   @export(implementation)
