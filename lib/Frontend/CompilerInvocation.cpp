@@ -443,6 +443,41 @@ void CompilerInvocation::computeCXXStdlibOptions() {
   }
 }
 
+void CompilerInvocation::setCommonEmbeddedSwiftOptions(
+    EmbeddedSwiftContext context, bool exclusivityEnforcementSpecified) {
+  LangOpts.enableFeature(Feature::Embedded);
+
+  LangOpts.UnavailableDeclOptimizationMode =
+      UnavailableDeclOptimization::Complete;
+  LangOpts.DisableImplicitStringProcessingModuleImport = true;
+  LangOpts.DisableImplicitConcurrencyModuleImport |=
+      !LangOpts.Target.isOSWASI();
+  IRGenOpts.DisableLegacyTypeInfo = true;
+  TypeCheckerOpts.SkipFunctionBodies = FunctionBodySkipping::None;
+  SILOpts.SkipFunctionBodies = FunctionBodySkipping::None;
+  SILOpts.UseAggressiveReg2MemForCodeSize = true;
+
+  if (!exclusivityEnforcementSpecified && !SILOpts.RemoveRuntimeAsserts) {
+    SILOpts.EnforceExclusivityStatic = true;
+    SILOpts.EnforceExclusivityDynamic = false;
+  }
+  if (context == EmbeddedSwiftContext::DebuggerExpression)
+    return;
+
+  // Settings that either don't matter or would be harmful for the debugger.
+  IRGenOpts.InternalizeAtLink = true;
+  IRGenOpts.ReflectionMetadata = ReflectionMetadataMode::None;
+  IRGenOpts.EnableReflectionNames = false;
+  FrontendOpts.DisableBuildingInterface = true;
+  SearchPathOpts.ModuleLoadMode = ModuleLoadingMode::OnlySerialized;
+  SILOpts.CMOMode = CrossModuleOptimizationMode::Everything;
+  SILOpts.EmbeddedSwift = true;
+  // -g is promoted to -gdwarf-types in embedded Swift
+  if (IRGenOpts.DebugInfoLevel == IRGenDebugInfoLevel::ASTTypes) {
+    IRGenOpts.DebugInfoLevel = IRGenDebugInfoLevel::DwarfTypes;
+  }
+}
+
 void CompilerInvocation::setRuntimeResourcePath(StringRef Path) {
   SearchPathOpts.RuntimeResourcePath = Path.str();
   updateRuntimeLibraryPaths(SearchPathOpts, FrontendOpts, LangOpts, SDKInfo);
@@ -1936,10 +1971,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.BypassResilienceChecks |= Args.hasArg(OPT_bypass_resilience);
 
   if (Opts.hasFeature(Feature::Embedded)) {
-    Opts.UnavailableDeclOptimizationMode = UnavailableDeclOptimization::Complete;
-    Opts.DisableImplicitStringProcessingModuleImport = true;
-    Opts.DisableImplicitConcurrencyModuleImport |= !Opts.Target.isOSWASI();
-
     if (!swiftModulesInitialized()) {
       Diags.diagnose(SourceLoc(), diag::no_swift_sources_with_embedded);
       HadError = true;
@@ -3493,11 +3524,6 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
       Diags.diagnose(SourceLoc(), diag::embedded_dynamic_exclusivity_staging);
       Opts.EnforceExclusivityDynamic = false;
     }
-  } else if (!Opts.RemoveRuntimeAsserts &&
-             LangOpts.hasFeature(Feature::Embedded)) {
-    // Embedded Swift defaults to -enforce-exclusivity=unchecked for now.
-    Opts.EnforceExclusivityStatic = true;
-    Opts.EnforceExclusivityDynamic = false;
   }
 
   Opts.NoAllocations = Args.hasArg(OPT_no_allocations);
@@ -4504,21 +4530,9 @@ bool CompilerInvocation::parseArgs(
   computeAArch64TBIOptions();
 
   if (LangOpts.hasFeature(Feature::Embedded)) {
-    IRGenOpts.InternalizeAtLink = true;
-    IRGenOpts.DisableLegacyTypeInfo = true;
-    IRGenOpts.ReflectionMetadata = ReflectionMetadataMode::None;
-    IRGenOpts.EnableReflectionNames = false;
-    FrontendOpts.DisableBuildingInterface = true;
-    SearchPathOpts.ModuleLoadMode = ModuleLoadingMode::OnlySerialized;
-    TypeCheckerOpts.SkipFunctionBodies = FunctionBodySkipping::None;
-    SILOpts.SkipFunctionBodies = FunctionBodySkipping::None;
-    SILOpts.CMOMode = CrossModuleOptimizationMode::Everything;
-    SILOpts.EmbeddedSwift = true;
-    SILOpts.UseAggressiveReg2MemForCodeSize = true;
-    // -g is promoted to -gdwarf-types in embedded Swift
-    if (IRGenOpts.DebugInfoLevel == IRGenDebugInfoLevel::ASTTypes) {
-      IRGenOpts.DebugInfoLevel = IRGenDebugInfoLevel::DwarfTypes;
-    }
+    setCommonEmbeddedSwiftOptions(
+        EmbeddedSwiftContext::FullCompilation,
+        ParsedArgs.hasArg(OPT_enforce_exclusivity_EQ));
   } else {
     if (SILOpts.NoAllocations) {
       Diags.diagnose(SourceLoc(), diag::no_allocations_without_embedded);
