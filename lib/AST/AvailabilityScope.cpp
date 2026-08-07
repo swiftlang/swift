@@ -271,10 +271,19 @@ void AvailabilityScope::addChild(AvailabilityScope *Child, ASTContext &Ctx) {
 
 AvailabilityScope *AvailabilityScope::findMostRefinedSubContextImpl(
     SourceLoc Loc, ASTContext &Ctx,
-    llvm::SmallVectorImpl<AvailabilityScope *> *ScopeStack) {
+    llvm::SmallVectorImpl<AvailabilityScope *> *ScopeStack,
+    ASTNode stopAtASTNode) {
   DEBUG_ASSERT(Loc.isValid());
 
   if (SrcRange.isValid() && !Ctx.SourceMgr.containsTokenLoc(SrcRange, Loc))
+    return nullptr;
+
+  // If this scope was introduced by the node that the caller is asking about,
+  // treat it as not containing the location. The caller wants the availability
+  // of the position that the node appears in, and expanding this scope may
+  // require querying the availability that the node introduces, which may be
+  // what triggered this lookup in the first place.
+  if (stopAtASTNode && getASTNode() == stopAtASTNode)
     return nullptr;
 
   (void)evaluateOrDefault(Ctx.evaluator,
@@ -295,8 +304,8 @@ AvailabilityScope *AvailabilityScope::findMostRefinedSubContextImpl(
   // Check whether the matching child or any of its descendants contain
   // the given location.
   if (iter != Children.end()) {
-    if (auto found =
-            (*iter)->findMostRefinedSubContextImpl(Loc, Ctx, ScopeStack))
+    if (auto found = (*iter)->findMostRefinedSubContextImpl(
+            Loc, Ctx, ScopeStack, stopAtASTNode))
       return found;
   }
 
@@ -306,14 +315,17 @@ AvailabilityScope *AvailabilityScope::findMostRefinedSubContextImpl(
 }
 
 AvailabilityScope *
-AvailabilityScope::findMostRefinedSubContext(SourceLoc Loc, ASTContext &Ctx) {
-  return findMostRefinedSubContextImpl(Loc, Ctx, /*ScopeStack=*/nullptr);
+AvailabilityScope::findMostRefinedSubContext(SourceLoc Loc, ASTContext &Ctx,
+                                             ASTNode stopAtASTNode) {
+  return findMostRefinedSubContextImpl(Loc, Ctx, /*ScopeStack=*/nullptr,
+                                       stopAtASTNode);
 }
 
 AvailabilityScope *AvailabilityScope::findMostRefinedSubContext(
     SourceLoc Loc, ASTContext &Ctx,
-    llvm::SmallVectorImpl<AvailabilityScope *> &ScopeStack) {
-  return findMostRefinedSubContextImpl(Loc, Ctx, &ScopeStack);
+    llvm::SmallVectorImpl<AvailabilityScope *> &ScopeStack,
+    ASTNode stopAtASTNode) {
+  return findMostRefinedSubContextImpl(Loc, Ctx, &ScopeStack, stopAtASTNode);
 }
 
 void AvailabilityScope::dump(SourceManager &SrcMgr) const {
@@ -323,6 +335,61 @@ void AvailabilityScope::dump(SourceManager &SrcMgr) const {
 void AvailabilityScope::dump(raw_ostream &OS, SourceManager &SrcMgr) const {
   print(OS, SrcMgr, 0);
   OS << '\n';
+}
+
+ASTNode AvailabilityScope::getASTNode() const {
+  switch (getReason()) {
+  case Reason::Root:
+    // A source file cannot be represented as an `ASTNode`.
+    return ASTNode();
+
+  case Reason::Decl:
+  case Reason::DeclImplicit:
+    return Node.getAsDecl();
+
+  case Reason::IfStmtThenBranch:
+  case Reason::IfStmtElseBranch:
+    return static_cast<Stmt *>(Node.getAsIfStmt());
+
+  case Reason::ConditionFollowingAvailabilityQuery:
+    return ASTNode();
+
+  case Reason::GuardStmtFallthrough:
+  case Reason::GuardStmtElseBranch:
+    return static_cast<Stmt *>(Node.getAsGuardStmt());
+
+  case Reason::WhileStmtBody:
+    return static_cast<Stmt *>(Node.getAsWhileStmt());
+
+  case Reason::SwitchStmt:
+    return static_cast<Stmt *>(Node.getAsSwitchStmt());
+
+  case Reason::SwitchStmtCaseBody:
+    return static_cast<Stmt *>(Node.getAsCaseStmt());
+  }
+
+  llvm_unreachable("Unhandled Reason in switch.");
+}
+
+bool AvailabilityScope::isIntroducedByStmt() const {
+  switch (getReason()) {
+  case Reason::Root:
+  case Reason::Decl:
+  case Reason::DeclImplicit:
+    return false;
+
+  case Reason::IfStmtThenBranch:
+  case Reason::IfStmtElseBranch:
+  case Reason::ConditionFollowingAvailabilityQuery:
+  case Reason::GuardStmtFallthrough:
+  case Reason::GuardStmtElseBranch:
+  case Reason::WhileStmtBody:
+  case Reason::SwitchStmt:
+  case Reason::SwitchStmtCaseBody:
+    return true;
+  }
+
+  llvm_unreachable("Unhandled Reason in switch.");
 }
 
 SourceLoc AvailabilityScope::getIntroductionLoc() const {

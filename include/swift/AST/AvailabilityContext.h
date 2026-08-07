@@ -160,6 +160,14 @@ public:
   /// Returns true if `other` is as available or is more available.
   bool isContainedIn(const AvailabilityContext other) const;
 
+  /// Creates implicit `@available` attributes describing the availability
+  /// restrictions that this context imposes relative to \p other and appends
+  /// them to \p attrs. Restrictions that cannot be expressed as attributes are
+  /// omitted.
+  void createImplicitAvailableAttrs(
+      const AvailabilityContext &other, ASTContext &ctx,
+      llvm::SmallVectorImpl<AvailableAttr *> &attrs) const;
+
   friend bool operator==(const AvailabilityContext &lhs,
                          const AvailabilityContext &rhs) {
     return lhs.storage == rhs.storage;
