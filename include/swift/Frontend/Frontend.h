@@ -280,6 +280,15 @@ public:
 
   void setRuntimeResourcePath(StringRef Path);
 
+  /// Recompute the implicit search paths for the runtime libraries and
+  /// frameworks.
+  ///
+  /// These paths depend on the target, the SDK path and on language options -
+  /// e.g. Embedded Swift uses its own set of runtime libraries. Tools which
+  /// modify LangOptions directly, instead of going through parseArgs(), need to
+  /// call this afterwards.
+  void updateImplicitSearchPaths();
+
   /// Compute the default prebuilt module cache path for a given resource path
   /// and SDK version. This function is also used by LLDB.
   static std::string
