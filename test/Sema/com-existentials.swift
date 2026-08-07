@@ -42,4 +42,4 @@ func rejectSuperclass(_: any NativeBase & IDerived) {}
 // expected-error@-1 {{COM existential containing interface 'IDerived' cannot also contain class constraint 'NativeBase'}}
 
 func rejectCOMInterface(_: any COMInterface) {}
-// expected-error@-1 {{'any COMInterface' is invalid because 'COMInterface' does not identify a COM interface}}
+// expected-error@-1 {{'any COMInterface' is invalid because 'COMInterface' describes a COM metatype identity}}

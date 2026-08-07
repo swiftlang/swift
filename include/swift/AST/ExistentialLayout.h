@@ -42,9 +42,8 @@ struct COMExistentialInterfaceResolution {
   /// The first non-marker Swift protocol, retained for diagnostics.
   ProtocolDecl *firstNonMarkerProtocol = nullptr;
 
-  /// Whether the composition contains the compiler-managed \c COMInterface
-  /// protocol itself.
-  bool containsCOMInterfaceProtocol = false;
+  /// A compiler-managed COM identity protocol contained by the composition.
+  ProtocolDecl *identityProtocol = nullptr;
 };
 
 struct ExistentialLayout {

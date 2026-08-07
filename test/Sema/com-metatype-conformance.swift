@@ -27,7 +27,7 @@ func f<Interface>(_ value: borrowing Interface)
 }
 
 typealias ErasedTearOff = TearOff<COMInterface>
-// expected-error@-1{{'any COMInterface' is invalid because 'COMInterface' does not identify a COM interface}}
+// expected-error@-1{{'any COMInterface' is invalid because 'COMInterface' describes a COM metatype identity}}
 
 typealias AmbiguousTearOff = TearOff<IWidget & IInterface>
 // expected-error@-1{{COM existential cannot contain interfaces 'IInterface' and 'IWidget' because neither refines the other}}

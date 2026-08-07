@@ -6886,7 +6886,9 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
 
     // Check and record normal conformances.
     if (auto normal = dyn_cast<NormalProtocolConformance>(conformance)) {
-      groupChecker.addConformance(normal);
+      if (!normal->isInvalid() ||
+          !normal->getProtocol()->isSpecificProtocol(KnownProtocolKind::COMInterface))
+        groupChecker.addConformance(normal);
     }
 
     // Diagnose @NSCoding on file/fileprivate/nested/generic classes, which
