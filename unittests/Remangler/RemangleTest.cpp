@@ -150,6 +150,21 @@ TEST(TestSwiftRemangler, IdentifierExpansionLimit) {
   ASSERT_NE(UnderDem.demangleSymbol(Under), nullptr);
 }
 
+TEST(TestSwiftRemangler, AllocateWithMisalignedSlabEnd) {
+  using namespace swift::Demangle;
+
+  // A char allocation big enough to force a new slab leaves the slab's end
+  // misaligned relative to Node. Allocating a Node afterwards must not read
+  // or write past the end of that slab.
+  NodeFactory Factory;
+  size_t Size = 100 * sizeof(Node) * 2 + 1;
+  char *Chars = Factory.Allocate<char>(Size);
+  memset(Chars, 'x', Size);
+
+  NodePointer N = Factory.createNode(Node::Kind::Identifier, "a");
+  ASSERT_EQ(N->getText(), "a");
+}
+
 TEST(TestSwiftRemangler, TooComplexIsReportedNotFatal) {
   using namespace swift::Demangle;
 

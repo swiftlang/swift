@@ -23,6 +23,7 @@
 #include "swift/Demangling/Errors.h"
 #include "swift/Demangling/ManglingFlavor.h"
 #include "swift/Demangling/NamespaceMacros.h"
+#include "llvm/Support/Alignment.h"
 
 //#define NODE_FACTORY_DEBUGGING
 
@@ -61,12 +62,6 @@ class NodeFactory {
   /// The slab size can only grow, even clear() does not reset the slab size.
   /// This initial size is good enough to fit most de-manglings.
   size_t SlabSize = 100 * sizeof(Node);
-
-  static char *align(char *Ptr, size_t Alignment) {
-    assert(Alignment > 0);
-    return (char*)(((uintptr_t)Ptr + Alignment - 1)
-                     & ~((uintptr_t)Alignment - 1));
-  }
 
   static void freeSlabs(AllocatedSlab *slab);
 
@@ -153,14 +148,17 @@ public:
     if (NumObjects > SIZE_MAX / sizeof(T))
       fatal(0, "too many objects requested from demangler allocator\n");
     size_t ObjectSize = NumObjects * sizeof(T);
-    CurPtr = align(CurPtr, alignof(T));
+    // Don't move CurPtr past End when aligning, which would make the space
+    // computation below wrap around.
+    size_t Padding = llvm::offsetToAlignedAddr(CurPtr, llvm::Align::Of<T>());
+    size_t Available = CurPtr ? (size_t)(End - CurPtr) : 0;
 #ifdef NODE_FACTORY_DEBUGGING
     fprintf(stderr, "%salloc %zu, CurPtr = %p\n", indent().c_str(), ObjectSize, (void *)CurPtr)
     allocatedMemory += ObjectSize;
 #endif
 
     // Do we have enough space in the current slab?
-    if (!CurPtr || (size_t)(End - CurPtr) < ObjectSize) {
+    if (!CurPtr || Available < Padding || Available - Padding < ObjectSize) {
       // No. We have to malloc a new slab.
       size_t MaxSlabSize = SIZE_MAX - sizeof(AllocatedSlab);
       if (ObjectSize > MaxSlabSize - alignof(T))
@@ -181,13 +179,15 @@ public:
       CurrentSlab = newSlab;
 
       // Initialize the pointers to the new slab.
-      CurPtr = align((char *)(newSlab + 1), alignof(T));
+      CurPtr = (char *)llvm::alignAddr(newSlab + 1, llvm::Align::Of<T>());
       End = (char *)newSlab + AllocSize;
       assert(CurPtr + ObjectSize <= End);
 #ifdef NODE_FACTORY_DEBUGGING
       fprintf(stderr, "%s** new slab %p, allocsize = %zu, CurPtr = %p, End = %p\n",
             indent().c_str(), newSlab, AllocSize, (void *)CurPtr, (void *)End);
 #endif
+    } else {
+      CurPtr += Padding;
     }
     T *AllocatedObj = (T *)CurPtr;
     CurPtr += ObjectSize;
