@@ -11086,6 +11086,19 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
 
   // Include requirements of protocols to which the metatype conforms.
   if (baseObjTy->is<AnyMetatypeType>()) {
+    auto addMetatypeConformanceMembers = [&](ProtocolDecl *protocol) {
+      SmallVector<ValueDecl *, 4> members;
+      DC->lookupQualified(protocol, DeclNameRef(lookupName.getFullName()),
+                          SourceLoc(), NLFlags::QualifiedDefault, members);
+      for (auto *member : members) {
+        if (auto *VD = dyn_cast<ValueDecl>(member)) {
+          metatypeConformanceMembers.insert(VD);
+          addChoice(getOverloadChoice(VD, /*isBridged=*/false,
+                                      /*isUnwrappedOptional=*/false));
+        }
+      }
+    };
+
     if (auto signature = DC->getGenericSignatureOfContext()) {
       for (const auto &requirement : signature.getRequirements()) {
         if (requirement.getKind() != RequirementKind::Conformance ||
@@ -11094,18 +11107,16 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
         if (!DC->mapTypeIntoEnvironment(requirement.getFirstType())
                ->isEqual(baseObjTy))
           continue;
+        addMetatypeConformanceMembers(requirement.getProtocolDecl());
+      }
+    }
 
-        SmallVector<ValueDecl *, 4> members;
-        DC->lookupQualified(requirement.getProtocolDecl(),
-                            DeclNameRef(lookupName.getFullName()), SourceLoc(),
-                            NLFlags::QualifiedDefault, members);
-        for (auto *member : members) {
-          if (auto *VD = dyn_cast<ValueDecl>(member)) {
-            metatypeConformanceMembers.insert(VD);
-            addChoice(getOverloadChoice(VD, /*isBridged=*/false,
-                                        /*isUnwrappedOptional=*/false));
-          }
-        }
+    if (!baseObjTy->hasTypeParameter()) {
+      for (auto kind : { KnownProtocolKind::COMInterface,
+                         KnownProtocolKind::COMActivatable }) {
+        auto *protocol = ctx.getProtocol(kind);
+        if (protocol && lookupConformance(baseObjTy, protocol))
+          addMetatypeConformanceMembers(protocol);
       }
     }
   }
