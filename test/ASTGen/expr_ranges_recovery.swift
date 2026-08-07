@@ -35,6 +35,13 @@ func commentBeforeSuffix(foo: Int?) {
   _ = foo/* */?.description
 }
 
+// A reference with a module selector but no name after it. ASTGen built an
+// UnresolvedDeclRefExpr with an empty name, whose range ran to the synthesized
+// identifier at the end of the line -- past the declaration -- so the following
+// top-level scope overlapped it. The C++ parser yields an ErrorExpr.
+let moduleSelectorWithoutName = Swift::
+do { 1 }
+
 // A statement body whose braces the parser had to synthesize. The synthesized
 // positions land past the last token's trailing trivia -- outside the statement
 // entirely, sometimes past the end of the line -- so a body built from them gave

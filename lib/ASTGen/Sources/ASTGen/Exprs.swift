@@ -619,6 +619,17 @@ extension ASTGenVisitor {
       }
       return generateDollarIdentifierExpr(token: node.baseName)
     }
+    // A reference with no name -- `Swift::` with the identifier after the module
+    // selector missing -- has nothing to resolve, and the synthesized name token
+    // sits past the end of the line, which would give the reference a range
+    // extending past the enclosing declaration. The C++ parser yields an
+    // ErrorExpr here; the parser has already reported the missing identifier.
+    guard node.baseName.presence == .present else {
+      return BridgedErrorExpr.create(
+        self.ctx,
+        loc: self.generateSourceRange(node)
+      ).asExpr
+    }
     let nameAndLoc = generateDeclNameRef(declReferenceExpr: node)
     return BridgedUnresolvedDeclRefExpr.createParsed(
       self.ctx,
