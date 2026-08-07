@@ -1,0 +1,32 @@
+// RUN: %swift -swift-version 4 -target arm64e-apple-ios12.0 -parse-stdlib -parse-as-library %s -emit-ir -module-name test -Xcc -Xclang -Xcc -fptrauth-calls | %FileCheck %s
+
+// REQUIRES: CPU=arm64e
+// REQUIRES: OS=ios
+
+// Verify that loading the isa pointer from a heap object authenticates it
+// with ptrauth on arm64e. The isa is signed with DA key, address-diverse,
+// discriminator 0x6AE1 (27361).
+
+import Builtin
+
+class A {
+  func foo() {}
+}
+
+sil_vtable A {}
+
+sil @test_load_isa : $@convention(thin) (@guaranteed A) -> () {
+bb0(%0 : $A):
+  %1 = class_method %0 : $A, #A.foo : (A) -> () -> (), $@convention(method) (@guaranteed A) -> ()
+  %2 = apply %1(%0) : $@convention(method) (@guaranteed A) -> ()
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// When loading the isa from a heap object for vtable dispatch, the loaded
+// pointer must be authenticated with ptrauth_auth(DA, blend(addr, 0x6AE1)).
+// CHECK-LABEL: define {{.*}} @test_load_isa
+// CHECK: [[ISA:%.*]] = load ptr
+// CHECK: ptrtoint ptr %0 to i64
+// CHECK: call i64 @llvm.ptrauth.blend(i64 %{{.*}}, i64 27361)
+// CHECK: call i64 @llvm.ptrauth.auth(i64 %{{.*}}, i32 2, i64 %{{.*}})

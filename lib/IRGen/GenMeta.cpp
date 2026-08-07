@@ -4149,6 +4149,16 @@ createSingletonInitializationMetadataAccessFunction(IRGenModule &IGM,
 
     llvm::Value *descriptor =
       IGF.IGM.getAddrOfTypeContextDescriptor(typeDecl, RequireMetadata);
+
+    // Sign the descriptor.
+    auto schema = IGF.IGM.getOptions().PointerAuth.TypeDescriptorsAsArguments;
+    if (schema) {
+      auto authInfo = PointerAuthInfo::emit(
+          IGF, schema, nullptr,
+          PointerAuthEntity::Special::TypeDescriptorAsArgument);
+      descriptor = emitPointerAuthSign(IGF, descriptor, authInfo);
+    }
+
     auto responsePair =
         IGF.Builder.CreateCall(IGF.IGM.getGetSingletonMetadataFunctionPointer(),
                                {request.get(IGF), descriptor});
@@ -4459,11 +4469,12 @@ namespace {
                     "class metadata kind is non-zero?");
 
       if (IGM.ObjCInterop) {
-        // Get the metaclass pointer as an intptr_t.
+        // Get the metaclass pointer. For arm64e, this will be signed with
+        // ptrauth. For other architectures, addSignedPointer falls back to
+        // add(pointer).
         auto metaclass = asImpl().getAddrOfMetaclassObject(NotForDefinition);
-        auto flags =
-          llvm::ConstantExpr::getPtrToInt(metaclass, IGM.MetadataKindTy);
-        B.add(flags);
+        const auto &isaSchema = IGM.getOptions().PointerAuth.ObjCIsaPointers;
+        B.addSignedPointer(metaclass, isaSchema, PointerAuthEntity());
       } else {
         // On non-objc platforms just fill it with a null, there
         // is no Objective-C metaclass.
@@ -4515,6 +4526,10 @@ namespace {
         return;
       }
 
+      // Use the ObjCSuperPointers schema to sign the superclass pointer.
+      // addSignedPointer falls back to add(pointer) when the schema is empty.
+      const auto &superSchema = IGM.getOptions().PointerAuth.ObjCSuperPointers;
+
       // If this is a root class, use SwiftObject as our formal parent.
       CanType superclass = asImpl().getSuperclassTypeForMetadata();
       if (!superclass) {
@@ -4527,9 +4542,12 @@ namespace {
         // We have to do getAddrOfObjCClass ourselves here because
         // the ObjC runtime base needs to be ObjC-mangled but isn't
         // actually imported from a clang module.
-        B.add(IGM.getAddrOfObjCClass(
+        // For arm64e, addSignedPointer will sign the pointer. For other
+        // architectures, it falls back to add(pointer).
+        auto objcClass = IGM.getAddrOfObjCClass(
                                IGM.getObjCRuntimeBaseForSwiftRootClass(Target),
-                               NotForDefinition));
+                               NotForDefinition);
+        B.addSignedPointer(objcClass, superSchema, PointerAuthEntity());
         return;
       }
 
@@ -4537,7 +4555,9 @@ namespace {
       // lead to shouldAddNullSuperclass returning true above.
       auto metadata = asImpl().getSuperclassMetadata(superclass);
       assert(metadata);
-      B.add(metadata);
+      // For arm64e, addSignedPointer will sign the pointer. For other
+      // architectures, it falls back to add(pointer).
+      B.addSignedPointer(metadata, superSchema, PointerAuthEntity());
     }
 
     llvm::Constant *emitLayoutString() {
@@ -4738,11 +4758,18 @@ namespace {
       auto bit = llvm::ConstantInt::get(
           IGM.IntPtrTy, asImpl().getClassDataPointerHasSwiftMetadataBits());
 
-      // Emit data + bit.
-      data = llvm::ConstantExpr::getPtrToInt(data, IGM.IntPtrTy);
-      data = llvm::ConstantExpr::getAdd(data, bit);
+      // Add the Swift bit to the pointer value. The ObjC runtime will mask
+      // this off when reading the class_ro pointer.
+      auto dataInt = llvm::ConstantExpr::getPtrToInt(data, IGM.IntPtrTy);
+      dataInt = llvm::ConstantExpr::getAdd(dataInt, bit);
+      auto dataWithBit = llvm::ConstantExpr::getIntToPtr(dataInt,
+                                                         data->getType());
 
-      B.add(data);
+      // Sign the class_ro pointer with ptrauth. addSignedPointer falls back
+      // to add(pointer) when the schema is empty (non-arm64e targets).
+      const auto &classROSchema =
+          IGM.getOptions().PointerAuth.ObjCClassROPointers;
+      B.addSignedPointer(dataWithBit, classROSchema, PointerAuthEntity());
     }
 
     void addDefaultActorStorageFieldOffset() {
@@ -5199,7 +5226,10 @@ namespace {
       // isa
       ClassDecl *rootClass = getRootClassForMetaclass(IGM, Target);
       auto isa = IGM.getAddrOfMetaclassObject(rootClass, NotForDefinition);
-      B.add(isa);
+      // Sign the isa pointer. addSignedPointer falls back to add(pointer)
+      // when the ObjCIsaPointers schema is empty (non-arm64e targets).
+      const auto &isaSchema = IGM.getOptions().PointerAuth.ObjCIsaPointers;
+      B.addSignedPointer(isa, isaSchema, PointerAuthEntity());
       // super, which is dependent if the superclass is generic
       B.addNullPointer(IGM.ObjCClassPtrTy);
       // cache
@@ -5219,15 +5249,6 @@ namespace {
                                       llvm::Value *descriptor,
                                       llvm::Value *arguments,
                                       llvm::Value *templatePointer) {
-      // Sign the descriptor.
-      auto schema = IGF.IGM.getOptions().PointerAuth.TypeDescriptorsAsArguments;
-      if (schema) {
-        auto authInfo = PointerAuthInfo::emit(
-            IGF, schema, nullptr,
-            PointerAuthEntity::Special::TypeDescriptorAsArgument);
-        descriptor = emitPointerAuthSign(IGF, descriptor, authInfo);
-      }
-
       auto metadata = IGF.Builder.CreateCall(
           getLayoutString() ?
             IGM.getAllocateGenericClassMetadataWithLayoutStringFunctionPointer() :
@@ -6211,15 +6232,6 @@ namespace {
       auto extraSize = getExtraDataSize(layout);
       auto extraSizeV = IGM.getSize(extraSize);
 
-      // Sign the descriptor.
-      auto schema = IGF.IGM.getOptions().PointerAuth.TypeDescriptorsAsArguments;
-      if (schema) {
-        auto authInfo = PointerAuthInfo::emit(
-            IGF, schema, nullptr,
-            PointerAuthEntity::Special::TypeDescriptorAsArgument);
-        descriptor = emitPointerAuthSign(IGF, descriptor, authInfo);
-      }
-
       if (layoutStringsEnabled(IGM)) {
         auto *call = IGF.Builder.CreateCall(
             IGM.getAllocateGenericValueMetadataWithLayoutStringFunctionPointer(),
@@ -6972,15 +6984,6 @@ namespace {
       auto &layout = IGM.getMetadataLayout(Target);
       auto extraSize = getExtraDataSize(layout);
       auto extraSizeV = IGM.getSize(extraSize);
-
-      // Sign the descriptor.
-      auto schema = IGF.IGM.getOptions().PointerAuth.TypeDescriptorsAsArguments;
-      if (schema) {
-        auto authInfo = PointerAuthInfo::emit(
-            IGF, schema, nullptr,
-            PointerAuthEntity::Special::TypeDescriptorAsArgument);
-        descriptor = emitPointerAuthSign(IGF, descriptor, authInfo);
-      }
 
       if (layoutStringsEnabled(IGM)) {
         auto *call = IGF.Builder.CreateCall(
