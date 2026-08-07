@@ -1,0 +1,1120 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "runs": [
+    {
+      "artifacts": [
+        {
+          "location": {
+            "uri": "FILE[0]"
+          },
+          "mimeType": "text/x-swift",
+          "sourceLanguage": "swift"
+        }
+      ],
+      "invocations": [
+        {
+          "properties": {
+            "Frontend": {
+              "moduleName": "locations"
+            },
+            "Language": {
+              "activeConcurrencyModel": "Standard",
+              "strictConcurrencyLevel": "Minimal"
+            }
+          }
+        }
+      ],
+      "results": [
+        {
+          "kind": "fail",
+          "level": "error",
+          "locations": [
+            {
+              "logicalLocations": [
+                {
+                  "fullyQualifiedName": "MyClass",
+                  "kind": "class",
+                  "name": "MyClass"
+                },
+                {
+                  "fullyQualifiedName": "MyClass.x",
+                  "kind": "variable",
+                  "name": "x",
+                  "parentIndex": 0
+                }
+              ],
+              "physicalLocation": {
+                "artifactLocation": {
+                  "index": 0
+                },
+                "region": {
+                  "startColumn": 16,
+                  "startLine": 6
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "cannot convert value of type 'String' to specified type 'Int'"
+          },
+          "ruleId": "MessageID(domain: \"SwiftCompiler\", id: \"SimpleDiagnostic\")"
+        },
+        {
+          "kind": "fail",
+          "level": "error",
+          "locations": [
+            {
+              "logicalLocations": [
+                {
+                  "fullyQualifiedName": "MyStruct",
+                  "kind": "struct",
+                  "name": "MyStruct"
+                },
+                {
+                  "fullyQualifiedName": "MyStruct.x",
+                  "kind": "variable",
+                  "name": "x",
+                  "parentIndex": 0
+                }
+              ],
+              "physicalLocation": {
+                "artifactLocation": {
+                  "index": 0
+                },
+                "region": {
+                  "startColumn": 16,
+                  "startLine": 39
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "cannot convert value of type 'String' to specified type 'Int'"
+          },
+          "ruleId": "MessageID(domain: \"SwiftCompiler\", id: \"SimpleDiagnostic\")"
+        },
+        {
+          "kind": "fail",
+          "level": "error",
+          "locations": [
+            {
+              "logicalLocations": [
+                {
+                  "fullyQualifiedName": "MyActor",
+                  "kind": "class",
+                  "name": "MyActor"
+                },
+                {
+                  "fullyQualifiedName": "MyActor.x",
+                  "kind": "variable",
+                  "name": "x",
+                  "parentIndex": 0
+                }
+              ],
+              "physicalLocation": {
+                "artifactLocation": {
+                  "index": 0
+                },
+                "region": {
+                  "startColumn": 16,
+                  "startLine": 74
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "cannot convert value of type 'String' to specified type 'Int'"
+          },
+          "ruleId": "MessageID(domain: \"SwiftCompiler\", id: \"SimpleDiagnostic\")"
+        },
+        {
+          "kind": "fail",
+          "level": "warning",
+          "locations": [
+            {
+              "logicalLocations": [
+                {
+                  "fullyQualifiedName": "myMacro",
+                  "kind": "macro",
+                  "name": "myMacro"
+                }
+              ],
+              "physicalLocation": {
+                "artifactLocation": {
+                  "index": 0
+                },
+                "region": {
+                  "startColumn": 7,
+                  "startLine": 148
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "external macro implementation type 'MyMacros.MyMacro' could not be found for macro 'myMacro'; plugin for module 'MyMacros' not found"
+          },
+          "ruleId": "MessageID(domain: \"SwiftCompiler\", id: \"SimpleDiagnostic\")"
+        },
+        {
+          "kind": "fail",
+          "level": "error",
+          "locations": [
+            {
+              "logicalLocations": [
+                {
+                  "fullyQualifiedName": "StructWithAccessors",
+                  "kind": "struct",
+                  "name": "StructWithAccessors"
+                },
+                {
+                  "fullyQualifiedName": "StructWithAccessors.value",
+                  "kind": "variable",
+                  "name": "value",
+                  "parentIndex": 0
+                },
+                {
+                  "fullyQualifiedName": "StructWithAccessors.value.didSet",
+                  "kind": "function",
+                  "name": "didSet",
+                  "parentIndex": 1
+                },
+                {
+                  "fullyQualifiedName": "StructWithAccessors.value.didSet.y",
+                  "kind": "variable",
+                  "name": "y",
+                  "parentIndex": 2
+                }
+              ],
+              "physicalLocation": {
+                "artifactLocation": {
+                  "index": 0
+                },
+                "region": {
+                  "startColumn": 20,
+                  "startLine": 180
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "cannot convert value of type 'String' to specified type 'Int'"
+          },
+          "ruleId": "MessageID(domain: \"SwiftCompiler\", id: \"SimpleDiagnostic\")"
+        },
+        {
+          "kind": "fail",
+          "level": "error",
+          "locations": [
+            {
+              "logicalLocations": [
+                {
+                  "fullyQualifiedName": "MyClass",
+                  "kind": "class",
+                  "name": "MyClass"
+                },
+                {
+                  "fullyQualifiedName": "MyClass.myMethod",
+                  "kind": "function",
+                  "name": "myMethod",
+                  "parentIndex": 0
+                },
+                {
+                  "fullyQualifiedName": "MyClass.myMethod.y",
+                  "kind": "variable",
+                  "name": "y",
+                  "parentIndex": 1
+                }
+              ],
+              "physicalLocation": {
+                "artifactLocation": {
+                  "index": 0
+                },
+                "region": {
+                  "startColumn": 18,
+                  "startLine": 9
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "cannot convert value of type 'String' to specified type 'Int'"
+          },
+          "ruleId": "MessageID(domain: \"SwiftCompiler\", id: \"SimpleDiagnostic\")"
+        },
+        {
+          "kind": "fail",
+          "level": "error",
+          "locations": [
+            {
+              "logicalLocations": [
+                {
+                  "fullyQualifiedName": "MyClass",
+                  "kind": "class",
+                  "name": "MyClass"
+                },
+                {
+                  "fullyQualifiedName": "MyClass.init",
+                  "kind": "function",
+                  "name": "init",
+                  "parentIndex": 0
+                },
+                {
+                  "fullyQualifiedName": "MyClass.init.z",
+                  "kind": "variable",
+                  "name": "z",
+                  "parentIndex": 1
+                }
+              ],
+              "physicalLocation": {
+                "artifactLocation": {
+                  "index": 0
+                },
+                "region": {
+                  "startColumn": 18,
+                  "startLine": 13
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "cannot convert value of type 'String' to specified type 'Int'"
+          },
+          "ruleId": "MessageID(domain: \"SwiftCompiler\", id: \"SimpleDiagnostic\")"
+        },
+        {
+          "kind": "fail",
+          "level": "error",
+          "locations": [
+            {
+              "logicalLocations": [
+                {
+                  "fullyQualifiedName": "MyClass",
+                  "kind": "class",
+                  "name": "MyClass"
+                },
+                {
+                  "fullyQualifiedName": "MyClass.deinit",
+                  "kind": "function",
+                  "name": "deinit",
+                  "parentIndex": 0
+                },
+                {
+                  "fullyQualifiedName": "MyClass.deinit.w",
+                  "kind": "variable",
+                  "name": "w",
+                  "parentIndex": 1
+                }
+              ],
+              "physicalLocation": {
+                "artifactLocation": {
+                  "index": 0
+                },
+                "region": {
+                  "startColumn": 18,
+                  "startLine": 17
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "cannot convert value of type 'String' to specified type 'Int'"
+          },
+          "ruleId": "MessageID(domain: \"SwiftCompiler\", id: \"SimpleDiagnostic\")"
+        },
+        {
+          "kind": "fail",
+          "level": "error",
+          "locations": [
+            {
+              "logicalLocations": [
+                {
+                  "fullyQualifiedName": "MyClass",
+                  "kind": "class",
+                  "name": "MyClass"
+                },
+                {
+                  "fullyQualifiedName": "MyClass.subscript",
+                  "kind": "function",
+                  "name": "subscript",
+                  "parentIndex": 0
+                },
+                {
+                  "fullyQualifiedName": "MyClass.subscript.s",
+                  "kind": "variable",
+                  "name": "s",
+                  "parentIndex": 1
+                }
+              ],
+              "physicalLocation": {
+                "artifactLocation": {
+                  "index": 0
+                },
+                "region": {
+                  "startColumn": 18,
+                  "startLine": 21
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "cannot convert value of type 'String' to specified type 'Int'"
+          },
+          "ruleId": "MessageID(domain: \"SwiftCompiler\", id: \"SimpleDiagnostic\")"
+        },
+        {
+          "kind": "fail",
+          "level": "error",
+          "locations": [
+            {
+              "logicalLocations": [
+                {
+                  "fullyQualifiedName": "MyClass",
+                  "kind": "class",
+                  "name": "MyClass"
+                },
+                {
+                  "fullyQualifiedName": "MyClass.computed",
+                  "kind": "variable",
+                  "name": "computed",
+                  "parentIndex": 0
+                },
+                {
+                  "fullyQualifiedName": "MyClass.computed.get",
+                  "kind": "function",
+                  "name": "get",
+                  "parentIndex": 1
+                },
+                {
+                  "fullyQualifiedName": "MyClass.computed.get.c",
+                  "kind": "variable",
+                  "name": "c",
+                  "parentIndex": 2
+                }
+              ],
+              "physicalLocation": {
+                "artifactLocation": {
+                  "index": 0
+                },
+                "region": {
+                  "startColumn": 20,
+                  "startLine": 27
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "cannot convert value of type 'String' to specified type 'Int'"
+          },
+          "ruleId": "MessageID(domain: \"SwiftCompiler\", id: \"SimpleDiagnostic\")"
+        },
+        {
+          "kind": "fail",
+          "level": "error",
+          "locations": [
+            {
+              "logicalLocations": [
+                {
+                  "fullyQualifiedName": "MyClass",
+                  "kind": "class",
+                  "name": "MyClass"
+                },
+                {
+                  "fullyQualifiedName": "MyClass.computed",
+                  "kind": "variable",
+                  "name": "computed",
+                  "parentIndex": 0
+                },
+                {
+                  "fullyQualifiedName": "MyClass.computed.set",
+                  "kind": "function",
+                  "name": "set",
+                  "parentIndex": 1
+                },
+                {
+                  "fullyQualifiedName": "MyClass.computed.set.d",
+                  "kind": "variable",
+                  "name": "d",
+                  "parentIndex": 2
+                }
+              ],
+              "physicalLocation": {
+                "artifactLocation": {
+                  "index": 0
+                },
+                "region": {
+                  "startColumn": 20,
+                  "startLine": 31
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "cannot convert value of type 'String' to specified type 'Int'"
+          },
+          "ruleId": "MessageID(domain: \"SwiftCompiler\", id: \"SimpleDiagnostic\")"
+        },
+        {
+          "kind": "fail",
+          "level": "error",
+          "locations": [
+            {
+              "logicalLocations": [
+                {
+                  "fullyQualifiedName": "MyStruct",
+                  "kind": "struct",
+                  "name": "MyStruct"
+                },
+                {
+                  "fullyQualifiedName": "MyStruct.myMethod",
+                  "kind": "function",
+                  "name": "myMethod",
+                  "parentIndex": 0
+                },
+                {
+                  "fullyQualifiedName": "MyStruct.myMethod.y",
+                  "kind": "variable",
+                  "name": "y",
+                  "parentIndex": 1
+                }
+              ],
+              "physicalLocation": {
+                "artifactLocation": {
+                  "index": 0
+                },
+                "region": {
+                  "startColumn": 18,
+                  "startLine": 42
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "cannot convert value of type 'String' to specified type 'Int'"
+          },
+          "ruleId": "MessageID(domain: \"SwiftCompiler\", id: \"SimpleDiagnostic\")"
+        },
+        {
+          "kind": "fail",
+          "level": "error",
+          "locations": [
+            {
+              "logicalLocations": [
+                {
+                  "fullyQualifiedName": "MyStruct",
+                  "kind": "struct",
+                  "name": "MyStruct"
+                },
+                {
+                  "fullyQualifiedName": "MyStruct.init",
+                  "kind": "function",
+                  "name": "init",
+                  "parentIndex": 0
+                },
+                {
+                  "fullyQualifiedName": "MyStruct.init.z",
+                  "kind": "variable",
+                  "name": "z",
+                  "parentIndex": 1
+                }
+              ],
+              "physicalLocation": {
+                "artifactLocation": {
+                  "index": 0
+                },
+                "region": {
+                  "startColumn": 18,
+                  "startLine": 46
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "cannot convert value of type 'String' to specified type 'Int'"
+          },
+          "ruleId": "MessageID(domain: \"SwiftCompiler\", id: \"SimpleDiagnostic\")"
+        },
+        {
+          "kind": "fail",
+          "level": "error",
+          "locations": [
+            {
+              "logicalLocations": [
+                {
+                  "fullyQualifiedName": "MyStruct",
+                  "kind": "struct",
+                  "name": "MyStruct"
+                },
+                {
+                  "fullyQualifiedName": "MyStruct.subscript",
+                  "kind": "function",
+                  "name": "subscript",
+                  "parentIndex": 0
+                },
+                {
+                  "fullyQualifiedName": "MyStruct.subscript.s",
+                  "kind": "variable",
+                  "name": "s",
+                  "parentIndex": 1
+                }
+              ],
+              "physicalLocation": {
+                "artifactLocation": {
+                  "index": 0
+                },
+                "region": {
+                  "startColumn": 18,
+                  "startLine": 50
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "cannot convert value of type 'String' to specified type 'Int'"
+          },
+          "ruleId": "MessageID(domain: \"SwiftCompiler\", id: \"SimpleDiagnostic\")"
+        },
+        {
+          "kind": "fail",
+          "level": "error",
+          "locations": [
+            {
+              "logicalLocations": [
+                {
+                  "fullyQualifiedName": "MyEnum",
+                  "kind": "enum",
+                  "name": "MyEnum"
+                },
+                {
+                  "fullyQualifiedName": "MyEnum.myMethod",
+                  "kind": "function",
+                  "name": "myMethod",
+                  "parentIndex": 0
+                },
+                {
+                  "fullyQualifiedName": "MyEnum.myMethod.y",
+                  "kind": "variable",
+                  "name": "y",
+                  "parentIndex": 1
+                }
+              ],
+              "physicalLocation": {
+                "artifactLocation": {
+                  "index": 0
+                },
+                "region": {
+                  "startColumn": 18,
+                  "startLine": 62
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "cannot convert value of type 'String' to specified type 'Int'"
+          },
+          "ruleId": "MessageID(domain: \"SwiftCompiler\", id: \"SimpleDiagnostic\")"
+        },
+        {
+          "kind": "fail",
+          "level": "error",
+          "locations": [
+            {
+              "logicalLocations": [
+                {
+                  "fullyQualifiedName": "MyEnum",
+                  "kind": "enum",
+                  "name": "MyEnum"
+                },
+                {
+                  "fullyQualifiedName": "MyEnum.computed",
+                  "kind": "variable",
+                  "name": "computed",
+                  "parentIndex": 0
+                },
+                {
+                  "fullyQualifiedName": "MyEnum.computed.c",
+                  "kind": "variable",
+                  "name": "c",
+                  "parentIndex": 1
+                }
+              ],
+              "physicalLocation": {
+                "artifactLocation": {
+                  "index": 0
+                },
+                "region": {
+                  "startColumn": 18,
+                  "startLine": 66
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "cannot convert value of type 'String' to specified type 'Int'"
+          },
+          "ruleId": "MessageID(domain: \"SwiftCompiler\", id: \"SimpleDiagnostic\")"
+        },
+        {
+          "kind": "fail",
+          "level": "error",
+          "locations": [
+            {
+              "logicalLocations": [
+                {
+                  "fullyQualifiedName": "MyActor",
+                  "kind": "class",
+                  "name": "MyActor"
+                },
+                {
+                  "fullyQualifiedName": "MyActor.myMethod",
+                  "kind": "function",
+                  "name": "myMethod",
+                  "parentIndex": 0
+                },
+                {
+                  "fullyQualifiedName": "MyActor.myMethod.y",
+                  "kind": "variable",
+                  "name": "y",
+                  "parentIndex": 1
+                }
+              ],
+              "physicalLocation": {
+                "artifactLocation": {
+                  "index": 0
+                },
+                "region": {
+                  "startColumn": 18,
+                  "startLine": 77
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "cannot convert value of type 'String' to specified type 'Int'"
+          },
+          "ruleId": "MessageID(domain: \"SwiftCompiler\", id: \"SimpleDiagnostic\")"
+        },
+        {
+          "kind": "fail",
+          "level": "error",
+          "locations": [
+            {
+              "logicalLocations": [
+                {
+                  "fullyQualifiedName": "MyActor",
+                  "kind": "class",
+                  "name": "MyActor"
+                },
+                {
+                  "fullyQualifiedName": "MyActor.init",
+                  "kind": "function",
+                  "name": "init",
+                  "parentIndex": 0
+                },
+                {
+                  "fullyQualifiedName": "MyActor.init.z",
+                  "kind": "variable",
+                  "name": "z",
+                  "parentIndex": 1
+                }
+              ],
+              "physicalLocation": {
+                "artifactLocation": {
+                  "index": 0
+                },
+                "region": {
+                  "startColumn": 18,
+                  "startLine": 81
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "cannot convert value of type 'String' to specified type 'Int'"
+          },
+          "ruleId": "MessageID(domain: \"SwiftCompiler\", id: \"SimpleDiagnostic\")"
+        },
+        {
+          "kind": "fail",
+          "level": "error",
+          "locations": [
+            {
+              "logicalLocations": [
+                {
+                  "fullyQualifiedName": "MyClass",
+                  "kind": "extension",
+                  "name": "MyClass"
+                },
+                {
+                  "fullyQualifiedName": "MyClass.extMethod",
+                  "kind": "function",
+                  "name": "extMethod",
+                  "parentIndex": 0
+                },
+                {
+                  "fullyQualifiedName": "MyClass.extMethod.x",
+                  "kind": "variable",
+                  "name": "x",
+                  "parentIndex": 1
+                }
+              ],
+              "physicalLocation": {
+                "artifactLocation": {
+                  "index": 0
+                },
+                "region": {
+                  "startColumn": 18,
+                  "startLine": 98
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "cannot convert value of type 'String' to specified type 'Int'"
+          },
+          "ruleId": "MessageID(domain: \"SwiftCompiler\", id: \"SimpleDiagnostic\")"
+        },
+        {
+          "kind": "fail",
+          "level": "error",
+          "locations": [
+            {
+              "logicalLocations": [
+                {
+                  "fullyQualifiedName": "OuterClass",
+                  "kind": "class",
+                  "name": "OuterClass"
+                },
+                {
+                  "fullyQualifiedName": "OuterClass.NestedClass",
+                  "kind": "class",
+                  "name": "NestedClass",
+                  "parentIndex": 0
+                },
+                {
+                  "fullyQualifiedName": "OuterClass.NestedClass.nestedMethod",
+                  "kind": "function",
+                  "name": "nestedMethod",
+                  "parentIndex": 1
+                },
+                {
+                  "fullyQualifiedName": "OuterClass.NestedClass.nestedMethod.x",
+                  "kind": "variable",
+                  "name": "x",
+                  "parentIndex": 2
+                }
+              ],
+              "physicalLocation": {
+                "artifactLocation": {
+                  "index": 0
+                },
+                "region": {
+                  "startColumn": 20,
+                  "startLine": 107
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "cannot convert value of type 'String' to specified type 'Int'"
+          },
+          "ruleId": "MessageID(domain: \"SwiftCompiler\", id: \"SimpleDiagnostic\")"
+        },
+        {
+          "kind": "fail",
+          "level": "error",
+          "locations": [
+            {
+              "logicalLocations": [
+                {
+                  "fullyQualifiedName": "OuterClass",
+                  "kind": "class",
+                  "name": "OuterClass"
+                },
+                {
+                  "fullyQualifiedName": "OuterClass.NestedStruct",
+                  "kind": "struct",
+                  "name": "NestedStruct",
+                  "parentIndex": 0
+                },
+                {
+                  "fullyQualifiedName": "OuterClass.NestedStruct.nestedMethod",
+                  "kind": "function",
+                  "name": "nestedMethod",
+                  "parentIndex": 1
+                },
+                {
+                  "fullyQualifiedName": "OuterClass.NestedStruct.nestedMethod.y",
+                  "kind": "variable",
+                  "name": "y",
+                  "parentIndex": 2
+                }
+              ],
+              "physicalLocation": {
+                "artifactLocation": {
+                  "index": 0
+                },
+                "region": {
+                  "startColumn": 20,
+                  "startLine": 113
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "cannot convert value of type 'String' to specified type 'Int'"
+          },
+          "ruleId": "MessageID(domain: \"SwiftCompiler\", id: \"SimpleDiagnostic\")"
+        },
+        {
+          "kind": "fail",
+          "level": "error",
+          "locations": [
+            {
+              "logicalLocations": [
+                {
+                  "fullyQualifiedName": "OuterClass",
+                  "kind": "class",
+                  "name": "OuterClass"
+                },
+                {
+                  "fullyQualifiedName": "OuterClass.NestedEnum",
+                  "kind": "enum",
+                  "name": "NestedEnum",
+                  "parentIndex": 0
+                },
+                {
+                  "fullyQualifiedName": "OuterClass.NestedEnum.nestedMethod",
+                  "kind": "function",
+                  "name": "nestedMethod",
+                  "parentIndex": 1
+                },
+                {
+                  "fullyQualifiedName": "OuterClass.NestedEnum.nestedMethod.z",
+                  "kind": "variable",
+                  "name": "z",
+                  "parentIndex": 2
+                }
+              ],
+              "physicalLocation": {
+                "artifactLocation": {
+                  "index": 0
+                },
+                "region": {
+                  "startColumn": 20,
+                  "startLine": 121
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "cannot convert value of type 'String' to specified type 'Int'"
+          },
+          "ruleId": "MessageID(domain: \"SwiftCompiler\", id: \"SimpleDiagnostic\")"
+        },
+        {
+          "kind": "fail",
+          "level": "error",
+          "locations": [
+            {
+              "logicalLocations": [
+                {
+                  "fullyQualifiedName": "+++",
+                  "kind": "function",
+                  "name": "+++"
+                },
+                {
+                  "fullyQualifiedName": "+++.x",
+                  "kind": "variable",
+                  "name": "x",
+                  "parentIndex": 0
+                }
+              ],
+              "physicalLocation": {
+                "artifactLocation": {
+                  "index": 0
+                },
+                "region": {
+                  "startColumn": 16,
+                  "startLine": 135
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "cannot convert value of type 'String' to specified type 'Int'"
+          },
+          "ruleId": "MessageID(domain: \"SwiftCompiler\", id: \"SimpleDiagnostic\")"
+        },
+        {
+          "kind": "fail",
+          "level": "error",
+          "locations": [
+            {
+              "logicalLocations": [
+                {
+                  "fullyQualifiedName": "topLevelFunction",
+                  "kind": "function",
+                  "name": "topLevelFunction"
+                },
+                {
+                  "fullyQualifiedName": "topLevelFunction.x",
+                  "kind": "variable",
+                  "name": "x",
+                  "parentIndex": 0
+                }
+              ],
+              "physicalLocation": {
+                "artifactLocation": {
+                  "index": 0
+                },
+                "region": {
+                  "startColumn": 16,
+                  "startLine": 153
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "cannot convert value of type 'String' to specified type 'Int'"
+          },
+          "ruleId": "MessageID(domain: \"SwiftCompiler\", id: \"SimpleDiagnostic\")"
+        },
+        {
+          "kind": "fail",
+          "level": "error",
+          "locations": [
+            {
+              "logicalLocations": [
+                {
+                  "fullyQualifiedName": "outerFunction",
+                  "kind": "function",
+                  "name": "outerFunction"
+                },
+                {
+                  "fullyQualifiedName": "outerFunction.innerFunction",
+                  "kind": "function",
+                  "name": "innerFunction",
+                  "parentIndex": 0
+                },
+                {
+                  "fullyQualifiedName": "outerFunction.innerFunction.x",
+                  "kind": "variable",
+                  "name": "x",
+                  "parentIndex": 1
+                }
+              ],
+              "physicalLocation": {
+                "artifactLocation": {
+                  "index": 0
+                },
+                "region": {
+                  "startColumn": 18,
+                  "startLine": 160
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "cannot convert value of type 'String' to specified type 'Int'"
+          },
+          "ruleId": "MessageID(domain: \"SwiftCompiler\", id: \"SimpleDiagnostic\")"
+        },
+        {
+          "kind": "fail",
+          "level": "error",
+          "locations": [
+            {
+              "logicalLocations": [
+                {
+                  "fullyQualifiedName": "functionWithClosure",
+                  "kind": "function",
+                  "name": "functionWithClosure"
+                },
+                {
+                  "fullyQualifiedName": "functionWithClosure.closure",
+                  "kind": "variable",
+                  "name": "closure",
+                  "parentIndex": 0
+                },
+                {
+                  "fullyQualifiedName": "functionWithClosure.closure.x",
+                  "kind": "variable",
+                  "name": "x",
+                  "parentIndex": 1
+                }
+              ],
+              "physicalLocation": {
+                "artifactLocation": {
+                  "index": 0
+                },
+                "region": {
+                  "startColumn": 18,
+                  "startLine": 168
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "cannot convert value of type 'String' to specified type 'Int'"
+          },
+          "ruleId": "MessageID(domain: \"SwiftCompiler\", id: \"SimpleDiagnostic\")"
+        },
+        {
+          "kind": "fail",
+          "level": "error",
+          "locations": [
+            {
+              "logicalLocations": [
+                {
+                  "fullyQualifiedName": "StructWithAccessors",
+                  "kind": "struct",
+                  "name": "StructWithAccessors"
+                },
+                {
+                  "fullyQualifiedName": "StructWithAccessors.value",
+                  "kind": "variable",
+                  "name": "value",
+                  "parentIndex": 0
+                },
+                {
+                  "fullyQualifiedName": "StructWithAccessors.value.willSet",
+                  "kind": "function",
+                  "name": "willSet",
+                  "parentIndex": 1
+                },
+                {
+                  "fullyQualifiedName": "StructWithAccessors.value.willSet.x",
+                  "kind": "variable",
+                  "name": "x",
+                  "parentIndex": 2
+                }
+              ],
+              "physicalLocation": {
+                "artifactLocation": {
+                  "index": 0
+                },
+                "region": {
+                  "startColumn": 20,
+                  "startLine": 177
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "cannot convert value of type 'String' to specified type 'Int'"
+          },
+          "ruleId": "MessageID(domain: \"SwiftCompiler\", id: \"SimpleDiagnostic\")"
+        }
+      ],
+      "tool": {
+        "driver": {
+          "informationUri": "https://swift.org",
+          "name": "Swift Compiler",
+          "organization": "Swift Project",
+          "version": "6.3"
+        }
+      }
+    }
+  ],
+  "version": "2.1.0"
+}
