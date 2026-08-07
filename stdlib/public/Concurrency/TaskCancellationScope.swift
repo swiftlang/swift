@@ -65,7 +65,7 @@ public struct TaskCancellationScope: ~Copyable, ~Escapable {
   @export(implementation)
   public func cancel(reason: CancellationError.Reason = .unspecified) {
     unsafe _taskCancelTaskCancellationScope(
-      record: _record, flags: UInt(reason.rawValue))
+      record: _record, flags: UInt(reason._rawValue))
   }
 
   /// Whether this scope has been cancelled.

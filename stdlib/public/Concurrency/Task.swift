@@ -265,7 +265,7 @@ extension Task {
   @export(implementation)
   @available(StdlibDeploymentTarget 6.5, *)
   public func cancel(reason: CancellationError.Reason) {
-    unsafe _taskCancelWithFlags(_AsyncTask(_task), UInt(reason.rawValue))
+    unsafe _taskCancelWithFlags(_AsyncTask(_task), UInt(reason._rawValue))
   }
 }
 
@@ -960,7 +960,7 @@ public struct UnsafeCurrentTask {
   @available(StdlibDeploymentTarget 6.5, *)
   @export(implementation)
   public func cancel(reason: CancellationError.Reason) {
-    unsafe _taskCancelWithFlags(_rawTask, UInt(reason.rawValue))
+    unsafe _taskCancelWithFlags(_rawTask, UInt(reason._rawValue))
   }
 
   /// The reason for the current task's cancellation, or `nil` if the task
@@ -977,7 +977,7 @@ public struct UnsafeCurrentTask {
     let packed = unsafe _taskGetIsCancelledWithReason(_rawTask)
     guard packed & 1 != 0 else { return nil }
     let raw = UInt8(truncatingIfNeeded: packed >> 1)
-    return CancellationError.Reason(rawValue: raw) ?? .unspecified
+    return CancellationError.Reason(_rawValue: raw) ?? .unspecified
   }
 
   /// Checks if this task is executing in a scope with a task cancellation shield activated by the
