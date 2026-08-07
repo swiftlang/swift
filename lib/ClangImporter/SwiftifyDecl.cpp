@@ -629,10 +629,6 @@ static bool getImplicitObjectParamAnnotation(const clang::ObjCMethodDecl* D) {
     return false; // Only C++ methods have implicit params
 }
 
-static size_t getNumParams(const clang::FunctionDecl* D) {
-    return D->getNumParams();
-}
-
 static bool shouldSkipModule(ModuleDecl *M) {
   if (M->isClangBridgingHeaderImportModule()) {
     DLOG("is from bridging header (or C++ namespace)\n");
@@ -745,7 +741,7 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
       ASSERT(MappedDecl->isImportAsInstanceMember());
       swiftNumParams += 1;
     }
-    if (getNumParams(ClangDecl) != swiftNumParams) {
+    if (ClangDecl->param_size() != swiftNumParams) {
       DLOG("mismatching parameter lists");
       assert(
           ClangDecl->isVariadic() ||
@@ -758,7 +754,7 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
 
     size_t selfParamIndex = MappedDecl->isImportAsInstanceMember()
                                 ? MappedDecl->getSelfIndex()
-                                : getNumParams(ClangDecl);
+                                : ClangDecl->param_size();
     for (auto [index, clangParam] : llvm::enumerate(ClangDecl->parameters())) {
       clang::QualType clangParamTy = clangParam->getType();
       DLOG_SCOPE("Checking parameter '" << *clangParam << "' with type '"
@@ -908,8 +904,14 @@ static bool diagnoseMissingMacroPlugin(ASTContext &SwiftContext,
 void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
   if (SwiftContext.LangOpts.DisableSafeInteropWrappers)
     return;
-  auto ClangDecl = dyn_cast_or_null<clang::FunctionDecl>(MappedDecl->getClangDecl());
-  if (!ClangDecl)
+  auto ClangDecl = MappedDecl->getClangDecl();
+  auto ClangFuncDecl = dyn_cast_or_null<clang::FunctionDecl>(ClangDecl);
+  auto ClangObjCMethodDecl = dyn_cast_or_null<clang::ObjCMethodDecl>(ClangDecl);
+  if (!ClangFuncDecl && !ClangObjCMethodDecl)
+    return;
+  ASSERT(!ClangFuncDecl || !ClangObjCMethodDecl);
+
+  if (isa<ProtocolDecl>(MappedDecl->getParent()))
     return;
 
   MacroDecl *SwiftifyImportDecl = dyn_cast_or_null<MacroDecl>(getKnownSingleDecl(SwiftContext, "_SwiftifyImport"));
@@ -934,7 +936,10 @@ void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
     SwiftifyInfoFunctionPrinter printer(
         getClangASTContext(), SwiftContext, out, *SwiftifyImportDecl,
         typeMapping, DiagnosedMissingNullableAsEmptySpanParam);
-    if (!swiftifyImpl(*this, printer, MappedDecl, ClangDecl)) {
+    bool foundInfo = ClangFuncDecl ?
+      swiftifyImpl(*this, printer, MappedDecl, ClangFuncDecl) :
+      swiftifyImpl(*this, printer, MappedDecl, ClangObjCMethodDecl);
+    if (!foundInfo) {
       DLOG("No relevant bounds or lifetime info found\n");
       return;
     }
