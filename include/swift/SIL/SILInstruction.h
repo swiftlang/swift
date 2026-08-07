@@ -5946,13 +5946,12 @@ public:
     return ReconstructionBlock;
   }
 
-  /// Sets the debug-only basic block for this instruction.
+  /// Sets the debug-only basic block for this instruction. If one is already
+  /// attached, it is freed.
   /// This should not be called by optimization passes. Optimization passes
   /// and debug information salvage operations should append to existing
   /// blocks using getOrCreateDebugReconstructionBlock.
-  void setDebugReconstructionBlock(SILBasicBlock *BB) {
-    ReconstructionBlock = BB;
-  }
+  void setDebugReconstructionBlock(SILBasicBlock *BB);
 
   /// Clones the reconstruction block from \p src onto this debug value.
   void cloneReconstructionBlockFrom(DebugValueInst *src);
