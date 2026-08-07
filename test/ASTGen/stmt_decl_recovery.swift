@@ -137,3 +137,13 @@ struct EmptySubscriptParams {
     get { 0 }
   }
 }
+
+// A 'do' with a 'throws' clause but no 'catch'. ASTGen asserted the clause was
+// absent instead of reporting it.
+enum DoError: Error { case bad }
+
+func doThrowsWithoutCatch() {
+  do throws(DoError) {
+  }
+  // expected-error@-2 {{a 'do' statement with a 'throws' clause must have at least one 'catch'}}
+}

@@ -391,8 +391,11 @@ extension ASTGenVisitor {
     labelInfo: BridgedLabeledStmtInfo = nil
   ) -> BridgedStmt {
     if node.catchClauses.isEmpty {
-      // FIXME: Handle
-      precondition(node.throwsClause == nil)
+      // A 'throws' clause is only meaningful with a 'catch' to type. The C++
+      // parser reports this and drops the clause, keeping a plain DoStmt.
+      if let throwsClause = node.throwsClause {
+        self.diagnose(.do_throws_without_catch, at: throwsClause.throwsSpecifier)
+      }
       return BridgedDoStmt.createParsed(
         self.ctx,
         labelInfo: labelInfo,
