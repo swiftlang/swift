@@ -174,6 +174,7 @@ swift::getIRTargetOptions(const IRGenOptions &Opts, ASTContext &Ctx,
   TargetOpts.EmulatedTLS = Clang->getCodeGenOpts().EmulatedTLS;
 
   TargetOpts.MCOptions.AsmVerbose = Opts.VerboseAsm;
+  TargetOpts.MCOptions.SplitDwarfFile = Opts.SplitDwarfFile;
 
   // WebAssembly doesn't support atomics yet, see
   // https://github.com/apple/swift/issues/54533 for more details.
@@ -908,8 +909,23 @@ bool swift::compileAndWriteLLVM(
     EmitPasses.add(createTargetTransformInfoWrapperPass(
         targetMachine->getTargetIRAnalysis()));
 
+    // Open a separate output file for split DWARF (.dwo) if requested.
+    std::unique_ptr<llvm::ToolOutputFile> DwoFile;
+    if (opts.OutputKind == IRGenOutputKind::ObjectFile &&
+        !opts.SplitDwarfOutput.empty()) {
+      std::error_code EC;
+      DwoFile = std::make_unique<llvm::ToolOutputFile>(
+          opts.SplitDwarfOutput, EC, llvm::sys::fs::OF_None);
+      if (EC) {
+        diagnoseSync(diags, diagMutex, SourceLoc(), diag::error_opening_output,
+                     opts.SplitDwarfOutput, EC.message());
+        return true;
+      }
+    }
+
     bool fail = targetMachine->addPassesToEmitFile(
-        EmitPasses, out, nullptr, FileType, !opts.Verify, nullptr, casid);
+        EmitPasses, out, DwoFile ? &DwoFile->os() : nullptr, FileType,
+        !opts.Verify, nullptr, casid);
     if (fail) {
       diagnoseSync(diags, diagMutex, SourceLoc(),
                    diag::error_codegen_init_fail);
@@ -917,6 +933,11 @@ bool swift::compileAndWriteLLVM(
     }
 
     EmitPasses.run(*module);
+
+    // Keep the DWO file on success (ToolOutputFile deletes on destruction
+    // unless keep() is called).
+    if (DwoFile)
+      DwoFile->keep();
     break;
   }
   }
