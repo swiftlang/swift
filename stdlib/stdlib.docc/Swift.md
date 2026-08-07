@@ -2,6 +2,10 @@
 
 Build apps using a powerful open language.
 
+@Metadata {
+    @TitleHeading("Libraries")
+}
+
 ## Overview
 
 Swift includes modern features like type inference, optionals, and closures, which
