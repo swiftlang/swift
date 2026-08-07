@@ -1621,6 +1621,14 @@ ParserResult<TypeRepr> Parser::parseTypeOrValue(Diag<> MessageID,
       shouldParseValueExpr = true;
   }
 
+  // A parenthesized expression that contains type-only syntax such as an opaque
+  // 'some' type, or a top-level comma (making it a tuple type), must be parsed
+  // as a type, not a value expression: such types have to appear as TypeReprs
+  // in the enclosing declaration, and a tuple is never a generic value argument.
+  if (shouldParseValueExpr && Tok.is(tok::l_paren) &&
+      parenGenericArgumentContainsTypeOnlySyntax())
+    shouldParseValueExpr = false;
+
   if (shouldParseValueExpr) {
     // Ensure that constituent references get parsed as declaration references,
     // not type references.
@@ -1633,9 +1641,33 @@ ParserResult<TypeRepr> Parser::parseTypeOrValue(Diag<> MessageID,
     }
     return makeParserResult(
         new (Context) GenericArgumentExprTypeRepr(expr.get(), &Context));
-  } else {
-    return parseType(MessageID, reason);
   }
+  return parseType(MessageID, reason);
+}
+
+bool Parser::parenGenericArgumentContainsTypeOnlySyntax() {
+  assert(Tok.is(tok::l_paren) && "not at a parenthesized generic argument");
+  BacktrackingScope backtrack(*this);
+  unsigned depth = 0;
+  do {
+    // An opaque 'some' type can only appear as a type, never as part of a
+    // value expression.
+    if (Tok.isContextualKeyword("some")) {
+      BacktrackingScope probe(*this);
+      if (canParseType())
+        return true;
+    }
+    // A top-level comma makes this a tuple type; tuples are never valid generic
+    // value arguments, so parse it as a type.
+    if (depth == 1 && Tok.is(tok::comma))
+      return true;
+    if (Tok.isAny(tok::l_paren, tok::l_square, tok::l_brace))
+      ++depth;
+    else if (Tok.isAny(tok::r_paren, tok::r_square, tok::r_brace))
+      --depth;
+    consumeToken();
+  } while (depth > 0 && Tok.isNot(tok::eof));
+  return false;
 }
 
 bool Parser::canParseGenericValueLiteral() {
@@ -1733,10 +1765,22 @@ bool Parser::canParseGenericArguments() {
   }
 
   do {
+    // With LiteralExpressions enabled, a generic argument may be a
+    // parenthesized value expression such as '(1 + 2)'. Treat a parenthesized
+    // group as a value expression only when it is immediately followed by ','
+    // or '>'; otherwise parse it as a type so that parenthesized and function
+    // types like '(Int, Int) -> Bool' are still recognized.
+    bool parsedValueExpr = false;
     if (Context.LangOpts.hasFeature(Feature::LiteralExpressions) &&
-        Tok.is(tok::l_paren))
+        Tok.is(tok::l_paren)) {
+      CancellableBacktrackingScope backtrack(*this);
       skipSingle();
-    else if (!canParseType())
+      if (Tok.is(tok::comma) || startsWithGreater(Tok)) {
+        backtrack.cancelBacktrack();
+        parsedValueExpr = true;
+      }
+    }
+    if (!parsedValueExpr && !canParseType())
       return false;
 
     // Parse the comma, if the list continues.
