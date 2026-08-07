@@ -225,7 +225,7 @@ public struct DiscardingTaskGroup {
   @available(StdlibDeploymentTarget 6.5, *)
   @export(implementation)
   public func cancelAll(reason: CancellationError.Reason) {
-    _taskGroupCancelAllWithFlags(group: _group, flags: UInt(reason.rawValue))
+    _taskGroupCancelAllWithFlags(group: _group, flags: UInt(reason._rawValue))
   }
 
   /// A Boolean value that indicates whether the group was canceled.
@@ -533,7 +533,7 @@ public struct ThrowingDiscardingTaskGroup<Failure: Error> {
   @available(StdlibDeploymentTarget 6.5, *)
   @export(implementation)
   public func cancelAll(reason: CancellationError.Reason) {
-    _taskGroupCancelAllWithFlags(group: _group, flags: UInt(reason.rawValue))
+    _taskGroupCancelAllWithFlags(group: _group, flags: UInt(reason._rawValue))
   }
 
   /// A Boolean value that indicates whether the group was canceled.

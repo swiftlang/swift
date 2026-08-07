@@ -166,7 +166,7 @@ public nonisolated(nonsending) func withTaskCancellationHandler<Return, Failure>
   return try await __withTaskCancellationHandlerWithReason0(
     operation: operation,
     onCancel: {
-      handler(CancellationError.Reason(rawValue: $0) ?? .unspecified)
+      handler(CancellationError.Reason(_rawValue: $0) ?? .unspecified)
     })
 }
 
@@ -432,18 +432,20 @@ extension CancellationError {
   /// - SeeAlso: `Task.cancellationReason`
   /// - SeeAlso: `Task.cancel(reason:)`
   @available(StdlibDeploymentTarget 6.5, *)
-  public enum Reason: UInt8, Sendable {
+  public enum Reason: Sendable {
+    // Not explicitly `: UInt8` because we want to leave it extensible just in case.
+
     /// The task was cancelled without a specific reason being provided.
     ///
     /// This is the reason produced by the plain `Task.cancel()` /
     /// `UnsafeCurrentTask.cancel()` / `TaskGroup.cancelAll()` entry points,
     /// as well as anything upstream that propagates cancellation without
     /// supplying a reason.
-    case unspecified = 0
+    case unspecified
 
     /// The task was cancelled because a `withDeadline` block's deadline
     /// elapsed.
-    case deadlineExpired = 1
+    case deadlineExpired
   }
 
   /// Create a `CancellationError` with a specific `Reason`.
@@ -452,7 +454,7 @@ extension CancellationError {
   @available(StdlibDeploymentTarget 6.5, *)
   public init(reason: Reason) {
     self.init()
-    self._reasonRawStorage = reason.rawValue
+    self._reasonRawStorage = reason._rawValue
   }
 
   /// The reason this task was cancelled.
@@ -463,7 +465,33 @@ extension CancellationError {
   /// specified reason.
   @available(StdlibDeploymentTarget 6.5, *)
   public var reason: Reason {
-    Reason(rawValue: _reasonRawStorage) ?? .unspecified
+    Reason(_rawValue: _reasonRawStorage) ?? .unspecified
+  }
+}
+
+@available(StdlibDeploymentTarget 6.5, *)
+extension CancellationError.Reason {
+  /// The stable numeric encoding used on the wire between Swift and the C++
+  /// runtime (low bits of `swift_task_cancelWithFlags`' flags, scope-record
+  /// state's packed reason field, etc.). Hard-coded so future non-frozen
+  /// cases can be added without perturbing the ABI.
+  @export(implementation)
+  internal var _rawValue: UInt8 {
+    switch self {
+    case .unspecified: return 0
+    case .deadlineExpired: return 1
+    }
+  }
+
+  /// Decode a raw value coming from the runtime. Returns nil for unknown
+  /// values so callers can decide the fallback policy (e.g. `.unspecified`).
+  @export(implementation)
+  internal init?(_rawValue: UInt8) {
+    switch _rawValue {
+    case 0: self = .unspecified
+    case 1: self = .deadlineExpired
+    default: return nil
+    }
   }
 }
 
