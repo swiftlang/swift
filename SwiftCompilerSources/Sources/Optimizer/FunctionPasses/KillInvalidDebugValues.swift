@@ -94,7 +94,7 @@ private func killInvalidDebugOperands(_ debugOperands: [Operand], root: Value,
   for operand in debugOperands {
     let dbg = operand.instruction as! DebugValueInst
     if !range.contains(dbg) {
-      dbg.killOperand(index: operand.index)
+      dbg.killOperand(index: operand.index, context)
     }
   }
 }

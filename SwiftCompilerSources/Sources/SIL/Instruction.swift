@@ -723,8 +723,11 @@ final public class DebugValueInst : Instruction, DebugVariableInstruction, MetaI
 
   public func stripDeref(index: Int) { bridged.DebugValue_stripDeref(index) }
   public func prependDeref(index: Int) { bridged.DebugValue_prependDeref(index) }
-  public func killOperand(index: Int, withType type: Type? = nil) {
+  public func killOperand(index: Int, withType type: Type? = nil,
+                          _ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
     bridged.DebugValue_killOperand(index, type?.bridged ?? BridgedType())
+    context.notifyInstructionChanged(self)
   }
 }
 
