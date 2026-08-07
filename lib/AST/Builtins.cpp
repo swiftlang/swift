@@ -2457,10 +2457,6 @@ static ValueDecl *getTaskPushDeadline(ASTContext &ctx, Identifier id) {
   // to materialize alloc_stacks for `_typeparam` operands, which
   // interfere with the stack-nesting invariant paired with
   // `taskPopDeadline`.
-  //
-  // The runtime `vw_initializeWithCopy`s both values into the record's
-  // task-allocated tail storage. Caller retains ownership of the
-  // originals; they're destroyed when their lexical scope ends.
   return getBuiltinFunction(
       ctx, id, _thin,
       _parameters(_label("clockPtr", _rawPointer),
