@@ -715,8 +715,7 @@ extension MutableRawSpan {
   /// span from which they are extracted.
   ///
   /// - Parameter bounds: A valid range of positions. Every position in
-  ///     this range must be within the bounds of this `MutableRawSpan`.
-  ///
+  ///   this range must be within the bounds of this `MutableRawSpan`.
   /// - Returns: A `MutableRawSpan` over the bytes within `bounds`.
   ///
   /// - Complexity: O(1)
@@ -741,8 +740,7 @@ extension MutableRawSpan {
   /// span from which they are extracted.
   ///
   /// - Parameter bounds: A valid range of positions. Every position in
-  ///     this range must be within the bounds of this `MutableRawSpan`.
-  ///
+  ///   this range must be within the bounds of this `MutableRawSpan`.
   /// - Returns: A `MutableRawSpan` over the bytes within `bounds`.
   ///
   /// - Complexity: O(1)
@@ -761,8 +759,7 @@ extension MutableRawSpan {
   /// span from which they are extracted.
   ///
   /// - Parameter bounds: A valid range of positions. Every position in
-  ///     this range must be within the bounds of this `MutableRawSpan`.
-  ///
+  ///   this range must be within the bounds of this `MutableRawSpan`.
   /// - Returns: A `MutableRawSpan` over the bytes within `bounds`.
   ///
   /// - Complexity: O(1)
@@ -789,8 +786,7 @@ extension MutableRawSpan {
   /// This function does not validate `bounds`; this is an unsafe operation.
   ///
   /// - Parameter bounds: A valid range of positions. Every position in
-  ///     this range must be within the bounds of this `MutableRawSpan`.
-  ///
+  ///   this range must be within the bounds of this `MutableRawSpan`.
   /// - Returns: A `MutableRawSpan` over the bytes within `bounds`.
   ///
   /// - Complexity: O(1)
@@ -815,8 +811,7 @@ extension MutableRawSpan {
   /// This function does not validate `bounds`; this is an unsafe operation.
   ///
   /// - Parameter bounds: A valid range of positions. Every position in
-  ///     this range must be within the bounds of this `MutableRawSpan`.
-  ///
+  ///   this range must be within the bounds of this `MutableRawSpan`.
   /// - Returns: A `MutableRawSpan` over the bytes within `bounds`.
   ///
   /// - Complexity: O(1)
@@ -838,8 +833,7 @@ extension MutableRawSpan {
   /// This function does not validate `bounds`; this is an unsafe operation.
   ///
   /// - Parameter bounds: A valid range of positions. Every position in
-  ///     this range must be within the bounds of this `MutableRawSpan`.
-  ///
+  ///   this range must be within the bounds of this `MutableRawSpan`.
   /// - Returns: A `MutableRawSpan` over the bytes within `bounds`.
   ///
   /// - Complexity: O(1)
@@ -862,8 +856,7 @@ extension MutableRawSpan {
   /// span from which they are extracted.
   ///
   /// - Parameter bounds: A valid range of positions. Every position in
-  ///     this range must be within the bounds of this `MutableRawSpan`.
-  ///
+  ///   this range must be within the bounds of this `MutableRawSpan`.
   /// - Returns: A `MutableRawSpan` over the bytes within `bounds`.
   ///
   /// - Complexity: O(1)
@@ -885,8 +878,7 @@ extension MutableRawSpan {
   /// span from which they are extracted.
   ///
   /// - Parameter bounds: A valid range of positions. Every position in
-  ///     this range must be within the bounds of this `MutableRawSpan`.
-  ///
+  ///   this range must be within the bounds of this `MutableRawSpan`.
   /// - Returns: A `MutableRawSpan` over the bytes within `bounds`.
   ///
   /// - Complexity: O(1)
@@ -907,8 +899,7 @@ extension MutableRawSpan {
   /// span from which they are extracted.
   ///
   /// - Parameter bounds: A valid range of positions. Every position in
-  ///     this range must be within the bounds of this `MutableRawSpan`.
-  ///
+  ///   this range must be within the bounds of this `MutableRawSpan`.
   /// - Returns: A `MutableRawSpan` over the bytes within `bounds`.
   ///
   /// - Complexity: O(1)
@@ -932,8 +923,7 @@ extension MutableRawSpan {
   /// This function does not validate `bounds`; this is an unsafe operation.
   ///
   /// - Parameter bounds: A valid range of positions. Every position in
-  ///     this range must be within the bounds of this `MutableRawSpan`.
-  ///
+  ///   this range must be within the bounds of this `MutableRawSpan`.
   /// - Returns: A `MutableRawSpan` over the bytes within `bounds`.
   ///
   /// - Complexity: O(1)
@@ -961,8 +951,7 @@ extension MutableRawSpan {
   /// This function does not validate `bounds`; this is an unsafe operation.
   ///
   /// - Parameter bounds: A valid range of positions. Every position in
-  ///     this range must be within the bounds of this `MutableRawSpan`.
-  ///
+  ///   this range must be within the bounds of this `MutableRawSpan`.
   /// - Returns: A `MutableRawSpan` over the bytes within `bounds`.
   ///
   /// - Complexity: O(1)
@@ -986,8 +975,7 @@ extension MutableRawSpan {
   /// This function does not validate `bounds`; this is an unsafe operation.
   ///
   /// - Parameter bounds: A valid range of positions. Every position in
-  ///     this range must be within the bounds of this `MutableRawSpan`.
-  ///
+  ///   this range must be within the bounds of this `MutableRawSpan`.
   /// - Returns: A `MutableRawSpan` over the bytes within `bounds`.
   ///
   /// - Complexity: O(1)

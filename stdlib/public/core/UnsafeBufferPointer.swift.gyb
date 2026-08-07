@@ -516,7 +516,7 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   ///
   /// - Parameter bounds: A valid range of indices. Every index in this range
   ///   must be within the bounds of this buffer.
-  /// - Returns: A new buffer pointer over the elements at `bounds`.
+  /// - Returns: A buffer pointer over the elements within `bounds`.
   ///
   /// - Complexity: O(1)
   @export(implementation)
@@ -558,7 +558,7 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   ///
   /// - Parameter bounds: A valid range of indices. Every index in this range
   ///   must be within the bounds of this buffer.
-  /// - Returns: A new buffer pointer over the elements at `bounds`.
+  /// - Returns: A buffer pointer over the elements within `bounds`.
   ///
   /// - Complexity: O(1)
   @export(implementation)
@@ -605,7 +605,7 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   ///
   /// - Parameter bounds: A valid range of indices. Every index in this range
   ///   must be within the bounds of this buffer.
-  /// - Returns: A new buffer pointer over the elements at `bounds`.
+  /// - Returns: A buffer pointer over the elements within `bounds`.
   ///
   /// - Complexity: O(1)
   @export(implementation)
@@ -626,7 +626,7 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   ///
   /// - Parameter bounds: A valid range of indices. Every index in this range
   ///   must be within the bounds of this buffer.
-  /// - Returns: A new buffer pointer over the elements at `bounds`.
+  /// - Returns: A buffer pointer over the elements within `bounds`.
   ///
   /// - Complexity: O(1)
   @export(implementation)

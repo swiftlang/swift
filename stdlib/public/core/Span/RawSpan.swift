@@ -437,8 +437,7 @@ extension RawSpan {
   /// span from which they are extracted.
   ///
   /// - Parameter bounds: A valid range of positions. Every position in
-  ///     this range must be within the bounds of this `RawSpan`.
-  ///
+  ///   this range must be within the bounds of this `RawSpan`.
   /// - Returns: A `RawSpan` over the bytes within `bounds`.
   ///
   /// - Complexity: O(1)
@@ -470,8 +469,7 @@ extension RawSpan {
   /// This function does not validate `bounds`; this is an unsafe operation.
   ///
   /// - Parameter bounds: A valid range of positions. Every position in
-  ///     this range must be within the bounds of this `RawSpan`.
-  ///
+  ///   this range must be within the bounds of this `RawSpan`.
   /// - Returns: A `RawSpan` over the bytes within `bounds`.
   ///
   /// - Complexity: O(1)
@@ -500,8 +498,7 @@ extension RawSpan {
   /// span from which they are extracted.
   ///
   /// - Parameter bounds: A valid range of positions. Every position in
-  ///     this range must be within the bounds of this `RawSpan`.
-  ///
+  ///   this range must be within the bounds of this `RawSpan`.
   /// - Returns: A `RawSpan` over the bytes within `bounds`.
   ///
   /// - Complexity: O(1)
@@ -528,8 +525,7 @@ extension RawSpan {
   /// This function does not validate `bounds`; this is an unsafe operation.
   ///
   /// - Parameter bounds: A valid range of positions. Every position in
-  ///     this range must be within the bounds of this `RawSpan`.
-  ///
+  ///   this range must be within the bounds of this `RawSpan`.
   /// - Returns: A `RawSpan` over the bytes within `bounds`.
   ///
   /// - Complexity: O(1)

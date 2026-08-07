@@ -1219,7 +1219,7 @@ extension Unsafe${Mutable}RawBufferPointer {
   ///
   /// - Parameter bounds: A valid range of byte offsets. Every byte offset in
   ///   this range must be within the bounds of this buffer.
-  /// - Returns: A new buffer pointer over the bytes at `bounds`.
+  /// - Returns: A buffer pointer over the bytes within `bounds`.
   ///
   /// - Complexity: O(1)
   @export(implementation)
@@ -1242,7 +1242,7 @@ extension Unsafe${Mutable}RawBufferPointer {
   ///
   /// - Parameter bounds: A valid range of byte offsets. Every byte offset in
   ///   this range must be within the bounds of this buffer.
-  /// - Returns: A new buffer pointer over the bytes at `bounds`.
+  /// - Returns: A buffer pointer over the bytes within `bounds`.
   ///
   /// - Complexity: O(1)
   @export(implementation)
@@ -1277,7 +1277,7 @@ extension Unsafe${Mutable}RawBufferPointer {
   ///
   /// - Parameter bounds: A valid range of byte offsets. Every byte offset in
   ///   this range must be within the bounds of this buffer.
-  /// - Returns: A new buffer pointer over the bytes at `bounds`.
+  /// - Returns: A buffer pointer over the bytes within `bounds`.
   ///
   /// - Complexity: O(1)
   @export(implementation)
@@ -1297,7 +1297,7 @@ extension Unsafe${Mutable}RawBufferPointer {
   ///
   /// - Parameter bounds: A valid range of byte offsets. Every byte offset in
   ///   this range must be within the bounds of this buffer.
-  /// - Returns: A new buffer pointer over the bytes at `bounds`.
+  /// - Returns: A buffer pointer over the bytes within `bounds`.
   ///
   /// - Complexity: O(1)
   @export(implementation)
