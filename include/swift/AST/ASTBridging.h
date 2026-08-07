@@ -651,6 +651,11 @@ SWIFT_NAME("getter:BridgedDeclContext.isModuleScopeContext(self:)")
 BRIDGED_INLINE bool
 BridgedDeclContext_isModuleScopeContext(BridgedDeclContext dc);
 
+/// Whether a 'deinit' may be declared directly in this context: a struct, enum,
+/// or class, or an `@_objcImplementation` extension.
+SWIFT_NAME("getter:BridgedDeclContext.allowsDestructorDecl(self:)")
+bool BridgedDeclContext_allowsDestructorDecl(BridgedDeclContext dc);
+
 SWIFT_NAME("getter:BridgedDeclContext.isClosureExpr(self:)")
 BRIDGED_INLINE bool BridgedDeclContext_isClosureExpr(BridgedDeclContext dc);
 
@@ -1098,6 +1103,16 @@ BridgedExclusivityAttr BridgedExclusivityAttr_createParsed(
     BridgedASTContext cContext, swift::SourceLoc atLoc,
     swift::SourceRange range, BridgedExclusivityAttrMode cMode);
 
+enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedNonexhaustiveMode {
+  BridgedNonexhaustiveModeError,
+  BridgedNonexhaustiveModeWarning,
+};
+
+SWIFT_NAME("BridgedNonexhaustiveAttr.createParsed(_:atLoc:range:mode:)")
+BridgedNonexhaustiveAttr BridgedNonexhaustiveAttr_createParsed(
+    BridgedASTContext cContext, swift::SourceLoc atLoc,
+    swift::SourceRange range, BridgedNonexhaustiveMode cMode);
+
 SWIFT_NAME("BridgedExposeAttr.createParsed(_:atLoc:range:name:kind:)")
 BridgedExposeAttr BridgedExposeAttr_createParsed(BridgedASTContext cContext,
                                                  swift::SourceLoc atLoc,
@@ -1515,6 +1530,9 @@ BridgedCallableAttr BridgedCallableAttr_createParsed(BridgedASTContext cContext,
 //===----------------------------------------------------------------------===//
 
 struct BridgedFingerprint;
+
+SWIFT_NAME("BridgedDecl.setInvalid(self:)")
+void BridgedDecl_setInvalid(BridgedDecl decl);
 
 SWIFT_NAME("BridgedDecl.attachParsedAttrs(self:_:)")
 void BridgedDecl_attachParsedAttrs(BridgedDecl decl, BridgedDeclAttributes attrs);

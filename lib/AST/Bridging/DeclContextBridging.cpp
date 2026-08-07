@@ -12,6 +12,8 @@
 
 #include "swift/AST/ASTBridging.h"
 
+#include "swift/AST/Decl.h"
+#include "swift/AST/DeclContext.h"
 #include "swift/AST/Expr.h"
 
 using namespace swift;
@@ -54,4 +56,14 @@ BridgedDeclContext BridgedCustomAttributeInitializer_asDeclContext(
 BridgedDeclContext
 BridgedClosureExpr_asDeclContext(BridgedClosureExpr cClosure) {
   return cClosure.unbridged();
+}
+
+bool BridgedDeclContext_allowsDestructorDecl(BridgedDeclContext cDeclContext) {
+  // Matches the `rejectDestructor` lambda in `Parser::parseDeclDeinit`.
+  auto *dc = cDeclContext.unbridged();
+  if (isa<StructDecl>(dc) || isa<EnumDecl>(dc) || isa<ClassDecl>(dc))
+    return true;
+  if (auto *ED = dyn_cast<ExtensionDecl>(dc))
+    return ED->isObjCImplementation();
+  return false;
 }

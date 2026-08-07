@@ -55,3 +55,32 @@ struct EmptyGenericParams< {}
 // expected-astgen-note@-2 {{to match this opening '<'}}
 // expected-astgen-note@-3 {{insert '>'}}
 // expected-cxx-error@-4 {{expected an identifier to name generic parameter}}
+
+// A 'deinit' outside a struct, enum, class, or @_objcImplementation extension.
+// ASTGen used to leave the decl valid, and Sema then dereferenced a null
+// nominal type.
+deinit {}
+// expected-error@-1 {{deinitializers may only be declared within a class, actor, or noncopyable type}}
+
+// Only an infix operator may declare a precedence group; passing one through for
+// a prefix operator violated an OperatorDecl invariant.
+precedencegroup SomeGroup {}
+prefix operator +++** : SomeGroup { }
+// expected-error@-1 {{only infix operators may declare a precedence}}
+// expected-astgen-error@-2 {{operator should not be declared with body}}
+// expected-astgen-note@-3 {{remove operator body}}
+// expected-cxx-error@-4 {{operator should no longer be declared with body}}
+
+// A repeated precedence group attribute. ASTGen reported this through an ad-hoc
+// diagnostic whose precondition required both nodes to have the same syntax
+// kind, and passed the wrong node, so the precondition failed.
+precedencegroup RepeatedAttribute {
+  associativity: left
+  associativity: left
+  // expected-error@-1 {{'associativity' attribute for precedence group declared multiple times}}
+}
+
+// '@nonexhaustive' takes an optional '(warn)'. ASTGen listed it as a simple
+// attribute, so building it hit "not a simple attribute".
+@nonexhaustive public enum Exhaustive { case a }
+@nonexhaustive(warn) public enum ExhaustiveWarn { case a }

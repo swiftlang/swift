@@ -896,6 +896,18 @@ extension ASTGenVisitor {
     )
     decl.asDecl.attachParsedAttrs(attrs.attributes)
 
+    // A 'deinit' is only allowed in a struct, enum, or class, or in an
+    // '@_objcImplementation' extension. The C++ parser reports a bad placement
+    // and marks the decl invalid so the type checker leaves it alone; without
+    // that, Sema dereferences a null nominal type.
+    if !self.declContext.allowsDestructorDecl {
+      self.diagnose(
+        .destructor_decl_outside_class_or_noncopyable,
+        at: node.deinitKeyword
+      )
+      decl.asDecl.setInvalid()
+    }
+
     if let body = node.body {
       self.withDeclContext(decl.asDeclContext) {
         decl.setParsedBody(self.generate(codeBlock: body))
@@ -1002,8 +1014,6 @@ extension ASTGenVisitor {
     guard let (name, nameLoc) = self.generateIdentifierDeclNameAndLoc(node.name) else {
       return nil
     }
-    let (precedenceGroupName, precedenceGroupLoc) =
-      self.generateIdentifierAndSourceLoc(node.operatorPrecedenceAndTypes?.precedenceGroup)
 
     let fixity: BridgedOperatorFixity
     if let value = BridgedOperatorFixity(from: node.fixitySpecifier.keywordKind) {
@@ -1013,6 +1023,18 @@ extension ASTGenVisitor {
       self.diagnose(.unexpectedTokenKind(token: node.fixitySpecifier))
     }
 
+    // Only an infix operator may declare a precedence group. A prefix or postfix
+    // operator decl carries no group at all, so passing one through would
+    // violate an OperatorDecl invariant.
+    var precedenceAndTypes = node.operatorPrecedenceAndTypes
+    if fixity != .infix, let group = precedenceAndTypes {
+      self.diagnose(.precedencegroup_not_infix, at: group.colon)
+      precedenceAndTypes = nil
+    }
+
+    let (precedenceGroupName, precedenceGroupLoc) =
+      self.generateIdentifierAndSourceLoc(precedenceAndTypes?.precedenceGroup)
+
     return .createParsed(
       self.ctx,
       declContext: self.declContext,
@@ -1020,7 +1042,7 @@ extension ASTGenVisitor {
       operatorKeywordLoc: self.generateSourceLoc(node.operatorKeyword),
       name: name,
       nameLoc: nameLoc,
-      colonLoc: self.generateSourceLoc(node.operatorPrecedenceAndTypes?.colon),
+      colonLoc: self.generateSourceLoc(precedenceAndTypes?.colon),
       precedenceGroupName: precedenceGroupName,
       precedenceGroupLoc: precedenceGroupLoc
     )
@@ -1054,8 +1076,11 @@ extension ASTGenVisitor {
       var lowerThanRelation: PrecedenceGroupRelationSyntax? = nil
     }
 
-    func diagnoseDuplicateSyntax(_ duplicate: some SyntaxProtocol, original: some SyntaxProtocol) {
-      self.diagnose(.duplicateSyntax(duplicate: duplicate, original: original))
+    func diagnoseDuplicateAttribute(_ duplicate: some SyntaxProtocol, name: TokenSyntax) {
+      self.diagnose(
+        .precedencegroup_attribute_redeclared(String(syntaxText: name.rawText)),
+        at: duplicate
+      )
     }
 
     let body = node.groupAttributes.reduce(into: PrecedenceGroupBody()) { body, element in
@@ -1064,14 +1089,14 @@ extension ASTGenVisitor {
         let keyword = relation.higherThanOrLowerThanLabel
         switch keyword.keywordKind {
         case .higherThan:
-          if let current = body.higherThanRelation {
-            diagnoseDuplicateSyntax(relation, original: current)
+          if body.higherThanRelation != nil {
+            diagnoseDuplicateAttribute(relation, name: keyword)
           } else {
             body.higherThanRelation = relation
           }
         case .lowerThan:
-          if let current = body.lowerThanRelation {
-            diagnoseDuplicateSyntax(relation, original: current)
+          if body.lowerThanRelation != nil {
+            diagnoseDuplicateAttribute(relation, name: keyword)
           } else {
             body.lowerThanRelation = relation
           }
@@ -1079,14 +1104,14 @@ extension ASTGenVisitor {
           return self.diagnose(.unexpectedTokenKind(token: keyword))
         }
       case .precedenceGroupAssignment(let assignment):
-        if let current = body.assignment {
-          diagnoseDuplicateSyntax(assignment, original: current)
+        if body.assignment != nil {
+          diagnoseDuplicateAttribute(assignment, name: assignment.assignmentLabel)
         } else {
           body.assignment = assignment
         }
       case .precedenceGroupAssociativity(let associativity):
-        if let current = body.associativity {
-          diagnoseDuplicateSyntax(node, original: current)
+        if body.associativity != nil {
+          diagnoseDuplicateAttribute(associativity, name: associativity.associativityLabel)
         } else {
           body.associativity = associativity
         }

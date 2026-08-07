@@ -740,3 +740,5 @@ bool AccessorKind_allowsEffectsSpecifiers(swift::AccessorKind kind) {
   // 'DistributedGet' is derived after parsing, so it does not appear here.
   return kind == swift::AccessorKind::Get;
 }
+
+void BridgedDecl_setInvalid(BridgedDecl decl) { decl.unbridged()->setInvalid(); }

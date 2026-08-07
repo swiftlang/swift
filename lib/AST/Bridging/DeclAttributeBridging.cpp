@@ -383,6 +383,24 @@ BridgedExposeAttr BridgedExposeAttr_createParsed(BridgedASTContext cContext,
       ExposeAttr(cName.unbridged(), atLoc, range, kind, /*Implicit=*/false);
 }
 
+static NonexhaustiveMode unbridged(BridgedNonexhaustiveMode mode) {
+  switch (mode) {
+  case BridgedNonexhaustiveModeError:
+    return NonexhaustiveMode::Error;
+  case BridgedNonexhaustiveModeWarning:
+    return NonexhaustiveMode::Warning;
+  }
+  llvm_unreachable("unhandled enum value");
+}
+
+BridgedNonexhaustiveAttr
+BridgedNonexhaustiveAttr_createParsed(BridgedASTContext cContext,
+                                      SourceLoc atLoc, SourceRange range,
+                                      BridgedNonexhaustiveMode cMode) {
+  return new (cContext.unbridged())
+      NonexhaustiveAttr(atLoc, range, unbridged(cMode));
+}
+
 BridgedExternAttr BridgedExternAttr_createParsed(
     BridgedASTContext cContext, SourceLoc atLoc, SourceRange range,
     SourceLoc lParenLoc, SourceLoc rParenLoc, swift::ExternKind kind,

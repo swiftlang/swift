@@ -170,6 +170,8 @@ extension ASTGenVisitor {
         return handle(self.generateMacroRoleAttr(attribute: node, attrName: attrName)?.asDeclAttribute)
       case .NonSendable:
         return handle(self.generateNonSendableAttr(attribute: node)?.asDeclAttribute)
+      case .Nonexhaustive:
+        return handle(self.generateNonexhaustiveAttr(attribute: node)?.asDeclAttribute)
       case .ObjC:
         return handle(self.generateObjCAttr(attribute: node)?.asDeclAttribute)
       case .ObjCImplementation:
@@ -264,7 +266,6 @@ extension ASTGenVisitor {
         .DynamicCallable,
         .EagerMove,
         .Exported,
-        .Nonexhaustive,
         .DiscardableResult,
         .DisfavoredOverload,
         .DynamicMemberLookup,
@@ -1054,6 +1055,33 @@ extension ASTGenVisitor {
   ///   @exclusivity(unchecked)
   ///   @exclusivity(checked)
   ///   ```
+  /// E.g.:
+  ///   ```
+  ///   @nonexhaustive
+  ///   @nonexhaustive(warn)
+  ///   ```
+  func generateNonexhaustiveAttr(attribute node: AttributeSyntax) -> BridgedNonexhaustiveAttr? {
+    let mode: BridgedNonexhaustiveMode? = self.generateSingleAttrOption(
+      attribute: node,
+      {
+        switch $0.rawText {
+        case "warn": return .warning
+        default: return nil
+        }
+      },
+      valueIfOmitted: .error
+    )
+    guard let mode else {
+      return nil
+    }
+    return .createParsed(
+      self.ctx,
+      atLoc: self.generateSourceLoc(node.atSign),
+      range: self.generateAttrSourceRange(node),
+      mode: mode
+    )
+  }
+
   func generateExclusivityAttr(attribute node: AttributeSyntax) -> BridgedExclusivityAttr? {
     let mode: BridgedExclusivityAttrMode? = self.generateSingleAttrOption(
       attribute: node,
