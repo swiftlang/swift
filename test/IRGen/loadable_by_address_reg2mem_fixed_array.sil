@@ -10,6 +10,10 @@ import Swift
 
 sil_stage canonical
 
+struct S {
+  @_hasStorage var x: Builtin.FixedArray<16, Builtin.Int64>
+}
+
 // CHECK: sil @test1 : $@convention(thin) (@in_guaranteed Builtin.FixedArray<16, Builtin.Int64>) -> () {
 // CHECK-NOT: load
 // CHECK-NOT: store
@@ -30,6 +34,58 @@ bb0(%0 : $Builtin.FixedArray<16, Builtin.Int64>):
   store %3 to %2 : $*Builtin.FixedArray<16, Builtin.Int64>
   dealloc_stack %2 : $*Builtin.FixedArray<16, Builtin.Int64>
   dealloc_stack %1 : $*Builtin.FixedArray<16, Builtin.Int64>
+  %t = tuple ()
+  return %t : $()
+}
+
+// The address of the load must not be forwarded to the bitcast, because the
+// bitcast's result is used after the load's source location is deallocated.
+
+// CHECK: sil @test_cast_of_forwarded_load :
+// CHECK:   [[COPY:%[^ ]+]] = alloc_stack $Builtin.FixedArray<16, Builtin.Int64>
+// CHECK:   [[SRC:%[^ ]+]] = alloc_stack $Builtin.FixedArray<16, Builtin.Int64>
+// CHECK:   copy_addr [take] [[SRC]] to [init] [[COPY]] : $*Builtin.FixedArray<16, Builtin.Int64>
+// CHECK:   [[CAST:%[^ ]+]] = unchecked_addr_cast [[COPY]] : $*Builtin.FixedArray<16, Builtin.Int64> to $*S
+// CHECK:   dealloc_stack [[SRC]] : $*Builtin.FixedArray<16, Builtin.Int64>
+// CHECK:   copy_addr [take] [[CAST]] to [init] %1 : $*S
+// CHECK:   dealloc_stack [[COPY]] : $*Builtin.FixedArray<16, Builtin.Int64>
+// CHECK: } // end sil function 'test_cast_of_forwarded_load'
+sil @test_cast_of_forwarded_load : $@convention(thin) (Builtin.FixedArray<16, Builtin.Int64>, @inout S) -> () {
+bb0(%0 : $Builtin.FixedArray<16, Builtin.Int64>, %1 : $*S):
+  %2 = alloc_stack $Builtin.FixedArray<16, Builtin.Int64>
+  store %0 to %2 : $*Builtin.FixedArray<16, Builtin.Int64>
+  %3 = load %2 : $*Builtin.FixedArray<16, Builtin.Int64>
+  %4 = unchecked_trivial_bit_cast %3 : $Builtin.FixedArray<16, Builtin.Int64> to $S
+  dealloc_stack %2 : $*Builtin.FixedArray<16, Builtin.Int64>
+  br bb1
+
+bb1:
+  store %4 to %1 : $*S
+  %t = tuple ()
+  return %t : $()
+}
+
+// Same for a mark_dependence, which also forwards the address of its operand.
+
+// CHECK: sil @test_mark_dependence_of_forwarded_load :
+// CHECK:   [[COPY:%[^ ]+]] = alloc_stack $Builtin.FixedArray<16, Builtin.Int64>
+// CHECK:   [[SRC:%[^ ]+]] = alloc_stack $Builtin.FixedArray<16, Builtin.Int64>
+// CHECK:   copy_addr [take] [[SRC]] to [init] [[COPY]] : $*Builtin.FixedArray<16, Builtin.Int64>
+// CHECK:   dealloc_stack [[SRC]] : $*Builtin.FixedArray<16, Builtin.Int64>
+// CHECK:   copy_addr [take] [[COPY]] to [init] %1 : $*Builtin.FixedArray<16, Builtin.Int64>
+// CHECK:   dealloc_stack [[COPY]] : $*Builtin.FixedArray<16, Builtin.Int64>
+// CHECK: } // end sil function 'test_mark_dependence_of_forwarded_load'
+sil @test_mark_dependence_of_forwarded_load : $@convention(thin) (Builtin.FixedArray<16, Builtin.Int64>, @inout Builtin.FixedArray<16, Builtin.Int64>, @guaranteed AnyObject) -> () {
+bb0(%0 : $Builtin.FixedArray<16, Builtin.Int64>, %1 : $*Builtin.FixedArray<16, Builtin.Int64>, %2 : $AnyObject):
+  %3 = alloc_stack $Builtin.FixedArray<16, Builtin.Int64>
+  store %0 to %3 : $*Builtin.FixedArray<16, Builtin.Int64>
+  %4 = load %3 : $*Builtin.FixedArray<16, Builtin.Int64>
+  %5 = mark_dependence %4 : $Builtin.FixedArray<16, Builtin.Int64> on %2 : $AnyObject
+  dealloc_stack %3 : $*Builtin.FixedArray<16, Builtin.Int64>
+  br bb1
+
+bb1:
+  store %5 to %1 : $*Builtin.FixedArray<16, Builtin.Int64>
   %t = tuple ()
   return %t : $()
 }
