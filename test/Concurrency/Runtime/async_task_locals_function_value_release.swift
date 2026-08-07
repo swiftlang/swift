@@ -7,6 +7,11 @@
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 
+// RUN: %if embedded_cooperative_executor %{ %target-run-embedded-cooperative-swift(-plugin-path %swift-plugin-dir) | %FileCheck %s %}
+// RUN: %if embedded_dispatch_executor %{ %target-run-embedded-dispatch-swift(-plugin-path %swift-plugin-dir) | %FileCheck %s %}
+
+import _Concurrency
+
 // In optimized builds specifically the task local add builtins (AddTaskLocalValue/TaskLocalValuePush)
 // would end up using the wrong type in this example, and attempt to demangle
 // at runtime a type including ~Copyable -- which cannot be represented at runtime

@@ -12,15 +12,10 @@
 // rdar://103606995
 // UNSUPPORTED: back_deployment_runtime
 
-// RUN: %if embedded_dispatch_executor %{ %empty-directory(%t.embedded) %}
-// RUN: %if embedded_dispatch_executor %{ %target-swift-frontend -target %embedded-dispatch-target-triple -enable-experimental-feature Embedded -disable-availability-checking -parse-as-library -wmo %s -c -o %t.embedded/a.o %}
-// RUN: %if embedded_dispatch_executor %{ %target-clang -target %embedded-dispatch-target-triple %target-clang-resource-dir-opt %t.embedded/a.o -o %t.embedded/a.out %embedded-dispatch-concurrency-libraries %target-swift-dead-strip-opt %}
-// RUN: %if embedded_dispatch_executor %{ %target-run %t.embedded/a.out | %FileCheck %s %}
+// RUN: %if embedded_cooperative_executor %{ %target-run-embedded-cooperative-swift() | %FileCheck %s %}
+// RUN: %if embedded_dispatch_executor %{ %target-run-embedded-dispatch-swift() | %FileCheck %s %}
 
 import _Concurrency
-#if !$Embedded
-import Dispatch
-#endif
 
 @available(SwiftStdlib 5.1, *)
 func test_detach_cancel_taskGroup() async {

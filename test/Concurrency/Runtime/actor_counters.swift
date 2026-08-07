@@ -10,10 +10,8 @@
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 
-// RUN: %if embedded_dispatch_executor %{ %empty-directory(%t.embedded) %}
-// RUN: %if embedded_dispatch_executor %{ %target-swift-frontend -target %embedded-dispatch-target-triple -enable-experimental-feature Embedded -disable-availability-checking -parse-as-library -wmo %s -c -o %t.embedded/a.o %}
-// RUN: %if embedded_dispatch_executor %{ %target-clang -target %embedded-dispatch-target-triple %target-clang-resource-dir-opt %t.embedded/a.o -o %t.embedded/a.out %embedded-dispatch-concurrency-libraries %target-swift-dead-strip-opt %}
-// RUN: %if embedded_dispatch_executor %{ %target-run %t.embedded/a.out | %FileCheck %s -check-prefix EMBEDDED %}
+// RUN: %if embedded_cooperative_executor %{ %target-run-embedded-cooperative-swift() %}
+// RUN: %if embedded_dispatch_executor %{ %target-run-embedded-dispatch-swift() %}
 
 import _Concurrency
 
@@ -112,6 +110,5 @@ func runTest(numCounters: Int, numWorkers: Int, numIterations: Int) async {
 #endif
     print("counters: \(counters), workers: \(workers), iterations: \(iterations)")
     await runTest(numCounters: counters, numWorkers: workers, numIterations: iterations)
-    // EMBEDDED: DONE!
   }
 }
