@@ -710,9 +710,8 @@ extension MutableRawSpan {
   ///
   /// The returned span represents a mutation of this span.
   ///
-  /// The returned span's first byte is always at offset 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
+  /// The returned span's first byte is always at offset 0. Extracted spans
+  /// do not share their indices with the span from which they are extracted.
   ///
   /// - Parameter bounds: A valid range of positions. Every position in
   ///   this range must be within the bounds of this `MutableRawSpan`.
@@ -735,9 +734,8 @@ extension MutableRawSpan {
   ///
   /// The returned span represents a mutation of this span.
   ///
-  /// The returned span's first byte is always at offset 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
+  /// The returned span's first byte is always at offset 0. Extracted spans
+  /// do not share their indices with the span from which they are extracted.
   ///
   /// - Parameter bounds: A valid range of positions. Every position in
   ///   this range must be within the bounds of this `MutableRawSpan`.
@@ -754,9 +752,8 @@ extension MutableRawSpan {
   /// Constructs a new span over the bytes within the supplied range of
   /// positions within this span.
   ///
-  /// The returned span's first byte is always at offset 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
+  /// The returned span's first byte is always at offset 0. Extracted spans
+  /// do not share their indices with the span from which they are extracted.
   ///
   /// - Parameter bounds: A valid range of positions. Every position in
   ///   this range must be within the bounds of this `MutableRawSpan`.
@@ -779,9 +776,8 @@ extension MutableRawSpan {
   ///
   /// The returned span represents a mutation of this span.
   ///
-  /// The returned span's first byte is always at offset 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
+  /// The returned span's first byte is always at offset 0. Extracted spans
+  /// do not share their indices with the span from which they are extracted.
   ///
   /// This function does not validate `bounds`; this is an unsafe operation.
   ///
@@ -804,9 +800,8 @@ extension MutableRawSpan {
   ///
   /// The returned span represents a mutation of this span.
   ///
-  /// The returned span's first byte is always at offset 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
+  /// The returned span's first byte is always at offset 0. Extracted spans
+  /// do not share their indices with the span from which they are extracted.
   ///
   /// This function does not validate `bounds`; this is an unsafe operation.
   ///
@@ -826,9 +821,8 @@ extension MutableRawSpan {
   /// Constructs a new span over the bytes within the supplied range of
   /// positions within this span.
   ///
-  /// The returned span's first byte is always at offset 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
+  /// The returned span's first byte is always at offset 0. Extracted spans
+  /// do not share their indices with the span from which they are extracted.
   ///
   /// This function does not validate `bounds`; this is an unsafe operation.
   ///
@@ -851,9 +845,8 @@ extension MutableRawSpan {
   ///
   /// The returned span represents a mutation of this span.
   ///
-  /// The returned span's first byte is always at offset 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
+  /// The returned span's first byte is always at offset 0. Extracted spans
+  /// do not share their indices with the span from which they are extracted.
   ///
   /// - Parameter bounds: A valid range of positions. Every position in
   ///   this range must be within the bounds of this `MutableRawSpan`.
@@ -873,9 +866,8 @@ extension MutableRawSpan {
   ///
   /// The returned span represents a mutation of this span.
   ///
-  /// The returned span's first byte is always at offset 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
+  /// The returned span's first byte is always at offset 0. Extracted spans
+  /// do not share their indices with the span from which they are extracted.
   ///
   /// - Parameter bounds: A valid range of positions. Every position in
   ///   this range must be within the bounds of this `MutableRawSpan`.
@@ -894,9 +886,8 @@ extension MutableRawSpan {
   /// Constructs a new span over the bytes within the supplied range of
   /// positions within this span.
   ///
-  /// The returned span's first byte is always at offset 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
+  /// The returned span's first byte is always at offset 0. Extracted spans
+  /// do not share their indices with the span from which they are extracted.
   ///
   /// - Parameter bounds: A valid range of positions. Every position in
   ///   this range must be within the bounds of this `MutableRawSpan`.
@@ -916,9 +907,8 @@ extension MutableRawSpan {
   ///
   /// The returned span represents a mutation of this span.
   ///
-  /// The returned span's first byte is always at offset 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
+  /// The returned span's first byte is always at offset 0. Extracted spans
+  /// do not share their indices with the span from which they are extracted.
   ///
   /// This function does not validate `bounds`; this is an unsafe operation.
   ///
@@ -944,9 +934,8 @@ extension MutableRawSpan {
   ///
   /// The returned span represents a mutation of this span.
   ///
-  /// The returned span's first byte is always at offset 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
+  /// The returned span's first byte is always at offset 0. Extracted spans
+  /// do not share their indices with the span from which they are extracted.
   ///
   /// This function does not validate `bounds`; this is an unsafe operation.
   ///
@@ -968,9 +957,8 @@ extension MutableRawSpan {
   /// Constructs a new span over the bytes within the supplied range of
   /// positions within this span.
   ///
-  /// The returned span's first byte is always at offset 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
+  /// The returned span's first byte is always at offset 0. Extracted spans
+  /// do not share their indices with the span from which they are extracted.
   ///
   /// This function does not validate `bounds`; this is an unsafe operation.
   ///
@@ -995,9 +983,8 @@ extension MutableRawSpan {
   ///
   /// The returned span represents a mutation of this span.
   ///
-  /// The returned span's first byte is always at offset 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
+  /// The returned span's first byte is always at offset 0. Extracted spans
+  /// do not share their indices with the span from which they are extracted.
   ///
   /// - Returns: A `MutableRawSpan` over all the bytes of this span.
   ///
@@ -1020,9 +1007,8 @@ extension MutableRawSpan {
   ///
   /// The returned span represents a mutation of this span.
   ///
-  /// The returned span's first byte is always at offset 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
+  /// The returned span's first byte is always at offset 0. Extracted spans
+  /// do not share their indices with the span from which they are extracted.
   ///
   /// - Returns: A `MutableRawSpan` over all the bytes of this span.
   ///
@@ -1036,9 +1022,8 @@ extension MutableRawSpan {
 
   /// Constructs a new span over all the bytes of this span.
   ///
-  /// The returned span's first byte is always at offset 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
+  /// The returned span's first byte is always at offset 0. Extracted spans
+  /// do not share their indices with the span from which they are extracted.
   ///
   /// - Returns: A `MutableRawSpan` over all the bytes of this span.
   ///
@@ -1202,9 +1187,8 @@ extension MutableRawSpan {
   ///
   /// The returned span represents a mutation of this span.
   ///
-  /// The returned span's first byte is always at offset 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
+  /// The returned span's first byte is always at offset 0. Extracted spans
+  /// do not share their indices with the span from which they are extracted.
   ///
   /// - Parameter maxLength: The maximum number of bytes to return.
   ///   `maxLength` must be greater than or equal to zero.
@@ -1233,9 +1217,8 @@ extension MutableRawSpan {
   ///
   /// The returned span represents a mutation of this span.
   ///
-  /// The returned span's first byte is always at offset 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
+  /// The returned span's first byte is always at offset 0. Extracted spans
+  /// do not share their indices with the span from which they are extracted.
   ///
   /// - Parameter maxLength: The maximum number of bytes to return.
   ///   `maxLength` must be greater than or equal to zero.
@@ -1255,9 +1238,8 @@ extension MutableRawSpan {
   /// If the maximum length exceeds the length of this span,
   /// the result contains all the bytes.
   ///
-  /// The returned span's first byte is always at offset 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
+  /// The returned span's first byte is always at offset 0. Extracted spans
+  /// do not share their indices with the span from which they are extracted.
   ///
   /// - Parameter maxLength: The maximum number of bytes to return.
   ///   `maxLength` must be greater than or equal to zero.
@@ -1285,9 +1267,8 @@ extension MutableRawSpan {
   ///
   /// The returned span represents a mutation of this span.
   ///
-  /// The returned span's first byte is always at offset 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
+  /// The returned span's first byte is always at offset 0. Extracted spans
+  /// do not share their indices with the span from which they are extracted.
   ///
   /// - Parameter k: The number of bytes to drop from the beginning of
   ///   the span. `k` must be greater than or equal to zero.
@@ -1316,9 +1297,8 @@ extension MutableRawSpan {
   ///
   /// The returned span represents a mutation of this span.
   ///
-  /// The returned span's first byte is always at offset 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
+  /// The returned span's first byte is always at offset 0. Extracted spans
+  /// do not share their indices with the span from which they are extracted.
   ///
   /// - Parameter k: The number of bytes to drop from the beginning of
   ///   the span. `k` must be greater than or equal to zero.
@@ -1337,9 +1317,8 @@ extension MutableRawSpan {
   /// If the number of bytes to drop exceeds the number of bytes in
   /// the span, the result is an empty span.
   ///
-  /// The returned span's first byte is always at offset 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
+  /// The returned span's first byte is always at offset 0. Extracted spans
+  /// do not share their indices with the span from which they are extracted.
   ///
   /// - Parameter k: The number of bytes to drop from the beginning of
   ///   the span. `k` must be greater than or equal to zero.

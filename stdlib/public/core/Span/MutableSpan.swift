@@ -641,9 +641,8 @@ extension MutableSpan where Element: ~Copyable {
   ///
   /// The returned span represents a mutation of this span.
   ///
-  /// The returned span's first element is always at index 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
+  /// The returned span's first element is always at index 0. Extracted spans
+  /// do not share their indices with the span from which they are extracted.
   ///
   /// - Parameter bounds: A valid range of indices. Every index in this range
   ///   must be within the bounds of this `MutableSpan`.
@@ -666,9 +665,8 @@ extension MutableSpan where Element: ~Copyable {
   ///
   /// The returned span represents a mutation of this span.
   ///
-  /// The returned span's first element is always at index 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
+  /// The returned span's first element is always at index 0. Extracted spans
+  /// do not share their indices with the span from which they are extracted.
   ///
   /// - Parameter bounds: A valid range of indices. Every index in this range
   ///   must be within the bounds of this `MutableSpan`.
@@ -685,9 +683,8 @@ extension MutableSpan where Element: ~Copyable {
   /// Constructs a new span over the elements within the supplied range of
   /// indices within this span.
   ///
-  /// The returned span's first element is always at index 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
+  /// The returned span's first element is always at index 0. Extracted spans
+  /// do not share their indices with the span from which they are extracted.
   ///
   /// - Parameter bounds: A valid range of indices. Every index in this range
   ///   must be within the bounds of this `MutableSpan`.
@@ -710,9 +707,8 @@ extension MutableSpan where Element: ~Copyable {
   ///
   /// The returned span represents a mutation of this span.
   ///
-  /// The returned span's first element is always at index 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
+  /// The returned span's first element is always at index 0. Extracted spans
+  /// do not share their indices with the span from which they are extracted.
   ///
   /// This function does not validate `bounds`; this is an unsafe operation.
   ///
@@ -736,9 +732,8 @@ extension MutableSpan where Element: ~Copyable {
   ///
   /// The returned span represents a mutation of this span.
   ///
-  /// The returned span's first element is always at index 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
+  /// The returned span's first element is always at index 0. Extracted spans
+  /// do not share their indices with the span from which they are extracted.
   ///
   /// This function does not validate `bounds`; this is an unsafe operation.
   ///
@@ -758,9 +753,8 @@ extension MutableSpan where Element: ~Copyable {
   /// Constructs a new span over the elements within the supplied range of
   /// indices within this span.
   ///
-  /// The returned span's first element is always at index 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
+  /// The returned span's first element is always at index 0. Extracted spans
+  /// do not share their indices with the span from which they are extracted.
   ///
   /// This function does not validate `bounds`; this is an unsafe operation.
   ///
@@ -784,9 +778,8 @@ extension MutableSpan where Element: ~Copyable {
   ///
   /// The returned span represents a mutation of this span.
   ///
-  /// The returned span's first element is always at index 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
+  /// The returned span's first element is always at index 0. Extracted spans
+  /// do not share their indices with the span from which they are extracted.
   ///
   /// - Parameter bounds: A valid range of indices. Every index in this range
   ///   must be within the bounds of this `MutableSpan`.
@@ -806,9 +799,8 @@ extension MutableSpan where Element: ~Copyable {
   ///
   /// The returned span represents a mutation of this span.
   ///
-  /// The returned span's first element is always at index 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
+  /// The returned span's first element is always at index 0. Extracted spans
+  /// do not share their indices with the span from which they are extracted.
   ///
   /// - Parameter bounds: A valid range of indices. Every index in this range
   ///   must be within the bounds of this `MutableSpan`.
@@ -827,9 +819,8 @@ extension MutableSpan where Element: ~Copyable {
   /// Constructs a new span over the elements within the supplied range of
   /// indices within this span.
   ///
-  /// The returned span's first element is always at index 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
+  /// The returned span's first element is always at index 0. Extracted spans
+  /// do not share their indices with the span from which they are extracted.
   ///
   /// - Parameter bounds: A valid range of indices. Every index in this range
   ///   must be within the bounds of this `MutableSpan`.
@@ -849,9 +840,8 @@ extension MutableSpan where Element: ~Copyable {
   ///
   /// The returned span represents a mutation of this span.
   ///
-  /// The returned span's first element is always at index 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
+  /// The returned span's first element is always at index 0. Extracted spans
+  /// do not share their indices with the span from which they are extracted.
   ///
   /// This function does not validate `bounds`; this is an unsafe operation.
   ///
@@ -877,9 +867,8 @@ extension MutableSpan where Element: ~Copyable {
   ///
   /// The returned span represents a mutation of this span.
   ///
-  /// The returned span's first element is always at index 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
+  /// The returned span's first element is always at index 0. Extracted spans
+  /// do not share their indices with the span from which they are extracted.
   ///
   /// This function does not validate `bounds`; this is an unsafe operation.
   ///
@@ -901,9 +890,8 @@ extension MutableSpan where Element: ~Copyable {
   /// Constructs a new span over the elements within the supplied range of
   /// indices within this span.
   ///
-  /// The returned span's first element is always at index 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
+  /// The returned span's first element is always at index 0. Extracted spans
+  /// do not share their indices with the span from which they are extracted.
   ///
   /// This function does not validate `bounds`; this is an unsafe operation.
   ///
@@ -928,9 +916,8 @@ extension MutableSpan where Element: ~Copyable {
   ///
   /// The returned span represents a mutation of this span.
   ///
-  /// The returned span's first element is always at index 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
+  /// The returned span's first element is always at index 0. Extracted spans
+  /// do not share their indices with the span from which they are extracted.
   ///
   /// - Returns: A `MutableSpan` over all the elements of this span.
   ///
@@ -953,9 +940,8 @@ extension MutableSpan where Element: ~Copyable {
   ///
   /// The returned span represents a mutation of this span.
   ///
-  /// The returned span's first element is always at index 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
+  /// The returned span's first element is always at index 0. Extracted spans
+  /// do not share their indices with the span from which they are extracted.
   ///
   /// - Returns: A `MutableSpan` over all the elements of this span.
   ///
@@ -969,9 +955,8 @@ extension MutableSpan where Element: ~Copyable {
 
   /// Constructs a new span over all the elements of this span.
   ///
-  /// The returned span's first element is always at index 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
+  /// The returned span's first element is always at index 0. Extracted spans
+  /// do not share their indices with the span from which they are extracted.
   ///
   /// - Returns: A `MutableSpan` over all the elements of this span.
   ///
@@ -1135,9 +1120,8 @@ extension MutableSpan where Element: ~Copyable {
   ///
   /// The returned span represents a mutation of this span.
   ///
-  /// The returned span's first element is always at index 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
+  /// The returned span's first element is always at index 0. Extracted spans
+  /// do not share their indices with the span from which they are extracted.
   ///
   /// - Parameter maxLength: The maximum number of elements to return.
   ///   `maxLength` must be greater than or equal to zero.
@@ -1167,9 +1151,8 @@ extension MutableSpan where Element: ~Copyable {
   ///
   /// The returned span represents a mutation of this span.
   ///
-  /// The returned span's first element is always at index 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
+  /// The returned span's first element is always at index 0. Extracted spans
+  /// do not share their indices with the span from which they are extracted.
   ///
   /// - Parameter maxLength: The maximum number of elements to return.
   ///   `maxLength` must be greater than or equal to zero.
@@ -1189,9 +1172,8 @@ extension MutableSpan where Element: ~Copyable {
   /// If the maximum length exceeds the length of this span,
   /// the result contains all the elements.
   ///
-  /// The returned span's first element is always at index 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
+  /// The returned span's first element is always at index 0. Extracted spans
+  /// do not share their indices with the span from which they are extracted.
   ///
   /// - Parameter maxLength: The maximum number of elements to return.
   ///   `maxLength` must be greater than or equal to zero.
@@ -1220,9 +1202,8 @@ extension MutableSpan where Element: ~Copyable {
   ///
   /// The returned span represents a mutation of this span.
   ///
-  /// The returned span's first element is always at index 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
+  /// The returned span's first element is always at index 0. Extracted spans
+  /// do not share their indices with the span from which they are extracted.
   ///
   /// - Parameter k: The number of elements to drop from the beginning of
   ///   the span. `k` must be greater than or equal to zero.
@@ -1252,9 +1233,8 @@ extension MutableSpan where Element: ~Copyable {
   ///
   /// The returned span represents a mutation of this span.
   ///
-  /// The returned span's first element is always at index 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
+  /// The returned span's first element is always at index 0. Extracted spans
+  /// do not share their indices with the span from which they are extracted.
   ///
   /// - Parameter k: The number of elements to drop from the beginning of
   ///   the span. `k` must be greater than or equal to zero.
@@ -1273,9 +1253,8 @@ extension MutableSpan where Element: ~Copyable {
   /// If the number of elements to drop exceeds the number of elements in
   /// the span, the result is an empty span.
   ///
-  /// The returned span's first element is always at index 0; unlike buffer
-  /// slices, extracted spans do not share their indices with the
-  /// span from which they are extracted.
+  /// The returned span's first element is always at index 0. Extracted spans
+  /// do not share their indices with the span from which they are extracted.
   ///
   /// - Parameter k: The number of elements to drop from the beginning of
   ///   the span. `k` must be greater than or equal to zero.

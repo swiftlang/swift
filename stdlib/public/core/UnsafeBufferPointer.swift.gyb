@@ -491,7 +491,7 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   /// supplied range of indices in the memory region addressed by this buffer
   /// pointer.
   ///
-  /// The returned buffer's first element is always at index 0; unlike buffer
+  /// The returned buffer's first element is always at index 0. Unlike buffer
   /// slices, extracted buffers do not share their indices with the
   /// original buffer pointer.
   ///
@@ -533,7 +533,7 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   /// supplied range of indices in the memory region addressed by this buffer
   /// pointer.
   ///
-  /// The returned buffer's first element is always at index 0; unlike buffer
+  /// The returned buffer's first element is always at index 0. Unlike buffer
   /// slices, extracted buffers do not share their indices with the
   /// original buffer pointer.
   ///
@@ -569,7 +569,7 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
 
   /// Returns a buffer over all the elements of this buffer.
   ///
-  /// The returned buffer's first element is always at index 0; unlike buffer
+  /// The returned buffer's first element is always at index 0. Unlike buffer
   /// slices, extracted buffers do not share their indices with the
   /// original buffer pointer.
   ///
@@ -597,7 +597,7 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   /// supplied range of indices in the memory region addressed by this buffer
   /// pointer.
   ///
-  /// The returned buffer's first element is always at index 0; unlike buffer
+  /// The returned buffer's first element is always at index 0. Unlike buffer
   /// slices, extracted buffers do not share their indices with the
   /// original buffer pointer.
   ///
@@ -618,7 +618,7 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   /// supplied range of indices in the memory region addressed by this buffer
   /// pointer.
   ///
-  /// The returned buffer's first element is always at index 0; unlike buffer
+  /// The returned buffer's first element is always at index 0. Unlike buffer
   /// slices, extracted buffers do not share their indices with the
   /// original buffer pointer.
   ///
@@ -682,7 +682,7 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   /// If the maximum length exceeds the length of this buffer,
   /// the result contains all the elements.
   ///
-  /// The returned buffer's first element is always at index 0; unlike buffer
+  /// The returned buffer's first element is always at index 0. Unlike buffer
   /// slices, extracted buffers do not share their indices with the
   /// original buffer pointer.
   ///
@@ -706,7 +706,7 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   /// If the number of elements to drop exceeds the number of elements in
   /// the buffer, the result is an empty buffer.
   ///
-  /// The returned buffer's first element is always at index 0; unlike buffer
+  /// The returned buffer's first element is always at index 0. Unlike buffer
   /// slices, extracted buffers do not share their indices with the
   /// original buffer pointer.
   ///
