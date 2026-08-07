@@ -526,8 +526,9 @@ ExistentialLayout::resolveCOMInterface() const {
   COMExistentialInterfaceResolution resolution;
 
   for (ProtocolDecl *protocol : getProtocols()) {
-    if (protocol->isSpecificProtocol(KnownProtocolKind::COMInterface)) {
-      resolution.containsCOMInterfaceProtocol = true;
+    if (protocol->isSpecificProtocol(KnownProtocolKind::COMInterface) ||
+        protocol->isSpecificProtocol(KnownProtocolKind::COMActivatable)) {
+      resolution.identityProtocol = protocol;
       continue;
     }
 
@@ -561,10 +562,8 @@ ExistentialLayout::resolveCOMInterface() const {
 
 ProtocolDecl *ExistentialLayout::getCOMInterface() const {
   COMExistentialInterfaceResolution result = resolveCOMInterface();
-  if (hasExplicitAnyObject || explicitSuperclass ||
-      result.containsCOMInterfaceProtocol ||
-      result.firstIncomparableInterface ||
-      result.firstNonMarkerProtocol)
+  if (hasExplicitAnyObject || explicitSuperclass || result.identityProtocol ||
+      result.firstIncomparableInterface || result.firstNonMarkerProtocol)
     return nullptr;
   return result.interface;
 }
