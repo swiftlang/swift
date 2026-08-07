@@ -225,12 +225,51 @@ extension ASTGenVisitor {
       params.append(param)
     }
 
+    let parenLocs = self.generateParenLocs(
+      leftParen: node.leftParen,
+      rightParen: node.rightParen,
+      isEmpty: params.isEmpty,
+      in: node
+    )
     return .createParsed(
       self.ctx,
-      leftParenLoc: self.generateSourceLoc(node.leftParen),
+      leftParenLoc: parenLocs.left,
       parameters: params.lazy.bridgedArray(in: self),
-      rightParenLoc: self.generateSourceLoc(node.rightParen)
+      rightParenLoc: parenLocs.right
     )
+  }
+
+  /// The locations of a parameter clause's parentheses, as a pair.
+  ///
+  /// Three constraints have to hold together. `ParameterList` asserts that both
+  /// locations are valid or neither is, so they cannot be decided
+  /// independently. A parenthesis the parser synthesized during recovery has a
+  /// zero-width position just past the preceding token, which can land on
+  /// whatever follows -- the body's '{', say -- making the parameter list's
+  /// range overlap the body's and tripping the ASTScope child-ordering check.
+  /// And `ParameterList::getSourceRange` falls back to the parameters' own
+  /// extent when the left paren is invalid, but yields an *invalid* range if
+  /// there are no parameters either, which ASTScope also rejects.
+  ///
+  /// So: use the real parentheses when both are there. Otherwise report none and
+  /// let the range come from the parameters -- unless there are no parameters, in
+  /// which case collapse to a zero-width location where the parentheses belong.
+  func generateParenLocs(
+    leftParen: TokenSyntax?,
+    rightParen: TokenSyntax?,
+    isEmpty: Bool,
+    in clause: some SyntaxProtocol
+  ) -> (left: SourceLoc, right: SourceLoc) {
+    if let leftParen, leftParen.presence == .present,
+      let rightParen, rightParen.presence == .present
+    {
+      return (self.generateSourceLoc(leftParen), self.generateSourceLoc(rightParen))
+    }
+    guard isEmpty else {
+      return (nil, nil)
+    }
+    let loc = self.generateSourceLoc(clause)
+    return (loc, loc)
   }
 
   func generate(enumCaseParameterClause node: EnumCaseParameterClauseSyntax) -> BridgedParameterList {
@@ -241,11 +280,17 @@ extension ASTGenVisitor {
       params.append(param)
     }
 
+    let parenLocs = self.generateParenLocs(
+      leftParen: node.leftParen,
+      rightParen: node.rightParen,
+      isEmpty: params.isEmpty,
+      in: node
+    )
     return .createParsed(
       self.ctx,
-      leftParenLoc: self.generateSourceLoc(node.leftParen),
+      leftParenLoc: parenLocs.left,
       parameters: params.lazy.bridgedArray(in: self),
-      rightParenLoc: self.generateSourceLoc(node.rightParen)
+      rightParenLoc: parenLocs.right
     )
   }
 
@@ -262,11 +307,18 @@ extension ASTGenVisitor {
       defaultValue: nil,
       defaultValueInitContext: nil
     )
+    let parenLocs = self.generateParenLocs(
+      leftParen: node.leftParen,
+      rightParen: node.rightParen,
+      // An accessor parameter clause always has exactly one parameter.
+      isEmpty: false,
+      in: node
+    )
     return .createParsed(
       self.ctx,
-      leftParenLoc: self.generateSourceLoc(node.leftParen),
+      leftParenLoc: parenLocs.left,
       parameters: CollectionOfOne(param).bridgedArray(in: self),
-      rightParenLoc: self.generateSourceLoc(node.rightParen)
+      rightParenLoc: parenLocs.right
     )
   }
 
@@ -278,11 +330,17 @@ extension ASTGenVisitor {
       params.append(param)
     }
 
+    let parenLocs = self.generateParenLocs(
+      leftParen: node.leftParen,
+      rightParen: node.rightParen,
+      isEmpty: params.isEmpty,
+      in: node
+    )
     return .createParsed(
       self.ctx,
-      leftParenLoc: self.generateSourceLoc(node.leftParen),
+      leftParenLoc: parenLocs.left,
       parameters: params.lazy.bridgedArray(in: self),
-      rightParenLoc: self.generateSourceLoc(node.rightParen)
+      rightParenLoc: parenLocs.right
     )
   }
 

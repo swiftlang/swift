@@ -94,3 +94,46 @@ associatedtype Stray = Int
 protocol HasAssociatedType {
   associatedtype Element
 }
+
+// Parameter clause parentheses the parser had to synthesize. Their zero-width
+// positions land on whatever follows -- the body's '{' -- so a parameter list
+// built from them overlapped the body, which ASTScope rejects. The two parsers
+// recover differently here (ASTGen keeps the recovered parameters, the C++
+// parser drops them), so each asserts its own diagnostics; both reject.
+struct MissingInitParens {
+  init c d: Int {}
+  // expected-astgen-error@-1 {{expected '(' to start parameter clause}}
+  // expected-astgen-note@-2 {{insert '('}}
+  // expected-astgen-error@-3 {{expected ')' to end parameter clause}}
+  // expected-astgen-note@-4 {{insert ')'}}
+  // expected-cxx-error@-5 {{expected '(' for initializer parameters}}
+  // expected-cxx-error@-6 {{initializer requires a body}}
+}
+
+struct MissingSubscriptParens {
+  subscript x y : Int -> Int {
+    // expected-astgen-error@-1 {{expected '(' to start parameter clause}}
+    // expected-astgen-note@-2 {{insert '('}}
+    // expected-astgen-error@-3 {{expected '(' to start function type}}
+    // expected-astgen-note@-4 {{insert '('}}
+    // expected-astgen-error@-5 {{expected ')' in function type}}
+    // expected-astgen-note@-6 {{insert ')'}}
+    // expected-astgen-error@-7 {{expected ')' to end parameter clause}}
+    // expected-astgen-note@-8 {{insert ')'}}
+    // expected-astgen-error@-9 {{expected '->' and return type in subscript}}
+    // expected-astgen-note@-10 {{insert '->' and return type}}
+    // expected-cxx-error@-11 {{expected '(' for subscript parameters}}
+    get { 0 }
+  }
+}
+
+// The same, but with no parameters at all: reporting no parentheses would leave
+// the list with an entirely invalid range, which ASTScope also rejects.
+struct EmptySubscriptParams {
+  subscript -> Int {
+    // expected-astgen-error@-1 {{expected parameter clause in subscript}}
+    // expected-astgen-note@-2 {{insert parameter clause}}
+    // expected-cxx-error@-3 {{expected '(' for subscript parameters}}
+    get { 0 }
+  }
+}
