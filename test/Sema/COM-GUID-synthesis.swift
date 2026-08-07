@@ -4,26 +4,33 @@
 
 import COM
 
-// --- Form 1: @com(interface: "...") on a protocol synthesizes IID in extension P.Protocol
+// --- Form 1: a `@com` interface metatype provides IID through COMInterface
 
 @com(interface: "10000000-0000-0000-0000-000000000001")
 protocol IWidget: IUnknown { }
 
 let _: GUID = IWidget.IID
 
-// --- Form 2: @com(implementation: "...") on a class synthesizes static var CLSID
+// --- Form 2: an implementation metatype provides CLSID through COMActivatable
 
 @com(implementation: "20000000-0000-0000-0000-000000000002")
 class Widget: IWidget { }
 
 let _: GUID = Widget.CLSID
 
-// --- IID is not synthesized for classes; CLSID is not on protocols
+func __uuidof<Implementation>(_ type: Implementation.Type) -> CLSID
+    where Implementation.Type: COMActivatable {
+  Implementation.CLSID
+}
+
+let _: GUID = __uuidof(Widget.self)
+
+// --- IID is not available on implementation classes; CLSID is not on protocols
 
 let _ = Widget.IID // expected-error {{type 'Widget' has no member 'IID'}}
 let _ = IWidget.CLSID // expected-error {{type 'any IWidget' has no member 'CLSID'}}
 
-// --- Form 3: bare @com on a class does not synthesize CLSID
+// --- Form 3: bare @com on a class is not activatable
 
 @com
 class BareWidget { }
