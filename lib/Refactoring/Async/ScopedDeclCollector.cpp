@@ -23,19 +23,20 @@ ScopedDeclCollector::getReferencedDecls(Stmt *Scope) const {
   return &Res->second;
 }
 
-bool ScopedDeclCollector::walkToDeclPre(Decl *D, CharSourceRange Range) {
+ASTWalker::PreWalkAction
+ScopedDeclCollector::walkToDeclPre(Decl *D, CharSourceRange Range) {
   if (ScopeStack.empty() || D->isImplicit())
-    return true;
+    return Action::Continue();
 
   ScopeStack.back().DeclaredDecls.insert(D);
   if (isa<DeclContext>(D))
     (*ScopeStack.back().ReferencedDecls)[D] += 1;
-  return true;
+  return Action::Continue();
 }
 
-bool ScopedDeclCollector::walkToExprPre(Expr *E) {
+ASTWalker::PreWalkAction ScopedDeclCollector::walkToExprPre(Expr *E) {
   if (ScopeStack.empty())
-    return true;
+    return Action::Continue();
 
   if (!E->isImplicit()) {
     if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
@@ -55,19 +56,19 @@ bool ScopedDeclCollector::walkToExprPre(Expr *E) {
       }
     }
   }
-  return true;
+  return Action::Continue();
 }
 
-bool ScopedDeclCollector::walkToStmtPre(Stmt *S) {
+ASTWalker::PreWalkAction ScopedDeclCollector::walkToStmtPre(Stmt *S) {
   // Purposely check \c BraceStmt here rather than \c startsNewScope.
   // References in the condition should be applied to the previous scope, not
   // the scope of that statement.
   if (isa<BraceStmt>(S))
     ScopeStack.emplace_back(&ReferencedDecls[S]);
-  return true;
+  return Action::Continue();
 }
 
-bool ScopedDeclCollector::walkToStmtPost(Stmt *S) {
+ASTWalker::PostWalkAction ScopedDeclCollector::walkToStmtPost(Stmt *S) {
   if (isa<BraceStmt>(S)) {
     size_t NumScopes = ScopeStack.size();
     if (NumScopes >= 2) {
@@ -82,5 +83,5 @@ bool ScopedDeclCollector::walkToStmtPost(Stmt *S) {
     }
     ScopeStack.pop_back();
   }
-  return true;
+  return Action::Continue();
 }

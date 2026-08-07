@@ -83,20 +83,23 @@ private:
     return MacroWalking::ArgumentsAndExpansion;
   }
 
-  bool walkToExprPre(Expr *E) override;
-  bool walkToExprPost(Expr *E) override;
-  bool walkToDeclPre(Decl *D, CharSourceRange Range) override;
-  bool walkToDeclPost(Decl *D) override;
-  bool walkToStmtPre(Stmt *S) override;
-  bool walkToStmtPost(Stmt *S) override;
-  bool visitDeclReference(ValueDecl *D, SourceRange Range, TypeDecl *CtorTyRef,
-                          ExtensionDecl *ExtTyRef, Type T,
-                          ReferenceMetaData Data) override;
-  bool visitCallArgName(Identifier Name, CharSourceRange Range,
-                        ValueDecl *D) override;
-  bool visitDeclarationArgumentName(Identifier Name, SourceLoc StartLoc,
-                                    ValueDecl *D) override;
-  bool visitModuleReference(ModuleEntity Mod, CharSourceRange Range) override;
+  PreWalkAction walkToExprPre(Expr *E) override;
+  PostWalkAction walkToExprPost(Expr *E) override;
+  PreWalkAction walkToDeclPre(Decl *D, CharSourceRange Range) override;
+  PostWalkAction walkToDeclPost(Decl *D) override;
+  PreWalkAction walkToStmtPre(Stmt *S) override;
+  PostWalkAction walkToStmtPost(Stmt *S) override;
+  PostWalkAction visitDeclReference(ValueDecl *D, SourceRange Range,
+                                    TypeDecl *CtorTyRef,
+                                    ExtensionDecl *ExtTyRef, Type T,
+                                    ReferenceMetaData Data) override;
+  PostWalkAction visitCallArgName(Identifier Name, CharSourceRange Range,
+                                  ValueDecl *D) override;
+  PostWalkAction visitDeclarationArgumentName(Identifier Name,
+                                              SourceLoc StartLoc,
+                                              ValueDecl *D) override;
+  PostWalkAction visitModuleReference(ModuleEntity Mod,
+                                      CharSourceRange Range) override;
   bool rangeContainsLoc(SourceRange Range) const;
   bool rangeContainsLoc(CharSourceRange Range) const;
   bool isDone() const { return CursorInfo->isValid(); }
@@ -105,9 +108,9 @@ private:
                   std::optional<ReferenceMetaData> Data = std::nullopt);
   bool tryResolve(ModuleEntity Mod, SourceLoc Loc);
   bool tryResolve(Stmt *St);
-  bool visitSubscriptReference(ValueDecl *D, SourceRange Range,
-                               ReferenceMetaData Data,
-                               bool IsOpenBracket) override;
+  PostWalkAction visitSubscriptReference(ValueDecl *D, SourceRange Range,
+                                         ReferenceMetaData Data,
+                                         bool IsOpenBracket) override;
 };
 
 SourceManager &CursorInfoResolver::getSourceMgr() const
@@ -209,10 +212,10 @@ bool CursorInfoResolver::tryResolve(Stmt *St) {
   return false;
 }
 
-bool CursorInfoResolver::visitSubscriptReference(ValueDecl *D,
-                                                 SourceRange Range,
-                                                 ReferenceMetaData Data,
-                                                 bool IsOpenBracket) {
+ASTWalker::PostWalkAction
+CursorInfoResolver::visitSubscriptReference(ValueDecl *D, SourceRange Range,
+                                            ReferenceMetaData Data,
+                                            bool IsOpenBracket) {
   // We should treat both open and close brackets equally
   return visitDeclReference(D, Range, nullptr, nullptr, Type(), Data);
 }
@@ -238,7 +241,8 @@ ResolvedCursorInfoPtr CursorInfoResolver::resolve(SourceLoc Loc) {
   return CursorInfo;
 }
 
-bool CursorInfoResolver::walkToDeclPre(Decl *D, CharSourceRange Range) {
+ASTWalker::PreWalkAction
+CursorInfoResolver::walkToDeclPre(Decl *D, CharSourceRange Range) {
   // Get char based source range for this declaration.
   SourceRange SR = D->getSourceRangeIncludingAttrs();
   auto &Context = D->getASTContext();
@@ -246,27 +250,28 @@ bool CursorInfoResolver::walkToDeclPre(Decl *D, CharSourceRange Range) {
       Lexer::getCharSourceRangeFromSourceRange(Context.SourceMgr, SR);
 
   if (!rangeContainsLoc(CharSR))
-    return false;
+    return Action::SkipNode();
 
   if (isa<ExtensionDecl>(D))
-    return true;
+    return Action::Continue();
 
   if (auto *VD = dyn_cast<ValueDecl>(D))
-    return !tryResolve(VD, /*CtorTyRef=*/nullptr, /*ExtTyRef=*/nullptr,
-                       Range.getStart(), /*IsRef=*/false);
+    return Action::VisitNodeIf(!tryResolve(VD, /*CtorTyRef=*/nullptr,
+                                           /*ExtTyRef=*/nullptr,
+                                           Range.getStart(), /*IsRef=*/false));
 
-  return true;
+  return Action::Continue();
 }
 
-bool CursorInfoResolver::walkToDeclPost(Decl *D) {
+ASTWalker::PostWalkAction CursorInfoResolver::walkToDeclPost(Decl *D) {
   if (isDone())
-    return false;
+    return Action::Stop();
   if (getSourceMgr().isBeforeInBuffer(LocToResolve, D->getStartLoc()))
-    return false;
-  return true;
+    return Action::Stop();
+  return Action::Continue();
 }
 
-bool CursorInfoResolver::walkToStmtPre(Stmt *S) {
+ASTWalker::PreWalkAction CursorInfoResolver::walkToStmtPre(Stmt *S) {
   // Getting the character range for the statement, to account for interpolation
   // strings. The token range for the interpolation string is the whole string,
   // with begin/end locations pointing at the beginning of the string, so if
@@ -286,31 +291,30 @@ bool CursorInfoResolver::walkToStmtPre(Stmt *S) {
   if (!S->isImplicit() &&
       !rangeContainsLoc(Lexer::getCharSourceRangeFromSourceRange(
           getSourceMgr(), S->getSourceRange())))
-    return false;
-  return !tryResolve(S);
+    return Action::SkipNode();
+  return Action::VisitNodeIf(!tryResolve(S));
 }
 
-bool CursorInfoResolver::walkToStmtPost(Stmt *S) {
+ASTWalker::PostWalkAction CursorInfoResolver::walkToStmtPost(Stmt *S) {
   if (isDone())
-    return false;
+    return Action::Stop();
   // FIXME: Even implicit Stmts should have proper ranges that include any
   // non-implicit Stmts (fix Stmts created for lazy vars).
   if (!S->isImplicit() && getSourceMgr().isBeforeInBuffer(LocToResolve,
                                                           S->getStartLoc()))
-    return false;
-  return true;
+    return Action::Stop();
+  return Action::Continue();
 }
 
-bool CursorInfoResolver::visitDeclReference(ValueDecl *D, SourceRange Range,
-                                            TypeDecl *CtorTyRef,
-                                            ExtensionDecl *ExtTyRef, Type T,
-                                            ReferenceMetaData Data) {
+ASTWalker::PostWalkAction CursorInfoResolver::visitDeclReference(
+    ValueDecl *D, SourceRange Range, TypeDecl *CtorTyRef,
+    ExtensionDecl *ExtTyRef, Type T, ReferenceMetaData Data) {
   if (isDone())
-    return false;
+    return Action::Stop();
   if (Data.isImplicit || !Range.isValid())
-    return true;
-  return !tryResolve(D, CtorTyRef, ExtTyRef, Range.Start, /*IsRef=*/true, T,
-                     Data);
+    return Action::Continue();
+  return Action::StopIf(tryResolve(D, CtorTyRef, ExtTyRef, Range.Start,
+                                   /*IsRef=*/true, T, Data));
 }
 
 static bool isCursorOn(Expr *E, SourceLoc Loc) {
@@ -328,9 +332,9 @@ static bool isCursorOn(Expr *E, SourceLoc Loc) {
   return IsCursorOnLoc;
 }
 
-bool CursorInfoResolver::walkToExprPre(Expr *E) {
+ASTWalker::PreWalkAction CursorInfoResolver::walkToExprPre(Expr *E) {
   if (isDone())
-    return true;
+    return Action::Continue();
 
   if (auto CaptureList = dyn_cast<CaptureListExpr>(E)) {
     for (auto ShorthandShadows : getShorthandShadows(CaptureList)) {
@@ -357,56 +361,58 @@ bool CursorInfoResolver::walkToExprPre(Expr *E) {
 
   ExprStack.push_back(E);
 
-  return true;
+  return Action::Continue();
 }
 
-bool CursorInfoResolver::walkToExprPost(Expr *E) {
+ASTWalker::PostWalkAction CursorInfoResolver::walkToExprPost(Expr *E) {
   if (isDone())
-    return false;
+    return Action::Stop();
 
   if (OutermostCursorExpr && isCursorOn(E, LocToResolve)) {
     CursorInfo = new ResolvedExprStartCursorInfo(
         CursorInfo->getSourceFile(), CursorInfo->getLoc(), OutermostCursorExpr);
-    return false;
+    return Action::Stop();
   }
 
   ExprStack.pop_back();
 
-  return true;
+  return Action::Continue();
 }
 
-bool CursorInfoResolver::visitCallArgName(Identifier Name,
-                                          CharSourceRange Range,
-                                          ValueDecl *D) {
+ASTWalker::PostWalkAction
+CursorInfoResolver::visitCallArgName(Identifier Name, CharSourceRange Range,
+                                     ValueDecl *D) {
   if (isDone())
-    return false;
+    return Action::Stop();
 
   // Handle invalid code where the called decl isn't actually callable, so this
   // argument label doesn't really refer to it.
   if (isa<ModuleDecl>(D))
-    return true;
+    return Action::Continue();
 
   bool Found = tryResolve(D, nullptr, nullptr, Range.getStart(), /*IsRef=*/true);
   if (Found) {
     cast<ResolvedValueRefCursorInfo>(CursorInfo)->setIsKeywordArgument(true);
   }
-  return !Found;
+  return Action::StopIf(Found);
 }
 
-bool CursorInfoResolver::
-visitDeclarationArgumentName(Identifier Name, SourceLoc StartLoc, ValueDecl *D) {
+ASTWalker::PostWalkAction CursorInfoResolver::visitDeclarationArgumentName(
+    Identifier Name, SourceLoc StartLoc, ValueDecl *D) {
   if (isDone())
-    return false;
-  return !tryResolve(D, nullptr, nullptr, StartLoc, /*IsRef=*/false);
+    return Action::Stop();
+  return Action::StopIf(tryResolve(D, nullptr, nullptr, StartLoc,
+                                   /*IsRef=*/false));
 }
 
-bool CursorInfoResolver::visitModuleReference(ModuleEntity Mod,
-                                              CharSourceRange Range) {
+ASTWalker::PostWalkAction
+CursorInfoResolver::visitModuleReference(ModuleEntity Mod,
+                                         CharSourceRange Range) {
   if (isDone())
-    return false;
+    return Action::Stop();
   if (Mod.isBuiltinModule())
-    return true; // Ignore.
-  return !tryResolve(Mod, Range.getStart());
+    return Action::Continue(); // Ignore.
+  return Action::StopIf(tryResolve(Mod, Range.getStart()));
 }
 
 bool CursorInfoResolver::rangeContainsLoc(SourceRange Range) const {
@@ -455,15 +461,16 @@ void swift::ide::simple_display(llvm::raw_ostream &out,
 class RangeResolver : public SourceEntityWalker {
   struct Implementation;
   std::unique_ptr<Implementation> Impl;
-  bool walkToExprPre(Expr *E) override;
-  bool walkToExprPost(Expr *E) override;
-  bool walkToStmtPre(Stmt *S) override;
-  bool walkToStmtPost(Stmt *S) override;
-  bool walkToDeclPre(Decl *D, CharSourceRange Range) override;
-  bool walkToDeclPost(Decl *D) override;
-  bool visitDeclReference(ValueDecl *D, SourceRange Range, TypeDecl *CtorTyRef,
-                          ExtensionDecl *ExtTyRef, Type T,
-                          ReferenceMetaData Data) override;
+  PreWalkAction walkToExprPre(Expr *E) override;
+  PostWalkAction walkToExprPost(Expr *E) override;
+  PreWalkAction walkToStmtPre(Stmt *S) override;
+  PostWalkAction walkToStmtPost(Stmt *S) override;
+  PreWalkAction walkToDeclPre(Decl *D, CharSourceRange Range) override;
+  PostWalkAction walkToDeclPost(Decl *D) override;
+  PostWalkAction visitDeclReference(ValueDecl *D, SourceRange Range,
+                                    TypeDecl *CtorTyRef,
+                                    ExtensionDecl *ExtTyRef, Type T,
+                                    ReferenceMetaData Data) override;
   ResolvedRangeInfo moveArrayToASTContext(ResolvedRangeInfo Info);
 public:
   RangeResolver(SourceFile &File, SourceLoc Start, SourceLoc End);
@@ -475,20 +482,20 @@ static PossibleEffects getUnhandledEffects(ArrayRef<ASTNode> Nodes) {
   class EffectsAnalyzer : public SourceEntityWalker {
     PossibleEffects Effects;
   public:
-    bool walkToStmtPre(Stmt *S) override {
+    PreWalkAction walkToStmtPre(Stmt *S) override {
       if (auto DCS = dyn_cast<DoCatchStmt>(S)) {
         if (DCS->isSyntacticallyExhaustive())
-          return false;
+          return Action::SkipNode();
         Effects |= EffectKind::Throws;
       } else if (isa<ThrowStmt>(S)) {
         Effects |= EffectKind::Throws;
       }
-      return true;
+      return Action::Continue();
     }
-    bool walkToExprPre(Expr *E) override {
+    PreWalkAction walkToExprPre(Expr *E) override {
       // Don't walk into closures, they only produce effects when called.
       if (isa<ClosureExpr>(E))
-        return false;
+        return Action::SkipNode();
 
       if (isa<TryExpr>(E))
         Effects |= EffectKind::Throws;
@@ -497,10 +504,10 @@ static PossibleEffects getUnhandledEffects(ArrayRef<ASTNode> Nodes) {
       if (isa<UnsafeExpr>(E))
         Effects |= EffectKind::Unsafe;
 
-      return true;
+      return Action::Continue();
     }
-    bool walkToDeclPre(Decl *D, CharSourceRange Range) override {
-      return false;
+    PreWalkAction walkToDeclPre(Decl *D, CharSourceRange Range) override {
+      return Action::SkipNode();
     }
     PossibleEffects getEffects() const { return Effects; }
   };
@@ -793,17 +800,18 @@ public:
 
   class CompleteWalker : public SourceEntityWalker {
     Implementation *Impl;
-    bool walkToDeclPre(Decl *D, CharSourceRange Range) override {
+    PreWalkAction walkToDeclPre(Decl *D, CharSourceRange Range) override {
       if (D->isImplicit())
-        return false;
+        return Action::SkipNode();
       Impl->analyzeDecl(D);
-      return true;
+      return Action::Continue();
     }
-    bool visitDeclReference(ValueDecl *D, SourceRange Range,
-                            TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef,
-                            Type T, ReferenceMetaData Data) override {
+    PostWalkAction visitDeclReference(ValueDecl *D, SourceRange Range,
+                                      TypeDecl *CtorTyRef,
+                                      ExtensionDecl *ExtTyRef, Type T,
+                                      ReferenceMetaData Data) override {
       Impl->analyzeDeclRef(D, Range.Start, T, Data);
-      return true;
+      return Action::Continue();
     }
 
   public:
@@ -814,12 +822,13 @@ public:
   /// decls in the range is referenced after it.
   class FurtherReferenceWalker : public SourceEntityWalker {
     Implementation *Impl;
-    bool visitDeclReference(ValueDecl *D, SourceRange Range,
-                            TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef,
-                            Type T, ReferenceMetaData Data) override {
+    PostWalkAction visitDeclReference(ValueDecl *D, SourceRange Range,
+                                      TypeDecl *CtorTyRef,
+                                      ExtensionDecl *ExtTyRef, Type T,
+                                      ReferenceMetaData Data) override {
       // If the reference is after the given range, continue logic.
       if (!Impl->SM.isBeforeInBuffer(Impl->End, Range.Start))
-        return true;
+        return Action::Continue();
 
       // If the referenced decl is declared in the range, than the declared decl
       // is referenced out of scope/range.
@@ -828,7 +837,7 @@ public:
       if (It != Impl->DeclaredDecls.end()) {
         It->ReferredAfterRange = true;
       }
-      return true;
+      return Action::Continue();
     }
 
   public:
@@ -867,7 +876,7 @@ public:
                            Nodes.back().getEndLoc());
     struct ControlFlowStmtSelector : public SourceEntityWalker {
       std::vector<std::pair<SourceRange, OrphanKind>> Ranges;
-      bool walkToStmtPre(Stmt *S) override {
+      PreWalkAction walkToStmtPre(Stmt *S) override {
         // For each continue/break statement, record its target's range and the
         // orphan kind.
         if (auto *CS = dyn_cast<ContinueStmt>(S)) {
@@ -879,7 +888,7 @@ public:
             Ranges.emplace_back(Target->getSourceRange(), OrphanKind::Break);
           }
         }
-        return true;
+        return Action::Continue();
       }
     };
     for (auto N : Nodes) {
@@ -1101,53 +1110,54 @@ RangeResolver::RangeResolver(SourceFile &File, SourceLoc Start, SourceLoc End):
 
 RangeResolver::~RangeResolver() = default;
 
-bool RangeResolver::walkToExprPre(Expr *E) {
+ASTWalker::PreWalkAction RangeResolver::walkToExprPre(Expr *E) {
   if (!Impl->shouldEnter(E))
-    return false;
+    return Action::SkipNode();
   Impl->analyze(E);
   Impl->enter(E);
-  return true;
+  return Action::Continue();
 }
 
-bool RangeResolver::walkToStmtPre(Stmt *S) {
+ASTWalker::PreWalkAction RangeResolver::walkToStmtPre(Stmt *S) {
   if (!Impl->shouldEnter(S))
-    return false;
+    return Action::SkipNode();
   Impl->analyze(S);
   Impl->enter(S);
-  return true;
+  return Action::Continue();
 }
 
-bool RangeResolver::walkToDeclPre(Decl *D, CharSourceRange Range) {
+ASTWalker::PreWalkAction RangeResolver::walkToDeclPre(Decl *D,
+                                                      CharSourceRange Range) {
   if (D->isImplicit())
-    return false;
+    return Action::SkipNode();
   if (!Impl->shouldEnter(D))
-    return false;
+    return Action::SkipNode();
   Impl->analyze(D);
   Impl->enter(D);
-  return true;
+  return Action::Continue();
 }
 
-bool RangeResolver::walkToExprPost(Expr *E) {
+ASTWalker::PostWalkAction RangeResolver::walkToExprPost(Expr *E) {
   Impl->leave(E);
-  return !Impl->hasResult();
+  return Action::StopIf(Impl->hasResult());
 }
 
-bool RangeResolver::walkToStmtPost(Stmt *S) {
+ASTWalker::PostWalkAction RangeResolver::walkToStmtPost(Stmt *S) {
   Impl->leave(S);
-  return !Impl->hasResult();
+  return Action::StopIf(Impl->hasResult());
 }
 
-bool RangeResolver::walkToDeclPost(Decl *D) {
+ASTWalker::PostWalkAction RangeResolver::walkToDeclPost(Decl *D) {
   Impl->leave(D);
-  return !Impl->hasResult();
+  return Action::StopIf(Impl->hasResult());
 }
 
-bool RangeResolver::visitDeclReference(ValueDecl *D, SourceRange Range,
-                                       TypeDecl *CtorTyRef,
-                                       ExtensionDecl *ExtTyRef, Type T,
-                                       ReferenceMetaData Data) {
+ASTWalker::PostWalkAction
+RangeResolver::visitDeclReference(ValueDecl *D, SourceRange Range,
+                                  TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef,
+                                  Type T, ReferenceMetaData Data) {
   Impl->analyzeDeclRef(D, Range.Start, T, Data);
-  return true;
+  return Action::Continue();
 }
 
 template <class T>

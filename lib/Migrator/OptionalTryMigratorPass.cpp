@@ -30,13 +30,13 @@ namespace {
   public SourceEntityWalker {
     
     bool explicitCastActiveForOptionalTry = false;
-    
-    bool walkToExprPre(Expr *E) override {
+
+    PreWalkAction walkToExprPre(Expr *E) override {
       if (dyn_cast<ParenExpr>(E) || E->isImplicit()) {
         // Look through parentheses and implicit expressions.
-        return true;
+        return Action::Continue();
       }
-      
+
       if (isa<ExplicitCastExpr>(E)) {
         // If the user has already provided an explicit cast for the
         // 'try?', then we don't need to add one. So let's track whether
@@ -45,7 +45,7 @@ namespace {
       }
       else if (const auto *optTryExpr = dyn_cast<OptionalTryExpr>(E)) {
         wrapTryInCastIfNeeded(optTryExpr);
-        return false;
+        return Action::SkipNode();
       }
       else if (explicitCastActiveForOptionalTry) {
         // If an explicit cast is active and we are entering a new
@@ -53,14 +53,14 @@ namespace {
         // does not apply to the OptionalTryExpr.
         explicitCastActiveForOptionalTry = false;
       }
-      return true;
+      return Action::Continue();
     }
-    
-    bool walkToExprPost(Expr *E) override {
+
+    PostWalkAction walkToExprPost(Expr *E) override {
       explicitCastActiveForOptionalTry = false;
-      return true;
+      return Action::Continue();
     }
-    
+
     void wrapTryInCastIfNeeded(const OptionalTryExpr *optTryExpr) {
       if (explicitCastActiveForOptionalTry) {
         // There's already an explicit cast here; we don't need to add anything

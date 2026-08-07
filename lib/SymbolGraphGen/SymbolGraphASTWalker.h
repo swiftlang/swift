@@ -111,8 +111,8 @@ struct SymbolGraphASTWalker : public SourceEntityWalker {
 
   // MARK: - SourceEntityWalker
 
-  virtual bool walkToDeclPre(Decl *D, CharSourceRange Range) override;
-    
+  virtual PreWalkAction walkToDeclPre(Decl *D, CharSourceRange Range) override;
+
   // MARK: - Utilities
 
   /// Walk the given decl and add its children as synthesized children of the

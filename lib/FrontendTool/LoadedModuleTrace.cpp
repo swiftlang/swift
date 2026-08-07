@@ -965,14 +965,15 @@ bool swift::emitLoadedModuleTraceIfNeeded(const ModuleDependencyID &mainModule,
 class ObjcMethodReferenceCollector: public SourceEntityWalker {
   unsigned CurrentFileID;
   llvm::DenseMap<const clang::ObjCMethodDecl*, unsigned> results;
-  bool visitDeclReference(ValueDecl *D, SourceRange Range, TypeDecl *CtorTyRef,
-                          ExtensionDecl *ExtTyRef, Type T,
-                          ReferenceMetaData Data) override {
+  PostWalkAction visitDeclReference(ValueDecl *D, SourceRange Range,
+                                    TypeDecl *CtorTyRef,
+                                    ExtensionDecl *ExtTyRef, Type T,
+                                    ReferenceMetaData Data) override {
     if (!Range.isValid())
-      return true;
+      return Action::Continue();
     if (auto *clangD = dyn_cast_or_null<clang::ObjCMethodDecl>(D->getClangDecl()))
       Info.References[CurrentFileID].push_back(clangD);
-    return true;
+    return Action::Continue();
   }
 
   clang::ObjCMethodReferenceInfo Info;

@@ -116,9 +116,9 @@ findConvertToTernaryExpression(const ResolvedRangeInfo &Info) {
         walk(S);
     }
 
-    virtual bool walkToExprPre(Expr *E) override {
+    virtual PreWalkAction walkToExprPre(Expr *E) override {
       Assign = dyn_cast<AssignExpr>(E);
-      return false;
+      return Action::SkipNode();
     }
   };
 
