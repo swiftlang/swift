@@ -2058,6 +2058,305 @@ bool Solution::isValidSolution() const {
           FixedScore.Data[SK_Fix] == 0);
 }
 
+typedef llvm::DenseMap<TypeVariableType *, ConflictedType> StorageEnv;
+typedef llvm::DenseMap<TypeVariableType *, std::pair<Type, Type>> ConflictEnv;
+typedef std::function<Type(std::pair<Type, Type>)> Accessor;
+typedef std::function<std::optional<CanType>(TypeVariableType *, CanType)>
+    LookupF;
+typedef std::function<void(TypeVariableType *, Type)> AddToEnvF;
+
+std::optional<CanType> ConflictMerger::inTypeMap(CanType key) {
+  for (auto eachTypePair : typeMap) {
+    if (key->isEqual(eachTypePair.first))
+      return std::optional<CanType>(eachTypePair.second);
+  }
+  return (std::optional<CanType>)std::nullopt;
+}
+
+TypeVariableType *ConflictMerger::freshVar(TypeVariableType *currentTV) {
+  return TypeVariableType::getNew(*context, nextFreeType++,
+                                  currentTV->getImpl());
+}
+
+std::optional<CanType> ConflictMerger::TypeUnifier::unifyNominal(CanType t) {
+  if (t->is<NominalType>()) {
+    if (t->isEqual(focusType)) {
+      std::optional<CanType> replacement = lookUpEnv(currentTV, t);
+      if (replacement.has_value()) {
+        if (!storeNew)
+          cm->addToNominal(focusType, replacement.value());
+        return replacement;
+      } else {
+        CanType nv = cm->freshVar(currentTV)->getCanonicalType();
+        if (storeNew)
+          cm->addToNominal(focusType, nv);
+        return nv;
+      }
+    } else
+      return cm->inTypeMap(t);
+  }
+  return std::nullopt;
+}
+
+std::optional<CanType> ConflictMerger::TypeUnifier::unifyAll(CanType t) {
+  if (t->is<NominalType>())
+    return unifyNominal(t);
+  if (t->is<BoundGenericType>()) {
+    BoundGenericType *bgt = t->getAs<BoundGenericType>();
+    ArrayRef<Type> genericArgs = bgt->getGenericArgs();
+    SmallVector<Type, 2> replacementArgs;
+    bool anyReplaced = false;
+    for (auto arg : genericArgs) {
+      std::optional<Type> replaceArg = arg.transformRec(
+          [&](Type t) { return this->unifyAll(t->getCanonicalType()); });
+      if (replaceArg.has_value()) {
+        replacementArgs.emplace_back(replaceArg.value());
+        anyReplaced = true;
+      } else {
+        // keep the current arg, in case there are any others replaced
+        replacementArgs.emplace_back(arg);
+      }
+    }
+    if (anyReplaced) {
+      auto replacement = BoundGenericType::get(
+          bgt->getDecl(), bgt->getParent(),
+          ArrayRef<Type>(replacementArgs.begin(), replacementArgs.end()));
+
+      return replacement->getCanonicalType();
+    }
+  }
+  if (t->is<TupleType>()) {
+    TupleType *tt = t->getAs<TupleType>();
+    TupleEltTypeArrayRef elementTypes = tt->getElementTypes();
+    SmallVector<TupleTypeElt, 2> replacementElementTypes;
+    bool anyReplaced = false;
+    for (auto elt : elementTypes) {
+      std::optional<Type> replaceElt = elt.transformRec(
+          [&](Type t) { return this->unifyAll(t->getCanonicalType()); });
+      if (replaceElt.has_value()) {
+        replacementElementTypes.emplace_back(TupleTypeElt(replaceElt.value()));
+        anyReplaced = true;
+      } else {
+        // Keep current in case any others are replaced
+        replacementElementTypes.emplace_back(elt);
+      }
+    }
+    if (anyReplaced) {
+      auto replacement =
+          TupleType::get(ArrayRef<TupleTypeElt>(replacementElementTypes.begin(),
+                                                replacementElementTypes.end()),
+                         *context);
+      return replacement->getCanonicalType();
+    }
+  }
+  return std::nullopt;
+}
+
+void ConflictMerger::TypeUnifier::buildMergedMap(
+    ASTContext *context, ConflictMerger *cm, ConflictEnv baseEnv,
+    bool storeNew, LookupF lookup, AddToEnvF addToMergeEnv,
+    Accessor typeAccess) {
+  auto loop = [&](bool nominalOrAll) {
+    for (auto tv : baseEnv) {
+      CanType idxType = typeAccess(tv.second)->getCanonicalType();
+      TypeUnifier transformer =
+          TypeUnifier(idxType, tv.first, context, cm, lookup, storeNew);
+      std::optional<CanType> nextType =
+          nominalOrAll
+              ? transformer.unifyNominal(idxType)
+              : idxType
+                    .transformRec([&](Type t) {
+                      return transformer.unifyAll(t->getCanonicalType());
+                    })
+                    ->getCanonicalType();
+      if (nextType.has_value()) {
+        addToMergeEnv(tv.first, nextType.value());
+      }
+    }
+  };
+  loop(true /*Nominal*/);
+  loop(false /* All */);
+}
+
+LookupF ConflictMerger::TypeUnifier::inStorageEnv(StorageEnv &env) {
+  return [&](TypeVariableType *currentTV, CanType _) {
+    if (env.contains(currentTV))
+      return std::optional<CanType>(env[currentTV].typeKey);
+    return (std::optional<CanType>)std::nullopt;
+  };
+}
+
+AddToEnvF ConflictMerger::TypeUnifier::addToStorageEnv(StorageEnv &env) {
+  return [&](TypeVariableType *typeVar, Type nv) {
+    if (env.contains(typeVar))
+      ASSERT("invariant failure");
+    env[typeVar] = ConflictedType{nv->getCanonicalType(), nv};
+  };
+}
+
+LookupF ConflictMerger::TypeUnifier::inMergeable(MergeableTypes &env) {
+  return [&](TypeVariableType *currentTV, CanType _) {
+    if (env.map.contains(currentTV))
+      return std::optional<CanType>(env.map[currentTV][0].typeKey);
+    return (std::optional<CanType>)std::nullopt;
+  };
+}
+
+AddToEnvF ConflictMerger::TypeUnifier::addToMergeable(MergeableTypes &env) {
+  return [&](TypeVariableType *typeVar, Type nv) {
+    env.map[typeVar].insert(ConflictedType{nv->getCanonicalType(), nv});
+  };
+}
+
+void ConflictMerger::TypeUnifier::loadIntoMergeable(Env env, StorageEnv storage) {
+  for (auto stored : storage) {
+    env.map[stored.first].insert(stored.second);
+  }
+}
+
+std::pair<bool, bool>
+ConflictMerger::TypeUnifier::matchingTypes(ConflictEnv baseMap, Env unified1,
+                                           StorageEnv comparison1, Env unified2,
+                                           StorageEnv comparison2) {
+  bool allMatchesU1 = true, allMatchesU2 = true;
+  for (auto tv : baseMap) {
+    TypeVariableType *typeVar = tv.first;
+    CanType firstUnification = unified1.map[typeVar][0].typeKey;
+    CanType firstComp = comparison1[typeVar].typeKey;
+    CanType secondUnification = unified2.map[typeVar][0].typeKey;
+    CanType secondComp = comparison2[typeVar].typeKey;
+
+    if ((firstUnification && firstComp &&
+         !firstUnification->isEqual(firstComp)) ||
+        !firstUnification || !firstComp)
+      allMatchesU1 = false;
+    if ((secondUnification && secondComp &&
+         !secondUnification->isEqual(secondComp)) ||
+        !secondUnification || !secondComp)
+      allMatchesU2 = false;
+  }
+  return std::pair(allMatchesU1, allMatchesU2);
+}
+
+void ConflictMerger::mergeTypes(ConflictEnv baseMap, const Solution *s1,
+                                       const Solution *s2) {
+  for (auto tv : baseMap) {
+    TypeVariableType *typeVar = tv.first;
+    auto &unifiedTypes1 = s1->mergeableTypes.map[typeVar];
+    auto &unifiedTypes2 = s2->mergeableTypes.map[typeVar];
+    unifiedTypes1.insert(ConflictedType{tv.second.first->getCanonicalType(), tv.second.first});
+    unifiedTypes2.insert(
+                         ConflictedType{tv.second.second->getCanonicalType(),
+                           tv.second.second});
+    unifiedTypes1.set_union(unifiedTypes2);
+    unifiedTypes2.set_union(unifiedTypes1);
+  }
+}
+
+bool ConflictMerger::canMergeTypes(const Solution *s1, const Solution *s2,
+                                   ConflictEnv baseMap, bool saveTypes) {
+  StorageEnv proposedS1Replacements;
+  StorageEnv proposedS2Replacements;
+  Env s2Mergeable; // New mergeable in the event that s2 or s1 have none yet
+  Env s1Mergeable;
+  auto baseSize = baseMap.size();
+
+  if (s1->mergeableTypes.map.size() >= baseSize &&
+      s2->mergeableTypes.map.size() >= baseSize) {
+    bool match = TypeUnifier::matchingTypes(baseMap,
+                                            s1->mergeableTypes, proposedS1Replacements,
+                                            s2->mergeableTypes, proposedS2Replacements)
+                     .first;
+    if (match && saveTypes)
+      mergeTypes(baseMap, s1, s2);
+    return match;
+  } else if (s1->mergeableTypes.map.size() >= baseSize) {
+    TypeUnifier::buildMergedMap(
+        context, this, baseMap, false,
+        TypeUnifier::inMergeable(s1->mergeableTypes),
+        TypeUnifier::addToMergeable(s2Mergeable), first);
+    TypeUnifier::buildMergedMap(
+        context, this, baseMap, true,
+        inTypeMapWrapper(),
+        TypeUnifier::addToStorageEnv(proposedS2Replacements), second);
+    TypeUnifier::buildMergedMap(
+        context, this, baseMap, false,
+        TypeUnifier::inStorageEnv(proposedS2Replacements),
+        TypeUnifier::addToMergeable(s1Mergeable), first);
+    auto matching =
+        TypeUnifier::matchingTypes(baseMap, s1->mergeableTypes, s2Mergeable,
+                                  s1Mergeable, proposedS2Replacements);
+
+    if (matching.first && saveTypes) {
+      s2->mergeableTypes.map.copyFrom(s1->mergeableTypes.map);
+      mergeTypes(baseMap, s1, s2);
+      return matching.first;
+    } else if (matching.second && saveTypes) {
+      TypeUnifier::loadIntoMergeable(s1->mergeableTypes, proposedS2Replacements);
+      TypeUnifier::loadIntoMergeable(s2->mergeableTypes, proposedS2Replacements);
+      mergeTypes(baseMap, s1, s2);
+      return matching.second;
+    } else
+      return matching.first || matching.second;
+  } else if (s2->mergeableTypes.map.size() >= baseSize) {
+    TypeUnifier::buildMergedMap(
+        context, this, baseMap, false,
+        TypeUnifier::inMergeable(s2->mergeableTypes), TypeUnifier::addToMergeable(s1Mergeable), second);
+    TypeUnifier::buildMergedMap(context, this, baseMap, true,
+                                     inTypeMapWrapper(), TypeUnifier::addToStorageEnv(proposedS1Replacements), first);
+    TypeUnifier::buildMergedMap(
+        context, this, baseMap, false,
+        TypeUnifier::inStorageEnv(proposedS1Replacements),TypeUnifier::addToMergeable(s2Mergeable), second);
+    auto matching =
+        TypeUnifier::matchingTypes(baseMap, s2->mergeableTypes, s1Mergeable,
+                                   s2Mergeable, proposedS1Replacements);
+
+    if (matching.second && saveTypes) {
+      s1->mergeableTypes.map.copyFrom(s2->mergeableTypes.map);
+      mergeTypes(baseMap, s1, s2);
+      return matching.second;
+    } else if (matching.first && saveTypes) {
+      TypeUnifier::loadIntoMergeable(s1->mergeableTypes, proposedS1Replacements);
+      TypeUnifier::loadIntoMergeable(s2->mergeableTypes, proposedS1Replacements);
+      mergeTypes(baseMap, s1, s2);
+      return matching.first;
+    } else
+      return matching.first || matching.second;
+  }
+  TypeUnifier::buildMergedMap(context, this, baseMap,
+                                    true, inTypeMapWrapper(), TypeUnifier::addToStorageEnv(proposedS1Replacements),
+                                   first);
+  typeMap.clear();
+  TypeUnifier::buildMergedMap(context, this, baseMap, true, inTypeMapWrapper(), TypeUnifier::addToStorageEnv(proposedS2Replacements),
+                                   second);
+
+  TypeUnifier::buildMergedMap(
+      context, this, baseMap, false,
+      TypeUnifier::inStorageEnv(proposedS1Replacements), TypeUnifier::addToMergeable(s2Mergeable), first);
+  TypeUnifier::buildMergedMap(
+      context, this, baseMap, false,
+      TypeUnifier::inStorageEnv(proposedS2Replacements), TypeUnifier::addToMergeable(s1Mergeable), second);
+
+  // Now check all of the type variabyles, for both orderings
+  auto matching = TypeUnifier::matchingTypes(
+      baseMap, s1Mergeable, proposedS1Replacements, s2Mergeable, proposedS2Replacements);
+  if (matching.first || matching.second) {
+    if (matching.first && saveTypes) {
+      TypeUnifier::loadIntoMergeable(s1->mergeableTypes, proposedS1Replacements);
+      TypeUnifier::loadIntoMergeable(s2->mergeableTypes, proposedS1Replacements);
+      mergeTypes(baseMap, s1, s2);
+    }
+    if (matching.second && saveTypes) {
+      TypeUnifier::loadIntoMergeable(s1->mergeableTypes, proposedS2Replacements);
+      TypeUnifier::loadIntoMergeable(s2->mergeableTypes, proposedS2Replacements);
+      mergeTypes(baseMap, s1, s2);
+    }
+  }
+  return matching.first || matching.second;
+}
+
+
+
 SolutionResult ConstraintSystem::salvage() {
   if (isDebugMode()) {
     llvm::errs() << "---Attempting to salvage and emit diagnostics---\n";

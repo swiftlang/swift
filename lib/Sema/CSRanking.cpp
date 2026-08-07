@@ -1491,6 +1491,8 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
   }
 
   // Compare the type variable bindings.
+  // TODO: Consider replacing with typesDiffPerSolution, which has
+  // performed many similar operations in setting differing types
   llvm::DenseMap<TypeVariableType *, TypeBindingsToCompare> typeDiff;
 
   const auto &bindings1 = solutions[idx1].typeBindings;
@@ -1691,6 +1693,7 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
 
     return SolutionCompareResult::Identical;
   } else {
+    // TODO:: consider if we still want to look at mergeable options here
     if (cs.isDebugMode()) {
       llvm::errs().indent(cs.solverState->getCurrentIndent())
           << "- incomparable\n";
@@ -1781,6 +1784,7 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable,
       break;
 
     case SolutionCompareResult::Better:
+    case SolutionCompareResult::Mergeable:
       losers[bestIdx] = true;
       bestIdx = i;
       break;
@@ -1804,6 +1808,7 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable,
       break;
 
     case SolutionCompareResult::Better:
+    case SolutionCompareResult::Mergeable:
       losers[i] = true;
       break;
 
@@ -1903,6 +1908,89 @@ SolutionDiff::SolutionDiff(ArrayRef<Solution> solutions) {
       break;
     }
   }
+
+  for (size_t idx : indices(solutions)) {
+    auto &solution = solutions[idx];
+    if (solution.Fixes.size() > 0) {
+      auto primaryFix = solution.Fixes[0];
+      bool added = false;
+      for (auto fixD : fixes)
+        if (primaryFix && fixD.fix == primaryFix->getKind()) {
+          fixD.solutions.push_back(idx);
+          added = true;
+        }
+      if (primaryFix && !added) {
+        FixDiff fd{primaryFix->getKind(), {idx}};
+        fixes.push_back(fd);
+      }
+    }
+
+    for (const auto &binding : solutions[idx].typeBindings) {
+      if (!binding.second)
+        continue;
+
+      auto *typeVar = binding.first;
+      auto *loc = typeVar->getImpl().getLocator();
+
+      // Check whether this is the overload type for a short-form init call
+      // 'X(...)' or 'self.init(...)' call.
+      if (auto initMemberTypeElt =
+              loc->getLastElementAs<LocatorPathElt::ConstructorMemberType>()) {
+      }
+
+      // If the type variable isn't one for which we should be looking at the
+      // bindings, don't.
+      /*if (!typeVar->getImpl().prefersSubtypeBinding() &&
+          !isShortFormOrSelfDelegatingConstructorBinding) {
+        continue;
+      }*/
+
+      // See if we already have a record for this type var
+      auto typeDiffs = types.find(typeVar);
+      // If not, create one for this solution
+      if (typeDiffs == types.end()) {
+        TypeDiff td{binding.second, {idx}};
+        types[typeVar].push_back(td);
+      } else {
+        // Add this solution to the proper record
+        bool added = false;
+        for (auto &typeD : typeDiffs->second) {
+          if (typeD.resolved->isEqual(binding.second)) {
+            typeD.solutions.push_back(idx);
+            added = true;
+          }
+        }
+        if (!added) {
+          TypeDiff td{binding.second, {idx}};
+          typeDiffs->second.push_back(td);
+        }
+      }
+    }
+  }
+}
+
+llvm::DenseMap<TypeVariableType *, std::pair<Type, Type>>
+SolutionDiff::typesDiffPerSolution(size_t idx1, size_t idx2) const {
+  auto pairDiff = llvm::DenseMap<TypeVariableType *, std::pair<Type, Type>>();
+  for (auto tdv : types) {
+    if (tdv.second.size() >= 1) {
+      std::optional<Type> ty1 = std::nullopt;
+      std::optional<Type> ty2 = std::nullopt;
+      for (auto td : tdv.second) {
+        for (auto idx : td.solutions) {
+          if (idx == idx1)
+            ty1 = td.resolved;
+          if (idx == idx2)
+            ty2 = td.resolved;
+        }
+      }
+      if (ty1.has_value() && ty2.has_value()) {
+        std::pair tb(ty1.value(), ty2.value());
+        pairDiff[tdv.first] = tb;
+      }
+    }
+  }
+  return pairDiff;
 }
 
 InputMatcher::InputMatcher(const ArrayRef<AnyFunctionType::Param> params,

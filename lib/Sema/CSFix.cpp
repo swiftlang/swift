@@ -373,7 +373,7 @@ AddSendableAttribute::AddSendableAttribute(ConstraintSystem &cs,
                                            ConstraintLocator *locator,
                                            FixBehavior fixBehavior)
     : ContextualMismatch(cs, FixKind::AddSendableAttribute, fromType, toType,
-                         locator, fixBehavior) {
+                         fromType, toType, locator, fixBehavior) {
   DEBUG_ASSERT(cs.simplifyType(fromType)->isSendableType() !=
                cs.simplifyType(toType)->isSendableType());
 }
@@ -600,8 +600,16 @@ bool ContextualMismatch::diagnoseForAmbiguity(
 ContextualMismatch *ContextualMismatch::create(ConstraintSystem &cs, Type lhs,
                                                Type rhs,
                                                ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      ContextualMismatch(cs, lhs, rhs, lhs, rhs, locator, FixBehavior::Error);
+}
+
+ContextualMismatch *ContextualMismatch::create(ConstraintSystem &cs, Type lhs,
+                                               Type rhs, Type lhsRaw,
+                                               Type rhsRaw,
+                                               ConstraintLocator *locator) {
   return new (cs.getAllocator()) ContextualMismatch(
-      cs, lhs, rhs, locator, FixBehavior::Error);
+      cs, lhs, rhs, lhsRaw, rhsRaw, locator, FixBehavior::Error);
 }
 
 bool AllowWrappedValueMismatch::diagnose(const Solution &solution, bool asError) const {
@@ -698,7 +706,8 @@ bool AllowTupleTypeMismatch::coalesceAndDiagnose(
   }
 
   TupleContextualFailure failure(solution, purpose, getFromType(), getToType(),
-                                 indices, locator);
+                                 getRawFromType(), getRawToType(), indices,
+                                 locator);
   return failure.diagnose(asNote);
 }
 
@@ -707,12 +716,11 @@ bool AllowTupleTypeMismatch::diagnose(const Solution &solution,
   return coalesceAndDiagnose(solution, {}, asNote);
 }
 
-AllowTupleTypeMismatch *
-AllowTupleTypeMismatch::create(ConstraintSystem &cs, Type lhs, Type rhs,
-                               ConstraintLocator *locator,
-                               std::optional<unsigned> index) {
+AllowTupleTypeMismatch *AllowTupleTypeMismatch::create(
+    ConstraintSystem &cs, Type lhs, Type rhs, Type lhsRaw, Type rhsRaw,
+    ConstraintLocator *locator, std::optional<unsigned> index) {
   return new (cs.getAllocator())
-      AllowTupleTypeMismatch(cs, lhs, rhs, locator, index);
+      AllowTupleTypeMismatch(cs, lhs, rhs, lhsRaw, rhsRaw, locator, index);
 }
 
 bool AllowFunctionTypeMismatch::coalesceAndDiagnose(
@@ -735,8 +743,12 @@ bool AllowFunctionTypeMismatch::coalesceAndDiagnose(
     return false;
 
   std::tie(purpose, fromType, toType) = *contextualTypeInfo;
-  FunctionTypeMismatch failure(solution, purpose, fromType, toType, indices,
-                               locator);
+  // TODO: Likely getStructuralTypeContext needs to pull some more type
+  // information
+  /// out of the structures to make sure of the best context for original/raw
+  /// types look for examples before proceeding
+  FunctionTypeMismatch failure(solution, purpose, fromType, toType, fromType,
+                               toType, indices, locator);
   return failure.diagnose(asNote);
 }
 
@@ -798,9 +810,10 @@ bool AllowFunctionTypeMismatch::diagnoseForAmbiguity(
 
 AllowFunctionTypeMismatch *
 AllowFunctionTypeMismatch::create(ConstraintSystem &cs, Type lhs, Type rhs,
+                                  Type lhsRaw, Type rhsRaw,
                                   ConstraintLocator *locator, unsigned index) {
   return new (cs.getAllocator())
-      AllowFunctionTypeMismatch(cs, lhs, rhs, locator, index);
+      AllowFunctionTypeMismatch(cs, lhs, rhs, lhsRaw, rhsRaw, locator, index);
 }
 
 bool GenericArgumentsMismatch::coalesceAndDiagnose(
@@ -1482,6 +1495,7 @@ RemoveAddressOf *RemoveAddressOf::create(ConstraintSystem &cs, Type lhs, Type rh
 RemoveReturn::RemoveReturn(ConstraintSystem &cs, Type resultTy,
                            ConstraintLocator *locator)
     : ContextualMismatch(cs, FixKind::RemoveReturn, resultTy,
+                         cs.getASTContext().TheEmptyTupleType, resultTy,
                          cs.getASTContext().TheEmptyTupleType, locator) {}
 
 bool RemoveReturn::diagnose(const Solution &solution, bool asNote) const {
@@ -1495,10 +1509,11 @@ RemoveReturn *RemoveReturn::create(ConstraintSystem &cs, Type resultTy,
 }
 
 NotCompileTimeLiteral::NotCompileTimeLiteral(ConstraintSystem &cs, Type paramTy,
-                                         ConstraintLocator *locator):
-  ContextualMismatch(cs, FixKind::NotCompileTimeLiteral, paramTy,
-                     cs.getASTContext().TheEmptyTupleType, locator,
-                     FixBehavior::AlwaysWarning) {}
+                                             ConstraintLocator *locator)
+    : ContextualMismatch(cs, FixKind::NotCompileTimeLiteral, paramTy,
+                         cs.getASTContext().TheEmptyTupleType, paramTy,
+                         cs.getASTContext().TheEmptyTupleType, locator,
+                         FixBehavior::AlwaysWarning) {}
 
 NotCompileTimeLiteral *
 NotCompileTimeLiteral::create(ConstraintSystem &cs, Type paramTy,
@@ -1911,9 +1926,11 @@ bool AllowInOutConversion::diagnose(const Solution &solution,
 
 AllowInOutConversion *AllowInOutConversion::create(ConstraintSystem &cs,
                                                    Type argType, Type paramType,
+                                                   Type argTypeRaw,
+                                                   Type paramTypeRaw,
                                                    ConstraintLocator *locator) {
-  return new (cs.getAllocator())
-      AllowInOutConversion(cs, argType, paramType, locator);
+  return new (cs.getAllocator()) AllowInOutConversion(
+      cs, argType, paramType, argTypeRaw, paramTypeRaw, locator);
 }
 
 ExpandArrayIntoVarargs *
@@ -1988,15 +2005,17 @@ unsigned AllowArgumentMismatch::getParamIdx() const {
 bool AllowArgumentMismatch::diagnose(const Solution &solution,
                                      bool asNote) const {
   ArgumentMismatchFailure failure(solution, getFromType(), getToType(),
+                                  getRawFromType(), getRawToType(),
                                   getLocator());
   return failure.diagnose(asNote);
 }
 
 AllowArgumentMismatch *
 AllowArgumentMismatch::create(ConstraintSystem &cs, Type argType,
-                              Type paramType, ConstraintLocator *locator) {
-  return new (cs.getAllocator())
-      AllowArgumentMismatch(cs, argType, paramType, locator);
+                              Type paramType, Type argTypeRaw,
+                              Type paramTypeRaw, ConstraintLocator *locator) {
+  return new (cs.getAllocator()) AllowArgumentMismatch(
+      cs, argType, paramType, argTypeRaw, paramTypeRaw, locator);
 }
 
 bool RemoveInvalidCall::diagnose(const Solution &solution, bool asNote) const {
@@ -2741,9 +2760,10 @@ bool AllowGlobalActorMismatch::diagnose(const Solution &solution,
 
 AllowGlobalActorMismatch *
 AllowGlobalActorMismatch::create(ConstraintSystem &cs, Type fromType,
-                                 Type toType, ConstraintLocator *locator) {
-  return new (cs.getAllocator())
-      AllowGlobalActorMismatch(cs, fromType, toType, locator);
+                                 Type toType, Type fromTypeRaw, Type toTypeRaw,
+                                 ConstraintLocator *locator) {
+  return new (cs.getAllocator()) AllowGlobalActorMismatch(
+      cs, fromType, toType, fromTypeRaw, toTypeRaw, locator);
 }
 
 bool DestructureTupleToMatchPackExpansionParameter::diagnose(

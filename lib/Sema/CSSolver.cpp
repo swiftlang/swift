@@ -96,6 +96,17 @@ Solution ConstraintSystem::finalize() {
     solution.typeBindings[tv] = simplifyType(tv)->reconstituteSugar(false);
   }
 
+  // If constraint system held onto any merged/conflicted types,
+  // finalize them into solution
+  for (auto mBinding : mergeableTypes.map) {
+    for(auto mConflicts : mBinding.second) {
+      solution.mergeableTypes.map[mBinding.first]
+        .insert(ConflictedType{
+          .typeKey = mConflicts.typeKey,
+          .diagnosticType = mConflicts.diagnosticType});
+    }
+  }
+
   // Copy over the resolved overloads.
   solution.overloadChoices.reserve(ResolvedOverloads.size());
   solution.overloadChoices.insert(ResolvedOverloads.begin(),
@@ -285,6 +296,16 @@ void ConstraintSystem::replaySolution(const Solution &solution,
       continue;
 
     assignFixedType(binding.first, binding.second, /*updateState=*/false);
+  }
+
+  // Register any merged/conflicted bindings from this solution
+  for (auto mBinding : solution.mergeableTypes.map) {
+    for (auto mConflicts : mBinding.second) {
+      mergeableTypes.map[mBinding.first]
+        .insert(ConflictedType{
+          .typeKey = mConflicts.typeKey,
+          .diagnosticType = mConflicts.diagnosticType});
+    }
   }
 
   // Register overload choices.

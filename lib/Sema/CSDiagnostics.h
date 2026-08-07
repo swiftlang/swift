@@ -652,7 +652,7 @@ private:
 /// e.g. argument/parameter, closure result, conversions etc.
 class ContextualFailure : public FailureDiagnostic {
   ContextualTypePurpose CTP;
-  Type RawFromType, RawToType;
+  Type RawFromType, RawToType, OrigFromType, OrigToType;
 
 public:
   ContextualFailure(const Solution &solution, Type lhs, Type rhs,
@@ -663,18 +663,32 @@ public:
             locator->isForContextualType()
                 ? locator->castLastElementTo<LocatorPathElt::ContextualType>()
                       .getPurpose()
-                : solution.getContextualTypePurpose(locator->getAnchor()),
-            lhs, rhs, locator, fixBehavior) {}
+                : solution.getConstraintSystem().getContextualTypePurpose(
+                      locator->getAnchor()),
+            lhs, rhs, lhs, rhs, locator, fixBehavior) {}
+
+  ContextualFailure(const Solution &solution, Type lhs, Type rhs, Type origLhs,
+                    Type origRhs, ConstraintLocator *locator,
+                    FixBehavior fixBehavior = FixBehavior::Error)
+      : ContextualFailure(
+            solution,
+            locator->isForContextualType()
+                ? locator->castLastElementTo<LocatorPathElt::ContextualType>()
+                      .getPurpose()
+                : solution.getConstraintSystem().getContextualTypePurpose(
+                      locator->getAnchor()),
+            lhs, rhs, origLhs, origRhs, locator, fixBehavior) {}
 
   ContextualFailure(const Solution &solution, ContextualTypePurpose purpose,
-                    Type lhs, Type rhs, ConstraintLocator *locator,
+                    Type lhs, Type rhs, Type origLhs, Type origRhs,
+                    ConstraintLocator *locator,
                     FixBehavior fixBehavior = FixBehavior::Error)
       : FailureDiagnostic(solution, locator, fixBehavior), CTP(purpose),
-        RawFromType(lhs), RawToType(rhs) {
+        RawFromType(lhs), RawToType(rhs), OrigFromType(origLhs),
+        OrigToType(origRhs) {
     assert(lhs && "Expected a valid 'from' type");
     assert(rhs && "Expected a valid 'to' type");
   }
-
   SourceLoc getLoc() const override;
 
   Type getFromType() const { return resolve(RawFromType); }
@@ -684,6 +698,10 @@ public:
   Type getRawFromType() const { return RawFromType; }
 
   Type getRawToType() const { return RawToType; }
+
+  Type getOriginalFromType() const { return OrigFromType; }
+
+  Type getOriginalToType() const { return OrigToType; }
 
   bool diagnoseAsError() override;
 
@@ -1086,9 +1104,10 @@ class TupleContextualFailure final : public ContextualFailure {
 public:
   TupleContextualFailure(const Solution &solution,
                          ContextualTypePurpose purpose, Type lhs, Type rhs,
+                         Type rawLhs, Type rawRhs,
                          llvm::ArrayRef<unsigned> indices,
                          ConstraintLocator *locator)
-      : ContextualFailure(solution, purpose, lhs, rhs, locator),
+      : ContextualFailure(solution, purpose, lhs, rhs, rawLhs, rawRhs, locator),
         Indices(indices.begin(), indices.end()) {
     std::sort(Indices.begin(), Indices.end());
     assert(getFromType()->is<TupleType>() && getToType()->is<TupleType>());
@@ -1109,9 +1128,10 @@ class FunctionTypeMismatch final : public ContextualFailure {
 
 public:
   FunctionTypeMismatch(const Solution &solution, ContextualTypePurpose purpose,
-                       Type lhs, Type rhs, llvm::ArrayRef<unsigned> indices,
+                       Type lhs, Type rhs, Type rawLhs, Type rawRhs,
+                       llvm::ArrayRef<unsigned> indices,
                        ConstraintLocator *locator)
-      : ContextualFailure(solution, purpose, lhs, rhs, locator),
+      : ContextualFailure(solution, purpose, lhs, rhs, rawLhs, rawRhs, locator),
         Indices(indices.begin(), indices.end()) {
     std::sort(Indices.begin(), Indices.end());
     assert(getFromType()->is<AnyFunctionType>() && getToType()->is<AnyFunctionType>());
@@ -2284,13 +2304,16 @@ public:
 /// ```
 class ArgumentMismatchFailure : public ContextualFailure {
   std::optional<FunctionArgApplyInfo> Info;
+  Type rawArgType;
 
 public:
   ArgumentMismatchFailure(const Solution &solution, Type argType,
-                          Type paramType, ConstraintLocator *locator,
+                          Type paramType, Type rawArgType, Type rawParamType,
+                          ConstraintLocator *locator,
                           FixBehavior fixBehavior = FixBehavior::Error)
-      : ContextualFailure(solution, argType, paramType, locator, fixBehavior),
-        Info(getFunctionArgApplyInfo(locator)) {}
+      : ContextualFailure(solution, argType, paramType, rawArgType,
+                          rawParamType, locator, fixBehavior),
+        Info(getFunctionArgApplyInfo(locator)), rawArgType(rawArgType) {}
 
   bool diagnoseAsError() override;
   bool diagnoseAsNote() override;
@@ -2462,10 +2485,9 @@ public:
                                 Type toType,
                                 ConversionRestrictionKind conversionKind,
                                 FixBehavior fixBehavior)
-      : ArgumentMismatchFailure(
-            solution, fromType, toType, locator, fixBehavior),
-        ConversionKind(conversionKind) {
-  }
+      : ArgumentMismatchFailure(solution, fromType, toType, fromType, toType,
+                                locator, fixBehavior),
+        ConversionKind(conversionKind) {}
 
   bool diagnoseAsError() override;
   bool diagnoseAsNote() override;
@@ -2499,7 +2521,8 @@ public:
   AssignmentTypeMismatchFailure(const Solution &solution,
                                 ContextualTypePurpose context, Type srcType,
                                 Type dstType, ConstraintLocator *locator)
-      : ContextualFailure(solution, context, srcType, dstType, locator) {}
+      : ContextualFailure(solution, context, srcType, dstType, srcType, dstType,
+                          locator) {}
 
   bool diagnoseAsError() override;
   bool diagnoseAsNote() override;
