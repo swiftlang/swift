@@ -15,11 +15,12 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "cross-module-serialization-setup"
-#include "swift/AST/Module.h"
 #include "swift/AST/ImportCache.h"
+#include "swift/AST/Module.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/IRGen/TBDGen.h"
 #include "swift/SIL/ApplySite.h"
+#include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILModule.h"
@@ -374,6 +375,8 @@ bool CrossModuleOptimization::isReferenceSerializeCandidate(SILGlobalVariable *G
 void CrossModuleOptimization::trySerializeFunctions(
     ArrayRef<SILFunction *> functions) {
   for (SILFunction *F : functions) {
+    PrettyStackTraceSILFunction stackTrace(
+        "running cross-module optimization on", F);
     if (isSerializeCandidate(F, M.getOptions()) || everything) {
       if (canSerializeFunction(F, canSerializeFlags, /*maxDepth*/ 64)) {
         serializeFunction(F, canSerializeFlags);

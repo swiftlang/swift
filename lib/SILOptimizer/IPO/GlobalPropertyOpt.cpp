@@ -12,6 +12,7 @@
 
 #define DEBUG_TYPE "globalpropertyopt"
 #include "swift/Basic/Assertions.h"
+#include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
@@ -375,6 +376,8 @@ void GlobalPropertyOpt::scanInstruction(swift::SILInstruction *Inst) {
 /// Scans all instructions of the module and builds the dependency graph.
 void GlobalPropertyOpt::scanInstructions() {
   for (auto &F : M) {
+    PrettyStackTraceSILFunction stackTrace(
+        "running global property optimization on", &F);
     LLVM_DEBUG(llvm::dbgs() << "  scan function " << F.getName() << "\n");
     for (auto &BB : F) {
       LLVM_DEBUG(llvm::dbgs() << "    scan basic block " << BB.getDebugID()

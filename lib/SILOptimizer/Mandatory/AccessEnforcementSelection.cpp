@@ -36,11 +36,12 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/SIL/ApplySite.h"
+#include "swift/SIL/BasicBlockBits.h"
+#include "swift/SIL/InstructionUtils.h"
+#include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILUndef.h"
-#include "swift/SIL/InstructionUtils.h"
-#include "swift/SIL/BasicBlockBits.h"
 #include "swift/SILOptimizer/Analysis/ClosureScope.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
@@ -640,6 +641,9 @@ void AccessEnforcementSelection::
 processFunction(SILFunction *F) {
   if (F->isExternalDeclaration())
     return;
+
+  PrettyStackTraceSILFunction stackTrace(
+      "running access enforcement selection on", F);
 
   LLVM_DEBUG(llvm::dbgs() << "Access Enforcement Selection in " << F->getName()
                           << "\n");
