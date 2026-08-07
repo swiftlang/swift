@@ -25,6 +25,8 @@ gyb_expand(Tuple.swift.gyb Tuple.swift
 # crashes if they are.
 add_library(swiftCore
   Algorithm.swift
+  AliasedMutableRef.swift
+  AliasedRef.swift
   ArrayBody.swift
   ArrayBuffer.swift
   ArrayBufferProtocol.swift
@@ -172,6 +174,10 @@ add_library(swiftCore
   Span/Span.swift
   Span/RawSpan.swift
   Span/MutableSpan.swift
+  Span/AliasedMutableRawSpan.swift
+  Span/AliasedMutableSpan.swift
+  Span/AliasedRawSpan.swift
+  Span/AliasedSpan.swift
   Span/MutableRawSpan.swift
   Span/OutputSpan.swift
   Span/OutputRawSpan.swift

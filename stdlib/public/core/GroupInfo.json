@@ -205,6 +205,10 @@
     "UnsafeRawBufferPointer.swift"
   ],
   "Span": [
+    "AliasedMutableRawSpan.swift",
+    "AliasedMutableSpan.swift",
+    "AliasedRawSpan.swift",
+    "AliasedSpan.swift",
     "MutableRawSpan.swift",
     "MutableSpan.swift",
     "OutputRawSpan.swift",
@@ -283,6 +287,8 @@
     "Exclusivity.swift",
     "Ref.swift",
     "MutableRef.swift",
+    "AliasedRef.swift",
+    "AliasedMutableRef.swift",
     "UniqueBox.swift"
   ],
   "Result": [

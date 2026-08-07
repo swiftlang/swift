@@ -30,6 +30,8 @@ split_embedded_sources(
   ### -- PLEASE KEEP THIS LIST IN ALPHABETICAL ORDER ###
   EMBEDDED ASCII.swift
   EMBEDDED Algorithm.swift
+  EMBEDDED AliasedMutableRef.swift
+  EMBEDDED AliasedRef.swift
   EMBEDDED AnyHashable.swift
   EMBEDDED Array.swift
   EMBEDDED ArrayBody.swift
@@ -183,6 +185,10 @@ split_embedded_sources(
   EMBEDDED SliceBuffer.swift
   EMBEDDED SmallString.swift
   EMBEDDED Sort.swift
+  EMBEDDED Span/AliasedMutableRawSpan.swift
+  EMBEDDED Span/AliasedMutableSpan.swift
+  EMBEDDED Span/AliasedRawSpan.swift
+  EMBEDDED Span/AliasedSpan.swift
   EMBEDDED Span/MutableRawSpan.swift
   EMBEDDED Span/MutableSpan.swift
   EMBEDDED Span/OutputRawSpan.swift
