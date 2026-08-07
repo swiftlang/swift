@@ -297,6 +297,7 @@ public:
     return HasRawLayout_t((Flags & DefinitelyHasRawLayoutFlag) != 0);
   }
 
+  void setTrivial() { Flags &= ~NonTrivialFlag; }
   void setNonTrivial() { Flags |= NonTrivialFlag; }
   void setIsOrContainsRawPointer() { Flags |= HasRawPointerFlag; }
 
