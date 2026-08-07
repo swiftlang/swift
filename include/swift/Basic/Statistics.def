@@ -213,6 +213,11 @@ FRONTEND_STATISTIC(Parse, NumIterableDeclContextParsed)
 #include "swift/AST/ParseTypeIDZone.def"
 #undef SWIFT_REQUEST
 
+/// Cache hit counters for Parse requests.
+#define SWIFT_REQUEST(ZONE, NAME, SIG, CACHE, LocOptions) FRONTEND_STATISTIC(Parse, NAME##CacheHit)
+#include "swift/AST/ParseTypeIDZone.def"
+#undef SWIFT_REQUEST
+
 /// Number of conformances that were deserialized by this frontend job.
 FRONTEND_STATISTIC(Sema, NumConformancesDeserialized)
 
@@ -320,7 +325,23 @@ FRONTEND_STATISTIC(Sema, NumSwift6Errors)
 #include "swift/ConstExtract/ConstExtractTypeIDZone.def"
 #undef SWIFT_REQUEST
 
+/// Cache hit counters for type check requests.
+#define SWIFT_REQUEST(ZONE, NAME, Sig, Caching, LocOptions) FRONTEND_STATISTIC(Sema, NAME##CacheHit)
+#include "swift/AST/AccessTypeIDZone.def"
+#include "swift/AST/NameLookupTypeIDZone.def"
+#include "swift/AST/TypeCheckerTypeIDZone.def"
+#include "swift/Sema/IDETypeCheckingRequestIDZone.def"
+#include "swift/IDE/IDERequestIDZone.def"
+#include "swift/ClangImporter/ClangImporterTypeIDZone.def"
+#include "swift/ConstExtract/ConstExtractTypeIDZone.def"
+#undef SWIFT_REQUEST
+
 #define SWIFT_REQUEST(ZONE, NAME, Sig, Caching, LocOptions) FRONTEND_STATISTIC(SILGen, NAME)
+#include "swift/AST/SILGenTypeIDZone.def"
+#undef SWIFT_REQUEST
+
+/// Cache hit counters for SILGen requests.
+#define SWIFT_REQUEST(ZONE, NAME, Sig, Caching, LocOptions) FRONTEND_STATISTIC(SILGen, NAME##CacheHit)
 #include "swift/AST/SILGenTypeIDZone.def"
 #undef SWIFT_REQUEST
 
@@ -338,6 +359,11 @@ FRONTEND_STATISTIC(SILModule, NumSILGenGlobalVariables)
 #include "swift/AST/SILOptimizerTypeIDZone.def"
 #undef SWIFT_REQUEST
 
+/// Cache hit counters for SILOptimizer requests.
+#define SWIFT_REQUEST(ZONE, NAME, Sig, Caching, LocOptions) FRONTEND_STATISTIC(SILOptimizer, NAME##CacheHit)
+#include "swift/AST/SILOptimizerTypeIDZone.def"
+#undef SWIFT_REQUEST
+
 FRONTEND_STATISTIC(SILModule, NumSILOptFunctions)
 FRONTEND_STATISTIC(SILModule, NumSILOptVtables)
 FRONTEND_STATISTIC(SILModule, NumSILOptWitnessTables)
@@ -345,6 +371,11 @@ FRONTEND_STATISTIC(SILModule, NumSILOptDefaultWitnessTables)
 FRONTEND_STATISTIC(SILModule, NumSILOptGlobalVariables)
 
 #define SWIFT_REQUEST(ZONE, NAME, Sig, Caching, LocOptions) FRONTEND_STATISTIC(IRGen, NAME)
+#include "swift/AST/IRGenTypeIDZone.def"
+#undef SWIFT_REQUEST
+
+/// Cache hit counters for IRGen requests.
+#define SWIFT_REQUEST(ZONE, NAME, Sig, Caching, LocOptions) FRONTEND_STATISTIC(IRGen, NAME##CacheHit)
 #include "swift/AST/IRGenTypeIDZone.def"
 #undef SWIFT_REQUEST
 
@@ -369,6 +400,11 @@ FRONTEND_STATISTIC(IRModule, NumGOTEntries)
 FRONTEND_STATISTIC(LLVM, NumLLVMBytesOutput)
 
 #define SWIFT_REQUEST(ZONE, NAME, Sig, Caching, LocOptions) FRONTEND_STATISTIC(TBDGen, NAME)
+#include "swift/AST/TBDGenTypeIDZone.def"
+#undef SWIFT_REQUEST
+
+/// Cache hit counters for TBDGen requests.
+#define SWIFT_REQUEST(ZONE, NAME, Sig, Caching, LocOptions) FRONTEND_STATISTIC(TBDGen, NAME##CacheHit)
 #include "swift/AST/TBDGenTypeIDZone.def"
 #undef SWIFT_REQUEST
 
