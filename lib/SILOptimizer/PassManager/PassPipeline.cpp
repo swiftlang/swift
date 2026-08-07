@@ -601,6 +601,7 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   P.addCommonSubexpressionElimination();
   P.addDCE();
   P.addDeadDebugVariableElimination();
+  P.addDebugReconstructionBlockSimplification();
   P.addDeadAccessScopeElimination();
 
   // Perform retain/release code motion and run the first ARC optimizer.
@@ -920,9 +921,6 @@ static void addLastChanceOptPassPipeline(SILPassPipelinePlan &P) {
 
   // Emits remarks on all functions with @_assemblyVision attribute.
   P.addAssemblyVisionRemarkGenerator();
-
-  // Simplify redundant instruction pairs in debug reconstruction blocks.
-  P.addDebugReconstructionBlockSimplification();
 
   // In optimized builds, do the inter-procedural analysis in a module pass.
   P.addStackProtection();

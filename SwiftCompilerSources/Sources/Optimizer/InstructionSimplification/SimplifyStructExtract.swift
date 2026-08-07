@@ -12,12 +12,23 @@
 
 import SIL
 
-extension StructExtractInst : OnoneSimplifiable, SILCombineSimplifiable, DebugReconstructionBlockSimplifiable {
+extension StructExtractInst : OnoneSimplifiable, SILCombineSimplifiable {
   func simplify(_ context: SimplifyContext) {
     guard let structInst = self.struct as? StructInst else {
       return
     }
     context.tryReplaceRedundantInstructionPair(first: structInst, second: self,
                                                with: structInst.operands[fieldIndex].value)
+  }
+}
+
+extension StructExtractInst : DebugReconstructionBlockSimplifiable {
+  /// Folds `struct_extract undef` to `undef`, and fold `struct_extract(struct(x)) -> x`
+  func simplifyForDebugReconstructionBlock(_ context: SimplifyContext) {
+    if self.struct is Undef {
+      replaceWithUndef(context)
+    } else {
+      simplify(context)
+    }
   }
 }
