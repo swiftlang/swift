@@ -2411,6 +2411,10 @@ final public class CheckedCastBranchInst : TermInst, UnaryInstruction {
   public var successBlock: BasicBlock { bridged.CheckedCastBranch_getSuccessBlock().block }
   public var failureBlock: BasicBlock { bridged.CheckedCastBranch_getFailureBlock().block }
 
+  public var targetFormalType: CanonicalType {
+    CanonicalType(bridged: bridged.CheckedCastBranch_getTargetFormalType())
+  }
+
   public func updateSourceFormalTypeFromOperandLoweredType() {
     bridged.CheckedCastBranch_updateSourceFormalTypeFromOperandLoweredType()
   }

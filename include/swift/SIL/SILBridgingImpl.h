@@ -1919,6 +1919,10 @@ BridgedBasicBlock BridgedInstruction::CheckedCastBranch_getSuccessBlock() const 
   return {getAs<swift::CheckedCastBranchInst>()->getSuccessBB()};
 }
 
+BridgedCanType BridgedInstruction::CheckedCastBranch_getTargetFormalType() const {
+  return {getAs<swift::CheckedCastBranchInst>()->getTargetFormalType()};
+}
+
 BridgedBasicBlock BridgedInstruction::CheckedCastBranch_getFailureBlock() const {
   return {getAs<swift::CheckedCastBranchInst>()->getFailureBB()};
 }
