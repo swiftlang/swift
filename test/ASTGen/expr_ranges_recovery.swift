@@ -34,3 +34,13 @@ func tryWithoutExpression() throws -> Int {
 func commentBeforeSuffix(foo: Int?) {
   _ = foo/* */?.description
 }
+
+// A statement body whose braces the parser had to synthesize. The synthesized
+// positions land past the last token's trailing trivia -- outside the statement
+// entirely, sometimes past the end of the line -- so a body built from them gave
+// the statement a range extending beyond what it consumed, and the statement's
+// own child scopes then fell outside it.
+//
+// Last in the file: a bare 'for' swallows whatever follows into its body during
+// recovery, and the two parsers disagree about how much.
+for i

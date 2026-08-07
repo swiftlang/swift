@@ -14,7 +14,7 @@ import ASTBridging
 import SwiftDiagnostics
 @_spi(ExperimentalLanguageFeatures) @_spi(RawSyntax) import SwiftSyntax
 
-protocol DoStmtOrExprSyntax {
+protocol DoStmtOrExprSyntax: SyntaxProtocol {
   var doKeyword: TokenSyntax { get }
   var throwsClause: ThrowsClauseSyntax? { get }
   var body: CodeBlockSyntax { get }
@@ -144,6 +144,45 @@ extension ASTGenVisitor {
     )
   }
 
+  /// A zero-width range at the end of `node`, for use as the fallback body range
+  /// of a statement whose body braces the parser had to synthesize.
+  ///
+  /// The end of the statement is inside every scope the statement introduces --
+  /// a conditional clause's, notably -- whereas the statement's *start* is not,
+  /// and the synthesized braces' own position may be anywhere.
+  func implicitBodyRange(atEndOf node: some SyntaxProtocol) -> SourceRange {
+    let end = self.generateSourceRange(node).end
+    return SourceRange(start: end, end: end)
+  }
+
+  /// Generate a statement body, supplying a range to use if the parser had to
+  /// synthesize the braces.
+  ///
+  /// A synthesized brace has a zero-width position just past the preceding token
+  /// *and its trailing trivia*, which can be outside the enclosing statement --
+  /// past the end of the line, even. A body built from it gives the statement a
+  /// range extending past what it consumed, and the statement's own child scopes
+  /// then fall outside it.
+  ///
+  /// The body is also marked implicit in that case, matching the C++ parser,
+  /// which likewise synthesizes a body it never saw braces for.
+  func generate(codeBlock node: CodeBlockSyntax, fallbackRange: SourceRange) -> BridgedBraceStmt {
+    guard node.leftBrace.presence == .present else {
+      // The body must at least contain its own contents, so prefer their extent.
+      // `fallbackRange` is only for an empty block, where there is nothing to
+      // derive a range from.
+      let contentRange = self.generateSourceRange(node.statements)
+      let range = contentRange.start.isValid ? contentRange : fallbackRange
+      return BridgedBraceStmt.createImplicit(
+        self.ctx,
+        lBraceLoc: range.start,
+        elements: self.generate(codeBlockItemList: node.statements).lazy.bridgedArray(in: self),
+        rBraceLoc: range.end
+      )
+    }
+    return self.generate(codeBlock: node)
+  }
+
   func generateHasSymbolStmtCondition(macroExpansionExpr node: MacroExpansionExprSyntax) -> BridgedStmtConditionElement {
     var args = node.arguments[...]
     let symbol: BridgedExpr?
@@ -268,10 +307,17 @@ extension ASTGenVisitor {
             ).asPattern
             pat.setImplicit()
           } else {
-            // Nothing usable to unwrap, e.g. a tuple pattern.
+            // Nothing usable to unwrap, e.g. a tuple pattern, or a pattern the
+            // parser could not form at all.
+            //
+            // A missing pattern has no source-accurate tokens, so its range is
+            // invalid; fall back to the condition's own range. An ErrorExpr with
+            // no location would give the condition a range with a valid start and
+            // an invalid end, which `SourceRange` asserts against.
+            let patternRange = self.generateSourceRange(node.pattern)
             initializer = BridgedErrorExpr.create(
               self.ctx,
-              loc: self.generateSourceRange(node.pattern)
+              loc: patternRange.start.isValid ? patternRange : self.generateSourceRange(node)
             ).asExpr
           }
         }
@@ -316,7 +362,7 @@ extension ASTGenVisitor {
       deferLoc: deferLoc
     )
     self.withDeclContext(stmt.tempDecl.asDeclContext) {
-      let body = self.generate(codeBlock: node.body)
+      let body = self.generate(codeBlock: node.body, fallbackRange: self.implicitBodyRange(atEndOf: node))
       stmt.tempDecl.setParsedBody(body)
       if body.hasAsyncNode() {
         stmt.makeAsync(ctx)
@@ -374,7 +420,7 @@ extension ASTGenVisitor {
       self.ctx,
       catchLoc: self.generateSourceLoc(node.catchKeyword),
       caseLabelItems: self.generate(catchItemList: node.catchItems),
-      body: self.generate(codeBlock: node.body)
+      body: self.generate(codeBlock: node.body, fallbackRange: self.implicitBodyRange(atEndOf: node))
     )
   }
 
@@ -400,7 +446,7 @@ extension ASTGenVisitor {
         self.ctx,
         labelInfo: labelInfo,
         doLoc: self.generateSourceLoc(node.doKeyword),
-        body: self.generate(codeBlock: node.body)
+        body: self.generate(codeBlock: node.body, fallbackRange: self.implicitBodyRange(atEndOf: node))
       ).asStmt
     } else {
       return BridgedDoCatchStmt.createParsed(
@@ -409,7 +455,7 @@ extension ASTGenVisitor {
         doLoc: self.generateSourceLoc(node.doKeyword),
         throwsLoc: self.generateSourceLoc(node.throwsClause?.throwsSpecifier),
         thrownType: self.generate(type: node.throwsClause?.type),
-        body: self.generate(codeBlock: node.body).asStmt,
+        body: self.generate(codeBlock: node.body, fallbackRange: self.implicitBodyRange(atEndOf: node)).asStmt,
         catches: self.generate(catchClauseList: node.catchClauses)
       ).asStmt
     }
@@ -431,7 +477,9 @@ extension ASTGenVisitor {
       sequence: self.generate(expr: node.sequence),
       whereLoc: self.generateSourceLoc(node.whereClause?.whereKeyword),
       whereExpr: self.generate(expr: node.whereClause?.condition),
-      body: self.generate(codeBlock: node.body),
+      // A for-each loop introduces no scope before its body, so the statement's
+      // whole range works here and is what the C++ parser uses.
+      body: self.generate(codeBlock: node.body, fallbackRange: self.generateSourceRange(node)),
       declContext: self.declContext
     )
   }
@@ -441,7 +489,7 @@ extension ASTGenVisitor {
       self.ctx,
       guardLoc: self.generateSourceLoc(node.guardKeyword),
       conds: self.generate(conditionElementList: node.conditions),
-      body: self.generate(codeBlock: node.body)
+      body: self.generate(codeBlock: node.body, fallbackRange: self.implicitBodyRange(atEndOf: node))
     )
   }
 
@@ -451,7 +499,7 @@ extension ASTGenVisitor {
       labelInfo: labelInfo,
       ifLoc: self.generateSourceLoc(node.ifKeyword),
       conditions: self.generate(conditionElementList: node.conditions),
-      then: self.generate(codeBlock: node.body),
+      then: self.generate(codeBlock: node.body, fallbackRange: self.implicitBodyRange(atEndOf: node)),
       elseLoc: self.generateSourceLoc(node.elseKeyword),
       else: node.elseBody.map {
         switch $0 {
@@ -537,7 +585,7 @@ extension ASTGenVisitor {
       repeatLoc: self.generateSourceLoc(node.repeatKeyword),
       cond: self.generate(expr: node.condition),
       whileLoc: self.generateSourceLoc(node.whileKeyword),
-      body: self.generate(codeBlock: node.body).asStmt
+      body: self.generate(codeBlock: node.body, fallbackRange: self.implicitBodyRange(atEndOf: node)).asStmt
     )
   }
 
@@ -669,7 +717,7 @@ extension ASTGenVisitor {
       labelInfo: labelInfo,
       whileLoc: self.generateSourceLoc(node.whileKeyword),
       cond: self.generate(conditionElementList: node.conditions),
-      body: self.generate(codeBlock: node.body).asStmt
+      body: self.generate(codeBlock: node.body, fallbackRange: self.implicitBodyRange(atEndOf: node)).asStmt
     )
   }
 
