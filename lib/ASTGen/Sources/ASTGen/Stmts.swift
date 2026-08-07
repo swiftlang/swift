@@ -574,11 +574,21 @@ extension ASTGenVisitor {
       items = CollectionOfOne(item).bridgedArray(in: self)
       terminatorLoc = self.generateSourceLoc(node.colon)
     }
-    let body = BridgedBraceStmt.createParsed(
+    // A switch case body has no braces in the source, so its locations have to
+    // be synthesized. They must be *valid*: `CaseStmt::getLabelItemsRange()`
+    // falls back to `SourceRange(getLoc(), getBody()->getEndLoc())` when the
+    // terminator location is invalid, and a `BraceStmt` with no elements and no
+    // brace locations has an invalid end location -- pairing a valid start with
+    // an invalid end, which `SourceRange` asserts against.
+    //
+    // `Parser::parseStmtCase` picks the same locations: the start of the body if
+    // it has any items, otherwise the position just past the label, for both.
+    let bodyRange = self.generateImplicitBraceRange(node.statements)
+    let body = BridgedBraceStmt.createImplicit(
       self.ctx,
-      lBraceLoc: nil,
+      lBraceLoc: bodyRange.start,
       elements: self.generate(codeBlockItemList: node.statements).lazy.bridgedArray(in: self),
-      rBraceLoc: nil
+      rBraceLoc: bodyRange.end
     )
 
     return .createParsedSwitchCase(

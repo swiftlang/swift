@@ -45,3 +45,13 @@ struct Layout<S> {}
 // expected-astgen-error@-2 {{expected alignment in layout requirement}}
 // expected-astgen-note@-3 {{insert alignment}}
 public func specialized<S>(_ s: S) {}
+
+// An empty generic parameter list, which recovery produces for `struct S< {}`.
+// ASTGen used to build a GenericParamList with no parameters, tripping
+// "Parsed an empty generic parameter list?" downstream; the C++ parser produces
+// no list at all.
+struct EmptyGenericParams< {}
+// expected-astgen-error@-1 {{expected '>' to end generic parameter clause}}
+// expected-astgen-note@-2 {{to match this opening '<'}}
+// expected-astgen-note@-3 {{insert '>'}}
+// expected-cxx-error@-4 {{expected an identifier to name generic parameter}}

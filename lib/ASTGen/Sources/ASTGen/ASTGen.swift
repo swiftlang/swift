@@ -424,7 +424,14 @@ extension ASTGenVisitor {
 
   @inline(__always)
   func generate(genericParameterClause node: GenericParameterClauseSyntax?) -> BridgedNullableGenericParamList {
-    node.map(generate(genericParameterClause:)).asNullable
+    // Drop an empty parameter list, e.g. the one recovery produces for
+    // `struct S< {}`. The C++ parser yields no list at all in that case, and
+    // downstream code asserts that a GenericParamList has at least one
+    // parameter ("Parsed an empty generic parameter list?").
+    guard let node, !node.parameters.isEmpty else {
+      return nil
+    }
+    return Optional(self.generate(genericParameterClause: node)).asNullable
   }
 
   @inline(__always)

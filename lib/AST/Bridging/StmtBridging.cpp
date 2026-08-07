@@ -92,6 +92,16 @@ BridgedBraceStmt BridgedBraceStmt_createImplicit(BridgedASTContext cContext,
                            /*Implicit=*/true);
 }
 
+BridgedBraceStmt
+BridgedBraceStmt_createImplicitWithElements(BridgedASTContext cContext,
+                                            SourceLoc lBLoc,
+                                            BridgedArrayRef elements,
+                                            SourceLoc rBLoc) {
+  return BraceStmt::create(cContext.unbridged(), lBLoc,
+                           elements.unbridged<ASTNode>(), rBLoc,
+                           /*Implicit=*/true);
+}
+
 bool BridgedBraceStmt_hasAsyncNode(BridgedBraceStmt braceStmt) {
   return (bool)braceStmt.unbridged()->findAsyncNode();
 }

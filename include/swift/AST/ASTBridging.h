@@ -2518,6 +2518,19 @@ BridgedBraceStmt BridgedBraceStmt_createImplicit(BridgedASTContext cContext,
                                                  BridgedASTNode element,
                                                  swift::SourceLoc rBLoc);
 
+/// Create an implicit brace statement with brace locations.
+///
+/// Distinct from `createParsed`, which infers implicitness from whether the left
+/// brace location is valid. A brace that is implicit but still has locations --
+/// a switch case body, say, whose extent is known but which has no braces in the
+/// source -- has to say so explicitly.
+SWIFT_NAME("BridgedBraceStmt.createImplicit(_:lBraceLoc:elements:rBraceLoc:)")
+BridgedBraceStmt
+BridgedBraceStmt_createImplicitWithElements(BridgedASTContext cContext,
+                                            swift::SourceLoc lBLoc,
+                                            BridgedArrayRef elements,
+                                            swift::SourceLoc rBLoc);
+
 SWIFT_NAME("BridgedBraceStmt.hasAsyncNode(self:)")
 bool BridgedBraceStmt_hasAsyncNode(BridgedBraceStmt braceStmt);
 
