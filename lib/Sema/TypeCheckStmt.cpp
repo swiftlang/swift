@@ -423,6 +423,7 @@ unsigned LocalDiscriminatorsRequest::evaluate(
   }
 
   ASTNode node;
+  ArgumentList *args = nullptr;
   ParameterList *params = nullptr;
   ParamDecl *selfParam = nullptr;
   if (auto func = dyn_cast<AbstractFunctionDecl>(dc)) {
@@ -473,12 +474,17 @@ unsigned LocalDiscriminatorsRequest::evaluate(
       node = initInfo.getInitFromProjectedValue();
       break;
     }
+  } else if (auto customAttrInit = dyn_cast<CustomAttributeInitializer>(dc)) {
+    args = customAttrInit->getAttribute()->getArgs();
+    // Custom attribute initializer contexts are omitted when mangling, so
+    // number their closures in the enclosing context.
+    dc = customAttrInit->getParent();
   } else {
     params = getParameterList(dc);
   }
 
   auto startDiscriminator = ctx.getNextDiscriminator(dc);
-  if (!node && !params && !selfParam)
+  if (!node && !args && !params && !selfParam)
     return startDiscriminator;
 
   SetLocalDiscriminators visitor(startDiscriminator);
@@ -496,6 +502,9 @@ unsigned LocalDiscriminatorsRequest::evaluate(
 
   if (node)
     node.walk(visitor);
+
+  if (args)
+    args->walk(visitor);
 
   unsigned nextDiscriminator = visitor.maxAssignedDiscriminator();
   ctx.setMaxAssignedDiscriminator(dc, nextDiscriminator);
