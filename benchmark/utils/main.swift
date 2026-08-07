@@ -68,6 +68,7 @@ import CxxStringConversion
 import DataBenchmarks
 import DeadArray
 import DevirtualizeProtocolComposition
+import DistributedThunkHop
 import DictOfArraysToArrayOfDicts
 import DictTest
 import DictTest2
@@ -286,6 +287,7 @@ register(CxxStringConversion.benchmarks)
 register(DataBenchmarks.benchmarks)
 register(DeadArray.benchmarks)
 register(DevirtualizeProtocolComposition.benchmarks)
+register(DistributedThunkHop.benchmarks)
 register(DictOfArraysToArrayOfDicts.benchmarks)
 register(DictTest.benchmarks)
 register(DictTest2.benchmarks)

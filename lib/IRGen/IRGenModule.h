@@ -654,15 +654,22 @@ private:
   std::string FunctionName;
 
   bool IsDistributed: 1;
+  bool HasLeadingImplicitActorIsolationParameter : 1;
 
   CanSILFunctionType Type;
   llvm::Constant *Address;
 
   explicit AccessibleFunction(std::string recordName, std::string funcName,
-                              bool isDistributed, CanSILFunctionType type,
-                              llvm::Constant *addr)
+                              bool isDistributed,
+                              bool hasLeadingImplicitActorIsolationParameter,
+                              CanSILFunctionType type, llvm::Constant *addr)
       : RecordName(recordName), FunctionName(funcName),
-        IsDistributed(isDistributed), Type(type), Address(addr) {}
+        IsDistributed(isDistributed),
+        HasLeadingImplicitActorIsolationParameter(hasLeadingImplicitActorIsolationParameter),
+        Type(type), Address(addr) {
+    assert((!hasLeadingImplicitActorIsolationParameter || isDistributed) &&
+           "currently only distributed accessors can take an isolated actor parameter");
+  }
 
 public:
   StringRef getRecordName() const { return RecordName; }
@@ -670,15 +677,22 @@ public:
 
   bool isDistributed() const { return IsDistributed; }
 
+  /// Whether the recorded distributed accessor takes an isolated
+  /// `(any Actor)?` parameter, and therefore must be invoked through
+  /// `swift_distributed_execute_target_with_isolation`
+  bool hasLeadingImplicitActorIsolationParameter() const {
+    return HasLeadingImplicitActorIsolationParameter;
+  }
+
   CanSILFunctionType getType() const { return Type; }
 
   llvm::Constant *getAddress() const { return Address; }
 
   static AccessibleFunction forSILFunction(IRGenModule &IGM, SILFunction *func);
-  static AccessibleFunction forDistributed(std::string recordName,
-                                           std::string accessorName,
-                                           CanSILFunctionType type,
-                                           llvm::Constant *address);
+  static AccessibleFunction
+  forDistributed(std::string recordName, std::string accessorName,
+                 bool hasLeadingImplicitActorIsolationParameter,
+                 CanSILFunctionType type, llvm::Constant *address);
 };
 
 enum class CStringSectionType {
@@ -2040,7 +2054,8 @@ public:
 
   llvm::Function *
   getAddrOfDistributedTargetAccessor(LinkEntity accessor,
-                                     ForDefinition_t forDefinition);
+                                     ForDefinition_t forDefinition,
+                                     bool hasIsolatedActorParameter);
 
   /// Emit a distributed accessor function for the given distributed thunk or
   /// protocol requirement.

@@ -91,6 +91,7 @@ FEATURE(TaskDeadline,                                   (6, 5))
 FEATURE(CancellationHandlerWithReason,                  (6, 5))
 FEATURE(DistributedActorResignRemoteID,                 (6, 5))
 FEATURE(EmbeddedDistributedSwift,                       (6, 5))
+FEATURE(DistributedAccessorIsolation,                   (6, 5))
 
 FEATURE(CustomGlobalExecutors,                          FUTURE)
 FEATURE(Differentiation,                                FUTURE)
