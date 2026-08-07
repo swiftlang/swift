@@ -2097,6 +2097,11 @@ endfunction()
 # INSTALL_WITH_SHARED
 #   Install a static library target alongside shared libraries
 #
+# INSTALL_WITH_STATIC
+#   Also install a library target in the static resource directory. This is
+#   useful for static-only libraries that must remain available to clients
+#   using either the shared or static resource directory.
+#
 # MACCATALYST_BUILD_FLAVOR
 #   Possible values are 'ios-like', 'macos-like', 'zippered', 'unzippered-twin'
 #   Presence of a build flavor requires SWIFT_MODULE_DEPENDS_MACCATALYST to be
@@ -2161,7 +2166,8 @@ function(add_swift_target_library name)
         SHARED
         STATIC
         NO_LINK_NAME
-        INSTALL_WITH_SHARED)
+        INSTALL_WITH_SHARED
+        INSTALL_WITH_STATIC)
   set(SWIFTLIB_single_parameter_options
         DEPLOYMENT_VERSION_IOS
         DEPLOYMENT_VERSION_OSX
@@ -2984,6 +2990,22 @@ function(add_swift_target_library name)
                                    DESTINATION ${install_dest}
                                    COMPONENT "${SWIFTLIB_INSTALL_IN_COMPONENT}"
                                    PERMISSIONS ${file_permissions}
+                                   "${optional_arg}")
+      endif()
+      if(SWIFTLIB_INSTALL_WITH_STATIC)
+        set(static_install_dest
+          "lib${LLVM_LIBDIR_SUFFIX}/swift_static/${resource_dir_sdk_subdir}")
+        if(sdk STREQUAL "WINDOWS" AND CMAKE_SYSTEM_NAME STREQUAL "Windows")
+          string(APPEND static_install_dest
+            "/${SWIFT_PRIMARY_VARIANT_ARCH}")
+        endif()
+        swift_install_in_component(FILES "${UNIVERSAL_LIBRARY_NAME}"
+                                   DESTINATION "${static_install_dest}"
+                                   COMPONENT "${SWIFTLIB_INSTALL_IN_COMPONENT}"
+                                   PERMISSIONS
+                                     OWNER_READ OWNER_WRITE
+                                     GROUP_READ
+                                     WORLD_READ
                                    "${optional_arg}")
       endif()
       if(sdk STREQUAL "WINDOWS")
