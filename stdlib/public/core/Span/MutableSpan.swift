@@ -645,8 +645,8 @@ extension MutableSpan where Element: ~Copyable {
   /// slices, extracted spans do not share their indices with the
   /// span from which they are extracted.
   ///
-  /// - Parameter bounds: A valid range of indices. Every index in
-  ///   this range must be within the bounds of this `MutableSpan`.
+  /// - Parameter bounds: A valid range of indices. Every index in this range
+  ///   must be within the bounds of this `MutableSpan`.
   /// - Returns: A `MutableSpan` over the elements within `bounds`.
   ///
   /// - Complexity: O(1)
@@ -670,8 +670,8 @@ extension MutableSpan where Element: ~Copyable {
   /// slices, extracted spans do not share their indices with the
   /// span from which they are extracted.
   ///
-  /// - Parameter bounds: A valid range of indices. Every index in
-  ///   this range must be within the bounds of this `MutableSpan`.
+  /// - Parameter bounds: A valid range of indices. Every index in this range
+  ///   must be within the bounds of this `MutableSpan`.
   /// - Returns: A `MutableSpan` over the elements within `bounds`.
   ///
   /// - Complexity: O(1)
@@ -689,8 +689,8 @@ extension MutableSpan where Element: ~Copyable {
   /// slices, extracted spans do not share their indices with the
   /// span from which they are extracted.
   ///
-  /// - Parameter bounds: A valid range of indices. Every index in
-  ///   this range must be within the bounds of this `MutableSpan`.
+  /// - Parameter bounds: A valid range of indices. Every index in this range
+  ///   must be within the bounds of this `MutableSpan`.
   /// - Returns: A `MutableSpan` over the elements within `bounds`.
   ///
   /// - Complexity: O(1)
@@ -716,8 +716,8 @@ extension MutableSpan where Element: ~Copyable {
   ///
   /// This function does not validate `bounds`; this is an unsafe operation.
   ///
-  /// - Parameter bounds: A valid range of indices. Every index in
-  ///   this range must be within the bounds of this `MutableSpan`.
+  /// - Parameter bounds: A valid range of indices. Every index in this range
+  ///   must be within the bounds of this `MutableSpan`.
   /// - Returns: A `MutableSpan` over the elements within `bounds`.
   ///
   /// - Complexity: O(1)
@@ -742,8 +742,8 @@ extension MutableSpan where Element: ~Copyable {
   ///
   /// This function does not validate `bounds`; this is an unsafe operation.
   ///
-  /// - Parameter bounds: A valid range of indices. Every index in
-  ///   this range must be within the bounds of this `MutableSpan`.
+  /// - Parameter bounds: A valid range of indices. Every index in this range
+  ///   must be within the bounds of this `MutableSpan`.
   /// - Returns: A `MutableSpan` over the elements within `bounds`.
   ///
   /// - Complexity: O(1)
@@ -764,8 +764,8 @@ extension MutableSpan where Element: ~Copyable {
   ///
   /// This function does not validate `bounds`; this is an unsafe operation.
   ///
-  /// - Parameter bounds: A valid range of indices. Every index in
-  ///   this range must be within the bounds of this `MutableSpan`.
+  /// - Parameter bounds: A valid range of indices. Every index in this range
+  ///   must be within the bounds of this `MutableSpan`.
   /// - Returns: A `MutableSpan` over the elements within `bounds`.
   ///
   /// - Complexity: O(1)
@@ -788,8 +788,8 @@ extension MutableSpan where Element: ~Copyable {
   /// slices, extracted spans do not share their indices with the
   /// span from which they are extracted.
   ///
-  /// - Parameter bounds: A valid range of indices. Every index in
-  ///   this range must be within the bounds of this `MutableSpan`.
+  /// - Parameter bounds: A valid range of indices. Every index in this range
+  ///   must be within the bounds of this `MutableSpan`.
   /// - Returns: A `MutableSpan` over the elements within `bounds`.
   ///
   /// - Complexity: O(1)
@@ -810,8 +810,8 @@ extension MutableSpan where Element: ~Copyable {
   /// slices, extracted spans do not share their indices with the
   /// span from which they are extracted.
   ///
-  /// - Parameter bounds: A valid range of indices. Every index in
-  ///   this range must be within the bounds of this `MutableSpan`.
+  /// - Parameter bounds: A valid range of indices. Every index in this range
+  ///   must be within the bounds of this `MutableSpan`.
   /// - Returns: A `MutableSpan` over the elements within `bounds`.
   ///
   /// - Complexity: O(1)
@@ -831,8 +831,8 @@ extension MutableSpan where Element: ~Copyable {
   /// slices, extracted spans do not share their indices with the
   /// span from which they are extracted.
   ///
-  /// - Parameter bounds: A valid range of indices. Every index in
-  ///   this range must be within the bounds of this `MutableSpan`.
+  /// - Parameter bounds: A valid range of indices. Every index in this range
+  ///   must be within the bounds of this `MutableSpan`.
   /// - Returns: A `MutableSpan` over the elements within `bounds`.
   ///
   /// - Complexity: O(1)
@@ -855,8 +855,8 @@ extension MutableSpan where Element: ~Copyable {
   ///
   /// This function does not validate `bounds`; this is an unsafe operation.
   ///
-  /// - Parameter bounds: A valid range of indices. Every index in
-  ///   this range must be within the bounds of this `MutableSpan`.
+  /// - Parameter bounds: A valid range of indices. Every index in this range
+  ///   must be within the bounds of this `MutableSpan`.
   /// - Returns: A `MutableSpan` over the elements within `bounds`.
   ///
   /// - Complexity: O(1)
@@ -883,8 +883,8 @@ extension MutableSpan where Element: ~Copyable {
   ///
   /// This function does not validate `bounds`; this is an unsafe operation.
   ///
-  /// - Parameter bounds: A valid range of indices. Every index in
-  ///   this range must be within the bounds of this `MutableSpan`.
+  /// - Parameter bounds: A valid range of indices. Every index in this range
+  ///   must be within the bounds of this `MutableSpan`.
   /// - Returns: A `MutableSpan` over the elements within `bounds`.
   ///
   /// - Complexity: O(1)
@@ -907,8 +907,8 @@ extension MutableSpan where Element: ~Copyable {
   ///
   /// This function does not validate `bounds`; this is an unsafe operation.
   ///
-  /// - Parameter bounds: A valid range of indices. Every index in
-  ///   this range must be within the bounds of this `MutableSpan`.
+  /// - Parameter bounds: A valid range of indices. Every index in this range
+  ///   must be within the bounds of this `MutableSpan`.
   /// - Returns: A `MutableSpan` over the elements within `bounds`.
   ///
   /// - Complexity: O(1)
