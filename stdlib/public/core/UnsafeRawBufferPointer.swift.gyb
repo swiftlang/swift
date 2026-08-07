@@ -1217,7 +1217,8 @@ extension Unsafe${Mutable}RawBufferPointer {
   /// slices, extracted buffers do not share their indices with the
   /// original buffer pointer.
   ///
-  /// - Parameter bounds: A valid range of byte offsets within this buffer.
+  /// - Parameter bounds: A valid range of byte offsets. Every byte offset in
+  ///   this range must be within the bounds of this buffer.
   /// - Returns: A new buffer pointer over the bytes at `bounds`.
   ///
   /// - Complexity: O(1)
@@ -1239,7 +1240,8 @@ extension Unsafe${Mutable}RawBufferPointer {
   /// slices, extracted buffers do not share their indices with the
   /// original buffer pointer.
   ///
-  /// - Parameter bounds: A valid range of byte offsets within this buffer.
+  /// - Parameter bounds: A valid range of byte offsets. Every byte offset in
+  ///   this range must be within the bounds of this buffer.
   /// - Returns: A new buffer pointer over the bytes at `bounds`.
   ///
   /// - Complexity: O(1)
@@ -1273,7 +1275,8 @@ extension Unsafe${Mutable}RawBufferPointer {
   ///
   /// This function does not validate `bounds`; this is an unsafe operation.
   ///
-  /// - Parameter bounds: A valid range of byte offsets within this buffer.
+  /// - Parameter bounds: A valid range of byte offsets. Every byte offset in
+  ///   this range must be within the bounds of this buffer.
   /// - Returns: A new buffer pointer over the bytes at `bounds`.
   ///
   /// - Complexity: O(1)
@@ -1292,7 +1295,8 @@ extension Unsafe${Mutable}RawBufferPointer {
   ///
   /// This function does not validate `bounds`; this is an unsafe operation.
   ///
-  /// - Parameter bounds: A valid range of byte offsets within this buffer.
+  /// - Parameter bounds: A valid range of byte offsets. Every byte offset in
+  ///   this range must be within the bounds of this buffer.
   /// - Returns: A new buffer pointer over the bytes at `bounds`.
   ///
   /// - Complexity: O(1)

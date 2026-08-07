@@ -514,7 +514,8 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   /// However, unlike slicing, the `extracting` operation remains available even
   /// if `Element` happens to be noncopyable.
   ///
-  /// - Parameter bounds: A valid range of indices within this buffer.
+  /// - Parameter bounds: A valid range of indices. Every index in this range
+  ///   must be within the bounds of this buffer.
   /// - Returns: A new buffer pointer over the elements at `bounds`.
   ///
   /// - Complexity: O(1)
@@ -555,7 +556,8 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   /// However, unlike slicing, the `extracting` operation remains available even
   /// if `Element` happens to be noncopyable.
   ///
-  /// - Parameter bounds: A valid range of indices within this buffer.
+  /// - Parameter bounds: A valid range of indices. Every index in this range
+  ///   must be within the bounds of this buffer.
   /// - Returns: A new buffer pointer over the elements at `bounds`.
   ///
   /// - Complexity: O(1)
@@ -601,7 +603,8 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   ///
   /// This function does not validate `bounds`; this is an unsafe operation.
   ///
-  /// - Parameter bounds: A valid range of indices within this buffer.
+  /// - Parameter bounds: A valid range of indices. Every index in this range
+  ///   must be within the bounds of this buffer.
   /// - Returns: A new buffer pointer over the elements at `bounds`.
   ///
   /// - Complexity: O(1)
@@ -621,7 +624,8 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   ///
   /// This function does not validate `bounds`; this is an unsafe operation.
   ///
-  /// - Parameter bounds: A valid range of indices within this buffer.
+  /// - Parameter bounds: A valid range of indices. Every index in this range
+  ///   must be within the bounds of this buffer.
   /// - Returns: A new buffer pointer over the elements at `bounds`.
   ///
   /// - Complexity: O(1)
