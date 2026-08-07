@@ -729,3 +729,14 @@ BridgedStringRef AccessorKind_nameForDiagnostic(swift::AccessorKind kind) {
 bool AccessorKind_requiresCoroutineAccessorsFeature(swift::AccessorKind kind) {
   return requiresFeatureCoroutineAccessors(kind);
 }
+
+BridgedStringRef AccessorKind_name(swift::AccessorKind kind) {
+  // Returns a static string, so it outlives the call.
+  return accessorKindName(kind);
+}
+
+bool AccessorKind_allowsEffectsSpecifiers(swift::AccessorKind kind) {
+  // Matches Parser::parseAccessorSpecifiers: only 'get' may be effectful.
+  // 'DistributedGet' is derived after parsing, so it does not appear here.
+  return kind == swift::AccessorKind::Get;
+}

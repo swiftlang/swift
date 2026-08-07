@@ -467,6 +467,23 @@ extension ASTGenVisitor {
         at: node.accessorSpecifier
       )
     }
+    // Only a 'get' accessor may be effectful. For any other kind, diagnose each
+    // specifier and drop it: an AccessorDecl that is both non-'get' and 'async'
+    // violates an AccessorDecl invariant and would trip an assertion.
+    var asyncSpecifier = node.effectSpecifiers?.asyncSpecifier
+    var throwsClause = node.effectSpecifiers?.throwsClause
+    if !kind.allowsEffectsSpecifiers {
+      let kindName = String(bridged: kind.name)
+      for specifier in [asyncSpecifier, throwsClause?.throwsSpecifier].compactMap({ $0 }) {
+        self.diagnose(
+          .invalid_accessor_specifier(kindName, String(syntaxText: specifier.rawText)),
+          at: specifier
+        )
+      }
+      asyncSpecifier = nil
+      throwsClause = nil
+    }
+
     let accessor = BridgedAccessorDecl.createParsed(
       self.ctx,
       declContext: self.declContext,
@@ -475,9 +492,9 @@ extension ASTGenVisitor {
       declLoc: self.generateSourceLoc(node.accessorSpecifier),
       accessorKeywordLoc: self.generateSourceLoc(node.accessorSpecifier),
       parameterList: self.generate(accessorParameters: node.parameters),
-      asyncSpecifierLoc: self.generateSourceLoc(node.effectSpecifiers?.asyncSpecifier),
-      throwsSpecifierLoc: self.generateSourceLoc(node.effectSpecifiers?.throwsClause),
-      thrownType: self.generate(type: node.effectSpecifiers?.thrownError)
+      asyncSpecifierLoc: self.generateSourceLoc(asyncSpecifier),
+      throwsSpecifierLoc: self.generateSourceLoc(throwsClause),
+      thrownType: self.generate(type: throwsClause?.type)
     )
     // With the CoroutineAccessors feature enabled, `_read`/`_modify` are just a
     // spelling of the yielding accessors; rewrite them to match the C++ parser

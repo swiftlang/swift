@@ -732,6 +732,15 @@ BridgedStringRef AccessorKind_nameForDiagnostic(swift::AccessorKind kind);
 SWIFT_NAME("getter:swift.AccessorKind.requiresCoroutineAccessorsFeature(self:)")
 bool AccessorKind_requiresCoroutineAccessorsFeature(swift::AccessorKind kind);
 
+/// The bare source spelling of \p kind, e.g. "set". Unlike
+/// `nameForDiagnostic`, this is not quoted and not composed.
+SWIFT_NAME("getter:swift.AccessorKind.name(self:)")
+BridgedStringRef AccessorKind_name(swift::AccessorKind kind);
+
+/// Whether \p kind may carry `async`/`throws` effects specifiers.
+SWIFT_NAME("getter:swift.AccessorKind.allowsEffectsSpecifiers(self:)")
+bool AccessorKind_allowsEffectsSpecifiers(swift::AccessorKind kind);
+
 SWIFT_NAME("BridgedAvailabilityMacroMap.has(self:name:)")
 bool BridgedAvailabilityMacroMap_hasName(BridgedAvailabilityMacroMap map,
                                          BridgedStringRef name);

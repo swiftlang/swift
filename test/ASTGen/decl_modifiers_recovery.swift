@@ -56,3 +56,25 @@ class WeakHolder {
   unowned(unsafe) var c: Referent?
   unowned(safe) var d: Referent?
 }
+
+// Only a 'get' accessor may be effectful. ASTGen used to build an AccessorDecl
+// that was both non-'get' and 'async', violating an AccessorDecl invariant and
+// tripping an assertion; the specifiers are now diagnosed and dropped.
+struct EffectfulAccessors {
+  var setAsync: Int {
+    get { 0 }
+    set async { }
+    // expected-error@-1 {{'set' accessor cannot have specifier 'async'}}
+  }
+
+  var setThrows: Int {
+    get { 0 }
+    set throws { }
+    // expected-error@-1 {{'set' accessor cannot have specifier 'throws'}}
+  }
+
+  // An effectful 'get' is fine.
+  var getAsyncThrows: Int {
+    get async throws { 0 }
+  }
+}
