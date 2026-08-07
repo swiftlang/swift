@@ -411,7 +411,6 @@ public:
   std::vector<SingleValueStmtInitialization> SingleValueStmtInitStack;
 
   SourceFile *SF;
-  SourceLoc LastSourceLoc;
   using ASTScopeTy = ast_scope::ASTScopeImpl;
   const ASTScopeTy *FnASTScope = nullptr;
   using VarDeclScopeMapTy =
