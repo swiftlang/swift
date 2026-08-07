@@ -368,6 +368,10 @@ EXPERIMENTAL_FEATURE(MoveOnlyTuples, true)
 EXPERIMENTAL_FEATURE(MoveOnlyPartialReinitialization, true)
 EXPERIMENTAL_FEATURE(ConsumeSelfInDeinit, true)
 
+// Whether `as?`/`as!`/`is` are permitted from a noncopyable existential
+// value to a concrete type.
+EXPERIMENTAL_FEATURE(NoncopyableCasting, false)
+
 EXPERIMENTAL_FEATURE(AccessLevelOnImport, true)
 
 /// Disable the special behavior of of explicit 'nonisolated' vs. being
