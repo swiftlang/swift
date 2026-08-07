@@ -545,7 +545,18 @@ public:
 
   BridgedDiagnosticArgument(SwiftInt i);
   BridgedDiagnosticArgument(BridgedStringRef s);
+  BridgedDiagnosticArgument(swift::Identifier identifier);
 };
+
+/// Create an argument holding an unsigned value.
+///
+/// This is a factory rather than a constructor because the diagnostic engine
+/// formats signed and unsigned arguments differently, so a diagnostic declared
+/// as taking `unsigned` must be given an unsigned argument, and an overload set
+/// on integer width would be ambiguous in Swift.
+SWIFT_NAME("BridgedDiagnosticArgument.unsigned(_:)")
+BridgedDiagnosticArgument
+BridgedDiagnosticArgument_createUnsigned(unsigned value);
 
 class BridgedFixIt {
 public:

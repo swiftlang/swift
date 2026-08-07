@@ -556,7 +556,7 @@ extension ASTGenVisitor {
         let storage = primaryVar.asAbstractStorageDecl
         storage.setAccessors(generate(accessorBlock: accessors, for: storage))
       } else {
-        self.diagnose(.nonTrivialPatternForAccessor(binding.pattern))
+        self.diagnose(.getset_nontrivial_pattern, at: binding.pattern)
       }
     }
     return BridgedPatternBindingEntry(

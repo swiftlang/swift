@@ -405,6 +405,18 @@ extension ASTGenVisitor {
     return handle(self.generateCustomAttr(attribute: node)?.asDeclAttribute)
   }
 
+  /// Diagnose an attribute that requires an argument clause but does not have a
+  /// usable one.
+  ///
+  /// Matches the C++ parser, which points at the attribute name rather than at
+  /// the `@`.
+  func diagnoseExpectedAttributeArguments(_ node: AttributeSyntax) {
+    self.diagnose(
+      .attr_expected_lparen(node.attributeName.trimmedDescription, /*isModifier=*/false),
+      at: node.attributeName
+    )
+  }
+
   /// E.g.:
   ///   ```
   ///   @abi(func fn())
@@ -526,7 +538,7 @@ extension ASTGenVisitor {
   ///   ```
   func generateAvailableAttr(attribute node: AttributeSyntax, attrName: SyntaxText) -> [BridgedAvailableAttr] {
     guard let args = node.arguments else {
-      self.diagnose(.expectedArgumentsInAttribute(node))
+      self.diagnoseExpectedAttributeArguments(node)
       return []
     }
     guard let args = args.as(AvailabilityArgumentListSyntax.self) else {
@@ -548,7 +560,7 @@ extension ASTGenVisitor {
   ///   ```
   func generateBackDeployedAttr(attribute node: AttributeSyntax) -> [BridgedBackDeployedAttr] {
     guard let args = node.arguments else {
-      self.diagnose(.expectedArgumentsInAttribute(node))
+      self.diagnoseExpectedAttributeArguments(node)
       return []
     }
     guard let args = args.as(BackDeployedAttributeArgumentsSyntax.self) else {
@@ -1163,7 +1175,7 @@ extension ASTGenVisitor {
   ///   ```
   func generateSectionAttr(attribute node: AttributeSyntax) -> BridgedSectionAttr? {
     guard let arg = node.arguments?.as(SectionAttributeArgumentSyntax.self) else {
-      self.diagnose(.expectedArgumentsInAttribute(node))
+      self.diagnoseExpectedAttributeArguments(node)
       return nil
     }
 
@@ -2623,7 +2635,7 @@ extension ASTGenVisitor {
     _ generatorFunction: (inout Slice<LabeledExprListSyntax>) throws -> T?
   ) rethrows -> T? {
     guard var args = node.arguments?.as(LabeledExprListSyntax.self)?[...] else {
-      self.diagnose(.expectedArgumentsInAttribute(node))
+      self.diagnoseExpectedAttributeArguments(node)
       return nil
     }
     guard let result = try generatorFunction(&args) else {
@@ -2694,7 +2706,7 @@ extension ASTGenVisitor {
       if let valueIfOmitted {
         return valueIfOmitted
       }
-      self.diagnose(.expectedArgumentsInAttribute(node))
+      self.diagnoseExpectedAttributeArguments(node)
       return nil
     }
 

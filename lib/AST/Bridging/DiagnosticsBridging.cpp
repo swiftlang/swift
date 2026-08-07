@@ -32,6 +32,13 @@ BridgedDiagnosticArgument::BridgedDiagnosticArgument(SwiftInt i)
 BridgedDiagnosticArgument::BridgedDiagnosticArgument(BridgedStringRef s)
     : BridgedDiagnosticArgument(DiagnosticArgument(s.unbridged())) {}
 
+BridgedDiagnosticArgument::BridgedDiagnosticArgument(Identifier identifier)
+    : BridgedDiagnosticArgument(DiagnosticArgument(identifier)) {}
+
+BridgedDiagnosticArgument BridgedDiagnosticArgument_createUnsigned(unsigned value) {
+  return BridgedDiagnosticArgument(DiagnosticArgument(value));
+}
+
 static_assert(sizeof(BridgedDiagnosticFixIt) >= sizeof(DiagnosticInfo::FixIt),
               "BridgedDiagnosticFixIt has wrong size");
 
