@@ -678,6 +678,9 @@ EXPERIMENTAL_FEATURE(LibkernOwnershipConventions, true)
 /// Emit `resignRemoteID` calls in remote distributed actor deinits.
 EXPERIMENTAL_FEATURE(DistributedActorResignRemoteID, false)
 
+/// Allow use of '@remoteCall(...)' distributed remote call semantics
+EXPERIMENTAL_FEATURE(DistributedRemoteCallSemantics, false)
+
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE

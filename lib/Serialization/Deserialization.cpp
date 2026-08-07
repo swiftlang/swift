@@ -6700,6 +6700,16 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
         break;
       }
 
+      case decls_block::RemoteCall_DECL_ATTR: {
+        unsigned options;
+        bool isImplicit{};
+        serialization::decls_block::RemoteCallDeclAttrLayout::readRecord(
+            scratch, options, isImplicit);
+        Attr = new (ctx) RemoteCallAttr(
+            {}, {}, static_cast<RemoteCallSemantics>(options), isImplicit);
+        break;
+      }
+
       case decls_block::Unsafe_DECL_ATTR: {
         bool isAlways{};
         bool isImplicit{};

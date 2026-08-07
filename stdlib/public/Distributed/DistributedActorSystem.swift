@@ -727,14 +727,93 @@ internal func _validateMatchingResultHandler<
 public struct RemoteCallTarget: CustomStringConvertible, Hashable {
   private let _identifier: String
 
+  /// Bitset for remoteCall semantics flags.
+  @usableFromInline
+  internal var flags: UInt64
+
   public init(_ identifier: String) {
     self._identifier = identifier
+    self.flags = 0
   }
 
   /// The underlying identifier of the target, returned as-is.
   public var identifier: String {
     return _identifier
   }
+
+#if $DistributedRemoteCallSemantics
+  /// Whether the target was declared '@remoteCall(oneway)'.
+  ///
+  /// This is a runtime hint for the distributed actor system that the remote
+  /// call is fire-and-forget. Unlike a normal void-returning method, the caller
+  /// does not expect the call to be suspended until the call returns on the remote side.
+  ///
+  /// The actor system is free to complete the local side of the call immediately,
+  /// and should document its exact semantics of handling oneway calls.
+  /// For example, an actor system implementation should document if returning
+  /// form an oneway call has the implication that the message was enqueued onto
+  /// the underlying transport (or not).
+  ///
+  /// Oneway calls always result in calling the ``remoteCallVoid`` method on the actor system,
+  /// because oneway methods are restricted to Void-only return types.
+  ///
+  /// The `remoteCallVoid` implementation is allowed suspend the caller for any reason,
+  /// e.g. until an outgoing write completes and to throw if the sending operation failed.
+  /// However, it should not suspend the caller while waiting for a potential reply.
+  ///
+  /// Remote call semantics are merely a "hint" and systems which do not support oneway messages
+  /// may choose to completely ignore the hint, warn about it, or throw on such operations.
+  @export(implementation)
+  @available(SwiftStdlib 6.5, *)
+  public var isOnewayRemoteCall: Bool {
+    get {
+      (flags & (1 << 0)) != 0
+    }
+    set {
+      if newValue {
+        flags |= (1 << 0)
+      } else {
+        flags &= ~(1 << 0)
+      }
+    }
+  }
+
+  /// Whether the target was declared '@remoteCall(blocking)'.
+  ///
+  /// This is a runtime hint for the distributed actor system to prefer
+  /// a synchronous "blocking" way of performing the remote call.
+  /// For example, IPC systems may choose a synchronous form of IPC
+  /// if this hint is provided.
+  ///
+  /// Systems may also validate if the blocking will be performed in a context
+  /// that is "safe" to perform the blocking on. E.g. an actor system may
+  /// require that blocking calls only happen on a specific ``TaskExecutor``
+  /// that is dedicated to these blocking operations, and fail the call
+  /// if it was made from a different context.
+  ///
+  /// It is _not_ recommended to use synchronous blocking calls unless
+  /// you are absolutely certain this is the right semantic for a call.
+  /// Synchronous calls block the calling thread rather than suspending the task
+  /// when the remote call is issued, and can yield to thread starvation problems
+  /// and similar issues unless used carefully.
+  ///
+  /// Remote call semantics are merely a "hint" and systems which do not support oneway messages
+  /// may choose to completely ignore the hint, warn about it, or throw on such operations.
+  @export(implementation)
+  @available(SwiftStdlib 6.5, *)
+  public var isSynchronousBlockingRemoteCall: Bool {
+    get {
+      (flags & (1 << 1)) != 0
+    }
+    set {
+      if newValue {
+        flags |= (1 << 1)
+      } else {
+        flags &= ~(1 << 1)
+      }
+    }
+  }
+#endif
 
   /// Attempts to pretty format the underlying target identifier.
   /// If unable to, returns the raw underlying identifier.
@@ -744,6 +823,16 @@ public struct RemoteCallTarget: CustomStringConvertible, Hashable {
     } else {
       return "\(_identifier)"
     }
+  }
+
+  // A target's identity is its identifier;
+  // Flags do not participate in equality checks.
+  public static func ==(lhs: RemoteCallTarget, rhs: RemoteCallTarget) -> Bool {
+    lhs._identifier == rhs._identifier
+  }
+
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(_identifier)
   }
 }
 

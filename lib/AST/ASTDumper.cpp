@@ -5743,6 +5743,12 @@ public:
     printField(Attr->getSemantics(), Label::always("semantics"));
     printFoot();
   }
+  void visitRemoteCallAttr(RemoteCallAttr *Attr, Label label) {
+    printCommon(Attr, "remote_call_attr", label);
+    printFlag(Attr->isBlocking(), "blocking");
+    printFlag(Attr->isOneway(), "oneway");
+    printFoot();
+  }
 };
 
 } // end anonymous namespace

@@ -150,6 +150,15 @@ enum class ENUM_EXTENSIBILITY_ATTR(closed) ExecutionSemantics : uint8_t {
   Last_ExecutionSemantics = Once
 };
 
+/// Semantic descriptor for the '@remoteCall(...)' attribute.
+enum class RemoteCallSemantics : uint8_t {
+  /// The remote call must be Void-returning and remoteCall should not wait for remote response.
+  Oneway SWIFT_NAME("oneway") = 0,
+  /// The remote call is allowed to block the calling thread, e.g. in order to use synchronous IPC.
+  SynchronousBlocking SWIFT_NAME("blocking") = 1,
+  Last_RemoteCallSemantics = SynchronousBlocking
+};
+
 enum class ENUM_EXTENSIBILITY_ATTR(closed) DeclAttrKind : unsigned {
 #define DECL_ATTR(_, CLASS, ...) CLASS,
 #define LAST_DECL_ATTR(CLASS) Last_DeclAttr = CLASS,

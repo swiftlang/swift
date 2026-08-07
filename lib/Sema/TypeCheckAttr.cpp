@@ -34,6 +34,7 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/DiagnosticsSema.h"
+#include "swift/AST/DistributedDecl.h"
 #include "swift/AST/Effects.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -545,6 +546,7 @@ public:
   void visitUnsafeSelfDependentResultAttr(UnsafeSelfDependentResultAttr *attr);
 
   void visitCalledAttr(CalledAttr *attr);
+  void visitRemoteCallAttr(RemoteCallAttr *attr);
 };
 
 } // end anonymous namespace
@@ -9208,6 +9210,46 @@ void AttributeChecker::visitCalledAttr(CalledAttr *attr) {
                           false, Feature::CalledAttribute.getName());
     return;
   }
+}
+
+void AttributeChecker::visitRemoteCallAttr(RemoteCallAttr *attr) {
+  auto *VD = dyn_cast<ValueDecl>(D);
+  if (!VD) {
+    // Attribute was written on something that isn't a value decl.
+    // '@remoteCall' is declared 'OnFunc | OnAccessor | OnVar', so this is
+    // theoretically unreachable, but defensively diagnose rather than crash.
+    diagnose(attr->getLocation(), diag::attr_name_only_at_non_local_scope,
+             attr->getAttrName());
+    attr->setInvalid();
+    return;
+  }
+
+  // '@remoteCall' describes a whole distributed declaration, not an individual
+  // accessor. The synthesized distributed thunk reads the semantics from the
+  // storage declaration (see 'deriveBodyDistributed_thunk'), so an attribute
+  // written on an accessor would be silently ignored. Reject it and point the
+  // user at the enclosing property.
+  if (isa<AccessorDecl>(VD)) {
+    diagnoseAndRemoveAttr(attr, diag::distributed_remotecall_on_accessor);
+    return;
+  }
+
+  if (!VD->isDistributed()) {
+    auto diagnostic =
+        diagnoseAndRemoveAttr(attr,
+                              diag::distributed_remotecall_requires_distributed);
+    // If the declaration is a member of a distributed actor, it is likely the
+    // user simply forgot 'distributed'; offer to add it.
+    if (auto *nominal = VD->getDeclContext()->getSelfNominalTypeDecl())
+      if (nominal->isDistributedActor())
+        diagnostic.fixItInsert(VD->getAttributeInsertionLoc(/*forModifier=*/true),
+                               "distributed ");
+    return;
+  }
+
+  // The remaining checks need to be performed after conformance checking,
+  // in ResolveDistributedEffectiveRemoteCallSemanticsRequest, so we can take
+  // into account semantics inherited from witnessed protocol requirements.
 }
 
 namespace {

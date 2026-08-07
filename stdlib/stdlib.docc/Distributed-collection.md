@@ -46,8 +46,11 @@ You use three main parts when writing code with distributed actors:
 ### Distributed actors
 
 - ``Distributed/DistributedActor``
+
+### Attributes and macros
+
+- <doc:remoteCall>
 - ``Distributed/Resolvable()``
-- ``Distributed/buildDefaultDistributedRemoteActorExecutor(_:)``
 
 ### Distributed actor system
 
@@ -63,15 +66,9 @@ You use three main parts when writing code with distributed actors:
 ### Local testing
 
 - ``Distributed/LocalTestingDistributedActorSystem``
-- ``Distributed/LocalTestingActorID``
-- ``Distributed/LocalTestingActorAddress``
-- ``Distributed/LocalTestingInvocationEncoder``
-- ``Distributed/LocalTestingInvocationDecoder``
-- ``Distributed/LocalTestingInvocationResultHandler``
 
 ### Errors
 
-- ``Distributed/DistributedActorCodingError``
 - ``Distributed/DistributedActorSystemError``
+- ``Distributed/DistributedActorCodingError``
 - ``Distributed/ExecuteDistributedTargetError``
-- ``Distributed/LocalTestingDistributedActorSystemError``

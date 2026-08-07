@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckDistributed.h"
+#include "MiscDiagnostics.h"
 #include "TypeChecker.h"
 #include "swift/Strings.h"
 #include "swift/AST/ASTWalker.h"
@@ -30,7 +31,9 @@
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
+#include "swift/Basic/SourceManager.h"
 #include "swift/AST/ASTPrinter.h"
+#include "llvm/ADT/STLExtras.h"
 
 using namespace swift;
 
@@ -763,6 +766,154 @@ bool swift::checkDistributedFunction(AbstractFunctionDecl *func) {
                            false); // no error if cycle
 }
 
+std::optional<DistributedRemoteCallSemantics>
+ResolveDistributedEffectiveRemoteCallSemanticsRequest::evaluate(
+    Evaluator &evaluator, ValueDecl *decl) const {
+  if (!decl || !decl->isDistributed())
+    return {};
+
+  DistributedRemoteCallSemantics result;
+  auto &C = decl->getASTContext();
+
+  struct EffectiveSemanticsEntry {
+    const RemoteCallAttr *attr;
+    const ValueDecl *requirement; // null => written on 'decl' itself
+    bool isInherited() const { return requirement != nullptr; }
+  };
+
+  SmallVector<EffectiveSemanticsEntry, 2> entries;
+
+  // -- collect semantics declared on the member explicitly
+  for (auto *attrs : decl->getAttrs()) {
+    if (auto *rc = dyn_cast<RemoteCallAttr>(attrs))
+      if (!rc->isInvalid())
+        entries.push_back({rc, /*requirement=*/nullptr});
+  }
+
+  // -- collect inherited semantics from witnessed requirement
+  for (auto *req : decl->getSatisfiedProtocolRequirements()) {
+    for (auto *attrs : req->getAttrs())
+      if (auto *rc = dyn_cast<RemoteCallAttr>(attrs))
+        if (!rc->isInvalid())
+          entries.push_back({rc, req});
+  }
+
+  if (entries.empty())
+    return {};
+
+  // Process explicitly-written attributes in source order (the attribute list
+  // is stored in reverse), so a duplicate-semantics warning points at the later
+  // (redundant) attribute; inherited entries sort last.
+  auto &SM = C.SourceMgr;
+  llvm::stable_sort(entries, [&](const EffectiveSemanticsEntry &a,
+                                 const EffectiveSemanticsEntry &b) {
+    if (a.isInherited() != b.isInherited())
+      return !a.isInherited();
+    if (a.isInherited())
+      return false;
+    return SM.isBeforeInBuffer(a.attr->getLocation(), b.attr->getLocation());
+  });
+
+  // Location for the primary diagnostic:
+  // - explicitly-written attribute if we have one,
+  // - otherwise the declaration itself (the semantics were inherited).
+  auto primaryLoc = [&](const EffectiveSemanticsEntry &e) {
+    return e.isInherited() ? decl->getLoc() : e.attr->getLocation();
+  };
+  auto noteDeclaredHere = [&](const EffectiveSemanticsEntry &e, StringRef name) {
+    // Only inherited semantics get a note pointing back at the distributed
+    // protocol requirement that declared them; a directly-written attribute is
+    // already the subject of the primary diagnostic.
+    if (!e.isInherited())
+      return;
+    SourceLoc loc = e.attr->getLocation().isValid() ? e.attr->getLocation()
+                                                     : e.requirement->getLoc();
+    if (loc.isValid())
+      C.Diags.diagnose(loc, diag::distributed_remotecall_semantics_declared_here,
+                       name);
+  };
+
+  // --- Warn about duplicate same-semantics attrs
+  const EffectiveSemanticsEntry *firstBlocking = nullptr;
+  const EffectiveSemanticsEntry *firstOneway = nullptr;
+  for (auto &e : entries) {
+    const EffectiveSemanticsEntry *&firstOfKind = e.attr->isBlocking() ? firstBlocking : firstOneway;
+    if (firstOfKind) {
+      if (!e.isInherited())
+        C.Diags.diagnose(e.attr->getLocation(),
+                         diag::distributed_remotecall_duplicate_semantics,
+                         e.attr->isBlocking() ? "blocking" : "oneway");
+    } else {
+      firstOfKind = &e;
+    }
+  }
+
+  // --- Error about conflicting 'oneway' and 'blocking' semantics
+  if (firstOneway && firstBlocking) {
+    SourceLoc loc = !firstOneway->isInherited() ? firstOneway->attr->getLocation()
+                    : !firstBlocking->isInherited()
+                        ? firstBlocking->attr->getLocation()
+                        : decl->getLoc();
+    C.Diags.diagnose(loc, diag::distributed_remotecall_blocking_oneway_illegal_combination);
+    noteDeclaredHere(*firstOneway, "oneway");
+    noteDeclaredHere(*firstBlocking, "blocking");
+    return {};
+  }
+
+  // --- Validate '@remoteCall(oneway)'
+  if (firstOneway) {
+    // -- Ban oneway computed properties
+    if (isa<VarDecl>(decl) || isa<AccessorDecl>(decl)) {
+      C.Diags.diagnose(primaryLoc(*firstOneway),
+                       diag::distributed_remotecall_oneway_on_computed_property);
+      noteDeclaredHere(*firstOneway, "oneway");
+      return {};
+    }
+
+    // -- Oneway methods must return 'Void'
+    if (auto *FD = dyn_cast<FuncDecl>(decl)) {
+      if (!FD->getResultInterfaceType()->isVoid()) {
+        {
+          auto err =
+              C.Diags.diagnose(primaryLoc(*firstOneway),
+                               diag::distributed_remotecall_oneway_requires_void_result,
+                               decl);
+          fixItRemoveReturnType(err, FD);
+        }
+        noteDeclaredHere(*firstOneway, "oneway");
+        return {};
+      }
+    }
+  }
+
+  // -- Validate availability: @remoteCall is new in Swift 6.5, it would always no-op in older Swift so error about it
+  if (firstOneway || firstBlocking) {
+    const EffectiveSemanticsEntry *semanticEntry = firstOneway ? firstOneway : firstBlocking;
+    TypeChecker::checkAvailability(
+        SourceRange(primaryLoc(*semanticEntry)), C.getSwiftAvailability(6, 5),
+        diag::distributed_remotecall_semantics_only_version_newer,
+        decl->getInnermostDeclContext());
+  }
+
+  result.isOneway = firstOneway != nullptr;
+  result.isBlocking = firstBlocking != nullptr;
+  return result;
+}
+
+void swift::checkDistributedEffectiveCallSemantics(ValueDecl *valueDecl) {
+  if (!valueDecl || !valueDecl->isDistributed())
+    return;
+
+  if (auto *afd = dyn_cast<AbstractFunctionDecl>(valueDecl)) {
+    if (afd->isDistributed())
+      (void)getDistributedEffectiveRemoteCallSemantics(afd);
+  } else if (auto *var = dyn_cast<VarDecl>(valueDecl)) {
+    if (var->isDistributed())
+      (void)getDistributedEffectiveRemoteCallSemantics(var);
+  }
+}
+
+
 /// Emit a fix-it suggesting to constrain the `@Resolvable` \p resolvableProto's
 /// `Self.ActorSystem` to the enclosing actor's system type (or a placeholder
 /// when no concrete enclosing system is known).
@@ -1085,13 +1236,11 @@ GetDistributedRemoteCallTargetInitFunctionRequest::evaluate(
 
     auto params = ctor->getParameters();
     if (params->size() != 1)
-      return nullptr;
+      continue;
 
     // _ identifier
     if (params->get(0)->getArgumentName().empty())
       return ctor;
-
-    return nullptr;
   }
 
   return nullptr;

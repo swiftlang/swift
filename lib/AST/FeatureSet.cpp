@@ -579,6 +579,10 @@ static bool usesFeatureNonexhaustiveAttribute(Decl *decl) {
   return decl->getAttrs().hasAttribute<NonexhaustiveAttr>();
 }
 
+static bool usesFeatureDistributedRemoteCallSemantics(Decl *decl) {
+  return decl->getAttrs().hasAttribute<RemoteCallAttr>();
+}
+
 static bool usesFeatureAlwaysInheritActorContext(Decl *decl) {
   auto *VD = dyn_cast<ValueDecl>(decl);
   if (!VD)

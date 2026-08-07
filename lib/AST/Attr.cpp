@@ -1920,6 +1920,23 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
 
+  case DeclAttrKind::RemoteCall: {
+    Printer.printAttrName("@remoteCall");
+    auto *rc = cast<RemoteCallAttr>(this);
+    SmallVector<StringRef, 2> names;
+    if (rc->isOneway())
+      names.push_back("oneway");
+    if (rc->isBlocking())
+      names.push_back("blocking");
+    if (!names.empty()) {
+      Printer << "(";
+      llvm::interleave(names, [&](StringRef name) { Printer << name; },
+                       [&] { Printer << ", "; });
+      Printer << ")";
+    }
+    break;
+  }
+
 #define SIMPLE_DECL_ATTR(X, CLASS, ...) case DeclAttrKind::CLASS:
 #include "swift/AST/DeclAttr.def"
     llvm_unreachable("handled above");
@@ -2183,6 +2200,14 @@ StringRef DeclAttribute::getAttrName() const {
     case ExecutionSemantics::Once:
       return "called(once)";
     }
+  case DeclAttrKind::RemoteCall: {
+    auto *rc = cast<RemoteCallAttr>(this);
+    if (rc->isOneway())
+      return "remoteCall(oneway)";
+    if (rc->isBlocking())
+      return "remoteCall(blocking)";
+    llvm_unreachable("'@remoteCall' must have at least one value");
+  }
   }
   llvm_unreachable("bad DeclAttrKind");
 }

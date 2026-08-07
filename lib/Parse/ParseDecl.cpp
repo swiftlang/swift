@@ -4418,6 +4418,54 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
 
     break;
   }
+
+  case DeclAttrKind::RemoteCall: {
+    if (!isAtAttributeLParen()) {
+      diagnose(Loc, diag::attr_expected_lparen, AttrName,
+               DeclAttribute::isDeclModifier(DK));
+      return makeParserSuccess();
+    }
+    consumeAttributeLParen();
+
+    // Each '@remoteCall(...)' carries exactly one semantic. To combine
+    // semantics, stack multiple '@remoteCall' attributes on the declaration.
+    std::optional<RemoteCallSemantics> semantics;
+    bool sawError = false;
+
+    if (!Tok.is(tok::identifier)) {
+      diagnose(Tok, diag::attr_expected_option_such_as, AttrName,
+               "'blocking' or 'oneway'");
+      sawError = true;
+    } else {
+      Identifier optName = Context.getIdentifier(Tok.getText());
+      SourceLoc optLoc = consumeToken(tok::identifier);
+      if (optName == Context.Id_blocking)
+        semantics = RemoteCallSemantics::SynchronousBlocking;
+      else if (optName == Context.Id_oneway)
+        semantics = RemoteCallSemantics::Oneway;
+
+      if (!semantics) {
+        diagnose(optLoc, diag::attr_unknown_option, optName.str(), AttrName);
+        sawError = true;
+      }
+    }
+
+    if (!consumeIf(tok::r_paren)) {
+      diagnose(Loc, diag::attr_expected_rparen, AttrName,
+               DeclAttribute::isDeclModifier(DK));
+      return makeParserSuccess();
+    }
+
+    AttrRange = SourceRange(Loc, PreviousLoc);
+
+    if (sawError || !semantics)
+      return makeParserSuccess();
+
+    if (!DiscardAttribute)
+      Attributes.add(new (Context) RemoteCallAttr(AtLoc, AttrRange, *semantics));
+
+    break;
+  }
   }
 
   if (DuplicateAttribute) {

@@ -876,3 +876,11 @@ BridgedCalledAttr_createParsed(BridgedASTContext cContext, SourceLoc atLoc,
                                swift::ExecutionSemantics semantics) {
   return new (cContext.unbridged()) CalledAttr(atLoc, range, semantics);
 }
+
+BridgedRemoteCallAttr
+BridgedRemoteCallAttr_createParsed(BridgedASTContext cContext, SourceLoc atLoc,
+                                   SourceRange range,
+                                   swift::RemoteCallSemantics semantics) {
+  return new (cContext.unbridged())
+      RemoteCallAttr(atLoc, range, semantics, /*implicit=*/false);
+}

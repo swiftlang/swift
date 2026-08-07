@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 1020; // end_formal_scope SIL insn
+const uint16_t SWIFTMODULE_VERSION_MINOR = 1021; // Distributed @remoteCall semantics
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -2717,6 +2717,12 @@ namespace decls_block {
   using NonexhaustiveDeclAttrLayout = BCRecordLayout<
     Nonexhaustive_DECL_ATTR,
     BCFixed<2>  // mode
+  >;
+
+  using RemoteCallDeclAttrLayout = BCRecordLayout<
+    RemoteCall_DECL_ATTR,
+    BCFixed<8>, // RemoteCallSemantics raw value
+    BCFixed<1>  // implicit flag
   >;
 
   using COMDeclAttrLayout = BCRecordLayout<COM_DECL_ATTR,
