@@ -150,7 +150,7 @@ extension ASTGenVisitor {
   }
 
   /// The character range covering `node`, excluding trivia.
-  fileprivate func generateCharSourceRange(_ node: some SyntaxProtocol) -> CharSourceRange {
+  func generateCharSourceRange(_ node: some SyntaxProtocol) -> CharSourceRange {
     self.generateCharSourceRange(
       start: node.positionAfterSkippingLeadingTrivia,
       length: node.trimmedLength

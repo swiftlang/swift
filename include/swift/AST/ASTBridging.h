@@ -719,6 +719,10 @@ SWIFT_NAME("BridgedOptionalPlatformKind.init(from:)")
 BridgedOptionalPlatformKind
 PlatformKind_fromIdentifier(swift::Identifier ident);
 
+/// The platform name closest to \p cStr, for a "did you mean" suggestion, or an
+/// empty string if there is no close match.
+BridgedStringRef PlatformKind_closestCorrectedString(BridgedStringRef cStr);
+
 SWIFT_NAME("BridgedAvailabilityMacroMap.has(self:name:)")
 bool BridgedAvailabilityMacroMap_hasName(BridgedAvailabilityMacroMap map,
                                          BridgedStringRef name);

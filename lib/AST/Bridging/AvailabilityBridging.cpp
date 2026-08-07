@@ -55,6 +55,14 @@ BridgedOptionalPlatformKind PlatformKind_fromIdentifier(Identifier ident) {
   return PlatformKind_fromString(ident.str());
 }
 
+BridgedStringRef PlatformKind_closestCorrectedString(BridgedStringRef cStr) {
+  // The returned StringRef points at one of the static platform-name strings,
+  // so it outlives the call.
+  if (auto corrected = closestCorrectedPlatformString(cStr.unbridged()))
+    return *corrected;
+  return BridgedStringRef();
+}
+
 //===----------------------------------------------------------------------===//
 // MARK: AvailabilitySpec
 //===----------------------------------------------------------------------===//
