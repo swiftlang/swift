@@ -69,6 +69,20 @@ class WorktreeTestCase(scheme_mock.SchemeMockTestCase):
             ]
         )
 
+    def test_clone_skips_worktree_repositories(self):
+        self.call(
+            [
+                self.update_checkout_path,
+                "--config",
+                self.config_path,
+                "--source-root",
+                self.worktree_path,
+                "--scheme",
+                "main",
+                "--clone",
+            ]
+        )
+
     def setUp(self):
         super(WorktreeTestCase, self).setUp()
         self.worktree_path = os.path.join(self.workspace, WORKTREE_NAME)
