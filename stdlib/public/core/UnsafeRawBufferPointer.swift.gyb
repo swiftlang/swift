@@ -1327,7 +1327,8 @@ extension Unsafe${Mutable}RawBufferPointer {
     return unsafe Self(_uncheckedStart: baseAddress, count: newCount)
   }
 
-  /// Returns a buffer pointer over all but the given number of trailing bytes.
+  /// Returns a buffer pointer over all but the specified number of trailing
+  /// bytes.
   ///
   /// If the number of bytes to drop exceeds the number of bytes in the buffer,
   /// the result is an empty buffer.
@@ -1348,7 +1349,7 @@ extension Unsafe${Mutable}RawBufferPointer {
   }
 
   /// Returns a buffer pointer containing the trailing bytes of this buffer,
-  /// up to the given maximum length.
+  /// up to the specified maximum length.
   ///
   /// If the maximum length exceeds the length of this buffer,
   /// the result contains all the bytes.
@@ -1371,7 +1372,8 @@ extension Unsafe${Mutable}RawBufferPointer {
     return unsafe Self(_uncheckedStart: newStart, count: newCount)
   }
 
-  /// Returns a buffer pointer over all but the given number of initial bytes.
+  /// Returns a buffer pointer over all but the specified number of initial
+  /// bytes.
   ///
   /// If the number of bytes to drop exceeds the number of bytes in the buffer,
   /// the result is an empty buffer.

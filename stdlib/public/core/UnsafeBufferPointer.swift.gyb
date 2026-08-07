@@ -656,7 +656,7 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
     return unsafe Self(_uncheckedStart: _position, count: newCount)
   }
 
-  /// Returns a buffer pointer over all but the given number of trailing
+  /// Returns a buffer pointer over all but the specified number of trailing
   /// elements.
   ///
   /// If the number of elements to drop exceeds the number of elements in
@@ -677,7 +677,7 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   }
 
   /// Returns a buffer pointer containing the trailing elements of this buffer,
-  /// up to the given maximum length.
+  /// up to the specified maximum length.
   ///
   /// If the maximum length exceeds the length of this buffer,
   /// the result contains all the elements.
@@ -700,7 +700,7 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
     return unsafe Self(_uncheckedStart: newStart, count: newCount)
   }
 
-  /// Returns a buffer pointer over all but the given number of initial
+  /// Returns a buffer pointer over all but the specified number of initial
   /// elements.
   ///
   /// If the number of elements to drop exceeds the number of elements in

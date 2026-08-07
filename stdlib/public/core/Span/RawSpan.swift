@@ -882,7 +882,7 @@ extension RawSpan {
     extracting(first: maxLength)
   }
 
-  /// Returns a span over all but the given number of trailing bytes.
+  /// Returns a span over all but the specified number of trailing bytes.
   ///
   /// If the number of bytes to drop exceeds the number of bytes in
   /// the span, the result is an empty span.
@@ -909,8 +909,8 @@ extension RawSpan {
     extracting(droppingLast: k)
   }
 
-  /// Returns a span containing the trailing bytes of the span,
-  /// up to the given maximum length.
+  /// Returns a span containing the trailing bytes of this span,
+  /// up to the specified maximum length.
   ///
   /// If the maximum length exceeds the length of this span,
   /// the result contains all the bytes.
@@ -943,7 +943,7 @@ extension RawSpan {
     extracting(last: maxLength)
   }
 
-  /// Returns a span over all but the given number of initial bytes.
+  /// Returns a span over all but the specified number of initial bytes.
   ///
   /// If the number of bytes to drop exceeds the number of bytes in
   /// the span, the result is an empty span.

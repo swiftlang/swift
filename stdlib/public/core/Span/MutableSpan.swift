@@ -1058,7 +1058,7 @@ extension MutableSpan where Element: ~Copyable {
 #endif
   }
 
-  /// Returns a span over all but the given number of trailing elements.
+  /// Returns a span over all but the specified number of trailing elements.
   ///
   /// If the number of elements to drop exceeds the number of elements in
   /// the span, the result is an empty span.
@@ -1084,7 +1084,7 @@ extension MutableSpan where Element: ~Copyable {
 #endif
   }
 
-  /// Returns a span over all but the given number of trailing elements.
+  /// Returns a span over all but the specified number of trailing elements.
   ///
   /// If the number of elements to drop exceeds the number of elements in
   /// the span, the result is an empty span.
@@ -1103,7 +1103,7 @@ extension MutableSpan where Element: ~Copyable {
     _mutatingExtracting(droppingLast: k)
   }
 
-  /// Returns a span over all but the given number of trailing elements.
+  /// Returns a span over all but the specified number of trailing elements.
   ///
   /// If the number of elements to drop exceeds the number of elements in
   /// the span, the result is an empty span.
@@ -1127,8 +1127,8 @@ extension MutableSpan where Element: ~Copyable {
 #endif
   }
 
-  /// Returns a span containing the trailing elements of the span,
-  /// up to the given maximum length.
+  /// Returns a span containing the trailing elements of this span,
+  /// up to the specified maximum length.
   ///
   /// If the maximum length exceeds the length of this span,
   /// the result contains all the elements.
@@ -1159,8 +1159,8 @@ extension MutableSpan where Element: ~Copyable {
 #endif
   }
 
-  /// Returns a span containing the trailing elements of the span,
-  /// up to the given maximum length.
+  /// Returns a span containing the trailing elements of this span,
+  /// up to the specified maximum length.
   ///
   /// If the maximum length exceeds the length of this span,
   /// the result contains all the elements.
@@ -1183,8 +1183,8 @@ extension MutableSpan where Element: ~Copyable {
     _mutatingExtracting(last: maxLength)
   }
 
-  /// Returns a span containing the trailing elements of the span,
-  /// up to the given maximum length.
+  /// Returns a span containing the trailing elements of this span,
+  /// up to the specified maximum length.
   ///
   /// If the maximum length exceeds the length of this span,
   /// the result contains all the elements.
@@ -1213,7 +1213,7 @@ extension MutableSpan where Element: ~Copyable {
 #endif
   }
 
-  /// Returns a span over all but the given number of initial elements.
+  /// Returns a span over all but the specified number of initial elements.
   ///
   /// If the number of elements to drop exceeds the number of elements in
   /// the span, the result is an empty span.
@@ -1245,7 +1245,7 @@ extension MutableSpan where Element: ~Copyable {
 #endif
   }
 
-  /// Returns a span over all but the given number of initial elements.
+  /// Returns a span over all but the specified number of initial elements.
   ///
   /// If the number of elements to drop exceeds the number of elements in
   /// the span, the result is an empty span.
@@ -1268,7 +1268,7 @@ extension MutableSpan where Element: ~Copyable {
     _mutatingExtracting(droppingFirst: k)
   }
 
-  /// Returns a span over all but the given number of initial elements.
+  /// Returns a span over all but the specified number of initial elements.
   ///
   /// If the number of elements to drop exceeds the number of elements in
   /// the span, the result is an empty span.
