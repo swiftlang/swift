@@ -7,14 +7,13 @@
 // linked — so like `dict-init.swift` this test restricts itself rather than
 // costing `keypaths-exec.swift` its Linux coverage.
 
-// RUN: %target-run-simple-swift(-enable-experimental-feature Embedded -wmo -runtime-compatibility-version none %target-embedded-posix-shim -enable-experimental-feature EmbeddedKeyPaths) | %FileCheck %s
-// RUN: %target-run-simple-swift(-O -enable-experimental-feature Embedded -wmo -runtime-compatibility-version none %target-embedded-posix-shim -enable-experimental-feature EmbeddedKeyPaths) | %FileCheck %s
+// RUN: %target-run-simple-swift(-enable-experimental-feature Embedded -wmo -runtime-compatibility-version none %target-embedded-posix-shim) | %FileCheck %s
+// RUN: %target-run-simple-swift(-O -enable-experimental-feature Embedded -wmo -runtime-compatibility-version none %target-embedded-posix-shim) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
 // REQUIRES: OS=macosx || OS=wasip1
 // REQUIRES: swift_feature_Embedded
-// REQUIRES: swift_feature_EmbeddedKeyPaths
 // Embedded key paths and SIL opaque values don't currently mix: the
 // combination trips `getSILArgumentConvention`. `keypaths-static.swift` and
 // `keypaths-exec.swift` carry the same XFAIL.
