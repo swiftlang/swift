@@ -58,7 +58,7 @@ entry:
   %value = apply %make<C>() : $@convention(thin) <T: SomeClass> () -> (@owned Biggish<T>)
 
   //   Write the spilled objects to the buffer.
-  // CHECK-NEXT:    call void @llvm.lifetime.start.p0(i64 {{.*}}, ptr [[SPILLS]])
+  // CHECK-NEXT:    call void @llvm.lifetime.start.p0(ptr [[SPILLS]])
   // CHECK-NEXT:    [[T0:%.*]] = getelementptr inbounds{{.*}} [[SPILLS_T]], ptr [[SPILLS]], i32 0, i32 0
   // CHECK-NEXT:    store ptr [[R2]], ptr [[T0]]
   // CHECK-NEXT:    [[T0:%.*]] = getelementptr inbounds{{.*}} [[SPILLS_T]], ptr [[SPILLS]], i32 0, i32 1
@@ -68,7 +68,7 @@ entry:
   // CHECK-NEXT:    [[IS_UNWIND:%.*]] = call i1 (...) @llvm.coro.suspend.retcon.i1(ptr [[R0]], ptr [[R1]], ptr [[SPILLS]])
 
   //   Clean up the spills buffer.
-  // CHECK-NEXT:    call void @llvm.lifetime.end.p0(i64 {{.*}}, ptr [[SPILLS]])
+  // CHECK-NEXT:    call void @llvm.lifetime.end.p0(ptr [[SPILLS]])
 
   // CHECK-NEXT:    br i1 [[IS_UNWIND]]
   yield %value : $Biggish<C>, resume resume, unwind unwind
@@ -89,7 +89,7 @@ unwind:
   unwind
 
   // CHECK:       coro.end:
-  // CHECK:         call i1 @llvm.coro.end(ptr [[BEGIN]], i1 false, token none)
+  // CHECK:         call void @llvm.coro.end(ptr [[BEGIN]], i1 false, token none)
   // CHECK-NEXT:    unreachable
 }
 
@@ -100,9 +100,9 @@ unwind:
 sil [ossa] @test_simple_call : $(Builtin.Int1) -> () {
 entry(%flag : $Builtin.Int1):
   //   Allocate the buffer.
-  // CHECK:         [[T0:%.*]] = alloca {{\[}}[[BUFFER_SIZE]] x i8], align [[BUFFER_ALIGN]]
-  // CHECK-NEXT:    [[BUFFER:%.*]] = getelementptr inbounds{{.*}} {{\[}}[[BUFFER_SIZE]] x i8], ptr [[T0]], i32 0, i32 0
-  // CHECK-NEXT:    call void @llvm.lifetime.start.p0(i64 [[BUFFER_SIZE]], ptr [[BUFFER]])
+  // CHECK:         [[BUFFER_ALLOCA:%.*]] = alloca {{\[}}[[BUFFER_SIZE]] x i8], align [[BUFFER_ALIGN]]
+  // CHECK-NEXT:    [[BUFFER:%.*]] = getelementptr inbounds{{.*}} {{\[}}[[BUFFER_SIZE]] x i8], ptr [[BUFFER_ALLOCA]], i32 0, i32 0
+  // CHECK-NEXT:    call void @llvm.lifetime.start.p0(ptr [[BUFFER_ALLOCA]])
 
   // CHECK-NEXT:    [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$s18yield_once_biggish12SomeSubclassCMa"([[INT]] 0)
   // CHECK-NEXT:    [[SUBCLASS:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
@@ -134,7 +134,7 @@ yes:
   // CHECK-64-ptrauth: ptrtoint
   // CHECK-64-ptrauth-NEXT: ptrauth.blend
   // CHECK:    call swiftcc void [[CONTINUATION]](ptr noalias dereferenceable([[BUFFER_SIZE]]) [[BUFFER]], i1 false)
-  // CHECK-NEXT:    call void @llvm.lifetime.end.p0(i64 [[BUFFER_SIZE]], ptr [[BUFFER]])
+  // CHECK-NEXT:    call void @llvm.lifetime.end.p0(ptr [[BUFFER_ALLOCA]])
   end_apply %token as $()
 
   // CHECK-NEXT:    br label
@@ -144,7 +144,7 @@ no:
   // CHECK-64-ptrauth: ptrtoint
   // CHECK-64-ptrauth-NEXT: ptrauth.blend
   // CHECK:    call swiftcc void [[CONTINUATION]](ptr noalias dereferenceable([[BUFFER_SIZE]]) [[BUFFER]], i1 true)
-  // CHECK-NEXT:    call void @llvm.lifetime.end.p0(i64 [[BUFFER_SIZE]], ptr [[BUFFER]])
+  // CHECK-NEXT:    call void @llvm.lifetime.end.p0(ptr [[BUFFER_ALLOCA]])
   abort_apply %token
 
   // CHECK-NEXT:    br label

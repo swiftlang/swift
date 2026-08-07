@@ -126,9 +126,9 @@ int symbolgraphgen::emitSymbolGraphForModule(
     // Scan through the Clang module's exports and collect them for later
     // handling
     for (auto ClangExport : ClangModule->Exports) {
-      if (ClangExport.getInt()) {
+      if (ClangExport.second) {
         // Blanket exports are represented as a true boolean tag
-        if (const auto *ExportParent = ClangExport.getPointer()) {
+        if (const clang::Module *ExportParent = ClangExport.first) {
           // If a pointer is present, this is a scoped blanket export, like
           // `export Submodule.*`
           WildcardExportClangModules.insert(ExportParent);
@@ -136,9 +136,9 @@ int symbolgraphgen::emitSymbolGraphForModule(
           // Otherwise it represents a full blanket `export *`
           WildcardExportClangModules.insert(ClangModule);
         }
-      } else if (!ClangExport.getInt() && ClangExport.getPointer()) {
+      } else if (!ClangExport.second && ClangExport.first) {
         // This is an explicit `export Submodule`
-        ExportedClangModules.insert(ClangExport.getPointer());
+        ExportedClangModules.insert(ClangExport.first);
       }
     }
 

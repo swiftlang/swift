@@ -18,7 +18,11 @@
 // ENABLED: define{{.*}} swifttailcc void @"$s5async6callerySiSbYaF"{{.*}} [[ENTRY_ATTR:#[0-9]+]]
 // ENABLED: define{{.*}} internal swifttailcc void @"$s5async6callerySiSbYaFTY0_"{{.*}} [[CONTINUATION_ATTR:#[0-9]+]]
 // ENABLED: define{{.*}} internal swifttailcc void @"$s5async6callerySiSbYaFTQ1_"{{.*}} [[RET_ATTR:#[0-9]+]]
-// ENABLED: define{{.*}} internal swifttailcc void @"$s5async6callerySiSbYaFTY2_"{{.*}} [[CONTINUATION_ATTR]]
+// Whether TY2_ shares an attribute group with TY0_ depends on optimizer-inferred
+// attributes (TY0_ calls plusOne(), which may unwind, so only TY2_ gets
+// `nounwind` at -O). That TY2_ is a continuation funclet is already pinned by
+// the @__swift_async_cont_functlets check above.
+// ENABLED: define{{.*}} internal swifttailcc void @"$s5async6callerySiSbYaFTY2_"
 
 // ENABLED: attributes [[ENTRY_ATTR]] = { {{.*}} "async_entry"
 // ENABLED: attributes [[CONTINUATION_ATTR]] = { {{.*}} "async_continuation"
