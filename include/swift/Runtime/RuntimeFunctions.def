@@ -2825,12 +2825,6 @@ FUNCTION(TaskPopDeadline,
          EFFECT(RuntimeEffect::Concurrency),
          UNKNOWN_MEMEFFECTS)
 
-// swift_task_findNearestDeadlineForClock is generic over
-// `C: Clock & Identifiable` in Swift, so we're matching
-// the calling convention with the Type and WT passed after
-// the explicit parameters. Swift's canonical generic-sig ordering
-// places `Identifiable` before `Clock`, which drives WT slot order.
-//
 // OpaqueValue *
 // swift_task_findNearestDeadlineForClock(OpaqueValue *queryClock,
 //                                        const Metadata *clockType,
