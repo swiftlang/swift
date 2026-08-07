@@ -14,6 +14,7 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/AutoDiff.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Identifier.h"
@@ -547,6 +548,11 @@ BridgedDiagnoseAttr_createParsed(BridgedASTContext cContext,
                              BridgedStringRef reason) {
   ASTContext &context = cContext.unbridged();
   auto diagGroupID = getDiagGroupIDByName(diagGroupName.str());
+  if (!diagGroupID) {
+    context.Diags.diagnose(atLoc, diag::attr_diagnose_unknown_diagnostic_group_identifier,
+                           diagGroupName.str());
+    diagGroupID = DiagGroupID::no_group;
+  }
 
   WarningGroupBehavior attrBehavior;
   switch (behavior) {
