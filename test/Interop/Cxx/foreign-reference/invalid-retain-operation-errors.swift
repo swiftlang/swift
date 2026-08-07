@@ -215,6 +215,22 @@ void release2(MultipleRetainReleaseAttrFRT *v);
 
 struct
     __attribute__((swift_attr("import_reference")))
+    __attribute__((swift_attr("retain:")))
+    __attribute__((swift_attr("release:emptyNameRelease")))
+EmptyRetainName {};
+
+void emptyNameRelease(EmptyRetainName *v);
+
+struct
+    __attribute__((swift_attr("import_reference")))
+    __attribute__((swift_attr("retain:emptyNameRetain")))
+    __attribute__((swift_attr("release:")))
+EmptyReleaseName {};
+
+void emptyNameRetain(EmptyReleaseName *v);
+
+struct
+    __attribute__((swift_attr("import_reference")))
     __attribute__((swift_attr("retain:Uretain")))
     __attribute__((swift_attr("release:Urelease")))
 UnimportedRetainRelease {};
@@ -302,6 +318,14 @@ public func testMultipleRetainRelease(x: MultipleRetainReleaseFRT) {}
 // CHECK: error: reference type 'MultipleRetainReleaseAttrFRT' must have only one 'release:' Swift attribute
 @available(macOS 13.3, *)
 public func testMultipleRetainRelease(x: MultipleRetainReleaseAttrFRT) {}
+
+// CHECK: error: reference type 'EmptyRetainName' has an empty retain operation name
+@available(macOS 13.3, *)
+public func testEmptyRetainName(x: EmptyRetainName) {}
+
+// CHECK: error: reference type 'EmptyReleaseName' has an empty release operation name
+@available(macOS 13.3, *)
+public func testEmptyReleaseName(x: EmptyReleaseName) {}
 
 // CHECK: error: cannot find retain function 'Uretain' for reference type 'UnimportedRetainRelease'
 // CHECK: note: function uses foreign reference type 'UnimportedRetainRelease' as a value in a parameter types which breaks 'swift_shared_reference' contract

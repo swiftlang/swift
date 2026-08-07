@@ -742,6 +742,9 @@ public:
   ValueDecl *getCalledBaseCxxMethod(const ValueDecl *decl) override;
   bool isMemberSynthesizedPerType(const ValueDecl *decl) override;
 
+  std::pair<const clang::FunctionDecl *, const clang::FunctionDecl *>
+  getForeignReferenceTypeOperations(const clang::RecordDecl *decl) override;
+
   void checkCalledClangFunction(const ValueDecl *funcDecl,
                                 SourceLoc callSiteLoc) override;
 
@@ -777,10 +780,6 @@ getModuleCachePathFromClang(const clang::CompilerInstance &Instance);
 bool isCompletionHandlerParamName(StringRef paramName);
 
 namespace importer {
-/// Returns true if the given C/C++ reference type uses "immortal"
-/// retain/release functions.
-bool hasAnyImmortalAttr(const clang::RecordDecl *decl);
-
 struct ReturnOwnershipInfo {
   ReturnOwnershipInfo(const clang::NamedDecl *decl);
 

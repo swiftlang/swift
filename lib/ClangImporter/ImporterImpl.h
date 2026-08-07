@@ -824,6 +824,40 @@ public:
   /// properties.
   llvm::DenseMap<const clang::FunctionDecl *, VarDecl *> FunctionsAsProperties;
 
+  /// Maps a foreign reference type's Clang record to the (retain, release)
+  /// Clang functions that implement its custom reference counting.
+  ///
+  /// The entry is populated by \c importer::checkRetainReleaseFunctions when an
+  /// FRT is imported, and consumed during IRGen. Three states are possible:
+  ///   - no entry: the record is not a (valid) foreign reference type;
+  ///   - {nullptr, nullptr}: an immortal FRT, which has no custom retain/release
+  ///     operations;
+  ///   - {retain, release}: a shared FRT, where both functions are the concrete
+  ///     Clang callees that IRGen should emit calls to.
+  llvm::DenseMap<const clang::RecordDecl *,
+                 std::pair<const clang::FunctionDecl *,
+                           const clang::FunctionDecl *>>
+      FRTRetainReleaseFunctions;
+
+  /// Records the (retain, release) Clang operations for the foreign reference
+  /// type \p classDecl. Passing null functions marks the type as immortal.
+  void setForeignReferenceTypeOperations(const clang::RecordDecl *decl,
+                                         const clang::FunctionDecl *retain,
+                                         const clang::FunctionDecl *release) {
+    FRTRetainReleaseFunctions[decl] = {retain, release};
+  }
+
+  /// Returns the (retain, release) Clang operations for the foreign reference
+  /// type \p decl, or {nullptr, nullptr} if it has no custom reference counting
+  /// (i.e. it is immortal or not a valid foreign reference type).
+  std::pair<const clang::FunctionDecl *, const clang::FunctionDecl *>
+  getForeignReferenceTypeOperations(const clang::RecordDecl *decl) {
+    auto it = FRTRetainReleaseFunctions.find(decl);
+    if (it == FRTRetainReleaseFunctions.end())
+      return {nullptr, nullptr};
+    return it->second;
+  }
+
   /// Calling AbstractFunctionDecl::getLifetimeDependencies before we added
   /// the conformances we want to all the imported types is problematic because
   /// it will populate the conformance too early. To avoid the need for that we
@@ -2383,24 +2417,25 @@ getImplicitObjectParamAnnotation(const clang::FunctionDecl *FD) {
 bool diagnoseForeignReferenceType(const clang::CXXRecordDecl *decl,
                                   ClangImporter::Implementation &Impl);
 
+/// Validate the custom retain/release operations of the foreign reference type
+/// \p classDecl, emitting diagnostics for any problems.
+///
+/// For an FRT that inherits its reference-counting operations from a base FRT,
+/// this function synthesizes and imports forwarding methods into \p classDecl.
+///
+/// On success, this records the resolved (retain, release) Clang functions
+/// (or null functions, for an immortal type) via
+/// \c ClangImporter::Implementation::setForeignReferenceTypeOperations so that
+/// they can be looked up during IRGen.
+void checkRetainReleaseFunctions(ClassDecl *classDecl,
+                                 ClangImporter::Implementation &Impl);
+
 /// Returns the module \p Node comes from, or \c nullptr if \p Node does not
 /// have a valid owning module.
 ///
 /// Note that \p Node cannot itself be a clang::Module.
 const clang::Module *getClangOwningModule(ClangNode Node,
                                           const clang::ASTContext &ClangCtx);
-
-enum class RetainReleaseOperationKind {
-  notAfunction,
-  notAnInstanceFunction,
-  invalidReturnType,
-  invalidParameters,
-  valid
-};
-
-RetainReleaseOperationKind checkRetainReleaseOperationValidity(
-    const ClassDecl *classDecl, ValueDecl *operation,
-    CustomRefCountingOperationKind operationKind);
 } // end namespace importer
 } // end namespace swift
 
