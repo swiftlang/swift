@@ -4774,7 +4774,7 @@ static bool canComputeRegionsForFunction(SILFunction *fn) {
 RegionAnalysisFunctionInfo::RegionAnalysisFunctionInfo(
     SILFunction *fn, PostOrderFunctionInfo *pofi)
     : allocator(), fn(fn), valueMap(fn), translator(), ptrSetFactory(allocator),
-      isolationHistoryFactory(allocator),
+      isolationHistoryFactory(allocator, shouldEmitIsolationHistoryFor(fn)),
       sendingOperandToStateMap(isolationHistoryFactory), blockStates(),
       pofi(pofi), solved(false), supportedFunction(true) {
   // Before we do anything, make sure that we support processing this function.
@@ -4923,7 +4923,7 @@ static FunctionTest PartitionOpsTest(
     "sil_regionanalysis_partitionoptranslation",
     [](auto &function, auto &arguments, auto &test) {
       llvm::BumpPtrAllocator allocator;
-      IsolationHistory::Factory historyFactory(allocator);
+      IsolationHistory::Factory historyFactory(allocator, /*enabled=*/true);
       RegionAnalysisValueMap valueMap(&function);
       PartitionOpTranslator translator(
           &function,
@@ -4950,7 +4950,7 @@ static FunctionTest PartitionOpsBlockLoweringTest(
     "sil_regionanalysis_partitionoptranslation_block",
     [](auto &function, auto &arguments, auto &test) {
       llvm::BumpPtrAllocator allocator;
-      IsolationHistory::Factory historyFactory(allocator);
+      IsolationHistory::Factory historyFactory(allocator, /*enabled=*/true);
       RegionAnalysisValueMap valueMap(&function);
       PartitionOpTranslator translator(
           &function,

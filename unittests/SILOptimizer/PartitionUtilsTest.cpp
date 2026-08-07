@@ -81,6 +81,8 @@ struct MockedPartitionOpEvaluatorWithFailureCallback final
 
   static SILLocation getLoc(Operand *op) { return SILLocation::invalid(); }
 
+  static SILInstruction *getUser(Operand *op) { return nullptr; }
+
   static SILIsolationInfo getIsolationInfo(const PartitionOp &partitionOp) {
     return {};
   }
@@ -121,7 +123,7 @@ SILLocation fakeLoc = SILLocation::invalid();
 TEST(PartitionUtilsTest, TestMergeAndJoin) {
   llvm::BumpPtrAllocator allocator;
   Partition::SendingOperandSetFactory factory(allocator);
-  IsolationHistory::Factory historyFactory(allocator);
+  IsolationHistory::Factory historyFactory(allocator, /*enabled=*/true);
   SendingOperandToStateMap sendingOpToStateMap(historyFactory);
 
   Partition p1(historyFactory.get());
@@ -250,7 +252,7 @@ TEST(PartitionUtilsTest, TestMergeAndJoin) {
 TEST(PartitionUtilsTest, Join1) {
   llvm::BumpPtrAllocator allocator;
   Partition::SendingOperandSetFactory factory(allocator);
-  IsolationHistory::Factory historyFactory(allocator);
+  IsolationHistory::Factory historyFactory(allocator, /*enabled=*/true);
   SendingOperandToStateMap transferringOpToStateMap(historyFactory);
 
   Element data1[] = {Element(0), Element(1), Element(2),
@@ -293,7 +295,7 @@ TEST(PartitionUtilsTest, Join1) {
 TEST(PartitionUtilsTest, Join2) {
   llvm::BumpPtrAllocator allocator;
   Partition::SendingOperandSetFactory factory(allocator);
-  IsolationHistory::Factory historyFactory(allocator);
+  IsolationHistory::Factory historyFactory(allocator, /*enabled=*/true);
   SendingOperandToStateMap transferringOpToStateMap(historyFactory);
 
   Element data1[] = {Element(0), Element(1), Element(2),
@@ -342,7 +344,7 @@ TEST(PartitionUtilsTest, Join2) {
 TEST(PartitionUtilsTest, Join2Reversed) {
   llvm::BumpPtrAllocator allocator;
   Partition::SendingOperandSetFactory factory(allocator);
-  IsolationHistory::Factory historyFactory(allocator);
+  IsolationHistory::Factory historyFactory(allocator, /*enabled=*/true);
   SendingOperandToStateMap transferringOpToStateMap(historyFactory);
 
   Element data1[] = {Element(0), Element(1), Element(2),
@@ -391,7 +393,7 @@ TEST(PartitionUtilsTest, Join2Reversed) {
 TEST(PartitionUtilsTest, JoinLarge) {
   llvm::BumpPtrAllocator allocator;
   Partition::SendingOperandSetFactory factory(allocator);
-  IsolationHistory::Factory historyFactory(allocator);
+  IsolationHistory::Factory historyFactory(allocator, /*enabled=*/true);
   SendingOperandToStateMap transferringOpToStateMap(historyFactory);
 
   Element data1[] = {
@@ -532,7 +534,7 @@ TEST(PartitionUtilsTest, JoinLarge) {
 TEST(PartitionUtilsTest, TestAssign) {
   llvm::BumpPtrAllocator allocator;
   Partition::SendingOperandSetFactory factory(allocator);
-  IsolationHistory::Factory historyFactory(allocator);
+  IsolationHistory::Factory historyFactory(allocator, /*enabled=*/true);
   SendingOperandToStateMap transferringOpToStateMap(historyFactory);
 
   Partition p1(historyFactory.get());
@@ -623,7 +625,7 @@ TEST(PartitionUtilsTest, TestAssign) {
 TEST(PartitionUtilsTest, TestConsumeAndRequire) {
   llvm::BumpPtrAllocator allocator;
   Partition::SendingOperandSetFactory factory(allocator);
-  IsolationHistory::Factory historyFactory(allocator);
+  IsolationHistory::Factory historyFactory(allocator, /*enabled=*/true);
   SendingOperandToStateMap transferringOpToStateMap(historyFactory);
 
   Partition p(historyFactory.get());
@@ -722,7 +724,7 @@ TEST(PartitionUtilsTest, TestConsumeAndRequire) {
 TEST(PartitionUtilsTest, TestCopyConstructor) {
   llvm::BumpPtrAllocator allocator;
   Partition::SendingOperandSetFactory factory(allocator);
-  IsolationHistory::Factory historyFactory(allocator);
+  IsolationHistory::Factory historyFactory(allocator, /*enabled=*/true);
   SendingOperandToStateMap transferringOpToStateMap(historyFactory);
 
   Partition p1(historyFactory.get());
@@ -760,7 +762,7 @@ TEST(PartitionUtilsTest, TestCopyConstructor) {
 TEST(PartitionUtilsTest, TestUndoTransfer) {
   llvm::BumpPtrAllocator allocator;
   Partition::SendingOperandSetFactory factory(allocator);
-  IsolationHistory::Factory historyFactory(allocator);
+  IsolationHistory::Factory historyFactory(allocator, /*enabled=*/true);
   SendingOperandToStateMap transferringOpToStateMap(historyFactory);
 
   Partition p(historyFactory.get());
@@ -778,7 +780,7 @@ TEST(PartitionUtilsTest, TestUndoTransfer) {
 TEST(PartitionUtilsTest, TestLastEltInTransferredRegion) {
   llvm::BumpPtrAllocator allocator;
   Partition::SendingOperandSetFactory factory(allocator);
-  IsolationHistory::Factory historyFactory(allocator);
+  IsolationHistory::Factory historyFactory(allocator, /*enabled=*/true);
   SendingOperandToStateMap transferringOpToStateMap(historyFactory);
 
   // First make sure that we do this correctly with an assign fresh.

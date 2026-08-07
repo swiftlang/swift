@@ -8590,6 +8590,20 @@ public:
   /// vtable.
   bool needsNewVTableEntry() const;
 
+  /// Whether this is a generic method of a class that Embedded Swift must
+  /// dispatch statically, because it cannot be given a vtable entry.
+  ///
+  /// Embedded Swift has no unspecialized generic code, so a generic method
+  /// cannot appear in a vtable: there is no single implementation to put there.
+  /// Rather than reject such methods outright, they are dispatched statically
+  /// and kept out of the vtable entirely. The type checker makes that sound by
+  /// rejecting the two ways a static dispatch could be wrong -- an `open`
+  /// generic method, which a subclass in another module could override, and an
+  /// `override` of a generic method within this module.
+  ///
+  /// Returns false outside of Embedded Swift.
+  bool mustBeStaticallyDispatchedInEmbedded() const;
+
   /// True if the decl is a method which introduces a new witness table entry.
   bool requiresNewWitnessTableEntry() const {
     return getOverriddenDecls().empty();

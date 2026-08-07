@@ -11274,6 +11274,32 @@ bool AbstractFunctionDecl::needsNewVTableEntry() const {
       false);
 }
 
+bool AbstractFunctionDecl::mustBeStaticallyDispatchedInEmbedded() const {
+  if (!getASTContext().LangOpts.hasFeature(Feature::Embedded))
+    return false;
+
+  // Only members written directly in a class are dispatched through a vtable.
+  auto *classDecl = dyn_cast<ClassDecl>(getDeclContext());
+  if (!classDecl)
+    return false;
+
+  // A `final` method (or a method of a `final` class) is already statically
+  // dispatched and never has a vtable entry, so there is nothing to decide.
+  if (classDecl->isSemanticallyFinal() || isSemanticallyFinal())
+    return false;
+
+  // Initializers are reached through the metatype rather than an instance, and
+  // a `required` generic initializer genuinely cannot be dispatched; that is
+  // diagnosed separately rather than silently made static.
+  if (isa<ConstructorDecl>(this))
+    return false;
+
+  // Only generic methods are a problem: a non-generic method of a generic class
+  // still has one implementation per specialization.
+  return getGenericSignature().isABIMoreGenericThan(
+      classDecl->getGenericSignature());
+}
+
 ParamDecl *AbstractFunctionDecl::getImplicitSelfDecl(bool createIfNeeded) {
   auto **selfDecl = getImplicitSelfDeclStorage();
 
