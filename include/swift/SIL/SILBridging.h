@@ -747,9 +747,6 @@ struct BridgedInstruction {
   BRIDGED_INLINE bool mayRelease() const;
   BRIDGED_INLINE bool mayHaveSideEffects() const;
   BRIDGED_INLINE bool maySuspend() const;
-  bool mayAccessPointer() const;
-  bool mayLoadWeakOrUnowned() const;
-  bool maySynchronize() const;
   BRIDGED_INLINE bool shouldBeForwarding() const;
   BRIDGED_INLINE bool isIdenticalTo(BridgedInstruction inst) const;
   BRIDGED_INLINE SwiftInt getRawIndexInBlock() const;
