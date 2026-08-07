@@ -793,9 +793,56 @@ void TupleTypeRepr::printImpl(ASTPrinter &Printer,
   Printer.callPrintStructurePre(PrintStructureKind::TupleType);
   SWIFT_DEFER { Printer.printStructurePost(PrintStructureKind::TupleType); };
 
+  unsigned NumElements = Bits.TupleTypeRepr.NumElements;
+
+  // Compact printing for homogeneous unlabeled tuples with 5+ elements.
+  // We rely on the resolved `TupleType` threaded through `PrintOptions` 
+  // by `ASTPrinter::printTypeLoc()` so we can compare element types 
+  // using `Type::isEqual()`, matching the criterion used on the `Type` 
+  // printing path in `TypePrinter::visitTupleType()`.
+  if (Opts.PrintHomogeneousTuplesCompactly && NumElements > 4) {
+    if (auto *ResolvedTuple = Opts.CurrentTupleTypeReprResolvedType) {
+      auto ResolvedElts = ResolvedTuple->getElements();
+      if (ResolvedElts.size() == NumElements) {
+        Type FirstEltType = ResolvedElts[0].getType();
+        bool IsHomogeneous = true;
+        for (unsigned i = 0; i != NumElements; ++i) {
+          if (isNamedParameter(i) || !getElementName(i).empty() ||
+              !ResolvedElts[i].getType()->isEqual(FirstEltType)) {
+            IsHomogeneous = false;
+            break;
+          }
+        }
+
+        if (IsHomogeneous) {
+          // Clear the resolved-type field for the element print so a 
+          // nested `TupleTypeRepr` cannot incorrectly inherit this 
+          // tuple's resolved type.
+          PrintOptions::OverrideScope scope(Opts);
+          OVERRIDE_PRINT_OPTION_UNCONDITIONAL(
+              scope, CurrentTupleTypeReprResolvedType, nullptr);
+
+          Printer << "(";
+          Printer.callPrintStructurePre(PrintStructureKind::TupleElement);
+          printTypeRepr(getElementType(0), Printer, Opts);
+          Printer.printStructurePost(PrintStructureKind::TupleElement);
+          Printer << " /* ... repeated " << NumElements << " times ... */)";
+          return;
+        }
+      }
+    }
+  }
+
+  // Clear the outer-tuple resolved type for the duration of element 
+  // prints, so a nested `TupleTypeRepr` doesn't pick up this tuple's 
+  // `TupleType`.
+  PrintOptions::OverrideScope scope(Opts);
+  OVERRIDE_PRINT_OPTION_UNCONDITIONAL(
+    scope, CurrentTupleTypeReprResolvedType, nullptr);
+
   Printer << "(";
 
-  for (unsigned i = 0, e = Bits.TupleTypeRepr.NumElements; i != e; ++i) {
+  for (unsigned i = 0, e = NumElements; i != e; ++i) {
     if (i) Printer << ", ";
     Printer.callPrintStructurePre(PrintStructureKind::TupleElement);
     auto name = getElementName(i);
