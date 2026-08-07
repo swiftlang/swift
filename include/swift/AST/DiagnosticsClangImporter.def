@@ -302,6 +302,12 @@ ERROR(foreign_reference_type_unreachable, none,
       "foreign reference type '%0' has unreachable definition",
       (StringRef))
 
+ERROR(nonescapable_foreign_reference_type, none,
+      "%0 cannot be both a foreign reference type and non-escapable; foreign "
+      "reference types are imported as Swift classes, which are always "
+      "escapable",
+      (const clang::NamedDecl *))
+
 GROUPED_WARNING(unannotated_cxx_func_returning_frt, ForeignReferenceType, none,
         "cannot infer ownership of foreign reference value returned by %0",
         (const ValueDecl *))

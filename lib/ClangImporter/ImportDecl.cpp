@@ -2474,14 +2474,25 @@ namespace {
         return nullptr;
       }
 
-      if (frtInfo.isReference())
+      if (frtInfo.isReference()) {
+        // Swift classes are always Escapable.
+        if (evaluateOrDefault(
+                Impl.SwiftContext.evaluator,
+                ClangTypeEscapability({decl->getTypeForDecl(), &Impl}),
+                CxxEscapability::Unknown) == CxxEscapability::NonEscapable) {
+          Impl.diagnose(HeaderLoc(decl->getLocation()),
+                        diag::nonescapable_foreign_reference_type, decl);
+          return nullptr;
+        }
+
         result = Impl.createDeclWithClangNode<ClassDecl>(
             decl, importer::convertClangAccess(decl->getAccess()), loc, name,
             loc, ArrayRef<InheritedEntry>{}, nullptr, dc, false);
-      else
+      } else {
         result = Impl.createDeclWithClangNode<StructDecl>(
             decl, importer::convertClangAccess(decl->getAccess()), loc, name,
             loc, ArrayRef<InheritedEntry>(), nullptr, dc);
+      }
       Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = result;
       // We've written a partial entry into ImportedDecls so that nested
       // member imports (especially those that recurse into us via
@@ -7329,6 +7340,11 @@ Decl *SwiftDeclConverter::importGlobalAsInitializer(
 
   auto importedType =
       Impl.importFunctionReturnType(dc, decl, allowNSUIntegerAsInt);
+  if (!importedType) {
+    Impl.addImportDiagnostic(decl, Diagnostic(diag::return_type_not_imported),
+                             decl->getSourceRange().getBegin());
+    return nullptr;
+  }
 
   // Update the failability appropriately based on the imported method type.
   bool failable = false, isIUO = false;

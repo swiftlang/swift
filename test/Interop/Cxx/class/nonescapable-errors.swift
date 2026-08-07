@@ -201,6 +201,8 @@ const View* usedToCrash(const View* p) {
     return p;
 }
 
+View* usedToCrashAsInit(const int* p) SWIFT_NAME(View.init(p:));
+
 // expected-note@+1 {{escapable record 'Invalid' cannot have non-escapable field 'v'}}
 struct SWIFT_ESCAPABLE Invalid {
     View v;
@@ -369,6 +371,12 @@ public func importInvalid(_ x: Invalid) {}
 
 // expected-error@+1 {{cannot find type 'Invalid2' in scope}}
 public func importInvalid(_ x: Invalid2) {}
+
+// 'usedToCrashAsInit' returns a pointer to a non-escapable type, which cannot
+// be imported, so no 'init(p:)' is added to 'View'.
+public func droppedInitializer() {
+    _ = View(p: nil) // expected-error {{extraneous argument label 'p:' in call}}
+}
 
 // expected-LIFETIMES-error@+3 {{a function with a ~Escapable result needs a parameter to depend on}}
 // expected-LIFETIMES-note@+2 {{'@_lifetime(immortal)' can be used to indicate that values produced by this initializer have no lifetime dependencies}}
