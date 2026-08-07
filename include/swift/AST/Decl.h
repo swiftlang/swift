@@ -3408,6 +3408,15 @@ public:
   /// Is this declaration 'final'?
   bool isFinal() const;
 
+  /// True if this declaration should have a non-unique definition based on
+  /// the Embedded Swift linkage model (i.e. its type metadata / code may be
+  /// emitted redundantly in every module that references it, rather than
+  /// having a single unique definition). Returns false outside Embedded Swift.
+  ///
+  /// This is the AST-level source of truth consulted by
+  /// `SILDeclRef::declHasNonUniqueDefinition`.
+  bool hasNonUniqueDefinition() const;
+
   /// Is this declaration marked with 'dynamic'?
   bool isDynamic() const;
 

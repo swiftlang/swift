@@ -236,6 +236,10 @@ bool BridgedDeclObj::NominalType_isGlobalActor() const {
   return getAs<swift::NominalTypeDecl>()->isGlobalActor();
 }
 
+bool BridgedDeclObj::NominalType_hasNonUniqueDefinition() const {
+  return getAs<swift::NominalTypeDecl>()->hasNonUniqueDefinition();
+}
+
 OptionalBridgedDeclObj BridgedDeclObj::NominalType_getValueTypeDestructor() const {
   return {getAs<swift::NominalTypeDecl>()->getValueTypeDestructor()};
 }
