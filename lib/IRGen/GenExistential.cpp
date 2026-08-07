@@ -269,17 +269,17 @@ namespace {
     }
 
     void initializeWithCopy(IRGenFunction &IGF, Address dest, Address src,
-                            SILType T, bool isOutlined) const override {
-      if (isOutlined || T.hasLocalArchetype()) {
+                            SILType T,
+                            bool suppressOutlinedValueOperationCalls) const override {
+      if (suppressOutlinedValueOperationCalls ||
+          !this->canUseOutlinedValueOperation(T)) {
         Address destValue = projectValue(IGF, dest);
         Address srcValue = projectValue(IGF, src);
         asDerived().emitValueInitializeWithCopy(IGF, destValue, srcValue);
         emitCopyOfTables(IGF, dest, src);
       } else {
-        OutliningMetadataCollector collector(T, IGF, LayoutIsNeeded,
-                                             DeinitIsNotNeeded);
-        collector.emitCallToOutlinedCopy(dest, src, T, *this,
-                                         IsInitialization, IsNotTake);
+        this->callOutlinedCopy(IGF, dest, src, T, IsInitialization,
+                               IsNotTake);
       }
     }
 
@@ -969,8 +969,10 @@ public:
   }
 
   void initializeWithCopy(IRGenFunction &IGF, Address dest, Address src,
-                          SILType T, bool isOutlined) const override {
-    if (isOutlined || T.hasLocalArchetype()) {
+                          SILType T,
+                          bool suppressOutlinedValueOperationCalls) const override {
+    if (suppressOutlinedValueOperationCalls ||
+        !canUseOutlinedValueOperation(T)) {
       llvm::Value *metadata = copyType(IGF, dest, src);
 
       auto layout = getLayout();
@@ -982,11 +984,7 @@ public:
       emitInitializeBufferWithCopyOfBufferCall(IGF, metadata, destBuffer,
                                                srcBuffer);
     } else {
-      // Create an outlined function to avoid explosion
-      OutliningMetadataCollector collector(T, IGF, LayoutIsNeeded,
-                                           DeinitIsNotNeeded);
-      collector.emitCallToOutlinedCopy(dest, src, T, *this,
-                                       IsInitialization, IsNotTake);
+      callOutlinedCopy(IGF, dest, src, T, IsInitialization, IsNotTake);
     }
   }
 

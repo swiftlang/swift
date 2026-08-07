@@ -163,8 +163,9 @@ public:
   }
 
   void initializeWithCopy(IRGenFunction &IGF, Address destAddr, Address srcAddr,
-                          SILType T, bool isOutlined) const override {
-    bitwiseCopy(IGF, destAddr, srcAddr, T, isOutlined);
+                          SILType T,
+                          bool suppressOutlinedValueOperationCalls) const override {
+    bitwiseCopy(IGF, destAddr, srcAddr, T, suppressOutlinedValueOperationCalls);
   }
 
   void assignWithCopy(IRGenFunction &IGF, Address destAddr, Address srcAddr,

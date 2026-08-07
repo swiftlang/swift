@@ -261,12 +261,13 @@ public:
   }
 
   void initializeWithCopy(IRGenFunction &IGF, Address dest, Address src,
-                          SILType T, bool isOutlined) const override {
+                          SILType T,
+                          bool suppressOutlinedValueOperationCalls) const override {
     // If we're POD, use the generic routine.
     if (this->isTriviallyDestroyable(ResilienceExpansion::Maximal) &&
         isa<LoadableTypeInfo>(this)) {
       return cast<LoadableTypeInfo>(this)->LoadableTypeInfo::initializeWithCopy(
-          IGF, dest, src, T, isOutlined);
+          IGF, dest, src, T, suppressOutlinedValueOperationCalls);
     }
 
     // If the fields are not ABI-accessible, use the value witness table.
@@ -274,7 +275,8 @@ public:
       return emitInitializeWithCopyCall(IGF, T, dest, src);
     }
 
-    if (isOutlined || T.hasParameterizedExistential()) {
+    if (suppressOutlinedValueOperationCalls ||
+        !this->canUseOutlinedValueOperation(T)) {
       auto offsets = asImpl().getNonFixedOffsets(IGF, T);
       for (auto &field : getFields()) {
         if (field.isEmpty())
@@ -283,7 +285,8 @@ public:
         Address destField = field.projectAddress(IGF, dest, offsets);
         Address srcField = field.projectAddress(IGF, src, offsets);
         field.getTypeInfo().initializeWithCopy(
-            IGF, destField, srcField, field.getType(IGF.IGM, T), isOutlined);
+            IGF, destField, srcField, field.getType(IGF.IGM, T),
+            /* suppressOutlinedValueOperationCalls */ false);
       }
     } else {
       this->callOutlinedCopy(IGF, dest, src, T, IsInitialization, IsNotTake);

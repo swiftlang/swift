@@ -283,7 +283,8 @@ public:
   }
 
   void initializeWithCopy(IRGenFunction &IGF, Address destAddr, Address srcAddr,
-                          SILType T, bool isOutlined) const override {
+                          SILType T,
+                          bool suppressOutlinedValueOperationCalls) const override {
     // 'Builtin.Borrow' is always bitwise copyable.
     IGF.Builder.CreateMemCpy(destAddr, srcAddr, getSize(IGF, T));
   }

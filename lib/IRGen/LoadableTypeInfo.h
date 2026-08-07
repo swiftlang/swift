@@ -127,7 +127,8 @@ public:
 
   // We can give this a reasonable default implementation.
   void initializeWithCopy(IRGenFunction &IGF, Address destAddr, Address srcAddr,
-                          SILType T, bool isOutlined) const override;
+                          SILType T,
+                          bool suppressOutlinedValueOperationCalls) const override;
 
   /// Consume a bunch of values which have exploded at one explosion
   /// level and produce them at another.

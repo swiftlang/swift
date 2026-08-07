@@ -365,7 +365,7 @@ public:
   /// Perform a copy-initialization from the given object.
   virtual void initializeWithCopy(IRGenFunction &IGF, Address destAddr,
                                   Address srcAddr, SILType T,
-                                  bool isOutlined) const = 0;
+                                  bool suppressOutlinedValueOperationCalls) const = 0;
 
   /// Perform a copy-initialization from the given fixed-size buffer
   /// into an uninitialized fixed-size buffer, allocating the buffer if
@@ -560,6 +560,10 @@ public:
   virtual void collectMetadataForOutlining(OutliningMetadataCollector &collector,
                                            SILType T) const;
 
+  /// Whether this type can use outlined value operation dispatch. The
+  /// dispatcher may fall back to a value witness call.
+  bool canUseOutlinedValueOperation(SILType T) const;
+
   /// Get the native (abi) convention for a return value of this type.
   const NativeConventionSchema &nativeReturnValueSchema(IRGenModule &IGM) const;
 
@@ -578,7 +582,7 @@ public:
   /// Returns whether there was an appropriate emitter (and whether \p
   /// invocation was called).
   bool withWitnessableMetadataCollector(
-      IRGenFunction &IGF, SILType T, LayoutIsNeeded_t needsLayout,
+      IRGenFunction &IGF, SILType T,
       DeinitIsNeeded_t needsDeinit,
       llvm::function_ref<void(OutliningMetadataCollector &)> invocation) const;
 
