@@ -188,6 +188,11 @@ public class Instruction : CustomStringConvertible, Hashable {
     switch self {
     case SIL.isFullApplySite, is EndApplyInst, is AbortApplyInst:
       return true
+    case let endAccess as EndAccessInst where endAccess.beginAccess.enforcement == .dynamic:
+      // A deinitializer can read and write class properties, global variables or boxes - which are
+      // protected by dynamic access scopes: the deinit could modify the memory which the access
+      // scope is reading, or vice versa.
+      return true
     default:
       return mayAccessPointerOrGlobal || mayLoadWeakOrUnowned || maySynchronize
     }
