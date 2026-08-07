@@ -27,6 +27,7 @@ func acceptMarked(_: any IDerived & Sendable & LocalMarker) {}
 func acceptRefinementChain(_: any IDerived & IBase) {}
 
 // A generic environment can carry independent COM conformances separately.
+
 func acceptGeneric<T: IDerived & IIndependent>(_: T) {}
 
 func rejectIndependent(_: any IDerived & IIndependent) {}
@@ -43,3 +44,17 @@ func rejectSuperclass(_: any NativeBase & IDerived) {}
 
 func rejectCOMInterface(_: any COMInterface) {}
 // expected-error@-1 {{'any COMInterface' is invalid because 'COMInterface' describes a COM metatype identity}}
+
+extension IDerived {
+  func method() {
+  }
+}
+
+func rejectExtensionMember(_ value: any IDerived) {
+  value.method()
+  // expected-error@-1 {{member 'method' cannot be used on value of type 'any IDerived'; consider using a generic constraint instead}}
+}
+
+func acceptGenericExtentionMember<Derived: IDerived>(_ value: Derived) {
+  value.method()
+}

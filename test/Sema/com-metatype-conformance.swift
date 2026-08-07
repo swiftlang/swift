@@ -26,6 +26,10 @@ func f<Interface>(_ value: borrowing Interface)
   _ = Interface.IID
 }
 
+func g(_ widget: borrowing IWidget) {
+  f(widget)
+}
+
 typealias ErasedTearOff = TearOff<COMInterface>
 // expected-error@-1{{'any COMInterface' is invalid because 'COMInterface' describes a COM metatype identity}}
 
