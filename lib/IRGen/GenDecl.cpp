@@ -4620,15 +4620,19 @@ AccessibleFunction AccessibleFunction::forSILFunction(IRGenModule &IGM,
       /*recordName=*/LinkEntity::forAccessibleFunctionRecord(func)
           .mangleAsString(IGM.Context),
       /*funcName=*/LinkEntity::forSILFunction(func).mangleAsString(IGM.Context),
-      /*isDistributed=*/false, func->getLoweredFunctionType(), funcAddr);
+      /*isDistributed=*/false,
+      /*hasLeadingImplicitActorIsolationParameter=*/false,
+      func->getLoweredFunctionType(), funcAddr);
 }
 
-AccessibleFunction AccessibleFunction::forDistributed(std::string recordName,
-                                                      std::string accessorName,
-                                                      CanSILFunctionType type,
-                                                      llvm::Constant *address) {
+AccessibleFunction AccessibleFunction::forDistributed(
+    std::string recordName, std::string accessorName,
+    bool hasLeadingImplicitActorIsolationParameter, CanSILFunctionType type,
+    llvm::Constant *address) {
   return AccessibleFunction(recordName, accessorName,
-                            /*isDistributed=*/true, type, address);
+                            /*isDistributed=*/true,
+                            hasLeadingImplicitActorIsolationParameter, type,
+                            address);
 }
 
 void IRGenModule::addAccessibleFunction(AccessibleFunction func) {
@@ -4907,6 +4911,8 @@ void IRGenModule::emitAccessibleFunction(StringRef sectionName,
   // -- Field: Flags
   AccessibleFunctionFlags flags;
   flags.setDistributed(func.isDistributed());
+  flags.setHasLeadingImplicitActorIsolationParameter(
+      func.hasLeadingImplicitActorIsolationParameter());
   fields.addInt32(flags.getOpaqueValue());
 
   // ---- End of 'TargetAccessibleFunctionRecord' fields

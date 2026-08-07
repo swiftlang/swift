@@ -3133,13 +3133,21 @@ public:
   enum {
     /// Whether this is a "distributed" actor function.
     Distributed = 0,
+    /// Whether the accessor this record points at has a leading `isolated (any Actor)?`.
+    HasLeadingImplicitActorIsolationParameter = 1,
   };
 
   explicit AccessibleFunctionFlags(uint32_t bits) : FlagSet(bits) {}
   constexpr AccessibleFunctionFlags() {}
 
   /// Whether the this is a "distributed" actor function.
-  FLAGSET_DEFINE_FLAG_ACCESSORS(Distributed, isDistributed, setDistributed)
+  FLAGSET_DEFINE_FLAG_ACCESSORS(Distributed,
+    isDistributed, setDistributed)
+
+  /// Whether the target function has a leading implicit actor isolation parameter.
+  FLAGSET_DEFINE_FLAG_ACCESSORS(HasLeadingImplicitActorIsolationParameter,
+    hasLeadingImplicitActorIsolationParameter,
+    setHasLeadingImplicitActorIsolationParameter)
 };
 
 } // end namespace swift

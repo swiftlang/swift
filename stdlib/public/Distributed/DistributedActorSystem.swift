@@ -415,6 +415,17 @@ public protocol DistributedActorSystem<SerializationRequirement>: Sendable {
   /// Implementations of this method must ensure that the `Argument` type parameter conforms
   /// to the types' `SerializationRequirement`.
   ///
+  /// ### Nonisolated nonsending witnesses
+  /// It is possible to witness this requirement using a `nonisolated(nonsending)` function.
+  /// Doing so will result in less actor hops when distributed functions are invoked on remote targets,
+  /// as the `remoteCall` function is able to continue executing on the calling context.
+  /// This also implies that any "heavy" work should be performed asynchronously to not block the calling context
+  /// for an unnecessarily long amount of time, however it gives system implementations more flexibility
+  /// to carefully manage isolation/threading for optimal performance.
+  ///
+  /// > Tip: When writing a new `DistributedActorSystem` it is recommended to witness the
+  /// >      `remoteCall` functions using `nonisolated(nonsending)` witnesses.
+  ///
   /// ## Errors
   /// This method is allowed to throw because of underlying transport or serialization errors,
   /// as well as by re-throwing the error received from the remote callee (if able to).
@@ -423,6 +434,8 @@ public protocol DistributedActorSystem<SerializationRequirement>: Sendable {
   /// In Embedded Swift the function signature is slightly different, as the passed in target actor's
   /// actor system must be exactly the same as the system the method is defined on,
   /// rather only be ID compatible, as it is in non-Embedded swift.
+  ///
+  /// - SeeAlso: ``remoteCallVoid(on:target:invocation:throwing:)``
 #if $Embedded
   func remoteCall<Act, Err, Res>(
       on actor: Act,
@@ -457,6 +470,15 @@ public protocol DistributedActorSystem<SerializationRequirement>: Sendable {
   ///
   /// This method should perform the actual remote function call, and await for its response.
   ///
+  /// ### Nonisolated nonsending witnesses
+  /// It is possible to witness this requirement using a `nonisolated(nonsending)` function.
+  /// Doing so will result much of the generated code supporting remote call to also adopt
+  /// `nonisolated(nonsending)` resulting in improved latency due to less actor isolation
+  /// changes on remote call paths.
+  ///
+  /// > Tip: When writing a new `DistributedActorSystem` it is recommended to witness the
+  /// >      `remoteCall` functions using `nonisolated(nonsending)` witnesses.
+  ///
   /// ## Errors
   /// This method is allowed to throw because of underlying transport or serialization errors,
   /// as well as by re-throwing the error received from the remote callee (if able to).
@@ -465,6 +487,8 @@ public protocol DistributedActorSystem<SerializationRequirement>: Sendable {
   /// In Embedded Swift the function signature is slightly different, as the passed in target actor's
   /// actor system must be exactly the same as the system the method is defined on,
   /// rather only be ID compatible, as it is in non-Embedded swift.
+  ///
+  /// - SeeAlso: ``remoteCall(on:target:invocation:throwing:)``
 #if $Embedded
   func remoteCallVoid<Act, Err>(
       on actor: Act,
@@ -535,6 +559,10 @@ extension DistributedActorSystem {
   /// is that thanks to this approach it can avoid any existential boxing, and can serve the most
   /// latency sensitive-use-cases.
   ///
+  /// This method executes on the caller's isolation. When it is invoked from the actor system's
+  /// own executor, the distributed target is entered directly on the target actor, without first
+  /// switching to the global concurrent executor.
+  ///
   /// - Parameters:
   ///   - actor: actor on which the remote call should invoke the target
   ///   - target: the target (method) identifier that should be invoked
@@ -572,8 +600,32 @@ extension DistributedActorSystem {
       resultHandler: handler)
   }
 #else
+  // `nonisolated(nonsending)` does not affect the mangled symbol name of a
+  // plain top-level function declaration (only of function *values*), so
+  // adding it here is purely a calling-convention change under the same,
+  // already-shipped ABI symbol. `@backDeployed` alone is sufficient: clients
+  // built against a deployment target below 6.5 get their own compiled copy
+  // of this body (which cannot yet observe the nonsending behavior since it
+  // never existed for them), while newer clients call straight into the
+  // exported symbol, which now runs on the caller's isolation.
   @available(SwiftStdlib 5.7, *)
-  public func executeDistributedTarget<Act>(
+  @backDeployed(before: SwiftStdlib 6.5)
+  public nonisolated(nonsending) func executeDistributedTarget<Act>(
+    on actor: Act,
+    target: RemoteCallTarget,
+    invocationDecoder: inout InvocationDecoder,
+    handler: Self.ResultHandler
+  ) async throws where Act: DistributedActor {
+    try await _executeDistributedTargetImpl(
+      on: actor,
+      target: target,
+      invocationDecoder: &invocationDecoder,
+      handler: handler)
+  }
+
+  @available(SwiftStdlib 5.7, *)
+  @usableFromInline
+  internal nonisolated(nonsending) func _executeDistributedTargetImpl<Act>(
     on actor: Act,
     target: RemoteCallTarget,
     invocationDecoder: inout InvocationDecoder,
@@ -766,18 +818,63 @@ extension DistributedActorSystem {
       let returnType = try invocationDecoder.decodeReturnType() ?? returnTypeFromTypeInfo
       // let errorType = try invocationDecoder.decodeErrorType() // TODO(distributed): decide how to use when typed throws are done
 
-      // Execute the target!
-      try unsafe await _executeDistributedTarget(
-        on: actor,
-        /*targetNameData:*/targetName,
-        /*targetNameLength:*/UInt(targetName.utf8.count),
-        argumentDecoder: &invocationDecoder,
-        argumentTypes: argumentTypesBuffer.baseAddress!._rawValue,
-        resultBuffer: resultBuffer._rawValue,
-        substitutions: UnsafeRawPointer(substitutionsBuffer),
-        witnessTables: witnessTablesBuffer,
-        numWitnessTables: UInt(numWitnessTables)
-      )
+      // If the target actor is a local instance, tell the runtime to enter
+      // the distributed accessor with the target actor as its isolation.
+      // An accessor whose thunk is `nonisolated(nonsending)` switches onto
+      // the target actor's executor itself, directly from the executor this
+      // function is running on (the caller's, since it is nonsending), and
+      // the thunk and target then run without any further switch.
+      // After the accessor returns we switch back to the caller's isolation.
+      //
+      // The distributed accessor is `isolated` to this actor, so it needs
+      // an `any Actor` here. `Act` is statically known at this call site,
+      // so this works even for generic distributed actor types - no
+      // witness-table lookup is required in IRGen for this. `asLocalActor`
+      // itself is actor-isolated (it can only be read from a context
+      // already isolated to the actor), so its underlying builtin is used
+      // directly here instead.
+      //
+      // Critical safety property: we must never pass a real actor here for
+      // a remote actor reference - the accessor would then attempt to hop
+      // onto a remote reference. `__isLocalActor` gates that.
+      //
+      // The `_executeDistributedTargetWithIsolation` runtime entry point is
+      // only available on SwiftStdlib 6.5 and later. This check only exists
+      // for the compiler: this function ships in the same library as that
+      // entry point, so the legacy branch is not taken at runtime.
+      if #available(SwiftStdlib 6.5, *) {
+        let isolatedActor: (any Actor)? =
+          if __isLocalActor(actor) {
+            Builtin.distributedActorAsAnyActor(actor)
+          } else {
+            nil
+          }
+
+        try unsafe await _executeDistributedTargetWithIsolation(
+          on: actor,
+          isolatedActor: isolatedActor,
+          /*targetNameData:*/targetName,
+          /*targetNameLength:*/UInt(targetName.utf8.count),
+          argumentDecoder: &invocationDecoder,
+          argumentTypes: argumentTypesBuffer.baseAddress!._rawValue,
+          resultBuffer: resultBuffer._rawValue,
+          substitutions: UnsafeRawPointer(substitutionsBuffer),
+          witnessTables: witnessTablesBuffer,
+          numWitnessTables: UInt(numWitnessTables)
+        )
+      } else {
+        try unsafe await _executeDistributedTarget(
+          on: actor,
+          /*targetNameData:*/targetName,
+          /*targetNameLength:*/UInt(targetName.utf8.count),
+          argumentDecoder: &invocationDecoder,
+          argumentTypes: argumentTypesBuffer.baseAddress!._rawValue,
+          resultBuffer: resultBuffer._rawValue,
+          substitutions: UnsafeRawPointer(substitutionsBuffer),
+          witnessTables: witnessTablesBuffer,
+          numWitnessTables: UInt(numWitnessTables)
+        )
+      }
       // execute has not thrown, so the result buffer has been filled with some value,
       // we must properly deinitialize it.
       executeDistributedTargetHasThrown = false
@@ -1022,6 +1119,28 @@ private func _mangledTargetIdentifiersEqual(
 @_silgen_name("swift_distributed_execute_target")
 func _executeDistributedTarget<D: DistributedTargetInvocationDecoder>(
   on actor: AnyObject, // : DistributedActor
+  _ targetName: UnsafePointer<UInt8>, _ targetNameLength: UInt,
+  argumentDecoder: inout D,
+  argumentTypes: Builtin.RawPointer,
+  resultBuffer: Builtin.RawPointer,
+  substitutions: UnsafeRawPointer?,
+  witnessTables: UnsafeRawPointer?,
+  numWitnessTables: UInt
+) async throws
+
+@available(SwiftStdlib 6.5, *)
+@_unavailableInEmbedded
+@_silgen_name("swift_distributed_execute_target_with_isolation")
+func _executeDistributedTargetWithIsolation<D: DistributedTargetInvocationDecoder>(
+  on actor: AnyObject, // : DistributedActor
+  // NOT `isolated`: this runtime entry is plumbing, it must not become
+  // actor-isolated to `isolatedActor` (that would make the caller emit an
+  // executor hop / continuation dance the C++ runtime never performs, which
+  // desyncs the async continuation and crashes on resume). The genuine hop
+  // happens in the accessor, whose own `isolated (any Actor)?` parameter this
+  // value is forwarded into. Here it is just a value: the erased target actor
+  // when local, nil when remote.
+  isolatedActor: (any Actor)?,
   _ targetName: UnsafePointer<UInt8>, _ targetNameLength: UInt,
   argumentDecoder: inout D,
   argumentTypes: Builtin.RawPointer,
