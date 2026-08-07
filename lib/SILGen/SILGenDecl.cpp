@@ -387,7 +387,7 @@ void StoreBorrowInitialization::copyOrInitValueInto(SILGenFunction &SGF,
                                                     bool isInit) {
   auto value = mv.getValue();
   auto &lowering = SGF.getTypeLowering(value->getType());
-  if (lowering.isAddressOnly() && SGF.silConv.useLoweredAddresses()) {
+  if (!lowering.isLoadableOrOpaque(SGF.F)) {
     llvm::report_fatal_error(
         "Attempting to store_borrow an address-only value!?");
   }
@@ -817,13 +817,13 @@ public:
       //
       // For noncopyable types, we always need to box them.
       needsTemporaryBuffer =
-          (lowering->isAddressOnly() && SGF.silConv.useLoweredAddresses()) ||
+          !lowering->isLoadableOrOpaque(SGF.F) ||
               lowering->getLoweredType().isMoveOnly(/*orWrapped=*/false);
     }
 
     // Make sure that we have a non-address only type when binding a
     // @_noImplicitCopy let.
-    if (lowering->isAddressOnly() && vd->isNoImplicitCopy()) {
+    if (lowering->getRecursiveProperties().isAddressOnly() && vd->isNoImplicitCopy()) {
       auto d = diag::noimplicitcopy_used_on_generic_or_existential;
       diagnose(SGF.getASTContext(), vd->getLoc(), d);
     }
@@ -1346,7 +1346,7 @@ void EnumElementPatternInitialization::emitEnumMatch(
           // NOTE: The APIs that we are using here will ensure that if we have
           // a trivial value, the load_borrow will become a load [trivial] and
           // the copies will be "automagically" elided.
-          if (boxedTL.isLoadable() || !SGF.silConv.useLoweredAddresses()) {
+          if (boxedTL.isLoadableOrOpaque(SGF.F)) {
             UnenforcedAccess access;
             SILValue accessAddress = access.beginAccess(
                 SGF, loc, boxedValue.getValue(), SILAccessKind::Read);
