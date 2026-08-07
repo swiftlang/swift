@@ -84,9 +84,9 @@ struct ASTGenVisitor {
       if !declContext.parentSourceFile.isScriptMode {
         switch astNode.kind {
         case .stmt:
-          self.diagnose(.illegalTopLevelStmt(node))
+          self.diagnose(.illegalTopLevelStmt, at: node)
         case .expr:
-          self.diagnose(.illegalTopLevelExpr(node))
+          self.diagnose(.illegalTopLevelExpr, at: node)
         case .decl:
           fatalError("unreachable")
         }
