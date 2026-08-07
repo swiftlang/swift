@@ -10560,6 +10560,11 @@ DeclContext *ClangImporter::Implementation::importDeclContextImpl(
   // TranslationUnit DeclContext here.
   assert(!dc->isTranslationUnit());
 
+  // A declaration declared inside a function body (e.g. a local C++ class) has
+  // no Swift decl context to be imported into.
+  if (dc->isFunctionOrMethod())
+    return nullptr;
+
   auto decl = dyn_cast<clang::NamedDecl>(dc);
   if (!decl || !decl->getDeclName().isIdentifier())
     return nullptr;
