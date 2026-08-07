@@ -285,6 +285,62 @@ func testUniversallyUnavailable() {
   if #unavailable(EnabledDomain) {} // FIXME: [availability] Diagnose?
 }
 
+func testLocalDeclsWithExplicitAvailability() {
+  // expected-note@-1 {{add '@available' attribute to enclosing global function}}
+  if #available(EnabledDomain) {
+    @available(DynamicDomain)
+    func restrictedInAnotherDomain() {
+      availableInEnabledDomain()
+      availableInDynamicDomain()
+    }
+
+    restrictedInAnotherDomain() // expected-error {{'restrictedInAnotherDomain()' is only available in DynamicDomain}}
+    // expected-note@-1 {{add 'if #available' version check}}
+
+    if #available(DynamicDomain) {
+      restrictedInAnotherDomain()
+    }
+
+    @available(EnabledDomain)
+    func redundantlyRestricted() {
+      availableInEnabledDomain()
+    }
+    redundantlyRestricted()
+
+    @available(EnabledDomain, unavailable)
+    func localUnavailableInEnabledDomain() { }
+    // expected-note@-1 2 {{'localUnavailableInEnabledDomain()' has been explicitly marked unavailable here}}
+    localUnavailableInEnabledDomain() // expected-error {{'localUnavailableInEnabledDomain()' is unavailable}}
+
+    if #unavailable(EnabledDomain) {
+      // FIXME: [availability] Should not be diagnosed
+      localUnavailableInEnabledDomain() // expected-error {{'localUnavailableInEnabledDomain()' is unavailable}}
+    }
+  }
+}
+
+func testLocalDeclsAfterGuard() { // expected-note 3 {{add '@available' attribute to enclosing global function}}
+  useAfterGuard() // expected-error {{'useAfterGuard()' is only available in EnabledDomain}}
+  // expected-note@-1 {{add 'if #available' version check}}
+  useAfterGuardInDynamicDomain() // expected-error {{'useAfterGuardInDynamicDomain()' is only available in EnabledDomain}}
+  // expected-note@-1 {{add 'if #available' version check}}
+
+  guard #available(EnabledDomain) else { return }
+
+  func useAfterGuard() {
+    availableInEnabledDomain()
+  }
+  useAfterGuard()
+
+  @available(DynamicDomain)
+  func useAfterGuardInDynamicDomain() {
+    availableInDynamicDomain()
+  }
+  useAfterGuardInDynamicDomain() // expected-error {{'useAfterGuardInDynamicDomain()' is only available in DynamicDomain}}
+  // expected-note@-1 {{add 'if #available' version check}}
+}
+
+
 @available(EnabledDomain)
 struct EnabledDomainAvailable {
   @available(DynamicDomain)
