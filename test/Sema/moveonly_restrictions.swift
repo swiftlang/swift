@@ -194,7 +194,7 @@ extension ProtocolCheckMoveOnlyEnum : P & Q {}
 extension ProtocolCheckMoveOnlyEnum : Any {}
 
 extension ProtocolCheckMoveOnlyEnum : AnyHashable {}
-// expected-error@-1 {{inheritance from non-protocol type 'AnyHashable'}}
+// expected-error@-1 {{non-protocol type 'AnyHashable' cannot be used in a conformance list}}
 
 // But a normal extension is ok.
 extension ProtocolCheckMoveOnlyKlass {}
