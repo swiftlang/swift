@@ -9131,6 +9131,13 @@ GROUPED_WARNING(generic_nonfinal_in_embedded_swift, EmbeddedRestrictions,
                 none,
                 "generic %kind0 in a class %select{must be 'final'|cannot be 'required'}1 in Embedded Swift",
                 (const Decl *, bool))
+GROUPED_ERROR(generic_open_in_embedded_swift, EmbeddedRestrictions, none,
+              "generic %kind0 in a class cannot be 'open' in Embedded Swift",
+              (const Decl *))
+GROUPED_ERROR(generic_override_in_embedded_swift, EmbeddedRestrictions, none,
+              "generic %kind0 in a class cannot override another method in "
+              "Embedded Swift",
+              (const Decl *))
 GROUPED_WARNING(use_generic_member_of_existential_in_embedded_swift,
                 EmbeddedRestrictions, none,
                 "cannot use generic %kind0 on a value of type %1 in Embedded Swift",
