@@ -1,0 +1,31 @@
+// RUN: %target-sil-opt -test-runner %s -o /dev/null 2>&1 | %FileCheck %s
+
+sil_stage raw
+
+class NS {}
+
+sil @makeNS : $@convention(thin) (@guaranteed NS) -> @owned NS
+
+// CHECK-LABEL: begin running test {{.*}} on closure_move_value
+// CHECK:         Callee origin: {{.*}}= partial_apply
+// CHECK-LABEL: end running test {{.*}} on closure_move_value
+sil [ossa] @closure_move_value : $@convention(thin) (@guaranteed NS) -> () {
+entry(%0 : @guaranteed $NS):
+  specify_test "apply_callee_origin %call"
+
+  %f = function_ref @makeNS : $@convention(thin) (@guaranteed NS) -> @owned NS
+  %arg = copy_value %0
+  %pa = partial_apply [callee_guaranteed] %f(%arg) : $@convention(thin) (@guaranteed NS) -> @owned NS
+  %mv = move_value [lexical] [var_decl] %pa
+  %b1 = begin_borrow %mv
+  %cp = copy_value %b1
+  %b2 = begin_borrow %cp
+  %call = apply %b2() : $@callee_guaranteed () -> @owned NS
+  end_borrow %b2
+  destroy_value %call
+  destroy_value %cp
+  end_borrow %b1
+  destroy_value %mv
+  %ret = tuple ()
+  return %ret
+}
