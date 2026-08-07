@@ -930,6 +930,53 @@ protected:
   // MARK: attribute parsing and inference helpers
   // ==========================================================================
 
+  /// A scoped dependency needs borrowable storage in the caller. If the callee
+  /// receives \p paramInfo as its own copy, diagnose at \p loc and return true.
+  ///
+  /// Imported C records are addressable-for-dependencies, so a scoped
+  /// dependency on one lowers to an address dependency; a by-value copy has no
+  /// storage in the caller to form that on. Pointer and lvalue reference
+  /// parameters do.
+  ///
+  /// getLoweredOwnership() cannot answer this: it sees only the Swift
+  /// signature, where an imported by-value record is a plain parameter. Nor can
+  /// lowering be consulted, since it depends on the dependencies computed here
+  /// (see paramsWithScopedDependencies in SILFunctionType.cpp).
+  bool diagnoseScopeOnForeignByValue(ParamInfo const &paramInfo,
+                                     SourceLoc loc) {
+    if (!afd)
+      return false;
+
+    // 'self' is not a Clang parameter, so its index is out of range here.
+    auto *params = afd->getParameters();
+    if (!params || paramInfo.index >= params->size())
+      return false;
+
+    auto *clangParam = dyn_cast_or_null<clang::ParmVarDecl>(
+        params->get(paramInfo.index)->getClangDecl());
+    if (!clangParam)
+      return false;
+
+    auto clangParamTy = clangParam->getType();
+    // An rvalue reference is imported as 'consuming', which likewise leaves
+    // nothing to borrow.
+    if (auto *rvalueRef = clangParamTy->getAs<clang::RValueReferenceType>())
+      clangParamTy = rvalueRef->getPointeeType();
+    if (!clangParamTy->isRecordType())
+      return false;
+
+    // C++ allows unnamed parameters; describe those positionally.
+    SmallString<32> paramName;
+    if (paramInfo.name().empty())
+      (Twine("parameter #") + Twine(paramInfo.index + 1)).toVector(paramName);
+    else
+      paramName.append(paramInfo.name());
+
+    diagnose(loc, diag::lifetime_dependence_scope_foreign_by_value, paramName,
+             diagnosticQualifier());
+    return true;
+  }
+
   // Attribute parsing helper.
   bool isCompatibleWithOwnership(ParsedLifetimeDependenceKind kind,
                                  Type paramType, ValueOwnership loweredOwnership,
@@ -1394,6 +1441,10 @@ protected:
 
       return;
     }
+    if (lifetimeKind == LifetimeDependenceKind::Scope &&
+        diagnoseScopeOnForeignByValue(*paramInfo, source.getLoc())) {
+      return;
+    }
     addDescriptorIndices(deps, source, sourceIndex, *lifetimeKind);
   }
 
@@ -1845,38 +1896,10 @@ protected:
       return;
     }
     auto kind = LifetimeDependenceKind::Scope;
-    // A foreign function's parameter conventions are fixed by its C
-    // declaration. Imported C records are addressable-for-dependencies (see
-    // TypeConverter::getTypeProperties()), so a scoped dependency on one is
-    // lowered as an address dependency -- but a record that the callee receives
-    // as its own copy has no borrowable storage in the caller to form one on.
     // Do not infer a dependency that cannot be lowered; an explicit annotation
     // is required instead.
-    //
-    // A record passed by pointer or lvalue reference does have borrowable
-    // storage, so those keep their inferred dependency.
-    if (auto *clangFn =
-            dyn_cast_or_null<clang::FunctionDecl>(afd->getClangDecl())) {
-      // 'self' is not part of the Clang parameter list, and inference only
-      // reaches this point for a single Swift parameter.
-      if (clangFn->getNumParams() == 1) {
-        auto clangParamTy = clangFn->getParamDecl(0)->getType();
-        // An rvalue reference is imported as 'consuming', which likewise leaves
-        // nothing to borrow.
-        if (auto *rvalueRef = clangParamTy->getAs<clang::RValueReferenceType>())
-          clangParamTy = rvalueRef->getPointeeType();
-        if (clangParamTy->isRecordType()) {
-          // C++ allows unnamed parameters. Inference only reaches this point
-          // for a function with a single parameter, so name it positionally.
-          StringRef paramName =
-              paramInfo.name().empty() ? "parameter #1" : paramInfo.name();
-          diagnose(
-              returnLoc,
-              diag::lifetime_dependence_cannot_infer_scope_foreign_by_value,
-              paramName, diagnosticQualifier());
-          return;
-        }
-      }
+    if (diagnoseScopeOnForeignByValue(paramInfo, returnLoc)) {
+      return;
     }
     if (!isCompatibleWithOwnership(kind, paramInfo)) {
       diagnose(returnLoc,
