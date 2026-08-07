@@ -2321,6 +2321,10 @@ final public class BranchInst : TermInst {
   public func getArgument(for operand: Operand) -> Argument {
     return targetBlock.arguments[operand.index]
   }
+
+  public func getPhi(for operand: Operand) -> Phi {
+    return Phi(getArgument(for: operand))!
+  }
 }
 
 final public class CondBranchInst : TermInst {
