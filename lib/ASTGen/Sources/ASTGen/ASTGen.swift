@@ -215,6 +215,23 @@ extension ASTGenVisitor {
     node.map(generateSourceLoc(_:)) ?? nil
   }
 
+  /// Obtains the C++ start location of `token`, or an invalid location if the
+  /// parser synthesized it during recovery.
+  ///
+  /// A missing token still has a position -- a zero-width one where the token
+  /// would have gone -- so `generateSourceLoc` returns a valid location for it.
+  /// That position can fall outside the enclosing node's range, which makes any
+  /// AST range built from it inconsistent with its parent's. Use this wherever
+  /// the C++ parser would have left the corresponding `SourceLoc` default
+  /// because it never consumed a token.
+  @inline(__always)
+  func generateSourceLocIfPresent(_ token: TokenSyntax?) -> SourceLoc {
+    guard let token, token.presence == .present else {
+      return nil
+    }
+    return self.generateSourceLoc(token)
+  }
+
   /// Obtains a pair of an `ASTContext`-owned identifier and a C++ source
   /// location from `token`.
   @inline(__always)

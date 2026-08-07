@@ -1124,6 +1124,18 @@ extension ASTGenVisitor {
         elements.append(oper.asExpr)
         elements.append(oper.asExpr)
       case .unresolvedTernaryExpr(let node):
+        // A ternary without its ':' cannot be represented: with no 'else'
+        // expression, `TernaryExpr`'s range degenerates and is no longer
+        // consistent with its children's, which the AST verifier rejects.
+        // `Parser::parseExprSequence` fails the whole sequence in this case, so
+        // the enclosing expression becomes an ErrorExpr; do the same. The parser
+        // has already reported the missing ':'.
+        guard node.colon.presence == .present else {
+          return BridgedErrorExpr.create(
+            self.ctx,
+            loc: self.generateSourceRange(node.parent ?? Syntax(node))
+          ).asExpr
+        }
         elements.append(self.generate(unresolvedTernaryExpr: node).asExpr)
       default:
         elements.append(self.generate(expr: node))
@@ -1166,8 +1178,16 @@ extension ASTGenVisitor {
   }
 
   func generate(tryExpr node: TryExprSyntax, overridingSubExpr: BridgedExpr? = nil) -> BridgedExpr {
-    let tryLoc = self.generateSourceLoc(node.tryKeyword)
     let subExpr = overridingSubExpr ?? self.generate(expr: node.expression)
+
+    // A synthesized 'try' has a zero-width position just past the preceding
+    // token *and its trailing trivia*, which can land beyond the expression it
+    // would wrap -- giving the Try expression an inverted range. The C++ parser
+    // never builds one of these without consuming a 'try', so neither should we.
+    guard node.tryKeyword.presence == .present else {
+      return subExpr
+    }
+    let tryLoc = self.generateSourceLoc(node.tryKeyword)
 
     switch node.questionOrExclamationMark {
     case nil:
@@ -1282,7 +1302,11 @@ extension ASTGenVisitor {
       self.ctx,
       questionLoc: self.generateSourceLoc(node.questionMark),
       thenExpr: self.generate(expr: node.thenExpression),
-      colonLoc: self.generateSourceLoc(node.colon)
+      // A synthesized ':' sits just past the 'then' expression, which can be
+      // outside the enclosing sequence's range; `TernaryExpr::getEndLoc()` falls
+      // back to it when there is no 'else' expression, and the AST verifier then
+      // sees a child reaching past its parent.
+      colonLoc: self.generateSourceLocIfPresent(node.colon)
     )
   }
 
