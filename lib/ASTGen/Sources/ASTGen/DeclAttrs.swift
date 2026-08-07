@@ -2759,13 +2759,12 @@ extension ASTGenVisitor {
     default:
       // Other modifiers are all "simple" attributes.
       let kind = BridgedOptionalDeclAttrKind(from: node.name.rawText.bridged)
-      guard kind.hasValue else {
-        // TODO: Diagnose.
-        fatalError("(compiler bug) unknown decl modifier")
-      }
-      if !BridgedDeclAttribute.isDeclModifier(kind.value) {
-        // TODO: Diagnose.
-        fatalError("(compiler bug) decl attribute was parsed as a modifier")
+      guard kind.hasValue, BridgedDeclAttribute.isDeclModifier(kind.value) else {
+        // Not a modifier at all. The parser only produces a DeclModifierSyntax
+        // for a known modifier keyword, so reaching here means recovery
+        // produced something else and has already diagnosed it. Dropping the
+        // modifier is enough; inventing a diagnostic here would duplicate it.
+        return nil
       }
       return self.generateSimpleDeclAttr(declModifier: node, kind: kind.value)
     }
@@ -2776,8 +2775,14 @@ extension ASTGenVisitor {
   {
     if let detail = node.detail {
       guard detail.detail.rawText == "set" else {
-        // TODO: Diagnose
-        fatalError("only accepted modifier argument is '(set)'")
+        // The only argument the grammar allows here is '(set)'; anything else is
+        // recovery output that the parser has already diagnosed. Treat the
+        // modifier as if it had no argument.
+        return BridgedAccessControlAttr.createParsed(
+          self.ctx,
+          range: self.generateSourceRange(node),
+          accessLevel: level
+        ).asDeclAttribute
       }
       return BridgedSetterAccessAttr.createParsed(
         self.ctx,
@@ -2802,10 +2807,11 @@ extension ASTGenVisitor {
       modifier = .nonsending
     case nil:
       modifier = .none
-    case let text?:
-      // TODO: Diagnose
-      _ = text
-      fatalError("invalid argument for nonisolated modifier")
+    default:
+      // The grammar only admits 'unsafe' and 'nonsending'; anything else is
+      // recovery output that the parser has already diagnosed. Recover as
+      // plain 'nonisolated'.
+      modifier = .none
     }
 
     return BridgedNonisolatedAttr.createParsed(
@@ -2827,10 +2833,8 @@ extension ASTGenVisitor {
     switch node.name.keywordKind {
     case .weak:
       kind = .weak
-      guard node.detail == nil else {
-        // TODO: Diagnose.
-        fatalError("invalid argument for 'weak' modifier")
-      }
+      // 'weak' takes no argument; an argument is recovery output that the parser
+      // has already diagnosed, so ignore it.
     case .unowned:
       switch node.detail?.detail.rawText {
       case "safe", nil:
@@ -2838,9 +2842,15 @@ extension ASTGenVisitor {
       case "unsafe":
         kind = .unmanaged
       case let text?:
-        // TODO: Diagnose
-        _ = text
-        fatalError("invalid argument for 'unowned' modifier")
+        // Unlike most malformed modifier arguments, the parser accepts an
+        // arbitrary identifier here without complaint, so ASTGen has to be the
+        // one to reject it -- otherwise this would be accepted where the C++
+        // parser rejects it.
+        self.diagnose(
+          .attr_unknown_option(String(syntaxText: text), "unowned"),
+          at: node.name
+        )
+        kind = .unowned
       }
     default:
       preconditionFailure("ReferenceOwnership modifier must be 'weak' or 'unowned'")

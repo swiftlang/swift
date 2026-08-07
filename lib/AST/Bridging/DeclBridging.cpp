@@ -715,3 +715,17 @@ BridgedYieldList BridgedYieldList_createParsed(BridgedASTContext cContext,
   return YieldList::create(context, leftParenLoc,
                            cYieldTypes.unbridged<TypeRepr *>(), rightParenLoc);
 }
+
+//===----------------------------------------------------------------------===//
+// MARK: AccessorKind
+//===----------------------------------------------------------------------===//
+
+BridgedStringRef AccessorKind_nameForDiagnostic(swift::AccessorKind kind) {
+  // Returns a static string, so it outlives the call.
+  return getAccessorNameForDiagnostic(kind, /*article=*/false,
+                                      /*underscored=*/false);
+}
+
+bool AccessorKind_requiresCoroutineAccessorsFeature(swift::AccessorKind kind) {
+  return requiresFeatureCoroutineAccessors(kind);
+}

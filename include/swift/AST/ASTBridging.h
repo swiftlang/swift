@@ -723,6 +723,15 @@ PlatformKind_fromIdentifier(swift::Identifier ident);
 /// empty string if there is no close match.
 BridgedStringRef PlatformKind_closestCorrectedString(BridgedStringRef cStr);
 
+/// The name of \p kind as it should appear in a diagnostic, e.g.
+/// "'yielding borrow'".
+SWIFT_NAME("getter:swift.AccessorKind.nameForDiagnostic(self:)")
+BridgedStringRef AccessorKind_nameForDiagnostic(swift::AccessorKind kind);
+
+/// Whether \p kind is only available with the CoroutineAccessors feature.
+SWIFT_NAME("getter:swift.AccessorKind.requiresCoroutineAccessorsFeature(self:)")
+bool AccessorKind_requiresCoroutineAccessorsFeature(swift::AccessorKind kind);
+
 SWIFT_NAME("BridgedAvailabilityMacroMap.has(self:name:)")
 bool BridgedAvailabilityMacroMap_hasName(BridgedAvailabilityMacroMap map,
                                          BridgedStringRef name);

@@ -437,11 +437,16 @@ extension ASTGenVisitor {
       attrs.add(attr)
     }
 
-    // The modifiers
-    for m in node.modifiers {
-        if let g = self.generate(declModifier: m) {
-            attrs.add(g)
-        }
+    // The modifiers.
+    //
+    // 'yielding' is not a modifier of its own: it is part of the spelling of the
+    // 'yielding borrow' and 'yielding mutate' accessor kinds, and is consumed by
+    // `generate(accessorSpecifier:modifiers:)` below. Passing it to
+    // `generate(declModifier:)` would not find a declaration attribute for it.
+    for m in node.modifiers where m.name.keywordKind != .yielding {
+      if let g = self.generate(declModifier: m) {
+        attrs.add(g)
+      }
     }
 
     guard let kind = self.generate(accessorSpecifier: node.accessorSpecifier,
@@ -449,6 +454,18 @@ extension ASTGenVisitor {
       // TODO: We could potentially recover if this is the first accessor by treating
       // it as an implicit getter.
       return nil
+    }
+
+    // 'yielding borrow' and 'yielding mutate' are gated on a feature flag. The
+    // parser accepts them regardless so that the diagnostic is about the
+    // feature rather than about the syntax.
+    if kind.requiresCoroutineAccessorsFeature,
+      !self.ctx.langOpts.hasFeature(.CoroutineAccessors)
+    {
+      self.diagnose(
+        .accessor_requires_coroutine_accessors(String(bridged: kind.nameForDiagnostic)),
+        at: node.accessorSpecifier
+      )
     }
     let accessor = BridgedAccessorDecl.createParsed(
       self.ctx,
@@ -488,9 +505,13 @@ extension ASTGenVisitor {
     case .accessors(let accessors):
       return BridgedAccessorRecord(
         lBraceLoc: leftBrace,
-        accessors: accessors.lazy.compactMap {
+        // Use `compactMap(in:)` rather than `lazy.compactMap { }.bridgedArray`:
+        // the latter evaluates the transform twice, once to compute `count` and
+        // again to fill the buffer, which would generate every accessor -- and
+        // emit any diagnostic it produces -- twice.
+        accessors: accessors.compactMap(in: self) {
           self.generate(accessorDecl: $0, for: storage)
-        }.bridgedArray(in: self),
+        },
         rBraceLoc: rightBrace
       )
     case .getter(let codeBlock):
