@@ -934,6 +934,11 @@ def create_argument_parser():
     option('--install-swift-testing-macros',
            toggle_true('install_swift_testing_macros'),
            help='install Swift Testing macro plugin')
+    option('--swift-testing-harness', toggle_true('build_swift_testing_harness'),
+           help='build Swift Testing harness executable')
+    option('--install-swift-testing-harness',
+           toggle_true('install_swift_testing_harness'),
+           help='install Swift Testing harness executable')
 
     option('--xctest', toggle_true('build_xctest'),
            help='build xctest')
