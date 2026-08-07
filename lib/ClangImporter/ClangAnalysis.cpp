@@ -1,6 +1,7 @@
 #include "ClangDerivedConformances.h"
 #include "ImporterImpl.h"
 #include "swift/AST/DiagnosticsClangImporter.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Defer.h"
 #include "swift/ClangImporter/ClangImporter.h"
@@ -8,9 +9,12 @@
 #include "clang/AST/Attr.h"
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclObjC.h"
+#include "clang/AST/Expr.h"
+#include "clang/AST/ExprCXX.h"
 #include "clang/AST/RecordLayout.h"
 #include "clang/AST/Type.h"
 #include "clang/Basic/Specifiers.h"
+#include "clang/Sema/Sema.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
@@ -144,6 +148,89 @@ bool importer::isDirectViewType(const clang::Decl *decl, ASTContext &swiftCtx) {
 }
 
 namespace {
+/// The retain:/release: attributes written directly on a record.
+struct RetainReleaseInfo {
+  RetainReleaseInfo(const clang::RecordDecl *decl) : decl(decl) {
+    if (!decl->hasAttrs())
+      return;
+    for (auto *attr : decl->specific_attrs<clang::SwiftAttrAttr>()) {
+      StringRef attrStr = attr->getAttribute();
+      if (attrStr.consume_front("retain:")) {
+        ++retainCount;
+        retain = attrStr;
+      } else if (attrStr.consume_front("release:")) {
+        ++releaseCount;
+        release = attrStr;
+      }
+    }
+  }
+
+  /// The name of the last retain: operation (empty if none).
+  StringRef getRetain() const { return retain; }
+
+  /// The name of the last release: operation (empty if none).
+  StringRef getRelease() const { return release; }
+
+  unsigned numRetain() const { return retainCount; }
+
+  unsigned numRelease() const { return releaseCount; }
+
+  bool isImmortal() const {
+    return retainCount == 1 && releaseCount == 1 && retain == "immortal" &&
+           release == "immortal";
+  }
+
+  bool hasMixedImmortality() const {
+    bool retainImmortal = retain == "immortal";
+    bool releaseImmortal = release == "immortal";
+    return retainImmortal != releaseImmortal;
+  }
+
+  bool isValid() const {
+    return numRetain() == 1 && numRelease() == 1 && !hasMixedImmortality();
+  }
+
+  /// Diagnose malformed retain:/release: attributes via \p Impl (if non-null).
+  /// Returns whether the annotations are structurally well-formed.
+  bool checkShape(ClangImporter::Implementation *Impl) const {
+    HeaderLoc loc(decl->getLocation());
+    auto checkOp = [&](unsigned count, StringRef name, bool isRelease) {
+      if (count != 1) {
+        if (Impl)
+          Impl->diagnose(
+              loc,
+              count == 0 ? diag::reference_type_must_have_retain_release_attr
+                         : diag::too_many_reference_type_retain_release_attr,
+              isRelease, decl->getNameAsString());
+        return false;
+      }
+      if (name.empty()) {
+        if (Impl)
+          Impl->diagnose(loc, diag::reference_type_empty_retain_release_name,
+                         isRelease, decl->getNameAsString());
+        return false;
+      }
+      return true;
+    };
+    bool retainOk = checkOp(retainCount, retain, /*isRelease=*/false);
+    bool releaseOk = checkOp(releaseCount, release, /*isRelease=*/true);
+    if (!retainOk || !releaseOk)
+      return false;
+
+    if (hasMixedImmortality()) {
+      if (Impl)
+        Impl->diagnose(loc, diag::reference_type_mixed_immortal_marker, decl);
+      return false;
+    }
+    return true;
+  }
+
+private:
+  const clang::RecordDecl *decl;
+  StringRef retain, release;
+  unsigned retainCount = 0, releaseCount = 0;
+};
+
 class ForeignReferenceTypeChecker {
   /// We are checking this to determine whether it is a foreign reference type.
   const clang::CXXRecordDecl *checkedDecl;
@@ -236,8 +323,15 @@ public:
       // checkedDecl is explicitly annotated as a foreign reference type.
       // Do not let it have a primarySuperclass, to prevent upcasting past the
       // annotation boundary in the class hierarchy.
-      return ForeignReferenceTypeInfo::Shared(checkedDecl,
-                                              /*primarySuperclass=*/nullptr);
+      auto rrInfo = RetainReleaseInfo(checkedDecl);
+      if (rrInfo.isImmortal())
+        return ForeignReferenceTypeInfo::Immortal(checkedDecl,
+                                                  /*primarySuperclass=*/nullptr,
+                                                  /*isValid=*/rrInfo.isValid());
+      else
+        return ForeignReferenceTypeInfo::Shared(checkedDecl,
+                                                /*primarySuperclass=*/nullptr,
+                                                /*isValid=*/rrInfo.isValid());
     }
 
     const clang::CXXRecordDecl *uniqueDirectFRTBase = visitBases(checkedDecl);
@@ -256,16 +350,21 @@ public:
                                   : nullptr;
 
     const clang::CXXRecordDecl *FRTBase = nullptr;
-    bool seenShared = false, seenMultipleShared = false, seenImmortal = false;
+    bool seenShared = false, seenMultipleShared = false, seenImmortal = false,
+         seenInvalidOps = false;
 
     for (auto *base : FRTBases) {
-      if (importer::hasAnyImmortalAttr(base)) {
+      auto rrInfo = RetainReleaseInfo(base);
+      seenInvalidOps |= !rrInfo.isValid();
+      if (rrInfo.isImmortal()) {
         seenImmortal = true;
-      } else if (!FRTBase) {
-        FRTBase = base;
-        seenShared = true;
       } else {
-        seenMultipleShared = true;
+        if (!FRTBase) {
+          FRTBase = base;
+          seenShared = true;
+        } else {
+          seenMultipleShared = true;
+        }
       }
     }
 
@@ -275,7 +374,7 @@ public:
       FRTBase = FRTBases.front();
     }
 
-    if (seenMultipleShared || (seenShared && seenImmortal)) {
+    if (seenMultipleShared || (seenShared && seenImmortal) || seenInvalidOps) {
       // checkedDecl is an invalid FRT, either because it has multiple shared
       // FRT bases (ambiguous retain/release ops), or because it has mixed
       // ancestry between shared and immortal bases.
@@ -293,6 +392,10 @@ public:
       // that this is an (invalid) value type.
       return ForeignReferenceTypeInfo::Value(/*isValid=*/false);
     }
+
+    if (seenImmortal)
+      return ForeignReferenceTypeInfo::Immortal(FRTBase, primarySuperclass);
+
     return ForeignReferenceTypeInfo::Shared(FRTBase, primarySuperclass);
   }
 };
@@ -325,9 +428,17 @@ ForeignReferenceTypeInfo ForeignReferenceTypeInfoRequest::evaluate(
   // If this isn't a C++ record, then there's no inheritance (nor any of the
   // associated complications) to worry about. Just look for ref attributes.
 
-  if (importer::hasImportReferenceAttr(decl))
-    return ForeignReferenceTypeInfo::Shared(decl,
-                                            /*primarySuperclass=*/nullptr);
+  if (importer::hasImportReferenceAttr(decl)) {
+    auto rrInfo = RetainReleaseInfo(decl);
+    if (rrInfo.isImmortal())
+      return ForeignReferenceTypeInfo::Immortal(decl,
+                                                /*primarySuperclass=*/nullptr,
+                                                /*isValid=*/rrInfo.isValid());
+    else
+      return ForeignReferenceTypeInfo::Shared(decl,
+                                              /*primarySuperclass=*/nullptr,
+                                              /*isValid=*/rrInfo.isValid());
+  }
 
   return ForeignReferenceTypeInfo::Value();
 }
@@ -388,7 +499,7 @@ static void diagnoseMissingReturnsRetained(ClangImporter::Implementation &Impl,
     // Furthermore, we do not diagnose clang::FunctionTemplateDecls here;
     // instead, we need to diagnose calls to their specializations.
     return;
-  
+
   if (const auto *methodDecl = dyn_cast<clang::CXXMethodDecl>(clangFunc)) {
     ASSERT((!isa<clang::CXXDeductionGuideDecl, clang::CXXDestructorDecl>(
                clangFunc)) &&
@@ -413,7 +524,7 @@ static void diagnoseMissingReturnsRetained(ClangImporter::Implementation &Impl,
   auto info =
       evaluateOrDefault(Impl.SwiftContext.evaluator,
                         ForeignReferenceTypeInfoRequest({recordDecl}), {});
-  if (!info.isReference() || importer::hasAnyImmortalAttr(recordDecl))
+  if (!info.isReference() || info.isImmortal())
     return; // recordDecl is not a shared reference type
 
   if (importer::matchSwiftAttr<bool>(
@@ -471,6 +582,381 @@ swift::importer::getOwnershipOfReturnedFRT(const clang::NamedDecl *decl) {
   }
 
   return std::nullopt;
+}
+
+//===----------------------------------------------------------------------===//
+// Foreign reference type retain/release operations
+//===----------------------------------------------------------------------===//
+
+/// Whether \p op is a valid retain/release operation for the foreign reference
+/// type \p classDecl (\p isRetain selects which). If \p Impl is non-null, the
+/// specific problem is diagnosed at \p loc; otherwise the check is silent (used
+/// to disambiguate an overloaded operation name).
+static bool checkRefCountOperation(const ClassDecl *classDecl, ValueDecl *op,
+                                   bool isRetain, StringRef name,
+                                   ClangImporter::Implementation *Impl,
+                                   HeaderLoc loc) {
+  auto diagnose = [&Impl, &loc](auto diag, auto &&...args) {
+    if (Impl)
+      Impl->diagnose(loc, diag, std::forward<decltype(args)>(args)...);
+  };
+
+  auto *fn = dyn_cast<FuncDecl>(op);
+  if (!fn) {
+    diagnose(diag::foreign_reference_types_retain_release_not_a_function_decl,
+             !isRetain, name);
+    return false;
+  }
+
+  if (fn->isStatic()) {
+    diagnose(
+        diag::foreign_reference_types_retain_release_not_an_instance_function,
+        !isRetain, name);
+    return false;
+  }
+
+  // Instance operations take no parameters; free operations take one.
+  if (fn->getParameters()->size() != (fn->isInstanceMember() ? 0 : 1)) {
+    diagnose(diag::foreign_reference_types_invalid_retain_release, !isRetain,
+             name, classDecl->getNameStr());
+    return false;
+  }
+
+  Type paramType;
+  NominalTypeDecl *paramDecl;
+  if (fn->isInstanceMember()) {
+    paramDecl = cast<NominalTypeDecl>(fn->getParent());
+    paramType = paramDecl->getDeclaredInterfaceType();
+  } else {
+    paramType = fn->getParameters()
+                    ->get(0)
+                    ->getInterfaceType()
+                    ->lookThroughSingleOptionalType();
+    paramDecl = paramType->getAnyNominal();
+  }
+
+  // The return type must be void or an integer
+  auto resultTy = fn->getResultInterfaceType();
+  bool validReturn =
+      resultTy->isVoid() || resultTy->isUInt() || resultTy->isUInt8() ||
+      resultTy->isUInt16() || resultTy->isUInt32() || resultTy->isUInt64() ||
+      resultTy->isInt() || resultTy->isInt8() || resultTy->isInt16() ||
+      resultTy->isInt32() || resultTy->isInt64();
+  // A retain may also return the parameter (self) type
+  if (isRetain && !validReturn)
+    validReturn = resultTy->lookThroughSingleOptionalType()->isEqual(paramType);
+  if (!validReturn) {
+    diagnose(
+        isRetain
+            ? diag::foreign_reference_types_retain_non_void_or_self_return_type
+            : diag::foreign_reference_types_release_non_void_return_type,
+        name);
+    return false;
+  }
+
+  // The operation must take the FRT as its parameter
+  if (paramDecl != classDecl) {
+    auto *cxxDecl = dyn_cast<clang::CXXRecordDecl>(classDecl->getClangDecl());
+    auto *paramCxxDecl = dyn_cast_or_null<clang::CXXRecordDecl>(
+        paramDecl ? paramDecl->getClangDecl() : nullptr);
+    if (cxxDecl && paramCxxDecl && cxxDecl->isDerivedFrom(paramCxxDecl)) {
+      // The parameter may also be one of the FRT's bases
+    } else {
+      diagnose(diag::foreign_reference_types_invalid_retain_release, !isRetain,
+               name, classDecl->getNameStr());
+      return false;
+    }
+  }
+  return true;
+}
+
+/// Resolve and diagnose the retain (\p isRetain) or release operation for the
+/// foreign reference type \p classDecl, based on the annotation read from
+/// \p annotatedDecl. Returns null on any (semantic) error.
+///
+/// This performs semantic checking only: the caller guarantees, via
+/// \c RetainReleaseInfo::checkShape, that \p annotatedDecl has exactly one
+/// \c retain: and one \c release: attribute, and (via the FRT request) that
+/// neither is immortal.
+static ValueDecl *
+resolveRefCountOperation(const ClassDecl *classDecl,
+                         const ClassDecl *annotatedDecl, StringRef name,
+                         bool isRetain, ClangImporter::Implementation &Impl) {
+  auto *record = cast<clang::RecordDecl>(classDecl->getClangDecl());
+  HeaderLoc loc(record->getLocation());
+
+  ASSERT(!name.empty() &&
+         "structural check should guarantee a retain/release attr");
+  ASSERT(name != "immortal" && "immortal FRTs are handled before resolution");
+
+  auto results = importer::getValueDeclsForName(
+      const_cast<ClassDecl *>(annotatedDecl), name);
+
+  // Pick the operation, silently disambiguating an overloaded name.
+  ValueDecl *op = nullptr;
+  if (results.size() == 1) {
+    op = results.front();
+  } else {
+    for (auto *candidate : results) {
+      if (!checkRefCountOperation(classDecl, candidate, isRetain, name,
+                                  /*Impl=*/nullptr, loc))
+        continue;
+      if (op) {
+        Impl.diagnose(loc,
+                      diag::too_many_reference_type_retain_release_operations,
+                      !isRetain, name, record->getNameAsString());
+        return nullptr;
+      }
+      op = candidate;
+    }
+  }
+
+  if (!op) {
+    Impl.diagnose(loc, diag::foreign_reference_types_cannot_find_retain_release,
+                  !isRetain, name, record->getNameAsString());
+    if (!Impl.SwiftContext.LangOpts.DisableExperimentalClangImporterDiagnostics)
+      Impl.diagnoseTopLevelValue(
+          DeclName(Impl.SwiftContext.getIdentifier(name)));
+    return nullptr;
+  }
+
+  // Diagnose any signature problem on the chosen operation. It is still
+  // returned (and recorded) even if invalid, matching prior behavior.
+  checkRefCountOperation(classDecl, op, isRetain, name, &Impl, loc);
+  return op;
+}
+
+/// Synthesize an inline C++ method on \p clangDecl that forwards to \p baseFn.
+/// Returns the synthesized method, or nullptr on failure.
+///
+/// Unlike SwiftDeclSynthesizer::synthesizeCXXForwardingMethod, this function
+/// does not use Sema::SynthesizedFunctionScope (which is not re-entrant), so
+/// it is safe to use during importing.
+static const clang::CXXMethodDecl *
+synthesizeForwardingRefCountMethod(clang::CXXRecordDecl *clangDecl,
+                                   const clang::FunctionDecl *baseFn,
+                                   ClangImporter::Implementation &Impl) {
+  if (!baseFn)
+    return nullptr;
+  auto &clangCtx = Impl.getClangASTContext();
+  auto &clangSema = Impl.getClangSema();
+
+  clang::QualType methodType = clangCtx.getFunctionType(
+      clangCtx.VoidTy, {}, clang::FunctionProtoType::ExtProtoInfo{});
+
+  auto loc = baseFn->getLocation();
+  auto &ident = clangCtx.Idents.get("__synthesized_lifetimeAccessor_" +
+                                    baseFn->getNameAsString());
+  clang::DeclarationName methodName(&ident);
+  auto method = clang::CXXMethodDecl::Create(
+      clangCtx, clangDecl, baseFn->getSourceRange().getBegin(),
+      clang::DeclarationNameInfo(methodName, clang::SourceLocation()),
+      methodType, clangCtx.getTrivialTypeSourceInfo(methodType), clang::SC_None,
+      /*usesFPIntrin=*/false, /*isInline=*/true,
+      clang::ConstexprSpecKind::Unspecified, baseFn->getSourceRange().getEnd());
+  method->setImplicit();
+  method->setImplicitlyInline();
+  method->setAccess(clang::AccessSpecifier::AS_public);
+  method->addAttr(clang::NoDebugAttr::CreateImplicit(clangCtx));
+
+  clang::Expr *argExpr =
+      clang::CXXThisExpr::Create(clangCtx, clang::SourceLocation(),
+                                 method->getThisType(), /*IsImplicit=*/false);
+
+  if (auto calledMethod = dyn_cast<clang::CXXMethodDecl>(baseFn)) {
+    if (calledMethod->isStatic())
+      return nullptr;
+    auto memberExpr = clangSema.BuildMemberExpr(
+        argExpr, /*isArrow=*/true, loc, clang::NestedNameSpecifierLoc(),
+        clang::SourceLocation(),
+        const_cast<clang::CXXMethodDecl *>(calledMethod),
+        clang::DeclAccessPair::make(
+            const_cast<clang::CXXMethodDecl *>(calledMethod), clang::AS_public),
+        /*HadMultipleCandidates=*/false, calledMethod->getNameInfo(),
+        clangCtx.BoundMemberTy, clang::VK_PRValue, clang::OK_Ordinary);
+    auto memberCall =
+        clangSema.BuildCallExpr(nullptr, memberExpr, clang::SourceLocation(),
+                                {}, clang::SourceLocation());
+    ASSERT(memberCall.isUsable());
+    method->setBody(clang::CompoundStmt::Create(
+        clangCtx, {memberCall.get()}, clang::FPOptionsOverride(), loc, loc));
+  } else {
+    clang::Expr *fnExpr = clang::DeclRefExpr::Create(
+        clangCtx, clang::NestedNameSpecifierLoc(), clang::SourceLocation(),
+        const_cast<clang::FunctionDecl *>(baseFn),
+        /*RefersToEnclosingVariableOrCapture=*/false, loc, baseFn->getType(),
+        clang::VK_LValue);
+    auto call =
+        clangSema.BuildCallExpr(nullptr, fnExpr, clang::SourceLocation(),
+                                {argExpr}, clang::SourceLocation());
+    method->setBody(clang::CompoundStmt::Create(
+        clangCtx, {call.get()}, clang::FPOptionsOverride(), loc, loc));
+  }
+  return method;
+}
+
+/// Synthesize forwarding retain/release methods on the derived FRT \p decl that
+/// performs the derived-to-base adjustment on behalf of Swift. This function
+/// assumes both the derived and base types have reachable definitions.
+static std::pair<const clang::CXXMethodDecl *, const clang::CXXMethodDecl *>
+synthesizeInheritedRefCountOperations(ClassDecl *decl,
+                                      clang::CXXRecordDecl *clangDecl,
+                                      const clang::FunctionDecl *baseRetainFn,
+                                      const clang::FunctionDecl *baseReleaseFn,
+                                      ClangImporter::Implementation &Impl) {
+  auto &context = Impl.SwiftContext;
+  auto &clangCtx = Impl.getClangASTContext();
+
+  auto synthesizedRetain =
+      synthesizeForwardingRefCountMethod(clangDecl, baseRetainFn, Impl);
+  auto synthesizedRelease =
+      synthesizeForwardingRefCountMethod(clangDecl, baseReleaseFn, Impl);
+  if (!synthesizedRetain || !synthesizedRelease)
+    return {nullptr, nullptr};
+
+  // Add attributes to class.
+  clangDecl->addAttr(clang::SwiftAttrAttr::Create(
+      clangCtx,
+      context.AllocateCopy("retain:." + synthesizedRetain->getNameAsString())));
+  clangDecl->addAttr(clang::SwiftAttrAttr::Create(
+      clangCtx, context.AllocateCopy("release:." +
+                                     synthesizedRelease->getNameAsString())));
+
+  // Update the Swift type
+  auto importRefCountOp = [&](const clang::CXXMethodDecl *op) {
+    auto importedOp =
+        cast<ValueDecl>(context.getClangModuleLoader()->importDeclDirectly(op));
+    Impl.markMemberSynthesizedPerType(importedOp);
+    decl->addMember(importedOp);
+    decl->addMemberToLookupTable(importedOp);
+  };
+  importRefCountOp(synthesizedRetain);
+  importRefCountOp(synthesizedRelease);
+
+  return {synthesizedRetain, synthesizedRelease};
+}
+
+void importer::checkRetainReleaseFunctions(
+    ClassDecl *classDecl, ClangImporter::Implementation &Impl) {
+  auto *recordDecl = cast<clang::RecordDecl>(classDecl->getClangDecl());
+  auto *cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(recordDecl);
+  auto frtInfo =
+      evaluateOrDefault(Impl.SwiftContext.evaluator,
+                        ForeignReferenceTypeInfoRequest({recordDecl}), {});
+
+  // Where classDecl inherits its FRT annotations. When this is null, classDecl
+  // (i.e., recordDecl) is directly annotated itself (i.e., does not inherit).
+  auto *baseCxxRecordDecl =
+      dyn_cast_or_null<clang::CXXRecordDecl>(frtInfo.getDecl());
+
+  // Imported class of whatever was annotated.
+  // FIXME: should not be necessary to keep track of this, it is confusing.
+  const ClassDecl *annotatedClassDecl = classDecl;
+
+  if (cxxRecordDecl && baseCxxRecordDecl && baseCxxRecordDecl != cxxRecordDecl)
+    annotatedClassDecl = cast<ClassDecl>(
+        Impl.importDecl(baseCxxRecordDecl, Impl.CurrentVersion));
+  else
+    baseCxxRecordDecl = nullptr;
+
+  // Check that the record carrying the retain:/release: attributes has exactly
+  // one of each. Only diagnose when those attributes are on this type, to avoid
+  // repeating diagnostics once per derived type.
+  const clang::RecordDecl *annotatedDecl =
+      baseCxxRecordDecl ? baseCxxRecordDecl : recordDecl;
+
+  auto rrInfo = RetainReleaseInfo(annotatedDecl);
+  if (!rrInfo.checkShape(/*Impl=*/baseCxxRecordDecl ? nullptr : &Impl))
+    return;
+
+  if (!frtInfo.isValid())
+    // If this FRT is invalid for any other reason, do not resolve or synthesize
+    // retain/release operations and just bail.
+    return;
+
+  // Immortal FRTs have no custom reference counting, so there is nothing to
+  // resolve or synthesize.
+  if (frtInfo.isImmortal()) {
+    Impl.setForeignReferenceTypeOperations(recordDecl, /*retain=*/nullptr,
+                                           /*release=*/nullptr);
+    return;
+  }
+
+  auto isReachable = [&Impl](const clang::CXXRecordDecl *Decl) -> bool {
+    if (!Decl->getDefinition())
+      return false;
+    clang::Sema::SFINAETrap trap(Impl.getClangSema());
+    return Impl.getClangSema().hasReachableDefinition(
+        const_cast<clang::CXXRecordDecl *>(Decl));
+  };
+
+  // An FRT by inheritance must have a reachable definition; check that here.
+  // (A directly-annotated FRT may be forward-declared.)
+  if (baseCxxRecordDecl &&
+      (!isReachable(cxxRecordDecl) || !isReachable(baseCxxRecordDecl))) {
+    Impl.diagnose(HeaderLoc(recordDecl->getLocation()),
+                  diag::foreign_reference_type_unreachable,
+                  classDecl->getNameStr());
+    return;
+  }
+
+  // Resolve (and semantically diagnose) the retain/release operations.
+  ValueDecl *retainOp = resolveRefCountOperation(classDecl, annotatedClassDecl,
+                                                 rrInfo.getRetain(),
+                                                 /*isRetain=*/true, Impl);
+  ValueDecl *releaseOp = resolveRefCountOperation(classDecl, annotatedClassDecl,
+                                                  rrInfo.getRelease(),
+                                                  /*isRetain=*/false, Impl);
+
+  const clang::FunctionDecl *retainFn = nullptr;
+  const clang::FunctionDecl *releaseFn = nullptr;
+
+  // Look through a cloned (inherited) member to the original base method,
+  // without forcing any synthesis (getCalledBaseCxxMethod would call
+  // getBody()).
+  auto baseClangFn = [&](ValueDecl *op, bool *cloned = nullptr) {
+    if (auto *original = Impl.getOriginalForClonedMember(op)) {
+      op = original;
+      if (cloned)
+        *cloned = true;
+    } else {
+      if (cloned)
+        *cloned = false;
+    }
+    return dyn_cast_or_null<clang::FunctionDecl>(op->getClangDecl());
+  };
+
+  if (baseCxxRecordDecl && retainOp && releaseOp) {
+    // FRT annotation was inherited: always synthesize forwarding methods that
+    // call the base's operations, performing the derived-to-base adjustment.
+    std::tie(retainFn, releaseFn) = synthesizeInheritedRefCountOperations(
+        classDecl, const_cast<clang::CXXRecordDecl *>(cxxRecordDecl),
+        baseClangFn(retainOp), baseClangFn(releaseOp), Impl);
+  } else if (!baseCxxRecordDecl && retainOp && releaseOp) {
+    // FRT annotation appears directly on clangDecl/cxxDecl.
+    bool retainCloned = false, releaseCloned = false;
+    retainFn = baseClangFn(retainOp, &retainCloned);
+    releaseFn = baseClangFn(releaseOp, &releaseCloned);
+
+    // Even if cxxDecl was itself directly annotated, its retain/release may
+    // still be inherited from some (reachable) base. If so, synthesize
+    // forwarding retain/release methods as well.
+    if (cxxRecordDecl && (retainCloned || releaseCloned) &&
+        isReachable(cxxRecordDecl)) {
+      auto *cxxDeclMut = const_cast<clang::CXXRecordDecl *>(cxxRecordDecl);
+      if (retainCloned) {
+        if (auto *retainThunk =
+                synthesizeForwardingRefCountMethod(cxxDeclMut, retainFn, Impl))
+          retainFn = retainThunk;
+      }
+      if (releaseCloned) {
+        if (auto *releaseThunk =
+                synthesizeForwardingRefCountMethod(cxxDeclMut, releaseFn, Impl))
+          releaseFn = releaseThunk;
+      }
+    }
+  }
+  Impl.setForeignReferenceTypeOperations(recordDecl, retainFn, releaseFn);
 }
 
 //===----------------------------------------------------------------------===//

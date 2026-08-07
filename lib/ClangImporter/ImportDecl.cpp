@@ -180,10 +180,6 @@ void ClangImporter::Implementation::makeComputed(AbstractStorageDecl *storage,
   }
 }
 
-bool importer::hasAnyImmortalAttr(const clang::RecordDecl *decl) {
-  return hasSwiftAttribute(decl, {"retain:immortal", "release:immortal"});
-}
-
 importer::ReturnOwnershipInfo::ReturnOwnershipInfo(
     const clang::NamedDecl *decl) {
   if (!decl->hasAttrs())
@@ -2303,42 +2299,6 @@ namespace {
       }
     }
 
-    std::pair<CustomRefCountingOperationResult,
-              CustomRefCountingOperationResult>
-    addRefCountOperationsIfRequired(ClassDecl *nominal,
-                                    clang::RecordDecl *clangType) {
-      auto &context = Impl.SwiftContext;
-      auto nonInheritedRefCountingOperations = [&] {
-        auto retainResult = evaluateOrDefault(
-            context.evaluator,
-            CustomRefCountingOperation(
-                {nominal, CustomRefCountingOperationKind::retain}),
-            {});
-        auto releaseResult = evaluateOrDefault(
-            context.evaluator,
-            CustomRefCountingOperation(
-                {nominal, CustomRefCountingOperationKind::release}),
-            {});
-        return std::make_pair(retainResult, releaseResult);
-      };
-      auto clangDecl = dyn_cast<clang::CXXRecordDecl>(clangType);
-      if (!clangDecl)
-        return nonInheritedRefCountingOperations();
-
-      auto frtInfo = evaluateOrDefault(
-          context.evaluator, ForeignReferenceTypeInfoRequest({clangDecl}), {});
-      auto *baseClangDecl =
-          dyn_cast_or_null<clang::CXXRecordDecl>(frtInfo.getDecl());
-      if (!baseClangDecl || baseClangDecl == clangDecl)
-        return nonInheritedRefCountingOperations();
-
-      auto baseSwiftDecl = cast<ClassDecl>(
-          Impl.importDecl(baseClangDecl, getActiveSwiftVersion()));
-
-      return synthesizer.addRefCountOperations(nominal, clangDecl,
-                                               baseSwiftDecl, baseClangDecl);
-    }
-
     void addSuppressedProtocol(TypeDecl *D, KnownProtocolKind kind) const {
       auto inheritedTypes = D->getInherited();
       SmallVector<InheritedEntry> entries(inheritedTypes.getEntries());
@@ -2374,23 +2334,29 @@ namespace {
       if (decl->isInterface())
         return nullptr;
 
-      bool incompleteTypeAsReference = false;
-      if (auto def = decl->getDefinition()) {
-        // Continue with the definition of the type.
+      if (auto def = decl->getDefinition())
         decl = def;
-      } else if (recordHasReferenceSemantics(decl)) {
-        // Incomplete types are okay if the resulting type has reference
-        // semantics.
-        incompleteTypeAsReference = true;
-      } else {
-        Impl.addImportDiagnostic(
-            decl,
-            Diagnostic(diag::incomplete_record, Impl.SwiftContext.AllocateCopy(
-                                                    decl->getNameAsString())),
-            decl->getLocation());
 
-        forwardDeclaration = true;
-        return nullptr;
+      auto frtInfo =
+          evaluateOrDefault(Impl.SwiftContext.evaluator,
+                            ForeignReferenceTypeInfoRequest({decl}), {});
+
+      bool incompleteTypeAsReference = false;
+
+      if (!decl->getDefinition()) {
+        if (frtInfo.isReference()) {
+          // Incomplete types are okay if the resulting type has reference
+          // semantics.
+          incompleteTypeAsReference = true;
+        } else {
+          Impl.addImportDiagnostic(decl,
+                                   Diagnostic(diag::incomplete_record,
+                                              Impl.SwiftContext.AllocateCopy(
+                                                  decl->getNameAsString())),
+                                   decl->getLocation());
+          forwardDeclaration = true;
+          return nullptr;
+        }
       }
 
       // TODO(https://github.com/apple/swift/issues/56206): Fix this once we support dependent types.
@@ -2507,7 +2473,7 @@ namespace {
         return nullptr;
       }
 
-      if (recordHasReferenceSemantics(decl))
+      if (frtInfo.isReference())
         result = Impl.createDeclWithClangNode<ClassDecl>(
             decl, importer::convertClangAccess(decl->getAccess()), loc, name,
             loc, ArrayRef<InheritedEntry>{}, nullptr, dc, false);
@@ -2574,9 +2540,6 @@ namespace {
 
           // If this is an inherited foreign reference type, check if it has a
           // suitable superclass.
-          auto frtInfo = evaluateOrDefault(
-              Impl.SwiftContext.evaluator,
-              ForeignReferenceTypeInfoRequest({cxxRecordDecl}), {});
           if (auto primaryBase = frtInfo.getPrimarySuperclass()) {
             if (auto baseDecl = cast_or_null<ClassDecl>(
                     Impl.importDecl(primaryBase, getVersion()))) {
@@ -2990,11 +2953,7 @@ namespace {
       }
 
       if (auto classDecl = dyn_cast<ClassDecl>(result)) {
-        auto operations = addRefCountOperationsIfRequired(
-            classDecl, const_cast<clang::RecordDecl *>(decl));
-
-        validateForeignReferenceType(decl, classDecl, operations.first,
-                                     operations.second);
+        importer::checkRetainReleaseFunctions(classDecl, Impl);
 
         auto availability = Impl.SwiftContext.getSwift58Availability();
         if (!availability.isAlwaysAvailable()) {
@@ -3060,148 +3019,6 @@ namespace {
                             suggestion);
           }
         }
-      }
-    }
-
-    void validateForeignReferenceType(
-        const clang::RecordDecl *decl, ClassDecl *classDecl,
-        CustomRefCountingOperationResult retainOperation,
-        CustomRefCountingOperationResult releaseOperation) {
-
-      if (retainOperation.kind ==
-              CustomRefCountingOperationResult::unreachable ||
-          releaseOperation.kind ==
-              CustomRefCountingOperationResult::unreachable) {
-        Impl.diagnose(HeaderLoc(decl->getLocation()),
-                      diag::foreign_reference_type_unreachable,
-                      classDecl->getNameStr());
-        return;
-      }
-
-      HeaderLoc loc(decl->getLocation());
-
-      if (retainOperation.kind ==
-          CustomRefCountingOperationResult::noAttribute) {
-        Impl.diagnose(loc, diag::reference_type_must_have_retain_release_attr,
-                      false, decl->getNameAsString());
-      } else if (retainOperation.kind ==
-                 CustomRefCountingOperationResult::tooManyAttributes) {
-        Impl.diagnose(loc, diag::too_many_reference_type_retain_release_attr,
-                      false, decl->getNameAsString());
-      } else if (retainOperation.kind ==
-                 CustomRefCountingOperationResult::notFound) {
-        Impl.diagnose(loc,
-                      diag::foreign_reference_types_cannot_find_retain_release,
-                      false, retainOperation.name, decl->getNameAsString());
-        if (!Impl.SwiftContext.LangOpts
-                 .DisableExperimentalClangImporterDiagnostics) {
-          Impl.diagnoseTopLevelValue(
-              DeclName(Impl.SwiftContext.getIdentifier(retainOperation.name)));
-        }
-      } else if (retainOperation.kind ==
-                 CustomRefCountingOperationResult::tooManyFound) {
-        Impl.diagnose(loc,
-                      diag::too_many_reference_type_retain_release_operations,
-                      false, retainOperation.name, decl->getNameAsString());
-      } else if (retainOperation.kind ==
-                 CustomRefCountingOperationResult::foundOperation) {
-        RetainReleaseOperationKind operationKind =
-            importer::checkRetainReleaseOperationValidity(
-                classDecl, retainOperation.operation,
-                CustomRefCountingOperationKind::retain);
-        switch (operationKind) {
-        case RetainReleaseOperationKind::notAfunction:
-          Impl.diagnose(
-              loc,
-              diag::foreign_reference_types_retain_release_not_a_function_decl,
-              false, retainOperation.name);
-          break;
-        case RetainReleaseOperationKind::notAnInstanceFunction:
-          Impl.diagnose(
-              loc,
-              diag::foreign_reference_types_retain_release_not_an_instance_function,
-              false, retainOperation.name);
-          break;
-        case RetainReleaseOperationKind::invalidReturnType:
-          Impl.diagnose(
-              loc,
-              diag::foreign_reference_types_retain_non_void_or_self_return_type,
-              retainOperation.name);
-          break;
-        case RetainReleaseOperationKind::invalidParameters:
-          Impl.diagnose(loc,
-                        diag::foreign_reference_types_invalid_retain_release,
-                        false, retainOperation.name, classDecl->getNameStr());
-          break;
-        case RetainReleaseOperationKind::valid:
-          break;
-        }
-      } else {
-        // Nothing to do.
-        assert(retainOperation.kind ==
-               CustomRefCountingOperationResult::immortal);
-      }
-
-      if (releaseOperation.kind ==
-          CustomRefCountingOperationResult::noAttribute) {
-        Impl.diagnose(loc, diag::reference_type_must_have_retain_release_attr,
-                      true, decl->getNameAsString());
-      } else if (releaseOperation.kind ==
-                 CustomRefCountingOperationResult::tooManyAttributes) {
-        Impl.diagnose(loc, diag::too_many_reference_type_retain_release_attr,
-                      true, decl->getNameAsString());
-      } else if (releaseOperation.kind ==
-                 CustomRefCountingOperationResult::notFound) {
-        Impl.diagnose(loc,
-                      diag::foreign_reference_types_cannot_find_retain_release,
-                      true, releaseOperation.name, decl->getNameAsString());
-        if (!Impl.SwiftContext.LangOpts
-                 .DisableExperimentalClangImporterDiagnostics) {
-          Impl.diagnoseTopLevelValue(
-              DeclName(Impl.SwiftContext.getIdentifier(releaseOperation.name)));
-        }
-      } else if (releaseOperation.kind ==
-                 CustomRefCountingOperationResult::tooManyFound) {
-        Impl.diagnose(loc,
-                      diag::too_many_reference_type_retain_release_operations,
-                      true, releaseOperation.name, decl->getNameAsString());
-      } else if (releaseOperation.kind ==
-                 CustomRefCountingOperationResult::foundOperation) {
-        RetainReleaseOperationKind operationKind =
-            importer::checkRetainReleaseOperationValidity(
-                classDecl, releaseOperation.operation,
-                CustomRefCountingOperationKind::release);
-        switch (operationKind) {
-        case RetainReleaseOperationKind::notAfunction:
-          Impl.diagnose(
-              loc,
-              diag::foreign_reference_types_retain_release_not_a_function_decl,
-              true, releaseOperation.name);
-          break;
-        case RetainReleaseOperationKind::notAnInstanceFunction:
-          Impl.diagnose(
-              loc,
-              diag::foreign_reference_types_retain_release_not_an_instance_function,
-              true, releaseOperation.name);
-          break;
-        case RetainReleaseOperationKind::invalidReturnType:
-          Impl.diagnose(
-              loc,
-              diag::foreign_reference_types_release_non_void_return_type,
-              releaseOperation.name);
-          break;
-        case RetainReleaseOperationKind::invalidParameters:
-          Impl.diagnose(loc,
-                        diag::foreign_reference_types_invalid_retain_release,
-                        true, releaseOperation.name, classDecl->getNameStr());
-          break;
-        case RetainReleaseOperationKind::valid:
-          break;
-        }
-      } else {
-        // Nothing to do.
-        assert(releaseOperation.kind ==
-               CustomRefCountingOperationResult::immortal);
       }
     }
 
@@ -3834,8 +3651,14 @@ namespace {
       auto attrInfo = importer::ReturnOwnershipInfo(decl);
       HeaderLoc loc(decl->getLocation());
 
-      if (recordDecl && recordHasReferenceSemantics(recordDecl) &&
-          !hasAnyImmortalAttr(recordDecl)) {
+      // These diagnostics apply only to shared (non-immortal) reference types.
+      auto frtInfo =
+          recordDecl
+              ? evaluateOrDefault(Impl.SwiftContext.evaluator,
+                                  ForeignReferenceTypeInfoRequest({recordDecl}),
+                                  {})
+              : ForeignReferenceTypeInfo();
+      if (frtInfo.isReference() && !frtInfo.isImmortal()) {
         if (attrInfo.hasConflictingAttr()) {
           Impl.diagnose(loc, diag::both_returns_retained_returns_unretained,
                         decl);
