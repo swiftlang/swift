@@ -102,6 +102,11 @@ struct SubstitutionMapWithLocalArchetypes {
       if (origType->is<PrimaryArchetypeType>() ||
           origType->is<PackArchetypeType>()) {
         origType = origType->mapTypeOutOfEnvironment();
+      } else if (auto *metatype = origType->getAs<AnyMetatypeType>()) {
+        auto instanceType = metatype->getInstanceType();
+        if (instanceType->is<PrimaryArchetypeType>() ||
+            instanceType->is<PackArchetypeType>())
+          origType = origType->mapTypeOutOfEnvironment();
       }
 
       return SubsMap->lookupConformance(
