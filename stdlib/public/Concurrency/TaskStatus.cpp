@@ -714,10 +714,10 @@ swift_task_pushDeadlineImpl(OpaqueValue *clock,
   assert(task && "Currently, withDeadline must be used from an async context; We may relax this in the future");
 
   // Task-allocate one contiguous chunk holding the record header + the
-  // trailing clock and instant payloads. Both incoming values are
-  // borrowed (+0); COPY them in via value witnesses so the caller keeps
-  // ownership of the originals. Pop mirrors this with vw_destroy and
-  // swift_task_dealloc.
+  // trailing clock and instant payloads. Both incoming values arrive at +1
+  // (the Swift `Builtin.taskPushDeadline` takes them `consuming`), so we
+  // TAKE them into the record's tail storage - the record now owns them.
+  // Pop mirrors this with vw_destroy and swift_task_dealloc.
   size_t size = TaskDeadlineStatusRecord::recordSize(clockType, instantType);
   void *allocation = _swift_task_alloc_specific(task, size);
 
@@ -728,8 +728,8 @@ swift_task_pushDeadlineImpl(OpaqueValue *clock,
   // `HasDeadline` in O(1) without walking the chain.
   auto record = ::new (allocation) TaskDeadlineStatusRecord(
       clockType, instantType, /*isOutermostDeadline=*/false);
-  clockType->vw_initializeWithCopy(record->getClockStorage(), clock);
-  instantType->vw_initializeWithCopy(record->getInstantStorage(), instant);
+  clockType->vw_initializeWithTake(record->getClockStorage(), clock);
+  instantType->vw_initializeWithTake(record->getInstantStorage(), instant);
 
   SWIFT_TASK_DEBUG_LOG("[Deadline] Create deadline record:%p for task:%p "
                        "(clockType:%p, instantType:%p, size:%zu)",
