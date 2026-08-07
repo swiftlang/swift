@@ -69,6 +69,7 @@ class CMark(cmake_product.CMakeProduct):
         #     -DCMAKE_OSX_DEPLOYMENT_TARGET="${cmake_osx_deployment_target}"
         #     -DCMAKE_OSX_ARCHITECTURES="${architecture}"
         # )
+        self.cmake_options.define('CMAKE_INSTALL_PREFIX:PATH', self.args.install_prefix)
 
         self.build_with_cmake(["all"], self.args.cmark_build_variant, [])
 
