@@ -10,6 +10,13 @@
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 
+// RUN: %if embedded_dispatch_executor %{ %empty-directory(%t.embedded) %}
+// RUN: %if embedded_dispatch_executor %{ %target-swift-frontend -target %embedded-dispatch-target-triple -enable-experimental-feature Embedded -disable-availability-checking -parse-as-library -wmo %s -c -o %t.embedded/a.o %}
+// RUN: %if embedded_dispatch_executor %{ %target-clang -target %embedded-dispatch-target-triple %target-clang-resource-dir-opt %t.embedded/a.o -o %t.embedded/a.out %embedded-dispatch-concurrency-libraries %target-swift-dead-strip-opt %}
+// RUN: %if embedded_dispatch_executor %{ %target-run %t.embedded/a.out | %FileCheck %s -check-prefix EMBEDDED %}
+
+import _Concurrency
+
 let printCounters = false
 
 @available(SwiftStdlib 5.1, *)
@@ -71,7 +78,11 @@ func runTest(numCounters: Int, numWorkers: Int, numIterations: Int) async {
   for i in 0..<numWorkers {
     workers.append(
       Task.detached(priority: randomPriority) { [counters] in
+#if $Embedded
+        await Task.yield()
+#else
         try! await Task.sleep(nanoseconds: UInt64.random(in: 0..<100) * 1_000_000)
+#endif
         await worker(identity: i, counters: counters, numIterations: numIterations)
       }
     )
@@ -88,12 +99,19 @@ func runTest(numCounters: Int, numWorkers: Int, numIterations: Int) async {
 @available(SwiftStdlib 5.1, *)
 @main struct Main {
   static func main() async {
+#if $Embedded
+    let counters = 10
+    let workers = 100
+    let iterations = 1000
+#else
     // Useful for debugging: specify counter/worker/iteration counts
     let args = CommandLine.arguments
     let counters = args.count >= 2 ? Int(args[1])! : 10
     let workers = args.count >= 3 ? Int(args[2])! : 100
     let iterations = args.count >= 4 ? Int(args[3])! : 1000
+#endif
     print("counters: \(counters), workers: \(workers), iterations: \(iterations)")
     await runTest(numCounters: counters, numWorkers: workers, numIterations: iterations)
+    // EMBEDDED: DONE!
   }
 }

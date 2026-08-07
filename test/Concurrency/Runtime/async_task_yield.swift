@@ -9,6 +9,13 @@
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 
+// RUN: %if embedded_dispatch_executor %{ %empty-directory(%t.embedded) %}
+// RUN: %if embedded_dispatch_executor %{ %target-swift-frontend -target %embedded-dispatch-target-triple -enable-experimental-feature Embedded -disable-availability-checking -parse-as-library -wmo %s -c -o %t.embedded/a.o %}
+// RUN: %if embedded_dispatch_executor %{ %target-clang -target %embedded-dispatch-target-triple %target-clang-resource-dir-opt %t.embedded/a.o -o %t.embedded/a.out %embedded-dispatch-concurrency-libraries %target-swift-dead-strip-opt %}
+// RUN: %if embedded_dispatch_executor %{ %target-run %t.embedded/a.out %}
+
+import _Concurrency
+
 @available(SwiftStdlib 5.1, *)
 protocol Go: Actor {
   func go(times: Int) async -> Int
