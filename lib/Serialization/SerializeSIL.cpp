@@ -403,6 +403,14 @@ namespace {
     /// deserialization if the function body for F should be deserialized.
     bool shouldEmitFunctionBody(const SILFunction *F, bool isReference = true);
 
+    /// True if F's body references any function or global owned by a foreign
+    /// `-static` module. Such a body must not be serialized for cross-module
+    /// inlining: when a non-static client inlines it, the resulting code emits
+    /// a direct reference to the static module's symbol, which may not be
+    /// exported by whichever shared library the client links against.
+    /// See issue #88199.
+    bool bodyReferencesForeignStaticModule(const SILFunction &F);
+
     IdentifierID addSILFunctionRef(SILFunction *F);
 
   public:
@@ -449,7 +457,7 @@ void SILSerializer::addReferencedSILFunction(const SILFunction *F,
 
   // We haven't seen this function before. Let's see if we should
   // serialize the body or just the declaration.
-  if (shouldEmitFunctionBody(F)) {
+  if (shouldEmitFunctionBody(F) && !bodyReferencesForeignStaticModule(*F)) {
     FuncsToEmit[F] = false;
     functionWorklist.push_back(F);
     return;
@@ -533,7 +541,8 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
 
   // Check if we need to emit a body for this function.
   bool NoBody = DeclOnly || isAvailableExternally(Linkage) ||
-                F.isExternalDeclaration();
+                F.isExternalDeclaration() ||
+                bodyReferencesForeignStaticModule(F);
 
   // If we don't emit a function body then make sure to mark the declaration
   // as available externally.
@@ -3894,6 +3903,31 @@ bool SILSerializer::shouldEmitFunctionBody(const SILFunction *F,
   if (F->isAnySerialized() && !hasSharedVisibility(F->getLinkage()))
     return true;
 
+  return false;
+}
+
+bool SILSerializer::bodyReferencesForeignStaticModule(const SILFunction &F) {
+  ModuleDecl *currentModule = F.getModule().getSwiftModule();
+  auto isForeignStatic = [&](ModuleDecl *M) {
+    return M && M != currentModule && M->isStaticLibrary();
+  };
+  for (auto &BB : F) {
+    for (auto &I : BB) {
+      if (auto *FRI = dyn_cast<FunctionRefBaseInst>(&I)) {
+        if (auto *Fn = FRI->getReferencedFunctionOrNull())
+          if (isForeignStatic(Fn->getParentModule()))
+            return true;
+      } else if (auto *GAI = dyn_cast<GlobalAddrInst>(&I)) {
+        if (auto *G = GAI->getReferencedGlobal())
+          if (isForeignStatic(G->getParentModule()))
+            return true;
+      } else if (auto *GVI = dyn_cast<GlobalValueInst>(&I)) {
+        if (auto *G = GVI->getReferencedGlobal())
+          if (isForeignStatic(G->getParentModule()))
+            return true;
+      }
+    }
+  }
   return false;
 }
 
