@@ -162,6 +162,7 @@ CXX_PROTOCOL(UnsafeCxxMutableContiguousIterator)
 COM_PROTOCOL(IUnknown)
 COM_PROTOCOL(ISwiftObject)
 COM_PROTOCOL(COMInterface)
+COM_PROTOCOL(COMActivatable)
 
 PROTOCOL(AsyncSequence)
 PROTOCOL(AsyncIteratorProtocol)
