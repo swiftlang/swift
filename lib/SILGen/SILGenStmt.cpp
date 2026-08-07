@@ -335,7 +335,8 @@ void StmtEmitter::visitBraceStmt(BraceStmt *S) {
         // Other decls define entities that may be used by the program, such as
         // local function declarations. So handle them here, before checking for
         // reachability, and then continue looping.
-        SGF.visit(D);
+        if (!SGF.SGM.shouldSkipDecl(D))
+          SGF.visit(D);
         continue;
       }
     }

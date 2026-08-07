@@ -1493,6 +1493,76 @@ func twoGuardsInSameBlock(_ p: Int) {
         // expected-note@-1 {{add 'if #available' version check}}
 }
 
+func localDeclInGuardFallthrough() {
+        // expected-note@-1 3{{add '@available' attribute to enclosing global function}}
+  // The fallthrough of a guard extends to the end of the enclosing brace, so
+  // this local function is visible above the guard even though its body runs at
+  // macOS 51.
+  localFuncInFallthrough() // expected-error {{'localFuncInFallthrough()' is only available in macOS 51 or newer}}
+        // expected-note@-1 {{add 'if #available' version check}}
+
+  _ = LocalStructInFallthrough() // expected-error {{'LocalStructInFallthrough' is only available in macOS 51 or newer}}
+        // expected-note@-1 {{add 'if #available' version check}}
+
+  if #available(OSX 51, *) {
+    localFuncInFallthrough()
+    _ = LocalStructInFallthrough()
+  }
+
+  lessRestrictedAfterGuard() // expected-error {{'lessRestrictedAfterGuard()' is only available in macOS 51 or newer}}
+        // expected-note@-1 {{add 'if #available' version check}}
+
+  guard #available(OSX 51, *) else { return }
+
+  func localFuncInFallthrough() {
+    _ = globalFuncAvailableOn51()
+  }
+
+  struct LocalStructInFallthrough {
+    func m() { _ = globalFuncAvailableOn51() }
+  }
+
+  localFuncInFallthrough()
+  _ = LocalStructInFallthrough()
+
+  @available(OSX 50, *)
+  func lessRestrictedAfterGuard() { _ = globalFuncAvailableOn51() }
+  lessRestrictedAfterGuard()
+}
+
+func localDeclsWithExplicitAvailability() {
+        // expected-note@-1 {{add '@available' attribute to enclosing global function}}
+  if #available(OSX 51, *) {
+    @available(OSX 52, *)
+    func moreRestricted() { _ = globalFuncAvailableOn52() }
+
+    moreRestricted() // expected-error {{'moreRestricted()' is only available in macOS 52 or newer}}
+        // expected-note@-1 {{add 'if #available' version check}}
+
+    if #available(OSX 52, *) {
+      moreRestricted()
+    }
+
+    @available(OSX 50, *)
+    func lessRestricted() { _ = globalFuncAvailableOn51() }
+    lessRestricted()
+
+    @available(OSX, unavailable)
+    func unavailableOnMacOS() { }
+        // expected-note@-1 {{'unavailableOnMacOS()' has been explicitly marked unavailable here}}
+    unavailableOnMacOS() // expected-error {{'unavailableOnMacOS()' is unavailable in macOS}}
+
+    @available(*, unavailable)
+    func neverAvailable() { }
+        // expected-note@-1 {{'neverAvailable()' has been explicitly marked unavailable here}}
+    neverAvailable() // expected-error {{'neverAvailable()' is unavailable}}
+
+    @available(OSX, deprecated: 51)
+    func deprecatedOnMacOS() { }
+    deprecatedOnMacOS() // expected-warning {{'deprecatedOnMacOS()' was deprecated in macOS 51}}
+  }
+}
+
 // Refining while loops
 
 while globalFuncAvailableOn51() > 10 { } // expected-error {{'globalFuncAvailableOn51()' is only available in macOS 51 or newer}}

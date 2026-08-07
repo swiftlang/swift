@@ -4458,6 +4458,26 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Synthesizes the implicit `@available` attributes that are implied by the
+/// availability scopes that contain a declaration in a local context, attaching
+/// them to the declaration as a side effect.
+class SynthesizeLocalAvailableAttrsRequest
+    : public SimpleRequest<SynthesizeLocalAvailableAttrsRequest,
+                           evaluator::SideEffect(Decl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  evaluator::SideEffect evaluate(Evaluator &evaluator, Decl *decl) const;
+
+public:
+  bool isCached() const { return true; }
+  static bool appliesTo(const Decl *decl);
+};
+
 class ClosureEffectsRequest
     : public SimpleRequest<ClosureEffectsRequest,
                            FunctionType::ExtInfo(ClosureExpr *),

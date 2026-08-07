@@ -209,7 +209,8 @@ private:
 
   AvailabilityScope *findMostRefinedSubContextImpl(
       SourceLoc Loc, ASTContext &Ctx,
-      llvm::SmallVectorImpl<AvailabilityScope *> *ScopeStack);
+      llvm::SmallVectorImpl<AvailabilityScope *> *ScopeStack,
+      ASTNode stopAtASTNode);
 
   AvailabilityScope(ASTContext &Ctx, IntroNode Node, AvailabilityScope *Parent,
                     SourceRange SrcRange, const AvailabilityContext Info);
@@ -296,6 +297,14 @@ public:
   /// Returns the reason this scope was introduced.
   Reason getReason() const;
 
+  /// Returns the AST node that introduced this scope, or a null `ASTNode` if
+  /// the node cannot be represented as one.
+  ASTNode getASTNode() const;
+
+  /// Returns true if this scope was introduced by a statement, as opposed to a
+  /// declaration or the root of a source file.
+  bool isIntroducedByStmt() const;
+
   /// Returns the AST node that introduced this availability scope. Note that
   /// this node may be different than the refined range. For example, an
   /// availability scope covering an IfStmt Then branch will have the
@@ -340,8 +349,13 @@ public:
   void addChild(AvailabilityScope *Child, ASTContext &Ctx);
 
   /// Returns the innermost AvailabilityScope descendant of this scope
-  /// for the given source location.
-  AvailabilityScope *findMostRefinedSubContext(SourceLoc Loc, ASTContext &Ctx);
+  /// for the given source location. If \p stopAtASTNode is non-null, scopes
+  /// that were introduced by that node are not descended into (or expanded), so
+  /// the result describes the availability of the position \p stopAtASTNode
+  /// appears in rather than the availability that it introduces.
+  AvailabilityScope *
+  findMostRefinedSubContext(SourceLoc Loc, ASTContext &Ctx,
+                            ASTNode stopAtASTNode = ASTNode());
 
   /// Like `findMostRefinedSubContext()`, but also populates \p ScopeStack with
   /// the chain of scopes that contain \p Loc, ordered outermost first and
@@ -349,7 +363,8 @@ public:
   /// enclosing scopes of the result.
   AvailabilityScope *findMostRefinedSubContext(
       SourceLoc Loc, ASTContext &Ctx,
-      llvm::SmallVectorImpl<AvailabilityScope *> &ScopeStack);
+      llvm::SmallVectorImpl<AvailabilityScope *> &ScopeStack,
+      ASTNode stopAtASTNode = ASTNode());
 
   bool getNeedsExpansion() const { return LazyInfo.needsExpansion; }
 
