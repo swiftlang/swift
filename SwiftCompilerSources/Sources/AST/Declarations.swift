@@ -88,6 +88,19 @@ public class GenericTypeDecl: TypeDecl, GenericContext {
 public class NominalTypeDecl: GenericTypeDecl {
   final public var isGlobalActor: Bool { bridged.NominalType_isGlobalActor() }
 
+  /// True if this type should have a non-unique definition under the Embedded
+  /// Swift linkage model — i.e. its type metadata may be emitted redundantly
+  /// (as a `linkonce_odr`/`shared` copy) in every module that references it,
+  /// rather than there being a single unique definition. When true, an
+  /// identity-sensitive use across a module boundary (a class `as?`/`as!`
+  /// downcast, which compares metadata pointers) is unsound because the
+  /// allocating module and the casting module may see different metadata
+  /// records. Marking the type `@export(interface)` makes the definition
+  /// unique and flips this to false. Always false outside Embedded Swift.
+  final public var hasNonUniqueDefinition: Bool {
+    bridged.NominalType_hasNonUniqueDefinition()
+  }
+
   final public var valueTypeDestructor: DestructorDecl? {
     bridged.NominalType_getValueTypeDestructor().getAs(DestructorDecl.self)
   }
