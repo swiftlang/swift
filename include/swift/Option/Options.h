@@ -39,6 +39,7 @@ namespace options {
     ModuleInterfaceOptionIgnorable = (1 << 18),
     ArgumentIsFileList = (1 << 19),
     CacheInvariant = (1 << 20),
+    ArgumentIsEqualKeyedPath = (1 << 21)
   };
 
   enum ID {
