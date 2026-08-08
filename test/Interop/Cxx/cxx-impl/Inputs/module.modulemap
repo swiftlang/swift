@@ -1,0 +1,4 @@
+module Functions {
+  header "functions.h"
+  requires cplusplus
+}
