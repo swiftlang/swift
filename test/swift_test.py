@@ -79,6 +79,9 @@ class SwiftTest(lit.formats.ShTest, object):
             and not ("swift-dev-utils.test" in test.path_in_suite)
             # TODO: remove once the number of XFAILs under opaque values is close to zero.
             and not ("swift_test_mode_optimize_none_with_opaque_values" in test.config.available_features)
+            # ASTGen mode has a large, known, and entirely deterministic set of
+            # failures; retrying each one five times only slows the sweep down.
+            and "parser_astgen" not in test.config.available_features
         ):
             test.swift_max_attempts = MAX_ATTEMPTS
 
@@ -100,7 +103,28 @@ class SwiftTest(lit.formats.ShTest, object):
             self.skipped_tests.remove(test.getSourcePath())
         return result
 
+    def unsupported_under_parser_astgen(self, test):
+        """Why this test cannot exercise ASTGen, or None if it can.
+
+        Under `lit --param swift_parser_astgen` the frontend is asked to parse
+        with ASTGen, but shouldParseViaASTGen() (lib/Parse/ParseRequests.cpp)
+        refuses some files and falls back to the C++ parser silently. Reporting
+        those as unsupported keeps them from being counted as ASTGen coverage
+        they do not provide.
+        """
+        if 'parser_astgen' not in test.config.available_features:
+            return None
+
+        if test.getSourcePath().endswith('.sil'):
+            return 'SIL files are always parsed by the C++ parser'
+
+        return None
+
     def execute(self, test, litConfig):
+        reason = self.unsupported_under_parser_astgen(test)
+        if reason is not None:
+            return lit.Test.Result(lit.Test.UNSUPPORTED, reason)
+
         self.before_test(test, litConfig)
         result = self.execute_with_retries(test, litConfig)
         return self.after_test(test, litConfig, result)

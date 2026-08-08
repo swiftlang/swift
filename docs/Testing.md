@@ -132,6 +132,18 @@ out with ``lit.py -h``. We document some of the more useful ones below:
   build system targets and modify it rather than constructing it yourself.
 * ``--param use_os_stdlib`` will run all tests with the standard libraries
   coming from the OS.
+* ``--param swift_parser_astgen`` passes
+  ``-enable-experimental-feature ParserASTGen`` to every ``swift-frontend``
+  invocation, so that the suite runs against the swift-syntax-based parser
+  (ASTGen) rather than the C++ parser. It requires a compiler built with
+  swift-syntax and assertions. Only substitutions derived from
+  ``%target-swift-frontend`` are affected; tests that build through the driver,
+  and the ``swift-ide-test``/``sourcekitd-test``/``swift-refactor`` tools, still
+  parse with C++. Tests that ``shouldParseViaASTGen()``
+  (``lib/Parse/ParseRequests.cpp``) would refuse anyway are reported as
+  unsupported rather than silently falling back; a test can opt out explicitly
+  with ``UNSUPPORTED: parser_astgen``. Failures in this mode are not retried,
+  since they are deterministic.
 
 ##### Remote testing options
 
@@ -547,6 +559,12 @@ FIXME: full list.
 
 * ``XFAIL: linux``: tests that need to be adapted for Linux, for example parts
   that depend on Objective-C interop need to be split out.
+
+* ``parser_astgen``: present only when the suite is run with
+  ``--param swift_parser_astgen``. Use ``UNSUPPORTED: parser_astgen`` for a test
+  that cannot say anything about ASTGen in that mode -- most often because the
+  test compares the two parsers against each other, or because it drives the
+  frontend into a configuration ``shouldParseViaASTGen()`` refuses.
 
 #### Features ``REQUIRES: swift_feature_...``
 
