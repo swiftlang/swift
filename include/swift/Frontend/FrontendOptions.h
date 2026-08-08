@@ -543,10 +543,14 @@ public:
   /// loaded before it is run.
   static bool doesActionRequireSwiftStandardLibrary(ActionType);
 
+  /// \return true if the given action runs full semantic analysis over the
+  /// whole module, providing a fully type-checked main module.
+  static bool doesActionTypeCheckWholeModule(ActionType);
+
   /// \return true if the given action requires input files to be provided.
   static bool doesActionRequireInputs(ActionType action);
 
-  /// \return true if the given action requires input files to be provided.
+  /// \return true if the given action performs end of pipeline actions.
   static bool doesActionPerformEndOfPipelineActions(ActionType action);
 
   /// \return true if the given action supports caching.
