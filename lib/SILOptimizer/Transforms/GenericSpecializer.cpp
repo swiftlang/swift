@@ -19,6 +19,7 @@
 
 #include "swift/AST/AvailabilityInference.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/Feature.h"
 #include "swift/SIL/OptimizationRemark.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
@@ -27,6 +28,7 @@
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/ConstantFolding.h"
 #include "swift/SILOptimizer/Utils/Devirtualize.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/Generics.h"
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
 #include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
@@ -195,6 +197,50 @@ bool swift::specializeAppliesInFunction(SILFunction &F,
 namespace {
 
 /// The generic specializer, used in the optimization pipeline.
+/// Fold a `keypath`'s substitution map into its pattern, so that the pattern
+/// names concrete accessor thunks instead of generic ones.
+///
+/// This is the same transformation the mandatory pipeline applies for Embedded
+/// Swift, run here for a different reason: with `StaticKeyPaths` enabled, a
+/// fully concrete pattern is what lets IRGen describe the key path as data
+/// instead of calling `swift_getKeyPath`. Inside a specialized clone the
+/// instruction's substitutions are already concrete while the pattern is still
+/// generic, which is exactly the shape this fixes.
+///
+/// Only worth doing when the result would actually become static -- otherwise
+/// it just clones accessor thunks nothing benefits from.
+static bool specializeKeyPathsInFunction(SILFunction &F,
+                                         SILTransform *transform) {
+  if (!F.getModule().getASTContext().LangOpts.hasFeature(
+          Feature::StaticKeyPaths))
+    return false;
+  // Embedded already does this in the mandatory pipeline.
+  if (F.getModule().getOptions().EmbeddedSwift)
+    return false;
+
+  bool changed = false;
+  for (auto &BB : F) {
+    for (auto ii = BB.begin(), ie = BB.end(); ii != ie;) {
+      auto *kpi = dyn_cast<KeyPathInst>(&*ii);
+      ++ii;
+      if (!kpi)
+        continue;
+      // A capturing key path can't be static yet, and specializing its pattern
+      // would be pure cost.
+      if (kpi->needsRuntimeInstantiation())
+        continue;
+      // The shape has to be one IRGen can describe *after* folding; asking
+      // the plain query here would reject exactly the generic-accessor case
+      // this pass exists to fix.
+      if (!kpi->getStaticInstanceClassTypeAfterSpecialization())
+        continue;
+      if (specializeKeyPathInst(kpi, transform))
+        changed = true;
+    }
+  }
+  return changed;
+}
+
 class GenericSpecializer : public SILFunctionTransform {
 
   /// The entry point to the transformation.
@@ -203,6 +249,10 @@ class GenericSpecializer : public SILFunctionTransform {
 
     LLVM_DEBUG(llvm::dbgs() << "***** GenericSpecializer on function:"
                             << F.getName() << " *****\n");
+
+    bool specializedKeyPaths = specializeKeyPathsInFunction(F, this);
+    if (specializedKeyPaths)
+      invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
 
     if (specializeAppliesInFunction(F, this, /*isMandatory*/ false)) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);

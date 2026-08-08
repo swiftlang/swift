@@ -1265,12 +1265,36 @@ public:
   emitStaticKeyPathInstance(KeyPathInst *KPI,
                             SmallVectorImpl<uint32_t> *argDataOffsets = nullptr);
   /// True if `KPI` can be described at compile time in the current
-  /// compilation, rather than instantiated by `swift_getKeyPath`.  Currently
-  /// limited to Embedded Swift; `KeyPathInst::getStaticInstanceClassType` is
-  /// the single policy point for which patterns qualify.  Note that qualifying
-  /// does not imply the result is an immortal constant: see
-  /// `emitStaticKeyPathInstance` for capturing key paths.
+  /// compilation, rather than instantiated by `swift_getKeyPath`.  Always
+  /// available in Embedded Swift; elsewhere it requires the experimental
+  /// `StaticKeyPaths` feature and a layout that is fully known statically.
+  /// `KeyPathInst::getStaticInstanceClassType` is the single policy point for
+  /// which pattern *shapes* qualify.  Note that qualifying does not imply the
+  /// result is an immortal constant: see `emitStaticKeyPathInstance` for
+  /// capturing key paths, and `keyPathInstanceNeedsLazyMetadata` for objects
+  /// whose isa is filled in on first use.
   bool canEmitStaticKeyPathInstance(KeyPathInst *KPI);
+
+  /// True if the object `emitStaticKeyPathInstance` produces for `KPI` has a
+  /// null isa that must be initialized before the object is first used.
+  bool keyPathInstanceNeedsLazyMetadata(KeyPathInst *KPI);
+
+  /// A `swift_once`-guarded initializer that completes a statically emitted
+  /// key path object whose intermediate type metadata could not be named as a
+  /// constant.  Empty when the object needs no such fix-up.
+  struct StaticKeyPathLazyInit {
+    /// Address of the `swift_once_t` guarding `InitFn`.
+    llvm::Constant *Token = nullptr;
+    /// Fills in the object's lazy slots.  Also completes the object header
+    /// when the isa is lazy, so the caller needs only this one call.
+    llvm::Function *InitFn = nullptr;
+
+    explicit operator bool() const { return InitFn != nullptr; }
+  };
+
+  /// The lazy initializer for `KPI`'s statically emitted object, if it needs
+  /// one.  Only meaningful after `emitStaticKeyPathInstance`.
+  StaticKeyPathLazyInit getStaticKeyPathLazyInit(KeyPathInst *KPI);
   llvm::Constant *getAddrOfOpaqueTypeDescriptor(OpaqueTypeDecl *opaqueType,
                                                 ConstantInit forDefinition);
   llvm::Constant *
@@ -1470,6 +1494,8 @@ private:
   /// Keyed by the (uniqued) `KeyPathPattern *` so multiple `keypath_inst`s
   /// referring to the same pattern share one immortal global.
   llvm::DenseMap<KeyPathPattern*, llvm::Constant*> StaticKeyPathInstances;
+  llvm::DenseMap<KeyPathPattern *, StaticKeyPathLazyInit>
+      StaticKeyPathLazyInits;
 
   /// Uniquing key for a fixed type layout record.
   struct FixedLayoutKey {
