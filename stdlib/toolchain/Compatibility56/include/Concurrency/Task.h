@@ -220,7 +220,7 @@ public:
 
   /// Private storage for the use of the runtime.
   struct alignas(2 * alignof(void*)) OpaquePrivateStorage {
-    void *Storage[14];
+    void *Storage[16];
 
     /// Initialize this storage during the creation of a task.
     void initialize(AsyncTask *task);
@@ -600,7 +600,7 @@ private:
   }
 };
 
-enum { NumWords_AsyncTask = 24 };
+enum { NumWords_AsyncTask = 26 };
 
 // The compiler will eventually assume these.
 static_assert(sizeof(AsyncTask) == NumWords_AsyncTask * sizeof(void*),

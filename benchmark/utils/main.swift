@@ -218,6 +218,7 @@ import Suffix
 import SuperChars
 import TaskGroups
 import TaskLocalGet
+import TaskRegistryStress
 import ToddCoxeter
 import TwoSum
 import TypeFlood
@@ -437,6 +438,7 @@ register(Suffix.benchmarks)
 register(SuperChars.benchmarks)
 register(TaskGroups.benchmarks)
 register(TaskLocalGet.benchmarks)
+register(TaskRegistryStress.benchmarks)
 register(ToddCoxeter.benchmarks)
 register(TwoSum.benchmarks)
 register(TypeFlood.benchmarks)

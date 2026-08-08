@@ -64,6 +64,11 @@ using optional_uint8 = std::optional<uint8_t>;
 // Concurrency library can call.
 SWIFT_RUNTIME_STDLIB_SPI bool concurrencyEnableCooperativeQueues();
 
+// Wrapper around SWIFT_DEBUG_ENABLE_TASK_REGISTRY that the
+// Concurrency library can call.
+SWIFT_RUNTIME_STDLIB_SPI bool concurrencyEnableTaskRegistry();
+
+
 // Wrapper around SWIFT_DEBUG_VALIDATE_UNCHECKED_CONTINUATIONS that the
 // Concurrency library can call.
 SWIFT_RUNTIME_STDLIB_SPI bool concurrencyValidateUncheckedContinuations();
