@@ -51,6 +51,7 @@ add_library(swift_Concurrency
   Clock.swift
   ContinuousClock.swift
   CooperativeExecutor.swift
+  Deadline.swift
   Deque/_DequeBuffer.swift
   Deque/_DequeBufferHeader.swift
   Deque/_DequeSlot.swift
