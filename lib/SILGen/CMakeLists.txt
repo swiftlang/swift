@@ -40,6 +40,7 @@ add_swift_host_library(swiftSILGen STATIC
   SILGenTopLevel.cpp
   SILGenType.cpp)
 target_link_libraries(swiftSILGen PRIVATE
+  swiftFrontend
   swiftSerialization
   swiftSIL)
 
