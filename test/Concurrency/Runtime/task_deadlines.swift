@@ -45,6 +45,14 @@ final class InstantBox: @unchecked Sendable {
   }
 }
 
+// A class wrapping an `Atomic<Int>` so an escaping `onCancel` closure can
+// capture a copyable class reference instead of the non-copyable atomic by
+// value. Capturing the `Atomic<Int>` directly crashes the SIL ownership
+// verifier on the -enable-sil-opaque-values path
+final class CounterBox: @unchecked Sendable {
+  let value = Atomic<Int>(0)
+}
+
 @available(StdlibDeploymentTarget 6.5, *)
 struct ClassInstantClock: Clock, Identifiable {
   typealias Duration = Swift.Duration
@@ -497,7 +505,11 @@ struct ClassInstantClock: Clock, Identifiable {
     }
     
     tests.test("outer cancellation handler is unaffected by nested deadline scopes cancelling locally") {
-      let handlerCount = Atomic<Int>(0)
+      // The counter is wrapped in a class so the escaping `onCancel` closure
+      // captures a copyable class reference rather than the non-copyable
+      // `Atomic<Int>` by value, which trips the SIL ownership verifier on the
+      // -enable-sil-opaque-values path
+      let handlerCount = CounterBox()
       do {
         try await withTaskCancellationHandler {
           try await withDeadline(in: .seconds(-60)) {
@@ -507,19 +519,19 @@ struct ClassInstantClock: Clock, Identifiable {
             expectTrue(Task.isCancelled)
           }
         } onCancel: {
-          handlerCount.wrappingAdd(1, ordering: .relaxed)
+          handlerCount.value.wrappingAdd(1, ordering: .relaxed)
         }
       } catch {
         expectUnreachableCatch(error)
       }
-      expectEqual(0, handlerCount.load(ordering: .relaxed))
+      expectEqual(0, handlerCount.value.load(ordering: .relaxed))
     }
 
     final class ContinuationBox: @unchecked Sendable {
       var continuation: CheckedContinuation<Void, Never>?
     }
     tests.test("cancellation handler inside a scope fires only once even if the scope and the whole task both cancel") {
-      let handlerCount = Atomic<Int>(0)
+      let handlerCount = CounterBox()
       let box = ContinuationBox()
       let task = Task {
         _ = try? await withDeadline(in: .milliseconds(50)) {
@@ -528,7 +540,7 @@ struct ClassInstantClock: Clock, Identifiable {
               box.continuation = continuation
             }
           } onCancel: {
-            handlerCount.wrappingAdd(1, ordering: .relaxed)
+            handlerCount.value.wrappingAdd(1, ordering: .relaxed)
           }
         }
       }
@@ -543,7 +555,7 @@ struct ClassInstantClock: Clock, Identifiable {
       try? await Task.sleep(for: .milliseconds(50))
       box.continuation?.resume()
       _ = await task.value
-      expectEqual(1, handlerCount.load(ordering: .relaxed))
+      expectEqual(1, handlerCount.value.load(ordering: .relaxed))
     }
 
     // Two-clock composition: an outer deadline on ContinuousClock and an inner
