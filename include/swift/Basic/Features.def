@@ -652,6 +652,9 @@ EXPERIMENTAL_FEATURE(CalledAttribute, false)
 /// Allow `self` to be mutated or consumed inside of non-`Copyable` type `deinit`s.
 EXPERIMENTAL_FEATURE(MutateAndConsumeInDeinit, true)
 
+/// Allow the '@remoteCall(blocking)' attribute on distributed decls.
+EXPERIMENTAL_FEATURE(DistributedRemoteBlockingCalls, false)
+
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE

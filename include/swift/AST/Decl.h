@@ -3160,6 +3160,9 @@ public:
   /// can be distributed.
   bool isDistributed() const;
 
+  /// Returns the '@remoteCall' attribute of this declaration,
+  /// or 'nullptr' if it does not have one.
+  const RemoteCallAttr *getDistributedRemoteCallAttr() const;
   /// Is this a '_distributed_get' accessor?
   ///
   /// These are special accessors used by distributed thunks, implementing

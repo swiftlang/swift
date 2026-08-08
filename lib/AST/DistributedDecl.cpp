@@ -1481,6 +1481,10 @@ bool ValueDecl::isDistributed() const {
   return getAttrs().hasAttribute<DistributedActorAttr>();
 }
 
+const RemoteCallAttr *ValueDecl::getDistributedRemoteCallAttr() const {
+  return getAttrs().getAttribute<RemoteCallAttr>();
+}
+
 bool ValueDecl::isDistributedGetAccessor() const {
   if (auto accessor = dyn_cast<AccessorDecl>(this)) {
     if (accessor->getAccessorKind() == AccessorKind::DistributedGet) {
