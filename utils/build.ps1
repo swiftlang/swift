@@ -1583,12 +1583,25 @@ function Get-Dependencies {
         Invoke-Program (Get-DotNet) "$($WiX.Path)\wix.dll" -- burn extract -acceptEula $WiX.EulaIdentifier $BinaryCache\$InstallerExeName -out $BinaryCache\toolchains\ -outba $BinaryCache\toolchains\
       }
       New-Item -ItemType Directory -Path $destination -Force | Out-Null
-      subst X: "$BinaryCache\toolchains\$ToolchainName"
-      Get-ChildItem "$BinaryCache\toolchains\WixAttachedContainer" -Filter "*.msi" | ForEach-Object {
-        $LogFile = [System.IO.Path]::ChangeExtension($_.Name, "log")
-        Invoke-Program -OutNull msiexec.exe /lvx! $BinaryCache\toolchains\$LogFile /qn /a $BinaryCache\toolchains\WixAttachedContainer\$($_.Name) ALLUSERS=0 TARGETDIR=X:\
+      $RuntimePath = "LocalApp\Programs\Swift\Runtimes\$PinnedVersion\usr\bin"
+      $RuntimeDestination = Join-Path -Path $destination -ChildPath $RuntimePath
+      $RuntimeTarget = [IO.Path]::Combine("X:\", $RuntimePath)
+      New-Item -ItemType Directory -Path $RuntimeDestination -Force | Out-Null
+      $DriveMapped = $false
+      try {
+        Invoke-Program -OutNull subst.exe X: "$destination"
+        $DriveMapped = $true
+        Get-ChildItem "$BinaryCache\toolchains\WixAttachedContainer" -Filter "*.msi" | ForEach-Object {
+          $LogFile = [System.IO.Path]::ChangeExtension($_.Name, "log")
+          # Administrative installs do not run rtl.msi's SetDirectory actions.
+          $TargetDirectory = if ($_.Name -eq "rtl.msi") { $RuntimeTarget } else { "X:\" }
+          Invoke-Program -OutNull msiexec.exe /lvx! $BinaryCache\toolchains\$LogFile /qn /a $BinaryCache\toolchains\WixAttachedContainer\$($_.Name) ALLUSERS=0 TARGETDIR=$TargetDirectory
+        }
+      } finally {
+        if ($DriveMapped) {
+          subst.exe /d X: | Out-Null
+        }
       }
-      subst /d X:
     }
 
     if ($IncludeSBoM) {
