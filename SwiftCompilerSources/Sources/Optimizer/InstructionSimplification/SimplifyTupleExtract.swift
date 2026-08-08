@@ -24,3 +24,14 @@ extension TupleExtractInst : OnoneSimplifiable {
                                                with: tupleInst.operands[fieldIndex].value)
   }
 }
+
+extension TupleExtractInst : DebugReconstructionBlockSimplifiable {
+  /// Folds `tuple_extract undef` to `undef`, and fold `tuple_extract(tuple(x)) -> x`
+  func simplifyForDebugReconstructionBlock(_ context: SimplifyContext) {
+    if tuple is Undef {
+      replaceWithUndef(context)
+    } else {
+      simplify(context)
+    }
+  }
+}

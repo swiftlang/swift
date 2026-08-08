@@ -360,6 +360,11 @@ public class SingleValueInstruction : Instruction, Value {
     uses.replaceAll(with: replacement, context)
     context.erase(instruction: self)
   }
+  
+  /// Replaces this instruction with an undef and erases the instruction.
+  public final func replaceWithUndef(_ context: some MutatingContext) {
+    replace(with: Undef.get(type: type, context), context)
+  }
 }
 
 public final class MultipleValueInstructionResult : Value, Hashable {
@@ -727,10 +732,38 @@ final public class DebugValueInst : Instruction, DebugVariableInstruction, MetaI
     bridged.DebugValue_getOrCreateDebugReconstructionBlock().block
   }
 
+  /// Destroys the debug reconstruction block, leaving the operand to describe the
+  /// variable directly. Only valid when the block does nothing but return its only
+  /// argument, as the block's return type is what carries the variable type.
+  public func clearDebugReconstructionBlock(_ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.DebugValue_clearDebugReconstructionBlock()
+    context.notifyInstructionChanged(self)
+  }
+
   public func stripDeref(index: Int) { bridged.DebugValue_stripDeref(index) }
   public func prependDeref(index: Int) { bridged.DebugValue_prependDeref(index) }
-  public func killOperand(index: Int, withType type: Type? = nil) {
+  public func killOperand(index: Int, withType type: Type? = nil,
+                          _ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
     bridged.DebugValue_killOperand(index, type?.bridged ?? BridgedType())
+    context.notifyInstructionChanged(self)
+  }
+
+  /// Removes the operand at `index` along with its matching reconstruction block
+  /// argument, shifting the following operands. The operand must be dead.
+  public func eraseOperand(index: Int, _ context: some MutatingContext) {
+    guard let debugBB = debugReconstructionBlock else {
+      fatalError("cannot erase an operand without a debug reconstruction block")
+    }
+    context.notifyInstructionsChanged()
+    debugBB.eraseArgument(at: index, context)
+    // Shift each operand left, then erase the last operand.
+    for shifted in (index + 1)..<operands.count {
+      setOperand(at: shifted - 1, to: operands[shifted].value, context)
+    }
+    bridged.DebugValue_eraseLastOperand()
+    context.notifyInstructionChanged(self)
   }
 }
 

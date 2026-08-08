@@ -1807,6 +1807,21 @@ public:
     return sharedUInt32().InstructionBaseWithTrailingOperands.numOperands;
   }
 
+protected:
+  /// Removes the last operand, shrinking the tail allocated operand list.
+  /// The other, previous, operands, remain fully valid.
+  /// If there are any OtherTrailingTypes, they need to be moved separately by
+  /// the callee.
+  void eraseLastOperandInPlace() {
+    auto operands = getAllOperands();
+    ASSERT(!operands.empty() && "no operand to erase");
+
+    operands.back().~Operand();
+    sharedUInt32().InstructionBaseWithTrailingOperands.numOperands =
+        operands.size() - 1;
+  }
+
+public:
   ArrayRef<Operand> getAllOperands() const {
     return this->template getTrailingObjectsNonStrict<Operand>(
         sharedUInt32().InstructionBaseWithTrailingOperands.numOperands);
@@ -5773,10 +5788,12 @@ class DebugValueInst final
   SIL_DEBUG_VAR_SUPPLEMENT_TRAILING_OBJS_IMPL()
 
 public:
-  // FIXME: These following 2 functions are temporary, while debug_value
-  // transitions to being a multi-operand instruction.
-  SILValue getOperand() const { return getAllOperands()[0].get(); }
-  void setOperand(SILValue V) { getAllOperands()[0].set(V); }
+  /// Removes the last operand, shrinking the tail allocated operand list.
+  /// Only the last operand can be removed, to avoid invalidating other
+  /// existing Operand pointers. Pointers to this last operand are invalidated.
+  /// This does not touch the debug reconstruction block: the caller has to erase
+  /// the matching block argument to keep the two in sync.
+  void eraseLastOperand();
 
   /// Returns the single operand, asserting that there is exactly one.
   /// Should only be used in contexts where it is known that there is no
@@ -5931,13 +5948,12 @@ public:
     return ReconstructionBlock;
   }
 
-  /// Sets the debug-only basic block for this instruction.
+  /// Sets the debug-only basic block for this instruction. If one is already
+  /// attached, it is freed.
   /// This should not be called by optimization passes. Optimization passes
   /// and debug information salvage operations should append to existing
   /// blocks using getOrCreateDebugReconstructionBlock.
-  void setDebugReconstructionBlock(SILBasicBlock *BB) {
-    ReconstructionBlock = BB;
-  }
+  void setDebugReconstructionBlock(SILBasicBlock *BB);
 
   /// Clones the reconstruction block from \p src onto this debug value.
   void cloneReconstructionBlockFrom(DebugValueInst *src);
@@ -5948,15 +5964,16 @@ public:
   /// The newly created basic block will be well-formed, returning the SSA
   /// value of this debug_value directly.
   /// If this debug_value has an undef operand, the reconstruction block
-  /// has no arguments and returns undef directly.
+  /// has no arguments and returns undef directly, and the operand is dropped.
   SILBasicBlock *getOrCreateDebugReconstructionBlock();
 
-  /// Drops the operand from this debug value.
+  /// Kills the operand from this debug value.
   /// This function must be called by passes whenever the operand of this debug
   /// value is no longer valid and cannot be salvaged.
-  /// This will replace the operand with an undef, and clear any DIExpr or debug
-  /// reconstruction block.
-  /// If \p varType is specified, the undef will use that type (in the
+  /// Uses inside a debug reconstruction block are replaced with undef. If this
+  /// is the last operand, the operand list is shrunk.
+  /// Any pointers to the killed Operand are invalidated.
+  /// If \p operandType is specified, that undef will use that type (in the
   /// appropriate address/object form) instead of the current operand's type.
   void killOperand(unsigned operandIdx, SILType operandType = SILType());
 
