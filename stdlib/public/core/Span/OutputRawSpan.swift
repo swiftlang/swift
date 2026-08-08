@@ -318,6 +318,7 @@ extension OutputRawSpan {
     unsafe _append(value, as: T.self)
   }
 
+#if !SPAN_COMPATIBILITY_STUB
   /// Appends the given value's bytes to this span's bytes.
   ///
   /// There must be at least `MemoryLayout<T>.size` bytes available
@@ -328,7 +329,7 @@ extension OutputRawSpan {
   ///   - type: The type of the instance to store.
   ///   - byteOrder: The order in which the bytes will be encoded to the span.
   @export(implementation)
-  @available(SwiftStdlib 6.4, *)
+  @available(StdlibDeploymentTarget 6.4, *)
   @_lifetime(self: copy self)
   public mutating func append<T>(
     _ value: T, as type: T.Type, _ byteOrder: ByteOrder
@@ -339,6 +340,7 @@ extension OutputRawSpan {
     }
     unsafe _append(rawValue, as: T.self)
   }
+#endif
 }
 
 // MARK: bulk-append functions
@@ -397,6 +399,7 @@ extension OutputRawSpan {
     unsafe _append(repeating: repeatedValue, count: count, as: T.self)
   }
 
+#if !SPAN_COMPATIBILITY_STUB
   /// Appends the given value's bytes repeatedly to this span's bytes.
   ///
   /// There must be at least `count * MemoryLayout<T>.stride` bytes
@@ -409,7 +412,7 @@ extension OutputRawSpan {
   ///   - type: The type of the instance to store repeatedly.
   ///   - byteOrder: The order in which the bytes will be encoded to the span.
   @export(implementation)
-  @available(SwiftStdlib 6.4, *)
+  @available(StdlibDeploymentTarget 6.4, *)
   @_lifetime(self: copy self)
   public mutating func append<T>(
     repeating repeatedValue: T,
@@ -423,6 +426,7 @@ extension OutputRawSpan {
     }
     unsafe _append(repeating: rawValue, count: count, as: T.self)
   }
+#endif
 }
 
 @available(SwiftCompatibilitySpan 5.0, *)

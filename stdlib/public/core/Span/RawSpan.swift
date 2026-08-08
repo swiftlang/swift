@@ -772,6 +772,7 @@ extension RawSpan {
     unsafe unsafeLoadUnaligned(fromByteOffset: offset, as: T.self)
   }
 
+#if !SPAN_COMPATIBILITY_STUB
   /// Returns a value constructed from the raw memory at the specified offset.
   ///
   /// The range of bytes required to construct a value of type `T` starting at
@@ -785,7 +786,7 @@ extension RawSpan {
   ///   - byteOrder: The order in which the bytes will be decoded.
   /// - Returns: A new value of type `T`, read from `offset`.
   @export(implementation)
-  @available(SwiftStdlib 6.4, *)
+  @available(StdlibDeploymentTarget 6.4, *)
   public func load<T: ConvertibleFromBytes & FixedWidthInteger>(
     fromByteOffset offset: Int,
     as type: T.Type,
@@ -797,6 +798,7 @@ extension RawSpan {
     case .littleEndian: rawValue.littleEndian
     }
   }
+#endif
 }
 
 @available(SwiftCompatibilitySpan 5.0, *)
