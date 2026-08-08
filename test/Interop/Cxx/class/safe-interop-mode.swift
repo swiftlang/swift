@@ -114,6 +114,13 @@ __attribute__((swift_attr("@lifetime(borrow o)")))
 // expected-warning@+1{{the returned type 'View' is annotated as non-escapable; its lifetime dependencies must be annotated}}
 View returnsViewHandWrittenLifetime(const Owner &o);
 
+// expected-expansion@+5:6{{
+//   expected-error@1{{cannot borrow the lifetime of 'byValue', which is passed by value on a function}}
+// }}
+__attribute__((swift_attr("@lifetime(borrow byValue)")))
+// expected-warning@+1{{the returned type 'View' is annotated as non-escapable; its lifetime dependencies must be annotated}}
+View returnsViewByValueLifetime(Owner byValue);
+
 __attribute__((swift_attr("safe")))
 // expected-warning@+1{{the returned type 'View' is annotated as non-escapable; its lifetime dependencies must be annotated}}
 View returnsViewAuditedSafe(const Owner &o);
@@ -307,6 +314,7 @@ func useDefaultConstructedView() {
 func useAnnotatedLifetimeDependency(o: Owner) {
     let _ = returnsViewLifetimebound(o)
     let _ = returnsViewHandWrittenLifetime(o)
+    let _ = returnsViewByValueLifetime(o)
     let _ = returnsViewAuditedSafe(o)
 }
 
