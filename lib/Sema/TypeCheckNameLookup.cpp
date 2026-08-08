@@ -723,10 +723,13 @@ noteTypoCorrection(DeclNameLoc loc, ValueDecl *decl,
 
   if (wasClaimed) {
     return decl->diagnose(diag::decl_declared_here_base, decl);
-  } else if (showFullName) {
-    return decl->diagnose(diag::note_typo_candidate_compound_name,
-                          DeclNameRef(decl->getName()));
   } else {
+    if (showFullName) {
+      llvm::SmallString<32> scratch;
+      auto name = decl->getName().getString(scratch);
+      return decl->diagnose(diag::note_typo_candidate,
+                            decl->getASTContext().AllocateCopy(name));
+    }
     return decl->diagnose(diag::note_typo_candidate,
                           decl->getBaseName().userFacingName());
   }

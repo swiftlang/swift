@@ -967,12 +967,6 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
       // `self` gets diagnosed with a different error when it can't be found.
       Context.Diags.diagnose(Loc, diag::cannot_find_self_in_scope)
           .highlight(UDRE->getSourceRange());
-    } else if (Name.isCompoundName()) {
-      llvm::SmallString<32> scratch;
-      Context.Diags
-          .diagnose(Loc, diag::cannot_find_compound_name_in_scope,
-                    Context.AllocateCopy(Name.getString(scratch)))
-          .highlight(UDRE->getSourceRange());
     } else {
       Context.Diags
           .diagnose(Loc, diag::cannot_find_in_scope, Name, Name.isOperator())
