@@ -2900,6 +2900,13 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
     Opts.WarningGroupControlRules.emplace_back(WarningGroupBehavior::AsWarning,
                                                DiagGroupID::EmbeddedRestrictions);
 
+  // If -no-allocations was specified, make the HeapAllocation warnings into
+  // errors.
+  if (isEmbedded(Args) && Args.hasArg(OPT_no_allocations)) {
+    Opts.WarningGroupControlRules.emplace_back(WarningGroupBehavior::AsError,
+                                               DiagGroupID::HeapAllocation);
+  }
+
   Opts.SuppressWarnings |= Args.hasArg(OPT_suppress_warnings);
   Opts.SuppressNotes |= Args.hasArg(OPT_suppress_notes);
   Opts.SuppressRemarks |= Args.hasArg(OPT_suppress_remarks);

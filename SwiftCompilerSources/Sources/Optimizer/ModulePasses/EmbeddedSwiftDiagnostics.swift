@@ -38,7 +38,7 @@ let embeddedSwiftDiagnostics = ModulePass(name: "embedded-swift-diagnostics") {
       assert(checker.callStack.isEmpty)
       try checker.checkFunction(function)
     } catch let error as Diagnostic<Location> {
-      checker.diagnose(error)
+      checker.diagnose(error, popCallStack: true)
     } catch {
       fatalError("unknown error thrown")
     }
@@ -160,25 +160,29 @@ private struct FunctionChecker {
       fallthrough
     case is AllocRefInst,
          is AllocRefDynamicInst:
-      if context.options.noAllocations {
-        throw Diagnostic(.embedded_swift_allocating_type, (instruction as! SingleValueInstruction).type,
-                              at: instruction.location)
-      }
+      try diagnoseHeapAllocation(
+        Diagnostic(.embedded_swift_allocating_type,
+                   (instruction as! SingleValueInstruction).type,
+                   at: instruction.location)
+      )
 
     case is ThunkInst:
-      if context.options.noAllocations {
-        throw Diagnostic(.embedded_swift_allocating, at: instruction.location)
-      }
+      try diagnoseHeapAllocation(
+        Diagnostic(.embedded_swift_allocating, at: instruction.location)
+      )
 
     case let ba as BeginApplyInst:
-      if context.options.noAllocations {
-        throw Diagnostic(.embedded_swift_allocating_coroutine, at: instruction.location)
-      }
+      try diagnoseHeapAllocation(
+        Diagnostic(.embedded_swift_allocating_coroutine, at: instruction.location)
+      )
+
       try checkApply(apply: ba)
 
     case let pai as PartialApplyInst:
-      if context.options.noAllocations && !pai.isOnStack {
-        throw Diagnostic(.embedded_swift_allocating_closure, at: instruction.location)
+      if !pai.isOnStack {
+        try diagnoseHeapAllocation(
+          Diagnostic(.embedded_swift_allocating_closure, at: instruction.location)
+        )
       }
       try checkApply(apply: pai)
 
@@ -208,9 +212,9 @@ private struct FunctionChecker {
     case let bi as BuiltinInst:
       switch bi.id {
       case .AllocRaw:
-        if context.options.noAllocations {
-          throw Diagnostic(.embedded_swift_allocating, at: instruction.location)
-        }
+        try diagnoseHeapAllocation(
+          Diagnostic(.embedded_swift_allocation_raw, at: instruction.location)
+        )
       case .BuildOrdinaryTaskExecutorRef,
            .BuildOrdinarySerialExecutorRef,
            .BuildComplexEqualitySerialExecutorRef:
@@ -260,8 +264,10 @@ private struct FunctionChecker {
   }
 
   mutating func checkApply(apply: ApplySite) throws {
-    if context.options.noAllocations && apply.isAsync {
-      throw Diagnostic(.embedded_swift_allocating_type, at: apply.location)
+    if apply.isAsync {
+      try diagnoseHeapAllocation(
+        Diagnostic(.embedded_swift_allocating_async, at: apply.location)
+      )
     }
 
     if !apply.callee.type.hasValidSignatureForEmbedded,
@@ -330,16 +336,22 @@ private struct FunctionChecker {
     }
   }
 
-  mutating func diagnose(_ error: Diagnostic<Location>) {
+  mutating func diagnose(_ error: Diagnostic<Location>, popCallStack: Bool) {
     var diagPrinted = false
     if error.location.hasValidLineNumber {
       context.diagnosticEngine.diagnose(error)
       diagPrinted = true
     }
 
+    var savedCallStack = Stack<CallSite>(context)
+
     // If the original instruction doesn't have a location (e.g. because it's in a stdlib function),
     // search the callstack and use the location from a call site.
     while let callSite = callStack.pop() {
+      if !popCallStack {
+        savedCallStack.push(callSite)
+      }
+
       if !diagPrinted {
         if callSite.location.hasValidLineNumber {
           context.diagnosticEngine.diagnose(error.id, error.arguments, at: callSite.location)
@@ -362,6 +374,20 @@ private struct FunctionChecker {
     if !diagPrinted {
       context.diagnosticEngine.diagnose(error)
     }
+
+    while let callSite = savedCallStack.pop() {
+      callStack.push(callSite)
+    }
+  }
+
+  /// Emit a diagnostic describing a heap allocation.
+  mutating func diagnoseHeapAllocation(_ diag: Diagnostic<Location>) throws {
+    // Under -no-allocations mode, heap allocations are fatal
+    if context.options.noAllocations {
+      throw diag
+    }
+
+    diagnose(diag, popCallStack: false)
   }
 }
 
