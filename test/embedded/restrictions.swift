@@ -20,7 +20,7 @@ typealias FnType = () throws -> Void
 func untypedThrowsInBody() {
   do throws {
     throw MyError.failed
-  } catch {
+  } catch _ {
   }
 
   _ = { (x) throws in x + 1 }

@@ -120,7 +120,7 @@ func testDoCatchRethrowsTyped() throws(HomeworkError) {
   do {
     try doSomething()
     try doHomework()
-  } catch {
+  } catch _ {
 
   } // okay, the thrown 'any Error' has been caught
 }
@@ -352,7 +352,7 @@ func noThrow() throws(Never) {
   do throws(Never) {
     throw MyError.epicFailed
     // expected-error@-1 {{thrown expression type 'MyError' cannot be converted to error type 'Never'}}
-  } catch {}
+  } catch _ {}
 }
 
 precedencegroup LowerThanAssignment {
