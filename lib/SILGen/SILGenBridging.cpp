@@ -1479,6 +1479,7 @@ emitObjCThunkArguments(SILGenFunction &SGF, SILLocation loc, SILDeclRef thunk,
   assert(bridgedArgs.size() == nativeInputs.size() - bool(nativeInputsHasImplicitIsolatedParam));
   for (unsigned i = 0, size = bridgedArgs.size(); i < size; ++i) {
     unsigned nativeParamIndex = i + nativeInputsHasImplicitIsolatedParam;
+    auto nativeParam = nativeInputs[nativeParamIndex];
     // Consider the bridged values to be "call results" since they're coming
     // from potentially nil-unsound ObjC callers.
     ManagedValue native = SGF.emitBridgedToNativeValue(
@@ -1491,21 +1492,21 @@ emitObjCThunkArguments(SILGenFunction &SGF, SILLocation loc, SILDeclRef thunk,
 
     // This can happen if the value is resilient in the calling convention
     // but not resilient locally.
-    if (fnConv.isSILIndirect(nativeInputs[i]) &&
+    if (fnConv.isSILIndirect(nativeParam) &&
         !native.getType().isAddress()) {
       auto buf = SGF.emitTemporaryAllocation(loc, native.getType());
       native.forwardInto(SGF, loc, buf);
       native = SGF.emitManagedBufferWithCleanup(buf);
-    } else if (!fnConv.isSILIndirect(nativeInputs[i]) &&
+    } else if (!fnConv.isSILIndirect(nativeParam) &&
                native.getType().isAddress() && SGF.useLoweredAddresses()) {
       // Load the value if the argument has an address type and the native
       // function expects the argument to be passed directly.
       native = SGF.emitManagedLoadCopy(loc, native.getValue());
     }
 
-    if (nativeInputs[i].isConsumedInCaller()) {
+    if (nativeParam.isConsumedInCaller()) {
       argValue = native.forward(SGF);
-    } else if (nativeInputs[i].isGuaranteedInCaller()) {
+    } else if (nativeParam.isGuaranteedInCaller()) {
       argValue = native.borrow(SGF, loc).getUnmanagedValue();
     } else {
       argValue = native.getValue();
