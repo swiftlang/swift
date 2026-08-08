@@ -1632,6 +1632,9 @@ Remangler::mangleFunctionSignatureSpecializationParam(Node *node,
     case FunctionSigSpecializationParamKind::ClosurePropPreviousArg:
       Buffer << 'C' << node->getChild(idx++)->getIndex();
       break;
+    case FunctionSigSpecializationParamKind::AutoDiffBranchTracingEnum:
+      Buffer << 'b';
+      break;
     case FunctionSigSpecializationParamKind::BoxToValue:
       Buffer << 'i';
       break;

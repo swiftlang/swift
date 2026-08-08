@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-ir -O -g %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-disable-pass=autodiff-closure-specialization -emit-ir -O -g %s | %FileCheck %s
 
 // https://github.com/apple/swift/issues/58123
 // Mutating functions with control flow can cause assertion failure for
