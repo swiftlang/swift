@@ -334,7 +334,6 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
       if(NOT "${mod}" MATCHES "-linux-gnu$")
         continue()
       endif()
-      list(APPEND extra_c_compile_flags -stdlib=libc++)
     elseif (SWIFT_HOST_VARIANT STREQUAL "macosx")
       if(NOT "${mod}" MATCHES "x86_64|arm64|arm64e|armv7|armv7m|armv7em|armv8m.main|armv8.1m.main")
         continue()
@@ -438,6 +437,11 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
     endif()
 
     if(build_embedded_dispatch_executor)
+      set(dispatch_extra_c_compile_flags ${extra_c_compile_flags})
+      if(SWIFT_HOST_VARIANT STREQUAL "linux")
+        list(APPEND dispatch_extra_c_compile_flags -stdlib=libc++)
+      endif()
+
       # lib/swift/embedded/<host-triple>/libswift_ConcurrencyDispatchExecutor.a
       add_embedded_swift_target_library(
         embedded-concurrency-dispatch-executor
@@ -450,7 +454,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
         DispatchExecutor.swift
 
         C_COMPILE_FLAGS
-          ${extra_c_compile_flags} ${SWIFT_RUNTIME_CONCURRENCY_C_FLAGS}
+          ${dispatch_extra_c_compile_flags} ${SWIFT_RUNTIME_CONCURRENCY_C_FLAGS}
           -DSWIFT_CONCURRENCY_EMBEDDED=1 -DSWIFT_RUNTIME_EMBEDDED=1
           -DSWIFT_CONCURRENCY_USES_DISPATCH=1
           -ffunction-sections -fdata-sections -fno-exceptions

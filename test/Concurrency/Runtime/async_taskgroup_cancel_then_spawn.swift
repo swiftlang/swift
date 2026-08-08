@@ -13,9 +13,6 @@
 // RUN: %if embedded_cooperative_executor %{ %target-run-embedded-cooperative-swift() | %FileCheck %s --dump-input=always %}
 // RUN: %if embedded_dispatch_executor %{ %target-run-embedded-dispatch-swift() | %FileCheck %s --dump-input=always %}
 
-#if !$Embedded
-import Dispatch
-#endif
 import _Concurrency
 
 @available(SwiftStdlib 5.1, *)
