@@ -2124,6 +2124,29 @@ ERROR(macro_role_syntax_mismatch,PointsToFirstBadToken,
 ERROR(macro_attribute_unknown_label,PointsToFirstBadToken,
       "'@%select{freestanding|attached}0' has no argument with label %1",
       (bool, Identifier))
+ERROR(macro_attribute_unsupported_label,PointsToFirstBadToken,
+      "%0 unsupported for %1 macros",
+      (Identifier, StringRef))
+NOTE(suggest_accessor_role,none,
+     "did you mean 'accessor' here?", ())
+NOTE(suggest_remove_param,none,
+     "remove '%0'", (StringRef))
+ERROR(macro_attribute_initializer_unknown_argument,PointsToFirstBadToken,
+      "unknown initialization context kind", ())
+NOTE(suggest_replace_argument,none,
+     "replace %0 with '%1'", (Identifier, StringRef))
+ERROR(macro_attribute_initializer_missing_argument,PointsToFirstBadToken,
+      "initialization argument missing", ())
+NOTE(suggest_insert_argument,none,
+     "insert '%0'", (StringRef))
+NOTE(suggest_remove_param_for_default,none,
+     "remove '%0' for default '%1' behavior", (StringRef, StringRef))
+ERROR(macro_attribute_initializer_multiple_arguments,PointsToFirstBadToken,
+      "'initialization' does not support multiple arguments", ())
+NOTE(suggest_keep_argument,none,
+     "keep '%0'", (StringRef))
+NOTE(suggest_replace_arguments,none,
+     "replace '%0' with '%1'", (StringRef, StringRef))
 ERROR(macro_attribute_duplicate_label,PointsToFirstBadToken,
       "'@%select{freestanding|attached}0' already has an argument with "
       "label %1", (bool, StringRef))
