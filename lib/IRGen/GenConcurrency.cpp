@@ -321,6 +321,9 @@ llvm::Value *irgen::emitBuiltinTaskAddHandler(IRGenFunction &IGF,
     if (kind == BuiltinValueKind::TaskAddCancellationHandler) {
       return IGF.IGM.getTaskAddCancellationHandlerFunctionPointer();
     }
+    if (kind == BuiltinValueKind::TaskAddCancellationHandlerWithReason) {
+      return IGF.IGM.getTaskAddCancellationHandlerWithReasonFunctionPointer();
+    }
     if (kind == BuiltinValueKind::TaskAddPriorityEscalationHandler) {
       return IGF.IGM.getTaskAddPriorityEscalationHandlerFunctionPointer();
     }
@@ -379,6 +382,57 @@ llvm::Value *irgen::emitBuiltinTaskCancellationShieldPush(IRGenFunction &IGF) {
 void irgen::emitBuiltinTaskCancellationShieldPop(IRGenFunction &IGF) {
   auto *call =
       IGF.Builder.CreateCall(IGF.IGM.getTaskCancellationShieldPopFunctionPointer(), {});
+  call->setDoesNotThrow();
+  call->setCallingConv(IGF.IGM.SwiftCC);
+}
+
+llvm::Value *irgen::emitBuiltinTaskPushDeadline(IRGenFunction &IGF,
+                                               llvm::Value *clockPtr,
+                                               llvm::Value *instantPtr,
+                                               llvm::Value *clockType,
+                                               llvm::Value *instantType) {
+  // Runtime signature:
+  //   swift_task_pushDeadline(OpaqueValue *clock, OpaqueValue *instant,
+  //                           const Metadata *clockType,
+  //                           const Metadata *instantType,
+  //                           const WitnessTable *identifiableWT,
+  //                           const WitnessTable *clockWT)
+  //
+  // Swift's canonical generic-sig ordering places `Identifiable` before
+  // `Clock`, so the WT slots follow that order.
+  // Both WTs are reserved for future runtime use; pass null for now
+  // (Swift-side identity comparison is dispatched via the
+  // `_task_isEqualIdentifiableID` bridge which threads its own
+  // generic-arg witnesses).
+  auto *null = llvm::ConstantPointerNull::get(IGF.IGM.Int8PtrTy);
+  auto *call = IGF.Builder.CreateCall(
+      IGF.IGM.getTaskPushDeadlineFunctionPointer(),
+      {clockPtr, instantPtr, clockType, instantType, null, null});
+  call->setDoesNotThrow();
+  call->setCallingConv(IGF.IGM.SwiftCC);
+  return call;
+}
+
+void irgen::emitBuiltinTaskPopDeadline(IRGenFunction &IGF,
+                                       llvm::Value *record) {
+  auto *call = IGF.Builder.CreateCall(
+      IGF.IGM.getTaskPopDeadlineFunctionPointer(), {record});
+  call->setDoesNotThrow();
+  call->setCallingConv(IGF.IGM.SwiftCC);
+}
+
+llvm::Value *irgen::emitBuiltinTaskCancellationScopePush(IRGenFunction &IGF) {
+  auto *call = IGF.Builder.CreateCall(
+      IGF.IGM.getTaskPushCancellationScopeFunctionPointer(), {});
+  call->setDoesNotThrow();
+  call->setCallingConv(IGF.IGM.SwiftCC);
+  return call;
+}
+
+void irgen::emitBuiltinTaskCancellationScopePop(IRGenFunction &IGF,
+                                            llvm::Value *record) {
+  auto *call = IGF.Builder.CreateCall(
+      IGF.IGM.getTaskPopCancellationScopeFunctionPointer(), {record});
   call->setDoesNotThrow();
   call->setCallingConv(IGF.IGM.SwiftCC);
 }

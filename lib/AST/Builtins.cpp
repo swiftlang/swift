@@ -2407,6 +2407,20 @@ static ValueDecl *getTaskRemoveCancellationHandler(ASTContext &ctx,
       ctx, id, _thin, _parameters(_label("record", _unsafeRawPointer)), _void);
 }
 
+static ValueDecl *getTaskAddCancellationHandlerWithReason(ASTContext &ctx,
+                                                           Identifier id) {
+  // (UInt8) -> ()
+  std::array<AnyFunctionType::Param, 1> params = {
+      AnyFunctionType::Param(ctx.getUInt8Type()),
+  };
+  auto extInfo = ASTExtInfoBuilder().withNoEscape().build();
+  auto *functionType =
+      FunctionType::get(params, ctx.TheEmptyTupleType, extInfo);
+  return getBuiltinFunction(ctx, id, _thin,
+                            _parameters(_label("handler", functionType)),
+                            _unsafeRawPointer);
+}
+
 static ValueDecl *getTaskAddPriorityEscalationHandler(ASTContext &ctx,
                                                       Identifier id) {
   std::array<AnyFunctionType::Param, 2> params = {
@@ -2424,6 +2438,37 @@ static ValueDecl *getTaskAddPriorityEscalationHandler(ASTContext &ctx,
 
 static ValueDecl *getTaskRemovePriorityEscalationHandler(ASTContext &ctx,
                                                          Identifier id) {
+  return getBuiltinFunction(
+      ctx, id, _thin, _parameters(_label("record", _unsafeRawPointer)), _void);
+}
+
+static ValueDecl *getTaskPushDeadline(ASTContext &ctx, Identifier id) {
+  // <C, I> (clock: consuming C, instant: consuming I) -> UnsafeRawPointer
+  //
+  // Values first, metadata trailing (matches Swift's generic ABI).
+  //
+  // The stack-nesting invariant paired with `taskPopDeadline` is fixed up
+  // post-SILGen by `finalizeTaskPushDeadline` -> `StackNesting::fixNesting`,
+  // exactly mirroring the `AddTaskLocalValue` sibling. Without that hook,
+  // the operand `alloc_stack` temporaries would deallocate before the
+  // defer'd pop and trip the flow-sensitive verifier.
+  return getBuiltinFunction(
+      ctx, id, _thin, _generics(_unrestricted, _unrestricted),
+      _parameters(_label("clock", _consuming(_typeparam(0))),
+                  _label("instant", _consuming(_typeparam(1)))),
+      _unsafeRawPointer);
+}
+
+static ValueDecl *getTaskPopDeadline(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(
+      ctx, id, _thin, _parameters(_label("record", _unsafeRawPointer)), _void);
+}
+
+static ValueDecl *getTaskCancellationScopePush(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin, _parameters(), _unsafeRawPointer);
+}
+
+static ValueDecl *getTaskCancellationScopePop(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(
       ctx, id, _thin, _parameters(_label("record", _unsafeRawPointer)), _void);
 }
@@ -3590,11 +3635,26 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::TaskRemoveCancellationHandler:
     return getTaskRemoveCancellationHandler(Context, Id);
 
+  case BuiltinValueKind::TaskAddCancellationHandlerWithReason:
+    return getTaskAddCancellationHandlerWithReason(Context, Id);
+
   case BuiltinValueKind::TaskAddPriorityEscalationHandler:
     return getTaskAddPriorityEscalationHandler(Context, Id);
 
   case BuiltinValueKind::TaskRemovePriorityEscalationHandler:
     return getTaskRemovePriorityEscalationHandler(Context, Id);
+
+  case BuiltinValueKind::TaskPushDeadline:
+    return getTaskPushDeadline(Context, Id);
+
+  case BuiltinValueKind::TaskPopDeadline:
+    return getTaskPopDeadline(Context, Id);
+
+  case BuiltinValueKind::TaskCancellationScopePush:
+    return getTaskCancellationScopePush(Context, Id);
+
+  case BuiltinValueKind::TaskCancellationScopePop:
+    return getTaskCancellationScopePop(Context, Id);
 
   case BuiltinValueKind::TaskLocalValuePush:
     return getTaskLocalValuePush(Context, Id);

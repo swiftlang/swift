@@ -1067,6 +1067,17 @@ visitResumeThrowingContinuationThrowing(BuiltinInst *bi, StringRef attr) {
   return OperandOwnership::TrivialUse;
 }
 
+/// TaskPushDeadline takes four trivial operands:
+///   (clockPtr: Builtin.RawPointer, instantPtr: Builtin.RawPointer,
+///    clockType: Any.Type, instantType: Any.Type).
+/// All trivial; the runtime copies through the pointers via value
+/// witnesses without taking ownership of either.
+OperandOwnership
+OperandOwnershipBuiltinClassifier::visitTaskPushDeadline(BuiltinInst *bi,
+                                                        StringRef attr) {
+  return OperandOwnership::TrivialUse;
+}
+
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, TaskRunInline)
 
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, InitializeDefaultActor)
@@ -1093,6 +1104,8 @@ BUILTIN_OPERAND_OWNERSHIP(TrivialUse, AutoDiffCreateLinearMapContextWithType)
 
 // InstantaneousUse since we take in a closure at +0.
 BUILTIN_OPERAND_OWNERSHIP(BitwiseEscape, TaskAddCancellationHandler)
+// InstantaneousUse since we take in a closure at +0.
+BUILTIN_OPERAND_OWNERSHIP(BitwiseEscape, TaskAddCancellationHandlerWithReason)
 // Trivial use since our operand is just an UnsafeRawPointer.
 BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskRemoveCancellationHandler)
 // InstantaneousUse since we take in a closure at +0.
@@ -1108,6 +1121,17 @@ BUILTIN_OPERAND_OWNERSHIP(TrivialUse, RemoveTaskLocalValue)
 
 BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskCancellationShieldPush)
 BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskCancellationShieldPop)
+
+// TaskCancellationScopePush takes no operands.
+BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskCancellationScopePush)
+// Trivial use since our operand is just an UnsafeRawPointer.
+BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskCancellationScopePop)
+
+// Trivial use since our operand is just an UnsafeRawPointer.
+BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskPopDeadline)
+// TaskPushDeadline is handled by the custom visitor above so its
+// trivial operand tuple can be classified without relying on the
+// generic BUILTIN_OPERAND_OWNERSHIP macro.
 
 #undef BUILTIN_OPERAND_OWNERSHIP
 

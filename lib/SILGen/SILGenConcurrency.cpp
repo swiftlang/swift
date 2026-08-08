@@ -970,3 +970,13 @@ void SILGenFunction::finalizeAddTaskLocalValue(BuiltinInst *BI) {
   // SILGen emits the argument without a temporary.
   StackNesting::fixNesting(&F);
 }
+
+void SILGenFunction::finalizeTaskPushDeadline(BuiltinInst *BI) {
+  // Similar workaround to finalizeAddTaskLocalValue because the taskPushDeadline builtin
+  // is generic over clock, which ends up creating a temporary for the metadata which
+  // are not properly nested, causing nesting validation to fail.
+  //
+  // Rather than change the builtin to be not-generic and use hacks on the call-site,
+  // we apply the same fixNesting pattern as AddTaskLocalValue already does.
+  StackNesting::fixNesting(&F);
+}
