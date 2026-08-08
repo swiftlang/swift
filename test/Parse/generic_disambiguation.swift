@@ -1,7 +1,7 @@
 // RUN: %target-typecheck-verify-swift -verify-additional-prefix swift5-
 // RUN: %target-typecheck-verify-swift -swift-version 6 -verify-additional-prefix swift6-
 
-struct A<B> { // expected-note{{generic struct 'A' declared here}}
+struct A<B> { // expected-note 2 {{generic struct 'A' declared here}}
   init(x:Int) {}
   static func c() {}
 
@@ -76,8 +76,7 @@ meta(A<B>.C<D>.self)
 meta2(A<B>.C<D>.self, 0)
  */
 
-// TODO: parse empty <> list
-//A<>.c() // e/xpected-error{{xxx}}
+A<>.c() // expected-error{{generic type 'A' specialized with too few type parameters (got 0, but expected 1}}
 
 A<B, D>.c() // expected-error{{generic type 'A' specialized with too many type parameters (got 2, but expected 1)}}
 
