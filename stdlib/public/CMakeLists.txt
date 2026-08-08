@@ -32,6 +32,20 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Darwin" AND
   list(APPEND SWIFT_RUNTIME_SWIFT_LINK_FLAGS ${shared_cache_link_flags})
 endif()
 
+if(SWIFT_STDLIB_ENABLE_LAZY_LINK)
+  list(APPEND SWIFT_RUNTIME_CXX_FLAGS "-DSWIFT_STDLIB_ENABLE_LAZY_LINK")
+
+  # We lazy link these libraries to avoid loading them unnecessarily, and upward
+  # link to indicate that this shouldn't be considered part of a dependency
+  # cycle.
+  list(APPEND SWIFT_RUNTIME_SWIFT_LINK_FLAGS "-Wl,-lazy_framework,CoreFoundation")
+  list(APPEND SWIFT_RUNTIME_SWIFT_LINK_FLAGS "-Wl,-upward_framework,CoreFoundation")
+  list(APPEND SWIFT_RUNTIME_SWIFT_LINK_FLAGS "-Wl,-lazy_framework,Foundation")
+  list(APPEND SWIFT_RUNTIME_SWIFT_LINK_FLAGS "-Wl,-upward_framework,Foundation")
+  list(APPEND SWIFT_RUNTIME_SWIFT_LINK_FLAGS "-Wl,-lazy-lswiftObjectiveC")
+  list(APPEND SWIFT_RUNTIME_SWIFT_LINK_FLAGS "-Wl,-upward-lswiftObjectiveC")
+endif()
+
 # Build the runtime with -Wall to catch, e.g., uninitialized variables
 # warnings.
 if(SWIFT_COMPILER_IS_MSVC_LIKE)
