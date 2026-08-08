@@ -5851,7 +5851,7 @@ void AttributeChecker::checkBackDeployedAttrs(
         if (auto unavailableAttr = attrDecl->getUnavailableAttr()) {
           diagnose(unavailableAttr->getParsedAttr()->AtLoc,
                    diag::availability_marked_unavailable, VD)
-              .highlight(unavailableAttr->getParsedAttr()->getRange());
+              .highlight(unavailableAttr->getParsedAttr()->getRangeWithAt());
           break;
         }
 
@@ -5882,7 +5882,7 @@ void AttributeChecker::checkBackDeployedAttrs(
         diagnose(availableAttr.getParsedAttr()->AtLoc,
                  diag::availability_introduced_in_version, VD,
                  introDomainAndRange->getDomain(), introRange)
-            .highlight(availableAttr.getParsedAttr()->getRange());
+            .highlight(availableAttr.getParsedAttr()->getRangeWithAt());
         continue;
       }
     }
@@ -9107,9 +9107,9 @@ AttributeChecker::visitAddressableForDependenciesAttr(
 void AttributeChecker::visitUnsafeAttr(UnsafeAttr *attr) {
   if (auto safeAttr = D->getAttrs().getAttribute<SafeAttr>()) {
     D->diagnose(diag::safe_and_unsafe_attr, D)
-      .highlight(attr->getRange())
-      .highlight(safeAttr->getRange())
-      .warnInSwiftInterface(D->getDeclContext());
+        .highlight(attr->getRangeWithAt())
+        .highlight(safeAttr->getRangeWithAt())
+        .warnInSwiftInterface(D->getDeclContext());
   }
 }
 
