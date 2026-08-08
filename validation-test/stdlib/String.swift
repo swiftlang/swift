@@ -1941,7 +1941,7 @@ for test in testCases {
 }
 
 for test in testCases {
-  StringTests.test("COW.\(test.name).RemoveAtDoesNotReallocate") {
+  StringTests.test("COW.\(test.name).RemoveAllDoesNotReallocate") {
     do {
       var s = test.test + testSuffix
       expectGT(s.count, 0)

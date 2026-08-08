@@ -76,7 +76,7 @@ UnsafeRawPointerTestSuite.test("alignedUp.toMultiple.overflow") {
   expectEqual(Int(bitPattern: up), 0)
 }
 
-UnsafeRawPointerTestSuite.test("alignedUp.for.overflow") {
+UnsafeRawPointerTestSuite.test("alignedDown.for.overflow") {
   let p = UnsafeRawPointer(bitPattern: MemoryLayout<Int64>.stride-1)!
   if _isDebugAssertConfiguration() {
     expectCrashLater()
@@ -85,7 +85,7 @@ UnsafeRawPointerTestSuite.test("alignedUp.for.overflow") {
   expectEqual(Int(bitPattern: up), 0)
 }
 
-UnsafeRawPointerTestSuite.test("alignedUp.toMultiple.overflow") {
+UnsafeRawPointerTestSuite.test("alignedDown.toMultiple.overflow") {
   let p = UnsafeRawPointer(bitPattern: 13)!
   if _isDebugAssertConfiguration() {
     expectCrashLater()
@@ -112,7 +112,7 @@ UnsafeRawPointerTestSuite.test("alignedUp.toMultiple.overflow.mutable") {
   expectEqual(Int(bitPattern: up), 0)
 }
 
-UnsafeRawPointerTestSuite.test("alignedUp.for.overflow.mutable") {
+UnsafeRawPointerTestSuite.test("alignedDown.for.overflow.mutable") {
   let p = UnsafeMutableRawPointer(bitPattern: MemoryLayout<Int64>.stride-1)!
   if _isDebugAssertConfiguration() {
     expectCrashLater()
@@ -121,7 +121,7 @@ UnsafeRawPointerTestSuite.test("alignedUp.for.overflow.mutable") {
   expectEqual(Int(bitPattern: up), 0)
 }
 
-UnsafeRawPointerTestSuite.test("alignedUp.toMultiple.overflow.mutable") {
+UnsafeRawPointerTestSuite.test("alignedDown.toMultiple.overflow.mutable") {
   let p = UnsafeMutableRawPointer(bitPattern: 13)!
   if _isDebugAssertConfiguration() {
     expectCrashLater()

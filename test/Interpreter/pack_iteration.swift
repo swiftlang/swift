@@ -26,7 +26,7 @@ packIter.test("break") {
   expectEqual(results, [0, "hello"] as [AnyHashable])
 }
 
-packIter.test("break") {
+packIter.test("continue") {
   func continueTest<each T: Hashable>(_ ts: (repeat (each T)?)) -> [AnyHashable] {
     var result: [AnyHashable] = []
 

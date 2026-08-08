@@ -2231,6 +2231,10 @@ public final class TestSuite {
     }
 
     internal func _build(_ testCode: _TestCode) {
+      if _testSuite._testNameToIndex[_name] != nil {
+        fatalError(
+          "test '\(_name)' already exists in test suite '\(_testSuite.name)'")
+      }
       _testSuite._tests.append(
         _Test(
           name: _name, testLoc: _data._testLoc!, xfail: _data._xfail,

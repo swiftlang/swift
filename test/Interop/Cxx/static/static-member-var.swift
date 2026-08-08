@@ -62,27 +62,6 @@ StaticMemberVarTestSuite.test("const-static-member") {
   expectEqual(96, WithConstStaticMember.definedOutOfLine)
 }
 
-StaticMemberVarTestSuite.test("const-static-member") {
-  //TODO fix undefined reference to `WithConstStaticMember::notDefined`.
-  // expectEqual(24, WithConstStaticMember.notDefined)
-  expectEqual(48, WithConstStaticMember.defined)
-  expectEqual(96, WithConstStaticMember.definedOutOfLine)
-}
-
-StaticMemberVarTestSuite.test("const-static-member") {
-  //TODO fix undefined reference to `WithConstStaticMember::notDefined`.
-  // expectEqual(24, WithConstStaticMember.notDefined)
-  expectEqual(48, WithConstStaticMember.defined)
-  expectEqual(96, WithConstStaticMember.definedOutOfLine)
-}
-
-StaticMemberVarTestSuite.test("const-static-member") {
-  //TODO fix undefined reference to `WithConstStaticMember::notDefined`.
-  // expectEqual(WithConstStaticMember.notDefined)
-  expectEqual(48, WithConstStaticMember.defined)
-  expectEqual(96, WithConstStaticMember.definedOutOfLine)
-}
-
 // Check that variables with identical names in different namespaces don't
 // collide in any intermediate representation of the compiler.
 StaticMemberVarTestSuite.test("no-collisions") {

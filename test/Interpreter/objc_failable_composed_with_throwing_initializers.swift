@@ -617,7 +617,7 @@ class AtObjCPolarBear : AtObjCBear {
   }
 }
 
-FailableComposedWithThrowingInitTestSuite.test("FailableInitFailure_Root") {
+FailableComposedWithThrowingInitTestSuite.test("FailableInitFailure_Root_AtObjC") {
   mustFail { AtObjCBear(n: 0, before: true) }
   mustFail { AtObjCBear(n: 0, after: true) }
   mustFail { AtObjCBear(n: 0, before: true, after: false) }
@@ -625,7 +625,7 @@ FailableComposedWithThrowingInitTestSuite.test("FailableInitFailure_Root") {
   expectEqual(NSLifetimeTracked.count(), 0)
 }
 
-FailableComposedWithThrowingInitTestSuite.test("FailableInitFailure_Derived") {
+FailableComposedWithThrowingInitTestSuite.test("FailableInitFailure_Derived_AtObjC") {
   mustFail { AtObjCPolarBear(n: 0, before: true) }
   mustFail { AtObjCPolarBear(n: 0, during: true) }
   mustFail { AtObjCPolarBear(n: 0, before: true, during: false) }
@@ -641,7 +641,7 @@ FailableComposedWithThrowingInitTestSuite.test("FailableInitFailure_Derived") {
   expectEqual(NSLifetimeTracked.count(), 0)
 }
 
-FailableComposedWithThrowingInitTestSuite.test("ConvenienceInitFailure_Root") {
+FailableComposedWithThrowingInitTestSuite.test("ConvenienceInitFailure_Root_AtObjC") {
   mustFail { AtObjCBear(before: true) }
   mustFail { AtObjCBear(during: true) }
   mustFail { AtObjCBear(before: true, during: false) }
@@ -661,7 +661,7 @@ FailableComposedWithThrowingInitTestSuite.test("ConvenienceInitFailure_Root") {
   expectEqual(NSLifetimeTracked.count(), 0)
 }
 
-FailableComposedWithThrowingInitTestSuite.test("ConvenienceInitFailure_Derived") {
+FailableComposedWithThrowingInitTestSuite.test("ConvenienceInitFailure_Derived_AtObjC") {
   mustFail { AtObjCPolarBear(before: true) }
   mustFail { AtObjCPolarBear(during: true) }
   mustFail { AtObjCPolarBear(before: true, during: false) }
