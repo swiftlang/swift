@@ -12,6 +12,10 @@
 
 import SIL
 
+private func log(_ message: @autoclosure () -> String) {
+  llvmDebug("loop-invariant-code-motion", message())
+}
+
 /// Hoist loop invariant code out of innermost loops.
 let loopInvariantCodeMotionPass = FunctionPass(name: "loop-invariant-code-motion") { function, context in
   for loop in context.loopTree.loops {
@@ -67,6 +71,8 @@ private struct MovableInstructions {
 private struct AnalyzedInstructions {
   /// Side effects of the loop.
   var loopSideEffects: StackWithCount<Instruction>
+  /// Non-load instructions that have no side effects but may read from memory.
+  var loopReadOnlyEffects: StackWithCount<Instruction>
   var loads: Stack<LoadInst>
   var stores: Stack<StoreInst>
   var scopedInsts: Stack<UnaryInstruction>
@@ -75,10 +81,13 @@ private struct AnalyzedInstructions {
   var dominatingBlocks: BasicBlockSet
 
   /// `true` if the loop has instructions which (may) read from memory, which are not in `Loads` and not in `sideEffects`.
-  var hasOtherMemReadingInsts = false
+  var hasOtherMemReadingInsts: Bool {
+    !loopReadOnlyEffects.isEmpty
+  }
   
   init (in loop: Loop, _ context: FunctionPassContext) {
     self.loopSideEffects = StackWithCount<Instruction>(context)
+    self.loopReadOnlyEffects = StackWithCount<Instruction>(context)
     self.loads = Stack<LoadInst>(context)
     self.stores = Stack<StoreInst>(context)
     self.scopedInsts = Stack<UnaryInstruction>(context)
@@ -87,6 +96,7 @@ private struct AnalyzedInstructions {
   
   mutating func deinitialize() {
     loopSideEffects.deinitialize()
+    loopReadOnlyEffects.deinitialize()
     loads.deinitialize()
     stores.deinitialize()
     scopedInsts.deinitialize()
@@ -107,7 +117,7 @@ private func analyzeLoopAndSplitLoads(loop: Loop, _ context: FunctionPassContext
 
   collectProjectableAccessPathsAndSplitLoads(in: loop, &analyzedInstructions, &movableInstructions, context)
 
-  collectSpeculativelyMovableInstructions(in: loop,  &movableInstructions)
+  collectSpeculativelyMovableInstructions(in: loop, analyzedInstructions, &movableInstructions, context)
 
   collectMovableInstructions(in: loop, analyzedInstructions, &movableInstructions, context)
     
@@ -139,7 +149,7 @@ private func analyzeInstructions(
       if inst.mayHaveSideEffects {
         analyzedInstructions.loopSideEffects.append(inst)
       } else if inst.mayReadFromMemory {
-        analyzedInstructions.hasOtherMemReadingInsts = true
+        analyzedInstructions.loopReadOnlyEffects.append(inst)
       }
     }
   }
@@ -178,12 +188,55 @@ private func collectProjectableAccessPathsAndSplitLoads(
 }
 
 /// Collect movable instructions, even if they are not executed in every loop iteration.
-private func collectSpeculativelyMovableInstructions(in loop: Loop, _ movableInstructions: inout MovableInstructions) {
+private func collectSpeculativelyMovableInstructions(in loop: Loop,
+                                                     _ analyzedInstructions: AnalyzedInstructions,
+                                                     _ movableInstructions: inout MovableInstructions,
+                                                     _ context: FunctionPassContext) {
+  var trivialStoreCounter = 0
+
   for bb in loop.loopBlocks {
     for inst in bb.instructions {
       switch inst {
-      case is LoadInst, is StoreInst:
+      case is LoadInst:
         movableInstructions.loadsAndStores.append(inst)
+      case let storeInst as StoreInst:
+        movableInstructions.loadsAndStores.append(inst)
+
+        // Trivial store instructions are also speculatively hoistable.
+        if storeInst.storeOwnership != .trivial {
+          break
+        }
+        
+        // Avoid quadratic complexity in corner cases. Usually, this limit will not be exceeded.
+        if trivialStoreCounter * analyzedInstructions.loopSideEffects.count >= 8000 {
+          break
+        }
+        trivialStoreCounter += 1
+
+        let accessPath = storeInst.destination.accessPath
+
+        if !analyzedInstructions.trivialStoreIsSpeculativelyHoistable(
+             outOf: loop, accessPath: accessPath, storeInst: storeInst, context)
+        {
+          break
+        }
+
+        // If the store's destination is an alloc_stack inside the loop, it must
+        // be hoisted before the store.
+        if case .stack(let allocStackInst) = accessPath.base,
+           loop.contains(block: allocStackInst.parentBlock) {
+          // Only hoist the alloc_stack if the store's other operand (the source) is
+          // loop-invariant; otherwise, the store cannot be hoisted.
+          if !loop.contains(block: storeInst.source.parentBlock),
+            storeInst.destination == allocStackInst
+              || !loop.contains(block: storeInst.destination.parentBlock)
+          {
+            movableInstructions.speculativelyHoistable.append(allocStackInst)
+            movableInstructions.speculativelyHoistable.append(storeInst)
+          }
+        } else {
+          movableInstructions.speculativelyHoistable.append(storeInst)
+        }
       case let refElementAddrInst as RefElementAddrInst:
         movableInstructions.speculativelyHoistable.append(refElementAddrInst)
       default:
@@ -228,7 +281,8 @@ private func collectMovableInstructions(
       case is UncheckedOwnershipConversionInst:
         break // TODO: Add support
       case is StoreInst:
-        break // Stores are moved out of the loop in `hoistAndSinkLoadsAndStores`
+          // Stores are moved out of the loop in `hoistAndSinkLoadsAndStores` and `speculativelyHoistInstructions`.
+          break
       case let condFailInst as CondFailInst:
         // We can (and must) hoist cond_fail instructions if the operand is
         // invariant. We must hoist them so that we preserve memory safety. A
@@ -347,6 +401,134 @@ private extension AnalyzedInstructions {
       return false
     }
     
+    return true
+  }
+
+  /// Returns true only if `storeInst` is speculatively hoistable out of `loop`.
+  func trivialStoreIsSpeculativelyHoistable(
+    outOf loop: Loop, accessPath: AccessPath, storeInst: StoreInst, _ context: FunctionPassContext
+  ) -> Bool {
+    precondition(storeInst.storeOwnership == .trivial)
+
+    log("Processing candidate hoistable store:\n\(storeInst.description)")
+
+    guard let address = accessPath.base.address,
+          address.type.isTrivial(in: storeInst.parentFunction)
+    else {
+      // Even a trivial address can be projected out of a non-trivial one.
+      // Hoisting the store in this case could hoist it into a region
+      // where the base address is borrowed. Bail out to avoid this when
+      // the accessBase is not known to be trivial.
+      log("Access base is unknown or non-trivial: \(accessPath.base.address?.description ?? "none").")
+      return false
+
+    }
+
+    if !storesUniqueReadableValue(
+      accessPath: accessPath, storeInst: storeInst, context)
+    {
+      log("Found an instruction with a read or write effect that prevents store hoisting.")
+      return false
+    }
+
+    // If a store in a non-exit-dominating block dominates all potentially
+    // aliased reads in the loop we may be able to hoist it speculatively. To do
+    // so, we have to ensure that the stored value could not be read after the
+    // loop. If the base address is an alloc_stack inside the loop, all uses
+    // will be inside the loop. If that alloc_stack is then hoisted, it will be
+    // safe to speculatively hoist the store.
+    //
+    // An alloc_stack outside the loop, or any non-alloc_stack access base,
+    // could be read after the loop. It is not safe to speculatively host the
+    // store in these cases. In the following example, hoisting the store would
+    // result in `n` always being set to 6, even if the predicate returned false
+    // on every iteration.
+    //
+    //   var n = 5 // Local or global
+    //   
+    //   for i in 0..<10 {
+    //     if pred(i) {
+    //       n = 6
+    //     }
+    //   }
+    //   
+    //   print(n) // 5 or 6?
+    if !dominatingBlocks.contains(storeInst.parentBlock) {
+      log("Block is not guaranteed to execute. Only hoistable if the access base is an alloc_stack inside the loop.")
+      switch accessPath.base {
+      case let .stack(allocStackInst):
+        if !loop.contains(block: allocStackInst.parentBlock) {
+          log("Access base is an alloc_stack outside the loop.")
+          return false
+        }
+      default:
+        log("Access base is not an alloc_stack.")
+        return false
+      }
+    }
+
+    log("Hoisting store.")
+    return true
+  }
+
+  /// Returns true only if `storeInst` dominates all reads that may alias with
+  /// this path, and there are no potentially aliasing writes that may overwrite
+  /// the value `storeInst` stored.
+  ///
+  /// For efficiency, the implementation may not detect all such cases, for
+  /// example, with stores in branches.
+  private func storesUniqueReadableValue(accessPath: AccessPath, storeInst: StoreInst, _ context: FunctionPassContext) -> Bool {
+    precondition(storeInst.storeOwnership == .trivial)
+    let aliasAnalysis = context.aliasAnalysis
+    let domTree = context.dominatorTree
+    let storeAddr = storeInst.destination
+
+    /// If `inst` has a write effect on `storeAddr`, or it has a read effect and
+    /// is not dominated by `storeInst`, it has a conflicting effect. In this
+    /// case we know `storeInst` does not meet our conditions.
+    let hasConflictingEffect = { (inst: Instruction) in
+      log(inst.description)
+      // Ignore the store itself.
+
+      switch inst {
+      case storeInst:
+        log("   instruction does not conflict with itself")
+        return false
+      case is DeallocStackInst:
+        // dealloc_stack of a trivial type ignores the actual written value so
+        // we can ignore its memory effects
+        log("   ignoring the effects of dealloc_stack")
+        return false
+      default:
+        break
+      }
+
+      // Pass the original address value until we can fix alias analysis.
+      let effect = aliasAnalysis.getMemoryEffect(of: inst, on: storeAddr)
+      if effect.write {
+        log("    CONFLICTS: write effect")
+        return true
+      } else if effect.read && !storeInst.dominates(inst, domTree) {
+        log("    CONFLICTS: read effect and instruction is not dominated by the store")
+        return true
+      }
+
+      log("    no conflicting read or write effect")
+      return false
+    }
+    
+    // loopSideEffects, loopReadOnlyEffects and loads partition the set of
+    // instructions with memory effects in the loop.
+    if loopSideEffects.contains(where: hasConflictingEffect) {
+      return false
+    }
+    if loopReadOnlyEffects.contains(where: hasConflictingEffect) {
+      return false
+    }
+    if loads.contains(where: hasConflictingEffect) {
+      return false
+    }
+
     return true
   }
   
@@ -565,17 +747,6 @@ private extension MovableInstructions {
     for scopedInst in scopedInsts {
       if let storeBorrowInst = scopedInst as? StoreBorrowInst {
         _ = storeBorrowInst.allocStack.hoist(outOf: loop, context)
-        
-        var sankFirst = false
-        for deallocStack in storeBorrowInst.allocStack.deallocations {
-          if sankFirst {
-            context.erase(instruction: deallocStack)
-          } else {
-            sankFirst = deallocStack.sink(outOf: loop, context)
-          }
-        }
-        
-        context.notifyInvalidatedStackNesting()
       }
 
       guard scopedInst.hoist(outOf: loop, context) else {
@@ -811,6 +982,21 @@ private extension MovableInstructions {
   }
 }
 
+func hoistAllocAndDealloc(allocStackInst: AllocStackInst, outOf loop: Loop, _ context: FunctionPassContext) {
+  allocStackInst.move(before: loop.preheader!.terminator, context)
+  
+  var sankFirst = false
+  for deallocStack in allocStackInst.deallocations {
+    if sankFirst {
+      context.erase(instruction: deallocStack)
+    } else {
+      sankFirst = deallocStack.sink(outOf: loop, context)
+    }
+  }
+  
+  context.notifyInvalidatedStackNesting()
+}
+  
 private extension Instruction {
   /// Returns `true` if this instruction follows the default hoisting heuristic which means it
   /// is not a terminator, allocation or deallocation and either a hoistable array semantics call or doesn't have memory effects.
@@ -842,6 +1028,9 @@ private extension Instruction {
       if let loadCopyInst = self as? LoadInst, loadCopyInst.loadOwnership == .copy {
         hoist(loadCopyInst: loadCopyInst, outOf: loop, context)
         return true
+      } else if let allocStackInst = self as? AllocStackInst {
+        hoistAllocAndDealloc(allocStackInst: allocStackInst, outOf: loop, context)
+        return true
       } else {
         move(before: terminator, context)
       }
@@ -868,7 +1057,7 @@ private extension Instruction {
       exitBlockBuilder.createEndBorrow(of: preheaderLoadBorrow)
     }
   }
-  
+
   func sink(outOf loop: Loop, _ context: FunctionPassContext) -> Bool {
     var changed = false
 

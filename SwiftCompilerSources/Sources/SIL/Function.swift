@@ -692,6 +692,23 @@ extension Function {
                                                 withConvention: convention)
         return effects.memory.read
       },
+      // argumentMayWrite  (used by the MemoryLifetimeVerifier)
+      { (f: BridgedFunction, bridgedArgOp: BridgedOperand, bridgedAddr: BridgedValue) -> Bool in
+        let argOp = Operand(bridged: bridgedArgOp)
+        let addr = bridgedAddr.value
+        let applySite = argOp.instruction as! FullApplySite
+        let addrPath = addr.accessPath
+        let calleeArgIdx = applySite.calleeArgumentIndex(of: argOp)!
+        let convention = applySite.convention(of: argOp)!
+        assert(convention.isIndirectIn || convention.isInout)
+        let argPath = argOp.value.accessPath
+        assert(!argPath.isDistinct(from: addrPath))
+        let path = argPath.getProjection(to: addrPath) ?? SmallProjectionPath()
+        let effects = f.function.getSideEffects(forArgument: argOp.value.at(path),
+                                                atIndex: calleeArgIdx,
+                                                withConvention: convention)
+        return effects.memory.write
+      },
       // isDeinitBarrier
       { (f: BridgedFunction) -> Bool in
         return f.function.getSideEffects().isDeinitBarrier
