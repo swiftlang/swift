@@ -201,13 +201,13 @@ struct RetainReleaseInfo {
               loc,
               count == 0 ? diag::reference_type_must_have_retain_release_attr
                          : diag::too_many_reference_type_retain_release_attr,
-              isRelease, decl->getNameAsString());
+              isRelease, allocateRecordName(*Impl));
         return false;
       }
       if (name.empty()) {
         if (Impl)
           Impl->diagnose(loc, diag::reference_type_empty_retain_release_name,
-                         isRelease, decl->getNameAsString());
+                         isRelease, allocateRecordName(*Impl));
         return false;
       }
       return true;
@@ -229,6 +229,10 @@ private:
   const clang::RecordDecl *decl;
   StringRef retain, release;
   unsigned retainCount = 0, releaseCount = 0;
+
+  StringRef allocateRecordName(ClangImporter::Implementation &Impl) const {
+    return Impl.SwiftContext.AllocateCopy(decl->getNameAsString());
+  }
 };
 
 class ForeignReferenceTypeChecker {
@@ -684,6 +688,9 @@ resolveRefCountOperation(const ClassDecl *classDecl,
                          bool isRetain, ClangImporter::Implementation &Impl) {
   auto *record = cast<clang::RecordDecl>(classDecl->getClangDecl());
   HeaderLoc loc(record->getLocation());
+  auto recordName = [&]() -> StringRef {
+    return Impl.SwiftContext.AllocateCopy(record->getNameAsString());
+  };
 
   ASSERT(!name.empty() &&
          "structural check should guarantee a retain/release attr");
@@ -704,7 +711,7 @@ resolveRefCountOperation(const ClassDecl *classDecl,
       if (op) {
         Impl.diagnose(loc,
                       diag::too_many_reference_type_retain_release_operations,
-                      !isRetain, name, record->getNameAsString());
+                      !isRetain, name, recordName());
         return nullptr;
       }
       op = candidate;
@@ -713,7 +720,7 @@ resolveRefCountOperation(const ClassDecl *classDecl,
 
   if (!op) {
     Impl.diagnose(loc, diag::foreign_reference_types_cannot_find_retain_release,
-                  !isRetain, name, record->getNameAsString());
+                  !isRetain, name, recordName());
     if (!Impl.SwiftContext.LangOpts.DisableExperimentalClangImporterDiagnostics)
       Impl.diagnoseTopLevelValue(
           DeclName(Impl.SwiftContext.getIdentifier(name)));
