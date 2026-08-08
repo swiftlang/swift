@@ -743,8 +743,6 @@ resolveRefCountOperation(const ClassDecl *classDecl,
     return nullptr;
   }
 
-  // Diagnose any signature problem on the chosen operation. It is still
-  // returned (and recorded) even if invalid, matching prior behavior.
   checkRefCountOperation(classDecl, op, isRetain, name, &Impl, loc);
   return op;
 }
