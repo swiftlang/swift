@@ -101,7 +101,7 @@ public func span(_ p: inout MutableSpan<CInt>) {
 @__swiftmacro_So13bufferPointer15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@available(visionOS 1.0, *) @_alwaysEmitIntoClient @_disfavoredOverload
+@available(iOS 2.0, visionOS 1.0, *) @_alwaysEmitIntoClient @_disfavoredOverload
 public func bufferPointer(_ _bufferPointer_param0: UnsafeMutableBufferPointer<CInt>) {
     let _bufferPointer_param1 = CInt(exactly: _bufferPointer_param0.count)!
     return unsafe bufferPointer(_bufferPointer_param0.baseAddress, _bufferPointer_param1)
@@ -110,7 +110,7 @@ public func bufferPointer(_ _bufferPointer_param0: UnsafeMutableBufferPointer<CI
 @__swiftmacro_So4span15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@available(visionOS 1.0, *) @_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
+@available(iOS 2.0, visionOS 1.0, *) @_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
 public func span(_ p: inout MutableSpan<CInt>) {
     let len = CInt(exactly: p.count)!
     let _pPtr = p.withUnsafeMutableBufferPointer {
