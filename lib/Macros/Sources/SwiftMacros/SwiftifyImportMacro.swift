@@ -1795,7 +1795,7 @@ func containsLifetimeAttr(_ attrs: AttributeListSyntax, for paramName: TokenSynt
   return false
 }
 
-// Mutable[Raw]Span parameters need explicit @lifetime annotations since they are inout
+// Mutable[Raw]Span parameters need explicit @_lifetime annotations since they are inout
 func paramLifetimes(_ newSignature: FunctionSignatureSyntax) -> [LabeledExprSyntax] {
   var defaultLifetimes: [LabeledExprSyntax] = []
   for param in newSignature.parameterClause.parameters {

@@ -316,7 +316,7 @@ extension ApplySite {
   /// Returns .value if this apply fully assigns 'operand' (via @out).
   ///
   /// Returns .lifetime if this 'operand' is a non-Escapable inout argument and its lifetime is not propagated by the
-  /// call ('@lifetime(param: copy param)' is not present).
+  /// call ('@_lifetime(param: copy param)' is not present).
   public func fullyAssigns(operand: Operand) -> IsFullyAssigned {
     switch convention(of: operand) {
     case .indirectOut:
