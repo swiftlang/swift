@@ -485,7 +485,12 @@ private:
     // The move-only checker (which runs in raw SIL) relies on ignoring deinit
     // barriers for non-lexical lifetimes.
     // Optimizations, on the other hand, should always respect deinit barriers.
-    if (module.getStage() == SILStage::Raw && !currentDef->isLexical())
+    //
+    // This reads the module floor, not the function's stage, to stay consistent
+    // with supportsLexicalLifetimes() below, which is keyed to the floor. Asking
+    // the two questions on different axes would let a function ahead of the
+    // floor skip this check and still take the raw answer below.
+    if (module.getStageFloor() == SILStage::Raw && !currentDef->isLexical())
       return false;
 
     if (currentDef->getFunction()->forceEnableLexicalLifetimes())

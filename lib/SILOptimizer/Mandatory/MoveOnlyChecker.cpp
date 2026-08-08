@@ -246,7 +246,7 @@ class MoveOnlyCheckerPass : public SILFunctionTransform {
     if (getFunction()->wasDeserializedCanonical())
       return;
 
-    assert(fn->getModule().getStage() == SILStage::Raw &&
+    assert(fn->getModule().getStageFloor() == SILStage::Raw &&
            "Should only run on Raw SIL");
 
     // If an earlier pass told use to not emit diagnostics for this function,
