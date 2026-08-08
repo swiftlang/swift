@@ -423,11 +423,9 @@ void emitDeallocateUninitializedHeapObjectTyped(IRGenFunction &IGF,
       {object, size, alignMask, typeDescriptor});
 }
 
-void emitDeallocateUninitializedHeapObject(IRGenFunction &IGF,
-                                           llvm::Value *object,
-                                           llvm::Value *size,
-                                           llvm::Value *alignMask,
-                                           std::optional<uint64_t> mallocTypeId) {
+void irgen::emitDeallocateUninitializedHeapObject(
+    IRGenFunction &IGF, llvm::Value *object, llvm::Value *size,
+    llvm::Value *alignMask, std::optional<uint64_t> mallocTypeId) {
   if (mallocTypeId) {
     auto descriptorConst = llvm::ConstantInt::get(IGF.IGM.Int64Ty,
                                                   *mallocTypeId);

@@ -37,14 +37,14 @@ func contravariant() {
   func consumesCalledOnce(_: @called(once) () -> Void) {}
 
   var wrapperFn: (@escaping () -> Void) -> Void = consumes
-  var wrapperOnce: (@called(once) () -> Void) -> Void = consumesCalledOnce
+  var wrapperOnce: (@escaping @called(once) () -> Void) -> Void = consumesCalledOnce
 
   wrapperFn = wrapperOnce // Ok
   wrapperOnce = wrapperFn
   // expected-error@-1 {{invalid conversion from '@called(once)' function of type '@called(once) () -> Void' to function type '() -> Void'}}
 }
 
-func impliedEscaping(onceFn: @called(once) () -> Void) {
+func impliedEscaping(onceFn: @escaping @called(once) () -> Void) {
   func takesEscaping(_ f: @escaping () -> Void) {}
   takesEscaping(onceFn) // no diagnostics about `@escaping`
   // expected-error@-1 {{invalid conversion from '@called(once)' function of type '@called(once) () -> Void' to function type '() -> Void'}}
@@ -52,7 +52,7 @@ func impliedEscaping(onceFn: @called(once) () -> Void) {
 
 protocol P {
   func run(_: @called(once) () -> Void)
-  // expected-note@-1 {{protocol requires function 'run' with type '(consuming @escaping @called(once) () -> Void) -> ()'}}
+  // expected-note@-1 {{protocol requires function 'run' with type '(consuming @called(once) () -> Void) -> ()'}}
 }
 
 struct S1: P { // expected-error {{type 'S1' does not conform to protocol 'P'}} expected-note {{add stubs for conformance}}
