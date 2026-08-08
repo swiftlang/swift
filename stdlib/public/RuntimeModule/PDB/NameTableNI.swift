@@ -49,6 +49,10 @@ struct NameTableNI: Sequence {
     // Read the present bitmap
     let present = try Bitset.load(from: &stream)
 
+    guard Int(size) <= present.endIndex else {
+      return nil
+    }
+
     // Read the deleted bitmap
     let _ = try Bitset.load(from: &stream)
 

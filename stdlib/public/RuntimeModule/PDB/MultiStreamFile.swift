@@ -467,7 +467,7 @@ class MultiStreamFile {
 
   func read<T>(
     stream: Int, offset: Int, as type: T.Type, count: Int,
-    mustRead: Bool = false
+    mustRead: Bool = true
   ) throws -> [T] {
     let streamInfo = streams[stream + 1]
     var pageNdx = offset / pageSize

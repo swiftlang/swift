@@ -1703,7 +1703,15 @@ class DwarfReader<S: DwarfSource & AnyObject> {
           break
         }
 
-        fn(beginning + rangeBase, ending + rangeBase)
+        let (lowPC, lowOverflowed)
+          = beginning.addingReportingOverflow(rangeBase)
+        let (highPC, highOverflowed)
+          = ending.addingReportingOverflow(rangeBase)
+        if lowOverflowed || highOverflowed || highPC < lowPC {
+          continue
+        }
+
+        fn(lowPC, highPC)
       }
     }
   }
@@ -1813,7 +1821,9 @@ class DwarfReader<S: DwarfSource & AnyObject> {
       if case let .address(highPCAddr) = highPCVal {
         highPC = highPCAddr
       } else if let highPCOffset = highPCVal.uint64Value() {
-        highPC = lowPC + highPCOffset
+        let (sum, overflowed) = lowPC.addingReportingOverflow(highPCOffset)
+        guard !overflowed else { return }
+        highPC = sum
       } else {
         return
       }
@@ -1906,7 +1916,9 @@ class DwarfReader<S: DwarfSource & AnyObject> {
       if case let .address(highPCAddr) = highPCVal {
         highPC = highPCAddr
       } else if let highPCOffset = highPCVal.uint64Value() {
-        highPC = lowPC + highPCOffset
+        let (sum, overflowed) = lowPC.addingReportingOverflow(highPCOffset)
+        guard !overflowed else { return }
+        highPC = sum
       } else {
         return
       }
