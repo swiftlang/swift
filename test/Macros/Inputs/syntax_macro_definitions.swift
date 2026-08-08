@@ -1327,6 +1327,39 @@ public struct AddCompletionHandler: PeerMacro {
   }
 }
 
+public struct RemoveAsyncMacro: PeerMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingPeersOf declaration: some DeclSyntaxProtocol,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    guard var function = declaration.as(FunctionDeclSyntax.self) else {
+      throw CustomError.message("@RemoveAsync only works on functions")
+    }
+
+    if function.signature.effectSpecifiers?.asyncSpecifier == nil {
+      throw CustomError.message("@RemoveAsync requires an async function")
+    }
+
+    // Drop the peer macro attribute from the new declaration.
+    function.attributes = function.attributes.filter { element in
+      guard case let .attribute(attr) = element else {
+        return true
+      }
+      if let attrType = attr.attributeName.as(IdentifierTypeSyntax.self),
+         let nodeType = node.attributeName.as(IdentifierTypeSyntax.self) {
+        return attrType.name.text != nodeType.name.text
+      }
+      return true
+    }
+
+    // Remove the 'async' specifier.
+    function.signature.effectSpecifiers?.asyncSpecifier = nil
+
+    return [DeclSyntax(function)]
+  }
+}
+
 public struct ExpandTypeErrorMacro: PeerMacro {
   public static func expansion<
     Context: MacroExpansionContext,
