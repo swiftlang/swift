@@ -819,6 +819,18 @@ namespace {
                                IsTypeExpansionSensitive_t isSensitive) {
       switch (SILType::getPrimitiveObjectType(type)
                 .getPreferredExistentialRepresentation()) {
+      case ExistentialRepresentation::COM:
+        // COM existentials are fixed-size, loadable values with custom
+        // copy/destroy operations. They must not be classified as Swift
+        // reference-counted values: their sole pointer is an interface address,
+        // not a Swift heap-object address point.
+        return asImpl().handleNonTrivialAggregate(type, {IsNotTrivial,
+                                                         IsFixedABI,
+                                                         IsNotAddressOnly,
+                                                         IsNotResilient,
+                                                         isSensitive,
+                                                         DoesNotHaveRawPointer,
+                                                         IsLexical});
       case ExistentialRepresentation::None:
         llvm_unreachable("not an existential type?!");
       // Opaque existentials are address-only.
@@ -2376,7 +2388,14 @@ namespace {
       auto silType = SILType::getPrimitiveObjectType(type);
       return new (TC) OpaqueValueTypeLowering(silType, properties, Expansion);
     }
-    
+
+    TypeLowering *handleNonTrivialAggregate(CanType T,
+                                            SILTypeProperties properties) {
+      properties = mergeHasPack(HasPack_t(T->hasAnyPack()), properties);
+      auto type = SILType::getPrimitiveObjectType(T);
+      return new (TC) MiscNontrivialTypeLowering(type, properties, Expansion);
+    }
+
     TypeLowering *handleInfinite(CanType type,
                                  SILTypeProperties properties) {
       properties = mergeHasPack(HasPack_t(type->hasAnyPack()), properties);
