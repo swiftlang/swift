@@ -3313,6 +3313,12 @@ SetTestSuite.test("remove(member)")
   expectTrue(s2.isEmpty)
 }
 
+SetTestSuite.test("contains small set") {
+  let s1 = Set([1010, 2020, 3030])
+  expectTrue(s1.contains(1010))
+  expectFalse(s1.contains(999))
+}
+
 SetTestSuite.test("memberAtIndex") {
   let s1 = Set([1010, 2020, 3030])
 
