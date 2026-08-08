@@ -100,6 +100,24 @@ static bool shouldYieldThread() {
 /******************************* TASK TRACKING ******************************/
 /*****************************************************************************/
 
+/// The currently executing task. If this has thread-local storage (Windows,
+/// Linux) or is a plain global (embedded), give it a stable name and protected
+/// visibility, enabling debuggers to locate the symbol by name and ensuring it
+/// survives stripping the symbol table.
+/// Bump _concurrency_current_task_storage_kind in Debug.h if this changes.
+#ifdef SWIFT_THREAD_LOCAL
+extern "C" {
+// (windows) dllexport is not allowed on thread-local variables.
+#if defined(__ELF__)
+SWIFT_ATTRIBUTE_FOR_EXPORTS
+#endif
+#else
+namespace {
+#endif
+SWIFT_THREAD_LOCAL_TYPE(TLSPointer<AsyncTask>, tls_key::concurrency_task)
+_swift_concurrency_currentTask;
+}
+
 namespace {
 
 /// A class which encapsulates the information we track about
@@ -191,23 +209,15 @@ public:
 };
 
 class ActiveTask {
-  /// A thread-local variable pointing to the active tracking
-  /// information about the current thread, if any.
-  static SWIFT_THREAD_LOCAL_TYPE(TLSPointer<AsyncTask>,
-                                 tls_key::concurrency_task) Value;
-
 public:
-  static void set(AsyncTask *task) { Value.set(task); }
-  static AsyncTask *get() { return Value.get(); }
+  static void set(AsyncTask *task) { _swift_concurrency_currentTask.set(task); }
+  static AsyncTask *get() { return _swift_concurrency_currentTask.get(); }
   static AsyncTask *swap(AsyncTask *newTask) {
-    return Value.swap(newTask);
+    return _swift_concurrency_currentTask.swap(newTask);
   }
 };
 
 /// Define the thread-locals.
-SWIFT_THREAD_LOCAL_TYPE(TLSPointer<AsyncTask>, tls_key::concurrency_task)
-ActiveTask::Value;
-
 SWIFT_THREAD_LOCAL_TYPE(TLSPointer<ExecutorTrackingInfo>,
                         tls_key::concurrency_executor_tracking_info)
 ExecutorTrackingInfo::ActiveInfoInThread;
