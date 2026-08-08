@@ -261,6 +261,12 @@ void RequirementMachine::checkCompletionResult(CompletionResult result) const {
       out << "Rewrite system exceeded concrete type difference limit\n";
       dump(out);
     });
+
+  case CompletionResult::RecursiveRule:
+    ABORT([&](auto &out) {
+      out << "Recursive same-type or superclass requirement detected\n";
+      dump(out);
+    });
   }
 }
 
@@ -299,6 +305,12 @@ RequirementMachine::initWithProtocolSignatureRequirements(
                     std::move(builder.RequirementRules));
 
   auto result = computeCompletion(RewriteSystem::DisallowInvalidRequirements);
+
+  if (auto optRule = checkForRecursiveRule()) {
+    // If we have a recursive same-type or superclass requirement, this
+    // supersedes any other failure reported by completion.
+    result = std::pair(CompletionResult::RecursiveRule, *optRule);
+  }
 
   freeze();
 
@@ -351,6 +363,12 @@ RequirementMachine::initWithGenericSignature(GenericSignature sig) {
                     std::move(builder.RequirementRules));
 
   auto result = computeCompletion(RewriteSystem::DisallowInvalidRequirements);
+
+  if (auto optRule = checkForRecursiveRule()) {
+    // If we have a recursive same-type or superclass requirement, this
+    // supersedes any other failure reported by completion.
+    result = std::make_pair(CompletionResult::RecursiveRule, *optRule);
+  }
 
   freeze();
 
@@ -407,6 +425,12 @@ RequirementMachine::initWithProtocolWrittenRequirements(
 
   auto result = computeCompletion(RewriteSystem::AllowInvalidRequirements);
 
+  if (auto optRule = checkForRecursiveRule()) {
+    // If we have a recursive same-type or superclass requirement, this
+    // supersedes any other failure reported by completion.
+    result = std::make_pair(CompletionResult::RecursiveRule, *optRule);
+  }
+
   if (Dump) {
     llvm::dbgs() << "}\n";
   }
@@ -458,11 +482,35 @@ RequirementMachine::initWithWrittenRequirements(
 
   auto result = computeCompletion(RewriteSystem::AllowInvalidRequirements);
 
+  if (auto optRule = checkForRecursiveRule()) {
+    // If we have a recursive same-type or superclass requirement, this
+    // supersedes any other failure reported by completion.
+    result = std::make_pair(CompletionResult::RecursiveRule, *optRule);
+  }
+
   if (Dump) {
     llvm::dbgs() << "}\n";
   }
 
   return result;
+}
+
+std::optional<unsigned> RequirementMachine::checkForRecursiveRule() const {
+  // One of the initial rules might already be recursive.
+  for (unsigned i = 0; i < System.getRules().size(); ++i) {
+    const auto &rule = System.getRule(i);
+    if (rule.isRedundant() ||
+        rule.isPermanent() ||
+        rule.isLHSSimplified() ||
+        rule.isRHSSimplified() ||
+        rule.isSubstitutionSimplified())
+      continue;
+
+    if (rule.isRecursiveRule())
+      return i;
+  }
+
+  return std::nullopt;
 }
 
 /// Attempt to obtain a confluent rewrite system by iterating the Knuth-Bendix
@@ -518,17 +566,26 @@ RequirementMachine::computeCompletion(RewriteSystem::ValidityPolicy policy) {
       // Check new rules added by the property map against configured limits.
       for (unsigned i = 0; i < rulesAdded; ++i) {
         const auto &newRule = System.getRule(ruleCount + i);
+
         if (newRule.getDepth() > MaxRuleLength + System.getLongestInitialRule()) {
           return std::make_pair(CompletionResult::MaxRuleLength,
                                 ruleCount + i);
         }
+
         auto nestingAndSize = newRule.getNestingAndSize();
+
         if (nestingAndSize.first > MaxConcreteNesting + System.getMaxNestingOfInitialRule()) {
           return std::make_pair(CompletionResult::MaxConcreteNesting,
                                 ruleCount + i);
         }
+
         if (nestingAndSize.second > MaxConcreteSize + System.getMaxSizeOfInitialRule()) {
           return std::make_pair(CompletionResult::MaxConcreteSize,
+                                ruleCount + i);
+        }
+
+        if (newRule.isRecursiveRule()) {
+          return std::make_pair(CompletionResult::RecursiveRule,
                                 ruleCount + i);
         }
       }
