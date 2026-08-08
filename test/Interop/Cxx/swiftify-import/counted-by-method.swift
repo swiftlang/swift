@@ -157,9 +157,8 @@ struct SWIFT_REFERENCE RefType {
   int refBasic(const int * __counted_by(len) p, int len) const;
 
   // FIXME: merge availability with that of surrounding context
-  // expected-expansion@+15:80{{
+  // expected-expansion@+14:80{{
   //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-  //   expected-apple-error@2{{instance method cannot be more available than enclosing scope}}
   //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_disfavoredOverload|}}
   //   expected-remark@3{{macro content: |public final func refNoescape(_ p: Span<CInt>) {|}}
   //   expected-remark@4{{macro content: |    let len = CInt(exactly: p.count)!|}}
@@ -188,9 +187,8 @@ struct SWIFT_REFERENCE RefType {
   virtual int refBasicVirt(const int * __counted_by(len) p, int len) const;
 
   // FIXME: merge availability with that of surrounding context
-  // expected-expansion@+20:103{{
+  // expected-expansion@+19:103{{
   //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-  //   expected-apple-error@2{{instance method cannot be more available than enclosing scope}}
   //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_lifetime(p: copy p) @_disfavoredOverload|}}
   //   expected-remark@3{{macro content: |public final func refLifetimebound(_ p: inout MutableSpan<CInt>) -> MutableSpan<CInt> {|}}
   //   expected-remark@4{{macro content: |    let len = CInt(exactly: p.count)!|}}
