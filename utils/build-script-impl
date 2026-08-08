@@ -1304,7 +1304,7 @@ LIBDISPATCH_SOURCE_DIR="${WORKSPACE}/swift-corelibs-libdispatch"
 LIBDISPATCH_STATIC_SOURCE_DIR="${WORKSPACE}/swift-corelibs-libdispatch"
 LIBCXX_SOURCE_DIR="${WORKSPACE}/llvm-project/runtimes"
 SWIFT_COLLECTIONS_SOURCE_DIR="${WORKSPACE}/swift-collections"
-SWIFT_PATH_TO_STRING_PROCESSING_SOURCE="${WORKSPACE}/swift-experimental-string-processing"
+SWIFT_PATH_TO_STRING_PROCESSING_SOURCE="${WORKSPACE}/swift-string-processing"
 SWIFTSYNTAX_SOURCE_DIR="${WORKSPACE}/swift-syntax"
 SWIFT_SYNTAX_SOURCE_DIR="${WORKSPACE}/swift-syntax"
 
