@@ -530,6 +530,9 @@ class OptimizerStatsAnalysis : public SILAnalysis {
   SmallVector<SILFunction *, 16> DeletedFuncs;
   SmallVector<SILFunction *, 16> AddedFuncs;
 
+  /// Maps derived functions to the function they were created from.
+  llvm::DenseMap<SILFunction *, SILFunction *> DerivedFromMap;
+
 public:
   OptimizerStatsAnalysis(SILModule *M)
       : SILAnalysis(SILAnalysisKind::OptimizerStats), M(*M), Cache(nullptr) {}
@@ -552,6 +555,11 @@ public:
   /// Notify the analysis about a newly created function.
   virtual void notifyAddedOrModifiedFunction(SILFunction *F) override {
     AddedFuncs.push_back(F);
+  }
+
+  /// Record that \p Derived was created from \p Original.
+  void recordDerivedFunction(SILFunction *Derived, SILFunction *Original) {
+    DerivedFromMap[Derived] = Original;
   }
 
   /// Notify the analysis about a function which will be deleted from the
@@ -771,13 +779,51 @@ bool functionHasInstructionInScope(SILFunction *F,
   return false;
 }
 
+/// Compute lost variables when a function was derived from another (e.g. by
+/// specialization).  Scopes are cloned during derivation, so scopes can't be
+/// compared easily.  Instead, compare inlining information.
+int computeLostVariablesForDerivedFunction(
+    SILFunction *derivedFn,
+    FunctionStat &OrigOld, FunctionStat &DerivedNew) {
+
+  using DerivedVarID =
+      std::tuple<SILFunction *, llvm::StringRef, SourceLoc>;
+
+  llvm::DenseSet<DerivedVarID> OldVars;
+  for (auto &Var : OrigOld.DebugVariables) {
+    SILFunction *parentFn = std::get<0>(Var)->getParentFunction();
+    SILFunction *inlinedFn = std::get<0>(Var)->getInlinedFunction();
+    // If this variable wasn't inlined, it is expected that the function
+    // changes from the original function to the derived one.
+    if (inlinedFn == parentFn)
+      inlinedFn = derivedFn;
+    OldVars.insert({inlinedFn, std::get<1>(Var), std::get<2>(Var)});
+  }
+
+  llvm::DenseSet<DerivedVarID> NewVars;
+  for (auto &Var : DerivedNew.DebugVariables) {
+    SILFunction *inlinedFn = std::get<0>(Var)->getInlinedFunction();
+    NewVars.insert({inlinedFn, std::get<1>(Var), std::get<2>(Var)});
+  }
+
+  unsigned LostCount = 0;
+  for (auto &Var : OldVars) {
+    if (!NewVars.contains(Var))
+      LostCount++;
+  }
+  return LostCount;
+}
+
 int computeLostVariables(SILFunction *F, FunctionStat &Old, FunctionStat &New,
-                         TransformationContext &Ctx) {
+                         TransformationContext &Ctx, FunctionStat *Orig) {
   // Transparent functions cannot be debugged. By definition, they are
   // skipped by the debugger, and you cannot place a breakpoint in one.
   // Dropping variables in those functions is acceptable.
   if (F->isTransparent())
     return 0;
+
+  if (Orig)
+    return computeLostVariablesForDerivedFunction(F, *Orig, New);
 
   unsigned LostCount = 0;
   auto &OldSet = Old.DebugVariables;
@@ -847,9 +893,12 @@ void processFuncStatHistory(SILFunction *F, FunctionStat &Stat,
 /// \param OldStat statistics computed last time
 /// \param NewStat statistics computed now, after the run of the transformation
 /// \param Ctx transformation context to be used
+/// \param OrigStat statistics computed last time on the function this was
+/// derived from
 void processFuncStatsChanges(SILFunction *F, FunctionStat &OldStat,
                              FunctionStat &NewStat,
-                             TransformationContext &Ctx) {
+                             TransformationContext &Ctx,
+                             FunctionStat *OrigStat = nullptr) {
   processFuncStatHistory(F, NewStat, Ctx);
 
   if (!SILStatsFunctions && !SILStatsLostVariables && !SILStatsDumpAll)
@@ -866,7 +915,7 @@ void processFuncStatsChanges(SILFunction *F, FunctionStat &OldStat,
   // Compute deltas.
   double DeltaBlockCount = computeDelta(OldStat.BlockCount, NewStat.BlockCount);
   double DeltaInstCount = computeDelta(OldStat.InstCount, NewStat.InstCount);
-  int LostVariables = computeLostVariables(F, OldStat, NewStat, Ctx);
+  int LostVariables = computeLostVariables(F, OldStat, NewStat, Ctx, OrigStat);
 
   NewLineInserter nl;
 
@@ -1036,6 +1085,28 @@ void OptimizerStatsAnalysis::updateModuleStats(TransformationContext &Ctx) {
     // record all transformations, even if they do not change anything.
     NewModStat = OldModStat;
 
+    // Process added functions first, so that derived functions can read their
+    // original function's pre-pass stats.
+    while (!AddedFuncs.empty()) {
+      auto *F = AddedFuncs.back();
+      AddedFuncs.pop_back();
+      auto &FuncStat = getFunctionStat(F);
+      FunctionStat OldFuncStat;
+      FunctionStat NewFuncStat(F);
+
+      // If this function was derived from another (e.g. specialization),
+      // compare its variables against the original's.
+      FunctionStat *OrigStat = nullptr;
+      if (SILFunction *original = DerivedFromMap.lookup(F)) {
+        OrigStat = &getFunctionStat(original);
+      }
+
+      processFuncStatsChanges(F, OldFuncStat, NewFuncStat, Ctx, OrigStat);
+      NewModStat.addFunctionStat(NewFuncStat);
+      FuncStat = std::move(NewFuncStat);
+    }
+    DerivedFromMap.clear();
+
     // Process modified functions.
     while (!InvalidatedFuncs.empty()) {
       auto *F = InvalidatedFuncs.back();
@@ -1059,18 +1130,6 @@ void OptimizerStatsAnalysis::updateModuleStats(TransformationContext &Ctx) {
       processFuncStatsChanges(F, OldFuncStat, NewFuncStat, Ctx);
       NewModStat.subFunctionStat(OldFuncStat);
       Cache->deleteFunctionStat(F);
-    }
-
-    // Process added functions.
-    while (!AddedFuncs.empty()) {
-      auto *F = AddedFuncs.back();
-      AddedFuncs.pop_back();
-      auto &FuncStat = getFunctionStat(F);
-      FunctionStat OldFuncStat;
-      FunctionStat NewFuncStat(F);
-      processFuncStatsChanges(F, OldFuncStat, NewFuncStat, Ctx);
-      NewModStat.addFunctionStat(NewFuncStat);
-      FuncStat = std::move(NewFuncStat);
     }
   }
 
@@ -1126,6 +1185,16 @@ void swift::updateSILModuleStatsBeforeTransform(SILModule &M,
   if (!SILStatsModules && !SILStatsFunctions)
     return;
 }
+
+void swift::notifySILModuleStatsOfFunctionDerivedFrom(SILPassManager &PM,
+                                                      SILFunction *Derived,
+                                                      SILFunction *Original) {
+  if (!SILStatsLostVariables)
+    return;
+  OptimizerStatsAnalysis *Stats = PM.getAnalysis<OptimizerStatsAnalysis>();
+  Stats->recordDerivedFunction(Derived, Original);
+}
+
 
 SILAnalysis *swift::createOptimizerStatsAnalysis(SILModule *M) {
   return new OptimizerStatsAnalysis(M);
