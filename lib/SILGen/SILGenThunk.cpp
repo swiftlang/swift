@@ -38,9 +38,11 @@
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
+#include "swift/SIL/SILValue.h"
 #include "swift/SIL/TypeLowering.h"
 
 #include "clang/AST/ASTContext.h"
+#include "llvm/ADT/SmallVector.h"
 
 using namespace swift;
 using namespace Lowering;
@@ -678,6 +680,37 @@ getOrCreateReabstractionThunk(CanSILFunctionType thunkType,
       IsNotRuntimeAccessible);
 }
 
+/// Given a value, extracts all elements to `result` from this value if it's a
+/// tuple. Otherwise, add this value directly to `result`.
+static void extractAllElements(SILValue val, SILLocation loc,
+                               SILBuilder &builder,
+                               SmallVectorImpl<SILValue> &result) {
+  auto &fn = builder.getFunction();
+  auto tupleType = val->getType().getAs<TupleType>();
+  if (!tupleType) {
+    result.push_back(val);
+    return;
+  }
+  if (!fn.hasOwnership()) {
+    for (auto i : range(tupleType->getNumElements()))
+      result.push_back(builder.createTupleExtract(loc, val, i));
+    return;
+  }
+  if (tupleType->getNumElements() == 0)
+    return;
+  builder.emitDestructureValueOperation(loc, val, result);
+}
+
+/// Given a range of elements, joins these into a single value. If there's
+/// exactly one element, returns that element. Otherwise, creates a tuple using
+/// a `tuple` instruction.
+static SILValue joinElements(ArrayRef<SILValue> elements, SILBuilder &builder,
+                             SILLocation loc) {
+  if (elements.size() == 1)
+    return elements.front();
+  return builder.createTuple(loc, elements);
+}
+
 SILFunction *SILGenModule::getOrCreateDerivativeVTableThunk(
     SILDeclRef derivativeFnDeclRef, CanSILFunctionType constantTy) {
   auto *derivativeId = derivativeFnDeclRef.getDerivativeFunctionIdentifier();
@@ -732,7 +765,11 @@ SILFunction *SILGenModule::getOrCreateDerivativeVTableThunk(
   auto apply =
       SGF.emitApplyWithRethrow(loc, derivativeFn, derivativeFnSILTy,
                                SGF.getForwardingSubstitutionMap(), args);
-  SGF.B.createReturn(loc, apply);
+  // TODO: This is a bit crazy, but apparently address lowering expects this
+  // particular code pattern
+  SmallVector<SILValue, 2> results;
+  extractAllElements(apply, loc, SGF.B, results);
+  SGF.B.createReturn(loc, joinElements(results, SGF.B, loc));
 
   return thunk;
 }
