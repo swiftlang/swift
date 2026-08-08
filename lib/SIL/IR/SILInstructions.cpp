@@ -1053,14 +1053,14 @@ PartialApplyInst *PartialApplyInst::create(
     SubstitutionMap Subs, ParameterConvention calleeConvention,
     SILFunctionTypeIsolation resultIsolation, SILFunction &F,
     const GenericSpecializationInformation *specializationInfo,
-    OnStackKind onStack, StackAllocationIsNested_t isNested,
+    OnStackKind onStack, StackAllocationIsNested_t isNested, bool isCalledOnce,
     std::optional<ArrayRef<SILLocation>> ArgLocs) {
   SILType SubstCalleeTy = Callee->getType().substGenericArgs(
       F.getModule(), Subs, F.getTypeExpansionContext());
 
   SILType ClosureType = SILBuilder::getPartialApplyResultType(
       F.getTypeExpansionContext(), SubstCalleeTy, Args.size(), F.getModule(), {},
-      calleeConvention, resultIsolation, onStack);
+      calleeConvention, resultIsolation, onStack, isCalledOnce);
 
   SmallVector<SILValue, 32> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, F,

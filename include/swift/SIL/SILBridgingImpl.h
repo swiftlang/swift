@@ -1571,6 +1571,10 @@ SwiftInt BridgedInstruction::PartialApply_getCalleeArgIndexOfFirstAppliedArg() c
   return swift::ApplySite(unbridged()).getSubstCalleeArgIndexOfFirstAppliedArg();
 }
 
+bool BridgedInstruction::PartialApplyInst_isCalledOnce() const {
+  return getAs<swift::PartialApplyInst>()->isCalledOnce();
+}
+
 bool BridgedInstruction::PartialApplyInst_isOnStack() const {
   return getAs<swift::PartialApplyInst>()->isOnStack();
 }
@@ -3010,7 +3014,7 @@ BridgedInstruction BridgedBuilder::createPartialApply(
     BridgedValue funcRef, BridgedValueArray bridgedCapturedArgs,
     BridgedArgumentConvention calleeConvention,
     BridgedSubstitutionMap bridgedSubstitutionMap, bool hasUnknownIsolation,
-    bool isOnStack, bool isNested,
+    bool isOnStack, bool isNested, bool isCalledOnce,
     OptionalBridgedInstruction argLocsFrom) const {
   llvm::SmallVector<swift::SILValue, 8> capturedArgs;
   llvm::ArrayRef<swift::SILValue> args =
@@ -3020,6 +3024,7 @@ BridgedInstruction BridgedBuilder::createPartialApply(
       args, getParameterConvention(calleeConvention),
       hasUnknownIsolation ? swift::SILFunctionTypeIsolation::forUnknown()
                           : swift::SILFunctionTypeIsolation::forErased(),
+      isCalledOnce,
       isOnStack ? swift::PartialApplyInst::OnStack
                 : swift::PartialApplyInst::NotOnStack,
       swift::StackAllocationIsNested_t(isNested),

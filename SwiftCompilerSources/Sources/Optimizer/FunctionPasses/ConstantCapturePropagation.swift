@@ -252,7 +252,7 @@ private func rewritePartialApply(_ partialApply: PartialApplyInst, withSpecializ
       substitutionMap: specialized.genericSignature.isEmpty ? SubstitutionMap() : partialApply.substitutionMap,
       capturedArguments: arguments, calleeConvention: partialApply.calleeConvention,
       hasUnknownResultIsolation: partialApply.hasUnknownResultIsolation, isOnStack: partialApply.isOnStack,
-      isNested: partialApply.isNested)
+      isNested: partialApply.isNested, isCalledOnce: partialApply.isCalledOnce)
     newClosure = newPartialApply
   }
   partialApply.uses.replaceAll(with: newClosure, context)

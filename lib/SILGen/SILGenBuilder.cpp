@@ -69,16 +69,17 @@ PartialApplyInst *SILGenBuilder::createPartialApply(
     ParameterConvention CalleeConvention,
     SILFunctionTypeIsolation ResultIsolation,
     PartialApplyInst::OnStackKind OnStack, StackAllocationIsNested_t IsNested,
-    const GenericSpecializationInformation *SpecializationInfo) {
+    const GenericSpecializationInformation *SpecializationInfo,
+    bool IsCalledOnce) {
 
   // We completely drop the generic signature if all generic parameters were
   // concrete. Similar to emitRawApply.
   if (Subs && Subs.getGenericSignature()->areAllParamsConcrete())
     Subs = SubstitutionMap();
 
-  return SILBuilder::createPartialApply(Loc, Fn, Subs, Args, CalleeConvention,
-                                        ResultIsolation, OnStack, IsNested,
-                                        SpecializationInfo);
+  return SILBuilder::createPartialApply(
+      Loc, Fn, Subs, Args, CalleeConvention, ResultIsolation, IsCalledOnce,
+      OnStack, IsNested, SpecializationInfo, std::nullopt);
 }
 
 //===----------------------------------------------------------------------===//
@@ -89,7 +90,8 @@ ManagedValue SILGenBuilder::createPartialApply(SILLocation loc, SILValue fn,
                                                SubstitutionMap subs,
                                                ArrayRef<ManagedValue> args,
                                                ParameterConvention calleeConvention,
-                                         SILFunctionTypeIsolation resultIsolation) {
+                                               SILFunctionTypeIsolation resultIsolation,
+                                               bool isCalledOnce) {
   llvm::SmallVector<SILValue, 8> values;
   llvm::transform(args, std::back_inserter(values),
                   [&](ManagedValue mv) -> SILValue {
@@ -97,7 +99,9 @@ ManagedValue SILGenBuilder::createPartialApply(SILLocation loc, SILValue fn,
   });
   SILValue result =
       createPartialApply(loc, fn, subs, values, calleeConvention,
-                         resultIsolation);
+                         resultIsolation,
+                         PartialApplyInst::OnStackKind::NotOnStack,
+                         StackAllocationIsNested, nullptr, isCalledOnce);
   // Partial apply instructions create a box, so we need to put on a cleanup.
   return getSILGenFunction().emitManagedRValueWithCleanup(result);
 }

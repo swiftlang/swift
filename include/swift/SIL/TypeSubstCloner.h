@@ -228,8 +228,10 @@ protected:
         getOpLocation(Inst->getLoc()), Helper.getCallee(),
         Helper.getSubstitutions(), Helper.getArguments(),
         Inst->getCalleeConvention(), Inst->getResultIsolation(),
-        Inst->isOnStack(), Inst->isStackAllocationNested(),
-        GenericSpecializationInformation::create(Inst, getBuilder()));
+        Inst->isCalledOnce(), Inst->isOnStack(),
+        Inst->isStackAllocationNested(),
+        GenericSpecializationInformation::create(Inst, getBuilder()),
+        std::nullopt);
     recordClonedInstruction(Inst, N);
   }
 

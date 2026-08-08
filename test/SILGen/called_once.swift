@@ -43,9 +43,8 @@ func testCallOnceEscaping(_ f: @escaping @called(once) () -> Void) {
 // CHECK:  [[CLOSURE_REF:%.*]] = function_ref @$s11called_once22testClosureWithCapture1fyyyXEn_tFyyXOfU_ : $@convention(thin) (@owned @noescape @called(once) @callee_owned () -> ()) -> ()
 // CHECK:  [[FN_ADDR:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[FN_PROJ]] : $*@noescape @called(once) @callee_owned () -> ()
 // CHECK:  [[FN_VALUE:%.*]] = load [take] [[FN_ADDR]] : $*@noescape @called(once) @callee_owned () -> ()
-// CHECK:  [[CLOSURE_WITH_CAPTURE:%.*]] = partial_apply [[CLOSURE_REF]]([[FN_VALUE]]) : $@convention(thin) (@owned @noescape @called(once) @callee_owned () -> ()) -> ()
-// CHECK:  [[G_CLOSURE:%.*]] = convert_function [[CLOSURE_WITH_CAPTURE]] : $@callee_owned () -> () to $@called(once) @callee_owned () -> ()
-// CHECK:  store [[G_CLOSURE]] to [init] [[G_PROJ]]
+// CHECK:  [[CLOSURE_WITH_CAPTURE:%.*]] = partial_apply [called_once] [[CLOSURE_REF]]([[FN_VALUE]]) : $@convention(thin) (@owned @noescape @called(once) @callee_owned () -> ()) -> ()
+// CHECK:  store [[CLOSURE_WITH_CAPTURE]] to [init] [[G_PROJ]]
 // CHECK:  [[X_BOX:%.*]] = alloc_box ${ let @called(once) @callee_owned () -> () }, let, name "x"
 // CHECK:  [[BORROWED_X_BOX:%.*]] = begin_borrow [lexical] [var_decl] [[X_BOX]] : ${ let @called(once) @callee_owned () -> () }
 // CHECK:  [[X_PROJ:%.*]] = project_box [[BORROWED_X_BOX]] : ${ let @called(once) @callee_owned () -> () }
@@ -96,9 +95,8 @@ func testClosureWithCapture(f: @called(once) () -> Void) {
 // CHECK:  [[G_PROJ:%.*]] = project_box {{.*}} : ${ let @called(once) @callee_owned () -> () }, 0
 // CHECK:  [[F_TAKE_ADDR:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[F_PROJ]] : $*@noescape @called(once) @callee_owned () -> ()
 // CHECK:  [[F_VALUE:%.*]] = load [take] [[F_TAKE_ADDR]] : $*@noescape @called(once) @callee_owned () -> ()
-// CHECK:  [[CLOSURE:%.*]] = partial_apply {{.*}}([[F_VALUE]]) : $@convention(thin) (@owned @noescape @called(once) @callee_owned () -> ()) -> ()
-// CHECK:  [[G_CLOSURE:%.*]] = convert_function [[CLOSURE]]
-// CHECK:  store [[G_CLOSURE]] to [init] [[G_PROJ]]
+// CHECK:  [[CLOSURE:%.*]] = partial_apply [called_once] {{.*}}([[F_VALUE]]) : $@convention(thin) (@owned @noescape @called(once) @callee_owned () -> ()) -> ()
+// CHECK:  store [[CLOSURE]] to [init] [[G_PROJ]]
 // CHECK:  [[NEW_VALUE:%.*]] = apply {{.*}}() : $@convention(thin) () -> @owned @called(once) @callee_owned () -> ()
 // CHECK:  [[NEW_VALUE_NOESCAPE:%.*]] = convert_escape_to_noescape [[NEW_VALUE]] : $@called(once) @callee_owned () -> () to $@noescape @called(once) @callee_owned () -> ()
 // CHECK:  [[F_ACCESS:%.*]] = begin_access [modify] [unknown] [[F_PROJ]] : $*@noescape @called(once) @callee_owned () -> ()
@@ -141,7 +139,7 @@ func testClosureWithVarCapture(_ f: @called(once) () -> Void) {
 // CHECK:  [[COUNT_BOX_COPY:%.*]] = copy_value [[COUNT_BORROW]] : ${ var Int }
 // CHECK:  [[F_TAKE_ADDR:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[F_PROJ]] : $*@noescape @called(once) @callee_owned () -> ()
 // CHECK:  [[F_VALUE:%.*]] = load [take] [[F_TAKE_ADDR]] : $*@noescape @called(once) @callee_owned () -> ()
-// CHECK:  partial_apply {{.*}}([[COUNT_BOX_COPY]], [[F_VALUE]]) : $@convention(thin) (@guaranteed { var Int }, @owned @noescape @called(once) @callee_owned () -> ()) -> ()
+// CHECK:  partial_apply [called_once] {{.*}}([[COUNT_BOX_COPY]], [[F_VALUE]]) : $@convention(thin) (@guaranteed { var Int }, @owned @noescape @called(once) @callee_owned () -> ()) -> ()
 // CHECK: } // end sil function '$s11called_once21testMixedCaptureKindsyyyyXEnF'
 
 // CHECK-LABEL: sil private [ossa] @$s11called_once21testMixedCaptureKindsyyyyXEnFyyXOfU_ : $@convention(thin) (@guaranteed { var Int }, @owned @noescape @called(once) @callee_owned () -> ()) -> () {
