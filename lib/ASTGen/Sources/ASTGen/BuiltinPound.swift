@@ -29,9 +29,12 @@ extension ASTGenVisitor {
 
     switch result {
     case .generated(_):
-      guard node.attributes.isEmpty && node.modifiers.isEmpty else {
-        // TODO: Diagnose.
-        fatalError("attributes not applied")
+      // A built-in pound is not a declaration, so it cannot carry attributes or
+      // modifiers. The C++ parser fails to parse a declaration at the pound and
+      // reports that, but still evaluates the directive, so keep the generated
+      // node rather than dropping it.
+      if !node.attributes.isEmpty || !node.modifiers.isEmpty {
+        self.diagnose(.expected_decl, at: node.pound)
       }
       break
     case .ignored:
@@ -229,21 +232,68 @@ extension ASTGenVisitor {
     )
   }
 
+  /// The location of `token`, or of `node`'s pound keyword when the parser
+  /// synthesized `token` during recovery.
+  ///
+  /// A synthesized token still has a position -- a zero-width one past the
+  /// preceding token and its trailing trivia -- so diagnosing at it can land
+  /// well away from the construct it belongs to.
+  func generateSourceLoc(
+    _ token: TokenSyntax?,
+    orPoundOf node: some FreestandingMacroExpansionSyntax
+  ) -> SourceLoc {
+    let loc = self.generateSourceLocIfPresent(token)
+    if loc == nil {
+      return self.generateSourceLoc(node.pound)
+    }
+    return loc
+  }
+
+  /// Where to report that `#selector`/`#keyPath` was written with something the
+  /// grammar does not admit after the keyword -- a generic argument clause or a
+  /// trailing closure.
+  ///
+  /// The C++ parser has no production for either, so it stops right after the
+  /// keyword and reports a missing '(' there. Point at whichever of the two
+  /// appeared, matching that column.
+  func poundArgumentListMismatchLoc(
+    _ node: some FreestandingMacroExpansionSyntax
+  ) -> SourceLoc {
+    if let genericArgumentClause = node.genericArgumentClause {
+      return self.generateSourceLoc(genericArgumentClause)
+    }
+    if let trailingClosure = node.trailingClosure {
+      return self.generateSourceLoc(trailingClosure)
+    }
+    return self.generateSourceLoc(node.additionalTrailingClosures)
+  }
+
   func generateObjCSelectorExpr(freestandingMacroExpansion node: some FreestandingMacroExpansionSyntax) -> BridgedExpr {
     guard
       node.genericArgumentClause == nil,
       node.trailingClosure == nil,
       node.additionalTrailingClosures.isEmpty
     else {
-      // TODO: Diagnose.
-      fatalError("#selector with generic specialization")
+      // `#selector` takes neither generic arguments nor a trailing closure. The
+      // C++ parser has no grammar for either, so it fails looking for the '('
+      // that should have followed the keyword.
+      self.diagnose(
+        .expr_selector_expected_lparen,
+        at: self.poundArgumentListMismatchLoc(node)
+      )
+      return BridgedErrorExpr.create(self.ctx, loc: self.generateSourceRange(node)).asExpr
     }
 
     var args = node.arguments[...]
     guard let arg = args.popFirst() else {
-      // TODO: Diagnose
-      fatalError("expected an argument for #selector")
-      // return ErrorExpr
+      // `#selector()`. The C++ parser reports the missing method expression and
+      // recovers with an ErrorExpr; nothing here needs the argument. It points
+      // at the ')', so fall back to the pound if recovery synthesized one.
+      self.diagnose(
+        .expr_selector_expected_method_expr,
+        at: self.generateSourceLoc(node.rightParen, orPoundOf: node)
+      )
+      return BridgedErrorExpr.create(self.ctx, loc: self.generateSourceRange(node)).asExpr
     }
     let kind: BridgedObjCSelectorKind
     switch arg.label?.rawText {
@@ -251,15 +301,18 @@ extension ASTGenVisitor {
     case "getter": kind = .getter
     case "setter": kind = .setter
     case _?:
-      // TODO: Diagnose
-      fatalError("unexpected argument label in #selector")
-      // return ErrorExpr
+      // Only 'getter:' and 'setter:' are labels here. The C++ parser has no
+      // grammar for any other label: it parses the label as the method
+      // expression and then fails looking for the ')' at the colon.
+      self.diagnose(.expr_selector_expected_rparen, at: self.generateSourceLoc(arg.colon, orPoundOf: node))
+      return BridgedErrorExpr.create(self.ctx, loc: self.generateSourceRange(node)).asExpr
     }
     let expr = self.generate(expr: arg.expression)
     guard args.isEmpty else {
-      // TODO: Diagnose
-      fatalError("unexpected argument in #selector")
-      // return ErrorExpr
+      // `#selector` takes exactly one argument; the C++ parser stops after it
+      // and fails looking for the ')' at the comma.
+      self.diagnose(.expr_selector_expected_rparen, at: self.generateSourceLoc(arg.trailingComma, orPoundOf: node))
+      return BridgedErrorExpr.create(self.ctx, loc: self.generateSourceRange(node)).asExpr
     }
     return BridgedObjCSelectorExpr.createParsed(
       self.ctx,
@@ -278,13 +331,20 @@ extension ASTGenVisitor {
       node.trailingClosure == nil,
       node.additionalTrailingClosures.isEmpty
     else {
-      // TODO: Diagnose.
-      fatalError("#keyPath with generic specialization")
+      // As with `#selector`, neither form has a grammar, so the C++ parser fails
+      // looking for the '(' that should have followed the keyword.
+      self.diagnose(
+        .expr_keypath_expected_lparen,
+        at: self.poundArgumentListMismatchLoc(node)
+      )
+      return BridgedErrorExpr.create(self.ctx, loc: self.generateSourceRange(node)).asExpr
     }
 
     var names: [BridgedDeclNameRef] = []
     var nameLocs: [BridgedDeclNameLoc] = []
 
+    /// Collect the dotted chain of names in `node`, returning true if it is not
+    /// one -- the only shape `#keyPath` accepts.
     func collectNames(expr node: ExprSyntax) -> Bool {
       if let declRefExpr = node.as(DeclReferenceExprSyntax.self) {
         let nameAndLoc = self.generateDeclNameRef(declReferenceExpr: declRefExpr)
@@ -294,8 +354,10 @@ extension ASTGenVisitor {
       }
       if let memberExpr = node.as(MemberAccessExprSyntax.self) {
         guard let base = memberExpr.base else {
-          // TODO: Diagnose
-          fatalError("unexpected expression in #keyPath")
+          // An implicit member reference such as `#keyPath(.p)`: there is no
+          // base to walk into.
+          self.diagnose(.expr_keypath_expected_property_or_type, at: memberExpr)
+          return true
         }
         if collectNames(expr: base) {
           return true
@@ -305,30 +367,37 @@ extension ASTGenVisitor {
         nameLocs.append(nameAndLoc.loc)
         return false
       }
-      // TODO: Diagnose
-      fatalError("unexpected expression in #keyPath")
-      // return true
+      // Anything else -- an operator expression, a parenthesized one, a literal.
+      // The C++ parser reports this at the start of the offending expression.
+      self.diagnose(.expr_keypath_expected_property_or_type, at: node)
+      return true
     }
 
     var args = node.arguments[...]
     guard let arg = args.popFirst() else {
-      // TODO: Diagnose
-      fatalError("expected an argument for #keyPath")
-      // return ErrorExpr
+      // `#keyPath()`. As with `#selector()`, the C++ parser reports the missing
+      // name at the ')' and recovers with an ErrorExpr.
+      self.diagnose(
+        .expr_keypath_expected_property_or_type,
+        at: self.generateSourceLoc(node.rightParen, orPoundOf: node)
+      )
+      return BridgedErrorExpr.create(self.ctx, loc: self.generateSourceRange(node)).asExpr
     }
     guard arg.label == nil else {
-      // TODO: Diagnose
-      fatalError("unexpected argument label  #keyPath")
-
+      // `#keyPath` takes no labels; the C++ parser parses the label as the first
+      // name and then fails looking for the ')' at the colon.
+      self.diagnose(.expr_keypath_expected_rparen, at: self.generateSourceLoc(arg.colon, orPoundOf: node))
+      return BridgedErrorExpr.create(self.ctx, loc: self.generateSourceRange(node)).asExpr
     }
     if /*hadError=*/collectNames(expr: arg.expression) {
       return BridgedErrorExpr.create(self.ctx, loc: self.generateSourceRange(node)).asExpr;
     }
 
     guard args.isEmpty else {
-      // TODO: Diagnose
-      fatalError("unexpected argument in #keyPath")
-      // return ErrorExpr
+      // `#keyPath` takes exactly one argument; the C++ parser stops after it and
+      // fails looking for the ')' at the comma.
+      self.diagnose(.expr_keypath_expected_rparen, at: self.generateSourceLoc(arg.trailingComma, orPoundOf: node))
+      return BridgedErrorExpr.create(self.ctx, loc: self.generateSourceRange(node)).asExpr
     }
 
     return BridgedKeyPathExpr.createParsedPoundKeyPath(
