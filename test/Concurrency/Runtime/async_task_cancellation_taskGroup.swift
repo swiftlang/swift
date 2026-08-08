@@ -12,7 +12,10 @@
 // rdar://103606995
 // UNSUPPORTED: back_deployment_runtime
 
-import Dispatch
+// RUN: %if embedded_cooperative_executor %{ %target-run-embedded-cooperative-swift() | %FileCheck %s %}
+// RUN: %if embedded_dispatch_executor %{ %target-run-embedded-dispatch-swift() | %FileCheck %s %}
+
+import _Concurrency
 
 @available(SwiftStdlib 5.1, *)
 func test_detach_cancel_taskGroup() async {

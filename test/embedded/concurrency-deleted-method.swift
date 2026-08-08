@@ -3,12 +3,16 @@
 // RUN: %target-swift-frontend -enable-experimental-feature Embedded -parse-as-library -module-name main %s -c -o %t/a.o
 // RUN: %target-embedded-link %t/a.o -o %t/a.out -L%swift_obj_root/lib/swift/embedded/%module-target-triple %target-clang-resource-dir-opt -lswift_Concurrency %target-swift-default-executor-opt %target-embedded-concurrency-threading-shim -dead_strip
 // RUN: %target-run %t/a.out | %FileCheck %s
+// RUN: %if embedded_dispatch_executor %{ %target-embedded-link %t/a.o -o %t/dispatch.out -L%swift_obj_root/lib/swift/embedded/%module-target-triple %target-clang-resource-dir-opt -lswift_Concurrency %target-swift-dispatch-executor-opt %target-embedded-concurrency-threading-shim -dead_strip %}
+// RUN: %if embedded_dispatch_executor %{ %target-run %t/dispatch.out | %FileCheck %s %}
 
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -enable-experimental-feature Embedded -parse-as-library -module-name main %s -emit-ir | %FileCheck --check-prefix=EXIST-IR %s
 // RUN: %target-swift-frontend -enable-experimental-feature Embedded -parse-as-library -module-name main %s -c -o %t/a.o
 // RUN: %target-embedded-link %t/a.o -o %t/a.out -L%swift_obj_root/lib/swift/embedded/%module-target-triple %target-clang-resource-dir-opt -lswift_Concurrency %target-swift-default-executor-opt %target-embedded-concurrency-threading-shim -dead_strip
 // RUN: %target-run %t/a.out | %FileCheck %s
+// RUN: %if embedded_dispatch_executor %{ %target-embedded-link %t/a.o -o %t/dispatch.out -L%swift_obj_root/lib/swift/embedded/%module-target-triple %target-clang-resource-dir-opt -lswift_Concurrency %target-swift-dispatch-executor-opt %target-embedded-concurrency-threading-shim -dead_strip %}
+// RUN: %if embedded_dispatch_executor %{ %target-run %t/dispatch.out | %FileCheck %s %}
 
 
 // REQUIRES: executable_test
