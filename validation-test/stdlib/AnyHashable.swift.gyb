@@ -114,7 +114,7 @@ AnyHashableTests.test("AnyHashable(MinimalHashableValue, SwiftValue(MinimalHasha
 
 % for wrapped in ['GenericMinimalHashableValue', 'GenericMinimalHashableClass']:
 %   for payload in [ 'OpaqueValue<Int>', 'LifetimeTracked' ]:
-AnyHashableTests.test("AnyHashable(${wrapped}<OpaqueValue<Int>>)/Hashable") {
+AnyHashableTests.test("AnyHashable(${wrapped}<${payload}>)/Hashable") {
   ${wrapped}_equalImpl.value = {
     ($0 as! ${payload}).value == ($1 as! ${payload}).value
   }
@@ -132,7 +132,7 @@ AnyHashableTests.test("AnyHashable(${wrapped}<OpaqueValue<Int>>)/Hashable") {
     equalityOracle: { $0 / 2 == $1 / 2 })
 }
 
-AnyHashableTests.test("AnyHashable(${wrapped}).base") {
+AnyHashableTests.test("AnyHashable(${wrapped}<${payload}>).base") {
   let ah = AnyHashable(${wrapped}(${payload}(42), identity: 0))
   expectEqual(${wrapped}<${payload}>.self, type(of: ah.base))
 }
@@ -314,7 +314,7 @@ AnyHashableTests.test("AnyHashable(${wrapped}).base") {
 }
 
 %   for payload in [ 'OpaqueValue<Int>', 'LifetimeTracked' ]:
-AnyHashableTests.test("AnyHashable(${genericWrapped}<${payload}>)/Hashable") {
+AnyHashableTests.test("AnyHashable(${genericWrapped}<${payload}>).base") {
   GenericMinimalHashableValue_equalImpl.value = {
     ($0 as! ${payload}).value == ($1 as! ${payload}).value
   }

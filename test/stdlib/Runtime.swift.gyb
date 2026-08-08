@@ -416,8 +416,8 @@ if #available(macOS 11.0, iOS 14.0, tvOS 14.0, watchOS 7.0, visionOS 1.0, *) {
   }
 }
 
-% for optionality in ['', '?']:
-Runtime.test("_stdlib_atomicCompareExchangeStrongPtr") {
+% for optionality, name in [('', 'NonOptional'), ('?', 'Optional')]:
+Runtime.test("_stdlib_atomicCompareExchangeStrongPtr/${name}") {
   typealias IntPtr = UnsafeMutablePointer<Int>
   let origP1: IntPtr${optionality} = IntPtr(bitPattern: 0x10101010)!
   let origP2: IntPtr${optionality} = IntPtr(bitPattern: 0x20202020)!

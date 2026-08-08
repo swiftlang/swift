@@ -194,7 +194,7 @@ suite.test("intersection.${inputKind}.${argumentKind}") {
 %     if needsCocoa:
 #if _runtime(_ObjC)
 %     end
-suite.test("intersection.same-number-of-duplicates-as-missing-items") {
+suite.test("intersection.same-number-of-duplicates-as-missing-items.${inputKind}.${argumentKind}") {
   let a = ${inputGenerator}([3, 6, 0, 1, 5, 2, 4], identity: 1)
   let b = ${argumentGenerator}([0, 1, 1, 2, 3, 4, 5], identity: 2)
   let c = a.intersection(b)
@@ -493,7 +493,7 @@ suite.test("isStrictSuperset.${inputKind}.${argumentKind}") {
 %     if needsCocoa:
 #if _runtime(_ObjC)
 %     end
-suite.test("isStrictSuperset.${inputKind}.${argumentKind}") {
+suite.test("isDisjoint.${inputKind}.${argumentKind}") {
   let a = ${inputGenerator}(0 ..< 10, identity: 1)
   let b0 = ${argumentGenerator}(0 ..< 0, identity: 2)
   let b1 = ${argumentGenerator}(0 ..< 10, identity: 2)

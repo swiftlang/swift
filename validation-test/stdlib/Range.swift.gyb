@@ -355,6 +355,7 @@ all_range_types = [
    ('ClosedRange', '...', 'MinimalComparableValue', ''),
    ('ClosedRange', '...', 'MinimalStrideableValue', 'Countable'),
 ]
+range_shapes = [('Range', '..<'), ('ClosedRange', '...')]
 }%
 
 % for (Self, op, Bound, Countable) in all_range_types:
@@ -400,7 +401,7 @@ if #available(macOS 11.3, iOS 14.5, tvOS 14.5, watchOS 7.4, *) {
   }
 }
 
-%   for (DestinationSelf, _, _, _) in all_range_types:
+%   for (DestinationSelf, _) in range_shapes:
 ${TestSuite}.test("init(${DestinationSelf})/whereBoundIsStrideable")
   .forEach(in: [(0, 0), (1, 2), (10, 20), (Int.min, Int.max)]) {
   (lowerInt, upperInt) in
@@ -543,7 +544,7 @@ ${TestSuite}.test("contains(_:)/semantics, ~=/semantics")
   expectEqual(expected, range ~= value)
 }
 
-%   for (OtherSelf, other_op, _, _) in all_range_types:
+%   for (OtherSelf, other_op) in range_shapes:
 ${TestSuite}.test("overlaps(${OtherSelf})/semantics")
   .forEach(in: overlapsTests) {
   (test) in
@@ -869,4 +870,3 @@ MiscTestSuite.test("Compatibility typealiases") {
 }
 
 runAllTests()
-

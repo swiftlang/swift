@@ -76,9 +76,6 @@ ${SelfName}TestSuite.test("initFromOpaquePointer") {
 
 % end
 
-% for (SelfName, SelfType) in [
-%         ('UnsafeRawPointer', 'UnsafeRawPointer'),
-%         ('UnsafeMutableRawPointer', 'UnsafeMutableRawPointer')]:
 UnsafeMutableRawPointerTestSuite.test("initFromMutating") {
   let other = UnsafeRawPointer(bitPattern: 0x12345678)!
   let ptr = UnsafeMutableRawPointer(mutating: other)
@@ -93,7 +90,6 @@ UnsafeMutableRawPointerTestSuite.test("initFromMutating") {
   let nilPointer = UnsafeMutableRawPointer(mutating: nilOther)
   expectNil(nilPointer)
 }
-% end
 
 % for (SelfName, SelfType) in [
 %         ('UnsafePointer', 'UnsafePointer<Float>'),

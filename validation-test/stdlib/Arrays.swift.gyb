@@ -1243,7 +1243,7 @@ let indexTests: [ArrayIndexTest<[Int]>] = [
 ]
 
 % for Kind in ['Array', 'ContiguousArray', 'ArraySlice']:
-ArrayTestSuite.test("ArrayIndexTests") {
+ArrayTestSuite.test("${Kind}.ArrayIndexTests") {
   for test in indexTests {
     let testData = test.data.map(OpaqueValue.init)
 % if Kind == 'ArraySlice':

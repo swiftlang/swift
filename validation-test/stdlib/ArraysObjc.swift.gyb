@@ -1751,7 +1751,7 @@ ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.BridgeUsingAs") {
 }
 
 
-ArrayTestSuite.test("BridgedFromObjC.Verbatim.ArrayIsCopied") {
+ArrayTestSuite.test("BridgedFromObjC.Verbatim.ArrayIsCopiedUsingAs") {
   let source = [ 10, 20, 30 ]
   let nsa = getAsNSMutableArray(source)
   let result = nsa as Array<AnyObject>
@@ -1766,7 +1766,7 @@ ArrayTestSuite.test("BridgedFromObjC.Verbatim.ArrayIsCopied") {
   expectEqual(20, (result[1] as! TestObjCValueTy).value)
 }
 
-ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.ArrayIsCopied") {
+ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.ArrayIsCopiedUsingAs") {
   let source = [ 10, 20, 30 ]
   let nsa = getAsNSMutableArray(source)
   var result = nsa as AnyObject as! Array<TestBridgedValueTy>
@@ -1782,7 +1782,7 @@ ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.ArrayIsCopied") {
 }
 
 
-ArrayTestSuite.test("BridgedFromObjC.Verbatim.NSArrayIsRetained") {
+ArrayTestSuite.test("BridgedFromObjC.Verbatim.NSArrayIsRetainedUsingAs") {
   let nsa = NSArray(array: getAsNSArray([ 10, 20, 30 ]))
   let a: Array<AnyObject> = convertNSArrayToArray(nsa)
   let bridgedBack: NSArray = convertArrayToNSArray(a)
@@ -1796,7 +1796,7 @@ ArrayTestSuite.test("BridgedFromObjC.Verbatim.NSArrayIsRetained") {
   _fixLifetime(bridgedBack)
 }
 
-ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.NSArrayIsCopied") {
+ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.NSArrayIsCopiedUsingAs") {
   let nsa = NSArray(array: getAsNSArray([ 10, 20, 30 ]))
   let a: Array<TestBridgedValueTy> = convertNSArrayToArray(nsa)
   let bridgedBack: NSArray = convertArrayToNSArray(a)
@@ -1811,7 +1811,7 @@ ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.NSArrayIsCopied") {
 }
 
 
-ArrayTestSuite.test("BridgedFromObjC.Verbatim.ImmutableArrayIsRetained") {
+ArrayTestSuite.test("BridgedFromObjC.Verbatim.ImmutableArrayIsRetainedUsingAs") {
   let nsa: NSArray = CustomImmutableNSArray(_privateInit: ())
 
   CustomImmutableNSArray.timesCopyWithZoneWasCalled = 0
@@ -1833,7 +1833,7 @@ ArrayTestSuite.test("BridgedFromObjC.Verbatim.ImmutableArrayIsRetained") {
   _fixLifetime(bridgedBack)
 }
 
-ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.ImmutableArrayIsCopied")
+ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.ImmutableArrayIsCopiedUsingAs")
   .skip(.iOSAny("<rdar://problem/33926468>"))
   .skip(.tvOSAny("<rdar://problem/33926468>"))
   .code {
