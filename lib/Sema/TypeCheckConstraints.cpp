@@ -1643,10 +1643,22 @@ TypeChecker::typeCheckCheckedCast(Type fromType, Type toType,
   //
   // Thus, right now, a move-only type is only a subtype of itself.
   // We also want to prevent conversions of a move-only type's metatype.
-  if (fromType->getMetatypeInstanceType()->isNoncopyable()
-      || toType->getMetatypeInstanceType()->isNoncopyable())
+  //
+  // Exception: under NoncopyableCasting, a noncopyable existential value
+  // may be cast to a concrete (non-existential, non-archetype) type, since
+  // the existential's erased dynamic type is exactly the kind of thing a
+  // runtime cast can meaningfully recover. (This does not apply to
+  // metatypes, handled by the getMetatypeInstanceType() checks above.)
+  bool isSupportedNoncopyableExistentialCast =
+      dc->getASTContext().LangOpts.hasFeature(Feature::NoncopyableCasting) &&
+      fromType->isNoncopyable() && fromType->isExistentialType() &&
+      !toType->isExistentialType() && !toType->is<ArchetypeType>();
+
+  if (!isSupportedNoncopyableExistentialCast &&
+      (fromType->getMetatypeInstanceType()->isNoncopyable()
+       || toType->getMetatypeInstanceType()->isNoncopyable()))
     return CheckedCastKind::Unresolved;
-  
+
   // Check for a bridging conversion.
   // Anything bridges to AnyObject.
   if (toType->isAnyObject())
