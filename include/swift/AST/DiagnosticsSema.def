@@ -1194,6 +1194,8 @@ ERROR(nonexistent_power_operator,none,
 
 ERROR(cannot_find_in_scope,none,
       "cannot %select{find|find operator}1 %0 in scope", (DeclNameRef, bool))
+ERROR(cannot_find_compound_name_in_scope,none,
+      "cannot find '%0' in scope", (StringRef))
 ERROR(cannot_find_in_scope_corrected,none,
       "cannot %select{find|find operator}1 %0 in scope; did you mean '%2'?",
       (DeclNameRef, bool, StringRef))
@@ -1224,6 +1226,8 @@ NOTE(note_add_explicit_self_with_module_selector,none,
      "did you mean the member of 'self'?", ())
 NOTE(note_typo_candidate_implicit_member,none,
      "did you mean the implicitly-synthesized %kindbase0?", (const ValueDecl *))
+NOTE(note_typo_candidate_compound_name,none,
+     "did you mean %0?", (DeclNameRef))
 NOTE(note_remapped_type,none,
      "did you mean to use '%0'?", (StringRef))
 NOTE(note_module_as_type,none,
