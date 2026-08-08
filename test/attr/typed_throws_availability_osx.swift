@@ -9,4 +9,5 @@ enum MyError: Error {
 
 @available(macOS 12, *)
 func throwMyErrorBadly() throws(MyError) { }
-// expected-error@-1{{'MyError' is only available in macOS 13 or newer}}
+// expected-note@-1 {{update '@available' attribute on enclosing}}
+// expected-error@-2 {{'MyError' is only available in macOS 13 or newer}}

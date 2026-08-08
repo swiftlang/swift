@@ -81,6 +81,7 @@ func testDeploymentTarget() {
 
 @available(iOS 17.4, *)
 func testAfterDeployment_iOS() {
+// expected-note@-1 {{update '@available' attribute on enclosing}}
   doSomething()
   doSomethingElse() // expected-error {{'doSomethingElse()' is unavailable in visionOS: you don't want to do that anyway}}
   doSomethingFarFuture() // expected-error {{'doSomethingFarFuture()' is only available in visionOS 99.0 or newer}}

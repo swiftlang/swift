@@ -56,6 +56,7 @@ public func noOtherOSes() {}
 
 @available(_iOS53Aligned, *)
 func client() {
+// expected-note@-1 {{update '@available' attribute on enclosing global function}}
   onMacOS50()
   onMacOS51_0() // expected-error {{is only available in macOS 51.0 or newer}}
   // expected-note @-1 {{add 'if #available' version check}}
