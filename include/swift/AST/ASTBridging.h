@@ -789,6 +789,13 @@ BRIDGED_INLINE swift::Identifier
 BridgedAvailabilityDomainOrIdentifier_getAsIdentifier(
     BridgedAvailabilityDomainOrIdentifier cVal);
 
+/// The platform \p cVal denotes, whether it is still an identifier or has
+/// already been resolved to a domain. A domain that is not a platform, such as
+/// the wildcard domain or a custom one, yields `PlatformKind::none`.
+SWIFT_NAME("BridgedOptionalPlatformKind.init(from:)")
+BridgedOptionalPlatformKind PlatformKind_fromDomainOrIdentifier(
+    BridgedAvailabilityDomainOrIdentifier cVal);
+
 SWIFT_NAME("BridgedAvailabilitySpec.createWildcard(_:loc:)")
 BridgedAvailabilitySpec
 BridgedAvailabilitySpec_createWildcard(BridgedASTContext cContext,

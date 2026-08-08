@@ -518,24 +518,31 @@ extension ASTGenVisitor {
         version: version
       )
       if !expanded.isEmpty {
-        var appendedAny = false
+        var specs: [BridgedAvailabilitySpec] = []
         expanded.withElements(ofType: UnsafeRawPointer.self) { buffer in
-          for ptr in buffer {
-            let spec = BridgedAvailabilitySpec(raw: UnsafeMutableRawPointer(mutating: ptr))
-            let domainOrIdentifier = spec.domainOrIdentifier
-            precondition(!domainOrIdentifier.isDomain)
-            let platform = BridgedOptionalPlatformKind(from: domainOrIdentifier.asIdentifier)
-            guard platform.hasValue else {
-              continue
-            }
-            result.versions.append((platform: platform.value, version: spec.rawVersion))
-            appendedAny = true
+          specs = buffer.map {
+            BridgedAvailabilitySpec(raw: UnsafeMutableRawPointer(mutating: $0))
           }
         }
-        // A macro that expanded to nothing usable (e.g. just a wildcard) is not
-        // an error, but it also does not contribute a platform version.
-        if !appendedAny {
+
+        // A macro that expands to just a wildcard contributes no platform
+        // version, but is not an error either. The C++ parser special-cases
+        // exactly this shape; the general loop below would instead fall through
+        // to `attr_availability_need_platform_version`.
+        if specs.count == 1, specs[0].isWildcard {
           result.droppedNonPlatform = true
+          continue
+        }
+
+        for spec in specs {
+          // A spec that came from the macro map may carry a resolved domain
+          // rather than an identifier -- a wildcard is one -- so ask for the
+          // platform in a way that accepts either.
+          let platform = BridgedOptionalPlatformKind(from: spec.domainOrIdentifier)
+          guard platform.hasValue, platform.value != .none else {
+            continue
+          }
+          result.versions.append((platform: platform.value, version: spec.rawVersion))
         }
         continue
       }

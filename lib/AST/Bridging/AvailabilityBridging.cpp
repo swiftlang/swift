@@ -55,6 +55,17 @@ BridgedOptionalPlatformKind PlatformKind_fromIdentifier(Identifier ident) {
   return PlatformKind_fromString(ident.str());
 }
 
+BridgedOptionalPlatformKind PlatformKind_fromDomainOrIdentifier(
+    BridgedAvailabilityDomainOrIdentifier cVal) {
+  // Keep this in sync with getPlatformFromDomainOrIdentifier() in
+  // lib/Parse/ParseDecl.cpp, which is what the C++ parser uses here.
+  auto domainOrIdentifier = cVal.unbridged();
+  if (auto domain = domainOrIdentifier.getAsDomain())
+    return domain->getPlatformKind();
+
+  return PlatformKind_fromIdentifier(*domainOrIdentifier.getAsIdentifier());
+}
+
 BridgedStringRef PlatformKind_closestCorrectedString(BridgedStringRef cStr) {
   // The returned StringRef points at one of the static platform-name strings,
   // so it outlives the call.

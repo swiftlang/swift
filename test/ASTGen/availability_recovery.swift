@@ -6,11 +6,15 @@
 // RUN:   -verify-additional-prefix astgen- \
 // RUN:   -enable-experimental-feature ParserASTGen \
 // RUN:   -enable-experimental-feature CustomAvailability \
-// RUN:   -define-enabled-availability-domain EnabledDomain
+// RUN:   -define-enabled-availability-domain EnabledDomain \
+// RUN:   -define-availability "_wildcardMacro:*" \
+// RUN:   -define-availability "_platformMacro 1.0:macOS 12.0"
 // RUN: %target-typecheck-verify-swift -target %target-cpu-apple-macosx13.0 \
 // RUN:   -verify-additional-prefix cxx- \
 // RUN:   -enable-experimental-feature CustomAvailability \
-// RUN:   -define-enabled-availability-domain EnabledDomain
+// RUN:   -define-enabled-availability-domain EnabledDomain \
+// RUN:   -define-availability "_wildcardMacro:*" \
+// RUN:   -define-availability "_platformMacro 1.0:macOS 12.0"
 
 // REQUIRES: OS=macosx
 // REQUIRES: swift_swift_parser
@@ -76,3 +80,21 @@ public func backDeployedUnknownPlatform() {}
 // expected-error@-2 {{expected at least one platform version in '@_originallyDefinedIn' attribute}}
 @available(macOS 13.10, *)
 public class WildcardPlatform {}
+
+// An availability macro that expands to just '*' names no platform, but is not
+// an error: the wildcard is dropped and the entry contributes nothing, without
+// tripping the "needs a platform version" error. ASTGen used to assume that a
+// macro-expanded spec always held an unresolved identifier, and a wildcard spec
+// holds a resolved domain instead.
+@backDeployed(before: _wildcardMacro)
+@available(macOS 13.10, *)
+public func backDeployedWildcardMacro() {}
+
+@_originallyDefinedIn(module: "foo", _wildcardMacro)
+@available(macOS 13.10, *)
+public class OriginallyDefinedInWildcardMacro {}
+
+// A macro that does expand to a platform still contributes its version.
+@backDeployed(before: _platformMacro 1.0)
+@available(macOS 10.10, *)
+public func backDeployedPlatformMacro() {}
