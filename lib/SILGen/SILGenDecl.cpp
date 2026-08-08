@@ -2058,6 +2058,7 @@ namespace {
     void emit(SILGenFunction &SGF, CleanupLocation l,
               ForUnwind_t forUnwind) override {
       switch (repr) {
+      case ExistentialRepresentation::COM:
       case ExistentialRepresentation::None:
       case ExistentialRepresentation::Class:
       case ExistentialRepresentation::Metatype:

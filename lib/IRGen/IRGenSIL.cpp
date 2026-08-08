@@ -3430,6 +3430,8 @@ void IRGenSILFunction::visitExistentialMetatypeInst(
   SILType opType = op->getType();
 
   switch (opType.getPreferredExistentialRepresentation()) {
+  case ExistentialRepresentation::COM:
+    llvm_unreachable("COM existential metatype projection is not implemented");
   case ExistentialRepresentation::Metatype: {
     Explosion existential = getLoweredExplosion(op);
     emitMetatypeOfMetatype(*this, existential, opType, result);
@@ -3557,6 +3559,12 @@ emitWitnessTableForLoweredCallee(IRGenSILFunction &IGF,
       IGF.IGM.getSILModule(), IGF.IGM.getMaximalTypeExpansionContext());
   auto substConformance =
       substCalleeType->getWitnessMethodConformanceOrInvalid();
+
+  // For a conformance of a protocol metatype itself (e.g. from `T.Type: P`)
+  // the conforming type is the metatype, not its instance.
+  if (substConformance && substConformance.getType() &&
+      substConformance.getType()->is<AnyMetatypeType>())
+    substSelfType = substConformance.getType()->getCanonicalType();
 
   llvm::Value *argMetadata = IGF.emitTypeMetadataRef(substSelfType);
   llvm::Value *wtable =

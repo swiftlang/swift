@@ -3842,6 +3842,14 @@ ASTMangler::RequirementSubject ASTMangler::appendRequirementSubject(
     };
   }
 
+  // A metatype subject, e.g. 'T.Type: P'. Mangle the metatype as the subject
+  // type and use the substitution-style requirement operator, which references
+  // the preceding mangled type rather than a generic parameter index.
+  if (subjectType->is<AnyMetatypeType>()) {
+    appendType(subjectType, sig);
+    return RequirementSubject { RequirementSubject::Substitution };
+  }
+
   GenericTypeParamType *gpBase = subjectType->castTo<GenericTypeParamType>();
   return RequirementSubject { RequirementSubject::GenericParameter, gpBase };
 }

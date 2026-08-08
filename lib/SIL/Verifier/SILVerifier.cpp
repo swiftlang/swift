@@ -4551,7 +4551,13 @@ public:
       require(AMI->getTypeDependentOperands().empty() || lookupType->hasLocalArchetype(),
               "Should not have an operand for the opened existential");
     }
-    if (!isa<ArchetypeType>(lookupType) && !isa<DynamicSelfType>(lookupType)) {
+    bool isArchetypeMetatype = false;
+    // The metatype of an archetype (e.g. 'T.Type' for a 'T.Type: P'
+    // requirement) uses an abstract metatype conformance, like an archetype.
+    if (auto metatype = dyn_cast<AnyMetatypeType>(lookupType))
+      isArchetypeMetatype = isa<ArchetypeType>(metatype.getInstanceType());
+    if (!isa<ArchetypeType>(lookupType) && !isa<DynamicSelfType>(lookupType) &&
+        !isArchetypeMetatype) {
       require(AMI->getConformance().isConcrete(),
               "concrete type lookup requires concrete conformance");
       auto conformance = AMI->getConformance().getConcrete();

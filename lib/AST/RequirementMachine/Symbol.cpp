@@ -32,10 +32,15 @@ const StringRef Symbol::Kinds[] = {
   "generic",
   "name",
   "shape",
+  "pack_element",
+  "metatype",
   "layout",
   "super",
   "concrete"
 };
+
+static_assert(static_cast<unsigned>(Symbol::Kind::ConcreteType) + 1 == Symbol::NumKinds);
+static_assert(sizeof(Symbol::Kinds) / sizeof(Symbol::Kinds[0]) == Symbol::NumKinds);
 
 /// Symbols are uniqued and immutable, stored as a single pointer;
 /// the Storage type is the allocated backing storage.
@@ -88,6 +93,14 @@ struct Symbol::Storage final
 
   explicit Storage(ForPackElement shape) {
     Kind = Kind::PackElement;
+  }
+
+  /// A dummy type for overload resolution of the
+  /// `metatype` constructor for Storage.
+  struct ForMetatype {};
+
+  explicit Storage(ForMetatype shape) {
+    Kind = Kind::Metatype;
   }
 
   Storage(const ProtocolDecl *proto, Identifier name) {
@@ -336,6 +349,16 @@ Symbol Symbol::forPackElement(RewriteContext &ctx) {
   return (ctx.ThePackElementSymbol = symbol);
 }
 
+Symbol Symbol::forMetatype(RewriteContext &ctx) {
+  if (auto *symbol = ctx.TheMetatypeSymbol)
+    return symbol;
+
+  unsigned size = Storage::totalSizeToAlloc<unsigned, Term>(0, 0);
+  void *mem = ctx.Allocator.Allocate(size, alignof(Storage));
+  auto *symbol = new (mem) Storage(Storage::ForMetatype());
+  return (ctx.TheMetatypeSymbol = symbol);
+}
+
 /// Creates a layout symbol, representing a layout constraint.
 Symbol Symbol::forLayout(LayoutConstraint layout,
                          RewriteContext &ctx) {
@@ -486,6 +509,7 @@ const ProtocolDecl *Symbol::getRootProtocol() const {
   case Symbol::Kind::ConcreteType:
   case Symbol::Kind::ConcreteConformance:
   case Symbol::Kind::Shape:
+  case Symbol::Kind::Metatype:
     break;
   }
 
@@ -574,6 +598,12 @@ std::optional<int> Symbol::compare(Symbol other, RewriteContext &ctx) const {
     break;
   }
 
+  case Kind::Metatype:
+    // Payload-free singleton: two equal-kind metatype symbols are always
+    // pointer-identical, so this is caught before the switch; nothing to
+    // compare.
+    break;
+
   case Kind::Layout:
     result = getLayoutConstraint().compare(other.getLayoutConstraint());
     break;
@@ -646,6 +676,7 @@ Symbol Symbol::withConcreteSubstitutions(
   case Kind::Shape:
   case Kind::PackElement:
   case Kind::Layout:
+  case Kind::Metatype:
     break;
   }
 
@@ -776,6 +807,11 @@ void Symbol::dump(llvm::raw_ostream &out) const {
     out << "[element]";
     return;
   }
+
+  case Kind::Metatype: {
+    out << "[metatype]";
+    return;
+  }
   }
 
   llvm_unreachable("Bad symbol kind");
@@ -803,6 +839,7 @@ void Symbol::Storage::Profile(llvm::FoldingSetNodeID &id) const {
     return;
 
   case Symbol::Kind::Shape:
+  case Symbol::Kind::Metatype:
     // Nothing more to add.
     return;
 
