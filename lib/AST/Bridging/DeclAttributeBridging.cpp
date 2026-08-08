@@ -404,6 +404,14 @@ BridgedInlineAttr BridgedInlineAttr_createParsed(BridgedASTContext cContext,
   return new (cContext.unbridged()) InlineAttr(atLoc, range, kind);
 }
 
+BridgedNoSanitizeAttr
+BridgedNoSanitizeAttr_createParsed(BridgedASTContext cContext,
+                                   SourceLoc atLoc,
+                                   SourceRange range,
+                                   swift::NoSanitizeKind kind) {
+  return new (cContext.unbridged()) NoSanitizeAttr(atLoc, range, kind);
+}
+
 static swift::ParsedLifetimeDependenceKind
 unbridged(BridgedParsedLifetimeDependenceKind kind) {
   switch (kind) {

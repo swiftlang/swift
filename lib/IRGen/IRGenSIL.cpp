@@ -1953,14 +1953,26 @@ IRGenSILFunction::IRGenSILFunction(IRGenModule &IGM, SILFunction *f,
                     f->getOptimizationMode(), f->getDebugScope(),
                     f->getLocation()),
       CurSILFn(f) {
-  // Apply sanitizer attributes to the function.
-  // TODO: Check if the function is supposed to be excluded from ASan either by
-  // being in the external file or via annotations.
-  if (IGM.IRGen.Opts.Sanitizers & SanitizerKind::Address)
+  // Apply sanitizer attributes to the function. Kinds listed in one or more
+  // @_noSanitize(<kind>) attributes on the function's decl are suppressed,
+  // mirroring Clang's __attribute__((no_sanitize("<kind>"))).
+  bool noAsan = false, noTsan = false, noMemTag = false;
+  if (f->hasLocation()) {
+    if (auto *D = f->getLocation().getAsASTNode<Decl>()) {
+      for (auto *attr : D->getAttrs().getAttributes<NoSanitizeAttr>()) {
+        switch (attr->getKind()) {
+        case NoSanitizeKind::Address: noAsan = true; break;
+        case NoSanitizeKind::Thread:  noTsan = true; break;
+        case NoSanitizeKind::MemTag:  noMemTag = true; break;
+        }
+      }
+    }
+  }
+  if ((IGM.IRGen.Opts.Sanitizers & SanitizerKind::Address) && !noAsan)
     CurFn->addFnAttr(llvm::Attribute::SanitizeAddress);
-  if (IGM.IRGen.Opts.Sanitizers & SanitizerKind::MemTagStack)
+  if ((IGM.IRGen.Opts.Sanitizers & SanitizerKind::MemTagStack) && !noMemTag)
     CurFn->addFnAttr(llvm::Attribute::SanitizeMemTag);
-  if (IGM.IRGen.Opts.Sanitizers & SanitizerKind::Thread) {
+  if ((IGM.IRGen.Opts.Sanitizers & SanitizerKind::Thread) && !noTsan) {
     auto declContext = f->getDeclContext();
     if (isa_and_nonnull<DestructorDecl>(declContext)) {
       // Do not report races in deinit and anything called from it

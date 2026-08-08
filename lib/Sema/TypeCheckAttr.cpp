@@ -201,6 +201,7 @@ public:
   IGNORED_ATTR(Semantics)
   IGNORED_ATTR(NoLocks)
   IGNORED_ATTR(NoAllocation)
+  IGNORED_ATTR(NoSanitize)
   IGNORED_ATTR(NoRuntime)
   IGNORED_ATTR(NoExistentials)
   IGNORED_ATTR(NoManualOwnership)

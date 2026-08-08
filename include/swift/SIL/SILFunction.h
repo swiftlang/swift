@@ -352,6 +352,10 @@ private:
 
   PerformanceConstraints perfConstraints = PerformanceConstraints::None;
 
+  /// Bitmask of sanitizers suppressed for this function by @_noSanitize.
+  /// Bit positions match NoSanitizeKind (0=Address, 1=Thread, 2=MemTag).
+  uint8_t noSanitizeMask = 0;
+
   /// The undefs of each type in the function.
   llvm::SmallMapVector<SILType, SILUndef *, 1> undefValues;
 
@@ -1140,6 +1144,12 @@ public:
   void setPerfConstraints(PerformanceConstraints perfConstr) {
     perfConstraints = perfConstr;
   }
+
+  /// Bitmask of sanitizers suppressed via @_noSanitize on this function's
+  /// decl. Bit positions match NoSanitizeKind (0=Address, 1=Thread, 2=MemTag).
+  uint8_t getNoSanitizeMask() const { return noSanitizeMask; }
+
+  void setNoSanitizeMask(uint8_t mask) { noSanitizeMask = mask; }
 
   // see `IsPerformanceConstraint`
   bool isPerformanceConstraint() const { return IsPerformanceConstraint; }

@@ -162,6 +162,8 @@ extension ASTGenVisitor {
         return handle(self.generateImplementsAttr(attribute: node)?.asDeclAttribute)
       case .Inline:
         return handle(self.generateInlineAttr(attribute: node)?.asDeclAttribute)
+      case .NoSanitize:
+        return handle(self.generateNoSanitizeAttr(attribute: node)?.asDeclAttribute)
       case .Lifetime:
         return handle(self.generateLifetimeAttr(attribute: node)?.asDeclAttribute)
       case .MacroRole:
@@ -1225,6 +1227,35 @@ extension ASTGenVisitor {
         case "never": return .never
         case "__always": return .alwaysUnderscored
         case "always": return .always
+        default: return nil
+        }
+      }
+    )
+    guard let kind else {
+      return nil
+    }
+    return .createParsed(
+      self.ctx,
+      atLoc: self.generateSourceLoc(node.atSign),
+      range: self.generateAttrSourceRange(node),
+      kind: kind
+    )
+  }
+
+  /// E.g.:
+  ///   ```
+  ///   @_noSanitize(address)
+  ///   @_noSanitize(thread)
+  ///   @_noSanitize(memtag)
+  ///   ```
+  func generateNoSanitizeAttr(attribute node: AttributeSyntax) -> BridgedNoSanitizeAttr? {
+    let kind: swift.NoSanitizeKind? = self.generateSingleAttrOption(
+      attribute: node,
+      {
+        switch $0.rawText {
+        case "address": return .address
+        case "thread": return .thread
+        case "memtag": return .memtag
         default: return nil
         }
       }
