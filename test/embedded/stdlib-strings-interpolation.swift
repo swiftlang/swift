@@ -2,7 +2,7 @@
 
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
-// REQUIRES: OS=macosx || OS=linux-gnu || OS=wasip1
+// REQUIRES: OS=macosx || OS=linux-gnu || OS=wasip1 || OS=linux-android
 // REQUIRES: swift_feature_Embedded
 
 @main
