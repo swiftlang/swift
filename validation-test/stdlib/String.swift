@@ -1935,7 +1935,7 @@ for test in testCases {
       let _ = s2.remove(at: index1)
 
       expectEqual(identity1, s1._rawIdentifier())
-      expectTrue(identity1 == s2._rawIdentifier())
+      expectNotEqual(identity1, s2._rawIdentifier())
     }
   }
 }

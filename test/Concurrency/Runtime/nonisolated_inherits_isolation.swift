@@ -52,9 +52,12 @@ func executionConcurrentIsolation() async {
 
 let tests = TestSuite("NonIsolatedInheritsIsolation")
 
-tests.test("checkIfOnMainQueue crashes in a synchronous MainActor test") { @MainActor () -> () in
+tests.test("checkIfOnMainQueue crashes in a synchronous MainActor test") { @Sendable in
   expectCrashLater()
-  checkIfOnMainQueue()
+  let isolated: @MainActor () -> Void = {
+    checkIfOnMainQueue()
+  }
+  unsafeBitCast(isolated, to: (() -> Void).self)()
 }
 
 tests.test("checkIfOnMainQueue does not crash on the main queue") { @MainActor () async -> () in

@@ -1008,7 +1008,7 @@ let indexTests: [ArrayIndexTest<[Int]>] = [
   ArrayIndexTest(
     data: [ 1, 2 ],
     expectedStart: 0,
-    expectedEnd: 0,
+    expectedEnd: 1,
     operation: .removeLast
   ),
   ArrayIndexTest(
@@ -1176,7 +1176,7 @@ let indexTests: [ArrayIndexTest<[Int]>] = [
   ArrayIndexTest(
     data: [ 1, 2, 3 ],
     expectedStart: 0,
-    expectedEnd: 1,
+    expectedEnd: 0,
     operation: .removeHalfClosedSubrange(0..<3)
   ),
   ArrayIndexTest(
@@ -1216,7 +1216,7 @@ let indexTests: [ArrayIndexTest<[Int]>] = [
   ArrayIndexTest(
     data: [ 1, 2, 3 ],
     expectedStart: 0,
-    expectedEnd: 1,
+    expectedEnd: 0,
     operation: .removeClosedSubrange(0...2)
   ),
   ArrayIndexTest(

@@ -50,10 +50,13 @@ struct CustomActor {
 
 let tests = TestSuite("UnspecifiedIsMainActor")
 
-tests.test("checkIfOnMainQueue crashes in a synchronous MainActor test") { @MainActor () -> () in
+tests.test("checkIfOnMainQueue crashes in a synchronous MainActor test") { @Sendable in
   // Why do we crash if this is synchronous.
   expectCrashLater()
-  checkIfOnMainQueue()
+  let isolated: @MainActor () -> Void = {
+    checkIfOnMainQueue()
+  }
+  unsafeBitCast(isolated, to: (() -> Void).self)()
 }
 
 tests.test("checkIfOnMainQueue does not crash on the main queue") { @MainActor () async -> () in
