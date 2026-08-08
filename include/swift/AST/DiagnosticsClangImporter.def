@@ -255,8 +255,8 @@ GROUPED_WARNING(cant_infer_frt_in_cxx_inheritance, ClangDeclarationImport, none,
         (const clang::NamedDecl *))
 
 ERROR(reference_type_mixed_immortal_marker, none,
-      "reference type %0 must mark both or neither of its 'retain:' and "
-      "'release:' Swift attributes 'immortal'",
+      "reference type %0 must mark both or neither of its retain and release "
+      "operations as immortal",
       (const clang::NamedDecl *))
 ERROR(reference_type_exactly_one_retain_release_attr, none,
       "reference type '%1' must have exactly one '%select{retain|release}0:' "
@@ -265,6 +265,10 @@ ERROR(reference_type_exactly_one_retain_release_attr, none,
 ERROR(reference_type_empty_retain_release_name, none,
       "reference type '%1' has an empty %select{retain|release}0 operation name",
       (bool, StringRef))
+NOTE(retain_release_functions_origin, none,
+     "retain and release functions %select{specified on|inherited from}0 '%1'",
+     (bool, StringRef))
+
 ERROR(foreign_reference_types_cannot_find_retain_release, none,
       "cannot find %select{retain|release}0 function '%1' for reference type "
       "'%2'",

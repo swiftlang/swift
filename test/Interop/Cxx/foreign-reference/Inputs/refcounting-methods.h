@@ -144,10 +144,11 @@ struct SharedAB : SharedA, SharedB { SharedAB(int) {} };
 
 // MARK: Mixed immortal / non-immortal retain/release
 struct MixedImmortalRetainRelease {
-// expected-error@-1 {{reference type 'MixedImmortalRetainRelease' must mark both or neither of its 'retain:' and 'release:' Swift attributes 'immortal'}}
+// expected-error@-1 {{reference type 'MixedImmortalRetainRelease' must mark both or neither of its retain and release operations as immortal}}
   int value;
   void doRelease() const {}
 } SWIFT_SHARED_REFERENCE(immortal, doRelease);
+// expected-note@-1 {{retain and release functions specified on 'MixedImmortalRetainRelease'}}
 
 // A type that inherits its FRT-ness from a base with a mixed annotation is
 // itself invalid (in addition to the base's own diagnostic above).

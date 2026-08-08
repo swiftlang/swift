@@ -15,6 +15,11 @@ module Test {
 #pragma once
 #pragma clang assume_nonnull begin
 
+#define SWIFT_SHARED_REFERENCE(_retain, _release)                              \
+  __attribute__((swift_attr("import_reference")))                              \
+  __attribute__((swift_attr("retain:" #_retain)))                              \
+  __attribute__((swift_attr("release:" #_release)))
+
 struct
     __attribute__((swift_attr("import_reference")))
     __attribute__((swift_attr("retain:nonexistent")))
@@ -247,12 +252,43 @@ EmptyReleaseName {};
 
 void emptyNameRetain(EmptyReleaseName *v);
 
+// This struct is formatted with roughly one token per line to make it clear which token the diagnostic is pointed to
+struct
+  MixedImmortalHeaderLoc
+  // expected-error@-1:3 {{reference type 'MixedImmortalHeaderLoc' must mark both or neither of its retain and release operations as immortal}}
+  {
+  }
+  SWIFT_SHARED_REFERENCE(mixedImmortalRetain, immortal)
+  // expected-note@-1:3 {{retain and release functions specified on 'MixedImmortalHeaderLoc'}}
+;
+
+void mixedImmortalRetain(MixedImmortalHeaderLoc *v);
+
+struct
+  MixedImmortalAPINotes
+  // expected-error@-1:3 {{reference type 'MixedImmortalAPINotes' must mark both or neither of its retain and release operations as immortal}}
+  {
+  }
+;
+// N.B. attributes come from Test.apinotes and carry no source location, so no note is emitted
+
+void apiNotesMixedImmortalRelease(MixedImmortalAPINotes *v);
+
 void FRTParameterByValue(GoodRetainRelease v={});
 // expected-note@-1{{parameter takes foreign reference type 'GoodRetainRelease' by value which violates reference type contract}}
 GoodRetainRelease FRTReturnByValue(GoodRetainRelease* v);
 // expected-note@-1{{function returns foreign reference type 'GoodRetainRelease' by value which violates reference type contract}}
 
 #pragma clang assume_nonnull end
+
+//--- Inputs/Test.apinotes
+---
+Name: Test
+Tags:
+- Name: MixedImmortalAPINotes
+  SwiftImportAs: reference
+  SwiftRetainOp: immortal
+  SwiftReleaseOp: apiNotesMixedImmortalRelease
 
 //--- test.swift
 
@@ -278,6 +314,8 @@ public func test(x: MultipleRetainReleaseFRT) {}
 public func test(x: MultipleRetainReleaseAttrFRT) {}
 public func test(x: EmptyRetainName) {}
 public func test(x: EmptyReleaseName) {}
+public func test(x: MixedImmortalHeaderLoc) {}
+public func test(x: MixedImmortalAPINotes) {}
 
 public func testCalls() {
   FRTParameterByValue() // expected-error {{cannot find 'FRTParameterByValue' in scope}}

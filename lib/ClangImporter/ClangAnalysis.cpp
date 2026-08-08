@@ -158,9 +158,11 @@ struct RetainReleaseInfo {
       if (attrStr.consume_front("retain:")) {
         ++retainCount;
         retain = attrStr;
+        retainLoc = attr->getLocation();
       } else if (attrStr.consume_front("release:")) {
         ++releaseCount;
         release = attrStr;
+        releaseLoc = attr->getLocation();
       }
     }
   }
@@ -190,6 +192,17 @@ struct RetainReleaseInfo {
     return numRetain() == 1 && numRelease() == 1 && !hasMixedImmortality();
   }
 
+  /// Emit "retain and release functions specified on / inherited from" note.
+  void noteRetainReleaseOrigin(ClangImporter::Implementation &Impl) const {
+    clang::SourceLocation loc = retainLoc.isValid() ? retainLoc : releaseLoc;
+    if (loc.isValid()) {
+      StringRef name = Impl.SwiftContext.AllocateCopy(decl->getNameAsString());
+      Impl.diagnose(HeaderLoc(loc), diag::retain_release_functions_origin,
+                    /*isInherited=*/false, name);
+    }
+    // Otherwise: no usable attribute location and not inherited -> omit.
+  }
+
   /// Diagnose malformed retain:/release: attributes via \p Impl (if non-null).
   /// Returns whether the annotations are structurally well-formed.
   bool checkShape(ClangImporter::Implementation *Impl) const {
@@ -216,8 +229,10 @@ struct RetainReleaseInfo {
       return false;
 
     if (hasMixedImmortality()) {
-      if (Impl)
+      if (Impl) {
         Impl->diagnose(loc, diag::reference_type_mixed_immortal_marker, decl);
+        noteRetainReleaseOrigin(*Impl);
+      }
       return false;
     }
     return true;
@@ -226,6 +241,7 @@ struct RetainReleaseInfo {
 private:
   const clang::RecordDecl *decl;
   StringRef retain, release;
+  clang::SourceLocation retainLoc, releaseLoc;
   unsigned retainCount = 0, releaseCount = 0;
 
   StringRef allocateRecordName(ClangImporter::Implementation &Impl) const {
