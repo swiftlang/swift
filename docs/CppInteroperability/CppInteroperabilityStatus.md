@@ -205,11 +205,29 @@ Swift functions can be called from C++, with some restrictions. See this table f
 
 | **Swift Language Feature**   | **Implemented Experimental Support For Using It In C++** |
 |------------------------------|----------------------------------------------------------|
-| Generic functions            | Partially, only without generic constraints              |
-| Generic methods              | Partially, only without generic constraints              |
-| Generic `struct` types       | Partially, only without generic constraints and less than 4 generic parameters             |
-| Generic `enum` types         | Partially, only without generic constraints and less than 4 generic parameters |
+| Generic functions            | Partially; direct `Hashable` requirements on generic parameters are supported outside Embedded Swift |
+| Generic methods              | Partially; direct `Hashable` requirements on generic parameters are supported outside Embedded Swift |
+| Generic `struct` types       | Partially; direct `Hashable` requirements are supported outside Embedded Swift, with at most three combined type metadata and conformance arguments |
+| Generic `enum` types         | Partially; direct `Hashable` requirements are supported outside Embedded Swift, with at most three combined type metadata and conformance arguments |
 | Generic `class` types        | No |
+
+Generated C++ templates cannot statically enforce Swift protocol conformances.
+When a generated API has a `Hashable` requirement, the conformance is looked up
+from the Swift type metadata at runtime. Using the API with a type that does not
+have a loaded Swift `Hashable` conformance terminates the process with a fatal
+error. When the runtime and concurrency runtime can enforce an isolated
+conformance, the generated binding checks that execution is on the
+conformance's global-actor executor before passing its witness table to the
+generic API. Configurations that cannot perform this check—including older
+Apple back-deployment runtimes and runtimes without the concurrency hook—retain
+the legacy lookup behavior and cannot reject off-actor use. Runtime-discovered
+conformances must be present in a loaded image at lookup time. If a conformance
+is defined only in an otherwise-unreferenced member of a static archive, the
+linker must be instructed to load that member.
+Runtime witness-table lookup is limited to direct `Hashable` requirements; this
+does not expose arbitrary Swift protocols.
+This support does not make protocol existential or opaque result types such as
+`any Hashable` or `some Hashable` representable in C++.
 
 ### Swift standard library
 
@@ -220,3 +238,4 @@ This status table describes which of the following Swift standard library APIs h
 | `String`     | Can be used as a type in C++. APIs in extensions are not exposed to C++. Conversion between `std.string` is not yet supported   |
 | `Array<T>`   | Can be used as a type in C++. Ranged for loops are supported. Limited set of APIs in some extensions are exposed to C++. |
 | `Optional<T>`   | Can be used as a type in C++. Can be constructed. `get` extracts the optional value and it's also implicitly castable to `bool`.  |
+| `Dictionary<K, V>`   | Can be used as a type in C++ outside Embedded Swift. Can be constructed. Key lookup via `operator []` returns an `Optional`, mutation via `updateValueForKey` / `removeValueForKey`. Iteration over keys/values is not yet supported. |
