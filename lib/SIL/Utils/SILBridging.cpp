@@ -595,18 +595,6 @@ BridgedOwnedString BridgedInstruction::getDebugDescription() const {
   return BridgedOwnedString(str);
 }
 
-bool BridgedInstruction::mayAccessPointer() const {
-  return ::mayAccessPointer(unbridged());
-}
-
-bool BridgedInstruction::mayLoadWeakOrUnowned() const {
-  return ::mayLoadWeakOrUnowned(unbridged());
-}
-
-bool BridgedInstruction::maySynchronize() const {
-  return ::maySynchronize(unbridged());
-}
-
 BridgedType
 BridgedInstruction::KeyPathInst_getStaticInstanceClassType() const {
   return getAs<swift::KeyPathInst>()->getStaticInstanceClassType();
