@@ -128,7 +128,7 @@ typedef void (*__swift_tls_dtor_t)(void * EMBEDDED_SWIFT_NULLABLE);
  * entrypoints might be optional, where the entrypoint is needed only when
  * certain Swift functionality is used.
  */
-#define EMBEDDED_SWIFT_PLATFORM_VERSION_MINOR 1
+#define EMBEDDED_SWIFT_PLATFORM_VERSION_MINOR 2
 
 #if defined(__cplusplus)
 extern "C" {
@@ -253,6 +253,34 @@ typedef enum EMBEDDED_SWIFT_OPTION_SET: __swift_options_t {
    */
   SWIFT_MUTEX_CHECKED EMBEDDED_SWIFT_NAME(checked) = 0x01
 } swift_mutex_flags_t EMBEDDED_SWIFT_NAME(SwiftMutexFlags);
+
+/**
+ * Identifies one of the clocks used by the Swift time APIs.
+ *
+ * The values match the runtime's `swift_clock_id`.
+ */
+typedef enum EMBEDDED_SWIFT_ENUM: int {
+  /**
+   * A clock that increments monotonically and keeps incrementing while the
+   * system is asleep, like the Swift `ContinuousClock`.
+   */
+  SWIFT_CLOCK_CONTINUOUS EMBEDDED_SWIFT_NAME(continuous) = 1,
+
+  /**
+   * A clock that increments monotonically but stops incrementing while the
+   * system is asleep, like the Swift `SuspendingClock`.
+   *
+   * A platform that cannot distinguish the two behaviors may use the same
+   * time source for the continuous and suspending clocks.
+   */
+  SWIFT_CLOCK_SUSPENDING EMBEDDED_SWIFT_NAME(suspending) = 2,
+
+  /**
+   * A clock that measures wall-clock time since the UNIX epoch
+   * (January 1, 1970).
+   */
+  SWIFT_CLOCK_WALL EMBEDDED_SWIFT_NAME(wall) = 3,
+} swift_clock_id_t EMBEDDED_SWIFT_NAME(SwiftClockID);
 
 /**
  * Allocates memory and returns the resulting pointer.
@@ -591,6 +619,74 @@ __swift_ptrdiff_t _swift_thread_isMain(void);
  * function.
  */
 void _swift_exit(int code);
+
+/**
+ * Reads the current time of one of the Swift clocks.
+ *
+ * - Parameters:
+ *   - clock_id: The clock to read.
+ *   - seconds: On return, the whole seconds of the current time.
+ *   - nanoseconds: On return, the remaining nanoseconds of the current time.
+ *     The value should be in the range [0, 999999999].
+ *
+ * The time reported by the continuous and suspending clocks is measured from
+ * an arbitrary fixed point in the past, such as system boot. The wall clock
+ * reports time since the UNIX epoch (January 1, 1970).
+ *
+ * The runtime only calls this function with one of the declared
+ * `swift_clock_id_t` values.
+ *
+ * This function is required when using the Swift clock APIs, such as
+ * `ContinuousClock`, or any functionality built on top of them, such as
+ * `Task.sleep`.
+ *
+ * This function can be implemented as a call to `clock_gettime`.
+ */
+void _swift_clock_getTime(swift_clock_id_t clock_id,
+    long long * EMBEDDED_SWIFT_NONNULL EMBEDDED_SWIFT_SINGLE seconds,
+    long long * EMBEDDED_SWIFT_NONNULL EMBEDDED_SWIFT_SINGLE nanoseconds);
+
+/**
+ * Reports the resolution of one of the Swift clocks.
+ *
+ * - Parameters:
+ *   - clock_id: The clock whose resolution is being requested.
+ *   - seconds: On return, the whole seconds of the clock's resolution.
+ *   - nanoseconds: On return, the remaining nanoseconds of the clock's
+ *     resolution. The value should be in the range [0, 999999999].
+ *
+ * The runtime only calls this function with one of the declared
+ * `swift_clock_id_t` values.
+ *
+ * This function is required when using the Swift clock APIs; the
+ * `minimumResolution` properties of the clocks report the value returned
+ * here.
+ *
+ * This function can be implemented as a call to `clock_getres`.
+ */
+void _swift_clock_getResolution(swift_clock_id_t clock_id,
+    long long * EMBEDDED_SWIFT_NONNULL EMBEDDED_SWIFT_SINGLE seconds,
+    long long * EMBEDDED_SWIFT_NONNULL EMBEDDED_SWIFT_SINGLE nanoseconds);
+
+/**
+ * Blocks the calling execution context for at least the given relative
+ * duration.
+ *
+ * - Parameters:
+ *   - seconds: The whole seconds of the duration.
+ *   - nanoseconds: The remaining nanoseconds of the duration.
+ *
+ * Only the default cooperative global executor calls this function; it uses
+ * it to wait until the next delayed job becomes ready to run. The function
+ * must be linkable whenever the Concurrency clock entry points are in use,
+ * but a platform that installs a custom global executor that schedules
+ * delayed jobs by other means (e.g., a hardware timer) may implement it as
+ * a no-op or a trap.
+ *
+ * This function can be implemented as a call to `nanosleep`, retrying when
+ * the sleep is interrupted by a signal.
+ */
+void _swift_clock_sleep(long long seconds, long long nanoseconds);
 
 #if defined(__cplusplus)
 }

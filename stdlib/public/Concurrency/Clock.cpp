@@ -13,6 +13,29 @@
 #include "swift/Runtime/Concurrency.h"
 #include "swift/Runtime/Once.h"
 
+#include "Error.h"
+
+#if SWIFT_CONCURRENCY_EMBEDDED && SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
+
+// When the Embedded Swift platform abstraction layer is in use, the clock
+// services declared in swift/EmbeddedPlatform.h are provided by the platform
+// at link time and the default implementations at the end of this file are
+// not compiled. This keeps the embedded runtime free of any direct libc
+// clock dependency.
+#include "swift/EmbeddedPlatform.h"
+
+static_assert(SWIFT_CLOCK_CONTINUOUS ==
+                  static_cast<int>(swift::swift_clock_id_continuous),
+              "platform clock IDs must match the runtime clock IDs");
+static_assert(SWIFT_CLOCK_SUSPENDING ==
+                  static_cast<int>(swift::swift_clock_id_suspending),
+              "platform clock IDs must match the runtime clock IDs");
+static_assert(SWIFT_CLOCK_WALL ==
+                  static_cast<int>(swift::swift_clock_id_wall),
+              "platform clock IDs must match the runtime clock IDs");
+
+#else
+
 #include <errno.h>
 #include <time.h>
 #if defined(_WIN32)
@@ -32,13 +55,32 @@
 #endif
 #endif // __has_include(<chrono>)
 
-#include "Error.h"
-
 #ifndef NSEC_PER_SEC
 #define NSEC_PER_SEC 1000000000ull
 #endif
 
+#endif // SWIFT_CONCURRENCY_EMBEDDED && SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
+
 using namespace swift;
+
+#if !(SWIFT_CONCURRENCY_EMBEDDED && SWIFT_USE_EMBEDDED_SWIFT_PLATFORM)
+// The platform clock services. The runtime entry points below forward to
+// these functions; the default implementations at the end of this file wrap
+// the platform's native clock facilities. When the embedded platform
+// abstraction layer is in use, they are declared in swift/EmbeddedPlatform.h
+// and provided by the platform instead.
+typedef swift_clock_id swift_clock_id_t;
+
+extern "C" void _swift_clock_getTime(swift_clock_id_t clock_id,
+                                     long long *seconds,
+                                     long long *nanoseconds);
+
+extern "C" void _swift_clock_getResolution(swift_clock_id_t clock_id,
+                                           long long *seconds,
+                                           long long *nanoseconds);
+
+extern "C" void _swift_clock_sleep(long long seconds, long long nanoseconds);
+#endif // !(SWIFT_CONCURRENCY_EMBEDDED && SWIFT_USE_EMBEDDED_SWIFT_PLATFORM)
 
 SWIFT_EXPORT_FROM(swift_Concurrency)
 SWIFT_CC(swift)
@@ -46,6 +88,54 @@ void swift_get_time(
   long long *seconds,
   long long *nanoseconds,
   swift_clock_id clock_id) {
+#if SWIFT_CONCURRENCY_EMBEDDED && SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
+  // The platform implementation is only required to handle the declared
+  // clock IDs; validate before crossing the platform boundary.
+  if (clock_id != swift_clock_id_continuous &&
+      clock_id != swift_clock_id_suspending &&
+      clock_id != swift_clock_id_wall)
+    swift_Concurrency_fatalError(0, "Fatal error: invalid clock ID %d\n",
+                                 clock_id);
+#endif
+  _swift_clock_getTime(static_cast<swift_clock_id_t>(clock_id),
+                       seconds, nanoseconds);
+}
+
+SWIFT_EXPORT_FROM(swift_Concurrency)
+SWIFT_CC(swift)
+void swift_get_clock_res(
+  long long *seconds,
+  long long *nanoseconds,
+  swift_clock_id clock_id) {
+#if SWIFT_CONCURRENCY_EMBEDDED && SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
+  // The platform implementation is only required to handle the declared
+  // clock IDs; validate before crossing the platform boundary.
+  if (clock_id != swift_clock_id_continuous &&
+      clock_id != swift_clock_id_suspending &&
+      clock_id != swift_clock_id_wall)
+    swift_Concurrency_fatalError(0, "Fatal error: invalid clock ID %d\n",
+                                 clock_id);
+#endif
+  _swift_clock_getResolution(static_cast<swift_clock_id_t>(clock_id),
+                             seconds, nanoseconds);
+}
+
+SWIFT_EXPORT_FROM(swift_Concurrency)
+SWIFT_CC(swift)
+void swift_sleep(
+  long long seconds,
+  long long nanoseconds) {
+  _swift_clock_sleep(seconds, nanoseconds);
+}
+
+#if !(SWIFT_CONCURRENCY_EMBEDDED && SWIFT_USE_EMBEDDED_SWIFT_PLATFORM)
+
+// Default implementations of the platform clock services on top of the
+// platform's native clock facilities.
+
+extern "C" void _swift_clock_getTime(swift_clock_id_t clock_id,
+                                     long long *seconds,
+                                     long long *nanoseconds) {
   switch (clock_id) {
     case swift_clock_id_continuous: {
       struct timespec continuous;
@@ -143,13 +233,10 @@ void swift_get_time(
                                clock_id);
 }
 
-SWIFT_EXPORT_FROM(swift_Concurrency)
-SWIFT_CC(swift)
-void swift_get_clock_res(
-  long long *seconds,
-  long long *nanoseconds,
-  swift_clock_id clock_id) {
-switch (clock_id) {
+extern "C" void _swift_clock_getResolution(swift_clock_id_t clock_id,
+                                           long long *seconds,
+                                           long long *nanoseconds) {
+  switch (clock_id) {
     case swift_clock_id_continuous: {
       struct timespec continuous;
 #if defined(__linux__)
@@ -217,11 +304,7 @@ switch (clock_id) {
                                clock_id);
 }
 
-SWIFT_EXPORT_FROM(swift_Concurrency)
-SWIFT_CC(swift)
-void swift_sleep(
-  long long seconds,
-  long long nanoseconds) {
+extern "C" void _swift_clock_sleep(long long seconds, long long nanoseconds) {
 #if defined(_WIN32)
   ULONGLONG now;
   (void)QueryInterruptTimePrecise(&now);
@@ -256,3 +339,5 @@ void swift_sleep(
   #error Missing platform sleep definition
 #endif
 }
+
+#endif // !(SWIFT_CONCURRENCY_EMBEDDED && SWIFT_USE_EMBEDDED_SWIFT_PLATFORM)
