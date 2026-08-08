@@ -156,49 +156,48 @@ struct RetainReleaseInfo {
     for (auto *attr : decl->specific_attrs<clang::SwiftAttrAttr>()) {
       StringRef attrStr = attr->getAttribute();
       if (attrStr.consume_front("retain:")) {
-        ++retainCount;
-        retain = attrStr;
-        retainLoc = attr->getLocation();
+        retainAttrs.push_back(attr);
+        retainName = attrStr;
       } else if (attrStr.consume_front("release:")) {
-        ++releaseCount;
-        release = attrStr;
-        releaseLoc = attr->getLocation();
+        releaseAttrs.push_back(attr);
+        releaseName = attrStr;
       }
     }
   }
 
   /// The name of the last retain: operation (empty if none).
-  StringRef getRetain() const { return retain; }
+  StringRef getRetain() const { return retainName; }
 
   /// The name of the last release: operation (empty if none).
-  StringRef getRelease() const { return release; }
-
-  unsigned numRetain() const { return retainCount; }
-
-  unsigned numRelease() const { return releaseCount; }
+  StringRef getRelease() const { return releaseName; }
 
   bool isImmortal() const {
-    return retainCount == 1 && releaseCount == 1 && retain == "immortal" &&
-           release == "immortal";
+    return isValid() && retainName == "immortal" && releaseName == "immortal";
   }
 
   bool hasMixedImmortality() const {
-    bool retainImmortal = retain == "immortal";
-    bool releaseImmortal = release == "immortal";
+    bool retainImmortal = retainName == "immortal";
+    bool releaseImmortal = releaseName == "immortal";
     return retainImmortal != releaseImmortal;
   }
 
   bool isValid() const {
-    return numRetain() == 1 && numRelease() == 1 && !hasMixedImmortality();
+    return retainAttrs.size() == 1 && releaseAttrs.size() == 1 &&
+           !hasMixedImmortality();
   }
 
   /// Emit "retain and release functions specified on / inherited from" note.
-  void noteRetainReleaseOrigin(ClangImporter::Implementation &Impl) const {
-    clang::SourceLocation loc = retainLoc.isValid() ? retainLoc : releaseLoc;
+  void
+  noteRetainReleaseOrigin(ClangImporter::Implementation &Impl,
+                          clang::SourceLocation loc,
+                          std::optional<bool> isRelease = std::nullopt) const {
     if (loc.isValid()) {
-      StringRef name = Impl.SwiftContext.AllocateCopy(decl->getNameAsString());
-      Impl.diagnose(HeaderLoc(loc), diag::retain_release_functions_origin,
-                    /*isInherited=*/false, name);
+      unsigned sel = 2 /* retain and release functions */;
+      if (isRelease.has_value())
+        sel = isRelease.value() ? 1 /* release function */
+                                : 0 /* retain function */;
+      Impl.diagnose(HeaderLoc(loc), diag::retain_release_function_origin, sel,
+                    /*isInherited=*/false, allocateRecordName(Impl));
     }
     // Otherwise: no usable attribute location and not inherited -> omit.
   }
@@ -207,31 +206,38 @@ struct RetainReleaseInfo {
   /// Returns whether the annotations are structurally well-formed.
   bool checkShape(ClangImporter::Implementation *Impl) const {
     HeaderLoc loc(decl->getLocation());
-    auto checkOp = [&](unsigned count, StringRef name, bool isRelease) {
-      if (count != 1) {
-        if (Impl)
+    auto checkOp = [&](bool isRelease) {
+      auto &attrs = isRelease ? releaseAttrs : retainAttrs;
+      auto &name = isRelease ? releaseName : retainName;
+      if (attrs.size() != 1) {
+        if (Impl) {
           Impl->diagnose(loc,
                          diag::reference_type_exactly_one_retain_release_attr,
                          isRelease, allocateRecordName(*Impl));
+          for (auto *attr : attrs)
+            noteRetainReleaseOrigin(*Impl, attr->getLocation(), isRelease);
+        }
         return false;
       }
       if (name.empty()) {
-        if (Impl)
+        if (Impl) {
           Impl->diagnose(loc, diag::reference_type_empty_retain_release_name,
                          isRelease, allocateRecordName(*Impl));
+          noteRetainReleaseOrigin(*Impl, attrs[0]->getLocation(), isRelease);
+        }
         return false;
       }
       return true;
     };
-    bool retainOk = checkOp(retainCount, retain, /*isRelease=*/false);
-    bool releaseOk = checkOp(releaseCount, release, /*isRelease=*/true);
+    bool retainOk = checkOp(/*isRelease=*/false);
+    bool releaseOk = checkOp(/*isRelease=*/true);
     if (!retainOk || !releaseOk)
       return false;
 
     if (hasMixedImmortality()) {
       if (Impl) {
         Impl->diagnose(loc, diag::reference_type_mixed_immortal_marker, decl);
-        noteRetainReleaseOrigin(*Impl);
+        noteRetainReleaseOrigin(*Impl, retainAttrs[0]->getLocation());
       }
       return false;
     }
@@ -240,9 +246,8 @@ struct RetainReleaseInfo {
 
 private:
   const clang::RecordDecl *decl;
-  StringRef retain, release;
-  clang::SourceLocation retainLoc, releaseLoc;
-  unsigned retainCount = 0, releaseCount = 0;
+  StringRef retainName, releaseName;
+  llvm::SmallVector<const clang::SwiftAttrAttr *, 1> retainAttrs, releaseAttrs;
 
   StringRef allocateRecordName(ClangImporter::Implementation &Impl) const {
     return Impl.SwiftContext.AllocateCopy(decl->getNameAsString());

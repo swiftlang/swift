@@ -222,9 +222,13 @@ void release(GoodRetainRelease *v);
 struct
     __attribute__((swift_attr("import_reference")))
     __attribute__((swift_attr("retain:retain2")))
+    // expected-note@-1{{retain function specified on 'MultipleRetainReleaseAttrFRT'}}
     __attribute__((swift_attr("retain:retain1")))
+    // expected-note@-1{{retain function specified on 'MultipleRetainReleaseAttrFRT'}}
     __attribute__((swift_attr("release:release1")))
+    // expected-note@-1{{release function specified on 'MultipleRetainReleaseAttrFRT'}}
     __attribute__((swift_attr("release:release2")))
+    // expected-note@-1{{release function specified on 'MultipleRetainReleaseAttrFRT'}}
 MultipleRetainReleaseAttrFRT {};
 // expected-error@-1 {{reference type 'MultipleRetainReleaseAttrFRT' must have exactly one 'retain:' Swift attribute}}
 // expected-error@-2 {{reference type 'MultipleRetainReleaseAttrFRT' must have exactly one 'release:' Swift attribute}}
@@ -237,6 +241,7 @@ void release2(MultipleRetainReleaseAttrFRT *v);
 struct
     __attribute__((swift_attr("import_reference")))
     __attribute__((swift_attr("retain:")))
+    // expected-note@-1{{retain function specified on 'EmptyRetainName'}}
     __attribute__((swift_attr("release:emptyNameRelease")))
 EmptyRetainName {};
 // expected-error@-1 {{reference type 'EmptyRetainName' has an empty retain operation name}}
@@ -247,6 +252,7 @@ struct
     __attribute__((swift_attr("import_reference")))
     __attribute__((swift_attr("retain:emptyNameRetain")))
     __attribute__((swift_attr("release:")))
+    // expected-note@-1{{release function specified on 'EmptyReleaseName'}}
 EmptyReleaseName {};
 // expected-error@-1 {{reference type 'EmptyReleaseName' has an empty release operation name}}
 
