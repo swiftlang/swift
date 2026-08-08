@@ -293,6 +293,7 @@ enum PeCoffImageError: Error {
   case badPESignature
   case missingOptionalHeader
   case badOptionalHeader
+  case badDebugDirectory
 }
 
 enum PeImageDirectoryEntry: Int {
@@ -641,7 +642,10 @@ final class PeCoffImage {
         if source.isMappedImage {
           pos = Address(debugInfo.VirtualAddress) + self.imageBase
         } else {
-          pos = Address(filePointer(from: debugInfo.VirtualAddress)!)
+          guard let fp = filePointer(from: debugInfo.VirtualAddress) else {
+            throw PeCoffImageError.badDebugDirectory
+          }
+          pos = Address(fp)
         }
 
         let end = pos + Address(debugInfo.Size)
@@ -701,7 +705,10 @@ final class PeCoffImage {
       if virtualAddress >= section.virtualAddress {
         let offset = virtualAddress - section.virtualAddress
         if offset < section.virtualSize && offset < section.sizeOfRawData {
-          return section.pointerToRawData + offset
+          let (result, overflowed)
+            = section.pointerToRawData.addingReportingOverflow(offset)
+          guard !overflowed else { return nil }
+          return result
         }
       }
     }
@@ -715,7 +722,10 @@ final class PeCoffImage {
       if filePointer >= section.pointerToRawData {
         let offset = filePointer - section.pointerToRawData
         if offset < section.sizeOfRawData {
-          return section.virtualAddress + offset
+          let (result, overflowed)
+            = section.virtualAddress.addingReportingOverflow(offset)
+          guard !overflowed else { return nil }
+          return result
         }
       }
     }
