@@ -2379,12 +2379,12 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
     // Diagnose unused constructor calls.
     if (isa_and_nonnull<ConstructorDecl>(callee) && !call->isImplicit()) {
       DE.diagnose(fn->getLoc(), diag::expression_unused_init_result,
-               callee->getDeclContext()->getDeclaredInterfaceType())
-        .highlight(call->getArgs()->getSourceRange());
+                  callee->getDeclContext()->getDeclaredInterfaceType())
+          .highlight(call->getSourceRange());
       return;
     }
-    
-    SourceRange SR1 = call->getArgs()->getSourceRange(), SR2;
+
+    SourceRange SR1 = call->getSourceRange(), SR2;
     if (auto *BO = dyn_cast<BinaryExpr>(call)) {
       SR1 = BO->getLHS()->getSourceRange();
       SR2 = BO->getRHS()->getSourceRange();
