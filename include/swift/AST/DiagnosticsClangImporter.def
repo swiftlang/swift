@@ -265,9 +265,9 @@ ERROR(reference_type_exactly_one_retain_release_attr, none,
 ERROR(reference_type_empty_retain_release_name, none,
       "reference type '%1' has an empty %select{retain|release}0 operation name",
       (bool, StringRef))
-NOTE(retain_release_functions_origin, none,
-     "retain and release functions %select{specified on|inherited from}0 '%1'",
-     (bool, StringRef))
+NOTE(retain_release_function_origin, none,
+     "%select{retain function|release function|retain and release functions}0 " "%select{specified on|inherited from}1 '%2'",
+     (unsigned, bool, StringRef))
 
 ERROR(foreign_reference_types_cannot_find_retain_release, none,
       "cannot find %select{retain|release}0 function '%1' for reference type "
