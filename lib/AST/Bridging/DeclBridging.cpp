@@ -407,8 +407,7 @@ BridgedEnumElementDecl BridgedEnumElementDecl_createParsed(
 
   return new (context)
       EnumElementDecl(nameLoc, declName, parameterList, equalsLoc,
-                      cast_or_null<LiteralExpr>(rawValue.unbridged()),
-                      cDeclContext.unbridged());
+                      rawValue.unbridged(), cDeclContext.unbridged());
 }
 
 BridgedNominalTypeDecl BridgedStructDecl_createParsed(

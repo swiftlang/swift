@@ -423,7 +423,11 @@ extension ASTGenVisitor {
             start: node.dependsOnKeyword,
             end: node.rightParen
           ),
-          sources: node.arguments.lazy.compactMap(self.generateLifetimeDescriptor(lifetimeSpecifierArgument:)).bridgedArray(in: self)
+          // `compactMap(in:)`, not `lazy.compactMap { }.bridgedArray`, which
+          // would run the transform -- and any diagnostic it emits -- twice.
+          sources: node.arguments.compactMap(in: self) {
+            self.generateLifetimeDescriptor(lifetimeSpecifierArgument: $0)
+          }
         )
       case .nonisolatedTypeSpecifier(_):
         nonisolatedLoc = loc

@@ -365,6 +365,22 @@ extension ASTGenVisitor {
       return nil
     }
 
+    var rawValue: BridgedExpr? = nil
+    if let rawValueNode = node.rawValue?.value {
+      rawValue = self.generate(expr: rawValueNode)
+
+      // Without `LiteralExpressions`, a raw value has to be one of a fixed set of
+      // literal forms. The C++ parser checks the same list, reports the same
+      // diagnostic, and then drops the raw value; keeping it would leave an
+      // expression Sema is not prepared for on the EnumElementDecl.
+      if !ctx.langOpts.hasFeature(.LiteralExpressions),
+        !rawValueNode.isValidEnumRawValueLiteral
+      {
+        self.diagnose(.nonliteral_enum_case_raw_value, at: rawValueNode)
+        rawValue = nil
+      }
+    }
+
     return .createParsed(
       self.ctx,
       declContext: self.declContext,
@@ -372,7 +388,7 @@ extension ASTGenVisitor {
       nameLoc: nameLoc,
       parameterList: self.generate(enumCaseParameterClause: node.parameterClause),
       equalsLoc: self.generateSourceLoc(node.rawValue?.equal),
-      rawValue: self.generate(expr: node.rawValue?.value)
+      rawValue: rawValue.asNullable
     )
   }
 
@@ -380,17 +396,22 @@ extension ASTGenVisitor {
     let attrs = self.generateDeclAttributes(node, allowStatic: false)
 
     // All attributes goes to each element.
-    let elements = node.elements.lazy.compactMap({ elem -> BridgedEnumElementDecl? in
+    //
+    // `compactMap(in:)` rather than `lazy.compactMap { }.bridgedArray`: the
+    // latter evaluates the transform twice, once to compute `count` and again to
+    // fill the buffer, which would build every element -- attaching its
+    // attributes, and emitting any diagnostic it produces -- twice.
+    let elements = node.elements.compactMap(in: self) { elem -> BridgedEnumElementDecl? in
       guard let elemDecl = self.generate(enumCaseElement: elem) else {
         return nil
       }
       elemDecl.asDecl.attachParsedAttrs(attrs.attributes)
       return elemDecl
-    })
+    }
     return .createParsed(
       declContext: self.declContext,
       caseKeywordLoc: self.generateSourceLoc(node.caseKeyword),
-      elements: elements.bridgedArray(in: self)
+      elements: elements
     )
   }
 }
@@ -1330,5 +1351,28 @@ extension ASTGenVisitor {
     node.lazy.map {
       self.generateLocatedIdentifier($0.name)
     }.bridgedArray(in: self)
+  }
+}
+
+extension ExprSyntax {
+  /// Whether this expression is one of the literal forms an enum case's raw
+  /// value may take without the `LiteralExpressions` feature.
+  ///
+  /// Mirrors `isValidEnumRawValueLiteral` in ParseDecl.cpp. A negated numeric
+  /// literal is written as a prefix operator applied to the literal, and the C++
+  /// parser folds the sign into the literal while parsing, so accept that shape
+  /// too.
+  var isValidEnumRawValueLiteral: Bool {
+    var expr = self
+    if let prefix = expr.as(PrefixOperatorExprSyntax.self), prefix.operator.rawText == "-" {
+      expr = prefix.expression
+    }
+    switch expr.as(ExprSyntaxEnum.self) {
+    case .integerLiteralExpr, .floatLiteralExpr, .stringLiteralExpr,
+      .booleanLiteralExpr, .nilLiteralExpr:
+      return true
+    default:
+      return false
+    }
   }
 }
