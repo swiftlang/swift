@@ -38,7 +38,6 @@ syn keyword swiftKeyword
       \ throw
       \ try
       \ unsafe
-      \ where
       \ while
 syn match swiftMultiwordKeyword
       \ "indirect case"
@@ -67,15 +66,17 @@ syn keyword swiftLabel
 
 " ---- Modifiers & specifiers ----
 
-" nonisolated(unsafe), nonisolated(nonsending)
+" nonisolated(unsafe), nonisolated(nonsending), unowned(safe), unowned(unsafe)
 syn keyword swiftModifierArgument contained
       \ nonsending
+      \ safe
       \ unsafe
 syn region swiftModifierArguments contained transparent
       \ matchgroup=Delimiter start=/(/ end=/)/
       \ contains=swiftModifierArgument
 syn keyword swiftDefinitionModifier skipwhite skipempty nextgroup=swiftModifierArguments
       \ nonisolated
+      \ unowned
 
 syn keyword swiftDefinitionModifier
       \ async
@@ -181,8 +182,19 @@ syn match swiftVarName contained skipwhite skipempty nextgroup=swiftTypeDeclarat
 syn match swiftImplicitVarName
       \ /\$\<[A-Za-z_0-9]\+\>/
 
+" Codable & Equatable (protocol composition). contained, so it only ever
+" chains off an already-recognized type -- it can't be confused with the
+" bitwise-and operator in ordinary expressions.
+syn match swiftProtocolComposition contained skipwhite skipempty nextgroup=@swiftTypeContext
+      \ /&/
+
+" `, subject ==` continues a same-type requirement after a comma; the
+" lookahead keeps ordinary tuple/parameter-list commas unaffected.
+syn match swiftWhereConstraintComma contained skipwhite skipempty nextgroup=swiftWhereConstraintSubject
+      \ /,\ze\s*[A-Za-z_][A-Za-z_0-9.]*\s*==/
+
 " TypeName[Optionality]?
-syn match swiftType contained skipwhite skipempty nextgroup=swiftTypeParameters
+syn match swiftType contained skipwhite skipempty nextgroup=swiftTypeParameters,swiftProtocolComposition,swiftWhereConstraintComma
       \ /\<[A-Za-z_][A-Za-z_0-9\.]*\>[!?]\?/
 " [Type:Type] (dictionary) or [Type] (array)
 syn region swiftType contained contains=swiftTypePair,@swiftTypeContext
@@ -216,6 +228,15 @@ syn match swiftCastOp skipwhite skipempty nextgroup=@swiftTypeContext,swiftCoreT
 syn match swiftCastOp skipwhite skipempty nextgroup=@swiftTypeContext,swiftCoreTypes
       \ "\<as\>[!?]\?"
 
+" where T == Int (same-type requirement); `:` conformance already works
+" without this, since swiftTypeDeclaration is not `contained`.
+syn match swiftWhereSameType contained skipwhite skipempty nextgroup=@swiftTypeContext
+      \ /==/
+syn match swiftWhereConstraintSubject contained skipwhite skipempty nextgroup=swiftWhereSameType
+      \ /\<[A-Za-z_][A-Za-z_0-9]*\>\%(\.[A-Za-z_][A-Za-z_0-9]*\)*/
+syn keyword swiftKeyword skipwhite skipempty nextgroup=swiftWhereConstraintSubject
+      \ where
+
 " ---- Literals ----
 
 syn keyword swiftBoolean
@@ -239,11 +260,31 @@ syn match swiftChar
 
 syn region swiftString contains=swiftInterpolationRegion
       \ start=/"/ skip=/\\\\\|\\"/ end=/"/
+" """..."""  Must be defined after the single-line swiftString above so
+" it wins when both could start at the same `"`, per :syn-priority (the
+" item defined last has priority for matches starting at the same spot).
+syn region swiftString contains=swiftInterpolationRegion
+      \ start=/"""/ skip=/\\\\\|\\"/ end=/"""/
 syn region swiftInterpolationRegion contained contains=TOP
       \ matchgroup=swiftInterpolation start=/\\(/ end=/)/
 
+" #"..."#  Raw string: no escape processing at all except `\#(` for
+" interpolation. Only the single-`#` delimiter is handled; `##"..."##`
+" and higher would need matching delimiter counts on both ends, which a
+" plain start/end pair cannot enforce.
+syn region swiftString contains=swiftInterpolationRegion
+      \ start=/#"/ end=/"#/
+syn region swiftInterpolationRegion contained contains=TOP
+      \ matchgroup=swiftInterpolation start=/\\#(/ end=/)/
+
 syn match swiftTupleIndexNumber contains=swiftDecimal
       \ /\.[0-9]\+/
+
+" \Type.path or \.path (key path literal). The whole path is a single
+" token, since a plain regex cannot distinguish the leading type name
+" from the member names that follow it.
+syn match swiftKeyPath
+      \ /\\\%([A-Za-z_][A-Za-z_0-9]*\)\?\%(\.[A-Za-z_][A-Za-z_0-9]*[?!]\?\)\+/
 syn match swiftDecimal contained
       \ /[0-9]\+/
 
@@ -337,7 +378,10 @@ hi def link swiftConstraint Special
 hi def link swiftTypeAliasValue Delimiter
 hi def link swiftTypeDeclaration Delimiter
 hi def link swiftTypeParameters Delimiter
+hi def link swiftProtocolComposition Operator
 hi def link swiftCastOp Operator
+hi def link swiftWhereConstraintSubject Identifier
+hi def link swiftWhereSameType Operator
 
 hi def link swiftBoolean Boolean
 hi def link swiftNil Constant
@@ -348,6 +392,7 @@ hi def link swiftBin Number
 hi def link swiftChar Character
 hi def link swiftString String
 hi def link swiftInterpolation Special
+hi def link swiftKeyPath Special
 
 hi def link swiftOperator Operator
 hi def link swiftNilOps Operator
