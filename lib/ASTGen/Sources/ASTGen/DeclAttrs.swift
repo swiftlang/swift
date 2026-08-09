@@ -1963,7 +1963,8 @@ extension ASTGenVisitor {
   }
 
   func generateRawLayoutAttr(attribute node: AttributeSyntax) -> BridgedRawLayoutAttr? {
-    self.generateWithLabeledExprListArguments(attribute: node) { args in
+    self.generateWithLabeledExprListArguments(attribute: node) {
+      (args: inout Slice<LabeledExprListSyntax>) -> BridgedRawLayoutAttr? in
       switch args.first?.label?.rawText {
       case "size":
         return generateSizeAlignment()
@@ -1972,13 +1973,25 @@ extension ASTGenVisitor {
       case "likeArrayOf":
         return generateArrayLike()
       default:
-        // TODO: Diagnose.
-        fatalError("invalid argument for @rawLayout attribute")
+        // The C++ parser reports this at the attribute name, not at the label.
+        self.diagnose(
+          .attr_rawlayout_expected_label("'size', 'like', or 'likeArrayOf'"),
+          at: node.attributeName
+        )
+        return nil
       }
 
       func generateSizeAlignment() -> BridgedRawLayoutAttr? {
         guard let size = generateConsumingIntegerLiteralOption(label: "size") else {
           // Should already be diagnosed.
+          return nil
+        }
+        guard !args.isEmpty else {
+          // '@_rawLayout(size: 4)' with no 'alignment:'.
+          self.diagnose(
+            .attr_rawlayout_expected_params("size", "alignment"),
+            at: node.attributeName
+          )
           return nil
         }
         guard let alignment = generateConsumingIntegerLiteralOption(label: "alignment") else {
@@ -2023,9 +2036,18 @@ extension ASTGenVisitor {
           return nil
         }
 
+        guard !args.isEmpty else {
+          // '@_rawLayout(likeArrayOf: T)' with no 'count:'.
+          self.diagnose(
+            .attr_rawlayout_expected_params("likeArrayOf", "count"),
+            at: node.attributeName
+          )
+          return nil
+        }
+
         // 'count:' can be integer literal or a generic parameter.
         let count = self.generateConsumingAttrOption(args: &args, label: "count") {
-          self.generateValueOrType(expr: $0).asTypeRepr
+          self.generateValueOrType(expr: $0)
         }
         guard let count else {
           return nil
@@ -2046,15 +2068,22 @@ extension ASTGenVisitor {
       }
 
       func generateConsumingIntegerLiteralOption(label: SyntaxText) -> Int? {
-        self.generateConsumingAttrOption(args: &args, label: label) {
-          guard let integerExpr = $0.as(IntegerLiteralExprSyntax.self) else {
-            // TODO: Diagnose
-            fatalError("expected integer literal for '\(String(syntaxText: label)):' in @_rawLayout")
+        self.generateConsumingAttrOption(args: &args, label: label) { expr in
+          // The C++ parser has a dedicated diagnostic per position here, so pick
+          // the one matching the label.
+          let diagnostic: CompilerDiagnostic =
+            label == "alignment"
+            ? .attr_rawlayout_expected_integer_alignment
+            : .attr_rawlayout_expected_integer_size
+          guard let integerExpr = expr.as(IntegerLiteralExprSyntax.self),
+            let value = integerExpr.representedLiteralValue
+          else {
+            // Not an integer literal at all, or one the lexer accepted but that
+            // does not fit, e.g. an overflowing literal.
+            self.diagnose(diagnostic, at: expr)
+            return nil
           }
-          guard let count = integerExpr.representedLiteralValue else {
-            fatalError("invalid value literal for '\(String(syntaxText: label)):' in @_rawLayout")
-          }
-          return count
+          return value
         }
       }
 

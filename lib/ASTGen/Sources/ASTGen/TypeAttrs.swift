@@ -144,9 +144,16 @@ extension ASTGenVisitor {
         .SILImplicitLeadingParam,
         .CallerIsolated,
         .UnownedInnerPointer:
-        // TODO: Diagnose or fallback to CustomAttr?
-        fatalError("SIL type attributes are not supported")
-        break;
+        // These spellings exist only in SIL, and ASTGen never parses a SIL file
+        // (`shouldParseViaASTGen` refuses `SourceFileKind::SIL`), so reaching one
+        // here means it was written in ordinary Swift. The C++ parser does not
+        // recognize SIL-only type attributes outside SIL either, and reports them
+        // as unknown at the '@'.
+        self.diagnose(
+          .unknown_attr_name(node.attributeName.trimmedDescription),
+          at: node.atSign
+        )
+        return nil
 
       case nil:
         // Not a builtin type attribute. Fall back to CustomAttr

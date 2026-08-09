@@ -1641,6 +1641,17 @@ BridgedParamDecl_setSpecifier(BridgedParamDecl cDecl,
 SWIFT_NAME("BridgedParamDecl.setImplicit(self:)")
 BRIDGED_INLINE void BridgedParamDecl_setImplicit(BridgedParamDecl cDecl);
 
+/// Whether this parameter has a name that can be written in source, so that a
+/// diagnostic can suggest it.
+SWIFT_NAME("getter:BridgedParamDecl.hasName(self:)")
+BRIDGED_INLINE bool BridgedParamDecl_hasName(BridgedParamDecl cDecl);
+
+/// The parameter's name as it appears in source. The returned string is owned by
+/// the identifier table, so it outlives the call.
+SWIFT_NAME("getter:BridgedParamDecl.nameStr(self:)")
+BRIDGED_INLINE BridgedStringRef
+BridgedParamDecl_getNameStr(BridgedParamDecl cDecl);
+
 SWIFT_NAME("BridgedConstructorDecl.setParsedBody(self:_:)")
 void BridgedConstructorDecl_setParsedBody(BridgedConstructorDecl decl,
                                           BridgedBraceStmt body);

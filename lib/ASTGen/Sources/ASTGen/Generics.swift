@@ -172,7 +172,7 @@ extension ASTGenVisitor {
       return self.generate(type: type)
 
     case .expr(let expr):
-      return self.generateValueOrType(expr: expr).asTypeRepr
+      return self.generateValueOrType(expr: expr)
     }
   }
 
@@ -182,7 +182,7 @@ extension ASTGenVisitor {
       return self.generate(type: type)
 
     case .expr(let expr):
-      return self.generateValueOrType(expr: expr).asTypeRepr
+      return self.generateValueOrType(expr: expr)
     }
   }
 
@@ -192,13 +192,17 @@ extension ASTGenVisitor {
       return self.generate(type: type)
 
     case .expr(let expr):
-      return self.generateValueOrType(expr: expr).asTypeRepr
+      return self.generateValueOrType(expr: expr)
     }
   }
 
-  func generateValueOrType(expr node: ExprSyntax) -> BridgedGenericArgumentExprTypeRepr {
-    let bridgedArgumentExpr: BridgedExpr
-
+  /// Generate a type from an expression that stands in either for a generic
+  /// *value* argument, such as the `2` in `Vector<Int, 2>`, or for a type that
+  /// the parser happened to hand back in expression position, such as the
+  /// `Count` in `@_rawLayout(likeArrayOf: Element, count: Count)`.
+  ///
+  /// The C++ parser's equivalent is `parseTypeOrValue`.
+  func generateValueOrType(expr node: ExprSyntax) -> BridgedTypeRepr {
     // Generic value argument expressions can be integer literals, or
     // arbitrary parenthesized integer expressions (Literal Expressions).
 
@@ -206,29 +210,35 @@ extension ASTGenVisitor {
     // language feature (LiteralExpressions), and prefix '-' for integer literals
     // is otherwise supported, we handle the '-' prefix operator here as a special
     // case by turning it into a negative IntegerLiteralExpr.
-    if case .prefixOperatorExpr(let prefixNode) = node.as(ExprSyntaxEnum.self) {
-      let op = prefixNode.operator
-      guard op.text == "-" else {
-        fatalError("Unknown prefix operator for generic argument type")
-      }
-      guard let intLitExpr = prefixNode.expression.as(IntegerLiteralExprSyntax.self) else {
-        fatalError("Unknown expression kind for generic argument type")
-      }
+    if case .prefixOperatorExpr(let prefixNode) = node.as(ExprSyntaxEnum.self),
+      prefixNode.operator.text == "-",
+      let intLitExpr = prefixNode.expression.as(IntegerLiteralExprSyntax.self)
+    {
       let bridgedIntExpr = self.generate(integerLiteralExpr: intLitExpr)
-      bridgedIntExpr.setNegative(loc: self.generateSourceLoc(op))
-      bridgedArgumentExpr = bridgedIntExpr.asExpr
-    } else if case .integerLiteralExpr(_) = node.as(ExprSyntaxEnum.self) {
-      bridgedArgumentExpr = self.generate(expr: node)
-    } else if ctx.langOpts.hasFeature(.LiteralExpressions) {
-      bridgedArgumentExpr = self.generate(expr: node)
-    } else {
-      fatalError("Unknown expression kind for generic argument type")
+      bridgedIntExpr.setNegative(loc: self.generateSourceLoc(prefixNode.operator))
+      return BridgedGenericArgumentExprTypeRepr.createParsed(
+        self.ctx,
+        expr: bridgedIntExpr.asExpr,
+        loc: self.generateSourceLoc(node)
+      ).asTypeRepr
     }
 
-    return .createParsed(
-      self.ctx,
-      expr: bridgedArgumentExpr,
-      loc: self.generateSourceLoc(node)
-    )
+    if node.is(IntegerLiteralExprSyntax.self) || ctx.langOpts.hasFeature(.LiteralExpressions) {
+      return BridgedGenericArgumentExprTypeRepr.createParsed(
+        self.ctx,
+        expr: self.generate(expr: node),
+        loc: self.generateSourceLoc(node)
+      ).asTypeRepr
+    }
+
+    // Not a value, so it has to be a type. A generic parameter reference reaches
+    // here as an expression whenever the enclosing syntax is an argument list
+    // rather than a generic argument clause.
+    if let typeRepr = self.generateTypeRepr(expr: node) {
+      return typeRepr
+    }
+
+    self.diagnose(.expected_type, at: node)
+    return BridgedErrorTypeRepr.create(self.ctx, range: self.generateSourceRange(node)).asTypeRepr
   }
 }

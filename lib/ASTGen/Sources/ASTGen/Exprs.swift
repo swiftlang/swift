@@ -573,31 +573,44 @@ extension ASTGenVisitor {
     }
 
     guard let idx = parseDollarIdentifierIndex(text: token.rawText) else {
-      // TODO: Diagnose.
-      fatalError("(compiler bug) malformed dollar identifier token")
+      // The lexer only produces this token kind for '$' followed by digits, so
+      // there is always an index to parse.
+      preconditionFailure("dollar identifier token without a number")
     }
 
     let closure = self.declContext.castToClosureExpr()
     let params = closure.getParameterList()
 
-    if !closure.hasAnonymousClosureVars {
-      // TODO: Diagnose and fix it to the named parameter.
-      // Fall through, bind to the parameter even though the name doesn't match.
+    // Mirror `Parser::parseExprIdentifier`: '$N' resolves to an anonymous
+    // closure variable only when the closure's parameters *are* the anonymous
+    // ones. Otherwise the closure was written with explicit parameters, and '$N'
+    // is either a typo for one of their names or simply not usable.
+    if closure.hasAnonymousClosureVars && idx < params.size {
+      return BridgedDeclRefExpr.create(
+        self.ctx,
+        decl: params.get(idx).asDecl,
+        loc: .createParsed(loc),
+        isImplicit: false
+      ).asExpr
     }
 
-    guard idx < params.size else {
-      // TODO: Diagnose out of range (but should be unreachable)
-      fatalError("(compiler bug) out-of-bound dollar identifier number")
+    if idx < params.size, params.get(idx).hasName {
+      let paramName = String(bridged: params.get(idx).nameStr)
+      self.diagnose(
+        .anon_closure_arg_in_closure_with_args_typo(paramName),
+        at: token,
+        fixIts: [.init(replace: self.generateCharSourceRange(token), with: paramName)]
+      )
+      return BridgedDeclRefExpr.create(
+        self.ctx,
+        decl: params.get(idx).asDecl,
+        loc: .createParsed(loc),
+        isImplicit: false
+      ).asExpr
     }
 
-    let param = params.get(idx)
-
-    return BridgedDeclRefExpr.create(
-      self.ctx,
-      decl: param.asDecl,
-      loc: .createParsed(loc),
-      isImplicit: false
-    ).asExpr
+    self.diagnose(.anon_closure_arg_in_closure_with_args, at: token)
+    return BridgedErrorExpr.create(self.ctx, loc: self.generateSourceRange(token)).asExpr
   }
 
   func generate(declReferenceExpr node: DeclReferenceExprSyntax) -> BridgedExpr {
