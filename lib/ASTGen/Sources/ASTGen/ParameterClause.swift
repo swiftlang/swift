@@ -162,7 +162,11 @@ extension ASTGenVisitor {
     // If we have both, use them. If we only have one, then use that as the
     // parameter name, inferring it as the argument name if we're allowed to.
     switch (node.optionalFirstName, node.secondName) {
-    case let (argNameNode?, paramNameNode?) where keywordArgumentlessContext != nil:
+    // `_ name: T` is not a keyword argument: '_' means the parameter has no
+    // argument label, which is allowed everywhere. Only a *named* label is
+    // rejected, matching the C++ parser's `!param.FirstName.empty()`.
+    case let (argNameNode?, paramNameNode?)
+    where keywordArgumentlessContext != nil && self.generateIdentifier(argNameNode) != nil:
       // An operator, closure or enum case cannot have a keyword argument. The
       // C++ parser reports this and then collapses the two names into one,
       // keeping the parameter name; leaving the argument label in place produces

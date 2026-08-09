@@ -78,3 +78,12 @@ infix operator +++
 
 // A regular function of course may have both.
 func labelled(label name: Int) {}
+
+// '_' is not a keyword argument: it means the parameter has no argument label,
+// which is allowed in all three contexts.
+enum UnderscoreLabel {
+  case foo(_ s: Int)
+}
+let underscoreLabelClosure = {(_ x: Int) in }
+func --- (_ a: Int, _ b: Int) -> Int { 0 }
+infix operator ---
