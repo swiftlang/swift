@@ -1668,6 +1668,13 @@ void BridgedConstructorDecl_setParsedBody(BridgedConstructorDecl decl,
 SWIFT_NAME("BridgedFuncDecl.setParsedBody(self:_:)")
 void BridgedFuncDecl_setParsedBody(BridgedFuncDecl decl, BridgedBraceStmt body);
 
+/// Mark \p decl as possibly capturing bindings introduced by a top-level 'guard'
+/// statement, so that SILGen computes its capture list even though the function
+/// is not itself in a local context. Applies to any function that follows such a
+/// 'guard' at file scope.
+SWIFT_NAME("BridgedDecl.setHasTopLevelLocalContextCaptures(self:)")
+void BridgedDecl_setHasTopLevelLocalContextCaptures(BridgedDecl decl);
+
 SWIFT_NAME("BridgedDestructorDecl.setParsedBody(self:_:)")
 void BridgedDestructorDecl_setParsedBody(BridgedDestructorDecl decl,
                                          BridgedBraceStmt body);

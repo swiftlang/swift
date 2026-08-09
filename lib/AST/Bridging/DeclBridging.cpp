@@ -222,6 +222,14 @@ void BridgedFuncDecl_setParsedBody(BridgedFuncDecl decl,
   decl.unbridged()->setBody(body.unbridged(), FuncDecl::BodyKind::Parsed);
 }
 
+void BridgedDecl_setHasTopLevelLocalContextCaptures(BridgedDecl decl) {
+  // Only a FuncDecl carries the flag; the caller does not have to filter, which
+  // matches how the C++ parser applies this to whatever declarations follow a
+  // top-level 'guard'.
+  if (auto *fn = dyn_cast<FuncDecl>(decl.unbridged()))
+    fn->setHasTopLevelLocalContextCaptures();
+}
+
 void BridgedDestructorDecl_setParsedBody(BridgedDestructorDecl decl,
                                          BridgedBraceStmt body) {
   decl.unbridged()->setBody(body.unbridged(), FuncDecl::BodyKind::Parsed);

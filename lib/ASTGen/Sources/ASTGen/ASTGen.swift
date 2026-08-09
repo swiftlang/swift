@@ -152,6 +152,15 @@ struct ASTGenVisitor {
 
   func generateTopLevel(codeBlockItemList node: CodeBlockItemListSyntax) -> [BridgedASTNode] {
     var out = [BridgedASTNode]()
+
+    /// Whether a top-level 'guard' has been seen. Such a statement introduces
+    /// bindings that the rest of the file can use, so every function after it has
+    /// to be treated as if it were in a local context when SILGen computes
+    /// captures -- otherwise SILGen skips the capture list, and a reference to one
+    /// of those bindings ends up on the global path instead. `Parser::parseBraceItems`
+    /// tracks the same thing as `IsFollowingGuard`.
+    var isFollowingGuard = false
+
     visitIfConfigElements(
       node,
       of: CodeBlockItemSyntax.self,
@@ -159,6 +168,12 @@ struct ASTGenVisitor {
     ) { element in
       guard let item = self.generateTopLevel(codeBlockItem: element) else {
         return
+      }
+      if isFollowingGuard, item.kind == .decl {
+        item.castToDecl().setHasTopLevelLocalContextCaptures()
+      }
+      if element.item.isGuardStmt {
+        isFollowingGuard = true
       }
       out.append(item)
 
@@ -173,6 +188,17 @@ struct ASTGenVisitor {
       }
     }
     return out
+  }
+}
+
+extension CodeBlockItemSyntax.Item {
+  /// Whether this item is a 'guard' statement, which at file scope introduces
+  /// bindings visible to everything after it.
+  var isGuardStmt: Bool {
+    if case .stmt(let stmt) = self {
+      return stmt.is(GuardStmtSyntax.self)
+    }
+    return false
   }
 }
 
