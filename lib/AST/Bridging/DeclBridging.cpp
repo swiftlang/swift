@@ -118,6 +118,11 @@ static StaticSpellingKind unbridged(BridgedStaticSpelling kind) {
   return static_cast<StaticSpellingKind>(kind);
 }
 
+BridgedDiagnosticArgument
+BridgedDiagnosticArgument_createStaticSpelling(BridgedStaticSpelling spelling) {
+  return BridgedDiagnosticArgument(DiagnosticArgument(unbridged(spelling)));
+}
+
 void BridgedDecl_attachParsedAttrs(BridgedDecl decl,
                                    BridgedDeclAttributes attrs) {
   decl.unbridged()->attachParsedAttrs(attrs.unbridged());

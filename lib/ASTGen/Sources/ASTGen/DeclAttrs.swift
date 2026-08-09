@@ -66,7 +66,29 @@ extension ASTGenVisitor {
       // TODO: Diagnose duplicated attrs.
       // TODO: Diagnose if allowStatic is false.
       // TODO: Diagnose 'class' for non-class decls.
-      // TODO: Diagnose if not current decl context is not a type context.
+
+      // 'static'/'class' requires a type context. The C++ parser reports this and
+      // then drops the static-ness entirely; keeping it would leave a static decl
+      // at file scope, which downstream code is not prepared for -- a static
+      // property there reaches `getSelfInterfaceType()` and asserts.
+      if !self.declContext.isTypeContext {
+        let diagnostic: CompilerDiagnostic =
+          node.parent?.parent?.is(FunctionDeclSyntax.self) == true
+          ? .static_func_decl_global_scope(spelling)
+          : .static_var_decl_global_scope(spelling)
+        // The C++ parser reports this once the modifier list has been consumed,
+        // so it points at the declaration's introducer keyword rather than at the
+        // modifier -- the 'let' in 'static let x', say.
+        let introducer = node.parent?.as(DeclModifierListSyntax.self)?.last?
+          .nextToken(viewMode: .sourceAccurate)
+        self.diagnose(
+          diagnostic,
+          at: introducer.map(Syntax.init) ?? Syntax(node),
+          fixIts: [.init(remove: self.generateCharSourceRange(node))]
+        )
+        return
+      }
+
       // FIXME: Model static/class as a DeclAttribute.
       staticLoc = self.generateSourceLoc(node)
       staticSpelling = spelling

@@ -1567,6 +1567,12 @@ enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedStaticSpelling {
   BridgedStaticSpellingClass
 };
 
+/// Create an argument holding a static spelling, for a diagnostic declared as
+/// taking `StaticSpellingKind`.
+SWIFT_NAME("BridgedDiagnosticArgument.staticSpelling(_:)")
+BridgedDiagnosticArgument
+BridgedDiagnosticArgument_createStaticSpelling(BridgedStaticSpelling spelling);
+
 struct BridgedAccessorRecord {
   swift::SourceLoc lBraceLoc;
   BridgedArrayRef accessors;

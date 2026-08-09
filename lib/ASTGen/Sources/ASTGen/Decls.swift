@@ -45,7 +45,7 @@ extension ASTGenVisitor {
     case .ifConfigDecl:
       fatalError("Should have been handled by the caller")
     case .importDecl(let node):
-      return self.generate(importDecl: node).asDecl
+      return self.generate(importDecl: node)?.asDecl
     case .initializerDecl(let node):
       return self.generate(initializerDecl: node).asDecl
     case .macroDecl(let node):
@@ -1221,7 +1221,7 @@ extension BridgedImportKind {
 }
 
 extension ASTGenVisitor {
-  func generate(importDecl node: ImportDeclSyntax) -> BridgedImportDecl {
+  func generate(importDecl node: ImportDeclSyntax) -> BridgedImportDecl? {
     let attrs = self.generateDeclAttributes(node, allowStatic: false)
     let importKind: BridgedImportKind
     if let specifier = node.importKindSpecifier {
@@ -1233,6 +1233,14 @@ extension ASTGenVisitor {
       }
     } else {
       importKind = .module
+    }
+
+    // A non-module import needs at least a module name to import *from*, e.g.
+    // 'import var Module.member'. The C++ parser reports this and builds no
+    // ImportDecl; `ImportDecl::create` asserts the same invariant.
+    if importKind != .module, node.path.count == 1, let first = node.path.first {
+      self.diagnose(.decl_expected_module_name, at: first.name)
+      return nil
     }
 
     let decl = BridgedImportDecl.createParsed(

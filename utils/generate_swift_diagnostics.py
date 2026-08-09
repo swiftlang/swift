@@ -52,6 +52,7 @@ ARGUMENT_TYPES = {
     'bool': ('Bool', 'boolean'),
     'unsigned': ('UInt', 'unsigned'),
     'int': ('Int', 'integer'),
+    'StaticSpellingKind': ('BridgedStaticSpelling', 'staticSpelling'),
 }
 
 DIAGNOSTIC_MACROS = {
@@ -263,6 +264,11 @@ def generate(diagnostics, def_name, generator_name):
         '// (`.expected_expr`).',
         '//',
         '//===----------------------------------------------------------------------===//',
+        '',
+        # Needed for any bridged argument type that appears in a signature below,
+        # e.g. `BridgedStaticSpelling`. `swift.DiagID` itself is never named here:
+        # it is inferred from `CompilerDiagnostic.init`'s parameter type.
+        'import ASTBridging',
         '',
         'extension CompilerDiagnostic {',
     ]

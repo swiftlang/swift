@@ -44,6 +44,7 @@ enum CompilerDiagnosticArgument {
   case integer(Int)
   case unsigned(UInt)
   case boolean(Bool)
+  case staticSpelling(BridgedStaticSpelling)
 
   /// Bridge this argument, allocating any storage it needs in `ctx`.
   fileprivate func bridged(in ctx: BridgedASTContext) -> BridgedDiagnosticArgument {
@@ -61,6 +62,8 @@ enum CompilerDiagnosticArgument {
       // diagnostic declared as taking `bool` is formatted through the integer
       // path, which is what `%select` expects.
       return BridgedDiagnosticArgument(value ? 1 : 0)
+    case .staticSpelling(let value):
+      return .staticSpelling(value)
     }
   }
 }
@@ -92,6 +95,11 @@ struct CompilerDiagnosticFixIt {
   init(replace range: CharSourceRange, with replacement: String) {
     self.range = range
     self.replacement = replacement
+  }
+
+  /// A fix-it that deletes the source text of `range`.
+  init(remove range: CharSourceRange) {
+    self.init(replace: range, with: "")
   }
 }
 
