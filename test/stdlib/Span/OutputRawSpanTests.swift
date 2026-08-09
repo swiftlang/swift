@@ -243,6 +243,128 @@ suite.test("OutputRawSpan.withUnsafeMutableBytes")
   }
 }
 
+suite.test("OutputRawSpan.withUnsafeUninitializedMemory partial initialization")
+.require(.stdlib_6_2).code {
+  let capacity = 10
+  var a = Allocation(byteCount: capacity)
+  let source = Array<UInt8>(0..<UInt8(capacity*2))
+
+  a.initialize { ob in
+    let prefix = 2
+    for i in 0..<prefix { ob.append(source[i]) }
+    expectEqual(ob.byteCount, prefix)
+
+    var frameSize = 3
+    var startIndex = prefix
+
+    while !ob.isFull {
+      let free = ob.freeCapacity
+      unsafe ob.withUnsafeUninitializedMemory { buffer, newlyInitializedCount in
+        expectEqual(buffer.count, free)
+
+        frameSize = min(frameSize, buffer.count)
+        startIndex += unsafe buffer.initializeMemory(
+          as: UInt8.self,
+          fromContentsOf: source[startIndex..<startIndex+frameSize]
+        ).count
+        newlyInitializedCount = frameSize
+      }
+
+      expectEqual(ob.byteCount, startIndex)
+    }
+
+    expectEqual(ob.byteCount, capacity)
+  }
+
+  a.withSpan { s in
+    expectEqual(s.byteCount, capacity)
+    for o in s.byteOffsets {
+      let byte = unsafe s.unsafeLoad(fromByteOffset: o, as: UInt8.self)
+      expectEqual(byte, source[o])
+    }
+  }
+}
+
+suite.test("OutputRawSpan.withUnsafeUninitializedMemory commits count on throw")
+.require(.stdlib_6_2).code {
+  let capacity = 10
+  let partial = 4
+  let allocation = UnsafeMutableRawBufferPointer.allocate(
+    byteCount: capacity, alignment: 16
+  )
+  defer { unsafe allocation.deallocate() }
+
+  var ob = unsafe OutputRawSpan(buffer: allocation, initializedCount: 0)
+
+  do throws(MyTestError) {
+    try unsafe ob.withUnsafeUninitializedMemory {
+      buffer, newlyInitializedCount throws(MyTestError) in
+      for i in 0..<partial {
+        unsafe buffer.storeBytes(of: UInt8(i), toByteOffset: i, as: UInt8.self)
+      }
+
+      newlyInitializedCount = partial
+      throw MyTestError.error
+    }
+
+    expectUnreachable()
+  } catch {
+    expectEqual(error, MyTestError.error)
+  }
+
+  expectEqual(ob.byteCount, partial)
+
+  for i in 0..<partial {
+    let loaded = unsafe ob.bytes.unsafeLoad(fromByteOffset: i, as: UInt8.self)
+    expectEqual(loaded, UInt8(i))
+  }
+}
+
+suite.test("OutputRawSpan.withUnsafeUninitializedMemory empty and full spans")
+.require(.stdlib_6_2).code {
+  var empty = OutputRawSpan()
+  unsafe empty.withUnsafeUninitializedMemory { buffer, _ in
+    expectEqual(buffer.count, 0)
+  }
+
+  let capacity = 10
+  var a = Allocation(byteCount: capacity)
+  a.initialize { ob in
+    ob.append(repeating: 1, count: capacity, as: UInt8.self)
+    expectTrue(ob.isFull)
+
+    unsafe ob.withUnsafeUninitializedMemory { buffer, _ in
+      expectEqual(buffer.count, 0)
+    }
+  }
+}
+
+suite.test("OutputRawSpan.withUnsafeUninitializedMemory count overflow")
+.require(.crashTesting)
+.require(.stdlib_6_2).code {
+  var a = Allocation(byteCount: 10)
+  a.initialize { ob in
+    expectCrashLater()
+    unsafe ob.withUnsafeUninitializedMemory { buffer, newlyInitializedCount in
+      newlyInitializedCount = buffer.count + 1
+    }
+    expectUnreachable("OutputRawSpan.withUnsafeUninitializedMemory should have trapped on an overflowing count.")
+  }
+}
+
+suite.test("OutputRawSpan.withUnsafeUninitializedMemory negative count")
+.require(.crashTesting)
+.require(.stdlib_6_2).code {
+  var a = Allocation(byteCount: 4)
+  a.initialize { ob in
+    expectCrashLater()
+    unsafe ob.withUnsafeUninitializedMemory { _, newlyInitializedCount in
+      newlyInitializedCount = -1
+    }
+    expectUnreachable("OutputRawSpan.withUnsafeUninitializedMemory should have trapped on a negative count.")
+  }
+}
+
 suite.test("removeLast(k:)")
 .require(.stdlib_6_2).code {
 
