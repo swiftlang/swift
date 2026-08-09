@@ -9,15 +9,14 @@
 // Note: we pass the libraries as command line arguments so that test runs using
 // remote-run will copy them across to the runner.
 
-// A client resolves an imported `@com` interface's `IID` and class's `CLSID`
-// from the deserialized synthesized extension and reaches them at runtime;
-// without routing that extension through a file unit, `IWidget.IID` was never
-// emitted and this failed to link.
+// A client resolves an imported `@com` interface's `IID` through its builtin
+// metatype conformance and reaches the descriptor-backed value at runtime. A
+// Microsoft COM class similarly exposes the stored `CLSID` through its metatype
+// conformance.
 //
 // `data2`/`data3` are non-zero to catch a host-dependent field decomposition:
 // `swift::UUID` is native-endian on Windows, which would bake wrong literals.
 
-import COM
 import Widget
 
 // IID  10203040-5060-7080-90a0-b0c0d0e0f001
