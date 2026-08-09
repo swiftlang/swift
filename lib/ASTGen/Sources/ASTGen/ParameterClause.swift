@@ -87,6 +87,17 @@ extension ClosureParameterSyntax: ValueParameterSyntax {
 }
 
 extension ASTGenVisitor {
+  /// A parameter context that does not admit a keyword argument, i.e. a parameter
+  /// written with both an argument label and a parameter name.
+  ///
+  /// The raw values are the `%select` indices of
+  /// `diag::parameter_operator_keyword_argument`.
+  enum KeywordArgumentlessContext: UInt {
+    case `operator` = 0
+    case closure = 1
+    case enumElement = 2
+  }
+
   func generate(functionParameter node: FunctionParameterSyntax, for context: ParameterContext, at index: Int) -> BridgedParamDecl {
     // For non-subscripts, the argument name is defaulted to the parameter name.
     let argNameByDefault: Bool
@@ -96,20 +107,40 @@ extension ASTGenVisitor {
     case .function, .initializer, .macro:
       argNameByDefault = true
     }
-    return self.makeParamDecl(node, argNameByDefault: argNameByDefault, at: index)
+    return self.makeParamDecl(
+      node,
+      argNameByDefault: argNameByDefault,
+      keywordArgumentlessContext: context == .operator ? .operator : nil,
+      at: index
+    )
   }
 
   func generate(enumCaseParameter node: EnumCaseParameterSyntax, at index: Int) -> BridgedParamDecl {
-    self.makeParamDecl(node, argNameByDefault: true, at: index)
+    self.makeParamDecl(
+      node,
+      argNameByDefault: true,
+      keywordArgumentlessContext: .enumElement,
+      at: index
+    )
   }
 
   func generate(closureParameter node: ClosureParameterSyntax, at index: Int) -> BridgedParamDecl {
-    self.makeParamDecl(node, argNameByDefault: false, at: index)
+    self.makeParamDecl(
+      node,
+      argNameByDefault: false,
+      keywordArgumentlessContext: .closure,
+      at: index
+    )
   }
 
   /// Generate a ParamDecl. If `argNameByDefault` is true, then the parameter's
   /// argument label is inferred from the first name if no second name is present.
-  private func makeParamDecl(_ node: some ValueParameterSyntax, argNameByDefault: Bool, at index: Int) -> BridgedParamDecl {
+  private func makeParamDecl(
+    _ node: some ValueParameterSyntax,
+    argNameByDefault: Bool,
+    keywordArgumentlessContext: KeywordArgumentlessContext? = nil,
+    at index: Int
+  ) -> BridgedParamDecl {
     var attrs = BridgedDeclAttributes()
 
     // Attributes.
@@ -131,6 +162,28 @@ extension ASTGenVisitor {
     // If we have both, use them. If we only have one, then use that as the
     // parameter name, inferring it as the argument name if we're allowed to.
     switch (node.optionalFirstName, node.secondName) {
+    case let (argNameNode?, paramNameNode?) where keywordArgumentlessContext != nil:
+      // An operator, closure or enum case cannot have a keyword argument. The
+      // C++ parser reports this and then collapses the two names into one,
+      // keeping the parameter name; leaving the argument label in place produces
+      // a closure parameter with an API name, which Sema asserts against.
+      self.diagnose(
+        .parameter_operator_keyword_argument(keywordArgumentlessContext!.rawValue),
+        at: argNameNode,
+        fixIts: [
+          .init(
+            remove: self.generateCharSourceRange(
+              start: argNameNode.positionAfterSkippingLeadingTrivia,
+              length: SourceLength(
+                utf8Length: paramNameNode.positionAfterSkippingLeadingTrivia.utf8Offset
+                  - argNameNode.positionAfterSkippingLeadingTrivia.utf8Offset
+              )
+            )
+          )
+        ]
+      )
+      (paramName, paramNameLoc) = self.generateIdentifierAndSourceLoc(paramNameNode)
+      (argName, argNameLoc) = argNameByDefault ? (paramName, paramNameLoc) : (nil, nil)
     case let (argNameNode?, paramNameNode?):
       (argName, argNameLoc) = self.generateIdentifierAndSourceLoc(argNameNode)
       (paramName, paramNameLoc) = self.generateIdentifierAndSourceLoc(paramNameNode)

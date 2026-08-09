@@ -52,3 +52,29 @@ import var x
 // expected-error@-1 {{expected module name in import declaration}}
 import struct y
 // expected-error@-1 {{expected module name in import declaration}}
+
+// MARK: - Keyword arguments where they are not allowed
+
+// An operator, closure or enum case cannot have a parameter written with both an
+// argument label and a parameter name. Both parsers report it and then keep only
+// the parameter name; leaving the label in place gave a closure parameter an API
+// name, which Sema asserts against.
+let keywordArgClosure = {(y z: Int) in }
+// expected-error@-1 {{closure cannot have keyword arguments}}
+
+let keywordArgVariadicClosure = {(x: Int..., y z: Int) in }
+// expected-error@-1 {{closure cannot have keyword arguments}}
+// expected-error@-2 {{no parameters may follow a variadic parameter in a closure}}
+
+enum HasKeywordArg {
+  case foo(y z: Int)
+  // expected-error@-1 {{enum case cannot have keyword arguments}}
+}
+
+func +++ (a b: Int, c d: Int) -> Int { 0 }
+// expected-error@-1 {{operator cannot have keyword arguments}}
+// expected-error@-2 {{operator cannot have keyword arguments}}
+infix operator +++
+
+// A regular function of course may have both.
+func labelled(label name: Int) {}

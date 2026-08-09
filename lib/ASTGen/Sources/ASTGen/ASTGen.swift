@@ -616,10 +616,27 @@ public func buildTopLevelASTNodes(
     configuredRegions: sourceFile.pointee.configuredRegions(astContext: ctx)
   )
 
+  // A generated buffer is never a script-mode main file, whatever the enclosing
+  // declaration's file is, so a variable declaration in it is not top-level code.
+  // The C++ parser gets this from `allowTopLevelCode()`, i.e. the kind of the
+  // SourceFile it is parsing. Statements *are* still wrapped, matching the C++
+  // parser's `IsTopLevel` handling, which does not consult `allowTopLevelCode()`.
+  let isGeneratedBuffer = sourceFile.pointee.generatedKind != .none
+
+  func generateTopLevelNodes(_ body: () -> Void) {
+    if isGeneratedBuffer {
+      visitor.withTopLevelCodeSuppressed(body)
+    } else {
+      body()
+    }
+  }
+
   switch sourceFile.pointee.syntax.as(SyntaxEnum.self) {
   case .sourceFile(let node):
-    for elem in visitor.generate(sourceFile: node) {
-      callback(elem, outputContext)
+    generateTopLevelNodes {
+      for elem in visitor.generate(sourceFile: node) {
+        callback(elem, outputContext)
+      }
     }
 
   case .memberBlockItemListFile(let node):

@@ -478,6 +478,14 @@ extension ASTGenVisitor {
     // TODO: Diagnose if `abiDecl` has a body/initial value/etc.
     // The C++ parser considers it syntactically invalid but SwiftSyntax does not.
 
+    // Without an inner declaration there is nothing for the attribute to name, and
+    // `ABIAttr::attachToDeclImpl` unconditionally inspects it. The C++ parser also
+    // creates no attribute in this case; whatever made the declaration
+    // unrecoverable has already been diagnosed.
+    guard abiDecl != nil else {
+      return nil
+    }
+
     return .createParsed(
       self.ctx,
       atLoc: self.generateSourceLoc(node.atSign),

@@ -34,6 +34,14 @@ public struct ExportedSourceFile {
   /// The syntax tree for the complete source file.
   public let syntax: Syntax
 
+  /// How this buffer came to exist: `.none` for a real source file, or the kind
+  /// of macro expansion or other generated source it holds.
+  ///
+  /// The C++ parser reads the equivalent off the `SourceFile` it is parsing, as
+  /// `SF.Kind`. Consulting the *enclosing declaration's* file instead gives the
+  /// wrong answer inside a generated buffer.
+  public let generatedKind: BridgedGeneratedSourceFileKind
+
   /// A source location converter to convert `AbsolutePosition`s in `syntax` to line/column locations.
   public lazy var sourceLocationConverter: SourceLocationConverter = SourceLocationConverter(
     fileName: fileName,
@@ -186,7 +194,8 @@ public func parseSourceFile(
       buffer: buffer,
       moduleName: moduleName,
       fileName: fileName,
-      syntax: parsed
+      syntax: parsed,
+      generatedKind: kind
     )
   )
 
