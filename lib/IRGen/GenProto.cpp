@@ -32,6 +32,7 @@
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsIRGen.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/IRGenOptions.h"
@@ -49,6 +50,7 @@
 #include "swift/SIL/SILWitnessTable.h"
 #include "swift/SIL/SILWitnessVisitor.h"
 #include "swift/SIL/TypeLowering.h"
+#include "swift/shims/Metadata.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/IR/DerivedTypes.h"
@@ -3876,6 +3878,31 @@ void NecessaryBindings::save(IRGenFunction &IGF, Address buffer,
                                       /*onHeapPacks=*/!NoEscape);
 }
 
+namespace {
+llvm::Constant *getOrCreateCOMClassID(IRGenModule &IGM, ClassDecl *CD) {
+  auto *info = CD->getCOMDeclInfo();
+  ASSERT(info && info->isImplementation() && info->getImplementationID());
+
+  IRGenMangler decorator(IGM.Context);
+  std::string label =
+      (Twine("CLSID_") + decorator.mangleNominalTypeDescriptor(CD)).str();
+
+  if (auto GV = IGM.getModule()->getNamedGlobal(label))
+    return GV;
+
+  auto *initializer = IGM.getCOMIdentityConstant(*info->getImplementationID());
+  llvm::GlobalVariable *GV =
+      new llvm::GlobalVariable(*IGM.getModule(), initializer->getType(),
+                               /*isConstant=*/true,
+                               llvm::GlobalVariable::LinkOnceODRLinkage,
+                               initializer, label);
+  GV->setVisibility(llvm::GlobalVariable::HiddenVisibility);
+  GV->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global);
+  GV->setAlignment(llvm::Align(4));
+  return GV;
+}
+}
+
 llvm::Value *irgen::emitWitnessTableRef(IRGenFunction &IGF,
                                         CanType srcType,
                                         ProtocolConformanceRef conformance) {
@@ -3926,6 +3953,30 @@ llvm::Value *irgen::emitWitnessTableRef(IRGenFunction &IGF,
     return emitWitnessTablePackRef(IGF, pack, conformance.getPack());
   } else {
     concreteConformance = conformance.getConcrete();
+
+    if (auto *BPC = dyn_cast<BuiltinProtocolConformance>(concreteConformance)) {
+      assert(BPC->getBuiltinConformanceKind() == BuiltinConformanceKind::COMIdentityMetatype &&
+             "unexpected builtin conformance requiring runtime evidence");
+      auto *metatype = BPC->getType()->castTo<AnyMetatypeType>();
+      if (proto->isSpecificProtocol(KnownProtocolKind::COMInterface)) {
+        auto *interface =
+            metatype->getInstanceType()->getExistentialLayout().getCOMInterface();
+        ASSERT(interface &&
+               "COMInterface metatype conformance without a COM interface");
+        auto *descriptor = IGF.IGM.getAddrOfProtocolDescriptor(interface);
+        auto *offset =
+            llvm::ConstantInt::get(IGF.IGM.IntPtrTy,
+                                   sizeof(_SwiftProtocolDescriptorHeader));
+        return llvm::ConstantExpr::getInBoundsGetElementPtr(IGF.IGM.Int8Ty,
+                                                            descriptor, offset);
+      } else if (proto->isSpecificProtocol(KnownProtocolKind::COMActivatable)) {
+        auto *CD = metatype->getInstanceType()->getClassOrBoundGenericClass();
+        ASSERT(CD && "COMActivatable metatype conformance without a class");
+        return getOrCreateCOMClassID(IGF.IGM, CD);
+      }
+      assert(proto->isSpecificProtocol(KnownProtocolKind::COMInterface) ||
+             proto->isSpecificProtocol(KnownProtocolKind::COMActivatable));
+    }
   }
   assert(concreteConformance->getProtocol() == proto);
 
