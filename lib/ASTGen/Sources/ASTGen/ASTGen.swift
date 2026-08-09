@@ -256,10 +256,15 @@ extension ASTGenVisitor {
     if loc != nil {
       return loc
     }
-    guard let lastPresent = node.lastToken(viewMode: .sourceAccurate) else {
-      return nil
+    if let lastPresent = node.lastToken(viewMode: .sourceAccurate) {
+      return self.generateSourceLoc(lastPresent)
     }
-    return self.generateSourceLoc(lastPresent)
+    // Nothing in the construct is present -- `if c { } else` gives an 'else' body
+    // with neither brace nor contents. Collapse to the construct's own start,
+    // which is where the '{' was synthesized, so that the range stays a valid
+    // zero-width point: a range with one valid and one invalid endpoint is itself
+    // an assertion failure.
+    return self.generateSourceLoc(node)
   }
 
   /// Obtains the C++ start location of `token`, or an invalid location if the

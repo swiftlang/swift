@@ -33,3 +33,12 @@ var afterIt: Int { 0 }
 func unterminatedClosure() {
   someUndefinedFunction {
 }
+
+// An 'else' with no body at all: neither brace is present and there are no
+// contents, so there is no token to end the range at. Collapsing to the
+// construct's start keeps the range a valid zero-width point -- a range with one
+// valid and one invalid endpoint is itself an assertion failure.
+func elseWithoutBody() {
+  if someUndefinedCondition() {
+  } else
+}
