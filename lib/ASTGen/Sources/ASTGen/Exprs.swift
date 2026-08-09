@@ -395,7 +395,7 @@ extension ASTGenVisitor {
         self.ctx,
         lBraceLoc: self.generateSourceLoc(node.leftBrace),
         elements: self.generate(codeBlockItemList: node.statements).lazy.bridgedArray(in: self),
-        rBraceLoc: self.generateSourceLoc(node.rightBrace)
+        rBraceLoc: self.generateRBraceLoc(node.rightBrace, of: node)
       )
     }
 

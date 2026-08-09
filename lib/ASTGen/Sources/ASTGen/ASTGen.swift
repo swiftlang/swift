@@ -241,6 +241,27 @@ extension ASTGenVisitor {
     node.map(generateSourceLoc(_:)) ?? nil
   }
 
+  /// The end location for a brace-delimited construct: the '}' if the parser
+  /// saw one, and otherwise the end of the last token that is actually present.
+  ///
+  /// A '}' the parser synthesized during recovery still has a position -- a
+  /// zero-width one just past the preceding token *and its trailing trivia* --
+  /// which for an unterminated construct lands beyond everything it contains,
+  /// and sometimes inside whatever follows. Using it makes the construct's range
+  /// exceed its contents, so its own child scopes fall outside it and ASTScope
+  /// and the availability-scope builder reject the result. The C++ parser ends
+  /// the range at the last token it consumed.
+  func generateRBraceLoc(_ rightBrace: TokenSyntax, of node: some SyntaxProtocol) -> SourceLoc {
+    let loc = self.generateSourceLocIfPresent(rightBrace)
+    if loc != nil {
+      return loc
+    }
+    guard let lastPresent = node.lastToken(viewMode: .sourceAccurate) else {
+      return nil
+    }
+    return self.generateSourceLoc(lastPresent)
+  }
+
   /// Obtains the C++ start location of `token`, or an invalid location if the
   /// parser synthesized it during recovery.
   ///

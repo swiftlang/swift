@@ -552,7 +552,20 @@ extension ASTGenVisitor {
     for storage: BridgedAbstractStorageDecl
   ) -> BridgedAccessorRecord {
     let leftBrace = self.generateSourceLoc(accessorBlock.leftBrace)
-    let rightBrace = self.generateSourceLoc(accessorBlock.rightBrace)
+
+    // A '}' the parser synthesized during recovery still has a position: a
+    // zero-width one past the previous token *and its trailing trivia*, which
+    // for an unterminated accessor block lands inside the following
+    // declaration. The resulting storage declaration then overlaps its
+    // successor, which the availability-scope and ASTScope builders reject. Use
+    // the last token actually present instead, matching the C++ parser, which
+    // ends the range at the last token it consumed.
+    var rightBrace = self.generateSourceLocIfPresent(accessorBlock.rightBrace)
+    if rightBrace == nil {
+      rightBrace = self.generateSourceLoc(
+        accessorBlock.lastToken(viewMode: .sourceAccurate) ?? accessorBlock.leftBrace
+      )
+    }
 
     // FIXME: We need to handle the diagnostics in ParsedAccessors::classify,
     // or defer them to the type-checker.
@@ -838,6 +851,16 @@ extension ASTGenVisitor {
   
   func generate(functionDecl node: FunctionDeclSyntax) -> BridgedFuncDecl? {
     var attrs = self.generateDeclAttributes(node, allowStatic: true)
+
+    // A synthesized 'func' keyword means the parser invented this declaration
+    // while recovering -- `associatedtype X<T>` produces one for the `<T>` -- and
+    // has already diagnosed it. Everything about such a declaration is
+    // synthesized, so its source range is not trustworthy, and building it gives
+    // ASTScope a child that does not sit inside its parent.
+    guard node.funcKeyword.presence == .present else {
+      return nil
+    }
+
     guard let (name, nameLoc) = self.generateIdentifierDeclNameAndLoc(node.name) else {
       return nil
     }
