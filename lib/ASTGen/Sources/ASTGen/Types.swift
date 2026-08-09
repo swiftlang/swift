@@ -612,9 +612,39 @@ extension ASTGenVisitor {
       ).asTypeRepr
 
     case .sequenceExpr(let node):
-      // TODO: Support composition type?
-      _ = node
-      break
+      // A composition written where the parser was expecting an expression, e.g.
+      // '~Copyable & ~Escapable' as the 'except:' argument of
+      // '@_preInverseGenerics'. The elements alternate between operands and '&'.
+      var types: [BridgedTypeRepr] = []
+      var firstAmpersandLoc: SourceLoc = nil
+      for (index, element) in node.elements.enumerated() {
+        if index % 2 == 1 {
+          guard let binaryOperator = element.as(BinaryOperatorExprSyntax.self),
+            binaryOperator.operator.rawText == "&"
+          else {
+            // Some other operator, so this is not a composition.
+            return nil
+          }
+          if firstAmpersandLoc == nil {
+            firstAmpersandLoc = self.generateSourceLoc(binaryOperator.operator)
+          }
+          continue
+        }
+        guard let type = self.generateTypeRepr(expr: element) else {
+          return nil
+        }
+        types.append(type)
+      }
+      // An even number of elements means a trailing '&' with nothing after it;
+      // the parser has already diagnosed that.
+      guard types.count > 1, node.elements.count == types.count * 2 - 1 else {
+        return nil
+      }
+      return BridgedCompositionTypeRepr.createParsed(
+        self.ctx,
+        types: types.lazy.bridgedArray(in: self),
+        ampersandLoc: firstAmpersandLoc
+      ).asTypeRepr
 
     case .tupleExpr(let node):
       // TODO: Support tuple type?
@@ -630,7 +660,8 @@ extension ASTGenVisitor {
       break
     }
 
-    // TODO: Diagnose
-    fatalError("invalid/unimplemented expression for type")
+    // Not a type. Every caller checks for nil and reports something appropriate
+    // for the position, so there is nothing to diagnose here.
+    return nil
   }
 }

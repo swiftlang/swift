@@ -298,7 +298,7 @@ extension ASTGenVisitor {
   }
 
   func generateLifetimeTypeAttr(attribute node: AttributeSyntax) -> BridgedLifetimeTypeAttr? {
-    guard let entry = self.generateLifetimeEntry(attribute: node) else {
+    guard let entry = self.generateLifetimeEntry(attribute: node, allowIndices: true) else {
       return nil
     }
 

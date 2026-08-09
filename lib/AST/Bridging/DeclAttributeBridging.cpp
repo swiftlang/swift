@@ -203,6 +203,19 @@ BridgedPreInverseGenericsAttr_createParsedWithExcept(BridgedASTContext cContext,
       PreInverseGenericsAttr(atLoc, range, cExceptType.unbridged());
 }
 
+BridgedPreInverseGenericsAttr
+BridgedPreInverseGenericsAttr_createParsedExceptCopyable(
+    BridgedASTContext cContext, SourceLoc atLoc, SourceRange range) {
+  // Keep this in sync with the `_preInverseGenericsExceptCopyable` case of
+  // DeclAttrKind::PreInverseGenerics in ParseDecl.cpp: the shorthand's 'except:'
+  // type is injected already resolved, since it is not written in source.
+  auto &ctx = cContext.unbridged();
+  Type resolvedExceptType = ProtocolCompositionType::getInverseOf(
+      ctx, InvertibleProtocolKind::Copyable);
+  return new (ctx) PreInverseGenericsAttr(
+      atLoc, range, /*exceptType=*/nullptr, resolvedExceptType);
+}
+
 BridgedBackDeployedAttr BridgedBackDeployedAttr_createParsed(
     BridgedASTContext cContext, SourceLoc atLoc, SourceRange range,
     swift::PlatformKind platform, BridgedVersionTuple cVersion) {

@@ -886,8 +886,15 @@ extension ASTGenVisitor {
       differentiability = .reverse
     }
     guard differentiability == .reverse || differentiability == .linear else {
-      // TODO: Diagnose.
-      fatalError("not supported kind for @differentiable attribute")
+      // E.g. '@differentiable(_forward)'. Only 'reverse' (and the SIL-only
+      // '_linear') are supported.
+      self.diagnose(
+        .attr_differentiable_kind_not_supported(
+          args.kindSpecifier.map { String(syntaxText: $0.rawText) } ?? ""
+        ),
+        at: args.kindSpecifier.map(Syntax.init) ?? Syntax(node.attributeName)
+      )
+      return nil
     }
 
     let parameters = self.generate(differentiabilityWithRespectToArgument: args.arguments)
@@ -1340,7 +1347,15 @@ extension ASTGenVisitor {
     }
   }
 
-  func generateLifetimeDescriptor(expr node: ExprSyntax) -> BridgedLifetimeDescriptor? {
+  /// Generate a lifetime descriptor, i.e. the `borrow x` in `@_lifetime(borrow x)`.
+  ///
+  /// `allowIndices` says whether a parameter index is accepted in this position,
+  /// which only affects the wording of the diagnostic when it is not -- matching
+  /// the C++ parser's `parseLifetimeDescriptor`.
+  func generateLifetimeDescriptor(
+    expr node: ExprSyntax,
+    allowIndices: Bool
+  ) -> BridgedLifetimeDescriptor? {
     let lifetimeDependenceKind: BridgedParsedLifetimeDependenceKind
     let descriptorExpr: ExprSyntax
     if let copyExpr = node.as(CopyExprSyntax.self) {
@@ -1377,16 +1392,24 @@ extension ASTGenVisitor {
       )
     }
 
-    // TODO: Diangose
-    fatalError("expected identifier, 'self', or integer in @_lifetime")
+    // Not a name, 'self', or an index, e.g. '@_lifetime(a: inout a)' where the
+    // 'inout' has nothing to apply to.
+    self.diagnose(
+      .expected_identifier_or_index_or_self_after_lifetime_dependence(allowIndices),
+      at: descriptorExpr
+    )
+    return nil
   }
 
-  func generateLifetimeEntry(attribute node: AttributeSyntax) -> BridgedLifetimeEntry? {
+  func generateLifetimeEntry(
+    attribute node: AttributeSyntax,
+    allowIndices: Bool
+  ) -> BridgedLifetimeEntry? {
     self.generateWithLabeledExprListArguments(attribute: node) { args in
       guard !args.isEmpty else {
         // `@_lifetime()`. The C++ parser reports the missing specifier here.
         self.diagnose(
-          .expected_identifier_or_index_or_self_after_lifetime_dependence(false),
+          .expected_identifier_or_index_or_self_after_lifetime_dependence(allowIndices),
           at: node.rightParen.map(Syntax.init) ?? Syntax(node.attributeName)
         )
         return nil
@@ -1408,7 +1431,10 @@ extension ASTGenVisitor {
           }
         }
 
-        if let src = self.generateLifetimeDescriptor(expr: arg.expression) {
+        if let src = self.generateLifetimeDescriptor(
+          expr: arg.expression,
+          allowIndices: allowIndices
+        ) {
           sources.append(src)
         }
       }
@@ -1438,7 +1464,9 @@ extension ASTGenVisitor {
   ///   @_lifetime(self)
   ///   ```
   func generateLifetimeAttr(attribute node: AttributeSyntax) -> BridgedLifetimeAttr? {
-    guard let entry = self.generateLifetimeEntry(attribute: node) else {
+    // A declaration attribute does not accept parameter indices; only the type
+    // attribute spelling does.
+    guard let entry = self.generateLifetimeEntry(attribute: node, allowIndices: false) else {
       // TODO: Diagnose?
       return nil
     }
@@ -1931,6 +1959,20 @@ extension ASTGenVisitor {
   }
 
   func generatePreInverseGenericsAttr(attribute node: AttributeSyntax) -> BridgedPreInverseGenericsAttr? {
+    // '@_preInverseGenericsExceptCopyable' is a shorthand for
+    // '@_preInverseGenerics(except: ~Copyable)'. It takes no arguments, and its
+    // 'except:' type is resolved rather than written, so it cannot go through the
+    // TypeRepr path below.
+    if node.attributeName.as(IdentifierTypeSyntax.self)?.name.rawText
+      == "_preInverseGenericsExceptCopyable"
+    {
+      return .createParsedExceptCopyable(
+        self.ctx,
+        atLoc: self.generateSourceLoc(node.atSign),
+        range: self.generateAttrSourceRange(node)
+      )
+    }
+
     // Bare '@_preInverseGenerics' takes no arguments.
     guard node.arguments != nil else {
       return .createParsed(
@@ -2534,10 +2576,11 @@ extension ASTGenVisitor {
       return nil
     }
 
-    if let accessorToken = args.accessorSpecifier {
-      // TODO: Diagnostics.
-      _ = accessorToken
-      fatalError("(compiler bug) unexpected accessor kind for @transpose attribute")
+    if args.accessorSpecifier != nil {
+      // Only '@derivative' has an accessor form; '@transpose' has no grammar for
+      // one, so the C++ parser stops at the offending token. `generateDerivativeOriginalDecl()`
+      // above has already reported it, so just bail out.
+      return nil
     }
 
     let parameters = self.generate(differentiabilityWithRespectToArgument: args.arguments)

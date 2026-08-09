@@ -1008,6 +1008,15 @@ BridgedPreInverseGenericsAttr_createParsedWithExcept(
     BridgedASTContext cContext, swift::SourceLoc atLoc,
     swift::SourceRange range, BridgedTypeRepr cExceptType);
 
+/// Create the attribute for the `@_preInverseGenericsExceptCopyable` shorthand,
+/// whose `except:` type is `~Copyable` and is already resolved rather than
+/// written in source.
+SWIFT_NAME("BridgedPreInverseGenericsAttr.createParsedExceptCopyable(_:atLoc:range:)")
+BridgedPreInverseGenericsAttr
+BridgedPreInverseGenericsAttr_createParsedExceptCopyable(
+    BridgedASTContext cContext, swift::SourceLoc atLoc,
+    swift::SourceRange range);
+
 SWIFT_NAME(
     "BridgedBackDeployedAttr.createParsed(_:atLoc:range:platform:version:)")
 BridgedBackDeployedAttr BridgedBackDeployedAttr_createParsed(

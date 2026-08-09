@@ -5,15 +5,18 @@
 // RUN: %target-typecheck-verify-swift -parse-as-library \
 // RUN:   -disable-availability-checking \
 // RUN:   -enable-experimental-feature RawLayout \
+// RUN:   -enable-experimental-feature Lifetimes \
 // RUN:   -enable-experimental-feature ParserASTGen
 // RUN: %target-typecheck-verify-swift -parse-as-library \
 // RUN:   -disable-availability-checking \
 // RUN:   -verify-additional-prefix cxx- \
+// RUN:   -enable-experimental-feature Lifetimes \
 // RUN:   -enable-experimental-feature RawLayout
 
 // REQUIRES: swift_swift_parser
 // REQUIRES: swift_feature_ParserASTGen
 // REQUIRES: swift_feature_RawLayout
+// REQUIRES: swift_feature_Lifetimes
 
 // MARK: - @_rawLayout
 
@@ -75,3 +78,12 @@ func anonymousClosureArguments(_ take: ((String, String) -> Void) -> Void) {
     // expected-error@-1 {{anonymous closure arguments cannot be used inside a closure that has explicit arguments; did you mean 'w'?}} {{9-11=w}}
   }
 }
+
+// MARK: - @_lifetime
+
+// 'inout' has nothing to apply to here, so neither parser can build a lifetime
+// descriptor. ASTGen crashed instead of reporting it.
+struct NE: ~Escapable {}
+@_lifetime(a: inout a)
+// expected-error@-1 {{expected 'copy', 'borrow', or '&' followed by an identifier or 'self' in lifetime dependence specifier}}
+func lifetimeBadSpecifier(a: inout NE) {}
