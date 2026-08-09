@@ -540,15 +540,63 @@ class IsolationHistoryNoteEmitter {
   }
 
 public:
-  /// Single-use entry point. Constructs an internal emitter from the inputs
-  /// and emits any isolation-history notes that apply.
-  static void emit(SILFunction *fn, RegionAnalysisFunctionInfo *functionInfo,
-                   RegionAnalysisValueMap &valueMap, Element sentElement,
-                   Partition &&partition,
-                   SILDynamicMergedIsolationInfo regionInfo) {
-    IsolationHistoryNoteEmitter emitter(fn, functionInfo, valueMap, sentElement,
-                                        std::move(partition), regionInfo);
-    emitter.emitHelper();
+  /// What a chain of isolation-history notes should explain.
+  ///
+  /// The walk answers questions of the form "how does element A reach element
+  /// B"; a request is the root question, and it comes in two shapes. Both are
+  /// already handled by the walk -- only the entry point distinguished them.
+  struct Request {
+    /// Which of the two questions this request asks.
+    enum class Kind {
+      /// "How did \c from become isolated to \c regionInfo's isolation?" The
+      /// chain terminates at the isolated value that put it there.
+      HowDidBecomeIsolatedTo,
+
+      /// "How did \c from become connected to \c to?" Every link is a plain
+      /// connection; there is no isolated value to terminate at.
+      HowDidBecomeConnectedTo,
+    };
+
+    /// The element whose route the chain explains: the near end, which the
+    /// notes read outward from.
+    Element from;
+
+    /// The far end, or None when the chain explains how \c from's region came
+    /// to be isolated rather than how it reaches one specific element.
+    std::optional<Element> to;
+
+    /// The isolation of the region \c from ended up in. Set only for
+    /// \c HowDidBecomeIsolatedTo requests, where it supplies the terminal
+    /// note's wording; a connect request has no isolated terminus.
+    std::optional<SILDynamicMergedIsolationInfo> regionInfo;
+
+    /// "How did \p elt become isolated to \p info's isolation?" The chain
+    /// terminates at the isolated value.
+    static Request howDidBecomeIsolatedTo(Element elt,
+                                          SILDynamicMergedIsolationInfo info) {
+      return Request{elt, std::nullopt, info};
+    }
+
+    /// "How did \p from become connected to \p to, i.e. how did the two come to
+    /// be in one region?" Every link is a plain connection; there is no
+    /// isolated value to terminate at.
+    static Request howDidBecomeConnectedTo(Element from, Element to) {
+      return Request{from, to, std::nullopt};
+    }
+
+    Kind getKind() const {
+      return to.has_value() ? Kind::HowDidBecomeConnectedTo
+                            : Kind::HowDidBecomeIsolatedTo;
+    }
+  };
+
+  /// Single-use entry point. Returns true when at least one note was emitted.
+  static bool emit(SILFunction *fn, RegionAnalysisFunctionInfo *functionInfo,
+                   RegionAnalysisValueMap &valueMap, Request request,
+                   Partition &&partition) {
+    IsolationHistoryNoteEmitter emitter(fn, functionInfo, valueMap, request,
+                                        std::move(partition));
+    return emitter.emitHelper();
   }
 
 private:
@@ -679,37 +727,48 @@ private:
   /// repeatedly.
   BasicBlockSet visitedBlocks;
 
-  /// The element whose path into the isolated region we are explaining.
-  Element inputSentElement;
+  /// The question this chain of notes answers: which element's route to
+  /// explain, where it ends, and -- for a \c HowDidBecomeIsolatedTo request
+  /// -- the isolation of the region it ended up in.
+  Request inputRequest;
 
   /// The input partition to use for our emission.
   Partition inputPartition;
 
-  /// Merged isolation info for the receiving region. Supplies the
-  /// task-isolated flag and the descriptive-kind string used in the
-  /// diagnostic format strings.
-  SILDynamicMergedIsolationInfo inputRegionInfo;
-
   IsolationHistoryNoteEmitter(SILFunction *fn,
                               RegionAnalysisFunctionInfo *functionInfo,
-                              RegionAnalysisValueMap &valueMap,
-                              Element sentElement, Partition &&partition,
-                              SILDynamicMergedIsolationInfo regionInfo)
+                              RegionAnalysisValueMap &valueMap, Request request,
+                              Partition &&partition)
       : inputFn(fn), inputValueMap(valueMap), inputFunctionInfo(functionInfo),
-        visitedBlocks(fn), inputSentElement(sentElement),
-        inputPartition(std::move(partition)), inputRegionInfo(regionInfo) {}
+        visitedBlocks(fn), inputRequest(request),
+        inputPartition(std::move(partition)) {}
 
-  void emitHelper() {
-    ISOLATION_HISTORY_LOG(
-        log() << "===== Explaining why the sent value in " << inputFn->getName()
-              << " is isolated =====\n";
-        log() << "The value being sent is %%" << inputSentElement << '\n';
-        log() << "It is being sent into: "
-              << inputRegionInfo.printForDiagnostics(inputFn)
-              << (inputRegionInfo->isTaskIsolated() ? " (task isolated)" : "")
-              << '\n';
-        log() << "Regions at the moment of the send: ";
-        inputPartition.print(llvm::dbgs()));
+  /// Announce the question being answered, in whichever of the two shapes the
+  /// request has. Only called from under \c ISOLATION_HISTORY_LOG.
+  void logRequestPreamble() const {
+    if (inputRequest.getKind() == Request::Kind::HowDidBecomeIsolatedTo) {
+      log() << "===== Explaining why the sent value in " << inputFn->getName()
+            << " is isolated =====\n";
+      log() << "The value being sent is %%" << inputRequest.from << '\n';
+      log() << "It is being sent into: "
+            << inputRequest.regionInfo->printForDiagnostics(inputFn)
+            << ((*inputRequest.regionInfo)->isTaskIsolated()
+                    ? " (task isolated)"
+                    : "")
+            << '\n';
+    } else {
+      log() << "===== Explaining how the two ends of a region in "
+            << inputFn->getName() << " came together =====\n";
+      log() << "The near end is %%" << inputRequest.from
+            << ", the far end is %%" << *inputRequest.to << '\n';
+    }
+
+    log() << "Regions at the moment of the send: ";
+    inputPartition.print(llvm::dbgs());
+  }
+
+  bool emitHelper() {
+    ISOLATION_HISTORY_LOG(logRequestPreamble());
 
     if (!shouldEmit()) {
       ISOLATION_HISTORY_LOG(
@@ -717,7 +776,7 @@ private:
           << "Nothing to explain: either these notes are turned off for this "
              "function, or the sent value is itself actor isolated rather than "
              "having been made isolated by a merge.\n");
-      return;
+      return false;
     }
 
     collectIsolationHistoryNotes();
@@ -743,7 +802,7 @@ private:
                             llvm::dbgs() << '\n';
                           });
 
-    emitNotes();
+    return emitNotes();
   }
 
   /// How an element should be spelled in a note.
@@ -847,21 +906,46 @@ private:
       const State &state, ArrayRef<SILBasicBlock *> joinedBlocks,
       unsigned pendingStart, SmallVectorImpl<State> &states);
 
-  void emitNotes();
+  /// Emit a diagnostic for each link of the chain. Returns true when at least
+  /// one was emitted.
+  bool emitNotes();
 
   /// Returns true when isolation-history emission is on for this function and
-  /// the sent element is "disconnected" (i.e., it became isolated by being
-  /// merged with an isolated value rather than being intrinsically isolated).
+  /// the request is one the walk can say anything about.
   bool shouldEmit() const {
     if (!swift::shouldEmitIsolationHistoryFor(inputFn))
       return false;
-    return inputValueMap.getIsolationRegion(inputSentElement).isDisconnected();
+
+    if (inputRequest.getKind() == Request::Kind::HowDidBecomeIsolatedTo) {
+      // Never format an isolation we cannot prove valid: printForDiagnostics
+      // report_fatal_error()s on the Invalid lattice element, and emitNotes()
+      // prints this one. An error carrying an isolation nobody validated gets
+      // no chain rather than a crash. (Some errors default their isolation to
+      // {} -- see InOutSendingReturnedError.)
+      if (!*inputRequest.regionInfo)
+        return false;
+
+      // An intrinsically isolated element was not *made* isolated by a merge,
+      // so there is no chain to describe.
+      return inputValueMap.getIsolationRegion(inputRequest.from)
+          .isDisconnected();
+    }
+
+    // For a connect request the two ends must actually be in one region here,
+    // since the walk explains a chain by finding the merge that separates them.
+    // Nothing to explain otherwise -- and no isolation requirement either:
+    // neither end need be isolated, so there is nothing to validate.
+    if (!inputPartition.isTrackingElement(inputRequest.from) ||
+        !inputPartition.isTrackingElement(*inputRequest.to))
+      return false;
+    return inputPartition.getRegion(inputRequest.from) ==
+           inputPartition.getRegion(*inputRequest.to);
   }
 
   void emitGenericOriginatingNote(SourceLoc loc, StringRef descriptiveKind) {
     inputFn->getASTContext().Diags.diagnose(
         loc, diag::regionbasedisolation_value_became_part_of_isolated_region,
-        descriptiveKind, inputRegionInfo->isTaskIsolated());
+        descriptiveKind, (*inputRequest.regionInfo)->isTaskIsolated());
   }
 };
 
@@ -949,16 +1033,16 @@ struct IsolationHistoryNoteEmitter::PartitionWrapper {
 
 } // namespace
 
-/// Work out how \c inputSentElement's region came to be isolated by *rewinding*
-/// the send-time partition one history node at a time
+/// Work out how the request's near end reached its far end -- or, when there is
+/// no far end, how its region came to be isolated -- by *rewinding* the
+/// send-time partition one history node at a time
 /// (\c Partition::popHistoryOnce), undoing each node's effect as we go.
 ///
 /// The walk answers questions of the form "how does this element reach that
-/// one", starting with "how did the sent element come to be in an isolated
-/// region". A merge that separates the two ends of a question answers it: the
-/// pair the merge names becomes a link of the chain, and the question splits
-/// into the two halves left over on either side of it. The walk is done when
-/// every question has been answered.
+/// one", starting with the request itself. A merge that separates the two ends
+/// of a question answers it: the pair the merge names becomes a link of the
+/// chain, and the question splits into the two halves left over on either side
+/// of it. The walk is done when every question has been answered.
 ///
 /// On exit, populates \c notes with one entry per link, each carrying the two
 /// elements to name, the location of the instruction that merged them, and
@@ -981,7 +1065,7 @@ void IsolationHistoryNoteEmitter::collectIsolationHistoryNotes() {
   // send-time partition we start from is stripped here.
   State initial{inputPartition.removingSendingOperandState(), {}};
   initial.openQuestions.push_back(
-      ChainQuestion{inputSentElement, std::nullopt, std::nullopt});
+      ChainQuestion{inputRequest.from, inputRequest.to, std::nullopt});
 
   // Paths still to try, newest first: a path is followed until it explains the
   // chain or dies, and only then does the walk back up to the next one.
@@ -1364,12 +1448,24 @@ void IsolationHistoryNoteEmitter::prepareStatesForPredecessors(
 /// question is rewound before the merges that explain either half. Nothing
 /// depends on that order -- every note names both of its ends and points at its
 /// own merge, so it reads on its own.
-void IsolationHistoryNoteEmitter::emitNotes() {
-  auto descriptiveKindStr = inputRegionInfo.printForDiagnostics(inputFn);
+///
+/// Returns true when at least one note was emitted.
+bool IsolationHistoryNoteEmitter::emitNotes() {
+  // Only a HowDidBecomeIsolatedTo request has an isolated terminus to
+  // describe, and only it carries an isolation to name it with.
+  StringRef descriptiveKindStr;
+  if (inputRequest.regionInfo)
+    descriptiveKindStr = inputRequest.regionInfo->printForDiagnostics(inputFn);
   auto &diags = inputFn->getASTContext().Diags;
+  bool emittedNote = false;
 
   for (unsigned i = 0, e = notes.size(); i != e; ++i) {
     const NoteToEmit &note = notes[i];
+
+    // rhsIsIsolatedSource is only ever set on the "looking for whatever
+    // isolated this" path in processState, which a connect request never takes.
+    assert((!note.rhsIsIsolatedSource || inputRequest.regionInfo) &&
+           "Connect request produced an isolated-source link?!");
 
     // The location comes from the sequence boundary behind the merge, which a
     // truncated history may never have reached.
@@ -1395,6 +1491,7 @@ void IsolationHistoryNoteEmitter::emitNotes() {
                       "so it only says where the value became isolated.\n");
         emitGenericOriginatingNote(note.mergeLoc.getSourceLoc(),
                                    descriptiveKindStr);
+        emittedNote = true;
         continue;
       }
 
@@ -1403,7 +1500,8 @@ void IsolationHistoryNoteEmitter::emitNotes() {
           diag::regionbasedisolation_chain_value_exposed_to_isolated_named,
           nearName->name, nearName->isCallResult, farName->name,
           farName->isCallResult, descriptiveKindStr,
-          inputRegionInfo->isTaskIsolated());
+          (*inputRequest.regionInfo)->isTaskIsolated());
+      emittedNote = true;
       continue;
     }
 
@@ -1439,7 +1537,10 @@ void IsolationHistoryNoteEmitter::emitNotes() {
                    diag::regionbasedisolation_chain_value_exposed,
                    subject->name, subject->isCallResult, object->name,
                    object->isCallResult);
+    emittedNote = true;
   }
+
+  return emittedNote;
 }
 
 //===----------------------------------------------------------------------===//
@@ -3246,8 +3347,9 @@ class SentNeverSendableDiagnosticEmitter {
   /// region).
   Element sentElement;
 
-  /// The partition at the point of the error.
-  Partition partition;
+  /// The partition at the point of the error, or None when isolation-history
+  /// recording is off for this function and nobody will rewind it.
+  std::optional<Partition> partition;
 
   /// The region analysis for this function; forwarded to the isolation-history
   /// note emitter so it can recover predecessor exit partitions across joins.
@@ -3304,10 +3406,13 @@ private:
 } // namespace
 
 void SentNeverSendableDiagnosticEmitter::emitIsolationHistoryNoteIfNeeded() {
+  if (!partition)
+    return;
   IsolationHistoryNoteEmitter::emit(
       diagnosticEmitter.getOperand()->getFunction(), info, valueMap,
-      sentElement, std::move(partition),
-      diagnosticEmitter.getIsolationRegionInfo());
+      IsolationHistoryNoteEmitter::Request::howDidBecomeIsolatedTo(
+          sentElement, diagnosticEmitter.getIsolationRegionInfo()),
+      std::move(*partition));
 }
 
 bool SentNeverSendableDiagnosticEmitter::initForSendingPartialApply(

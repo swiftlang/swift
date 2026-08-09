@@ -1182,6 +1182,13 @@ public:
   /// Returns true if this value has any isolation history stored.
   bool hasHistory() const { return bool(history.getHead()); }
 
+  /// True when this partition's history is being recorded, and so when it is
+  /// worth snapshotting the partition for a later isolation-history walk.
+  ///
+  /// Distinct from \c hasHistory(): a partition can be recording and not have
+  /// pushed anything yet.
+  bool isRecordingIsolationHistory() const { return history.isEnabled(); }
+
   /// Returns the number of nodes of stored history.
   ///
   /// NOTE: Do not use this in real code... only intended to be used in testing
@@ -1451,15 +1458,15 @@ public:
     Element sentElement;
     SILDynamicMergedIsolationInfo isolationRegionInfo;
 
-    /// The partition at the point where the error was emitted. Used for
-    /// isolation history rewinding.
-    Partition partition;
+    /// The partition at the point where the error was emitted, for isolation
+    /// history rewinding. None when history recording is off for this function.
+    std::optional<Partition> partition;
 
     SentNeverSendableError(const PartitionOp &op, Element sentElement,
                            SILDynamicMergedIsolationInfo isolationRegionInfo,
-                           const Partition &p)
+                           std::optional<Partition> &&p)
         : op(&op), sentElement(sentElement),
-          isolationRegionInfo(isolationRegionInfo), partition(p) {}
+          isolationRegionInfo(isolationRegionInfo), partition(std::move(p)) {}
 
     SentNeverSendableError(SentNeverSendableError &&other) = default;
     SentNeverSendableError &operator=(SentNeverSendableError &&other) = default;
@@ -2516,6 +2523,18 @@ public:
   }
 
 private:
+  /// A snapshot of the working partition for a later isolation-history walk, or
+  /// None when history recording is off for this function.
+  ///
+  /// Copying a Partition copies its element-to-region map, so an error that
+  /// will never have its history rewound should not pay for one. The immutable
+  /// history node chain itself is shared, not copied.
+  std::optional<Partition> getSnapshotForIsolationHistory() const {
+    if (!p.isRecordingIsolationHistory())
+      return {};
+    return p;
+  }
+
   /// To work around not having isolation in interface types, the type checker
   /// inserts casts and other AST nodes that are used to enrich the AST with
   /// isolation information. This results in Sendable functions being
@@ -2664,8 +2683,8 @@ private:
     }
 
     // Ok, we actually need to emit a call to the callback.
-    return handleError(
-        SentNeverSendableError(op, elt, dynamicMergedIsolationInfo, p));
+    return handleError(SentNeverSendableError(
+        op, elt, dynamicMergedIsolationInfo, getSnapshotForIsolationHistory()));
   }
 };
 
