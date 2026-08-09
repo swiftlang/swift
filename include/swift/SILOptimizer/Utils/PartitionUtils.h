@@ -1532,10 +1532,15 @@ public:
     Element inoutSendingElement;
     SILDynamicMergedIsolationInfo isolationInfo;
 
+    /// The partition at the exiting terminator, for isolation history
+    /// rewinding. None when history recording is off for this function.
+    std::optional<Partition> partition;
+
     InOutSendingNotDisconnectedAtExitError(
         const PartitionOp &op, Element elt,
-        SILDynamicMergedIsolationInfo isolation)
-        : op(&op), inoutSendingElement(elt), isolationInfo(isolation) {}
+        SILDynamicMergedIsolationInfo isolation, std::optional<Partition> &&p)
+        : op(&op), inoutSendingElement(elt), isolationInfo(isolation),
+          partition(std::move(p)) {}
 
     InOutSendingNotDisconnectedAtExitError(
         InOutSendingNotDisconnectedAtExitError &&other) = default;
@@ -2432,7 +2437,8 @@ public:
 
         // Otherwise, we emit the normal not disconnected at exit error.
         handleError(InOutSendingNotDisconnectedAtExitError(
-            op, op.getOpArg1(), dynamicRegionIsolation));
+            op, op.getOpArg1(), dynamicRegionIsolation,
+            getSnapshotForIsolationHistory()));
         return;
       }
 

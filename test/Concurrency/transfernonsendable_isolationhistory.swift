@@ -3029,3 +3029,51 @@ func degenerate_redundant_merge(_ x: NS) async {
     mergeFn(y, z) // expected-note {{'y' is connected to 'z'}}
     await toConcurrent(y) // expected-warning {{sending 'y' risks causing data races; this is an error in the Swift 6 language mode}} expected-note {{sending main actor-isolated 'y' to @concurrent global function 'toConcurrent' risks causing data races between @concurrent and main actor-isolated uses}}
 }
+
+////////////////////////////////////////////////////////////////////////////////
+// FIXME: A chain whose isolated source is an actor's stored property read
+// straight into a local produces NO history note at all, so this diagnostic
+// says a value is isolated without ever saying why -- on one of the most common
+// ways a value gets into an isolated region. The case below pins that so it
+// cannot change silently; when it is fixed, it should produce, on the
+// 'let z = ns' line:
+//
+//   'z' is connected to 'self.ns' which is accessible to 'self'-isolated code
+//
+// Two heuristics collide. Naming a call result after its callee deliberately
+// exempts accessors, since the user wrote a property rather than a call
+// (VariableNameUtils.cpp: "An accessor's name is its storage's name"), so the
+// getter's result is named after the variable it initializes -- 'z'. The walk's
+// isSameUserValue then sees both ends of the merge named 'z' and drops it as an
+// artifact of lowering, which is what that rule exists for: real SILGen
+// temporaries. Here it discards a semantically distinct value, and since this
+// was the only link the whole chain empties.
+//
+// Substituting anything that is not an accessor read restores the note -- see
+// 'chain_actor_via_method' below, which is the same shape through a method call
+// and does get its chain. That asymmetry is the bug's signature. Likely fix:
+// under Flag::NameCallResultAfterCallee, name an accessor result after its
+// storage rather than after the local, which is already what a read with no
+// local binding prints.
+////////////////////////////////////////////////////////////////////////////////
+
+actor ActorWithStoredNS {
+  var ns = NS()
+  func getNS() -> NS { NS() }
+
+  // FIXME: Should also produce the note quoted above, on the 'let z = ns' line.
+  func chain_actor_via_property() async {
+    let z = ns
+    await transferToMain(z) // expected-warning {{sending 'z' risks causing data races}}
+    // expected-note @-1 {{sending 'self'-isolated 'z' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and 'self'-isolated uses}}
+  }
+
+  // The control for the FIXME above: identical shape, but the isolated source is
+  // a method result rather than an accessor result, so the chain is reported.
+  func chain_actor_via_method() async {
+    // expected-note@+1 {{'z' is connected to result of 'getNS()' which is accessible to 'self'-isolated code}}
+    let z = getNS()
+    await transferToMain(z) // expected-warning {{sending 'z' risks causing data races}}
+    // expected-note @-1 {{sending 'self'-isolated 'z' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and 'self'-isolated uses}}
+  }
+}

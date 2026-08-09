@@ -4465,6 +4465,15 @@ private:
   /// region at the terminator inst.
   SILDynamicMergedIsolationInfo actorIsolatedRegionInfo;
 
+  /// The region analysis for this function; forwarded to the isolation-history
+  /// note emitter so it can recover predecessor exit partitions across joins.
+  RegionAnalysisFunctionInfo *info;
+
+  /// The element of the 'inout sending' param, and the partition at the exit,
+  /// for the isolation-history notes.
+  Element inoutSendingElement;
+  std::optional<Partition> partition;
+
   bool emittedErrorDiagnostic = false;
 
 public:
@@ -4473,7 +4482,9 @@ public:
       : functionExitingInst(cast<TermInst>(error.op->getSourceInst())),
         inoutSendingParam(
             info->getValueMap().getRepresentative(error.inoutSendingElement)),
-        actorIsolatedRegionInfo(error.isolationInfo) {}
+        actorIsolatedRegionInfo(error.isolationInfo), info(info),
+        inoutSendingElement(error.inoutSendingElement),
+        partition(std::move(error.partition)) {}
 
   ~InOutSendingNotDisconnectedAtExitDiagnosticEmitter() {
     // If we were supposed to emit a diagnostic and didn't emit an unknown
@@ -4493,6 +4504,27 @@ public:
     EMIT_UNKNOWN_PATTERN_ERROR(InOutSendingNotDisconnectedDiagnosticEmitter,
                                functionExitingInst, getBehaviorLimit(),
                                /*pushToFuture=*/false);
+  }
+
+  /// Explain how the 'inout sending' parameter's region came to be isolated,
+  /// when isolation-history emission is on for this function.
+  ///
+  /// Deliberately still runs on emit()'s early unknown-pattern path: that is
+  /// an error about this same value, a chain is useful context for it, and
+  /// emitUnknownPatternError sets emittedErrorDiagnostic, so the note still
+  /// follows its error. Do not "fix" that by narrowing the defer.
+  void emitIsolationHistoryNoteIfNeeded() {
+    // A note has to follow the diagnostic it annotates. When emit() bailed
+    // without emitting anything the unknown-pattern error comes from our
+    // destructor -- after this defer runs -- so there is nothing to attach to
+    // yet.
+    if (!emittedErrorDiagnostic || !partition)
+      return;
+    IsolationHistoryNoteEmitter::emit(
+        getFunction(), info, info->getValueMap(),
+        IsolationHistoryNoteEmitter::Request::howDidBecomeIsolatedTo(
+            inoutSendingElement, actorIsolatedRegionInfo),
+        std::move(*partition));
   }
 
   void emit();
@@ -4543,6 +4575,9 @@ public:
 } // namespace
 
 void InOutSendingNotDisconnectedAtExitDiagnosticEmitter::emit() {
+  // Emit isolation history notes after the primary diagnostic returns.
+  SWIFT_DEFER { emitIsolationHistoryNoteIfNeeded(); };
+
   // We should always be able to find a name for an inout sending param. If we
   // do not, emit an unknown pattern error.
   auto varName = inferNameHelper(inoutSendingParam);
