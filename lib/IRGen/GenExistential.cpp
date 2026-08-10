@@ -1666,6 +1666,11 @@ llvm::Type *IRGenModule::getExistentialType(unsigned numTables) {
   return Types.getExistentialType(numTables);
 }
 
+const TypeInfo *irgen::createCOMInterfaceTypeInfo(IRGenModule &IGM) {
+  return new COMExistentialTypeInfo(IGM.Int8PtrTy, IGM.getPointerSize(),
+                                    IGM.getPointerAlignment());
+}
+
 static const TypeInfo *createExistentialTypeInfo(IRGenModule &IGM, CanType T) {
   auto layout = T.getExistentialLayout();
 
@@ -1679,8 +1684,7 @@ static const TypeInfo *createExistentialTypeInfo(IRGenModule &IGM, CanType T) {
   }
 
   if (layout.getCOMInterface())
-    return new COMExistentialTypeInfo(IGM.Int8PtrTy, IGM.getPointerSize(),
-                                      IGM.getPointerAlignment());
+    return createCOMInterfaceTypeInfo(IGM);
 
   llvm::StructType *type;
 
