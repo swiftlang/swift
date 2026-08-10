@@ -443,8 +443,10 @@ extension ASTGenVisitor {
     case .`init`:
       return .Init
     case .read:
+      self.diagnose(.old_coroutine_accessor("borrow", "read"), at: specifier)
       return .yielding_borrow
     case .modify:
+      self.diagnose(.old_coroutine_accessor("mutate", "modify"), at: specifier)
       return .yielding_mutate
     case .borrow:
       if modifiers.first(where: { $0.name.text == "yielding" }) != nil {
@@ -466,6 +468,7 @@ extension ASTGenVisitor {
 
   private func generate(
     accessorDecl node: AccessorDeclSyntax,
+    kind: swift.AccessorKind,
     for storage: BridgedAbstractStorageDecl
   ) -> BridgedAccessorDecl? {
     var attrs = BridgedDeclAttributes()
@@ -485,13 +488,6 @@ extension ASTGenVisitor {
       if let g = self.generate(declModifier: m) {
         attrs.add(g)
       }
-    }
-
-    guard let kind = self.generate(accessorSpecifier: node.accessorSpecifier,
-                                   modifiers: node.modifiers) else {
-      // TODO: We could potentially recover if this is the first accessor by treating
-      // it as an implicit getter.
-      return nil
     }
 
     // 'yielding borrow' and 'yielding mutate' are gated on a feature flag. The
@@ -547,6 +543,37 @@ extension ASTGenVisitor {
     return accessor
   }
 
+  /// Report a second accessor of a kind that already appeared.
+  ///
+  /// The C++ parser reports this from `Parser::parseGetSet` and then keeps the
+  /// duplicate anyway, so the AST is identical either way. Emitting the error is
+  /// nonetheless load-bearing: `AbstractStorageDecl::getAccessor` returns only
+  /// the first accessor of a kind, so the AST verifier's
+  /// "storage declaration has different accessor for this kind" check fails on
+  /// the second one -- and that check only runs when no error has been emitted.
+  private func diagnoseDuplicateAccessor(
+    _ node: AccessorDeclSyntax,
+    kind: swift.AccessorKind,
+    previous: AccessorDeclSyntax,
+    isSubscript: Bool
+  ) {
+    let underscored = self.ctx.langOpts.hasFeature(.CoroutineAccessors)
+    self.diagnose(
+      .duplicate_accessor(
+        isSubscript ? 1 : 0,
+        String(bridged: kind.diagnosticName(article: true, underscored: underscored))
+      ),
+      at: node.accessorSpecifier
+    )
+    self.diagnose(
+      .previous_accessor(
+        String(bridged: kind.diagnosticName(article: false, underscored: underscored)),
+        true
+      ),
+      at: previous.accessorSpecifier
+    )
+  }
+
   private func generate(
     accessorBlock: AccessorBlockSyntax,
     for storage: BridgedAbstractStorageDecl
@@ -567,18 +594,45 @@ extension ASTGenVisitor {
       )
     }
 
-    // FIXME: We need to handle the diagnostics in ParsedAccessors::classify,
-    // or defer them to the type-checker.
+    // FIXME: We still need to handle the conflicting-accessor and
+    // missing-reading-accessor diagnostics in ParsedAccessors::classify, or defer
+    // them to the type-checker. The duplicate check below is handled here because
+    // omitting it lets an invalid AST reach the verifier; see
+    // `diagnoseDuplicateAccessor`.
     switch accessorBlock.accessors {
     case .accessors(let accessors):
+      /// The first accessor seen of each kind, for duplicate detection.
+      var firstOfKind: [swift.AccessorKind: AccessorDeclSyntax] = [:]
+
       return BridgedAccessorRecord(
         lBraceLoc: leftBrace,
         // Use `compactMap(in:)` rather than `lazy.compactMap { }.bridgedArray`:
         // the latter evaluates the transform twice, once to compute `count` and
         // again to fill the buffer, which would generate every accessor -- and
         // emit any diagnostic it produces -- twice.
-        accessors: accessors.compactMap(in: self) {
-          self.generate(accessorDecl: $0, for: storage)
+        accessors: accessors.compactMap(in: self) { node -> BridgedAccessorDecl? in
+          // The kind is computed once here, not again inside
+          // `generate(accessorDecl:kind:for:)`: the mapper diagnoses an unknown
+          // specifier and a deprecated 'read'/'modify' spelling, so calling it
+          // twice would emit those twice.
+          //
+          // TODO: We could potentially recover from an unknown specifier if this
+          // is the first accessor, by treating it as an implicit getter.
+          guard let kind = self.generate(accessorSpecifier: node.accessorSpecifier,
+                                         modifiers: node.modifiers) else {
+            return nil
+          }
+          if let previous = firstOfKind[kind] {
+            self.diagnoseDuplicateAccessor(
+              node,
+              kind: kind,
+              previous: previous,
+              isSubscript: accessorBlock.parent?.is(SubscriptDeclSyntax.self) == true
+            )
+          } else {
+            firstOfKind[kind] = node
+          }
+          return self.generate(accessorDecl: node, kind: kind, for: storage)
         },
         rBraceLoc: rightBrace
       )
@@ -794,8 +848,18 @@ extension ASTGenVisitor {
 
   func generate(accessorBlockFile node: AccessorBlockFileSyntax, for storage: BridgedAbstractStorageDecl) -> [BridgedAccessorDecl] {
     var accessors: [BridgedAccessorDecl] = []
+    var firstOfKind: [swift.AccessorKind: AccessorDeclSyntax] = [:]
     for elem in node.accessors {
-      if let accessor = self.generate(accessorDecl: elem, for: storage) {
+      guard let kind = self.generate(accessorSpecifier: elem.accessorSpecifier,
+                                     modifiers: elem.modifiers) else {
+        continue
+      }
+      if let previous = firstOfKind[kind] {
+        self.diagnoseDuplicateAccessor(elem, kind: kind, previous: previous, isSubscript: false)
+      } else {
+        firstOfKind[kind] = elem
+      }
+      if let accessor = self.generate(accessorDecl: elem, kind: kind, for: storage) {
         accessors.append(accessor)
       }
     }

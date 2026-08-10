@@ -738,6 +738,13 @@ BridgedStringRef AccessorKind_nameForDiagnostic(swift::AccessorKind kind) {
                                       /*underscored=*/false);
 }
 
+BridgedStringRef AccessorKind_nameForDiagnosticStyled(swift::AccessorKind kind,
+                                                      bool article,
+                                                      bool underscored) {
+  // Returns a static string, so it outlives the call.
+  return getAccessorNameForDiagnostic(kind, article, underscored);
+}
+
 bool AccessorKind_requiresCoroutineAccessorsFeature(swift::AccessorKind kind) {
   return requiresFeatureCoroutineAccessors(kind);
 }

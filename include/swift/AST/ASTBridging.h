@@ -737,6 +737,14 @@ BridgedStringRef PlatformKind_closestCorrectedString(BridgedStringRef cStr);
 SWIFT_NAME("getter:swift.AccessorKind.nameForDiagnostic(self:)")
 BridgedStringRef AccessorKind_nameForDiagnostic(swift::AccessorKind kind);
 
+/// The name of \p kind as it should appear in a diagnostic, with control over
+/// whether it is prefixed with an article ("a 'yielding borrow' accessor") and
+/// whether the underscored spelling is used ("a '_read' accessor").
+SWIFT_NAME("swift.AccessorKind.diagnosticName(self:article:underscored:)")
+BridgedStringRef AccessorKind_nameForDiagnosticStyled(swift::AccessorKind kind,
+                                                      bool article,
+                                                      bool underscored);
+
 /// Whether \p kind is only available with the CoroutineAccessors feature.
 SWIFT_NAME("getter:swift.AccessorKind.requiresCoroutineAccessorsFeature(self:)")
 bool AccessorKind_requiresCoroutineAccessorsFeature(swift::AccessorKind kind);
