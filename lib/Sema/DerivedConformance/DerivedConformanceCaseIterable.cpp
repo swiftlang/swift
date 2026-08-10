@@ -87,7 +87,9 @@ static ValueDecl *deriveCaseIterableViaMacros(DerivedConformance &derived,
   }
   os << ")";
   os.flush();
-  return deriveRequirementViaMacro(derived, requirement, macro);
+  return deriveRequirementViaMacro(
+      derived, requirement, macro,
+      BuiltinDerivedConformanceMacroKind::DeriveCaseIterable);
 }
 
 static Type deriveCaseIterable_AllCases(DerivedConformance &derived) {

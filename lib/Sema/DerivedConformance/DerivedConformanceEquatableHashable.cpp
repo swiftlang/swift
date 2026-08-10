@@ -444,7 +444,9 @@ static ValueDecl *deriveEquatableViaMacro(DerivedConformance &derived,
   os << "#_deriveEquatable(" << QuotedString(getNominalTypeInfoString(derived))
      << ", isResilient: "
      << (parentDC->getParentModule()->isResilient() ? "true" : "false") << ")";
-  auto *witness = deriveRequirementViaMacro(derived, requirement, os.str());
+  auto *witness = deriveRequirementViaMacro(
+      derived, requirement, os.str(),
+      BuiltinDerivedConformanceMacroKind::DeriveEquatable);
   return witness;
 }
 
@@ -981,7 +983,9 @@ static std::string getHashableMacroDecl(DerivedConformance &derived,
 static ValueDecl *deriveHashableViaMacro(DerivedConformance &derived,
                                          ValueDecl *requirement) {
   auto macro = getHashableMacroDecl(derived, requirement);
-  return deriveRequirementViaMacro(derived, requirement, macro);
+  return deriveRequirementViaMacro(
+      derived, requirement, macro,
+      BuiltinDerivedConformanceMacroKind::DeriveHashable);
 }
 
 ValueDecl *DerivedConformance::deriveHashable(ValueDecl *requirement) {

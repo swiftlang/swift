@@ -294,7 +294,9 @@ static ValueDecl *deriveComparableViaMacros(DerivedConformance &derived,
              : "false")
      << ")";
  out.flush();
- return deriveRequirementViaMacro(derived, requirement, macro);
+ return deriveRequirementViaMacro(
+     derived, requirement, macro,
+     BuiltinDerivedConformanceMacroKind::DeriveComparable);
 }
 
 ValueDecl *DerivedConformance::deriveComparable(ValueDecl *requirement) {

@@ -137,7 +137,9 @@ static ValueDecl *deriveBridgedNSErrorViaMacro(DerivedConformance &derived,
   auto os = llvm::raw_string_ostream(macro);
   os << "#_deriveError(" << QuotedString(arg) << ")";
   os.flush();
-  return deriveRequirementViaMacro(derived, requirement, macro);
+  return deriveRequirementViaMacro(
+      derived, requirement, macro,
+      BuiltinDerivedConformanceMacroKind::DeriveError);
 }
 
 ValueDecl *DerivedConformance::deriveBridgedNSError(ValueDecl *requirement) {

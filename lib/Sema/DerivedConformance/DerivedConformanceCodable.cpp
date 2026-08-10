@@ -2097,7 +2097,9 @@ static ValueDecl *deriveEncodableViaMacro(DerivedConformance &derived,
   os << "#_deriveEncodable("
      << QuotedString(getCodableTypeInfoString(derived, /*forDecode=*/false))
      << ")";
-  return deriveRequirementViaMacro(derived, requirement, macro);
+  return deriveRequirementViaMacro(
+      derived, requirement, macro,
+      BuiltinDerivedConformanceMacroKind::DeriveEncodable);
 }
 
 static ValueDecl *deriveDecodableViaMacro(DerivedConformance &derived,
@@ -2107,7 +2109,9 @@ static ValueDecl *deriveDecodableViaMacro(DerivedConformance &derived,
   os << "#_deriveDecodable("
      << QuotedString(getCodableTypeInfoString(derived, /*forDecode=*/true))
      << ")";
-  return deriveRequirementViaMacro(derived, requirement, macro);
+  return deriveRequirementViaMacro(
+      derived, requirement, macro,
+      BuiltinDerivedConformanceMacroKind::DeriveDecodable);
 }
 
 /// Returns whether the given type is valid for synthesizing {En,De}codable.
