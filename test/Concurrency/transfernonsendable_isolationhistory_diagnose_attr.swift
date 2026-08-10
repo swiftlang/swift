@@ -98,3 +98,16 @@ func inout_sending_returned_no_attr(_ x: inout sending NS, _ y: NS) -> sending N
   x = y
   return y // expected-warning 2 {{}} expected-note 2 {{}}
 }
+
+////////////////////////////////////////////////////////////////////////////////
+// The same pair for InOutSendingParametersInSameRegion.
+////////////////////////////////////////////////////////////////////////////////
+
+@diagnose(RegionIsolationIsolationHistory, as: warning)
+func same_region_opted_in(_ a: inout sending NS, _ b: inout sending NS) {
+  a = b // expected-note {{'a' is connected to 'b'}}
+} // expected-warning {{}} expected-note {{}}
+
+func same_region_no_attr(_ a: inout sending NS, _ b: inout sending NS) {
+  a = b
+} // expected-warning {{}} expected-note {{}}

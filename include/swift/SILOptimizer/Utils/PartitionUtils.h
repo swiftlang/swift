@@ -1577,8 +1577,8 @@ public:
     /// If set, the emitter should downgrade this error to a warning.
     bool downgradeToWarning = false;
 
-    /// The partition at the exiting terminator, for isolation history rewinding.
-    /// None when history recording is off for this function.
+    /// The partition at the exiting terminator, for isolation history
+    /// rewinding. None when history recording is off for this function.
     std::optional<Partition> partition;
 
     InOutSendingReturnedError(const PartitionOp &op,
@@ -1614,11 +1614,17 @@ public:
     Element firstInoutSendingParam;
     SmallVector<Element, 1> otherInOutSendingParams;
 
+    /// The partition at the exiting terminator, for isolation history
+    /// rewinding. None when history recording is off for this function.
+    std::optional<Partition> partition;
+
     InOutSendingParametersInSameRegionError(
         const PartitionOp &op, Element firstInoutSendingParam,
-        SmallVector<Element, 1> &&otherInOutSendingParams)
+        SmallVector<Element, 1> &&otherInOutSendingParams,
+        std::optional<Partition> &&p)
         : op(&op), firstInoutSendingParam(firstInoutSendingParam),
-          otherInOutSendingParams(std::move(otherInOutSendingParams)) {}
+          otherInOutSendingParams(std::move(otherInOutSendingParams)),
+          partition(std::move(p)) {}
 
     InOutSendingParametersInSameRegionError(
         InOutSendingParametersInSameRegionError &&other) = default;
@@ -2466,7 +2472,8 @@ public:
       if (findOtherInOutSendingParameters(inoutSendingRegion, op.getOpArg1(),
                                           foundInOutSendingElts)) {
         handleError(InOutSendingParametersInSameRegionError(
-            op, op.getOpArg1(), std::move(foundInOutSendingElts)));
+            op, op.getOpArg1(), std::move(foundInOutSendingElts),
+            getSnapshotForIsolationHistory()));
         return;
       }
 

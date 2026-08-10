@@ -3869,17 +3869,18 @@ public:
   /// Exactly one chain per error, anchored on the elements the error carries
   /// rather than on anything emit() re-derives. emit() walks epilogue phis and
   /// resolves indirect out-parameters through LastValueEnum, and can emit
-  /// several primary diagnostics from one error -- but those paths exist to find
-  /// a better diagnostic *location*, not to describe more regions. Following
-  /// them here would be wrong twice over: LastValueEnum yields SILValues that
-  /// may have no Element in the value map at all, so there would be nothing to
-  /// ask the walk about; and the region fact being explained is singular, so one
-  /// chain is what matches it. The walk's own sequence boundaries place the
-  /// notes.
+  /// several primary diagnostics from one error -- but those paths exist to
+  /// find a better diagnostic *location*, not to describe more regions.
+  /// Following them here would be wrong twice over: LastValueEnum yields
+  /// SILValues that may have no Element in the value map at all, so there would
+  /// be nothing to ask the walk about; and the region fact being explained is
+  /// singular, so one chain is what matches it. The walk's own sequence
+  /// boundaries place the notes.
   ///
   /// Branch on the elements, not on the inoutSendingParam == returnedValue
   /// SILValue comparison emit() uses: two elements can share a representative
-  /// through load look-through, and it is the element identity the request needs.
+  /// through load look-through, and it is the element identity the request
+  /// needs.
   void emitIsolationHistoryNoteIfNeeded() {
     // A note has to follow the diagnostic it annotates. When emit() bailed
     // without emitting anything the unknown-pattern error comes from our
@@ -5173,15 +5174,30 @@ class InOutSendingParametersInSameRegionDiagnosticEmitter {
   /// The second 'inout sending' param in the region.
   SILValue secondInOutSendingParam;
 
+  /// The region analysis for this function; forwarded to the isolation-history
+  /// note emitter so it can recover predecessor exit partitions across joins.
+  RegionAnalysisFunctionInfo *info;
+
+  /// The elements of the two parameters, and the partition at the exit, for the
+  /// isolation-history notes. This emitter is constructed once per reported
+  /// pair, so each instance explains exactly its own pair.
+  Element firstElement;
+  Element secondElement;
+  std::optional<Partition> partition;
+
   bool emittedErrorDiagnostic = false;
 
 public:
   InOutSendingParametersInSameRegionDiagnosticEmitter(
-      TermInst *functionExitingInst, SILValue firstInOutSendingParam,
-      SILValue secondInOutSendingParam)
+      RegionAnalysisFunctionInfo *info, TermInst *functionExitingInst,
+      SILValue firstInOutSendingParam, SILValue secondInOutSendingParam,
+      Element firstElement, Element secondElement,
+      std::optional<Partition> &&partition)
       : functionExitingInst(functionExitingInst),
         firstInOutSendingParam(firstInOutSendingParam),
-        secondInOutSendingParam(secondInOutSendingParam) {}
+        secondInOutSendingParam(secondInOutSendingParam), info(info),
+        firstElement(firstElement), secondElement(secondElement),
+        partition(std::move(partition)) {}
 
   ~InOutSendingParametersInSameRegionDiagnosticEmitter() {
     // If we were supposed to emit a diagnostic and didn't emit an unknown
@@ -5213,6 +5229,26 @@ public:
         InOutSendingParametersInSameRegionDiagnosticEmitter,
         functionExitingInst, getBehaviorLimit(),
         /*pushToFuture=*/false);
+  }
+
+  /// Explain how the two 'inout sending' parameters came to share a region,
+  /// when isolation-history emission is on for this function.
+  ///
+  /// Both parameters are disconnected -- this diagnostic is purely about them
+  /// sharing a region -- so the request is a connect one and every link is a
+  /// plain "'a' is connected to 'b'" with no isolated terminus.
+  void emitIsolationHistoryNoteIfNeeded() {
+    // A note has to follow the diagnostic it annotates. When emit() bailed
+    // without emitting anything the unknown-pattern error comes from our
+    // destructor -- after this defer runs -- so there is nothing to attach to
+    // yet.
+    if (!emittedErrorDiagnostic || !partition)
+      return;
+    IsolationHistoryNoteEmitter::emit(
+        getFunction(), info, info->getValueMap(),
+        IsolationHistoryNoteEmitter::Request::howDidBecomeConnectedTo(
+            firstElement, secondElement),
+        std::move(*partition));
   }
 
   void emit();
@@ -5263,6 +5299,9 @@ public:
 } // namespace
 
 void InOutSendingParametersInSameRegionDiagnosticEmitter::emit() {
+  // Emit isolation history notes after the primary diagnostic returns.
+  SWIFT_DEFER { emitIsolationHistoryNoteIfNeeded(); };
+
   // We should always be able to find a name for an inout sending param. If we
   // do not, emit an unknown pattern error.
   auto firstName = inferNameHelper(firstInOutSendingParam);
@@ -5670,9 +5709,18 @@ void SendNonSendableImpl::emitVerbatimErrors() {
             behavior && *behavior == DiagnosticBehavior::Ignore) {
           continue;
         }
+        // Each reported pair gets its own chain, emitted from inside this loop:
+        // a pair skipped above gets no primary diagnostic, so a chain for it
+        // would be a note with no error to attach to. The walk consumes the
+        // partition it rewinds, so hand each pair its own copy rather than
+        // moving the error's.
+        std::optional<Partition> pairPartition;
+        if (e.partition)
+          pairPartition.emplace(*e.partition);
         InOutSendingParametersInSameRegionDiagnosticEmitter diagnosticEmitter(
-            cast<TermInst>(e.op->getSourceInst()), firstParam.getValue(),
-            paramValue);
+            info, cast<TermInst>(e.op->getSourceInst()), firstParam.getValue(),
+            paramValue, e.firstInoutSendingParam, paramElt,
+            std::move(pairPartition));
         diagnosticEmitter.emit();
       }
       continue;
