@@ -2533,7 +2533,7 @@ COMMethodInst *COMMethodInst::create(SILDebugLocation DL, SILValue Operand,
                                Operand->getType().getASTType());
 
   unsigned size =
-      totalSizeToAlloc<swift::Operand>(1 + TypeDependentOperands.size());
+      totalSizeToAlloc<swift::Operand>(TypeDependentOperands.size() + 1);
   void *Buffer = M.allocateInst(size, alignof(COMMethodInst));
   return ::new (Buffer)
       COMMethodInst(DL, Operand, TypeDependentOperands, Member, Ty);
