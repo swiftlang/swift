@@ -42,3 +42,20 @@ func elseWithoutBody() {
   if someUndefinedCondition() {
   } else
 }
+
+// A declaration whose braces are missing entirely, rather than just unclosed.
+// The range has to end at the start of a token *inside* the declaration:
+// getCharSourceRangeOfScope extends a scope's end with getLocForEndOfToken, so an
+// end sitting on trailing trivia lexes forward into the next declaration and
+// overlaps it.
+func noParameterClause
+func following(x: Int) {}
+
+// A brace-less member block still has to contain whatever swift-syntax's recovery
+// absorbed into it -- a bare 'extension' swallows the extensions after it -- or
+// the members fall outside their own parent.
+extension
+
+extension SomeUndefinedType {
+
+extension SomeOtherUndefinedType

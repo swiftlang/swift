@@ -325,6 +325,19 @@ extension ASTGenVisitor {
     guard isEmpty else {
       return (nil, nil)
     }
+    // With no parameters either, the range would be invalid, which ASTScope also
+    // rejects, so collapse to a zero-width location. It has to be the *start of a
+    // token belonging to the declaration*, not the position where the parentheses
+    // would have gone: `getCharSourceRangeOfScope` extends a scope's end with
+    // `Lexer::getLocForEndOfToken`, so an end that sits on trailing trivia lexes
+    // forward into whatever declaration comes next and overlaps it.
+    //
+    // The C++ parser ends up at the declaration's name for the same reason, e.g.
+    // for `func f` with no parameter clause.
+    if let precedingToken = clause.previousToken(viewMode: .sourceAccurate) {
+      let loc = self.generateSourceLoc(precedingToken)
+      return (loc, loc)
+    }
     let loc = self.generateSourceLoc(clause)
     return (loc, loc)
   }

@@ -124,10 +124,7 @@ extension ASTGenVisitor {
       genericParamList: self.generate(genericParameterClause: node.genericParameterClause),
       inheritedTypes: self.generate(inheritedTypeList: node.inheritanceClause?.inheritedTypes),
       genericWhereClause: self.generate(genericWhereClause: node.genericWhereClause),
-      braceRange: self.generateSourceRange(
-        start: node.memberBlock.leftBrace,
-        end: node.memberBlock.rightBrace
-      )
+      braceRange: self.generateMemberBraceRange(node.memberBlock)
     )
     decl.asDecl.attachParsedAttrs(attrs.attributes)
 
@@ -158,10 +155,7 @@ extension ASTGenVisitor {
       genericParamList: self.generate(genericParameterClause: node.genericParameterClause),
       inheritedTypes: self.generate(inheritedTypeList: node.inheritanceClause?.inheritedTypes),
       genericWhereClause: self.generate(genericWhereClause: node.genericWhereClause),
-      braceRange: self.generateSourceRange(
-        start: node.memberBlock.leftBrace,
-        end: node.memberBlock.rightBrace
-      )
+      braceRange: self.generateMemberBraceRange(node.memberBlock)
     )
     decl.asDecl.attachParsedAttrs(attrs.attributes)
 
@@ -192,10 +186,7 @@ extension ASTGenVisitor {
       genericParamList: self.generate(genericParameterClause: node.genericParameterClause),
       inheritedTypes: self.generate(inheritedTypeList: node.inheritanceClause?.inheritedTypes),
       genericWhereClause: self.generate(genericWhereClause: node.genericWhereClause),
-      braceRange: self.generateSourceRange(
-        start: node.memberBlock.leftBrace,
-        end: node.memberBlock.rightBrace
-      ),
+      braceRange: self.generateMemberBraceRange(node.memberBlock),
       isActor: false
     )
     decl.asDecl.attachParsedAttrs(attrs.attributes)
@@ -227,10 +218,7 @@ extension ASTGenVisitor {
       genericParamList: self.generate(genericParameterClause: node.genericParameterClause),
       inheritedTypes: self.generate(inheritedTypeList: node.inheritanceClause?.inheritedTypes),
       genericWhereClause: self.generate(genericWhereClause: node.genericWhereClause),
-      braceRange: self.generateSourceRange(
-        start: node.memberBlock.leftBrace,
-        end: node.memberBlock.rightBrace
-      ),
+      braceRange: self.generateMemberBraceRange(node.memberBlock),
       isActor: true
     )
     decl.asDecl.attachParsedAttrs(attrs.attributes)
@@ -265,10 +253,7 @@ extension ASTGenVisitor {
       primaryAssociatedTypeNames: primaryAssociatedTypeNames.bridgedArray(in: self),
       inheritedTypes: self.generate(inheritedTypeList: node.inheritanceClause?.inheritedTypes),
       genericWhereClause: self.generate(genericWhereClause: node.genericWhereClause),
-      braceRange: self.generateSourceRange(
-        start: node.memberBlock.leftBrace,
-        end: node.memberBlock.rightBrace
-      )
+      braceRange: self.generateMemberBraceRange(node.memberBlock)
     )
     decl.asDecl.attachParsedAttrs(attrs.attributes)
 
@@ -337,10 +322,7 @@ extension ASTGenVisitor {
       extendedType: self.generate(type: node.extendedType),
       inheritedTypes: self.generate(inheritedTypeList: node.inheritanceClause?.inheritedTypes),
       genericWhereClause: self.generate(genericWhereClause: node.genericWhereClause),
-      braceRange: self.generateSourceRange(
-        start: node.memberBlock.leftBrace,
-        end: node.memberBlock.rightBrace
-      )
+      braceRange: self.generateMemberBraceRange(node.memberBlock)
     )
     decl.asDecl.attachParsedAttrs(attrs.attributes)
 
@@ -354,6 +336,45 @@ extension ASTGenVisitor {
     )
 
     return decl
+  }
+}
+
+extension ASTGenVisitor {
+  /// The brace range of a nominal type or extension body.
+  ///
+  /// When the parser had to synthesize the braces there is nothing to point at,
+  /// and the synthesized tokens sit past the last real token -- on trailing
+  /// trivia, or at end of file. That is not safe to use as a range end:
+  /// `getCharSourceRangeOfScope` extends a scope's end with
+  /// `Lexer::getLocForEndOfToken`, so an end on trivia lexes forward into the
+  /// next declaration, and the scope then fails ASTScope's containment check.
+  /// Collapse to the last token that *is* present instead, which is what the C++
+  /// parser ends up doing for e.g. `extension Foo` with no body.
+  func generateMemberBraceRange(_ memberBlock: MemberBlockSyntax) -> SourceRange {
+    if memberBlock.leftBrace.presence == .present {
+      // An unterminated body still has a '{' and contents to point at; only the
+      // end needs care, which `generateRBraceLoc` handles.
+      return SourceRange(
+        start: self.generateSourceLoc(memberBlock.leftBrace),
+        end: self.generateRBraceLoc(memberBlock.rightBrace, of: memberBlock)
+      )
+    }
+    // No '{' at all, as in `extension Foo` with no body.
+    //
+    // The body must still contain whatever members it holds: swift-syntax's
+    // recovery can absorb the declarations that follow into a brace-less member
+    // block -- a bare `extension` swallows the extensions after it -- and a range
+    // that excluded them would fail the verifier's containment check. Prefer the
+    // members' own extent, and collapse only when there are none.
+    let contentRange = self.generateSourceRange(memberBlock.members)
+    if contentRange.start.isValid {
+      return contentRange
+    }
+    guard let precedingToken = memberBlock.previousToken(viewMode: .sourceAccurate) else {
+      return self.generateSourceRange(memberBlock)
+    }
+    let loc = self.generateSourceLoc(precedingToken)
+    return SourceRange(start: loc, end: loc)
   }
 }
 
