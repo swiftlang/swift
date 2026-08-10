@@ -14,6 +14,8 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AvailabilityContext.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/DiagnosticsSema.h"
+#include "swift/AST/ProtocolConformance.h"
 
 using namespace swift;
 
@@ -61,6 +63,71 @@ bool AvailabilityRestriction::isActiveForRuntimeQueries(
   return swift::isPlatformActive(getAttr().getPlatform(), ctx.LangOpts,
                                  /*forTargetVariant=*/false,
                                  /*forRuntimeQuery=*/true);
+}
+
+bool AvailabilityRestriction::emitNoteForDecl(const ValueDecl *decl) const {
+  auto &ctx = decl->getASTContext();
+  auto &diags = ctx.Diags;
+  auto parsedAttr = getAttr().getParsedAttr();
+  auto sourceRange = parsedAttr->getRangeWithAt();
+  auto domainAndRange = getDomainAndRange(ctx);
+
+  switch (getReason()) {
+  case Reason::UnavailableUnconditionally:
+    diags.diagnose(decl, diag::availability_marked_unavailable, decl)
+        .highlight(sourceRange);
+    break;
+  case Reason::UnavailableUnintroduced:
+    diags
+        .diagnose(decl, diag::availability_introduced_in_version, decl,
+                  domainAndRange.getDomain(), domainAndRange.getRange())
+        .highlight(sourceRange);
+    break;
+  case Reason::UnavailableObsolete:
+    diags
+        .diagnose(decl, diag::availability_obsoleted, decl,
+                  domainAndRange.getDomain(), domainAndRange.getRange())
+        .highlight(sourceRange);
+    break;
+  case Reason::Unintroduced:
+  case Reason::Deprecated:
+    return false;
+  }
+  return true;
+}
+
+bool AvailabilityRestriction::emitNoteForConformance(
+    const ExtensionDecl *ext, const RootProtocolConformance *rootConf) const {
+  auto &ctx = ext->getASTContext();
+  auto &diags = ctx.Diags;
+  auto type = rootConf->getType();
+  auto proto = rootConf->getProtocol()->getDeclaredInterfaceType();
+  auto parsedAttr = getAttr().getParsedAttr();
+  auto domainAndRange = getDomainAndRange(ctx);
+
+  switch (getReason()) {
+  case Reason::UnavailableUnconditionally:
+    diags
+        .diagnose(ext, diag::conformance_availability_marked_unavailable, type,
+                  proto)
+        .highlight(parsedAttr->getRangeWithAt());
+    break;
+  case Reason::UnavailableUnintroduced:
+    diags.diagnose(ext, diag::conformance_availability_introduced_in_version,
+                   type, proto, domainAndRange.getDomain(),
+                   domainAndRange.getRange());
+    break;
+  case Reason::UnavailableObsolete:
+    diags
+        .diagnose(ext, diag::conformance_availability_obsoleted, type, proto,
+                  domainAndRange.getDomain(), domainAndRange.getRange())
+        .highlight(parsedAttr->getRangeWithAt());
+    break;
+  case Reason::Unintroduced:
+  case Reason::Deprecated:
+    return false;
+  }
+  return true;
 }
 
 void AvailabilityRestriction::print(llvm::raw_ostream &os) const {

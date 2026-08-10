@@ -1918,28 +1918,7 @@ bool diagnoseExplicitUnavailability(SourceLoc loc,
       .warnUntilLanguageModeIf(warnIfConformanceUnavailablePreSwift6,
                                LanguageMode::v6);
 
-  switch (restriction.getReason()) {
-  case AvailabilityRestriction::Reason::UnavailableUnconditionally:
-    diags
-        .diagnose(ext, diag::conformance_availability_marked_unavailable, type,
-                  proto)
-        .highlight(attr.getParsedAttr()->getRangeWithAt());
-    break;
-  case AvailabilityRestriction::Reason::UnavailableUnintroduced:
-    diags.diagnose(ext, diag::conformance_availability_introduced_in_version,
-                   type, proto, domainAndRange.getDomain(),
-                   domainAndRange.getRange());
-    break;
-  case AvailabilityRestriction::Reason::UnavailableObsolete:
-    diags
-        .diagnose(ext, diag::conformance_availability_obsoleted, type, proto,
-                  domainAndRange.getDomain(), domainAndRange.getRange())
-        .highlight(attr.getParsedAttr()->getRangeWithAt());
-    break;
-  case AvailabilityRestriction::Reason::Unintroduced:
-  case AvailabilityRestriction::Reason::Deprecated:
-    llvm_unreachable("unexpected restriction");
-  }
+  restriction.emitNoteForConformance(ext, rootConf);
   return true;
 }
 
@@ -2279,29 +2258,7 @@ bool diagnoseExplicitUnavailability(
         .limitBehavior(limit);
   }
 
-  auto sourceRange = Attr.getParsedAttr()->getRangeWithAt();
-  switch (restriction.getReason()) {
-  case AvailabilityRestriction::Reason::UnavailableUnconditionally:
-    diags.diagnose(D, diag::availability_marked_unavailable, D)
-        .highlight(sourceRange);
-    break;
-  case AvailabilityRestriction::Reason::UnavailableUnintroduced:
-    diags
-        .diagnose(D, diag::availability_introduced_in_version, D,
-                  domainAndRange.getDomain(), domainAndRange.getRange())
-        .highlight(sourceRange);
-    break;
-  case AvailabilityRestriction::Reason::UnavailableObsolete:
-    diags
-        .diagnose(D, diag::availability_obsoleted, D,
-                  domainAndRange.getDomain(), domainAndRange.getRange())
-        .highlight(sourceRange);
-    break;
-  case AvailabilityRestriction::Reason::Unintroduced:
-  case AvailabilityRestriction::Reason::Deprecated:
-    llvm_unreachable("unexpected restriction");
-    break;
-  }
+  restriction.emitNoteForDecl(D);
   return true;
 }
 
