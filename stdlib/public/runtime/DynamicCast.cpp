@@ -2330,11 +2330,63 @@ tryCastToCOMExistential(OpaqueValue *destLocation, const Metadata *destType,
                         const Metadata *&srcFailureType,
                         bool takeOnSuccess, bool mayDeferChecks,
                         bool prohibitIsolatedConformances) {
-  // The representation alone cannot implement a COM cast: doing so requires
-  // the interface IID and QueryInterface entry point.
   srcFailureType = srcType;
   destFailureType = destType;
-  return DynamicCastResult::Failure;
+
+  // A COM interface pointer is the only source that can be queried directly.
+  // Native Swift object projection and recovering a native object from a COM
+  // interface requires compiler-managed prefix/projection support and remain
+  // outside of this casting path.
+  if (srcType->getKind() != MetadataKind::Existential)
+    return DynamicCastResult::Failure;
+
+  auto srcExistentialType = cast<ExistentialTypeMetadata>(srcType);
+  if (srcExistentialType->getRepresentation() != ExistentialTypeRepresentation::COM)
+    return DynamicCastResult::Failure;
+
+  auto destExistentialType = cast<ExistentialTypeMetadata>(destType);
+
+  // Find the single ABI-bearing interface descriptor. Marker constraints such
+  // as `Sendable` have no interface identity and do not participate in
+  // `QueryInterface`.
+  const ProtocolDescriptor *interfaceProtocol = nullptr;
+  for (auto protocol : destExistentialType->getProtocols()) {
+    if (protocol.getSpecialProtocol() != SpecialProtocol::COM)
+      continue;
+    if (interfaceProtocol)
+      return DynamicCastResult::Failure;
+    interfaceProtocol = protocol.getSwiftProtocol();
+  }
+  if (!interfaceProtocol)
+    return DynamicCastResult::Failure;
+
+  auto iid = interfaceProtocol->getCOMInterfaceID();
+  if (!iid)
+    return DynamicCastResult::Failure;
+
+  auto sourceInterface = *reinterpret_cast<void **>(srcValue);
+  if (!sourceInterface)
+    return DynamicCastResult::Failure;
+
+  // The compiler-defined common identity -query result convention uses zero for
+  // success and reserves the high bit for failure. Model-specific source APIs
+  // spell this as `HRESULT`, `nsresult`, or their equivalent; interpreting the
+  // common result as `int32_t` makes every failure negative.
+  using QueryInterface = int32_t (*)(void *, const uint8_t *, void **);
+  auto **vtable = *reinterpret_cast<void ***>(sourceInterface);
+  auto QI = reinterpret_cast<QueryInterface>(vtable[0]);
+
+  void *resultInterface = nullptr;
+  int32_t result = QI(sourceInterface, iid, &resultInterface);
+  if (result < 0 || !resultInterface)
+    return DynamicCastResult::Failure;
+
+  *reinterpret_cast<void **>(destLocation) = resultInterface;
+
+  // `QueryInterface` returns an owned (+1) interface pointer. Report a copy
+  // even when the caller requested a take: the top-level cast driver will then
+  // destroy the independent source ownership exactly once.
+  return DynamicCastResult::SuccessViaCopy;
 }
 
 /******************************************************************************/
