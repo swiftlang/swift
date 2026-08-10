@@ -425,8 +425,7 @@ public:
 
   /// Omit the Objective-C ivar list of Swift classes that cannot need it,
   /// i.e. classes with a Swift-only superclass hierarchy and a fixed metadata
-  /// layout. Trades introspection of those ivars through the Objective-C
-  /// runtime for binary size.
+  /// layout.
   unsigned DisableObjCIvarMetadata : 1;
 
   unsigned DisableLLVMMergeFunctions : 1;
