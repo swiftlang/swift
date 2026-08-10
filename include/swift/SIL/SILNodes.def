@@ -650,6 +650,8 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
                             SingleValueInstruction, None, DoesNotRelease)
   SINGLE_VALUE_INST(OpenExistentialRefInst, open_existential_ref,
                             SingleValueInstruction, None, DoesNotRelease)
+  SINGLE_VALUE_INST(OpenCOMExistentialInst, open_com_existential,
+                    SingleValueInstruction, None, DoesNotRelease)
   SINGLE_VALUE_INST(InitExistentialMetatypeInst, init_existential_metatype,
                             SingleValueInstruction, None, DoesNotRelease)
   SINGLE_VALUE_INST(OpenExistentialMetatypeInst, open_existential_metatype,

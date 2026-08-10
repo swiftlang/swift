@@ -2217,6 +2217,22 @@ public:
         getSILDebugLocation(Loc), Operand, Ty, forwardingOwnershipKind));
   }
 
+  OpenCOMExistentialInst *
+  createOpenCOMExistential(SILLocation Loc, SILValue Operand, SILType Ty) {
+    return createOpenCOMExistential(Loc, Operand, Ty,
+                                    Operand->getOwnershipKind());
+  }
+
+  OpenCOMExistentialInst *
+  createOpenCOMExistential(SILLocation Loc, SILValue Operand, SILType Ty,
+                           ValueOwnershipKind forwardingOwnershipKind) {
+    auto instruction =
+        new (getModule()) OpenCOMExistentialInst(getSILDebugLocation(Loc),
+                                                 Operand, Ty,
+                                                 forwardingOwnershipKind);
+    return insert(instruction);
+  }
+
   OpenExistentialBoxInst *
   createOpenExistentialBox(SILLocation Loc, SILValue Operand, SILType Ty) {
     return insert(new (getModule()) OpenExistentialBoxInst(

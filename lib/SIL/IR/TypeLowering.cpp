@@ -791,6 +791,18 @@ namespace {
     RetTy
     visitArchetypeType(CanArchetypeType type, AbstractionPattern origType,
                        IsTypeExpansionSensitive_t isSensitive) {
+      if (llvm::any_of(type->getConformsTo(), [](ProtocolDecl *protocol) {
+                         return protocol->isCOMInterface();
+                       })) {
+        return asImpl().handleNonTrivialAggregate(type, {IsNotTrivial,
+                                                         IsFixedABI,
+                                                         IsNotAddressOnly,
+                                                         IsNotResilient,
+                                                         isSensitive,
+                                                         DoesNotHaveRawPointer,
+                                                         IsLexical});
+      }
+
       // TODO: Add a HasOnlyDefaultDeinit "layout protocol".
       auto LayoutInfo = type->getLayoutConstraint();
       if (LayoutInfo) {

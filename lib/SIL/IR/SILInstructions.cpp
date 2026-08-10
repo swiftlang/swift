@@ -2649,6 +2649,14 @@ OpenExistentialRefInst::OpenExistentialRefInst(
   assert(Ty.isObject() && "Result type must be an object type.");
 }
 
+OpenCOMExistentialInst::OpenCOMExistentialInst(SILDebugLocation DebugLoc,
+                                               SILValue Operand, SILType Ty,
+                                               ValueOwnershipKind ownership)
+    : UnaryInstructionBase(DebugLoc, Operand, Ty, ownership) {
+  assert(Operand->getType().isObject() && "Operand must be an object.");
+  assert(Ty.isObject() && "Result type must be an object type.");
+}
+
 OpenExistentialMetatypeInst::OpenExistentialMetatypeInst(
     SILDebugLocation DebugLoc, SILValue operand, SILType ty)
     : UnaryInstructionBase(DebugLoc, operand, ty) {

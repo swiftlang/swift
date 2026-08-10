@@ -3324,6 +3324,20 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     break;
   }
 
+  case SILInstructionKind::OpenCOMExistentialInst: {
+    if (parseTypedValueRef(Val, B) || parseVerbatim("to") || parseSILType(Ty))
+      return true;
+
+    ValueOwnershipKind forwardingOwnership = Val->getOwnershipKind();
+    if (parseForwardingOwnershipKind(forwardingOwnership)
+        || parseSILDebugLocation(InstLoc, B))
+      return true;
+
+    ResultVal =
+        B.createOpenCOMExistential(InstLoc, Val, Ty, forwardingOwnership);
+    break;
+  }
+
   case SILInstructionKind::OpenExistentialValueInst: {
     if (parseTypedValueRef(Val, B) || parseVerbatim("to") || parseSILType(Ty))
       return true;

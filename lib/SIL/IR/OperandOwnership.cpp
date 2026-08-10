@@ -405,6 +405,7 @@ OPERAND_OWNERSHIP(EndBorrow, AbortApply)
         /*allowUnowned*/ false);                                               \
   }
 FORWARDING_OWNERSHIP(OpenExistentialRef)
+FORWARDING_OWNERSHIP(OpenCOMExistential)
 FORWARDING_OWNERSHIP(ConvertFunction)
 FORWARDING_OWNERSHIP(RefToBridgeObject)
 FORWARDING_OWNERSHIP(BridgeObjectToRef)
