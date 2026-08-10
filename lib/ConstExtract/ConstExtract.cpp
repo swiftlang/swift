@@ -1099,8 +1099,8 @@ getConditionalMemberFromIfStmt(const IfStmt *ifStmt,
     for (auto elem : thenBraceStmt->getElements()) {
       if (auto memberElement = getResultBuilderElementFromASTNode(elem)) {
         // Skip compiler-synthesized bindings (buildBlock, buildLimitedAvailability, etc)
-        if (auto *sfc = dyn_cast<StaticFunctionCallValue>(memberElement->get()))
-          if (sfc->getLabel() != "buildExpression")
+        if (auto *callValue = dyn_cast<StaticFunctionCallValue>(memberElement->get()))
+          if (callValue->getLabel() != "buildExpression")
             continue;
         IfElements.push_back(std::make_shared<BuilderValue::SingleMember>(
             memberElement.value()));
@@ -1115,8 +1115,8 @@ getConditionalMemberFromIfStmt(const IfStmt *ifStmt,
     } else if (auto *elseBraceStmt = dyn_cast<BraceStmt>(elseStmt)) {
       for (auto elem : elseBraceStmt->getElements()) {
         if (auto memberElement = getResultBuilderElementFromASTNode(elem)) {
-          if (auto *sfc = dyn_cast<StaticFunctionCallValue>(memberElement->get()))
-            if (sfc->getLabel() != "buildExpression")
+          if (auto *callValue = dyn_cast<StaticFunctionCallValue>(memberElement->get()))
+            if (callValue->getLabel() != "buildExpression")
               continue;
           ElseElements.push_back(std::make_shared<BuilderValue::SingleMember>(
               memberElement.value()));
