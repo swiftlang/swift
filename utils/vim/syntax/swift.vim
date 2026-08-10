@@ -148,7 +148,13 @@ syn keyword swiftTypeAliasDefinition skipwhite skipempty nextgroup=swiftTypeAlia
       \ associatedtype
       \ typealias
 
-syn keyword swiftVarDefinition skipwhite skipempty nextgroup=swiftVarName
+" let (a, b, c) = ... (tuple destructuring pattern). A region, like the
+" `<...>` generic-parameter clause, so nested tuples and any number of
+" names all get swiftVarName treatment, the same as a single `let x = ...`.
+syn region swiftVarNamePattern contained contains=swiftVarNamePattern,swiftVarName,swiftParamDelim
+      \ matchgroup=Delimiter start=/(/ end=/)/
+
+syn keyword swiftVarDefinition skipwhite skipempty nextgroup=swiftVarName,swiftVarNamePattern
       \ let
       \ var
 
