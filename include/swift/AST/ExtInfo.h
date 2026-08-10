@@ -380,6 +380,10 @@ enum class SILFunctionTypeRepresentation : uint8_t {
   KeyPathAccessorSetter,
   KeyPathAccessorEquals,
   KeyPathAccessorHash,
+
+  /// A COM interface method. The interface pointer is passed as the first
+  /// argument using the foreign calling convention.
+  COMMethod,
 };
 
 /// Returns true if the function with this convention doesn't carry a context.
@@ -409,6 +413,7 @@ isThinRepresentation(SILFunctionTypeRepresentation rep) {
   case SILFunctionTypeRepresentation::WitnessMethod:
   case SILFunctionTypeRepresentation::CFunctionPointer:
   case SILFunctionTypeRepresentation::Closure:
+  case SILFunctionTypeRepresentation::COMMethod:
   case SILFunctionTypeRepresentation::CXXMethod:
   case SILFunctionTypeRepresentation::KeyPathAccessorGetter:
   case SILFunctionTypeRepresentation::KeyPathAccessorSetter:
@@ -445,6 +450,7 @@ isKeyPathAccessorRepresentation(SILFunctionTypeRepresentation rep) {
     case SILFunctionTypeRepresentation::CFunctionPointer:
     case SILFunctionTypeRepresentation::Closure:
     case SILFunctionTypeRepresentation::CXXMethod:
+    case SILFunctionTypeRepresentation::COMMethod:
       return false;
   }
   llvm_unreachable("Unhandled SILFunctionTypeRepresentation in switch.");
@@ -475,6 +481,7 @@ convertRepresentation(SILFunctionTypeRepresentation rep) {
     return {FunctionTypeRepresentation::Block};
   case SILFunctionTypeRepresentation::Thin:
     return {FunctionTypeRepresentation::Thin};
+  case SILFunctionTypeRepresentation::COMMethod:
   case SILFunctionTypeRepresentation::CXXMethod:
   case SILFunctionTypeRepresentation::CFunctionPointer:
     return {FunctionTypeRepresentation::CFunctionPointer};
@@ -500,6 +507,7 @@ constexpr bool canBeCalledIndirectly(SILFunctionTypeRepresentation rep) {
   case SILFunctionTypeRepresentation::CFunctionPointer:
   case SILFunctionTypeRepresentation::Block:
   case SILFunctionTypeRepresentation::Closure:
+  case SILFunctionTypeRepresentation::COMMethod:
   case SILFunctionTypeRepresentation::CXXMethod:
     return false;
   case SILFunctionTypeRepresentation::ObjCMethod:
@@ -524,6 +532,7 @@ template <typename Repr> constexpr bool shouldStoreClangType(Repr repr) {
   case SILFunctionTypeRepresentation::Block:
   case SILFunctionTypeRepresentation::CXXMethod:
     return true;
+  case SILFunctionTypeRepresentation::COMMethod:
   case SILFunctionTypeRepresentation::ObjCMethod:
   case SILFunctionTypeRepresentation::Thick:
   case SILFunctionTypeRepresentation::Thin:
@@ -723,6 +732,7 @@ public:
     case SILFunctionTypeRepresentation::ObjCMethod:
     case SILFunctionTypeRepresentation::Method:
     case SILFunctionTypeRepresentation::WitnessMethod:
+    case SILFunctionTypeRepresentation::COMMethod:
     case SILFunctionTypeRepresentation::CXXMethod:
       return true;
     }
@@ -1079,6 +1089,7 @@ SILFunctionLanguage getSILFunctionLanguage(SILFunctionTypeRepresentation rep) {
   case SILFunctionTypeRepresentation::ObjCMethod:
   case SILFunctionTypeRepresentation::CFunctionPointer:
   case SILFunctionTypeRepresentation::Block:
+  case SILFunctionTypeRepresentation::COMMethod:
   case SILFunctionTypeRepresentation::CXXMethod:
     return SILFunctionLanguage::C;
   case SILFunctionTypeRepresentation::Thick:
@@ -1275,6 +1286,7 @@ public:
     case Representation::ObjCMethod:
     case Representation::Method:
     case Representation::WitnessMethod:
+    case SILFunctionTypeRepresentation::COMMethod:
     case SILFunctionTypeRepresentation::CXXMethod:
       return true;
     }
@@ -1293,6 +1305,7 @@ public:
     case Representation::Method:
     case Representation::WitnessMethod:
     case Representation::Closure:
+    case SILFunctionTypeRepresentation::COMMethod:
     case SILFunctionTypeRepresentation::CXXMethod:
     case Representation::KeyPathAccessorGetter:
     case Representation::KeyPathAccessorSetter:

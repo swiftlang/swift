@@ -307,8 +307,8 @@ static StringRef getDumpString(SILFunctionType::Representation value) {
   case SILFunctionType::Representation::Thick: return "thick";
   case SILFunctionType::Representation::Block: return "block";
   case SILFunctionType::Representation::CFunctionPointer: return "c";
-  case SILFunctionType::Representation::CXXMethod:
-    return "cxx_method";
+  case SILFunctionType::Representation::COMMethod: return "com_method";
+  case SILFunctionType::Representation::CXXMethod: return "cxx_method";
   case SILFunctionType::Representation::Thin: return "thin";
   case SILFunctionType::Representation::Method: return "method";
   case SILFunctionType::Representation::ObjCMethod: return "objc_method";
