@@ -608,6 +608,9 @@ public:
     case Kind::WitnessMethod:
       if (Constant.isForeign)
         return true;
+      if (cast<ProtocolDecl>(Constant.getDecl()->getDeclContext())
+              ->isCOMInterface())
+        return true;
       return false;
     case Kind::ClassMethod:
     case Kind::SuperMethod:
@@ -737,7 +740,15 @@ public:
       ArgumentScope S(SGF, Loc);
 
       SILValue fn;
-      if (!constant->isForeign) {
+      if (proto->isCOMInterface()) {
+        auto FTy = constantInfo.getSILType().castTo<SILFunctionType>();
+        auto OTy =
+            Lowering::adjustFunctionType(FTy,
+                                         SILFunctionTypeRepresentation::COMMethod,
+                                         ProtocolConformanceRef());
+        fn = SGF.B.createCOMMethod(Loc, borrowedSelf->getValue(), *constant,
+                                   SILType::getPrimitiveObjectType(OTy));
+      } else if (!constant->isForeign) {
         fn = SGF.B.createWitnessMethod(
           Loc, lookupType, conformance, *constant,
           constantInfo.getSILType());
@@ -815,7 +826,16 @@ public:
 
       auto constantInfo =
           SGF.getConstantInfo(SGF.getTypeExpansionContext(), *constant);
-      return createCalleeTypeInfo(SGF, constant, constantInfo.getSILType());
+      SILType Ty = constantInfo.getSILType();
+      auto *proto = cast<ProtocolDecl>(Constant.getDecl()->getDeclContext());
+      if (proto->isCOMInterface()) {
+        auto FTy =
+            Lowering::adjustFunctionType(Ty.castTo<SILFunctionType>(),
+                                         SILFunctionTypeRepresentation::COMMethod,
+                                         ProtocolConformanceRef());
+        Ty = SILType::getPrimitiveObjectType(FTy);
+      }
+      return createCalleeTypeInfo(SGF, constant, Ty);
     }
     case Kind::DynamicMethod: {
       auto formalType = getDynamicMethodLoweredType(
