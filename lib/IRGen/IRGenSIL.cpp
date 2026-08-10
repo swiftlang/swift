@@ -3638,7 +3638,7 @@ Callee LoweredValue::getCallee(IRGenFunction &IGF,
     assert(vector.size() == 2 && "thick function pointer with size != 2");
     llvm::Value *functionValue = vector[0];
     llvm::Value *contextValue = vector[1];
-    bool castToRefcountedContext = calleeInfo.OrigFnType->isNoEscape();
+    bool castToRefcountedContext = calleeInfo.OrigFnType->isTrivialNoEscape();
     return getSwiftFunctionPointerCallee(IGF, functionValue, contextValue,
                                          std::move(calleeInfo),
                                          castToRefcountedContext, true);
@@ -7460,7 +7460,11 @@ void IRGenSILFunction::visitConvertFunctionInst(swift::ConvertFunctionInst *i) {
 
 void IRGenSILFunction::visitConvertEscapeToNoEscapeInst(
     swift::ConvertEscapeToNoEscapeInst *i) {
-  // This instruction makes the context trivial.
+  // This instruction makes the context trivial, unless the result is a
+  // `@called(once)` closure, whose context remains a real refcounted object
+  // that must still be retained/released/destroyed correctly.
+  bool contextIsTrivial =
+      i->getType().castTo<SILFunctionType>()->isTrivialNoEscape();
   Explosion in = getLoweredExplosion(i->getOperand());
   Explosion out;
   // Differentiable functions contain multiple pairs of fn and ctx pointer.
@@ -7469,7 +7473,8 @@ void IRGenSILFunction::visitConvertEscapeToNoEscapeInst(
     llvm::Value *fn = in.claimNext();
     llvm::Value *ctx = in.claimNext();
     out.add(fn);
-    out.add(Builder.CreateBitCast(ctx, IGM.OpaquePtrTy));
+    out.add(contextIsTrivial ? Builder.CreateBitCast(ctx, IGM.OpaquePtrTy)
+                             : ctx);
   }
   setLoweredExplosion(i, out);
 }
@@ -7732,7 +7737,7 @@ void IRGenSILFunction::visitThinToThickFunctionInst(
   Explosion from = getLoweredExplosion(i->getOperand());
   Explosion to;
   to.add(Builder.CreateBitCast(from.claimNext(), IGM.FunctionPtrTy));
-  if (i->getType().castTo<SILFunctionType>()->isNoEscape())
+  if (i->getType().castTo<SILFunctionType>()->isTrivialNoEscape())
     to.add(llvm::ConstantPointerNull::get(IGM.OpaquePtrTy));
   else
     to.add(IGM.RefCountedNull);

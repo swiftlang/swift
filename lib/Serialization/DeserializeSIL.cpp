@@ -2530,7 +2530,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     // FIXME: Why the arbitrary order difference in IRBuilder type argument?
     ResultInst = Builder.createPartialApply(
         Loc, FnVal, Substitutions, Args, closureTy->getCalleeConvention(),
-        closureTy->getIsolation(), onStack, isNested,
+        closureTy->getIsolation(), closureTy->isCalledOnce(), onStack, isNested,
         /*SpecializationInfo=*/nullptr, argLocsRef);
     break;
   }

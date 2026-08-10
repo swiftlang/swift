@@ -2850,9 +2850,9 @@ swift::replaceWithSpecializedCallee(ApplySite applySite, SILValue callee,
       });
     }
     auto *newPAI = builder.createPartialApply(
-        loc, callee, subs, arguments,
-        pai->getCalleeConvention(), pai->getResultIsolation(),
-        pai->isOnStack(), pai->isStackAllocationNested());
+        loc, callee, subs, arguments, pai->getCalleeConvention(),
+        pai->getResultIsolation(), pai->isCalledOnce(), pai->isOnStack(),
+        pai->isStackAllocationNested());
     pai->replaceAllUsesWith(newPAI);
     return newPAI;
   }
@@ -3715,9 +3715,9 @@ void swift::trySpecializeApplyOfGeneric(
     auto FnTy = Thunk->getLoweredFunctionType();
     Subs = SubstitutionMap::get(FnTy->getSubstGenericSignature(), Subs);
     SingleValueInstruction *newPAI = Builder.createPartialApply(
-      PAI->getLoc(), FRI, Subs, Arguments,
-      PAI->getCalleeConvention(), PAI->getResultIsolation(),
-      PAI->isOnStack(), PAI->isStackAllocationNested());
+        PAI->getLoc(), FRI, Subs, Arguments, PAI->getCalleeConvention(),
+        PAI->getResultIsolation(), PAI->isCalledOnce(), PAI->isOnStack(),
+        PAI->isStackAllocationNested());
     PAI->replaceAllUsesWith(newPAI);
     DeadApplies.insert(PAI);
     return;

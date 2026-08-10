@@ -7132,6 +7132,7 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
   auto PartialApplyIsolation = SILFunctionTypeIsolation::forUnknown();
   ApplyOptions ApplyOpts;
   bool IsNoEscape = false;
+  bool IsCalledOnce = false;
 
   StringRef AttrName;
   SourceLoc AttrLoc;
@@ -7181,6 +7182,12 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
     if (AttrName == "non_nested") {
       assert(!bool(AttrValue));
       isNested = StackAllocationIsNotNested;
+      continue;
+    }
+
+    if (AttrName == "called_once") {
+      assert(!bool(AttrValue));
+      IsCalledOnce = true;
       continue;
     }
 
@@ -7366,7 +7373,7 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
     // FIXME: Why the arbitrary order difference in IRBuilder type argument?
     ResultVal = B.createPartialApply(
         InstLoc, FnVal, subs, Args, PartialApplyConvention,
-        PartialApplyIsolation,
+        PartialApplyIsolation, IsCalledOnce,
         IsNoEscape ? PartialApplyInst::OnStackKind::OnStack
                    : PartialApplyInst::OnStackKind::NotOnStack,
         isNested ? *isNested : StackAllocationIsNested);
