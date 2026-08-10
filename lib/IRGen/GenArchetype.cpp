@@ -39,6 +39,7 @@
 #include "Explosion.h"
 #include "FixedTypeInfo.h"
 #include "GenClass.h"
+#include "GenExistential.h"
 #include "GenHeap.h"
 #include "GenMeta.h"
 #include "GenOpaque.h"
@@ -76,6 +77,23 @@ irgen::emitArchetypeTypeMetadataRef(IRGenFunction &IGF,
   if (auto opaque = dyn_cast<OpaqueTypeArchetypeType>(archetype)) {
     if (opaque->isRoot())
       return emitOpaqueTypeMetadataRef(IGF, opaque, request);
+  }
+
+  // A COM existential does not carry the dynamic metadata of its native
+  // implementation. Use the static existential metadata if an operation on
+  // the opened archetype actually needs to cross a generic ABI boundary.
+  if (auto opened = dyn_cast<ExistentialArchetypeType>(archetype);
+      opened && llvm::any_of(opened->getConformsTo(),
+                             [](ProtocolDecl *protocol) {
+                               return protocol->isCOMInterface();
+                             })) {
+    auto existential = opened->getGenericEnvironment()
+                            ->getOpenedExistentialType()
+                            ->getCanonicalType();
+    auto response = IGF.emitTypeMetadataRef(existential, request);
+    setTypeMetadataName(IGF.IGM, response.getMetadata(), archetype);
+    IGF.setScopedLocalTypeMetadata(archetype, response);
+    return response;
   }
 
 #ifndef NDEBUG
@@ -359,6 +377,15 @@ irgen::emitAssociatedTypeMetadataRef(IRGenFunction &IGF,
 
 const TypeInfo *TypeConverter::convertArchetypeType(ArchetypeType *archetype) {
   assert(isExemplarArchetype(archetype) && "lowering non-exemplary archetype");
+
+  // An opened COM existential contains its interface pointer directly.
+  // Ordinary generic parameters constrained to a COM interface remain opaque
+  // and continue through the normal generic ABI below.
+  if (isa<ExistentialArchetypeType>(archetype) &&
+      llvm::any_of(archetype->getConformsTo(), [](ProtocolDecl *protocol) {
+                    return protocol->isCOMInterface();
+                   }))
+    return createCOMInterfaceTypeInfo(IGM);
 
   auto layout = archetype->getLayoutConstraint();
 
