@@ -3427,6 +3427,7 @@ private:
          SILFunctionTypeIsolation ResultIsolation, SILFunction &F,
          const GenericSpecializationInformation *SpecializationInfo,
          OnStackKind onStack, StackAllocationIsNested_t isNested,
+         bool isCalledOnce,
          std::optional<ArrayRef<SILLocation>> ArgLocs = std::nullopt);
 
 public:
@@ -3444,6 +3445,10 @@ public:
     return getFunctionType()->getIsolation();
   }
 
+  bool isCalledOnce() const {
+    return getFunctionType()->isCalledOnce();
+  }
+  
   OnStackKind isOnStack() const {
     return getFunctionType()->isNoEscape() ? OnStack : NotOnStack;
   }

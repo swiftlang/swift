@@ -1874,6 +1874,9 @@ public:
       if (!CI->isStackAllocationNested())
         *this << "[non_nested] ";
     }
+    if (CI->isCalledOnce()) {
+      *this << "[called_once] ";
+    }
     visitApplyInstBase(CI);
   }
 
