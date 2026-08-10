@@ -3719,6 +3719,12 @@ CanSILFunctionType swift::buildSILFunctionThunkType(
   if (withoutActuallyEscaping)
     extInfoBuilder = extInfoBuilder.withNoEscape(false);
 
+  // The thunk itself cannot be `@called(once)` just like a closure cannot
+  // be since the constraint is about the value and is expressed on
+  // `partial_apply` instruction that forms the value of the thunk.
+  if (extInfoBuilder.isCalledOnce())
+    extInfoBuilder = extInfoBuilder.withCalledOnce(false);
+
   // Does the thunk type involve a local archetype type?
   SmallVector<GenericEnvironment *, 2> capturedEnvs;
   auto archetypeVisitor = [&](CanType t) {
