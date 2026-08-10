@@ -8229,6 +8229,25 @@ class ObjCMethodInst final
          SILDeclRef Member, SILType Ty, SILFunction *F);
 };
 
+/// COMMethodInst - Loads a protocol requirement from a COM interface vtable.
+class COMMethodInst final
+    : public UnaryInstructionWithTypeDependentOperandsBase<
+          SILInstructionKind::COMMethodInst, COMMethodInst, MethodInst>
+{
+  friend SILBuilder;
+
+  COMMethodInst(SILDebugLocation DebugLoc, SILValue Operand,
+                ArrayRef<SILValue> TypeDependentOperands, SILDeclRef Member,
+                SILType Ty)
+      : UnaryInstructionWithTypeDependentOperandsBase(DebugLoc, Operand,
+                                                      TypeDependentOperands, Ty,
+                                                      Member) {}
+
+  static COMMethodInst *
+  create(SILDebugLocation DebugLoc, SILValue Operand, SILDeclRef Member,
+         SILType Ty, SILFunction *F);
+};
+
 /// ObjCSuperMethodInst - Given the address of a value of class type and a method
 /// constant, extracts the implementation of that method for the superclass of
 /// the static type of the class.

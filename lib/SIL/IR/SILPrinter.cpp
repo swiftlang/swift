@@ -2786,6 +2786,12 @@ public:
     *this << ", ";
     *this << AMI->getType();
   }
+  void visitCOMMethodInst(COMMethodInst *CMI) {
+    printMethodInst(CMI, CMI->getOperand());
+    *this << " : " << CMI->getMember().getDecl()->getInterfaceType();
+    *this << ", ";
+    *this << CMI->getType();
+  }
   void visitObjCSuperMethodInst(ObjCSuperMethodInst *AMI) {
     printMethodInst(AMI, AMI->getOperand());
     *this << " : " << AMI->getMember().getDecl()->getInterfaceType();
