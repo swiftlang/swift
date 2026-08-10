@@ -447,16 +447,17 @@ OVERRIDE_TASK_STATUS(task_popTaskExecutorPreference, void,
 #if !SWIFT_CONCURRENCY_EMBEDDED
 
 OVERRIDE_TASK_STATUS(task_pushDeadline,
-                     TaskDeadlineStatusRecord *,
+                     void,
                      SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
                      swift::,
-                     (OpaqueValue *clock,
+                     (TaskDeadlineStatusRecord *record,
+                      OpaqueValue *clock,
                       OpaqueValue *instant,
                       const Metadata *clockType,
                       const Metadata *instantType,
                       const WitnessTable *identifiableWT,
                       const WitnessTable *clockWT),
-                     (clock, instant, clockType, instantType,
+                     (record, clock, instant, clockType, instantType,
                       identifiableWT, clockWT))
 
 OVERRIDE_TASK_STATUS(task_popDeadline, void,

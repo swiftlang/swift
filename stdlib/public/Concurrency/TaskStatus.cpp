@@ -701,52 +701,48 @@ bool _task_isEqualIdentifiableID(
     const WitnessTable *identifiableWT);
 
 SWIFT_CC(swift)
-static TaskDeadlineStatusRecord *
-swift_task_pushDeadlineImpl(OpaqueValue *clock,
+static void
+swift_task_pushDeadlineImpl(TaskDeadlineStatusRecord *record,
+                            OpaqueValue *clock,
                             OpaqueValue *instant,
                             const Metadata *clockType,
                             const Metadata *instantType,
                             const WitnessTable *identifiableWT,
                             const WitnessTable *clockWT) {
-  (void)identifiableWT;
-  (void)clockWT;
   auto task = swift_task_getCurrent();
   assert(task && "Currently, withDeadline must be used from an async context; We may relax this in the future");
 
-  // Task-allocate one contiguous chunk holding the record header + the
-  // trailing clock and instant payloads. Both incoming values arrive at +1
-  // (the Swift `Builtin.taskPushDeadline` takes them `consuming`), so we
-  // TAKE them into the record's tail storage - the record now owns them.
-  // Pop mirrors this with vw_destroy and swift_task_dealloc.
-  size_t size = TaskDeadlineStatusRecord::recordSize(clockType, instantType);
-  void *allocation = _swift_task_alloc_specific(task, size);
-
-  // `IsOutermostDeadline` is decided under the status-record lock inside
-  // `addStatusRecord`'s update closure and stored on the record: the
-  // outermost record is the one whose push flipped `HasDeadline` from
-  // false to true. The bookkeeping lets `swift_task_popDeadline` clear
-  // `HasDeadline` in O(1) without walking the chain.
-  auto record = ::new (allocation) TaskDeadlineStatusRecord(
-      clockType, instantType, /*isOutermostDeadline=*/false);
-  clockType->vw_initializeWithTake(record->getClockStorage(), clock);
-  instantType->vw_initializeWithTake(record->getInstantStorage(), instant);
+  // The record's storage lives in the caller's async frame (allocated by
+  // IRGen via `emitBuiltinTaskPushDeadline`, sized for
+  // `NumWords_TaskDeadline`). Placement-new the record into it and
+  // store *borrowed* pointers to the caller's clock and instant values
+  // - no copies. Their lifetimes are guaranteed to outlive the record
+  // because the paired `swift_task_popDeadline` runs before the
+  // caller's frame goes away.
+  //
+  // `IsOutermostDeadline` is decided under the status-record lock
+  // inside `addStatusRecord`'s update closure below.
+  ::new (record) TaskDeadlineStatusRecord(
+      clockType, instantType,
+      /*clockPtr=*/clock, /*instantPtr=*/instant,
+      identifiableWT, clockWT,
+      /*isOutermostDeadline=*/false);
 
   SWIFT_TASK_DEBUG_LOG("[Deadline] Create deadline record:%p for task:%p "
-                       "(clockType:%p, instantType:%p, size:%zu)",
-                       allocation, task, clockType, instantType, size);
+                       "(clockType:%p, instantType:%p)",
+                       record, task, clockType, instantType);
 
   addStatusRecord(task, record,
                   [&](ActiveTaskStatus oldStatus, ActiveTaskStatus &newStatus) {
                     if (!oldStatus.hasDeadline()) {
-                      // We are the outermost deadline on this task; remember
-                      // it so the matching pop can flip the flag back off.
+                      // We are the outermost deadline on this task;
+                      // remember it so the matching pop can flip the
+                      // flag back off in O(1) without walking the chain.
                       record->setOutermostDeadline(true);
                       newStatus = newStatus.withDeadline();
                     }
                     return true; // always add the record
                   });
-
-  return record;
 }
 
 SWIFT_CC(swift)
@@ -760,8 +756,8 @@ static void swift_task_popDeadlineImpl(TaskDeadlineStatusRecord *record) {
   if (!task)
     return;
 
-  // If we're removing the "outermost" deadline, we must clear the HasDeadline,
-  // as we know for sure there's no more deadline records present.
+  // If we're removing the "outermost" deadline, clear `HasDeadline` -
+  // we know for sure there's no more deadline records left.
   bool clearHasDeadlineFlag = record->isOutermostDeadline();
   removeStatusRecordWhere(
       task,
@@ -777,15 +773,16 @@ static void swift_task_popDeadlineImpl(TaskDeadlineStatusRecord *record) {
         }
       });
 
-  // Destroy the inline payload values before releasing the storage.
-  record->getInstantType()->vw_destroy(record->getInstantStorage());
-  record->getClockType()->vw_destroy(record->getClockStorage());
-  swift_task_dealloc(record);
+  // The record's storage belongs to the caller's async frame - no
+  // deallocation. The record holds only borrowed pointers, so there is
+  // nothing to destroy either.
 }
 
 /// Search a single task's status record chain for a deadline record
-/// whose clock matches the given query. Returns a borrowed pointer into
-/// the matching record's instant storage, or nullptr if none.
+/// whose clock matches the given query. Returns a borrowed pointer to
+/// the matching record's instant (which itself points into the async
+/// frame of whichever ancestor task installed the deadline), or nullptr
+/// if none.
 ///
 /// Takes the task's status-record lock.
 static OpaqueValue *
@@ -805,11 +802,11 @@ findDeadlineOnSingleTask(AsyncTask *task,
 
       // Same-clock identity check via Swift callout.
       if (_task_isEqualIdentifiableID(
-        /*recordClockStorage=*/record->getClockStorage(),
+        /*recordClockStorage=*/record->getClockPtr(),
         /*queryClock=*/queryClock,
         /*clockType=*/clockType,
         /*identifiableWT=*/identifiableWT)) {
-        foundInstant = record->getInstantStorage();
+        foundInstant = record->getInstantPtr();
         return;
       }
     }

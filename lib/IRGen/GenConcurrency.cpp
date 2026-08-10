@@ -391,26 +391,33 @@ llvm::Value *irgen::emitBuiltinTaskPushDeadline(IRGenFunction &IGF,
                                                llvm::Value *instantPtr,
                                                llvm::Value *clockType,
                                                llvm::Value *instantType) {
+  // Allocate the deadline record in the caller's frame. In an async
+  // function this ends up in the coroutine's async frame after
+  // CoroSplit; either way the storage lives from here until the
+  // paired TaskPopDeadline balances it below.
+  auto ty = llvm::ArrayType::get(IGF.IGM.Int8PtrTy, NumWords_TaskDeadline);
+  auto address = IGF.createAlloca(ty, Alignment(Alignment_TaskDeadline),
+                                  "task.deadline.record");
+  auto record = IGF.Builder.CreateBitCast(address.getAddress(),
+                                          IGF.IGM.Int8PtrTy);
+  IGF.Builder.CreateLifetimeStart(record);
+
   // Runtime signature:
-  //   swift_task_pushDeadline(OpaqueValue *clock, OpaqueValue *instant,
-  //                           const Metadata *clockType,
-  //                           const Metadata *instantType,
-  //                           const WitnessTable *identifiableWT,
-  //                           const WitnessTable *clockWT)
-  //
-  // Swift's canonical generic-sig ordering places `Identifiable` before
-  // `Clock`, so the WT slots follow that order.
-  // Both WTs are reserved for future runtime use; pass null for now
-  // (Swift-side identity comparison is dispatched via the
-  // `_task_isEqualIdentifiableID` bridge which threads its own
-  // generic-arg witnesses).
+  //   void swift_task_pushDeadline(TaskDeadlineStatusRecord *record,
+  //                                OpaqueValue *clock,
+  //                                OpaqueValue *instant,
+  //                                const Metadata *clockType,
+  //                                const Metadata *instantType,
+  //                                const WitnessTable *identifiableWT,
+  //                                const WitnessTable *clockWT)
   auto *null = llvm::ConstantPointerNull::get(IGF.IGM.Int8PtrTy);
   auto *call = IGF.Builder.CreateCall(
       IGF.IGM.getTaskPushDeadlineFunctionPointer(),
-      {clockPtr, instantPtr, clockType, instantType, null, null});
+      {record, clockPtr, instantPtr, clockType, instantType, null, null});
   call->setDoesNotThrow();
   call->setCallingConv(IGF.IGM.SwiftCC);
-  return call;
+
+  return record;
 }
 
 void irgen::emitBuiltinTaskPopDeadline(IRGenFunction &IGF,
@@ -419,6 +426,11 @@ void irgen::emitBuiltinTaskPopDeadline(IRGenFunction &IGF,
       IGF.IGM.getTaskPopDeadlineFunctionPointer(), {record});
   call->setDoesNotThrow();
   call->setCallingConv(IGF.IGM.SwiftCC);
+
+  // Release the caller-frame slot so LLVM can reuse the storage after
+  // this point (relevant in async frames, where CoroSplit packs live
+  // ranges).
+  IGF.Builder.CreateLifetimeEnd(record);
 }
 
 llvm::Value *irgen::emitBuiltinTaskCancellationScopePush(IRGenFunction &IGF) {

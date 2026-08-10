@@ -1258,9 +1258,15 @@ BUILTIN_MISC_OPERATION(TaskRemovePriorityEscalationHandler,
 
 /// Equivalent to calling swift_task_pushDeadline.
 ///
-/// Signature: (clockPtr: Builtin.RawPointer, instantPtr: Builtin.RawPointer,
-///             clockType: Any.Type, instantType: Any.Type)
+/// Signature: <C, I> (clock: borrowing C, instant: borrowing I)
 ///           -> UnsafeRawPointer
+///
+/// IRGen synthesizes the record's storage as an alloca of
+/// `NumWords_TaskDeadline` words in the caller's frame; the returned
+/// pointer is that slot's address. The paired `taskPopDeadline` acts
+/// as the matching stack deallocation (see `StackAllocation.h`); that
+/// push/pop scope in SIL is what keeps the borrowed operand addresses
+/// live for the record's lifetime.
 BUILTIN_MISC_OPERATION(TaskPushDeadline, "taskPushDeadline", "", Special)
 
 /// Equivalent to calling swift_task_popDeadline.

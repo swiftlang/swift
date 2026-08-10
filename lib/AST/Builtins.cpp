@@ -2443,19 +2443,33 @@ static ValueDecl *getTaskRemovePriorityEscalationHandler(ASTContext &ctx,
 }
 
 static ValueDecl *getTaskPushDeadline(ASTContext &ctx, Identifier id) {
-  // <C, I> (clock: consuming C, instant: consuming I) -> UnsafeRawPointer
+  // <C, I> (clock: borrowing C, instant: borrowing I) -> UnsafeRawPointer
   //
-  // Values first, metadata trailing (matches Swift's generic ABI).
+  // Operands are borrowed at +0. SILGen passes them as `$*C` / `$*I`
+  // addresses (opaque generics are indirect), and IRGen forwards those
+  // addresses to the runtime as `OpaqueValue *`. No copies of the
+  // clock or instant are made - the record stores borrowed pointers
+  // into the caller's frame.
   //
-  // The stack-nesting invariant paired with `taskPopDeadline` is fixed up
-  // post-SILGen by `finalizeTaskPushDeadline` -> `StackNesting::fixNesting`,
-  // exactly mirroring the `AddTaskLocalValue` sibling. Without that hook,
-  // the operand `alloc_stack` temporaries would deallocate before the
-  // defer'd pop and trip the flow-sensitive verifier.
+  // The push/pop pair is registered in `StackAllocation.h` as a
+  // stack-scoped allocation (`BuiltinTaskPushDeadline` /
+  // `BuiltinTaskPopDeadline`); the flow-sensitive SIL verifier
+  // enforces LIFO nesting and, because `clock`/`instant` are borrowed
+  // operands of the push, keeps their scopes live for the whole
+  // push/pop span. That gives us the "borrows outlive the record"
+  // guarantee.
+  //
+  // The stack-nesting invariant paired with `taskPopDeadline` is fixed
+  // up post-SILGen by `finalizeTaskPushDeadline` ->
+  // `StackNesting::fixNesting`, exactly mirroring the
+  // `AddTaskLocalValue` sibling. Without that hook, any argument-scope
+  // `alloc_stack` temporaries SILGen materialises for `borrowing`
+  // operands would deallocate before the paired `taskPopDeadline` and
+  // trip the flow-sensitive verifier.
   return getBuiltinFunction(
       ctx, id, _thin, _generics(_unrestricted, _unrestricted),
-      _parameters(_label("clock", _consuming(_typeparam(0))),
-                  _label("instant", _consuming(_typeparam(1)))),
+      _parameters(_label("clock", _borrowing(_typeparam(0))),
+                  _label("instant", _borrowing(_typeparam(1)))),
       _unsafeRawPointer);
 }
 

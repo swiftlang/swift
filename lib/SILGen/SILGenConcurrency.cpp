@@ -972,11 +972,25 @@ void SILGenFunction::finalizeAddTaskLocalValue(BuiltinInst *BI) {
 }
 
 void SILGenFunction::finalizeTaskPushDeadline(BuiltinInst *BI) {
-  // Similar workaround to finalizeAddTaskLocalValue because the taskPushDeadline builtin
-  // is generic over clock, which ends up creating a temporary for the metadata which
-  // are not properly nested, causing nesting validation to fail.
+  // Same shape of workaround as `finalizeAddTaskLocalValue` above.
   //
-  // Rather than change the builtin to be not-generic and use hacks on the call-site,
-  // we apply the same fixNesting pattern as AddTaskLocalValue already does.
+  // `Builtin.taskPushDeadline` is `<C, I>(borrowing C, borrowing I) ->
+  // UnsafeRawPointer`. Callers whose `clock` / `instant` don't already
+  // live at a stable indirect address (e.g. we come from an
+  // `@in_guaranteed` parameter but SILGen still materialises fresh
+  // `alloc_stack`s during argument scope building) end up with
+  // temporaries whose `dealloc_stack` sits between the paired
+  // `taskPushDeadline` and `taskPopDeadline`. Because the SIL
+  // stack-allocation classification treats those builtins as a
+  // scope-forming push/pop pair (see `StackAllocation.h`), the
+  // flow-sensitive verifier reports:
+  //
+  //   deallocating allocation that is not the top of the stack
+  //
+  // Rerouting the argument-scope allocs to be `[non_nested]` (i.e.
+  // "may be deallocated in any order") is exactly what
+  // `StackNesting::fixNesting` does, and matches the AddTaskLocalValue
+  // sibling. This is the pragmatic fix Konrad landed originally on
+  // commit e38fee6cdee before we experimented with dropping it.
   StackNesting::fixNesting(&F);
 }

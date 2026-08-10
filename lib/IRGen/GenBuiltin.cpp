@@ -1596,6 +1596,11 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     return;
   }
   case BuiltinValueKind::TaskPushDeadline: {
+    // <C, I> (clock: borrowing C, instant: borrowing I) -> UnsafeRawPointer
+    //
+    // Under `borrowing` opaque-generic operands, SIL passes the values
+    // by address ($*C, $*I), which IRGen sees as raw `i8*` pointers.
+    // Metadata comes from the generic substitutions.
     auto *clockPtr = args.claimNext();
     auto *instantPtr = args.claimNext();
     auto clockTy = substitutions.getReplacementTypes()[0]->getCanonicalType();

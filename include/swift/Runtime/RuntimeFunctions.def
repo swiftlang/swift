@@ -2800,17 +2800,17 @@ FUNCTION(TaskRemovePriorityEscalationHandler,
          EFFECT(RuntimeEffect::Concurrency),
          UNKNOWN_MEMEFFECTS)
 
-// TaskDeadlineStatusRecord*
-// swift_task_pushDeadline(OpaqueValue *clock, OpaqueValue *instant,
-//                         const Metadata *clockType,
-//                         const Metadata *instantType,
-//                         const WitnessTable *identifiableWT,
-//                         const WitnessTable *clockWT);
+// void swift_task_pushDeadline(TaskDeadlineStatusRecord *record,
+//                              OpaqueValue *clock, OpaqueValue *instant,
+//                              const Metadata *clockType,
+//                              const Metadata *instantType,
+//                              const WitnessTable *identifiableWT,
+//                              const WitnessTable *clockWT);
 FUNCTION(TaskPushDeadline,
         _Concurrency, swift_task_pushDeadline, SwiftCC,
         TaskDeadlineAvailability,
-        RETURNS(Int8PtrTy),
-        ARGS(Int8PtrTy, Int8PtrTy, Int8PtrTy, Int8PtrTy, Int8PtrTy, Int8PtrTy),
+        RETURNS(VoidTy),
+        ARGS(Int8PtrTy, Int8PtrTy, Int8PtrTy, Int8PtrTy, Int8PtrTy, Int8PtrTy, Int8PtrTy),
         ATTRS(NoUnwind),
         EFFECT(RuntimeEffect::Concurrency),
         UNKNOWN_MEMEFFECTS)

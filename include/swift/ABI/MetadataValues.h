@@ -68,6 +68,17 @@ enum {
   /// The number of words in an AsyncLet (flags + child task context & allocation)
   NumWords_AsyncLet = 80, // 640 bytes ought to be enough for anyone
 
+  /// The number of words in a task deadline record.
+  ///
+  /// The record is fixed-size and stack-allocated in the caller's async
+  /// frame by IRGen (see `emitBuiltinTaskPushDeadline`). Current layout
+  /// uses 8 words (TaskStatusRecord header + clock/instant type metadata
+  /// + borrowed clock/instant pointers + two reserved witness-table
+  /// slots); the padding to 16 leaves headroom for a cached clock
+  /// executor handle, a timer-registration cookie, and future flags,
+  /// without another ABI bump.
+  NumWords_TaskDeadline = 16, // 128 bytes ought to be enough for anyone
+
   /// The size of a unique hash.
   NumBytes_UniqueHash = 16,
 
@@ -155,6 +166,9 @@ const size_t Alignment_TaskGroup = MaximumAlignment;
 
 /// The alignment of an AsyncLet.
 const size_t Alignment_AsyncLet = MaximumAlignment;
+
+/// The alignment of a TaskDeadline record slot.
+const size_t Alignment_TaskDeadline = MaximumAlignment;
 
 /// Flags stored in the value-witness table.
 template <typename int_type>

@@ -133,6 +133,14 @@ public nonisolated(nonsending) func withDeadline<Return, Failure, C>(
   }
 
   // Push a deadline record on the current task.
+  //
+  // The record is fixed-size and stack-allocated in this function's
+  // async frame by IRGen (see `emitBuiltinTaskPushDeadline`). It stores
+  // borrowed pointers to `clock` and `expiration` - no copies of the
+  // clock or instant are made. SIL treats the push/pop pair as a
+  // stack allocation (see `StackAllocation.h`), which forces the
+  // borrows of `clock` and `expiration` to remain live for the whole
+  // push/pop scope - i.e. until the `defer` runs `taskPopDeadline`.
 #if $BuiltinTaskDeadline
   let record = unsafe Builtin.taskPushDeadline(clock: clock, instant: expiration)
   defer { unsafe Builtin.taskPopDeadline(record: record) }
@@ -308,20 +316,19 @@ extension Task where Success == Never, Failure == Never {
 // MARK: Internals
 
 /// Swift-side helper called by the runtime for each deadline record whose
-/// `ClockType` metadata pointer-equals the caller's `I`. Reads the record's
-/// inline-stored clock as an `I` value and compares identities.
+/// `ClockType` metadata pointer-equals the caller's `I`.
 ///
 /// The runtime pointer-equality checks `record->ClockType == I-metadata`
-/// before calling this bridge, so `recordClockStorage` is guaranteed to
+/// before calling this bridge, so `recordClockPointer` is guaranteed to
 /// hold a valid `I`. Only `Identifiable` is needed here - the clock-ness
 /// of the type doesn't enter the comparison.
 @available(StdlibDeploymentTarget 6.5, *)
 @_silgen_name("_task_isEqualIdentifiableID")
 internal func _task_isEqualIdentifiableID<I: Identifiable>(
-  recordClockStorage: UnsafeMutableRawPointer,
+  recordClockPointer: UnsafeMutableRawPointer,
   queryClock: I
 ) -> Bool {
-  let stored = unsafe recordClockStorage
+  let stored = unsafe recordClockPointer
     .assumingMemoryBound(to: I.self).pointee
   return stored.id == queryClock.id
 }
@@ -336,10 +343,11 @@ public func _findNearestDeadline<C: Clock & Identifiable>(clock: C) -> C.Instant
     return nil
   }
 
-  // The runtime returns a borrowed +0 pointer into the record's tail
-  // storage. Load through `assumingMemoryBound` + `.pointee` which lowers
-  // to the value witness `initializeWithCopy` on `C.Instant`, producing
-  // an owned +1 while the record retains its copy until pop.
+  // The runtime returns a borrowed +0 pointer into the record's instant
+  // slot, which itself points into the installing `withDeadline`'s async
+  // frame (structured concurrency keeps that frame live). Load through
+  // `assumingMemoryBound` + `.pointee`, which lowers to
+  // `initializeWithCopy` on `C.Instant` and produces an owned +1.
   return unsafe UnsafeRawPointer(matched)
     .assumingMemoryBound(to: C.Instant.self).pointee
 }

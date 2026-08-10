@@ -1085,17 +1085,6 @@ visitResumeThrowingContinuationThrowing(BuiltinInst *bi, StringRef attr) {
   return OperandOwnership::TrivialUse;
 }
 
-/// TaskPushDeadline takes four trivial operands:
-///   (clockPtr: Builtin.RawPointer, instantPtr: Builtin.RawPointer,
-///    clockType: Any.Type, instantType: Any.Type).
-/// All trivial; the runtime copies through the pointers via value
-/// witnesses without taking ownership of either.
-OperandOwnership
-OperandOwnershipBuiltinClassifier::visitTaskPushDeadline(BuiltinInst *bi,
-                                                        StringRef attr) {
-  return OperandOwnership::TrivialUse;
-}
-
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, TaskRunInline)
 
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, InitializeDefaultActor)
@@ -1145,11 +1134,14 @@ BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskCancellationScopePush)
 // Trivial use since our operand is just an UnsafeRawPointer.
 BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskCancellationScopePop)
 
+// TaskPushDeadline takes two borrowed generic operands passed by
+// address ($*C, $*I); at the SIL level address operands are trivial,
+// with the borrow scope enforced by the alloc_stack/dealloc_stack
+// bracket in the caller and by the mark_dependence [nonescaping] that
+// SILGen wraps around the returned raw pointer.
+BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskPushDeadline)
 // Trivial use since our operand is just an UnsafeRawPointer.
 BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskPopDeadline)
-// TaskPushDeadline is handled by the custom visitor above so its
-// trivial operand tuple can be classified without relying on the
-// generic BUILTIN_OPERAND_OWNERSHIP macro.
 
 #undef BUILTIN_OPERAND_OWNERSHIP
 

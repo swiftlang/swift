@@ -477,55 +477,111 @@ public:
 
 /// A status record that represents a task deadline.
 ///
-/// ### Deadline nesting
-/// Multiple deadlines may be installed on the same task, they may use the same or different clocks.
+/// ### Layout
+/// The record is fixed-size and lives in the caller's async frame. It
+/// stores *borrowed* pointers to the caller's clock and instant values -
+/// no copies. The push/pop bracket around a `withDeadline` scope keeps
+/// the borrowed values live for the record's lifetime; a descendant task
+/// that reads through these pointers via `_findNearestDeadline` is safe
+/// because structured concurrency guarantees the ancestor's async frame
+/// outlives its children (the ancestor cannot return, and thus cannot
+/// pop, until every child completes).
 ///
-/// By construction, the innermost record for any given clock identity always is the "nearest".
-/// I.e. a search for nearest deadline can always stop at first matching record.
+/// The compiler allocates a fixed-size opaque buffer of
+/// `NumWords_TaskDeadline` words in the caller's frame (see
+/// `emitBuiltinTaskPushDeadline` in `lib/IRGen/GenConcurrency.cpp`) and
+/// hands its address to `swift_task_pushDeadline`, which placement-news
+/// this class into it.
+///
+/// ### Deadline nesting
+/// Multiple deadlines may be installed on the same task, they may use the
+/// same or different clocks.
+///
+/// By construction, the innermost record for any given clock identity
+/// always is the "nearest". I.e. a search for nearest deadline can
+/// always stop at the first matching record.
 ///
 /// ### Clock identity
 /// Comparing clock identity is fast-pathed for known system clocks,
-/// however needs to to a slow-path Identifiable comparison for any user defined clocks.
+/// however needs to do a slow-path Identifiable comparison for any user
+/// defined clocks.
 class TaskDeadlineStatusRecord : public TaskStatusRecord {
   static constexpr uintptr_t FlagsMask = ~uintptr_t(alignof(void*) - 1);
 
-  /// Clock type and `Flags` stored its spare low bits.
+  /// Clock type metadata, with `Flags` stored in the spare low bits.
+  ///
+  /// Metadata pointers are aligned to at least `alignof(void*)`, so the
+  /// low bits below that alignment are always zero on a valid pointer
+  /// and free for us to reuse.
   uintptr_t ClockTypeAndFlags;
 
-  /// Clock.Instant type, where Clock stored in ClockTypeAndFlags
+  /// Clock.Instant type metadata (Clock is stored in ClockTypeAndFlags).
   const Metadata *InstantType;
 
+  /// Borrowed pointer to the caller's clock value. Valid for the
+  /// record's lifetime because push/pop bracket in the same async
+  /// function keeps the storage live.
+  OpaqueValue *ClockPtr;
+
+  /// Borrowed pointer to the caller's deadline instant value. Same
+  /// lifetime story as `ClockPtr`.
+  OpaqueValue *InstantPtr;
+
+  /// Reserved slot for the clock's `Identifiable` witness table. Not
+  /// used today (Swift-side identity comparison is dispatched via the
+  /// `_task_isEqualIdentifiableID` bridge, which threads its own
+  /// witnesses); pre-populated so a future runtime can perform the
+  /// identity comparison directly without a Swift callout.
+  const WitnessTable *IdentifiableWT;
+
+  /// Reserved slot for the clock's `Clock` witness table. Not used
+  /// today.
+  const WitnessTable *ClockWT;
+
   enum class Flags : uintptr_t {
-    /// True iff the record is the "outermost" deadline in this entire task hierarchy.
+    /// True iff the record is the "outermost" deadline in this entire
+    /// task hierarchy.
     ///
-    /// This allows short-circuiting lookups; if we find the outermost record,
-    /// there's no reason to keep looking at parent tasks and records for other deadlines.
+    /// This allows short-circuiting lookups; if we find the outermost
+    /// record, there's no reason to keep looking at parent tasks and
+    /// records for other deadlines.
     ///
     /// This flag does NOT take into account clock identity.
     IsOutermostDeadline = 1 << 0,
   };
 
-  // Trailing tail-allocated storage (uninitialized in this class body):
-  //   [pad to ClockType.vw_alignment()]
-  //   C bytes                            <- getClockStorage()
-  //   [pad to InstantType.vw_alignment()]
-  //   C.Instant bytes                    <- getInstantStorage()
-
 public:
   TaskDeadlineStatusRecord(const Metadata *clockType,
                            const Metadata *instantType,
+                           OpaqueValue *clockPtr,
+                           OpaqueValue *instantPtr,
+                           const WitnessTable *identifiableWT,
+                           const WitnessTable *clockWT,
                            bool isOutermostDeadline)
       : TaskStatusRecord(TaskStatusRecordKind::Deadline),
         ClockTypeAndFlags(reinterpret_cast<uintptr_t>(clockType) |
                           (isOutermostDeadline
                                ? static_cast<uintptr_t>(Flags::IsOutermostDeadline)
                                : 0)),
-        InstantType(instantType) {}
+        InstantType(instantType),
+        ClockPtr(clockPtr),
+        InstantPtr(instantPtr),
+        IdentifiableWT(identifiableWT),
+        ClockWT(clockWT) {}
 
   const Metadata *getClockType() const {
     return reinterpret_cast<const Metadata *>(ClockTypeAndFlags & FlagsMask);
   }
   const Metadata *getInstantType() const { return InstantType; }
+
+  /// Borrowed pointer to the caller's clock value.
+  OpaqueValue *getClockPtr() const { return ClockPtr; }
+
+  /// Borrowed pointer to the caller's deadline instant value.
+  OpaqueValue *getInstantPtr() const { return InstantPtr; }
+
+  const WitnessTable *getIdentifiableWT() const { return IdentifiableWT; }
+  const WitnessTable *getClockWT() const { return ClockWT; }
 
   bool isOutermostDeadline() const {
     return ClockTypeAndFlags & static_cast<uintptr_t>(Flags::IsOutermostDeadline);
@@ -537,39 +593,17 @@ public:
       ClockTypeAndFlags &= ~static_cast<uintptr_t>(Flags::IsOutermostDeadline);
   }
 
-  /// Offset from the base of the record where the clock value lives.
-  static size_t clockOffset(const Metadata *clockType) {
-    size_t align = clockType->vw_alignment();
-    return (sizeof(TaskDeadlineStatusRecord) + align - 1) & ~(align - 1);
-  }
-
-  /// Offset from the base of the record where the deadline instant lives.
-  static size_t instantOffset(const Metadata *clockType,
-                              const Metadata *instantType) {
-    size_t off = clockOffset(clockType) + clockType->vw_size();
-    size_t align = instantType->vw_alignment();
-    return (off + align - 1) & ~(align - 1);
-  }
-
-  /// Total allocation size for a record with the given generic types.
-  static size_t recordSize(const Metadata *clockType,
-                           const Metadata *instantType) {
-    return instantOffset(clockType, instantType) + instantType->vw_size();
-  }
-
-  OpaqueValue *getClockStorage() {
-    return reinterpret_cast<OpaqueValue *>(
-        reinterpret_cast<char *>(this) + clockOffset(getClockType()));
-  }
-  OpaqueValue *getInstantStorage() {
-    return reinterpret_cast<OpaqueValue *>(
-        reinterpret_cast<char *>(this) + instantOffset(getClockType(), InstantType));
-  }
-
   static bool classof(const TaskStatusRecord *record) {
     return record->getKind() == TaskStatusRecordKind::Deadline;
   }
 };
+
+// The IRGen-emitted alloca must fit a fully-constructed record. If this
+// static_assert fires, either shrink the record or bump
+// NumWords_TaskDeadline (which is ABI once shipped).
+static_assert(sizeof(TaskDeadlineStatusRecord) <=
+                  NumWords_TaskDeadline * sizeof(void *),
+              "TaskDeadlineStatusRecord must fit in NumWords_TaskDeadline");
 
 #endif // !SWIFT_CONCURRENCY_EMBEDDED
 
