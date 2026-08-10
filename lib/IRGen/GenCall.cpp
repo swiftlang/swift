@@ -5757,12 +5757,7 @@ StackAddress irgen::allocateForCoercion(IRGenFunction &IGF,
   llvm::Align alignment =
       std::max(DL.getABITypeAlign(fromTy), DL.getABITypeAlign(toTy));
 
-  // The lifetime markers emitted by emitStaticAlloca take a size in *bytes*.
-  // fromSize/toSize above are in bits (getTypeSizeInBits), so use the buffer
-  // type's allocation size here instead; otherwise the lifetime range is 8x too
-  // large and, once this temporary is coalesced into an async coroutine frame,
-  // spuriously covers adjacent live frame slots.
-  Size size(DL.getTypeAllocSize(bufferTy));
+  auto size = Size::forBits(std::max(fromSize, toSize));
   auto buffer = IGF.emitStaticAlloca(bufferTy, size,
                                      Alignment(alignment.value()),
                                      basename + ".coerced");
