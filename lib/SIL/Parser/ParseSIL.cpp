@@ -5831,6 +5831,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     case SILInstructionKind::ClassMethodInst:
     case SILInstructionKind::SuperMethodInst:
     case SILInstructionKind::ObjCMethodInst:
+    case SILInstructionKind::COMMethodInst:
     case SILInstructionKind::ObjCSuperMethodInst: {
       SILDeclRef Member;
       SILType MethodTy;
@@ -5857,6 +5858,9 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
         break;
       case SILInstructionKind::ObjCMethodInst:
         ResultVal = B.createObjCMethod(InstLoc, Val, Member, MethodTy);
+        break;
+      case SILInstructionKind::COMMethodInst:
+        ResultVal = B.createCOMMethod(InstLoc, Val, Member, MethodTy);
         break;
       case SILInstructionKind::ObjCSuperMethodInst:
         ResultVal = B.createObjCSuperMethod(InstLoc, Val, Member, MethodTy);

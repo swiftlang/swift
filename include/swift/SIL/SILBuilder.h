@@ -2162,6 +2162,12 @@ public:
                                          Member, MethodTy, &getFunction()));
   }
 
+  COMMethodInst *createCOMMethod(SILLocation Loc, SILValue Operand,
+                                 SILDeclRef Member, SILType MethodTy) {
+    return insert(COMMethodInst::create(getSILDebugLocation(Loc), Operand,
+                                        Member, MethodTy, &getFunction()));
+  }
+
   ObjCSuperMethodInst *createObjCSuperMethod(SILLocation Loc, SILValue Operand,
                                              SILDeclRef Member, SILType MethodTy) {
     return insert(new (getModule()) ObjCSuperMethodInst(
