@@ -14,12 +14,19 @@ import itertools
 
 class TestParameters(object):
   name = ''
-  ref_name = ''
+  base_name = ''
   base = ''
   traversal = ''
   mutable = False
   range_replaceable = False
   base_kind = ''
+  use_ref = False
+  shard_count = 1
+
+def shard_count_for(base):
+  if "Mutable" in base:
+    return 4
+  return 1
 
 def all_tests():
   for traversal, base_kind, mutable, range_replaceable in itertools.product(
@@ -27,18 +34,23 @@ def all_tests():
       ['Defaulted', 'Minimal'],
       [False, True],
       [False, True]):
-    test = TestParameters()
-    test.traversal = traversal
-    test.base_kind = base_kind
-    test.mutable = mutable
-    test.range_replaceable = range_replaceable
-    test.base = base_kind + collectionTypeName(
+    base = base_kind + collectionTypeName(
       traversal=traversal,
       mutable=mutable,
       rangeReplaceable=range_replaceable)
-    test.name = test.base + '.swift'
-    test.ref_name = test.base + 'OfRef.swift'
-    yield test
+
+    for use_ref in [False, True]:
+      test = TestParameters()
+      test.traversal = traversal
+      test.base_kind = base_kind
+      test.mutable = mutable
+      test.range_replaceable = range_replaceable
+      test.base = base
+      test.use_ref = use_ref
+      test.name = base + ('OfRef' if use_ref else '') + '.swift'
+      test.base_name = test.name[:-len('.swift')]
+      test.shard_count = shard_count_for(base)
+      yield test
 
 def test_methods(test):
   traversal = test.traversal
@@ -60,6 +72,16 @@ def test_methods(test):
 }%
 
 % for test in all_tests():
+% if test.shard_count > 1:
+// BEGIN Inputs/${test.base_name}/main.swift
+// -*- swift -*-
+
+//===----------------------------------------------------------------------===//
+// Automatically Generated From validation-test/stdlib/Collection/Inputs/Template.swift.gyb
+// Do Not Edit Directly!
+//===----------------------------------------------------------------------===//
+
+% else:
 // BEGIN ${test.name}
 // -*- swift -*-
 
@@ -75,73 +97,19 @@ def test_methods(test):
 // rdar://problem/46878013
 // REQUIRES: optimized_stdlib
 
-import StdlibUnittest
-import StdlibCollectionUnittest
-
-var CollectionTests = TestSuite("Collection")
-
-// Test collections using value types as elements.
-do {
-  var resiliencyChecks = CollectionMisuseResiliencyChecks.all
-  resiliencyChecks.creatingOutOfBoundsIndicesBehavior = .trap
-
-% for method in test_methods(test):
-  CollectionTests.add${method}Tests(
-    makeCollection: { (elements: [OpaqueValue<Int>]) in
-      return ${test.base}(elements: elements)
-    },
-    wrapValue: identity,
-    extractValue: identity,
-    makeCollectionOfEquatable: { (elements: [MinimalEquatableValue]) in
-      return ${test.base}(elements: elements)
-    },
-    wrapValueIntoEquatable: identityEq,
-    extractValueFromEquatable: identityEq,
-%   if 'Mutable' in method:
-    makeCollectionOfComparable: { (elements: [MinimalComparableValue]) in
-      return ${test.base}(elements: elements)
-    },
-    wrapValueIntoComparable: identityComp,
-    extractValueFromComparable: identityComp,
-%   end
-    resiliencyChecks: resiliencyChecks
-%   if 'Mutable' in method:
-    , withUnsafeMutableBufferPointerIsSupported: false,
-    isFixedLengthCollection: true
-%   end
-  )
 % end
-}
-
-runAllTests()
-
-
-// BEGIN ${test.ref_name}
-// -*- swift -*-
-
-//===----------------------------------------------------------------------===//
-// Automatically Generated From validation-test/stdlib/Collection/Inputs/Template.swift.gyb
-// Do Not Edit Directly!
-//===----------------------------------------------------------------------===//
-
-// RUN: %target-run-simple-swift
-// REQUIRES: executable_test
-
-// FIXME: the test is too slow when the standard library is not optimized.
-// rdar://problem/46878013
-// REQUIRES: optimized_stdlib
-
 import StdlibUnittest
 import StdlibCollectionUnittest
 
 var CollectionTests = TestSuite("Collection")
 
+% if test.use_ref:
 // Test collections using a reference type as element.
 do {
   var resiliencyChecks = CollectionMisuseResiliencyChecks.all
   resiliencyChecks.creatingOutOfBoundsIndicesBehavior = .trap
 
-% for method in test_methods(test):
+%   for method in test_methods(test):
   CollectionTests.add${method}Tests(
     makeCollection: { (elements: [LifetimeTracked]) in
       return ${test.base}(elements: elements)
@@ -158,22 +126,81 @@ do {
     },
     wrapValueIntoEquatable: identityEq,
     extractValueFromEquatable: identityEq,
-%   if 'Mutable' in method:
+%     if 'Mutable' in method:
     makeCollectionOfComparable: { (elements: [MinimalComparableValue]) in
       // FIXME: use LifetimeTracked.
       return ${test.base}(elements: elements)
     },
     wrapValueIntoComparable: identityComp,
     extractValueFromComparable: identityComp,
-%   end
+%     end
     resiliencyChecks: resiliencyChecks
-%   if 'Mutable' in method:
+%     if 'Mutable' in method:
     , withUnsafeMutableBufferPointerIsSupported: false,
     isFixedLengthCollection: true
-%   end
+%     end
   )
-% end
+%   end
 }
+% else:
+// Test collections using value types as elements.
+do {
+  var resiliencyChecks = CollectionMisuseResiliencyChecks.all
+  resiliencyChecks.creatingOutOfBoundsIndicesBehavior = .trap
+
+%   for method in test_methods(test):
+  CollectionTests.add${method}Tests(
+    makeCollection: { (elements: [OpaqueValue<Int>]) in
+      return ${test.base}(elements: elements)
+    },
+    wrapValue: identity,
+    extractValue: identity,
+    makeCollectionOfEquatable: { (elements: [MinimalEquatableValue]) in
+      return ${test.base}(elements: elements)
+    },
+    wrapValueIntoEquatable: identityEq,
+    extractValueFromEquatable: identityEq,
+%     if 'Mutable' in method:
+    makeCollectionOfComparable: { (elements: [MinimalComparableValue]) in
+      return ${test.base}(elements: elements)
+    },
+    wrapValueIntoComparable: identityComp,
+    extractValueFromComparable: identityComp,
+%     end
+    resiliencyChecks: resiliencyChecks
+%     if 'Mutable' in method:
+    , withUnsafeMutableBufferPointerIsSupported: false,
+    isFixedLengthCollection: true
+%     end
+  )
+%   end
+}
+% end
 
 runAllTests()
+% if test.shard_count > 1:
+%   for shard_index in range(test.shard_count):
+// BEGIN ${test.base_name}_shard${shard_index + 1}.swift
+// -*- swift -*-
+
+//===----------------------------------------------------------------------===//
+// Automatically Generated From validation-test/stdlib/Collection/Inputs/Template.swift.gyb
+// Do Not Edit Directly!
+//===----------------------------------------------------------------------===//
+
+// This file runs one shard of the tests defined in
+// Inputs/${test.base_name}/main.swift,
+// to limit each shard's running time to a reasonable amount.
+// RUN: %empty-directory(%t)
+// RUN: %target-build-swift %s %S/Inputs/${test.base_name}/main.swift -o %t/a.out
+// RUN: %target-codesign %t/a.out
+// RUN: %target-run %t/a.out --stdlib-unittest-shard-count ${test.shard_count} --stdlib-unittest-shard-index ${shard_index}
+
+// REQUIRES: executable_test
+
+// FIXME: the test is too slow when the standard library is not optimized.
+// rdar://problem/46878013
+// REQUIRES: optimized_stdlib
+%   end
+% end
 % end
