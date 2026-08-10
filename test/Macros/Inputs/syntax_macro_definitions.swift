@@ -515,6 +515,10 @@ extension AccessorBlockSyntax {
 
 public struct LazyMacro {}
 
+extension LazyMacro: PeerMacro {
+  expansion
+}
+
 extension LazyMacro: AccessorMacro {
   public static func expansion(
     of node: SwiftSyntax.AttributeSyntax,

@@ -2425,6 +2425,10 @@ Parser::parseMacroRoleAttribute(
                        diag::macro_attribute_duplicate_label, isAttached,
                        "initialization");
             }
+            // We encountered the next name after "initialization".
+            // Before we create the new `Field` struct, we keep a
+            // copy of the parsed "initialization:" field so we can
+            // finalize it after parseList is finished.
             initializationField = field;
           }
           
@@ -2608,7 +2612,16 @@ Parser::parseMacroRoleAttribute(
             MacroIntroducedDeclName(*introducedKind, name.getFullName()));
 
         return status;
-      });
+      }); // parseList
+  
+  if (field.fieldName.is("initialization")) {
+    // TODO: Maybe better use class for `Field`
+    // This way we don't have to copy this awkwardly...
+    
+    
+    // "initialization" was the last parameter in the list.
+    initializationField = field;
+  }
 
   if (argumentsStatus.isErrorOrHasCompletion())
     return argumentsStatus;
@@ -2685,14 +2698,14 @@ Parser::parseMacroRoleAttribute(
           suggestRemoveParam.fixItRemove(initializationField->range());
         }
       }
-    }
+    } // if (initializationField)
     
     // By default, `self` is unavailable for property initializers when
     // re-contextualized by an accessor macro.
     if (!initializerContext.has_value()) {
       initializerContext = MacroInitializerContextKind::SelfUnavailable;
     }
-  } else if (initializationField) {
+  } /* if (role == MacroRole::Accessor) */ else if (initializationField) {
     // 'initialization:' is not supported unless macro role is 'accessor'.
     SourceLoc loc = initializationField->fieldNameLoc;
     auto diag = diagnose(loc,
