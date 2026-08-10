@@ -370,6 +370,10 @@ constexpr SpecifiedParamSynthesizer<G> _consuming(G sub) {
   return {ParamSpecifier::Consuming, sub};
 }
 template <class G>
+constexpr SpecifiedParamSynthesizer<G> _borrowing(G sub) {
+  return {ParamSpecifier::Borrowing, sub};
+}
+template <class G>
 constexpr SpecifiedParamSynthesizer<G> _inout(G sub) {
   return {ParamSpecifier::InOut, sub};
 }
