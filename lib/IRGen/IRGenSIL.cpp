@@ -3980,7 +3980,12 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
     SILValue selfArg = args.back();
     args = args.drop_back();
 
-    if (selfArg->getType().isObject()) {
+    if (origCalleeType->getRepresentation() == SILFunctionTypeRepresentation::COMMethod) {
+      Address storage = getLoweredAddress(selfArg);
+      Address self = Address(storage.getAddress(), IGM.Int8PtrTy,
+                             IGM.getPointerAlignment());
+      selfValue = Builder.CreateLoad(self, "com.self");
+    } else if (selfArg->getType().isObject()) {
       selfValue = getLoweredSingletonExplosion(selfArg);
     } else {
       selfValue = getLoweredAddress(selfArg).getAddress();
