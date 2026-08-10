@@ -249,8 +249,9 @@ internal func _assertionFailure(
   flags: UInt32
 ) -> Never {
 #if !$Embedded
-  _assertionFailure(kind._failureMessagePrefix(), message,
-    file: file, line: line, flags: flags)
+  _assertionFailure(
+    kind._failureMessagePrefix(), message, file: file, line: line, flags: flags
+  )
 #else
   if _isDebugAssertConfiguration() {
     var message = message
@@ -260,6 +261,21 @@ internal func _assertionFailure(
   }
   Builtin.int_trap()
 #endif
+}
+
+/// An opaque wrapper around `_assertionFailure`. This function should be used
+/// only in the implementation of user-level assertions.
+///
+/// Conceals the `Never`-returning nature of `_assertionFailure()` from the
+/// mandatory inlining pass.
+@export(implementation)
+@inline(never)
+internal func _opaqueAssertionFailure(
+  kind: Int, _ message: String,
+  file: StaticString, line: UInt,
+  flags: UInt32
+) {
+  _assertionFailure(kind: kind, message, file: file, line: line, flags: flags)
 }
 
 /// This function should be used only in the implementation of user-level
