@@ -259,24 +259,24 @@ ERROR(reference_type_mixed_immortal_marker, none,
       "operations as immortal",
       (const clang::NamedDecl *))
 ERROR(reference_type_exactly_one_retain_release_attr, none,
-      "reference type '%1' must have exactly one '%select{retain|release}0:' "
+      "reference type %1 must have exactly one '%select{retain|release}0:' "
       "Swift attribute",
-      (bool, StringRef))
+      (bool, const clang::NamedDecl *))
 ERROR(reference_type_empty_retain_release_name, none,
-      "reference type '%1' has an empty %select{retain|release}0 operation name",
-      (bool, StringRef))
+      "reference type %1 has an empty %select{retain|release}0 operation name",
+      (bool, const clang::NamedDecl *))
 NOTE(retain_release_function_origin, none,
-     "%select{retain function|release function|retain and release functions}0 " "%select{specified on|inherited from}1 '%2'",
-     (unsigned, bool, StringRef))
+     "%select{retain function|release function|retain and release functions}0 "
+     "%select{specified on|inherited from}1 %2",
+     (unsigned, bool, const clang::NamedDecl *))
 
 ERROR(foreign_reference_types_cannot_find_retain_release, none,
-      "cannot find %select{retain|release}0 function '%1' for reference type "
-      "'%2'",
-      (bool, StringRef, StringRef))
+      "cannot find %select{retain|release}0 function '%1' for reference type %2",
+      (bool, StringRef, const clang::NamedDecl *))
 ERROR(too_many_reference_type_retain_release_operations, none,
       "multiple functions '%1' found; there must be exactly one "
-      "%select{retain|release}0 function for reference type '%2'",
-      (bool, StringRef, StringRef))
+      "%select{retain|release}0 function for reference type %2",
+      (bool, StringRef, const clang::NamedDecl *))
 ERROR(foreign_reference_retain_release_param_type, none,
       "%select{retain|release}0 function '%1' must have exactly one argument of "
       "type '%2'",
