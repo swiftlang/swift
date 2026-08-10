@@ -41,6 +41,10 @@ public struct EnumTypeInfo {
 
   /// Information on all its cases
   var cases: [EnumCaseInfo]
+
+  /// The textual representation of the enum's raw type, `nil` if it does not
+  /// declare one.
+  var rawTypeName: String?
 }
 
 /// Represents information on a single case of an enumeration.
@@ -54,6 +58,26 @@ public struct EnumCaseInfo {
 
   /// Whether or not the enum case is marked as reachable
   var isReachable: Bool
+
+  /// The textual representation of the case's raw value literal, `nil` if it
+  /// does not have one.
+  var rawValue: String?
+
+  /// Whether the case is available at runtime given the deployment target.
+  var runtimeAvailability: CaseRuntimeAvailability
+}
+
+/// Whether an enum case is always, never, or conditionally available at
+/// runtime given the deployment target's availability context.
+public enum CaseRuntimeAvailability {
+  /// The case is always available.
+  case always
+
+  /// The case is never available.
+  case unavailable
+
+  /// The case is only available starting with `version` on `platform`.
+  case conditional(platform: String, version: String)
 }
 
 public struct StructTypeInfo {
@@ -439,14 +463,16 @@ extension StructTypeInfo: TypeInfoProtocol {
 extension EnumTypeInfo: TypeInfoProtocol {
   public static func fromSyntax(node: ExprSyntax) throws -> Self {
     // Expecting:
-    //   EnumTypeInfo(isObjC: <Bool>, cases: <[EnumCaseInfo]>)
-    let (isObjC, cases) = try getNamedFuncallArgs(
+    //   EnumTypeInfo(isObjC: <Bool>, cases: <[EnumCaseInfo]>,
+    //                rawTypeName: <String?>)
+    let (isObjC, cases, rawTypeName) = try getNamedFuncallArgs(
       node: node,
       name: "EnumTypeInfo"
     )
     .expect(
       .boolArg("isObjC"),
-      .arrayArg("cases", parser: EnumCaseInfo.fromSyntax)
+      .arrayArg("cases", parser: EnumCaseInfo.fromSyntax),
+      .stringArg("rawTypeName").toOptional()
     )
     var seen: Set<String> = Set()
     let uniqueCases = cases.reversed().compactMap { (c: EnumCaseInfo) -> EnumCaseInfo? in
@@ -455,12 +481,12 @@ extension EnumTypeInfo: TypeInfoProtocol {
       }
       return c
     }.reversed()
-    return Self(isObjC: isObjC, cases: uniqueCases.map { $0 })
+    return Self(isObjC: isObjC, cases: uniqueCases.map { $0 }, rawTypeName: rawTypeName)
   }
 
   public var syntax: ExprSyntax {
     """
-    EnumTypeInfo(isObjC: \(boollit(isObjC)), cases: \(arraySyntax(cases)))
+    EnumTypeInfo(isObjC: \(boollit(isObjC)), cases: \(arraySyntax(cases)), rawTypeName: \(optionalSyntax(rawTypeName, stringlit)))
     """
   }
 }
@@ -507,25 +533,77 @@ extension EnumCaseInfo: TypeInfoProtocol {
     // Expecting:
     //   EnumCaseInfo(name: <String>,
     //                associatedValueLabels: <[String?]>,
-    //                isReachable: <Bool>)
+    //                isReachable: <Bool>,
+    //                rawValue: <String?>,
+    //                runtimeAvailability: <CaseRuntimeAvailability>)
 
-    let (name, associatedValueLabels, isReachable) = try getNamedFuncallArgs(
-      node: node,
-      name: "EnumCaseInfo"
-    ).expect(
-      .stringArg("name"),
-      .stringArg("associatedValueLabels").toOptional().toArray(),
-      .boolArg("isReachable")
-    )
+    let (name, associatedValueLabels, isReachable, rawValue, runtimeAvailability) =
+      try getNamedFuncallArgs(
+        node: node,
+        name: "EnumCaseInfo"
+      ).expect(
+        .stringArg("name"),
+        .stringArg("associatedValueLabels").toOptional().toArray(),
+        .boolArg("isReachable"),
+        .stringArg("rawValue").toOptional(),
+        .init(name: "runtimeAvailability", parser: CaseRuntimeAvailability.fromSyntax)
+      )
 
     return Self(
-      name: name, associatedValueLabels: associatedValueLabels, isReachable: isReachable)
+      name: name,
+      associatedValueLabels: associatedValueLabels,
+      isReachable: isReachable,
+      rawValue: rawValue,
+      runtimeAvailability: runtimeAvailability)
   }
 
   public var syntax: ExprSyntax {
     """
-    EnumCaseInfo(name: \(stringlit(name)), associatedValueLabels: \(arraySyntax(associatedValueLabels, {optionalSyntax($0, stringlit)})))
+    EnumCaseInfo(name: \(stringlit(name)), associatedValueLabels: \(arraySyntax(associatedValueLabels, {optionalSyntax($0, stringlit)})), isReachable: \(boollit(isReachable)), rawValue: \(optionalSyntax(rawValue, stringlit)), runtimeAvailability: \(runtimeAvailability.syntax))
     """
+  }
+}
+
+extension CaseRuntimeAvailability: TypeInfoProtocol {
+  public static func fromSyntax(node: ExprSyntax) throws -> Self {
+    // Expecting:
+    //   always
+    // or
+    //   unavailable
+    // or
+    //   conditional(platform: <String>, version: <String>)
+    if node.trimmedDescription == "always" {
+      return .always
+    }
+    if node.trimmedDescription == "unavailable" {
+      return .unavailable
+    }
+    guard let fcall = node.as(FunctionCallExprSyntax.self),
+      fcall.calledExpression.trimmedDescription == "conditional"
+    else {
+      throw TypeInfoParseError.expectedFunctionCallNames(
+        names: ["always", "unavailable", "conditional"],
+        got: node
+      )
+    }
+    let (platform, version) = try fcall.arguments.expect(
+      .stringArg("platform"),
+      .stringArg("version")
+    )
+    return .conditional(platform: platform, version: version)
+  }
+
+  public var syntax: ExprSyntax {
+    switch self {
+    case .always:
+      "always"
+    case .unavailable:
+      "unavailable"
+    case .conditional(let platform, let version):
+      """
+      conditional(platform: \(stringlit(platform)), version: \(stringlit(version)))
+      """
+    }
   }
 }
 

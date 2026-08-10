@@ -16,10 +16,14 @@
 #include "TypeChecker.h"
 #include "swift/AST/ASTNode.h"
 #include "swift/AST/ASTPrinter.h"
+#include "swift/AST/AvailabilityContext.h"
+#include "swift/AST/AvailabilityDomain.h"
+#include "swift/AST/AvailabilityRestriction.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/PlatformKindUtils.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SourceFile.h"
@@ -1169,6 +1173,62 @@ swift::deriveRequirementViaMacro(DerivedConformance &derived,
   return witness;
 }
 
+/// Prints the Swift source text of an enum case's raw value literal
+/// expression \p raw to \p out.
+static void printRawValueLiteral(llvm::raw_ostream &out,
+                                 const LiteralExpr *raw) {
+  if (auto *intLit = dyn_cast<IntegerLiteralExpr>(raw)) {
+    if (intLit->isNegative())
+      out << "-";
+    out << intLit->getDigitsText();
+  } else if (isa<NilLiteralExpr>(raw)) {
+    out << "nil";
+  } else if (auto *stringLit = dyn_cast<StringLiteralExpr>(raw)) {
+    out << QuotedString(stringLit->getValue());
+  } else if (auto *floatLit = dyn_cast<FloatLiteralExpr>(raw)) {
+    if (floatLit->isNegative())
+      out << "-";
+    out << floatLit->getDigitsText();
+  } else if (auto *boolLit = dyn_cast<BooleanLiteralExpr>(raw)) {
+    out << (boolLit->getValue() ? "true" : "false");
+  } else {
+    llvm_unreachable("invalid raw literal expr");
+  }
+}
+
+/// Prints, as swift syntax, whether \p decl is always, never, or conditionally
+/// available given the availability context.
+static void printCaseRuntimeAvailability(llvm::raw_ostream &out,
+                                         const EnumElementDecl *decl) {
+  auto &C = decl->getASTContext();
+  auto availabilityContext = AvailabilityContext::forDeploymentTarget(C);
+  auto restriction = availabilityContext.unsatisfiedRestrictionForDecl(decl);
+  if (!restriction) {
+    out << "always";
+    return;
+  }
+  if (restriction->isUnavailable()) {
+    out << "unavailable";
+    return;
+  }
+  if (!restriction->isActiveForRuntimeQueries(C)) {
+    out << "always";
+    return;
+  }
+  auto domainAndRange = restriction->getDomainAndRange(C);
+  if (!domainAndRange.getDomain().isPlatform()) {
+    out << "always";
+    return;
+  }
+  out << "conditional(platform: "
+      << QuotedString(
+             platformString(domainAndRange.getDomain().getPlatformKind()))
+      << ", version: "
+      << QuotedString(
+             domainAndRange.getRange().getRawMinimumVersion().getAsString())
+      << ")";
+}
+
 /// Prints a string containing swift syntax describing the case \p  decl with
 /// relevant information to \p out.
 static void printEnumCaseInfo(llvm::raw_ostream &out,
@@ -1194,7 +1254,20 @@ static void printEnumCaseInfo(llvm::raw_ostream &out,
                                     PrintNameContext::FunctionParameterExternal));
                           }
                         });
-  out << "], isReachable: " << (markReachable ? "true" : "false") << ")";
+  out << "], isReachable: " << (markReachable ? "true" : "false")
+      << ", rawValue: ";
+  if (auto *raw = decl->getRawValueExpr()) {
+    std::string literalText;
+    llvm::raw_string_ostream litOut(literalText);
+    printRawValueLiteral(litOut, raw);
+    litOut.flush();
+    out << QuotedString(literalText);
+  } else {
+    out << "nil";
+  }
+  out << ", runtimeAvailability: ";
+  printCaseRuntimeAvailability(out, decl);
+  out << ")";
 }
 
 /// Returns a string containing swift syntax describing the enum \p
@@ -1207,7 +1280,13 @@ std::string swift::getEnumTypeInfoString(const EnumDecl *decl) {
   llvm::interleaveComma(
       decl->getAllElements(), out,
       [&](const EnumElementDecl *elem) { printEnumCaseInfo(out, elem); });
-  out << "])";
+  out << "], rawTypeName: ";
+  if (Type rawType = decl->getRawType()) {
+    out << QuotedString(rawType->getString());
+  } else {
+    out << "nil";
+  }
+  out << ")";
   out.flush();
   return res;
 }
