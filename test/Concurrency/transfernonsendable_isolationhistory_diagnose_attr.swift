@@ -65,3 +65,21 @@ func inout_sending_no_attr(_ x: inout sending NS) {
   x = globalNS
 } // expected-warning {{'inout sending' parameter 'x' cannot be main actor-isolated at end of function}}
 // expected-note @-1 {{main actor-isolated 'x' risks causing races in between main actor-isolated uses and caller uses since caller assumes value is not actor isolated}}
+
+////////////////////////////////////////////////////////////////////////////////
+// The same pair for AssignNeverSendableIntoSendingResult.
+////////////////////////////////////////////////////////////////////////////////
+
+@diagnose(RegionIsolationIsolationHistory, as: warning)
+func sending_result_opted_in<T>(_ t: T) -> sending T {
+  // expected-note@+1 {{'y' is connected to 't' which is accessible to code in the current isolation context}}
+  let y = t
+  return y // expected-warning {{returning 'y' as a 'sending' result risks causing data races}}
+  // expected-note @-1 {{returning 'y' risks causing data races since the caller assumes that 'y' can be safely sent to other isolation domains}}
+}
+
+func sending_result_no_attr<T>(_ t: T) -> sending T {
+  let y = t
+  return y // expected-warning {{returning 'y' as a 'sending' result risks causing data races}}
+  // expected-note @-1 {{returning 'y' risks causing data races since the caller assumes that 'y' can be safely sent to other isolation domains}}
+}

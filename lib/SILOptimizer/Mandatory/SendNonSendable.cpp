@@ -4641,6 +4641,15 @@ private:
   /// the never-sent value's region when the error was diagnosed.
   SILDynamicMergedIsolationInfo isolatedValueIsolationRegionInfo;
 
+  /// The region analysis for this function; forwarded to the isolation-history
+  /// note emitter so it can recover predecessor exit partitions across joins.
+  RegionAnalysisFunctionInfo *info;
+
+  /// The element of the never-sent value, and the partition at the assignment,
+  /// for the isolation-history notes.
+  Element neverSentElement;
+  std::optional<Partition> partition;
+
   bool emittedErrorDiagnostic = false;
 
 public:
@@ -4648,7 +4657,9 @@ public:
       RegionAnalysisFunctionInfo *info, Error &&error)
       : srcOperand(error.op->getSourceOp()), outSendingResult(error.destValue),
         neverSentValue(error.srcValue),
-        isolatedValueIsolationRegionInfo(error.srcIsolationRegionInfo) {}
+        isolatedValueIsolationRegionInfo(error.srcIsolationRegionInfo),
+        info(info), neverSentElement(error.srcElement),
+        partition(std::move(error.partition)) {}
 
   ~AssignNeverSendableIntoSendingResultDiagnosticEmitter() {
     // If we were supposed to emit a diagnostic and didn't emit an unknown
@@ -4669,6 +4680,27 @@ public:
                                srcOperand->getUser(),
                                getConcurrencyDiagnosticBehavior(),
                                /*pushToFuture=*/false);
+  }
+
+  /// Explain how the assigned value's region came to be isolated, when
+  /// isolation-history emission is on for this function.
+  ///
+  /// Deliberately still runs on emit()'s unknown-pattern paths: that error is
+  /// about this same value, a chain is useful context for it, and
+  /// emitUnknownPatternError sets emittedErrorDiagnostic, so the note still
+  /// follows its error. Do not "fix" that by narrowing the defer.
+  void emitIsolationHistoryNoteIfNeeded() {
+    // A note has to follow the diagnostic it annotates. When emit() bailed
+    // without emitting anything the unknown-pattern error comes from our
+    // destructor -- after this defer runs -- so there is nothing to attach to
+    // yet.
+    if (!emittedErrorDiagnostic || !partition)
+      return;
+    IsolationHistoryNoteEmitter::emit(
+        getFunction(), info, info->getValueMap(),
+        IsolationHistoryNoteEmitter::Request::howDidBecomeIsolatedTo(
+            neverSentElement, isolatedValueIsolationRegionInfo),
+        std::move(*partition));
   }
 
   void emit();
@@ -4751,6 +4783,9 @@ static SILValue findOutParameter(SILValue v) {
 }
 
 void AssignNeverSendableIntoSendingResultDiagnosticEmitter::emit() {
+  // Emit isolation history notes after the primary diagnostic returns.
+  SWIFT_DEFER { emitIsolationHistoryNoteIfNeeded(); };
+
   // Then emit the note with greater context.
   auto descriptiveKindStr =
       isolatedValueIsolationRegionInfo.printForDiagnostics(getFunction());

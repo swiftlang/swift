@@ -1486,13 +1486,19 @@ public:
     SILValue srcValue;
     SILDynamicMergedIsolationInfo srcIsolationRegionInfo;
 
+    /// The partition at the assignment, for isolation history rewinding. None
+    /// when history recording is off for this function.
+    std::optional<Partition> partition;
+
     AssignNeverSendableIntoSendingResultError(
         const PartitionOp &op, Element destElement,
         SILFunctionArgument *destValue, Element srcElement, SILValue srcValue,
-        SILDynamicMergedIsolationInfo srcIsolationRegionInfo)
+        SILDynamicMergedIsolationInfo srcIsolationRegionInfo,
+        std::optional<Partition> &&p)
         : op(&op), destElement(destElement), destValue(destValue),
           srcElement(srcElement), srcValue(srcValue),
-          srcIsolationRegionInfo(srcIsolationRegionInfo) {}
+          srcIsolationRegionInfo(srcIsolationRegionInfo),
+          partition(std::move(p)) {}
 
     AssignNeverSendableIntoSendingResultError(
         AssignNeverSendableIntoSendingResultError &&other) = default;
@@ -2056,7 +2062,8 @@ public:
     }
 
     handleError(AssignNeverSendableIntoSendingResultError(
-        op, op.getOpArg1(), fArg, op.getOpArg2(), rep, dynamicRegionIsolation));
+        op, op.getOpArg1(), fArg, op.getOpArg2(), rep, dynamicRegionIsolation,
+        getSnapshotForIsolationHistory()));
   }
 
   /// Apply \p op to the partition op.
