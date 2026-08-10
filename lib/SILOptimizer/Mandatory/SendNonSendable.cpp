@@ -3815,6 +3815,13 @@ private:
   /// isolation.
   SILDynamicMergedIsolationInfo isolationInfo;
 
+  /// The element of the returned value, and the partition at the exit, for the
+  /// isolation-history notes. Kept alongside \c returnedValue because the
+  /// history walk works in elements, and because \c returnedValue is null'd out
+  /// in the "returned the parameter itself" case.
+  Element returnedValueElement;
+  std::optional<Partition> partition;
+
   bool downgradeToWarning = false;
   bool emittedErrorDiagnostic = false;
 
@@ -3831,6 +3838,8 @@ public:
         returnedValue(
             raFuncInfo->getValueMap().getRepresentative(error.returnedValue)),
         isolationInfo(error.isolationInfo),
+        returnedValueElement(error.returnedValue),
+        partition(std::move(error.partition)),
         downgradeToWarning(error.downgradeToWarning) {}
 
   ~InOutSendingReturnedDiagnosticEmitter() {
@@ -3852,6 +3861,43 @@ public:
     EMIT_UNKNOWN_PATTERN_ERROR(InOutSendingReturnedDiagnosticEmitter,
                                functionExitingInst, getBehaviorLimit(),
                                pushToFuture);
+  }
+
+  /// Explain the region fact behind this error, when isolation-history emission
+  /// is on for this function.
+  ///
+  /// Exactly one chain per error, anchored on the elements the error carries
+  /// rather than on anything emit() re-derives. emit() walks epilogue phis and
+  /// resolves indirect out-parameters through LastValueEnum, and can emit
+  /// several primary diagnostics from one error -- but those paths exist to find
+  /// a better diagnostic *location*, not to describe more regions. Following
+  /// them here would be wrong twice over: LastValueEnum yields SILValues that
+  /// may have no Element in the value map at all, so there would be nothing to
+  /// ask the walk about; and the region fact being explained is singular, so one
+  /// chain is what matches it. The walk's own sequence boundaries place the
+  /// notes.
+  ///
+  /// Branch on the elements, not on the inoutSendingParam == returnedValue
+  /// SILValue comparison emit() uses: two elements can share a representative
+  /// through load look-through, and it is the element identity the request needs.
+  void emitIsolationHistoryNoteIfNeeded() {
+    // A note has to follow the diagnostic it annotates. When emit() bailed
+    // without emitting anything the unknown-pattern error comes from our
+    // destructor -- after this defer runs -- so there is nothing to attach to
+    // yet.
+    if (!emittedErrorDiagnostic || !partition)
+      return;
+
+    auto request =
+        returnedValueElement == inoutSendingParamElement
+            ? IsolationHistoryNoteEmitter::Request::howDidBecomeIsolatedTo(
+                  inoutSendingParamElement, isolationInfo)
+            : IsolationHistoryNoteEmitter::Request::howDidBecomeConnectedTo(
+                  returnedValueElement, inoutSendingParamElement);
+
+    IsolationHistoryNoteEmitter::emit(getFunction(), raFuncInfo,
+                                      raFuncInfo->getValueMap(), request,
+                                      std::move(*partition));
   }
 
   void emit();
@@ -4344,6 +4390,9 @@ bool InOutSendingReturnedDiagnosticEmitter::emitOutParamIncomingValueError(
 }
 
 void InOutSendingReturnedDiagnosticEmitter::emit() {
+  // Emit isolation history notes after the primary diagnostic returns.
+  SWIFT_DEFER { emitIsolationHistoryNoteIfNeeded(); };
+
   // Check if we had a separate erroring value that is our returned value. If we
   // do not then we just returned the 'inout sending' parameter. Emit a special
   // message and return.

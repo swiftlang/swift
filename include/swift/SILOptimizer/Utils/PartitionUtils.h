@@ -1577,18 +1577,26 @@ public:
     /// If set, the emitter should downgrade this error to a warning.
     bool downgradeToWarning = false;
 
-    InOutSendingReturnedError(const PartitionOp &op,
-                              Element inoutSendingElement,
-                              Element returnedValue,
-                              SILDynamicMergedIsolationInfo isolationInfo = {})
-        : op(&op), inoutSendingElement(inoutSendingElement),
-          returnedValue(returnedValue), isolationInfo(isolationInfo) {}
+    /// The partition at the exiting terminator, for isolation history rewinding.
+    /// None when history recording is off for this function.
+    std::optional<Partition> partition;
 
     InOutSendingReturnedError(const PartitionOp &op,
                               Element inoutSendingElement,
-                              SILDynamicMergedIsolationInfo isolationInfo = {})
+                              Element returnedValue,
+                              SILDynamicMergedIsolationInfo isolationInfo = {},
+                              std::optional<Partition> &&p = {})
+        : op(&op), inoutSendingElement(inoutSendingElement),
+          returnedValue(returnedValue), isolationInfo(isolationInfo),
+          partition(std::move(p)) {}
+
+    InOutSendingReturnedError(const PartitionOp &op,
+                              Element inoutSendingElement,
+                              SILDynamicMergedIsolationInfo isolationInfo = {},
+                              std::optional<Partition> &&p = {})
         : InOutSendingReturnedError(op, inoutSendingElement,
-                                    inoutSendingElement, isolationInfo) {}
+                                    inoutSendingElement, isolationInfo,
+                                    std::move(p)) {}
 
     InOutSendingReturnedError(InOutSendingReturnedError &&other) = default;
     InOutSendingReturnedError &
@@ -2407,15 +2415,17 @@ public:
           // determining element identity. When that changes, this code will
           // need to be updated to look through loads.
           if (*elt == op.getOpArg1()) {
-            handleError(InOutSendingReturnedError(op, op.getOpArg1(),
-                                                  dynamicRegionIsolation));
+            handleError(InOutSendingReturnedError(
+                op, op.getOpArg1(), dynamicRegionIsolation,
+                getSnapshotForIsolationHistory()));
             continue;
           }
 
           // Otherwise, we need to refer to a different value in the same region
           // as the 'inout sending' parameter. Emit a special error. For that.
-          handleError(InOutSendingReturnedError(op, op.getOpArg1(), *elt,
-                                                dynamicRegionIsolation));
+          handleError(InOutSendingReturnedError(
+              op, op.getOpArg1(), *elt, dynamicRegionIsolation,
+              getSnapshotForIsolationHistory()));
         }
 
         return emittedDiagnostic;
@@ -2431,9 +2441,9 @@ public:
         // This handles task-isolated captures.
         if (auto outParam =
                 findNonDisconnectedOutParameterInRegion(inoutSendingRegion)) {
-          handleError(InOutSendingReturnedError(op, op.getOpArg1(),
-                                                getElement(outParam).value(),
-                                                dynamicRegionIsolation));
+          handleError(InOutSendingReturnedError(
+              op, op.getOpArg1(), getElement(outParam).value(),
+              dynamicRegionIsolation, getSnapshotForIsolationHistory()));
           return;
         }
 
@@ -2484,7 +2494,8 @@ public:
       if (auto outParam =
           findSendingOutParameterInRegion(inoutSendingRegion)) {
         InOutSendingReturnedError error(op, op.getOpArg1(), outParam.value(),
-                                       dynamicRegionIsolation);
+                                        dynamicRegionIsolation,
+                                        getSnapshotForIsolationHistory());
         error.downgradeToWarning = true;
         handleError(std::move(error));
         return;

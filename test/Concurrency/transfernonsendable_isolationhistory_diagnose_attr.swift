@@ -83,3 +83,18 @@ func sending_result_no_attr<T>(_ t: T) -> sending T {
   return y // expected-warning {{returning 'y' as a 'sending' result risks causing data races}}
   // expected-note @-1 {{returning 'y' risks causing data races since the caller assumes that 'y' can be safely sent to other isolation domains}}
 }
+
+////////////////////////////////////////////////////////////////////////////////
+// The same pair for InOutSendingReturned, using its connect request shape.
+////////////////////////////////////////////////////////////////////////////////
+
+@diagnose(RegionIsolationIsolationHistory, as: warning)
+func inout_sending_returned_opted_in(_ x: inout sending NS, _ y: NS) -> sending NS {
+  x = y // expected-note {{'y' is connected to 'x'}}
+  return y // expected-warning 2 {{}} expected-note 2 {{}}
+}
+
+func inout_sending_returned_no_attr(_ x: inout sending NS, _ y: NS) -> sending NS {
+  x = y
+  return y // expected-warning 2 {{}} expected-note 2 {{}}
+}
