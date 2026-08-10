@@ -21,6 +21,7 @@
 // RUN:   -typecheck -cache-compile-job -cas-path %t/cas \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
 // RUN:   -module-name Test -cache-replay-prefix-map /^tmp %t -const-gather-protocols-file /^tmp/protocols.json \
+// RUN:   -const-gather-top-level-constant topLevel \
 // RUN:   /^tmp/test.swift @%t/MyApp.cmd -emit-const-values-path %t/main.module.swiftconstvalues
 
 // RUN: %FileCheck %s < %t/main.module.swiftconstvalues
@@ -29,6 +30,7 @@
 // RUN:   -typecheck -cache-compile-job -cas-path %t/cas \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
 // RUN:   -module-name Test -cache-replay-prefix-map /^tmp %t -const-gather-protocols-file /^tmp/protocols.json \
+// RUN:   -const-gather-top-level-constant topLevel \
 // RUN:   /^tmp/test.swift @%t/MyApp.cmd -emit-const-values-path %t/main.module2.swiftconstvalues -Rcache-compile-job 2>&1 | %FileCheck %s --check-prefix=HIT
 
 // HIT: remark: replay output file 'TMP_DIR/main.module2.swiftconstvalues'
@@ -108,6 +110,18 @@
 // CHECK-NEXT:       }
 // CHECK-NEXT:     ],
 // CHECK-NEXT:     "typeName": "Test.MyFoo"
+// CHECK-NEXT:   },
+// CHECK-NEXT:   {
+// CHECK-NEXT:     "file": "TMP_DIR/test.swift",
+// CHECK-NEXT:     "isComputed": "false",
+// CHECK-NEXT:     "isStatic": "false",
+// CHECK-NEXT:     "kind": "topLevelConstant",
+// CHECK-NEXT:     "label": "topLevel",
+// CHECK-NEXT:     "line": 21,
+// CHECK-NEXT:     "mangledTypeName": "n/a - deprecated",
+// CHECK-NEXT:     "type": "Swift.String",
+// CHECK-NEXT:     "value": "Top",
+// CHECK-NEXT:     "valueKind": "RawLiteral"
 // CHECK-NEXT:   }
 // CHECK-NEXT: ]
 
@@ -135,6 +149,8 @@ public struct MyFoo : Foo {
 
   @Zero var value: Int
 }
+
+let topLevel = "Top"
 
 //--- protocols.json
 ["Foo"]

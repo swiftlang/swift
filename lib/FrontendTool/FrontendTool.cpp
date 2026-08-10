@@ -707,21 +707,24 @@ static void emitSwiftdepsForAllPrimaryInputsIfNeeded(
 /// prefix-remapped pretty-printed JSON is written to disk. Without CAS,
 /// pretty-printed JSON is written directly.
 /// Returns true on error.
-static bool writeConstValues(CompilerInstance &Instance,
-                             const std::vector<ConstValueTypeInfo> &ConstValues,
-                             StringRef ConstValuesFilePath) {
+static bool writeConstValues(
+    CompilerInstance &Instance,
+    const std::vector<ConstValueTypeInfo> &ConstValues,
+    const std::vector<ConstValueTypePropertyInfo> &TopLevelConstantConstValues,
+    StringRef ConstValuesFilePath) {
   return withOutputPath(
       Instance.getDiags(), Instance.getOutputBackend(), ConstValuesFilePath,
       [&](llvm::raw_ostream &OS) {
         if (!Instance.supportCaching()) {
           // Caching not enabled, write output directly.
-          writeAsJSONToFile(ConstValues, OS);
+          writeAsJSONToFile(ConstValues, TopLevelConstantConstValues, OS);
           return false;
         }
         // Using CAS, the path need to be remapped.
         std::string Buffer;
         llvm::raw_string_ostream BufferOS(Buffer);
-        writeAsJSONToFile(ConstValues, BufferOS, /*Compact=*/true);
+        writeAsJSONToFile(ConstValues, TopLevelConstantConstValues, BufferOS,
+                          /*Compact=*/true);
         if (auto err =
                 Instance.getCASOutputBackend().storeSupplementaryOutputFile(
                     ConstValuesFilePath, Buffer)) {
@@ -741,9 +744,11 @@ static bool emitConstValuesForWholeModuleIfNeeded(
     CompilerInstance &Instance) {
   const auto &Invocation = Instance.getInvocation();
   const auto &frontendOpts = Invocation.getFrontendOptions();
+  const auto &searchPathOpts = Instance.getASTContext().SearchPathOpts;
   auto constExtractProtocolListPath =
-      Instance.getASTContext().SearchPathOpts.ConstGatherProtocolListFilePath;
-  if (constExtractProtocolListPath.empty())
+      searchPathOpts.ConstGatherProtocolListFilePath;
+  if (constExtractProtocolListPath.empty() &&
+      searchPathOpts.ConstGatherTopLevelConstantNames.empty())
     return false;
   if (!frontendOpts.InputsAndOutputs.hasConstValuesOutputPath())
     return false;
@@ -756,33 +761,54 @@ static bool emitConstValuesForWholeModuleIfNeeded(
   // List of protocols whose conforming nominal types
   // we should extract compile-time-known values from
   std::unordered_set<std::string> Protocols;
-  bool inputParseSuccess = parseProtocolListFromFile(
-      constExtractProtocolListPath, Instance.getDiags(),
-      Instance.getFileSystem(), Protocols);
-  if (!inputParseSuccess)
-    return true;
+  if (!constExtractProtocolListPath.empty()) {
+    bool inputParseSuccess = parseProtocolListFromFile(
+        constExtractProtocolListPath, Instance.getDiags(),
+        Instance.getFileSystem(), Protocols);
+    if (!inputParseSuccess)
+      return true;
+  }
 
+  // Names of top-level constants whose initialization expressions
+  // we should extract compile-time-known values from
+  const std::unordered_set<std::string> TopLevelConstantNames(
+      searchPathOpts.ConstGatherTopLevelConstantNames.begin(),
+      searchPathOpts.ConstGatherTopLevelConstantNames.end());
+
+  auto *Module = Instance.getMainModule();
   return writeConstValues(
-      Instance, gatherConstValuesForModule(Protocols, Instance.getMainModule()),
+      Instance, gatherConstValuesForModule(Protocols, Module),
+      gatherConstValuesForTopLevelConstantsInModule(TopLevelConstantNames, Module),
       ConstValuesFilePath);
 }
 
 static void emitConstValuesForAllPrimaryInputsIfNeeded(
     CompilerInstance &Instance) {
   const auto &Invocation = Instance.getInvocation();
+  const auto &searchPathOpts = Instance.getASTContext().SearchPathOpts;
   auto constExtractProtocolListPath =
-      Instance.getASTContext().SearchPathOpts.ConstGatherProtocolListFilePath;
-  if (constExtractProtocolListPath.empty())
+      searchPathOpts.ConstGatherProtocolListFilePath;
+  if (constExtractProtocolListPath.empty() &&
+      searchPathOpts.ConstGatherTopLevelConstantNames.empty())
     return;
 
   // List of protocols whose conforming nominal types
   // we should extract compile-time-known values from
   std::unordered_set<std::string> Protocols;
-  bool inputParseSuccess = parseProtocolListFromFile(
-      constExtractProtocolListPath, Instance.getDiags(),
-      Instance.getFileSystem(), Protocols);
-  if (!inputParseSuccess)
-    return;
+  if (!constExtractProtocolListPath.empty()) {
+    bool inputParseSuccess = parseProtocolListFromFile(
+        constExtractProtocolListPath, Instance.getDiags(),
+        Instance.getFileSystem(), Protocols);
+    if (!inputParseSuccess)
+      return;
+  }
+
+  // Names of top-level constants whose initialization expressions
+  // we should extract compile-time-known values from
+  const std::unordered_set<std::string> TopLevelConstantNames(
+      searchPathOpts.ConstGatherTopLevelConstantNames.begin(),
+      searchPathOpts.ConstGatherTopLevelConstantNames.end());
+
   for (auto *SF : Instance.getPrimarySourceFiles()) {
     const std::string &ConstValuesFilePath =
         Invocation.getConstValuesFilePathForPrimary(
@@ -790,8 +816,10 @@ static void emitConstValuesForAllPrimaryInputsIfNeeded(
     if (ConstValuesFilePath.empty())
       continue;
 
-    writeConstValues(Instance, gatherConstValuesForPrimary(Protocols, SF),
-                     ConstValuesFilePath);
+    writeConstValues(
+        Instance, gatherConstValuesForPrimary(Protocols, SF),
+        gatherConstValuesForTopLevelConstantsInPrimary(TopLevelConstantNames, SF),
+        ConstValuesFilePath);
   }
 }
 
