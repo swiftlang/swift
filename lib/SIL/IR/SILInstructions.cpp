@@ -608,10 +608,19 @@ SILBasicBlock *DebugValueInst::getOrCreateDebugReconstructionBlock() {
   return block;
 }
 
+void DebugValueInst::setDebugReconstructionBlock(SILBasicBlock *BB) {
+  // Free the existing reconstruction block if we have one.
+  if (ReconstructionBlock)
+    ReconstructionBlock->~SILBasicBlock();
+  ReconstructionBlock = BB;
+}
+
 void DebugValueInst::cloneReconstructionBlockFrom(DebugValueInst *src) {
   auto *srcBB = src->getDebugReconstructionBlock();
-  if (!srcBB)
+  if (!srcBB) {
+    setDebugReconstructionBlock(nullptr);
     return;
+  }
   auto *newBB = getFunction()->createEmptyDebugReconstructionBlock();
   setDebugReconstructionBlock(newBB);
   DebugBasicBlockCloner(*getFunction())
