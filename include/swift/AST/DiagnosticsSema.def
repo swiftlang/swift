@@ -8939,7 +8939,7 @@ ERROR(lifetime_dependence_cannot_infer_kind, none,
 ERROR(lifetime_dependence_cannot_infer_scope_ownership, none,
       "cannot borrow the lifetime of '%0', which has consuming ownership on %1",
       (StringRef, StringRef))
-ERROR(lifetime_dependence_cannot_infer_scope_foreign_by_value, none,
+ERROR(lifetime_dependence_scope_foreign_by_value, none,
       "cannot borrow the lifetime of '%0', which is passed by value on %1",
       (StringRef, StringRef))
 NOTE(lifetime_dependence_cannot_infer_inout_suggest, none,

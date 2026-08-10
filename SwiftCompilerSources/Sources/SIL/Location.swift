@@ -66,6 +66,12 @@ public struct Location: ProvidingSourceLocation, Equatable, CustomStringConverti
     Location(bridged: bridged.getCleanupLocation())
   }
 
+  /// Keeps the location and debug scope but marks it as setting up the stack frame.
+  /// The first breakpoint location of a function is at the end of its prologue.
+  public var asPrologue: Location {
+    Location(bridged: bridged.getPrologueLocation())
+  }
+
   public func withScope(of other: Location) -> Location {
     Location(bridged: bridged.withScopeOf(other.bridged))
   }

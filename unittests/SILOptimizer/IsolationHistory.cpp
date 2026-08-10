@@ -927,3 +927,89 @@ TEST(IsolationHistory, AssignDirectMovesElementRoundTrip) {
       << "AssignDirect that moved an element across regions did not "
          "rewind cleanly.";
 }
+
+//===----------------------------------------------------------------------===//
+//                      MARK: History recording gate
+//===----------------------------------------------------------------------===//
+
+// A partition built from a disabled Factory records nothing at all, no matter
+// what is done to it. isRecordingIsolationHistory() is the gate every consumer
+// keys off before it snapshots a partition to rewind later, so pin that it
+// tracks the thing that actually controls recording: with it false, there is no
+// history to walk and popHistoryOnce would assert.
+TEST(IsolationHistory, RecordingDisabledPartitionHasNoHistory) {
+  llvm::BumpPtrAllocator allocator;
+  IsolationHistory::Factory historyFactory(allocator, /*enabled=*/false);
+
+  SILLocation loc = SILLocation::invalid();
+  // Same mutations as SingleRegionRecordsOneMergePerPeer, which records a
+  // boundary, four AddNewRegionForElement nodes and three merges when enabled.
+  auto p = Partition::singleRegion(
+      loc, {Element(0), Element(1), Element(2), Element(3)},
+      historyFactory.get());
+
+  EXPECT_FALSE(p.isRecordingIsolationHistory());
+  EXPECT_FALSE(p.hasHistory());
+  EXPECT_EQ(p.historySize(), 0u);
+  EXPECT_EQ(p.getIsolationHistory().getHead(), nullptr);
+
+  // The region mapping itself is unaffected by the gate -- only the history is.
+  PartitionTester tester(p);
+  EXPECT_EQ(tester.getRegion(0), tester.getRegion(3));
+}
+
+// isRecordingIsolationHistory() is not a synonym for hasHistory(): an enabled
+// partition reports recording before anything has been pushed to it. Consumers
+// rely on the distinction, since they decide whether to snapshot a partition
+// before knowing whether the walk will find anything in it.
+TEST(IsolationHistory, RecordingEnabledPartitionReportsRecording) {
+  llvm::BumpPtrAllocator allocator;
+  IsolationHistory::Factory historyFactory(allocator, /*enabled=*/true);
+
+  Partition p(historyFactory.get());
+  EXPECT_TRUE(p.isRecordingIsolationHistory());
+  EXPECT_FALSE(p.hasHistory());
+  EXPECT_EQ(p.historySize(), 0u);
+
+  p.pushHistorySequenceBoundary(SILLocation::invalid());
+
+  EXPECT_TRUE(p.isRecordingIsolationHistory());
+  EXPECT_TRUE(p.hasHistory());
+}
+
+// Copying a Partition shares the immutable history node chain rather than
+// duplicating it, and rewinding the copy leaves the source's history alone.
+// This is what makes snapshotting a partition for a later isolation-history
+// walk cheap, and what lets two walks run off one snapshot: each walk rewinds
+// its own copy.
+TEST(IsolationHistory, SnapshotSharesHistoryWithSource) {
+  llvm::BumpPtrAllocator allocator;
+  IsolationHistory::Factory historyFactory(allocator, /*enabled=*/true);
+
+  SILLocation loc = SILLocation::invalid();
+  auto p = Partition::singleRegion(
+      loc, {Element(0), Element(1), Element(2), Element(3)},
+      historyFactory.get());
+  ASSERT_TRUE(p.hasHistory());
+
+  Partition snapshot = p;
+  EXPECT_TRUE(snapshot.isRecordingIsolationHistory());
+  EXPECT_EQ(snapshot.historySize(), p.historySize());
+  // The chain is shared, not copied: both heads are the same node.
+  EXPECT_EQ(snapshot.getIsolationHistory().getHead(),
+            p.getIsolationHistory().getHead());
+
+  const IsolationHistory::Node *sourceHead = p.getIsolationHistory().getHead();
+  unsigned sourceSize = p.historySize();
+
+  llvm::SmallVector<SILBasicBlock *, 4> joins;
+  while (popOnePartitionOp(snapshot, joins))
+    continue;
+  EXPECT_FALSE(snapshot.hasHistory());
+  EXPECT_TRUE(joins.empty());
+
+  EXPECT_EQ(p.getIsolationHistory().getHead(), sourceHead)
+      << "Rewinding a snapshot moved the source partition's history head.";
+  EXPECT_EQ(p.historySize(), sourceSize)
+      << "Rewinding a snapshot consumed the source partition's history.";
+}

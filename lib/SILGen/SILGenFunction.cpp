@@ -1123,7 +1123,10 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
                             : SILFunctionTypeIsolation::forUnknown());
     auto toClosure =
       B.createPartialApply(loc, functionRef, subs, forwardedArgs,
-                           calleeConvention, resultIsolation);
+                           calleeConvention, resultIsolation,
+                           PartialApplyInst::OnStackKind::NotOnStack,
+                           StackAllocationIsNested, nullptr,
+                           typeContext.ExpectedLoweredType->isCalledOnce());
     result = emitManagedRValueWithCleanup(toClosure);
   }
 
