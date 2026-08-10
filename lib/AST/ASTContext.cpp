@@ -42,6 +42,7 @@
 #include "swift/AST/KnownProtocols.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/LocalArchetypeRequirementCollector.h"
+#include "swift/AST/MacroDefinition.h"
 #include "swift/AST/MacroDiscriminatorContext.h"
 #include "swift/AST/ModuleDependencies.h"
 #include "swift/AST/ModuleLoader.h"
@@ -59,6 +60,7 @@
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/AST/SynthesizedFileUnit.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeTransform.h"
 #include "swift/Basic/APIntMap.h"
@@ -763,6 +765,11 @@ struct ASTContext::Implementation {
   BuiltinTupleType *TheTupleType = nullptr;
 
   std::array<ProtocolDecl *, NumInvertibleProtocols> InvertibleProtocolDecls = {};
+
+  /// Builtin derived-conformance macro decls cache
+  std::array<MacroDecl *,
+             static_cast<size_t>(BuiltinDerivedConformanceMacroKind::NumKinds)>
+      BuiltinDerivedConformanceMacroDecls = {};
 
   void dump(llvm::raw_ostream &out) const;
 };
@@ -1504,6 +1511,107 @@ ASTContext::synthesizeInvertibleProtocolDecl(InvertibleProtocolKind ip) const {
 
   getImpl().InvertibleProtocolDecls[index] = protocol;
   return protocol;
+}
+
+MacroDecl *ASTContext::getBuiltinDerivedConformanceMacroDecl(
+    BuiltinDerivedConformanceMacroKind kind) const {
+  auto &ctx = const_cast<ASTContext &>(*this);
+  unsigned index = static_cast<unsigned>(kind);
+  if (auto *macro = getImpl().BuiltinDerivedConformanceMacroDecls[index])
+    return macro;
+
+  ModuleDecl *stdlib = getStdlibModule();
+  assert(stdlib && "Stdlib module must be available to derive conformances "
+                   "via builtin macros");
+  FileUnit &file = stdlib->getFiles()[0]->getOrCreateSynthesizedFile();
+
+  auto param = [&](StringRef label, StringRef name, Type type) {
+    Identifier argumentName =
+        label.empty() ? Identifier() : getIdentifier(label);
+    return ParamDecl::createImplicit(ctx, argumentName, getIdentifier(name),
+                                     type, &file);
+  };
+  auto stringParam = [&](StringRef label, StringRef name) {
+    return param(label, name, getStringType());
+  };
+  auto boolParam = [&](StringRef label, StringRef name) {
+    return param(label, name, getBoolType());
+  };
+
+  auto makeMacro = [&](StringRef name, StringRef externalMacroTypeName,
+                       ArrayRef<ParamDecl *> params,
+                       MacroIntroducedDeclName introducedNames) {
+    auto *paramList = ParameterList::create(ctx, params);
+    SmallVector<Identifier, 3> argumentNames;
+    for (auto *param : params)
+      argumentNames.push_back(param->getArgumentName());
+    auto macroName = DeclName(ctx, getIdentifier(name), argumentNames);
+
+    auto *macro = new (ctx) MacroDecl(
+        /*macroLoc=*/SourceLoc(), macroName, /*nameLoc=*/SourceLoc(),
+        /*genericParams=*/nullptr, paramList, /*arrowLoc=*/SourceLoc(),
+        /*resultType=*/nullptr, /*definition=*/nullptr, &file);
+    macro->setImplicit();
+    macro->setAccess(AccessLevel::Public);
+
+    auto *roleAttr = MacroRoleAttr::create(
+        ctx, SourceLoc(), SourceRange(), MacroSyntax::Freestanding, SourceLoc(),
+        MacroRole::Declaration, {introducedNames},
+        /*conformances=*/{}, SourceLoc(), /*implicit=*/true);
+    macro->getAttrs().add(roleAttr);
+
+    macro->setDefinition(MacroDefinition::forExternal(
+        getIdentifier("SwiftMacros"), getIdentifier(externalMacroTypeName)));
+    return macro;
+  };
+
+  MacroDecl *macro;
+  switch (kind) {
+  case BuiltinDerivedConformanceMacroKind::DeriveEquatable:
+    macro = makeMacro(
+        "_deriveEquatable", "DeriveEquatableMacro",
+        {stringParam("", "infos"), boolParam("isResilient", "isResilient")},
+        MacroIntroducedDeclName::getArbitrary());
+    break;
+  case BuiltinDerivedConformanceMacroKind::DeriveHashable:
+    macro = makeMacro("_deriveHashable", "DeriveHashableMacro",
+                      {stringParam("", "infos")},
+                      MacroIntroducedDeclName::getArbitrary());
+    break;
+  case BuiltinDerivedConformanceMacroKind::DeriveError:
+    macro = makeMacro("_deriveError", "DeriveErrorMacro",
+                      {stringParam("", "infos")},
+                      MacroIntroducedDeclName::getNamed(
+                          DeclName(getIdentifier("_nsErrorDomain"))));
+    break;
+  case BuiltinDerivedConformanceMacroKind::DeriveComparable:
+    macro = makeMacro("_deriveComparable", "DeriveComparableMacro",
+                      {stringParam("", "infos"),
+                       boolParam("isResilient", "isResilient"),
+                       boolParam("isNoncopyable", "isNoncopyable")},
+                      MacroIntroducedDeclName::getArbitrary());
+    break;
+  case BuiltinDerivedConformanceMacroKind::DeriveCaseIterable:
+    macro = makeMacro("_deriveCaseIterable", "DeriveCaseIterableMacro",
+                      {stringParam("", "infos"), stringParam("", "witness")},
+                      MacroIntroducedDeclName::getArbitrary());
+    break;
+  case BuiltinDerivedConformanceMacroKind::DeriveEncodable:
+    macro = makeMacro("_deriveEncodable", "DeriveEncodableMacro",
+                      {stringParam("", "infos")},
+                      MacroIntroducedDeclName::getArbitrary());
+    break;
+  case BuiltinDerivedConformanceMacroKind::DeriveDecodable:
+    macro = makeMacro("_deriveDecodable", "DeriveDecodableMacro",
+                      {stringParam("", "infos")},
+                      MacroIntroducedDeclName::getArbitrary());
+    break;
+  case BuiltinDerivedConformanceMacroKind::NumKinds:
+    llvm_unreachable("not a real kind");
+  }
+
+  getImpl().BuiltinDerivedConformanceMacroDecls[index] = macro;
+  return macro;
 }
 
 ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
