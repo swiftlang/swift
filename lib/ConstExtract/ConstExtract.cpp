@@ -26,6 +26,7 @@
 #include "swift/ConstExtract/ConstExtractRequests.h"
 #include "swift/Subsystems.h"
 #include "llvm/ADT/PointerUnion.h"
+#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/JSON.h"
 #include "llvm/Support/PrefixMapper.h"
@@ -176,6 +177,9 @@ getResultBuilderMembersFromBraceStmt(BraceStmt *braceStmt,
 
 static std::shared_ptr<CompileTimeValue>
 extractCompileTimeValue(Expr *expr, const DeclContext *declContext);
+
+static ConstValueTypePropertyInfo
+extractTypePropertyInfo(VarDecl *propertyDecl);
 
 static std::vector<FunctionParameter>
 extractFunctionArguments(const ArgumentList *args,
@@ -480,6 +484,25 @@ extractCompileTimeValue(Expr *expr, const DeclContext *declContext) {
       if (isa<TypeExpr>(memberExpr->getBase())) {
         auto baseTypeExpr = cast<TypeExpr>(memberExpr->getBase());
         auto label = memberExpr->getDecl().getDecl()->getBaseIdentifier().str();
+
+        // Attempt to resolve static stored/computed properties to their
+        // compile-time value. A thread-local visited set breaks cycles that
+        // would otherwise cause infinite recursion (e.g. A.x -> B.y -> A.x).
+        if (auto *varDecl =
+                dyn_cast<VarDecl>(memberExpr->getDecl().getDecl())) {
+          if (varDecl->isStatic()) {
+            static thread_local llvm::SmallPtrSet<VarDecl *, 4>
+                resolvingVarDecls;
+            if (resolvingVarDecls.insert(varDecl).second) {
+              auto info = extractTypePropertyInfo(varDecl);
+              resolvingVarDecls.erase(varDecl);
+              if (!isa<RuntimeValue>(info.Value.get())) {
+                return info.Value;
+              }
+            }
+          }
+        }
+
         return std::make_shared<MemberReferenceValue>(
             baseTypeExpr->getInstanceType(), label.str());
       }
