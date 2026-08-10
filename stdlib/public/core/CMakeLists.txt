@@ -70,7 +70,6 @@ split_embedded_sources(
   EMBEDDED ContiguousArrayBuffer.swift
   EMBEDDED ContiguouslyStored.swift
     NORMAL DebuggerSupport.swift
-    NORMAL DerivedConformances.swift
   EMBEDDED Dictionary.swift
   EMBEDDED DictionaryBridging.swift
   EMBEDDED DictionaryBuilder.swift

@@ -443,7 +443,9 @@ static ValueDecl *deriveEquatableViaMacro(DerivedConformance &derived,
   os << "#_deriveEquatable(" << QuotedString(getNominalTypeInfoString(derived))
      << ", isResilient: "
      << (parentDC->getParentModule()->isResilient() ? "true" : "false") << ")";
-  auto *witness = deriveRequirementViaMacro(derived, requirement, os.str());
+  auto *witness = deriveRequirementViaMacro(
+      derived, requirement, os.str(),
+      BuiltinDerivedConformanceMacroKind::DeriveEquatable);
   return witness;
 }
 

@@ -1071,9 +1071,10 @@ handleASTNodeForDerivation(ASTContext &C, DerivedConformance &derived,
   return vDecl;
 }
 
-ValueDecl *swift::deriveRequirementViaMacro(DerivedConformance &derived,
-                                            ValueDecl *requirement,
-                                            StringRef code) {
+ValueDecl *
+swift::deriveRequirementViaMacro(DerivedConformance &derived,
+                                 ValueDecl *requirement, StringRef code,
+                                 BuiltinDerivedConformanceMacroKind macroKind) {
   auto *parentDC = derived.getConformanceContext();
   auto &C = parentDC->getASTContext();
 
@@ -1111,6 +1112,11 @@ ValueDecl *swift::deriveRequirementViaMacro(DerivedConformance &derived,
     expansion = mDecl;
   }
   ASSERT(expansion);
+
+  // Resolve the macro reference directly to the builtin MacroDecl, bypassing
+  // name lookup.
+  expansion->setMacroRef(
+      ConcreteDeclRef(C.getBuiltinDerivedConformanceMacroDecl(macroKind)));
 
   // Find the expanded `ValueDecl *` and return it. There should only ever be a
   // single one.
