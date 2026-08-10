@@ -1080,6 +1080,15 @@ class OpenExistentialRefInst : SingleValueInstruction, UnaryInstruction {
 }
 
 final public
+class OpenCOMExistentialInst : SingleValueInstruction, UnaryInstruction {
+  public var existential: Value { operand.value }
+
+  public var definedGenericEnvironment: GenericEnvironment {
+    GenericEnvironment(bridged: bridged.OpenCOMExistentialInst_getDefinedGenericEnvironment())
+  }
+}
+
+final public
 class InitExistentialValueInst : SingleValueInstruction, UnaryInstruction, InitExistentialInstruction {
   public var conformances: ConformanceArray {
     ConformanceArray(bridged: bridged.InitExistentialValueInst_getConformances())
