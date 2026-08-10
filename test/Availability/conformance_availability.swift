@@ -18,7 +18,7 @@ public struct HasUnavailableConformance1 {}
 
 @available(*, unavailable)
 extension HasUnavailableConformance1 : Horse {}
-// expected-note@-1 7{{conformance of 'HasUnavailableConformance1' to 'Horse' has been explicitly marked unavailable here}}
+// expected-note@-2 7{{conformance of 'HasUnavailableConformance1' to 'Horse' has been explicitly marked unavailable here}}
 
 func passUnavailableConformance1(x: HasUnavailableConformance1) {
   takesHorse(x) // expected-error {{conformance of 'HasUnavailableConformance1' to 'Horse' is unavailable}}
@@ -44,7 +44,7 @@ public struct HasUnavailableConformance2 {}
 
 @available(macOS, unavailable)
 extension HasUnavailableConformance2 : Horse {}
-// expected-note@-1 6{{conformance of 'HasUnavailableConformance2' to 'Horse' has been explicitly marked unavailable here}}
+// expected-note@-2 6{{conformance of 'HasUnavailableConformance2' to 'Horse' has been explicitly marked unavailable here}}
 
 func passUnavailableConformance2(x: HasUnavailableConformance2) {
   takesHorse(x) // expected-error {{conformance of 'HasUnavailableConformance2' to 'Horse' is unavailable in macOS}}
@@ -70,7 +70,7 @@ public struct HasUnavailableConformance3 {}
 
 @available(swift 12)
 extension HasUnavailableConformance3 : Horse {}
-// expected-note@-1 6{{conformance of 'HasUnavailableConformance3' to 'Horse' was introduced in Swift 12}}
+// expected-note@-2 6{{conformance of 'HasUnavailableConformance3' to 'Horse' was introduced in Swift 12}}
 
 func passUnavailableConformance3(x: HasUnavailableConformance3) {
   takesHorse(x) // expected-error {{conformance of 'HasUnavailableConformance3' to 'Horse' is unavailable}}
@@ -96,7 +96,7 @@ public struct HasUnavailableConformance4 {}
 
 @available(macOS, obsoleted: 10.1)
 extension HasUnavailableConformance4 : Horse {}
-// expected-note@-1 6{{conformance of 'HasUnavailableConformance4' to 'Horse' was obsoleted in macOS 10.1}}
+// expected-note@-2 6{{conformance of 'HasUnavailableConformance4' to 'Horse' was obsoleted in macOS 10.1}}
 
 func passUnavailableConformance4(x: HasUnavailableConformance4) {
   takesHorse(x) // expected-error {{conformance of 'HasUnavailableConformance4' to 'Horse' is unavailable in macOS}}
@@ -122,7 +122,7 @@ public struct HasUnavailableConformance5 {}
 
 @available(swift, obsoleted: 4)
 extension HasUnavailableConformance5 : Horse {}
-// expected-note@-1 6{{conformance of 'HasUnavailableConformance5' to 'Horse' was obsoleted in Swift 4}}
+// expected-note@-2 6{{conformance of 'HasUnavailableConformance5' to 'Horse' was obsoleted in Swift 4}}
 
 func passUnavailableConformance5(x: HasUnavailableConformance5) {
   takesHorse(x) // expected-error {{conformance of 'HasUnavailableConformance5' to 'Horse' is unavailable}}
@@ -148,7 +148,7 @@ public struct HasUnavailableConformance6 {}
 
 @available(*, unavailable, message: "This conformance is bad")
 extension HasUnavailableConformance6 : Horse {}
-// expected-note@-1 6{{conformance of 'HasUnavailableConformance6' to 'Horse' has been explicitly marked unavailable here}}
+// expected-note@-2 6{{conformance of 'HasUnavailableConformance6' to 'Horse' has been explicitly marked unavailable here}}
 
 func passUnavailableConformance6(x: HasUnavailableConformance6) {
   takesHorse(x) // expected-error {{conformance of 'HasUnavailableConformance6' to 'Horse' is unavailable: This conformance is bad}}

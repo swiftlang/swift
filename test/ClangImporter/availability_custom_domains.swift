@@ -37,14 +37,14 @@ func testClangDecls() { // expected-note 3 {{add '@available' attribute to enclo
 @available(BayBridge)
 func availableInBayBridge() { }
 
-@available(BayBridge, unavailable)
-func unavailableInBayBridge() { } // expected-note {{'unavailableInBayBridge()' has been explicitly marked unavailable here}}
+@available(BayBridge, unavailable) // expected-note {{'unavailableInBayBridge()' has been explicitly marked unavailable here}}
+func unavailableInBayBridge() { }
 
 @available(Pacific)
 func availableInPacific() { }
 
-@available(Colorado, unavailable)
-func unavailableInColorado() { } // expected-note {{'unavailableInColorado()' has been explicitly marked unavailable here}}
+@available(Colorado, unavailable) // expected-note {{'unavailableInColorado()' has been explicitly marked unavailable here}}
+func unavailableInColorado() { }
 
 // The Seas module is only imported directly by the other source file.
 @available(Baltic) // expected-error {{unrecognized platform name 'Baltic'}}

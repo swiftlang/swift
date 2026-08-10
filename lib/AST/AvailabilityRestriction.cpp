@@ -72,21 +72,28 @@ bool AvailabilityRestriction::emitNoteForDecl(const ValueDecl *decl) const {
   auto sourceRange = parsedAttr->getRangeWithAt();
   auto domainAndRange = getDomainAndRange(ctx);
 
+  // Point at the attribute so that the reason for the restriction is always
+  // rendered. Implicit attributes, like the ones on imported or synthesized
+  // declarations, have no location; refer to the declaration instead.
+  auto loc = parsedAttr->AtLoc;
+  auto diagnose = [&](const Diagnostic &diag) {
+    return loc.isValid() ? diags.diagnose(loc, diag)
+                         : diags.diagnose(decl, diag);
+  };
+
   switch (getReason()) {
   case Reason::UnavailableUnconditionally:
-    diags.diagnose(decl, diag::availability_marked_unavailable, decl)
+    diagnose({diag::availability_marked_unavailable, decl})
         .highlight(sourceRange);
     break;
   case Reason::UnavailableUnintroduced:
-    diags
-        .diagnose(decl, diag::availability_introduced_in_version, decl,
-                  domainAndRange.getDomain(), domainAndRange.getRange())
+    diagnose({diag::availability_introduced_in_version, decl,
+              domainAndRange.getDomain(), domainAndRange.getRange()})
         .highlight(sourceRange);
     break;
   case Reason::UnavailableObsolete:
-    diags
-        .diagnose(decl, diag::availability_obsoleted, decl,
-                  domainAndRange.getDomain(), domainAndRange.getRange())
+    diagnose({diag::availability_obsoleted, decl, domainAndRange.getDomain(),
+              domainAndRange.getRange()})
         .highlight(sourceRange);
     break;
   case Reason::Unintroduced:
@@ -100,28 +107,34 @@ bool AvailabilityRestriction::emitNoteForConformance(
     const ExtensionDecl *ext, const RootProtocolConformance *rootConf) const {
   auto &ctx = ext->getASTContext();
   auto &diags = ctx.Diags;
+  auto parsedAttr = getAttr().getParsedAttr();
+  auto sourceRange = parsedAttr->getRangeWithAt();
   auto type = rootConf->getType();
   auto proto = rootConf->getProtocol()->getDeclaredInterfaceType();
-  auto parsedAttr = getAttr().getParsedAttr();
   auto domainAndRange = getDomainAndRange(ctx);
+
+  // Point at the attribute so that the reason for the restriction is always
+  // rendered. Implicit attributes, like the ones on imported or synthesized
+  // extensions, have no location; refer to the extension instead.
+  auto loc = parsedAttr->AtLoc;
+  auto diagnose = [&](const Diagnostic &diag) {
+    return loc.isValid() ? diags.diagnose(loc, diag)
+                         : diags.diagnose(ext, diag);
+  };
 
   switch (getReason()) {
   case Reason::UnavailableUnconditionally:
-    diags
-        .diagnose(ext, diag::conformance_availability_marked_unavailable, type,
-                  proto)
-        .highlight(parsedAttr->getRangeWithAt());
+    diagnose({diag::conformance_availability_marked_unavailable, type, proto})
+        .highlight(sourceRange);
     break;
   case Reason::UnavailableUnintroduced:
-    diags.diagnose(ext, diag::conformance_availability_introduced_in_version,
-                   type, proto, domainAndRange.getDomain(),
-                   domainAndRange.getRange());
+    diagnose({diag::conformance_availability_introduced_in_version, type, proto,
+              domainAndRange.getDomain(), domainAndRange.getRange()});
     break;
   case Reason::UnavailableObsolete:
-    diags
-        .diagnose(ext, diag::conformance_availability_obsoleted, type, proto,
-                  domainAndRange.getDomain(), domainAndRange.getRange())
-        .highlight(parsedAttr->getRangeWithAt());
+    diagnose({diag::conformance_availability_obsoleted, type, proto,
+              domainAndRange.getDomain(), domainAndRange.getRange()})
+        .highlight(sourceRange);
     break;
   case Reason::Unintroduced:
   case Reason::Deprecated:

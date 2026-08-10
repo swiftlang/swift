@@ -5,14 +5,14 @@
 @available(macCatalyst, introduced: 1.0, deprecated: 2.0, obsoleted: 9.0,
            message: "you don't want to do that anyway")
 func obsoletedOnMacCatalyst() { }
-// expected-note @-1{{'obsoletedOnMacCatalyst()' was obsoleted in Mac Catalyst 9.0}}
+// expected-note @-3{{'obsoletedOnMacCatalyst()' was obsoleted in Mac Catalyst 9.0}}
 
 obsoletedOnMacCatalyst() // expected-error{{'obsoletedOnMacCatalyst()' is unavailable in Mac Catalyst: you don't want to do that anyway}}
 
 @available(iOS, introduced: 1.0, deprecated: 2.0, obsoleted: 9.0,
            message: "you don't want to do that anyway")
 func obsoletedOnIOS() { }
-// expected-note @-1{{'obsoletedOnIOS()' was obsoleted in iOS 9.0}}
+// expected-note @-3{{'obsoletedOnIOS()' was obsoleted in iOS 9.0}}
 
 obsoletedOnIOS() // expected-error{{'obsoletedOnIOS()' is unavailable in iOS: you don't want to do that anyway}}
 
@@ -20,7 +20,7 @@ obsoletedOnIOS() // expected-error{{'obsoletedOnIOS()' is unavailable in iOS: yo
 @available(iOS, introduced: 1.0)
 @available(macCatalyst, introduced: 1.0, obsoleted: 12.0)
 func obsoletedOnMacCatalystButNotIOS() { }
-// expected-note @-1{{'obsoletedOnMacCatalystButNotIOS()' was obsoleted in Mac Catalyst 12.0}}
+// expected-note @-2{{'obsoletedOnMacCatalystButNotIOS()' was obsoleted in Mac Catalyst 12.0}}
 
 obsoletedOnMacCatalystButNotIOS() // expected-error {{'obsoletedOnMacCatalystButNotIOS()' is unavailable}}
 
@@ -146,11 +146,11 @@ extension X: P {}
 
 func takesAnything<T>(_ t: T) { }
 
-@available(macCatalyst, unavailable)
-struct UnavailableOnMacCatalyst { } // expected-note * {{'UnavailableOnMacCatalyst' has been explicitly marked unavailable here}}
+@available(macCatalyst, unavailable) // expected-note * {{'UnavailableOnMacCatalyst' has been explicitly marked unavailable here}}
+struct UnavailableOnMacCatalyst { }
 
-@available(iOS, unavailable)
-struct UnavailableOniOS { } // expected-note * {{'UnavailableOniOS' has been explicitly marked unavailable here}}
+@available(iOS, unavailable) // expected-note * {{'UnavailableOniOS' has been explicitly marked unavailable here}}
+struct UnavailableOniOS { }
 
 @available(iOS, unavailable)
 @available(macCatalyst, introduced: 13.0)

@@ -2,15 +2,15 @@
 
 // REQUIRES: OS=macosx
 
-@available(macOS, unavailable)
-struct UnavailableMacOSStruct {} // expected-note 4 {{'UnavailableMacOSStruct' has been explicitly marked unavailable here}}
+@available(macOS, unavailable) // expected-note 4 {{'UnavailableMacOSStruct' has been explicitly marked unavailable here}}
+struct UnavailableMacOSStruct {}
 
 @available(iOS, introduced: 8.0)
 @_spi_available(macOS, introduced: 10.9)
 public struct SPIAvailableMacOSStruct {}
 
-@available(*, unavailable)
-public struct UniversallyUnavailableStruct {} // expected-note 3 {{'UniversallyUnavailableStruct' has been explicitly marked unavailable here}}
+@available(*, unavailable) // expected-note 3 {{'UniversallyUnavailableStruct' has been explicitly marked unavailable here}}
+public struct UniversallyUnavailableStruct {}
 
 // Ok, initialization of globals is lazy and boxed.
 @available(macOS, unavailable)
