@@ -1166,7 +1166,7 @@ namespace {
     void emitDestroyValue(SILBuilder &B, SILLocation loc,
                           SILValue value) const override {
       if (B.getFunction().hasOwnership()
-          && B.getModule().getStage() == SILStage::Raw
+          && B.getFunction().getFunctionStage() == SILStage::Raw
           && value->isFromVarDecl()) {
         // Do not use destroy_value for trivial values. The lifetime introducer
         // may be implicitly copied and used outside of its original scope,
@@ -2094,7 +2094,9 @@ namespace {
     void emitCopyInto(SILBuilder &B, SILLocation loc, SILValue src,
                       SILValue dest, IsTake_t isTake,
                       IsInitialization_t isInit) const override {
-      assert((B.getModule().getStage() == SILStage::Raw || isTake == true) &&
+      assert((!B.maybeGetFunction() ||
+              B.getFunction().getFunctionStage() == SILStage::Raw ||
+              isTake == true) &&
              "Can only copy move only values in Raw SIL");
       B.createCopyAddr(loc, src, dest, isTake, isInit);
     }
@@ -2289,7 +2291,7 @@ namespace {
 
     SILValue emitCopyValue(SILBuilder &B, SILLocation loc,
                            SILValue value) const override {
-      assert(B.getModule().getStage() == SILStage::Raw &&
+      assert(B.getFunction().getFunctionStage() == SILStage::Raw &&
              "Can not copy a move only value in non-Raw SIL");
       return B.createCopyValue(loc, value);
     }

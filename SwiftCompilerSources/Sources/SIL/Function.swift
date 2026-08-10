@@ -50,6 +50,15 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
 
   public var wasDeserializedCanonical: Bool { bridged.wasDeserializedCanonical() }
 
+  /// This function's SIL stage. Prefer this over `Context.stageFloor` for a
+  /// per-function query.
+  public var silStage: SILStage {
+    guard let stage = SILStage(rawValue: bridged.getStage()) else {
+      fatalError("unhandled SILStage")
+    }
+    return stage
+  }
+
   public var isTrapNoReturn: Bool { bridged.isTrapNoReturn() }
 
   public var isAutodiffVJP: Bool { bridged.isAutodiffVJP() }

@@ -337,7 +337,7 @@ void SILLinkerVisitor::visitProtocolConformance(
     // If the module is at or past the Lowered stage, then we can't do any
     // further deserialization, since pre-IRGen SIL lowering changes the types
     // of definitions to make them incompatible with canonical serialized SIL.
-    if (Mod.getStage() == SILStage::Lowered)
+    if (Mod.hasCommittedLowered())
       return;
   
     WT = Mod.getSILLoader()->lookupWitnessTable(WT);

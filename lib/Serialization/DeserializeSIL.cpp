@@ -732,7 +732,7 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
   // canonical SIL form.
   assert(!forDebugScope || declarationOnly); // debug scopes must always be read
                                              // declaration only
-  switch (SILMod.getStage()) {
+  switch (SILMod.getStageFloor()) {
   case SILStage::Raw:
   case SILStage::Canonical:
     break;
@@ -1218,6 +1218,16 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
   }
 
   ++NumDeserializedFunc;
+
+  // A .swiftmodule body is serialized only after the mandatory pipeline, so it
+  // is Canonical or later. Seed the stage, so the function reports Canonical
+  // while the importing module's floor is still Raw. Do this only for a body:
+  // IRGen deserializes declarations after the module commits to Lowered, and a
+  // declaration has no body to describe. A .sib body can be at any stage, so it
+  // is not seeded. Neither is a textual [canonical] function, which can still
+  // carry raw-only constructs.
+  if (!MF->isSIB())
+    fn->setFunctionStage(SILStage::Canonical);
 
   assert(!(fn->getGenericEnvironment() && !fn->empty())
          && "function already has context generic params?!");

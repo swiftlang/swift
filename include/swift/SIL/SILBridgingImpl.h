@@ -831,6 +831,10 @@ bool BridgedFunction::hasOwnership() const { return getFunction()->hasOwnership(
 
 bool BridgedFunction::hasLoweredAddresses() const { return getFunction()->hasLoweredAddresses(); }
 
+SwiftInt BridgedFunction::getStage() const {
+  return (SwiftInt)getFunction()->getFunctionStage();
+}
+
 BridgedCanType BridgedFunction::getLoweredFunctionType() const {
   return getFunction()->getLoweredFunctionType();
 }
@@ -3368,8 +3372,8 @@ bool BridgedContext::hasChangeNotification(NotificationKind changeKind) const {
   return (context->getChangeNotifications() & (swift::SILContext::NotificationKind)changeKind) != 0;
 }
 
-BridgedContext::SILStage BridgedContext::getSILStage() const {
-  return (SILStage)context->getModule()->getStage();
+BridgedContext::SILStage BridgedContext::getStageFloor() const {
+  return (SILStage)context->getModule()->getStageFloor();
 }
 
 bool BridgedContext::moduleIsSerialized() const {
