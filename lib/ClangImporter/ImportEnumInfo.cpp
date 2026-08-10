@@ -25,6 +25,7 @@
 #include "clang/AST/Decl.h"
 #include "clang/Lex/MacroInfo.h"
 #include "clang/Lex/Preprocessor.h"
+#include "llvm/ADT/StringSwitch.h"
 
 #include "llvm/ADT/Statistic.h"
 #define DEBUG_TYPE "Enum Info"
@@ -125,18 +126,15 @@ void EnumInfo::classifyEnum(const clang::EnumDecl *decl,
   // only.
   auto loc = decl->getBeginLoc();
   if (loc.isMacroID()) {
-    StringRef MacroName = pp.getImmediateMacroName(loc);
-    if (MacroName == "CF_ENUM" || MacroName == "__CF_NAMED_ENUM" ||
-        MacroName == "OBJC_ENUM" || MacroName == "SWIFT_ENUM" ||
-        MacroName == "SWIFT_ENUM_NAMED") {
-      kind = EnumKind::NonFrozenEnum;
+    kind = llvm::StringSwitch<EnumKind>(pp.getImmediateMacroName(loc))
+               .Cases({"CF_ENUM", "__CF_NAMED_ENUM", "OBJC_ENUM", "SWIFT_ENUM",
+                       "SWIFT_ENUM_NAMED"},
+                      EnumKind::NonFrozenEnum)
+               .Cases({"CF_OPTIONS", "OBJC_OPTIONS", "SWIFT_OPTIONS"},
+                      EnumKind::Options)
+               .Default(EnumKind::Unknown);
+    if (kind != EnumKind::Unknown)
       return;
-    }
-    if (MacroName == "CF_OPTIONS" || MacroName == "OBJC_OPTIONS" ||
-        MacroName == "SWIFT_OPTIONS") {
-      kind = EnumKind::Options;
-      return;
-    }
   }
 
   // Hardcode a particular annoying case in the OS X headers.
