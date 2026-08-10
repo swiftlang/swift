@@ -5372,6 +5372,15 @@ struct IncompatibleRegionMergeDiagnosticEmitter {
   SILDynamicMergedIsolationInfo dstIsolationInfo;
   RegionMergeReason reason;
 
+  /// The region analysis for this function; forwarded to the isolation-history
+  /// note emitter so it can recover predecessor exit partitions across joins.
+  RegionAnalysisFunctionInfo *info;
+
+  /// The partition before the failed merge. See the error struct's comment: the
+  /// two regions are still separate here, so each side is explained by its own
+  /// independent walk. None when history recording is off for this function.
+  std::optional<Partition> partition;
+
   IncompatibleRegionMergeDiagnosticEmitter(RegionAnalysisFunctionInfo *info,
                                            Error &&error)
       : valueMap(info->getValueMap()), op(error.op->getSourceOp()),
@@ -5383,7 +5392,8 @@ struct IncompatibleRegionMergeDiagnosticEmitter {
         // the error since we may have an error reason that was specified
         // explicitly when the error was created, not from the actual
         // PartitionOp.
-        reason(error.reason) {}
+        reason(error.reason), info(info),
+        partition(std::move(error.partition)) {}
 
   void emit();
 
@@ -5398,6 +5408,43 @@ private:
     EMIT_UNKNOWN_PATTERN_ERROR(IncompatibleRegionMergeErrorEmitter,
                                op->getUser(), getBehaviorLimit(),
                                /*pushToFuture=*/true);
+  }
+
+  /// Explain one side of the failed merge: how that side's region came to have
+  /// the isolation it has.
+  ///
+  /// The isolation-history chain is the deep version of the shallow
+  /// "X is exposed to <iso> code" note -- it names every hop rather than just
+  /// the endpoint -- so when a chain is emitted the shallow note would only
+  /// restate its last link. Fall back to the shallow note when there is no
+  /// chain to show, which is the common case: history recording is off unless
+  /// the function opted in. The fallback keys off whether the walk actually
+  /// emitted anything, not off whether recording is on: recording can be on and
+  /// the walk still find nothing, and the user must keep the shallow note in
+  /// that case.
+  ///
+  /// Called exactly where the shallow note was called, i.e. after the primary
+  /// diagnostic, rather than from a SWIFT_DEFER -- the unknown-pattern paths
+  /// return before reaching here and must stay note-free. Being downstream of
+  /// each sub-emitter's leading !srcIsolationInfo / !dstIsolationInfo guards is
+  /// also what makes the isolation safe to format at all.
+  void emitSideNote(Element elt, RepresentativeValue regionValue,
+                    SILDynamicMergedIsolationInfo isolation,
+                    StringRef isolationStr) {
+    if (partition) {
+      // Each walk consumes the partition it rewinds, and there are two sides to
+      // explain, so hand it a copy.
+      if (IsolationHistoryNoteEmitter::emit(
+              getFunction(), info, valueMap,
+              IsolationHistoryNoteEmitter::Request::howDidBecomeIsolatedTo(
+                  elt, isolation),
+              Partition(*partition)))
+        return;
+    }
+
+    if (auto value = regionValue.maybeGetValue())
+      emitMergeRegionValueNote(value, isolationStr,
+                               isolation->isTaskIsolated());
   }
 
   // Emit incompatible-region-merge diagnostics as warnings until the future
@@ -5435,9 +5482,14 @@ void IncompatibleRegionMergeDiagnosticEmitter::emitUnknown() {
 
   // Canonicalize so that srcRegionValue is always the task-isolated value when
   // possible. This only affects which isolation string is rendered first.
+  // The elements must travel with the values they name: a swapped isolation
+  // paired with an unswapped element would explain the wrong region.
+  auto srcElt = srcRegionValueElt;
+  auto dstElt = dstRegionValueElt;
   if (!srcIsolation->isTaskIsolated() && dstIsolation->isTaskIsolated()) {
     std::swap(srcIsolation, dstIsolation);
     std::swap(srcRegionValue, dstRegionValue);
+    std::swap(srcElt, dstElt);
   }
 
   auto srcIsolationStr = srcIsolation.printForDiagnostics(getFunction());
@@ -5448,12 +5500,8 @@ void IncompatibleRegionMergeDiagnosticEmitter::emitUnknown() {
                 dstIsolation->isTaskIsolated())
       .limitBehaviorIf(getBehaviorLimit());
 
-  if (auto srcValue = srcRegionValue.maybeGetValue())
-    emitMergeRegionValueNote(srcValue, srcIsolationStr,
-                             srcIsolation->isTaskIsolated());
-  if (auto dstValue = dstRegionValue.maybeGetValue())
-    emitMergeRegionValueNote(dstValue, dstIsolationStr,
-                             dstIsolation->isTaskIsolated());
+  emitSideNote(srcElt, srcRegionValue, srcIsolation, srcIsolationStr);
+  emitSideNote(dstElt, dstRegionValue, dstIsolation, dstIsolationStr);
 }
 
 void IncompatibleRegionMergeDiagnosticEmitter::emitAssign() {
@@ -5470,9 +5518,14 @@ void IncompatibleRegionMergeDiagnosticEmitter::emitAssign() {
 
   // Canonicalize so that srcRegionValue is always the task-isolated value when
   // possible. This only affects which isolation string is rendered first.
+  // The elements must travel with the values they name: a swapped isolation
+  // paired with an unswapped element would explain the wrong region.
+  auto srcElt = srcRegionValueElt;
+  auto dstElt = dstRegionValueElt;
   if (!srcIsolation->isTaskIsolated() && dstIsolation->isTaskIsolated()) {
     std::swap(srcIsolation, dstIsolation);
     std::swap(srcRegionValue, dstRegionValue);
+    std::swap(srcElt, dstElt);
   }
 
   auto srcIsolationStr = srcIsolation.printForDiagnostics(getFunction());
@@ -5483,12 +5536,8 @@ void IncompatibleRegionMergeDiagnosticEmitter::emitAssign() {
                 dstIsolation->isTaskIsolated())
       .limitBehaviorIf(getBehaviorLimit());
 
-  if (auto srcValue = srcRegionValue.maybeGetValue())
-    emitMergeRegionValueNote(srcValue, srcIsolationStr,
-                             srcIsolation->isTaskIsolated());
-  if (auto dstValue = dstRegionValue.maybeGetValue())
-    emitMergeRegionValueNote(dstValue, dstIsolationStr,
-                             dstIsolation->isTaskIsolated());
+  emitSideNote(srcElt, srcRegionValue, srcIsolation, srcIsolationStr);
+  emitSideNote(dstElt, dstRegionValue, dstIsolation, dstIsolationStr);
 }
 
 void IncompatibleRegionMergeDiagnosticEmitter::emitNonisolatedFunction() {
@@ -5504,9 +5553,14 @@ void IncompatibleRegionMergeDiagnosticEmitter::emitNonisolatedFunction() {
 
   // Canonicalize so that srcRegionValue is always the task-isolated value when
   // possible. This only affects which isolation string is rendered first.
+  // The elements must travel with the values they name: a swapped isolation
+  // paired with an unswapped element would explain the wrong region.
+  auto srcElt = srcRegionValueElt;
+  auto dstElt = dstRegionValueElt;
   if (!srcIsolation->isTaskIsolated() && dstIsolation->isTaskIsolated()) {
     std::swap(srcIsolation, dstIsolation);
     std::swap(srcRegionValue, dstRegionValue);
+    std::swap(srcElt, dstElt);
   }
 
   auto srcIsolationStr = srcIsolation.printForDiagnostics(getFunction());
@@ -5526,12 +5580,8 @@ void IncompatibleRegionMergeDiagnosticEmitter::emitNonisolatedFunction() {
                 srcIsolation->isTaskIsolated(), dstIsolation->isTaskIsolated())
       .limitBehaviorIf(getBehaviorLimit());
 
-  if (auto srcValue = srcRegionValue.maybeGetValue())
-    emitMergeRegionValueNote(srcValue, srcIsolationStr,
-                             srcIsolation->isTaskIsolated());
-  if (auto dstValue = dstRegionValue.maybeGetValue())
-    emitMergeRegionValueNote(dstValue, dstIsolationStr,
-                             dstIsolation->isTaskIsolated());
+  emitSideNote(srcElt, srcRegionValue, srcIsolation, srcIsolationStr);
+  emitSideNote(dstElt, dstRegionValue, dstIsolation, dstIsolationStr);
 }
 
 void IncompatibleRegionMergeDiagnosticEmitter::emitIsolatedFunction() {
@@ -5580,9 +5630,8 @@ void IncompatibleRegionMergeDiagnosticEmitter::emitIsolatedFunction() {
         .limitBehaviorIf(getBehaviorLimit());
   }
 
-  if (auto srcValue = srcRegionValue.maybeGetValue())
-    emitMergeRegionValueNote(srcValue, srcIsolationStr,
-                             srcIsolation->isTaskIsolated());
+  emitSideNote(srcRegionValueElt, srcRegionValue, srcIsolation,
+               srcIsolationStr);
 }
 
 void IncompatibleRegionMergeDiagnosticEmitter::emitCast() {
@@ -5626,9 +5675,8 @@ void IncompatibleRegionMergeDiagnosticEmitter::emitCast() {
                 srcIsolation->isTaskIsolated(), dstIsolation->isTaskIsolated())
       .limitBehaviorIf(getBehaviorLimit());
 
-  if (auto srcValue = srcRegionValue.maybeGetValue())
-    emitMergeRegionValueNote(srcValue, srcIsolationStr,
-                             srcIsolation->isTaskIsolated());
+  emitSideNote(srcRegionValueElt, srcRegionValue, srcIsolation,
+               srcIsolationStr);
 }
 
 void IncompatibleRegionMergeDiagnosticEmitter::emit() {

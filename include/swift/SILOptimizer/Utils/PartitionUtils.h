@@ -1686,16 +1686,24 @@ public:
     SILDynamicMergedIsolationInfo dstIsolationRegionInfo;
     Reason reason;
 
+    /// The partition *before* the failed merge, for isolation history
+    /// rewinding. The two regions are still separate here -- the error is
+    /// raised before assignElement/merge runs -- which is what lets each side
+    /// be explained by its own independent walk. None when history recording is
+    /// off.
+    std::optional<Partition> partition;
+
     IncompatibleRegionMergeError(
         const PartitionOp &op, Element srcRegionElt,
         SILDynamicMergedIsolationInfo srcIsolationRegionInfo,
         Element dstRegionElt,
         SILDynamicMergedIsolationInfo dstIsolationRegionInfo,
-        Reason reason = Reason::Unknown)
+        Reason reason = Reason::Unknown, std::optional<Partition> &&p = {})
         : op(&op), srcRegionElt(srcRegionElt),
           srcIsolationRegionInfo(srcIsolationRegionInfo),
           dstRegionElt(dstRegionElt),
-          dstIsolationRegionInfo(dstIsolationRegionInfo), reason(reason) {}
+          dstIsolationRegionInfo(dstIsolationRegionInfo), reason(reason),
+          partition(std::move(p)) {}
 
     IncompatibleRegionMergeError(IncompatibleRegionMergeError &&other) =
         default;
@@ -2172,7 +2180,7 @@ public:
         }
         return handleError(IncompatibleRegionMergeError(
             op, srcElement, srcRegIsolation, destElement, destIsolation,
-            RegionMergeReason::Assign));
+            RegionMergeReason::Assign, getSnapshotForIsolationHistory()));
       }
 
       // Then perform the actual assignment.
@@ -2215,7 +2223,7 @@ public:
         }
         return handleError(IncompatibleRegionMergeError(
             op, srcElement, srcRegIsolation, destElement, destIsolation,
-            RegionMergeReason::Assign));
+            RegionMergeReason::Assign, getSnapshotForIsolationHistory()));
       }
 
       // Create extra region for our dest and merge it into dest's region.
@@ -2356,7 +2364,7 @@ public:
         }
         return handleError(IncompatibleRegionMergeError(
             op, srcElement, srcRegIsolation, destElement, destRegIsolation,
-            op.getRegionMergeReason()));
+            op.getRegionMergeReason(), getSnapshotForIsolationHistory()));
       }
 
       // Then perform the actual merge.
