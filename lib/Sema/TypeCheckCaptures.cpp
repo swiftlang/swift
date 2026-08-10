@@ -690,6 +690,9 @@ public:
     if (auto *L = dyn_cast<LoadExpr>(E))
       return getReferencedNonCopyableValue(L->getSubExpr());
 
+    if (auto *FCE = dyn_cast<FunctionConversionExpr>(E))
+      return getReferencedNonCopyableValue(FCE->getSubExpr());
+
     auto *DRE = dyn_cast<DeclRefExpr>(E);
     if (!DRE)
       return nullptr;

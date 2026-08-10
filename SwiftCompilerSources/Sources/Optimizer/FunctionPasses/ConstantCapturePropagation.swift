@@ -204,7 +204,10 @@ private func cloneArgument(_ argumentOp: Operand,
                            _ context: FunctionPassContext
 ) {
   let firstInst = targetFunction.entryBlock.instructions.first!
-  var argCloner = Cloner(cloneBefore: firstInst, context)
+  // The constants come from another function, so attribute them to the specialized
+  // closure. They materialize an argument, so they belong to the prologue.
+  let location = targetFunction.location.asPrologue
+  var argCloner = Cloner(cloneBefore: firstInst, location: location, context)
   defer { argCloner.deinitialize() }
 
   let clonedArg = argCloner.cloneRecursively(value: argumentOp.value)
@@ -214,7 +217,7 @@ private func cloneArgument(_ argumentOp: Operand,
   if partialApply.calleeArgumentConventions[calleeArgIdx].isGuaranteed,
      clonedArg.ownership == .owned
   {
-    let builder = Builder(before: firstInst, context)
+    let builder = Builder(before: firstInst, location: location, context)
     let borrowedClonedArg = builder.createBeginBorrow(of: clonedArg)
     calleeArg.uses.replaceAll(with: borrowedClonedArg, context)
 
@@ -252,7 +255,7 @@ private func rewritePartialApply(_ partialApply: PartialApplyInst, withSpecializ
       substitutionMap: specialized.genericSignature.isEmpty ? SubstitutionMap() : partialApply.substitutionMap,
       capturedArguments: arguments, calleeConvention: partialApply.calleeConvention,
       hasUnknownResultIsolation: partialApply.hasUnknownResultIsolation, isOnStack: partialApply.isOnStack,
-      isNested: partialApply.isNested)
+      isNested: partialApply.isNested, isCalledOnce: partialApply.isCalledOnce)
     newClosure = newPartialApply
   }
   partialApply.uses.replaceAll(with: newClosure, context)
