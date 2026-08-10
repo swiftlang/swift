@@ -8492,7 +8492,12 @@ void IRGenSILFunction::visitOpenExistentialRefInst(OpenExistentialRefInst *i) {
 }
 
 void IRGenSILFunction::visitOpenCOMExistentialInst(OpenCOMExistentialInst *i) {
-  llvm_unreachable("open_com_existential lowering is not implemented");
+  Explosion base = getLoweredExplosion(i->getOperand());
+
+  Explosion result;
+  result.add(base.claimNext());
+  assert(base.empty() && "COM existential must contain exactly one pointer");
+  setLoweredExplosion(i, result);
 }
 
 void IRGenSILFunction::visitOpenExistentialMetatypeInst(
