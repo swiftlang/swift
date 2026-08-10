@@ -673,10 +673,10 @@ public:
       hasFixedLocation(true),
       fixedLocation(ArtificialUnreachableLocation(), nullptr) {}
 
-  BridgedClonerImpl(SILInstruction *insertionPoint)
+  BridgedClonerImpl(SILInstruction *insertionPoint, SILDebugLocation loc)
     : SILCloner<BridgedClonerImpl>(*insertionPoint->getFunction()),
       hasFixedLocation(true),
-      fixedLocation(insertionPoint->getDebugLocation()) {
+      fixedLocation(loc) {
     Builder.setInsertionPoint(insertionPoint);
   }
 
@@ -774,9 +774,9 @@ BridgedCloner::BridgedCloner(BridgedGlobalVar var, BridgedContext context)
   context.context->notifyNewCloner();
 }
 
-BridgedCloner::BridgedCloner(BridgedInstruction inst,
+BridgedCloner::BridgedCloner(BridgedInstruction inst, BridgedLocation loc,
                              BridgedContext context)
-    : cloner(new BridgedClonerImpl(inst.unbridged())) {
+    : cloner(new BridgedClonerImpl(inst.unbridged(), loc.getLoc())) {
   context.context->notifyNewCloner();
 }
 
