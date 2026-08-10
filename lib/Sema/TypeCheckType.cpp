@@ -4969,6 +4969,7 @@ NeverNullType TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
         .Case("thin", SILFunctionType::Representation::Thin)
         .Case("c", SILFunctionType::Representation::CFunctionPointer)
         .Case("method", SILFunctionType::Representation::Method)
+        .Case("com_method", SILFunctionType::Representation::COMMethod)
         .Case("objc_method",
               SILFunctionType::Representation::ObjCMethod)
         .Case("witness_method",

@@ -799,6 +799,7 @@ BridgedASTType::FunctionTypeRepresentation BridgedASTType::getFunctionTypeRepres
   static_assert((int)FunctionTypeRepresentation::KeyPathAccessorSetter == (int)swift::SILFunctionTypeRepresentation::KeyPathAccessorSetter);
   static_assert((int)FunctionTypeRepresentation::KeyPathAccessorEquals == (int)swift::SILFunctionTypeRepresentation::KeyPathAccessorEquals);
   static_assert((int)FunctionTypeRepresentation::KeyPathAccessorHash == (int)swift::SILFunctionTypeRepresentation::KeyPathAccessorHash);
+  static_assert((int)FunctionTypeRepresentation::COMMethod == (int)swift::SILFunctionTypeRepresentation::COMMethod);
 
   auto fnType = unbridged()->castTo<swift::SILFunctionType>();
   return (FunctionTypeRepresentation)(fnType->getRepresentation());

@@ -2524,6 +2524,7 @@ NodePointer Demangler::demangleImplFunctionType() {
   case 'O': FConv = "objc_method"; break;
   case 'K': FConv = "closure"; break;
   case 'W': FConv = "witness_method"; break;
+  case 'V': FConv = "com_method"; break;
   default: pushBack(); break;
   }
   if (FConv) {
