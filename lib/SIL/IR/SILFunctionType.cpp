@@ -3804,10 +3804,15 @@ CanSILFunctionType swift::buildSILFunctionThunkType(
       extInfoBuilder = extInfoBuilder.withIsPseudogeneric();
 
   // Add the formal parameters of the expected type to the thunk.
-  auto contextConvention =
-      fn->getTypeProperties(sourceType).isTrivial()
-          ? ParameterConvention::Direct_Unowned
-          : ParameterConvention::Direct_Guaranteed;
+  //
+  // A `@called(once)` source function is applied inside the thunk body,
+  // which is itself the consuming use that enforces call-at-most-once, so
+  // it must be captured as `Direct_Owned`.
+  auto contextConvention = fn->getTypeProperties(sourceType).isTrivial()
+                               ? ParameterConvention::Direct_Unowned
+                           : sourceType->isCalledOnce()
+                               ? ParameterConvention::Direct_Owned
+                               : ParameterConvention::Direct_Guaranteed;
   SmallVector<SILParameterInfo, 4> params;
   params.append(expectedType->getParameters().begin(),
                 expectedType->getParameters().end());
