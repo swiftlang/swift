@@ -2480,7 +2480,7 @@ namespace {
         // Swift classes are always Escapable.
         if (evaluateOrDefault(
                 Impl.SwiftContext.evaluator,
-                ClangTypeEscapability({decl->getTypeForDecl(), &Impl}),
+                ClangTypeEscapability({declTy, &Impl}),
                 CxxEscapability::Unknown) == CxxEscapability::NonEscapable) {
           Impl.diagnose(HeaderLoc(decl->getLocation()),
                         diag::nonescapable_foreign_reference_type, decl);
