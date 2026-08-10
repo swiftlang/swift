@@ -17,10 +17,12 @@
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/Enum.h"
 #include "swift/Runtime/Debug.h"
+#include "swift/Basic/MathUtils.h"
 #include "Private.h"
 #include "BytecodeLayouts.h"
 #include "EnumImpl.h"
 #include "MetadataCache.h"
+#include "llvm/Support/MathExtras.h"
 #include <cstring>
 #include <algorithm>
 
@@ -50,6 +52,39 @@ static EnumValueWitnessTable *getMutableVWTableForInit(EnumMetadata *self,
   self->setValueWitnesses(newTable);
 
   return newTable;
+}
+
+/// Add the tag bytes to a payload size, raising a fatal error if the sum is not
+/// representable.
+static size_t addTagBytesOrTrap(const EnumMetadata *enumType,
+                                size_t payloadSize, unsigned numTagBytes) {
+  bool overflowed = false;
+  size_t totalSize =
+      llvm::SaturatingAdd(payloadSize, (size_t)numTagBytes, &overflowed);
+  if (SWIFT_UNLIKELY(overflowed)) {
+    swift::fatalError(0,
+                      "enum %s has a payload size of %zu bytes, which leaves "
+                      "no room for %u tag bytes\n",
+                      enumType->getDescription()->Name.get(), payloadSize,
+                      numTagBytes);
+  }
+  return totalSize;
+}
+
+/// Round a size up to a stride, raising a fatal error if the rounding is not
+/// representable.
+static size_t strideForSizeOrTrap(const EnumMetadata *enumType, size_t size,
+                                  size_t alignMask) {
+  size_t stride;
+  if (SWIFT_UNLIKELY(
+          !roundUpToAlignMaskCheckingOverflow(size, alignMask, stride))) {
+    swift::fatalError(
+        0,
+        "enum %s has a size of %zu bytes, which cannot be rounded "
+        "up to an alignment of %zu\n",
+        enumType->getDescription()->Name.get(), size, alignMask + 1);
+  }
+  return stride == 0 ? 1 : stride;
 }
 
 void
@@ -152,9 +187,11 @@ swift::swift_initEnumMetadataSinglePayload(EnumMetadata *self,
     size = payloadSize;
     unusedExtraInhabitants = payloadNumExtraInhabitants - emptyCases;
   } else {
-    size = payloadSize + getEnumTagCounts(payloadSize,
-                                      emptyCases - payloadNumExtraInhabitants,
-                                        1 /*payload case*/).numTagBytes; ;
+    size = addTagBytesOrTrap(
+        self, payloadSize,
+        getEnumTagCounts(payloadSize, emptyCases - payloadNumExtraInhabitants,
+                         1 /*payload case*/)
+            .numTagBytes);
   }
 
   auto vwtable = getMutableVWTableForInit(self, layoutFlags);
@@ -174,8 +211,7 @@ swift::swift_initEnumMetadataSinglePayload(EnumMetadata *self,
           .withInlineStorage(
               ValueWitnessTable::isValueInline(isBT, size, align));
   layout.extraInhabitantCount = unusedExtraInhabitants;
-  auto rawStride = llvm::alignTo(size, align);
-  layout.stride = rawStride == 0 ? 1 : rawStride;
+  layout.stride = strideForSizeOrTrap(self, size, align - 1);
   
   // Substitute in better common value witnesses if we have them.
   // If the payload type is a single-refcounted pointer, and the enum has
@@ -261,7 +297,7 @@ static void swift_cvw_initEnumMetadataSinglePayloadWithLayoutStringImpl(
         getEnumTagCounts(payloadSize, emptyCases - payloadNumExtraInhabitants,
                          1 /*payload case*/)
             .numTagBytes;
-    size = payloadSize + extraTagBytes;
+    size = addTagBytesOrTrap(self, payloadSize, extraTagBytes);
   }
 
   auto vwtable = getMutableVWTableForInit(self, layoutFlags);
@@ -280,8 +316,7 @@ static void swift_cvw_initEnumMetadataSinglePayloadWithLayoutStringImpl(
       .withInlineStorage(
           ValueWitnessTable::isValueInline(isBT, size, align));
   layout.extraInhabitantCount = unusedExtraInhabitants;
-  auto rawStride = llvm::alignTo(size, align);
-  layout.stride = rawStride == 0 ? 1 : rawStride;
+  layout.stride = strideForSizeOrTrap(self, size, align - 1);
 
   auto xiElement = findXIElement(payloadType);
 
@@ -437,8 +472,9 @@ swift::swift_initEnumMetadataMultiPayload(EnumMetadata *enumType,
   auto tagCounts = getEnumTagCounts(payloadSize,
                                 enumType->getDescription()->getNumEmptyCases(),
                                 numPayloads);
-  unsigned totalSize = payloadSize + tagCounts.numTagBytes;
-  
+  size_t totalSize =
+      addTagBytesOrTrap(enumType, payloadSize, tagCounts.numTagBytes);
+
   // See whether there are extra inhabitants in the tag.
   unsigned numExtraInhabitants = tagCounts.numTagBytes == 4
     ? INT_MAX
@@ -449,19 +485,18 @@ swift::swift_initEnumMetadataMultiPayload(EnumMetadata *enumType,
   auto vwtable = getMutableVWTableForInit(enumType, layoutFlags);
 
   // Set up the layout info in the vwtable.
-  auto rawStride = (totalSize + alignMask) & ~alignMask;
-  TypeLayout layout{totalSize,
-                    rawStride == 0 ? 1 : rawStride,
+  auto stride = strideForSizeOrTrap(enumType, totalSize, alignMask);
+  TypeLayout layout{totalSize, stride,
                     ValueWitnessFlags()
-                     .withAlignmentMask(alignMask)
-                     .withPOD(isPOD)
-                     .withCopyable(isCopyable)
-                     .withBitwiseTakable(isBT)
-                     .withBitwiseBorrowable(isBB)
-                     .withAddressableForDependencies(isAFD)
-                     .withEnumWitnesses(true)
-                     .withInlineStorage(ValueWitnessTable::isValueInline(
-                         isBT, totalSize, alignMask + 1)),
+                        .withAlignmentMask(alignMask)
+                        .withPOD(isPOD)
+                        .withCopyable(isCopyable)
+                        .withBitwiseTakable(isBT)
+                        .withBitwiseBorrowable(isBB)
+                        .withAddressableForDependencies(isAFD)
+                        .withEnumWitnesses(true)
+                        .withInlineStorage(ValueWitnessTable::isValueInline(
+                            isBT, totalSize, alignMask + 1)),
                     numExtraInhabitants};
 
   installCommonValueWitnesses(layout, vwtable);
@@ -515,7 +550,8 @@ static void swift_cvw_initEnumMetadataMultiPayloadWithLayoutStringImpl(
   auto tagCounts = getEnumTagCounts(payloadSize,
                                 enumType->getDescription()->getNumEmptyCases(),
                                 numPayloads);
-  unsigned totalSize = payloadSize + tagCounts.numTagBytes;
+  size_t totalSize =
+      addTagBytesOrTrap(enumType, payloadSize, tagCounts.numTagBytes);
 
   // See whether there are extra inhabitants in the tag.
   unsigned numExtraInhabitants = tagCounts.numTagBytes == 4
@@ -594,19 +630,18 @@ static void swift_cvw_initEnumMetadataMultiPayloadWithLayoutStringImpl(
   }
 
   // Set up the layout info in the vwtable.
-  auto rawStride = (totalSize + alignMask) & ~alignMask;
-  TypeLayout layout{totalSize,
-                    rawStride == 0 ? 1 : rawStride,
+  auto stride = strideForSizeOrTrap(enumType, totalSize, alignMask);
+  TypeLayout layout{totalSize, stride,
                     ValueWitnessFlags()
-                     .withAlignmentMask(alignMask)
-                     .withPOD(isPOD)
-                     .withCopyable(isCopyable)
-                     .withBitwiseTakable(isBT)
-                     .withBitwiseBorrowable(isBB)
-                     .withAddressableForDependencies(isAFD)
-                     .withEnumWitnesses(true)
-                     .withInlineStorage(ValueWitnessTable::isValueInline(
-                         isBT, totalSize, alignMask + 1)),
+                        .withAlignmentMask(alignMask)
+                        .withPOD(isPOD)
+                        .withCopyable(isCopyable)
+                        .withBitwiseTakable(isBT)
+                        .withBitwiseBorrowable(isBB)
+                        .withAddressableForDependencies(isAFD)
+                        .withEnumWitnesses(true)
+                        .withInlineStorage(ValueWitnessTable::isValueInline(
+                            isBT, totalSize, alignMask + 1)),
                     numExtraInhabitants};
 
   installCommonValueWitnesses(layout, vwtable);
@@ -638,6 +673,8 @@ struct MultiPayloadLayout {
 static MultiPayloadLayout getMultiPayloadLayout(const EnumMetadata *enumType) {
   size_t payloadSize = enumType->getPayloadSize();
   size_t totalSize = enumType->getValueWitnesses()->size;
+  assert(totalSize >= payloadSize &&
+         "multi-payload enum size is smaller than its payload size");
   return {payloadSize, totalSize - payloadSize};
 }
 
