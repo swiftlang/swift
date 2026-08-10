@@ -232,6 +232,7 @@ private func registerSILClasses() {
   register(ClassMethodInst.self)
   register(SuperMethodInst.self)
   register(ObjCMethodInst.self)
+  register(COMMethodInst.self)
   register(ObjCSuperMethodInst.self)
   register(WitnessMethodInst.self)
   register(IsUniqueInst.self)

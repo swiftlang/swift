@@ -2974,6 +2974,16 @@ SILCloner<ImplClass>::visitObjCMethodInst(ObjCMethodInst *Inst) {
                 Inst->getMember(), getOpType(Inst->getType())));
 }
 
+template <typename T>
+void SILCloner<T>::visitCOMMethodInst(COMMethodInst *Inst) {
+  auto &B = getBuilder();
+  B.setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  auto clone = B.createCOMMethod(getOpLocation(Inst->getLoc()),
+                                 getOpValue(Inst->getOperand()),
+                                 Inst->getMember(), getOpType(Inst->getType()));
+  recordClonedInstruction(Inst, clone);
+}
+
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitObjCSuperMethodInst(ObjCSuperMethodInst *Inst) {

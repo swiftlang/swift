@@ -3787,6 +3787,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
   case SILInstructionKind::ClassMethodInst:
   case SILInstructionKind::SuperMethodInst:
   case SILInstructionKind::ObjCMethodInst:
+  case SILInstructionKind::COMMethodInst:
   case SILInstructionKind::ObjCSuperMethodInst: {
     // Format: a type, an operand and a SILDeclRef. Use SILOneTypeValuesLayout:
     // type, Attr, SILDeclRef (DeclID, Kind, uncurryLevel), and an operand.
@@ -3823,6 +3824,13 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
           getLocalValue(Builder.maybeGetFunction(),
                         ListOfValues[NextValueIndex], operandTy),
           DRef, Ty);
+      break;
+    case SILInstructionKind::COMMethodInst:
+      ResultInst =
+          Builder.createCOMMethod(Loc, getLocalValue(Builder.maybeGetFunction(),
+                                                     ListOfValues[NextValueIndex],
+                                                     operandTy),
+                                  DRef, Ty);
       break;
     case SILInstructionKind::ObjCSuperMethodInst:
       ResultInst = Builder.createObjCSuperMethod(
