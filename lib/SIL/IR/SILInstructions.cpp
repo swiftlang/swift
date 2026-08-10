@@ -2522,10 +2522,11 @@ COMMethodInst::create(SILDebugLocation DL, SILValue Operand, SILDeclRef Member,
                       SILType Ty, SILFunction *F) {
   SILModule &M = F->getModule();
   SmallVector<SILValue, 8> TypeDependentOperands;
-  collectTypeDependentOperands(TypeDependentOperands, *F, Ty.getASTType());
+  collectTypeDependentOperands(TypeDependentOperands, *F, Ty.getASTType(),
+                               Operand->getType().getASTType());
 
   unsigned size =
-      totalSizeToAlloc<swift::Operand>(1 + TypeDependentOperands.size());
+      totalSizeToAlloc<swift::Operand>(TypeDependentOperands.size() + 1);
   void *Buffer = M.allocateInst(size, alignof(COMMethodInst));
   return ::new (Buffer) COMMethodInst(DL, Operand, TypeDependentOperands,
                                       Member, Ty);
