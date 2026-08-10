@@ -771,6 +771,11 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
     return RuntimeEffect::MetaData | RuntimeEffect::ExistentialClassBound;
   }
 
+  case SILInstructionKind::OpenCOMExistentialInst: {
+    impactType = inst->getOperand(0)->getType();
+    return RuntimeEffect::Existential;
+  }
+
   case SILInstructionKind::UnconditionalCheckedCastInst:
     impactType = inst->getOperand(0)->getType();
     return RuntimeEffect::Casting | metadataEffect(impactType) |

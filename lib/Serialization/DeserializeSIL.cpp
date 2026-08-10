@@ -2160,6 +2160,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
         getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn));      \
     break;
     ONEOPERAND_ONETYPE_INST(OpenExistentialRef)
+    ONEOPERAND_ONETYPE_INST(OpenCOMExistential)
     ONEOPERAND_ONETYPE_INST(OpenExistentialMetatype)
     ONEOPERAND_ONETYPE_INST(OpenExistentialBox)
     ONEOPERAND_ONETYPE_INST(OpenExistentialValue)

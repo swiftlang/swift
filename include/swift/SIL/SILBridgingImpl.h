@@ -1413,6 +1413,13 @@ BridgedGenericEnvironment BridgedInstruction::OpenExistentialRefInst_getDefinedG
   return {getAs<swift::OpenExistentialRefInst>()->getDefinedOpenedArchetype()->getGenericEnvironment()};
 }
 
+BridgedGenericEnvironment
+BridgedInstruction::OpenCOMExistentialInst_getDefinedGenericEnvironment() const {
+  return {getAs<swift::OpenCOMExistentialInst>()
+              ->getDefinedOpenedArchetype()
+                ->getGenericEnvironment()};
+}
+
 BridgedGlobalVar BridgedInstruction::GlobalAccessInst_getGlobal() const {
   return {getAs<swift::GlobalAccessInst>()->getReferencedGlobal()};
 }

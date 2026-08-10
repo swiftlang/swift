@@ -4880,6 +4880,23 @@ public:
             "SILFunction");
   }
 
+  void checkOpenCOMExistentialInst(OpenCOMExistentialInst *OCE) {
+    SILType operandType = OCE->getOperand()->getType();
+    require(operandType.isObject(),
+            "open_com_existential operand must not be address");
+    require(operandType.canUseExistentialRepresentation(ExistentialRepresentation::COM),
+            "open_com_existential operand must be a COM existential");
+
+    require(OCE->getType().isObject(),
+            "open_com_existential result must not be an address");
+
+    auto archetype = getOpenedArchetypeOf(OCE->getType().getASTType());
+    require(archetype,
+            "open_com_existential result must be an opened existential archetype");
+    require(OCE->getModule().getRootLocalArchetypeDefInst(archetype, OCE->getFunction()) == OCE,
+            "Archetype opened by open_com_existential should be registered in SILFunction");
+  }
+
   void checkOpenExistentialBoxInst(OpenExistentialBoxInst *OEI) {
     SILType operandType = OEI->getOperand()->getType();
     require(operandType.isObject(),

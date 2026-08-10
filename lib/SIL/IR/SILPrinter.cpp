@@ -2818,6 +2818,10 @@ public:
     *this << getIDAndType(OI->getOperand()) << " to " << OI->getType();
     printForwardingOwnershipKind(OI, OI->getOperand());
   }
+  void visitOpenCOMExistentialInst(OpenCOMExistentialInst *OI) {
+    *this << getIDAndType(OI->getOperand()) << " to " << OI->getType();
+    printForwardingOwnershipKind(OI, OI->getOperand());
+  }
   void visitOpenExistentialMetatypeInst(OpenExistentialMetatypeInst *OI) {
     *this << getIDAndType(OI->getOperand()) << " to " << OI->getType();
   }
