@@ -4957,7 +4957,7 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
     // Diagnose and ignore arguments.
     if (attr->hasArgs()) {
       diagnose(attr->getLocation(), diag::result_builder_arguments)
-        .highlight(attr->getArgs()->getSourceRange());
+          .highlight(attr->getRangeWithAt());
     }
 
     // Complain if this isn't the primary result-builder attribute.
