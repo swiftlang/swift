@@ -8580,8 +8580,7 @@ void SwiftDeclConverter::importMirroredProtocolMembers(
           return;
 
         bool inNearbyCategory =
-            std::any_of(interfaceDecl->known_categories_begin(),
-                        interfaceDecl->known_categories_end(),
+            llvm::any_of(interfaceDecl->known_categories(),
                         [=](const clang::ObjCCategoryDecl *category) -> bool {
                           if (!Impl.getClangSema().isVisible(category)) {
                             return false;
@@ -9207,6 +9206,10 @@ void ClangImporter::Implementation::importNontrivialAttribute(
   }
 }
 
+/// The `swift_attr` prefix introducing an explicit protocol conformance,
+/// e.g. `SWIFT_CONFORMS_TO_PROTOCOL(Module.Protocol)`.
+constexpr static llvm::StringLiteral conformsToPrefix = "conforms_to:";
+
 void
 ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
   auto ClangDecl =
@@ -9350,7 +9353,7 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
         continue;
       }
 
-      if (swiftAttr->getAttribute().starts_with("conforms_to:")) {
+      if (swiftAttr->getAttribute().starts_with(conformsToPrefix)) {
         if (auto nominal = dyn_cast<NominalTypeDecl>(MappedDecl))
           addExplicitProtocolConformance(nominal, swiftAttr, conformancesSeen);
       }
@@ -9463,7 +9466,7 @@ void ClangImporter::Implementation::addExplicitProtocolConformance(
     clang::SwiftAttrAttr *conformsToAttr,
     llvm::SmallSet<ProtocolDecl *, 4> &alreadyAdded) {
   auto conformsToValue = conformsToAttr->getAttribute()
-                             .drop_front(StringRef("conforms_to:").size())
+                             .drop_front(conformsToPrefix.size())
                              .str();
   auto names = StringRef(conformsToValue).split('.');
   auto moduleName = names.first;
@@ -9537,7 +9540,7 @@ void ClangImporter::Implementation::addExplicitProtocolConformancesFromBases(
     llvm::SmallSet<ProtocolDecl *, 4> alreadyAdded;
     llvm::for_each(cxxRecordDecl->getAttrs(), [&](auto *attr) {
       if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr)) {
-        if (swiftAttr->getAttribute().starts_with("conforms_to:"))
+        if (swiftAttr->getAttribute().starts_with(conformsToPrefix))
           addExplicitProtocolConformance(nominal, swiftAttr, alreadyAdded);
       }
     });
