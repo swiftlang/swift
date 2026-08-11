@@ -801,6 +801,10 @@ BridgedLocation BridgedFunction::getLocation() const {
   return {swift::SILDebugLocation(getFunction()->getLocation(), getFunction()->getDebugScope())};
 }
 
+OptionalBridgedDeclObj BridgedFunction::getParentModule() const {
+  return {getFunction()->getParentModule()};
+}
+
 BridgedArrayRef BridgedFunction::getFilesForModule() const {
   return getFunction()->getModule().getSwiftModule()->getFiles();
 }

@@ -1,22 +1,19 @@
 // RUN: %target-swift-emit-ir %s -wmo
 // RUN: %target-swift-emit-ir %s -enable-experimental-feature Embedded -wmo
 
-// RUN: %empty-directory(%t)
-// RUN: split-file %s %t
-// RUN: echo "// expected-error@'%swift_src_root/stdlib/public/core/ArrayShared.swift':48{{creating an instance of type '_ContiguousArrayStorage<Int>' involves heap allocation}}" >> %t/main.swift
-// RUN: echo "// expected-error@'%swift_src_root/stdlib/public/core/SwiftNativeNSArray.swift':501{{creating an instance of type '__SwiftNativeNSArrayWithContiguousStorage' involves heap allocation}}" >> %t/main.swift
-// RUN: echo "// expected-error@'%swift_src_root/stdlib/public/core/ContiguousArrayBuffer.swift':361{{creating an instance of type '_ContiguousArrayStorage<Int>' involves heap allocation}}" >> %t/main.swift
-// RUN: echo "// expected-error@'%swift_src_root/stdlib/public/core/UnsafePointer.swift':831{{explicit heap allocation}}" >> %t/main.swift
+// A heap allocation in a function of another module - e.g. in a standard library function or in a
+// specialization of one - is reported at the innermost call in this file, because that's the code
+// which can be changed. If a violation is not reached through a call from this file - e.g. because
+// the containing function is only referenced from a vtable - it can only be reported in the
+// standard library itself. '-verify-ignore-unrelated' ignores those.
 
-// RUN: %target-swift-emit-ir %t/main.swift -enable-experimental-feature Embedded -Werror HeapAllocation -wmo -verify -verify-ignore-unknown
+// RUN: %target-swift-emit-ir %s -enable-experimental-feature Embedded -Werror HeapAllocation -wmo -verify -verify-ignore-unknown -verify-ignore-unrelated
 
-// RUN: %target-swift-emit-ir %t/main.swift -enable-experimental-feature Embedded -no-allocations -wmo -verify -verify-ignore-unknown
+// RUN: %target-swift-emit-ir %s -enable-experimental-feature Embedded -no-allocations -wmo -verify -verify-ignore-unknown -verify-ignore-unrelated
 
 // REQUIRES: optimized_stdlib
 // REQUIRES: OS=macosx || OS=linux-gnu
 // REQUIRES: swift_feature_Embedded
-
-//--- main.swift
 
 public class X {} // expected-error {{creating an instance of type 'X' involves heap allocation}}
 public func use_a_class() -> X {
@@ -25,12 +22,12 @@ public func use_a_class() -> X {
 }
 
 public func use_an_array() -> Int {
-	let a = [1, 2, 3] // expected-note*{{generic specialization called here}}
+	let a = [1, 2, 3] // expected-error {{creating an instance of type '_ContiguousArrayStorage<Int>' involves heap allocation}}
 	return a.count
 }
 
 public func use_unsafepointer_allocate() -> UnsafeMutablePointer<UInt8> {
-	return UnsafeMutablePointer<UInt8>.allocate(capacity: 10) // expected-note {{generic specialization called here}}
+	return UnsafeMutablePointer<UInt8>.allocate(capacity: 10) // expected-error {{explicit heap allocation}}
 }
 
 func acceptEscaping(_ body: @escaping () -> Void) { }
@@ -57,6 +54,7 @@ public func getVariable(_ name: String) -> SyntaxTree {
 }
 
 public func addEm(lhs: SyntaxTree, rhs: SyntaxTree) -> SyntaxTree {
+  // TODO: this diagnostic could be better
   return .add(lhs, rhs) // expected-error{{creating an instance of type '{ var (SyntaxTree, SyntaxTree) }' involves heap allocation}}
 }
 

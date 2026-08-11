@@ -32,6 +32,18 @@ public struct Location: ProvidingSourceLocation, Equatable, CustomStringConverti
     return String(taking: bridged.getDebugDescription())
   }
   
+  /// The `SourceLoc` if this location can be resolved to a location in a loaded source file,
+  /// and nil otherwise.
+  ///
+  /// Locations which are de-serialized from a swiftmodule file - e.g. locations of instructions in
+  /// standard library functions - don't have a `SourceLoc`. They consist of a filename + line and
+  /// column indices (see `fileNameAndPosition`) and can only be shown in a diagnostic by loading
+  /// the referenced file with `getSourceLocation(diagnosticEngine:)`.
+  ///
+  /// Note that a valid `SourceLoc` does _not_ mean that the location is in the module which is
+  /// currently compiled: locations of de-serialized _declarations_ of other modules do have a valid
+  /// `SourceLoc` if those modules were built with a swiftsourceinfo file. Use
+  /// `Function.isInCurrentModule` to check that.
   public var sourceLoc: SourceLoc? {
     if hasValidLineNumber {
       return SourceLoc(bridged: bridged.getSourceLocation())

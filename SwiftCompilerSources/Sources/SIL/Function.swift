@@ -50,6 +50,20 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
 
   public var wasDeserializedCanonical: Bool { bridged.wasDeserializedCanonical() }
 
+  /// The module which defines this function, or nil if it's not known.
+  ///
+  /// This is nil for functions which are created by the optimizer from a function of another module,
+  /// e.g. for a specialization of a standard library function.
+  public var parentModule: ModuleDecl? { bridged.getParentModule().getAs(ModuleDecl.self) }
+
+  /// True if this function is defined in the module which is currently compiled.
+  ///
+  /// This is false for functions which are de-serialized from another module - e.g. from the
+  /// standard library - and for specializations of such functions.
+  public func isInCurrentModule(_ context: some Context) -> Bool {
+    parentModule == context.currentModuleContext
+  }
+
   public var isTrapNoReturn: Bool { bridged.isTrapNoReturn() }
 
   public var isAutodiffVJP: Bool { bridged.isAutodiffVJP() }

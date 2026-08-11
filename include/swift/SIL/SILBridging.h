@@ -544,6 +544,7 @@ struct BridgedFunction {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedStringRef getName() const;
   BridgedOwnedString getDebugDescription() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedLocation getLocation() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedDeclObj getParentModule() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedArrayRef getFilesForModule() const;
   BRIDGED_INLINE bool isAccessor() const;
   BRIDGED_INLINE bool isInitializer() const;
