@@ -6,8 +6,10 @@
 import InheritedGenericArgument
 
 func add<T: BaseObj>(_ obj: T) {}
+func addShared<T: SharedObj>(_ obj: T) {}
 
 func test() {
   add(DerivedObj1.make())
   add(DerivedObj2.make())
+  addShared(SharedObj.make())
 }
