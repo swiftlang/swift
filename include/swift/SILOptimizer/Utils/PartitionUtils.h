@@ -1486,13 +1486,19 @@ public:
     SILValue srcValue;
     SILDynamicMergedIsolationInfo srcIsolationRegionInfo;
 
+    /// The partition at the assignment, for isolation history rewinding. None
+    /// when history recording is off for this function.
+    std::optional<Partition> partition;
+
     AssignNeverSendableIntoSendingResultError(
         const PartitionOp &op, Element destElement,
         SILFunctionArgument *destValue, Element srcElement, SILValue srcValue,
-        SILDynamicMergedIsolationInfo srcIsolationRegionInfo)
+        SILDynamicMergedIsolationInfo srcIsolationRegionInfo,
+        std::optional<Partition> &&p)
         : op(&op), destElement(destElement), destValue(destValue),
           srcElement(srcElement), srcValue(srcValue),
-          srcIsolationRegionInfo(srcIsolationRegionInfo) {}
+          srcIsolationRegionInfo(srcIsolationRegionInfo),
+          partition(std::move(p)) {}
 
     AssignNeverSendableIntoSendingResultError(
         AssignNeverSendableIntoSendingResultError &&other) = default;
@@ -1571,18 +1577,26 @@ public:
     /// If set, the emitter should downgrade this error to a warning.
     bool downgradeToWarning = false;
 
-    InOutSendingReturnedError(const PartitionOp &op,
-                              Element inoutSendingElement,
-                              Element returnedValue,
-                              SILDynamicMergedIsolationInfo isolationInfo = {})
-        : op(&op), inoutSendingElement(inoutSendingElement),
-          returnedValue(returnedValue), isolationInfo(isolationInfo) {}
+    /// The partition at the exiting terminator, for isolation history
+    /// rewinding. None when history recording is off for this function.
+    std::optional<Partition> partition;
 
     InOutSendingReturnedError(const PartitionOp &op,
                               Element inoutSendingElement,
-                              SILDynamicMergedIsolationInfo isolationInfo = {})
+                              Element returnedValue,
+                              SILDynamicMergedIsolationInfo isolationInfo = {},
+                              std::optional<Partition> &&p = {})
+        : op(&op), inoutSendingElement(inoutSendingElement),
+          returnedValue(returnedValue), isolationInfo(isolationInfo),
+          partition(std::move(p)) {}
+
+    InOutSendingReturnedError(const PartitionOp &op,
+                              Element inoutSendingElement,
+                              SILDynamicMergedIsolationInfo isolationInfo = {},
+                              std::optional<Partition> &&p = {})
         : InOutSendingReturnedError(op, inoutSendingElement,
-                                    inoutSendingElement, isolationInfo) {}
+                                    inoutSendingElement, isolationInfo,
+                                    std::move(p)) {}
 
     InOutSendingReturnedError(InOutSendingReturnedError &&other) = default;
     InOutSendingReturnedError &
@@ -1600,11 +1614,17 @@ public:
     Element firstInoutSendingParam;
     SmallVector<Element, 1> otherInOutSendingParams;
 
+    /// The partition at the exiting terminator, for isolation history
+    /// rewinding. None when history recording is off for this function.
+    std::optional<Partition> partition;
+
     InOutSendingParametersInSameRegionError(
         const PartitionOp &op, Element firstInoutSendingParam,
-        SmallVector<Element, 1> &&otherInOutSendingParams)
+        SmallVector<Element, 1> &&otherInOutSendingParams,
+        std::optional<Partition> &&p)
         : op(&op), firstInoutSendingParam(firstInoutSendingParam),
-          otherInOutSendingParams(std::move(otherInOutSendingParams)) {}
+          otherInOutSendingParams(std::move(otherInOutSendingParams)),
+          partition(std::move(p)) {}
 
     InOutSendingParametersInSameRegionError(
         InOutSendingParametersInSameRegionError &&other) = default;
@@ -1666,16 +1686,24 @@ public:
     SILDynamicMergedIsolationInfo dstIsolationRegionInfo;
     Reason reason;
 
+    /// The partition *before* the failed merge, for isolation history
+    /// rewinding. The two regions are still separate here -- the error is
+    /// raised before assignElement/merge runs -- which is what lets each side
+    /// be explained by its own independent walk. None when history recording is
+    /// off.
+    std::optional<Partition> partition;
+
     IncompatibleRegionMergeError(
         const PartitionOp &op, Element srcRegionElt,
         SILDynamicMergedIsolationInfo srcIsolationRegionInfo,
         Element dstRegionElt,
         SILDynamicMergedIsolationInfo dstIsolationRegionInfo,
-        Reason reason = Reason::Unknown)
+        Reason reason = Reason::Unknown, std::optional<Partition> &&p = {})
         : op(&op), srcRegionElt(srcRegionElt),
           srcIsolationRegionInfo(srcIsolationRegionInfo),
           dstRegionElt(dstRegionElt),
-          dstIsolationRegionInfo(dstIsolationRegionInfo), reason(reason) {}
+          dstIsolationRegionInfo(dstIsolationRegionInfo), reason(reason),
+          partition(std::move(p)) {}
 
     IncompatibleRegionMergeError(IncompatibleRegionMergeError &&other) =
         default;
@@ -2056,7 +2084,8 @@ public:
     }
 
     handleError(AssignNeverSendableIntoSendingResultError(
-        op, op.getOpArg1(), fArg, op.getOpArg2(), rep, dynamicRegionIsolation));
+        op, op.getOpArg1(), fArg, op.getOpArg2(), rep, dynamicRegionIsolation,
+        getSnapshotForIsolationHistory()));
   }
 
   /// Apply \p op to the partition op.
@@ -2151,7 +2180,7 @@ public:
         }
         return handleError(IncompatibleRegionMergeError(
             op, srcElement, srcRegIsolation, destElement, destIsolation,
-            RegionMergeReason::Assign));
+            RegionMergeReason::Assign, getSnapshotForIsolationHistory()));
       }
 
       // Then perform the actual assignment.
@@ -2194,7 +2223,7 @@ public:
         }
         return handleError(IncompatibleRegionMergeError(
             op, srcElement, srcRegIsolation, destElement, destIsolation,
-            RegionMergeReason::Assign));
+            RegionMergeReason::Assign, getSnapshotForIsolationHistory()));
       }
 
       // Create extra region for our dest and merge it into dest's region.
@@ -2335,7 +2364,7 @@ public:
         }
         return handleError(IncompatibleRegionMergeError(
             op, srcElement, srcRegIsolation, destElement, destRegIsolation,
-            op.getRegionMergeReason()));
+            op.getRegionMergeReason(), getSnapshotForIsolationHistory()));
       }
 
       // Then perform the actual merge.
@@ -2400,15 +2429,17 @@ public:
           // determining element identity. When that changes, this code will
           // need to be updated to look through loads.
           if (*elt == op.getOpArg1()) {
-            handleError(InOutSendingReturnedError(op, op.getOpArg1(),
-                                                  dynamicRegionIsolation));
+            handleError(InOutSendingReturnedError(
+                op, op.getOpArg1(), dynamicRegionIsolation,
+                getSnapshotForIsolationHistory()));
             continue;
           }
 
           // Otherwise, we need to refer to a different value in the same region
           // as the 'inout sending' parameter. Emit a special error. For that.
-          handleError(InOutSendingReturnedError(op, op.getOpArg1(), *elt,
-                                                dynamicRegionIsolation));
+          handleError(InOutSendingReturnedError(
+              op, op.getOpArg1(), *elt, dynamicRegionIsolation,
+              getSnapshotForIsolationHistory()));
         }
 
         return emittedDiagnostic;
@@ -2424,9 +2455,9 @@ public:
         // This handles task-isolated captures.
         if (auto outParam =
                 findNonDisconnectedOutParameterInRegion(inoutSendingRegion)) {
-          handleError(InOutSendingReturnedError(op, op.getOpArg1(),
-                                                getElement(outParam).value(),
-                                                dynamicRegionIsolation));
+          handleError(InOutSendingReturnedError(
+              op, op.getOpArg1(), getElement(outParam).value(),
+              dynamicRegionIsolation, getSnapshotForIsolationHistory()));
           return;
         }
 
@@ -2449,7 +2480,8 @@ public:
       if (findOtherInOutSendingParameters(inoutSendingRegion, op.getOpArg1(),
                                           foundInOutSendingElts)) {
         handleError(InOutSendingParametersInSameRegionError(
-            op, op.getOpArg1(), std::move(foundInOutSendingElts)));
+            op, op.getOpArg1(), std::move(foundInOutSendingElts),
+            getSnapshotForIsolationHistory()));
         return;
       }
 
@@ -2477,7 +2509,8 @@ public:
       if (auto outParam =
           findSendingOutParameterInRegion(inoutSendingRegion)) {
         InOutSendingReturnedError error(op, op.getOpArg1(), outParam.value(),
-                                       dynamicRegionIsolation);
+                                        dynamicRegionIsolation,
+                                        getSnapshotForIsolationHistory());
         error.downgradeToWarning = true;
         handleError(std::move(error));
         return;
