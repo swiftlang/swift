@@ -1,5 +1,4 @@
-// RUN: %target-sil-opt -sil-verify-none -sil-print-types %s | %target-sil-opt -sil-verify-none -sil-print-types | %FileCheck %s
-// TODO: Remove -sil-verify-none when multi-operand debug_value is supported
+// RUN: %target-sil-opt -sil-print-types %s | %target-sil-opt -sil-print-types | %FileCheck %s
 sil_stage canonical
 
 import Builtin
