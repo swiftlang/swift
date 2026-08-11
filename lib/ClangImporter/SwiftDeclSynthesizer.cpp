@@ -43,6 +43,7 @@
 #include "clang/Basic/Specifiers.h"
 #include "clang/Sema/DelayedDiagnostic.h"
 #include "clang/Sema/Sema.h"
+#include "llvm/ADT/STLExtras.h"
 
 using namespace swift;
 using namespace importer;
@@ -2435,7 +2436,7 @@ SwiftDeclSynthesizer::makeOperator(FuncDecl *operatorMethod,
   auto oldArgNames = operatorMethod->getName().getArgumentNames();
   SmallVector<Identifier, 4> newArgNames;
   newArgNames.emplace_back();
-  newArgNames.append(oldArgNames.begin(), oldArgNames.end());
+  llvm::append_range(newArgNames, oldArgNames);
 
   auto opDeclName =
       DeclName(ctx, opId, {newArgNames.begin(), newArgNames.end()});
@@ -2477,10 +2478,11 @@ FuncDecl *SwiftDeclSynthesizer::makeVirtualMethod(
       ReferenceReturnTypeBehaviorForBaseMethodSynthesis::KeepReference,
       /*forceConstQualifier*/ false);
 
+  constexpr llvm::StringLiteral initName = "init";
   llvm::SmallString<64> backtickedSwiftName;
-  if (swiftName == "init" || swiftName.starts_with("init(")) {
+  if (swiftName == initName || swiftName.starts_with("init(")) {
     backtickedSwiftName = "`init`";
-    backtickedSwiftName += swiftName.drop_front(StringRef("init").size());
+    backtickedSwiftName += swiftName.drop_front(initName.size());
     swiftName = backtickedSwiftName;
   }
 
