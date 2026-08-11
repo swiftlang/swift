@@ -3779,7 +3779,10 @@ struct TargetGenericClassMetadataPattern final :
   /// in words.
   uint16_t MetaclassRODataOffset;
 
-  uint16_t Reserved;
+  /// The size in pointer words of the native instance-prefix template.
+  /// Generic metadata layout rounds this up to the instance alignment to
+  /// produce the final HeapObject address point.
+  uint16_t InstancePrefixSizeInWords;
 
   bool hasImmediateMembersPattern() const {
     return PatternFlags.class_hasImmediateMembersPattern();
@@ -4336,6 +4339,39 @@ struct TargetObjCResilientClassStubInfo {
   TargetRelativeDirectPointer<Runtime, const void> Stub;
 };
 
+/// Describes bytes copied ahead of a native class instance's address point.
+///
+/// This is an optional trailing record in a class context descriptor, selected
+/// by TypeContextDescriptorFlags::class_hasInstancePrefix(). It is deliberately
+/// independent of any particular foreign object model.
+///
+/// The prefix template contains exactly PrefixSizeInWords pointer words. The
+/// allocator copies it immediately before the HeapObject address point.
+/// InstanceAddressPoint can be larger than the template when leading padding
+/// is needed to preserve the native instance alignment.
+///
+/// A descriptor always references the complete template for that dynamic
+/// class, including inherited prefix words. Consequently the allocator needs
+/// no static knowledge of the allocation's class declaration.
+///
+/// The record is last among the class descriptor's trailing records so a
+/// future version can append data without changing the locations of existing
+/// trailing records. Runtimes must reject versions they do not understand.
+template <typename Runtime>
+struct TargetClassInstancePrefixDescriptor {
+  using PrefixTemplatePointerType =
+    TargetRelativeDirectPointer<Runtime, const void, /*nullable*/ false>;
+  static constexpr uint16_t CurrentVersion =
+      ClassInstancePrefixDescriptorVersion;
+
+  uint16_t Version;
+  uint16_t PrefixSizeInWords;
+  PrefixTemplatePointerType PrefixTemplate;
+};
+
+using ClassInstancePrefixDescriptor =
+    TargetClassInstancePrefixDescriptor<InProcess>;
+
 template <typename Runtime>
 class swift_ptrauth_struct_context_descriptor(ClassDescriptor)
     TargetClassDescriptor final
@@ -4358,7 +4394,8 @@ class swift_ptrauth_struct_context_descriptor(ClassDescriptor)
                               InvertibleProtocolSet,
                               TargetSingletonMetadataPointer<Runtime>,
                               TargetMethodDefaultOverrideTableHeader<Runtime>,
-                              TargetMethodDefaultOverrideDescriptor<Runtime>> {
+                              TargetMethodDefaultOverrideDescriptor<Runtime>,
+                              TargetClassInstancePrefixDescriptor<Runtime>> {
 private:
   using TrailingGenericContextObjects = 
     swift::TrailingGenericContextObjects<TargetClassDescriptor<Runtime>,
@@ -4378,7 +4415,8 @@ private:
                                          InvertibleProtocolSet,
                                          TargetSingletonMetadataPointer<Runtime>,
                                          TargetMethodDefaultOverrideTableHeader<Runtime>,
-                                         TargetMethodDefaultOverrideDescriptor<Runtime>>;
+                                         TargetMethodDefaultOverrideDescriptor<Runtime>,
+                                         TargetClassInstancePrefixDescriptor<Runtime>>;
 
   using TrailingObjects =
     typename TrailingGenericContextObjects::TrailingObjects;
@@ -4414,6 +4452,8 @@ public:
       TargetMethodDefaultOverrideTableHeader<Runtime>;
   using DefaultOverrideDescriptor =
       TargetMethodDefaultOverrideDescriptor<Runtime>;
+  using InstancePrefixDescriptor =
+      TargetClassInstancePrefixDescriptor<Runtime>;
 
   using StoredPointer = typename Runtime::StoredPointer;
   using StoredPointerDifference = typename Runtime::StoredPointerDifference;
@@ -4569,6 +4609,10 @@ private:
     return getDefaultOverrideTable()->NumEntries;
   }
 
+  size_t numTrailingObjects(OverloadToken<InstancePrefixDescriptor>) const {
+    return hasInstancePrefix() ? 1 : 0;
+  }
+
 public:
   const TargetRelativeDirectPointer<Runtime, const void, /*nullable*/true> &
   getResilientSuperclass() const {
@@ -4602,6 +4646,16 @@ public:
 
   bool hasDefaultOverrideTable() const {
     return getTypeContextDescriptorFlags().class_hasDefaultOverrideTable();
+  }
+
+  bool hasInstancePrefix() const {
+    return getTypeContextDescriptorFlags().class_hasInstancePrefix();
+  }
+
+  const InstancePrefixDescriptor *getInstancePrefixDescriptor() const {
+    if (!hasInstancePrefix())
+      return nullptr;
+    return this->template getTrailingObjects<InstancePrefixDescriptor>();
   }
 
   bool isActor() const {
