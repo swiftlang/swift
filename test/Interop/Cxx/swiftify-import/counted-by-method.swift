@@ -9,7 +9,7 @@
 // RUN:   -Xcc -Wno-nullability-completeness -target %target-swift-6.2-abi-triple \
 // RUN:   -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature SafeInteropWrappersNullAsEmptySpan \
 // RUN:   -verify-additional-prefix %target-vendor- \
-// RUN:   %if !OS=xros %{ -verify-additional-prefix nonxros- %}
+// RUN:   %if OS_FAMILY=darwin %{ %if !OS=xros %{ -verify-additional-prefix nonxros- %} %}
 
 //--- test.h
 #define __counted_by(x) __attribute__((__counted_by__(x)))
