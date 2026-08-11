@@ -85,13 +85,30 @@ private struct FunctionChecker {
       break
 
     case is AllocExistentialBoxInst:
+      let alloc = instruction as! AllocExistentialBoxInst
+      try diagnoseHeapAllocation(
+        .init(.embedded_swift_allocating_existential_box,
+              alloc.existentialType, alloc.formalConcreteType.rawType,
+              at: alloc.location)
+      )
       break
 
-    case is InitExistentialAddrInst,
-         is InitExistentialValueInst,
+    case is InitExistentialAddrInst:
+      let iea = instruction as! InitExistentialAddrInst
+      if !context.bridgedPassContext.fitsInOpaqueExistentialPayload(iea.type.bridged) {
+        try diagnoseHeapAllocation(
+          .init(.embedded_swift_allocating_existential_box,
+                iea.operands[0].value.type, iea.formalConcreteType.rawType,
+                at: iea.location)
+        )
+      }
+      fallthrough
+
+    case is InitExistentialValueInst,
          is InitExistentialRefInst,
          is InitExistentialMetatypeInst:
       let ie = instruction as! any InitExistentialInstruction
+
       for conf in ie.conformances {
         try checkConformance(conf, location: ie.location)
       }

@@ -437,6 +437,9 @@ GROUPED_WARNING(embedded_swift_allocating,HeapAllocation,none,
       "function conversion involves heap allocation", ())
 GROUPED_WARNING(embedded_swift_allocation_raw,HeapAllocation,none,
       "explicit heap allocation", ())
+GROUPED_WARNING(embedded_swift_allocating_existential_box,HeapAllocation,none,
+      "boxing a value of type %1 into an %0 involves heap allocation",
+      (Type, Type))
 
 ERROR(wrong_linkage_for_serialized_function,none,
       "function has wrong linkage to be called from %0", (StringRef))

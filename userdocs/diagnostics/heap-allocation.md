@@ -40,3 +40,13 @@ Embedded Swift is designed to fit constrained environments. In some cases, it is
     return \[T].[index] // warning: a key path that captures 1 value requires a heap allocationa key
   }
   ```
+
+* Forming an `any` type that requires heap allocation, for example because a large value type is being stored into it:
+  ```swift
+  protocol P { }
+  struct BigType: P { ... }
+
+  func formP() -> any P {
+    return BigType() // warning: boxing a value of type 'BigType' into an 'any P' involves heap allocation
+  }
+  ```

@@ -32,3 +32,68 @@ public func use_an_array() -> Int {
 public func use_unsafepointer_allocate() -> UnsafeMutablePointer<UInt8> {
 	return UnsafeMutablePointer<UInt8>.allocate(capacity: 10) // expected-note {{generic specialization called here}}
 }
+
+func acceptEscaping(_ body: @escaping () -> Void) { }
+
+public func passEscaping(i: Int) {
+
+  acceptEscaping {
+    print(17)
+  }
+
+  acceptEscaping { // expected-error{{escaping closure involves heap allocation}}
+    print(i)
+  }
+}
+
+public enum SyntaxTree {
+  case integerLiteral(Int)
+  case variable(String)
+  indirect case add(SyntaxTree, SyntaxTree)
+}
+
+public func getVariable(_ name: String) -> SyntaxTree {
+  return .variable(name)
+}
+
+public func addEm(lhs: SyntaxTree, rhs: SyntaxTree) -> SyntaxTree {
+  return .add(lhs, rhs) // expected-error{{creating an instance of type '{ var (SyntaxTree, SyntaxTree) }' involves heap allocation}}
+}
+
+public protocol P { }
+
+public enum HomeworkError: Error, P {
+  case forgot
+  case dogAteIt(String)
+}
+
+public func getHomeworkError(dogName: String?) -> HomeworkError {
+  if let dogName {
+    return .dogAteIt(dogName)
+  }
+
+  return .forgot
+}
+
+public func getHomeworkErrorAsAnyError(dogName: String) -> any Error {
+  return HomeworkError.dogAteIt(dogName) // expected-error{{boxing a value of type 'HomeworkError' into an 'any Error' involves heap allocation}}
+}
+
+public struct BigType: P {
+  var values: (Double, Double, Double, Double, Double, Double, Double, Double)
+}
+
+public func getExistentialPSmall() -> any P {
+  return HomeworkError.forgot
+}
+
+public func getExistentialErrorPSmall() -> any P & Error {
+  return HomeworkError.forgot
+}
+
+public func getExistentialPBig() -> any P {
+  return BigType(values: (0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)) // expected-error{{boxing a value of type 'BigType' into an 'any P' involves heap allocation}}
+}
+
+// TODO: async functions require _Concurrency, which brings in some
+// allocation. Test for await calls later.

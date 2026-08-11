@@ -181,6 +181,20 @@ bool BridgedPassContext::hasClassFixedMetadataLayout(BridgedDeclObj classDecl) c
   return igm->getClassMetadataStrategy(classDecl.getAs<swift::ClassDecl>()) == swift::irgen::ClassMetadataStrategy::Fixed;
 }
 
+bool BridgedPassContext::fitsInOpaqueExistentialPayload(BridgedType type) const {
+  SILPassManager *pm = invocation->getPassManager();
+  auto *igm = pm->getIRGenModule();
+  if (!igm)
+    return false;
+
+  auto &valueTI = igm->getTypeInfo(type.unbridged());
+  if (auto *fixedTI = dyn_cast<irgen::FixedTypeInfo>(&valueTI)) {
+    return fixedTI->getFixedPacking(*igm) == irgen::FixedPacking::OffsetZero;
+  }
+
+  return false;
+}
+
 OptionalBridgedFunction BridgedPassContext::specializeFunction(BridgedFunction function,
                                                                BridgedSubstitutionMap substitutions,
                                                                bool convertIndirectToDirect,
