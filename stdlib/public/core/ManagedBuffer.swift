@@ -46,6 +46,11 @@ open class ManagedBuffer<Header, Element: ~Copyable> {
   public final var header: Header
 
   #if $Embedded
+  @usableFromInline
+  final var _capacity: Int
+  #endif
+
+  #if $Embedded
   // In embedded mode this initializer has to be public, otherwise derived
   // classes cannot be specialized.
   @_preInverseGenerics
@@ -92,6 +97,11 @@ extension ManagedBuffer where Element: ~Copyable {
 
     let initHeaderVal = try factory(p)
     unsafe p.headerAddress.initialize(to: initHeaderVal)
+
+    #if $Embedded
+    unsafe p._capacityAddress.initialize(to: minimumCapacity)
+    #endif
+
     // The _fixLifetime is not really needed, because p is used afterwards.
     // But let's be conservative and fix the lifetime after we use the
     // headerAddress.
@@ -108,11 +118,15 @@ extension ManagedBuffer where Element: ~Copyable {
   @inlinable
   @available(OpenBSD, unavailable, message: "malloc_size is unavailable.")
   public final var capacity: Int {
+    #if $Embedded
+    return unsafe _capacityAddress.pointee
+    #else
     let storageAddr = UnsafeMutableRawPointer(Builtin.bridgeToRawPointer(self))
     let endAddr = unsafe storageAddr + _swift_stdlib_malloc_size(storageAddr)
     let realCapacity = unsafe endAddr.assumingMemoryBound(to: Element.self) -
       firstElementAddress
     return realCapacity
+    #endif
   }
 
   @_preInverseGenerics
@@ -127,6 +141,13 @@ extension ManagedBuffer where Element: ~Copyable {
   internal final var headerAddress: UnsafeMutablePointer<Header> {
     return unsafe UnsafeMutablePointer<Header>(Builtin.addressof(&header))
   }
+
+  #if $Embedded
+  @inlinable
+  internal final var _capacityAddress: UnsafeMutablePointer<Int> {
+    unsafe UnsafeMutablePointer<Int>(Builtin.addressof(&_capacity))
+  }
+  #endif
 }
 
 extension ManagedBuffer where Element: ~Copyable {
