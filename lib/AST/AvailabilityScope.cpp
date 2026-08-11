@@ -73,21 +73,24 @@ AvailabilityScope::createForSourceFile(SourceFile *SF,
       auto charRange = Ctx.SourceMgr.getRangeForBuffer(SF->getBufferID());
       range = SourceRange(charRange.getStart(), charRange.getEnd());
 
+      auto originalNode = SF->getNodeInEnclosingSourceFile();
+      SourceLoc lookupLoc = originalNode.getStartLoc();
+
       // For peer, conformance, and extension macros, the expansion is a
       // sibling of the attached declaration rather than nested inside it.
       // The expansion should therefore inherit availability from the
-      // enclosing context, not from the attached declaration. Locate the
-      // parent scope using the buffer's logical declaration context instead
-      // of the attached node's source location.
-      SourceLoc lookupLoc;
+      // enclosing context, not from the attached declaration, so ignore the
+      // scopes that the attached declaration introduces when looking up the
+      // parent scope.
+      ASTNode stopAtNode;
       if (auto role = SF->getFulfilledMacroRole()) {
         switch (*role) {
         case MacroRole::Peer:
         case MacroRole::Conformance:
         case MacroRole::Extension:
-          if (auto *dcDecl =
-                  SF->getGeneratedSourceFileInfo()->declContext->getAsDecl())
-            lookupLoc = dcDecl->getStartLoc();
+          if (auto *attachedDecl = originalNode.dyn_cast<Decl *>())
+            stopAtNode = const_cast<Decl *>(
+                attachedDecl->getConcreteSyntaxDeclForAttributes());
           break;
         case MacroRole::Expression:
         case MacroRole::Declaration:
@@ -97,17 +100,14 @@ AvailabilityScope::createForSourceFile(SourceFile *SF,
         case MacroRole::Member:
         case MacroRole::Body:
         case MacroRole::Preamble:
-          lookupLoc = SF->getNodeInEnclosingSourceFile().getStartLoc();
           break;
         }
-      } else {
-        lookupLoc = SF->getNodeInEnclosingSourceFile().getStartLoc();
       }
 
-      parentContext =
-          lookupLoc.isValid()
-              ? parentScope->findMostRefinedSubContext(lookupLoc, Ctx)
-              : parentScope;
+      parentContext = lookupLoc.isValid()
+                          ? parentScope->findMostRefinedSubContext(
+                                lookupLoc, Ctx, stopAtNode)
+                          : parentScope;
     }
     break;
   }
