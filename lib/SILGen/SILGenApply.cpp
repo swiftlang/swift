@@ -3917,7 +3917,12 @@ private:
     if (!arg.hasLValueType()) {
       // If the unsubstituted function type has a parameter of tuple type,
       // explode the tuple value.
-      if (origParamType.isTuple()) {
+      //
+      // However, a C++ reference to an aggregate imported as a tuple is passed
+      // as a single indirect value rather than exploded into its elements.
+      bool isClangReference = origParamType.isClangType() &&
+                              origParamType.getClangType()->isReferenceType();
+      if (origParamType.isTuple() && !isClangReference) {
         emitExpanded(std::move(arg), origParamType);
         return;
       }
