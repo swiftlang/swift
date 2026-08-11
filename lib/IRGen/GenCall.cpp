@@ -5757,7 +5757,7 @@ StackAddress irgen::allocateForCoercion(IRGenFunction &IGF,
   llvm::Align alignment =
       std::max(DL.getABITypeAlign(fromTy), DL.getABITypeAlign(toTy));
 
-  Size size(std::max(fromSize, toSize));
+  auto size = Size::forBits(std::max(fromSize, toSize));
   auto buffer = IGF.emitStaticAlloca(bufferTy, size,
                                      Alignment(alignment.value()),
                                      basename + ".coerced");
