@@ -388,9 +388,17 @@ SILGenTopLevel::SILGenTopLevel(SILGenFunction &SGF) : SGF(SGF) {}
 
 void SILGenTopLevel::visitSourceFile(SourceFile *SF) {
 
-  for (auto *D : SF->getTopLevelDecls()) {
-    D->visitAuxiliaryDecls([&](Decl *AuxiliaryDecl) { visit(AuxiliaryDecl); });
+  // Auxiliary decls can themselves have auxiliary decls, e.g. when a macro
+  // expands to a declaration that has another macro attached to it, so this
+  // recurses.
+  std::function<void(Decl *)> visitDecl = [&](Decl *D) {
+    D->visitAuxiliaryDecls(
+        [&](Decl *AuxiliaryDecl) { visitDecl(AuxiliaryDecl); });
     visit(D);
+  };
+
+  for (auto *D : SF->getTopLevelDecls()) {
+    visitDecl(D);
   }
 
   if (auto *SynthesizedFile = SF->getSynthesizedFile()) {
