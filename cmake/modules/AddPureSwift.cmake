@@ -541,6 +541,12 @@ function(add_pure_swift_host_tool name)
     swift_install_in_component(TARGETS ${name}
       COMPONENT ${APSHT_SWIFT_COMPONENT}
       RUNTIME DESTINATION bin)
+    if(CMAKE_Swift_LINKER_SUPPORTS_PDB)
+      swift_install_in_component(FILES $<TARGET_PDB_FILE:${name}>
+        DESTINATION bin
+        COMPONENT ${APSHT_SWIFT_COMPONENT}
+        OPTIONAL)
+    endif()
     swift_is_installing_component(${APSHT_SWIFT_COMPONENT} is_installing)
   endif()
 

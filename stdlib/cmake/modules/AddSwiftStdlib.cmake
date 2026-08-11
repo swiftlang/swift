@@ -2968,6 +2968,13 @@ function(add_swift_target_library name)
                                      DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/${resource_dir}/${resource_dir_sdk_subdir}/${SWIFT_PRIMARY_VARIANT_ARCH}"
                                      COMPONENT "${SWIFTLIB_INSTALL_IN_COMPONENT}"
                                    PERMISSIONS ${file_permissions})
+        if(SWIFTLIB_SHARED AND NOT SWIFT_SDK_${sdk}_STATIC_ONLY AND
+           CMAKE_CXX_LINKER_SUPPORTS_PDB)
+          swift_install_in_component(FILES $<TARGET_PDB_FILE:${name}-windows-${SWIFT_PRIMARY_VARIANT_ARCH}>
+                                     DESTINATION "bin"
+                                     COMPONENT "${SWIFTLIB_INSTALL_IN_COMPONENT}"
+                                     OPTIONAL)
+        endif()
       else()
         # NOTE: ${UNIVERSAL_LIBRARY_NAME} is the output associated with the target
         # ${lipo_target}
@@ -3674,6 +3681,14 @@ function(add_swift_target_executable name)
                                  OWNER_READ OWNER_WRITE OWNER_EXECUTE
                                  GROUP_READ GROUP_EXECUTE
                                  WORLD_READ WORLD_EXECUTE)
+    set(primary_variant_name "${name}-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${SWIFT_PRIMARY_VARIANT_ARCH}")
+    if(sdk STREQUAL "WINDOWS" AND TARGET ${primary_variant_name} AND
+       CMAKE_CXX_LINKER_SUPPORTS_PDB)
+      swift_install_in_component(FILES $<TARGET_PDB_FILE:${primary_variant_name}>
+                                 DESTINATION ${install_dest}
+                                 COMPONENT "${install_in_component}"
+                                 OPTIONAL)
+    endif()
 
     swift_is_installing_component(
       "${install_in_component}"
