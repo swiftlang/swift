@@ -4779,6 +4779,16 @@ static CanSILFunctionType getUncachedSILFunctionTypeForConstant(
         foreignInfo.self.setSelfIndex(selfIndex);
       }
 
+      // A `@cxx @implementation` function is lowered to the entry point of the
+      // C++ declaration it implements, so its `self` (if any) must be lowered
+      // the way the importer lowers that declaration's `self`.
+      if (!foreignInfo.self.isImportAsMember() &&
+          decl->getAttrs().hasAttribute<CxxDeclAttr>()) {
+        if (auto *interface = dyn_cast_or_null<AbstractFunctionDecl>(
+                decl->getImplementedObjCDecl()))
+          foreignInfo.self = interface->getImportAsMemberStatus();
+      }
+
       return getSILFunctionTypeForClangDecl(
           TC, clangDecl, origLoweredInterfaceType, origLoweredInterfaceType,
           extInfoBuilder, foreignInfo, constant);
