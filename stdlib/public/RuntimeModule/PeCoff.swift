@@ -756,7 +756,7 @@ final class PeCoffImage {
 
 extension PeCoffImage: SymbolSource {
   func lookupSymbol(address: SymbolSource.Address) -> SymbolSource.Symbol? {
-    let address = address + Address(imageBase)
+    let address = address &+ Address(imageBase)
 
     if let function = dwarfReader?.lookupFunction(at: address) {
       let offset = address - function.lowPC
@@ -794,7 +794,7 @@ extension PeCoffImage: SymbolSource {
   func sourceLocation(
     for relativeAddress: SymbolSource.Address
   ) -> SymbolSource.SourceLocation? {
-    let address = relativeAddress + Address(imageBase)
+    let address = relativeAddress &+ Address(imageBase)
 
     guard let dwarfReader else {
       return nil
@@ -807,7 +807,7 @@ extension PeCoffImage: SymbolSource {
   func inlineCallSites(
     at relativeAddress: SymbolSource.Address
   ) -> Array<SymbolSource.CallSiteInfo> {
-    let address = relativeAddress + Address(imageBase)
+    let address = relativeAddress &+ Address(imageBase)
 
     guard let dwarfReader else {
       return []
