@@ -69,15 +69,7 @@ enum {
   NumWords_AsyncLet = 80, // 640 bytes ought to be enough for anyone
 
   /// The number of words in a task deadline record.
-  ///
-  /// The record is fixed-size and stack-allocated in the caller's async
-  /// frame by IRGen (see `emitBuiltinTaskPushDeadline`). Current layout
-  /// uses 8 words (TaskStatusRecord header + clock/instant type metadata
-  /// + borrowed clock/instant pointers + two reserved witness-table
-  /// slots); the padding to 16 leaves headroom for a cached clock
-  /// executor handle, a timer-registration cookie, and future flags,
-  /// without another ABI bump.
-  NumWords_TaskDeadline = 16, // 128 bytes ought to be enough for anyone
+  NumWords_TaskDeadline = 16,
 
   /// The size of a unique hash.
   NumBytes_UniqueHash = 16,

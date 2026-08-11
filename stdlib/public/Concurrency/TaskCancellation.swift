@@ -162,7 +162,9 @@ public nonisolated(nonsending) func withTaskCancellationHandler<Return, Failure>
 public nonisolated(nonsending) func withTaskCancellationHandler<Return, Failure>(
   operation: nonisolated(nonsending) () async throws(Failure) -> Return,
   onCancel handler: sending (CancellationError.Reason) -> Void
-) async throws(Failure) -> Return {
+) async throws(Failure) -> Return
+  where Return: ~Copyable,
+        Failure: Error {
   return try await __withTaskCancellationHandlerWithReason0(
     operation: operation,
     onCancel: {
@@ -176,7 +178,9 @@ public nonisolated(nonsending) func withTaskCancellationHandler<Return, Failure>
 nonisolated(nonsending) func __withTaskCancellationHandlerWithReason0<Return, Failure>(
   operation: nonisolated(nonsending) () async throws(Failure) -> Return,
   onCancel handler0: sending (UInt8) -> Void
-) async throws(Failure) -> Return {
+) async throws(Failure) -> Return
+  where Return: ~Copyable,
+        Failure: Error {
   // unconditionally add the cancellation record to the task.
   // if the task was already cancelled, it will be executed right away.
 #if $BuiltinCancellationHandlerWithReason
@@ -366,6 +370,14 @@ extension Task where Success == Never, Failure == Never {
   ///
   /// Reading this from outside the context of a task returns `nil`.
   ///
+  /// - Returns: The ``CancellationError/Reason`` that was passed to the
+  ///   originating cancellation call (e.g. via
+  ///   ``Task/cancel(reason:)``, ``TaskGroup/cancelAll(reason:)``, or
+  ///   ``TaskCancellationScope/cancel(reason:)``), or
+  ///   ``CancellationError/Reason/unspecified`` for tasks cancelled
+  ///   through a reasonless entry point. `nil` if the current task is
+  ///   not cancelled, or if there is no current task.
+  ///
   /// - SeeAlso: ``Task/isCancelled``
   /// - SeeAlso: ``CancellationError/Reason``
   @available(StdlibDeploymentTarget 6.5, *)
@@ -432,7 +444,9 @@ extension CancellationError {
   /// - SeeAlso: `Task.cancellationReason`
   /// - SeeAlso: `Task.cancel(reason:)`
   @available(StdlibDeploymentTarget 6.5, *)
-  public enum Reason: Sendable {
+  @nonexhaustive
+  public enum Reason: Sendable, Hashable, CaseIterable,
+                      CustomStringConvertible, CustomDebugStringConvertible {
     // Not explicitly `: UInt8` because we want to leave it extensible just in case.
 
     /// The task was cancelled without a specific reason being provided.
@@ -446,6 +460,19 @@ extension CancellationError {
     /// The task was cancelled because a `withDeadline` block's deadline
     /// elapsed.
     case deadlineExpired
+
+    @available(StdlibDeploymentTarget 6.5, *)
+    public var description: String {
+      switch self {
+      case .unspecified: return "unspecified"
+      case .deadlineExpired: return "deadlineExpired"
+      }
+    }
+
+    @available(StdlibDeploymentTarget 6.5, *)
+    public var debugDescription: String {
+      "CancellationError.Reason.\(description)"
+    }
   }
 
   /// Create a `CancellationError` with a specific `Reason`.

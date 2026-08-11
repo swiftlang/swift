@@ -134,6 +134,7 @@ enum _ClockID: Int32 {
 
 /// Identifier for the standard-library clocks.
 @available(StdlibDeploymentTarget 6.5, *)
+@nonexhaustive
 public enum SystemClockID: UInt8, Sendable, Hashable {
   case continuous = 1
   case suspending = 2

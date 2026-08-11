@@ -47,7 +47,8 @@ import Swift
 /// - If the operation throws an error before deadline: Throws the operation error.
 /// - If deadline expires and operation completes successfully: Returns the operation result.
 /// - If deadline expires and operation throws an error: Throws the operation error,
-///     potentially a ``CancellationError`` caused by cancellation caused by the expired deadline.
+///     potentially a ``CancellationError`` if the operation throws it as a result of the
+///     deadline-triggered cancellation.
 ///
 /// When the deadline expires `Task.isCancelled` returns true for the duration of `operation`.
 /// This cancellation does not affect the "outer" task in which the deadline operation was started:
@@ -76,9 +77,9 @@ import Swift
 ///
 /// When a deadline expires, semantically the scope of the task which is running the `operation`
 /// becomes cancelled. This is observable using `Task.isCancelled` and similar APIs, and has
-/// the usual effect on child tasks an task cancellation handlers.
+/// the usual effect on child tasks and task cancellation handlers.
 ///
-/// Even though this a deadline's expiry cancels the operation scope, the `withDeadline` block still
+/// Even though a deadline's expiry cancels the operation scope, the `withDeadline` closure
 /// will await for the operation to complete. This is consistent with Swift's approach to cooperative
 /// cancellation and structured concurrency. It does mean however that operation code must be checking
 /// for cancellation if it wants to react and return "early".
@@ -111,7 +112,7 @@ import Swift
 ///
 /// - Parameters:
 ///   - expiration: The instant by which the operation must complete.
-///   - tolerance: The tolerance used for the sleep.
+///   - tolerance: The tolerance used for the sleep. Defaults to `nil`.
 ///   - clock: The clock to use for measuring time. Defaults to ``ContinuousClock``.
 ///   - operation: The asynchronous operation to complete before the deadline.
 ///
@@ -205,7 +206,7 @@ public nonisolated(nonsending) func withDeadline<Return, Failure, C>(
 /// - Parameters:
 ///   - timeout: The duration, relative to `clock.now`, by which the
 ///     operation must complete.
-///   - tolerance: The tolerance used for the sleep.
+///   - tolerance: The tolerance used for the sleep. Defaults to `nil`.
 ///   - clock: The clock to use for measuring time. Defaults to ``ContinuousClock``.
 ///   - operation: The asynchronous operation to complete before the deadline.
 ///
@@ -230,43 +231,13 @@ public nonisolated(nonsending) func withDeadline<Return, Failure, C>(
   )
 }
 
-/// Executes an operation with the expectation it completes within the given
-/// relative timeout, measured by ``ContinuousClock``.
-///
-/// See ``withDeadline(_:tolerance:clock:operation:)`` for full behavior.
-///
-/// - Parameters:
-///   - timeout: The duration, relative to `ContinuousClock().now`, by which
-///     the operation must complete.
-///   - tolerance: The tolerance used for the sleep.
-///   - operation: The asynchronous operation to complete before the deadline.
-///
-/// - Returns: The result of the operation.
-/// - Throws: The error thrown by the operation.
-@available(StdlibDeploymentTarget 6.5, *)
-public nonisolated(nonsending)
-func withDeadline<Return, Failure>(
-  in timeout: ContinuousClock.Instant.Duration,
-  tolerance: ContinuousClock.Instant.Duration? = nil,
-  operation: nonisolated(nonsending) () async throws(Failure) -> Return
-) async throws(Failure) -> Return
-  where Return: ~Copyable,
-        Failure: Error {
-  let clock = ContinuousClock()
-  return try await withDeadline(
-    clock.now.advanced(by: timeout),
-    tolerance: tolerance,
-    clock: clock,
-    operation: operation
-  )
-}
-
 // ==== -----------------------------------------------------------------------
 // MARK: Task.hasActiveDeadline
 
 @available(StdlibDeploymentTarget 6.5, *)
 extension Task where Success == Never, Failure == Never {
-  /// Whether any deadline is set on the current task.
+  /// A Boolean value indicating whether a deadline is currently installed on
+  /// the current task.
   ///
   /// Returns `true` when the current task is executing inside at least one
   /// `withDeadline` scope (for any clock), and `false` otherwise. This is
@@ -277,6 +248,10 @@ extension Task where Success == Never, Failure == Never {
   /// govern our behavior" can use this without knowing which specific
   /// clock is in play. To read the actual deadline value use
   /// ``activeDeadline(for:)``.
+  ///
+  /// - Returns: `true` if any `withDeadline` scope is active on the
+  ///   current task, `false` otherwise. Also returns `false` when
+  ///   called outside of any task context.
   ///
   /// - SeeAlso: ``activeDeadline(for:)``
   @available(StdlibDeploymentTarget 6.5, *)
@@ -291,7 +266,8 @@ extension Task where Success == Never, Failure == Never {
 
 @available(StdlibDeploymentTarget 6.5, *)
 extension Task where Success == Never, Failure == Never {
-  /// Find the nearest deadline given the specified clock.
+  /// Find the nearest active deadline installed on the current task for the
+  /// specified clock.
   ///
   /// The returned instant is the earliest deadline whose clock identity
   /// (`clock.id`) matches the argument's - nested `withDeadline` scopes
@@ -303,6 +279,16 @@ extension Task where Success == Never, Failure == Never {
   /// still works correctly - the nearest deadline for each clock governs
   /// independently - but this accessor can only report on one clock at a
   /// time.
+  ///
+  /// - Parameter clock: The clock whose deadlines to search for. Clock
+  ///   identity is compared via ``Identifiable/id``; deadlines installed
+  ///   with any other clock value are ignored, even if they share the
+  ///   same `C.Instant` type.
+  ///
+  /// - Returns: The nearest `C.Instant` deadline installed for `clock` on
+  ///   the current task (or any of its parents, walking outward), or
+  ///   `nil` if no `withDeadline` scope for `clock` is active. Returns
+  ///   `nil` when called outside of any task context.
   ///
   /// - SeeAlso: ``hasActiveDeadline``
   @available(StdlibDeploymentTarget 6.5, *)

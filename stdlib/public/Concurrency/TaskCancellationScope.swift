@@ -62,17 +62,27 @@ public struct TaskCancellationScope: ~Copyable, ~Escapable {
   /// Multiple calls to `cancel(reason:)` are safe: first-cancel-wins, so
   /// subsequent calls are no-ops and the originally-recorded reason is
   /// preserved.
+  ///
+  /// - Parameter reason: The ``CancellationError/Reason`` to record on the
+  ///   scope; observable via ``Task/cancellationReason`` from code
+  ///   running inside the scope, and passed to reason-aware cancellation
+  ///   handlers. Defaults to ``CancellationError/Reason/unspecified``.
   @export(implementation)
   public func cancel(reason: CancellationError.Reason = .unspecified) {
     unsafe _taskCancelTaskCancellationScope(
       record: _record, flags: UInt(reason._rawValue))
   }
 
-  /// Whether this scope has been cancelled.
+  /// A Boolean value indicating whether this scope has been cancelled.
   ///
   /// Checks only the cancellation status of this scope, and not the enclosing task.
-  /// 
+  ///
   /// If checking from within a task and the scope is cancelled, the task will also report being cancelled.
+  ///
+  /// - Returns: `true` if this scope has been cancelled (via
+  ///   ``cancel(reason:)`` or by an outer scope cascading cancellation
+  ///   inward), `false` otherwise. Once `true`, remains `true` for the
+  ///   scope's lifetime.
   @export(implementation)
   public var isCancelled: Bool {
     unsafe _taskCancellationScopeIsCancelled(record: _record)
