@@ -2273,7 +2273,8 @@ uint64_t getTypedMemoryDescriptorStableSipHash(StringRef Str) {
 } // namespace
 
 std::optional<uint64_t> irgen::computeTypedMallocTypeDescriptor(
-    IRGenModule &IGM, llvm::SmallVectorImpl<SILType> &fieldTypes) {
+    IRGenModule &IGM, llvm::SmallVectorImpl<SILType> &fieldTypes,
+    bool isArray) {
   if (!IGM.isTypedAllocationAvailable()) {
     return std::nullopt;
   }
@@ -2346,7 +2347,7 @@ std::optional<uint64_t> irgen::computeTypedMallocTypeDescriptor(
       getTypedMemoryDescriptorStableSipHash(layoutString) & 0xffffffff;
 
   uint64_t summary = 0; // Version 0
-  summary |= 1 << 6;    // Callsite flags: fixed size
+  summary |= (isArray ? 2 : 1) << 6; // Callsite flags: Array | FixedSize
   summary |= 2 << 10;   // Type kind: Swift
   summary |= ((uint64_t)layoutSemantics) << 16;
 

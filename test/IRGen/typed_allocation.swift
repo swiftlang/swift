@@ -102,3 +102,35 @@ public func makeEnum(x: Int, y: Int, b: Bool) -> Indirect {
 
   return .y(x, y)
 }
+
+@inline(never)
+public func allocateInts(_ count: Int) -> UnsafeMutablePointer<Int> {
+  return UnsafeMutablePointer<Int>.allocate(capacity: count)
+}
+
+@inline(never)
+public func deallocateInts(_ ptr: UnsafeMutablePointer<Int>) {
+  ptr.deallocate()
+}
+
+@inline(never)
+public func allocateMyClasses(_ count: Int) -> UnsafeMutablePointer<MyClass> {
+  return UnsafeMutablePointer<MyClass>.allocate(capacity: count)
+}
+
+@inline(never)
+public func deallocateMyClasses(_ ptr: UnsafeMutablePointer<MyClass>) {
+  ptr.deallocate()
+}
+
+// CHECK-LABEL: define {{.*}}swiftcc ptr @"$eSp8allocate8capacitySpyxGSi_tFZ16typed_allocation7MyClassC_Tt0g5"
+// CHECK:   call noalias ptr @swift_allocRawTyped(i64 {{.*}}, i64 {{.*}}, i64 [[MYCLASS_ARRAY_TYPEID:.*]])
+
+// CHECK-LABEL: define {{.*}}swiftcc ptr @"$eSp8allocate8capacitySpyxGSi_tFZSi_Tt0g5"
+// CHECK:   call noalias ptr @swift_allocRawTyped(i64 {{.*}}, i64 {{.*}}, i64 [[INT_ARRAY_TYPEID:.*]])
+
+// CHECK-LABEL: define {{.*}}swiftcc void @"$eSp10deallocateyyF16typed_allocation7MyClassC_Tg5"
+// CHECK:   call void @swift_deallocRawTyped(ptr %0, i64 {{.*}}, i64 {{.*}}, i64 [[MYCLASS_ARRAY_TYPEID]])
+
+// CHECK-LABEL: define {{.*}}swiftcc void @"$eSp10deallocateyyFSi_Tg5"
+// CHECK:   call void @swift_deallocRawTyped(ptr %0, i64 {{.*}}, i64 {{.*}}, i64 [[INT_ARRAY_TYPEID]])
