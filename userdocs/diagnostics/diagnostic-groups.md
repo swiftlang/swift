@@ -38,12 +38,12 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:explicit-sendable-annotations>
 - <doc:preconcurrency-import>
 - <doc:foreign-reference-type>
+- <doc:heap-allocation>
 - <doc:return-type-implicit-copy>
 - <doc:implicit-strong-capture>
 - <doc:clang-declaration-import>
 - <doc:inconsistent-import-access>
 - <doc:isolated-conformances>
-- <doc:key-path-allocation>
 - <doc:error-in-future-swift-version>
 - <doc:old-suppressed-associatedtypes>
 - <doc:canimport-missing-module>
@@ -95,12 +95,12 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:preconcurrency-import>
 - <doc:foreign-reference-type>
 - <doc:getting-non-sendable-values-out-of-actors>
+- <doc:heap-allocation>
 - <doc:return-type-implicit-copy>
 - <doc:implicit-strong-capture>
 - <doc:clang-declaration-import>
 - <doc:inconsistent-import-access>
 - <doc:isolated-conformances>
-- <doc:key-path-allocation>
 - <doc:error-in-future-swift-version>
 - <doc:old-suppressed-associatedtypes>
 - <doc:canimport-missing-module>

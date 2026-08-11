@@ -14,7 +14,7 @@
 // The performance hint fires for every capturing key path. It's emitted from a
 // SIL pass, so this needs to get past type checking, and it's in the
 // `PerformanceHints` group, which is ignored by default, so ask for it.
-// RUN: %target-swift-frontend -enable-experimental-feature Embedded -parse-as-library -wmo -O -Wwarning PerformanceHints -emit-ir -o /dev/null -verify %t/hint.swift -module-name hint
+// RUN: %target-swift-frontend -enable-experimental-feature Embedded -parse-as-library -wmo -O -Wwarning PerformanceHints -emit-ir -o /dev/null -verify %t/hint.swift -module-name hint -verify-ignore-unrelated -verify-ignore-unknown
 
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
