@@ -3990,6 +3990,17 @@ function Repair-SDKHeaders([string] $SDKRoot) {
   }
 }
 
+# Removes module maps that a previously built architecture installed into the
+# shared SDK.  Their content matches the source copies that the build passes
+# via -fmodule-map-file, but Clang keys modules on path, so with both visible
+# the compile fails with a redefinition of the module.  The build that follows
+# reinstalls them.
+function Remove-SDKModuleMaps([string] $SDKRoot, [string[]] $Modules) {
+  foreach ($Module in $Modules) {
+    Remove-Item -Force -ErrorAction Ignore "$SDKRoot\usr\include\$Module\module.modulemap"
+  }
+}
+
 # Copies files installed by CMake from the arch-specific platform root,
 # where they follow the layout expected by the installer,
 # to the final platform root, following the installer layout.
@@ -4082,6 +4093,10 @@ function Build-SDK([Hashtable] $Platform, [Hashtable] $Context) {
   $Variant               = $Context.Variant
   $Compilers             = $Context.Compilers
   $Static                = [bool]$Context.Static
+  # Resilience only applies to the dynamic runtime; a static runtime is always
+  # rebuilt alongside its clients. FIXME(compnerd): enabling this previously
+  # caused a build failure on Windows.
+  $LibraryEvolution      = if ($Static) { "NO" } else { "YES" }
   $BuildFoundation       = [bool]$Context.BuildFoundation
   $SupplementalRuntimes  = @($Context.SupplementalRuntimes)
   $InstallRuntimeToStage = $Platform.OS -eq [OS]::Windows
@@ -4155,9 +4170,7 @@ function Build-SDK([Hashtable] $Platform, [Hashtable] $Context) {
           SwiftCore_ENABLE_CONCURRENCY       = "YES";
           # FIXME(compnerd) remove this once the default option is flipped to `ON`.
           SwiftCore_ENABLE_REMOTE_MIRROR     = "YES";
-          # FIXME(compnerd) this currently causes a build failure on Windows, but
-          # this should be enabled when building the dynamic runtime.
-          SwiftCore_ENABLE_LIBRARY_EVOLUTION = "NO";
+          SwiftCore_ENABLE_LIBRARY_EVOLUTION = $LibraryEvolution;
         })
     }
 
@@ -4181,9 +4194,7 @@ function Build-SDK([Hashtable] $Platform, [Hashtable] $Context) {
           SwiftCore_DIR = "$RuntimeBinaryCache\cmake\SwiftCore";
 
           SwiftOverlay_ENABLE_CXX_INTEROP = "YES";
-          # FIXME(compnerd) this currently causes a build failure on Windows, but
-          # this should be enabled when building the dynamic runtime.
-          SwiftOverlay_ENABLE_LIBRARY_EVOLUTION = "NO";
+          SwiftOverlay_ENABLE_LIBRARY_EVOLUTION = $LibraryEvolution;
         })
     }
 
@@ -4207,9 +4218,7 @@ function Build-SDK([Hashtable] $Platform, [Hashtable] $Context) {
 
             SwiftCore_DIR = "$RuntimeBinaryCache\cmake\SwiftCore";
 
-            # FIXME(compnerd) this currently causes a build failure on Windows, but
-            # this should be enabled when building the dynamic runtime.
-            SwiftStringProcessing_ENABLE_LIBRARY_EVOLUTION = "NO";
+            SwiftStringProcessing_ENABLE_LIBRARY_EVOLUTION = $LibraryEvolution;
           })
       }
     }
@@ -4234,9 +4243,7 @@ function Build-SDK([Hashtable] $Platform, [Hashtable] $Context) {
             SwiftCore_DIR    = "$RuntimeBinaryCache\cmake\SwiftCore";
             SwiftOverlay_DIR = "$OverlayBinaryCache\cmake\SwiftOverlay";
 
-            # FIXME(compnerd) this currently causes a build failure on Windows, but
-            # this should be enabled when building the dynamic runtime.
-            SwiftSynchronization_ENABLE_LIBRARY_EVOLUTION = "NO";
+            SwiftSynchronization_ENABLE_LIBRARY_EVOLUTION = $LibraryEvolution;
           })
       }
     }
@@ -4263,9 +4270,7 @@ function Build-SDK([Hashtable] $Platform, [Hashtable] $Context) {
             SwiftCore_DIR    = "$RuntimeBinaryCache\cmake\SwiftCore";
             SwiftOverlay_DIR = "$OverlayBinaryCache\cmake\SwiftOverlay";
 
-            # FIXME(compnerd) this currently causes a build failure on Windows, but
-            # this should be enabled when building the dynamic runtime.
-            SwiftDistributed_ENABLE_LIBRARY_EVOLUTION = "NO";
+            SwiftDistributed_ENABLE_LIBRARY_EVOLUTION = $LibraryEvolution;
           })
       }
     }
@@ -4291,9 +4296,7 @@ function Build-SDK([Hashtable] $Platform, [Hashtable] $Context) {
             SwiftCore_DIR    = "$RuntimeBinaryCache\cmake\SwiftCore";
             SwiftOverlay_DIR = "$OverlayBinaryCache\cmake\SwiftOverlay";
 
-            # FIXME(compnerd) this currently causes a build failure on Windows, but
-            # this should be enabled when building the dynamic runtime.
-            SwiftObservation_ENABLE_LIBRARY_EVOLUTION = "NO";
+            SwiftObservation_ENABLE_LIBRARY_EVOLUTION = $LibraryEvolution;
           })
       }
     }
@@ -4318,9 +4321,7 @@ function Build-SDK([Hashtable] $Platform, [Hashtable] $Context) {
             SwiftCore_DIR    = "$RuntimeBinaryCache\cmake\SwiftCore";
             SwiftOverlay_DIR = "$OverlayBinaryCache\cmake\SwiftOverlay";
 
-            # FIXME(compnerd) this currently causes a build failure on Windows, but
-            # this should be enabled when building the dynamic runtime.
-            SwiftDifferentiation_ENABLE_LIBRARY_EVOLUTION = "NO";
+            SwiftDifferentiation_ENABLE_LIBRARY_EVOLUTION = $LibraryEvolution;
           })
       }
     }
@@ -4345,9 +4346,7 @@ function Build-SDK([Hashtable] $Platform, [Hashtable] $Context) {
             SwiftCore_DIR    = "$RuntimeBinaryCache\cmake\SwiftCore";
             SwiftOverlay_DIR = "$OverlayBinaryCache\cmake\SwiftOverlay";
 
-            # FIXME(compnerd) this currently causes a build failure on Windows, but
-            # this should be enabled when building the dynamic runtime.
-            SwiftVolatile_ENABLE_LIBRARY_EVOLUTION = "NO";
+            SwiftVolatile_ENABLE_LIBRARY_EVOLUTION = $LibraryEvolution;
           })
       }
     }
@@ -4374,9 +4373,7 @@ function Build-SDK([Hashtable] $Platform, [Hashtable] $Context) {
             SwiftOverlay_DIR    = "$OverlayBinaryCache\cmake\SwiftOverlay";
             SwiftCxxOverlay_DIR = "$OverlayBinaryCache\Cxx\cmake\SwiftCxxOverlay";
 
-            # FIXME(compnerd) this currently causes a build failure on Windows, but
-            # this should be enabled when building the dynamic runtime.
-            SwiftRuntime_ENABLE_LIBRARY_EVOLUTION = "NO";
+            SwiftRuntime_ENABLE_LIBRARY_EVOLUTION = $LibraryEvolution;
 
             SwiftRuntime_ENABLE_BACKTRACING = "YES";
           })
@@ -4384,6 +4381,8 @@ function Build-SDK([Hashtable] $Platform, [Hashtable] $Context) {
     }
 
     # ── Dispatch ──────────────────────────────────────────────────────────────
+    Remove-SDKModuleMaps $SDKRoot @("dispatch")
+
     Record-OperationTime $Platform "Build-${Variant}Dispatch" {
       $DispatchDefines = @{
         BUILD_TESTING                     = "NO";
@@ -4442,6 +4441,8 @@ roots:
 
     if ($BuildFoundation) {
       # ── Foundation ────────────────────────────────────────────────────────────
+      Remove-SDKModuleMaps $SDKRoot @("_FoundationCShims", "_foundation_unicode")
+
       Record-OperationTime $Platform "Build-${Variant}Foundation" {
         $FoundationDefines = @{
           BUILD_SHARED_LIBS                 = $BUILD_SHARED_LIBS;
