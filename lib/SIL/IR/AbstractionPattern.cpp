@@ -503,6 +503,10 @@ const clang::Type *getClangFunctionParameterType(const clang::Type *ty,
 static
 const clang::Type *getClangArrayElementType(const clang::Type *ty,
                                             unsigned index) {
+  // A fixed-size array can be imported as a tuple either directly or through
+  // a C++ reference to it. In the latter case strip the reference.
+  if (ty->isReferenceType())
+    ty = ty->getPointeeType().getTypePtr();
   return ty->castAsArrayTypeUnsafe()->getElementType().getTypePtr();
 }
 
@@ -1546,6 +1550,11 @@ unsigned AbstractionPattern::getLoweredParamIndex(unsigned formalIndex) const {
 }
 
 unsigned AbstractionPattern::getFlattenedValueCount() const {
+  // A C++ reference to an array that is imported as a tuple is passed as a
+  // single indirect value, not exploded into its elements.
+  if (isClangType() && getClangType()->isReferenceType())
+    return 1;
+
   // The count is always 1 unless the original type is a tuple.
   if (!isTuple())
     return 1;
