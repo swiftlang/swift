@@ -9,6 +9,7 @@ protocol IWidget: IUnknown { }
 
 @com(interface: "20000000-0000-0000-0000-000000000002")
 protocol IGizmo: IUnknown { associatedtype Element }
+// expected-error@-1{{requirement 'Element' cannot be represented in a COM interface}}
 
 // A protocol metatype extension has no generic signature, and its members are
 // static members of the protocol metatype.  They cannot reference 'Self' or the

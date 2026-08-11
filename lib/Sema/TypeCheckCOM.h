@@ -34,6 +34,9 @@ void validateImplementation(ClassDecl *CD);
 /// Validate the compiler-managed requirements of the COM identity protocol.
 void validateIdentityProtocol(ProtocolDecl *PD);
 
+/// Diagnose requirements which cannot be represented in a COM vtable.
+void validateInterfaceRequirements(ProtocolDecl *PD);
+
 /// Diagnose restrictions on an explicitly declared COM conformance.
 void validateConformance(ProtocolConformance *conformance);
 }
