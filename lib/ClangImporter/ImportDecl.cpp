@@ -2480,6 +2480,16 @@ namespace {
           return nullptr;
         }
 
+        // Escapability annotations have no effect on a foreign reference type.
+        for (auto *swiftAttr : decl->specific_attrs<clang::SwiftAttrAttr>()) {
+          if (swiftAttr->getAttribute() == "Escapable" ||
+              swiftAttr->getAttribute().starts_with("escapable_if:"))
+            Impl.diagnose(HeaderLoc(decl->getLocation()),
+                          diag::escapable_foreign_reference_type,
+                          importer::getPrettySwiftAttributeName(swiftAttr),
+                          decl);
+        }
+
         result = Impl.createDeclWithClangNode<ClassDecl>(
             decl, importer::convertClangAccess(decl->getAccess()), loc, name,
             loc, ArrayRef<InheritedEntry>{}, nullptr, dc, false);
