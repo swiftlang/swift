@@ -1702,8 +1702,9 @@ static void diagnoseIfDeprecated(SourceRange referenceRange,
   auto &ctx = referenceDC->getASTContext();
 
   auto attr = restriction.getAttr();
-  auto domain = attr.getDomain();
-  auto deprecatedRange = attr.getDeprecatedRange(ctx).value();
+  auto domainAndRange = restriction.getDomainAndRange(ctx);
+  auto domain = domainAndRange.getDomain();
+  auto deprecatedRange = domainAndRange.getRange();
   auto message = attr.getMessage();
   auto rawRename = attr.getRename();
   if (message.empty() && rawRename.empty()) {
@@ -1766,8 +1767,9 @@ static bool diagnoseIfDeprecated(SourceLoc loc,
   auto proto = rootConf->getProtocol()->getDeclaredInterfaceType();
 
   auto attr = restriction.getAttr();
-  auto domain = attr.getDomain();
-  auto deprecatedRange = attr.getDeprecatedRange(ctx).value();
+  auto domainAndRange = restriction.getDomainAndRange(ctx);
+  auto domain = domainAndRange.getDomain();
+  auto deprecatedRange = domainAndRange.getRange();
   auto message = attr.getMessage();
   if (message.empty()) {
     ctx.Diags
