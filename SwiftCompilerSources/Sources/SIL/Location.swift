@@ -96,4 +96,44 @@ public struct Location: ProvidingSourceLocation, Equatable, CustomStringConverti
   public static var artificialUnreachableLocation: Location {
     Location(bridged: BridgedLocation.getArtificialUnreachableLocation())
   }
+
+  public var scope: DebugScope? {
+    bridged.getScope().debugScope
+  }
+}
+
+extension OptionalBridgedDebugScope {
+  public var debugScope: DebugScope? {
+    if let scope {
+      return DebugScope(bridged: BridgedDebugScope(scope: scope))
+    }
+    return nil
+  }
+}
+
+/// Wraps `SILDebugScope*` as an opaque, hashable pointer.
+public struct DebugScope : Equatable, Hashable {
+  public let bridged: BridgedDebugScope
+
+  public var parentScope: DebugScope? {
+    bridged.getParentScope().debugScope
+  }
+
+  public var inlinedCallSite: DebugScope? {
+    bridged.getInlinedCallSite().debugScope
+  }
+
+  public static func ==(lhs: DebugScope, rhs: DebugScope) -> Bool {
+    lhs.bridged.scope == rhs.bridged.scope
+  }
+
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(bridged.scope)
+  }
+}
+
+extension BridgedSILDebugVariable {
+  public var scope: DebugScope? {
+    getScope().debugScope
+  }
 }

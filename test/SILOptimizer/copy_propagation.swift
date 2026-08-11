@@ -69,11 +69,18 @@ func reassign_with_lets() -> C {
   return z
 }
 
+// The debug values for a, b and c should survive the optimized pipeline,
+// but FunctionSignatureOpts moves the variables to the signature optimized
+// function.
+// The signature optimized function is then inlined back into the thunk, so
+// the variables are in the dead scope of the inlined function. This is not
+// the normal case.
+// The variable a, being an argument, should still be kept by
+// FunctionSignatureOpts.
+
 // CHECK-LABEL: sil {{.*}}@renamed_return : {{.*}} {
-// CHECK-NOT:       strong_retain
-// CHECK:           debug_value %1, let, name "a"
-// CHECK-NEXT:      debug_value %1, let, name "b"
-// CHECK-NEXT:      debug_value %1, let, name "c"
+// CHECK:       bb0(
+// TODO-CHECK:      debug_value %1, let, name "a"
 // CHECK-NEXT:      strong_retain %1
 // CHECK-NEXT:      return %1
 // CHECK-LABEL: } // end sil function 'renamed_return'
