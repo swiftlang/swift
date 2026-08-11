@@ -125,3 +125,61 @@ TEST(TestSwiftRemangler, DependentGenericConformanceRequirement) {
     ASSERT_FALSE(b.remangleSuccess(n));
   }
 }
+
+TEST(TestSwiftRemangler, IdentifierExpansionLimit) {
+  using namespace swift::Demangle;
+
+  // Word substitution lets each one-letter reference re-append a whole
+  // previously-seen word. 2048 references to a 2048-character word is exactly
+  // the identifier length limit.
+  std::string Word(2048, 'x');
+  std::string Mangled =
+      "$s0" + std::to_string(Word.size()) + Word + std::string(2048, 'a') +
+      "03fooV";
+
+  Demangler Dem;
+  ASSERT_EQ(Dem.demangleSymbol(Mangled), nullptr);
+  ASSERT_FALSE(Dem.isTooComplex());
+
+  // One reference fewer stays under the limit and demangles.
+  std::string Under =
+      "$s0" + std::to_string(Word.size()) + Word + std::string(2047, 'a') +
+      "03fooV";
+
+  Demangler UnderDem;
+  ASSERT_NE(UnderDem.demangleSymbol(Under), nullptr);
+}
+
+TEST(TestSwiftRemangler, AllocateWithMisalignedSlabEnd) {
+  using namespace swift::Demangle;
+
+  // A char allocation big enough to force a new slab leaves the slab's end
+  // misaligned relative to Node. Allocating a Node afterwards must not read
+  // or write past the end of that slab.
+  NodeFactory Factory;
+  size_t Size = 100 * sizeof(Node) * 2 + 1;
+  char *Chars = Factory.Allocate<char>(Size);
+  memset(Chars, 'x', Size);
+
+  NodePointer N = Factory.createNode(Node::Kind::Identifier, "a");
+  ASSERT_EQ(N->getText(), "a");
+}
+
+TEST(TestSwiftRemangler, TooComplexIsReportedNotFatal) {
+  using namespace swift::Demangle;
+
+  // A factory that has hit a size limit reports failure from both the
+  // demangler and the remangler rather than raising a fatal error.
+  Demangler Dem;
+  NodeBuilder b(Dem);
+  NodePointer n = b.GlobalTypeMangling(b.IntType());
+  ASSERT_TRUE(b.remangleSuccess(n));
+
+  Dem.setTooComplex();
+  ASSERT_TRUE(Dem.isTooComplex());
+  ASSERT_FALSE(b.remangleSuccess(n));
+
+  // clear() resets the failure so the factory can be reused.
+  Dem.clear();
+  ASSERT_FALSE(Dem.isTooComplex());
+}
