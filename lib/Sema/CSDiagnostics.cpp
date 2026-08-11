@@ -6189,6 +6189,17 @@ bool OutOfOrderArgumentFailure::diagnoseAsError() {
   auto firstRange = argRange(ArgIdx, first);
   auto secondRange = argRange(PrevArgIdx, second);
 
+  // A highlighted range has to cover a whole syntax node in order to be
+  // rendered, and a label together with its expression is not one: the syntax
+  // node for a labeled argument also covers its trailing comma. Highlight the
+  // label on its own, which is what this diagnostic is about anyway, and fall
+  // back to the expression for an unlabeled argument.
+  auto argHighlight = [&](unsigned argIdx, Identifier label) -> SourceRange {
+    if (!label.empty())
+      return SourceRange(args->getLabelLoc(argIdx));
+    return args->getExpr(argIdx)->getSourceRange();
+  };
+
   SourceLoc diagLoc = firstRange.Start;
 
   auto addFixIts = [&](InFlightDiagnostic diag) {
@@ -6201,7 +6212,8 @@ bool OutOfOrderArgumentFailure::diagnoseAsError() {
         !SM.rangeContains(argsRange, secondRange))
       return;
 
-    diag.highlight(firstRange).highlight(secondRange);
+    diag.highlight(argHighlight(ArgIdx, first))
+        .highlight(argHighlight(PrevArgIdx, second));
 
     // Move the misplaced argument by removing it from one location and
     // inserting it in another location. To maintain argument comma
@@ -6412,7 +6424,7 @@ bool ExtraneousArgumentsFailure::diagnoseAsError() {
       auto paramContext = getParameterContextForDiag(getRawAnchor());
       emitDiagnostic(diag::extra_argument_to_nullary_call,
                      static_cast<unsigned>(paramContext))
-          .highlight(args->getSourceRange())
+          .highlight(getRawAnchor().getSourceRange())
           .fixItRemove(args->getSourceRange());
       return true;
     }
@@ -6480,7 +6492,7 @@ bool ExtraneousArgumentsFailure::diagnoseSingleExtraArgument() const {
     if (TE && getType(TE)->getMetatypeInstanceType()->isVoid()) {
       emitDiagnosticAt(call->getLoc(), diag::extra_argument_to_nullary_call,
                        static_cast<unsigned>(paramContext))
-          .highlight(call->getArgs()->getSourceRange());
+          .highlight(call->getSourceRange());
       return true;
     }
   }
@@ -6508,16 +6520,16 @@ bool ExtraneousArgumentsFailure::diagnoseSingleExtraArgument() const {
     } else {
       emitDiagnosticAt(loc, diag::extra_argument_to_nullary_call,
                        static_cast<unsigned>(paramContext))
-          .highlight(arguments->getSourceRange());
+          .highlight(getRawAnchor().getSourceRange());
     }
   } else if (argument.hasLabel()) {
     emitDiagnosticAt(loc, diag::extra_argument_named, argument.getLabel(),
                      static_cast<unsigned>(paramContext))
-        .highlight(arguments->getSourceRange());
+        .highlight(getRawAnchor().getSourceRange());
   } else {
     emitDiagnosticAt(loc, diag::extra_argument_positional,
                      static_cast<unsigned>(paramContext))
-        .highlight(arguments->getSourceRange());
+        .highlight(getRawAnchor().getSourceRange());
   }
   return true;
 }
@@ -7567,7 +7579,7 @@ bool InvalidTupleSplatWithSingleParameterFailure::diagnoseAsError() {
                                                    args->getLabelLoc(0));
   }
 
-  diagnostic.highlight(args->getSourceRange())
+  diagnostic.highlight(getRawAnchor().getSourceRange())
       .fixItInsertAfter(newLeftParenLoc, "(")
       .fixItInsert(args->getEndLoc(), ")");
 
