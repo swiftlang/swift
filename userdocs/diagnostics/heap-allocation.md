@@ -50,3 +50,13 @@ Embedded Swift is designed to fit constrained environments. In some cases, it is
     return BigType() // warning: boxing a value of type 'BigType' into an 'any P' involves heap allocation
   }
   ```
+
+* Forming an indirect enum case:
+  ```swift
+  enum ComputationTree {
+    case literal(Double)
+    indirect case binaryOperation(BinaryOperator, ComputationTree, ComputationTree)
+  }
+
+  lett add = ComputationTree.binaryOperation(.add, lhs, rhs) // warning: requires heap allocation
+  ```
