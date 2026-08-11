@@ -772,7 +772,6 @@ extension RawSpan {
     unsafe unsafeLoadUnaligned(fromByteOffset: offset, as: T.self)
   }
 
-#if !SPAN_COMPATIBILITY_STUB
   /// Returns a value constructed from the raw memory at the specified offset.
   ///
   /// The range of bytes required to construct a value of type `T` starting at
@@ -798,7 +797,6 @@ extension RawSpan {
     case .littleEndian: rawValue.littleEndian
     }
   }
-#endif
 }
 
 @available(SwiftCompatibilitySpan 5.0, *)
