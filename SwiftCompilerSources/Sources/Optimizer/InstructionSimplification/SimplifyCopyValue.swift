@@ -110,7 +110,7 @@ private func tryRemoveProjectedCopy(copy: CopyValueInst, _ context: SimplifyCont
 /// Returns true if every non-forwarding, non-debug use of `copy` and its forwarding
 /// chain is outside the owned value's liverange which ends at `destroy`.
 private func checkForwardingChain(from value: Value, to destroy: DestroyValueInst) -> Bool {
-  for use in value.uses {
+  for use in value.uses.ignoreDebugUses {
     let user = use.instruction
     if user.parentBlock != destroy.parentBlock || destroy.strictlyDominatesInBlock(user) {
       continue
@@ -136,9 +136,15 @@ private func moveForwardingChain(from value: Value,
     if user.parentBlock != destroy.parentBlock || destroy.strictlyDominatesInBlock(user) {
       continue
     }
-    let fwdInst = user as! (SingleValueInstruction & ForwardingInstruction)
-    fwdInst.move(before: destroy, context)
-    moveForwardingChain(from: fwdInst, before: destroy, context)
+    switch user {
+    case let debugValue as DebugValueInst:
+      debugValue.move(before: destroy, context)
+    case let fwdInst as (SingleValueInstruction & ForwardingInstruction):
+      fwdInst.move(before: destroy, context)
+      moveForwardingChain(from: fwdInst, before: destroy, context)
+    default:
+      fatalError("unhandled user")
+    }
   }
 }
 

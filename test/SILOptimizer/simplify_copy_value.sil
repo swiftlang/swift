@@ -208,6 +208,52 @@ bb0(%0 : @owned $S1):
   return %5
 }
 
+// A debug_value of the copy inside the owned value's liverange must not block the
+// optimization. It is moved out of the liverange together with the copy.
+//
+// CHECK-LABEL: sil [ossa] @projected_copy_with_debug_value :
+// CHECK:         end_borrow
+// CHECK:         [[C:%.*]] = destructure_struct %0
+// CHECK:         debug_value [[C]]
+// CHECK-NOT:     copy_value
+// CHECK:         return [[C]]
+// CHECK:       } // end sil function 'projected_copy_with_debug_value'
+sil [ossa] @projected_copy_with_debug_value : $@convention(thin) (@owned S1) -> @owned C {
+bb0(%0 : @owned $S1):
+  %1 = begin_borrow %0
+  %2 = struct_extract %1, #S1.c
+  %3 = copy_value %2
+  debug_value %3, let, name "x"
+  end_borrow %1
+  destroy_value %0
+  return %3
+}
+
+// Same as above, but the debug_value is a use of a forwarding instruction in the
+// chain. Both the forwarding instructions and the debug_value are moved.
+//
+// CHECK-LABEL: sil [ossa] @projected_copy_debug_value_of_forwarded_value :
+// CHECK:         end_borrow
+// CHECK:         [[C:%.*]] = destructure_struct %0
+// CHECK:         [[B:%.*]] = upcast [[C]] to $B
+// CHECK:         debug_value [[B]]
+// CHECK:         [[D:%.*]] = unchecked_ref_cast [[B]]
+// CHECK-NOT:     copy_value
+// CHECK:         return [[D]]
+// CHECK:       } // end sil function 'projected_copy_debug_value_of_forwarded_value'
+sil [ossa] @projected_copy_debug_value_of_forwarded_value : $@convention(thin) (@owned S1) -> @owned C {
+bb0(%0 : @owned $S1):
+  %1 = begin_borrow %0
+  %2 = struct_extract %1, #S1.c
+  %3 = copy_value %2
+  %4 = upcast %3 to $B
+  %5 = unchecked_ref_cast %4 to $C
+  debug_value %4, let, name "x"
+  end_borrow %1
+  destroy_value %0
+  return %5
+}
+
 // -----------------------------------------------------------------------------
 // negative tests (optimization must NOT fire)
 // -----------------------------------------------------------------------------
