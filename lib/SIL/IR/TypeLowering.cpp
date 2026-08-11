@@ -2314,15 +2314,8 @@ namespace {
   };
 
   static bool isImmortalForeignReferenceType(CanType type) {
-    if (type->getReferenceCounting() == ReferenceCounting::None &&
-        type.isForeignReferenceType())
-      return true;
-
-    // getReferenceCounting() on an archetype only consults the superclass when
-    // ObjC interop is enabled so here we look at the superclass explicitly
-    if (auto archetype = dyn_cast<ArchetypeType>(type))
-      if (auto superclass = archetype->getSuperclass())
-        return superclass->getReferenceCounting() == ReferenceCounting::None;
+    if (type.isForeignReferenceType() || isa<ArchetypeType>(type))
+      return type->getReferenceCounting() == ReferenceCounting::None;
     return false;
   }
 

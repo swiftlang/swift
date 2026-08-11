@@ -391,7 +391,7 @@ const TypeInfo *TypeConverter::convertArchetypeType(ArchetypeType *archetype) {
   // representation.
   if (layout && layout->isRefCounted()) {
     llvm::PointerType *reprTy;
-    ReferenceCounting refcount;
+    ReferenceCounting refcount = archetype->getReferenceCounting();
     const ClassTypeInfo *customRefCountingTI = nullptr;
 
     // If the archetype has a superclass constraint, it has at least the
@@ -400,10 +400,8 @@ const TypeInfo *TypeConverter::convertArchetypeType(ArchetypeType *archetype) {
     if (auto super = archetype->getSuperclass()) {
       auto &superTI = IGM.getTypeInfoForUnlowered(super);
       reprTy = cast<llvm::PointerType>(superTI.StorageType);
-      refcount = super->getReferenceCounting();
       customRefCountingTI = dyn_cast<const ClassTypeInfo>(&superTI);
     } else {
-      refcount = archetype->getReferenceCounting();
       if (refcount == ReferenceCounting::Native) {
         reprTy = IGM.RefCountedPtrTy;
       } else {
