@@ -1204,6 +1204,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.WeakLinkAtTarget |= Args.hasArg(OPT_weak_link_at_target);
 
+  Opts.WeakLinkSpanCompatibilityLib |=
+      Args.hasArg(OPT_weak_link_span_compatibility_lib);
+
   Opts.WarnOnEditorPlaceholder |= Args.hasArg(OPT_warn_on_editor_placeholder);
 
   auto setUnsignedIntegerArgument =
