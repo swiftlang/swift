@@ -654,16 +654,18 @@ struct BridgedFunction {
   typedef EffectInfo (* _Nonnull GetEffectInfoFn)(BridgedFunction, SwiftInt);
   typedef BridgedMemoryBehavior (* _Nonnull GetMemBehaviorFn)(BridgedFunction, bool);
   typedef bool (* _Nonnull ArgumentMayReadFn)(BridgedFunction, BridgedOperand, BridgedValue);
+  typedef bool (*_Nonnull ArgumentMayWriteFn)(BridgedFunction, BridgedOperand,
+                                              BridgedValue);
   typedef bool (* _Nonnull IsDeinitBarrierFn)(BridgedFunction);
 
-  static void registerBridging(SwiftMetatype metatype,
-              RegisterFn initFn, RegisterFn destroyFn,
-              WriteFn writeFn, ParseFn parseFn,
-              CopyEffectsFn copyEffectsFn,
-              GetEffectInfoFn effectInfoFn,
-              GetMemBehaviorFn memBehaviorFn,
-              ArgumentMayReadFn argumentMayReadFn,
-              IsDeinitBarrierFn isDeinitBarrierFn);
+  static void registerBridging(SwiftMetatype metatype, RegisterFn initFn,
+                               RegisterFn destroyFn, WriteFn writeFn,
+                               ParseFn parseFn, CopyEffectsFn copyEffectsFn,
+                               GetEffectInfoFn effectInfoFn,
+                               GetMemBehaviorFn memBehaviorFn,
+                               ArgumentMayReadFn argumentMayReadFn,
+                               ArgumentMayWriteFn argumentMayWriteFn,
+                               IsDeinitBarrierFn isDeinitBarrierFn);
 };
 
 struct OptionalBridgedFunction {

@@ -218,6 +218,7 @@ static BridgedFunction::CopyEffectsFn copyEffectsFunction = nullptr;
 static BridgedFunction::GetEffectInfoFn getEffectInfoFunction = nullptr;
 static BridgedFunction::GetMemBehaviorFn getMemBehvaiorFunction = nullptr;
 static BridgedFunction::ArgumentMayReadFn argumentMayReadFunction = nullptr;
+static BridgedFunction::ArgumentMayWriteFn argumentMayWriteFunction = nullptr;
 static BridgedFunction::IsDeinitBarrierFn isDeinitBarrierFunction = nullptr;
 
 SILFunction::SILFunction(
@@ -1370,14 +1371,12 @@ void SILFunction::forEachSpecializeAttrTargetFunction(
   }
 }
 
-void BridgedFunction::registerBridging(SwiftMetatype metatype,
-            RegisterFn initFn, RegisterFn destroyFn,
-            WriteFn writeFn, ParseFn parseFn,
-            CopyEffectsFn copyEffectsFn,
-            GetEffectInfoFn effectInfoFn,
-            GetMemBehaviorFn memBehaviorFn,
-            ArgumentMayReadFn argumentMayReadFn,
-            IsDeinitBarrierFn isDeinitBarrierFn) {
+void BridgedFunction::registerBridging(
+    SwiftMetatype metatype, RegisterFn initFn, RegisterFn destroyFn,
+    WriteFn writeFn, ParseFn parseFn, CopyEffectsFn copyEffectsFn,
+    GetEffectInfoFn effectInfoFn, GetMemBehaviorFn memBehaviorFn,
+    ArgumentMayReadFn argumentMayReadFn, ArgumentMayWriteFn argumentMayWriteFn,
+    IsDeinitBarrierFn isDeinitBarrierFn) {
   functionMetatype = metatype;
   initFunction = initFn;
   destroyFunction = destroyFn;
@@ -1387,6 +1386,7 @@ void BridgedFunction::registerBridging(SwiftMetatype metatype,
   getEffectInfoFunction = effectInfoFn;
   getMemBehvaiorFunction = memBehaviorFn;
   argumentMayReadFunction = argumentMayReadFn;
+  argumentMayWriteFunction = argumentMayWriteFn;
   isDeinitBarrierFunction = isDeinitBarrierFn;
 }
 
@@ -1487,6 +1487,13 @@ bool SILFunction::argumentMayRead(Operand *argOp, SILValue addr) {
     return true;
 
   return argumentMayReadFunction({this}, {argOp}, {addr});
+}
+
+bool SILFunction::argumentMayWrite(Operand *argOp, SILValue addr) {
+  if (!argumentMayWriteFunction)
+    return true;
+
+  return argumentMayWriteFunction({this}, {argOp}, {addr});
 }
 
 bool SILFunction::isDeinitBarrier() {
