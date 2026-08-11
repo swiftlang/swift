@@ -404,7 +404,7 @@ struct HasWrapperOnActor {
     synced = 17
   }
 
-  @WrapperActor var actorSynced: Int = 0 // expected-warning {{'nonisolated' cannot be applied to mutable stored properties}}
+  @WrapperActor var actorSynced: Int = 0 // expected-warning {{'nonisolated' cannot be applied to mutable stored property 'actorSynced'}}
   func testActorSynced() {
     _ = actorSynced
     _ = $actorSynced
