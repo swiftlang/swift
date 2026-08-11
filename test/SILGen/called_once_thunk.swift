@@ -59,6 +59,16 @@ func testNoEscapeConversionThroughThunk(_ f: @escaping (Big) -> Void, _ big: Big
   consumeCalledOnce(identity(f), big)
 }
 
+// CHECK-LABEL: sil hidden [ossa] @$s17called_once_thunk30testGenericCalledOnceParameteryyyAA3BigVXEn_ADtF : $@convention(thin) (@owned @noescape @called(once) @callee_owned (Big) -> (), Big) -> () {
+// CHECK: [[F_PROJ:%.*]] = project_box {{.*}} : ${ var @noescape @called(once) @callee_owned (Big) -> () }, 0
+// CHECK: [[F_ACCESS:%.*]] = begin_access [deinit] [unknown] [[F_PROJ]] : $*@noescape @called(once) @callee_owned (Big) -> ()
+// CHECK: [[F_ADDR:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[F_ACCESS]] : $*@noescape @called(once) @callee_owned (Big) -> ()
+// CHECK: [[F_VALUE:%.*]] = load [copy] [[F_ADDR]] : $*@noescape @called(once) @callee_owned (Big) -> ()
+// CHECK: [[THUNK:%.*]] = function_ref @$s17called_once_thunk3BigVIOxy_ACIeOxn_TR
+// CHECK: partial_apply [called_once] [[THUNK]]([[F_VALUE]]) : $@convention(thin) (@in_guaranteed Big, @owned @noescape @called(once) @callee_owned (Big) -> ()) -> ()
+// CHECK: function_ref @$s17called_once_thunk23acceptGenericCalledOnceyyyxXEn_xtlF
+// CHECK: end_access [[F_ACCESS]] : $*@noescape @called(once) @callee_owned (Big) -> ()
+// CHECK: } // end sil function '$s17called_once_thunk30testGenericCalledOnceParameteryyyAA3BigVXEn_ADtF'
 func testGenericCalledOnceParameter(_ f: @called(once) (Big) -> Void, _ big: Big) {
   acceptGenericCalledOnce(f, big)
 }
@@ -67,8 +77,3 @@ func testGenericCalledOnceParameter(_ f: @called(once) (Big) -> Void, _ big: Big
 // CHECK: bb0([[ARG:%.*]] : $*Big, [[FN:%.*]] : @owned $@noescape @called(once) @callee_owned (Big) -> ()):
 // CHECK: apply [[FN]]({{%.*}}) : $@noescape @called(once) @callee_owned (Big) -> ()
 // CHECK: } // end sil function '$s17called_once_thunk3BigVIOxy_ACIeOxn_TR'
-
-// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$s17called_once_thunk3BigVIOxn_ACIeOxy_TR : $@convention(thin) (Big, @owned @noescape @called(once) @callee_owned (@in_guaranteed Big) -> ()) -> () {
-// CHECK: bb0([[ARG:%.*]] : $Big, [[FN:%.*]] : @owned $@noescape @called(once) @callee_owned (@in_guaranteed Big) -> ()):
-// CHECK: apply [[FN]]({{%.*}}) : $@noescape @called(once) @callee_owned (@in_guaranteed Big) -> ()
-// CHECK: } // end sil function '$s17called_once_thunk3BigVIOxn_ACIeOxy_TR'
