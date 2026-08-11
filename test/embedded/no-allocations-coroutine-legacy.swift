@@ -9,7 +9,7 @@
 // REQUIRES: swift_feature_Embedded
 // REQUIRES: swift_feature_CoroutineAccessors
 
-// CHECK: cannot use co-routines (like accessors) in -no-allocations mode
+// CHECK: error: coroutine accessor involves heap allocation [#PerformanceHints::HeapAllocation]
 
 open class Base {
   var _i = 42
