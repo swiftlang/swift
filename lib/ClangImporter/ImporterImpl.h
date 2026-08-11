@@ -318,8 +318,8 @@ enum class SpecialMethodKind {
   NSDictionarySubscriptGetter
 };
 
-#define SWIFT_PROTOCOL_SUFFIX "Protocol"
-#define SWIFT_CFTYPE_SUFFIX "Ref"
+constexpr static const llvm::StringLiteral ProtocolSuffix = "Protocol";
+constexpr static const llvm::StringLiteral CFTypeSuffix = "Ref";
 
 /// Describes whether to classify a factory method as an initializer.
 enum class FactoryAsInitKind {
@@ -504,12 +504,12 @@ public:
 
   const Version CurrentVersion;
 
-  constexpr static const char *const moduleImportBufferName =
+  static constexpr llvm::StringLiteral moduleImportBufferName =
       "<swift-imported-modules>";
-  constexpr static const char *const bridgingHeaderBufferName =
+  static constexpr llvm::StringLiteral bridgingHeaderBufferName =
       "<bridging-header-import>";
   /// The name of system vfsoverlay.
-  constexpr static const char *const clangSystemVFSOverlayName =
+  static constexpr llvm::StringLiteral clangSystemVFSOverlayName =
       "<clang-system-vfs-overlay>";
 
 private:
