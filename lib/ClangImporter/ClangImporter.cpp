@@ -6865,11 +6865,26 @@ static void lookupRelatedFuncs(AbstractFunctionDecl *func,
       SmallVector<ValueDecl *, 4> found;
       ty->lookupQualified({ty}, DeclNameRef(name), func->getLoc(),
                           (NLFlags::QualifiedDefault) | options, found);
-      results.insert(found.begin(), found.end());
+      for (ValueDecl *vd : found) {
+        // Qualified lookup matches members by base name only, so a compound
+        // query like `foo(_:)` also returns `foo(_:_:)`. Enforce the full
+        // compound name here to support overloads of different arity.
+        if (name.isCompoundName() && isa<AbstractFunctionDecl>(vd) &&
+            vd->getName() != name)
+          continue;
+        results.insert(vd);
+      }
     };
     doLookup(swiftName);
     if (foreignName)
       doLookup(foreignName);
+
+    // `lookupQualified` on an imported C++ namespace (which Swift represents
+    // as an enum) returns only the namespace's Clang members, not members
+    // added by Swift extensions of that enum. Add the decl we are matching for
+    // to the candidate set.
+    if (importer::isClangNamespace(func->getDeclContext()))
+      results.insert(func);
   } else {
     UnqualifiedLookupOptions options =
         UnqualifiedLookupFlags::IgnoreAccessControl;
