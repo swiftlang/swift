@@ -148,7 +148,13 @@ syn keyword swiftTypeAliasDefinition skipwhite skipempty nextgroup=swiftTypeAlia
       \ associatedtype
       \ typealias
 
-syn keyword swiftVarDefinition skipwhite skipempty nextgroup=swiftVarName
+" let (a, b, c) = ... (tuple destructuring pattern). A region, like the
+" `<...>` generic-parameter clause, so nested tuples and any number of
+" names all get swiftVarName treatment, the same as a single `let x = ...`.
+syn region swiftVarNamePattern contained contains=swiftVarNamePattern,swiftVarName,swiftParamDelim
+      \ matchgroup=Delimiter start=/(/ end=/)/
+
+syn keyword swiftVarDefinition skipwhite skipempty nextgroup=swiftVarName,swiftVarNamePattern
       \ let
       \ var
 
@@ -315,6 +321,19 @@ syn match swiftNilOps
 syn match swiftAttribute
       \ /@\<\w\+\>/ skipwhite skipempty nextgroup=swiftAttribute,swiftDefinitionModifier,swiftImport,swiftType,swiftTypeAliasDefinition,swiftTypeDefinition
 
+" @convention(c) (Params) -> Return. Unlike a plain @attribute, the
+" parens here are the attribute's own argument (the calling convention),
+" not the type it applies to; that function type follows once the
+" parens close, and @swiftTypeContext picks it up from there. Defined
+" after the plain @attribute match above so it wins for this one name.
+syn keyword swiftConventionArgument contained
+      \ block
+      \ c
+      \ swift
+      \ thin
+syn region swiftAttribute skipwhite skipempty nextgroup=@swiftTypeContext contains=swiftConventionArgument
+      \ matchgroup=swiftAttribute start=/@convention(/ end=/)/
+
 " ---- Preprocessor & macros ----
 
 " This is a superset of the Preproc macros below, so it must come FIRST
@@ -398,6 +417,7 @@ hi def link swiftOperator Operator
 hi def link swiftNilOps Operator
 
 hi def link swiftAttribute PreProc
+hi def link swiftConventionArgument Keyword
 
 hi def link swiftPreproc PreCondit
 hi def link swiftPreprocFalse Comment
