@@ -3646,8 +3646,10 @@ public:
     for (auto Member : PD->getMembers())
       visit(Member);
 
-    if (Ctx.LangOpts.EnableCOMInterop)
+    if (Ctx.LangOpts.EnableCOMInterop) {
       com::validateIdentityProtocol(PD);
+      com::validateInterfaceRequirements(PD);
+    }
 
     checkAccessControl(PD);
 
