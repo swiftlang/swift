@@ -1002,14 +1002,29 @@ void swift::releasePartialApplyCapturedArg(SILBuilder &builder, SILLocation loc,
   emitDestroyOperation(builder, loc, arg, callbacks);
 }
 
+/// Returns true if \p user is a user of an on-stack closure which can be
+/// deleted together with the closure.
+static bool isDeadOnStackClosureUser(SILInstruction *user) {
+  return isa<DeallocStackInst>(user) || isa<DebugValueInst>(user) ||
+         isa<DestroyValueInst>(user);
+}
+
 static bool
-deadMarkDependenceUser(SILInstruction *inst,
+deadMarkDependenceUser(Operand *use,
                        SmallVectorImpl<SILInstruction *> &deleteInsts) {
-  if (!isa<MarkDependenceInst>(inst))
+  auto *mdi = dyn_cast<MarkDependenceInst>(use->getUser());
+  // If the closure is the base operand, another value depends on it. Deleting
+  // the mark_dependence and the destroys of its result would leak that value.
+  if (!mdi || use->getOperandNumber() != MarkDependenceInst::Dependent)
     return false;
-  deleteInsts.push_back(inst);
-  for (auto *use : cast<SingleValueInstruction>(inst)->getUses()) {
-    if (!deadMarkDependenceUser(use->getUser(), deleteInsts))
+  deleteInsts.push_back(mdi);
+  for (auto *mdiUse : mdi->getUses()) {
+    // In OSSA the closure is destroyed via the forwarding mark_dependence.
+    if (isDeadOnStackClosureUser(mdiUse->getUser())) {
+      deleteInsts.push_back(mdiUse->getUser());
+      continue;
+    }
+    if (!deadMarkDependenceUser(mdiUse, deleteInsts))
       return false;
   }
   return true;
@@ -1129,16 +1144,14 @@ bool swift::tryDeleteDeadClosure(SingleValueInstruction *closure,
     return false;
 
   // A stack allocated partial apply does not have any release users. Delete it
-  // if the only users are the dealloc_stack and mark_dependence instructions.
+  // if the only users are the dealloc_stack, debug_value and destroy_value
+  // instructions, either directly or forwarded through mark_dependence.
   if (pa && pa->isOnStack()) {
     SmallVector<SILInstruction *, 8> deleteInsts;
     for (auto *use : pa->getUses()) {
-      SILInstruction *user = use->getUser();
-      if (isa<DeallocStackInst>(user)
-          || isa<DebugValueInst>(user)
-          || isa<DestroyValueInst>(user)) {
-        deleteInsts.push_back(user);
-      } else if (!deadMarkDependenceUser(user, deleteInsts)) {
+      if (isDeadOnStackClosureUser(use->getUser())) {
+        deleteInsts.push_back(use->getUser());
+      } else if (!deadMarkDependenceUser(use, deleteInsts)) {
         return false;
       }
     }
