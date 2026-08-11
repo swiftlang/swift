@@ -6,22 +6,23 @@
 
 protocol MyProto {}
 
-// A type outside the extraction protocol list, mimicking e.g. CSCustomAttributeKey
-// from an external framework.
+// A type outside the extraction protocol list
 struct CustomKey {
     let keyName: String
     init(keyName: String) { self.keyName = keyName }
 
-    // Static stored let — constant initializer
     static let storedKey = CustomKey(keyName: "stored")
 
-    // Static computed property returning an init call
     static var computedKey: CustomKey {
-        return CustomKey(keyName: "computed")
+        CustomKey(keyName: "computed")
     }
 
-    // Static computed property returning a string literal
-    static var labelKey: String { return "label" }
+    static var labelKey: String { "label" }
+
+    static var dynamicLabelKey: String {  Int.random(in: 0...100) > 50 ? "dynamic1" : "dynamic2" }
+    static var dyanmicComputedKey: CustomKey { Int.random(in: 0...100) > 50 ? CustomKey(keyName: "dynamic1") : CustomKey(keyName: "dynamic2") }
+    static let dynamicStoredKey: CustomKey = Int.random(in: 0...100) > 50 ? CustomKey(keyName: "a") : CustomKey(keyName: "b")
+    static let interpolatedStringKey: String = "interpolated \(Self.labelKey)"
 }
 
 // Two types that reference each other — cycle detection test
@@ -45,6 +46,14 @@ struct Container: MyProto {
 
     // Unresolvable: cycle — must fall back to MemberReference
     var prop4 = CycleA.value
+
+    // Unresolvable: dynamic values — must fall back to MemberReference
+    var prop5 = CustomKey.dynamicLabelKey
+    var prop6 = CustomKey.dyanmicComputedKey
+    var prop7 = CustomKey.dynamicStoredKey
+
+    // Resolved: static stored property containing an interpolated string literal with a member reference
+    var prop8 = CustomKey.interpolatedStringKey
 }
 
 // CHECK:       "label": "prop1",
@@ -84,4 +93,44 @@ struct Container: MyProto {
 // CHECK-NEXT:  "value": {
 // CHECK-NEXT:    "baseType": "ExtractResolvedMemberReferences.CycleA",
 // CHECK-NEXT:    "memberLabel": "value"
+// CHECK-NEXT:  }
+
+// CHECK:       "label": "prop5",
+// CHECK:       "valueKind": "MemberReference",
+// CHECK-NEXT:  "value": {
+// CHECK-NEXT:    "baseType": "ExtractResolvedMemberReferences.CustomKey",
+// CHECK-NEXT:    "memberLabel": "dynamicLabelKey"
+// CHECK-NEXT:  }
+
+// CHECK:       "label": "prop6",
+// CHECK:       "valueKind": "MemberReference",
+// CHECK-NEXT:  "value": {
+// CHECK-NEXT:    "baseType": "ExtractResolvedMemberReferences.CustomKey",
+// CHECK-NEXT:    "memberLabel": "dyanmicComputedKey"
+// CHECK-NEXT:  }
+
+// CHECK:       "label": "prop7",
+// CHECK:       "valueKind": "MemberReference",
+// CHECK-NEXT:  "value": {
+// CHECK-NEXT:    "baseType": "ExtractResolvedMemberReferences.CustomKey",
+// CHECK-NEXT:    "memberLabel": "dynamicStoredKey"
+// CHECK-NEXT:  }
+
+// CHECK:       "label": "prop8",
+// CHECK:       "valueKind": "InterpolatedStringLiteral",
+// CHECK-NEXT:  "value": {
+// CHECK-NEXT:    "segments": [
+// CHECK-NEXT:      {
+// CHECK-NEXT:        "valueKind": "RawLiteral",
+// CHECK-NEXT:        "value": "interpolated "
+// CHECK-NEXT:      },
+// CHECK-NEXT:      {
+// CHECK-NEXT:        "valueKind": "RawLiteral",
+// CHECK-NEXT:        "value": "label"
+// CHECK-NEXT:      },
+// CHECK-NEXT:      {
+// CHECK-NEXT:        "valueKind": "RawLiteral",
+// CHECK-NEXT:        "value": ""
+// CHECK-NEXT:      }
+// CHECK-NEXT:    ]
 // CHECK-NEXT:  }
