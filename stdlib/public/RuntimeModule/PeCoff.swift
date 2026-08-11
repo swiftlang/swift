@@ -761,7 +761,7 @@ extension PeCoffImage: SymbolSource {
     if let function = dwarfReader?.lookupFunction(at: address) {
       let offset = address - function.lowPC
       return SymbolSource.Symbol(name: function.rawName,
-                                 offset: Int(offset),
+                                 offset: Int(clamping: offset),
                                  size: nil)
     } else if let functions {
       // If we don't have a DWARF reader, but we do have a function list,
@@ -780,7 +780,7 @@ extension PeCoffImage: SymbolSource {
           if mid + 1 == functions.count || address < functions[mid + 1].address {
             let offset = address - functions[mid].address
             return SymbolSource.Symbol(name: functions[mid].name,
-                                       offset: Int(offset),
+                                       offset: Int(clamping: offset),
                                        size: nil)
           }
           min = mid + 1
