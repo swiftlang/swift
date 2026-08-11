@@ -9,4 +9,8 @@
 // EXIST-NOT: @"$es13ManagedBufferCySis5UInt8VGN" = {{.*}}alias
 
 final public class MyBuffer: ManagedBuffer<Int, UInt8> {
+  // EXIST-NOT: _swift_stdlib_malloc_size
+  public final var cap: Int {
+    capacity
+  }
 }
