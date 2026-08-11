@@ -93,8 +93,22 @@ private struct FunctionChecker {
       )
       break
 
-    case is InitExistentialAddrInst:
-      let iea = instruction as! InitExistentialAddrInst
+    case let iem as InitExistentialMetatypeInst:
+      let concreteType = iem.operand.value.type.loweredInstanceTypeOfMetatype(in: iem.parentFunction)
+      if !context.bridgedPassContext.fitsInOpaqueExistentialPayload(concreteType.bridged) {
+        let existentialType = iem.type.objectType
+        try diagnoseHeapAllocation(
+          .init(.embedded_swift_allocating_existential_metatype_box,
+                existentialType, concreteType.rawType,
+                at: iem.location)
+        )
+      }
+
+      for conf in iem.conformances {
+        try checkConformance(conf, location: iem.location)
+      }
+
+    case let iea as InitExistentialAddrInst:
       if !context.bridgedPassContext.fitsInOpaqueExistentialPayload(iea.type.bridged) {
         try diagnoseHeapAllocation(
           .init(.embedded_swift_allocating_existential_box,
@@ -105,8 +119,7 @@ private struct FunctionChecker {
       fallthrough
 
     case is InitExistentialValueInst,
-         is InitExistentialRefInst,
-         is InitExistentialMetatypeInst:
+         is InitExistentialRefInst:
       let ie = instruction as! any InitExistentialInstruction
 
       for conf in ie.conformances {

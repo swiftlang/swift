@@ -95,5 +95,14 @@ public func getExistentialPBig() -> any P {
   return BigType(values: (0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)) // expected-error{{boxing a value of type 'BigType' into an 'any P' involves heap allocation}}
 }
 
+public func getExistentialMetaPSmall() -> any (P.Type) {
+  return HomeworkError.self
+}
+
+public func getExistentialMetaPBig() -> any (P.Type) {
+  // TODO: can we drop the @thick somehow?
+  return BigType.self // expected-error{{boxing type 'BigType' into an '@thick any P.Type' can result in later heap allocation}}
+}
+
 // TODO: async functions require _Concurrency, which brings in some
 // allocation. Test for await calls later.
