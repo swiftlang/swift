@@ -1329,6 +1329,7 @@ public:
 
   // Used by the MemoryLifetimeVerifier
   bool argumentMayRead(Operand *argOp, SILValue addr);
+  bool argumentMayWrite(Operand *argOp, SILValue addr);
 
   bool isDeinitBarrier();
 
