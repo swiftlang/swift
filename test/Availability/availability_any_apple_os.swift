@@ -61,9 +61,12 @@ func availableAtDeploymentTarget() {
   // expected-visionos-error@-5 {{'availableInAnyAppleOS26_1()' is only available in visionOS 26.1 or newer}}
   // expected-apple-note@-6 {{add 'if #available' version check}}{{3-30=if #available(anyAppleOS 26.1, *) {\n      availableInAnyAppleOS26_1()\n  \} else {\n      // Fallback on earlier versions\n  \}}}
 
-  // FIXME: [availability] Remap domain/version in deprecation diagnostics
   deprecatedInAnyAppleOS26()
-  // expected-apple-warning@-1 {{'deprecatedInAnyAppleOS26()' was deprecated in any Apple OS 26}}
+  // expected-macos-warning@-1 {{'deprecatedInAnyAppleOS26()' was deprecated in macOS 26}}
+  // expected-ios-warning@-2 {{'deprecatedInAnyAppleOS26()' was deprecated in iOS 26}}
+  // expected-watchos-warning@-3 {{'deprecatedInAnyAppleOS26()' was deprecated in watchOS 26}}
+  // expected-tvos-warning@-4 {{'deprecatedInAnyAppleOS26()' was deprecated in tvOS 26}}
+  // expected-visionos-warning@-5 {{'deprecatedInAnyAppleOS26()' was deprecated in visionOS 26}}
 
   obsoletedInAnyAppleOS26()
   // expected-macos-error@-1 {{'obsoletedInAnyAppleOS26()' is unavailable in macOS}}
