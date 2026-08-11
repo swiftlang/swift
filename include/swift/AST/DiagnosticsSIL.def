@@ -401,7 +401,7 @@ GROUPED_ERROR(embedded_swift_metatype_type,EmbeddedRestrictions,none,
       "cannot use metatype of type %0 in embedded Swift", (Type))
 GROUPED_ERROR(embedded_swift_keypath,EmbeddedRestrictions,none,
       "cannot use key path in embedded Swift", ())
-GROUPED_WARNING(perf_hint_keypath_captures_values,KeyPathAllocation,none,
+GROUPED_WARNING(perf_hint_keypath_captures_values,HeapAllocation,none,
       "a key path that captures %0 value%s0 requires a heap allocation",
       (unsigned))
 GROUPED_ERROR(embedded_swift_dynamic_cast,EmbeddedRestrictions,none,
@@ -424,14 +424,25 @@ NOTE(embedded_constructor_called,none,
       "instance of type created here", ())
 
 // no-allocations diagnostics
-ERROR(embedded_swift_allocating_type,none,
-      "cannot use allocating type %0 in -no-allocations mode", (Type))
-ERROR(embedded_swift_allocating_coroutine,none,
-      "cannot use co-routines (like accessors) in -no-allocations mode", ())
-ERROR(embedded_swift_allocating_closure,none,
-      "cannot use escaping closures in -no-allocations mode", ())
-ERROR(embedded_swift_allocating,none,
-      "cannot use allocating operation in -no-allocations mode", ())
+GROUPED_WARNING(embedded_swift_allocating_type,HeapAllocation,none,
+      "creating an instance of type %0 involves heap allocation", (Type))
+GROUPED_WARNING(embedded_swift_allocating_coroutine,HeapAllocation,none,
+      "coroutine accessor involves heap allocation",
+      ())
+GROUPED_WARNING(embedded_swift_allocating_async,HeapAllocation,none,
+      "async call involves heap allocation", ())
+GROUPED_WARNING(embedded_swift_allocating_closure,HeapAllocation,none,
+      "escaping closure involves heap allocation", ())
+GROUPED_WARNING(embedded_swift_allocating,HeapAllocation,none,
+      "function conversion involves heap allocation", ())
+GROUPED_WARNING(embedded_swift_allocation_raw,HeapAllocation,none,
+      "explicit heap allocation", ())
+GROUPED_WARNING(embedded_swift_allocating_existential_box,HeapAllocation,none,
+      "boxing a value of type %1 into an %0 involves heap allocation",
+      (Type, Type))
+GROUPED_WARNING(embedded_swift_allocating_existential_metatype_box,HeapAllocation,none,
+      "boxing type %1 into an %0 can result in later heap allocation",
+      (Type, Type))
 
 ERROR(wrong_linkage_for_serialized_function,none,
       "function has wrong linkage to be called from %0", (StringRef))

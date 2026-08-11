@@ -815,6 +815,10 @@ BridgedLocation BridgedFunction::getLocation() const {
   return {swift::SILDebugLocation(getFunction()->getLocation(), getFunction()->getDebugScope())};
 }
 
+OptionalBridgedDeclObj BridgedFunction::getParentModule() const {
+  return {getFunction()->getParentModule()};
+}
+
 BridgedArrayRef BridgedFunction::getFilesForModule() const {
   return getFunction()->getModule().getSwiftModule()->getFiles();
 }
@@ -1357,6 +1361,14 @@ bool BridgedInstruction::IndexAddrInst_isProjection() const {
   return getAs<swift::IndexAddrInst>()->isProjection();
 }
 
+BridgedConformanceArray BridgedInstruction::AllocExistentialBoxInst_getConformances() const {
+  return {getAs<swift::AllocExistentialBoxInst>()->getConformances()};
+}
+
+BridgedCanType BridgedInstruction::AllocExistentialBoxInst_getFormalConcreteType() const {
+  return getAs<swift::AllocExistentialBoxInst>()->getFormalConcreteType();
+}
+
 BridgedConformanceArray BridgedInstruction::InitExistentialRefInst_getConformances() const {
   return {getAs<swift::InitExistentialRefInst>()->getConformances()};
 }
@@ -1369,16 +1381,25 @@ BridgedConformanceArray BridgedInstruction::InitExistentialAddrInst_getConforman
   return {getAs<swift::InitExistentialAddrInst>()->getConformances()};
 }
 
-BridgedConformanceArray BridgedInstruction::InitExistentialValueInst_getConformances() const {
-  return {getAs<swift::InitExistentialValueInst>()->getConformances()};
-}
-
 BridgedCanType BridgedInstruction::InitExistentialAddrInst_getFormalConcreteType() const {
   return getAs<swift::InitExistentialAddrInst>()->getFormalConcreteType();
 }
 
+BridgedConformanceArray BridgedInstruction::InitExistentialValueInst_getConformances() const {
+  return {getAs<swift::InitExistentialValueInst>()->getConformances()};
+}
+
+BridgedCanType BridgedInstruction::InitExistentialValueInst_getFormalConcreteType() const {
+  return getAs<swift::InitExistentialValueInst>()->getFormalConcreteType();
+}
+
 BridgedConformanceArray BridgedInstruction::InitExistentialMetatypeInst_getConformances() const {
   return {getAs<swift::InitExistentialMetatypeInst>()->getConformances()};
+}
+
+BridgedCanType BridgedInstruction::InitExistentialMetatypeInst_getFormalConcreteType() const {
+  return getAs<swift::InitExistentialMetatypeInst>()->getOperand()->getType()
+        .getASTType();
 }
 
 bool BridgedInstruction::OpenExistentialAddr_isImmutable() const {

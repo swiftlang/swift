@@ -1053,6 +1053,7 @@ class TailAddrInst : SingleValueInstruction, IndexingInstruction {}
 @_semantics("fast_cast")
 public protocol InitExistentialInstruction: Instruction {
   var conformances: ConformanceArray { get }
+  var formalConcreteType: CanonicalType { get }
 }
 
 final public
@@ -1082,6 +1083,10 @@ final public
 class InitExistentialValueInst : SingleValueInstruction, UnaryInstruction, InitExistentialInstruction {
   public var conformances: ConformanceArray {
     ConformanceArray(bridged: bridged.InitExistentialValueInst_getConformances())
+  }
+
+  public var formalConcreteType: CanonicalType {
+    CanonicalType(bridged: bridged.InitExistentialValueInst_getFormalConcreteType())
   }
 }
 
@@ -1122,6 +1127,10 @@ class InitExistentialMetatypeInst : SingleValueInstruction, UnaryInstruction, In
 
   public var conformances: ConformanceArray {
     ConformanceArray(bridged: bridged.InitExistentialMetatypeInst_getConformances())
+  }
+
+  public var formalConcreteType: CanonicalType {
+    CanonicalType(bridged: bridged.InitExistentialMetatypeInst_getFormalConcreteType())
   }
 }
 
@@ -1872,6 +1881,18 @@ final public class AllocBoxInst : SingleValueInstruction, Allocation, DebugVaria
 }
 
 final public class AllocExistentialBoxInst : SingleValueInstruction, Allocation {
+  public var existentialType: Type {
+    results[0].type
+  }
+
+  public var formalConcreteType: CanonicalType {
+    CanonicalType(bridged: bridged.AllocExistentialBoxInst_getFormalConcreteType())
+  }
+
+  public var conformances: ConformanceArray {
+    ConformanceArray(bridged: bridged.AllocExistentialBoxInst_getConformances())
+  }
+
 }
 
 //===----------------------------------------------------------------------===//

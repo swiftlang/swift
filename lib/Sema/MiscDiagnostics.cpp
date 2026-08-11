@@ -412,21 +412,34 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       if (!castType)
         return;
 
-      if (castType->isNoncopyable()) {
+      Type fromType = cast->getSubExpr()->getType();
+
+      // 'as?'/'as!'/'is' from a noncopyable existential value to a concrete
+      // type is permitted under NoncopyableCasting: there, unlike other
+      // move-only types, the existential's erased dynamic type is exactly
+      // the kind of thing a runtime cast can meaningfully recover. The
+      // destination must be a concrete (non-existential, non-archetype)
+      // type; existential-to-existential and existential-to-archetype casts
+      // are not yet supported by the runtime and remain rejected below.
+      bool isSupportedExistentialCast =
+          Ctx.LangOpts.hasFeature(Feature::NoncopyableCasting) &&
+          fromType && fromType->isNoncopyable() &&
+          fromType->isExistentialType() &&
+          !castType->isExistentialType() &&
+          !castType->is<ArchetypeType>();
+
+      if (castType->isNoncopyable() && !isSupportedExistentialCast) {
         // can't cast anything to move-only; there should be no valid ones.
         Ctx.Diags.diagnose(cast->getLoc(), diag::noncopyable_cast);
         return;
       }
 
-      // no support for runtime casts from move-only types.
-      // as of now there is no type it could be cast to except itself, so
-      // there's no reason for it to happen at runtime.
-      if (auto fromType = cast->getSubExpr()->getType()) {
-        if (fromType->isNoncopyable()) {
-          // can't cast move-only to anything.
-          Ctx.Diags.diagnose(cast->getLoc(), diag::noncopyable_cast);
-          return;
-        }
+      // no support for runtime casts from move-only types, except for the
+      // existential-to-concrete case handled above.
+      if (fromType && fromType->isNoncopyable() && !isSupportedExistentialCast) {
+        // can't cast move-only to anything.
+        Ctx.Diags.diagnose(cast->getLoc(), diag::noncopyable_cast);
+        return;
       }
 
       // Embedded Swift places restrictions on dynamic casting.
