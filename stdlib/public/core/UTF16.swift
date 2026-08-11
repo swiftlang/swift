@@ -242,7 +242,7 @@ extension Unicode.UTF16 {
     while true {
       let s = d.parseScalar(from: &i)
       if _fastPath(s._valid != nil), let scalarContent = s._valid {
-        let utf16 = transcode(scalarContent, from: sourceEncoding)
+        let utf16 = unsafe transcode(scalarContent, from: sourceEncoding)
           ._unsafelyUnwrappedUnchecked
         utf16Count += utf16.count
         for x in utf16 { utf16BitUnion |= x }
