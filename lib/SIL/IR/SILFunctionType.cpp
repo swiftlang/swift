@@ -3726,6 +3726,12 @@ CanSILFunctionType swift::buildSILFunctionThunkType(
   if (withoutActuallyEscaping)
     extInfoBuilder = extInfoBuilder.withNoEscape(false);
 
+  // The thunk itself cannot be `@called(once)` just like a closure cannot
+  // be since the constraint is about the value and is expressed on
+  // `partial_apply` instruction that forms the value of the thunk.
+  if (extInfoBuilder.isCalledOnce())
+    extInfoBuilder = extInfoBuilder.withCalledOnce(false);
+
   // Does the thunk type involve a local archetype type?
   SmallVector<GenericEnvironment *, 2> capturedEnvs;
   auto archetypeVisitor = [&](CanType t) {
@@ -3805,10 +3811,15 @@ CanSILFunctionType swift::buildSILFunctionThunkType(
       extInfoBuilder = extInfoBuilder.withIsPseudogeneric();
 
   // Add the formal parameters of the expected type to the thunk.
-  auto contextConvention =
-      fn->getTypeProperties(sourceType).isTrivial()
-          ? ParameterConvention::Direct_Unowned
-          : ParameterConvention::Direct_Guaranteed;
+  //
+  // A `@called(once)` source function is applied inside the thunk body,
+  // which is itself the consuming use that enforces call-at-most-once, so
+  // it must be captured as `Direct_Owned`.
+  auto contextConvention = fn->getTypeProperties(sourceType).isTrivial()
+                               ? ParameterConvention::Direct_Unowned
+                           : sourceType->isCalledOnce()
+                               ? ParameterConvention::Direct_Owned
+                               : ParameterConvention::Direct_Guaranteed;
   SmallVector<SILParameterInfo, 4> params;
   params.append(expectedType->getParameters().begin(),
                 expectedType->getParameters().end());
