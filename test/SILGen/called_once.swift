@@ -76,9 +76,10 @@ func testClosureWithCapture(f: @called(once) () -> Void) {
 
 // Captured `var`s go through the same "move at formation" path as `let`s:
 // forming `g` takes `f`'s current value out via [consumable_and_assignable]
-// + load [take]. Reassigning `f` afterward is ordinary box reinitialization,
-// via the pre-existing [assignable_but_not_consumable] + assign idiom, and
-// does not disturb the value already moved into `g`.
+// + load [take]. Reassigning `f` afterward also uses
+// [consumable_and_assignable] -- `@called(once)` values always have
+// consuming semantics, even for a plain overwrite -- and does not disturb
+// the value already moved into `g`.
 //
 // CHECK-LABEL: sil hidden [ossa] @$s11called_once25testClosureWithVarCaptureyyyyXEnF : $@convention(thin) (@owned @noescape @called(once) @callee_owned () -> ()) -> () {
 // CHECK: bb0([[F_PARAM:%.*]] : @owned $@noescape @called(once) @callee_owned () -> ()):
@@ -100,7 +101,7 @@ func testClosureWithCapture(f: @called(once) () -> Void) {
 // CHECK:  [[NEW_VALUE:%.*]] = apply {{.*}}() : $@convention(thin) () -> @owned @called(once) @callee_owned () -> ()
 // CHECK:  [[NEW_VALUE_NOESCAPE:%.*]] = convert_escape_to_noescape [[NEW_VALUE]] : $@called(once) @callee_owned () -> () to $@noescape @called(once) @callee_owned () -> ()
 // CHECK:  [[F_ACCESS:%.*]] = begin_access [modify] [unknown] [[F_PROJ]] : $*@noescape @called(once) @callee_owned () -> ()
-// CHECK:  [[F_WRITE_ADDR:%.*]] = mark_unresolved_non_copyable_value [assignable_but_not_consumable] [[F_ACCESS]] : $*@noescape @called(once) @callee_owned () -> ()
+// CHECK:  [[F_WRITE_ADDR:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[F_ACCESS]] : $*@noescape @called(once) @callee_owned () -> ()
 // CHECK:  assign [[NEW_VALUE_NOESCAPE]] to [[F_WRITE_ADDR]] : $*@noescape @called(once) @callee_owned () -> ()
 // CHECK: } // end sil function '$s11called_once25testClosureWithVarCaptureyyyyXEnF'
 
