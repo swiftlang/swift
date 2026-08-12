@@ -46,7 +46,6 @@ bool ForwardingOperation::hasSameRepresentation() const {
   case SILInstructionKind::CopyableToMoveOnlyWrapperValueInst:
   case SILInstructionKind::DestructureTupleInst:
   case SILInstructionKind::DestructureStructInst:
-  case SILInstructionKind::InitExistentialRefInst:
   case SILInstructionKind::ObjectInst:
   case SILInstructionKind::OpenExistentialBoxValueInst:
   case SILInstructionKind::OpenExistentialRefInst:
@@ -61,6 +60,10 @@ bool ForwardingOperation::hasSameRepresentation() const {
   case SILInstructionKind::ImplicitActorToOpaqueIsolationCastInst:
   case SILInstructionKind::UncheckedOwnershipInst:
     return true;
+
+  case SILInstructionKind::InitExistentialRefInst:
+    return !cast<InitExistentialRefInst>(forwardingInst)->getType()
+      .canUseExistentialRepresentation(ExistentialRepresentation::COM);
   }
 }
 
