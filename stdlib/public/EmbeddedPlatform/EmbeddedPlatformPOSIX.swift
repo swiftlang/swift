@@ -196,9 +196,11 @@ public func _swift_typedAllocate(_ size: Int, _ alignMask: Int, _ flags: SwiftAl
 
 #if SWIFT_STDLIB_HAS_MALLOC_TYPE
   if _isMallocTypeOSVersionAtLeast() {
-    // This check also forces "default" alignment to use malloc_memalign().
+    // This check also forces "default" alignment (alignMask == -1) to use
+    // malloc_type_posix_memalign(). Note we need to check the signedness of
+    // alignMask because it's signed unlike in swift_slowAllocTyped.
     let MALLOC_ALIGN_MASK = 15
-    if (alignMask <= MALLOC_ALIGN_MASK) {
+    if (alignMask >= 0 && alignMask <= MALLOC_ALIGN_MASK) {
       return unsafe malloc_type_malloc(size, typeId);
     } else {
       var alignment: Int

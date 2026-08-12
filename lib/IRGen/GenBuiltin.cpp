@@ -33,6 +33,7 @@
 #include "GenConcurrency.h"
 #include "GenDistributed.h"
 #include "GenEnum.h"
+#include "GenHeap.h"
 #include "GenPointerAuth.h"
 #include "GenIntegerLiteral.h"
 #include "GenOpaque.h"
@@ -632,6 +633,50 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     // Translate the alignment to a mask.
     auto alignMask = IGF.Builder.CreateSub(align, IGF.IGM.getSize(Size(1)));
     IGF.emitDeallocRawCall(pointer, size, alignMask);
+    return;
+  }
+
+  case BuiltinValueKind::AllocRawTyped: {
+    auto size = args.claimNext();
+    auto align = args.claimNext();
+    // The T.Type argument is dropped in SILGen; only its substitution
+    // (read via `substitutions` below) is needed here.
+    // Translate the alignment to a mask.
+    auto alignMask = IGF.Builder.CreateSub(align, IGF.IGM.getSize(Size(1)));
+    auto boundTy = substitutions.getReplacementTypes()[0]->getCanonicalType();
+    SmallVector<SILType, 1> fieldTypes{IGF.IGM.getLoweredType(boundTy)};
+    llvm::Value *alloc;
+    if (auto descriptor = computeTypedMallocTypeDescriptor(
+            IGF.IGM, fieldTypes, /*isArray=*/true)) {
+      auto descriptorConst =
+          llvm::ConstantInt::get(IGF.IGM.Int64Ty, *descriptor);
+      alloc = IGF.emitAllocRawTypedCall(size, alignMask, descriptorConst,
+                                        "builtin-allocRawTyped");
+    } else {
+      alloc = IGF.emitAllocRawCall(size, alignMask, "builtin-allocRaw");
+    }
+    out.add(alloc);
+    return;
+  }
+
+  case BuiltinValueKind::DeallocRawTyped: {
+    auto pointer = args.claimNext();
+    auto size = args.claimNext();
+    auto align = args.claimNext();
+    // The T.Type argument is dropped in SILGen; only its substitution
+    // (read via `substitutions` below) is needed here.
+    // Translate the alignment to a mask.
+    auto alignMask = IGF.Builder.CreateSub(align, IGF.IGM.getSize(Size(1)));
+    auto boundTy = substitutions.getReplacementTypes()[0]->getCanonicalType();
+    SmallVector<SILType, 1> fieldTypes{IGF.IGM.getLoweredType(boundTy)};
+    if (auto descriptor = computeTypedMallocTypeDescriptor(
+            IGF.IGM, fieldTypes, /*isArray=*/true)) {
+      auto descriptorConst =
+          llvm::ConstantInt::get(IGF.IGM.Int64Ty, *descriptor);
+      IGF.emitDeallocRawTypedCall(pointer, size, alignMask, descriptorConst);
+    } else {
+      IGF.emitDeallocRawCall(pointer, size, alignMask);
+    }
     return;
   }
 

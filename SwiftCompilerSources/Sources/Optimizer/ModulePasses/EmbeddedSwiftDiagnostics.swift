@@ -239,7 +239,7 @@ private struct FunctionChecker {
 
     case let bi as BuiltinInst:
       switch bi.id {
-      case .AllocRaw:
+      case .AllocRaw, .AllocRawTyped:
         try diagnoseHeapAllocation(
           Violation(.embedded_swift_allocation_raw, in: bi)
         )
