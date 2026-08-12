@@ -93,8 +93,8 @@ bb3(%result : $Int64):
   return %t : $()
 }
 
-sil [ossa] @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
-bb0(%argc : $Int32, %argv : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
+sil [ossa] @main : $@convention(c) () -> Int32 {
+bb0:
   %castSmall = function_ref @castSmall : $@convention(thin) (@in any P & ~Copyable) -> ()
   %castBig = function_ref @castBig : $@convention(thin) (@in any P & ~Copyable) -> ()
 
