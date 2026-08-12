@@ -881,9 +881,10 @@ namespace {
 
   public:
     ProtocolDescriptorBuilder(IRGenModule &IGM, ProtocolDecl *Proto,
-                                     SILDefaultWitnessTable *defaultWitnesses)
+                              SILDefaultWitnessTable *defaultWitnesses)
       : super(IGM), Proto(Proto), DefaultWitnesses(defaultWitnesses),
-        Resilient(IGM.getSwiftModule()->isResilient()) {}
+        Resilient(IGM.getSwiftModule()->isResilient() &&
+                  !Proto->isCOMInterface()) {}
 
     void layout() {
       super::layout();
@@ -912,7 +913,11 @@ namespace {
                                  ? ProtocolClassConstraint::Class
                                  : ProtocolClassConstraint::Any);
       flags.setSpecialProtocol(getSpecialProtocolID(Proto));
-      flags.setIsResilient(DefaultWitnesses != nullptr);
+      // Preserve the existing resilient-protocol discriminator for ordinary
+      // protocols. A COM interface's IID fixes its requirement layout, so its
+      // descriptor and witness tables must always agree on a fixed layout.
+      flags.setIsResilient(DefaultWitnesses != nullptr &&
+                           !Proto->isCOMInterface());
       return flags.getOpaqueValue();
     }
 
