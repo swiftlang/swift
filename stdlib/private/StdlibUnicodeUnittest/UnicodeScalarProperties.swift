@@ -602,7 +602,7 @@ func parseBidiClassDefaults(
     let longName = components[1].filter { !$0.isWhitespace }
 
     guard let bidi = bidiClass(forLongName: Substring(longName)) else {
-      continue
+      fatalError("Unhandled Bidi_Class default: \(longName)")
     }
 
     let scalars = parseScalars(String(components[0]))
@@ -634,7 +634,7 @@ func parseBidiClass(
     let filteredClass = components[1].filter { !$0.isWhitespace }
 
     guard let bidi = bidiClass(forAbbreviation: Substring(filteredClass)) else {
-      continue
+      fatalError("Unhandled Bidi_Class value: \(filteredClass)")
     }
 
     let scalars = parseScalars(String(components[0]))
