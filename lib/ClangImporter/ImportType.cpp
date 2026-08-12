@@ -1075,14 +1075,10 @@ namespace {
       if (!decl)
         return nullptr;
 
-      if (Bridging == Bridgeability::Full)
-        for (const auto *attr : decl->getAttrs())
-          if (const auto *customAttr = dyn_cast<CustomAttr>(attr))
-            if (customAttr->getTypeRepr()->isSimpleUnqualifiedIdentifier(
-                    "_refCountedPtr")) {
-              return ImportResult(decl->getDeclaredInterfaceType(),
-                                  ImportHint::IntrusivelyRefCountedSmartPtr);
-            }
+      if (Bridging == Bridgeability::Full &&
+          importer::getRefCountedPtrAttr(decl))
+        return ImportResult(decl->getDeclaredInterfaceType(),
+                            ImportHint::IntrusivelyRefCountedSmartPtr);
 
       return decl->getDeclaredInterfaceType();
     }
@@ -2540,14 +2536,9 @@ static bool isParameterContextGlobalActorIsolated(DeclContext *dc,
   if (getActorIsolationOfContext(dc).isGlobalActor())
     return true;
 
-  if (!parent->hasAttrs())
-    return false;
-
-  for (const auto *attr : parent->getAttrs()) {
-    if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr)) {
-      if (isMainActorAttr(swiftAttr))
-        return true;
-    }
+  for (const auto *swiftAttr : parent->specific_attrs<clang::SwiftAttrAttr>()) {
+    if (isMainActorAttr(swiftAttr))
+      return true;
   }
 
   return false;
@@ -2813,9 +2804,10 @@ static ParamDecl *getParameterInfo(ClangImporter::Implementation *impl,
   // If SendingArgsAndResults are enabled and we have a sending argument,
   // set that the param was sending.
   if (ASTContext.LangOpts.hasFeature(Feature::SendingArgsAndResults)) {
-    if (auto *attr = param->getAttr<clang::SwiftAttrAttr>()) {
+    for (auto *attr : param->specific_attrs<clang::SwiftAttrAttr>()) {
       if (attr->getAttribute() == "sending") {
         paramInfo->setSending();
+        break;
       }
     }
   }

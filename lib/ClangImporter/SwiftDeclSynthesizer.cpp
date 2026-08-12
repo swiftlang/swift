@@ -3421,16 +3421,9 @@ static bool isSufficientlyTrivial(const clang::CXXRecordDecl *decl) {
 /// given Clang type and return it.
 FuncDecl *SwiftDeclSynthesizer::findExplicitDestroy(
     NominalTypeDecl *nominal, const clang::RecordDecl *clangType) {
-  if (!clangType->hasAttrs())
-    return nullptr;
-
   llvm::SmallPtrSet<FuncDecl *, 2> matchingDestroyFuncs;
   llvm::TinyPtrVector<FuncDecl *> nonMatchingDestroyFuncs;
-  for (auto attr : clangType->getAttrs()) {
-    auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr);
-    if (!swiftAttr)
-      continue;
-
+  for (auto *swiftAttr : clangType->specific_attrs<clang::SwiftAttrAttr>()) {
     auto destroyFuncName = swiftAttr->getAttribute();
     if (!destroyFuncName.consume_front("destroy:"))
       continue;

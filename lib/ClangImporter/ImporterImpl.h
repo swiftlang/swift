@@ -2320,6 +2320,11 @@ bool hasIteratorAPIAttr(const clang::Decl *decl);
 bool hasNonEscapableAttr(const clang::RecordDecl *decl);
 bool hasNonCopyableAttr(const clang::RecordDecl *decl);
 bool hasEscapableAttr(const clang::RecordDecl *decl);
+
+/// The \c @_refCountedPtr attribute marking \p decl as a reference counting
+/// smart pointer, or null if it does not have one.
+CustomAttr *getRefCountedPtrAttr(Decl *decl);
+
 CxxValueSemanticsKind
 getCxxValueSemanticsKind(const clang::Type *type,
                          ClangImporter::Implementation &Impl);
