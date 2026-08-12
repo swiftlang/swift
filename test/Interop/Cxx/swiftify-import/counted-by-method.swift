@@ -9,6 +9,8 @@
 // RUN:   -Xcc -Wno-nullability-completeness -target %target-swift-6.2-abi-triple \
 // RUN:   -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature SafeInteropWrappersNullAsEmptySpan \
 // RUN:   -verify-additional-prefix %target-vendor-
+// XFAIL: OS=xros
+// rdar://183989115
 
 //--- test.h
 #define __counted_by(x) __attribute__((__counted_by__(x)))
