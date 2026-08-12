@@ -294,6 +294,7 @@ enum PeCoffImageError: Error {
   case missingOptionalHeader
   case badOptionalHeader
   case badDebugDirectory
+  case badVirtualAddress
 }
 
 enum PeImageDirectoryEntry: Int {
@@ -641,7 +642,13 @@ final class PeCoffImage {
       if debugInfo.VirtualAddress != 0 && debugInfo.Size != 0 {
         var pos: Address
         if source.isMappedImage {
-          pos = Address(debugInfo.VirtualAddress) + self.imageBase
+          let (thePos, ov) = self.imageBase.addingReportingOverflow(
+            Address(debugInfo.VirtualAddress)
+          )
+          guard !ov else {
+            throw PeCoffImageError.badVirtualAddress
+          }
+          pos = thePos
         } else {
           guard let fp = filePointer(from: debugInfo.VirtualAddress) else {
             throw PeCoffImageError.badDebugDirectory
@@ -657,7 +664,13 @@ final class PeCoffImage {
 
           let dataPos: Address
           if source.isMappedImage {
-            dataPos = Address(entry.AddressOfRawData) + self.imageBase
+            let (thePos, ov) = self.imageBase.addingReportingOverflow(
+              Address(entry.AddressOfRawData)
+            )
+            guard !ov else {
+              throw PeCoffImageError.badVirtualAddress
+            }
+            dataPos = thePos
           } else {
             dataPos = Address(entry.PointerToRawData)
           }
