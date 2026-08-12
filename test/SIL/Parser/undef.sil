@@ -175,20 +175,20 @@ bb0:
   init_existential_addr undef : $*P, $D
   // CHECK: deinit_existential_addr undef : $*any P
   deinit_existential_addr undef : $*P
-  // CHECK: open_existential_addr immutable_access undef : $*any P to $*@opened("01234567-89AB-CDEF-0123-000000000000", any P) Self
-  open_existential_addr immutable_access undef : $*P to $*@opened("01234567-89AB-CDEF-0123-000000000000", P) Self
-  // CHECK: open_existential_addr mutable_access undef : $*any P to $*@opened("01234567-89AB-CDEF-0123-100000000000", any P) Self
-  open_existential_addr mutable_access undef : $*P to $*@opened("01234567-89AB-CDEF-0123-100000000000", P) Self
+  // CHECK: open_existential_addr immutable_access undef : $*any P to $*@opened(1, any P) Self
+  open_existential_addr immutable_access undef : $*P to $*@opened(1, P) Self
+  // CHECK: open_existential_addr mutable_access undef : $*any P to $*@opened(2, any P) Self
+  open_existential_addr mutable_access undef : $*P to $*@opened(2, P) Self
   // CHECK: init_existential_ref undef : $D : $D, $any ClassP
   init_existential_ref undef : $D : $D, $ClassP
-  // CHECK: open_existential_ref undef : $any ClassP to $@opened("01234567-89AB-CDEF-0123-000000000001", any ClassP) Self
-  open_existential_ref undef : $ClassP to $@opened("01234567-89AB-CDEF-0123-000000000001", ClassP) Self
+  // CHECK: open_existential_ref undef : $any ClassP to $@opened(3, any ClassP) Self
+  open_existential_ref undef : $ClassP to $@opened(3, ClassP) Self
   // CHECK: init_existential_metatype undef : $@thick D.Type, $@thick any P.Type
   init_existential_metatype undef : $@thick D.Type, $@thick P.Type
-  // CHECK: open_existential_metatype undef : $@thick any P.Type to $@thick (@opened("01234567-89AB-CDEF-0123-000000000002", any P) Self).Type
-  open_existential_metatype undef : $@thick P.Type to $@thick (@opened("01234567-89AB-CDEF-0123-000000000002", P) Self).Type
-  // CHECK: open_existential_box undef : $any Error to $*@opened("01234567-89AB-CDEF-0123-000000000003", any Error) Self
-  open_existential_box undef : $Error to $*@opened("01234567-89AB-CDEF-0123-000000000003", Error) Self
+  // CHECK: open_existential_metatype undef : $@thick any P.Type to $@thick (@opened(4, any P) Self).Type
+  open_existential_metatype undef : $@thick P.Type to $@thick (@opened(4, P) Self).Type
+  // CHECK: open_existential_box undef : $any Error to $*@opened(5, any Error) Self
+  open_existential_box undef : $Error to $*@opened(5, Error) Self
   // CHECK: dealloc_existential_box undef : $any Error, $()
   dealloc_existential_box undef : $Error, $()
 

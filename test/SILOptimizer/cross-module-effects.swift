@@ -25,7 +25,7 @@ public final class X {
 
 // CHECK-FR-MODULE-LABEL: sil [canonical] @$s6Module17noInlineNoEffectsySiAA1XCF :
 // CHECK-FR-MODULE-NEXT:  [%0: noescape **, read c0.v**]
-// CHECK-FR-MODULE-NEXT:  [global: ]
+// CHECK-FR-MODULE-NEXT:  [global: deinit_barrier]
 // CHECK-FR-MODULE-NEXT:  {{^[^[]}}
 // CHECK-LE-MODULE-NOT: @$s6Module17noInlineNoEffectsySiAA1XCF
 public func noInlineNoEffects(_ x: X) -> Int {
@@ -34,7 +34,7 @@ public func noInlineNoEffects(_ x: X) -> Int {
 
 // CHECK-FR-MODULE-LABEL: sil [serialized] [noinline] [canonical] {{.*}}@$s6Module15inlineNoEffectsySiAA1XCF : $@convention(thin) (@guaranteed X) -> Int {
 // CHECK-FR-MODULE-NEXT:  [%0: noescape **, read c0.v**]
-// CHECK-FR-MODULE-NEXT:  [global: ]
+// CHECK-FR-MODULE-NEXT:  [global: deinit_barrier]
 // CHECK-FR-MODULE-NEXT:  {{^[^[]}}
 // CHECK-LE-MODULE-LABEL: sil [serialized] [noinline] [canonical] {{.*}}@$s6Module15inlineNoEffectsySiAA1XCF : $@convention(thin) (@guaranteed X) -> Int {
 // CHECK-LE-MODULE-NEXT:  {{^[^[]}}
@@ -46,7 +46,7 @@ public func inlineNoEffects(_ x: X) -> Int {
 
 // CHECK-FR-MODULE-LABEL: sil [canonical] @$s6Module14internalCalleeySiAA1XCF : $@convention(thin) (@guaranteed X) -> Int {
 // CHECK-FR-MODULE-NEXT:  [%0: noescape **, read c0.v**]
-// CHECK-FR-MODULE-NEXT:  [global: ]
+// CHECK-FR-MODULE-NEXT:  [global: deinit_barrier]
 // CHECK-FR-MODULE-NEXT:  {{^[^[]}}
 // CHECK-LE-MODULE-LABEL: sil [canonical] @$s6Module14internalCalleeySiAA1XCF : $@convention(thin) (@guaranteed X) -> Int{{$}}
 @usableFromInline
@@ -56,7 +56,7 @@ func internalCallee(_ x: X) -> Int {
 
 // CHECK-FR-MODULE-LABEL: sil [canonical] @$s6Module19noInlineWithEffectsySiAA1XCF :
 // CHECK-FR-MODULE-NEXT:  [%0: noescape! **, read c0.v**]
-// CHECK-FR-MODULE-NEXT:  [global: ]
+// CHECK-FR-MODULE-NEXT:  [global: deinit_barrier]
 // CHECK-FR-MODULE-NEXT:  {{^[^[]}}
 // CHECK-LE-MODULE-NOT: @$s6Module19noInlineWithEffectsySiAA1XCF
 @_effects(notEscaping x.**)
@@ -66,7 +66,7 @@ public func noInlineWithEffects(_ x: X) -> Int {
 
 // CHECK-FR-MODULE-LABEL: sil [serialized] [noinline] [canonical] {{.*}}@$s6Module17inlineWithEffectsySiAA1XCF :
 // CHECK-FR-MODULE-NEXT:  [%0: noescape! **, read c0.v**]
-// CHECK-FR-MODULE-NEXT:  [global: ]
+// CHECK-FR-MODULE-NEXT:  [global: deinit_barrier]
 // CHECK-FR-MODULE-NEXT:  {{^[^[]}}
 // CHECK-LE-MODULE-LABEL: sil [serialized] [noinline] [canonical] {{.*}}@$s6Module17inlineWithEffectsySiAA1XCF :
 // CHECK-LE-MODULE-NEXT:  [%0: noescape! **]
@@ -84,7 +84,7 @@ public func inlineWithEffects(_ x: X) -> Int {
 
 // CHECK-FR-MODULE-LABEL: sil [serialized] [noinline] [canonical] [ossa] @$s6Module12simpleInlineySiAA1XCF : $@convention(thin) (@guaranteed X) -> Int {
 // CHECK-FR-MODULE-NEXT:  [%0: noescape **, read c0.v**]
-// CHECK-FR-MODULE-NEXT:  [global: ]
+// CHECK-FR-MODULE-NEXT:  [global: deinit_barrier]
 // CHECK-FR-MODULE-NEXT:  {{^[^[]}}
 // CHECK-LE-MODULE-LABEL: sil [serialized] [noinline] [canonical] [ossa] @$s6Module12simpleInlineySiAA1XCF : $@convention(thin) (@guaranteed X) -> Int {
 // CHECK-LE-MODULE-NEXT:  {{^[^[]}}
@@ -125,7 +125,7 @@ public func callit1() -> Int {
 
 // CHECK-FR-MAIN-LABEL: sil @$s6Module17noInlineNoEffectsySiAA1XCF : $@convention(thin) (@guaranteed X) -> Int
 // CHECK-FR-MAIN-NEXT:  [%0: noescape **, read c0.v**]
-// CHECK-FR-MAIN-NEXT:  [global: ]
+// CHECK-FR-MAIN-NEXT:  [global: deinit_barrier]
 // CHECK-FR-MAIN-NEXT:  {{^[^[]}}
 // CHECK-LE-MAIN-LABEL: sil @$s6Module17noInlineNoEffectsySiAA1XCF : $@convention(thin) (@guaranteed X) -> Int{{$}}
 
@@ -141,7 +141,7 @@ public func callit2() -> Int {
 
 // CHECK-FR-MAIN-LABEL: sil public_external [noinline] @$s6Module15inlineNoEffectsySiAA1XCF : $@convention(thin) (@guaranteed X) -> Int {
 // CHECK-FR-MAIN-NEXT:  [%0: noescape **, read c0.v**]
-// CHECK-FR-MAIN-NEXT:  [global: ]
+// CHECK-FR-MAIN-NEXT:  [global: deinit_barrier]
 // CHECK-FR-MAIN-NEXT:  {{^[^[]}}
 // CHECK-LE-MAIN-LABEL: sil public_external [noinline] @$s6Module15inlineNoEffectsySiAA1XCF : $@convention(thin) (@guaranteed X) -> Int {
 // CHECK-LE-MAIN-NEXT:  {{^[^[]}}
@@ -189,7 +189,7 @@ public func callit5() -> Int {
 
 // CHECK-FR-MAIN-LABEL: sil public_external [noinline] @$s6Module12simpleInlineySiAA1XCF : $@convention(thin) (@guaranteed X) -> Int {
 // CHECK-FR-MAIN-NEXT:  [%0: noescape **, read c0.v**]
-// CHECK-FR-MAIN-NEXT:  [global: ]
+// CHECK-FR-MAIN-NEXT:  [global: deinit_barrier]
 // CHECK-FR-MAIN-NEXT:  {{^[^[]}}
 // CHECK-LE-MAIN-LABEL: sil public_external [noinline] @$s6Module12simpleInlineySiAA1XCF : $@convention(thin) (@guaranteed X) -> Int {
 // CHECK-LE-MAIN-NEXT:  {{^[^[]}}
@@ -217,7 +217,7 @@ public func callit6() -> X? {
 
 // CHECK-FR-MAIN-LABEL: sil @$s6Module14internalCalleeySiAA1XCF : $@convention(thin) (@guaranteed X) -> Int {
 // CHECK-FR-MAIN-NEXT:  [%0: noescape **, read c0.v**]
-// CHECK-FR-MAIN-NEXT:  [global: ]
+// CHECK-FR-MAIN-NEXT:  [global: deinit_barrier]
 // CHECK-FR-MAIN-NEXT:  {{^[^[]}}
 // CHECK-LE-MAIN-LABEL: sil @$s6Module14internalCalleeySiAA1XCF : $@convention(thin) (@guaranteed X) -> Int{{$}}
 

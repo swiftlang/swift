@@ -20,9 +20,9 @@ sil [ossa] @replace_archetype : $@convention(thin) () -> () {
 bb0:
   %0 = metatype $@thick S.Type
   %1 = init_existential_metatype %0, $@thick P.Type
-  %2 = open_existential_metatype %1 to $@thick (@opened("82105EE0-DCB0-11E5-865D-C8E0EB309913", P) Self).Type
-  %3 = witness_method $@opened("82105EE0-DCB0-11E5-865D-C8E0EB309913", P) Self, #P.foo, %2 : $@thick (@opened("82105EE0-DCB0-11E5-865D-C8E0EB309913", P) Self).Type : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@thick τ_0_0.Type) -> ()
-  %4 = apply %3<@opened("82105EE0-DCB0-11E5-865D-C8E0EB309913", P) Self>(%2) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@thick τ_0_0.Type) -> ()
+  %2 = open_existential_metatype %1 to $@thick (@opened(1, P) Self).Type
+  %3 = witness_method $@opened(1, P) Self, #P.foo, %2 : $@thick (@opened(1, P) Self).Type : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@thick τ_0_0.Type) -> ()
+  %4 = apply %3<@opened(1, P) Self>(%2) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@thick τ_0_0.Type) -> ()
   %5 = tuple ()
   return %5
 }
@@ -32,9 +32,9 @@ bb0:
 // CHECK:       } // end sil function 'dont_replace_archetype_unknown_concrete_type'
 sil [ossa] @dont_replace_archetype_unknown_concrete_type : $@convention(thin) (@thick any P.Type) -> () {
 bb0(%0 : $@thick any P.Type):
-  %2 = open_existential_metatype %0 to $@thick (@opened("82105EE0-DCB0-11E5-865D-C8E0EB309913", P) Self).Type
-  %3 = witness_method $@opened("82105EE0-DCB0-11E5-865D-C8E0EB309913", P) Self, #P.foo, %2 : $@thick (@opened("82105EE0-DCB0-11E5-865D-C8E0EB309913", P) Self).Type : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@thick τ_0_0.Type) -> ()
-  %4 = apply %3<@opened("82105EE0-DCB0-11E5-865D-C8E0EB309913", P) Self>(%2) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@thick τ_0_0.Type) -> ()
+  %2 = open_existential_metatype %0 to $@thick (@opened(2, P) Self).Type
+  %3 = witness_method $@opened(2, P) Self, #P.foo, %2 : $@thick (@opened(2, P) Self).Type : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@thick τ_0_0.Type) -> ()
+  %4 = apply %3<@opened(2, P) Self>(%2) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@thick τ_0_0.Type) -> ()
   %5 = tuple ()
   return %5
 }

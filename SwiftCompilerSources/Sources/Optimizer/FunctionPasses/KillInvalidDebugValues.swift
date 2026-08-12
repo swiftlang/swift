@@ -34,29 +34,33 @@ let killInvalidDebugValuesPass = FunctionPass(name: "kill-invalid-debug-values")
   // Collect debug_values grouped by root, so ranges are only computed once.
   var rootWorklist = ValueWorklist(context)
   defer { rootWorklist.deinitialize() }
-  var debugValuesForRoot: [ObjectIdentifier: [DebugValueInst]] = [:]
+  var debugOperandsForRoot: [ObjectIdentifier: [Operand]] = [:]
 
   for block in function.blocks {
     for inst in block.instructions {
-      guard let dbg = inst as? DebugValueInst,
-            let root = findOwnershipRoot(of: dbg.operand.value) else {
+      guard let dbg = inst as? DebugValueInst else {
         continue
       }
-      rootWorklist.pushIfNotVisited(root)
-      debugValuesForRoot[ObjectIdentifier(root), default: []].append(dbg)
+      for operand in dbg.operands {
+        guard let root = findOwnershipRoot(of: operand.value) else {
+          continue
+        }
+        rootWorklist.pushIfNotVisited(root)
+        debugOperandsForRoot[ObjectIdentifier(root), default: []].append(operand)
+      }
     }
   }
 
   while let root = rootWorklist.pop() {
-    let debugValues = debugValuesForRoot[ObjectIdentifier(root)]!
+    let debugOperands = debugOperandsForRoot[ObjectIdentifier(root)]!
     guard context.continueWithNextSubpassRun(forValue: root) else {
       return
     }
-    killInvalidDebugValues(debugValues, root: root, context)
+    killInvalidDebugOperands(debugOperands, root: root, context)
   }
 }
 
-private func killInvalidDebugValues(_ debugValues: [DebugValueInst], root: Value,
+private func killInvalidDebugOperands(_ debugOperands: [Operand], root: Value,
                                     _ context: FunctionPassContext) {
   // Build a range from the root to where the content is actually destroyed.
   // Forwarding consumers (struct, tuple, etc.) don't free the content, so having debug values on
@@ -87,9 +91,10 @@ private func killInvalidDebugValues(_ debugValues: [DebugValueInst], root: Value
     }
   }
 
-  for dbg in debugValues {
+  for operand in debugOperands {
+    let dbg = operand.instruction as! DebugValueInst
     if !range.contains(dbg) {
-      dbg.killOperand()
+      dbg.killOperand(index: operand.index)
     }
   }
 }

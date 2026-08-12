@@ -507,6 +507,14 @@ ManagedValue Transform::transform(ManagedValue v,
   auto &expectedTL = SGF.getTypeLowering(loweredResultTy);
   loweredResultTy = expectedTL.getLoweredType();
 
+  // The moveOnly wrapper does not exist in the formal type system, so
+  // unwrap the value before dispatching on lowered types below; otherwise
+  // wrapped values from 'borrowing'/@noImplicitCopy bindings fall through
+  // the type-equality checks into unreachable/invalid conversion paths.
+  // It unwraps the moveOnly wrapper only if loweredResultTy is not wrapped
+  if (!loweredResultTy.isMoveOnlyWrapped())
+    v = SGF.emitMoveOnlyWrapperToCopyableValueIfNeeded(Loc, v);
+
   // Nothing to convert
   if (v.getType() == loweredResultTy)
     return v;
@@ -3327,12 +3335,14 @@ public:
             CanSILFunctionType innerFnType, CanSILFunctionType outerFnType) {
     // Assert that the indirect results are set up like we expect.
     assert(InnerArgs.empty());
-    assert(SGF.F.begin()->args_size()
-           >= SILFunctionConventions(outerFnType, SGF.SGM.M)
-                  .getNumIndirectSILResults());
+    assert(SGF.F.begin()->args_size() >=
+           SILFunctionConventions(
+               outerFnType, SILAddressConventions::forFunction(SGF.F))
+               .getNumIndirectSILResults());
 
     InnerArgs.reserve(
-        SILFunctionConventions(innerFnType, SGF.SGM.M)
+        SILFunctionConventions(innerFnType,
+                               SILAddressConventions::forFunction(SGF.F))
             .getNumIndirectSILResults());
 
     AllOuterResults = outerFnType->getUnsubstitutedType(SGF.SGM.M)->getResults();
@@ -3347,7 +3357,8 @@ public:
     assert(AllOuterResults.empty());
     assert(AllInnerResults.empty());
     assert(InnerArgs.size() ==
-           SILFunctionConventions(innerFnType, SGF.SGM.M)
+           SILFunctionConventions(
+               innerFnType, SILAddressConventions::forFunction(SGF.F))
                .getNumIndirectSILResults());
     OuterArgs.finish();
   }
@@ -5340,8 +5351,9 @@ SILValue ResultPlanner::execute(SILValue innerResult,
   // results).
   SmallVector<SILValue, 4> innerDirectResultStack;
   unsigned numInnerDirectResults =
-    SILFunctionConventions(innerFnType, SGF.SGM.M)
-        .getNumDirectSILResults();
+      SILFunctionConventions(innerFnType,
+                             SILAddressConventions::forFunction(SGF.F))
+          .getNumDirectSILResults();
   if (numInnerDirectResults == 0) {
     // silently ignore the result
   } else if (numInnerDirectResults > 1) {
@@ -6354,8 +6366,10 @@ ManagedValue SILGenFunction::getThunkedAutoDiffLinearMap(
   thunkSGF.collectThunkParams(
       loc, params, &thunkIndirectResults, &thunkIndirectErrorResults);
 
-  SILFunctionConventions fromConv(fromType, getModule());
-  SILFunctionConventions toConv(toType, getModule());
+  SILAddressConventions silConv =
+      SILAddressConventions::forFunction(thunkSGF.F);
+  SILFunctionConventions fromConv(fromType, silConv);
+  SILFunctionConventions toConv(toType, silConv);
   if (!toConv.useLoweredAddresses()) {
     SmallVector<ManagedValue, 4> thunkArguments;
     for (auto indRes : thunkIndirectResults)
@@ -6655,11 +6669,16 @@ SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
   auto customDerivativeFnTy = customDerivativeFn->getLoweredFunctionType();
   auto *thunkGenericEnv = customDerivativeFnTy->getSubstGenericSignature().getGenericEnvironment();
 
+  bool isDefaultDerivative =
+      isa<ProtocolDecl>(originalAFD->getDeclContext()) &&
+      !originalAFD->getAttrs().hasAttribute<DifferentiableAttr>();
   auto origFnTy = originalFn->getLoweredFunctionType();
   auto derivativeCanGenSig = config.derivativeGenericSignature.getCanonicalSignature();
   auto thunkFnTy = origFnTy->getAutoDiffDerivativeFunctionType(
       config.parameterIndices, config.resultIndices, kind, Types,
-      LookUpConformanceInModule(), derivativeCanGenSig);
+      LookUpConformanceInModule(), derivativeCanGenSig,
+      /*isReabstractionThunk*/ false, /* origTypeOfAbstraction */ CanType(),
+      isDefaultDerivative);
   assert(!thunkFnTy->getExtInfo().hasContext());
 
   Mangle::ASTMangler mangler(getASTContext());
@@ -6780,7 +6799,8 @@ SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
           ->mapTypeIntoEnvironment(
               thunkFnTy->getResults().back().getSILStorageInterfaceType())
           .castTo<SILFunctionType>();
-  SILFunctionConventions conv(thunkFnTy, thunkSGF.getModule());
+  SILFunctionConventions conv(
+      thunkFnTy, SILAddressConventions::forFunction(thunkSGF.F));
 
   // Create return instruction in the thunk, first deallocating local
   // allocations and freeing arguments-to-free.
@@ -7611,32 +7631,42 @@ void SILGenFunction::emitProtocolWitness(
   if (enterIsolation) {
     // If we are supposed to enter the actor, do so now by hopping to the
     // actor.
-    std::optional<ManagedValue> actorSelf;
+    std::optional<ManagedValue> actor;
 
-    // For an instance actor, get the actor 'self'.
-    if (*enterIsolation == ActorIsolation::ActorInstance) {
-      assert(enterIsolation->isActorInstanceForSelfParameter() && "Not self?");
-      auto actorSelfVal = origParams.back();
+    // If the requirement is isolated to an actor instance it could be either
+    // `self` or an `isolated` parameter.
+    if (enterIsolation->isActorInstanceIsolated()) {
+      ManagedValue actorParamVal;
+      if (enterIsolation->isActorInstanceForSelfParameter()) {
+        // Get the actor 'self'.
+        actorParamVal = origParams.back();
+      } else {
+        // Or `isolated` parameter.
+        unsigned formalIndex = enterIsolation->getActorInstanceParameterIndex();
+        actorParamVal =
+            origParams[reqtOrigTy.getLoweredParamIndex(formalIndex)];
+      }
 
-      if (actorSelfVal.getType().isAddress()) {
-        auto &actorSelfTL = getTypeLowering(actorSelfVal.getType());
-        if (!actorSelfTL.isAddressOnly()) {
-          actorSelfVal = emitManagedLoad(
-              *this, loc, actorSelfVal, actorSelfTL);
+      // Load the actor instance if necessary.
+      if (actorParamVal.getType().isAddress()) {
+        auto &actorInstanceTL = getTypeLowering(actorParamVal.getType());
+        if (!actorInstanceTL.isAddressOnly()) {
+          actorParamVal =
+              emitManagedLoad(*this, loc, actorParamVal, actorInstanceTL);
         }
       }
 
-      actorSelf = actorSelfVal;
+      actor = actorParamVal;
     }
 
     if (!F.isAsync()) {
       assert(isPreconcurrency);
 
       if (getASTContext().LangOpts.isDynamicActorIsolationCheckingEnabled()) {
-        emitPreconditionCheckExpectedExecutor(loc, *enterIsolation, actorSelf);
+        emitPreconditionCheckExpectedExecutor(loc, *enterIsolation, actor);
       }
     } else {
-      emitHopToTargetActor(loc, enterIsolation, actorSelf);
+      emitHopToTargetActor(loc, enterIsolation, actor);
     }
   }
 

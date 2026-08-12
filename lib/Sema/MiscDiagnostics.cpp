@@ -23,6 +23,7 @@
 #include "swift/AST/ASTBridging.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/AvailabilityScope.h"
 #include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ConformanceLookup.h"
@@ -411,21 +412,34 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       if (!castType)
         return;
 
-      if (castType->isNoncopyable()) {
+      Type fromType = cast->getSubExpr()->getType();
+
+      // 'as?'/'as!'/'is' from a noncopyable existential value to a concrete
+      // type is permitted under NoncopyableCasting: there, unlike other
+      // move-only types, the existential's erased dynamic type is exactly
+      // the kind of thing a runtime cast can meaningfully recover. The
+      // destination must be a concrete (non-existential, non-archetype)
+      // type; existential-to-existential and existential-to-archetype casts
+      // are not yet supported by the runtime and remain rejected below.
+      bool isSupportedExistentialCast =
+          Ctx.LangOpts.hasFeature(Feature::NoncopyableCasting) &&
+          fromType && fromType->isNoncopyable() &&
+          fromType->isExistentialType() &&
+          !castType->isExistentialType() &&
+          !castType->is<ArchetypeType>();
+
+      if (castType->isNoncopyable() && !isSupportedExistentialCast) {
         // can't cast anything to move-only; there should be no valid ones.
         Ctx.Diags.diagnose(cast->getLoc(), diag::noncopyable_cast);
         return;
       }
 
-      // no support for runtime casts from move-only types.
-      // as of now there is no type it could be cast to except itself, so
-      // there's no reason for it to happen at runtime.
-      if (auto fromType = cast->getSubExpr()->getType()) {
-        if (fromType->isNoncopyable()) {
-          // can't cast move-only to anything.
-          Ctx.Diags.diagnose(cast->getLoc(), diag::noncopyable_cast);
-          return;
-        }
+      // no support for runtime casts from move-only types, except for the
+      // existential-to-concrete case handled above.
+      if (fromType && fromType->isNoncopyable() && !isSupportedExistentialCast) {
+        // can't cast move-only to anything.
+        Ctx.Diags.diagnose(cast->getLoc(), diag::noncopyable_cast);
+        return;
       }
 
       // Embedded Swift places restrictions on dynamic casting.
@@ -5369,6 +5383,113 @@ checkImplicitPromotionsInCondition(const StmtConditionElement &cond,
   }
 }
 
+/// Returns true if a useless availability query should be diagnosed in the given
+/// source file.
+static bool shouldDiagnoseUselessAvailabilityConditions(const SourceFile &sf) {
+  switch (sf.Kind) {
+  case SourceFileKind::MacroExpansion:
+  case SourceFileKind::SyntheticMacro:
+  case SourceFileKind::Interface:
+  case SourceFileKind::DefaultArgument:
+  case SourceFileKind::SIL:
+    return false;
+  case SourceFileKind::Library:
+  case SourceFileKind::Main:
+    return true;
+  }
+
+  llvm_unreachable("bad SourceFileKind");
+}
+
+/// Diagnoses an availability query that can never be false because an enclosing
+/// scope already guarantees the availability that it checks for.
+static void diagnoseUselessAvailabilityCondition(PoundAvailableInfo *info,
+                                                 DeclContext *DC) {
+  auto loc = info->getStartLoc();
+  auto *sf = DC->getParentModule()->getSourceFileContainingLocation(loc);
+  if (!sf)
+    return;
+
+  if (!shouldDiagnoseUselessAvailabilityConditions(*sf))
+    return;
+
+  // Unavailability queries never refine availability, so they are never
+  // diagnosed as useless.
+  if (info->isUnavailability())
+    return;
+
+  // Removing an availability check from a fragile function with an opaque
+  // result type could change the function's ABI and result in a miscompilation,
+  // so don't suggest it.
+  if (DC->getResilienceExpansion() == ResilienceExpansion::Minimal) {
+    if (auto *decl = DC->getInnermostDeclarationDeclContext()) {
+      if (auto *afd = dyn_cast<AbstractFunctionDecl>(decl)) {
+        if (afd->getOpaqueResultTypeDecl())
+          return;
+      }
+    }
+  }
+
+  auto query = info->getAvailabilityQuery();
+  if (!query)
+    return;
+
+  if (info->getIntroducedAvailabilityScope())
+    return;
+
+  auto &ctx = DC->getASTContext();
+
+  // Only the spec that the query resolved to is relevant; the others apply
+  // when compiling for other targets. A query that resolved to a wildcard is
+  // never diagnosed for the same reason: the specs that were written may be
+  // useful for another target.
+  auto semanticSpecs = info->getSemanticAvailabilitySpecs(DC);
+  auto foundSpec =
+      llvm::find_if(semanticSpecs, [query](SemanticAvailabilitySpec spec) {
+        if (spec.isWildcard())
+          return false;
+        return spec.getDomain() == query->getDomain();
+      });
+
+  if (foundSpec == semanticSpecs.end())
+    return;
+
+  SemanticAvailabilitySpec spec = *foundSpec;
+  auto domain = spec.getDomain();
+  auto specRange = domain.isVersioned() ? AvailabilityRange(spec.getVersion())
+                                        : AvailabilityRange::alwaysAvailable();
+
+  // Find the innermost enclosing scope that specifies an availability range
+  // for the domain in source so that it can be pointed at in a note. Scopes
+  // that don't specify one are skipped; a query nested in the body of a switch
+  // case, for example, is contained by the placeholder scope for the switch.
+  auto *rootScope = AvailabilityScope::getOrBuildForSourceFile(*sf);
+  if (!rootScope)
+    return;
+
+  llvm::SmallVector<AvailabilityScope *, 8> scopeStack;
+  rootScope->findMostRefinedSubContext(loc, ctx, scopeStack);
+
+  for (auto scope : llvm::reverse(scopeStack)) {
+    auto explicitRange = scope->getExplicitAvailabilityRange(domain, ctx);
+    if (!explicitRange)
+      continue;
+
+    // Only diagnose if the range that was written in source is what makes the
+    // query always true. The query may instead be useless because of the
+    // deployment target, in which case there is nothing to point at.
+    if (explicitRange->isContainedIn(specRange)) {
+      ctx.Diags.diagnose(info->getLoc(),
+                         diag::availability_query_useless_enclosing_scope,
+                         domain.getNameForAttributePrinting());
+      ctx.Diags.diagnose(scope->getIntroductionLoc(),
+                         diag::availability_query_useless_enclosing_scope_here);
+    }
+
+    break;
+  }
+}
+
 /// Diagnoses a `if #available(...)` condition. Returns true if a diagnostic
 /// was emitted.
 static bool diagnoseAvailabilityCondition(PoundAvailableInfo *info,
@@ -5484,6 +5605,8 @@ static bool diagnoseAvailabilityCondition(PoundAvailableInfo *info,
       }
     }
   }
+
+  diagnoseUselessAvailabilityCondition(info, DC);
 
   return false;
 }

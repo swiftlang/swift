@@ -766,6 +766,8 @@ memserver_start()
   }
 
   memserver_pid = getpid();
+  // FIXME: variable 'memserver_pid' set but not used. Forgot to use or remove?
+  (void)memserver_pid;
 
   return fds[1];
 }

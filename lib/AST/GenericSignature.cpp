@@ -289,6 +289,40 @@ CanGenericSignature::getCanonical(ArrayRef<GenericTypeParamType *> params,
   return CanGenericSignature(canSig);
 }
 
+bool GenericSignature::isABIMoreGenericThan(GenericSignature outerSig) const {
+  auto canInnerSig = getCanonicalSignature();
+  auto canOuterSig = outerSig.getCanonicalSignature();
+  if (canInnerSig == canOuterSig)
+    return false;
+
+  // The inner signature added generic parameters.
+  if (canOuterSig.getGenericParams().size() !=
+        canInnerSig.getGenericParams().size())
+    return true;
+
+  // Look at the requirements of the inner signature that aren't satisfied
+  // by the outer signature, to see if there are any requirements that aren't
+  // just marker protocols.
+  auto requirements = canInnerSig.requirementsNotSatisfiedBy(canOuterSig);
+  for (const auto &req : requirements) {
+    switch (req.getKind()) {
+    case RequirementKind::Conformance:
+      if (req.getProtocolDecl()->isMarkerProtocol())
+        continue;
+
+      return true;
+
+    case RequirementKind::Superclass:
+    case RequirementKind::Layout:
+    case RequirementKind::SameShape:
+    case RequirementKind::SameType:
+      return true;
+    }
+  }
+
+  return false;
+}
+
 CanGenericSignature GenericSignature::getCanonicalSignature() const {
   // If the underlying pointer is null, return `CanGenericSignature()`.
   if (isNull())

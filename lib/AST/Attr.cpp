@@ -22,6 +22,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/IndexSubset.h"
+#include "swift/AST/Initializer.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookupRequests.h"
@@ -36,6 +37,7 @@
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSwitch.h"
+#include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
 using namespace swift;
@@ -272,7 +274,7 @@ void OpenedTypeAttr::printImpl(ASTPrinter &printer,
                                const PrintOptions &options) const {
   printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
   printer.printAttrName("@opened");
-  printer << "(\"" << getUUID() << "\"";
+  printer << "(" << getID();
   if (auto constraintType = getConstraintType()) {
     printer << ", ";
     constraintType->print(printer, options);
@@ -285,7 +287,7 @@ void PackElementTypeAttr::printImpl(ASTPrinter &printer,
                                     const PrintOptions &options) const {
   printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
   printer.printAttrName("@pack_element");
-  printer << "(\"" << getUUID() << "\")";
+  printer << "(" << getID() << ")";
   printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
 }
 
@@ -301,6 +303,23 @@ void IsolatedTypeAttr::printImpl(ASTPrinter &printer,
   printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
   printer.printAttrName("@isolated");
   printer << "(" << getIsolationKindName() << ")";
+  printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
+}
+
+const char *
+CalledTypeAttr::getSemanticsName(CalledTypeAttr::Semantics semantics) {
+  switch (semantics) {
+  case CalledTypeAttr::Semantics::Once:
+    return "once";
+  }
+  llvm_unreachable("bad kind");
+}
+
+void CalledTypeAttr::printImpl(ASTPrinter &printer,
+                               const PrintOptions &options) const {
+  printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
+  printer.printAttrName("@called");
+  printer << "(" << getSemanticsName() << ")";
   printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
 }
 
@@ -825,6 +844,16 @@ void DeclAttributes::print(ASTPrinter &Printer, const PrintOptions &Options,
   auto *SF = D ? D->getDeclContext()->getParentSourceFile() : nullptr;
 
   for (auto DA : llvm::reverse(FlattenedAttrs)) {
+    AttributeVector &which = DA->isDeclModifier() ? modifiers :
+                             isa<BackDeployedAttr>(DA) ? backDeployedAttributes :
+                             DA->isLongAttribute() ? longAttributes :
+                             attributes;
+
+    if (Options.alwaysIncludeAttrKind(DA->getKind())) {
+      which.push_back(DA);
+      continue;
+    }
+
     // Don't skip implicit custom attributes. Custom attributes like global
     // actor isolation have critical semantic meaning and should never be
     // suppressed. Other custom attrs that can be suppressed, like macros,
@@ -889,10 +918,6 @@ void DeclAttributes::print(ASTPrinter &Printer, const PrintOptions &Options,
       }
     }
 
-    AttributeVector &which = DA->isDeclModifier() ? modifiers :
-                             isa<BackDeployedAttr>(DA) ? backDeployedAttributes :
-                             DA->isLongAttribute() ? longAttributes :
-                             attributes;
     which.push_back(DA);
   }
 
@@ -1140,6 +1165,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   case DeclAttrKind::Export:
   case DeclAttrKind::Optimize:
   case DeclAttrKind::Exclusivity:
+  case DeclAttrKind::Unsafe:
   case DeclAttrKind::NonSendable:
   case DeclAttrKind::ObjCImplementation:
     if (getKind() == DeclAttrKind::Effects &&
@@ -1166,6 +1192,12 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
         Printer << ' ';
         // Add @inlinable
         Printer.printSimpleAttr("inlinable", /*needAt=*/true);
+      } else if (getKind() == DeclAttrKind::Unsafe &&
+                 cast<UnsafeAttr>(this)->isAlways() &&
+                 Options.SuppressUnsafeAlways) {
+        // Older compilers don't understand the argument, and plain '@unsafe'
+        // is the closest approximation they can check.
+        Printer.printSimpleAttr("unsafe", /*needAt=*/true);
       } else {
         Printer.printSimpleAttr(attrName, /*needAt=*/true);
       }
@@ -1333,11 +1365,16 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
 
-  case DeclAttrKind::Section:
+  case DeclAttrKind::Section: {
     Printer.printAttrName("@section");
-    Printer << "(\"" << cast<SectionAttr>(this)->Name << "\")";
+    auto sectionAttr = cast<SectionAttr>(this);
+    if (sectionAttr->isDefault())
+      Printer << "(default)";
+    else
+      Printer << "(\"" << *sectionAttr->Name << "\")";
     break;
-      
+  }
+
   case DeclAttrKind::Diagnose: {
     auto diagnoseAttr = cast<DiagnoseAttr>(this);
     Printer.printAttrName("@diagnose(");
@@ -2011,6 +2048,8 @@ StringRef DeclAttribute::getAttrName() const {
     }
     llvm_unreachable("Invalid optimization kind");
   }
+  case DeclAttrKind::Unsafe:
+    return cast<UnsafeAttr>(this)->isAlways() ? "unsafe(always)" : "unsafe";
   case DeclAttrKind::Effects:
     switch (cast<EffectsAttr>(this)->getKind()) {
       case EffectsKind::ReadNone:
@@ -2126,6 +2165,11 @@ StringRef DeclAttribute::getAttrName() const {
     return cast<LifetimeAttr>(this)->isUnderscored() ? "_lifetime" : "lifetime";
   case DeclAttrKind::Nonexhaustive:
     return "nonexhaustive";
+  case DeclAttrKind::Called:
+    switch (cast<CalledAttr>(this)->getSemantics()) {
+    case ExecutionSemantics::Once:
+      return "called(once)";
+    }
   }
   llvm_unreachable("bad DeclAttrKind");
 }
@@ -3074,7 +3118,7 @@ DerivativeAttr::DerivativeAttr(bool implicit, SourceLoc atLoc,
                                ArrayRef<ParsedAutoDiffParameter> params)
     : DeclAttribute(DeclAttrKind::Derivative, atLoc, baseRange, implicit),
       BaseTypeRepr(baseTypeRepr), OriginalFunctionName(std::move(originalName)),
-      NumParsedParameters(params.size()) {
+      NumOriginalFunctions(0), NumParsedParameters(params.size()) {
   std::copy(params.begin(), params.end(), getTrailingObjects());
 }
 
@@ -3084,6 +3128,7 @@ DerivativeAttr::DerivativeAttr(bool implicit, SourceLoc atLoc,
                                IndexSubset *parameterIndices)
     : DeclAttribute(DeclAttrKind::Derivative, atLoc, baseRange, implicit),
       BaseTypeRepr(baseTypeRepr), OriginalFunctionName(std::move(originalName)),
+      NumOriginalFunctions(0), NumParsedParameters(0),
       ParameterIndices(parameterIndices) {}
 
 DerivativeAttr *
@@ -3107,24 +3152,28 @@ DerivativeAttr *DerivativeAttr::create(ASTContext &context, bool implicit,
                                   std::move(originalName), parameterIndices);
 }
 
-AbstractFunctionDecl *
-DerivativeAttr::getOriginalFunction(ASTContext &context) const {
+TinyPtrVector<AbstractFunctionDecl *>
+DerivativeAttr::getOriginalFunctions(ASTContext &context) const {
   return evaluateOrDefault(
       context.evaluator,
       DerivativeAttrOriginalDeclRequest{const_cast<DerivativeAttr *>(this)},
-      nullptr);
+      {});
 }
 
-void DerivativeAttr::setOriginalFunction(AbstractFunctionDecl *decl) {
-  assert(!OriginalFunction && "cannot overwrite original function");
-  OriginalFunction = decl;
+void DerivativeAttr::setOriginalFunctions(
+    ASTContext &context, ArrayRef<AbstractFunctionDecl *> decls) {
+  assert(!OriginalFunctions && "cannot overwrite original function");
+  NumOriginalFunctions = decls.size();
+  OriginalFunctions = context.AllocateCopy(decls).data();
 }
 
 void DerivativeAttr::setOriginalFunctionResolver(
-    LazyMemberLoader *resolver, uint64_t resolverContextData) {
-  assert(!OriginalFunction && "cannot overwrite original function");
-  OriginalFunction = resolver;
-  ResolverContextData = resolverContextData;
+    ASTContext &context, LazyMemberLoader *resolver,
+    ArrayRef<uint64_t> resolverContextData) {
+  assert(!OriginalFunctions && "cannot overwrite original function");
+  Resolver = resolver;
+  NumOriginalFunctions = resolverContextData.size();
+  OriginalFunctions = context.AllocateCopy(resolverContextData).data();
 }
 
 void DerivativeAttr::attachToDeclImpl(Decl *originalDeclaration) {
@@ -3266,6 +3315,8 @@ CustomAttr::CustomAttr(SourceLoc atLoc, SourceRange range, TypeExpr *type,
     : DeclAttribute(DeclAttrKind::Custom, atLoc, range, implicit),
       typeExpr(type), argList(argList), owner(owner), initContext(initContext) {
   assert(type);
+  if (initContext)
+    initContext->setAttribute(this);
   isArgUnsafeBit = false;
 }
 

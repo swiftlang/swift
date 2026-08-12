@@ -1068,7 +1068,8 @@ namespace {
         auto address =
           B.getAddrOfCurrentPosition(IGM.ProtocolRequirementStructTy);
         int offset = WitnessTableFirstRequirementOffset;
-        auto firstReqAdjustment = llvm::ConstantInt::get(IGM.Int32Ty, -offset);
+        auto firstReqAdjustment =
+            llvm::ConstantInt::getSigned(IGM.Int32Ty, -offset);
         address = llvm::ConstantExpr::getGetElementPtr(
             IGM.ProtocolRequirementStructTy, address, firstReqAdjustment);
 
@@ -2871,8 +2872,7 @@ namespace {
               if (isUnavailability) {
                 // Invert the result of "at least" check by xor'ing resulting
                 // boolean with `-1`.
-                success =
-                    IGF.Builder.CreateXor(success, IGF.Builder.getIntN(1, -1));
+                success = IGF.Builder.CreateXor(success, IGF.Builder.getTrue());
               }
 
               auto nextCondOrRet = queryIndex == queries.size() - 1
@@ -3613,7 +3613,7 @@ static void emitInitializeRawLayoutOld(IRGenFunction &IGF, SILType likeType,
   // If we don't have a count, then we're the 'like:' variant and we need to
   // pass '-1' to the runtime call.
   if (!count) {
-    count = llvm::ConstantInt::get(IGF.IGM.Int32Ty, -1);
+    count = llvm::ConstantInt::getAllOnesValue(IGF.IGM.Int32Ty);
   }
 
   // Call swift_initRawStructMetadata().
@@ -7700,6 +7700,7 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::ConvertibleFromBytes:
   case KnownProtocolKind::IUnknown:
   case KnownProtocolKind::ISwiftObject:
+  case KnownProtocolKind::COMInterface:
     return SpecialProtocol::None;
   }
 

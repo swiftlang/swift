@@ -991,7 +991,8 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
     formalIndirectResult = params.claimNext();
   } else {
     SILType appliedResultTy = origMethodType->getDirectFormalResultsType(
-        IGM.getSILModule(), IGM.getMaximalTypeExpansionContext());
+        IGM.getSILModule(), IGM.getMaximalTypeExpansionContext(),
+        /*loweredAddresses=*/true);
     indirectedResultTI =
       &cast<LoadableTypeInfo>(IGM.getTypeInfo(appliedResultTy));
     auto &nativeSchema = indirectedResultTI->nativeReturnValueSchema(IGM);
@@ -1083,7 +1084,8 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
     cleanup();
     auto &callee = emission->getCallee();
     auto resultType = callee.getOrigFunctionType()->getDirectFormalResultsType(
-        IGM.getSILModule(), IGM.getMaximalTypeExpansionContext());
+        IGM.getSILModule(), IGM.getMaximalTypeExpansionContext(),
+        /*loweredAddresses=*/true);
     subIGF.emitScalarReturn(resultType, resultType, result,
                             /*isSwiftCCReturn=*/true,
                             /*isOutlined=*/false,
@@ -1739,14 +1741,10 @@ void IRGenFunction::emitBlockRelease(llvm::Value *value) {
 }
 
 void IRGenFunction::emitForeignReferenceTypeLifetimeOperation(
-    ValueDecl *fn, llvm::Value *value, bool needsNullCheck) {
-  auto loader = fn->getASTContext().getClangModuleLoader();
-  if (loader->getOriginalForClonedMember(fn))
-    fn = loader->getCalledBaseCxxMethod(fn);
+    const clang::FunctionDecl *clangFn, llvm::Value *value,
+    bool needsNullCheck) {
+  assert(clangFn);
 
-  assert(fn->getClangDecl() && isa<clang::FunctionDecl>(fn->getClangDecl()));
-
-  auto clangFn = cast<clang::FunctionDecl>(fn->getClangDecl());
   auto llvmFn = cast<llvm::Function>(
       IGM.getAddrOfClangGlobalDecl(clangFn, ForDefinition));
 

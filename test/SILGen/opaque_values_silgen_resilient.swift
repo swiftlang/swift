@@ -2,7 +2,7 @@
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -enable-sil-opaque-values -Xllvm -sil-full-demangle -enable-library-evolution %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
 
 
-// CHECK-LABEL: sil [ossa] @$s30opaque_values_silgen_resilient10OneOfTheseO4hash4intoys6HasherVz_tF : {{.*}} {
+// CHECK-LABEL: sil [ossa] [opaque] @$s30opaque_values_silgen_resilient10OneOfTheseO4hash4intoys6HasherVz_tF : {{.*}} {
 // CHECK:       {{bb[0-9]+}}({{%[^,]+}} : $*Hasher, [[ENUM:%[^,]+]] : @guaranteed $OneOfThese):
 // CHECK:         switch_enum [[ENUM]] : $OneOfThese, case #OneOfThese.loadable!enumelt: [[LOADABLE:bb[0-9]+]], case #OneOfThese.resilient!enumelt: [[RESILIENT:bb[0-9]+]]
 // CHECK:       [[LOADABLE]]([[LOADABLE_BOX:%[^,]+]] :

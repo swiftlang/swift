@@ -89,7 +89,7 @@ func open<T: P>(_: T) async {}
 // CHECK-LABEL: sil hidden [ossa] @$s14attr_execution19testOpenExistential11existentialyAA1P_p_tYaF : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed any P) -> ()
 // CHECK: bb0([[ISOLATION:%.*]] : @guaranteed $Builtin.ImplicitActor, [[EXISTENTIAL:%.*]] : $*any P):
 // CHECK: [[OPEN_REF:%.*]] = function_ref @$s14attr_execution4openyyxYaAA1PRzlF
-// CHECK: apply [[OPEN_REF]]<@opened("{{.*}}", any P) Self>([[ISOLATION]], {{.*}})
+// CHECK: apply [[OPEN_REF]]<@opened({{.*}}, any P) Self>([[ISOLATION]], {{.*}})
 // CHECK: } // end sil function '$s14attr_execution19testOpenExistential11existentialyAA1P_p_tYaF'
 func testOpenExistential(existential: any P) async {
   await _openExistential(existential, do: open)

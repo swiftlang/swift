@@ -23,6 +23,7 @@
 #include "llvm/Support/MD5.h"
 #include "llvm/Support/Path.h"
 
+#include "ClangExportCompat.h"
 #include "SymbolGraphASTWalker.h"
 
 using namespace swift;
@@ -125,20 +126,21 @@ int symbolgraphgen::emitSymbolGraphForModule(
   if (const auto *ClangModule = M->findUnderlyingClangModule()) {
     // Scan through the Clang module's exports and collect them for later
     // handling
-    for (auto ClangExport : ClangModule->Exports) {
-      if (ClangExport.getInt()) {
+    for (const auto &ClangExport : ClangModule->Exports) {
+      const clang::Module *ExportedModule = getExportedClangModule(ClangExport);
+      if (isWildcardClangExport(ClangExport)) {
         // Blanket exports are represented as a true boolean tag
-        if (const auto *ExportParent = ClangExport.getPointer()) {
+        if (ExportedModule) {
           // If a pointer is present, this is a scoped blanket export, like
           // `export Submodule.*`
-          WildcardExportClangModules.insert(ExportParent);
+          WildcardExportClangModules.insert(ExportedModule);
         } else {
           // Otherwise it represents a full blanket `export *`
           WildcardExportClangModules.insert(ClangModule);
         }
-      } else if (!ClangExport.getInt() && ClangExport.getPointer()) {
+      } else if (ExportedModule) {
         // This is an explicit `export Submodule`
-        ExportedClangModules.insert(ClangExport.getPointer());
+        ExportedClangModules.insert(ExportedModule);
       }
     }
 

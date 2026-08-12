@@ -318,8 +318,8 @@ enum class SpecialMethodKind {
   NSDictionarySubscriptGetter
 };
 
-#define SWIFT_PROTOCOL_SUFFIX "Protocol"
-#define SWIFT_CFTYPE_SUFFIX "Ref"
+constexpr static const llvm::StringLiteral ProtocolSuffix = "Protocol";
+constexpr static const llvm::StringLiteral CFTypeSuffix = "Ref";
 
 /// Describes whether to classify a factory method as an initializer.
 enum class FactoryAsInitKind {
@@ -504,12 +504,12 @@ public:
 
   const Version CurrentVersion;
 
-  constexpr static const char *const moduleImportBufferName =
+  static constexpr llvm::StringLiteral moduleImportBufferName =
       "<swift-imported-modules>";
-  constexpr static const char *const bridgingHeaderBufferName =
+  static constexpr llvm::StringLiteral bridgingHeaderBufferName =
       "<bridging-header-import>";
   /// The name of system vfsoverlay.
-  constexpr static const char *const clangSystemVFSOverlayName =
+  static constexpr llvm::StringLiteral clangSystemVFSOverlayName =
       "<clang-system-vfs-overlay>";
 
 private:
@@ -676,8 +676,11 @@ private:
 
   /// Sets the target & code generation options for use by IRGen/CodeGen
   /// clients of `ClangImporter`. If `CI` is null, the data is drawn from the
-  /// importer's invocation.
+  /// importer's invocation. When `IRGenOpts` is non-null, also applies the
+  /// AST-affecting CodeGen configuration (optimization level, debug info, ...)
+  /// to the Clang invocation and, if distinct, the IRGen-facing copy.
   void configureOptionsForCodeGen(clang::DiagnosticsEngine &Diags,
+                                  const IRGenOptions *IRGenOpts,
                                   clang::CompilerInvocation *CI = nullptr);
 
   clang::TargetInfo &getCodeGenTargetInfo() const { return *CodeGenTargetInfo; }
@@ -788,6 +791,13 @@ private:
   llvm::DenseMap<NominalTypeDecl *, FuncDecl *> importedOperatorBoolCache;
 
 public:
+  /// Cache of synthesized derived-to-base pointer upcast functions,
+  /// keyed by the (derived, base) C++ record pair.
+  llvm::DenseMap<
+      std::pair<const clang::CXXRecordDecl *, const clang::CXXRecordDecl *>,
+      FuncDecl *>
+      synthesizedBaseCastFunctions;
+
   llvm::DenseMap<const clang::ParmVarDecl*, FuncDecl*> defaultArgGenerators;
 
   bool isDefaultArgSafeToImport(const clang::ParmVarDecl *param);
@@ -813,6 +823,40 @@ public:
   /// Keeps track of the Clang functions that have been turned into
   /// properties.
   llvm::DenseMap<const clang::FunctionDecl *, VarDecl *> FunctionsAsProperties;
+
+  /// Maps a foreign reference type's Clang record to the (retain, release)
+  /// Clang functions that implement its custom reference counting.
+  ///
+  /// The entry is populated by \c importer::checkRetainReleaseFunctions when an
+  /// FRT is imported, and consumed during IRGen. Three states are possible:
+  ///   - no entry: the record is not a (valid) foreign reference type;
+  ///   - {nullptr, nullptr}: an immortal FRT, which has no custom retain/release
+  ///     operations;
+  ///   - {retain, release}: a shared FRT, where both functions are the concrete
+  ///     Clang callees that IRGen should emit calls to.
+  llvm::DenseMap<const clang::RecordDecl *,
+                 std::pair<const clang::FunctionDecl *,
+                           const clang::FunctionDecl *>>
+      FRTRetainReleaseFunctions;
+
+  /// Records the (retain, release) Clang operations for the foreign reference
+  /// type \p classDecl. Passing null functions marks the type as immortal.
+  void setForeignReferenceTypeOperations(const clang::RecordDecl *decl,
+                                         const clang::FunctionDecl *retain,
+                                         const clang::FunctionDecl *release) {
+    FRTRetainReleaseFunctions[decl] = {retain, release};
+  }
+
+  /// Returns the (retain, release) Clang operations for the foreign reference
+  /// type \p decl, or {nullptr, nullptr} if it has no custom reference counting
+  /// (i.e. it is immortal or not a valid foreign reference type).
+  std::pair<const clang::FunctionDecl *, const clang::FunctionDecl *>
+  getForeignReferenceTypeOperations(const clang::RecordDecl *decl) {
+    auto it = FRTRetainReleaseFunctions.find(decl);
+    if (it == FRTRetainReleaseFunctions.end())
+      return {nullptr, nullptr};
+    return it->second;
+  }
 
   /// Calling AbstractFunctionDecl::getLifetimeDependencies before we added
   /// the conformances we want to all the imported types is problematic because
@@ -1168,7 +1212,8 @@ public:
   ///
   /// \returns The imported declaration, or null if the macro could not be
   /// translated into Swift.
-  ValueDecl *importMacro(Identifier name, ClangNode macroNode);
+  ValueDecl *importMacro(Identifier name, ClangNode macroNode,
+                         const clang::IdentifierInfo *II = nullptr);
 
   /// Map a Clang identifier name to its imported Swift equivalent.
   StringRef getSwiftNameFromClangName(StringRef name);
@@ -2281,6 +2326,32 @@ getCxxValueSemanticsKind(const clang::Type *type,
 
 bool isViewType(const clang::CXXRecordDecl *decl);
 
+/// Determine whether \p type is a "direct view": a pointer or reference to a
+/// self-contained pointee, or a record (including a class template
+/// specialization) in which every field and base is either self-contained or
+/// itself a direct view. Here "self-contained" means escapable
+/// (SWIFT_ESCAPABLE), a foreign reference type, or a type annotated
+/// SWIFT_SELF_CONTAINED (import_owned); a type explicitly marked unsafe is
+/// never self-contained. Incomplete/forward-declared types, `void` pointees,
+/// and function pointees are never direct views.
+///
+/// This is meant to be called on types that are imported as views, i.e. types
+/// that are non-escapable.
+bool isDirectViewType(const clang::Type *type, Evaluator &eval);
+bool isDirectViewType(const clang::Decl *decl, ASTContext &swiftCtx);
+
+/// Whether \p decl is a C++ record that is really a Swift class type exposed
+/// back to C++ (annotated with a Swift \c external_source_symbol attribute and
+/// derived from \c swift::RefCountedClass).
+bool isSwiftClassType(const clang::CXXRecordDecl *decl);
+
+/// Whether the C++ method \p method can be safely used in Swift, i.e. it is not
+/// a projection that could yield a dangling pointer/reference/iterator. Methods
+/// that are not safe are imported under a \c __<name>Unsafe name and/or marked
+/// \c @unsafe. See also PrintOptions::SkipUnsafeCXXMethods.
+bool shouldRenameCXXMethodAsUnsafe(const clang::CXXMethodDecl *method,
+                                   ASTContext &ctx);
+
 inline const clang::Type *desugarIfElaborated(const clang::Type *type) {
   if (auto elaborated = dyn_cast<clang::ElaboratedType>(type))
     return elaborated->desugar().getTypePtr();
@@ -2346,24 +2417,25 @@ getImplicitObjectParamAnnotation(const clang::FunctionDecl *FD) {
 bool diagnoseForeignReferenceType(const clang::CXXRecordDecl *decl,
                                   ClangImporter::Implementation &Impl);
 
+/// Validate the custom retain/release operations of the foreign reference type
+/// \p classDecl, emitting diagnostics for any problems.
+///
+/// For an FRT that inherits its reference-counting operations from a base FRT,
+/// this function synthesizes and imports forwarding methods into \p classDecl.
+///
+/// On success, this records the resolved (retain, release) Clang functions
+/// (or null functions, for an immortal type) via
+/// \c ClangImporter::Implementation::setForeignReferenceTypeOperations so that
+/// they can be looked up during IRGen.
+void checkRetainReleaseFunctions(ClassDecl *classDecl,
+                                 ClangImporter::Implementation &Impl);
+
 /// Returns the module \p Node comes from, or \c nullptr if \p Node does not
 /// have a valid owning module.
 ///
 /// Note that \p Node cannot itself be a clang::Module.
 const clang::Module *getClangOwningModule(ClangNode Node,
                                           const clang::ASTContext &ClangCtx);
-
-enum class RetainReleaseOperationKind {
-  notAfunction,
-  notAnInstanceFunction,
-  invalidReturnType,
-  invalidParameters,
-  valid
-};
-
-RetainReleaseOperationKind checkRetainReleaseOperationValidity(
-    const ClassDecl *classDecl, ValueDecl *operation,
-    CustomRefCountingOperationKind operationKind);
 } // end namespace importer
 } // end namespace swift
 

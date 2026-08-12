@@ -15,11 +15,11 @@ sil_scope 3 { loc "test.swift":2:7 parent 2 }
 
 sil @testit : $@convention(thin) (@in_guaranteed any P) -> () {
 bb0(%0 : $*any P):
-  %1 = open_existential_addr immutable_access %0 to $*@opened("2A0E9166-A9AC-11F0-A5A7-0EA13E3AABAF", any P) Self 
-  %2 = alloc_stack [lexical] $@opened("2A0E9166-A9AC-11F0-A5A7-0EA13E3AABAF", any P) Self, var, name "x", loc "test.swift":2:7, scope 3
+  %1 = open_existential_addr immutable_access %0 to $*@opened(1, any P) Self 
+  %2 = alloc_stack [lexical] $@opened(1, any P) Self, var, name "x", loc "test.swift":2:7, scope 3
   dealloc_stack %2
-  %4 = open_existential_addr immutable_access %0 to $*@opened("3A0E9166-A9AC-11F0-A5A7-0EA13E3AABAF", any P) Self 
-  %5 = alloc_stack [lexical] $@opened("3A0E9166-A9AC-11F0-A5A7-0EA13E3AABAF", any P) Self, var, name "x", loc "test.swift":2:7, scope 3
+  %4 = open_existential_addr immutable_access %0 to $*@opened(2, any P) Self 
+  %5 = alloc_stack [lexical] $@opened(2, any P) Self, var, name "x", loc "test.swift":2:7, scope 3
   dealloc_stack %5
   %r = tuple ()
   return %r

@@ -551,7 +551,7 @@ void TypeTreeLeafTypeRange::constructFilteredProjections(
             if (utedai->getElement() != record.element) {
               continue;
             }
-            if (!domTree->dominates(utedai, insertPt)) {
+            if (!domTree->properlyDominates(utedai, insertPt)) {
               continue;
             }
 

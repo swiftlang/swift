@@ -122,6 +122,23 @@ void ClangImporter::getBridgingHeaderOptions(
     break;
   }
 
+  // If the main compilation specifies '-clang-target', forward it so the
+  // bridging header PCH is emitted through the same `ClangImporter::create`
+  // configuration path (and therefore the same `clang::CodeGenOptions`) as the
+  // compilations that later consume the PCH.
+  if (ctx.LangOpts.ClangTarget.has_value()) {
+    swiftArgs.push_back("-target");
+    swiftArgs.push_back(ctx.LangOpts.Target.str());
+    swiftArgs.push_back("-clang-target");
+    swiftArgs.push_back(ctx.LangOpts.ClangTarget->str());
+  }
+
+  // Inherit Embedded Swift.
+  if (ctx.LangOpts.hasFeature(Feature::Embedded)) {
+    swiftArgs.push_back("-enable-experimental-feature");
+    swiftArgs.push_back("Embedded");
+  }
+
   // Add args reported by the scanner.
 
   // Round-trip clang args to canonicalize and clear the options that swift

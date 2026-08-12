@@ -28,8 +28,10 @@
 #include "IRGen.h"
 #include "Outlining.h"
 #include "swift/AST/ReferenceCounting.h"
+#include "swift/AST/TypeInfoStorage.h"
 #include "swift/SIL/SILInstruction.h"
 #include "llvm/ADT/MapVector.h"
+#include <memory>
 
 namespace llvm {
   class Constant;
@@ -40,6 +42,11 @@ namespace llvm {
 namespace swift {
   enum IsInitialization_t : bool;
   enum IsTake_t : bool;
+  struct SerializableLLVMTypeRepresentation;
+  class SerializableFixedTypeInfoRepresentation;
+  class SerializableHiddenTypeInfoRepresentation;
+  class SerializableLoadableRecordTypeInfoRepresentation;
+  class SerializableLoadableTypeInfoRepresentation;
   class SILType;
 
 namespace irgen {
@@ -58,6 +65,12 @@ namespace irgen {
   class RValueSchema;
   class TypeLayoutEntry;
 
+std::unique_ptr<SerializableLLVMTypeRepresentation>
+serializeLLVMType(llvm::Type *type);
+llvm::Type *deserializeLLVMType(
+    IRGenModule &IGM,
+    const std::unique_ptr<SerializableLLVMTypeRepresentation> &representation);
+
 /// Ways in which an object can fit into a fixed-size buffer.
 enum class FixedPacking {
   /// It fits at offset zero.
@@ -70,24 +83,6 @@ enum class FixedPacking {
   Dynamic
 };
 
-enum class SpecialTypeInfoKind : uint8_t {
-  Unimplemented,
-
-  None,
-
-  /// Everything after this is statically fixed-size.
-  Fixed,
-  Weak,
-
-  /// Everything after this is loadable.
-  Loadable,
-  Reference,
-
-  Last_Kind = Reference
-};
-enum : unsigned { NumSpecialTypeInfoKindBits =
-  countBitsUsed(static_cast<unsigned>(SpecialTypeInfoKind::Last_Kind)) };
-
 /// Information about the IR representation and generation of the
 /// given type.
 class TypeInfo {
@@ -97,68 +92,16 @@ class TypeInfo {
   friend class TypeConverter;
 
 protected:
-  // clang-format off
-  union {
-    uint64_t OpaqueBits;
-
-    SWIFT_INLINE_BITFIELD_BASE(TypeInfo,
-                             bitmax(NumSpecialTypeInfoKindBits,8)+6+1+1+1+1+3+1+1,
-      /// The kind of supplemental API this type has, if any.
-      Kind : bitmax(NumSpecialTypeInfoKindBits,8),
-
-      /// The storage alignment of this type in log2 bytes.
-      AlignmentShift : 6,
-
-      /// Whether this type is known to be trivially destructible.
-      TriviallyDestroyable : 1,
-      
-      /// Whether this type is known to be bitwise-takable.
-      BitwiseTakable : 1,
-
-      /// Whether this type is known to be bitwise-borrowable.
-      BitwiseBorrowable : 1,
-
-      /// Whether this type is known to be copyable.
-      Copyable : 1,
-
-      /// An arbitrary discriminator for the subclass.  This is useful for e.g.
-      /// distinguishing between different TypeInfos that all implement the same
-      /// kind of type.
-      /// FIXME -- Create TypeInfoNodes.def and get rid of this field.
-      SubclassKind : 3,
-
-      /// Whether this type can be assumed to have a fixed size from all
-      /// resilience domains.
-      AlwaysFixedSize : 1,
-
-      /// Whether this type is ABI-accessible from this SILModule.
-      ABIAccessible : 1
-    );
-
-    /// FixedTypeInfo will use the remaining bits for the size.
-    ///
-    /// NOTE: Until one can define statically sized inline arrays in the
-    /// language, defining an extremely large object is quite impractical.
-    /// For now: "4 GiB should be more than good enough."
-    SWIFT_INLINE_BITFIELD_FULL(FixedTypeInfo, TypeInfo, 32,
-      : NumPadBits,
-
-      /// The storage size of this type in bytes.  This may be zero even
-      /// for well-formed and complete types, such as a trivial enum or
-      /// tuple.
-      Size : 32
-    );
-  } Bits;
-  // clang-format on
+  TypeInfoBitfields Bits;
 
   enum { InvalidSubclassKind = 0x7 };
 
   TypeInfo(llvm::Type *Type, Alignment A, IsTriviallyDestroyable_t pod,
-           IsBitwiseTakable_t bitwiseTakable,
-           IsCopyable_t copyable,
-           IsFixedSize_t alwaysFixedSize,
-           IsABIAccessible_t abiAccessible,
-           SpecialTypeInfoKind stik) : StorageType(Type) {
+           IsBitwiseTakable_t bitwiseTakable, IsCopyable_t copyable,
+           IsFixedSize_t alwaysFixedSize, IsABIAccessible_t abiAccessible,
+           SpecialTypeInfoKind stik)
+      : CreatedFromSerializableHiddenTypeInfoRepresentation(false),
+        StorageType(Type) {
     assert(stik >= SpecialTypeInfoKind::Fixed || !alwaysFixedSize);
     Bits.OpaqueBits = 0;
     Bits.TypeInfo.Kind = unsigned(stik);
@@ -173,6 +116,17 @@ protected:
     Bits.TypeInfo.ABIAccessible = abiAccessible;
   }
 
+  TypeInfo(IRGenModule &IGM,
+           const SerializableHiddenTypeInfoRepresentation &representation);
+
+  void populateSerializableHiddenTypeInfoRepresentation(
+      IRGenModule &IGM,
+      SerializableHiddenTypeInfoRepresentation &representation) const;
+
+  bool CreatedFromSerializableHiddenTypeInfoRepresentation;
+
+  void assertNotDeserialized(const char *operation) const;
+
   /// Change the minimum alignment of a stored value of this type.
   void setStorageAlignment(Alignment alignment) {
     auto Prev = Bits.TypeInfo.AlignmentShift;
@@ -180,6 +134,10 @@ protected:
     assert(Next >= Prev && "Alignment can only increase");
     (void)Prev;
     Bits.TypeInfo.AlignmentShift = Next;
+  }
+
+  void setSpecialTypeInfoKind(SpecialTypeInfoKind kind) {
+    Bits.TypeInfo.Kind = unsigned(kind);
   }
 
   void setSubclassKind(unsigned kind) {
@@ -200,6 +158,9 @@ private:
 
 public:
   virtual ~TypeInfo();
+
+  virtual std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
+  createSerializableHiddenTypeInfoRepresentation(IRGenModule &IGM) const;
 
   /// Unsafely cast this to the given subtype.
   template <class T> const T &as() const {

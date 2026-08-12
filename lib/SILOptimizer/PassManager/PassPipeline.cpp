@@ -169,12 +169,6 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   // Check noImplicitCopy and move only types for objects and addresses.
   P.addMoveOnlyChecker();
 
-  // FIXME: rdar://122701694 (`consuming` keyword causes verification error on
-  //        invalid SIL types)
-  //
-  // Lower move only wrapped trivial types.
-  //   P.addTrivialMoveOnlyTypeEliminator();
-
   // Check no uses after consume operator of a value in an address.
   P.addConsumeOperatorCopyableAddressesChecker();
   // No uses after consume operator of copyable value.
@@ -250,9 +244,6 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
     P.addDiagnoseLifetimeIssues();
   }
 
-  // Canonical swift requires all non cond_br critical edges to be split.
-  P.addSplitNonCondBrCriticalEdges();
-
   // This is needed to clean up SIL after MandatoryDeadObjectElimination for
   // OSLogOptimization (in the next function up the call tree). It must happen
   // before the next module-pass (= MandatoryPerformanceOptimizations) after
@@ -307,6 +298,16 @@ SILPassPipelinePlan::getSILGenPassPipeline(const SILOptions &Options) {
   P.startPipeline("SILGen Passes");
 
   P.addSILGenCleanup();
+
+  if (P.getOptions().EnableLifetimeResolution) {
+    if (P.getOptions().EnableLifetimeDependenceDiagnostics)
+      P.addLifetimeDependenceInsertion();
+
+    P.addRemoveSILGenLifetimes();
+    P.addLifetimeResolution();
+    return P;
+  }
+
   if (P.getOptions().EnableLifetimeDependenceDiagnostics) {
     P.addLifetimeDependenceInsertion();
     P.addLifetimeDependenceScopeFixup();
@@ -602,6 +603,7 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   P.addRedundantPhiElimination();
   P.addCommonSubexpressionElimination();
   P.addDCE();
+  P.addDeadDebugVariableElimination();
   P.addDeadAccessScopeElimination();
 
   // Perform retain/release code motion and run the first ARC optimizer.
@@ -786,6 +788,7 @@ static void addClosureSpecializePassPipeline(SILPassPipelinePlan &P) {
   P.addConstantCapturePropagation();
 
   P.addClosureSpecialization();
+  P.addDeadDebugVariableElimination();
 
   // Do the second stack promotion on low-level SIL.
   P.addStackPromotion();
@@ -804,16 +807,25 @@ static void addClosureSpecializePassPipeline(SILPassPipelinePlan &P) {
 }
 
 static void addLowLevelPassPipeline(SILPassPipelinePlan &P) {
-  P.startPipeline("LowLevel,Function", true /*isFunctionPassPipeline*/);
-
-  // Should be after FunctionSignatureOpts and before the last inliner.
-  P.addReleaseDevirtualizer();
+  P.startPipeline("LowLevelPrepare", true /*isFunctionPassPipeline*/);
 
   // In OSSA we cannot do all kind of redundant load elimination, yet.
   // Therefore do it now at the beginning of the non-OSSA pipeline.
   // TODO: we should be able to remove this RLE run once we can represent all kind
   //       of eliminated redundant loads in OSSA.
   P.addRedundantLoadElimination();
+
+  // Make sure there are no redundant stores which prevent ObjectOutlining. This pass
+  // must run before the ReleaseDevirtualizer (in a separate pipeline, because of
+  // possible pipeline-restarts) to avoid removing stores to class fields - which can
+  // also prevent ObjectOutlining.
+  // TODO: we should be able to remove this pass once we have OSSA throughout the pipeline.
+  P.addDeadStoreElimination();
+
+  P.startPipeline("LowLevel,Function", true /*isFunctionPassPipeline*/);
+
+  // Should be after FunctionSignatureOpts and before the last inliner.
+  P.addReleaseDevirtualizer();
 
   addFunctionPasses(P, OptimizationLevelKind::LowLevel);
 
@@ -875,6 +887,7 @@ static void addLateLoopOptPassPipeline(SILPassPipelinePlan &P) {
   P.addDCE();
   P.addSILCombine();
   P.addSimplifyCFG();
+  P.addDeadDebugVariableElimination();
   P.addStripObjectHeaders();
 
   // Try to hoist all releases, including epilogue releases. This should be
@@ -911,9 +924,6 @@ static void addLastChanceOptPassPipeline(SILPassPipelinePlan &P) {
 
   // In optimized builds, do the inter-procedural analysis in a module pass.
   P.addStackProtection();
-
-  // FIXME: rdar://72935649 (Miscompile on combining PruneVTables with WMO)
-  // P.addPruneVTables();
 }
 
 static void addSILDebugInfoGeneratorPipeline(SILPassPipelinePlan &P) {
@@ -1156,6 +1166,11 @@ SILPassPipelinePlan
 SILPassPipelinePlan::getSerializeSILPassPipeline(const SILOptions &Options) {
   SILPassPipelinePlan P(Options);
   P.startPipeline("Serialize SIL");
+  if (Options.EmbeddedSwift) {
+    // CMO is required for embedded swift. Make sure to run it in case it didn't
+    // run in the regular pipeline because `-sil-opt-pass-count` was used.
+    P.addCrossModuleOptimization();
+  }
   P.addSerializeSILPass();
   return P;
 }

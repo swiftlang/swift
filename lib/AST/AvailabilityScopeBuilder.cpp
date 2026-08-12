@@ -331,6 +331,14 @@ private:
     if (isa<ExtensionDecl>(decl))
       return true;
 
+    // Declarations in local contexts may have availability attributes that are
+    // synthesized from the availability scopes that contain them (see
+    // SynthesizeLocalAvailableAttrsRequest). Expanding lazily ensures that
+    // building out the scopes for the enclosing function body does not query
+    // the availability of these declarations, which would be circular.
+    if (SynthesizeLocalAvailableAttrsRequest::appliesTo(decl))
+      return true;
+
     return false;
   }
 
@@ -1216,44 +1224,10 @@ private:
         newContext.constrainWithAvailabilityRange(*trueRange, domain, Context);
 
       // Check whether the new context refines availability. If it doesn't, the
-      // query is useless and should potentially be diagnosed.
-      if (currentContext.isContainedIn(newContext)) {
-        // If the explicitly-specified (via #availability) version range for the
-        // current scope is completely contained in the range for the spec, then
-        // a version query can never be false, so the spec is useless.
-        // If so, report this.
-        auto explicitRange =
-            currentScope->getExplicitAvailabilityRange(domain, Context);
-        if (explicitRange && trueRange &&
-            explicitRange->isContainedIn(*trueRange)) {
-          // Platform unavailability queries never refine availability so don't
-          // diangose them.
-          if (isUnavailability.value())
-            continue;
-
-          // Skip diagnosing useless availability in fragile functions with
-          // opaque result types since removing an availability check could
-          // change the ABI of the function and result in a miscompilation.
-          auto *dc = getCurrentDeclContext();
-          if (dc->getResilienceExpansion() == ResilienceExpansion::Minimal) {
-            if (auto decl = dc->getInnermostDeclarationDeclContext()) {
-              if (auto afd = dyn_cast<AbstractFunctionDecl>(decl)) {
-                if (afd->getOpaqueResultTypeDecl())
-                  continue;
-              }
-            }
-          }
-
-          DiagnosticEngine &diags = Context.Diags;
-          diags.diagnose(query->getLoc(),
-                         diag::availability_query_useless_enclosing_scope,
-                         domain.getNameForAttributePrinting());
-          diags.diagnose(currentScope->getIntroductionLoc(),
-                         diag::availability_query_useless_enclosing_scope_here);
-        }
-
+      // query is useless. Diagnosing that is the responsibility of
+      // diagnoseAvailabilityCondition() in MiscDiagnostics.
+      if (currentContext.isContainedIn(newContext))
         continue;
-      }
 
       // If the #available() is not useless then there is a potential false
       // flow and we need to potentially expand the range covered by the false
@@ -1264,6 +1238,7 @@ private:
       auto *scope = AvailabilityScope::createForConditionFollowingQuery(
           Context, query, lastElement, getCurrentDeclContext(), currentScope,
           newContext);
+      query->setIntroducedAvailabilityScope(scope);
 
       pushContext(scope, ParentTy());
       ++nestedCount;

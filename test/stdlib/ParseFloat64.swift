@@ -364,6 +364,33 @@ tests.test("Substring - long") {
   expectEqual(parsed!.bitPattern, (2.0).bitPattern)
 }
 
+tests.test("Integers") {
+  expectParse("1", 1.0);
+  expectParse("12", 12.0);
+  expectParse("123", 123.0);
+  expectParse("1234", 1234.0);
+  expectParse("12345", 12345.0);
+  expectParse("123456", 123456.0);
+  expectParse("1234567", 1234567.0);
+  expectParse("12345678", 12345678.0);
+  expectParse("123456789", 123456789.0);
+  expectParse("1234567890", 1234567890.0);
+  expectParse("12345678901", 12345678901.0);
+  expectParse("123456789012", 123456789012.0);
+  expectParse("1234567890123", 1234567890123.0);
+  expectParse("12345678901234", 12345678901234.0);
+  expectParse("123456789012345", 123456789012345.0);
+  expectParse("1234567890123456", 1234567890123456.0);
+  expectParse("12345678901234567", 12345678901234567.0);
+  expectParse("123456789012345678", 123456789012345678.0);
+  expectParse("1234567890123456789", 1234567890123456789.0);
+  expectParse("12345678901234567890", 12345678901234567890.0);
+  expectParse("123456789012345678901", 123456789012345678901.0);
+  expectParse("1234567890123456789012", 1234567890123456789012.0);
+  expectParse("12345678901234567890123", 12345678901234567890123.0);
+  expectParse("123456789012345678901234", 123456789012345678901234.0);
+}
+
 /*
  // These need Foundation to run, so can't run on Linux?
 tests.test("Bridged - short") {

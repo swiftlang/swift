@@ -209,6 +209,7 @@ struct BridgedPassContext {
   void deserializeAllCallees(BridgedFunction function, bool deserializeAll) const;
   bool specializeClassMethodInst(BridgedInstruction cm) const;
   bool specializeWitnessMethodInst(BridgedInstruction wm) const;
+  bool specializeKeyPathInst(BridgedInstruction kpi) const;
   bool specializeAppliesInFunction(BridgedFunction function, bool isMandatory) const;
   BridgedOwnedString mangleOutlinedVariable(BridgedFunction function) const;
   BridgedOwnedString mangleAsyncRemoved(BridgedFunction function) const;
@@ -241,6 +242,7 @@ struct BridgedPassContext {
   SwiftInt getStaticStride(BridgedType type) const;
   bool canMakeStaticObjectReadOnly(BridgedType type) const;
   bool hasClassFixedMetadataLayout(BridgedDeclObj classDecl) const;
+  bool fitsInOpaqueExistentialPayload(BridgedType type) const;
 
   // Stack nesting and other notifications
 

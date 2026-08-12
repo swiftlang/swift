@@ -833,6 +833,24 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordGenericSubstitut
   if (!fd) {
     return false;
   }
+
+  // === Must be declared in a 'DistributedTargetInvocationEncoder' conforming type
+  ProtocolDecl *encoderProto =
+      C.getProtocol(KnownProtocolKind::DistributedTargetInvocationEncoder);
+  if (!encoderProto) {
+    return false;
+  }
+
+  auto encoderNominal = getDeclContext()->getSelfNominalTypeDecl();
+  if (!encoderNominal) {
+    return false;
+  }
+  auto protocolConformance = lookupConformance(
+      encoderNominal->getDeclaredInterfaceType(), encoderProto);
+  if (protocolConformance.isInvalid()) {
+    return false;
+  }
+
   if (fd->getParameters()->size() != 1) {
     return false;
   }
@@ -842,11 +860,29 @@ AbstractFunctionDecl::isDistributedTargetInvocationEncoderRecordGenericSubstitut
   if (!fd->hasThrows()) {
     return false;
   }
-  // TODO(distributed): more checks
 
   // A single generic parameter.
   auto genericParamList = fd->getGenericParams();
-  if (genericParamList->size() != 1) {
+  if (!genericParamList || genericParamList->size() != 1) {
+    return false;
+  }
+
+  // --- Check parameter: _ type: T.Type
+  // The single parameter must be the metatype of the single generic parameter,
+  // i.e. 'recordGenericSubstitution<T>(_ type: T.Type)'.
+  GenericTypeParamDecl *typeGenericParam = genericParamList->getParams()[0];
+  auto typeParam = fd->getParameters()->get(0);
+  if (!typeParam->getArgumentName().empty()) {
+    return false;
+  }
+  auto typeParamTy = mapTypeIntoEnvironment(typeParam->getInterfaceType());
+  auto metatypeTy = typeParamTy->getAs<AnyMetatypeType>();
+  if (!metatypeTy) {
+    return false;
+  }
+  auto expectedInstanceTy =
+      mapTypeIntoEnvironment(typeGenericParam->getDeclaredInterfaceType());
+  if (!metatypeTy->getInstanceType()->isEqual(expectedInstanceTy)) {
     return false;
   }
 
@@ -1483,10 +1519,8 @@ ValueDecl::isSpecialDistributedActorProperty(bool onlyCheckName) const {
   // The synthesized bit doesn't get preserved by serialization or module
   // interfaces, we only need to check it when compiling a SourceFile though
   // since we'll diagnose any conflicting user-defined versions.
-  if (!isSynthesized() && DC->getParentSourceFile() &&
-      !DC->isInSwiftinterface()) {
+  if (!isSynthesized() && DC->isInSwiftSourceFile())
     return std::nullopt;
-  }
 
   return kind;
 }

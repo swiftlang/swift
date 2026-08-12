@@ -464,6 +464,18 @@ extension Dictionary._Variant {
     return try asNative.mapValues(transform)
   }
 
+  @_alwaysEmitIntoClient
+  internal func mapKeyedValues<T, E>(
+    _ transform: (Key, Value) throws(E) -> T
+  ) throws(E) -> _NativeDictionary<Key, T> {
+#if _runtime(_ObjC)
+    guard isNative else {
+      return try asCocoa.mapKeyedValues(transform)
+    }
+#endif
+    return try asNative.mapKeyedValues(transform)
+  }
+
 #if !$Embedded
   // ABI-only entrypoint for the rethrows version of mapValues, which has been
   // superseded by the typed-throws version. Expressed as "throws", which is

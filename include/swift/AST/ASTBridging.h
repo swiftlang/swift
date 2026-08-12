@@ -358,6 +358,7 @@ struct BridgedDeclObj {
   BRIDGED_INLINE bool AbstractStorage_isConst() const;
   BRIDGED_INLINE bool GenericType_isGenericAtAnyLevel() const;
   BRIDGED_INLINE bool NominalType_isGlobalActor() const;
+  BRIDGED_INLINE bool NominalType_hasNonUniqueDefinition() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType
   NominalType_getDeclaredInterfaceType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType NominalType_getSelfInterfaceType() const;
@@ -1347,10 +1348,11 @@ BridgedReferenceOwnershipAttr BridgedReferenceOwnershipAttr_createParsed(
     BridgedASTContext cContext, swift::SourceLoc atLoc,
     swift::SourceRange range, BridgedReferenceOwnership cKind);
 
-SWIFT_NAME("BridgedSectionAttr.createParsed(_:atLoc:range:name:)")
+SWIFT_NAME("BridgedSectionAttr.createParsed(_:atLoc:range:isDefault:name:)")
 BridgedSectionAttr BridgedSectionAttr_createParsed(BridgedASTContext cContext,
                                                    swift::SourceLoc atLoc,
                                                    swift::SourceRange range,
+                                                   bool isDefault,
                                                    BridgedStringRef cName);
 
 SWIFT_NAME("BridgedSemanticsAttr.createParsed(_:atLoc:range:value:)")
@@ -1419,6 +1421,18 @@ SWIFT_NAME(
 BridgedUnavailableFromAsyncAttr BridgedUnavailableFromAsyncAttr_createParsed(
     BridgedASTContext cContext, swift::SourceLoc atLoc,
     swift::SourceRange range, BridgedStringRef cMessage);
+
+SWIFT_NAME("BridgedUnsafeAttr.createParsed(_:atLoc:range:isAlways:)")
+BridgedUnsafeAttr
+BridgedUnsafeAttr_createParsed(BridgedASTContext cContext,
+                               swift::SourceLoc atLoc, swift::SourceRange range,
+                               bool isAlways);
+
+SWIFT_NAME("BridgedCalledAttr.createParsed(_:atLoc:range:semantics:)")
+BridgedCalledAttr
+BridgedCalledAttr_createParsed(BridgedASTContext cContext,
+                               swift::SourceLoc atLoc, swift::SourceRange range,
+                               swift::ExecutionSemantics semantics);
 
 //===----------------------------------------------------------------------===//
 // MARK: Decls
@@ -2615,6 +2629,10 @@ enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedIsolatedTypeAttrIsolationKind {
   BridgedIsolatedTypeAttrIsolationKind_DynamicIsolation,
 };
 
+enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedCalledTypeAttrSemantics {
+  BridgedCalledTypeAttrSemantics_Once,
+};
+
 SWIFT_NAME("BridgedConventionTypeAttr.createParsed(_:atLoc:nameLoc:parensRange:"
            "name:nameLoc:witnessMethodProtocol:clangType:clangTypeLoc:)")
 BridgedConventionTypeAttr BridgedConventionTypeAttr_createParsed(
@@ -2654,6 +2672,13 @@ BridgedOpaqueReturnTypeOfTypeAttr_createParsed(
     BridgedASTContext cContext, swift::SourceLoc atLoc, swift::SourceLoc kwLoc,
     swift::SourceRange parens, BridgedStringRef cMangled,
     swift::SourceLoc mangledDoc, size_t index, swift::SourceLoc indexLoc);
+
+SWIFT_NAME("BridgedCalledTypeAttr.createParsed(_:atLoc:nameLoc:parensRange:"
+           "semantics:semanticsLoc:)")
+BridgedCalledTypeAttr BridgedCalledTypeAttr_createParsed(
+    BridgedASTContext cContext, swift::SourceLoc atLoc,
+    swift::SourceLoc nameLoc, swift::SourceRange parensRange,
+    BridgedCalledTypeAttrSemantics semantics, swift::SourceLoc semanticsLoc);
 
 //===----------------------------------------------------------------------===//
 // MARK: TypeReprs

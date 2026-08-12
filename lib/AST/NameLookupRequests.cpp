@@ -525,23 +525,6 @@ swift::extractNearestSourceLoc(const ClangRecordMemberLookupDescriptor &desc) {
 }
 
 //----------------------------------------------------------------------------//
-// CustomRefCountingOperation computation.
-//----------------------------------------------------------------------------//
-
-void swift::simple_display(llvm::raw_ostream &out,
-                           CustomRefCountingOperationDescriptor desc) {
-  out << "Finding custom (foreign reference) reference counting operation '"
-      << (desc.kind == CustomRefCountingOperationKind::retain ? "retain"
-                                                              : "release")
-      << "' for '" << desc.decl->getNameStr() << "'.\n";
-}
-
-SourceLoc
-swift::extractNearestSourceLoc(CustomRefCountingOperationDescriptor desc) {
-  return SourceLoc();
-}
-
-//----------------------------------------------------------------------------//
 // Macro-related adjustments to name lookup requests.
 //----------------------------------------------------------------------------//
 //

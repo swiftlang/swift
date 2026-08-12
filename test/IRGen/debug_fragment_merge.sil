@@ -47,11 +47,11 @@ bb0(%0 : $Int, %1 : $*any External):
   br bb1 // cond_br %cond, bb1, bb2
 
 bb1:                                              // Preds: bb0
-  %10 = open_existential_addr immutable_access %1 : $*any External to $*@opened("EDD72648-0EA0-11EE-9925-E91C6F300971", any External) Self, loc "debug_fragment_merge.swift":19:28, scope 12 // users: %14, %14, %13
+  %10 = open_existential_addr immutable_access %1 : $*any External to $*@opened(1, any External) Self, loc "debug_fragment_merge.swift":19:28, scope 12 // users: %14, %14, %13
   %11 = alloc_stack $Data, loc * "debug_fragment_merge.swift":19:28, scope 13 // users: %17, %15, %21, %14
   %12 = metatype $@thick Data.Type, loc "debug_fragment_merge.swift":19:35, scope 13 // user: %14
-  %13 = witness_method $@opened("EDD72648-0EA0-11EE-9925-E91C6F300971", any External) Self, #External.decode : <Self where Self : External><T> (Self) -> (T.Type) -> T, %10 : $*@opened("EDD72648-0EA0-11EE-9925-E91C6F300971", any External) Self : $@convention(witness_method: External) <τ_0_0 where τ_0_0 : External><τ_1_0> (@thick τ_1_0.Type, @in_guaranteed τ_0_0) -> @out τ_1_0, loc "debug_fragment_merge.swift":19:28, scope 13 // type-defs: %10; user: %14
-  %14 = apply %13<@opened("EDD72648-0EA0-11EE-9925-E91C6F300971", any External) Self, Data>(%11, %12, %10) : $@convention(witness_method: External) <τ_0_0 where τ_0_0 : External><τ_1_0> (@thick τ_1_0.Type, @in_guaranteed τ_0_0) -> @out τ_1_0, loc "debug_fragment_merge.swift":19:28, scope 13 // type-defs: %10
+  %13 = witness_method $@opened(1, any External) Self, #External.decode : <Self where Self : External><T> (Self) -> (T.Type) -> T, %10 : $*@opened(1, any External) Self : $@convention(witness_method: External) <τ_0_0 where τ_0_0 : External><τ_1_0> (@thick τ_1_0.Type, @in_guaranteed τ_0_0) -> @out τ_1_0, loc "debug_fragment_merge.swift":19:28, scope 13 // type-defs: %10; user: %14
+  %14 = apply %13<@opened(1, any External) Self, Data>(%11, %12, %10) : $@convention(witness_method: External) <τ_0_0 where τ_0_0 : External><τ_1_0> (@thick τ_1_0.Type, @in_guaranteed τ_0_0) -> @out τ_1_0, loc "debug_fragment_merge.swift":19:28, scope 13 // type-defs: %10
   %15 = struct_element_addr %11 : $*Data, #Data.a, loc "debug_fragment_merge.swift":19:28, scope 13 // user: %16
   %16 = load %15 : $*String, loc "debug_fragment_merge.swift":19:28, scope 13 // users: %19, %22
   %17 = struct_element_addr %11 : $*Data, #Data.b, loc "debug_fragment_merge.swift":19:28, scope 13 // user: %18

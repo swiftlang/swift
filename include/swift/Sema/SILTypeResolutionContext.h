@@ -14,7 +14,6 @@
 #define SWIFT_SEMA_SILTYPERESOLUTIONCONTEXT_H
 
 #include "llvm/ADT/DenseMap.h"
-#include "swift/Basic/UUID.h"
 
 namespace swift {
 class GenericParamList;
@@ -27,7 +26,7 @@ public:
     GenericParamList *Params;
     GenericEnvironment *Environment;
   };
-  using OpenedPackElementsMap = llvm::DenseMap<UUID, OpenedPackElement>;
+  using OpenedPackElementsMap = llvm::DenseMap<uint64_t, OpenedPackElement>;
 
   /// Are we requesting a SIL type?
   bool IsSILType;

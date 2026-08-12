@@ -36,3 +36,24 @@ extension Greeting where Self.SerializationRequirement == Codable {
     greetLocal(name: "Alice") // expected-error{{only 'distributed' instance methods can be called on a potentially remote distributed actor}}
   }
 }
+
+@MainActor
+func greetOnMainActor() {}
+// expected-note@-1:6 {{calls to global function 'greetOnMainActor()' from outside of its actor context are implicitly asynchronous}}
+
+@MainActor
+protocol MainActorGreeting {
+  func greet()
+}
+
+// Distributed actors shouldn't infer a global actor isolation from a protocol!
+// Beyond the normal issues, that would also conflict with DistributedActor.
+distributed actor MainActorGreeter: MainActorGreeting {
+  @MainActor func greet() {}
+
+  static func notAWitness() {
+    // expected-note@-1:15 {{add '@MainActor' to make static method 'notAWitness()' part of global actor 'MainActor'}}
+    greetOnMainActor()
+    // expected-error@-1:5 {{call to main actor-isolated global function 'greetOnMainActor()' in a synchronous nonisolated context}}
+  }
+}

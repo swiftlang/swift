@@ -738,9 +738,12 @@ BridgedReferenceOwnershipAttr_createParsed(BridgedASTContext cContext,
 BridgedSectionAttr BridgedSectionAttr_createParsed(BridgedASTContext cContext,
                                                    SourceLoc atLoc,
                                                    SourceRange range,
+                                                   bool isDefault,
                                                    BridgedStringRef cName) {
-  return new (cContext.unbridged()) SectionAttr(cName.unbridged(), atLoc, range,
-                                                /*Implicit=*/false);
+  return new (cContext.unbridged()) SectionAttr(
+      isDefault ? std::nullopt
+                : std::optional<StringRef>(cName.unbridged()),
+      atLoc, range, /*Implicit=*/false);
 }
 
 BridgedSemanticsAttr
@@ -851,4 +854,17 @@ BridgedUnavailableFromAsyncAttr_createParsed(BridgedASTContext cContext,
                                              BridgedStringRef cMessage) {
   return new (cContext.unbridged()) UnavailableFromAsyncAttr(
       cMessage.unbridged(), atLoc, range, /*implicit=*/false);
+}
+
+BridgedUnsafeAttr
+BridgedUnsafeAttr_createParsed(BridgedASTContext cContext, SourceLoc atLoc,
+                               SourceRange range, bool isAlways) {
+  return new (cContext.unbridged()) UnsafeAttr(atLoc, range, isAlways);
+}
+
+BridgedCalledAttr
+BridgedCalledAttr_createParsed(BridgedASTContext cContext, SourceLoc atLoc,
+                               SourceRange range,
+                               swift::ExecutionSemantics semantics) {
+  return new (cContext.unbridged()) CalledAttr(atLoc, range, semantics);
 }

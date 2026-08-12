@@ -182,7 +182,7 @@ bb0(%0 : $SinglePayloadNontrivial):
   return %v : $()
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @single_payload_nontrivial_copy_destroy(i64 %0)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @single_payload_nontrivial_copy_destroy(ptr %0)
 // CHECK:      call void @"$s20enum_value_semantics23SinglePayloadNontrivialOWOy"
 // CHECK-NEXT: call swiftcc void @single_payload_nontrivial_user
 // CHECK-NEXT: call void @"$s20enum_value_semantics23SinglePayloadNontrivialOWOe"
@@ -262,8 +262,9 @@ bb0(%0 : $SinglePayloadNontrivial):
 
 // -- SinglePayloadNontrivial destroyBuffer
 // CHECK: define internal void @"$s20enum_value_semantics23SinglePayloadNontrivialOwxx"(ptr noalias [[OBJ:%.*]], ptr %SinglePayloadNontrivial) {{.*}} {
-// CHECK: [[PAYLOAD:%.*]] = load i64, ptr [[OBJ]], align 8
-// CHECK-NEXT: switch i64 %0, label %[[RELEASE_PAYLOAD:[0-9]+]] [
+// CHECK: [[PAYLOAD:%.*]] = load ptr, ptr [[OBJ]], align 8
+// CHECK-NEXT: [[PAYLOAD_INT:%.*]] = ptrtoint ptr [[PAYLOAD]] to i64
+// CHECK-NEXT: switch i64 [[PAYLOAD_INT]], label %[[RELEASE_PAYLOAD:[0-9]+]] [
 // CHECK:        i64 0, label %[[DONE:[0-9]+]]
 // CHECK-native:      i64 1, label %[[DONE]]
 // CHECK-native:      i64 2, label %[[DONE]]

@@ -321,6 +321,23 @@ static bool isSendableFunctionType(EitherFunctionType eitherFnTy) {
   }
 }
 
+static bool isCalledOnceFunctionType(EitherFunctionType eitherFnTy) {
+  if (auto fnTy = eitherFnTy.dyn_cast<const AnyFunctionType *>()) {
+    return fnTy->isCalledOnce();
+  }
+
+  auto silFnTy = cast<const SILFunctionType *>(eitherFnTy);
+  return silFnTy->isCalledOnce();
+}
+
+/// Whether the given function type conforms to Copyable.
+static bool isCopyableFunctionType(EitherFunctionType eitherFnTy) {
+  if (isCalledOnceFunctionType(eitherFnTy))
+    return false;
+
+  return true;
+}
+
 /// Whether the given function type conforms to Escapable.
 static bool isEscapableFunctionType(EitherFunctionType eitherFnTy) {
   if (auto silFnTy = eitherFnTy.dyn_cast<const SILFunctionType *>()) {
@@ -337,6 +354,9 @@ static bool isEscapableFunctionType(EitherFunctionType eitherFnTy) {
 }
 
 static bool isBitwiseCopyableFunctionType(EitherFunctionType eitherFnTy) {
+  if (isCalledOnceFunctionType(eitherFnTy))
+    return false;
+
   SILFunctionTypeRepresentation representation;
   if (auto silFnTy = eitherFnTy.dyn_cast<const SILFunctionType *>()) {
     representation = silFnTy->getRepresentation();
@@ -390,7 +410,9 @@ static ProtocolConformanceRef getBuiltinFunctionTypeConformance(
     case KnownProtocolKind::Copyable:
       // Functions cannot permanently destroy a move-only var/let
       // that they capture, so it's safe to copy functions, like classes.
-      return synthesizeConformance();
+      if (isCopyableFunctionType(functionType))
+        return synthesizeConformance();
+      break;
     case KnownProtocolKind::BitwiseCopyable:
       if (isBitwiseCopyableFunctionType(functionType))
         return synthesizeConformance();

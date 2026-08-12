@@ -25,6 +25,7 @@
 #include "clang/AST/Decl.h"
 #include "clang/Lex/MacroInfo.h"
 #include "clang/Lex/Preprocessor.h"
+#include "llvm/ADT/StringSwitch.h"
 
 #include "llvm/ADT/Statistic.h"
 #define DEBUG_TYPE "Enum Info"
@@ -125,18 +126,15 @@ void EnumInfo::classifyEnum(const clang::EnumDecl *decl,
   // only.
   auto loc = decl->getBeginLoc();
   if (loc.isMacroID()) {
-    StringRef MacroName = pp.getImmediateMacroName(loc);
-    if (MacroName == "CF_ENUM" || MacroName == "__CF_NAMED_ENUM" ||
-        MacroName == "OBJC_ENUM" || MacroName == "SWIFT_ENUM" ||
-        MacroName == "SWIFT_ENUM_NAMED") {
-      kind = EnumKind::NonFrozenEnum;
+    kind = llvm::StringSwitch<EnumKind>(pp.getImmediateMacroName(loc))
+               .Cases({"CF_ENUM", "__CF_NAMED_ENUM", "OBJC_ENUM", "SWIFT_ENUM",
+                       "SWIFT_ENUM_NAMED"},
+                      EnumKind::NonFrozenEnum)
+               .Cases({"CF_OPTIONS", "OBJC_OPTIONS", "SWIFT_OPTIONS"},
+                      EnumKind::Options)
+               .Default(EnumKind::Unknown);
+    if (kind != EnumKind::Unknown)
       return;
-    }
-    if (MacroName == "CF_OPTIONS" || MacroName == "OBJC_OPTIONS" ||
-        MacroName == "SWIFT_OPTIONS") {
-      kind = EnumKind::Options;
-      return;
-    }
   }
 
   // Hardcode a particular annoying case in the OS X headers.
@@ -250,20 +248,6 @@ const clang::Type *importer::getUnderlyingType(const clang::EnumDecl *decl) {
 ImportedType importer::findOptionSetEnum(clang::QualType type,
                                          ClangImporter::Implementation &Impl) {
   auto typedefType = dyn_cast<clang::TypedefType>(type);
-
-  if (Impl.SwiftContext.LangOpts.EnableCXXInterop) {
-    // In C++ interop, a {CF,NS}_OPTIONS type is a Swift-unavailable typedef
-    // paired with an anonymous flag_enum. A typedef that aliases such a type,
-    // possibly through several levels, is itself available in Swift, so look
-    // through the alias chain to the underlying Swift-unavailable CF_OPTIONS
-    // typedef.
-    while (typedefType && !Impl.isUnavailableInSwift(typedefType->getDecl())) {
-      auto underlying =
-          desugarIfElaborated(typedefType->getDecl()->getUnderlyingType());
-      typedefType = dyn_cast<clang::TypedefType>(underlying);
-    }
-  }
-
   if (!typedefType || !Impl.isUnavailableInSwift(typedefType->getDecl()))
     // If this isn't a typedef, or it is a typedef that is available in Swift,
     // then this definitely isn't used for {CF,NS}_OPTIONS.

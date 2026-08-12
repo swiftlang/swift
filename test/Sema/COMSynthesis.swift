@@ -1,6 +1,8 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module-path %t/COM.swiftmodule -module-name COM -enable-experimental-com-interop %S/../Inputs/COM.swift
-// RUN: %target-typecheck-verify-swift -enable-experimental-com-interop -I %t
+// RUN: %target-typecheck-verify-swift -enable-experimental-com-interop -com-interop-model=microsoft -I %t
+
+// Microsoft's COM supplies `IUnknown` as an implicit identity root.
 
 import COM
 
@@ -16,8 +18,12 @@ class CClass1 {
 func com<COMType: IUnknown>(_ interface: COMType) {
 }
 
+func swift<COMType: ISwiftObject>(_ interface: COMType) {
+}
+
 func implicit(_ object: CClass1) {
   com(object)
+  swift(object)
 }
 
 @com

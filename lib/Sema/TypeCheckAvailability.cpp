@@ -847,14 +847,39 @@ static bool fixAvailabilityByNarrowingNearbyVersionCheck(
   if (!Domain.isPlatform())
     return false;
 
+  // Find the innermost enclosing scope that specifies an availability range for
+  // the domain in source. Scopes that don't specify one (such as the
+  // placeholder scopes of declarations in local contexts) are skipped.
+  auto loc = ReferenceRange.Start;
+  if (loc.isInvalid())
+    return false;
+
+  auto *sf =
+      ReferenceDC->getParentModule()->getSourceFileContainingLocation(loc);
+  if (!sf)
+    return false;
+
+  auto *rootScope = AvailabilityScope::getOrBuildForSourceFile(*sf);
+  if (!rootScope)
+    return false;
+
+  llvm::SmallVector<AvailabilityScope *, 8> scopeStack;
+  if (!rootScope->findMostRefinedSubContext(loc, Context, scopeStack))
+    return false;
+
   const AvailabilityScope *scope = nullptr;
-  (void)AvailabilityContext::forLocation(ReferenceRange.Start, ReferenceDC,
-                                         &scope);
+  std::optional<AvailabilityRange> ExplicitAvailability;
+  for (auto candidate : llvm::reverse(scopeStack)) {
+    if (auto range = candidate->getExplicitAvailabilityRange(Domain, Context)) {
+      ExplicitAvailability.emplace(*range);
+      scope = candidate;
+      break;
+    }
+  }
+
   if (!scope)
     return false;
 
-  auto ExplicitAvailability =
-      scope->getExplicitAvailabilityRange(Domain, Context);
   if (ExplicitAvailability && !RequiredAvailability.isAlwaysAvailable() &&
       scope->getReason() != AvailabilityScope::Reason::Root &&
       RequiredAvailability.isContainedIn(*ExplicitAvailability)) {
@@ -1677,8 +1702,9 @@ static void diagnoseIfDeprecated(SourceRange referenceRange,
   auto &ctx = referenceDC->getASTContext();
 
   auto attr = restriction.getAttr();
-  auto domain = attr.getDomain();
-  auto deprecatedRange = attr.getDeprecatedRange(ctx).value();
+  auto domainAndRange = restriction.getDomainAndRange(ctx);
+  auto domain = domainAndRange.getDomain();
+  auto deprecatedRange = domainAndRange.getRange();
   auto message = attr.getMessage();
   auto rawRename = attr.getRename();
   if (message.empty() && rawRename.empty()) {
@@ -1687,7 +1713,7 @@ static void diagnoseIfDeprecated(SourceRange referenceRange,
                   decl, attr.isPlatformSpecific(), domain,
                   deprecatedRange.hasMinimumVersion(), deprecatedRange,
                   /*message*/ StringRef())
-        .highlight(attr.getParsedAttr()->getRange());
+        .highlight(attr.getParsedAttr()->getRangeWithAt());
     return;
   }
 
@@ -1704,7 +1730,7 @@ static void diagnoseIfDeprecated(SourceRange referenceRange,
                   decl, attr.isPlatformSpecific(), domain,
                   deprecatedRange.hasMinimumVersion(), deprecatedRange,
                   EncodedMessage.Message)
-        .highlight(attr.getParsedAttr()->getRange());
+        .highlight(attr.getParsedAttr()->getRangeWithAt());
   } else {
     unsigned rawReplaceKind = static_cast<unsigned>(
         replacementDeclKind.value_or(ReplacementDeclKind::None));
@@ -1713,7 +1739,7 @@ static void diagnoseIfDeprecated(SourceRange referenceRange,
                   decl, attr.isPlatformSpecific(), domain,
                   deprecatedRange.hasMinimumVersion(), deprecatedRange,
                   replacementDeclKind.has_value(), rawReplaceKind, newName)
-        .highlight(attr.getParsedAttr()->getRange());
+        .highlight(attr.getParsedAttr()->getRangeWithAt());
   }
 
   if (!rawRename.empty() && !isa<AccessorDecl>(decl)) {
@@ -1741,8 +1767,9 @@ static bool diagnoseIfDeprecated(SourceLoc loc,
   auto proto = rootConf->getProtocol()->getDeclaredInterfaceType();
 
   auto attr = restriction.getAttr();
-  auto domain = attr.getDomain();
-  auto deprecatedRange = attr.getDeprecatedRange(ctx).value();
+  auto domainAndRange = restriction.getDomainAndRange(ctx);
+  auto domain = domainAndRange.getDomain();
+  auto deprecatedRange = domainAndRange.getRange();
   auto message = attr.getMessage();
   if (message.empty()) {
     ctx.Diags
@@ -1750,7 +1777,7 @@ static bool diagnoseIfDeprecated(SourceLoc loc,
                   attr.isPlatformSpecific(), domain,
                   deprecatedRange.hasMinimumVersion(), deprecatedRange,
                   /*message*/ StringRef())
-        .highlight(attr.getParsedAttr()->getRange());
+        .highlight(attr.getParsedAttr()->getRangeWithAt());
     return true;
   }
 
@@ -1760,7 +1787,7 @@ static bool diagnoseIfDeprecated(SourceLoc loc,
                 attr.isPlatformSpecific(), domain,
                 deprecatedRange.hasMinimumVersion(), deprecatedRange,
                 encodedMessage.Message)
-      .highlight(attr.getParsedAttr()->getRange());
+      .highlight(attr.getParsedAttr()->getRangeWithAt());
   return true;
 }
 
@@ -1896,7 +1923,7 @@ bool diagnoseExplicitUnavailability(SourceLoc loc,
     diags
         .diagnose(ext, diag::conformance_availability_marked_unavailable, type,
                   proto)
-        .highlight(attr.getParsedAttr()->getRange());
+        .highlight(attr.getParsedAttr()->getRangeWithAt());
     break;
   case AvailabilityRestriction::Reason::UnavailableUnintroduced:
     diags.diagnose(ext, diag::conformance_availability_introduced_in_version,
@@ -1907,7 +1934,7 @@ bool diagnoseExplicitUnavailability(SourceLoc loc,
     diags
         .diagnose(ext, diag::conformance_availability_obsoleted, type, proto,
                   domainAndRange.getDomain(), domainAndRange.getRange())
-        .highlight(attr.getParsedAttr()->getRange());
+        .highlight(attr.getParsedAttr()->getRangeWithAt());
     break;
   case AvailabilityRestriction::Reason::Unintroduced:
   case AvailabilityRestriction::Reason::Deprecated:
@@ -2252,7 +2279,7 @@ bool diagnoseExplicitUnavailability(
         .limitBehavior(limit);
   }
 
-  auto sourceRange = Attr.getParsedAttr()->getRange();
+  auto sourceRange = Attr.getParsedAttr()->getRangeWithAt();
   switch (restriction.getReason()) {
   case AvailabilityRestriction::Reason::UnavailableUnconditionally:
     diags.diagnose(D, diag::availability_marked_unavailable, D)

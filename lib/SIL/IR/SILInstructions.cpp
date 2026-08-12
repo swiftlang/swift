@@ -436,9 +436,11 @@ SILType AllocBoxInst::getAddressType() const {
 }
 
 DebugValueInst::DebugValueInst(
-    SILDebugLocation DebugLoc, SILValue Operand, SILDebugVariable Var,
-    UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo, bool trace, bool prependDeref)
-    : UnaryInstructionBase(DebugLoc, Operand),
+    SILDebugLocation DebugLoc, ArrayRef<SILValue> Operands, SILModule &M,
+    SILDebugVariable Var,
+    UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo, bool trace,
+    bool prependDeref)
+    : InstructionBaseWithTrailingOperands(Operands, DebugLoc),
       SILDebugVariableSupplement(Var.DIExpr.getNumElements(),
                                  Var.Type.has_value(), Var.Loc.has_value(),
                                  Var.Scope),
@@ -446,16 +448,19 @@ DebugValueInst::DebugValueInst(
               getTrailingObjects<SILLocation>(),
               getTrailingObjects<const SILDebugScope *>(),
               getTrailingObjects<SILDIExprElement>()) {
-  if (usesMoveableValueDebugInfo || Operand->getType().isMoveOnly())
+  if (usesMoveableValueDebugInfo ||
+      llvm::any_of(Operands, [](SILValue op) {
+        return op->getType().isMoveOnly();
+      }))
     setUsesMoveableValueDebugInfo();
   setTrace(trace);
   if (prependDeref)
-    this->prependDeref();
+    this->prependDeref(0);
 }
 
 DebugValueInst *DebugValueInst::create(SILDebugLocation DebugLoc,
-                                       SILValue Operand, SILModule &M,
-                                       SILDebugVariable Var,
+                                       ArrayRef<SILValue> Operands,
+                                       SILModule &M, SILDebugVariable Var,
                                        UsesMoveableValueDebugInfo_t wasMoved,
                                        bool trace) {
   // Don't store the same information twice.
@@ -463,7 +468,8 @@ DebugValueInst *DebugValueInst::create(SILDebugLocation DebugLoc,
     Var.Loc = {};
   if (Var.Scope == DebugLoc.getScope())
     Var.Scope = nullptr;
-  if (Var.Type == Operand->getType().getObjectType() &&
+  if (Operands.size() == 1 &&
+      Var.Type == Operands[0]->getType().getObjectType() &&
       !Var.DIExpr.getFragmentPart())
     Var.Type = {};
   // Use the prependDeref bit rather than storing it in the DIExpr.
@@ -471,27 +477,29 @@ DebugValueInst *DebugValueInst::create(SILDebugLocation DebugLoc,
   if (prependDeref) {
     Var.DIExpr.eraseElement(Var.DIExpr.element_begin());
   }
-  void *buf = allocateDebugVarCarryingInst<DebugValueInst>(M, Var);
+  void *buf = allocateDebugVarCarryingInst<DebugValueInst>(M, Var, Operands);
   return ::new (buf)
-    DebugValueInst(DebugLoc, Operand, Var, wasMoved, trace, prependDeref);
+    DebugValueInst(DebugLoc, Operands, M, Var, wasMoved, trace, prependDeref);
 }
 
-void DebugValueInst::prependDeref() {
+void DebugValueInst::prependDeref(unsigned operandIdx) {
+  SILValue operand = getAllOperands()[operandIdx].get();
   if (!ReconstructionBlock) {
     ASSERT(!hasDeref() && "Debug value cannot have two derefs!");
     sharedUInt8().DebugValueInst.prependDeref = true;
     return;
   }
+
   // If we have an undef, the reconstruction block shouldn't have an argument.
   // Nothing to do.
-  if (isa<SILUndef>(getOperand()))
+  if (isa<SILUndef>(operand))
     return;
 
   // If the type is address-only (not loadable or opaque), we cannot insert
   // a load into the reconstruction block. Kill the operand instead.
-  SILArgument *oldArg = ReconstructionBlock->getArgument(0);
+  SILArgument *oldArg = ReconstructionBlock->getArgument(operandIdx);
   if (!oldArg->getType().isLoadableOrOpaque(*getFunction()))
-    return killOperand();
+    return killOperand(operandIdx);
 
   // If we have a reconstruction block, add a load at the beginning.
   SILBuilder builder(ReconstructionBlock->begin());
@@ -501,7 +509,7 @@ void DebugValueInst::prependDeref() {
                                       LoadOwnershipQualifier::Unqualified);
   oldArg->replaceAllUsesWith(load);
   SILArgument *newArg =
-      ReconstructionBlock->replacePhiArgument(0, addrType, OwnershipKind::None);
+      ReconstructionBlock->replacePhiArgument(operandIdx, addrType, OwnershipKind::None);
   load->setOperand(newArg);
 }
 
@@ -518,11 +526,12 @@ void DebugValueInst::convertDerefToLoad() {
   sharedUInt8().DebugValueInst.prependDeref = false;
 }
 
-void DebugValueInst::stripDeref() {
+void DebugValueInst::stripDeref(unsigned operandIdx) {
+  SILValue operand = getAllOperands()[operandIdx].get();
   // If we have an undef, nothing to do.
-  if (isa<SILUndef>(getOperand()))
+  if (isa<SILUndef>(operand))
     return;
-  ASSERT(getOperand()->getType().isLoadableOrOpaque(*getFunction()) &&
+  ASSERT(operand->getType().isLoadableOrOpaque(*getFunction()) &&
          "cannot strip deref for address-only types");
   if (!ReconstructionBlock) {
     ASSERT(hasDeref() && "Cannot strip deref without one!");
@@ -532,7 +541,7 @@ void DebugValueInst::stripDeref() {
 
   // Replace all uses of the operand with undef.
   // Load users are salvaged to use the direct value.
-  SILArgument *oldArg = ReconstructionBlock->getArgument(0);
+  SILArgument *oldArg = ReconstructionBlock->getArgument(operandIdx);
   SILType objType = oldArg->getType().getObjectType();
   SILValue undefAddr = SILUndef::get(oldArg);
   SmallVector<LoadInst *, 16> loads;
@@ -548,11 +557,11 @@ void DebugValueInst::stripDeref() {
 
   // If there are no loads, this operand is no longer used. Kill it.
   if (loads.empty())
-    return killOperand();
+    return killOperand(operandIdx);
 
   // Otherwise, replace the arguments and all uses
   SILArgument *newArg =
-      ReconstructionBlock->replacePhiArgument(0, objType, OwnershipKind::None);
+      ReconstructionBlock->replacePhiArgument(operandIdx, objType, OwnershipKind::None);
 
   for (LoadInst *load : loads) {
     load->replaceAllUsesWith(newArg);
@@ -568,7 +577,7 @@ SILBasicBlock *DebugValueInst::getOrCreateDebugReconstructionBlock() {
   auto *block = getFunction()->createEmptyDebugReconstructionBlock();
   SILBuilder builder(block);
 
-  SILValue operand = getOperand();
+  SILValue operand = getSingleOperand();
   bool addressOnly = !operand->getType().isLoadableOrOpaque(*getFunction());
   SILValue retVal;
   if (isa<SILUndef>(operand)) {
@@ -599,28 +608,40 @@ SILBasicBlock *DebugValueInst::getOrCreateDebugReconstructionBlock() {
   return block;
 }
 
-void DebugValueInst::cloneReconstructionBlockFrom(DebugValueInst *src) {
-  auto *srcBB = src->getDebugReconstructionBlock();
-  if (!srcBB)
-    return;
-  auto *newBB = getFunction()->createEmptyDebugReconstructionBlock();
-  setDebugReconstructionBlock(newBB);
-  DebugBasicBlockCloner(*getFunction()).clone(srcBB, newBB);
+void DebugValueInst::setDebugReconstructionBlock(SILBasicBlock *BB) {
+  // Free the existing reconstruction block if we have one.
+  if (ReconstructionBlock)
+    ReconstructionBlock->~SILBasicBlock();
+  ReconstructionBlock = BB;
 }
 
-void DebugValueInst::killOperand(SILType operandType) {
-  if (isa<SILUndef>(getOperand())) {
+void DebugValueInst::cloneReconstructionBlockFrom(DebugValueInst *src) {
+  auto *srcBB = src->getDebugReconstructionBlock();
+  if (!srcBB) {
+    setDebugReconstructionBlock(nullptr);
+    return;
+  }
+  auto *newBB = getFunction()->createEmptyDebugReconstructionBlock();
+  setDebugReconstructionBlock(newBB);
+  DebugBasicBlockCloner(*getFunction())
+    .cloneDebugReconstructionBlockContent(srcBB, newBB);
+}
+
+void DebugValueInst::killOperand(unsigned operandIdx, SILType operandType) {
+  Operand &operandRef = getAllOperands()[operandIdx];
+  SILValue operand = operandRef.get();
+  if (isa<SILUndef>(operand)) {
     // Already undef: no operand to kill.
     return;
   }
 
-  SILType origType = operandType ? operandType : getOperand()->getType();
+  SILType origType = operandType ? operandType : operand->getType();
 
   // Non-undef debug_values on alloc_box are allowed and fixed by IRGen to
   // refer to the project_box. Undef debug_values, however, should always
   // have the type of the variable.
   if (!operandType)
-    if (auto *abi = dyn_cast<AllocBoxInst>(getOperand()))
+    if (auto *abi = dyn_cast<AllocBoxInst>(operand))
       origType = abi->getAddressType().getObjectType();
 
   bool addressOnly = !origType.isLoadableOrOpaque(*getFunction());
@@ -630,7 +651,7 @@ void DebugValueInst::killOperand(SILType operandType) {
   SILValue undef =
       SILUndef::get(getFunction(), addressOnly ? origType.getAddressType()
                                                : origType.getObjectType());
-  setOperand(undef);
+  operandRef.set(undef);
 
   // Strip prependDeref (unless address-only).
   // The stored DIExpr only contains fragments, which we want to keep.
@@ -640,10 +661,14 @@ void DebugValueInst::killOperand(SILType operandType) {
   // Rather than completely removing the debug reconstruction block, remove its
   // argument, as a part of the variable might be constant and recoverable.
   if (auto bb = getDebugReconstructionBlock()) {
-    ASSERT(bb->getNumArguments() == 1);
-    auto argument = bb->getArgument(0);
+    ASSERT(operandIdx < bb->getNumArguments());
+    ASSERT(bb->getNumArguments() == 1 && "Multi operand support not ready");
+    auto argument = bb->getArgument(operandIdx);
     argument->replaceAllUsesWithUndef();
-    bb->eraseArgument(0);
+    // FIXME: For correct multi operand support, the operand must also be
+    // removed from the debug_value instruction's operand list, or the
+    // indices will not match.
+    bb->eraseArgument(operandIdx);
   }
 }
 
@@ -653,11 +678,15 @@ SILType DebugValueInst::getVarType() const {
   if (auto *debugBB = getDebugReconstructionBlock())
     return cast<ReturnInst>(debugBB->getTerminator())
         ->getOperand()->getType().getObjectType();
-  return getOperand()->getType().getObjectType();
+  return getSingleOperand()->getType().getObjectType();
 }
 
 bool DebugValueInst::isExprTypeValid() const {
   auto varInfo = getCompleteVarInfo();
+
+  // TODO: Multiple operands are not yet supported.
+  if (getAllOperands().size() != 1)
+    return false;
 
   // Ignore trace debug values.
   if (hasTrace())
@@ -667,11 +696,12 @@ bool DebugValueInst::isExprTypeValid() const {
   if (!F)
     return false;
 
-  SILType valueType = getOperand()->getType();
+  SILValue operand = getSingleOperand();
+  SILType valueType = operand->getType();
 
   // Special case: a DebugValueInst with an alloc_box operand is equivalent to
   // the alloc_box.
-  if (auto *box = dyn_cast<AllocBoxInst>(getOperand()))
+  if (auto *box = dyn_cast<AllocBoxInst>(operand))
     if (varInfo.DIExpr.elements().empty() &&
         getDebugReconstructionBlock() == nullptr &&
         varInfo.Type == box->getAddressType().getObjectType())
@@ -848,7 +878,7 @@ ApplyInst::ApplyInst(SILDebugLocation loc, SILValue callee,
 ApplyInst *
 ApplyInst::create(SILDebugLocation loc, SILValue callee, SubstitutionMap subs,
                   ArrayRef<SILValue> args, ApplyOptions options,
-                  std::optional<SILModuleConventions> moduleConventions,
+                  std::optional<SILAddressConventions> moduleConventions,
                   SILFunction &parentFunction,
                   const GenericSpecializationInformation *specializationInfo,
                   std::optional<ApplyIsolationCrossing> isolationCrossing,
@@ -858,10 +888,14 @@ ApplyInst::create(SILDebugLocation loc, SILValue callee, SubstitutionMap subs,
       parentFunction.getTypeExpansionContext());
   auto substCalleeTy = substCalleeSILTy.getAs<SILFunctionType>();
 
+  // The result type is in address form iff this call site is lowered:
+  // AddressLowering may force lowered conventions explicitly (before it has set
+  // the function's bit), or the containing function may already be lowered
+  // while the module stage is still Raw.
   SILFunctionConventions conv(
-      substCalleeTy, moduleConventions.has_value()
-                         ? moduleConventions.value()
-                         : SILModuleConventions(parentFunction.getModule()));
+      substCalleeTy,
+      SILAddressConventions::forFunctionWithOverride(
+          parentFunction.getModule(), moduleConventions, &parentFunction));
   SILType result =
       conv.getSILResultType(parentFunction.getTypeExpansionContext());
 
@@ -898,7 +932,7 @@ BeginApplyInst::BeginApplyInst(
 BeginApplyInst *BeginApplyInst::create(
     SILDebugLocation loc, SILValue callee, SubstitutionMap subs,
     ArrayRef<SILValue> args, ApplyOptions options,
-    std::optional<SILModuleConventions> moduleConventions,
+    std::optional<SILAddressConventions> moduleConventions,
     SILFunction &parentFunction,
     const GenericSpecializationInformation *specializationInfo,
     std::optional<ApplyIsolationCrossing> isolationCrossing,
@@ -908,10 +942,14 @@ BeginApplyInst *BeginApplyInst::create(
       parentFunction.getTypeExpansionContext());
   auto substCalleeType = substCalleeSILType.castTo<SILFunctionType>();
 
+  // Keyed to this call site's lowered-addresses state, like ApplyInst::create:
+  // AddressLowering may force lowered conventions explicitly (before it has set
+  // the function's bit), or the containing function may already be lowered
+  // while the module stage is still Raw. Either makes the yields address form.
   SILFunctionConventions conv(
-      substCalleeType, moduleConventions.has_value()
-                           ? moduleConventions.value()
-                           : SILModuleConventions(parentFunction.getModule()));
+      substCalleeType,
+      SILAddressConventions::forFunctionWithOverride(
+          parentFunction.getModule(), moduleConventions, &parentFunction));
 
   SmallVector<SILType, 8> resultTypes;
   SmallVector<ValueOwnershipKind, 8> resultOwnerships;
@@ -921,11 +959,9 @@ BeginApplyInst *BeginApplyInst::create(
         conv.getSILType(yield, parentFunction.getTypeExpansionContext());
     auto argConvention = SILArgumentConvention(yield.getConvention());
     resultTypes.push_back(yieldType);
-    resultOwnerships.push_back(ValueOwnershipKind(
-        parentFunction, yieldType, argConvention,
-        moduleConventions.has_value()
-            ? moduleConventions.value()
-            : SILModuleConventions(parentFunction.getModule())));
+    resultOwnerships.push_back(ValueOwnershipKind(parentFunction, yieldType,
+                                                  argConvention,
+                                                  conv.silConv));
   }
 
   auto tokenTy = SILType::getSILTokenType(parentFunction.getASTContext());
@@ -1026,14 +1062,14 @@ PartialApplyInst *PartialApplyInst::create(
     SubstitutionMap Subs, ParameterConvention calleeConvention,
     SILFunctionTypeIsolation resultIsolation, SILFunction &F,
     const GenericSpecializationInformation *specializationInfo,
-    OnStackKind onStack, StackAllocationIsNested_t isNested,
+    OnStackKind onStack, StackAllocationIsNested_t isNested, bool isCalledOnce,
     std::optional<ArrayRef<SILLocation>> ArgLocs) {
   SILType SubstCalleeTy = Callee->getType().substGenericArgs(
       F.getModule(), Subs, F.getTypeExpansionContext());
 
   SILType ClosureType = SILBuilder::getPartialApplyResultType(
       F.getTypeExpansionContext(), SubstCalleeTy, Args.size(), F.getModule(), {},
-      calleeConvention, resultIsolation, onStack);
+      calleeConvention, resultIsolation, onStack, isCalledOnce);
 
   SmallVector<SILValue, 32> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, F,
@@ -1265,12 +1301,13 @@ SILType DifferentiabilityWitnessFunctionInst::getDifferentiabilityWitnessType(
   auto *parameterIndices = witness->getParameterIndices();
   auto *resultIndices = witness->getResultIndices();
   if (auto derivativeKind = witnessKind.getAsDerivativeFunctionKind()) {
-    bool isReabstractionThunk =
-        witness->getOriginalFunction()->isThunk() == IsReabstractionThunk;
+    auto original = witness->getOriginalFunction();
+    bool isDefaultDerivative = witness->isDefault();
+    bool isReabstractionThunk = original->isThunk() == IsReabstractionThunk;
     auto diffFnTy = fnTy->getAutoDiffDerivativeFunctionType(
         parameterIndices, resultIndices, *derivativeKind, module.Types,
-        LookUpConformanceInModule(), witnessCanGenSig,
-        isReabstractionThunk);
+        LookUpConformanceInModule(), witnessCanGenSig, isReabstractionThunk,
+        CanType(), isDefaultDerivative);
     return SILType::getPrimitiveObjectType(diffFnTy);
   }
   assert(witnessKind == DifferentiabilityWitnessFunctionKind::Transpose);
@@ -3432,10 +3469,9 @@ SILType KeyPathInst::getStaticInstanceClassType() const {
   if (getSubstitutions().getRecursiveProperties().hasArchetype())
     return SILType();
 
-  // Captured operands would require dynamic materialization (indices
-  // copied from arguments).
-  if (!getAllOperands().empty())
-    return SILType();
+  // Captured operands (subscript indices) are fine: the instance can still be
+  // described at compile time, but as a *template* whose argument area IRGen
+  // fills in where the key path is formed.  See `needsRuntimeInstantiation`.
 
   auto *pattern = getPattern();
   if (!pattern)
@@ -3481,15 +3517,45 @@ SILType KeyPathInst::getStaticInstanceClassType() const {
     case KeyPathPatternComponent::Kind::GettableProperty:
     case KeyPathPatternComponent::Kind::SettableProperty:
     case KeyPathPatternComponent::Kind::Method: {
-      // Reject captured subscript indices and external decl references.
-      if (!comp.getArguments().empty() || comp.getExternalDecl())
+      // An external component defers the component's layout to a property
+      // descriptor in the defining module. These don't show up in embedded.
+      if (comp.getExternalDecl())
         return SILType();
-      // Bail on generic accessors — we take their addresses via
-      // `getAddrOfSILFunction`, which doesn't apply substitutions.
       if (comp.getComputedPropertyForGettable()->isGeneric())
         return SILType();
       if (comp.getKind() == KeyPathPatternComponent::Kind::SettableProperty &&
           comp.getComputedPropertyForSettable()->isGeneric())
+        return SILType();
+      // The component's `id` -- the opaque identity the runtime compares in
+      // `==` and `hash(into:)` -- has to be something we can name as a
+      // constant now. A function reference and a class method descriptor both
+      // are. A protocol requirement is not: it resolves to a witness-table
+      // offset when the pattern is instantiated, and a foreign (ObjC) one goes
+      // through a selector reference that dyld fills in.
+      {
+        auto id = comp.getComputedPropertyId();
+        switch (id.getKind()) {
+        case KeyPathPatternComponent::ComputedPropertyId::Function:
+          break;
+        case KeyPathPatternComponent::ComputedPropertyId::DeclRef: {
+          auto declRef = id.getDeclRef();
+          if (declRef.isForeign)
+            return SILType();
+          if (!isa<ClassDecl>(declRef.getDecl()->getDeclContext()))
+            return SILType();
+          break;
+        }
+        case KeyPathPatternComponent::ComputedPropertyId::Property:
+          return SILType();
+        }
+      }
+      // A capturing component also puts the equals/hash thunks in the
+      // argument witness table, so those have to be fully specialized too.
+      // They are generic whenever the pattern's signature is, even when the
+      // captured values themselves are concrete.
+      if (!comp.getArguments().empty() &&
+          (comp.getIndexEquals()->isGeneric() ||
+           comp.getIndexHash()->isGeneric()))
         return SILType();
 
       if (comp.getKind() == KeyPathPatternComponent::Kind::SettableProperty &&
@@ -3504,9 +3570,17 @@ SILType KeyPathInst::getStaticInstanceClassType() const {
       break;
     }
     case KeyPathPatternComponent::Kind::OptionalChain:
-    case KeyPathPatternComponent::Kind::OptionalForce:
     case KeyPathPatternComponent::Kind::OptionalWrap:
-      return SILType();
+      // Chaining and wrapping force the whole key path read-only, matching
+      // `visitOptionalChainComponent` / `visitOptionalWrapComponent` in the
+      // runtime instantiator.
+      keyPathClass = ctx.getKeyPathDecl();
+      break;
+    case KeyPathPatternComponent::Kind::OptionalForce:
+      // Force-unwrapping passes the preceding mutability through; with no
+      // preceding component that is the initial writable capability.
+      keyPathClass = ctx.getWritableKeyPathDecl();
+      break;
     }
     assert(keyPathClass && "unhandled component kind above?");
     auto concreteTy = BoundGenericType::get(keyPathClass,
@@ -3535,8 +3609,11 @@ SILType KeyPathInst::getStaticInstanceClassType() const {
       auto *property = cast<VarDecl>(comp.getStoredPropertyDecl());
       if (property->isLet()) {
         keyPathClass = ctx.getKeyPathDecl();
-      } else if (rootIsClass &&
-                 keyPathClass == ctx.getWritableKeyPathDecl()) {
+      } else if (rootIsClass) {
+        // A mutable class property is a fresh root for reference mutation, so
+        // it promotes regardless of what came before -- a read-only prefix
+        // doesn't stick. Matches `visitStoredComponent` in KeyPath.swift,
+        // which assigns `capability = .reference` unconditionally here.
         keyPathClass = ctx.getReferenceWritableKeyPathDecl();
       }
       break;
@@ -3546,12 +3623,71 @@ SILType KeyPathInst::getStaticInstanceClassType() const {
       // introduce a class boundary either (tuples live inline in their
       // parent).
       break;
-    default:
-      // Computed / method / optional components aren't representable in
-      // an embedded multi-component chain, because the runtime walker
-      // only knows how to advance by a fixed offset or dereference a
-      // class reference.
-      return SILType();
+    case KeyPathPatternComponent::Kind::GettableProperty:
+    case KeyPathPatternComponent::Kind::SettableProperty:
+    case KeyPathPatternComponent::Kind::Method: {
+      // An external component defers the component's layout to a property
+      // descriptor in the defining module. These don't show up in embedded.
+      if (comp.getExternalDecl())
+        return SILType();
+      if (comp.getComputedPropertyForGettable()->isGeneric())
+        return SILType();
+      if (comp.getKind() == KeyPathPatternComponent::Kind::SettableProperty &&
+          comp.getComputedPropertyForSettable()->isGeneric())
+        return SILType();
+      // The component's `id` -- the opaque identity the runtime compares in
+      // `==` and `hash(into:)` -- has to be something we can name as a
+      // constant now. A function reference and a class method descriptor both
+      // are. A protocol requirement is not: it resolves to a witness-table
+      // offset when the pattern is instantiated, and a foreign (ObjC) one goes
+      // through a selector reference that dyld fills in.
+      {
+        auto id = comp.getComputedPropertyId();
+        switch (id.getKind()) {
+        case KeyPathPatternComponent::ComputedPropertyId::Function:
+          break;
+        case KeyPathPatternComponent::ComputedPropertyId::DeclRef: {
+          auto declRef = id.getDeclRef();
+          if (declRef.isForeign)
+            return SILType();
+          if (!isa<ClassDecl>(declRef.getDecl()->getDeclContext()))
+            return SILType();
+          break;
+        }
+        case KeyPathPatternComponent::ComputedPropertyId::Property:
+          return SILType();
+        }
+      }
+
+      // Get-only / method components demote the chain to read-only
+      // `KeyPath`.  Settable-computed intermediates preserve writable
+      // capability via the embedded writeback machinery in
+      // `_projectMutableAddress`:
+      //   * mutating setter (struct default): writable if the base is, so
+      //     leave the capability alone
+      //   * nonmutating setter (class default, or `nonmutating set` on a
+      //     struct): a fresh root for reference mutation, so it promotes
+      //     unconditionally -- a read-only prefix doesn't stick
+      // Matches the `(settable, mutating)` switch in `visitComputedComponent`
+      // in KeyPath.swift.
+      if (comp.getKind() != KeyPathPatternComponent::Kind::SettableProperty) {
+        keyPathClass = ctx.getKeyPathDecl();
+      } else if (!comp.isComputedSettablePropertyMutating()) {
+        keyPathClass = ctx.getReferenceWritableKeyPathDecl();
+      }
+      break;
+    }
+    case KeyPathPatternComponent::Kind::OptionalChain:
+    case KeyPathPatternComponent::Kind::OptionalWrap:
+      // Chaining and wrapping force the whole key path read-only, even if a
+      // later component would otherwise be reference-writable. The demotion is
+      // permanent, because the class-boundary promotion above only fires while
+      // the chain is still `WritableKeyPath`.
+      keyPathClass = ctx.getKeyPathDecl();
+      break;
+    case KeyPathPatternComponent::Kind::OptionalForce:
+      // Force-unwrapping passes the preceding mutability through unchanged.
+      break;
     }
 
     // Advance to the next root type by substituting the pattern

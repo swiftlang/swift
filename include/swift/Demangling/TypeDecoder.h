@@ -334,28 +334,31 @@ class ImplFunctionTypeFlags {
   unsigned Isolation : 2;
   unsigned DifferentiabilityKind : 3;
   unsigned HasSendingResult : 1;
+  unsigned CalledOnce : 1;
 
 public:
   ImplFunctionTypeFlags()
       : Rep(0), Pseudogeneric(0), Escaping(0), Concurrent(0), Async(0),
-        Isolation(0), DifferentiabilityKind(0), HasSendingResult(0) {}
+        Isolation(0), DifferentiabilityKind(0), HasSendingResult(0),
+        CalledOnce(0) {}
 
   ImplFunctionTypeFlags(ImplFunctionRepresentation rep, bool pseudogeneric,
                         bool noescape, bool concurrent, bool async,
                         ImplFunctionIsolation isolation,
                         ImplFunctionDifferentiabilityKind diffKind,
-                        bool hasSendingResult)
+                        bool hasSendingResult, bool calledOnce)
       : Rep(unsigned(rep)), Pseudogeneric(pseudogeneric), Escaping(noescape),
         Concurrent(concurrent), Async(async), Isolation(unsigned(isolation)),
         DifferentiabilityKind(unsigned(diffKind)),
-        HasSendingResult(hasSendingResult) {}
+        HasSendingResult(hasSendingResult), CalledOnce(calledOnce) {}
 
   ImplFunctionTypeFlags
   withRepresentation(ImplFunctionRepresentation rep) const {
-    return ImplFunctionTypeFlags(rep, Pseudogeneric, Escaping, Concurrent,
-                                 Async, ImplFunctionIsolation(Isolation),
-                                 ImplFunctionDifferentiabilityKind(DifferentiabilityKind),
-                                 HasSendingResult);
+    return ImplFunctionTypeFlags(
+        rep, Pseudogeneric, Escaping, Concurrent, Async,
+        ImplFunctionIsolation(Isolation),
+        ImplFunctionDifferentiabilityKind(DifferentiabilityKind),
+        HasSendingResult, CalledOnce);
   }
 
   ImplFunctionTypeFlags
@@ -364,7 +367,7 @@ public:
         ImplFunctionRepresentation(Rep), Pseudogeneric, Escaping, true, Async,
         ImplFunctionIsolation(Isolation),
         ImplFunctionDifferentiabilityKind(DifferentiabilityKind),
-        HasSendingResult);
+        HasSendingResult, CalledOnce);
   }
 
   ImplFunctionTypeFlags
@@ -373,7 +376,7 @@ public:
         ImplFunctionRepresentation(Rep), Pseudogeneric, Escaping, Concurrent,
         true, ImplFunctionIsolation(Isolation),
         ImplFunctionDifferentiabilityKind(DifferentiabilityKind),
-        HasSendingResult);
+        HasSendingResult, CalledOnce);
   }
 
   ImplFunctionTypeFlags
@@ -382,7 +385,7 @@ public:
         ImplFunctionRepresentation(Rep), Pseudogeneric, true, Concurrent, Async,
         ImplFunctionIsolation(Isolation),
         ImplFunctionDifferentiabilityKind(DifferentiabilityKind),
-        HasSendingResult);
+        HasSendingResult, CalledOnce);
   }
 
   ImplFunctionTypeFlags
@@ -391,7 +394,7 @@ public:
         ImplFunctionRepresentation(Rep), Pseudogeneric, Escaping, Concurrent,
         Async, ImplFunctionIsolation::Erased,
         ImplFunctionDifferentiabilityKind(DifferentiabilityKind),
-        HasSendingResult);
+        HasSendingResult, CalledOnce);
   }
 
   ImplFunctionTypeFlags withNonisolatedNonsendingIsolation() const {
@@ -399,7 +402,7 @@ public:
         ImplFunctionRepresentation(Rep), Pseudogeneric, Escaping, Concurrent,
         Async, ImplFunctionIsolation::NonisolatedNonsending,
         ImplFunctionDifferentiabilityKind(DifferentiabilityKind),
-        HasSendingResult);
+        HasSendingResult, CalledOnce);
   }
 
   ImplFunctionTypeFlags
@@ -408,21 +411,31 @@ public:
         ImplFunctionRepresentation(Rep), true, Escaping, Concurrent, Async,
         ImplFunctionIsolation(Isolation),
         ImplFunctionDifferentiabilityKind(DifferentiabilityKind),
-        HasSendingResult);
+        HasSendingResult, CalledOnce);
   }
 
   ImplFunctionTypeFlags
   withDifferentiabilityKind(ImplFunctionDifferentiabilityKind diffKind) const {
-    return ImplFunctionTypeFlags(
-        ImplFunctionRepresentation(Rep), Pseudogeneric, Escaping, Concurrent,
-        Async, ImplFunctionIsolation(Isolation), diffKind, HasSendingResult);
+    return ImplFunctionTypeFlags(ImplFunctionRepresentation(Rep), Pseudogeneric,
+                                 Escaping, Concurrent, Async,
+                                 ImplFunctionIsolation(Isolation), diffKind,
+                                 HasSendingResult, CalledOnce);
   }
 
   ImplFunctionTypeFlags withSendingResult() const {
     return ImplFunctionTypeFlags(
         ImplFunctionRepresentation(Rep), Pseudogeneric, Escaping, Concurrent,
         Async, ImplFunctionIsolation(Isolation),
-        ImplFunctionDifferentiabilityKind(DifferentiabilityKind), true);
+        ImplFunctionDifferentiabilityKind(DifferentiabilityKind), true,
+        CalledOnce);
+  }
+
+  ImplFunctionTypeFlags withCalledOnce() const {
+    return ImplFunctionTypeFlags(
+        ImplFunctionRepresentation(Rep), Pseudogeneric, Escaping, Concurrent,
+        Async, ImplFunctionIsolation(Isolation),
+        ImplFunctionDifferentiabilityKind(DifferentiabilityKind),
+        HasSendingResult, /*CalledOnce=*/true);
   }
 
   ImplFunctionRepresentation getRepresentation() const {
@@ -446,6 +459,8 @@ public:
   }
 
   bool hasSendingResult() const { return HasSendingResult; }
+
+  bool isCalledOnce() const { return CalledOnce; }
 
   bool isDifferentiable() const {
     return getDifferentiabilityKind() !=
@@ -773,19 +788,24 @@ protected:
                                              typeAlias))
         return *error;
 
-      // Reject ill-formed manglings that bind a concrete integer value to a
-      // generic parameter that is not a value parameter (e.g. `Optional<99>`).
-      // This prevents the integer value from being interpreted as a metadata
-      // pointer and crashing.
+      // Reject ill-formed manglings that bind an argument of one sort to a
+      // generic parameter of the other, in either direction. The runtime
+      // represents a metadata pointer and an integer value as one punned word,
+      // so neither confusion is caught without an explicit check.
       auto genericArgsList = Node->getChild(1);
-      for (unsigned i = 0, e = genericArgsList->getNumChildren(); i != e; ++i) {
-        if (!isConcreteIntegerValue(genericArgsList->getChild(i)))
-          continue;
-        auto isValueParam = Builder.isValueGenericParameter(typeDecl, i);
-        if (isValueParam && !*isValueParam)
+      unsigned numArgs = genericArgsList->getNumChildren();
+      auto valueParamFlags =
+          Builder.getValueGenericParameterFlags(typeDecl, numArgs);
+      for (unsigned i = 0, e = valueParamFlags.size(); i != e; ++i) {
+        auto argNode = genericArgsList->getChild(i);
+        if (valueParamFlags[i]) {
+          if (!isValueGenericArgument(argNode))
+            return MAKE_NODE_TYPE_ERROR0(
+                argNode, "type bound to a value generic parameter");
+        } else if (isConcreteIntegerValue(argNode)) {
           return MAKE_NODE_TYPE_ERROR0(
-              genericArgsList->getChild(i),
-              "integer value bound to non-value generic parameter");
+              argNode, "integer value bound to non-value generic parameter");
+        }
       }
 
       return Builder.createBoundGenericType(typeDecl, args, parent);
@@ -1008,6 +1028,7 @@ protected:
     case NodeKind::NoEscapeFunctionType:
     case NodeKind::AutoClosureType:
     case NodeKind::EscapingAutoClosureType:
+    case NodeKind::CalledOnceFunctionType:
     case NodeKind::FunctionType: {
       if (Node->getNumChildren() < 2)
         return MAKE_NODE_TYPE_ERROR(Node,
@@ -1155,6 +1176,9 @@ protected:
                           Node->getKind() == NodeKind::EscapingAutoClosureType ||
                           Node->getKind() == NodeKind::EscapingObjCBlock);
 
+      extFlags = extFlags.withCalledOnce(Node->getKind() ==
+                                         NodeKind::CalledOnceFunctionType);
+
       auto result =
           decodeMangledType(Node->getChild(firstChildIdx + 1), depth + 1,
                             /*forRequirement=*/false);
@@ -1255,6 +1279,8 @@ protected:
           flags = flags.withNonisolatedNonsendingIsolation();
         } else if (child->getKind() == NodeKind::ImplErasedIsolation) {
           flags = flags.withErasedIsolation();
+        } else if (child->getKind() == NodeKind::ImplCalledOnceFunction) {
+          flags = flags.withCalledOnce();
         } else if (child->getKind() == NodeKind::ImplParameter) {
           if (decodeImplFunctionParam(child, depth + 1, parameters))
             return MAKE_NODE_TYPE_ERROR0(child,
@@ -1712,6 +1738,14 @@ protected:
                                     "fewer children (%zu) than required (2)",
                                     Node->getNumChildren());
       }
+
+      if (!isValueGenericArgument(Node->getChild(0)))
+        return MAKE_NODE_TYPE_ERROR0(
+            Node->getChild(0),
+            "type where a Builtin.FixedArray count is required");
+
+      // A count of zero and an unresolved count are both represented by a null,
+      // so the count gets no further check.
       auto size = decodeMangledGenericArgument(Node->getChild(0), depth + 1);
       if (size.isError())
         return size;
@@ -1719,6 +1753,13 @@ protected:
       auto element = decodeMangledType(Node->getChild(1), depth + 1);
       if (element.isError())
         return element;
+
+      // A dependent generic parameter with nothing to substitute it with
+      // decodes to a null type.
+      if (!element.getType())
+        return MAKE_NODE_TYPE_ERROR0(
+            Node->getChild(1),
+            "unresolved Builtin.FixedArray element type");
 
       return Builder.createBuiltinFixedArrayType(size.getType(),
                                                  element.getType());
@@ -1932,6 +1973,23 @@ private:
       node = node->getChild(0);
     return node->getKind() == NodeKind::Integer ||
            node->getKind() == NodeKind::NegativeInteger;
+  }
+
+  /// Whether \p node (after unwrapping a \c Type node) is well-formed in a
+  /// value generic parameter position: either a literal integer, or a
+  /// dependent generic parameter reference, which is how a value parameter is
+  /// spelled before substitution.
+  static bool isValueGenericArgument(Demangle::NodePointer node) {
+    if (node->getKind() == NodeKind::Type && node->getNumChildren() == 1)
+      node = node->getChild(0);
+    switch (node->getKind()) {
+    case NodeKind::Integer:
+    case NodeKind::NegativeInteger:
+    case NodeKind::DependentGenericParamType:
+      return true;
+    default:
+      return false;
+    }
   }
 
   std::optional<TypeLookupError>

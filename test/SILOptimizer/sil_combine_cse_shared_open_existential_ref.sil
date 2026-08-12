@@ -161,31 +161,31 @@ bb0(%88 : @owned $View, %77 : @owned $Bar):
   %89 = init_existential_ref %88 : $View : $View, $any Designable
   %90 = begin_borrow [lexical] %89
   %91 = begin_borrow [lexical] %77
-  %94 = open_existential_ref %90 to $@opened("5AA778F6-7F99-11F1-B981-5BD94FC553CE", any Designable) Self
-  %95 = witness_method $@opened("5AA778F6-7F99-11F1-B981-5BD94FC553CE", any Designable) Self, #Designable.predefinedGradient!getter, %94 : $@opened("5AA778F6-7F99-11F1-B981-5BD94FC553CE", any Designable) Self : $@convention(witness_method: Designable) <τ_0_0 where τ_0_0 : Designable> (@guaranteed τ_0_0) -> Optional<GradientType>
-  %96 = apply %95<@opened("5AA778F6-7F99-11F1-B981-5BD94FC553CE", any Designable) Self>(%94) : $@convention(witness_method: Designable) <τ_0_0 where τ_0_0 : Designable> (@guaranteed τ_0_0) -> Optional<GradientType>
+  %94 = open_existential_ref %90 to $@opened(1, any Designable) Self
+  %95 = witness_method $@opened(1, any Designable) Self, #Designable.predefinedGradient!getter, %94 : $@opened(1, any Designable) Self : $@convention(witness_method: Designable) <τ_0_0 where τ_0_0 : Designable> (@guaranteed τ_0_0) -> Optional<GradientType>
+  %96 = apply %95<@opened(1, any Designable) Self>(%94) : $@convention(witness_method: Designable) <τ_0_0 where τ_0_0 : Designable> (@guaranteed τ_0_0) -> Optional<GradientType>
   %97 = upcast %91 to $Base
   %100 = ref_element_addr %97, #Base.predefinedGradient
   %101 = begin_access [modify] [dynamic] [no_nested_conflict] %100
   store %96 to [trivial] %101
   end_access %101
-  %94b = open_existential_ref %90 to $@opened("5AA778F6-7F99-11F1-B981-5BD94FC553CF", any Designable) Self
-  %104 = witness_method $@opened("5AA778F6-7F99-11F1-B981-5BD94FC553CF", any Designable) Self, #Designable.startColor!getter, %94b : $@opened("5AA778F6-7F99-11F1-B981-5BD94FC553CF", any Designable) Self : $@convention(witness_method: Designable) <τ_0_0 where τ_0_0 : Designable> (@guaranteed τ_0_0) -> Optional<Int>
-  %105 = apply %104<@opened("5AA778F6-7F99-11F1-B981-5BD94FC553CF", any Designable) Self>(%94b) : $@convention(witness_method: Designable) <τ_0_0 where τ_0_0 : Designable> (@guaranteed τ_0_0) -> Optional<Int>
+  %94b = open_existential_ref %90 to $@opened(2, any Designable) Self
+  %104 = witness_method $@opened(2, any Designable) Self, #Designable.startColor!getter, %94b : $@opened(2, any Designable) Self : $@convention(witness_method: Designable) <τ_0_0 where τ_0_0 : Designable> (@guaranteed τ_0_0) -> Optional<Int>
+  %105 = apply %104<@opened(2, any Designable) Self>(%94b) : $@convention(witness_method: Designable) <τ_0_0 where τ_0_0 : Designable> (@guaranteed τ_0_0) -> Optional<Int>
   %108 = ref_element_addr %91, #Bar.startColor
   %109 = begin_access [modify] [dynamic] [no_nested_conflict] %108
   store %105 to [trivial] %109
   end_access %109
-  %94c = open_existential_ref %90 to $@opened("5AA778F6-7F99-11F1-B981-5BD94FC553D0", any Designable) Self
-  %112 = witness_method $@opened("5AA778F6-7F99-11F1-B981-5BD94FC553D0", any Designable) Self, #Designable.endColor!getter, %94c : $@opened("5AA778F6-7F99-11F1-B981-5BD94FC553D0", any Designable) Self : $@convention(witness_method: Designable) <τ_0_0 where τ_0_0 : Designable> (@guaranteed τ_0_0) -> Optional<Int>
-  %113 = apply %112<@opened("5AA778F6-7F99-11F1-B981-5BD94FC553D0", any Designable) Self>(%94c) : $@convention(witness_method: Designable) <τ_0_0 where τ_0_0 : Designable> (@guaranteed τ_0_0) -> Optional<Int>
+  %94c = open_existential_ref %90 to $@opened(3, any Designable) Self
+  %112 = witness_method $@opened(3, any Designable) Self, #Designable.endColor!getter, %94c : $@opened(3, any Designable) Self : $@convention(witness_method: Designable) <τ_0_0 where τ_0_0 : Designable> (@guaranteed τ_0_0) -> Optional<Int>
+  %113 = apply %112<@opened(3, any Designable) Self>(%94c) : $@convention(witness_method: Designable) <τ_0_0 where τ_0_0 : Designable> (@guaranteed τ_0_0) -> Optional<Int>
   %116 = ref_element_addr %91, #Bar.endColor
   %117 = begin_access [modify] [dynamic] [no_nested_conflict] %116
   store %113 to [trivial] %117
   end_access %117
-  %94d = open_existential_ref %90 to $@opened("5AA778F6-7F99-11F1-B981-5BD94FC553D1", any Designable) Self
-  %120 = witness_method $@opened("5AA778F6-7F99-11F1-B981-5BD94FC553D1", any Designable) Self, #Designable.startPoint!getter, %94d : $@opened("5AA778F6-7F99-11F1-B981-5BD94FC553D1", any Designable) Self : $@convention(witness_method: Designable) <τ_0_0 where τ_0_0 : Designable> (@guaranteed τ_0_0) -> GradientStartPoint
-  %121 = apply %120<@opened("5AA778F6-7F99-11F1-B981-5BD94FC553D1", any Designable) Self>(%94d) : $@convention(witness_method: Designable) <τ_0_0 where τ_0_0 : Designable> (@guaranteed τ_0_0) -> GradientStartPoint
+  %94d = open_existential_ref %90 to $@opened(4, any Designable) Self
+  %120 = witness_method $@opened(4, any Designable) Self, #Designable.startPoint!getter, %94d : $@opened(4, any Designable) Self : $@convention(witness_method: Designable) <τ_0_0 where τ_0_0 : Designable> (@guaranteed τ_0_0) -> GradientStartPoint
+  %121 = apply %120<@opened(4, any Designable) Self>(%94d) : $@convention(witness_method: Designable) <τ_0_0 where τ_0_0 : Designable> (@guaranteed τ_0_0) -> GradientStartPoint
   %124 = ref_element_addr %91, #Bar.startPoint
   %125 = begin_access [modify] [dynamic] [no_nested_conflict] %124
   store %121 to [trivial] %125
@@ -222,24 +222,205 @@ class LeafNode : Taggable {}
 
 sil @genericTake : $@convention(thin) <T where T : Taggable> (@guaranteed T) -> ()
 sil @genericPush : $@convention(thin) <T where T : Taggable> (@guaranteed T) -> ()
+sil @genericConsume : $@convention(thin) <T where T : Taggable> (@owned T) -> ()
 
 // CHECK-LABEL: sil [ossa] @siblingGenericApplies :
-// CHECK-NOT: open_existential_ref
+// CHECK: [[EXIST:%.*]] = open_existential_ref
+// CHECK: [[BORROW1:%.*]] = begin_borrow [[EXIST]]
+// CHECK: [[CAST1:%.*]] = unchecked_ref_cast [[BORROW1]]{{.*}}to $LeafNode
+// CHECK: [[BORROW2:%.*]] = begin_borrow [[EXIST]]
+// CHECK: [[CAST2:%.*]] = unchecked_ref_cast [[BORROW2]]{{.*}}to $LeafNode
 // CHECK: function_ref @genericTake
-// CHECK: apply {{%[0-9]+}}<LeafNode>(%0)
+// CHECK: apply {{%[0-9]+}}<LeafNode>([[CAST2]])
 // CHECK: function_ref @genericPush
-// CHECK: apply {{%[0-9]+}}<LeafNode>(%0)
-// CHECK-NOT: open_existential_ref
+// CHECK: apply {{%[0-9]+}}<LeafNode>([[CAST1]])
+// CHECK: end_borrow [[BORROW2]]
+// CHECK: end_borrow [[BORROW1]]
+// CHECK: destroy_value [[EXIST]]
 // CHECK-LABEL: } // end sil function 'siblingGenericApplies'
 sil [ossa] @siblingGenericApplies : $@convention(thin) (@owned LeafNode) -> () {
 bb0(%0 : @owned $LeafNode):
   %4 = init_existential_ref %0 : $LeafNode : $LeafNode, $any Taggable
-  %5 = open_existential_ref %4 to $@opened("11111111-1111-1111-1111-111111111111", any Taggable) Self
+  %5 = open_existential_ref %4 to $@opened(5, any Taggable) Self
   %6 = function_ref @genericTake : $@convention(thin) <τ_0_0 where τ_0_0 : Taggable> (@guaranteed τ_0_0) -> ()
-  %7 = apply %6<@opened("11111111-1111-1111-1111-111111111111", any Taggable) Self>(%5) : $@convention(thin) <τ_0_0 where τ_0_0 : Taggable> (@guaranteed τ_0_0) -> ()
+  %7 = apply %6<@opened(5, any Taggable) Self>(%5) : $@convention(thin) <τ_0_0 where τ_0_0 : Taggable> (@guaranteed τ_0_0) -> ()
   %9 = function_ref @genericPush : $@convention(thin) <τ_0_0 where τ_0_0 : Taggable> (@guaranteed τ_0_0) -> ()
-  %10 = apply %9<@opened("11111111-1111-1111-1111-111111111111", any Taggable) Self>(%5) : $@convention(thin) <τ_0_0 where τ_0_0 : Taggable> (@guaranteed τ_0_0) -> ()
+  %10 = apply %9<@opened(5, any Taggable) Self>(%5) : $@convention(thin) <τ_0_0 where τ_0_0 : Taggable> (@guaranteed τ_0_0) -> ()
   destroy_value %5
   %14 = tuple ()
   return %14 : $()
+}
+
+//===----------------------------------------------------------------------===//
+// Regression test: an `open_existential_ref` is used by two sibling generic
+// `apply`s that take the existential with *different* ownership
+// conventions: one `@guaranteed`, the other `@owned`.
+//
+// SILCombine devirtualizes the `@guaranteed` sibling first via a
+// `begin_borrow` of the shared existential (casting it directly would
+// consume it, breaking the other sibling). It then devirtualizes the
+// `@owned` sibling by casting the existential directly, consuming it exactly
+// as the original apply would have. The sibling-fixup logic in
+// `createApplyWithConcreteType` must recognize that this direct, owned cast
+// is itself a consuming use of the existential -- not just a
+// `destroy_value` -- and close the earlier borrow scope with an `end_borrow`
+// right before it. Otherwise the `begin_borrow` is left with no
+// lifetime-ending use, failing OSSA verification.
+//===----------------------------------------------------------------------===//
+
+// CHECK-LABEL: sil [ossa] @mixedOwnershipSiblingApplies :
+// CHECK: [[TAKE:%.*]] = function_ref @genericTake
+// CHECK: apply [[TAKE]]<LeafNode>(%0)
+// CHECK: [[CONSUME:%.*]] = function_ref @genericConsume
+// CHECK: apply [[CONSUME]]<LeafNode>(%0)
+// CHECK-LABEL: } // end sil function 'mixedOwnershipSiblingApplies'
+sil [ossa] @mixedOwnershipSiblingApplies : $@convention(thin) (@owned LeafNode) -> () {
+bb0(%0 : @owned $LeafNode):
+  %4 = init_existential_ref %0 : $LeafNode : $LeafNode, $any Taggable
+  %5 = open_existential_ref %4 to $@opened(6, any Taggable) Self
+  %6 = function_ref @genericTake : $@convention(thin) <τ_0_0 where τ_0_0 : Taggable> (@guaranteed τ_0_0) -> ()
+  %7 = apply %6<@opened(6, any Taggable) Self>(%5) : $@convention(thin) <τ_0_0 where τ_0_0 : Taggable> (@guaranteed τ_0_0) -> ()
+  %9 = function_ref @genericConsume : $@convention(thin) <τ_0_0 where τ_0_0 : Taggable> (@owned τ_0_0) -> ()
+  %10 = apply %9<@opened(6, any Taggable) Self>(%5) : $@convention(thin) <τ_0_0 where τ_0_0 : Taggable> (@owned τ_0_0) -> ()
+  %14 = tuple ()
+  return %14 : $()
+}
+
+//===----------------------------------------------------------------------===//
+// Regression test: CSE merges two `open_existential_ref`s of the same
+// (owned, lexically borrowed) existential into one shared, owned value, used
+// by a sibling `witness_method` apply and by a `store_borrow` (through
+// another sibling `witness_method` apply).
+//
+// SILCombine's existential devirtualization tries to prove the shared
+// existential's concrete type. Casting the existential directly would
+// consume it, leaving the `store_borrow` sibling without a valid value to
+// reference. A `store_borrow`'s source operand must also exactly match the
+// type of its destination `alloc_stack`, which still uses the abstract
+// opened-archetype type, so redirecting it to a concrete-typed cast would
+// desync that type and fail verification.
+// SILCombine instead builds the concrete cast from a `begin_borrow` of the
+// shared existential, so the existential itself is never consumed and
+// remains available, in its original type, for the `store_borrow` sibling.
+// The borrow scope is closed with `end_borrow` right before the
+// existential's own `destroy_value`.
+//===----------------------------------------------------------------------===//
+
+protocol Identifiable2 {
+  func identify()
+}
+
+protocol Updatable2 : AnyObject {
+  func update()
+}
+
+class Foo : Identifiable2, Updatable2 {
+  init()
+  func update()
+  func identify()
+}
+
+sil hidden [ossa] @$s3Foo8identifyTW : $@convention(witness_method: Identifiable2) (@in_guaranteed Foo) -> () {
+bb0(%0 : $*Foo):
+  %1 = tuple ()
+  return %1 : $()
+}
+
+sil hidden [ossa] @$s3Foo6updateTW : $@convention(witness_method: Updatable2) (@guaranteed Foo) -> () {
+bb0(%0 : @guaranteed $Foo):
+  %1 = tuple ()
+  return %1 : $()
+}
+
+sil_witness_table Foo: Identifiable2 module main {
+  method #Identifiable2.identify: @$s3Foo8identifyTW
+}
+
+sil_witness_table Foo: Updatable2 module main {
+  method #Updatable2.update: @$s3Foo6updateTW
+}
+
+// CHECK-LABEL: sil [ossa] @sharedExistentialWithStoreBorrowSibling :
+// CHECK: [[EXIST:%.*]] = open_existential_ref
+// CHECK: [[BORROW:%.*]] = begin_borrow [[EXIST]]
+// CHECK: [[CAST:%.*]] = unchecked_ref_cast [[BORROW]]
+// CHECK: apply {{%[0-9]+}}([[CAST]])
+// CHECK: store_borrow [[EXIST]] to
+// CHECK: witness_method $@opened{{.*}}, {{.*}}, [[EXIST]]
+// CHECK: end_borrow [[BORROW]]
+// CHECK: destroy_value [[EXIST]]
+// CHECK-LABEL: } // end sil function 'sharedExistentialWithStoreBorrowSibling'
+sil [ossa] @sharedExistentialWithStoreBorrowSibling : $@convention(thin) (@owned Foo) -> () {
+bb0(%0 : @owned $Foo):
+  %4 = init_existential_ref %0 : $Foo : $Foo, $any Identifiable2 & Updatable2
+  %5 = begin_borrow [lexical] %4 : $any Identifiable2 & Updatable2
+
+  %6 = open_existential_ref %5 : $any Identifiable2 & Updatable2 to $@opened(7, any Identifiable2 & Updatable2) Self
+  %7 = witness_method $@opened(7, any Identifiable2 & Updatable2) Self, #Updatable2.update, %6 : $@opened(7, any Identifiable2 & Updatable2) Self : $@convention(witness_method: Updatable2) <τ_0_0 where τ_0_0 : Updatable2> (@guaranteed τ_0_0) -> ()
+  %10 = apply %7<@opened(7, any Identifiable2 & Updatable2) Self>(%6) : $@convention(witness_method: Updatable2) <τ_0_0 where τ_0_0 : Updatable2> (@guaranteed τ_0_0) -> ()
+
+  %11 = open_existential_ref %5 : $any Identifiable2 & Updatable2 to $@opened(8, any Identifiable2 & Updatable2) Self
+  %12 = alloc_stack $@opened(8, any Identifiable2 & Updatable2) Self
+  %13 = store_borrow %11 to %12 : $*@opened(8, any Identifiable2 & Updatable2) Self
+  %14 = witness_method $@opened(8, any Identifiable2 & Updatable2) Self, #Identifiable2.identify, %11 : $@opened(8, any Identifiable2 & Updatable2) Self : $@convention(witness_method: Identifiable2) <τ_0_0 where τ_0_0 : Identifiable2> (@in_guaranteed τ_0_0) -> ()
+  %15 = apply %14<@opened(8, any Identifiable2 & Updatable2) Self>(%13) : $@convention(witness_method: Identifiable2) <τ_0_0 where τ_0_0 : Identifiable2> (@in_guaranteed τ_0_0) -> ()
+  end_borrow %13 : $*@opened(8, any Identifiable2 & Updatable2) Self
+  dealloc_stack %12 : $*@opened(8, any Identifiable2 & Updatable2) Self
+
+  end_borrow %5 : $any Identifiable2 & Updatable2
+  destroy_value %4 : $any Identifiable2 & Updatable2
+  %r = tuple ()
+  return %r : $()
+}
+
+//===----------------------------------------------------------------------===//
+// Regression test: the concrete type proved for `%o2` below is itself an
+// opened archetype (`@opened(11, any Derived3) Self`), because the existential
+// `%ie` was built by re-wrapping an already-opened existential into a less
+// specific protocol. `%o2` is owned and the apply's argument is
+// `@guaranteed`, so casting `%o2` directly consumed it while its own
+// `destroy_value` still consumed it too -- "Found over consume?!". The extra
+// use of `%ie` keeps the `open_existential_ref`/`init_existential_ref` pair
+// from collapsing, so no later peephole repaired the double consume.
+//
+// Casting a borrow instead is no help here: SILCombine re-simplifies a cast
+// whose target is an opened archetype away, so the borrow+cast would be
+// rebuilt forever (see `test/embedded/existential-default-method.swift`).
+// Bail out of the propagation entirely and leave the apply abstract.
+//===----------------------------------------------------------------------===//
+
+protocol Base3 : AnyObject {}
+protocol Derived3 : Base3 {}
+
+sil @makeDerived3 : $@convention(thin) () -> @owned any Derived3
+sil @takeBase3 : $@convention(method) <T where T : Base3> (@guaranteed T) -> ()
+sil @useBase3 : $@convention(thin) (@guaranteed any Base3) -> ()
+
+// CHECK-LABEL: sil [ossa] @reopenedExistentialWithConcreteOpenedArchetype :
+// CHECK-NOT:   unchecked_ref_cast
+// CHECK:       [[O2:%.*]] = open_existential_ref {{%.*}} : $any Base3 to $@opened([[#OPENED:]], any Base3) Self
+// CHECK-NOT:   unchecked_ref_cast
+// CHECK:       apply {{%.*}}<@opened([[#OPENED]], any Base3) Self>([[O2]])
+// CHECK:       destroy_value [[O2]]
+// CHECK-LABEL: } // end sil function 'reopenedExistentialWithConcreteOpenedArchetype'
+sil [ossa] @reopenedExistentialWithConcreteOpenedArchetype : $@convention(thin) () -> () {
+bb0:
+  %f = function_ref @makeDerived3 : $@convention(thin) () -> @owned any Derived3
+  %e = apply %f() : $@convention(thin) () -> @owned any Derived3
+  %o1 = open_existential_ref %e : $any Derived3 to $@opened(11, any Derived3) Self
+  %ie = init_existential_ref %o1 : $@opened(11, any Derived3) Self : $@opened(11, any Derived3) Self, $any Base3
+
+  // An extra use of %ie, so that open_existential_ref(init_existential_ref)
+  // below cannot be folded away.
+  %c = copy_value %ie : $any Base3
+  %u = function_ref @useBase3 : $@convention(thin) (@guaranteed any Base3) -> ()
+  %au = apply %u(%c) : $@convention(thin) (@guaranteed any Base3) -> ()
+  destroy_value %c : $any Base3
+
+  %o2 = open_existential_ref %ie : $any Base3 to $@opened(12, any Base3) Self
+  %g = function_ref @takeBase3 : $@convention(method) <T where T : Base3> (@guaranteed T) -> ()
+  %a = apply %g<@opened(12, any Base3) Self>(%o2) : $@convention(method) <T where T : Base3> (@guaranteed T) -> ()
+  destroy_value %o2 : $@opened(12, any Base3) Self
+  %t = tuple ()
+  return %t : $()
 }

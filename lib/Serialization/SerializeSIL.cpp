@@ -1137,8 +1137,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     if (hasReconstructionBlock)
       DebugBBWorklist.push_back(const_cast<DebugValueInst *>(DVI));
 
-    auto Operand = DVI->getOperand();
-    auto Type = Operand->getType();
+    auto operands = DVI->getAllOperands();
 
     unsigned DebugVarTypeCategory = 0;
     auto DebugVar = DVI->getVarInfo();
@@ -1147,8 +1146,20 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     auto &SM = SI.getFunction()->getModule().getSourceManager();
 
     SmallVector<uint64_t, 8> ListOfValues;
-    ListOfValues.push_back(addValueRef(Operand));
-    ListOfValues.push_back(S.addTypeRef(Type.getRawASTType()));
+
+    // Encode operand count only when there's a reconstruction block
+    // (otherwise it's implicitly 1).
+    if (hasReconstructionBlock)
+      ListOfValues.push_back(operands.size());
+    else
+      ASSERT(operands.size() == 1);
+
+    // Encode each operand as (ValueRef, TypeRef, TypeCategory).
+    for (auto &op : operands) {
+      ListOfValues.push_back(addValueRef(op.get()));
+      ListOfValues.push_back(S.addTypeRef(op.get()->getType().getRawASTType()));
+      ListOfValues.push_back((unsigned)op.get()->getType().getCategory());
+    }
 
     if (DebugVar) {
       // Is a DebugVariable being serialized.
@@ -1218,7 +1229,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     }
     SILDebugValueLayout::emitRecord(
         Out, ScratchRecord, SILAbbrCodes[SILDebugValueLayout::Code],
-        (unsigned)Type.getCategory(), DebugVarTypeCategory, attrs,
+        DebugVarTypeCategory, attrs,
     ListOfValues);
 
     if (ScopeToWrite) {
@@ -3860,7 +3871,7 @@ void SILSerializer::writeSILDifferentiabilityWitness(
   DifferentiabilityWitnessLayout::emitRecord(
       Out, ScratchRecord, SILAbbrCodes[DifferentiabilityWitnessLayout::Code],
       addSILFunctionRef(original), toStableSILLinkage(dw.getLinkage()),
-      dw.isDeclaration(), dw.isSerialized(),
+      dw.isDeclaration(), dw.isSerialized(), dw.isDefault(),
       toStableDifferentiabilityKind(dw.getKind()),
       S.addGenericSignatureRef(dw.getDerivativeGenericSignature()), jvpID,
       vjpID, dw.getParameterIndices()->getNumIndices(),

@@ -20,6 +20,39 @@ struct A {
   } // expected-error {{return from initializer without initializing all stored properties}}
 }
 
+class MissingNilInFailableInitializer {
+  let value: Int  // expected-note {{'self.value' not initialized}}
+
+  init?(value: Int?) {
+    guard let value = value else {
+      return // expected-error {{return from failable initializer before initializing all stored properties; did you mean to return 'nil'?}} {{13-13= nil}}
+    }
+    self.value = value
+  }
+}
+
+class ValidReturnFromFailableInitializer {
+  let value: Int
+
+  init?(value: Int) {
+    self.value = value
+    return // no-error
+  }
+}
+
+// A use before initialization keeps its own diagnostic, even when the failable
+// initializer contains a bare return elsewhere.
+class UseBeforeInitInFailableInitializer {
+  let value: Int
+
+  init?(fail: Bool) {
+    guard !fail else { return nil }
+    print(value) // expected-error {{constant 'self.value' used before being initialized}}
+    self.value = 0
+    return // no-error
+  }
+}
+
 // Delegating, failable initializers that doesn't initialize along all paths must produce correct diagnostics.
 extension Int {
   init?(i: Int) {

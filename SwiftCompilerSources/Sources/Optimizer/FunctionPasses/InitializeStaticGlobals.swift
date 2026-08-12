@@ -471,7 +471,7 @@ private struct InitValueBuilder: AddressDefUseWalker {
         return .abortWalk
       }
 
-    case is LoadInst, is DeallocStackInst:
+    case is LoadInst, is DeallocStackInst, is DebugValueInst:
       return .continueWalk
     case let bi as BuiltinInst:
       switch bi.id {

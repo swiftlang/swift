@@ -12,9 +12,9 @@
 
 /// Performs a traditional C-style assert with an optional message.
 ///
-/// Use this function for internal consistency checks that are active during testing
-/// but do not impact performance of shipping code. To check for invalid usage
-/// in Release builds, see `precondition(_:_:file:line:)`.
+/// Use this function for internal consistency checks that are active during
+/// testing but do not impact performance of shipping code. To check for invalid
+/// usage in Release builds, see `precondition(_:_:file:line:)`.
 ///
 /// * In playgrounds and `-Onone` builds (the default for Xcode's Debug
 ///   configuration): If `condition` evaluates to `false`, stop program
@@ -49,7 +49,7 @@ public func assert(
   // Only assert in debug mode.
   if _isDebugAssertConfiguration() {
     if !_fastPath(condition()) {
-      _assertionFailure("Assertion failed", message(), file: file, line: line,
+      _assertionFailure(kind: .assertion(), message(), file: file, line: line,
         flags: _fatalErrorFlags())
     }
   }
@@ -65,7 +65,7 @@ public func assert(
   // Only assert in debug mode.
   if _isDebugAssertConfiguration() {
     if !_fastPath(condition()) {
-      _assertionFailure("Assertion failed", message(), file: file, line: line,
+      _assertionFailure(kind: .assertion(), message(), file: file, line: line,
         flags: _fatalErrorFlags())
     }
   }
@@ -111,7 +111,7 @@ public func precondition(
   // Only check in debug and release mode. In release mode just trap.
   if _isDebugAssertConfiguration() {
     if !_fastPath(condition()) {
-      _assertionFailure("Precondition failed", message(), file: file, line: line,
+      _assertionFailure(kind: .precondition(), message(), file: file, line: line,
         flags: _fatalErrorFlags())
     }
   } else if _isReleaseAssertConfiguration() {
@@ -131,13 +131,12 @@ public func precondition(
   // Only check in debug and release mode. In release mode just trap.
   if _isDebugAssertConfiguration() {
     if !_fastPath(condition()) {
-      _assertionFailure("Precondition failed", message(), file: file, line: line,
+      _assertionFailure(kind: .precondition(), message(), file: file, line: line,
         flags: _fatalErrorFlags())
     }
   } else if _isReleaseAssertConfiguration() {
     let error = !condition()
-    Builtin.condfail_message(error._value,
-      StaticString("precondition failure").unsafeRawPointer)
+    Builtin.condfail_message(error._value, message().unsafeRawPointer)
   }
 }
 #endif
@@ -172,8 +171,9 @@ public func assertionFailure(
   file: StaticString = #file, line: UInt = #line
 ) {
   if _isDebugAssertConfiguration() {
-    _assertionFailure("Fatal error", message(), file: file, line: line,
-      flags: _fatalErrorFlags())
+    _opaqueAssertionFailure(
+      kind: .fatal(), message(), file: file, line: line, flags: _fatalErrorFlags()
+    )
   }
   else if _isFastAssertConfiguration() {
     _conditionallyUnreachable()
@@ -187,8 +187,9 @@ public func assertionFailure(
   file: StaticString = #file, line: UInt = #line
 ) {
   if _isDebugAssertConfiguration() {
-    _assertionFailure("Fatal error", message(), file: file, line: line,
-      flags: _fatalErrorFlags())
+    _assertionFailure(
+      kind: .fatal(), message(), file: file, line: line, flags: _fatalErrorFlags()
+    )
   }
   else if _isFastAssertConfiguration() {
     _conditionallyUnreachable()
@@ -233,7 +234,7 @@ public func preconditionFailure(
 ) -> Never {
   // Only check in debug and release mode.  In release mode just trap.
   if _isDebugAssertConfiguration() {
-    _assertionFailure("Fatal error", message(), file: file, line: line,
+    _assertionFailure(kind: .fatal(), message(), file: file, line: line,
       flags: _fatalErrorFlags())
   } else if _isReleaseAssertConfiguration() {
     Builtin.condfail_message(true._value,
@@ -250,11 +251,10 @@ public func preconditionFailure(
 ) -> Never {
   // Only check in debug and release mode.  In release mode just trap.
   if _isDebugAssertConfiguration() {
-    _assertionFailure("Fatal error", message(), file: file, line: line,
+    _assertionFailure(kind: .fatal(), message(), file: file, line: line,
       flags: _fatalErrorFlags())
   } else if _isReleaseAssertConfiguration() {
-    Builtin.condfail_message(true._value,
-      StaticString("precondition failure").unsafeRawPointer)
+    Builtin.condfail_message(true._value, message().unsafeRawPointer)
   }
   _conditionallyUnreachable()
 }
@@ -277,11 +277,11 @@ public func fatalError(
   file: StaticString = #file, line: UInt = #line
 ) -> Never {
 #if !$Embedded
-  _assertionFailure("Fatal error", message(), file: file, line: line,
+  _assertionFailure(kind: .fatal(), message(), file: file, line: line,
     flags: _fatalErrorFlags())
 #else
   if _isDebugAssertConfiguration() {
-    _assertionFailure("Fatal error", message(), file: file, line: line,
+    _assertionFailure(kind: .fatal(), message(), file: file, line: line,
       flags: _fatalErrorFlags())
   } else {
     Builtin.condfail_message(true._value,
@@ -298,11 +298,10 @@ public func fatalError(
   file: StaticString = #file, line: UInt = #line
 ) -> Never {
   if _isDebugAssertConfiguration() {
-    _assertionFailure("Fatal error", message(), file: file, line: line,
+    _assertionFailure(kind: .fatal(), message(), file: file, line: line,
       flags: _fatalErrorFlags())
   } else {
-    Builtin.condfail_message(true._value,
-      StaticString("fatal error").unsafeRawPointer)
+    Builtin.condfail_message(true._value, message().unsafeRawPointer)
     Builtin.unreachable()
   }
 }
@@ -322,7 +321,7 @@ internal func _precondition(
   // Only check in debug and release mode. In release mode just trap.
   if _isDebugAssertConfiguration() {
     if !_fastPath(condition()) {
-      _assertionFailure("Fatal error", message, file: file, line: line,
+      _assertionFailure(kind: .fatal(), message, file: file, line: line,
         flags: _fatalErrorFlags())
     }
   } else if _isReleaseAssertConfiguration() {
@@ -351,7 +350,7 @@ public func _overflowChecked<T>(
   let (result, error) = args
   if _isDebugAssertConfiguration() {
     if _slowPath(error) {
-      _fatalErrorMessage("Fatal error", "Overflow/underflow",
+      _fatalErrorMessage(kind: .fatal(), "Overflow/underflow",
         file: file, line: line, flags: _fatalErrorFlags())
     }
   } else {
@@ -380,7 +379,7 @@ internal func _debugPrecondition(
   // Only check in debug mode.
   if _slowPath(_isDebugAssertConfiguration()) {
     if !_fastPath(condition()) {
-      _fatalErrorMessage("Fatal error", message, file: file, line: line,
+      _fatalErrorMessage(kind: .fatal(), message, file: file, line: line,
         flags: _fatalErrorFlags())
     }
   }
@@ -415,7 +414,7 @@ internal func _internalInvariant(
 ) {
 #if INTERNAL_CHECKS_ENABLED
   if !_fastPath(condition()) {
-    _fatalErrorMessage("Fatal error", message, file: file, line: line,
+    _fatalErrorMessage(kind: .fatal(), message, file: file, line: line,
       flags: _fatalErrorFlags())
   }
 #endif
@@ -466,7 +465,7 @@ internal func _precondition(
       #if !$Embedded
       guard _isExecutableLinkedOnOrAfter(version) else { return }
       #endif
-      _assertionFailure("Fatal error", message, file: file, line: line,
+      _assertionFailure(kind: .fatal(), message, file: file, line: line,
         flags: _fatalErrorFlags())
     }
   } else if _isReleaseAssertConfiguration() {

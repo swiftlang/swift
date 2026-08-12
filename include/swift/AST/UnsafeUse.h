@@ -65,6 +65,12 @@ public:
 private:
   Kind kind;
 
+  /// Whether the entity this use refers to was marked '@unsafe(always)'.
+  ///
+  /// This is computed when the use is formed, because answering it involves
+  /// walking types and the answer is needed several times per use.
+  bool always;
+
   union {
     struct {
       const Decl *decl;
@@ -105,7 +111,17 @@ private:
     const ImportDecl *importDecl;
   } storage;
 
-  UnsafeUse(Kind kind) : kind(kind) { }
+  UnsafeUse(Kind kind, bool always) : kind(kind), always(always) { }
+
+  /// Whether the given declaration was marked '@unsafe(always)'.
+  static bool isAlwaysUnsafe(const Decl *decl) {
+    return decl && decl->isAlwaysUnsafe();
+  }
+
+  /// Whether the given type involves a type marked '@unsafe(always)'.
+  static bool isAlwaysUnsafe(Type type) {
+    return type && type->findAlwaysUnsafeType();
+  }
 
   static UnsafeUse forPolymorphic(
       Kind kind,
@@ -115,7 +131,10 @@ private:
   ) {
     assert(kind == Override || kind == Witness);
 
-    UnsafeUse result(kind);
+    // Override and witness type matching is exact, so an always-unsafe type in
+    // the signature would already have made the base or requirement unsafe;
+    // only the attribute can differ here.
+    UnsafeUse result(kind, isAlwaysUnsafe(decl));
     result.storage.polymorphic.decl = decl;
     result.storage.polymorphic.original = original;
     result.storage.polymorphic.conformance = conformance;
@@ -136,7 +155,28 @@ private:
            kind == ReferenceToUnsafeThroughTypealias ||
            kind == CallToUnsafe);
 
-    UnsafeUse result(kind);
+    // Unsafety that comes from a language construct rather than an '@unsafe'
+    // attribute is never always-unsafe. Storage is unsafe because of its
+    // *type*, so an '@unsafe(always)' on the storage declaration itself says
+    // nothing about how hard that type is to use.
+    bool always;
+    switch (kind) {
+    case UnownedUnsafe:
+    case ExclusivityUnchecked:
+    case NonisolatedUnsafe:
+      always = false;
+      break;
+
+    case ReferenceToUnsafeStorage:
+      always = isAlwaysUnsafe(type);
+      break;
+
+    default:
+      always = isAlwaysUnsafe(decl) || isAlwaysUnsafe(type);
+      break;
+    }
+
+    UnsafeUse result(kind, always);
     result.storage.entity.decl = decl;
     result.storage.entity.type = type.getPointer();
     result.storage.entity.location = location.getOpaquePointerValue();
@@ -158,7 +198,7 @@ public:
                                   Type typeWitness,
                                   NormalProtocolConformance *conformance,
                                   SourceLoc location) {
-    UnsafeUse result(TypeWitness);
+    UnsafeUse result(TypeWitness, isAlwaysUnsafe(typeWitness));
     result.storage.typeWitness.assocType = assocType;
     result.storage.typeWitness.type = typeWitness.getPointer();
     result.storage.typeWitness.conformance = conformance;
@@ -170,7 +210,8 @@ public:
                                   ProtocolConformanceRef conformance,
                                   SourceLoc location) {
     assert(subjectType);
-    UnsafeUse result(UnsafeConformance);
+    // A conformance cannot (yet) be marked '@unsafe(always)'.
+    UnsafeUse result(UnsafeConformance, /*always=*/false);
     result.storage.conformance.type = subjectType.getPointer();
     result.storage.conformance.conformanceRef = conformance.getOpaqueValue();
     result.storage.conformance.location = location.getOpaquePointerValue();
@@ -215,7 +256,8 @@ public:
   static UnsafeUse forCallArgument(
       Expr *call, const Decl *calleeDecl, Type paramType,
       Identifier argumentName, unsigned argumentIndex, Expr *argument) {
-    UnsafeUse result(CallArgument);
+    UnsafeUse result(CallArgument, isAlwaysUnsafe(paramType) ||
+                                      isAlwaysUnsafe(argument->getType()));
     result.storage.callArgument.call = call;
     result.storage.callArgument.calleeDecl = calleeDecl;
     result.storage.callArgument.paramType = paramType.getPointer();
@@ -226,13 +268,16 @@ public:
   }
 
   static UnsafeUse forTemporarilyEscaping(MakeTemporarilyEscapableExpr *expr) {
-    UnsafeUse result(TemporarilyEscaping);
+    // This unsafety comes from the language construct, not from an '@unsafe'
+    // attribute, so it is never always-unsafe.
+    UnsafeUse result(TemporarilyEscaping, /*always=*/false);
     result.storage.temporarilyEscaping = expr;
     return result;
   }
 
   static UnsafeUse forPreconcurrencyImport(const ImportDecl *importDecl) {
-    UnsafeUse result(PreconcurrencyImport);
+    // As above: '@preconcurrency' is not an '@unsafe' attribute.
+    UnsafeUse result(PreconcurrencyImport, /*always=*/false);
     result.storage.importDecl = importDecl;
     return result;
   }
@@ -340,6 +385,14 @@ public:
     assert(getKind() == TypeWitness);
     return storage.typeWitness.assocType;
   }
+
+  /// Whether this use must be acknowledged with 'unsafe' even when strict
+  /// memory safety checking is disabled, because the entity it refers to was
+  /// marked '@unsafe(always)'.
+  ///
+  /// Forms of unsafety that come from a language construct rather than from an
+  /// '@unsafe' attribute are never always-unsafe.
+  bool isAlways() const { return always; }
 
   /// Get the original declaration for an issue with a polymorphic
   /// implementation, e.g., an overridden declaration or a protocol

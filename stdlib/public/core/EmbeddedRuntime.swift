@@ -147,8 +147,29 @@ public func _swift_generateRandom(_ buf: UnsafeMutableRawPointer, _ nbytes: Int)
 public func _swift_generateRandomHashSeed(_ buf: UnsafeMutableRawPointer, _ nbytes: Int)
 
 @_extern(c, "_swift_typedAllocate")
-public func _swift_typedAllocate(_ buf: UnsafeMutablePointer<UnsafeMutableRawPointer?>, _ size: Int, _ alignMask: Int, _ typeId: UInt64)
+public func _swift_typedAllocate(_ size: Int, _ alignMask: Int,  _ flags: CUnsignedLongLong, _ typeId: UInt64) -> UnsafeMutableRawPointer?
 
+@_extern(c, "_swift_typedDeallocate")
+public func _swift_typedDeallocate(_ buf: UnsafeMutableRawPointer, _ size: Int, _ alignMask: Int, _ flags: CUnsignedLongLong, _ typeId: UInt64)
+
+@_extern(c, "_swift_reportError")
+@usableFromInline
+internal func _swift_reportError(
+  _ message: UnsafePointer<UInt8>?,
+  _ messageCount: Int,
+  _ flags: CUnsignedLongLong
+)
+
+@_extern(c, "_swift_reportErrorAt")
+@usableFromInline
+internal func _swift_reportErrorAt(
+  _ message: UnsafePointer<UInt8>?,
+  _ messageCount: Int,
+  _ fileName: UnsafePointer<UInt8>?,
+  _ fileNameCount: Int,
+  _ line: Int,
+  _ flags: CUnsignedLongLong
+)
 #else
 // Interface that predates the introduction of swift/EmbeddedPlatform.h
 
@@ -204,6 +225,24 @@ public func swift_slowDealloc(_ ptr: UnsafeMutableRawPointer, _ size: Int, _ ali
 }
 
 @c
+public func swift_allocRawTyped(_ size: Int, _ alignMask: Int, _ typeId: UInt64) -> UnsafeMutableRawPointer? {
+#if SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
+  return unsafe _swift_typedAllocate(size, alignMask, 0, typeId)
+#else
+  return unsafe swift_slowAlloc(size, alignMask)
+#endif
+}
+
+@c
+public func swift_deallocRawTyped(_ ptr: UnsafeMutableRawPointer, _ size: Int, _ alignMask: Int, _ typeId: UInt64) {
+#if SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
+  unsafe _swift_typedDeallocate(ptr, size, alignMask, 0, typeId)
+#else
+  unsafe swift_slowDealloc(ptr, size, alignMask)
+#endif
+}
+
+@c
 public func swift_allocObject(metadata: Builtin.RawPointer, requiredSize: Int, requiredAlignmentMask: Int) -> Builtin.RawPointer {
   return unsafe swift_allocObject(metadata: UnsafeMutablePointer<ClassMetadata>(metadata), requiredSize: requiredSize, requiredAlignmentMask: requiredAlignmentMask)._rawValue
 }
@@ -219,8 +258,7 @@ func swift_allocObject(metadata: UnsafeMutablePointer<ClassMetadata>, requiredSi
 @c
 public func swift_allocObjectTyped(metadata: Builtin.RawPointer, requiredSize: Int, requiredAlignmentMask: Int, typeId: UInt64) -> Builtin.RawPointer {
 #if SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
-  var _p: UnsafeMutableRawPointer? = nil
-  unsafe _swift_typedAllocate(&_p, requiredSize, requiredAlignmentMask, typeId)
+  let _p: UnsafeMutableRawPointer? = unsafe _swift_typedAllocate(requiredSize, requiredAlignmentMask, 0, typeId)
   let p = unsafe _p!
   let object = unsafe p.assumingMemoryBound(to: HeapObject.self)
   unsafe _swift_embedded_set_heap_object_metadata_pointer(object, UnsafeMutablePointer<ClassMetadata>(metadata))
@@ -240,12 +278,30 @@ public func swift_deallocUninitializedObject(object: Builtin.RawPointer, allocat
 }
 
 @c
+public func swift_deallocUninitializedObjectTyped(object: Builtin.RawPointer, allocatedSize: Int, allocatedAlignMask: Int, typeId: UInt64) {
+  swift_deallocObjectTyped(
+    object: object,
+    allocatedSize: allocatedSize,
+    allocatedAlignMask: allocatedAlignMask,
+    typeId: typeId)
+}
+
+@c
 public func swift_deallocObject(object: Builtin.RawPointer, allocatedSize: Int, allocatedAlignMask: Int) {
   unsafe swift_deallocObject(object: UnsafeMutablePointer<HeapObject>(object), allocatedSize: allocatedSize, allocatedAlignMask: allocatedAlignMask)
 }
 
 func swift_deallocObject(object: UnsafeMutablePointer<HeapObject>, allocatedSize: Int, allocatedAlignMask: Int) {
   unsafe swift_slowDealloc(UnsafeMutableRawPointer(object), allocatedSize, allocatedAlignMask)
+}
+
+@c
+public func swift_deallocObjectTyped(object: Builtin.RawPointer, allocatedSize: Int, allocatedAlignMask: Int, typeId: UInt64) {
+#if SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
+  unsafe _swift_typedDeallocate(UnsafeMutableRawPointer(object), allocatedSize, allocatedAlignMask, 0, typeId)
+#else
+  unsafe swift_deallocObject(object: UnsafeMutablePointer<HeapObject>(object), allocatedSize: allocatedSize, allocatedAlignMask: allocatedAlignMask)
+#endif
 }
 
 @c
@@ -262,6 +318,19 @@ func swift_deallocClassInstance(object: UnsafeMutablePointer<HeapObject>, alloca
 }
 
 @c
+public func swift_deallocClassInstanceTyped(object: Builtin.RawPointer, allocatedSize: Int, allocatedAlignMask: Int, typeId: UInt64) {
+#if SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
+  let p = unsafe UnsafeMutablePointer<HeapObject>(object)
+  if (unsafe p.pointee.refcount & HeapObject.doNotFreeBit) != 0 {
+    return
+  }
+  unsafe _swift_typedDeallocate(UnsafeMutableRawPointer(p), allocatedSize, allocatedAlignMask, 0, typeId)
+#else
+  unsafe swift_deallocClassInstance(object: UnsafeMutablePointer<HeapObject>(object), allocatedSize: allocatedSize, allocatedAlignMask: allocatedAlignMask)
+#endif
+}
+
+@c
 public func swift_deallocPartialClassInstance(object: Builtin.RawPointer, metadata: Builtin.RawPointer, allocatedSize: Int, allocatedAlignMask: Int) {
   unsafe swift_deallocPartialClassInstance(object: UnsafeMutablePointer<HeapObject>(object), metadata: UnsafeMutablePointer<ClassMetadata>(metadata), allocatedSize: allocatedSize, allocatedAlignMask: allocatedAlignMask)
 }
@@ -273,6 +342,11 @@ func swift_deallocPartialClassInstance(object: UnsafeMutablePointer<HeapObject>,
     guard let superclassMetadata = unsafe classMetadata.pointee.superclassMetadata else { break }
     unsafe classMetadata = superclassMetadata
   }
+}
+
+@c
+public func swift_deallocPartialClassInstanceTyped(object: Builtin.RawPointer, metadata: Builtin.RawPointer, allocatedSize: Int, allocatedAlignMask: Int, typeId: UInt64) {
+  unsafe swift_deallocPartialClassInstance(object: UnsafeMutablePointer<HeapObject>(object), metadata: UnsafeMutablePointer<ClassMetadata>(metadata), allocatedSize: allocatedSize, allocatedAlignMask: allocatedAlignMask)
 }
 
 @c
@@ -650,7 +724,8 @@ public func swift_bridgeObjectRetain(object: Builtin.RawPointer) -> Builtin.RawP
 public func swift_bridgeObjectRetain_n(object: Builtin.RawPointer, n: UInt32) -> Builtin.RawPointer {
   let objectBits = UInt(Builtin.ptrtoint_Word(object))
   let untaggedObject = unsafe Builtin.inttoptr_Word((objectBits & HeapObject.bridgeObjectToPlainObjectMask)._builtinWordValue)
-  return swift_retain_n(object: untaggedObject, n: n)
+  _ = swift_retain_n(object: untaggedObject, n: n)
+  return object
 }
 
 @c
@@ -889,6 +964,79 @@ func _embeddedReportFatalErrorInFile(prefix: StaticString, message: UnsafeBuffer
   unsafe print(message)
 }
 
+// Error-kind-based variants. On platforms that provide the Embedded Swift
+// platform layer, the numeric `kind` is passed through to `_swift_reportError`
+// so the platform can format the error itself; otherwise the prefix is printed.
+// These are `@usableFromInline` (referenced by the emitted-into-client
+// `_assertionFailure` entrypoints) but kept out of line so the cold reporting
+// path isn't inlined into every call site.
+
+@usableFromInline
+@inline(never)
+func _embeddedReportFatalError(kind: Int, message: StaticString) {
+#if SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
+  message.withUTF8Buffer { messageBuffer in
+    unsafe _swift_reportError(
+      messageBuffer.baseAddress, messageBuffer.count, CUnsignedLongLong(kind))
+  }
+#else
+  print(kind._failureMessagePrefix(), terminator: "")
+  if message.utf8CodeUnitCount > 0 { print(": ", terminator: "") }
+  print(message)
+#endif
+}
+
+@usableFromInline
+@inline(never)
+func _embeddedReportFatalError(kind: Int, message: UnsafeBufferPointer<UInt8>) {
+#if SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
+  unsafe _swift_reportError(
+    message.baseAddress, message.count, CUnsignedLongLong(kind))
+#else
+  print(kind._failureMessagePrefix(), terminator: "")
+  if message.count > 0 { print(": ", terminator: "") }
+  unsafe print(message)
+#endif
+}
+
+@usableFromInline
+@inline(never)
+func _embeddedReportFatalErrorInFile(kind: Int, message: StaticString, file: StaticString, line: UInt) {
+#if SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
+  message.withUTF8Buffer { messageBuffer in
+    file.withUTF8Buffer { fileBuffer in
+      unsafe _swift_reportErrorAt(
+        messageBuffer.baseAddress, messageBuffer.count,
+        fileBuffer.baseAddress, fileBuffer.count, Int(line), CUnsignedLongLong(kind))
+    }
+  }
+#else
+  print(file, terminator: ":")
+  print(line, terminator: ": ")
+  print(kind._failureMessagePrefix(), terminator: "")
+  if message.utf8CodeUnitCount > 0 { print(": ", terminator: "") }
+  print(message)
+#endif
+}
+
+@usableFromInline
+@inline(never)
+func _embeddedReportFatalErrorInFile(kind: Int, message: UnsafeBufferPointer<UInt8>, file: StaticString, line: UInt) {
+#if SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
+  file.withUTF8Buffer { fileBuffer in
+    unsafe _swift_reportErrorAt(
+      message.baseAddress, message.count,
+      fileBuffer.baseAddress, fileBuffer.count, Int(line), CUnsignedLongLong(kind))
+  }
+#else
+  print(file, terminator: ":")
+  print(line, terminator: ": ")
+  print(kind._failureMessagePrefix(), terminator: "")
+  if message.count > 0 { print(": ", terminator: "") }
+  unsafe print(message)
+#endif
+}
+
 extension Access.Action {
   func printName() {
     switch self {
@@ -924,6 +1072,22 @@ func _embeddedReportExclusivityViolation(
   Builtin.condfail_message(
     true._value, StaticString("dynamic exclusivity violation").unsafeRawPointer)
   Builtin.int_trap()
+}
+
+@_extern(c)
+func _swift_tls_get(_ key: Int) -> UnsafeMutableRawPointer?
+
+@_extern(c)
+func _swift_tls_set(_ key: Int, _ pointer: UnsafeMutableRawPointer?)
+
+@c
+func _swift_getExclusivityTLS() -> UnsafeMutableRawPointer? {
+  return unsafe _swift_tls_get(/*exclusivity=*/7)
+}
+
+@c
+func _swift_setExclusivityTLS(_ pointer: UnsafeMutableRawPointer?) {
+  return unsafe _swift_tls_set(/*exclusivity=*/7, pointer)
 }
 
 private func intToFloatChunkFactor<T: ExpressibleByFloatLiteral>() -> T {

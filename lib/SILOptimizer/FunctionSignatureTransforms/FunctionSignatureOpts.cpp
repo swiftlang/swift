@@ -42,7 +42,9 @@
 #include "swift/SILOptimizer/Analysis/RCIdentityAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/SpecializationMangler.h"
@@ -224,7 +226,8 @@ FunctionSignatureTransformDescriptor::createOptimizedSILFunctionName() {
 /// Collect all archetypes used by a function.
 static bool usesGenerics(SILFunction *F,
                          ArrayRef<SILParameterInfo> InterfaceParams,
-                         ArrayRef<SILResultInfo> InterfaceResults) {
+                         ArrayRef<SILResultInfo> InterfaceResults,
+                         llvm::SmallVector<DebugValueInst *> &DebugUses) {
   CanSILFunctionType FTy = F->getLoweredFunctionType();
   auto HasGenericSignature = FTy->getInvocationGenericSignature() != nullptr;
   if (!HasGenericSignature)
@@ -262,16 +265,16 @@ static bool usesGenerics(SILFunction *F,
     return UsesGenerics;
 
   for (auto &BB : *F) {
-    for (auto &I : BB) {
-      for (auto Arg : BB.getArguments()) {
-        if (&BB != &*F->begin()) {
-          // Scan types of all BB arguments. Ignore the entry BB, because
-          // it is handled in a special way.
-           Arg->getType().getASTType().visit(FindArchetypesAndGenericTypes);
-           if (UsesGenerics)
-             return UsesGenerics;
-        }
+    for (auto Arg : BB.getArguments()) {
+      if (&BB != &*F->begin()) {
+        // Scan types of all BB arguments. Ignore the entry BB, because
+        // it is handled in a special way.
+         Arg->getType().getASTType().visit(FindArchetypesAndGenericTypes);
+         if (UsesGenerics)
+           return UsesGenerics;
       }
+    }
+    for (auto &I : BB) {
       // Scan types of all operands.
       for (auto &Op : I.getAllOperands()) {
         Op.get()->getType().getASTType().visit(FindArchetypesAndGenericTypes);
@@ -299,6 +302,17 @@ static bool usesGenerics(SILFunction *F,
       // Scan the result type of the instruction.
       for (auto V : I.getResults()) {
         V->getType().getASTType().visit(FindArchetypesAndGenericTypes);
+      }
+
+      if (auto *DVI = dyn_cast<DebugValueInst>(&I)) {
+        if (std::optional<SILType> VarType = DVI->getVarInfo()->Type)
+          VarType->getASTType().visit(FindArchetypesAndGenericTypes);
+
+        // If there are only debug uses of the generic, don't keep it.
+        if (UsesGenerics) {
+          UsesGenerics = false;
+          DebugUses.push_back(DVI);
+        }
       }
 
       if (UsesGenerics)
@@ -396,7 +410,9 @@ FunctionSignatureTransformDescriptor::createOptimizedSILFunctionType() {
     // callee at the LLVM IR level.
     // TODO: Implement a more precise analysis, so that we can eliminate only
     // those generic parameters which are not used.
-    UsesGenerics = usesGenerics(F, InterfaceParams, InterfaceResults);
+    llvm::SmallVector<DebugValueInst *> DebugUses;
+    UsesGenerics = usesGenerics(F, InterfaceParams, InterfaceResults,
+                                DebugUses);
 
     // The set of used archetypes is complete now.
     if (!UsesGenerics) {
@@ -412,6 +428,24 @@ FunctionSignatureTransformDescriptor::createOptimizedSILFunctionType() {
                  for (auto Result : InterfaceResults) {
                    Result.getInterfaceType().dump(llvm::dbgs());
                  });
+
+      // If there are only debug uses of the generics, rewrite them.
+      // They cannot use the removed generic type in any way (fragment,
+      // var type, and operand type).
+      // The variable is replaced with an empty tuple as a placeholder, as in
+      // this case, the whole type is removed and there's no other way to
+      // represent that.
+      auto VoidTy = SILType::getEmptyTupleType(F->getASTContext());
+      SILValue Undef = SILUndef::get(F, VoidTy);
+      for (auto *DVI : DebugUses) {
+        SILDebugVariable VarInfo = DVI->getCompleteVarInfo();
+        VarInfo.Type = VoidTy;
+        VarInfo.DIExpr = {};
+
+        SILBuilder Builder(DVI, DVI->getDebugScope());
+        Builder.createDebugValue(DVI->getLoc(), Undef, VarInfo);
+        DVI->eraseFromParent();
+      }
     }
   }
 
@@ -573,6 +607,10 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
       NewF->addSemanticsAttr(Attr);
   }
 
+  // The optimized function, which takes over the body of the original
+  // function, goes into the same section as the original function.
+  NewF->setSection(F->section());
+
   // Do the last bit of work to the newly created optimized function.
   DeadArgumentFinalizeOptimizedFunction();
   ArgumentExplosionFinalizeOptimizedFunction();
@@ -632,7 +670,9 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
     auto SubstCalleeType = GenCalleeType->substGenericArgs(
         M, Subs, Builder.getTypeExpansionContext());
     SubstCalleeSILType = SILType::getPrimitiveObjectType(SubstCalleeType);
-    SILFunctionConventions Conv(SubstCalleeType, M);
+    SILFunctionConventions Conv(
+        SubstCalleeType,
+        SILAddressConventions::forFunction(Builder.getFunction()));
     ResultType = Conv.getSILResultType(Builder.getTypeExpansionContext());
     if (FunctionTy->hasErrorResult()) {
       errorType = Conv.getSILErrorType(Builder.getTypeExpansionContext());
@@ -914,6 +954,15 @@ public:
     assert(F->isThunk() && "Old function should have been turned into a thunk");
 
     invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
+
+    // The thunk body was built from scratch after transferring the original
+    // blocks to the specialized function. If the thunk is no-return, it was
+    // terminated with an `unreachable`, which may require completing
+    // lifetimes and breaking infinite loops before the pass finishes.
+    if (F->needBreakInfiniteLoops())
+      breakInfiniteLoops(getPassManager(), F);
+    if (F->needCompleteLifetimes())
+      completeAllLifetimes(getPassManager(), F);
 
     // Make sure the PM knows about this function. This will also help us
     // with self-recursion.

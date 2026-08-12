@@ -156,7 +156,7 @@ class ExplicitSwiftModuleLoader : public SerializedModuleLoaderBase {
                   std::unique_ptr<llvm::MemoryBuffer> *moduleSourceInfoBuffer,
                   std::string *cacheKey, bool isCanImportLookup,
                   bool isTestableDependencyLookup, bool &isFramework,
-                  bool &isSystemModule) override;
+                  bool &isSystemModule, bool isSourceCanImport) override;
 
   std::error_code findModuleFilesInDirectory(
       ImportPath::Element ModuleID, const SerializedModuleBaseName &BaseName,
@@ -170,7 +170,8 @@ class ExplicitSwiftModuleLoader : public SerializedModuleLoaderBase {
 
   bool canImportModule(ImportPath::Module named, SourceLoc loc,
                        ModuleVersionInfo *versionInfo,
-                       bool isTestableDependencyLookup = false) override;
+                       bool isTestableDependencyLookup,
+                       bool isSourceCanImport) override;
 
   bool isCached(StringRef DepPath) override { return false; };
 
@@ -211,7 +212,7 @@ class ExplicitCASModuleLoader : public SerializedModuleLoaderBase {
                   std::unique_ptr<llvm::MemoryBuffer> *moduleSourceInfoBuffer,
                   std::string *cacheKey, bool isCanImportLookup,
                   bool isTestableDependencyLookup, bool &isFramework,
-                  bool &isSystemModule) override;
+                  bool &isSystemModule, bool isSourceCanImport) override;
 
   std::error_code findModuleFilesInDirectory(
       ImportPath::Element ModuleID, const SerializedModuleBaseName &BaseName,
@@ -225,7 +226,8 @@ class ExplicitCASModuleLoader : public SerializedModuleLoaderBase {
 
   bool canImportModule(ImportPath::Module named, SourceLoc loc,
                        ModuleVersionInfo *versionInfo,
-                       bool isTestableDependencyLookup = false) override;
+                       bool isTestableDependencyLookup,
+                       bool isSourceCanImport) override;
 
   struct Implementation;
   Implementation &Impl;

@@ -56,7 +56,19 @@ extension SIMD${n} where Scalar == ${Scalar} {
     ))
 %   end
   }
-  
+
+%  if n != 3:
+  @export(implementation) @_transparent
+  public func min() -> Scalar {
+    return ${Scalar}(Builtin.int_vector_reduce_${s}min_${Builtin}(_storage._value))
+  }
+
+  @export(implementation) @_transparent
+  public func max() -> Scalar {
+    return ${Scalar}(Builtin.int_vector_reduce_${s}max_${Builtin}(_storage._value))
+  }
+
+%  end
 %  if n >= 4:
   /// A vector formed by concatenating lowHalf and highHalf.
   ///

@@ -161,6 +161,15 @@ llvm::Value *IRGenFunction::emitAllocRawCall(llvm::Value *size,
                             {size, alignMask}, name);
 }
 
+/// Emit a typed 'raw' allocation, which has no heap pointer and is
+/// not guaranteed to be zero-initialized.
+llvm::Value *IRGenFunction::emitAllocRawTypedCall(
+    llvm::Value *size, llvm::Value *alignMask, llvm::Value *typeDescriptor,
+    const llvm::Twine &name) {
+  return emitAllocatingCall(*this, IGM.getAllocRawTypedFunctionPointer(),
+                            {size, alignMask, typeDescriptor}, name);
+}
+
 /// Emit a heap allocation.
 llvm::Value *IRGenFunction::emitAllocObjectCall(
     llvm::Value *metadata, llvm::Value *size, llvm::Value *alignMask,
@@ -275,6 +284,16 @@ void IRGenFunction::emitDeallocRawCall(llvm::Value *pointer,
   // For now, all we have is swift_slowDealloc.
   return emitDeallocatingCall(*this, IGM.getSlowDeallocFunctionPointer(),
                               {pointer, size, alignMask});
+}
+
+/// Emit a typed 'raw' deallocation, which has no heap pointer and is not
+/// guaranteed to be zero-initialized.
+void IRGenFunction::emitDeallocRawTypedCall(llvm::Value *pointer,
+                                            llvm::Value *size,
+                                            llvm::Value *alignMask,
+                                            llvm::Value *typeDescriptor) {
+  return emitDeallocatingCall(*this, IGM.getDeallocRawTypedFunctionPointer(),
+                              {pointer, size, alignMask, typeDescriptor});
 }
 
 void IRGenFunction::emitTSanInoutAccessCall(llvm::Value *address) {
@@ -490,7 +509,7 @@ Address IRGenFunction::emitAddressAtOffset(llvm::Value *base, Offset offset,
       // GEP to the slot, computing the index as a signed number.
       auto scaledIndex =
         int64_t(byteOffset.getValue()) / int64_t(objectSize.getValue());
-      auto indexValue = IGM.getSize(Size(scaledIndex));
+      auto indexValue = llvm::ConstantInt::getSigned(IGM.SizeTy, scaledIndex);
       auto slotPtr = Builder.CreateInBoundsGEP(objectTy, base, indexValue);
 
       return Address(slotPtr, objectTy, objectAlignment);

@@ -989,8 +989,9 @@ extension ContiguousArray: RangeReplaceableCollection {
   public mutating func removeAll(keepingCapacity keepCapacity: Bool = false) {
     if !keepCapacity {
       _buffer = _Buffer()
-    }
-    else if _buffer.isMutableAndUniquelyReferenced() {
+    } else if isEmpty {
+      return
+    } else if _buffer.isMutableAndUniquelyReferenced() {
       self.replaceSubrange(indices, with: EmptyCollection())
     }
     else {
@@ -1304,7 +1305,7 @@ extension ContiguousArray {
     borrowing get {
       let pointer = unsafe _buffer.firstElementAddress
       let count = _buffer.immutableCount
-      let span = unsafe Span(_unsafeStart: pointer, count: count)
+      let span = unsafe Span(_unchecked: pointer, count: count)
       return unsafe _overrideLifetime(span, borrowing: self)
     }
   }
@@ -1415,7 +1416,7 @@ extension ContiguousArray {
 #endif
       let pointer = unsafe _buffer.firstElementAddress
       let count = _buffer.mutableCount
-      let span = unsafe MutableSpan(_unsafeStart: pointer, count: count)
+      let span = unsafe MutableSpan(_unchecked: pointer, count: count)
       return unsafe _overrideLifetime(span, mutating: &self)
     }
   }

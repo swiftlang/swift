@@ -1256,7 +1256,7 @@ static ManagedValue emitBuiltinAutoDiffApplyDerivativeFunction(
   assert(derivativeFnType->isTrivialNoEscape());
 
   // Do the apply for the indirect result / error case.
-  if (SGF.SGM.M.useLoweredAddresses() &&
+  if (SGF.useLoweredAddresses() &&
       (derivativeFnType->hasIndirectFormalResults() ||
        derivativeFnType->hasIndirectErrorResult())) {
     assert(derivativeFnType->hasIndirectFormalResults() &&
@@ -1554,6 +1554,45 @@ static ManagedValue emitBuiltinAlignof(
   auto &ctx = SGF.getASTContext();
   return ManagedValue::forObjectRValueWithoutOwnership(SGF.B.createBuiltin(
       loc, BuiltinNames::Alignof, SILType::getBuiltinWordType(ctx), subs, {}));
+}
+
+/// Emit SIL for allocRawTyped/deallocRawTyped. These formally take a trailing
+/// T.Type argument that's only used at compile time, to recover the pointee
+/// type for the typed-malloc descriptor computed in IRGen.
+static ManagedValue emitBuiltinAllocRawTyped(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
+    PreparedArguments &&preparedArgs, SGFContext C) {
+  auto &ctx = SGF.getASTContext();
+  SILType rawPointerType = SILType::getRawPointerType(ctx);
+  auto argsOrError = decomposeArguments(SGF, loc, std::move(preparedArgs), 3);
+  if (!argsOrError)
+    return SGF.emitUndef(rawPointerType);
+  auto args = *argsOrError;
+  SILValue size = SGF.emitRValue(args[0]).forwardAsSingleValue(SGF, args[0]);
+  SILValue align = SGF.emitRValue(args[1]).forwardAsSingleValue(SGF, args[1]);
+  SILValue result = SGF.B.createBuiltin(loc, BuiltinNames::AllocRawTyped,
+                                        rawPointerType, subs, {size, align});
+  return ManagedValue::forObjectRValueWithoutOwnership(result);
+}
+
+static ManagedValue emitBuiltinDeallocRawTyped(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
+    PreparedArguments &&preparedArgs, SGFContext C) {
+  auto &ctx = SGF.getASTContext();
+  auto argsOrError = decomposeArguments(SGF, loc, std::move(preparedArgs), 4);
+  if (!argsOrError)
+    return ManagedValue::forObjectRValueWithoutOwnership(
+        SGF.emitEmptyTuple(loc));
+  auto args = *argsOrError;
+  SILValue pointer =
+      SGF.emitRValue(args[0]).forwardAsSingleValue(SGF, args[0]);
+  SILValue size = SGF.emitRValue(args[1]).forwardAsSingleValue(SGF, args[1]);
+  SILValue align = SGF.emitRValue(args[2]).forwardAsSingleValue(SGF, args[2]);
+  SGF.B.createBuiltin(loc, BuiltinNames::DeallocRawTyped,
+                      SILType::getEmptyTupleType(ctx), subs,
+                      {pointer, size, align});
+  return ManagedValue::forObjectRValueWithoutOwnership(
+      SGF.emitEmptyTuple(loc));
 }
 
 enum class CreateTaskOptions {

@@ -737,6 +737,9 @@ findDynamicValueAndType(OpaqueValue *value, const Metadata *type,
                                      outValue, outType, inoutCanTake, false,
                                      isTargetExistentialMetatype);
     }
+    case ExistentialTypeRepresentation::COM:
+      swift::fatalError(/*flags=*/0,
+                        "A COM interface cannot be bridged to Objective-C without an explicit object-model projection");
     }
   }
 
@@ -1176,6 +1179,9 @@ static void unwrapExistential(OpaqueValue *src,
                               bool &isOutOfLine,
                               bool &canTake) {
   switch (srcType->getRepresentation()) {
+    case ExistentialTypeRepresentation::COM:
+      swift::fatalError(/*flags=*/0,
+                        "A COM interface cannot be bridged to Objective-C without an explicit object-model projection");
     case ExistentialTypeRepresentation::Class: {
       auto classContainer =
         reinterpret_cast<ClassExistentialContainer*>(src);

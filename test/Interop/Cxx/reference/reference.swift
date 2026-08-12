@@ -5,11 +5,14 @@
 // RUN: %target-run %t/reference
 //
 // REQUIRES: executable_test
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 import Reference
 import StdlibUnittest
 
 var ReferenceTestSuite = TestSuite("Reference")
+
+func makeTuple() -> (UInt8, UInt8, UInt8, UInt8) { (10, 20, 30, 40) }
 
 ReferenceTestSuite.test("read-lvalue-reference") {
   expectNotEqual(13, getStaticInt())
@@ -106,6 +109,28 @@ ReferenceTestSuite.test("const reference to template") {
 ReferenceTestSuite.test("rvalue reference of trivial type") {
   setStaticIntRvalueRef(consuming: 2)
   expectEqual(2, getStaticInt())
+}
+
+ReferenceTestSuite.test("const reference to array") {
+  let tuple: (UInt8, UInt8, UInt8, UInt8) = (10, 20, 30, 40)
+  expectEqual(100, sumArrayRef4(tuple))
+}
+
+ReferenceTestSuite.test("const reference to array temporary") {
+  expectEqual(100, sumArrayRef4((10, 20, 30, 40)))
+  expectEqual(100, sumArrayRef4(makeTuple()))
+}
+
+ReferenceTestSuite.test("rvalue reference to array") {
+  let tuple: (UInt8, UInt8, UInt8, UInt8) = (10, 20, 30, 40)
+  expectEqual(100, sumArrayRValueRef4(consuming: tuple))
+  expectEqual(100, sumArrayRValueRef4(consuming: (10, 20, 30, 40)))
+}
+
+ReferenceTestSuite.test("const reference to array typealias") {
+  let bytes: ByteArray16Typealias = (7, 0, 0, 0, 0, 0, 0, 0,
+                                     0, 0, 0, 0, 0, 0, 0, 0)
+  expectEqual(7, firstByteOfArrayRefTypealias(bytes))
 }
 
 runAllTests()

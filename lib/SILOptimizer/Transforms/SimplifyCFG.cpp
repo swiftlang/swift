@@ -562,13 +562,7 @@ bool SimplifyCFG::dominatorBasedSimplify(DominanceAnalysis *DA) {
   if (!EnableOSSADominatorBasedSimplify && Fn.hasOwnership())
     return false;
 
-  // Split all critical edges such that we can move code onto edges. This is
-  // also required for SSA construction in dominatorBasedSimplifications' jump
-  // threading. It only splits new critical edges it creates by jump threading.
   bool Changed = false;
-  if (!Fn.hasOwnership() && EnableJumpThread) {
-    Changed = splitAllCriticalEdges(Fn, DT, nullptr);
-  }
   unsigned MaxIter = MaxIterationsOfDominatorBasedSimplify;
   SmallVector<SILBasicBlock *, 16> BlocksForWorklist;
 
@@ -2534,7 +2528,9 @@ bool SimplifyCFG::simplifyTryApplyBlock(TryApplyInst *TAI) {
   LLVM_DEBUG(llvm::dbgs() << "simplify try_apply block\n");
 
   auto CalleeFnTy = CalleeType.castTo<SILFunctionType>();
-  SILFunctionConventions calleeConv(CalleeFnTy, TAI->getModule());
+  SILAddressConventions silConv =
+      SILAddressConventions::forFunction(*TAI->getFunction());
+  SILFunctionConventions calleeConv(CalleeFnTy, silConv);
   auto ResultTy = calleeConv.getSILResultType(
       TAI->getFunction()->getTypeExpansionContext());
   auto OrigResultTy = TAI->getNormalBB()->getArgument(0)->getType();
@@ -2547,7 +2543,7 @@ bool SimplifyCFG::simplifyTryApplyBlock(TryApplyInst *TAI) {
         TAI->getModule(), TAI->getSubstitutionMap(),
         Builder.getTypeExpansionContext());
   }
-  SILFunctionConventions targetConv(TargetFnTy, TAI->getModule());
+  SILFunctionConventions targetConv(TargetFnTy, silConv);
 
   auto OrigFnTy = TAI->getCallee()->getType().getAs<SILFunctionType>();
   if (OrigFnTy->isPolymorphic()) {
@@ -2555,7 +2551,7 @@ bool SimplifyCFG::simplifyTryApplyBlock(TryApplyInst *TAI) {
         OrigFnTy->substGenericArgs(TAI->getModule(), TAI->getSubstitutionMap(),
                                    Builder.getTypeExpansionContext());
   }
-  SILFunctionConventions origConv(OrigFnTy, TAI->getModule());
+  SILFunctionConventions origConv(OrigFnTy, silConv);
   auto context = TAI->getFunction()->getTypeExpansionContext();
   SmallVector<SILValue, 8> Args;
   unsigned numArgs = TAI->getNumArguments();
@@ -3964,30 +3960,6 @@ SILTransform *swift::createJumpThreadSimplifyCFG() {
 
 namespace {
 
-// Used to test critical edge splitting with sil-opt.
-class SplitCriticalEdges : public SILFunctionTransform {
-  bool OnlyNonCondBrEdges;
-
-public:
-  SplitCriticalEdges(bool SplitOnlyNonCondBrEdges)
-      : OnlyNonCondBrEdges(SplitOnlyNonCondBrEdges) {}
-
-  void run() override {
-    auto &Fn = *getFunction();
-
-    if (OnlyNonCondBrEdges && Fn.getModule().getOptions().VerifyAll)
-      Fn.verifyCriticalEdges();
-
-    // Split all critical edges from all or non only cond_br terminators.
-    bool Changed = splitAllCriticalEdges(Fn, nullptr, nullptr);
-
-    if (Changed) {
-      invalidateAnalysis(SILAnalysis::InvalidationKind::BranchesAndInstructions);
-    }
-  }
-
-};
-
 // Used to test SimplifyCFG::simplifyArgs with sil-opt.
 class SimplifyBBArgs : public SILFunctionTransform {
 public:
@@ -4032,16 +4004,6 @@ public:
 };
 
 } // end anonymous namespace
-
-/// Splits all critical edges in a function.
-SILTransform *swift::createSplitAllCriticalEdges() {
-  return new SplitCriticalEdges(false);
-}
-
-/// Splits all critical edges from non cond_br terminators in a function.
-SILTransform *swift::createSplitNonCondBrCriticalEdges() {
-  return new SplitCriticalEdges(true);
-}
 
 // Simplifies basic block arguments.
 SILTransform *swift::createSROABBArgs() { return new SROABBArgs(); }

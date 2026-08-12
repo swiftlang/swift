@@ -298,7 +298,8 @@ emitApplyOfInitAccessor(SILGenFunction &SGF, SILLocation loc,
 
   // `initialValue`
   {
-    SILFunctionConventions fnConv(fnType, SGF.SGM.M);
+    SILFunctionConventions fnConv(
+        fnType, SILAddressConventions::forFunction(SGF.F));
     auto startArgIdx = fnConv.getSILArgIndexOfFirstParam();
 
     SmallVector<ManagedValue> initialValues;

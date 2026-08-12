@@ -1115,23 +1115,20 @@ class ClassExistentialTypeInfo final
 
   /// Given an explosion with multiple pointer elements in them, pack them
   /// into an enum payload explosion.
-  /// FIXME: Assumes the explosion is broken into word-sized integer chunks.
-  /// Should use EnumPayload.
   void mergeExplosion(Explosion &In, Explosion &Out, IRGenFunction &IGF)
   const {
-    // We always have at least one entry.
-    auto *part = In.claimNext();
-    Out.add(IGF.Builder.CreatePtrToInt(part, IGF.IGM.IntPtrTy));
-
-    for (unsigned i = 0; i != getNumStoredProtocols(); ++i) {
-      part = In.claimNext();
-      Out.add(IGF.Builder.CreatePtrToInt(part, IGF.IGM.IntPtrTy));
-    }
+    // A loadable optional class existential is lowered with its concrete
+    // pointer element types (the reference word and each witness table are
+    // `ptr`), just like the non-optional existential. Forward the words into
+    // the enum payload explosion unchanged, rather than round-tripping them
+    // through pointer-width integers.
+    Out.add(In.claimNext());
+    for (unsigned i = 0; i != getNumStoredProtocols(); ++i)
+      Out.add(In.claimNext());
   }
 
-  // Given an exploded enum payload consisting of consecutive word-sized
-  // chunks, cast them to their underlying component types.
-  // FIXME: Assumes the payload is word-chunked. Should use
+  // Given an exploded enum payload consisting of consecutive pointer-typed
+  // words, cast them to their underlying component types.
   void decomposeExplosion(Explosion &InE, Explosion &OutE,
                           IRGenFunction &IGF) const {
     // The first entry is always the weak*.
@@ -1987,6 +1984,8 @@ Address irgen::emitOpaqueExistentialContainerInit(IRGenFunction &IGF,
   llvm::Value *metadata = IGF.emitTypeMetadataRef(formalSrcType);
   IGF.Builder.CreateStore(metadata, destLayout.projectMetadataRef(IGF, dest));
 
+  if (IGF.IGM.isEmbeddedWithExistentials() && IGF.IGM.DebugInfo)
+    IGF.IGM.DebugInfo->emitExistentialPayloadType(formalSrcType);
 
   // Next, write the protocol witness tables.
   forEachProtocolWitnessTable(IGF, formalSrcType, &metadata,

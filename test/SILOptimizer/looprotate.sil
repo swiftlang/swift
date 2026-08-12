@@ -202,12 +202,12 @@ bb0(%0 : $Int32, %25: $*P):
   %2 = integer_literal $Builtin.Int32, 0
   %30 = alloc_box $<τ_0_0> { var τ_0_0 } <Bool>
   %30a = project_box %30 : $<τ_0_0> { var τ_0_0 } <Bool>, 0
-  %40 = open_existential_addr immutable_access %25 : $*P to $*@opened("C22498FA-CABF-11E5-B9A9-685B35C48C83", P) Self
+  %40 = open_existential_addr immutable_access %25 : $*P to $*@opened(1, P) Self
   br bb1(%1 : $Builtin.Int32, %2 : $Builtin.Int32, %30 : $<τ_0_0> { var τ_0_0 } <Bool>)
 
 bb1(%4 : $Builtin.Int32, %5 : $Builtin.Int32, %31 : $<τ_0_0> { var τ_0_0 } <Bool>):
-  %111 = witness_method $@opened("C22498FA-CABF-11E5-B9A9-685B35C48C83", P) Self, #P.boo, %40 : $*@opened("C22498FA-CABF-11E5-B9A9-685B35C48C83", P) Self : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64
-  %122 = apply %111<@opened("C22498FA-CABF-11E5-B9A9-685B35C48C83", P) Self>(%40) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64
+  %111 = witness_method $@opened(1, P) Self, #P.boo, %40 : $*@opened(1, P) Self : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64
+  %122 = apply %111<@opened(1, P) Self>(%40) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64
   %6 = struct $Int32 (%5 : $Builtin.Int32)
   %8 = builtin "cmp_eq_Word"(%5 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int1
   cond_br %8, bb3, bb2
@@ -453,16 +453,16 @@ bb1:
 
 bb2(%37 : $Builtin.Word):
   %38 = dynamic_pack_index %37 of $Pack{KeyPath<Wrapper, Wrapper>}
-  %39 = open_pack_element %38 of <Topic, each Value where Topic : AnyObject, repeat each Value : Sendable> at <Wrapper, Pack{Wrapper}>, shape $each Value, uuid "94218A22-3595-11EF-8496-4EA2A866E4C5"
-  %40 = pack_element_get %38 of %0 : $*Pack{KeyPath<Wrapper, Wrapper>} as $*KeyPath<Wrapper, @pack_element("94218A22-3595-11EF-8496-4EA2A866E4C5") each Value>
-  %41 = unchecked_addr_cast %5 : $*KeyPath<Wrapper, Wrapper> to $*KeyPath<Wrapper, @pack_element("94218A22-3595-11EF-8496-4EA2A866E4C5") each Value>
-  %42 = load %40 : $*KeyPath<Wrapper, @pack_element("94218A22-3595-11EF-8496-4EA2A866E4C5") each Value>
-  store %42 to %41 : $*KeyPath<Wrapper, @pack_element("94218A22-3595-11EF-8496-4EA2A866E4C5") each Value>
+  %39 = open_pack_element %38 of <Topic, each Value where Topic : AnyObject, repeat each Value : Sendable> at <Wrapper, Pack{Wrapper}>, shape $each Value, id 1
+  %40 = pack_element_get %38 of %0 : $*Pack{KeyPath<Wrapper, Wrapper>} as $*KeyPath<Wrapper, @pack_element(1) each Value>
+  %41 = unchecked_addr_cast %5 : $*KeyPath<Wrapper, Wrapper> to $*KeyPath<Wrapper, @pack_element(1) each Value>
+  %42 = load %40 : $*KeyPath<Wrapper, @pack_element(1) each Value>
+  store %42 to %41 : $*KeyPath<Wrapper, @pack_element(1) each Value>
   %7 = integer_literal $Builtin.Word, 1           // users: %45, %44
   %44 = builtin "add_Word"(%37 : $Builtin.Word, %7 : $Builtin.Word) : $Builtin.Word // users: %48, %45
   cond_br undef, bb1, bb3
 
 bb3:
-  strong_retain %42 : $KeyPath<Wrapper, @pack_element("94218A22-3595-11EF-8496-4EA2A866E4C5") each Value>
+  strong_retain %42 : $KeyPath<Wrapper, @pack_element(1) each Value>
   br bb2(%44 : $Builtin.Word)
 }

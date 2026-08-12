@@ -178,7 +178,7 @@ case TypeKind::Id:
       auto genericSig = env->getGenericSignature();
       auto existentialTy = env->getOpenedExistentialType();
       auto subMap = env->getOuterSubstitutions();
-      auto uuid = env->getOpenedExistentialUUID();
+      auto id = env->getOpenedExistentialID();
 
       auto newSubMap = asDerived().transformSubstitutionMap(subMap);
       if (newSubMap == subMap)
@@ -187,7 +187,7 @@ case TypeKind::Id:
         return Type();
 
       auto *newEnv = GenericEnvironment::forOpenedExistential(
-          genericSig, existentialTy, newSubMap, uuid);
+          genericSig, existentialTy, newSubMap, id);
       return newEnv->mapTypeIntoEnvironment(local->getInterfaceType());
     }
 

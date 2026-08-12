@@ -681,11 +681,11 @@ temporary name to the element type. This type is called an *opened pack
 element archetype*. It is spelled like this:
 
 ```
-   @pack_element("<uuid>") T
+   @pack_element(id) T
 ```
 
 There must be an `open_pack_element` in the current SIL function with
-the given UUID. The name `T` must resolve to a pack parameter within the
+the given ID. The name `T` must resolve to a pack parameter within the
 generic signature of this instruction, and that pack parameter must have
 the same shape class in the signature as the opened shape class pack
 parameter. The pack parameter is then translated to the corresponding

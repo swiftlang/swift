@@ -746,22 +746,21 @@ public func withUnsafeCurrentTask<T>(body: (UnsafeCurrentTask?) throws -> T) ret
 ///
 /// - Returns: The return value, if any, of the `body` closure.
 @available(SwiftStdlib 6.0, *)
-// Note: Could not be always-emit-into client since the UnsafeCurrentTask initializer was not usableFromInline
-// in 6.0, so we can't make this symbol more available than the availability of UnsafeCurrentTask.init.
+@export(implementation)
 @abi(
-  // abi only necessary to avoid redeclaration clash with previous declaration (__abi_withUnsafeCurrentTask)
-  nonisolated(nonsending) func withUnsafeCurrentTaskNonsending<T>(
+  nonisolated(nonsending) func withUnsafeCurrentTaskNonsendingExportedImpl<T>(
     body: nonisolated(nonsending) (UnsafeCurrentTask?) async throws -> T
   ) async rethrows -> T
 )
 public nonisolated(nonsending) func withUnsafeCurrentTask<T>(
   body: nonisolated(nonsending) (UnsafeCurrentTask?) async throws -> T
 ) async rethrows -> T {
-  guard let _task = unsafe _getCurrentAsyncTask() else {
-    return try await body(nil)
-  }
-
-  return try unsafe await body(UnsafeCurrentTask(_task))
+  // This is a backdeployment workaround!
+  // We cannot use the UnsafeCurrentTask initializer since it can't be used from a backdeployed function.
+  // We can get the UnsafeCurrentTask using the withUnsafeCurrentTask and escape the reference.
+  // This is safe, because we know this is the _current task_ so it must be alive still anyway.
+  let task: UnsafeCurrentTask? = unsafe withUnsafeCurrentTask { unsafe $0 }
+  return try unsafe await body(task)
 }
 
 // Old version for ABI compatibility
@@ -772,6 +771,19 @@ public nonisolated(nonsending) func withUnsafeCurrentTask<T>(
 )
 internal func __abi_withUnsafeCurrentTask<T>(
   body: (UnsafeCurrentTask?) async throws -> T
+) async rethrows -> T {
+  unsafe try await withUnsafeCurrentTask(body: body)
+}
+
+// Old version for ABI compatibility
+@available(SwiftStdlib 6.4, *)
+@abi(
+  nonisolated(nonsending) func withUnsafeCurrentTaskNonsending<T>(
+    body: nonisolated(nonsending) (UnsafeCurrentTask?) async throws -> T
+  ) async rethrows -> T
+)
+public nonisolated(nonsending) func __abi_withUnsafeCurrentTaskNonsending<T>(
+  body: nonisolated(nonsending) (UnsafeCurrentTask?) async throws -> T
 ) async rethrows -> T {
   unsafe try await withUnsafeCurrentTask(body: body)
 }

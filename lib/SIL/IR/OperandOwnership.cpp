@@ -22,7 +22,7 @@ using namespace swift;
 
 /// Return true if all OperandOwnership invariants hold.
 bool swift::checkOperandOwnershipInvariants(const Operand *operand,
-                                            SILModuleConventions *silConv) {
+                                            SILAddressConventions *silConv) {
   OperandOwnership opOwnership = operand->getOperandOwnership(silConv);
   if (opOwnership == OperandOwnership::Borrow) {
     // Must be a valid BorrowingOperand.
@@ -40,9 +40,10 @@ namespace {
 class OperandOwnershipClassifier
   : public SILInstructionVisitor<OperandOwnershipClassifier, OperandOwnership> {
   LLVM_ATTRIBUTE_UNUSED SILModule &mod;
-  // Allow module conventions to be overridden while lowering between canonical
-  // and lowered SIL stages.
-  SILModuleConventions silConv;
+  // Address conventions for classifying this operand. Overridable so
+  // AddressLowering can classify operands in address form before the function's
+  // lowered bit is set.
+  SILAddressConventions silConv;
 
   const Operand &op;
 
@@ -54,7 +55,7 @@ public:
   /// should be the subobject and Value should be the parent object. An example
   /// of where one would want to do this is in the case of value projections
   /// like struct_extract.
-  OperandOwnershipClassifier(SILModuleConventions silConv, const Operand &op)
+  OperandOwnershipClassifier(SILAddressConventions silConv, const Operand &op)
       : mod(silConv.getModule()), silConv(silConv), op(op) {}
 
   SILValue getValue() const { return op.get(); }
@@ -271,7 +272,25 @@ OPERAND_OWNERSHIP(UnownedInstantaneousUse, UnmanagedAutoreleaseValue)
 OPERAND_OWNERSHIP(PointerEscape, ProjectBox) // The result is a T*.
 OPERAND_OWNERSHIP(PointerEscape, ProjectExistentialBox)
 OPERAND_OWNERSHIP(PointerEscape, UncheckedOwnershipConversion)
-OPERAND_OWNERSHIP(PointerEscape, ConvertEscapeToNoEscape)
+
+// For an ordinary (copyable) escaping closure, the pre-conversion operand
+// may still be used again after the conversion (e.g. a `var` read again
+// later), so treat the conversion conservatively as a non-consuming pointer
+// escape.
+//
+// A `@called(once)` function value is single-owner and move-only-checked,
+// so pre-conversion value doesn't survive to be used again -- any further
+// use would already be diagnosed as a double consumption by the move-only
+// checker. Treat the conversion as an ordinary forwarding consume in that
+// case, matching how `convert_function` and other function type conversions
+// are already treated, so ownership-based analyses don't need to
+// special-case this instruction.
+OperandOwnership OperandOwnershipClassifier::visitConvertEscapeToNoEscapeInst(
+    ConvertEscapeToNoEscapeInst *i) {
+  return i->getType().castTo<SILFunctionType>()->isCalledOnce()
+             ? OperandOwnership::ForwardingConsume
+             : OperandOwnership::PointerEscape;
+}
 
 // UncheckedBitwiseCast ownership behaves like RefToUnowned. It produces an
 // Unowned value from a non-trivial value, without consuming or borrowing the
@@ -578,7 +597,7 @@ OperandOwnershipClassifier::visitFullApply(FullApplySite apply) {
     if (apply.isCalleeOperand(op)) {
       return SILArgumentConvention(calleeTy->getCalleeConvention());
     } else {
-      unsigned calleeArgIdx = apply.getCalleeArgIndexOfFirstAppliedArg()
+      unsigned calleeArgIdx = apply.getSubstCalleeArgIndexOfFirstAppliedArg()
                               + apply.getAppliedArgIndex(op);
       return silConv.getFunctionConventions(calleeTy).getSILArgumentConvention(
           calleeArgIdx);
@@ -824,6 +843,7 @@ BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, Add)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, GenericAdd)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, Alignof)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, AllocRaw)
+BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, AllocRawTyped)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, And)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, GenericAnd)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, AssertConf)
@@ -846,6 +866,7 @@ BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, CmpXChg)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, CondUnreachable)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, CopyArray)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, DeallocRaw)
+BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, DeallocRawTyped)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, DestroyArray)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, ExactSDiv)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, GenericExactSDiv)
@@ -1140,7 +1161,7 @@ OperandOwnership OperandOwnershipClassifier::visitBuiltinInst(BuiltinInst *bi) {
 //===----------------------------------------------------------------------===//
 
 OperandOwnership
-Operand::getOperandOwnership(SILModuleConventions *silConv) const {
+Operand::getOperandOwnership(SILAddressConventions *silConv) const {
   // A type-dependent operand is a NonUse (as opposed to say an
   // InstantaneousUse) because it does not require liveness.
   if (isTypeDependent())
@@ -1161,8 +1182,12 @@ Operand::getOperandOwnership(SILModuleConventions *silConv) const {
       return OperandOwnership(OperandOwnership::InstantaneousUse);
     }
   }
-  SILModuleConventions overrideConv =
-      silConv ? *silConv : SILModuleConventions(getUser()->getModule());
+  // Default to the lowered-addresses state of the function containing this
+  // operand's user, not the module stage: an already-lowered function must
+  // classify its operands in address form even while the module flag is false.
+  SILAddressConventions overrideConv =
+      silConv ? *silConv
+              : SILAddressConventions::forFunction(*getUser()->getFunction());
   OperandOwnershipClassifier classifier(overrideConv, *this);
   return classifier.visit(const_cast<SILInstruction *>(getUser()));
 }

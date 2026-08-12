@@ -59,3 +59,8 @@ bb0:
   return %0 : $()
 }
 
+sil @not_stored_property : $@convention(thin) (@owned Array<Int>) -> () {
+bb0(%0 : $Array<Int>):
+  %1 = struct_extract %0 : $Array<Int>, #Array.count // expected-error {{no declaration 'count' found that is a stored property}}
+}
+

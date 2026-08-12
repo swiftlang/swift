@@ -790,13 +790,6 @@ class SILPrinter : public SILInstructionVisitor<SILPrinter> {
   SIMPLE_PRINTER(ActorIsolation)
 #undef SIMPLE_PRINTER
 
-  SILPrinter &operator<<(UUID value) {
-    llvm::SmallString<UUID::StringBufferSize> str;
-    ASTPrinter::getUUIDStringForPrinting(value, str);
-    PrintState.OS << str;
-    return *this;
-  }
-
   SILPrinter &operator<<(SILValuePrinterInfo i) {
     SILColor C(PrintState.OS, SC_Type);
     *this << i.ValueID;
@@ -1881,6 +1874,9 @@ public:
       if (!CI->isStackAllocationNested())
         *this << "[non_nested] ";
     }
+    if (CI->isCalledOnce()) {
+      *this << "[called_once] ";
+    }
     visitApplyInstBase(CI);
   }
 
@@ -2220,11 +2216,21 @@ public:
 
   void visitDebugValueInst(DebugValueInst *DVI) {
     if (DVI->usesMoveableValueDebugInfo() &&
-        !DVI->getOperand()->getType().isMoveOnly())
+        DVI->getAllOperands().size() == 1 &&
+        !DVI->getAllOperands()[0].get()->getType().isMoveOnly())
       *this << "[moveable_value_debuginfo] ";
     if (DVI->hasTrace())
       *this << "[trace] ";
-    *this << getIDAndType(DVI->getOperand());
+    auto operands = DVI->getAllOperands();
+    if (operands.size() == 1) {
+      *this << getIDAndType(operands[0].get());
+    } else {
+      *this << "(";
+      llvm::interleave(
+          operands, [&](const Operand &op) { *this << getIDAndType(op.get()); },
+          [&] { *this << ", "; });
+      *this << ")";
+    }
     printDebugVar(DVI->getVarInfo(false),
                   &DVI->getModule().getASTContext().SourceMgr);
     if (auto *DebugBB = DVI->getDebugReconstructionBlock()) {
@@ -2892,7 +2898,7 @@ public:
       subs.getGenericSignature()->getSugaredType(
         env->getOpenedElementShapeClass());
     *this << ", shape $" << sugaredShapeClass
-          << ", uuid \"" << env->getOpenedElementUUID() << "\"";
+          << ", id " << env->getOpenedElementID();
   }
   void visitPackElementGetInst(PackElementGetInst *I) {
     *this << Ctx.getID(I->getIndex()) << " of "
@@ -3980,6 +3986,11 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   if (!isExternalDeclaration() && hasOwnership())
     OS << "[ossa] ";
 
+  // If this function is not yet address-lowered in an opaque values build,
+  // indicate this with [opaque].
+  if (!hasLoweredAddresses())
+    OS << "[opaque] ";
+
   if (needsStackProtection())
     OS << "[stack_protection] ";
 
@@ -4826,6 +4837,9 @@ void SILDifferentiabilityWitness::print(llvm::raw_ostream &OS,
   // ([serialized])?
   if (isSerialized())
     OS << "[serialized] ";
+  // ([default])?
+  if (isDefault())
+    OS << "[default] ";
   // Kind
   OS << '[';
   switch (getKind()) {

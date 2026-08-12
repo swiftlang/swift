@@ -63,7 +63,7 @@ public protocol MemoryReader {
   func fetch<T>(from addr: Address, as: T.Type) throws -> T
 
   /// Fetch a NUL terminated string from the specified location in the source
-  func fetchString(from addr: Address) throws -> String?
+  func fetchString(from addr: Address) throws -> (String?, consumedBytes: Int)
 
   /// Fetch a fixed-length string from the specified location in the source
   func fetchString(from addr: Address, length: Int) throws -> String?
@@ -125,7 +125,7 @@ extension MemoryReader {
     }
   }
 
-  public func fetchString(from addr: Address) throws -> String? {
+  public func fetchString(from addr: Address) throws -> (String?, consumedBytes: Int) {
     var bytes: [UInt8] = []
     var ptr = addr
     while true {
@@ -137,7 +137,7 @@ extension MemoryReader {
       ptr += 1
     }
 
-    return String(decoding: bytes, as: UTF8.self)
+    return (String(decoding: bytes, as: UTF8.self), consumedBytes: bytes.count)
   }
 
   public func fetchString(from addr: Address, length: Int) throws -> String? {
@@ -164,9 +164,12 @@ public struct UnsafeLocalMemoryReader: MemoryReader {
     return ptr.loadUnaligned(fromByteOffset: 0, as: type)
   }
 
-  public func fetchString(from address: Address) throws -> String? {
+  public func fetchString(from address: Address) throws -> (String?, consumedBytes: Int) {
     let ptr = UnsafeRawPointer(bitPattern: UInt(address))!
-    return String(validatingUTF8: ptr.assumingMemoryBound(to: CChar.self))
+    guard let str = String(validatingUTF8: ptr.assumingMemoryBound(to: CChar.self)) else {
+      return (nil, 0)
+    }
+    return (str, consumedBytes: str.utf8.count)
   }
 }
 

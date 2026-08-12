@@ -28,9 +28,8 @@ using namespace swift;
 #if SWIFT_BUILD_SWIFT_SYNTAX
 
 /// Enqueue a diagnostic with ASTGen's diagnostic rendering.
-static void addQueueDiagnostic(void *queuedDiagnostics,
-                               void *perFrontendState,
-                               const DiagnosticInfo &info, SourceManager &SM) {
+void DiagnosticBridge::addQueueDiagnostic(const DiagnosticInfo &info,
+                                          SourceManager &SM) {
   llvm::SmallString<256> text;
   {
     llvm::raw_svector_ostream out(text);
@@ -62,7 +61,9 @@ static void addQueueDiagnostic(void *queuedDiagnostics,
   // argument to `swift_ASTGen_addQueuedDiagnostic` but that requires
   // bridging of `Note` structure and new serialization.
   for (auto *childNote : info.ChildDiagnosticInfo) {
-    addQueueDiagnostic(queuedDiagnostics, perFrontendState, *childNote, SM);
+    if (childNote->Loc.isValid())
+      queueBuffer(SM, SM.findBufferContainingLoc(childNote->Loc));
+    addQueueDiagnostic(*childNote, SM);
   }
 }
 
@@ -119,7 +120,7 @@ void DiagnosticBridge::enqueueDiagnostic(SourceManager &SM,
     queuedDiagnostics = swift_ASTGen_createQueuedDiagnostics();
 
   queueBuffer(SM, innermostBufferID);
-  addQueueDiagnostic(queuedDiagnostics, perFrontendState, Info, SM);
+  addQueueDiagnostic(Info, SM);
 }
 
 void DiagnosticBridge::flush(llvm::raw_ostream &OS, bool includeTrailingBreak,

@@ -12,3 +12,14 @@ import Lib
 
 let _: Int = IWidget.tag
 let _: String = IWidget.describe()
+
+// The synthesized IID is still reachable too.
+let _: GUID = IWidget.IID
+
+// Declaration classification is reconstructed from the deserialized @com
+// attribute, so a client can also extend the imported interface metatype.
+extension IWidget.Protocol {
+  var clientTag: Int { 8 }
+}
+
+let _: Int = IWidget.clientTag
