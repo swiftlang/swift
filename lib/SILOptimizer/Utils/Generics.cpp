@@ -2618,7 +2618,7 @@ bool swift::specializeClassMethodInst(ClassMethodInst *cm) {
   CanSILFunctionType finalFuncTy = reInfo.getSpecializedType();
   SILType finalSILTy = SILType::getPrimitiveObjectType(finalFuncTy);
 
-  SILBuilder builder(cm);
+  SILBuilder builder(cm, cm->getDebugScope());
   auto *newCM = builder.createClassMethod(cm->getLoc(), cm->getOperand(),
                                           cm->getMember(), finalSILTy);
 
@@ -2671,7 +2671,7 @@ bool swift::specializeWitnessMethodInst(WitnessMethodInst *wm) {
   CanSILFunctionType finalFuncTy = reInfo.getSpecializedType();
   SILType finalSILTy = SILType::getPrimitiveObjectType(finalFuncTy);
 
-  SILBuilder builder(wm);
+  SILBuilder builder(wm, wm->getDebugScope());
   auto *newWM = builder.createWitnessMethod(wm->getLoc(), wm->getLookupType(),
                                             wm->getConformance(), wm->getMember(), finalSILTy);
 
