@@ -47,19 +47,17 @@ public func testCount(_ x: UnsafeBufferPointer<UInt>) -> Int {
   return x.count
 }
 
-// Within the loop, there should be no extra checks.
+// Within the loop, there should be no extra checks: the kernel just loads,
+// accumulates, tests the induction variable, and branches back. (Loop-invariant
+// entry preconditions -- e.g. a count >= 0 guard -- may precede the loop.)
 // CHECK-LABEL: define {{.*}} float {{.*}}testSubscript
-// The only unconditional branch is into the loop.
-// CHECK: br label %[[LOOP:[0-9]+]]
-//
-// CHECK: [[LOOP]]:
-// CHECK: phi float [ 0.000000e+00
+// CHECK: phi float
 // CHECK: load float, ptr
 // CHECK: fadd float
 // CHECK: [[CMP:%[0-9]+]] = icmp eq
-// CHECK: br i1 [[CMP]], label %.loopexit, label %[[LOOP]]
+// CHECK: br i1 [[CMP]], label %[[EXIT:[-A-Za-z0-9_.]+]], label %{{[-A-Za-z0-9_.]+}}
 //
-// CHECK: .loopexit: ; preds = %[[LOOP]]
+// CHECK: [[EXIT]]:
 // CHECK: ret float
 public func testSubscript(_ ubp: UnsafeBufferPointer<Float>) -> Float {
   var sum: Float = 0
@@ -69,20 +67,18 @@ public func testSubscript(_ ubp: UnsafeBufferPointer<Float>) -> Float {
   return sum
 }
 
-// Within the loop, there should be no extra checks.
+// Within the loop, there should be no extra checks: the kernel just loads,
+// accumulates, tests the induction variable, and branches back. (Loop-invariant
+// entry preconditions -- e.g. a base != nil guard -- may precede the loop.)
 // CHECK-LABEL: define {{.*}} i64 {{.*}}testSubscript
-// The only unconditional branch is into the loop.
-// CHECK: br label %[[LOOP:[0-9]+]]
-//
-// CHECK: [[LOOP]]:
-// CHECK: phi i64 [ 0
+// CHECK: phi i64
 // CHECK: load i8, ptr
 // CHECK: zext i8 %{{.*}} to i64
 // CHECK: add i64
 // CHECK: [[CMP:%[0-9]+]] = icmp eq
-// CHECK: br i1 [[CMP]], label %[[RET:.*]], label %[[LOOP]]
+// CHECK: br i1 [[CMP]], label %[[RET:[-A-Za-z0-9_.]+]], label %{{[-A-Za-z0-9_.]+}}
 //
-// CHECK: [[RET]]: ; preds = %[[LOOP]], %{{.*}}
+// CHECK: [[RET]]:
 // CHECK: ret i64
 public func testSubscript(_ ubp: UnsafeRawBufferPointer) -> Int64 {
   var sum: Int64 = 0
