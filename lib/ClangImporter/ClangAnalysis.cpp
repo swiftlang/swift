@@ -26,11 +26,11 @@ bool importer::hasImportReferenceAttr(const clang::RecordDecl *decl) {
 }
 
 bool importer::hasImportAsOpaquePointerAttr(const clang::RecordDecl *decl) {
-  return decl->hasAttrs() && llvm::any_of(decl->getAttrs(), [](auto *attr) {
-           if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
-             return swiftAttr->getAttribute() == "import_opaque_pointer";
-           return false;
-         });
+  return llvm::any_of(decl->specific_attrs<clang::SwiftAttrAttr>(),
+                      [](const clang::SwiftAttrAttr *swiftAttr) {
+                        return swiftAttr->getAttribute() ==
+                               "import_opaque_pointer";
+                      });
 }
 
 //===----------------------------------------------------------------------===//
@@ -151,8 +151,6 @@ namespace {
 /// The retain:/release: attributes written directly on a record.
 struct RetainReleaseInfo {
   RetainReleaseInfo(const clang::RecordDecl *decl) : decl(decl) {
-    if (!decl->hasAttrs())
-      return;
     for (auto *attr : decl->specific_attrs<clang::SwiftAttrAttr>()) {
       StringRef attrStr = attr->getAttribute();
       if (attrStr.consume_front("retain:")) {

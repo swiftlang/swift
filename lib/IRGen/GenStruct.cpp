@@ -763,18 +763,14 @@ namespace {
         ctx.Diags.diagnose(copyConstructorLoc, diag::failed_emit_copy,
                            recordDecl);
 
-        bool hasCopyableIfAttr =
-            recordDecl->hasAttrs() &&
-            llvm::any_of(recordDecl->getAttrs(), [&](clang::Attr *attr) {
-              if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr)) {
-                StringRef attrStr = swiftAttr->getAttribute();
-                assert(!attrStr.starts_with("~Copyable") &&
-                       "Trying to emit copy of a type annotated with "
-                       "'SWIFT_NONCOPYABLE'?");
-                if (attrStr.starts_with("copyable_if:"))
-                  return true;
-              }
-              return false;
+        bool hasCopyableIfAttr = llvm::any_of(
+            recordDecl->specific_attrs<clang::SwiftAttrAttr>(),
+            [&](const clang::SwiftAttrAttr *swiftAttr) {
+              StringRef attrStr = swiftAttr->getAttribute();
+              assert(!attrStr.starts_with("~Copyable") &&
+                     "Trying to emit copy of a type annotated with "
+                     "'SWIFT_NONCOPYABLE'?");
+              return attrStr.starts_with("copyable_if:");
             });
 
         bool hasRequiresClause =
