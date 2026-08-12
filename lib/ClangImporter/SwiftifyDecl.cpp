@@ -42,6 +42,8 @@
 #include "clang/AST/Type.h"
 #include "clang/Basic/Module.h"
 #include "clang/Sema/Overload.h"
+#include "llvm-c/Types.h"
+#include "llvm/ADT/SmallPtrSet.h"
 #include <optional>
 
 using namespace swift;
@@ -945,16 +947,22 @@ void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
                                ForeignReferenceTypeInfoRequest({Record}), {})
           .getPrimarySuperclass();
     };
-    for (auto *Overridden : CxxMethod->overridden_methods()) {
-      auto *BaseRecord = Overridden->getParent()->getCanonicalDecl();
+    if (CxxMethod->size_overridden_methods() > 0) {
+      llvm::SmallPtrSet<const clang::CXXRecordDecl *, 16> SuperClasses;
       for (auto *Super = primarySuperclassOf(CxxMethod->getParent()); Super;
            Super = primarySuperclassOf(Super)) {
-        if (Super->getCanonicalDecl() == BaseRecord) {
-          // FIXME: We should still generate a safe wrapper if the superclass is
-          // missing one, or if this one would produce a different signature.
-          DLOG("Inherits the wrapper of an overridden virtual method, which "
-               "dispatches here\n");
-          return;
+        SuperClasses.insert(Super->getCanonicalDecl());
+      }
+      if (SuperClasses.size() > 0) {
+        for (auto *Overridden : CxxMethod->overridden_methods()) {
+          if (SuperClasses.count(Overridden->getParent()->getCanonicalDecl())) {
+            // FIXME: We should still generate a safe wrapper if the superclass
+            // is missing one, or if this one would produce a different
+            // signature.
+            DLOG("Inherits the wrapper of an overridden virtual method, which "
+                 "dispatches here\n");
+            return;
+          }
         }
       }
     }
