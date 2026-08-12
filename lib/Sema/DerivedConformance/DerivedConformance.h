@@ -19,6 +19,7 @@
 #define SWIFT_SEMA_DERIVEDCONFORMANCE_DERIVEDCONFORMANCE_H
 
 #include "swift/AST/Builtins.h"
+#include "swift/AST/Decl.h"
 #include "swift/Basic/LLVM.h"
 #include <utility>
 
@@ -472,6 +473,14 @@ ValueDecl *
 deriveRequirementViaMacro(DerivedConformance &derived, ValueDecl *requirement,
                           StringRef code,
                           BuiltinDerivedConformanceMacroKind macroKind);
+
+/// Expands the synthesized macro declaration in `code` in the context of the
+/// \p derived derived conformance and returns the expansion.
+MacroExpansionDecl *
+expandDerivationMacro(DerivedConformance &derived, ValueDecl *requirement,
+                      StringRef code,
+                      BuiltinDerivedConformanceMacroKind macroKind,
+                      bool alwaysAttachToNominal = false);
 
 /// Get a string describing the nominal type we are deriving a conformance
 /// for by producing valid swift syntax.

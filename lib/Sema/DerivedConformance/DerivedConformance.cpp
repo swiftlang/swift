@@ -21,6 +21,7 @@
 #include "swift/AST/AvailabilityRestriction.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/DeclContext.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PlatformKindUtils.h"
@@ -1082,11 +1083,12 @@ handleASTNodeForDerivation(ASTContext &C, DerivedConformance &derived,
   return vDecl;
 }
 
-ValueDecl *
-swift::deriveRequirementViaMacro(DerivedConformance &derived,
-                                 ValueDecl *requirement, StringRef code,
-                                 BuiltinDerivedConformanceMacroKind macroKind) {
-  auto *parentDC = derived.getConformanceContext();
+MacroExpansionDecl *swift::expandDerivationMacro(
+    DerivedConformance &derived, ValueDecl *requirement, StringRef code,
+    BuiltinDerivedConformanceMacroKind macroKind, bool alwaysAttachToNominal) {
+
+  DeclContext *parentDC =
+      alwaysAttachToNominal ? derived.Nominal : derived.getConformanceContext();
   auto &C = parentDC->getASTContext();
 
   // Creating the buffer containing `code`. It is needed as macro need explicit
@@ -1102,7 +1104,9 @@ swift::deriveRequirementViaMacro(DerivedConformance &derived,
   info.kind = GeneratedSourceInfo::Kind::SyntheticMacro;
   info.originalSourceRange = CharSourceRange(parentLoc, 0);
   info.generatedSourceRange = C.SourceMgr.getRangeForBuffer(bufferID);
-  info.astNode = ASTNode(derived.ConformanceDecl).getOpaqueValue();
+  info.astNode =
+      ASTNode(alwaysAttachToNominal ? derived.Nominal : derived.ConformanceDecl)
+          .getOpaqueValue();
   info.declContext = parentDC;
   C.SourceMgr.setGeneratedSourceInfo(bufferID, info);
 
@@ -1128,6 +1132,18 @@ swift::deriveRequirementViaMacro(DerivedConformance &derived,
   // name lookup.
   expansion->setMacroRef(
       ConcreteDeclRef(C.getBuiltinDerivedConformanceMacroDecl(macroKind)));
+
+  return expansion;
+}
+
+ValueDecl *
+swift::deriveRequirementViaMacro(DerivedConformance &derived,
+                                 ValueDecl *requirement, StringRef code,
+                                 BuiltinDerivedConformanceMacroKind macroKind) {
+  auto &C = derived.Context;
+
+  auto *expansion =
+      expandDerivationMacro(derived, requirement, code, macroKind);
 
   // Find the expanded `ValueDecl *` and return it. There should only ever be a
   // single one.
