@@ -40,9 +40,6 @@ struct _SwiftEmptyArrayStorage {
   struct _SwiftArrayBodyStorage body;
 };
 
-SWIFT_RUNTIME_STDLIB_API
-struct _SwiftEmptyArrayStorage _swiftEmptyArrayStorage;
-
 struct _SwiftDictionaryBodyStorage {
   __swift_intptr_t count;
   __swift_intptr_t capacity;
@@ -77,12 +74,6 @@ struct _SwiftEmptySetSingleton {
   struct _SwiftSetBodyStorage body;
   __swift_uintptr_t metadata;
 };
-
-SWIFT_RUNTIME_STDLIB_API
-struct _SwiftEmptyDictionarySingleton _swiftEmptyDictionarySingleton;
-
-SWIFT_RUNTIME_STDLIB_API
-struct _SwiftEmptySetSingleton _swiftEmptySetSingleton;
 
 struct _SwiftHashingParameters {
   __swift_uint64_t seed0;

@@ -195,7 +195,7 @@ extension __EmptyDictionarySingleton: @unsafe _NSDictionaryCore {
 //
 // TODO: We should figure out how to make this a constant so that it's placed in
 // non-writable memory (can't be a let, Builtin.addressof below requires a var).
-@unsafe
+@exclusivity(unchecked)
 public var _swiftEmptyDictionarySingleton: (Int, Int, Int, Int, UInt8, UInt8, UInt16, UInt32, Int, Int, Int, Int) =
     (
       /*isa*/0, /*refcount*/-1, // HeapObject header
@@ -210,6 +210,10 @@ public var _swiftEmptyDictionarySingleton: (Int, Int, Int, Int, UInt8, UInt8, UI
       /*rawValues*/1,
       /*metadata*/~1
     )
+#else
+@exclusivity(unchecked)
+@_extern(c)
+public var _swiftEmptyDictionarySingleton: _SwiftEmptyDictionarySingleton
 #endif
 
 extension __RawDictionaryStorage {
