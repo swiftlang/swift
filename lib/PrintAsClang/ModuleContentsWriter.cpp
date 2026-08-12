@@ -705,9 +705,10 @@ public:
           // Don't emit nested types that are just implicitly @objc.
           // You should have to opt into this, since they are even less
           // namespaced than usual.
-          if (llvm::any_of(VD->getAttrs(), [](const DeclAttribute *attr) {
-                return isa<ObjCAttr>(attr) && !attr->isImplicit();
-              })) {
+          if (llvm::any_of(VD->getAttrs().getAttributes<ObjCAttr>(),
+                           [](const ObjCAttr *attr) {
+                             return !attr->isImplicit();
+                           })) {
             nestedTypes.push_back(VD);
           }
         }

@@ -3939,17 +3939,11 @@ getDirectCParameterConvention(clang::QualType type,
     // the deinit synthesizer would mark that call site specially so we can
     // drop this exception.
     if (clangModuleLoader && clangModuleLoader->isCxxMoveOnlyType(cxxRecord)) {
-      bool hasDestroyAttr = false;
-      if (cxxRecord->hasAttrs()) {
-        for (const clang::Attr *attr : cxxRecord->getAttrs()) {
-          if (auto *swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr)) {
-            if (swiftAttr->getAttribute().starts_with("destroy:")) {
-              hasDestroyAttr = true;
-              break;
-            }
-          }
-        }
-      }
+      bool hasDestroyAttr = llvm::any_of(
+          cxxRecord->specific_attrs<clang::SwiftAttrAttr>(),
+          [](const clang::SwiftAttrAttr *swiftAttr) {
+            return swiftAttr->getAttribute().starts_with("destroy:");
+          });
       if (!hasDestroyAttr)
         return ParameterConvention::Direct_Owned;
     }

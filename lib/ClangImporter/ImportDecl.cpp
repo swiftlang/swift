@@ -182,16 +182,11 @@ void ClangImporter::Implementation::makeComputed(AbstractStorageDecl *storage,
 
 importer::ReturnOwnershipInfo::ReturnOwnershipInfo(
     const clang::NamedDecl *decl) {
-  if (!decl->hasAttrs())
-    return;
-
-  for (const auto *attr : decl->getAttrs()) {
-    if (const auto *swiftAttr = llvm::dyn_cast<clang::SwiftAttrAttr>(attr)) {
-      if (swiftAttr->getAttribute() == "returns_unretained") {
-        hasReturnsUnretained = true;
-      } else if (swiftAttr->getAttribute() == "returns_retained") {
-        hasReturnsRetained = true;
-      }
+  for (const auto *swiftAttr : decl->specific_attrs<clang::SwiftAttrAttr>()) {
+    if (swiftAttr->getAttribute() == "returns_unretained") {
+      hasReturnsUnretained = true;
+    } else if (swiftAttr->getAttribute() == "returns_retained") {
+      hasReturnsRetained = true;
     }
   }
 }
@@ -4967,10 +4962,7 @@ namespace {
 
       // If the decl represents an availability domain, eagerly synthesize its
       // `if #available` predicate function.
-      if (decl->hasAttrs() &&
-          llvm::any_of(decl->getAttrs(), [](clang::Attr *attr) {
-            return isa<clang::AvailabilityDomainAttr>(attr);
-          }))
+      if (decl->hasAttr<clang::AvailabilityDomainAttr>())
         (void)synthesizer.makeAvailabilityDomainPredicate(decl);
 
       return result;
@@ -6911,12 +6903,10 @@ static bool conformsToProtocolInOriginalModule(NominalTypeDecl *nominal,
 /// Determine whether the given nominal type was imported with an OptionSet
 /// conformance.
 static bool isImportedOptionSet(NominalTypeDecl *nominal) {
-  for (auto attr : nominal->getAttrs()) {
-    if (auto synthesizedAttr = dyn_cast<SynthesizedProtocolAttr>(attr)) {
-      if (synthesizedAttr->getProtocol()->isSpecificProtocol(
-              KnownProtocolKind::OptionSet))
-        return true;
-    }
+  for (auto attr :
+       nominal->getAttrs().getAttributes<SynthesizedProtocolAttr>()) {
+    if (attr->getProtocol()->isSpecificProtocol(KnownProtocolKind::OptionSet))
+      return true;
   }
 
   return false;
@@ -9524,14 +9514,13 @@ void ClangImporter::Implementation::addExplicitProtocolConformancesFromBases(
     }
   }
 
-  if (isBase && cxxRecordDecl->hasAttrs()) {
+  if (isBase) {
     llvm::SmallSet<ProtocolDecl *, 4> alreadyAdded;
-    llvm::for_each(cxxRecordDecl->getAttrs(), [&](auto *attr) {
-      if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr)) {
-        if (swiftAttr->getAttribute().starts_with(conformsToPrefix))
-          addExplicitProtocolConformance(nominal, swiftAttr, alreadyAdded);
-      }
-    });
+    for (auto *swiftAttr :
+         cxxRecordDecl->specific_attrs<clang::SwiftAttrAttr>()) {
+      if (swiftAttr->getAttribute().starts_with(conformsToPrefix))
+        addExplicitProtocolConformance(nominal, swiftAttr, alreadyAdded);
+    }
   }
 }
 
@@ -9564,9 +9553,9 @@ static void filterUsableVersionedAttrs(
   // Scan through Swift-Versioned clang attributes and select which one to apply
   // if multiple candidates exist.
   SmallVector<clang::SwiftVersionedAdditionAttr *, 4> swiftVersionedAttributes;
-  for (auto attr : clangDecl->attrs())
-    if (auto versionedAttr = dyn_cast<clang::SwiftVersionedAdditionAttr>(attr))
-      swiftVersionedAttributes.push_back(versionedAttr);
+  for (auto *versionedAttr :
+       clangDecl->specific_attrs<clang::SwiftVersionedAdditionAttr>())
+    swiftVersionedAttributes.push_back(versionedAttr);
 
   // An attribute version is valid to apply if it is greater than the current
   // version or is unversioned
