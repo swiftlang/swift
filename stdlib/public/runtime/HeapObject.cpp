@@ -251,6 +251,57 @@ inline size_t getInstanceAddressPoint(const HeapMetadata *metadata) {
        : 0;
 }
 
+struct InstancePrefix {
+  const void *Template;
+  size_t TemplateSize;
+  size_t AddressPoint;
+};
+
+/// Validate and retrieve the metadata-driven prefix for a heap allocation.
+///
+/// The zero-address-point path intentionally avoids touching the class
+/// descriptor. Classes which do not opt into an instance prefix therefore
+/// retain their existing allocation behavior and metadata traffic.
+inline InstancePrefix
+getInstancePrefix(const HeapMetadata *metadata, size_t requiredSize,
+                  size_t requiredAlignmentMask) {
+  size_t offset = getInstanceAddressPoint(metadata);
+  if (offset == 0)
+    return {nullptr, 0, 0};
+
+  if (requiredSize < offset || requiredSize - offset < sizeof(HeapObject))
+    swift::fatalError(0, "invalid class instance prefix: address point %zu "
+                         "does not fit in allocation size %zu",
+                      offset, requiredSize);
+
+  // The allocation base has the requested alignment. The address point must
+  // preserve it so placement-new constructs a correctly aligned HeapObject.
+  if (offset & requiredAlignmentMask)
+    swift::fatalError(0, "invalid class instance prefix: address point %zu "
+                         "does not preserve alignment mask %zu",
+                      offset, requiredAlignmentMask);
+
+  auto *classMetadata = static_cast<const ClassMetadata *>(metadata);
+  auto *description = classMetadata->getDescription();
+  if (description == nullptr || !description->hasInstancePrefix())
+    swift::fatalError(0, "class metadata has a nonzero instance address point "
+                         "without an instance prefix descriptor");
+
+  auto *prefix = description->getInstancePrefixDescriptor();
+  if (prefix->Version != ClassInstancePrefixDescriptor::CurrentVersion)
+    swift::fatalError(0, "unsupported class instance prefix descriptor "
+                         "version %u",
+                      unsigned(prefix->Version));
+
+  size_t size = prefix->PrefixSizeInWords * sizeof(void *);
+  if (size == 0 || size > offset)
+    swift::fatalError(0, "class instance prefix size %zu does not fit "
+                         "metadata address point %zu",
+                      size, offset);
+
+  return {prefix->PrefixTemplate.get(), size, offset};
+}
+
 // Return a heap object's backing allocation to the allocator.
 //
 // A class instance's pointer may be interior, where the class metadata records
@@ -268,6 +319,8 @@ static HeapObject *_swift_allocObject_(HeapMetadata const *metadata,
                                        size_t requiredSize,
                                        size_t requiredAlignmentMask) {
   assert(isAlignmentMask(requiredAlignmentMask));
+  auto prefix =
+      getInstancePrefix(metadata, requiredSize, requiredAlignmentMask);
 #if SWIFT_STDLIB_HAS_MALLOC_TYPE
   auto allocation = swift_slowAllocTyped(requiredSize, requiredAlignmentMask,
                                           getMallocTypeId(metadata));
@@ -275,7 +328,14 @@ static HeapObject *_swift_allocObject_(HeapMetadata const *metadata,
   auto allocation = swift_slowAlloc(requiredSize, requiredAlignmentMask);
 #endif
 
-  size_t offset = getInstanceAddressPoint(metadata);
+  if (prefix.TemplateSize) {
+    auto *prefixAddress = reinterpret_cast<char *>(allocation)
+                        + prefix.AddressPoint
+                        - prefix.TemplateSize;
+    memcpy(prefixAddress, prefix.Template, prefix.TemplateSize);
+  }
+
+  size_t offset = prefix.AddressPoint;
   HeapObject *object =
       reinterpret_cast<HeapObject *>(reinterpret_cast<char *>(allocation) + offset);
 
@@ -301,6 +361,11 @@ HeapObject *swift::swift_allocObject(HeapMetadata const *metadata,
 HeapObject *
 swift::swift_initStackObject(HeapMetadata const *metadata,
                              HeapObject *object) {
+  // Stack promotion currently has no storage representation for native
+  // instance prefixes. IRGen must keep such objects on the common heap path.
+  assert(getInstanceAddressPoint(metadata) == 0 &&
+         "cannot initialize a prefixed class object on the stack");
+
   object->metadata = metadata;
   object->refCounts.initForNotFreeing();
 
@@ -318,6 +383,11 @@ struct InitStaticObjectContext {
 HeapObject *
 swift::swift_initStaticObject(HeapMetadata const *metadata,
                               HeapObject *object) {
+  // Object outlining currently has no way to place the prefix template and
+  // its once token ahead of the native address point.
+  assert(getInstanceAddressPoint(metadata) == 0 &&
+         "cannot initialize a prefixed static class object");
+
   SWIFT_RT_TRACK_INVOCATION(object, swift_initStaticObject);
   // The token is located at a negative offset from the object header.
   swift_once_t *token = ((swift_once_t *)object) - 1;
