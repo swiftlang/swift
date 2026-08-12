@@ -42,6 +42,9 @@ public struct SSAUpdater<Context: MutatingContext> {
   /// The phi arguments which were inserted so far by `getValue`, in the order they were created.
   public var insertedPhis = [Phi]()
 
+  /// The blocks in which this updater inserted a phi argument.
+  private var blocksWithInsertedPhis: BasicBlockSet
+
   /// Creates a new SSA-updater for values of `type` with the given `ownership`.
   ///
   /// All values that are constructed or merged by this updater (available values passed to
@@ -51,10 +54,12 @@ public struct SSAUpdater<Context: MutatingContext> {
     self.type = type
     self.ownership = ownership
     self.liverange = BasicBlockWorklist(context)
+    self.blocksWithInsertedPhis = BasicBlockSet(context)
   }
 
   public mutating func deinitialize() {
     liverange.deinitialize()
+    blocksWithInsertedPhis.deinitialize()
   }
 
   /// Registers `value` as the available value at the *end* of `block`.
@@ -136,7 +141,7 @@ public struct SSAUpdater<Context: MutatingContext> {
     // forward order. Therefore we have to reverse the list.
     for block in blocks.reversed() {
       if let existingValue = computedValuesAtBeginOfBlocks[block] {
-        if existingValue.isPhi(in: block) {
+        if isInsertedPhi(existingValue, in: block) {
           // Avoid creating another phi if we already have one created in this block.
           continue
         }
@@ -183,6 +188,7 @@ public struct SSAUpdater<Context: MutatingContext> {
           if previous != v {
             let phiArg = block.addArgument(type: type, ownership: ownership, context)
             insertedPhis.append(Phi(phiArg)!)
+            blocksWithInsertedPhis.insert(block)
             return phiArg
           }
         } else {
@@ -217,13 +223,24 @@ public struct SSAUpdater<Context: MutatingContext> {
         // merely forward `value`, it is its definition. This can happen if `value` is a loop-header
         // phi and the successor walk reaches the header again via a back-edge. Clearing it would
         // drop the genuine phi and cause a duplicate phi to be inserted on the next iteration.
-        if value.isPhi(in: block) {
+        if isInsertedPhi(value, in: block) {
           continue
         }
         computedValuesAtBeginOfBlocks.removeValue(forKey: block)
         worklist.pushIfNotVisited(contentsOf: block.successors)
       }
     }
+  }
+
+  /// Returns true if `value` is a phi argument which _this updater_ inserted into `block`.
+  private func isInsertedPhi(_ value: Value, in block: BasicBlock) -> Bool {
+    if let arg = value as? Argument,
+       arg.parentBlock == block,
+       blocksWithInsertedPhis.contains(block)
+    {
+      return true
+    }
+    return false
   }
 
   /// Rewrites each `br` predecessor of `phi`'s block to also pass the value that is live at the
@@ -354,15 +371,6 @@ public struct InstructionBasedSSAUpdater<Context: MutatingContext> {
 
   /// The phi arguments which were inserted so far by `getValue`, in the order they were created.
   public var insertedPhis: [Phi] { ssaUpdater.insertedPhis }
-}
-
-private extension Value {
-  func isPhi(in block: BasicBlock) -> Bool {
-    if let arg = self as? Argument, arg.parentBlock == block {
-      return true
-    }
-    return false
-  }
 }
 
 //===----------------------------------------------------------------------===//
