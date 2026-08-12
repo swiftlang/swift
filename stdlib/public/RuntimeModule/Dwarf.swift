@@ -279,9 +279,6 @@ private enum DwarfError: Error {
   case unsupportedVersion(Int)
   case unknownEHValueEncoding
   case unknownEHOffsetEncoding
-  case badAttribute(UInt64)
-  case badForm(UInt64)
-  case badTag(UInt64)
   case badLength(UInt32)
   case badAddressSize(Int)
   case badLineContentType(UInt64)
@@ -298,6 +295,12 @@ private enum DwarfError: Error {
   case missingStrOffsetsBase
   case missingLocListsBase
   case unspecifiedAddressSize
+  case badLNELength(UInt64)
+  case badLineNumberHeader
+  case ulebOutOfRange
+  case slebOutOfRange
+  case badUnitLength
+  case badLineProgramLength
 }
 
 // .. Dwarf utilities for ImageSource ..........................................
@@ -438,9 +441,41 @@ extension ImageSourceCursor {
     return result
   }
 
+  mutating func readULEB128<T: FixedWidthInteger>(as: T.Type) throws -> T {
+    guard let result = T(exactly: try readULEB128()) else {
+      throw DwarfError.ulebOutOfRange
+    }
+    return result
+  }
+
+  mutating func readULEB128<T: RawRepresentable>(as: T.Type) throws -> T
+  where T.RawValue: FixedWidthInteger {
+    let rawValue = try readULEB128(as: T.RawValue.self)
+    guard let result = T(rawValue: rawValue) else {
+      throw DwarfError.ulebOutOfRange
+    }
+    return result
+  }
+
   mutating func readSLEB128() throws -> Int64 {
     let (next, result) = try source.fetchSLEB128(from: pos)
     pos = next
+    return result
+  }
+
+  mutating func readSLEB128<T: FixedWidthInteger>(as: T.Type) throws -> T {
+    guard let result = T(exactly: try readSLEB128()) else {
+      throw DwarfError.slebOutOfRange
+    }
+    return result
+  }
+
+  mutating func readSLEB128<T: RawRepresentable>(as: T.Type) throws -> T
+  where T.RawValue: FixedWidthInteger {
+    let rawValue = try readSLEB128(as: T.RawValue.self)
+    guard let result = T(rawValue: rawValue) else {
+      throw DwarfError.slebOutOfRange
+    }
     return result
   }
 
@@ -657,7 +692,10 @@ class DwarfReader<S: DwarfSource & AnyObject> {
 
       // .1 unit_length
       let (length, dwarf64) = try cursor.readDwarfLength()
-      let next = cursor.pos + length
+      let (next, ov) = cursor.pos.addingReportingOverflow(length)
+      guard !ov && next <= end else {
+        throw DwarfError.badUnitLength
+      }
 
       // .2 version
       let version = Int(maybeSwap(try cursor.read(as: Dwarf_Half.self)))
@@ -726,6 +764,10 @@ class DwarfReader<S: DwarfSource & AnyObject> {
         }
       }
 
+      guard next >= cursor.pos else {
+        throw DwarfError.badUnitLength
+      }
+
       dieBounds = Bounds(base: cursor.pos, size: next - cursor.pos)
 
       let abbrevs = try readAbbrevs(at: abbrevOffset)
@@ -738,14 +780,14 @@ class DwarfReader<S: DwarfSource & AnyObject> {
       let tag = abbrevInfo.tag
 
       var unit = Unit(baseOffset: base,
-                           version: Int(version),
-                           isDwarf64: dwarf64,
-                           unitType: unitType,
-                           addressSize: Int(addressSize),
-                           abbrevOffset: abbrevOffset,
-                           dieBounds: dieBounds,
-                           abbrevs: abbrevs,
-                           tag: tag)
+                      version: Int(version),
+                      isDwarf64: dwarf64,
+                      unitType: unitType,
+                      addressSize: Int(addressSize),
+                      abbrevOffset: abbrevOffset,
+                      dieBounds: dieBounds,
+                      abbrevs: abbrevs,
+                      tag: tag)
 
       let attrPos = cursor.pos
       let firstPass = try readDieAttributes(
@@ -818,7 +860,10 @@ class DwarfReader<S: DwarfSource & AnyObject> {
         break
       }
 
-      let nextOffset = cursor.pos + length
+      let (nextOffset, ov) = cursor.pos.addingReportingOverflow(length)
+      guard !ov && nextOffset <= end else {
+        throw DwarfError.badLineProgramLength
+      }
 
       // .2 version
       let version = Int(maybeSwap(try cursor.read(as: Dwarf_Half.self)))
@@ -869,6 +914,9 @@ class DwarfReader<S: DwarfSource & AnyObject> {
 
       // .11 opcode_base
       let opcodeBase = try cursor.read(as: Dwarf_Byte.self)
+      guard opcodeBase >= 1 else {
+        throw DwarfError.badLineNumberHeader
+      }
 
       // .12 standard_opcode_lengths
       var standardOpcodeLengths: [UInt64] = [0]
@@ -919,14 +967,14 @@ class DwarfReader<S: DwarfSource & AnyObject> {
             break
           }
 
-          let dirIndex = try cursor.readULEB128()
-          let timestamp = try cursor.readULEB128()
+          let dirIndex = try cursor.readULEB128(as: Int.self)
+          let timestamp = try cursor.readULEB128(as: Int.self)
           let size = try cursor.readULEB128()
 
           fileInfo.append(DwarfFileInfo(
                             path: path,
-                            directoryIndex: Int(dirIndex),
-                            timestamp: timestamp != 0 ? Int(timestamp) : nil,
+                            directoryIndex: dirIndex,
+                            timestamp: timestamp != 0 ? timestamp : nil,
                             size: size != 0 ? size : nil,
                             md5sum: nil))
         }
@@ -935,23 +983,18 @@ class DwarfReader<S: DwarfSource & AnyObject> {
         var dirEntryFormat: [(Dwarf_Lhdr_Format, Dwarf_Form)] = []
         let dirEntryFormatCount = Int(try cursor.read(as: Dwarf_Byte.self))
         for _ in 0..<dirEntryFormatCount {
-          let rawType = try cursor.readULEB128()
-          let rawForm = try cursor.readULEB128()
-
-          guard let halfType = Dwarf_Half(exactly: rawType),
-                let type = Dwarf_Lhdr_Format(rawValue: halfType) else {
-            throw DwarfError.badLineContentType(rawType)
-          }
-          guard let byteForm = Dwarf_Byte(exactly: rawForm),
-                let form = Dwarf_Form(rawValue: byteForm) else {
-            throw DwarfError.badForm(rawForm)
-          }
+          let type = try cursor.readULEB128(as: Dwarf_Lhdr_Format.self)
+          let form = try cursor.readULEB128(as: Dwarf_Form.self)
 
           dirEntryFormat.append((type, form))
         }
 
+        guard dirEntryFormat.count > 0 else {
+          throw DwarfError.badLineNumberHeader
+        }
+
         // .15 directories_count
-        let dirCount = Int(try cursor.readULEB128())
+        let dirCount = try cursor.readULEB128(as: Int.self)
 
         // .16 directories
         for _ in 0..<dirCount {
@@ -977,23 +1020,18 @@ class DwarfReader<S: DwarfSource & AnyObject> {
         var fileEntryFormat: [(Dwarf_Lhdr_Format, Dwarf_Form)] = []
         let fileEntryFormatCount = Int(try cursor.read(as: Dwarf_Byte.self))
         for _ in 0..<fileEntryFormatCount {
-          let rawType = try cursor.readULEB128()
-          let rawForm = try cursor.readULEB128()
-
-          guard let halfType = Dwarf_Half(exactly: rawType),
-                let type = Dwarf_Lhdr_Format(rawValue: halfType) else {
-            throw DwarfError.badLineContentType(rawType)
-          }
-          guard let byteForm = Dwarf_Byte(exactly: rawForm),
-                let form = Dwarf_Form(rawValue: byteForm) else {
-            throw DwarfError.badForm(rawForm)
-          }
+          let type = try cursor.readULEB128(as: Dwarf_Lhdr_Format.self)
+          let form = try cursor.readULEB128(as: Dwarf_Form.self)
 
           fileEntryFormat.append((type, form))
         }
 
+        guard fileEntryFormat.count > 0 else {
+          throw DwarfError.badLineNumberHeader
+        }
+
         // .19 file_names_count
-        let fileCount = Int(try cursor.readULEB128())
+        let fileCount = try cursor.readULEB128(as: Int.self)
 
         // .20 file_names
         for _ in 0..<fileCount {
@@ -1036,6 +1074,10 @@ class DwarfReader<S: DwarfSource & AnyObject> {
       }
 
       // The actual program comes next
+      guard nextOffset >= cursor.pos else {
+        throw DwarfError.badLineProgramLength
+      }
+
       let program = cursor.source[cursor.pos..<nextOffset]
       cursor.pos = nextOffset
 
@@ -1075,29 +1117,18 @@ class DwarfReader<S: DwarfSource & AnyObject> {
         break
       }
 
-      let rawTag = try cursor.readULEB128()
-
-      guard let tag = Dwarf_Tag(rawValue: rawTag) else {
-        throw DwarfError.badTag(rawTag)
-      }
+      let tag = try cursor.readULEB128(as: Dwarf_Tag.self)
 
       let children = try cursor.read(as: Dwarf_ChildDetermination.self)
 
       // Fetch attributes
       var attributes: [(Dwarf_Attribute, Dwarf_Form, Int64?)] = []
       while true {
-        let rawAttr = try cursor.readULEB128()
-        let rawForm = try cursor.readULEB128()
+        let attr = try cursor.readULEB128(as: Dwarf_Attribute.self)
+        let form = try cursor.readULEB128(as: Dwarf_Form.self)
 
-        if rawAttr == 0 && rawForm == 0 {
+        if attr.rawValue == 0 && form.rawValue == 0 {
           break
-        }
-
-        guard let attr = Dwarf_Attribute(rawValue: UInt32(rawAttr)) else {
-          throw DwarfError.badAttribute(rawAttr)
-        }
-        guard let form = Dwarf_Form(rawValue: Dwarf_Byte(rawForm)) else {
-          throw DwarfError.badForm(rawForm)
         }
 
         if form == .DW_FORM_implicit_const {
@@ -1109,8 +1140,8 @@ class DwarfReader<S: DwarfSource & AnyObject> {
       }
 
       abbrevs[abbrev] = AbbrevInfo(tag: tag,
-                                     hasChildren: children != .DW_CHILDREN_no,
-                                     attributes: attributes)
+                                   hasChildren: children != .DW_CHILDREN_no,
+                                   attributes: attributes)
     }
 
     return abbrevs
@@ -1190,11 +1221,7 @@ class DwarfReader<S: DwarfSource & AnyObject> {
                     constantValue: Int64? = nil) throws -> DwarfValue {
     let form: Dwarf_Form
     if theForm == .DW_FORM_indirect {
-      let rawForm = try cursor.readULEB128()
-      guard let theForm = Dwarf_Form(rawValue: Dwarf_Byte(rawForm)) else {
-        throw DwarfError.badForm(rawForm)
-      }
-      form = theForm
+      form = try cursor.readULEB128(as: Dwarf_Form.self)
     } else {
       form = theForm
     }
@@ -1259,8 +1286,8 @@ class DwarfReader<S: DwarfSource & AnyObject> {
           return .address(address)
         }
       case .DW_FORM_block:
-        let length = try cursor.readULEB128()
-        let bytes = try cursor.read(count: Int(length), as: UInt8.self)
+        let length = try cursor.readULEB128(as: Int.self)
+        let bytes = try cursor.read(count: length, as: UInt8.self)
         return .data(bytes)
       case .DW_FORM_block1:
         let length = try cursor.read(as: UInt8.self)
@@ -1304,8 +1331,8 @@ class DwarfReader<S: DwarfSource & AnyObject> {
         return .data(data)
 
       case .DW_FORM_exprloc:
-        let length = try cursor.readULEB128()
-        let bytes = try cursor.read(count: Int(length), as: UInt8.self)
+        let length = try cursor.readULEB128(as: Int.self)
+        let bytes = try cursor.read(count: length, as: UInt8.self)
         return .expression(bytes)
 
       case .DW_FORM_flag:
@@ -1606,7 +1633,9 @@ class DwarfReader<S: DwarfSource & AnyObject> {
     var filename: String = "<unknown>"
     for info in lineNumberInfo {
       if info.baseOffset == unit.lineBase {
-        filename = info.fullPathForFile(index: Int(callFile))
+        if let ndx = Int(exactly: callFile) {
+          filename = info.fullPathForFile(index: ndx)
+        }
         break
       }
     }
@@ -1618,7 +1647,8 @@ class DwarfReader<S: DwarfSource & AnyObject> {
       if case let .address(highPCAddr) = highPCVal {
         highPC = highPCAddr
       } else if let highPCOffset = highPCVal.uint64Value() {
-        highPC = lowPC + highPCOffset
+        let (sum, ov) = lowPC.addingReportingOverflow(highPCOffset)
+        highPC = ov ? .max : sum
       } else {
         return
       }
@@ -1630,8 +1660,8 @@ class DwarfReader<S: DwarfSource & AnyObject> {
            lowPC: lowPC,
            highPC: highPC,
            filename: filename,
-           line: Int(callLine),
-           column: Int(callColumn)))
+           line: Int(clamping: callLine),
+           column: Int(clamping: callColumn)))
     } else if let rangeVal = attributes[.DW_AT_ranges],
               let rangesSection = rangesSection,
               case let .sectionOffset(offset) = rangeVal,
@@ -1746,7 +1776,8 @@ class DwarfReader<S: DwarfSource & AnyObject> {
       if case let .address(highPCAddr) = highPCVal {
         highPC = highPCAddr
       } else if let highPCOffset = highPCVal.uint64Value() {
-        highPC = lowPC + highPCOffset
+        let (sum, ov) = lowPC.addingReportingOverflow(highPCOffset)
+        highPC = ov ? .max : sum
       } else {
         return
       }
@@ -2045,7 +2076,7 @@ struct DwarfLineNumberInfo {
   mutating func executeProgram(
     line: (DwarfLineNumberState, inout Bool) -> ()
   ) throws {
-    let end = program.bytes.count
+    let end = UInt64(clamping: program.bytes.count)
     var cursor = ImageSourceCursor(source: program)
 
     func maybeSwap<T: FixedWidthInteger>(_ x: T) -> T {
@@ -2088,9 +2119,9 @@ struct DwarfLineNumberInfo {
         let instrAdvance
           = (state.opIndex + advance) / maximumOpsPerInstruction
         let newOp = (state.opIndex + advance) % maximumOpsPerInstruction
-        state.address += Address(instrAdvance)
+        state.address = state.address &+ Address(instrAdvance)
         state.opIndex = newOp
-        state.line += Int(lineBase) + Int(lineAdvance)
+        state.line = state.line &+ Int(lineBase) + Int(lineAdvance)
 
         line(state, &done)
 
@@ -2122,25 +2153,28 @@ struct DwarfLineNumberInfo {
                 throw DwarfError.badAddressSize(addressSize)
             }
             state.address = Address(address)
-              case .DW_LNE_define_file:
-                guard let path = try cursor.readString() else {
-                  throw DwarfError.badString
-                }
-                let directoryIndex = try cursor.readULEB128()
-                let timestamp = try cursor.readULEB128()
-                let size = try cursor.readULEB128()
-                files.append(DwarfFileInfo(
-                               path: path,
-                               directoryIndex: Int(directoryIndex),
-                               timestamp: timestamp != 0 ? Int(timestamp) : nil,
-                               size: size != 0 ? size : nil,
-                               md5sum: nil
-                             ))
-              case .DW_LNE_set_discriminator:
-                let discriminator = try cursor.readULEB128()
-                state.discriminator = UInt(discriminator)
-              default:
-                cursor.pos += length - 1
+          case .DW_LNE_define_file:
+            guard let path = try cursor.readString() else {
+              throw DwarfError.badString
+            }
+            let directoryIndex = try cursor.readULEB128(as: Int.self)
+            let timestamp = try cursor.readULEB128(as: Int.self)
+            let size = try cursor.readULEB128()
+            files.append(DwarfFileInfo(
+                           path: path,
+                           directoryIndex: directoryIndex,
+                           timestamp: timestamp != 0 ? timestamp : nil,
+                           size: size != 0 ? size : nil,
+                           md5sum: nil
+                         ))
+          case .DW_LNE_set_discriminator:
+            let discriminator = try cursor.readULEB128(as: UInt.self)
+            state.discriminator = discriminator
+          default:
+            if length < 1 || length - 1 > end - cursor.pos {
+              throw DwarfError.badLNELength(length)
+            }
+            cursor.pos += length - 1
         }
       } else {
         // Standard opcode
@@ -2152,21 +2186,21 @@ struct DwarfLineNumberInfo {
             state.prologueEnd = false
             state.epilogueBegin = false
           case .DW_LNS_advance_pc:
-            let advance = UInt(try cursor.readULEB128())
+            let advance = try cursor.readULEB128(as: UInt.self)
             let instrAdvance
               = (state.opIndex + advance) / maximumOpsPerInstruction
             let newOp = (state.opIndex + advance) % maximumOpsPerInstruction
-            state.address += Address(instrAdvance)
+            state.address = state.address &+ Address(instrAdvance)
             state.opIndex = newOp
           case .DW_LNS_advance_line:
-            let advance = try cursor.readSLEB128()
-            state.line += Int(advance)
+            let advance = try cursor.readSLEB128(as: Int.self)
+            state.line = state.line &+ advance
           case .DW_LNS_set_file:
-            let file = Int(try cursor.readULEB128())
+            let file = try cursor.readULEB128(as: Int.self)
             state.file = file
             state.path = fullPathForFile(index: state.file)
           case .DW_LNS_set_column:
-            let column = Int(try cursor.readULEB128())
+            let column = try cursor.readULEB128(as: Int.self)
             state.column = column
           case .DW_LNS_negate_stmt:
             state.isStmt = !state.isStmt
@@ -2178,18 +2212,18 @@ struct DwarfLineNumberInfo {
             let instrAdvance
               = (state.opIndex + advance) / maximumOpsPerInstruction
             let newOp = (state.opIndex + advance) % maximumOpsPerInstruction
-            state.address += Address(instrAdvance)
+            state.address = state.address &+ Address(instrAdvance)
             state.opIndex = newOp
           case .DW_LNS_fixed_advance_pc:
             let advance = try cursor.read(as: Dwarf_Half.self)
-            state.address += Address(advance)
+            state.address = state.address &+ Address(advance)
             state.opIndex = 0
           case .DW_LNS_set_prologue_end:
             state.prologueEnd = true
           case .DW_LNS_set_epilogue_begin:
             state.epilogueBegin = true
           case .DW_LNS_set_isa:
-            let isa = UInt(try cursor.readULEB128())
+            let isa = try cursor.readULEB128(as: UInt.self)
             state.isa = isa
           default:
             // Skip this unknown opcode
