@@ -81,6 +81,7 @@ class NodeSet;
 class OperandSet;
 class FixedSizeSlabPayload;
 class FixedSizeSlab;
+class SILDebugScope;
 }
 
 struct BridgedLoop {
