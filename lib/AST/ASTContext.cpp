@@ -1612,6 +1612,11 @@ MacroDecl *ASTContext::getBuiltinDerivedConformanceMacroDecl(
                        stringParam("", "rawType"), boolParam("", "usingRaw")},
                       MacroIntroducedDeclName::getArbitrary());
     break;
+  case BuiltinDerivedConformanceMacroKind::DeriveCodingKeysEnum:
+    macro = makeMacro("_deriveCodingKeysEnum", "DeriveCodingKeysEnumMacro",
+                      {stringParam("", "infos")},
+                      MacroIntroducedDeclName::getArbitrary());
+    break;
 
   case BuiltinDerivedConformanceMacroKind::NumKinds:
     llvm_unreachable("not a real kind");

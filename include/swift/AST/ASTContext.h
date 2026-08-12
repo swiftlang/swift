@@ -266,6 +266,7 @@ enum class BuiltinDerivedConformanceMacroKind : uint8_t {
   DeriveDecodable,
   DeriveRawRepresentable,
   DeriveCodingKey,
+  DeriveCodingKeysEnum,
 
   NumKinds,
 };
