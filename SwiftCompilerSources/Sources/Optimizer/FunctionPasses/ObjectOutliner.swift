@@ -87,6 +87,14 @@ let objectOutliner = FunctionPass(name: "object-outliner") {
 }
 
 private func optimizeObjectAllocation(allocRef: AllocRefInstBase, _ context: FunctionPassContext) -> GlobalValueInst? {
+  // A native COM object has projection words before its Swift address point.
+  // Static object containers do not yet materialize that prefox or relocate
+  // the once token around it, so keep these objects on the allocator path.
+  if let decl = allocRef.type.rawType.nominal as? ClassDecl,
+      decl.isCOMImplementation {
+    return nil
+  }
+
   if !allocRef.fieldsKnownStatically {
     return nil
   }
