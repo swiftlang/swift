@@ -2804,9 +2804,10 @@ static ParamDecl *getParameterInfo(ClangImporter::Implementation *impl,
   // If SendingArgsAndResults are enabled and we have a sending argument,
   // set that the param was sending.
   if (ASTContext.LangOpts.hasFeature(Feature::SendingArgsAndResults)) {
-    if (auto *attr = param->getAttr<clang::SwiftAttrAttr>()) {
+    for (auto *attr : param->specific_attrs<clang::SwiftAttrAttr>()) {
       if (attr->getAttribute() == "sending") {
         paramInfo->setSending();
+        break;
       }
     }
   }
