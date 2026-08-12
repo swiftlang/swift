@@ -7603,6 +7603,29 @@ static void emitTrapAndUndefValue(IRGenSILFunction &IGF,
     out.add(llvm::UndefValue::get(schema.getScalarType()));
 }
 
+/// Whether two loadable types explode to the same sequence of scalar/aggregate
+/// element types. Types can share a storage type but still differ here (e.g. a
+/// pointer exploded as `ptr` vs. as an integer word), which matters when
+/// deciding whether an explosion can be transferred verbatim.
+static bool haveSameExplosionSchema(IRGenModule &IGM,
+                                    const LoadableTypeInfo &lhs,
+                                    const LoadableTypeInfo &rhs) {
+  ExplosionSchema lhsSchema, rhsSchema;
+  lhs.getSchema(lhsSchema);
+  rhs.getSchema(rhsSchema);
+  if (lhsSchema.size() != rhsSchema.size())
+    return false;
+  for (unsigned i = 0, n = lhsSchema.size(); i != n; ++i) {
+    const auto &l = lhsSchema[i];
+    const auto &r = rhsSchema[i];
+    if (l.isScalar() != r.isScalar())
+      return false;
+    if (l.isScalar() && l.getScalarType() != r.getScalarType())
+      return false;
+  }
+  return true;
+}
+
 static void emitUncheckedValueBitCast(IRGenSILFunction &IGF,
                                       SourceLoc loc,
                                       Explosion &in,
@@ -7611,9 +7634,19 @@ static void emitUncheckedValueBitCast(IRGenSILFunction &IGF,
                                       const LoadableTypeInfo &outTI) {
   // If the transfer is doable bitwise, and if the elements of the explosion are
   // the same type, then just transfer the elements.
+  //
+  // Comparing the storage types is not enough: two types can share the same
+  // (opaque) storage type yet explode to different scalar types -- e.g. a
+  // single-pointer C union stored as an integer word vs. an
+  // `Optional<UnsafePointer>` exploded as `ptr`. Transferring the explosion
+  // directly in that case would hand a value of the wrong type to the
+  // destination, so also require the explosion schemas to match element-wise;
+  // otherwise fall through to the stack path, which reloads with the
+  // destination's schema.
   if (inTI.isBitwiseTakable(ResilienceExpansion::Maximal) &&
       outTI.isBitwiseTakable(ResilienceExpansion::Maximal) &&
-      isStructurallySame(inTI.getStorageType(), outTI.getStorageType())) {
+      isStructurallySame(inTI.getStorageType(), outTI.getStorageType()) &&
+      haveSameExplosionSchema(IGF.IGM, inTI, outTI)) {
     in.transferInto(out, in.size());
     return;
   }
