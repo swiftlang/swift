@@ -189,10 +189,17 @@ syn match swiftImplicitVarName
       \ /\$\<[A-Za-z_0-9]\+\>/
 
 " Codable & Equatable (protocol composition). contained, so it only ever
-" chains off an already-recognized type -- it can't be confused with the
+" chains off an already-recognized type; it can't be confused with the
 " bitwise-and operator in ordinary expressions.
 syn match swiftProtocolComposition contained skipwhite skipempty nextgroup=@swiftTypeContext
       \ /&/
+
+" A, B in `class X: A, B` (inheritance/conformance list). The lookahead
+" requires the next identifier not be followed by `:`, so a parameter
+" name or labeled tuple element (`f(a: Int, b: String)`) is not mistaken
+" for another type.
+syn match swiftTypeListComma contained skipwhite skipempty nextgroup=@swiftTypeContext
+      \ /,\ze\s*[A-Za-z_][A-Za-z_0-9]*\%(\s*:\)\@!/
 
 " `, subject ==` continues a same-type requirement after a comma; the
 " lookahead keeps ordinary tuple/parameter-list commas unaffected.
@@ -200,7 +207,7 @@ syn match swiftWhereConstraintComma contained skipwhite skipempty nextgroup=swif
       \ /,\ze\s*[A-Za-z_][A-Za-z_0-9.]*\s*==/
 
 " TypeName[Optionality]?
-syn match swiftType contained skipwhite skipempty nextgroup=swiftTypeParameters,swiftProtocolComposition,swiftWhereConstraintComma
+syn match swiftType contained skipwhite skipempty nextgroup=swiftTypeParameters,swiftProtocolComposition,swiftTypeListComma,swiftWhereConstraintComma
       \ /\<[A-Za-z_][A-Za-z_0-9\.]*\>[!?]\?/
 " [Type:Type] (dictionary) or [Type] (array)
 syn region swiftType contained contains=swiftTypePair,@swiftTypeContext
