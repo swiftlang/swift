@@ -3262,8 +3262,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   }
 
   if (func1->isCalledOnce() != func2->isCalledOnce()) {
-    if (func1->isCalledOnce() ||
-        (kind < ConstraintKind::Subtype && !isWitnessMatching(locator))) {
+    if (func1->isCalledOnce() || kind < ConstraintKind::Subtype) {
       if (!shouldAttemptFixes())
         return SolutionKind::Error;
 

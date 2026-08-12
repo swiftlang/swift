@@ -109,3 +109,72 @@ func testClosures() {
   genericNC(fn) // Ok
   genericNC { @called(once) in } // Ok
 }
+
+protocol PA {
+  associatedtype A // expected-note {{protocol requires nested type 'A'}}
+  func f(_: A)
+}
+
+struct TestAssociatedTypeInference : PA {
+  func f(_: @called(once) (Int) -> Int) { } // Ok
+}
+
+struct TestExplicitAssociatedType : PA {
+  typealias A = (Int) -> Int
+  func f(_: @called(once) (Int) -> Int) { } // Ok
+}
+
+struct TestWitnessAndAssociatedTypeMismatch : PA { // expected-error {{type 'TestWitnessAndAssociatedTypeMismatch' does not conform to protocol 'PA'}}
+  // expected-note@-1 {{add stubs for conformance}}
+  typealias A = @called(once) (Int) -> Int
+  // expected-note@-1 {{possibly intended match 'TestWitnessAndAssociatedTypeMismatch.A' (aka '@called(once) (Int) -> Int') does not conform to 'Copyable'}}
+  func f(_: (Int) -> Int) { }
+}
+
+protocol PR {
+  func f(_: (Int) -> Int)
+  func g(_: @called(once) (Int) -> Int)
+  // expected-note@-1 {{protocol requires function 'g' with type '(consuming @called(once) (Int) -> Int) -> ()'}}
+}
+
+struct TestDifferentWitnesses : PR { // expected-error {{type 'TestDifferentWitnesses' does not conform to protocol 'PR'}}
+// expected-note@-1 {{add stubs for conformance}}
+  func f(_: (Int) -> Int) { }
+  func g(_: (Int) -> Int) { }
+  // expected-note@-1 {{candidate has non-matching type '((Int) -> Int) -> ()'}}
+}
+
+struct TestSameWitnesses : PR {
+  func f(_: @called(once) (Int) -> Int) { } // Ok
+  func g(_: @called(once) (Int) -> Int) { } // Ok
+}
+
+protocol PA_Contravariant {
+  associatedtype A
+  func f(_: (A) -> Void)
+  // expected-note@-1 {{protocol requires function 'f' with type '((@escaping (Int) -> Int) -> Void) -> ()'}}
+}
+
+struct TestContravariantAssociatedTypeInference : PA_Contravariant { // expected-error {{type 'TestContravariantAssociatedTypeInference' does not conform to protocol 'PA_Contravariant'}}
+  // expected-note@-1 {{add stubs for conformance}}
+  func f(_: (@called(once) (Int) -> Int) -> Void) { }
+  // expected-note@-1 {{candidate has non-matching type '((consuming @called(once) (Int) -> Int) -> Void) -> ()' [with A = (Int) -> Int]}}
+}
+
+protocol P_PlainResult {
+  func f() -> () -> Void // expected-note {{protocol requires function 'f()' with type '() -> () -> Void'}}
+}
+
+protocol P_CalledOnceResult {
+  func f() -> @called(once) () -> Void
+}
+
+struct TestCalledOnceResultWitness : P_PlainResult { // expected-error {{type 'TestCalledOnceResultWitness' does not conform to protocol 'P_PlainResult'}}
+  // expected-note@-1 {{add stubs for conformance}}
+  func f() -> @called(once) () -> Void { { } }
+  // expected-note@-1 {{candidate has non-matching type '() -> @called(once) () -> Void'}}
+}
+
+struct TestPlainResultWitness : P_CalledOnceResult {
+  func f() -> () -> Void { { } } // Ok
+}
