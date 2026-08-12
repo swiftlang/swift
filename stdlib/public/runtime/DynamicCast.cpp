@@ -1801,6 +1801,93 @@ tryCastToErrorExistential(
   }
 }
 
+namespace {
+struct InterfaceID {
+  uint32_t Data1;
+  uint16_t Data2;
+  uint16_t Data3;
+  uint8_t  Data4[8];
+};
+
+// The compiler-managed ISwiftObject interface has one identity in every COM
+// model. Dynamic casts need its IID before they can recover a Swift object or
+// reach any of its metadata, including from COM values erased through Any.
+// Keep this deliberate, process-wide 16-byte bootstrap copy in native GUID
+// layout; ordinary interface identity remains owned solely by its protocol
+// descriptor.
+constexpr InterfaceID IID_ISwiftObject = {
+    0x8e369447,
+    0x5188,
+    0x5ada,
+    {0xb9, 0xec, 0x8f, 0xcb, 0x73, 0x2d, 0x22, 0x6b},
+};
+
+using QueryInterfaceType =
+    int32_t (* __stdcall)(void *, const uint8_t *, void **);
+using ReleaseType = uint32_t (* __stdcall)(void *);
+using ISwiftObject_get_object = void *(* __stdcall)(void *);
+using ISwiftObject_get_metadata = const Metadata *(* __stdcall)(void *);
+
+void *QueryInterface(void *pUnk, const uint8_t *riid) {
+  if (!pUnk)
+    return nullptr;
+
+  auto **lpVtbl = *reinterpret_cast<void ***>(pUnk);
+  auto pfnQueryInterface = reinterpret_cast<QueryInterfaceType>(lpVtbl[0]);
+  void *ppvObject = nullptr;
+  int32_t result = pfnQueryInterface(pUnk, riid, &ppvObject);
+  if (result < 0 || !ppvObject)
+    return nullptr;
+  return ppvObject;
+}
+
+void Release(void *pUnk) {
+  auto **lpVtbl = *reinterpret_cast<void ***>(pUnk);
+  auto pfnRelease = reinterpret_cast<ReleaseType>(lpVtbl[2]);
+  pfnRelease(pUnk);
+}
+
+/// Recover the native Swift object represented by a COM existential.
+///
+/// A successful ISwiftObject query returns a +1 interface pointer. The caller
+/// must keep that pointer alive while using `object` and release it afterwards.
+bool getISwiftObject(OpaqueValue *srcValue, const Metadata *srcType, void *&self,
+                     const Metadata *&metadata, void *&pISwiftObject) {
+  if (srcType->getKind() != MetadataKind::Existential)
+    return false;
+
+  auto existentialType = cast<ExistentialTypeMetadata>(srcType);
+  if (existentialType->getRepresentation() != ExistentialTypeRepresentation::COM)
+    return false;
+
+  auto pUnk = *reinterpret_cast<void **>(srcValue);
+  pISwiftObject =
+      QueryInterface(pUnk,
+                     reinterpret_cast<const uint8_t *>(&IID_ISwiftObject));
+  if (!pISwiftObject)
+    return false;
+
+  auto **lpVtbl = *reinterpret_cast<void ***>(pISwiftObject);
+  auto get_object = reinterpret_cast<ISwiftObject_get_object>(lpVtbl[3]);
+  auto get_metadata = reinterpret_cast<ISwiftObject_get_metadata>(lpVtbl[4]);
+  self = get_object(pISwiftObject);
+  metadata = get_metadata(pISwiftObject);
+
+  // ISwiftObject is compiler-managed, but validate that both requirements
+  // describe the same native class object before entering ordinary Swift
+  // casting. This also prevents an accidental model interface from being
+  // interpreted as a Swift heap object.
+  if (!self || !metadata || metadata->getKind() != MetadataKind::Class ||
+      swift_getObjectType(reinterpret_cast<HeapObject *>(self)) != metadata) {
+    Release(pISwiftObject);
+    pISwiftObject = nullptr;
+    return false;
+  }
+
+  return true;
+}
+}
+
 static DynamicCastResult
 tryCastUnwrappingExistentialSource(
   OpaqueValue *destLocation, const Metadata *destType,
@@ -1840,12 +1927,41 @@ tryCastUnwrappingExistentialSource(
     srcInnerValue = const_cast<OpaqueValue *>(srcErrorValue);
     break;
   }
-  case ExistentialTypeRepresentation::COM:
-    // COM interface pointers do not carry a Swift dynamic type to unwrap.
-    // Interface-to-interface casts are handled by tryCastToCOMExistential.
-    srcFailureType = srcType;
-    destFailureType = destType;
-    return DynamicCastResult::Failure;
+  case ExistentialTypeRepresentation::COM: {
+    // A COM-to-COM cast has already queried the destination interface before
+    // reaching source unwrapping. Do not follow a failed QueryInterface with
+    // an unrelated ISwiftObject query.
+    if (destType->getKind() == MetadataKind::Existential) {
+      auto metadata = cast<ExistentialTypeMetadata>(destType);
+      if (metadata->getRepresentation() == ExistentialTypeRepresentation::COM) {
+        srcFailureType = srcType;
+        destFailureType = destType;
+        return DynamicCastResult::Failure;
+      }
+    }
+
+    void *self = nullptr;
+    void *pISwiftObject = nullptr;
+    if (!getISwiftObject(srcValue, srcType, self, srcInnerType, pISwiftObject)) {
+      srcFailureType = srcType;
+      destFailureType = destType;
+      return DynamicCastResult::Failure;
+    }
+
+    // The ISwiftObject query keeps the native heap object alive while the
+    // ordinary Swift casting machinery inspects it. Never transfer that
+    // temporary ownership into the recursive cast: a successful result
+    // receives its own +1, and the original COM source is independently
+    // consumed by the top-level driver when requested.
+    srcInnerValue = reinterpret_cast<OpaqueValue *>(&self);
+    srcFailureType = srcInnerType;
+    auto result = tryCast(destLocation, destType, srcInnerValue, srcInnerType,
+                          destFailureType, srcFailureType,
+                          /*takeOnSuccess=*/false, mayDeferChecks,
+                          prohibitIsolatedConformances);
+    Release(pISwiftObject);
+    return result;
+  }
   }
 
   srcFailureType = srcInnerType;
@@ -2331,16 +2447,6 @@ static DynamicCastResult tryCastToCOMExistential(
   srcFailureType = srcType;
   destFailureType = destType;
 
-  // Query an interface pointer directly. The cast driver unwraps other
-  // source representations, such as an interface stored in Any.
-  if (srcType->getKind() != MetadataKind::Existential)
-    return DynamicCastResult::Failure;
-
-  auto srcExistentialType = cast<ExistentialTypeMetadata>(srcType);
-  if (srcExistentialType->getRepresentation() !=
-      ExistentialTypeRepresentation::COM)
-    return DynamicCastResult::Failure;
-
   auto destExistentialType = cast<ExistentialTypeMetadata>(destType);
 
   // Canonicalization leaves only the most-derived interface, and marker
@@ -2353,9 +2459,37 @@ static DynamicCastResult tryCastToCOMExistential(
   auto *interfaceProtocol = protocol.getSwiftProtocol();
 
   auto iid = interfaceProtocol->getCOMInterfaceID();
-  auto sourceInterface = *reinterpret_cast<void **>(srcValue);
-  if (!sourceInterface)
+  if (!iid)
     return DynamicCastResult::Failure;
+
+  void *sourceInterface = nullptr;
+  switch (srcType->getKind()) {
+  case MetadataKind::Existential: {
+    auto existential = cast<ExistentialTypeMetadata>(srcType);
+    if (existential->getRepresentation() != ExistentialTypeRepresentation::COM)
+      return DynamicCastResult::Failure;
+    sourceInterface = *reinterpret_cast<void **>(srcValue);
+    break;
+  }
+  case MetadataKind::Class: {
+    auto *sourceClass = cast<ClassMetadata>(srcType);
+    if (!sourceClass->isTypeMetadata())
+      return DynamicCastResult::Failure;
+    auto *description = sourceClass->getDescription();
+    if (!description || !description->hasInstancePrefix())
+      return DynamicCastResult::Failure;
+    auto *sourceObject = *reinterpret_cast<void **>(srcValue);
+    if (!sourceObject)
+      return DynamicCastResult::Failure;
+    // ISwiftObject is the compiler-managed projection immediately preceding
+    // every native Swift COM object address point. It provides a stable QI
+    // entry independently of the implementation's maximal interface set.
+    sourceInterface = reinterpret_cast<char *>(sourceObject) - sizeof(void *);
+    break;
+  }
+  default:
+    return DynamicCastResult::Failure;
+  }
 
   auto **vtable = *reinterpret_cast<void ***>(sourceInterface);
   auto queryInterface =
