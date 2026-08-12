@@ -906,6 +906,18 @@ BUILTIN_MISC_OPERATION(Dereferenceable, "dereferenceable", "n", Special)
 /// Sizeof has type T.Type -> Int
 BUILTIN_MISC_OPERATION_WITH_SILGEN(Sizeof, "sizeof", "n", Special)
 
+/// AllocRawTyped : <T> (Int, Int, T.Type) -> Builtin.RawPointer
+///
+/// The same as AllocRaw except that it also takes the pointee type, which
+/// is used by the runtime to compute a type descriptor for the allocation.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(AllocRawTyped, "allocRawTyped", "", Special)
+
+/// DeallocRawTyped : <T> (Builtin.RawPointer, Int, Int, T.Type) -> ()
+///
+/// The same as DeallocRaw except that it also takes the pointee type, which
+/// is used by the runtime to compute a type descriptor for the allocation.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(DeallocRawTyped, "deallocRawTyped", "", Special)
+
 /// Strideof has type T.Type -> Int
 BUILTIN_MISC_OPERATION_WITH_SILGEN(Strideof, "strideof", "n", Special)
 

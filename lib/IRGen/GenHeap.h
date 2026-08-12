@@ -221,7 +221,8 @@ IsaEncoding getIsaEncodingForType(IRGenModule &IGM, CanType type);
 
 std::optional<uint64_t>
 computeTypedMallocTypeDescriptor(IRGenModule &IGM,
-                                 llvm::SmallVectorImpl<SILType> &fieldTypes);
+                                 llvm::SmallVectorImpl<SILType> &fieldTypes,
+                                 bool isArray = false);
 
 } // end namespace irgen
 } // end namespace swift
