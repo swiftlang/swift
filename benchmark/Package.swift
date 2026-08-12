@@ -52,6 +52,9 @@ var singleSourceLibraryPaths: [String: String] = [:]
 var singleSourceLibraries: [String] = singleSourceLibraryDirs.flatMap { dir -> [String] in
   let names = getSingleSourceLibraries(subDirectory: dir)
   for name in names {
+    if let existingDir = singleSourceLibraryPaths[name] {
+      fatalError("Duplicate benchmark name '\(name)' found in both '\(existingDir)' and '\(dir)'; benchmark names must be unique")
+    }
     singleSourceLibraryPaths[name] = dir
   }
   return names
