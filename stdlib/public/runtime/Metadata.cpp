@@ -564,7 +564,11 @@ initializeClassMetadataFromPattern(ClassMetadata *metadata,
   metadata->Flags = pattern->Flags;
 
   // Instance layout.
-  metadata->InstanceAddressPoint = 0;
+
+  // Generic class patterns carry the physical prefix template size. Field
+  // layout rounds it up after computing the dynamic instance alignment.
+  metadata->InstanceAddressPoint =
+      pattern->InstancePrefixSizeInWords * sizeof(void *);
   metadata->InstanceSize = 0;
   metadata->InstanceAlignMask = 0;
 
@@ -4211,7 +4215,10 @@ static void initClassFieldOffsetVector(ClassMetadata *self,
 #if SWIFT_OBJC_INTEROP
     if (super->isTypeMetadata()) {
 #endif
-      size = super->getInstanceSize();
+      // InstanceSize includes the superclass's negative prefix, while stored
+      // property offsets are measured forward from the common native address
+      // point. Do not count that prefix again while laying out a subclass.
+      size = super->getInstanceSize() - super->getInstanceAddressPoint();
       alignMask = super->getInstanceAlignMask();
 
 #if SWIFT_OBJC_INTEROP
@@ -4279,7 +4286,10 @@ static void initClassFieldOffsetVector(ClassMetadata *self,
   // InstanceSize is 32 bits. Ensure we don't overflow it.
   if (SWIFT_UNLIKELY(size > (size_t)UINT32_MAX))
     fatalInstanceSizeOverflow(self->getDescription()->Name.get(), size);
-  self->setInstanceSize(size);
+  auto addressPoint =
+      roundUpToAlignMask(self->getInstanceAddressPoint(), alignMask);
+  self->setInstanceAddressPoint(addressPoint);
+  self->setInstanceSize(size + addressPoint);
   self->setInstanceAlignMask(alignMask);
 
 #if SWIFT_OBJC_INTEROP
