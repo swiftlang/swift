@@ -1,0 +1,15 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -enable-experimental-com-interop -module-name COM -emit-module-path %t/COM.swiftmodule %S/../Inputs/COM.swift
+// RUN: %target-swift-frontend -enable-experimental-com-interop -I %t -module-name Support -emit-module-path %t/Support.swiftmodule %S/Inputs/com-existential-erasure.swift
+// RUN: %target-swift-frontend -enable-experimental-com-interop -sil-verify-all -I %t -parse-sil %s -emit-sil -o /dev/null
+
+sil_stage raw
+
+import Builtin
+import Support
+
+sil [ossa] @erase_to_com_existential : $@convention(thin) <T where T : Support.IInterface> (@in_guaranteed T) -> @owned any Support.IInterface {
+bb0(%0 : $*T):
+  %1 = init_existential_ref %0 : $*T : $T, $any Support.IInterface, forwarding: @owned
+  return %1 : $any Support.IInterface
+}
