@@ -421,6 +421,7 @@ extension Task where Success == Never, Failure == Never {
 public struct CancellationError: Error {
   /// Raw storage containing the reason's `CancellationError.Reason.rawValue`;
   /// We cannot store the enum directly because of its availability.
+  @usableFromInline
   internal var _reasonRawStorage: UInt8 = 0x00
 
   // no extra information, cancellation is intended to be light-weight
@@ -479,6 +480,7 @@ extension CancellationError {
   ///
   /// The `reason` is then accessible via the error's `reason` property.
   @available(StdlibDeploymentTarget 6.5, *)
+  @export(implementation)
   public init(reason: Reason) {
     self.init()
     self._reasonRawStorage = reason._rawValue
@@ -491,6 +493,7 @@ extension CancellationError {
   /// `.unspecified`. Errors constructed via `init(reason:)` report the
   /// specified reason.
   @available(StdlibDeploymentTarget 6.5, *)
+  @export(implementation)
   public var reason: Reason {
     Reason(_rawValue: _reasonRawStorage) ?? .unspecified
   }
@@ -507,6 +510,8 @@ extension CancellationError.Reason {
     switch self {
     case .unspecified: return 0
     case .deadlineExpired: return 1
+    @unknown default:
+      fatalError("Unknown CancellationError.Reason: \(self)")
     }
   }
 

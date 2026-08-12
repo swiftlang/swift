@@ -612,7 +612,7 @@ public:
 
   // ==== Task Deadlines -------------------------------------------------------
 
-  /// Inherit the deadline status, if present, from `parent` onto `this`.
+  /// Inherit the deadline status from parent task if present.
   void inheritDeadlineFrom(AsyncTask *parent);
 
   // ==== Task Local Values ----------------------------------------------------

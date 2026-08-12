@@ -1135,10 +1135,7 @@ BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskCancellationScopePush)
 BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskCancellationScopePop)
 
 // TaskPushDeadline takes two borrowed generic operands passed by
-// address ($*C, $*I); at the SIL level address operands are trivial,
-// with the borrow scope enforced by the alloc_stack/dealloc_stack
-// bracket in the caller and by the mark_dependence [nonescaping] that
-// SILGen wraps around the returned raw pointer.
+// address; at the SIL level address operands are trivial.
 BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskPushDeadline)
 // Trivial use since our operand is just an UnsafeRawPointer.
 BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskPopDeadline)

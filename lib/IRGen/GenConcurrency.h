@@ -143,10 +143,6 @@ void emitBuiltinTaskCancellationShieldPop(IRGenFunction &IGF);
 
 /// Emit IR for the taskPushDeadline builtin.
 ///
-/// Values first, metadata trailing (matches Swift's generic ABI shape).
-/// The runtime `vw_initializeWithCopy`s both values into task-allocated
-/// tail storage on the deadline record.
-///
 /// \returns the record pointer to hand back to emitBuiltinTaskPopDeadline.
 llvm::Value *emitBuiltinTaskPushDeadline(IRGenFunction &IGF,
                                          llvm::Value *clockPtr,

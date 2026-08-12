@@ -706,9 +706,7 @@ swift_task_pushDeadlineImpl(TaskDeadlineStatusRecord *record,
                             OpaqueValue *clock,
                             OpaqueValue *instant,
                             const Metadata *clockType,
-                            const Metadata *instantType,
-                            const WitnessTable *identifiableWT,
-                            const WitnessTable *clockWT) {
+                            const Metadata *instantType) {
   auto task = swift_task_getCurrent();
   assert(task && "Currently, withDeadline must be used from an async context; We may relax this in the future");
 
@@ -725,7 +723,6 @@ swift_task_pushDeadlineImpl(TaskDeadlineStatusRecord *record,
   ::new (record) TaskDeadlineStatusRecord(
       clockType, instantType,
       /*clockPtr=*/clock, /*instantPtr=*/instant,
-      identifiableWT, clockWT,
       /*isOutermostDeadline=*/false);
 
   SWIFT_TASK_DEBUG_LOG("[Deadline] Create deadline record:%p for task:%p "
@@ -738,7 +735,7 @@ swift_task_pushDeadlineImpl(TaskDeadlineStatusRecord *record,
                       // We are the outermost deadline on this task;
                       // remember it so the matching pop can flip the
                       // flag back off in O(1) without walking the chain.
-                      record->setOutermostDeadline(true);
+                      record->setIsOutermostDeadline(true);
                       newStatus = newStatus.withDeadline();
                     }
                     return true; // always add the record

@@ -632,22 +632,12 @@ void swift_task_popTaskExecutorPreference(TaskExecutorPreferenceStatusRecord* re
 #if !SWIFT_CONCURRENCY_EMBEDDED
 
 /// Push a deadline status record onto the current task.
-/// Install a deadline on the current task, using storage supplied by the
-/// caller.
-///
-/// The record is fixed-size and lives in caller-provided memory (allocated
-/// by IRGen via `emitBuiltinTaskPushDeadline`), and stores *borrowed*
-/// pointers to the caller's `clock` and `instant`.
 ///
 /// The caller must guarantee that both `clock` and `instant` remain
-/// alive until the matching `swift_task_popDeadline`, and that
-/// `record` is at least `NumWords_TaskDeadline * sizeof(void*)` bytes
-/// with maximum pointer alignment.
+/// alive until the matching `swift_task_popDeadline`.
 ///
-/// This function pushes a record unconditionally; perform any checks
-/// about already-exceeded deadlines before calling.
-///
-/// Push/pop must observe stack discipline (LIFO order).
+/// This function pushes the record unconditionally; perform any checks
+/// about already-exceeded deadlines before calling it.
 ///
 /// Runtime availability: Swift 6.5
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
@@ -655,15 +645,9 @@ void swift_task_pushDeadline(TaskDeadlineStatusRecord *record,
                              OpaqueValue *clock,
                              OpaqueValue *instant,
                              const Metadata *clockType,
-                             const Metadata *instantType,
-                             const WitnessTable *identifiableWT, // reserved
-                             const WitnessTable *clockWT);       // reserved
+                             const Metadata *instantType);
 
 /// Remove the passed-in deadline record from the current task.
-///
-/// The record's storage belongs to the caller; the runtime only unlinks
-/// it from the task's status-record chain. Push/pop must observe stack
-/// discipline.
 ///
 /// Runtime availability: Swift 6.5
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
@@ -688,26 +672,24 @@ swift_task_findNearestDeadlineForClock(
 #endif // !SWIFT_CONCURRENCY_EMBEDDED
 
 /// Push a cancellation scope record onto the current task.
-/// Record push/push must observe stack-discipline, enforced by the task local allocator.
 ///
 /// Runtime availability: Swift 6.5
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 TaskCancellationScopeRecord * swift_task_pushCancellationScope();
 
 /// Remove the passed in cancellation scope record from the current task.
-/// Record push/push must observe stack-discipline, enforced by the task local allocator.
 ///
 /// Runtime availability: Swift 6.5
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_popCancellationScope(TaskCancellationScopeRecord *record);
 
-/// Cancel a cancellation scope, with additional flags.
+/// Cancel a cancellation scope.
 ///
-/// This is a purely local operation on the scope's own state,
-/// it does not affect the surrounding task's cancellation status.
+/// This operation modifies the scope, but does not affect
+/// the surrounding task's cancellation status.
 ///
 /// May be called from any thread, any number of times.
-/// The first cancellation reason wins, and is not overwritten by subsequent calls.
+/// The first cancellation reason wins, and is *not* overwritten by subsequent calls.
 ///
 /// ### Flags
 /// The low 3 bits carry `CancellationError.Reason`'s raw value.
@@ -718,9 +700,8 @@ SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_cancelCancellationScope(
     TaskCancellationScopeRecord *record, size_t flags);
 
-/// Return whether the given cancellation scope has been cancelled by
-/// reading its atomic flag directly. This bypasses whole-task cancellation
-/// state and any active cancellation shield on the enclosing task.
+/// Return whether the passed-in cancellation scope has been cancelled.
+/// This does not check the task cancellation status, just the scope.
 ///
 /// Runtime availability: Swift 6.5
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)

@@ -1,7 +1,10 @@
 // RUN: %target-sil-opt -sil-disable-input-verify -test-runner %s -o /dev/null 2>&1 | %FileCheck %s
 
+// REQUIRES: concurrency
+
 import Builtin
 import Swift
+import _Concurrency
 
 class MyClass {}
 
@@ -653,9 +656,9 @@ bb0:
 // generic `taskPushDeadline` are marked [non_nested].
 // CHECK-LABEL: sil [ossa] @test_deadline_non_nested :
 // CHECK:         integer_literal $Builtin.Int32, 1
-// CHECK-NEXT:    [[CLOCK:%.*]] = alloc_stack $Int
-// CHECK-NEXT:    [[INSTANT:%.*]] = alloc_stack $Int
-// CHECK:         [[RECORD:%.*]] = builtin "taskPushDeadline"<Int, Int>([[CLOCK]], [[INSTANT]])
+// CHECK-NEXT:    [[CLOCK:%.*]] = alloc_stack $ContinuousClock
+// CHECK-NEXT:    [[INSTANT:%.*]] = alloc_stack $ContinuousClock.Instant
+// CHECK:         [[RECORD:%.*]] = builtin "taskPushDeadline"<ContinuousClock, ContinuousClock.Instant>([[CLOCK]], [[INSTANT]])
 // CHECK-NEXT:    integer_literal $Builtin.Int32, 2
 // CHECK-NEXT:    [[B:%.*]] = alloc_stack $Int
 // CHECK-NEXT:    [[C:%.*]] = alloc_stack [non_nested] $Int
@@ -673,10 +676,10 @@ sil [ossa] @test_deadline_non_nested : $@convention(thin) @async () -> () {
 bb0:
   specify_test "stack_nesting_fixup"
   integer_literal $Builtin.Int32, 1
-  %clock = alloc_stack $Int
-  %instant = alloc_stack $Int
+  %clock = alloc_stack $ContinuousClock
+  %instant = alloc_stack $ContinuousClock.Instant
 
-  %record = builtin "taskPushDeadline"<Int, Int>(%clock : $*Int, %instant : $*Int) : $UnsafeRawPointer
+  %record = builtin "taskPushDeadline"<ContinuousClock, ContinuousClock.Instant>(%clock : $*ContinuousClock, %instant : $*ContinuousClock.Instant) : $UnsafeRawPointer
 
   integer_literal $Builtin.Int32, 2
 

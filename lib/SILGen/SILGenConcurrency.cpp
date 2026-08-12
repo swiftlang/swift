@@ -974,23 +974,14 @@ void SILGenFunction::finalizeAddTaskLocalValue(BuiltinInst *BI) {
 void SILGenFunction::finalizeTaskPushDeadline(BuiltinInst *BI) {
   // Same shape of workaround as `finalizeAddTaskLocalValue` above.
   //
-  // `Builtin.taskPushDeadline` is `<C, I>(borrowing C, borrowing I) ->
-  // UnsafeRawPointer`. Callers whose `clock` / `instant` don't already
-  // live at a stable indirect address (e.g. we come from an
-  // `@in_guaranteed` parameter but SILGen still materialises fresh
-  // `alloc_stack`s during argument scope building) end up with
-  // temporaries whose `dealloc_stack` sits between the paired
-  // `taskPushDeadline` and `taskPopDeadline`. Because the SIL
-  // stack-allocation classification treats those builtins as a
-  // scope-forming push/pop pair (see `StackAllocation.h`), the
-  // flow-sensitive verifier reports:
-  //
-  //   deallocating allocation that is not the top of the stack
-  //
-  // Rerouting the argument-scope allocs to be `[non_nested]` (i.e.
-  // "may be deallocated in any order") is exactly what
-  // `StackNesting::fixNesting` does, and matches the AddTaskLocalValue
-  // sibling. This is the pragmatic fix Konrad landed originally on
-  // commit e38fee6cdee before we experimented with dropping it.
+  // `Builtin.taskPushDeadline` is
+  // `<C: Clock & Identifiable, I>(borrowing C, borrowing I) -> UnsafeRawPointer`.
+  // Callers whose `clock` / `instant` don't already live at a stable
+  // indirect address (e.g. we come from an `@in_guaranteed` parameter but
+  // SILGen still materializes fresh `alloc_stack`s during argument scope
+  // building) end up with temporaries whose `dealloc_stack` sits between
+  // the paired `taskPushDeadline` and `taskPopDeadline`. These locals
+  // break strict SIL stack nesting, so we mark the push allocation
+  // `[non_nested]` to allow the intervening `dealloc_stack`s.
   StackNesting::fixNesting(&F);
 }

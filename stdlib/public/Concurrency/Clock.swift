@@ -132,9 +132,9 @@ enum _ClockID: Int32 {
   case walltime = 3
 }
 
-/// Identifier for the standard-library clocks.
-@available(StdlibDeploymentTarget 6.5, *)
+/// Identifier for the standard library clocks.
 @nonexhaustive
+@available(StdlibDeploymentTarget 6.5, *)
 public enum SystemClockID: UInt8, Sendable, Hashable {
   case continuous = 1
   case suspending = 2

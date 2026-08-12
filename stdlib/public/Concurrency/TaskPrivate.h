@@ -732,10 +732,21 @@ public:
 
   // CancellationReason
   /// Read the cancellation-reason bit. Meaningful only when `isCancelled()`
-  /// (or `isCancelledIgnoringShield()`) returns true. Returns 0 for
-  /// `.unspecified` and 1 for `.deadlineExpired`.
+  /// (or `isCancelledIgnoringShield()`) returns true. Returns the raw
+  /// value of `CancellationError.Reason`.
+  ///
+  /// The explicit `switch` below is exhaustive on purpose,
+  /// so we revisit this func when adding more reasons.
   size_t getCancellationReason() const {
-    return (Flags & CancelReasonDeadlineExpired) ? 1 : 0;
+    CancellationReason reason = (Flags & CancelReasonDeadlineExpired) != 0
+                                    ? CancellationReason::DeadlineExpired
+                                    : CancellationReason::Unspecified;
+    switch (reason) {
+    case CancellationReason::Unspecified:
+      return size_t(CancellationReason::Unspecified);
+    case CancellationReason::DeadlineExpired:
+      return size_t(CancellationReason::DeadlineExpired);
+    }
   }
 
   // IsStatusRecordLocked

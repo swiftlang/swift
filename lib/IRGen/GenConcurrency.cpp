@@ -391,10 +391,6 @@ llvm::Value *irgen::emitBuiltinTaskPushDeadline(IRGenFunction &IGF,
                                                llvm::Value *instantPtr,
                                                llvm::Value *clockType,
                                                llvm::Value *instantType) {
-  // Allocate the deadline record in the caller's frame. In an async
-  // function this ends up in the coroutine's async frame after
-  // CoroSplit; either way the storage lives from here until the
-  // paired TaskPopDeadline balances it below.
   auto ty = llvm::ArrayType::get(IGF.IGM.Int8PtrTy, NumWords_TaskDeadline);
   auto address = IGF.createAlloca(ty, Alignment(Alignment_TaskDeadline),
                                   "task.deadline.record");
@@ -407,13 +403,10 @@ llvm::Value *irgen::emitBuiltinTaskPushDeadline(IRGenFunction &IGF,
   //                                OpaqueValue *clock,
   //                                OpaqueValue *instant,
   //                                const Metadata *clockType,
-  //                                const Metadata *instantType,
-  //                                const WitnessTable *identifiableWT,
-  //                                const WitnessTable *clockWT)
-  auto *null = llvm::ConstantPointerNull::get(IGF.IGM.Int8PtrTy);
+  //                                const Metadata *instantType)
   auto *call = IGF.Builder.CreateCall(
       IGF.IGM.getTaskPushDeadlineFunctionPointer(),
-      {record, clockPtr, instantPtr, clockType, instantType, null, null});
+      {record, clockPtr, instantPtr, clockType, instantType});
   call->setDoesNotThrow();
   call->setCallingConv(IGF.IGM.SwiftCC);
 
@@ -427,9 +420,6 @@ void irgen::emitBuiltinTaskPopDeadline(IRGenFunction &IGF,
   call->setDoesNotThrow();
   call->setCallingConv(IGF.IGM.SwiftCC);
 
-  // Release the caller-frame slot so LLVM can reuse the storage after
-  // this point (relevant in async frames, where CoroSplit packs live
-  // ranges).
   IGF.Builder.CreateLifetimeEnd(record);
 }
 

@@ -2443,31 +2443,17 @@ static ValueDecl *getTaskRemovePriorityEscalationHandler(ASTContext &ctx,
 }
 
 static ValueDecl *getTaskPushDeadline(ASTContext &ctx, Identifier id) {
-  // <C, I> (clock: borrowing C, instant: borrowing I) -> UnsafeRawPointer
+  // <C: Clock & Identifiable, I> (clock: borrowing C, instant: borrowing I)
+  //   -> UnsafeRawPointer
   //
-  // Operands are borrowed at +0. SILGen passes them as `$*C` / `$*I`
-  // addresses (opaque generics are indirect), and IRGen forwards those
-  // addresses to the runtime as `OpaqueValue *`. No copies of the
-  // clock or instant are made - the record stores borrowed pointers
-  // into the caller's frame.
-  //
-  // The push/pop pair is registered in `StackAllocation.h` as a
-  // stack-scoped allocation (`BuiltinTaskPushDeadline` /
-  // `BuiltinTaskPopDeadline`); the flow-sensitive SIL verifier
-  // enforces LIFO nesting and, because `clock`/`instant` are borrowed
-  // operands of the push, keeps their scopes live for the whole
-  // push/pop span. That gives us the "borrows outlive the record"
-  // guarantee.
-  //
-  // The stack-nesting invariant paired with `taskPopDeadline` is fixed
-  // up post-SILGen by `finalizeTaskPushDeadline` ->
-  // `StackNesting::fixNesting`, exactly mirroring the
-  // `AddTaskLocalValue` sibling. Without that hook, any argument-scope
-  // `alloc_stack` temporaries SILGen materialises for `borrowing`
-  // operands would deallocate before the paired `taskPopDeadline` and
-  // trip the flow-sensitive verifier.
+  // Operands are borrowed at +0. No copies of the clock or instant are made,
+  // the record stores borrowed pointers into the caller's frame.
   return getBuiltinFunction(
-      ctx, id, _thin, _generics(_unrestricted, _unrestricted),
+      ctx, id, _thin,
+      _generics(_unrestricted,
+                _conformsTo(_typeparam(0), _clock),
+                _conformsTo(_typeparam(0), _identifiable),
+                _unrestricted),
       _parameters(_label("clock", _borrowing(_typeparam(0))),
                   _label("instant", _borrowing(_typeparam(1)))),
       _unsafeRawPointer);

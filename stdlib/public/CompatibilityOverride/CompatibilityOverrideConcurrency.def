@@ -454,11 +454,8 @@ OVERRIDE_TASK_STATUS(task_pushDeadline,
                       OpaqueValue *clock,
                       OpaqueValue *instant,
                       const Metadata *clockType,
-                      const Metadata *instantType,
-                      const WitnessTable *identifiableWT,
-                      const WitnessTable *clockWT),
-                     (record, clock, instant, clockType, instantType,
-                      identifiableWT, clockWT))
+                      const Metadata *instantType),
+                     (record, clock, instant, clockType, instantType))
 
 OVERRIDE_TASK_STATUS(task_popDeadline, void,
                      SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),

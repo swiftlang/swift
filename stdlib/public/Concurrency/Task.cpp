@@ -1165,11 +1165,10 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
     // however better safe than sorry and `async let` are not expressed as task groups,
     // so they may have been spawned in any case still.
     //
-    // Only whole-task cancellation propagates - not TaskCancellationScope
-    // cancellation. Scopes are local to the parent's dynamic extent and
-    // must not implicitly cancel structured children created inside them.
-    // Read the parent's IsCancelled bit directly, bypassing the scope
-    // chain walk `AsyncTask::isCancelled` does.
+    // Both whole-task cancellation AND an active `TaskCancellationScope`
+    // in the parent propagate to structured children. A child created
+    // inside a cancelled scope must be immediately cancelled with
+    // the scope's reason..
     //
     // Propagate the parent's cancellation reason so structured children
     // see the same `Task.cancellationReason` the parent set (typically
@@ -1178,31 +1177,31 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
         parent->_private()._status().load(std::memory_order_relaxed);
     // Also consider a cancelled cancellation scope in the parent's records:
     // structured children spawned inside a cancelled `__withTaskCancellationScope`
-    // (including `withDeadline` after its deadline elapsed) must observe as
-    // cancelled from creation, with the scope's reason.
+    // (including `withDeadline` after its deadline elapsed) must be cancelled
+    // immediately at creation, with the scope's reason.
     TaskCancellationScopeRecord *cancelledScope = nullptr;
     if (parentStatus.hasTaskCancellationScope()) {
       if (auto *scope = _swift_task_getCancellationScope(parent))
         if (scope->isCancelled())
           cancelledScope = scope;
     }
-    if ((group && group->isCancelled()) ||
-        parentStatus.isCancelledIgnoringShield() ||
-        cancelledScope) {
+    if (parentStatus.isCancelled()) {
+      // Whole-task cancellation on the parent (visible past any shield):
+      // propagate the parent's reason verbatim.
+      swift_task_cancelWithFlags(task, parentStatus.getCancellationReason());
+    } else if ((group && group->isCancelled()) ||
+               parentStatus.isCancelledIgnoringShield() ||
+               cancelledScope) {
+      // Either the enclosing group is cancelled, or the parent is
+      // whole-task cancelled behind a shield, or an active
+      // TaskCancellationScope in the parent is cancelled. Pick the
+      // reason from whichever source applies (task bit wins over scope).
       size_t reason = parentStatus.isCancelledIgnoringShield()
                           ? parentStatus.getCancellationReason()
                           : (cancelledScope ? cancelledScope->getReason() : 0);
       swift_task_cancelWithFlags(task, reason);
     }
 
-    // Inherit the `HasDeadline` flag from the parent. Structured
-    // children (async let, task groups) run "within" the same deadline
-    // scope as their parent, so `Task.hasActiveDeadline` and
-    // `Task.activeDeadline(for:)` should observe the same deadlines on
-    // the child that the parent would. The actual lookup walks into
-    // the parent chain via `childFragment()->getParent()` on a miss,
-    // so we don't copy the records themselves - only the fast-path bit
-    // that stops the lookup from bailing out early on the child.
     task->inheritDeadlineFrom(parent);
 
     // Inside a task group, we may have to perform some defensive copying,
@@ -1858,13 +1857,6 @@ size_t swift::swift_task_getIsCancelledWithReason(AsyncTask *task) {
   return isCancelledBit | (status.getCancellationReason() << 1);
 }
 
-/// Shared logic for `swift_task_addCancellationHandlerImpl` and
-/// `swift_task_addCancellationHandlerWithReasonImpl`: allocate and register
-/// the record, firing it immediately (and skipping registration) if the task
-/// or an enclosing cancellation scope is already cancelled at install time.
-/// `handler` picks which `CancellationNotificationStatusRecord` constructor
-/// (and therefore which union member/`HasReason` bit) is used; `discriminator`
-/// is the pointer-auth discriminator matching that same shape.
 template <typename FunctionPtrType>
 static CancellationNotificationStatusRecord*
 addCancellationHandlerCommon(FunctionPtrType handler, void *context,
@@ -1892,9 +1884,8 @@ addCancellationHandlerCommon(FunctionPtrType handler, void *context,
     return true; // add the record
   });
 
-  // A scope cancellation doesn't set the task's IsCancelled bit; check the
-  // scope search so we fire the handler immediately if we're installing
-  // inside an already-cancelled scope (e.g. `withDeadline` past deadline).
+  // Check the for cancelled scopes so we fire the handler immediately if we're
+  // installing inside an already-cancelled scope (e.g. `withDeadline` past deadline).
   if (!fireHandlerNow && task) {
     auto status = task->_private()._status().load(std::memory_order_relaxed);
     if (status.hasTaskCancellationScope()) {

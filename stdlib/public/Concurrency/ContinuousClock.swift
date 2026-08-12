@@ -211,8 +211,8 @@ extension ContinuousClock.Instant: InstantProtocol {
 // ==== -----------------------------------------------------------------------
 // MARK: Identifiable
 
-@available(StdlibDeploymentTarget 6.5, *)
 @_unavailableInEmbedded
+@available(StdlibDeploymentTarget 6.5, *)
 extension ContinuousClock: Identifiable {
   /// The stable identity of the continuous system clock.
   public var id: SystemClockID { .continuous }

@@ -28,7 +28,8 @@ Perform asynchronous and parallel operations.
 
 - ``Swift/withDeadline(_:tolerance:clock:operation:)``
 - ``Swift/withDeadline(in:tolerance:clock:operation:)``
-- ``Swift/withDeadline(in:tolerance:operation:)``
+- ``Swift/Task/hasActiveDeadline``
+- ``Swift/Task/activeDeadline(for:)``
 
 ### Task Cancellation
 

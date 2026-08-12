@@ -77,17 +77,17 @@ import Swift
 ///
 /// When a deadline expires, semantically the scope of the task which is running the `operation`
 /// becomes cancelled. This is observable using `Task.isCancelled` and similar APIs, and has
-/// the usual effect on child tasks and task cancellation handlers.
+/// the usual effect on child tasks and task cancellation handlers created inside `operation`.
 ///
-/// Even though a deadline's expiry cancels the operation scope, the `withDeadline` closure
-/// will await for the operation to complete. This is consistent with Swift's approach to cooperative
-/// cancellation and structured concurrency. It does mean however that operation code must be checking
-/// for cancellation if it wants to react and return "early".
+/// Task deadlines are a structured concurrency mechanism, and even though a deadline's expiry cancels
+/// the operation scope, the `withDeadline` closure will await for the operation to complete.
+/// The operation code must cooperatively be checking for cancellation, or make use of cancellation handlers,
+/// if it wants to react and return "early".
 ///
-/// The `withDeadline` function may return after the deadline has expired, as there is no guarantee on
-/// interrupting the operation's execution. Similarily, even if the deadline is set in the past, the
-/// operation will still always execute - and it is up to the operation (or any of its parts, or child tasks)
-/// to check e.g. `Task.isCancelled` if it should proceed with its computation or not.
+/// The `withDeadline` function may return after the deadline has expired.
+/// Similarily, even if the deadline is set in the past, the operation will still always execute -
+/// and it is up to the operation (or any of its parts, or child tasks) to determine if it should
+/// proceed with its computation or not.
 ///
 /// ## Coordinating multiple operations
 ///
@@ -118,6 +118,7 @@ import Swift
 ///
 /// - Returns: The result of the operation if it completes successfully before or after the deadline expires.
 /// - Throws: The error thrown by the operation.
+/// - SeeAlso: ``withDeadline(in:tolerance:clock:operation:)``
 @available(StdlibDeploymentTarget 6.5, *)
 public nonisolated(nonsending) func withDeadline<Return, Failure, C>(
   _ expiration: C.Instant,
@@ -128,21 +129,13 @@ public nonisolated(nonsending) func withDeadline<Return, Failure, C>(
   where Return: ~Copyable,
         Failure: Error,
         C: Clock & Identifiable {
+#if $BuiltinTaskDeadline
   // Fast path: if an outer deadline exists for the same clock
   if let outer = _findNearestDeadline(clock: clock), outer <= expiration {
     return try await operation()
   }
 
   // Push a deadline record on the current task.
-  //
-  // The record is fixed-size and stack-allocated in this function's
-  // async frame by IRGen (see `emitBuiltinTaskPushDeadline`). It stores
-  // borrowed pointers to `clock` and `expiration` - no copies of the
-  // clock or instant are made. SIL treats the push/pop pair as a
-  // stack allocation (see `StackAllocation.h`), which forces the
-  // borrows of `clock` and `expiration` to remain live for the whole
-  // push/pop scope - i.e. until the `defer` runs `taskPopDeadline`.
-#if $BuiltinTaskDeadline
   let record = unsafe Builtin.taskPushDeadline(clock: clock, instant: expiration)
   defer { unsafe Builtin.taskPopDeadline(record: record) }
 
@@ -173,7 +166,7 @@ public nonisolated(nonsending) func withDeadline<Return, Failure, C>(
         // Timer was cancelled (disarmed) before the deadline elapsed.
         return
       }
-      // Deadline elapsed; cancel the scope with the `deadlineExpired` reason
+      // Deadline exceeded; cancel the scope with the `deadlineExpired` reason
       // so `Task.checkCancellation()` etc. throw a `CancellationError` whose
       // `reason` reports the deadline expiration instead of `.unspecified`.
       unsafe TaskCancellationScope(record: scopeRecord).cancel(reason: .deadlineExpired)
@@ -212,6 +205,7 @@ public nonisolated(nonsending) func withDeadline<Return, Failure, C>(
 ///
 /// - Returns: The result of the operation.
 /// - Throws: The error thrown by the operation.
+/// - SeeAlso: ``withDeadline(_:tolerance:clock:operation:)``
 @available(StdlibDeploymentTarget 6.5, *)
 @export(implementation)
 public nonisolated(nonsending) func withDeadline<Return, Failure, C>(
@@ -240,14 +234,10 @@ extension Task where Success == Never, Failure == Never {
   /// the current task.
   ///
   /// Returns `true` when the current task is executing inside at least one
-  /// `withDeadline` scope (for any clock), and `false` otherwise. This is
-  /// cheap - it only reads the task's status flags and does not walk the
-  /// record chain.
+  /// `withDeadline` scope (for any clock), and `false` otherwise.
   ///
-  /// External systems that only need to know "does an outer deadline
-  /// govern our behavior" can use this without knowing which specific
-  /// clock is in play. To read the actual deadline value use
-  /// ``activeDeadline(for:)``.
+  /// This operation is cheaper than obtaining a deadline instant by calling
+  /// `activeDeadline(for:)` which needs to perform deadline lookups and clock comparisons.
   ///
   /// - Returns: `true` if any `withDeadline` scope is active on the
   ///   current task, `false` otherwise. Also returns `false` when
@@ -271,14 +261,13 @@ extension Task where Success == Never, Failure == Never {
   ///
   /// The returned instant is the earliest deadline whose clock identity
   /// (`clock.id`) matches the argument's - nested `withDeadline` scopes
-  /// on the same clock are coalesced to the nearest one.
+  /// on the same clock are coalesced, and the nearest one is returned.
   ///
-  /// Deadlines installed for a *different* clock are ignored (there is no
-  /// meaningful cross-clock conversion, so no attempt is made to unify
-  /// them). Composing multiple `withDeadline` scopes on different clocks
-  /// still works correctly - the nearest deadline for each clock governs
-  /// independently - but this accessor can only report on one clock at a
-  /// time.
+  /// Active deadlines for a *different* clock are ignored.
+  ///
+  /// Composing multiple `withDeadline` scopes on different clocks
+  /// is supported, however their lookups are idependent;
+  /// this accessor can only report one deadline for a specific clock at a time.
   ///
   /// - Parameter clock: The clock whose deadlines to search for. Clock
   ///   identity is compared via ``Identifiable/id``; deadlines installed
@@ -292,7 +281,7 @@ extension Task where Success == Never, Failure == Never {
   ///
   /// - SeeAlso: ``hasActiveDeadline``
   @available(StdlibDeploymentTarget 6.5, *)
-  public static func activeDeadline<C: Clock & Identifiable>(for clock: C) -> C.Instant? {
+  public static func activeDeadline<C: Clock & Identifiable>(for clock: C = ContinuousClock()) -> C.Instant? {
     // No need to short-circut here with hasDeadline as the `find...` already does so.
     _findNearestDeadline(clock: clock)
   }
