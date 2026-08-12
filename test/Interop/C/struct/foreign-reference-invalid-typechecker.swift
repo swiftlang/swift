@@ -14,8 +14,6 @@ module Test {
 #pragma once
 #pragma clang assume_nonnull begin
 
-// #include <stdlib.h>
-
 struct
   __attribute__((swift_attr("import_reference")))
   __attribute__((swift_attr("retain:nonexistent")))
