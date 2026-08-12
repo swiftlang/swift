@@ -52,6 +52,9 @@ enum CompressedImageSourceError: Error {
 let zlib_stream_init = swift.runtime.zlib_stream_init
 let lzma_stream_init = swift.runtime.lzma_stream_init
 
+/// The maximum size of blob we're prepared to decompress
+fileprivate let maxUncompressedSize = 1 << 30 // 1GB
+
 // .. CompressedStream .........................................................
 
 protocol CompressedStream {
@@ -411,9 +414,12 @@ extension ImageSource {
         chdr = rawChdr
     }
 
-    let uncompressedSize = UInt(chdr.ch_size)
+    guard let uncompressedSize = Int(exactly: chdr.ch_size),
+          uncompressedSize <= maxUncompressedSize else {
+      throw CompressedImageSourceError.badCompressedData
+    }
 
-    self.init(capacity: Int(uncompressedSize), isMappedImage: false, path: nil)
+    self.init(capacity: uncompressedSize, isMappedImage: false, path: nil)
 
     switch chdr.ch_type {
       case .ELFCOMPRESS_ZLIB:
@@ -446,7 +452,12 @@ extension ImageSource {
         throw CompressedImageSourceError.badCompressedData
     }
 
-    self.init(capacity: Int(uncompressedSize), isMappedImage: false, path: nil)
+    guard let uncompressed = Int(exactly: uncompressedSize),
+          uncompressed <= maxUncompressedSize else {
+      throw CompressedImageSourceError.badCompressedData
+    }
+
+    self.init(capacity: uncompressed, isMappedImage: false, path: nil)
 
     try decompress(stream: ZLibStream(),
                    source: source, offset: 12,

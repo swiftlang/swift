@@ -46,8 +46,7 @@ static std::optional<Path> getActualModuleMapPath(
   Path result;
 
   if (!Opts.RuntimeResourcePath.empty()) {
-    result.append(Opts.RuntimeResourcePath.begin(),
-                  Opts.RuntimeResourcePath.end());
+    result.assign(Opts.RuntimeResourcePath);
     llvm::sys::path::append(result, platform);
     if (isArchSpecific) {
       llvm::sys::path::append(result, arch);
@@ -63,8 +62,7 @@ static std::optional<Path> getActualModuleMapPath(
 
   StringRef SDKPath = Opts.getSDKPath();
   if (!SDKPath.empty()) {
-    result.clear();
-    result.append(SDKPath.begin(), SDKPath.end());
+    result.assign(SDKPath);
     llvm::sys::path::append(result, "usr", "lib", "swift");
     llvm::sys::path::append(result, platform);
     if (isArchSpecific) {
@@ -544,6 +542,14 @@ void GetWindowsFileMappings(
     llvm::sys::path::append(WinSDKInjection, "module.modulemap");
 
     AuxiliaryFile = GetPlatformAuxiliaryFile("windows", "winsdk_um.modulemap",
+                                             VFS, SearchPathOpts);
+    if (!AuxiliaryFile.empty())
+      fileMapping.redirectedFiles.emplace_back(std::string(WinSDKInjection),
+                                               AuxiliaryFile);
+
+    llvm::sys::path::remove_filename(WinSDKInjection);
+    llvm::sys::path::append(WinSDKInjection, "WinSDK.apinotes");
+    AuxiliaryFile = GetPlatformAuxiliaryFile("windows", "WinSDK.apinotes",
                                              VFS, SearchPathOpts);
     if (!AuxiliaryFile.empty())
       fileMapping.redirectedFiles.emplace_back(std::string(WinSDKInjection),

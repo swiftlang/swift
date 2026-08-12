@@ -1605,7 +1605,8 @@ namespace {
             SGF.SGM.M, Substitutions, SGF.getTypeExpansionContext());
       }
 
-      SILFunctionConventions accessorConv(accessorTy, SGF.SGM.M);
+      SILFunctionConventions accessorConv(
+          accessorTy, SILAddressConventions::forFunction(SGF.F));
 
       // FIXME: This should use CallEmission instead of doing everything
       // manually.
@@ -4616,10 +4617,13 @@ LValue SILGenLValue::visitKeyPathApplicationExpr(KeyPathApplicationExpr *e,
                     ? SGFAccessKind::BorrowedAddressRead
                     : SGFAccessKind::ReadWrite);
   } else {
+    // Under opaque values, the object form is chosen because the
+    // intrinsic's base parameter is non-indirect.
     // For all the other kinds, we want the emit the base as an address
     // r-value; we don't support key paths for storage with mutating read
     // operations.
-    subAccess = SGFAccessKind::BorrowedAddressRead;
+    subAccess = SGF.F.hasLoweredAddresses() ? SGFAccessKind::BorrowedAddressRead
+                                            : SGFAccessKind::BorrowedObjectRead;
   }
 
   // For now, just ignore any options we were given.

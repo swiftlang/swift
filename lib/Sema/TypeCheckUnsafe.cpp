@@ -204,6 +204,22 @@ void swift::diagnoseUnsafeUse(const UnsafeUse &use) {
   }
 }
 
+bool swift::retainUnsafeUsesToDiagnose(SmallVectorImpl<UnsafeUse> &unsafeUses,
+                                       bool includeMerelyUnsafe) {
+  bool anyAlways = false;
+  // When we're only after always-unsafe uses, this also drops the merely unsafe
+  // ones we happened to find along the way.
+  llvm::erase_if(unsafeUses, [&](const UnsafeUse &use) {
+    if (!use.isAlways())
+      return !includeMerelyUnsafe;
+
+    anyAlways = true;
+    return false;
+  });
+
+  return anyAlways;
+}
+
 /// Determine whether a reference to the given variable is treated as
 /// nonisolated(unsafe).
 static bool isReferenceToNonisolatedUnsafe(ValueDecl *decl) {
@@ -218,6 +234,22 @@ bool swift::enumerateUnsafeUses(ConcreteDeclRef declRef,
                                 llvm::function_ref<bool(UnsafeUse)> fn) {
   // If the declaration is explicitly unsafe, note that.
   auto decl = declRef.getDecl();
+  ASTContext &ctx = decl->getASTContext();
+  auto subs = declRef.getSubstitutions();
+
+  /// The interface type of this declaration, with any substitutions applied.
+  auto getSubstitutedType = [&]() -> Type {
+    auto type = decl->getInterfaceType();
+    if (subs) {
+      if (auto *genericFnType = type->getAs<GenericFunctionType>())
+        return genericFnType->substGenericArgs(subs);
+
+      return type.subst(subs);
+    }
+
+    return type;
+  };
+
   switch (decl->getExplicitSafety()) {
   case ExplicitSafety::Unspecified:
     // check based on the type, below
@@ -228,9 +260,18 @@ bool swift::enumerateUnsafeUses(ConcreteDeclRef declRef,
     return false;
 
   case ExplicitSafety::Unsafe: {
+    // A merely '@unsafe' declaration doesn't account for an always-unsafe type
+    // in its own signature, so report that type: otherwise the stronger
+    // requirement would be laundered through the weaker attribute.
+    Type alwaysUnsafeType;
+    if (!decl->isAlwaysUnsafe()) {
+      if (Type type = getSubstitutedType())
+        alwaysUnsafeType = type->findAlwaysUnsafeType();
+    }
+
     (void)fn(
         UnsafeUse::forReferenceToUnsafe(
-          decl, isCall && !isa<ParamDecl>(decl), Type(), loc));
+          decl, isCall && !isa<ParamDecl>(decl), alwaysUnsafeType, loc));
 
     // A declaration being explicitly marked @unsafe always stops enumerating
     // safety issues, because it causes too much noise.
@@ -239,15 +280,7 @@ bool swift::enumerateUnsafeUses(ConcreteDeclRef declRef,
   }
 
   // If the type of this declaration involves unsafe types, diagnose that.
-  ASTContext &ctx = decl->getASTContext();
-  auto subs = declRef.getSubstitutions();
-  auto type = decl->getInterfaceType();
-  if (subs) {
-    if (auto *genericFnType = type->getAs<GenericFunctionType>())
-      type = genericFnType->substGenericArgs(subs);
-    else
-      type = type.subst(subs);
-  }
+  auto type = getSubstitutedType();
 
   if (skipTypeCheck) {
     // We check the arguements instead of the funcion type for function calls.
@@ -422,70 +455,28 @@ void swift::diagnoseUnsafeType(ASTContext &ctx, SourceLoc loc, Type type,
   if (!type->isUnsafe())
     return;
 
-  // Look for a specific @unsafe nominal type along the way.
-  class Walker : public TypeWalker {
-  public:
-    Type specificType;
+  /// Find a specific nominal type to blame, looking in the canonical type but
+  /// preferring the sugared spelling when it names the same type.
+  auto findSpecificType =
+      [&](llvm::function_ref<bool(NominalTypeDecl *)> isUnsafeDecl) -> Type {
+    Type canonicalType = type->getCanonicalType()->findUnsafeType(isUnsafeDecl);
+    Type sugaredType = type->findUnsafeType(isUnsafeDecl);
+    if (canonicalType && sugaredType && canonicalType->isEqual(sugaredType))
+      return sugaredType;
 
-    Action walkToTypePre(Type type) override {
-      if (specificType)
-        return Action::Stop;
-
-      // If this refers to a nominal type that is @unsafe, store that.
-      if (auto typeDecl = type->getAnyNominal()) {
-        if (typeDecl->getExplicitSafety() == ExplicitSafety::Unsafe) {
-          specificType = type;
-          return Action::Stop;
-        }
-      }
-
-      // Do not recurse into nominal types, because we do not want to visit
-      // their "parent" types.
-      if (isa<NominalOrBoundGenericNominalType>(type.getPointer()) ||
-          isa<UnboundGenericType>(type.getPointer())) {
-        // Recurse into the generic arguments. This operation is recursive,
-        // because we also need to see the generic arguments of parent types.
-        walkGenericArguments(type);
-
-        return Action::SkipNode;
-      }
-
-      return Action::Continue;
-    }
-
-  private:
-    /// Recursively walk the generic arguments of this type and its parent
-    /// types.
-    void walkGenericArguments(Type type) {
-      if (!type)
-        return;
-
-      // Walk the generic arguments.
-      if (auto boundGeneric = type->getAs<BoundGenericType>()) {
-        for (auto genericArg : boundGeneric->getGenericArgs())
-          genericArg.walk(*this);
-      }
-
-      if (auto nominalOrBound = type->getAs<NominalOrBoundGenericNominalType>())
-        return walkGenericArguments(nominalOrBound->getParent());
-
-      if (auto unbound = type->getAs<UnboundGenericType>())
-        return walkGenericArguments(unbound->getParent());
-    }
+    return canonicalType;
   };
 
-  // Look for a canonical unsafe type.
-  Walker walker;
-  type->getCanonicalType().walk(walker);
-  Type specificType = walker.specificType;
-
-  // Look for an unsafe type in the non-canonical type, which is a better answer
-  // if we can find it.
-  walker.specificType = Type();
-  type.walk(walker);
-  if (specificType && walker.specificType &&
-      specificType->isEqual(walker.specificType))
-    specificType = walker.specificType;
+  // An always-unsafe type takes precedence over a merely unsafe one no matter
+  // where each appears in the type: it is the more severe thing to report, and
+  // it determines how uses have to be acknowledged.
+  Type specificType = findSpecificType(
+      [](NominalTypeDecl *typeDecl) { return typeDecl->isAlwaysUnsafe(); });
+  if (!specificType) {
+    specificType = findSpecificType([](NominalTypeDecl *typeDecl) {
+      return typeDecl->getExplicitSafety() == ExplicitSafety::Unsafe;
+    });
+  }
 
   diagnose(specificType ? specificType : type);
 }

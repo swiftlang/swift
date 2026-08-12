@@ -89,6 +89,44 @@ actor EnqueueTest {
         let wrongUse = EnqueueTest(unownedExecutor: normalRemoteWorker.unownedExecutor)
         await wrongUse.test()
       }
+
+      // A remote actor reference must never be considered isolated, even if
+      // the actor uses a shared executor, e.g. the MainActor
+      do {
+        let mainLocalWorker = MainWorker(actorSystem: system)
+        precondition(__isLocalActor(mainLocalWorker), "must be local")
+
+        let mainRemoteWorker = try! MainWorker.resolve(id: mainLocalWorker.id, using: system)
+        precondition(__isRemoteActor(mainRemoteWorker), "must be remote")
+
+        tests.test("preconditionIsolated: remote reference using MainActor's executor, called from MainActor") {
+          expectCrashLater(withMessage: "Cannot be isolated to remote distributed actor reference")
+          await MainActor.run {
+            mainRemoteWorker.preconditionIsolated()
+          }
+        }
+
+        tests.test("assertIsolated: remote reference using MainActor's executor, called from MainActor") {
+          if _isDebugAssertConfiguration() {
+            expectCrashLater(withMessage: "Cannot be isolated to remote distributed actor reference")
+          }
+          await MainActor.run {
+            mainRemoteWorker.assertIsolated()
+          }
+        }
+
+        tests.test("preconditionIsolated: remote reference with default executor") {
+          expectCrashLater(withMessage: "Cannot be isolated to remote distributed actor reference")
+          normalRemoteWorker.preconditionIsolated()
+        }
+
+        tests.test("preconditionIsolated: local reference using MainActor's executor, called from MainActor") {
+          await MainActor.run {
+            mainLocalWorker.preconditionIsolated()
+            mainLocalWorker.assertIsolated()
+          }
+        }
+      }
     }
 
     await runAllTestsAsync()

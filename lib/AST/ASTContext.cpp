@@ -25,6 +25,7 @@
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/ConformanceLookup.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/DiagnosticsSema.h"
@@ -65,6 +66,7 @@
 #include "swift/Basic/BasicBridging.h"
 #include "swift/Basic/BlockList.h"
 #include "swift/Basic/Compiler.h"
+#include "swift/Basic/Feature.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/StringExtras.h"
@@ -364,7 +366,7 @@ struct ASTContext::Implementation {
 
   /// The declaration of Optional<T>.TangentVector.value
   VarDecl *OptionalTanValueDecl = nullptr;
-  
+
   /// The declaration of Swift.Void.
   TypeAliasDecl *VoidDecl = nullptr;
 
@@ -376,10 +378,10 @@ struct ASTContext::Implementation {
 
   /// The declaration of Swift.UnsafeMutablePointer<T>.memory.
   VarDecl *UnsafeMutablePointerMemoryDecl = nullptr;
-  
+
   /// The declaration of Swift.UnsafePointer<T>.memory.
   VarDecl *UnsafePointerMemoryDecl = nullptr;
-  
+
   /// The declaration of Swift.AutoreleasingUnsafeMutablePointer<T>.memory.
   VarDecl *AutoreleasingUnsafeMutablePointerMemoryDecl = nullptr;
 
@@ -396,10 +398,10 @@ struct ASTContext::Implementation {
   // Declare cached declarations for each of the known declarations.
 #define KNOWN_SDK_FUNC_DECL(Module, Name, Id) FuncDecl *Get##Name = nullptr;
 #include "swift/AST/KnownSDKDecls.def"
-  
+
   /// func <Int, Int) -> Bool
   FuncDecl *LessThanIntDecl = nullptr;
-  
+
   /// func ==(Int, Int) -> Bool
   FuncDecl *EqualIntDecl = nullptr;
 
@@ -549,6 +551,8 @@ struct ASTContext::Implementation {
   /// Local and closure discriminators per context.
   llvm::DenseMap<const DeclContext *, unsigned> NextDiscriminator;
 
+  uint64_t NextGenericEnvironmentID = 0;
+
   /// Cached generic signatures for generic builtin types.
   static const unsigned NumBuiltinGenericTypes
     = unsigned(TypeKind::Last_BuiltinGenericType)
@@ -564,7 +568,7 @@ struct ASTContext::Implementation {
                MetatypeRepresentation::Last_MetatypeRepresentation) + 1,
                "Use std::pair for MetatypeTypes and ExistentialMetatypeTypes.");
 
-    using OpenedExistentialKey = std::pair<SubstitutionMap, UUID>;
+    using OpenedExistentialKey = std::pair<SubstitutionMap, uint64_t>;
 
     llvm::DenseMap<Type, ErrorType *> ErrorTypesWithOriginal;
     llvm::FoldingSet<TypeAliasType> TypeAliasTypes;
@@ -668,7 +672,7 @@ struct ASTContext::Implementation {
   llvm::FoldingSet<BuiltinVectorType> BuiltinVectorTypes;
   llvm::FoldingSet<DeclName::CompoundDeclName> CompoundNames;
   llvm::FoldingSet<DeclNameRef::SelectiveDeclNameRef> SelectiveNameRefs;
-  llvm::DenseMap<UUID, GenericEnvironment *> OpenedElementEnvironments;
+  llvm::DenseMap<uint64_t, GenericEnvironment *> OpenedElementEnvironments;
   llvm::FoldingSet<IndexSubset> IndexSubsets;
   llvm::FoldingSet<AutoDiffDerivativeFunctionIdentifier>
       AutoDiffDerivativeFunctionIdentifiers;
@@ -728,7 +732,7 @@ struct ASTContext::Implementation {
     }
     llvm_unreachable("bad AllocationArena");
   }
-  
+
   llvm::FoldingSet<SILLayout> SILLayouts;
 
   llvm::DenseMap<OverrideSignatureKey, GenericSignature> overrideSigCache;
@@ -1572,6 +1576,7 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
     break;
   case KnownProtocolKind::IUnknown:
   case KnownProtocolKind::ISwiftObject:
+  case KnownProtocolKind::COMInterface:
     M = getLoadedModule(Id_COM);
     if (!M)
       M = MainModule;
@@ -2481,6 +2486,10 @@ void ASTContext::setMaxAssignedDiscriminator(
   getImpl().NextDiscriminator[dc] = discriminator;
 }
 
+uint64_t ASTContext::getNextGenericEnvironmentID() {
+  return ++getImpl().NextGenericEnvironmentID;
+}
+
 void ASTContext::verifyAllLoadedModules() const {
 #ifndef NDEBUG
   FrontendStatsTracer tracer(Stats, "verify-all-loaded-modules");
@@ -2893,7 +2902,9 @@ bool ASTContext::canImportModuleImpl(
           ModuleLoader::ModuleVersionInfo &bestUnderlyingVersionInfo) -> bool {
     for (auto &importer : getImpl().ModuleLoaders) {
       ModuleLoader::ModuleVersionInfo versionInfo;
-      if (!importer->canImportModule(ModuleName, loc, &versionInfo))
+      if (!importer->canImportModule(ModuleName, loc, &versionInfo,
+                                     /*isTestableImport=*/false,
+                                     isSourceCanImport))
         continue; // The loader can't find the module.
 
       if (validateVersion(bestVersionInfo, versionInfo,
@@ -2921,7 +2932,9 @@ bool ASTContext::canImportModuleImpl(
   auto lookupModule = [&]() -> bool {
     for (auto &importer : getImpl().ModuleLoaders) {
       ModuleLoader::ModuleVersionInfo versionInfo;
-      if (!importer->canImportModule(ModuleName, loc, &versionInfo))
+      if (!importer->canImportModule(ModuleName, loc, &versionInfo,
+                                     /*isTestableImport=*/false,
+                                     isSourceCanImport))
         continue; // The loader can't find the module.
       return true;
     }
@@ -2932,7 +2945,7 @@ bool ASTContext::canImportModuleImpl(
     // If this module has already been successfully imported, it is importable.
     if (getLoadedModule(ModuleName) != nullptr)
       return true;
-    
+
     if (!isSourceCanImport)
       return lookupModule();
 
@@ -3373,7 +3386,7 @@ bool ASTContext::hasDelayedConformanceErrors(
 
     return false; // unknown conformance, so no delayed diags either.
   }
-  
+
   // check all conformances for any delayed errors
   for (const auto &entry : getImpl().DelayedConformanceDiags) {
     auto const& diagnostics = entry.getSecond();
@@ -3515,12 +3528,12 @@ size_t ASTContext::getTotalMemory() const {
 
 size_t ASTContext::getSolverMemory() const {
   size_t Size = 0;
-  
+
   if (getImpl().CurrentConstraintSolverArena) {
     Size += getImpl().CurrentConstraintSolverArena->getTotalMemory();
     Size += getImpl().CurrentConstraintSolverArena->Allocator.getBytesAllocated();
   }
-  
+
   return Size;
 }
 
@@ -3971,7 +3984,7 @@ BuiltinUnboundGenericType::get(TypeKind genericTypeKind,
                                const ASTContext &C) {
   BuiltinUnboundGenericType *&Result
     = C.getImpl().BuiltinUnboundGenericTypes[unsigned(genericTypeKind)];
-  
+
   if (Result == nullptr) {
     Result = new (C, AllocationArena::Permanent)
       BuiltinUnboundGenericType(C, genericTypeKind);
@@ -4314,7 +4327,7 @@ AnyFunctionType::Param swift::computeSelfParam(AbstractFunctionDecl *AFD,
                                                bool wantDynamicSelf) {
   auto *dc = AFD->getDeclContext();
   auto &Ctx = dc->getASTContext();
-  
+
   // Determine the type of the container.
   auto containerTy = dc->getDeclaredInterfaceType();
   if (!containerTy || containerTy->hasError())
@@ -4389,11 +4402,15 @@ AnyFunctionType::Param swift::computeSelfParam(AbstractFunctionDecl *AFD,
             isDynamicSelf = true;
     }
   } else if (isa<DestructorDecl>(AFD)) {
-    // Destructors only correctly appear on classes today. (If move-only types
-    // have destructors, they probably would want to consume self.)
-    // Note that we can't assert(containerTy->hasReferenceSemantics()) here
-    // since incorrect or incomplete code could have deinit decls in invalid
-    // contexts, and we need to recover gracefully in those cases.
+    if (Ctx.LangOpts.hasFeature(Feature::MutateAndConsumeInDeinit)) {
+      // In a noncopyable type, the `self` declaration behaves like a
+      // `consuming` binding.
+      auto nomTy = selfTy->getAnyNominal();
+
+      if (nomTy && (isa<StructDecl>(nomTy) || isa<EnumDecl>(nomTy))) {
+        selfAccess = SelfAccessKind::Consuming;
+      }
+    }
   }
 
   if (isDynamicSelf)
@@ -4425,7 +4442,7 @@ AnyFunctionType::Param swift::computeSelfParam(AbstractFunctionDecl *AFD,
     // The default flagless state.
     break;
   }
-  
+
   if (AFD->getAttrs().hasAttribute<AddressableSelfAttr>()) {
     flags = flags.withAddressable(true);
   }
@@ -4882,7 +4899,7 @@ ModuleType *ModuleType::get(ModuleDecl *M) {
 DynamicSelfType *DynamicSelfType::get(Type selfType, const ASTContext &ctx) {
   assert(selfType->isMaterializable()
          && "non-materializable dynamic self?");
-  
+
   auto properties = selfType->getRecursiveProperties();
   auto arena = getArena(properties);
 
@@ -5563,13 +5580,13 @@ SILFunctionType::SILFunctionType(
   // Make sure the type follows invariants.
   assert((!invocationSubs || genericSig)
          && "can only have substitutions with a generic signature");
-        
+
   if (invocationSubs) {
     assert(invocationSubs.getGenericSignature().getCanonicalSignature() ==
                genericSig.getCanonicalSignature() &&
            "substitutions must match generic signature");
   }
-        
+
   if (genericSig) {
     assert(!genericSig->areAllParamsConcrete() &&
            "If all generic parameters are concrete, SILFunctionType should "
@@ -5683,10 +5700,10 @@ CanSILBlockStorageType SILBlockStorageType::get(CanType captureType) {
   auto found = ctx.getImpl().SILBlockStorageTypes.find(captureType);
   if (found != ctx.getImpl().SILBlockStorageTypes.end())
     return CanSILBlockStorageType(found->second);
-  
+
   void *mem = ctx.Allocate(sizeof(SILBlockStorageType),
                            alignof(SILBlockStorageType));
-  
+
   SILBlockStorageType *storageTy = new (mem) SILBlockStorageType(captureType);
   ctx.getImpl().SILBlockStorageTypes.insert({captureType, storageTy});
   return CanSILBlockStorageType(storageTy);
@@ -5734,7 +5751,7 @@ CanSILFunctionType SILFunctionType::get(
   // with generic parameters)
   if (isThinRepresentation(ext.getRepresentation()))
     ext = ext.intoBuilder().withNoEscape(false);
-  
+
   llvm::FoldingSetNodeID id;
   SILFunctionType::Profile(id, genericSig, ext, coroutineKind, callee, params,
                            yields, normalResults, errorResult,
@@ -5774,7 +5791,7 @@ CanSILFunctionType SILFunctionType::get(
     properties |= result.getInterfaceType()->getRecursiveProperties();
   if (errorResult)
     properties |= errorResult->getInterfaceType()->getRecursiveProperties();
-  
+
   // FIXME: If we ever have first-class polymorphic values, we'll need to
   // revisit this.
   if (genericSig || patternSubs) {
@@ -5835,7 +5852,7 @@ VariadicSequenceType *VariadicSequenceType::get(Type base) {
 }
 
 DictionaryType *DictionaryType::get(Type keyType, Type valueType) {
-  auto properties = keyType->getRecursiveProperties() 
+  auto properties = keyType->getRecursiveProperties()
                   | valueType->getRecursiveProperties();
   auto arena = getArena(properties);
 
@@ -5845,7 +5862,7 @@ DictionaryType *DictionaryType::get(Type keyType, Type valueType) {
     = C.getImpl().getArena(arena).DictionaryTypes[{keyType, valueType}];
   if (entry) return entry;
 
-  return entry = new (C, arena) DictionaryType(C, keyType, valueType, 
+  return entry = new (C, arena) DictionaryType(C, keyType, valueType,
                                                properties);
 }
 
@@ -6035,7 +6052,7 @@ CanExistentialArchetypeType ExistentialArchetypeType::get(CanType existential) {
 
   auto *genericEnv = GenericEnvironment::forOpenedExistential(
       existentialSig.OpenedSig, existentialSig.Shape,
-      existentialSig.Generalization, UUID::fromTime());
+      existentialSig.Generalization, ctx.getNextGenericEnvironmentID());
 
   return cast<ExistentialArchetypeType>(
     genericEnv->mapTypeIntoEnvironment(existentialSig.SelfType)
@@ -6344,19 +6361,19 @@ GenericEnvironment *GenericEnvironment::forOpaqueType(
 
 /// Create a new generic environment for an opened archetype.
 GenericEnvironment *
-GenericEnvironment::forOpenedExistential(Type existential, UUID uuid) {
+GenericEnvironment::forOpenedExistential(Type existential, uint64_t id) {
   auto &ctx = existential->getASTContext();
   auto existentialSig = ctx.getOpenedExistentialSignature(existential);
   return forOpenedExistential(existentialSig.OpenedSig,
                               existentialSig.Shape,
-                              existentialSig.Generalization, uuid);
+                              existentialSig.Generalization, id);
 }
 
 /// Create a new generic environment for an opened archetype.
 GenericEnvironment *
 GenericEnvironment::forOpenedExistential(
     GenericSignature signature, Type existential,
-    SubstitutionMap subs, UUID uuid) {
+    SubstitutionMap subs, uint64_t id) {
   assert(existential->isExistentialType());
 
   // TODO: We could attempt to preserve type sugar in the substitution map.
@@ -6375,7 +6392,7 @@ GenericEnvironment::forOpenedExistential(
 
   auto arena = getArena(properties);
 
-  auto key = std::make_pair(subs, uuid);
+  auto key = std::make_pair(subs, id);
 
   auto &environments =
       ctx.getImpl().getArena(arena).OpenedExistentialEnvironments;
@@ -6386,7 +6403,7 @@ GenericEnvironment::forOpenedExistential(
     assert(existingEnv->getOpenedExistentialType()->isEqual(existential));
     assert(existingEnv->getGenericSignature().getPointer() == signature.getPointer());
     assert(existingEnv->getOuterSubstitutions() == subs);
-    assert(existingEnv->getOpenedExistentialUUID() == uuid);
+    assert(existingEnv->getOpenedExistentialID() == id);
 
     return existingEnv;
   }
@@ -6400,9 +6417,13 @@ GenericEnvironment::forOpenedExistential(
       1, 0, 1, 0, numGenericParams);
   void *mem = ctx.Allocate(bytes, alignof(GenericEnvironment));
   auto *genericEnv =
-      new (mem) GenericEnvironment(signature, existential, subs, uuid);
+      new (mem) GenericEnvironment(signature, existential, subs, id);
 
   environments[key] = genericEnv;
+
+  // Make sure we don't reuse IDs when parsing textual SIL and so on.
+  ctx.getImpl().NextGenericEnvironmentID
+      = std::max(ctx.getImpl().NextGenericEnvironmentID, id);
 
   return genericEnv;
 }
@@ -6410,20 +6431,20 @@ GenericEnvironment::forOpenedExistential(
 /// Create a new generic environment for an element archetype.
 GenericEnvironment *
 GenericEnvironment::forOpenedElement(GenericSignature signature,
-                                     UUID uuid,
+                                     uint64_t id,
                                      CanGenericTypeParamType shapeClass,
                                      SubstitutionMap outerSubs) {
   auto &ctx = signature->getASTContext();
 
   auto &openedElementEnvironments =
       ctx.getImpl().OpenedElementEnvironments;
-  auto found = openedElementEnvironments.find(uuid);
+  auto found = openedElementEnvironments.find(id);
 
   if (found != openedElementEnvironments.end()) {
     auto *existingEnv = found->second;
     assert(existingEnv->getGenericSignature().getPointer() == signature.getPointer());
     assert(existingEnv->getOpenedElementShapeClass()->isEqual(shapeClass));
-    assert(existingEnv->getOpenedElementUUID() == uuid);
+    assert(existingEnv->getOpenedElementID() == id);
 
     return existingEnv;
   }
@@ -6439,10 +6460,14 @@ GenericEnvironment::forOpenedElement(GenericSignature signature,
       1, 0, 0, 1, numGenericParams + numOpenedParams);
   void *mem = ctx.Allocate(bytes, alignof(GenericEnvironment));
   auto *genericEnv = new (mem) GenericEnvironment(signature,
-                                                  uuid, shapeClass,
+                                                  id, shapeClass,
                                                   outerSubs);
 
-  openedElementEnvironments[uuid] = genericEnv;
+  openedElementEnvironments[id] = genericEnv;
+
+  // Make sure we don't reuse IDs when parsing textual SIL and so on.
+  ctx.getImpl().NextGenericEnvironmentID
+      = std::max(ctx.getImpl().NextGenericEnvironmentID, id);
 
   return genericEnv;
 }
@@ -6483,7 +6508,7 @@ void DeclName::initialize(ASTContext &C, DeclBaseName baseName,
 DeclName::DeclName(ASTContext &C, DeclBaseName baseName,
                    ParameterList *paramList) {
   SmallVector<Identifier, 4> names;
-  
+
   for (auto P : *paramList)
     names.push_back(P->getArgumentName());
   initialize(C, baseName, names);
@@ -6523,7 +6548,7 @@ void DeclNameRef::initialize(ASTContext &C, Identifier moduleSelector,
 }
 
 /// Find the implementation of the named type in the given module.
-static NominalTypeDecl *findUnderlyingTypeInModule(ASTContext &ctx, 
+static NominalTypeDecl *findUnderlyingTypeInModule(ASTContext &ctx,
                                                    Identifier name,
                                                    ModuleDecl *module) {
   // Find all of the declarations with this name in the Swift module.
@@ -6650,7 +6675,7 @@ ASTContext::getForeignRepresentationInfo(NominalTypeDecl *nominal,
           addTrivial(getIdentifier(name), simd);                        \
         }                                                               \
       }
-#include "swift/ClangImporter/SIMDMappedTypes.def"      
+#include "swift/ClangImporter/SIMDMappedTypes.def"
     }
   }
 
@@ -6727,12 +6752,12 @@ ASTContext::getForeignRepresentationInfo(NominalTypeDecl *nominal,
     // If we didn't find anything, mark the result as "None".
     if (!result)
       result = ForeignRepresentationInfo::forNone(CurrentGeneration);
-    
+
     // Cache the result.
     known = getImpl().ForeignRepresentableCache.insert({ nominal, *result }).first;
   }
 
-  // Map a cache entry to a result for this specific 
+  // Map a cache entry to a result for this specific
   auto entry = known->second;
   if (entry.getKind() == ForeignRepresentableKind::None)
     return entry;
@@ -6811,14 +6836,14 @@ bool ASTContext::isObjCClassWithMultipleSwiftBridgedTypes(Type t) {
   auto clazz = t->getClassOrBoundGenericClass();
   if (!clazz)
     return false;
-  
+
   if (clazz == getNSErrorDecl())
     return true;
   if (clazz == getNSNumberDecl())
     return true;
   if (clazz == getNSValueDecl())
     return true;
-  
+
   return false;
 }
 
@@ -7049,7 +7074,7 @@ ASTContext::getOpenedElementSignature(CanGenericSignature baseGenericSig,
   return elementSig;
 }
 
-GenericSignature 
+GenericSignature
 ASTContext::getOverrideGenericSignature(const ValueDecl *base,
                                         const ValueDecl *derived) {
   assert(isa<AbstractFunctionDecl>(base) || isa<SubscriptDecl>(base));
@@ -7183,22 +7208,22 @@ SILLayout *SILLayout::get(ASTContext &C,
   if (!Generics || Generics->areAllParamsConcrete()) {
     CapturesGenericEnvironment = false;
   }
-  
+
   // Profile the layout parameters.
   llvm::FoldingSetNodeID id;
   Profile(id, Generics, Fields, CapturesGenericEnvironment);
-  
+
   // Return an existing layout if there is one.
   void *insertPos;
   auto &Layouts = C.getImpl().SILLayouts;
-  
+
   if (auto existing = Layouts.FindNodeOrInsertPos(id, insertPos))
     return existing;
-  
+
   // Allocate a new layout.
   void *memory = C.Allocate(totalSizeToAlloc<SILField>(Fields.size()),
                             alignof(SILLayout));
-  
+
   auto newLayout = ::new (memory) SILLayout(Generics, Fields,
                                             CapturesGenericEnvironment);
   Layouts.InsertNode(newLayout, insertPos);

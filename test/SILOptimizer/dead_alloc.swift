@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -O -emit-sil -parse-as-library -sil-verify-all %s | %FileCheck %s
+// RUN: %target-swift-frontend -O -emit-sil -parse-as-library -sil-verify-all -Xllvm -sil-print-transform-blocks=false %s | %FileCheck %s
 
 // REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
 
@@ -51,8 +51,6 @@ public func deadClassInstance() {
 
 // CHECK-LABEL: sil @$s10dead_alloc0A13ManagedBufferyyF :
 // CHECK:       bb0:
-// CHECK-NEXT:    debug_value
-// CHECK-NEXT:    debug_value
 // CHECK-NEXT:    tuple
 // CHECK-NEXT:    return
 // CHECK-NEXT:  } // end sil function '$s10dead_alloc0A13ManagedBufferyyF'

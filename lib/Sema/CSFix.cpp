@@ -1041,6 +1041,22 @@ AllowTypeOrInstanceMember::create(ConstraintSystem &cs, Type baseType,
       AllowTypeOrInstanceMember(cs, baseType, member, usedName, locator);
 }
 
+bool AllowMetatypeExtensionMemberOnConformingType::diagnose(
+    const Solution &solution, bool asNote) const {
+  InvalidMetatypeExtensionMemberRefFailure failure(
+      solution, getBaseType(), getMember(), getLocator());
+  return failure.diagnose(asNote);
+}
+
+AllowMetatypeExtensionMemberOnConformingType *
+AllowMetatypeExtensionMemberOnConformingType::create(
+    ConstraintSystem &cs, Type baseType, ValueDecl *member,
+    DeclNameRef usedName, ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      AllowMetatypeExtensionMemberOnConformingType(
+          cs, baseType, member, usedName, locator);
+}
+
 bool AllowInvalidPartialApplication::diagnose(const Solution &solution,
                                               bool asNote) const {
   PartialApplicationFailure failure(isWarning, solution, getLocator());
@@ -1971,9 +1987,12 @@ unsigned AllowArgumentMismatch::getParamIdx() const {
 
 bool AllowArgumentMismatch::diagnose(const Solution &solution,
                                      bool asNote) const {
-  ArgumentMismatchFailure failure(solution, getFromType(), getToType(),
-                                  getLocator());
-  return failure.diagnose(asNote);
+  std::optional<ArgumentMismatchFailure> failure =
+      ArgumentMismatchFailure::create(solution, getFromType(), getToType(),
+                                      getLocator());
+  if (!failure)
+    return false;
+  return failure.value().diagnose(asNote);
 }
 
 AllowArgumentMismatch *
@@ -1995,10 +2014,14 @@ RemoveInvalidCall *RemoveInvalidCall::create(ConstraintSystem &cs,
 
 bool TreatEphemeralAsNonEphemeral::diagnose(const Solution &solution,
                                             bool asNote) const {
-  NonEphemeralConversionFailure failure(solution, getLocator(), getFromType(),
-                                        getToType(), ConversionKind,
-                                        fixBehavior);
-  return failure.diagnose(asNote);
+
+  std::optional<NonEphemeralConversionFailure> failure =
+      NonEphemeralConversionFailure::create(solution, getLocator(),
+                                            getFromType(), getToType(),
+                                            ConversionKind, fixBehavior);
+  if (failure.has_value())
+    return failure.value().diagnose(asNote);
+  return false;
 }
 
 TreatEphemeralAsNonEphemeral *TreatEphemeralAsNonEphemeral::create(
@@ -2914,5 +2937,20 @@ bool IgnoreClassRequirementForDynamicMemberLookup::diagnose(
     const Solution &solution, bool asNote) const {
   NonClassBaseInDynamicMemberLookup failure(solution, BaseType, Member,
                                             getLocator());
+  return failure.diagnose(asNote);
+}
+
+ExecutionSemanticsMismatch *
+ExecutionSemanticsMismatch::create(ConstraintSystem &cs, FunctionType *fromType,
+                                   FunctionType *toType,
+                                   ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      ExecutionSemanticsMismatch(cs, fromType, toType, locator);
+}
+
+bool ExecutionSemanticsMismatch::diagnose(const Solution &solution,
+                                          bool asNote) const {
+  ConversionBetweenFunctionsWithDifferentExecutionSemantics failure(
+      solution, getFromType(), getToType(), getLocator());
   return failure.diagnose(asNote);
 }

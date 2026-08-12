@@ -240,6 +240,15 @@ bool visitExplodedTupleValue(SILValue value,
 std::pair<SILFunction *, SILWitnessTable *>
 lookUpFunctionInWitnessTable(WitnessMethodInst *wmi, SILModule::LinkingMode linkingMode);
 
+/// The maximum number of fields of an aggregate which is still expanded into
+/// element-wise operations.
+///
+/// Expanding a wider aggregate costs code size: an aggregate copy or destroy
+/// which is not expanded is emitted by IRGen as a single call to an outlined
+/// helper function, whereas an expanded one becomes an operation on every
+/// single field. It also increases register pressure.
+constexpr unsigned MaxNumFieldsToExpand = 6;
+
 /// True if a type can be expanded without a significant increase to code size.
 ///
 /// False if expanding a type is invalid. For example, expanding a

@@ -1221,8 +1221,7 @@ bool ElementUseCollector::addClosureElementUses(PartialApplyInst *pai,
   if (!VisitedClosures.insert(callee).second)
     return false;
 
-  unsigned argIndex = ApplySite(pai).getCalleeArgIndex(*argUse);
-  SILArgument *arg = callee->getArgument(argIndex);
+  SILArgument *arg = ApplySite(pai).getCalleeArgument(callee, *argUse);
   
   // Bail if arg is not the original 'self' object, but e.g. a projected member.
   assert(TheMemory.getType().isObject());

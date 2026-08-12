@@ -119,13 +119,22 @@ public:
         return;
       }
       auto NextSize = Self::getCurrentRecordSize(NextRecord);
-      if (NextSize > Size) {
+      if (!NextSize) {
+        std::cerr << "!!! Reflection record has an invalid record stride\n"
+                  << std::endl;
+        std::cerr << "Section Type: " << Name << std::endl;
+        // Set this iterator equal to the end. This section is effectively
+        // empty.
+        this->Size = 0;
+        return;
+      }
+      if (*NextSize > Size) {
         std::cerr
             << "!!! Reflection section too small to contain first record\n"
             << std::endl;
         std::cerr << "Section Type: " << Name << std::endl;
         std::cerr << "Section size: " << Size
-                  << ", size of first record: " << NextSize << std::endl;
+                  << ", size of first record: " << *NextSize << std::endl;
         // Set this iterator equal to the end. This section is effectively
         // empty.
         this->Size = 0;
@@ -142,8 +151,19 @@ public:
   Self &operator++() {
     auto CurRecord = this->operator*();
     auto CurSize = Self::getCurrentRecordSize(CurRecord);
-    Cur = Cur.atByteOffset(CurSize);
-    Size -= CurSize;
+    if (!CurSize || *CurSize > Size) {
+      // Every record is validated before it becomes the current one, so this
+      // should not happen. Check anyway: advancing by an unvalidated size would
+      // move Cur outside the section and underflow Size.
+      assert(false && "iterating an unvalidated reflection record size");
+      std::cerr << "!!! Reflection record has an invalid record stride\n"
+                << std::endl;
+      std::cerr << "Section Type: " << Name << std::endl;
+      Size = 0;
+      return asImpl();
+    }
+    Cur = Cur.atByteOffset(*CurSize);
+    Size -= *CurSize;
 
     if (Size > 0) {
       if (Size < Self::getMinimumRecordSize()) {
@@ -154,7 +174,16 @@ public:
       }
       auto NextRecord = this->operator*();
       auto NextSize = Self::getCurrentRecordSize(NextRecord);
-      if (NextSize > Size) {
+      if (!NextSize) {
+        std::cerr << "!!! Reflection record has an invalid record stride\n"
+                  << std::endl;
+        std::cerr << "Section Type: " << Name << std::endl;
+        std::cerr << "Offset in section: " << (OriginalSize - Size)
+                  << std::endl;
+        Size = 0;
+        return asImpl();
+      }
+      if (*NextSize > Size) {
         int offset = (int)(OriginalSize - Size);
         std::cerr << "!!! Reflection section too small to contain next record\n"
                   << std::endl;
@@ -162,7 +191,7 @@ public:
         std::cerr << "Remaining section size: " << Size
                   << ", total section size: " << OriginalSize
                   << ", offset in section: " << offset
-                  << ", size of next record: " << NextSize << std::endl;
+                  << ", size of next record: " << *NextSize << std::endl;
         const uint8_t *p =
             reinterpret_cast<const uint8_t *>(Cur.getLocalBuffer());
         std::cerr << "Last bytes of previous record: ";
@@ -207,8 +236,14 @@ public:
   FieldDescriptorIterator(RemoteRef<void> Cur, uint64_t Size)
       : ReflectionSectionIteratorBase(Cur, Size, "FieldDescriptor") {}
 
-  static uint64_t getCurrentRecordSize(RemoteRef<FieldDescriptor> FR) {
-    return sizeof(FieldDescriptor) + FR->NumFields * FR->FieldRecordSize;
+  static std::optional<uint64_t>
+  getCurrentRecordSize(RemoteRef<FieldDescriptor> FR) {
+    // We only ever emit FieldRecordSize equal to sizeof(FieldRecord). If it's
+    // anything else, consider it to be bad data and ignore it.
+    if (FR->FieldRecordSize != sizeof(FieldRecord))
+      return std::nullopt;
+    return sizeof(FieldDescriptor) +
+           (uint64_t)FR->NumFields * (uint64_t)FR->FieldRecordSize;
   }
 };
 using FieldSection = ReflectionSection<FieldDescriptorIterator>;
@@ -220,10 +255,16 @@ public:
   AssociatedTypeIterator(RemoteRef<void> Cur, uint64_t Size)
       : ReflectionSectionIteratorBase(Cur, Size, "AssociatedType") {}
 
-  static uint64_t
+  static std::optional<uint64_t>
   getCurrentRecordSize(RemoteRef<AssociatedTypeDescriptor> ATR) {
+    // We only ever emit AssociatedTypeRecordSize equal to
+    // sizeof(AssociatedTypeRecord). If it's anything else, consider it to be
+    // bad data and ignore it.
+    if (ATR->AssociatedTypeRecordSize != sizeof(AssociatedTypeRecord))
+      return std::nullopt;
     return sizeof(AssociatedTypeDescriptor) +
-           ATR->NumAssociatedTypes * ATR->AssociatedTypeRecordSize;
+           (uint64_t)ATR->NumAssociatedTypes *
+               (uint64_t)ATR->AssociatedTypeRecordSize;
   }
 };
 using AssociatedTypeSection = ReflectionSection<AssociatedTypeIterator>;
@@ -235,7 +276,8 @@ public:
   BuiltinTypeDescriptorIterator(RemoteRef<void> Cur, uint64_t Size)
       : ReflectionSectionIteratorBase(Cur, Size, "BuiltinTypeDescriptor") {}
 
-  static uint64_t getCurrentRecordSize(RemoteRef<BuiltinTypeDescriptor> ATR) {
+  static std::optional<uint64_t>
+  getCurrentRecordSize(RemoteRef<BuiltinTypeDescriptor> ATR) {
     return sizeof(BuiltinTypeDescriptor);
   }
 };
@@ -248,10 +290,12 @@ public:
   CaptureDescriptorIterator(RemoteRef<void> Cur, uint64_t Size)
       : ReflectionSectionIteratorBase(Cur, Size, "CaptureDescriptor") {}
 
-  static uint64_t getCurrentRecordSize(RemoteRef<CaptureDescriptor> CR) {
+  static std::optional<uint64_t>
+  getCurrentRecordSize(RemoteRef<CaptureDescriptor> CR) {
+    // Use 64-bit arithmetic to avoid overflowing with extremely large values.
     return sizeof(CaptureDescriptor) +
-           CR->NumCaptureTypes * sizeof(CaptureTypeRecord) +
-           CR->NumMetadataSources * sizeof(MetadataSourceRecord);
+           (uint64_t)CR->NumCaptureTypes * sizeof(CaptureTypeRecord) +
+           (uint64_t)CR->NumMetadataSources * sizeof(MetadataSourceRecord);
   }
 };
 using CaptureSection = ReflectionSection<CaptureDescriptorIterator>;
@@ -263,7 +307,7 @@ public:
   MultiPayloadEnumDescriptorIterator(RemoteRef<void> Cur, uint64_t Size)
       : ReflectionSectionIteratorBase(Cur, Size, "MultiPayloadEnum") {}
 
-  static uint64_t
+  static std::optional<uint64_t>
   getCurrentRecordSize(RemoteRef<MultiPayloadEnumDescriptor> MPER) {
     return MPER->getSizeInBytes();
   }
@@ -434,11 +478,11 @@ public:
   TypeRefBuilder(const TypeRefBuilder &other) = delete;
   TypeRefBuilder &operator=(const TypeRefBuilder &other) = delete;
 
-  Mangle::ManglingFlavor getManglingFlavor() {
-    return Mangle::ManglingFlavor::Default;
-  }
+  Mangle::ManglingFlavor getManglingFlavor() { return Flavor; }
 
 private:
+  Mangle::ManglingFlavor Flavor;
+
   Demangle::Demangler Dem;
 
   /// Makes sure dynamically allocated TypeRefs stick around for the life of
@@ -798,7 +842,8 @@ public:
                                                           PointerSize>
           conformanceReader(
               Builder.OpaqueByteReader, Builder.OpaqueStringReader,
-              Builder.OpaquePointerReader, Builder.OpaqueDynamicSymbolResolver);
+              Builder.OpaquePointerReader, Builder.OpaqueDynamicSymbolResolver,
+              Builder.getManglingFlavor());
       for (const auto &section : ReflectionInfos) {
         auto ConformanceBegin = section.Conformance.startAddress();
         auto ConformanceEnd = section.Conformance.endAddress();
@@ -985,9 +1030,9 @@ public:
   // TypeRefs model generic values as distinct IntegerTypeRefs, so a value
   // argument is never misinterpreted as a type; the demangler's value/type
   // consistency check is unnecessary here.
-  std::optional<bool> isValueGenericParameter(const BuiltTypeDecl &,
-                                              unsigned index) {
-    return std::nullopt;
+  llvm::SmallVector<bool, 8>
+  getValueGenericParameterFlags(const BuiltTypeDecl &, unsigned numArgs) {
+    return {};
   }
 
   const TypeRef *createNegativeIntegerType(intptr_t value) {
@@ -1536,7 +1581,10 @@ public:
 
   // Only for testing. A TypeRefBuilder built this way will not be able to
   // decode records in remote memory.
-  explicit TypeRefBuilder(ForTesting_t) : TC(*this), RDF(*this, nullptr) {}
+  explicit TypeRefBuilder(
+      ForTesting_t,
+      Mangle::ManglingFlavor flavor = Mangle::ManglingFlavor::Default)
+      : Flavor(flavor), TC(*this), RDF(*this, nullptr) {}
 
 private:
   /// Indexes of Reflection Infos we've already processed.
@@ -1602,6 +1650,10 @@ private:
   RefDemangler TypeRefDemangler;
   UnderlyingTypeReader OpaqueUnderlyingTypeReader;
 
+  /// Reason the most recent TypeRefDemangler run produced a null node.
+  remote::DemangleFailureReason LastTypeRefDemangleFailure =
+      remote::DemangleFailureReason::None;
+
   // Opaque fields captured from the MetadataReader's MemoryReader
   ByteReader OpaqueByteReader;
   StringReader OpaqueStringReader;
@@ -1616,14 +1668,17 @@ public:
   template <typename Runtime>
   TypeRefBuilder(remote::MetadataReader<Runtime, TypeRefBuilder> &reader,
                  remote::ExternalTypeRefCache *externalCache = nullptr,
-                 DescriptorFinder *externalDescriptorFinder = nullptr)
-      : TC(*this), EDF(externalDescriptorFinder), RDF(*this, externalCache),
+                 DescriptorFinder *externalDescriptorFinder = nullptr,
+                 Mangle::ManglingFlavor flavor = Mangle::ManglingFlavor::Default)
+      : Flavor(flavor), TC(*this), EDF(externalDescriptorFinder),
+        RDF(*this, externalCache),
         PointerSize(sizeof(typename Runtime::StoredPointer)),
         TypeRefDemangler([this, &reader](RemoteRef<char> string,
                                          bool useOpaqueTypeSymbolicReferences)
                              -> Demangle::Node * {
           return reader.demangle(string, remote::MangledNameKind::Type, Dem,
-                                 useOpaqueTypeSymbolicReferences);
+                                 useOpaqueTypeSymbolicReferences,
+                                 &LastTypeRefDemangleFailure);
         }),
         OpaqueUnderlyingTypeReader(
             [&reader](remote::RemoteAddress descriptorAddr,
@@ -1705,6 +1760,12 @@ public:
   Demangle::Node *demangleTypeRef(RemoteRef<char> string,
                                   bool useOpaqueTypeSymbolicReferences = true) {
     return TypeRefDemangler(string, useOpaqueTypeSymbolicReferences);
+  }
+
+  /// Reason the most recent demangleTypeRef() produced a null node (or None).
+  /// Valid only immediately after that call.
+  remote::DemangleFailureReason getLastDemangleFailure() const {
+    return LastTypeRefDemangleFailure;
   }
 
   TypeConverter &getTypeConverter() { return TC; }
@@ -2329,16 +2390,19 @@ private:
     StringReader OpaqueStringReader;
     DynamicSymbolResolver OpaqueDynamicSymbolResolver;
     QualifiedContextNameReader<ObjCInteropKind, PointerSize> NameReader;
+    Mangle::ManglingFlavor Flavor;
 
     ProtocolConformanceDescriptorReader(
         ByteReader byteReader, StringReader stringReader,
         PointerReader pointerReader,
-        DynamicSymbolResolver dynamicSymbolResolver)
+        DynamicSymbolResolver dynamicSymbolResolver,
+        Mangle::ManglingFlavor flavor)
         : Error(""), OpaquePointerReader(pointerReader),
           OpaqueByteReader(byteReader), OpaqueStringReader(stringReader),
           OpaqueDynamicSymbolResolver(dynamicSymbolResolver),
           NameReader(byteReader, stringReader, pointerReader,
-                     dynamicSymbolResolver) {}
+                     dynamicSymbolResolver),
+          Flavor(flavor) {}
 
     /// Extract conforming type's name from a Conformance Descriptor
     /// Returns a pair of (mangledTypeName, fullyQualifiedTypeName)
@@ -2429,7 +2493,7 @@ private:
           typeName = nodeToString(typeRoot);
 
           auto typeMangling =
-              Demangle::mangleNode(typeRoot, Mangle::ManglingFlavor::Default);
+              Demangle::mangleNode(typeRoot, Flavor);
           if (!typeMangling.isSuccess())
             mangledTypeName = "";
           else

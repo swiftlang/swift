@@ -162,6 +162,18 @@ public:
   /// pointer is \c nullptr. The result is cached.
   CanGenericSignature getCanonicalSignature() const;
 
+  /// Whether this signature is more generic than \p outerSig in a way that
+  /// affects ABI.
+  ///
+  /// Differences that don't affect ABI are ignored, such as requirements that
+  /// only add conformances to marker protocols. Either signature may be null.
+  ///
+  /// This is the notion Embedded Swift uses to decide whether a member is
+  /// "generic" relative to the context that declares it: a method of a generic
+  /// class that only uses the class's own generic parameters is not more
+  /// generic than the class, and needs no separate specialization.
+  bool isABIMoreGenericThan(GenericSignature outerSig) const;
+
   // Support for FoldingSet.
   void Profile(llvm::FoldingSetNodeID &id) const;
 

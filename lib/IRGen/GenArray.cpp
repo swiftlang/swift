@@ -342,8 +342,8 @@ public:
                                        Address src, SILType T,
                                        bool isOutlined) const override {
     if (ArraySize == 0)
-      return llvm::ConstantInt::get(IGF.IGM.Int32Ty, -1);
-      
+      return llvm::ConstantInt::getAllOnesValue(IGF.IGM.Int32Ty);
+
     auto firstElementAddr
       = IGF.Builder.CreateElementBitCast(src, Element.getStorageType());
 

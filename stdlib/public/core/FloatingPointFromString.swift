@@ -878,27 +878,29 @@ fileprivate func fastParse64(
   // but that's too long for a variable name, so...
   var nonZeroDigitCount = 0
   // Collect digits into "leadingDigits"
-  var t = unsafe input[unchecked: i] &- 0x30
+  let t = unsafe input[unchecked: i] &- 0x30
   if t < 10 {
     leadingDigits = UInt64(t)
     i &+= 1
-    if i >= input.count {
-      // Exactly one non-zero digit
+    while i < input.count {
+        let t = unsafe input[unchecked: i] &- 0x30
+        if t > 9 {
+            break
+        }
+        leadingDigits &*= 10
+        leadingDigits &+= UInt64(t)
+        i &+= 1
+    }
+    nonZeroDigitCount = i - firstNonZeroDigitOffset
+    if i >= input.count && nonZeroDigitCount < 19 {
+      // Pure integer
       return .decimal(digits: leadingDigits,
                       base10Exponent: 0,
                       unparsedDigitCount: 0,
                       firstUnparsedDigitOffset: UInt16(i),
-                      leadingDigitCount: 1,
+                      leadingDigitCount: UInt8(truncatingIfNeeded:nonZeroDigitCount),
                       sign: sign)
     }
-    t = unsafe input[unchecked: i] &- 0x30
-    while t < 10 && i < input.count {
-      leadingDigits &*= 10
-      leadingDigits &+= UInt64(t)
-      i &+= 1
-      t = unsafe input[unchecked: i] &- 0x30
-    }
-    nonZeroDigitCount = i - firstNonZeroDigitOffset
   }
 
   var unparsedDigitCount = 0
@@ -934,13 +936,15 @@ fileprivate func fastParse64(
       // https://lemire.me/blog/2018/09/30/quickly-identifying-a-sequence-of-digits-in-a-string-of-characters/
       // and
       // https://lemire.me/blog/2022/01/21/swar-explained-parsing-eight-digits/
-      var t = unsafe input[unchecked: i] &- 0x30
-      while t < 10 && i < input.count {
+      repeat {
+        let t = unsafe input[unchecked: i] &- 0x30
+        if t > 9 {
+          break
+        }
         leadingDigits &*= 10
         leadingDigits &+= UInt64(t)
         i &+= 1
-        t = unsafe input[unchecked: i] &- 0x30
-      }
+      } while i < input.count
     }
     nonZeroDigitCount &+= i &- firstSignificantDigitAfterDecimalPointOffset
     base10Exponent &-= Int32(truncatingIfNeeded: i &- firstDigitAfterDecimalPointOffset)
@@ -975,12 +979,14 @@ fileprivate func fastParse64(
     // For speed, we let the exponent overflow here.
     var explicitExponent = Int32(0)
     let firstExponentDigitOffset = i
-    var byte = unsafe input[unchecked: i]
-    while i < input.count && byte >= 0x30 && byte <= 0x39 {
+    while i < input.count {
+      let t = unsafe input[unchecked: i] - 0x30
+      if t > 9 {
+        break
+      }
       explicitExponent &*= 10
-      explicitExponent &+= Int32(byte) &- 0x30
+      explicitExponent &+= Int32(t)
       i &+= 1
-      byte = unsafe input[unchecked: i]
     }
     // Did we scan more than 8 digits in the exponent?
     if i &- firstExponentDigitOffset > 8 {

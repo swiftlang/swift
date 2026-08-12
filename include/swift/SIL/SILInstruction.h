@@ -640,8 +640,8 @@ public:
   /// Currently there are two kinds of type dependent operands:
   ///
   /// 1. for opened archetypes:
-  ///     %o = open_existential_addr %0 : $*P to $*@opened("UUID") P
-  ///     %w = witness_method $@opened("UUID") P, ... // type-defs: %o
+  ///     %o = open_existential_addr %0 : $*P to $*@opened(id, Self) P
+  ///     %w = witness_method $@opened(ID, Self) P, ... // type-defs: %o
   ///
   /// 2. for the dynamic self argument:
   ///     sil @foo : $@convention(method) (@thick X.Type) {
@@ -951,7 +951,7 @@ public:
 
   /// Verify that all operands of this instruction have compatible ownership
   /// with this instruction.
-  void verifyOperandOwnership(SILModuleConventions *silConv = nullptr) const;
+  void verifyOperandOwnership(SILAddressConventions *silConv = nullptr) const;
 
   /// Verify that this instruction and its associated debug information follow
   /// all SIL debug info invariants.
@@ -2957,7 +2957,11 @@ public:
     return getCallee()->getType().template castTo<SILFunctionType>();
   }
   SILFunctionConventions getOrigCalleeConv() const {
-    return SILFunctionConventions(getOrigCalleeType(), this->getModule());
+    // Keyed to the containing function's lowered-addresses state (see
+    // getSubstCalleeConv), not the module stage.
+    return SILFunctionConventions(
+        getOrigCalleeType(),
+        SILAddressConventions::forFunction(*this->getFunction()));
   }
 
   /// Get the type of the callee with the applied substitutions.
@@ -2973,7 +2977,15 @@ public:
   }
   
   SILFunctionConventions getSubstCalleeConv() const {
-    return SILFunctionConventions(getSubstCalleeType(), this->getModule());
+    // Keyed to the lowered-addresses state of the function containing this
+    // apply, not the module stage: AddressLowering rewrites a call's operands
+    // in the caller's context, so the operand shapes track the caller's state
+    // even while the module flag is still false. Routed through a free helper
+    // because reading the bit needs the complete SILFunction, only
+    // forward-declared here.
+    return SILFunctionConventions(
+        getSubstCalleeType(),
+        SILAddressConventions::forFunction(*this->getFunction()));
   }
 
   bool isCalleeNoReturn() const {
@@ -3362,7 +3374,7 @@ class ApplyInst final
   create(SILDebugLocation debugLoc, SILValue callee,
          SubstitutionMap substitutions, ArrayRef<SILValue> args,
          ApplyOptions options,
-         std::optional<SILModuleConventions> moduleConventions,
+         std::optional<SILAddressConventions> moduleConventions,
          SILFunction &parentFunction,
          const GenericSpecializationInformation *specializationInfo,
          std::optional<ApplyIsolationCrossing> isolationCrossing,
@@ -3415,6 +3427,7 @@ private:
          SILFunctionTypeIsolation ResultIsolation, SILFunction &F,
          const GenericSpecializationInformation *SpecializationInfo,
          OnStackKind onStack, StackAllocationIsNested_t isNested,
+         bool isCalledOnce,
          std::optional<ArrayRef<SILLocation>> ArgLocs = std::nullopt);
 
 public:
@@ -3432,6 +3445,10 @@ public:
     return getFunctionType()->getIsolation();
   }
 
+  bool isCalledOnce() const {
+    return getFunctionType()->isCalledOnce();
+  }
+  
   OnStackKind isOnStack() const {
     return getFunctionType()->isNoEscape() ? OnStack : NotOnStack;
   }
@@ -3493,7 +3510,7 @@ class BeginApplyInst final
   create(SILDebugLocation debugLoc, SILValue callee,
          SubstitutionMap substitutions, ArrayRef<SILValue> args,
          ApplyOptions options,
-         std::optional<SILModuleConventions> moduleConventions,
+         std::optional<SILAddressConventions> moduleConventions,
          SILFunction &parentFunction,
          const GenericSpecializationInformation *specializationInfo,
          std::optional<ApplyIsolationCrossing> isolationCrossing,
@@ -3652,9 +3669,6 @@ public:
 
   CanSILFunctionType getFunctionType() const {
     return getType().castTo<SILFunctionType>();
-  }
-  SILFunctionConventions getConventions() const {
-    return SILFunctionConventions(getFunctionType(), getModule());
   }
 
   ArrayRef<Operand> getAllOperands() const { return {}; }
@@ -4438,12 +4452,22 @@ public:
 
   SubstitutionMap getSubstitutions() const { return Substitutions; }
 
-  /// If this `keypath_inst` can be emitted as a statically-instantiated
-  /// immortal instance in Embedded Swift, returns the concrete key path
-  /// class SILType (e.g. `$KeyPath<Foo, Bar>`, `$WritableKeyPath<Foo,
-  /// Bar>`, or `$ReferenceWritableKeyPath<Foo, Bar>`) that IRGen would use
-  /// as the object's isa.  Returns an invalid SILType otherwise.
+  /// If this `keypath_inst` can be described entirely at compile time in
+  /// Embedded Swift, returns the concrete key path class SILType (e.g.
+  /// `$KeyPath<Foo, Bar>`, `$WritableKeyPath<Foo, Bar>`, or
+  /// `$ReferenceWritableKeyPath<Foo, Bar>`) that IRGen would use as the
+  /// object's isa.  Returns an invalid SILType otherwise.
+  ///
+  /// A result here does not by itself mean the instance is a constant: if the
+  /// key path captures values, IRGen emits a template plus code to fill the
+  /// captures in.  See `needsRuntimeInstantiation`.
   SILType getStaticInstanceClassType() const;
+
+  /// Whether an Embedded Swift instance of this key path has to be allocated
+  /// and populated at runtime rather than referenced as an immortal constant.
+  /// True exactly when the key path captures values, i.e. when some component
+  /// has subscript arguments.
+  bool needsRuntimeInstantiation() const { return !getAllOperands().empty(); }
 
   void dropReferencedPattern();
   
@@ -5726,12 +5750,11 @@ public:
 /// Define the start or update to a symbolic variable value (for loadable
 /// types).
 class DebugValueInst final
-    : public UnaryInstructionBase<SILInstructionKind::DebugValueInst,
-                                  NonValueInstruction>,
-      private SILDebugVariableSupplement,
-      private llvm::TrailingObjects<DebugValueInst, SILType, SILLocation,
-                                    const SILDebugScope *, SILDIExprElement,
-                                    char> {
+    : public InstructionBaseWithTrailingOperands<
+          SILInstructionKind::DebugValueInst, DebugValueInst,
+          NonValueInstruction, SILType, SILLocation, const SILDebugScope *,
+          SILDIExprElement, char>,
+      private SILDebugVariableSupplement {
   friend TrailingObjects;
   friend SILBuilder;
 
@@ -5741,20 +5764,36 @@ class DebugValueInst final
   /// Optional debug basic block holding reconstruction instructions.
   SILBasicBlock *ReconstructionBlock = nullptr;
 
-  DebugValueInst(SILDebugLocation DebugLoc, SILValue Operand,
-                 SILDebugVariable Var,
+  DebugValueInst(SILDebugLocation DebugLoc, ArrayRef<SILValue> Operands,
+                 SILModule &M, SILDebugVariable Var,
                  UsesMoveableValueDebugInfo_t operandWasMoved, bool trace,
                  bool prependDeref);
-  static DebugValueInst *create(SILDebugLocation DebugLoc, SILValue Operand,
-                                SILModule &M, SILDebugVariable Var,
+  static DebugValueInst *create(SILDebugLocation DebugLoc,
+                                ArrayRef<SILValue> Operands, SILModule &M,
+                                SILDebugVariable Var,
                                 UsesMoveableValueDebugInfo_t operandWasMoved,
                                 bool trace);
 
+  using InstructionBaseWithTrailingOperands::numTrailingObjects;
   SIL_DEBUG_VAR_SUPPLEMENT_TRAILING_OBJS_IMPL()
 
-  size_t numTrailingObjects(OverloadToken<char>) const { return 1; }
-
 public:
+  // FIXME: These following 2 functions are temporary, while debug_value
+  // transitions to being a multi-operand instruction.
+  SILValue getOperand() const { return getAllOperands()[0].get(); }
+  void setOperand(SILValue V) { getAllOperands()[0].set(V); }
+
+  /// Returns the single operand, asserting that there is exactly one.
+  /// Should only be used in contexts where it is known that there is no
+  /// debug reconstruction block.
+  SILValue getSingleOperand() const {
+    ASSERT(getAllOperands().size() == 1);
+    return getAllOperands()[0].get();
+  }
+
+  ArrayRef<Operand> getTypeDependentOperands() const { return {}; }
+  MutableArrayRef<Operand> getTypeDependentOperands() { return {}; }
+
   /// Sets a bool that states this debug_value is supposed to use the
   void setUsesMoveableValueDebugInfo() {
     sharedUInt8().DebugValueInst.usesMoveableValueDebugInfo =
@@ -5852,19 +5891,6 @@ public:
       *getTrailingObjects<const SILDebugScope *>() = NewDS;
   }
 
-  /// Whether the SSA value associated with the current debug_value
-  /// instruction has an address type.
-  bool hasAddrVal() const {
-    return getOperand()->getType().isAddress();
-  }
-
-  /// An utility to check if \p I is DebugValueInst and
-  /// whether it's associated with address type SSA value.
-  static DebugValueInst *hasAddrVal(SILInstruction *I) {
-    auto *DVI = dyn_cast_or_null<DebugValueInst>(I);
-    return DVI && DVI->hasAddrVal()? DVI : nullptr;
-  }
-
   /// Whether this debug value has a DIExpr with a deref.
   /// For address-only types with a debug reconstruction block, the deref
   /// applies after the BB's result. Otherwise, this is incompatible with
@@ -5884,7 +5910,7 @@ public:
   /// an address type (when moved to the stack, for example).
   /// If a reconstruction block exists, a load is added at the beginning.
   /// Otherwise, it will be prepended to the DIExpr.
-  void prependDeref();
+  void prependDeref(unsigned operandIdx);
 
   /// Removes a deref operator to this debug_value in place.
   /// This must be called when the operand is changed from an address type to
@@ -5893,7 +5919,7 @@ public:
   /// If a reconstruction block exists, a load is removed at the beginning. If
   /// there is no load at the beginning, the operand is killed, marking the
   /// variable as optimized away.
-  void stripDeref();
+  void stripDeref(unsigned operandIdx);
 
   /// Validates the type chain of the DIExpr.
   /// Starting from VarType, narrows through fragments (outermost first)
@@ -5910,13 +5936,12 @@ public:
     return ReconstructionBlock;
   }
 
-  /// Sets the debug-only basic block for this instruction.
+  /// Sets the debug-only basic block for this instruction. If one is already
+  /// attached, it is freed.
   /// This should not be called by optimization passes. Optimization passes
   /// and debug information salvage operations should append to existing
   /// blocks using getOrCreateDebugReconstructionBlock.
-  void setDebugReconstructionBlock(SILBasicBlock *BB) {
-    ReconstructionBlock = BB;
-  }
+  void setDebugReconstructionBlock(SILBasicBlock *BB);
 
   /// Clones the reconstruction block from \p src onto this debug value.
   void cloneReconstructionBlockFrom(DebugValueInst *src);
@@ -5937,7 +5962,7 @@ public:
   /// reconstruction block.
   /// If \p varType is specified, the undef will use that type (in the
   /// appropriate address/object form) instead of the current operand's type.
-  void killOperand(SILType operandType = SILType());
+  void killOperand(unsigned operandIdx, SILType operandType = SILType());
 
   bool hasTrace() const { return sharedUInt8().DebugValueInst.trace; }
 

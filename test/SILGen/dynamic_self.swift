@@ -88,7 +88,7 @@ func testArchetypeDispatch<T: P>(t: T) {
 // CHECK-LABEL: sil hidden [ossa] @$s12dynamic_self23testExistentialDispatch{{[_0-9a-zA-Z]*}}F
 func testExistentialDispatch(p: P) {
 // CHECK: bb0([[P:%[0-9]+]] : $*any P):
-// CHECK:   [[PCOPY_ADDR:%[0-9]+]] = open_existential_addr immutable_access [[P]] : $*any P to $*@opened([[N:".*"]], any P) Self
+// CHECK:   [[PCOPY_ADDR:%[0-9]+]] = open_existential_addr immutable_access [[P]] : $*any P to $*@opened([[N:.*]], any P) Self
 // CHECK:   [[P_RESULT:%[0-9]+]] = alloc_stack $any P
 // CHECK:   [[P_F_METHOD:%[0-9]+]] = witness_method $@opened([[N]], any P) Self, #P.f : {{.*}}, [[PCOPY_ADDR]]{{.*}} : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out τ_0_0
 // CHECK:   [[P_RESULT_ADDR:%[0-9]+]] = init_existential_addr [[P_RESULT]] : $*any P, $@opened([[N]], any P) Self
@@ -97,7 +97,7 @@ func testExistentialDispatch(p: P) {
 // CHECK:   dealloc_stack [[P_RESULT]] : $*any P
   _ = p.f()
 
-// CHECK:   [[PCOPY_ADDR:%[0-9]+]] = open_existential_addr immutable_access [[P]] : $*any P to $*@opened([[N:".*"]], any P) Self
+// CHECK:   [[PCOPY_ADDR:%[0-9]+]] = open_existential_addr immutable_access [[P]] : $*any P to $*@opened([[N:.*]], any P) Self
 // CHECK:   [[P_RESULT:%[0-9]+]] = alloc_stack $any P
 // CHECK:   [[P_P_GETTER:%[0-9]+]] = witness_method $@opened([[N]], any P) Self, #P.p!getter : {{.*}}, [[PCOPY_ADDR]]{{.*}} : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out τ_0_0
 // CHECK:   [[P_RESULT_ADDR2:%[0-9]+]] = init_existential_addr [[P_RESULT]] : $*any P, $@opened([[N]], any P) Self
@@ -106,7 +106,7 @@ func testExistentialDispatch(p: P) {
 // CHECK:   dealloc_stack [[P_RESULT]] : $*any P
   _ = p.p
 
-// CHECK:   [[PCOPY_ADDR:%[0-9]+]] = open_existential_addr immutable_access [[P]] : $*any P to $*@opened([[N:".*"]], any P) Self
+// CHECK:   [[PCOPY_ADDR:%[0-9]+]] = open_existential_addr immutable_access [[P]] : $*any P to $*@opened([[N:.*]], any P) Self
 // CHECK:   [[P_RESULT:%[0-9]+]] = alloc_stack $any P
 // CHECK:   [[P_SUBSCRIPT_GETTER:%[0-9]+]] = witness_method $@opened([[N]], any P) Self, #P.subscript!getter : {{.*}}, [[PCOPY_ADDR]]{{.*}} : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out τ_0_0
 // CHECK:   [[P_RESULT_ADDR:%[0-9]+]] = init_existential_addr [[P_RESULT]] : $*any P, $@opened([[N]], any P) Self
@@ -119,14 +119,14 @@ func testExistentialDispatch(p: P) {
 // CHECK-LABEL: sil hidden [ossa] @$s12dynamic_self28testExistentialDispatchClass{{[_0-9a-zA-Z]*}}F : $@convention(thin) (@guaranteed any CP) -> ()
 func testExistentialDispatchClass(cp: CP) {
 // CHECK: bb0([[CP:%[0-9]+]] : @guaranteed $any CP):
-// CHECK:   [[CP_ADDR:%[0-9]+]] = open_existential_ref [[CP]] : $any CP to $@opened([[N:".*"]], any CP) Self
+// CHECK:   [[CP_ADDR:%[0-9]+]] = open_existential_ref [[CP]] : $any CP to $@opened([[N:.*]], any CP) Self
 // CHECK:   [[CP_F:%[0-9]+]] = witness_method $@opened([[N]], any CP) Self, #CP.f : {{.*}}, [[CP_ADDR]]{{.*}} : $@convention(witness_method: CP) <τ_0_0 where τ_0_0 : CP> (@guaranteed τ_0_0) -> @owned τ_0_0
 // CHECK:   [[CP_F_RESULT:%[0-9]+]] = apply [[CP_F]]<@opened([[N]], any CP) Self>([[CP_ADDR]]) : $@convention(witness_method: CP) <τ_0_0 where τ_0_0 : CP> (@guaranteed τ_0_0) -> @owned τ_0_0
 // CHECK:   [[RESULT_EXISTENTIAL:%[0-9]+]] = init_existential_ref [[CP_F_RESULT]] : $@opened([[N]], any CP) Self : $@opened([[N]], any CP) Self, $any CP
 // CHECK:   destroy_value [[RESULT_EXISTENTIAL]]
   _ = cp.f()
 
-// CHECK: [[CP_ADDR:%[0-9]+]] = open_existential_ref [[CP]] : $any CP to $@opened([[N:".*"]], any CP) Self
+// CHECK: [[CP_ADDR:%[0-9]+]] = open_existential_ref [[CP]] : $any CP to $@opened([[N:.*]], any CP) Self
 // CHECK: [[CP_ADDR_1:%[0-9]+]] = copy_value [[CP_ADDR]] : $@opened([[N]], any CP) Self
 // CHECK: [[CP_BORROWED:%[0-9]+]] = begin_borrow [[CP_ADDR_1]] : $@opened([[N]], any CP) Self
 // CHECK: [[CP_P_GETTER:%[0-9]+]] = witness_method $@opened([[N]], any CP) Self, #CP.p!getter : {{.*}}, [[CP_ADDR]]{{.*}} : $@convention(witness_method: CP) <τ_0_0 where τ_0_0 : CP> (@guaranteed τ_0_0) -> @owned τ_0_0
@@ -137,7 +137,7 @@ func testExistentialDispatchClass(cp: CP) {
 // CHECK: destroy_value [[RESULT_EXISTENTIAL]] : $any CP
   _ = cp.p
 
-// CHECK: [[CP_ADDR:%[0-9]+]] = open_existential_ref [[CP]] : $any CP to $@opened([[N:".*"]], any CP) Self
+// CHECK: [[CP_ADDR:%[0-9]+]] = open_existential_ref [[CP]] : $any CP to $@opened([[N:.*]], any CP) Self
 // CHECK: [[CP_ADDR_1:%[0-9]+]] = copy_value [[CP_ADDR]] : $@opened([[N]], any CP) Self
 // CHECK: [[CP_BORROWED:%[0-9]+]] = begin_borrow [[CP_ADDR_1]] : $@opened([[N]], any CP) Self
 // CHECK: [[CP_SUBSCRIPT_GETTER:%[0-9]+]] = witness_method $@opened([[N]], any CP) Self, #CP.subscript!getter : {{.*}}, [[CP_ADDR]]{{.*}} : $@convention(witness_method: CP) <τ_0_0 where τ_0_0 : CP> (@guaranteed τ_0_0) -> @owned τ_0_0

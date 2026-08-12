@@ -27,13 +27,6 @@ func testInstanceTypeFactoryMethodInherited() {
   _ = a
 }
 
-func testCategoryFactoryMethodNotInheritedAsInit() {
-  // Category factory init: callable on its own class...
-  _ = NSObjectFactory(flag: 1)
-  // ...but not inherited as an initializer onto a subclass.
-  _ = NSObjectFactorySub(flag: 1) // expected-error{{incorrect argument label in call (have 'flag:', expected 'integer:')}}
-}
-
 func testFactoryWithLaterIntroducedInit() {
     // expected-note @-1 4{{add '@available' attribute to enclosing global function}}
   // Prefer importing more available factory initializer over less

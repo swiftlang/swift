@@ -387,17 +387,52 @@ HeapNonFixedOffsets::HeapNonFixedOffsets(IRGenFunction &IGF,
 void irgen::emitDeallocateHeapObject(IRGenFunction &IGF,
                                      llvm::Value *object,
                                      llvm::Value *size,
-                                     llvm::Value *alignMask) {
+                                     llvm::Value *alignMask,
+                                     std::optional<uint64_t> mallocTypeId) {
+  if (mallocTypeId) {
+    auto descriptorConst = llvm::ConstantInt::get(IGF.IGM.Int64Ty,
+                                                  *mallocTypeId);
+    emitDeallocateHeapObjectTyped(IGF, object, size, alignMask,
+                                  descriptorConst);
+    return;
+  }
   // FIXME: We should call a fast deallocator for heap objects with
   // known size.
   IGF.Builder.CreateCall(IGF.IGM.getDeallocObjectFunctionPointer(),
                          {object, size, alignMask});
 }
 
-void emitDeallocateUninitializedHeapObject(IRGenFunction &IGF,
-                                           llvm::Value *object,
-                                           llvm::Value *size,
-                                           llvm::Value *alignMask) {
+void irgen::emitDeallocateHeapObjectTyped(IRGenFunction &IGF,
+                                          llvm::Value *object,
+                                          llvm::Value *size,
+                                          llvm::Value *alignMask,
+                                          llvm::Value *typeDescriptor) {
+  // FIXME: We should call a fast deallocator for heap objects with
+  // known size.
+  IGF.Builder.CreateCall(IGF.IGM.getDeallocObjectTypedFunctionPointer(),
+                         {object, size, alignMask, typeDescriptor});
+}
+
+void emitDeallocateUninitializedHeapObjectTyped(IRGenFunction &IGF,
+                                                llvm::Value *object,
+                                                llvm::Value *size,
+                                                llvm::Value *alignMask,
+                                                llvm::Value *typeDescriptor) {
+  IGF.Builder.CreateCall(
+      IGF.IGM.getDeallocUninitializedObjectTypedFunctionPointer(),
+      {object, size, alignMask, typeDescriptor});
+}
+
+void irgen::emitDeallocateUninitializedHeapObject(
+    IRGenFunction &IGF, llvm::Value *object, llvm::Value *size,
+    llvm::Value *alignMask, std::optional<uint64_t> mallocTypeId) {
+  if (mallocTypeId) {
+    auto descriptorConst = llvm::ConstantInt::get(IGF.IGM.Int64Ty,
+                                                  *mallocTypeId);
+    emitDeallocateUninitializedHeapObjectTyped(IGF, object, size, alignMask,
+                                               descriptorConst);
+    return;
+  }
   IGF.Builder.CreateCall(IGF.IGM.getDeallocUninitializedObjectFunctionPointer(),
                          {object, size, alignMask});
 }
@@ -405,18 +440,39 @@ void emitDeallocateUninitializedHeapObject(IRGenFunction &IGF,
 void irgen::emitDeallocateClassInstance(IRGenFunction &IGF,
                                         llvm::Value *object,
                                         llvm::Value *size,
-                                        llvm::Value *alignMask) {
+                                        llvm::Value *alignMask,
+                                        std::optional<uint64_t> mallocTypeId) {
+  if (mallocTypeId) {
+    auto descriptorConst = llvm::ConstantInt::get(IGF.IGM.Int64Ty,
+                                                  *mallocTypeId);
+    return emitDeallocateClassInstanceTyped(IGF, object, size, alignMask,
+                                            descriptorConst);
+  }
   // FIXME: We should call a fast deallocator for heap objects with
   // known size.
   IGF.Builder.CreateCall(IGF.IGM.getDeallocClassInstanceFunctionPointer(),
                          {object, size, alignMask});
 }
 
-void irgen::emitDeallocatePartialClassInstance(IRGenFunction &IGF,
-                                               llvm::Value *object,
-                                               llvm::Value *metadata,
-                                               llvm::Value *size,
-                                               llvm::Value *alignMask) {
+void irgen::emitDeallocateClassInstanceTyped(
+    IRGenFunction &IGF, llvm::Value *object, llvm::Value *size,
+    llvm::Value *alignMask, llvm::Value *typeDescriptor) {
+  // FIXME: We should call a fast deallocator for heap objects with
+  // known size.
+  IGF.Builder.CreateCall(IGF.IGM.getDeallocClassInstanceTypedFunctionPointer(),
+                         {object, size, alignMask, typeDescriptor});
+}
+
+void irgen::emitDeallocatePartialClassInstance(
+    IRGenFunction &IGF, llvm::Value *object, llvm::Value *metadata,
+    llvm::Value *size, llvm::Value *alignMask,
+    std::optional<uint64_t> mallocTypeId) {
+  if (mallocTypeId) {
+    auto descriptorConst = llvm::ConstantInt::get(IGF.IGM.Int64Ty,
+                                                  *mallocTypeId);
+    return emitDeallocatePartialClassInstanceTyped(IGF, object, metadata, size,
+                                                   alignMask, descriptorConst);
+  }
   // FIXME: We should call a fast deallocator for heap objects with
   // known size.
   IGF.Builder.CreateCall(
@@ -424,9 +480,20 @@ void irgen::emitDeallocatePartialClassInstance(IRGenFunction &IGF,
       {object, metadata, size, alignMask});
 }
 
+void irgen::emitDeallocatePartialClassInstanceTyped(
+    IRGenFunction &IGF, llvm::Value *object, llvm::Value *metadata,
+    llvm::Value *size, llvm::Value *alignMask, llvm::Value *typeDescriptor) {
+  // FIXME: We should call a fast deallocator for heap objects with
+  // known size.
+  IGF.Builder.CreateCall(
+      IGF.IGM.getDeallocPartialClassInstanceTypedFunctionPointer(),
+      {object, metadata, size, alignMask, typeDescriptor});
+}
+
 /// Create the destructor function for a layout.
 /// TODO: give this some reasonable name and possibly linkage.
 static llvm::Function *createDtorFn(IRGenModule &IGM, const HeapLayout &layout,
+                                    std::optional<uint64_t> mallocTypeId,
                                     const llvm::Twine &layoutName) {
   llvm::Function *fn = llvm::Function::Create(
       IGM.DeallocatingDtorTy, llvm::Function::InternalLinkage,
@@ -467,7 +534,7 @@ static llvm::Function *createDtorFn(IRGenModule &IGM, const HeapLayout &layout,
   }
 
   emitDeallocateHeapObject(IGF, &*fn->arg_begin(), offsets.getSize(),
-                           offsets.getAlignMask());
+                           offsets.getAlignMask(), mallocTypeId);
   IGF.Builder.CreateRetVoid();
 
   return fn;
@@ -559,11 +626,12 @@ static llvm::Constant *buildPrivateMetadata(IRGenModule &IGM,
 llvm::Constant *
 HeapLayout::getPrivateMetadata(IRGenModule &IGM,
                                llvm::Constant *captureDescriptor,
+                               std::optional<uint64_t> mallocTypeId,
                                const llvm::Twine &name) const {
   if (!privateMetadata)
     privateMetadata = buildPrivateMetadata(
-        IGM, *this, createDtorFn(IGM, *this, name), captureDescriptor,
-        MetadataKind::HeapLocalVariable);
+        IGM, *this, createDtorFn(IGM, *this, mallocTypeId, name),
+        captureDescriptor, MetadataKind::HeapLocalVariable);
   return privateMetadata;
 }
 
@@ -602,8 +670,9 @@ llvm::Value *IRGenFunction::emitUnmanagedAlloc(const HeapLayout &layout,
     return IGM.RefCountedNull;
   }
 
+  auto maybeDescriptor = layout.computeTypedMallocTypeDescriptor(IGM);
   llvm::Value *metadata =
-      layout.getPrivateMetadata(IGM, captureDescriptor, name);
+      layout.getPrivateMetadata(IGM, captureDescriptor, maybeDescriptor, name);
   llvm::Value *size, *alignMask;
   if (offsets) {
     size = offsets->getSize();
@@ -613,7 +682,6 @@ llvm::Value *IRGenFunction::emitUnmanagedAlloc(const HeapLayout &layout,
     alignMask = layout.emitAlignMask(IGM);
   }
 
-  auto maybeDescriptor = layout.computeTypedMallocTypeDescriptor(IGM);
   return emitAllocObjectCall(metadata, size, alignMask, maybeDescriptor, name);
 }
 
@@ -782,8 +850,8 @@ llvm::Value *IRGenFunction::getReferenceStorageExtraInhabitantIndex(Address src,
   llvm::Value *ptr = Builder.CreateLoad(src);
   llvm::Value *isNull = Builder.CreateIsNull(ptr);
   llvm::Value *result =
-    Builder.CreateSelect(isNull, Builder.getInt32(0),
-                         llvm::ConstantInt::getSigned(IGM.Int32Ty, -1));
+      Builder.CreateSelect(isNull, Builder.getInt32(0),
+                           llvm::ConstantInt::getAllOnesValue(IGM.Int32Ty));
   return result;
 }
 
@@ -1657,8 +1725,9 @@ public:
   const override {
     auto size = layout.emitSize(IGF.IGM);
     auto alignMask = layout.emitAlignMask(IGF.IGM);
-
-    emitDeallocateUninitializedHeapObject(IGF, box, size, alignMask);
+    auto maybeDescriptor = layout.computeTypedMallocTypeDescriptor(IGF.IGM);
+    emitDeallocateUninitializedHeapObject(IGF, box, size, alignMask,
+                                          maybeDescriptor);
   }
 
   Address
@@ -2204,7 +2273,8 @@ uint64_t getTypedMemoryDescriptorStableSipHash(StringRef Str) {
 } // namespace
 
 std::optional<uint64_t> irgen::computeTypedMallocTypeDescriptor(
-    IRGenModule &IGM, llvm::SmallVectorImpl<SILType> &fieldTypes) {
+    IRGenModule &IGM, llvm::SmallVectorImpl<SILType> &fieldTypes,
+    bool isArray) {
   if (!IGM.isTypedAllocationAvailable()) {
     return std::nullopt;
   }
@@ -2277,7 +2347,7 @@ std::optional<uint64_t> irgen::computeTypedMallocTypeDescriptor(
       getTypedMemoryDescriptorStableSipHash(layoutString) & 0xffffffff;
 
   uint64_t summary = 0; // Version 0
-  summary |= 1 << 6;    // Callsite flags: fixed size
+  summary |= (isArray ? 2 : 1) << 6; // Callsite flags: Array | FixedSize
   summary |= 2 << 10;   // Type kind: Swift
   summary |= ((uint64_t)layoutSemantics) << 16;
 

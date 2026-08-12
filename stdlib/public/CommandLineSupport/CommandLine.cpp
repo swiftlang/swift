@@ -636,7 +636,7 @@ void _swift_stdlib_withExecutablePath(
 
 #if defined(__APPLE__)
 // Implemented in Swift on Darwin so it can be back-deployed.
-#elif defined(__linux__) || defined(__ANDROID__)
+#elif defined(__linux__)
 static ExecutablePath getExecutablePath(void) {
   size_t byteCount = PATH_MAX;
   while (true) {

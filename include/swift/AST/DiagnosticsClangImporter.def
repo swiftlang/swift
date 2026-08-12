@@ -254,6 +254,10 @@ GROUPED_WARNING(cant_infer_frt_in_cxx_inheritance, ClangDeclarationImport, none,
         "transitive base types is marked as SWIFT_SHARED_REFERENCE",
         (const clang::NamedDecl *))
 
+ERROR(reference_type_mixed_immortal_marker, none,
+      "reference type %0 must mark both or neither of its 'retain:' and "
+      "'release:' Swift attributes 'immortal'",
+      (const clang::NamedDecl *))
 ERROR(reference_type_must_have_retain_release_attr, none,
       "reference type '%1' must have %select{'retain:'|'release:'}0 Swift "
       "attribute",
@@ -262,6 +266,9 @@ ERROR(too_many_reference_type_retain_release_attr, none,
       "reference type '%1' must have only one %select{'retain:'|'release:'}0 "
       "Swift "
       "attribute",
+      (bool, StringRef))
+ERROR(reference_type_empty_retain_release_name, none,
+      "reference type '%1' has an empty %select{retain|release}0 operation name",
       (bool, StringRef))
 ERROR(foreign_reference_types_cannot_find_retain_release, none,
       "cannot find %select{retain|release}0 function '%1' for reference type "
@@ -294,6 +301,12 @@ ERROR(foreign_reference_types_retain_release_not_an_instance_function, none,
 ERROR(foreign_reference_type_unreachable, none,
       "foreign reference type '%0' has unreachable definition",
       (StringRef))
+
+ERROR(nonescapable_foreign_reference_type, none,
+      "%0 cannot be both a foreign reference type and non-escapable; foreign "
+      "reference types are imported as Swift classes, which are always "
+      "escapable",
+      (const clang::NamedDecl *))
 
 GROUPED_WARNING(unannotated_cxx_func_returning_frt, ForeignReferenceType, none,
         "cannot infer ownership of foreign reference value returned by %0",

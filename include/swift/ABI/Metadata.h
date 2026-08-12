@@ -19,11 +19,12 @@
 
 #include <atomic>
 #include <iterator>
-#include <string>
+#include <limits>
 #include <type_traits>
 #include <utility>
 #include <string.h>
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/Support/MathExtras.h"
 #include "swift/Strings.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/Once.h"
@@ -34,7 +35,14 @@
 #include "swift/ABI/TargetLayout.h"
 #include "swift/ABI/TrailingObjects.h"
 #include "swift/ABI/ValueWitnessTable.h"
+// Malloc.h (AlignedAlloc/AlignedFree) is not used by anything in this file;
+// it's included here only for the benefit of clients that don't include it
+// themselves. Its posix_memalign/aligned_alloc usage is hosted-only, and all
+// real callers of AlignedAlloc/AlignedFree are hosted-only compiler code
+// (lib/AST, lib/SIL, lib/SILOptimizer), so keep this hosted-only.
+#if __STDC_HOSTED__
 #include "swift/Basic/Malloc.h"
+#endif
 #include "swift/Basic/FlaggedPointer.h"
 #include "swift/Basic/RelativePointer.h"
 #include "swift/Demangling/Demangle.h"
@@ -1053,6 +1061,8 @@ public:
   }
   void setInstanceSize(StoredSize size) {
     assert(isTypeMetadata());
+    assert(size <= std::numeric_limits<decltype(InstanceSize)>::max() &&
+           "class instance size does not fit in the InstanceSize field");
     InstanceSize = size;
   }
 
@@ -1062,6 +1072,9 @@ public:
   }
   void setInstanceAddressPoint(StoredSize size) {
     assert(isTypeMetadata());
+    assert(size <= std::numeric_limits<decltype(InstanceAddressPoint)>::max() &&
+           "class instance address point does not fit in the "
+           "InstanceAddressPoint field");
     InstanceAddressPoint = size;
   }
 
@@ -1938,6 +1951,8 @@ enum class ExistentialTypeRepresentation {
   Class,
   /// The type uses the Error boxed existential representation.
   Error,
+  /// The type is represented by a single COM interface pointer.
+  COM,
 };
 
 /// The structure of type metadata for simple existential types which
@@ -2600,13 +2615,29 @@ struct TargetGenericBoxHeapMetadata : public TargetBoxHeapMetadata<Runtime> {
     return reinterpret_cast<OpaqueValue *>(bytes + Offset);
   }
 
-  /// Get the allocation size of this box.
-  unsigned getAllocSize() const {
-    return Offset + BoxedType->getValueWitnesses()->getSize();
+  typename Runtime::StoredSize getAllocSize() const {
+    using StoredSize = typename Runtime::StoredSize;
+    return (StoredSize)Offset +
+           (StoredSize)BoxedType->getValueWitnesses()->getSize();
+  }
+
+  /// Get the allocation size of this box, writing it into \p result. Returns
+  /// false if the calculation overflowed and the size is not representable.
+  bool
+  getAllocSizeCheckingOverflow(typename Runtime::StoredSize &result) const {
+    using StoredSize = typename Runtime::StoredSize;
+    bool overflowed = false;
+    StoredSize size = llvm::SaturatingAdd(
+        (StoredSize)Offset,
+        (StoredSize)BoxedType->getValueWitnesses()->getSize(), &overflowed);
+    if (overflowed)
+      return false;
+    result = size;
+    return true;
   }
 
   /// Get the allocation alignment of this box.
-  unsigned getAllocAlignMask() const {
+  typename Runtime::StoredSize getAllocAlignMask() const {
     // Heap allocations are at least pointer aligned.
     return BoxedType->getValueWitnesses()->getAlignmentMask()
       | (alignof(void*) - 1);

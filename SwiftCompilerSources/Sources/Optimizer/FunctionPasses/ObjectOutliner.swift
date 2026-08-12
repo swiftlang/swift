@@ -326,6 +326,14 @@ private func isValidUseOfObject(_ use: Operand) -> Bool {
     }
     return true
 
+  case let store as StoreInst:
+    // Tolerate a redundant store of the (not yet fully initialized) object into
+    // the global variable this function is initializing.
+    return use == store.sourceOperand &&
+           (store.destination as? GlobalAddrInst).map {
+             $0.global.isLet && $0.parentFunction.initializedGlobal == $0.global
+           } ?? false
+
   case is StructElementAddrInst,
        is AddressToPointerInst,
        is StructInst,

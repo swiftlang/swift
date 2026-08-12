@@ -40,6 +40,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/SourceFileExtras.h"
+#include "swift/AST/SynthesizedDeclBuilder.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
@@ -1837,10 +1838,10 @@ synthesizeLazyGetterBody(AccessorDecl *Get, VarDecl *VD, VarDecl *Storage,
   SmallVector<ASTNode, 6> Body;
 
   // Load the existing storage and store it into the 'tmp1' temporary.
-  auto *Tmp1VD = new (Ctx) VarDecl(/*IsStatic*/false, VarDecl::Introducer::Let,
-                                   SourceLoc(), Ctx.getIdentifier("tmp1"), Get);
-  Tmp1VD->setInterfaceType(VD->getValueInterfaceType());
-  Tmp1VD->setImplicit();
+  VarDecl *Tmp1VD = VarDeclBuilder(Get, Ctx.getIdentifier("tmp1"))
+                        .introducer(VarDecl::Introducer::Let)
+                        .type(VD->getValueInterfaceType())
+                        .synthesized(false);
 
   auto *Named = NamedPattern::createImplicit(Ctx, Tmp1VD, Tmp1VD->getTypeInContext());
   auto *Let =
@@ -1869,11 +1870,10 @@ synthesizeLazyGetterBody(AccessorDecl *Get, VarDecl *VD, VarDecl *Storage,
                                   /*elseloc*/ SourceLoc(),
                                   /*else*/ nullptr, /*implicit*/ true));
 
-  auto *Tmp2VD = new (Ctx) VarDecl(/*IsStatic*/false, VarDecl::Introducer::Let,
-                                   SourceLoc(), Ctx.getIdentifier("tmp2"),
-                                   Get);
-  Tmp2VD->setInterfaceType(VD->getValueInterfaceType());
-  Tmp2VD->setImplicit();
+  VarDecl *Tmp2VD = VarDeclBuilder(Get, Ctx.getIdentifier("tmp2"))
+                        .introducer(VarDecl::Introducer::Let)
+                        .type(VD->getValueInterfaceType())
+                        .synthesized(false);
 
 
   // Take the initializer from the PatternBindingDecl for VD.
@@ -2167,10 +2167,10 @@ synthesizeObservedSetterBody(AccessorDecl *Set, TargetImpl target,
         OldValueExpr = new (Ctx) LoadExpr(OldValueExpr, VD->getTypeInContext());
       }
 
-      OldValue = new (Ctx) VarDecl(/*IsStatic*/ false, VarDecl::Introducer::Let,
-                                   SourceLoc(), Ctx.getIdentifier("tmp"), Set);
-      OldValue->setImplicit();
-      OldValue->setInterfaceType(VD->getValueInterfaceType());
+      OldValue = VarDeclBuilder(Set, Ctx.getIdentifier("tmp"))
+                     .introducer(VarDecl::Introducer::Let)
+                     .type(VD->getValueInterfaceType())
+                     .synthesized(false);
       auto *tmpPattern =
           NamedPattern::createImplicit(Ctx, OldValue, OldValue->getTypeInContext());
       auto *tmpPBD = PatternBindingDecl::createImplicit(
@@ -2536,39 +2536,6 @@ synthesizeAccessorBody(AbstractFunctionDecl *fn, void *) {
   llvm_unreachable("bad synthesized function kind");
 }
 
-/// If the accessor is one of the given kinds, and there is a @section on a
-/// parsed accessor of one of the given kinds, transfer it to the accessor.
-///
-/// Returns true if anything was transferred.
-static bool tryTransferAccessorSection(
-    AccessorDecl *accessor, ArrayRef<AccessorKind> kinds) {
-  // Is our accessor one of the expected kinds?
-  if (std::find(kinds.begin(), kinds.end(), accessor->getAccessorKind()) ==
-        kinds.end())
-    return false;
-
-  // If the accessor has a @section attribute already, we're done.
-  if (accessor->getAttrs().hasAttribute<SectionAttr>())
-    return true;
-
-  // Look for a parsed accessor from which we can pull the section name.
-  auto storage = accessor->getStorage();
-  for (auto kind : kinds) {
-    auto parsed = storage->getParsedAccessor(kind);
-    if (!parsed)
-      continue;
-
-    if (auto section = parsed->getAttrs().getAttribute<SectionAttr>()) {
-      // Clone the attribute.
-      ASTContext &ctx = storage->getASTContext();
-      accessor->getAttrs().add(section->clone(ctx));
-      return true;
-    }
-  }
-
-  return false;
-}
-
 static void finishImplicitAccessor(AccessorDecl *accessor,
                                    ASTContext &ctx) {
   accessor->setImplicit();
@@ -2578,28 +2545,6 @@ static void finishImplicitAccessor(AccessorDecl *accessor,
 
   if (accessor->doesAccessorHaveBody())
     accessor->setBodySynthesizer(&synthesizeAccessorBody);
-
-  // Look for a @section attribute to transfer.
-  AccessorKind readAccessors[] = {
-    AccessorKind::Get,
-    AccessorKind::DistributedGet,
-    AccessorKind::Read,
-    AccessorKind::YieldingBorrow,
-    AccessorKind::Borrow,
-    AccessorKind::Address
-  };
-  AccessorKind writeAccessors[] = {
-    AccessorKind::Set,
-    AccessorKind::Modify,
-    AccessorKind::YieldingMutate,
-    AccessorKind::Mutate,
-    AccessorKind::MutableAddress,
-    AccessorKind::Init,
-    AccessorKind::WillSet,
-    AccessorKind::DidSet
-  };
-  if (!tryTransferAccessorSection(accessor, writeAccessors))
-    tryTransferAccessorSection(accessor, readAccessors);
 }
 
 static AccessorDecl *createGetterPrototype(AbstractStorageDecl *storage,
@@ -3345,10 +3290,11 @@ LazyStoragePropertyRequest::evaluate(Evaluator &evaluator,
   auto StorageInterfaceTy = OptionalType::get(VD->getInterfaceType());
   auto StorageTy = OptionalType::get(VD->getTypeInContext());
 
-  auto *Storage = new (Context) VarDecl(/*IsStatic*/false, VarDecl::Introducer::Var,
-                                        VD->getLoc(), StorageName,
-                                        VD->getDeclContext());
-  Storage->setInterfaceType(StorageInterfaceTy);
+  VarDecl *Storage = VarDeclBuilder(VD->getDeclContext(), StorageName)
+                         .introducer(VarDecl::Introducer::Var)
+                         .at(VD->getLoc())
+                         .type(StorageInterfaceTy)
+                         .synthesized(false);
   Storage->setLazyStorageFor(VD);
   Storage->setUserAccessible(false);
 
@@ -3422,10 +3368,10 @@ static VarDecl *synthesizeLocalWrappedValueVar(VarDecl *var) {
     }
   }
 
-  VarDecl *localVar = new (ctx) VarDecl(/*IsStatic=*/false,
-                                        VarDecl::Introducer::Var,
-                                        var->getLoc(), name, dc);
-  localVar->setImplicit();
+  VarDecl *localVar = VarDeclBuilder(dc, name)
+                          .introducer(VarDecl::Introducer::Var)
+                          .at(var->getLoc())
+                          .synthesized(false);
   localVar->getAttrs() = var->getAttrs();
   localVar->overwriteAccess(var->getFormalAccess());
   localVar->setImplInfo(*mutability);
@@ -3477,11 +3423,11 @@ static VarDecl *synthesizePropertyWrapperProjectionVar(
 
   // Form the property.
   auto dc = var->getDeclContext();
-  VarDecl *property = new (ctx) VarDecl(/*IsStatic=*/var->isStatic(),
-                                        VarDecl::Introducer::Var,
-                                        var->getLoc(),
-                                        name, dc);
-  property->setImplicit();
+  VarDecl *property = VarDeclBuilder(dc, name)
+                          .static_(var->isStatic())
+                          .introducer(VarDecl::Introducer::Var)
+                          .at(var->getLoc())
+                          .synthesized(false);
   property->setOriginalWrappedProperty(var);
   addMemberToContextIfNeeded(property, dc, var);
 
@@ -3742,11 +3688,11 @@ PropertyWrapperAuxiliaryVariablesRequest::evaluate(Evaluator &evaluator,
     backingVar->setName(name);
   } else {
     auto introducer = isa<ParamDecl>(var) ? VarDecl::Introducer::Let : VarDecl::Introducer::Var;
-    backingVar = new (ctx) VarDecl(/*IsStatic=*/var->isStatic(),
-                                   introducer,
-                                   var->getLoc(),
-                                   name, dc);
-    backingVar->setImplicit();
+    backingVar = VarDeclBuilder(dc, name)
+                     .static_(var->isStatic())
+                     .introducer(introducer)
+                     .at(var->getLoc())
+                     .synthesized(false);
     backingVar->setOriginalWrappedProperty(var);
 
     // The backing storage is 'private'.

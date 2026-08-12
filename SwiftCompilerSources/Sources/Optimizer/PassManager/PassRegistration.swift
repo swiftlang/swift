@@ -113,6 +113,8 @@ private func registerSwiftPasses() {
   registerPass(lifetimeDependenceDiagnosticsPass, { lifetimeDependenceDiagnosticsPass.run($0) })
   registerPass(lifetimeDependenceInsertionPass, { lifetimeDependenceInsertionPass.run($0) })
   registerPass(lifetimeDependenceScopeFixupPass, { lifetimeDependenceScopeFixupPass.run($0) })
+  registerPass(removeSILGenLifetimesPass, { removeSILGenLifetimesPass.run($0) })
+  registerPass(lifetimeResolutionPass, { lifetimeResolutionPass.run($0) })
   registerPass(copyToBorrowOptimization, { copyToBorrowOptimization.run($0) })
   registerPass(tempRValueElimination, { tempRValueElimination.run($0) })
   registerPass(mandatoryTempRValueElimination, { mandatoryTempRValueElimination.run($0) })
@@ -121,6 +123,7 @@ private func registerSwiftPasses() {
   registerPass(autodiffClosureSpecialization, { autodiffClosureSpecialization.run($0) })
   registerPass(loopInvariantCodeMotionPass, { loopInvariantCodeMotionPass.run($0) })
   registerPass(killInvalidDebugValuesPass, { killInvalidDebugValuesPass.run($0) })
+  registerPass(deadDebugVariableEliminationPass, { deadDebugVariableEliminationPass.run($0) })
   registerPass(packSpecialization, { packSpecialization.run($0) })
 
   // Instruction passes
@@ -152,6 +155,7 @@ private func registerSwiftPasses() {
   registerForSILCombine(MarkDependenceInst.self,    { run(MarkDependenceInst.self, $0) })
   registerForSILCombine(MarkDependenceAddrInst.self, { run(MarkDependenceAddrInst.self, $0) })
   registerForSILCombine(MoveValueInst.self,         { run(MoveValueInst.self, $0) })
+  registerForSILCombine(OpenExistentialRefInst.self, { run(OpenExistentialRefInst.self, $0) })
   registerForSILCombine(PointerToAddressInst.self,  { run(PointerToAddressInst.self, $0) })
   registerForSILCombine(UncheckedEnumDataInst.self, { run(UncheckedEnumDataInst.self, $0) })
   registerForSILCombine(WitnessMethodInst.self,     { run(WitnessMethodInst.self, $0) })
@@ -166,6 +170,7 @@ private func registerSwiftPasses() {
   registerForSILCombine(IndexAddrInst.self,         { run(IndexAddrInst.self, $0) })
   registerForSILCombine(IndexRawPointerInst.self,   { run(IndexRawPointerInst.self, $0) })
   registerForSILCombine(KeyPathInst.self,           { run(KeyPathInst.self, $0) })
+  registerForSILCombine(SwitchEnumAddrInst.self,    { run(SwitchEnumAddrInst.self, $0) })
   registerForSILCombine(DereferenceBorrowInst.self, { run(DereferenceBorrowInst.self, $0) })
   registerForSILCombine(DereferenceAddrBorrowInst.self, { run(DereferenceAddrBorrowInst.self, $0) })
   registerForSILCombine(DifferentiableFunctionInst.self, { run(DifferentiableFunctionInst.self, $0) })

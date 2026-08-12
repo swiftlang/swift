@@ -363,6 +363,19 @@ HeapObject* swift_bufferAllocate(
   return swift::swift_allocObject(bufferType, size, alignMask);
 }
 
+/// Get a box's allocation size, raising a fatal error if it is not
+/// representable.
+static size_t getBoxAllocSizeOrTrap(const GenericBoxHeapMetadata *metadata) {
+  size_t allocSize;
+  if (SWIFT_UNLIKELY(!metadata->getAllocSizeCheckingOverflow(allocSize))) {
+    swift::fatalError(0,
+                      "box of type %s has an allocation size that is too large "
+                      "to be representable\n",
+                      swift_getTypeName(metadata->BoxedType, true).data);
+  }
+  return allocSize;
+}
+
 namespace {
 /// Heap object destructor for a generic box allocated with swift_allocBox.
 static SWIFT_CC(swift) void destroyGenericBox(SWIFT_CONTEXT HeapObject *o) {
@@ -440,7 +453,7 @@ BoxPair swift::swift_allocBox(const Metadata *type) {
   auto metadata = &Boxes.getOrInsert(type).first->Data;
 
   // Allocate and project the box.
-  auto allocation = swift_allocObject(metadata, metadata->getAllocSize(),
+  auto allocation = swift_allocObject(metadata, getBoxAllocSizeOrTrap(metadata),
                                       metadata->getAllocAlignMask());
   auto projection = metadata->project(allocation);
 

@@ -15,11 +15,9 @@
 import CompletionHandlerGlobals
 
 // CHECK: func async_divide(_ x: CDouble, _ y: CDouble, _ completionHandler: @escaping (CDouble) -> Void)
+// CHECK: func async_divide(_ x: CDouble, _ y: CDouble) async -> CDouble
 
 // CHECK: extension SlowComputer
 // CHECK: public func divide(_ x: CDouble, _ y: CDouble) async -> CDouble
-
-// CHECK: func async_divide(_ x: CDouble, _ y: CDouble) async -> CDouble
-
 
 // DIAGS-NOT: error

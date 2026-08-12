@@ -120,8 +120,8 @@ func testGeneric2<T: AnyObject, U>(x: GenericObject<T>, y: U) async throws {
 
 // CHECK: sil{{.*}}@[[INT_COMPLETION_BLOCK]]
 // CHECK:   [[CONT_ADDR:%.*]] = project_block_storage %0
-// CHECK:   [[CONT_OPENED:%.*]] = open_existential_addr immutable_access [[CONT_ADDR]] : $*Any to $*@opened("{{.*}}", Any) Self
-// CHECK:   [[CONT:%.*]] = unchecked_addr_cast [[CONT_OPENED]] : $*@opened("{{.*}}", Any) Self to $*CheckedContinuation<Int, Never>
+// CHECK:   [[CONT_OPENED:%.*]] = open_existential_addr immutable_access [[CONT_ADDR]] : $*Any to $*@opened({{.*}}, Any) Self
+// CHECK:   [[CONT:%.*]] = unchecked_addr_cast [[CONT_OPENED]] : $*@opened({{.*}}, Any) Self to $*CheckedContinuation<Int, Never>
 // CHECK:   [[RESULT_BUF:%.*]] = alloc_stack $Int
 // CHECK:   store %1 to [trivial] [[RESULT_BUF]]
 // CHECK:   [[RESUME:%.*]] = function_ref @{{.*}}resumeCheckedContinuation
@@ -131,8 +131,8 @@ func testGeneric2<T: AnyObject, U>(x: GenericObject<T>, y: U) async throws {
 // CHECK:   [[RESUME_IN:%.*]] = copy_value %1
 // CHECK:   [[ERROR_IN:%.*]] = copy_value %2
 // CHECK:   [[CONT_ADDR:%.*]] = project_block_storage %0
-// CHECK:   [[CONT_OPENED:%.*]] = open_existential_addr immutable_access [[CONT_ADDR]] : $*Any to $*@opened("{{.*}}", Any) Self
-// CHECK:   [[CONT:%.*]] = unchecked_addr_cast [[CONT_OPENED]] : $*@opened("{{.*}}", Any) Self to $*CheckedContinuation<String, any Error>
+// CHECK:   [[CONT_OPENED:%.*]] = open_existential_addr immutable_access [[CONT_ADDR]] : $*Any to $*@opened({{.*}}, Any) Self
+// CHECK:   [[CONT:%.*]] = unchecked_addr_cast [[CONT_OPENED]] : $*@opened({{.*}}, Any) Self to $*CheckedContinuation<String, any Error>
 // CHECK:   [[ERROR_IN_B:%.*]] = begin_borrow [[ERROR_IN]]
 // CHECK:   switch_enum [[ERROR_IN_B]] : {{.*}}, case #Optional.some!enumelt: [[ERROR_BB:bb[0-9]+]], case #Optional.none!enumelt: [[RESUME_BB:bb[0-9]+]]
 // CHECK: [[RESUME_BB]]:
@@ -155,8 +155,8 @@ func testGeneric2<T: AnyObject, U>(x: GenericObject<T>, y: U) async throws {
 
 // CHECK: sil {{.*}} @[[VOID_COMPLETION_BLOCK]]
 // CHECK:   [[CONT_ADDR:%.*]] = project_block_storage %0
-// CHECK:   [[CONT_OPENED:%.*]] = open_existential_addr immutable_access [[CONT_ADDR]] : $*Any to $*@opened("{{.*}}", Any) Self
-// CHECK:   [[CONT:%.*]] = unchecked_addr_cast [[CONT_OPENED]] : $*@opened("{{.*}}", Any) Self to $*CheckedContinuation<(), Never>
+// CHECK:   [[CONT_OPENED:%.*]] = open_existential_addr immutable_access [[CONT_ADDR]] : $*Any to $*@opened({{.*}}, Any) Self
+// CHECK:   [[CONT:%.*]] = unchecked_addr_cast [[CONT_OPENED]] : $*@opened({{.*}}, Any) Self to $*CheckedContinuation<(), Never>
 // CHECK:   [[RESULT_BUF:%.*]] = alloc_stack $()
 // CHECK:   [[RESUME:%.*]] = function_ref @{{.*}}resumeCheckedContinuation
 // CHECK:   apply [[RESUME]]<()>([[CONT]], [[RESULT_BUF]])
@@ -251,8 +251,8 @@ func testSlowServerFromMain(slowServer: SlowServer) async throws {
 // CHECK: [[CONV_FN:%.*]] = function_ref @$s10Foundation22_convertNSErrorToErrorys0E0_pSo0C0CSgF : $@convention(thin) (@guaranteed Optional<NSError>) -> @owned any Error
 // CHECK: [[SWIFT_ERROR:%.*]] = apply [[CONV_FN]]([[ERR_VALUE]]) : $@convention(thin) (@guaranteed Optional<NSError>) -> @owned any Error
 // CHECK: [[PROJECTED_STORAGE:%.*]] = project_block_storage [[BLOCK_STORAGE]] : $*@block_storage Any
-// CHECK: [[CONT_OPENED:%.*]] = open_existential_addr immutable_access [[PROJECTED_STORAGE]] : $*Any to $*@opened("{{.*}}", Any) Self
-// CHECK: [[CHECKED_CONT:%.*]] = unchecked_addr_cast [[CONT_OPENED]] : $*@opened("{{.*}}", Any) Self to $*CheckedContinuation<String, any Error>
+// CHECK: [[CONT_OPENED:%.*]] = open_existential_addr immutable_access [[PROJECTED_STORAGE]] : $*Any to $*@opened({{.*}}, Any) Self
+// CHECK: [[CHECKED_CONT:%.*]] = unchecked_addr_cast [[CONT_OPENED]] : $*@opened({{.*}}, Any) Self to $*CheckedContinuation<String, any Error>
 // CHECK: [[ERROR_COPY:%.*]] = copy_value [[SWIFT_ERROR]] : $any Error
 // CHECK: [[RESUME_FN:%.*]] = function_ref @$ss43_resumeCheckedThrowingContinuationWithErroryyScCyxs0F0_pG_sAB_pntlF : $@convention(thin) <τ_0_0> (@in_guaranteed CheckedContinuation<τ_0_0, any Error>, @owned any Error) -> ()
 // CHECK: {{.*}} = apply [[RESUME_FN]]<String>([[CHECKED_CONT]], [[ERROR_COPY]]) : $@convention(thin) <τ_0_0> (@in_guaranteed CheckedContinuation<τ_0_0, any Error>, @owned any Error) -> ()

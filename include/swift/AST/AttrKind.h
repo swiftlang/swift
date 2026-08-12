@@ -145,6 +145,11 @@ enum class ENUM_EXTENSIBILITY_ATTR(closed) NonexhaustiveMode : uint8_t {
   Last_NonexhaustiveMode = Warning
 };
 
+enum class ENUM_EXTENSIBILITY_ATTR(closed) ExecutionSemantics : uint8_t {
+  Once SWIFT_NAME("once") = 0,
+  Last_ExecutionSemantics = Once
+};
+
 enum class ENUM_EXTENSIBILITY_ATTR(closed) DeclAttrKind : unsigned {
 #define DECL_ATTR(_, CLASS, ...) CLASS,
 #define LAST_DECL_ATTR(CLASS) Last_DeclAttr = CLASS,

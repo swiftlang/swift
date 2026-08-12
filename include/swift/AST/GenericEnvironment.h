@@ -23,7 +23,6 @@
 #include "swift/AST/GenericSignature.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/Debug.h"
-#include "swift/Basic/UUID.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/TrailingObjects.h"
@@ -63,12 +62,12 @@ struct OpaqueEnvironmentData {
 /// Extra data in a generic environment for an opened existential.
 struct ExistentialEnvironmentData {
   Type existential;
-  UUID uuid;
+  uint64_t id;
 };
 
 /// Extra data in a generic environment for an opened pack element.
 struct ElementEnvironmentData {
-  UUID uuid;
+  uint64_t id;
   CanGenericTypeParamType shapeClass;
 };
 
@@ -147,11 +146,12 @@ private:
 
   /// Private constructor for opened existential environments.
   explicit GenericEnvironment(
-      GenericSignature signature, Type existential, SubstitutionMap subs, UUID uuid);
+      GenericSignature signature, Type existential, SubstitutionMap subs,
+      uint64_t id);
 
   /// Private constructor for opened element environments.
   explicit GenericEnvironment(GenericSignature signature,
-                              UUID uuid,
+                              uint64_t id,
                               CanGenericTypeParamType shapeClass,
                               SubstitutionMap outerSubs);
 
@@ -182,8 +182,8 @@ public:
   /// Retrieve the existential type for an opened existential environment.
   Type getOpenedExistentialType() const;
 
-  /// Retrieve the UUID for an opened existential environment.
-  UUID getOpenedExistentialUUID() const;
+  /// Retrieve the ID for an opened existential environment.
+  uint64_t getOpenedExistentialID() const;
 
   /// Retrieve the opaque type declaration for a generic environment describing
   /// opaque types.
@@ -200,8 +200,8 @@ public:
   /// This is always a pack parameter.
   CanGenericTypeParamType getOpenedElementShapeClass() const;
 
-  /// Retrieve the UUID for an opened element environment.
-  UUID getOpenedElementUUID() const;
+  /// Retrieve the ID for an opened element environment.
+  uint64_t getOpenedElementID() const;
 
   /// Return the number of opened pack parameters.
   unsigned getNumOpenedPackParams() const;
@@ -234,9 +234,9 @@ public:
   /// Create a new generic environment for an opened existential.
   ///
   /// \param existential The subject existential type
-  /// \param uuid The unique identifier for this opened existential
+  /// \param id The unique identifier for this opened existential
   static GenericEnvironment *
-  forOpenedExistential(Type existential, UUID uuid);
+  forOpenedExistential(Type existential, uint64_t id);
 
   /// Create a new generic environment for an opened existential.
   ///
@@ -244,24 +244,24 @@ public:
   /// \param existential The generalized existential type
   /// \param outerSubs The substitution map containing archetypes from the
   /// outer generic context
-  /// \param uuid The unique identifier for this opened existential
+  /// \param id The unique identifier for this opened existential
   static GenericEnvironment *
   forOpenedExistential(GenericSignature signature,
                        Type existential, SubstitutionMap outerSubs,
-                       UUID uuid);
+                       uint64_t id);
 
   /// Create a new generic environment for an opened element.
   ///
   /// \param signature The opened element signature, which is the same as the
   /// signature of the context whose element type is being opened, but with
   /// the pack parameter bit erased from one or more generic parameters
-  /// \param uuid The unique identifier for this opened element
+  /// \param id The unique identifier for this opened element
   /// \param shapeClass The shape equivalence class for the originating packs
   /// \param outerSubs The substitution map containing archetypes from the
   /// outer generic context
   static GenericEnvironment *
   forOpenedElement(GenericSignature signature,
-                   UUID uuid, CanGenericTypeParamType shapeClass,
+                   uint64_t id, CanGenericTypeParamType shapeClass,
                    SubstitutionMap outerSubs);
 
   /// Make vanilla new/delete illegal.

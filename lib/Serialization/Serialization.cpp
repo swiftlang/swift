@@ -763,7 +763,7 @@ IdentifierID Serializer::addContainingModuleRef(const DeclContext *DC,
     return CURRENT_MODULE_ID;
   if (M == this->M->getASTContext().TheBuiltinModule)
     return BUILTIN_MODULE_ID;
-  if (M->isClangHeaderImportModule())
+  if (M->isClangBridgingHeaderImportModule())
     return OBJC_HEADER_MODULE_ID;
 
   // Reject references to hidden dependencies.
@@ -3064,6 +3064,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     case DeclAttrKind::PrivateImport:
     case DeclAttrKind::AllowFeatureSuppression:
     case DeclAttrKind::Diagnose:
+    case DeclAttrKind::Called:
       llvm_unreachable("cannot serialize attribute");
 
 #define SIMPLE_DECL_ATTR(_, CLASS, ...)                                        \
@@ -3494,17 +3495,11 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       assert(attr->getOriginalDeclaration() &&
              "`@differentiable` attribute should have original declaration set "
              "during construction or parsing");
-      auto *paramIndices = attr->getParameterIndices();
-      assert(paramIndices && "Parameter indices must be resolved");
-      SmallVector<bool, 4> paramIndicesVector;
-      for (unsigned i : range(paramIndices->getCapacity()))
-        paramIndicesVector.push_back(paramIndices->contains(i));
-
       DifferentiableDeclAttrLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode, attr->isImplicit(),
           getRawStableDifferentiabilityKind(attr->getDifferentiabilityKind()),
-          S.addGenericSignatureRef(attr->getDerivativeGenericSignature()),
-          paramIndicesVector);
+          S.addGenericSignatureRef(attr->getDerivativeGenericSignature()));
+      writeDiffParamIndices(attr->getParameterIndices());
       return;
     }
 
@@ -3512,27 +3507,26 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       auto abbrCode = S.DeclTypeAbbrCodes[DerivativeDeclAttrLayout::Code];
       auto *attr = cast<DerivativeAttr>(DA);
       auto &ctx = S.getASTContext();
-      assert(attr->getOriginalFunction(ctx) && attr->getOriginalDeclaration() &&
+      assert(attr->getOriginalFunctions(ctx).size() &&
+             attr->getOriginalDeclaration() &&
              "`@derivative` attribute should have original declaration set "
              "during construction or parsing");
       auto origDeclNameRef = attr->getOriginalFunctionName();
 
-      DeclID origDeclID = S.addDeclRef(attr->getOriginalFunction(ctx));
+      SmallVector<DeclID, 1> origDeclIDs;
+      for (auto *origAFD : attr->getOriginalFunctions(ctx))
+        origDeclIDs.push_back(S.addDeclRef(origAFD));
       auto derivativeKind =
           getRawStableAutoDiffDerivativeFunctionKind(attr->getDerivativeKind());
       uint8_t rawAccessorKind = 0;
       auto origAccessorKind = origDeclNameRef.AccessorKind;
       if (origAccessorKind)
         rawAccessorKind = uint8_t(getStableAccessorKind(*origAccessorKind));
-      auto *parameterIndices = attr->getParameterIndices();
-      assert(parameterIndices && "Parameter indices must be resolved");
-      SmallVector<bool, 4> paramIndicesVector;
-      for (unsigned i : range(parameterIndices->getCapacity()))
-        paramIndicesVector.push_back(parameterIndices->contains(i));
       DerivativeDeclAttrLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode, attr->isImplicit(),
-          origAccessorKind.has_value(), rawAccessorKind, origDeclID,
-          derivativeKind, paramIndicesVector);
+          origAccessorKind.has_value(), rawAccessorKind, derivativeKind,
+          origDeclIDs);
+      writeDiffParamIndices(attr->getParameterIndices());
       writeDeclNameRefIfNeeded(origDeclNameRef.Name);
       return;
     }
@@ -3545,14 +3539,9 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
              "during construction or parsing");
 
       DeclID origDeclID = S.addDeclRef(attr->getOriginalFunction());
-      auto *parameterIndices = attr->getParameterIndices();
-      assert(parameterIndices && "Parameter indices must be resolved");
-      SmallVector<bool, 4> paramIndicesVector;
-      for (unsigned i : range(parameterIndices->getCapacity()))
-        paramIndicesVector.push_back(parameterIndices->contains(i));
-      TransposeDeclAttrLayout::emitRecord(
-          S.Out, S.ScratchRecord, abbrCode, attr->isImplicit(), origDeclID,
-          paramIndicesVector);
+      TransposeDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                          attr->isImplicit(), origDeclID);
+      writeDiffParamIndices(attr->getParameterIndices());
       writeDeclNameRefIfNeeded(attr->getOriginalFunctionName().Name);
       return;
     }
@@ -3593,9 +3582,10 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     case DeclAttrKind::Section: {
       auto *theAttr = cast<SectionAttr>(DA);
       auto abbrCode = S.DeclTypeAbbrCodes[SectionDeclAttrLayout::Code];
-      SectionDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-                                           theAttr->isImplicit(),
-                                           theAttr->Name);
+      bool isDefault = theAttr->isDefault();
+      SectionDeclAttrLayout::emitRecord(
+          S.Out, S.ScratchRecord, abbrCode, theAttr->isImplicit(), isDefault,
+          isDefault ? StringRef() : *theAttr->Name);
       return;
     }
 
@@ -3632,6 +3622,15 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       InheritActorContextDeclAttrLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode,
           static_cast<uint8_t>(theAttr->getModifier()), theAttr->isImplicit());
+      return;
+    }
+
+    case DeclAttrKind::Unsafe: {
+      auto *theAttr = cast<UnsafeAttr>(DA);
+      auto abbrCode = S.DeclTypeAbbrCodes[UnsafeDeclAttrLayout::Code];
+      UnsafeDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                       theAttr->isAlways(),
+                                       theAttr->isImplicit());
       return;
     }
 
@@ -4021,6 +4020,21 @@ private:
 
     unsigned abbrCode = S.DeclTypeAbbrCodes[ParameterListLayout::Code];
     ParameterListLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode, paramIDs);
+  }
+
+  void writeDiffParamIndices(const IndexSubset *indices) {
+    assert(indices && "Parameter indices must be resolved");
+
+    using namespace decls_block;
+
+    SmallVector<bool, 4> paramIndicesVector;
+    for (unsigned i : range(indices->getCapacity()))
+      paramIndicesVector.push_back(indices->contains(i));
+
+    unsigned abbrCode =
+        S.DeclTypeAbbrCodes[DifferentiationParamIndicesLayout::Code];
+    DifferentiationParamIndicesLayout::emitRecord(S.Out, S.ScratchRecord,
+                                                  abbrCode, paramIndicesVector);
   }
 
   /// Writes an array of members for a decl context.
@@ -6177,7 +6191,8 @@ public:
         S.addTypeRef(fnTy->getThrownError()),
         getRawStableDifferentiabilityKind(fnTy->getDifferentiabilityKind()),
         isolation,
-        fnTy->hasSendingResult());
+        fnTy->hasSendingResult(),
+        fnTy->isCalledOnce());
 
     serializeFunctionTypeParams(fnTy);
 
@@ -6199,7 +6214,7 @@ public:
         fnTy->isSendable(), fnTy->isAsync(), fnTy->isThrowing(),
         S.addTypeRef(fnTy->getThrownError()),
         getRawStableDifferentiabilityKind(fnTy->getDifferentiabilityKind()),
-        isolation, fnTy->hasSendingResult(),
+        isolation, fnTy->hasSendingResult(), fnTy->isCalledOnce(),
         S.addGenericSignatureRef(genericSig));
 
     serializeFunctionTypeParams(fnTy);
@@ -6287,10 +6302,10 @@ public:
 
     unsigned abbrCode = S.DeclTypeAbbrCodes[SILFunctionTypeLayout::Code];
     SILFunctionTypeLayout::emitRecord(
-        S.Out, S.ScratchRecord, abbrCode, fnTy->isSendable(),
-        fnTy->isAsync(), stableCoroutineKind, stableCalleeConvention,
-        stableRepresentation, fnTy->isPseudogeneric(), fnTy->isNoEscape(),
-        fnTy->isUnimplementable(), fnTy->getIsolation().getKind(),
+        S.Out, S.ScratchRecord, abbrCode, fnTy->isSendable(), fnTy->isAsync(),
+        stableCoroutineKind, stableCalleeConvention, stableRepresentation,
+        fnTy->isPseudogeneric(), fnTy->isNoEscape(), fnTy->isUnimplementable(),
+        fnTy->isCalledOnce(), fnTy->getIsolation().getKind(),
         stableDiffKind, fnTy->hasErrorResult(),
         fnTy->getParameters().size(),
         fnTy->getNumYields(), fnTy->getNumResults(),
@@ -6733,6 +6748,8 @@ void Serializer::writeAllDeclsAndTypes() {
 
   registerDeclTypeAbbr<InheritedProtocolsLayout>();
 
+  registerDeclTypeAbbr<DifferentiationParamIndicesLayout>();
+
 #define DECL_ATTR(X, NAME, ...) \
   registerDeclTypeAbbr<NAME##DeclAttrLayout>();
 #include "swift/AST/DeclAttr.def"
@@ -7118,12 +7135,13 @@ static void recordDerivativeFunctionConfig(
          attr->getDerivativeGenericSignature()});
   }
   for (auto *attr : AFD->getAttrs().getAttributes<DerivativeAttr>()) {
-    auto *origAFD = attr->getOriginalFunction(ctx);
-    auto mangledName =
-        ctx.getIdentifier(Mangler.mangleDeclWithPrefix(origAFD, ""));
-    derivativeConfigs[mangledName].insert(
-        {ctx.getIdentifier(attr->getParameterIndices()->getString()),
-         AFD->getGenericSignature()});
+    for (auto *origAFD : attr->getOriginalFunctions(ctx)) {
+      auto mangledName =
+          ctx.getIdentifier(Mangler.mangleDeclWithPrefix(origAFD, ""));
+      derivativeConfigs[mangledName].insert(
+          {ctx.getIdentifier(attr->getParameterIndices()->getString()),
+           AFD->getGenericSignature()});
+    }
   }
 }
 

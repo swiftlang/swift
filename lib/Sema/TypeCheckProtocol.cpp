@@ -22,6 +22,7 @@
 #include "TypeCheckAccess.h"
 #include "TypeCheckAvailability.h"
 #include "TypeCheckBitwise.h"
+#include "TypeCheckCOM.h"
 #include "TypeCheckConcurrency.h"
 #include "TypeCheckDistributed.h"
 #include "TypeCheckEffects.h"
@@ -2598,26 +2599,6 @@ checkIndividualConformance(NormalProtocolConformance *conformance) {
                            ProtoType);
     conformance->setInvalid();
     return;
-  }
-
-  if (T->isActorType()) {
-    if (auto globalActor = Proto->getGlobalActorAttr()) {
-      Context.Diags.diagnose(ComplainLoc,
-                             diag::actor_cannot_conform_to_global_actor_protocol, T,
-                             ProtoType);
-
-      CustomAttr *attr;
-      NominalTypeDecl *actor;
-
-      std::tie(attr, actor) = *globalActor;
-
-      Context.Diags.diagnose(attr->getLocation(),
-                             diag::protocol_isolated_to_global_actor_here, ProtoType,
-                             actor->getDeclaredInterfaceType());
-
-      conformance->setInvalid();
-      return;
-    }
   }
 
   if (Proto->isObjC()) {
@@ -6889,6 +6870,9 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
   bool hasDeprecatedUnsafeSendable = false;
   bool sendableConformancePreconcurrency = false;
   for (auto conformance : conformances) {
+    if (Context.LangOpts.EnableCOMInterop)
+      com::validateConformance(conformance);
+
     // Check and record normal conformances.
     if (auto normal = dyn_cast<NormalProtocolConformance>(conformance)) {
       groupChecker.addConformance(normal);

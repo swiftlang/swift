@@ -8,10 +8,15 @@
 
 // RUN: %target-codesign %t/swift-objc-execution
 // RUN: %target-run %t/swift-objc-execution | %FileCheck %s
-// RUN: %target-run %t/swift-objc-execution | %FileCheck --check-prefix=DESTROY %s
+// RUN: %target-run %t/swift-objc-execution | %FileCheck --check-prefix=DESTROY --implicit-check-not "destroy ObjCKlass" %s
 
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
+
+// The generated header references the type metadata accessor for the imported
+// Obj-C class, which is emitted lazily and only has hidden linkage, so it might
+// not be present in the object file when optimizations are enabled (rdar://184508318).
+// UNSUPPORTED: swift_test_mode_optimize || swift_test_mode_optimize_size || swift_test_mode_optimize_unchecked
 
 //--- header.h
 
@@ -160,7 +165,8 @@ int main() {
   assert(globalCounter == 0);
 // CHECK: create ObjCKlass
 // CHECK-NEXT: OBJClass: 1
-// CHECK-NEXT: create ObjCKlass
+// Original ObjCKlass instance can be released eagerly here.
+// CHECK: create ObjCKlass
 // CHECK: OBJClass: 2
 // CHECK-NEXT: NIL
 // DESTROY: destroy ObjCKlass

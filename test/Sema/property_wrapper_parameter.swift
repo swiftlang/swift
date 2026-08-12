@@ -248,3 +248,8 @@ struct Widget {
 func buildWidget(_ w: ProjectionWrapper<Int>) -> Widget {
   Widget($w: w)
 }
+
+// FIXME: This should work, currently we don't consider property wrappers
+// when matching default arguments with parameters.
+func testCallerSideDefault(@Wrapper x: Int? = nil) {}
+testCallerSideDefault() // expected-error {{nil default argument value cannot be converted to type 'Wrapper<Int?>'}}

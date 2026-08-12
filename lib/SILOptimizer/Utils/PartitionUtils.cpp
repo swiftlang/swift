@@ -483,7 +483,8 @@ void Partition::assignElement(Element oldElt, Element newElt,
   canonical = false;
 }
 
-Partition Partition::join(const Partition &fst, Partition &mutableSnd) {
+Partition Partition::join(const Partition &fst, Partition &mutableSnd,
+                          SILBasicBlock *sndBlock) {
   ++NumPartitionJoin;
   // READ THIS! Remember, we cannot touch mutableSnd after this point. We just
   // use it to canonicalize to avoid having to copy snd. After this point,
@@ -496,9 +497,10 @@ Partition Partition::join(const Partition &fst, Partition &mutableSnd) {
   Partition result = fst;
   result.canonicalize();
 
-  // Push a history join so when processing, we know the next element to
-  // process.
-  result.pushCFGHistoryJoin(snd.history);
+  // Push a history join recording the predecessor block whose exit partition
+  // (snd) we are merging in, so the join can later be rewound by recovering
+  // that block's exit partition.
+  result.pushCFGHistoryJoin(sndBlock);
 
   // For each (sndEltNumber, sndRegionNumber) in snd_reduced...
   for (auto pair : snd.elementToRegionMap) {
@@ -603,45 +605,16 @@ Partition Partition::join(const Partition &fst, Partition &mutableSnd) {
   return result;
 }
 
-bool Partition::popHistory(
-    SmallVectorImpl<IsolationHistory> &foundJoinedHistories) {
-  // We only allow for history rewinding if we are not tracking any
-  // sending operands. This is because the history rewinding does not
-  // care about sending. One can either construct a new Partition from
-  // the current Partition using Partition::removeSendingOperandSet or clear
-  // the sending information using Partition::clearSendingOperandState().
-  assert(regionToSendingOpMap.empty() &&
-         "Can only rewind history if not tracking any sending operands");
-
-  if (!history.getHead())
-    return false;
-
-  // Just put in a continue here to ensure that clang-format doesn't do weird
-  // things with the semicolon.
-  while (popHistoryOnce(foundJoinedHistories))
-    continue;
-
-  // Return if our history head is non-null so our user knows if there are more
-  // things to pop.
-  return history.getHead();
-}
-
 void Partition::print(llvm::raw_ostream &os,
                       std::function<bool(llvm::raw_ostream &, Region)>
                           printRegionIsolation) const {
-  // If we are asked to printRegionIsolation, we need to canonicalize before we
-  // can get the correct regions. So, check if we are canonicalized. If we are
-  // not then we can continue printing below. Otherwise, we copy ourselves,
-  // canonicalize the copy, and then print that. We do this since the whole
-  // point of printing this type of information is to help us understand how the
-  // program flowed normally and if we canonicalize this partition to print, we
-  // would change the compiler state.
-  if (printRegionIsolation && !canonical) {
-    auto other = *this;
-    other.canonicalize();
-    other.print(os, printRegionIsolation);
-    return;
-  }
+  // Group by region, so the region numbers have to be the canonical ones or the
+  // grouping is against labels that happen to be stale. Canonicalizing is safe
+  // from a const printer: it relabels regions without changing which elements
+  // share one, so it does not change what this partition means.
+  //
+  // Use dump_labels() to see the labels as they stand instead.
+  canonicalize();
 
   SmallFrozenMultiMap<Region, Element, 8> multimap;
 
@@ -678,6 +651,9 @@ void Partition::print(llvm::raw_ostream &os,
 }
 
 void Partition::printVerbose(llvm::raw_ostream &os) const {
+  // Canonical region numbers, for the same reason as print.
+  canonicalize();
+
   SmallFrozenMultiMap<Region, Element, 8> multimap;
 
   for (auto [eltNo, regionNo] : elementToRegionMap)
@@ -839,12 +815,24 @@ Region Partition::merge(Element fst, Element snd, bool updateHistory) {
   assert(elementToRegionMap.at(fst) == elementToRegionMap.at(snd));
 
   // Now that we are correct/canonicalized, add the merge to our history.
+  //
+  // horizontalUpdate moved snd's *entire* region into fstRegion, so the
+  // elements it carried along have to be recorded too: popHistoryOnce reverses
+  // a merge by extracting the recorded elements, and an unrecorded passenger is
+  // left stranded in fstRegion for the rest of the rewind.
   if (updateHistory)
     pushMergeElementRegions(fst, snd, mergedElements);
   return result;
 }
 
-void Partition::canonicalize() {
+void Partition::canonicalize() const {
+  // Canonicalization is a lazy normalization of the region labels, so running it
+  // from a const query does not change what the partition means. See the
+  // declaration.
+  const_cast<Partition *>(this)->canonicalizeImpl();
+}
+
+void Partition::canonicalizeImpl() {
   if (canonical)
     return;
   canonical = true;
@@ -925,18 +913,28 @@ void Partition::horizontalUpdate(
   }
 }
 
-bool Partition::popHistoryOnce(
-    SmallVectorImpl<IsolationHistory> &foundJoinedHistoryNodes) {
+const IsolationHistory::Node *
+Partition::popHistoryOnce(SmallVectorImpl<SILBasicBlock *> &foundJoinedBlocks) {
+  // Rewinding a history that was never recorded silently finds nothing, which
+  // would read as "this value was never merged" rather than as a missing
+  // feature. Recording is gated on swift::shouldEmitIsolationHistoryFor and so
+  // is the only client that rewinds, so the two agreeing is an invariant, not a
+  // thing to handle.
+  assert(history.isEnabled() &&
+         "Rewinding an isolation history that was never recorded. The Factory "
+         "was built with recording off, but something is walking the history "
+         "anyway -- the recording gate and the consumer gate have drifted.");
+
   const auto *head = history.pop();
   if (!head)
-    return false;
+    return nullptr;
 
   // When popping, we /always/ want to canonicalize.
   canonicalize();
 
   switch (head->getKind()) {
   case IsolationHistory::Node::SequenceBoundary:
-    return false;
+    break;
 
   case IsolationHistory::Node::AddNewRegionForElement: {
     // We added an element to its own region... so we should remove it and it
@@ -951,13 +949,13 @@ bool Partition::popHistoryOnce(
                            return pair.second == oldRegion;
                          }) &&
            "Should have been last element?!");
-    return true;
+    break;
   }
   case IsolationHistory::Node::RemoveLastElementFromRegion:
     // We removed an element from a region and it was the last element. Just
     // add new.
     trackNewElement(head->getFirstArgAsElement(), false /*update history*/);
-    return true;
+    break;
   case IsolationHistory::Node::RemoveElementFromRegion:
     // We removed an element from a specific region. So, we need to add it
     // back. pushRemoveElementFromRegion stores the surviving sibling at
@@ -966,7 +964,7 @@ bool Partition::popHistoryOnce(
     assignElement(head->getFirstArgAsElement(),
                   head->getAdditionalElementArgs()[0],
                   false /*update history*/);
-    return true;
+    break;
 
   case IsolationHistory::Node::MergeElementRegions: {
     // We merged two regions together. We need to remove all elements from the
@@ -986,17 +984,18 @@ bool Partition::popHistoryOnce(
       merge(e, elementsToExtract[0], false /*update history*/);
     }
 
-    return true;
+    break;
   }
   case IsolationHistory::Node::CFGHistoryJoin:
-    // When we have a CFG History Merge, we cannot simply pop. Instead, we need
-    // to signal to the user that they need to visit each history node in turn
-    // by returning it in the out parameter.
-    auto newHistory = IsolationHistory(history.factory);
-    newHistory.head = head->getFirstArgAsNode();
-    foundJoinedHistoryNodes.push_back(newHistory);
-    return true;
+    // When we have a CFG history join, we cannot simply pop: the joined branch
+    // lives in a predecessor block's exit partition, not in this linear
+    // history. Signal the predecessor block to the caller so it can recover
+    // that exit partition and keep rewinding.
+    foundJoinedBlocks.push_back(head->getFirstArgAsBlock());
+    break;
   }
+
+  return head;
 }
 
 //===----------------------------------------------------------------------===//
@@ -1007,6 +1006,9 @@ bool Partition::popHistoryOnce(
 // independent region.
 IsolationHistory::Node *
 IsolationHistory::pushNewElementRegion(Element element) {
+  if (!isEnabled())
+    return nullptr;
+
   unsigned size = Node::totalSizeToAlloc<Element>(0);
   void *mem = factory->allocator.Allocate(size, alignof(Node));
   head = new (mem) Node(Node::AddNewRegionForElement, head, element);
@@ -1014,16 +1016,23 @@ IsolationHistory::pushNewElementRegion(Element element) {
 }
 
 IsolationHistory::Node *
-IsolationHistory::pushHistorySequenceBoundary(SILLocation loc) {
+IsolationHistory::pushHistorySequenceBoundary(SILLocation loc,
+                                              SILInstruction *inst) {
+  if (!isEnabled())
+    return nullptr;
+
   unsigned size = Node::totalSizeToAlloc<Element>(0);
   void *mem = factory->allocator.Allocate(size, alignof(Node));
-  head = new (mem) Node(Node::SequenceBoundary, head, loc);
+  head = new (mem) Node(Node::SequenceBoundary, head, loc, inst);
   return getHead();
 }
 
 // Push onto the history that \p value should be removed from any region that it
 // is apart of and placed within its own separate region.
 void IsolationHistory::pushRemoveLastElementFromRegion(Element element) {
+  if (!isEnabled())
+    return;
+
   unsigned size = Node::totalSizeToAlloc<Element>(0);
   void *mem = factory->allocator.Allocate(size, alignof(Node));
   head = new (mem) Node(Node::RemoveLastElementFromRegion, head, element);
@@ -1031,6 +1040,9 @@ void IsolationHistory::pushRemoveLastElementFromRegion(Element element) {
 
 void IsolationHistory::pushRemoveElementFromRegion(
     Element otherElementInOldRegion, Element element) {
+  if (!isEnabled())
+    return;
+
   unsigned size = Node::totalSizeToAlloc<Element>(1);
   void *mem = factory->allocator.Allocate(size, alignof(Node));
   head = new (mem) Node(Node::RemoveElementFromRegion, head, element,
@@ -1040,6 +1052,9 @@ void IsolationHistory::pushRemoveElementFromRegion(
 void IsolationHistory::pushMergeElementRegions(Element elementInNewRegion,
                                                Element elementInOldRegion,
                                                ArrayRef<Element> eltsToMerge) {
+  if (!isEnabled())
+    return;
+
   assert(elementInNewRegion != elementInOldRegion);
   assert(llvm::none_of(eltsToMerge, [&](Element elt) {
     return elt == elementInNewRegion || elt == elementInOldRegion;
@@ -1050,24 +1065,21 @@ void IsolationHistory::pushMergeElementRegions(Element elementInNewRegion,
                         elementInOldRegion, eltsToMerge);
 }
 
-// Push that \p other should be merged into this region.
-void IsolationHistory::pushCFGHistoryJoin(Node *otherNode) {
-  // If otherNode is nullptr or represents our same history, do not merge.
-  if (!otherNode || otherNode == head)
+// Record that \p predBlock's exit partition was merged into this history at a
+// control-flow merge point. The joined history is not copied in; it is
+// recovered on demand as predBlock's exit-partition isolation history.
+void IsolationHistory::pushCFGHistoryJoin(SILBasicBlock *predBlock) {
+  if (!isEnabled())
     return;
 
-  // If we do not have any history, just take on the history of otherNode. We
-  // are going to merge our contents.
-  if (!head) {
-    head = otherNode;
+  // Without a predecessor block there is nothing to recover the joined history
+  // from later, so there is nothing to record.
+  if (!predBlock)
     return;
-  }
 
-  // Otherwise, create a node that joins our true head and other node as a side
-  // path we can follow.
   unsigned size = Node::totalSizeToAlloc<Element>(0);
   void *mem = factory->allocator.Allocate(size, alignof(Node));
-  head = new (mem) Node(Node(Node::CFGHistoryJoin, head, otherNode));
+  head = new (mem) Node(Node::CFGHistoryJoin, head, predBlock);
 }
 
 IsolationHistory::Node *IsolationHistory::pop() {
@@ -1125,13 +1137,62 @@ void IsolationHistory::Node::print(ASTContext &ctx, llvm::raw_ostream &os,
        << prefix << "Element To Merge: " << getAdditionalElementArgs()[0]
        << '\n';
     break;
-  case CFGHistoryJoin:
-    os << "CFGHistoryJoin\n"
-       << prefix << "Other Node: " << getFirstArgAsNode() << '\n';
+  case CFGHistoryJoin: {
+    auto *predBlock = getFirstArgAsBlock();
+    os << "CFGHistoryJoin\n" << prefix << "Pred Block: ";
+    if (predBlock)
+      os << "bb" << predBlock->getDebugID() << '\n';
+    else
+      os << "<none>\n";
     break;
+  }
   case SequenceBoundary:
     os << "SequenceBoundary\n" << prefix << "Value: ";
     getHistoryBoundaryLoc()->print(os);
     break;
   }
+}
+
+void IsolationHistory::Node::printOneLine(
+    llvm::raw_ostream &os, const SourceManager &sourceMgr) const {
+  switch (getKind()) {
+  case AddNewRegionForElement:
+    os << "AddNewRegionForElement: %%" << getFirstArgAsElement();
+    return;
+  case RemoveLastElementFromRegion:
+    os << "RemoveLastElementFromRegion: %%" << getFirstArgAsElement();
+    return;
+  case RemoveElementFromRegion:
+    os << "RemoveElementFromRegion: %%" << getAdditionalElementArgs()[0]
+       << " from region of %%" << getFirstArgAsElement();
+    return;
+  case MergeElementRegions: {
+    os << "MergeElementRegions: into region of %%" << getFirstArgAsElement()
+       << " merged [";
+    bool isFirst = true;
+    for (Element e : getAdditionalElementArgs()) {
+      if (!isFirst)
+        os << ", ";
+      isFirst = false;
+      os << "%%" << e;
+    }
+    os << ']';
+    return;
+  }
+  case CFGHistoryJoin:
+    os << "CFGHistoryJoin: pred ";
+    if (auto *predBlock = getFirstArgAsBlock())
+      os << "bb" << predBlock->getDebugID();
+    else
+      os << "<none>";
+    return;
+  case SequenceBoundary:
+    os << "SequenceBoundary: ";
+    if (auto loc = getHistoryBoundaryLoc())
+      loc->print(os, sourceMgr);
+    else
+      os << "<no loc>";
+    return;
+  }
+  llvm_unreachable("Covered switch isn't covered?!");
 }

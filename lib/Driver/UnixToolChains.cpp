@@ -42,6 +42,32 @@ using namespace swift::driver;
 using namespace llvm::opt;
 using namespace swift::driver::toolchains;
 
+static unsigned getDefaultDWARFVersionForUnixTriple(const llvm::Triple &triple) {
+  // Match Clang: DWARF v5 is the default everywhere except Android, which
+  // stays on v4 for compatibility with the NDK's bundled debugging tools.
+  if (triple.isAndroid())
+    return 4;
+  return 5;
+}
+
+void toolchains::GenericUnix::addCommonFrontendArgs(
+    const OutputInfo &OI, const CommandOutput &output,
+    const llvm::opt::ArgList &inputArgs,
+    llvm::opt::ArgStringList &arguments) const {
+  ToolChain::addCommonFrontendArgs(OI, output, inputArgs, arguments);
+
+  std::string dwarfVersion;
+  {
+    llvm::raw_string_ostream os(dwarfVersion);
+    os << "-dwarf-version=";
+    if (OI.DWARFVersion)
+      os << std::to_string(*OI.DWARFVersion);
+    else
+      os << getDefaultDWARFVersionForUnixTriple(getTriple());
+  }
+  arguments.push_back(inputArgs.MakeArgString(dwarfVersion));
+}
+
 std::string
 toolchains::GenericUnix::sanitizerRuntimeLibName(StringRef Sanitizer,
                                                  bool shared) const {

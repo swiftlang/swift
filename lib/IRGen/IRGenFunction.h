@@ -39,6 +39,10 @@ namespace llvm {
   class Function;
 }
 
+namespace clang {
+  class FunctionDecl;
+}
+
 namespace swift {
   class ArchetypeType;
   class IRGenOptions;
@@ -483,7 +487,14 @@ public:
                                 const llvm::Twine &name ="");
   void emitDeallocRawCall(llvm::Value *pointer, llvm::Value *size,
                           llvm::Value *alignMask);
-  
+  llvm::Value *emitAllocRawTypedCall(llvm::Value *size,
+                                     llvm::Value *alignMask,
+                                     llvm::Value *typeDescriptor,
+                                     const llvm::Twine &name = "");
+  void emitDeallocRawTypedCall(llvm::Value *pointer, llvm::Value *size,
+                               llvm::Value *alignMask,
+                               llvm::Value *typeDescriptor);
+
   void emitAllocBoxCall(llvm::Value *typeMetadata,
                          llvm::Value *&box,
                          llvm::Value *&valueAddress);
@@ -750,7 +761,7 @@ public:
   llvm::Value *emitBlockCopyCall(llvm::Value *value);
   void emitBlockRelease(llvm::Value *value);
 
-  void emitForeignReferenceTypeLifetimeOperation(ValueDecl *fn,
+  void emitForeignReferenceTypeLifetimeOperation(const clang::FunctionDecl *fn,
                                                  llvm::Value *value,
                                                  bool needsNullCheck = false);
 

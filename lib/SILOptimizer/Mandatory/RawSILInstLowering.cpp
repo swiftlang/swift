@@ -196,7 +196,8 @@ lowerAssignOrInitInstruction(SILBuilderWithScope &b,
     case AssignOrInitInst::Init: {
       SILValue initFn = inst->getInitializer();
       CanSILFunctionType fTy = initFn->getType().castTo<SILFunctionType>();
-      SILFunctionConventions convention(fTy, inst->getModule());
+      SILFunctionConventions convention(
+          fTy, SILAddressConventions::forFunction(*inst->getFunction()));
 
       auto inLocalContext =
           inst->getProperty()->getDeclContext()->isLocalContext();
@@ -357,7 +358,8 @@ lowerAssignOrInitInstruction(SILBuilderWithScope &b,
       }
 
       CanSILFunctionType fTy = setterFn->getType().castTo<SILFunctionType>();
-      SILFunctionConventions convention(fTy, inst->getModule());
+      SILFunctionConventions convention(
+          fTy, SILAddressConventions::forFunction(*inst->getFunction()));
       assert(!convention.hasIndirectSILResults());
       SmallVector<SILValue, 4> args;
       getAssignByWrapperArgs(args, src, convention, b, forCleanup);

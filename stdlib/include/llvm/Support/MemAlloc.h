@@ -23,6 +23,12 @@
 inline namespace __swift { inline namespace __runtime {
 namespace llvm {
 
+// malloc/calloc/realloc are not guaranteed to be available in freestanding
+// mode by the C++ standard, and some standard library implementations (e.g.
+// libstdc++) omit their declarations entirely under -ffreestanding. These
+// helpers are only used by the non-embedded runtime (via SmallVector.cpp and
+// SmallPtrSet.cpp, which are not built for embedded targets).
+#if __STDC_HOSTED__
 LLVM_ATTRIBUTE_RETURNS_NONNULL inline void *safe_malloc(size_t Sz) {
   void *Result = std::malloc(Sz);
   if (Result == nullptr) {
@@ -62,6 +68,7 @@ LLVM_ATTRIBUTE_RETURNS_NONNULL inline void *safe_realloc(void *Ptr, size_t Sz) {
   }
   return Result;
 }
+#endif
 
 /// Allocate a buffer of memory with the given size and alignment.
 ///

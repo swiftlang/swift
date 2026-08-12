@@ -1,0 +1,53 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -diagnose-unreachable -sil-print-debuginfo | %FileCheck %s
+
+// Regression test for a crash when DiagnoseUnreachable deletes a chain of two
+// ownership-forwarding struct_extract instructions together, where the outer
+// struct_extract has a debug_value use that must be salvaged. Salvaging
+// clones the outer struct_extract, which needs the forwarding ownership kind
+// of the inner struct_extract; if that ownership kind is recomputed live from
+// the inner extract's operand (rather than using the ownership kind that was
+// passed in when cloning), it can observe the inner extract's operand after
+// it has already been unlinked by the same deletion, causing a crash.
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+class Klass {}
+
+struct Inner {
+  @_hasStorage var k: Klass { get set }
+}
+
+struct Wrapper {
+  @_hasStorage var inner: Inner { get set }
+}
+
+sil_scope 1 { loc "test.swift":1:1 parent @test_nested_struct_extract_salvage : $@convention(thin) (@guaranteed Wrapper) -> () }
+
+// The struct_extract chain and its debug_value are unreachable and get
+// deleted entirely along with bb2; the important thing is that this compiles
+// without crashing (see comment above).
+// CHECK-LABEL: sil [ossa] @test_nested_struct_extract_salvage
+// CHECK:       bb0({{%[0-9]+}} : @guaranteed $Wrapper):
+// CHECK-NEXT:    br bb1
+// CHECK:       bb1:
+// CHECK-NEXT:    tuple ()
+// CHECK-NEXT:    return
+// CHECK-LABEL: } // end sil function 'test_nested_struct_extract_salvage'
+sil [ossa] @test_nested_struct_extract_salvage : $@convention(thin) (@guaranteed Wrapper) -> () {
+bb0(%0 : @guaranteed $Wrapper):
+  %cond = integer_literal $Builtin.Int1, 1
+  cond_br %cond, bb1, bb2
+
+bb1:
+  %t = tuple ()
+  return %t : $()
+
+bb2:
+  %1 = struct_extract %0 : $Wrapper, #Wrapper.inner
+  %2 = struct_extract %1 : $Inner, #Inner.k
+  debug_value %2 : $Klass, let, name "k", loc "test.swift":1:1, scope 1
+  unreachable
+}

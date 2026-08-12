@@ -1080,7 +1080,7 @@ llvm::Value *irgen::clearImplicitIsolatedActorBits(IRGenFunction &IGF,
   auto *bitMask =
       IGF.getOptions().HasAArch64TBI
           ? llvm::ConstantInt::get(IGF.IGM.IntPtrTy, 0xCFFFFFFFFFFFFFFFull)
-          : llvm::ConstantInt::get(IGF.IGM.IntPtrTy, -4);
+          : llvm::ConstantInt::getSigned(IGF.IGM.IntPtrTy, -4);
   auto *result = IGF.Builder.CreateAnd(cast, bitMask);
   return IGF.Builder.CreateBitOrPointerCast(result, value->getType());
 }

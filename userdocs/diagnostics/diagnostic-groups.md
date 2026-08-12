@@ -38,6 +38,7 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:explicit-sendable-annotations>
 - <doc:preconcurrency-import>
 - <doc:foreign-reference-type>
+- <doc:heap-allocation>
 - <doc:return-type-implicit-copy>
 - <doc:implicit-strong-capture>
 - <doc:clang-declaration-import>
@@ -74,9 +75,9 @@ Or upgrade all warnings except deprecated declaration to errors:
 
 ## Topics
 - <doc:dynamic-callable-requirements>
-- <doc:actors-cannot-conform-to-global-actor-protocols>
 - <doc:add-preconcurrency-import>
 - <doc:always-available-domain>
+- <doc:always-unsafe>
 - <doc:trailing-closure-matching>
 - <doc:actor-isolated-mutating-async>
 - <doc:actor-isolated-call>
@@ -94,6 +95,7 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:preconcurrency-import>
 - <doc:foreign-reference-type>
 - <doc:getting-non-sendable-values-out-of-actors>
+- <doc:heap-allocation>
 - <doc:return-type-implicit-copy>
 - <doc:implicit-strong-capture>
 - <doc:clang-declaration-import>

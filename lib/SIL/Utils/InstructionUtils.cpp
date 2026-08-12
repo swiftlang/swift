@@ -1101,8 +1101,10 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
     case BuiltinValueKind::IsOptionalType:
       return RuntimeEffect::Casting;
     case BuiltinValueKind::AllocRaw:
+    case BuiltinValueKind::AllocRawTyped:
       return RuntimeEffect::Allocating;
     case BuiltinValueKind::DeallocRaw:
+    case BuiltinValueKind::DeallocRawTyped:
       return RuntimeEffect::Deallocating;
     case BuiltinValueKind::Fence:
     case BuiltinValueKind::CmpXChg:
@@ -1499,5 +1501,5 @@ bool swift::shouldExpand(SILModule &module, SILType ty) {
   }
 
   unsigned numFields = module.Types.countNumberOfFields(ty, expansion);
-  return (numFields <= 6);
+  return (numFields <= MaxNumFieldsToExpand);
 }

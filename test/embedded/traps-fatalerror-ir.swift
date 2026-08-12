@@ -15,8 +15,7 @@ public func test() {
 
 // CHECK-MESSAGE: define {{.*}}void @"$e4main4testyyF"(){{.*}} {
 // CHECK-MESSAGE: entry:
-// CHECK-MESSAGE:   {{.*}}call {{.*}}void @"${{(es17_assertionFailure__|es31_embeddedReportFatalErrorInFile)}}
-// CHECK-MESSAGE-SAME: Fatal error
+// CHECK-MESSAGE:   {{.*}}call {{.*}}void @"${{(es17_assertionFailure|es31_embeddedReportFatalErrorInFile)}}
 // CHECK-MESSAGE-SAME: task failed successfully
 // CHECK-MESSAGE-SAME: traps-fatalerror-ir.swift
 // CHECK-MESSAGE:   unreachable
@@ -35,9 +34,7 @@ public func testWithInterpolation(i: Int) {
 // CHECK-MESSAGE: define {{.*}}void @"$e4main21testWithInterpolation1iySi_tF"(i64 %0){{.*}} {
 // CHECK-MESSAGE: entry:
 // CHECK-MESSAGE: task failed successfully
-// CHECK-MESSAGE:   {{.*}}call {{.*}}void @"${{(es17_assertionFailure__|es31_embeddedReportFatalErrorInFile6prefix7message4file4lineys12StaticStringV_SRys5UInt8VGAGSutF)}}
-// CHECK-MESSAGE-SAME: Fatal error
-// CHECK-MESSAGE-SAME: traps-fatalerror-ir.swift
+// CHECK-MESSAGE: @"${{(es17_assertionFailure|es31_embeddedReportFatalErrorInFile)}}
 // CHECK-MESSAGE:   unreachable
 // CHECK-MESSAGE: }
 

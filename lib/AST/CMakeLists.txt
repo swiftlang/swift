@@ -83,6 +83,7 @@ add_swift_host_library(swiftAST STATIC
   NameLookup.cpp
   NameLookupRequests.cpp
   OperatorNameLookup.cpp
+  Ownership.cpp
   PackConformance.cpp
   PackExpansionMatcher.cpp
   ParameterPack.cpp
@@ -130,6 +131,7 @@ add_swift_host_library(swiftAST STATIC
   StorageImpl.cpp
   SubstitutionMap.cpp
   SwiftNameTranslation.cpp
+  SynthesizedDeclBuilder.cpp
   Type.cpp
   TypeCheckRequests.cpp
   TypeDeclFinder.cpp

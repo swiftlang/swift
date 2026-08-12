@@ -12,6 +12,7 @@ struct TwoFields {
   @_hasStorage var y: Int64 { get set }
 }
 
+class Klass {}
 
 // CHECK-LABEL: sil @test_dce_struct_extract
 // CHECK: bb0(%0 : $TwoFields):
@@ -70,4 +71,26 @@ bb0(%0 : $TwoFields):
   debug_value %2 : $Builtin.Int64, let, name "field"
   %3 = integer_literal $Builtin.Int64, 42
   return %3 : $Builtin.Int64
+}
+
+// A begin_borrow instruction can only get salvaged through DCE.
+// When the borrow only has debug uses, repoint it to the root, as they are
+// equivalent.
+// This pattern where a borrow has a debug use after the end_borrow is common
+// due to salvaging. This is valid as long as it is before the destroy of the
+// root (see the kill-invalid-debug-values pass).
+
+// CHECK-LABEL: sil [ossa] @test_dce_borrow
+// CHECK: bb0(%0 : @owned $Klass):
+// CHECK:   debug_value %0, let, name "borrowed"
+// CHECK-NOT: transform
+// CHECK:   destroy_value %0
+sil [ossa] @test_dce_borrow : $@convention(thin) (@owned Klass) -> Builtin.Int64 {
+bb0(%0 : @owned $Klass):
+  %1 = begin_borrow %0 : $Klass
+  end_borrow %1 : $Klass
+  debug_value %1 : $Klass, let, name "borrowed"
+  destroy_value %0 : $Klass
+  %5 = integer_literal $Builtin.Int64, 42
+  return %5 : $Builtin.Int64
 }

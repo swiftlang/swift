@@ -328,7 +328,7 @@ bb0(%0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>):
 
 // CHECK-LABEL: sil [ossa] @projections
 // CHECK-NEXT:  [%0: read e1.0.s0.c0.s0.v**]
-// CHECK-NEXT:  [global: ]
+// CHECK-NEXT:  [global: deinit_barrier]
 // CHECK-NEXT:  {{^[^[]}}
 sil [ossa] @projections : $@convention(thin) (@guaranteed EP) -> Builtin.Int32 {
 bb0(%0 : @guaranteed $EP):
@@ -979,7 +979,7 @@ bb0(%0 : $*Int32):
 
 // CHECK-LABEL: sil [ossa] @$writeToHead
 // CHECK-NEXT:  [%0: write s0.c0.v**]
-// CHECK-NEXT:  [global: ]
+// CHECK-NEXT:  [global: deinit_barrier]
 // CHECK-NEXT:  {{^[^[]}}
 sil [ossa] @$writeToHead : $@convention(thin) (@guaranteed S) -> () {
 bb0(%0 : @guaranteed $S):
@@ -1000,7 +1000,7 @@ bb0(%0 : @guaranteed $S):
 // CHECK-LABEL: sil [ossa] @storeToArgs
 // CHECK-NEXT:  [%0: noescape **, write c0.v**]
 // CHECK-NEXT:  [%1: noescape **, write c0.v**]
-// CHECK-NEXT:  [global: ]
+// CHECK-NEXT:  [global: deinit_barrier]
 // CHECK-NEXT:  {{^[^[]}}
 sil [ossa] @storeToArgs : $@convention(thin) (@guaranteed List, @guaranteed List) -> () {
 [%0: noescape **]
@@ -1090,7 +1090,7 @@ bb3(%6 : $Builtin.RawPointer) :
 
 // CHECK-LABEL: sil [ossa] @calleeWriteToHead
 // CHECK-NEXT:  [%0: write s0.c0.v**]
-// CHECK-NEXT:  [global: ]
+// CHECK-NEXT:  [global: deinit_barrier]
 // CHECK-NEXT:  {{^[^[]}}
 sil [ossa] @calleeWriteToHead : $@convention(thin) (@guaranteed S) -> () {
 bb0(%0 : @guaranteed $S):
@@ -1126,7 +1126,7 @@ bb0(%0 : @guaranteed $List):
 
 // CHECK-LABEL: sil [ossa] @readIdentifiedBoxArg
 // CHECK-NEXT:  [%0: read c0.v**]
-// CHECK-NEXT:  [global: ]
+// CHECK-NEXT:  [global: deinit_barrier]
 // CHECK-NEXT:  {{^[^[]}}
 sil [ossa] @readIdentifiedBoxArg : $@convention(thin) (@guaranteed { var Int32 }) -> Int32 {
 bb0(%0 : @guaranteed ${ var Int32 }):
@@ -1416,4 +1416,57 @@ bb0(%0 : $*X, %1 : $X):
 
   %r = tuple ()
   return %r : $()
+}
+
+struct WrapperSE {
+  @_hasStorage var x: X
+}
+
+// CHECK-LABEL: sil [ossa] @borrow_accessor_se
+// CHECK-NEXT:  [%0: read s0.v**]
+// CHECK-NEXT:  [global: ]
+// CHECK-NEXT:  {{^[^[]}}
+sil [ossa] @borrow_accessor_se : $@convention(method) (@in_guaranteed WrapperSE) -> @guaranteed X {
+bb0(%0 : $*WrapperSE):
+  %1 = struct_element_addr %0, #WrapperSE.x
+  %2 = load_borrow %1
+  return_borrow %2 from_scopes (%2)
+}
+
+// CHECK-LABEL: sil [ossa] @mutate_accessor_se
+// CHECK-NEXT:  [%0: read s0.v**]
+// CHECK-NEXT:  [global: ]
+// CHECK-NEXT:  {{^[^[]}}
+sil [ossa] @mutate_accessor_se : $@convention(thin) (@inout WrapperSE) -> @inout X {
+bb0(%0 : $*WrapperSE):
+  %1 = struct_element_addr %0, #WrapperSE.x
+  return %1
+}
+
+// CHECK-LABEL: sil [ossa] @call_borrow_accessor_se
+// CHECK-NEXT:  [%0: read s0.v**]
+// CHECK-NEXT:  [global: read,write,copy,destroy,allocate,deinit_barrier]
+// CHECK-NEXT:  {{^[^[]}}
+sil [ossa] @call_borrow_accessor_se : $@convention(thin) (@in_guaranteed WrapperSE) -> () {
+bb0(%0 : $*WrapperSE):
+  %func = function_ref @borrow_accessor_se : $@convention(method) (@in_guaranteed WrapperSE) -> @guaranteed X
+  %k = apply %func(%0) : $@convention(method) (@in_guaranteed WrapperSE) -> @guaranteed X
+  %use = function_ref @unknown_func : $@convention(thin) () -> ()
+  apply %use() : $@convention(thin) () -> ()
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @call_mutate_accessor_se
+// CHECK-NEXT:  [%0: read v**, write v**.v**, destroy v**.v**]
+// CHECK-NEXT:  [%1: write c*.v**, copy c*.v**]
+// CHECK-NEXT:  [global: write,copy]
+// CHECK-NEXT:  {{^[^[]}}
+sil [ossa] @call_mutate_accessor_se : $@convention(thin) (@inout WrapperSE, @owned X) -> () {
+bb0(%0 : $*WrapperSE, %1 : @owned $X):
+  %func = function_ref @mutate_accessor_se : $@convention(thin) (@inout WrapperSE) -> @inout X
+  %addr = apply %func(%0) : $@convention(thin) (@inout WrapperSE) -> @inout X
+  store %1 to [assign] %addr
+  %r = tuple ()
+  return %r
 }

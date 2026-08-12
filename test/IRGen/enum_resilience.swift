@@ -372,5 +372,9 @@ private enum ProtGenEnumWithSize<T: Prot> {
     case c2(s2: Size)
 }
 
-// CHECK-LABEL: define linkonce_odr hidden ptr @"$s15enum_resilience19ProtGenEnumWithSize33_59077B69D65A4A3BEE0C93708067D5F0LLOyxGAA0C0RzlWOh"(ptr
+// The outlined destroy of a file-private generic enum uses per-file private
+// linkage (not shared linkonce_odr): the enum's metadata is only accessible
+// from its defining file, so the collected signature would otherwise differ
+// across files under the same mangled name (rdar://176512369).
+// CHECK-LABEL: define private ptr @"$s15enum_resilience19ProtGenEnumWithSize33_59077B69D65A4A3BEE0C93708067D5F0LLOyxGAA0C0RzlWOh"(ptr
 // CHECK:   ret ptr %0

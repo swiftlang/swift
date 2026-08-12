@@ -113,7 +113,7 @@ func passingToId<T: CP, U>(receiver: NSIdLover,
 
   // CHECK:   [[ERROR_COPY:%.*]] = copy_value [[ERROR]] : $any Error
   // CHECK:   [[BORROWED_ERROR_COPY:%.*]] = begin_borrow [[ERROR_COPY]]
-  // CHECK:   [[ERROR_BOX:%[0-9]+]] = open_existential_box [[BORROWED_ERROR_COPY]] : $any Error to $*@opened([[ERROR_ARCHETYPE:"[^"]*"]], any Error) Self
+  // CHECK:   [[ERROR_BOX:%[0-9]+]] = open_existential_box [[BORROWED_ERROR_COPY]] : $any Error to $*@opened([[ERROR_ARCHETYPE:.*]], any Error) Self
   // CHECK:   [[ERROR_STACK:%[0-9]+]] = alloc_stack $@opened([[ERROR_ARCHETYPE]], any Error) Self
   // CHECK:   copy_addr [[ERROR_BOX]] to [init] [[ERROR_STACK]] : $*@opened([[ERROR_ARCHETYPE]], any Error) Self
   // CHECK:   [[BRIDGE_FUNCTION:%[0-9]+]] = function_ref @$ss27_bridgeAnythingToObjectiveCyyXlxlF
@@ -325,7 +325,7 @@ func passingToNullableId<T: CP, U>(receiver: NSIdLover,
 
   // CHECK-NEXT: [[ERROR_COPY:%.*]] = copy_value [[ERROR]] : $any Error
   // CHECK-NEXT: [[BORROWED_ERROR_COPY:%.*]] = begin_borrow [[ERROR_COPY]]
-  // CHECK-NEXT: [[ERROR_BOX:%[0-9]+]] = open_existential_box [[BORROWED_ERROR_COPY]] : $any Error to $*@opened([[ERROR_ARCHETYPE:"[^"]*"]], any Error) Self
+  // CHECK-NEXT: [[ERROR_BOX:%[0-9]+]] = open_existential_box [[BORROWED_ERROR_COPY]] : $any Error to $*@opened([[ERROR_ARCHETYPE:.*]], any Error) Self
   // CHECK-NEXT: [[ERROR_STACK:%[0-9]+]] = alloc_stack $@opened([[ERROR_ARCHETYPE]], any Error) Self
   // CHECK-NEXT: copy_addr [[ERROR_BOX]] to [init] [[ERROR_STACK]] : $*@opened([[ERROR_ARCHETYPE]], any Error) Self
   // CHECK-NEXT: end_borrow [[BORROWED_ERROR_COPY]]

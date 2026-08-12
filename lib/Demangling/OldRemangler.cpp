@@ -1824,6 +1824,12 @@ ManglingError Remangler::mangleImplErasedIsolation(Node *node, unsigned depth) {
   return ManglingError::Success;
 }
 
+ManglingError Remangler::mangleImplCalledOnceFunction(Node *node,
+                                                      unsigned depth) {
+  // The old mangler does not encode @called(once).
+  return ManglingError::Success;
+}
+
 ManglingError Remangler::mangleImplSendingResult(Node *node, unsigned depth) {
   // The old mangler does not encode sending result
   return ManglingError::Success;
@@ -3102,6 +3108,8 @@ Demangle::mangleNodeOld(NodePointer node) {
   ManglingError err = remangler.mangle(node, 0);
   if (!err.isSuccess())
     return err;
+  if (Factory.isTooComplex())
+    return ManglingError(ManglingError::TooComplex, node, 0);
 
   return remangler.str();
 }
@@ -3114,6 +3122,8 @@ Demangle::mangleNodeOld(NodePointer node, NodeFactory &Factory) {
   ManglingError err = remangler.mangle(node, 0);
   if (!err.isSuccess())
     return err;
+  if (Factory.isTooComplex())
+    return ManglingError(ManglingError::TooComplex, node, 0);
 
   return remangler.getBufferStr();
 }
@@ -3129,6 +3139,8 @@ Demangle::mangleNodeAsObjcCString(NodePointer node,
   if (!err.isSuccess())
     return err;
   remangler.append(StringRef("_", 2)); // Include the trailing 0 char.
+  if (Factory.isTooComplex())
+    return ManglingError(ManglingError::TooComplex, node, 0);
 
   return remangler.getBufferStr().data();
 }
@@ -3183,5 +3195,10 @@ ManglingError Remangler::mangleBorrowAccessor(Node *node, EntityContext &ctx,
 
 ManglingError Remangler::mangleMutateAccessor(Node *node, EntityContext &ctx,
                                               unsigned depth) {
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
+}
+
+ManglingError Remangler::mangleCalledOnceFunctionType(Node *node,
+                                                      unsigned depth) {
   return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }

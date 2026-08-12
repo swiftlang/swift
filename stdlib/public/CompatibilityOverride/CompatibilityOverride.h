@@ -81,10 +81,23 @@
 #ifndef COMPATIBILITY_OVERRIDE_H
 #define COMPATIBILITY_OVERRIDE_H
 
+// Neither Private.h nor Runtime/Metadata.h is used directly by this file;
+// they're included here only so that clients which don't include them
+// themselves (e.g. the hosted-only CompatibilityOverrideRuntime unittest)
+// still see their declarations (Demangler, TypeLookupErrorOr, std::string
+// nameForMetadata, etc.) transitively. Those declarations pull in
+// hosted-only STL headers (<string>, <functional>), so keep this
+// hosted-only. The embedded Concurrency runtime never needs anything from
+// either header: SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT is always off for
+// Embedded Swift (see AddSwiftStdlib.cmake), so the back-deployment
+// machinery in this file compiles down to a direct pass-through that
+// doesn't reference Metadata/WitnessTable/etc. by name.
+#if __STDC_HOSTED__
 #include "../runtime/Private.h"
+#include "swift/Runtime/Metadata.h"
+#endif
 #include "swift/Runtime/CMakeConfig.h"
 #include "swift/Runtime/Concurrency.h"
-#include "swift/Runtime/Metadata.h"
 #include <atomic>
 #include <type_traits>
 

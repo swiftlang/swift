@@ -19,7 +19,7 @@
 
 #include "swift/ABI/Actor.h"
 #include "swift/ABI/HeapObject.h"
-#include "swift/Runtime/Casting.h"
+#include "swift/ABI/TargetLayout.h"
 #include <inttypes.h>
 
 namespace swift {

@@ -2628,7 +2628,7 @@ Identifier ModuleDecl::getNameForModuleSelector() {
   return this->getName();
 }
 
-bool ModuleDecl::isClangHeaderImportModule() const {
+bool ModuleDecl::isClangBridgingHeaderImportModule() const {
   auto importer = getASTContext().getClangModuleLoader();
   if (!importer)
     return false;
@@ -3001,7 +3001,7 @@ RestrictedImportKind SourceFile::getRestrictedImportKind(const ModuleDecl *modul
 
   // Workaround for the cases where the bridging header isn't properly
   // imported implicitly.
-  if (module->getName().str() == CLANG_HEADER_MODULE_NAME)
+  if (module->isClangBridgingHeaderImportModule())
     return RestrictedImportKind::None;
 
   // Look at the imports of this source file.
@@ -3083,7 +3083,7 @@ SourceFile::getImportAccessLevel(const ModuleDecl *targetModule) const {
   if ((!restrictiveImport.has_value() ||
        restrictiveImport->accessLevel < AccessLevel::Public) &&
       !(restrictiveImport &&
-        restrictiveImport->module.importedModule->isClangHeaderImportModule()) &&
+        restrictiveImport->module.importedModule->isClangBridgingHeaderImportModule()) &&
       imports.isImportedBy(targetModule, getParentModule()))
     return std::nullopt;
 
@@ -4289,7 +4289,7 @@ evaluator::SideEffect CustomDerivativesRequest::evaluate(Evaluator &evaluator,
          afd->getAttrs().getAttributes<DerivativeAttr>()) {
       // Resolve derivative function configurations from `@derivative`
       // attributes by type-checking them.
-      (void)derAttr->getOriginalFunction(sf->getASTContext());
+      (void)derAttr->getOriginalFunctions(sf->getASTContext());
     }
   }
   return {};

@@ -316,7 +316,7 @@ void SROAMemoryUseAnalyzer::chopUpAlloca(std::vector<AllocStackInst *> &Worklist
     // variable from the different allocations, but a debug_value can only have
     // one operand.
     if (DVI->getDebugReconstructionBlock()) {
-      DVI->killOperand();
+      DVI->killOperand(Operand->getOperandNumber());
       continue;
     }
     for (size_t i : indices(NewAllocations)) {

@@ -20,6 +20,7 @@
 #include "swift/AST/SearchPathOptions.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/LLVMInitialize.h"
+#include "swift/Basic/Feature.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/Version.h"
 #include "swift/Driver/PluginPaths.h"
@@ -397,6 +398,8 @@ int swift_synthesize_interface_main(ArrayRef<const char *> Args,
     if (printOpts.AccessFilter < AccessLevel::Public)
       printOpts.PrintAccess = true;
   }
+
+  printOpts.AlwaysIncludeAttrList.push_back(DeclAttrKind::Unsafe);
 
   swift::OptionSet<swift::ide::ModuleTraversal> traversalOpts = std::nullopt;
   if (ParsedArgs.hasArg(OPT_include_submodules)) {

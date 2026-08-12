@@ -2731,6 +2731,11 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
   // diagnostic this can be used for better error presentation.
   SourceRange AttrRange;
 
+  auto attrRangeWithAt = [&]() -> SourceRange {
+    SourceLoc end = AttrRange.End.isValid() ? AttrRange.End : Loc;
+    return SourceRange(AtLoc.isValid() ? AtLoc : Loc, end);
+  };
+
   ParserStatus Status;
 
   switch (DK) {
@@ -2910,6 +2915,20 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     break;
   }
 
+  case DeclAttrKind::Unsafe: {
+    // Handle '@unsafe' and '@unsafe(always)'.
+    auto always = parseSingleAttrOption<bool>(
+        *this, Loc, AttrRange, AttrName, DK, {{Context.Id_always, true}},
+        /*valueIfOmitted=*/false);
+    if (!always.has_value())
+      return makeParserSuccess();
+
+    if (!DiscardAttribute)
+      Attributes.add(new (Context) UnsafeAttr(AtLoc, AttrRange, *always));
+
+    break;
+  }
+
   case DeclAttrKind::ReferenceOwnership: {
     // Handle weak/unowned/unowned(unsafe).
     auto Kind = AttrName == "weak" ? ReferenceOwnership::Weak
@@ -2979,10 +2998,10 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       // this declaration with a different access level.
       if (access != cast<AccessControlAttr>(DuplicateAttribute)->getAccess()) {
         diagnose(Loc, diag::multiple_access_level_modifiers)
-            .highlight(AttrRange);
+            .highlight(attrRangeWithAt());
         diagnose(DuplicateAttribute->getLocation(),
                  diag::previous_access_level_modifier)
-            .highlight(DuplicateAttribute->getRange());
+            .highlight(DuplicateAttribute->getRangeWithAt());
 
         // Remove the reference to the duplicate attribute
         // to avoid the extra diagnostic.
@@ -3055,10 +3074,10 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     // this declaration with a different access level.
     if (access != cast<SetterAccessAttr>(DuplicateAttribute)->getAccess()) {
       diagnose(Loc, diag::multiple_access_level_modifiers)
-        .highlight(AttrRange);
+          .highlight(attrRangeWithAt());
       diagnose(DuplicateAttribute->getLocation(),
                diag::previous_access_level_modifier)
-          .highlight(DuplicateAttribute->getRange());
+          .highlight(DuplicateAttribute->getRangeWithAt());
 
       // Remove the reference to the duplicate attribute
       // to avoid the extra diagnostic.
@@ -3263,20 +3282,25 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       return makeParserSuccess();
     }
 
-    if (Tok.isNot(tok::string_literal)) {
+    std::optional<StringRef> Name;
+    if (consumeIf(tok::kw_default)) {
+      // Leave the name empty to signal '@section(default)'.
+      AttrRange = SourceRange(Loc, Tok.getRange().getStart());
+    } else if (Tok.isNot(tok::string_literal)) {
       diagnose(Loc, diag::attr_expected_string_literal, AttrName);
       return makeParserSuccess();
+    } else {
+      // Parse the name as a string literal.
+      Name = getStringLiteralIfNotInterpolated(
+          Loc, ("'" + AttrName + "'").str());
+
+      consumeToken(tok::string_literal);
+
+      if (Name.has_value())
+        AttrRange = SourceRange(Loc, Tok.getRange().getStart());
+      else
+        DiscardAttribute = true;
     }
-
-    auto Name = getStringLiteralIfNotInterpolated(
-        Loc, ("'" + AttrName + "'").str());
-
-    consumeToken(tok::string_literal);
-
-    if (Name.has_value())
-      AttrRange = SourceRange(Loc, Tok.getRange().getStart());
-    else
-      DiscardAttribute = true;
 
     if (!consumeIf(tok::r_paren)) {
       diagnose(Loc, diag::attr_expected_rparen, AttrName,
@@ -3284,19 +3308,19 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       return makeParserSuccess();
     }
 
-    // @section in a local scope is not allowed.
-    if (CurDeclContext->isLocalContext()) {
-      diagnose(Loc, diag::attr_name_only_at_non_local_scope, AttrName);
-    }
-
+    // @section in a local scope is only allowed on functions and closures,
+    // which is checked in Sema.
     if (!DiscardAttribute)
-      Attributes.add(new (Context) SectionAttr(Name.value(), AtLoc,
+      Attributes.add(new (Context) SectionAttr(Name, AtLoc,
                                                AttrRange, /*Implicit=*/false));
 
     break;
   }
 
   case DeclAttrKind::Diagnose: {
+    // Record that this file carries a syntactic warning control.
+    SF.setHasWarningControlAttr();
+
     if (!consumeIfAttributeLParen()) {
       diagnose(Loc, diag::attr_expected_lparen, AttrName,
                DeclAttribute::isDeclModifier(DK));
@@ -4345,15 +4369,28 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
 
     break;
   }
+
+  case DeclAttrKind::Called: {
+    auto semantics = parseSingleAttrOption<ExecutionSemantics>(
+        *this, Loc, AttrRange, AttrName, DK,
+        {{Context.Id_once, ExecutionSemantics::Once}});
+    if (!semantics)
+      return makeParserSuccess();
+
+    if (!DiscardAttribute)
+      Attributes.add(new (Context) CalledAttr(AtLoc, AttrRange, *semantics));
+
+    break;
+  }
   }
 
   if (DuplicateAttribute) {
     diagnose(Loc, diag::duplicate_attribute, DeclAttribute::isDeclModifier(DK))
-      .highlight(AttrRange);
+        .highlight(attrRangeWithAt());
     diagnose(DuplicateAttribute->getLocation(),
              diag::previous_attribute,
              DeclAttribute::isDeclModifier(DK))
-      .highlight(DuplicateAttribute->getRange());
+        .highlight(DuplicateAttribute->getRangeWithAt());
   }
 
   // If this is a decl modifier spelled with an @, emit an error and remove it
@@ -4916,26 +4953,6 @@ bool Parser::parseConventionAttributeInternal(SourceLoc atLoc, SourceLoc attrLoc
   return false;
 }
 
-bool Parser::parseUUIDString(UUID &uuid, Diag<> diagnostic, bool justChecking) {
-  if (!Tok.is(tok::string_literal)) {
-    if (!justChecking)
-      diagnose(Tok, diagnostic);
-    return true;
-  }
-
-  bool failed = true;
-  auto literalText = Tok.getText().slice(1, Tok.getText().size() - 1);
-  llvm::SmallString<UUID::StringBufferSize> text(literalText);
-  if (auto id = UUID::fromString(text.c_str())) {
-    uuid = *id;
-    failed = false;
-  } else if (!justChecking) {
-    diagnose(Tok, diagnostic);
-  }
-  consumeToken(tok::string_literal);
-  return failed;
-}
-
 /// \verbatim
 ///   attribute-type:
 ///     'noreturn'
@@ -5126,7 +5143,7 @@ ParserStatus Parser::parseTypeAttribute(TypeOrCustomAttr &result,
   }
 
   case TypeAttrKind::Opened: {
-    // Parse the opened existential ID string in parens
+    // Parse the opened existential ID in parens
     SourceLoc beginLoc = Tok.getLoc(), idLoc, endLoc;
     if (!consumeIfAttributeLParen()) {
       if (!justChecking)
@@ -5135,9 +5152,9 @@ ParserStatus Parser::parseTypeAttribute(TypeOrCustomAttr &result,
     }
 
     idLoc = Tok.getLoc();
-    UUID id;
+    unsigned id;
     bool invalid = false;
-    if (parseUUIDString(id, diag::opened_attribute_id_value, justChecking))
+    if (parseUnsignedInteger(id, idLoc, diag::opened_attribute_id_value, justChecking))
       invalid = true;
 
     TypeRepr *constraintType = nullptr;
@@ -5188,9 +5205,9 @@ ParserStatus Parser::parseTypeAttribute(TypeOrCustomAttr &result,
     }
 
     idLoc = Tok.getLoc();
-    UUID id;
+    unsigned id;
     bool invalid = false;
-    if (parseUUIDString(id, diag::opened_attribute_id_value, justChecking))
+    if (parseUnsignedInteger(id, idLoc, diag::opened_attribute_id_value, justChecking))
       invalid = true;
 
     // TODO: allow more information so that these can be parsed
@@ -5320,6 +5337,46 @@ ParserStatus Parser::parseTypeAttribute(TypeOrCustomAttr &result,
                                                         {beginLoc, endLoc},
                                                         {mangling, manglingLoc},
                                                         {index, indexLoc});
+    }
+    return makeParserSuccess();
+  }
+
+  case TypeAttrKind::Called: {
+    SourceLoc lpLoc = Tok.getLoc(), semanticsLoc, rpLoc;
+    if (!consumeIfAttributeLParen()) {
+      if (!justChecking) {
+        diagnose(Tok, diag::attr_expected_lparen);
+      }
+      return makeParserError();
+    }
+
+    bool invalid = false;
+    std::optional<CalledTypeAttr::Semantics> semantics;
+    if (isIdentifier(Tok, "once")) {
+      semanticsLoc = consumeToken(tok::identifier);
+      semantics = CalledTypeAttr::Semantics::Once;
+    } else {
+      if (!justChecking) {
+        diagnose(Tok, diag::attr_called_expected_semantics)
+            .fixItReplace(Tok.getLoc(), "once");
+      }
+      invalid = true;
+      consumeIf(tok::identifier);
+    }
+
+    if (justChecking && !Tok.is(tok::r_paren))
+      return makeParserError();
+    if (parseMatchingToken(tok::r_paren, rpLoc,
+                           diag::attr_called_expected_rparen, lpLoc))
+      return makeParserError();
+
+    if (invalid)
+      return makeParserError();
+    assert(semantics);
+
+    if (!justChecking) {
+      result = new (Context) CalledTypeAttr(AtLoc, attrLoc, {lpLoc, rpLoc},
+                                            {*semantics, semanticsLoc});
     }
     return makeParserSuccess();
   }

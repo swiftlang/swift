@@ -198,6 +198,7 @@ set(SWIFT_BENCH_MODULES
     single-source/StringDistance
     single-source/StringEdits
     single-source/StringEnum
+    single-source/StringInsert
     single-source/StringInterpolation
     single-source/StringMatch
     single-source/StringRemoveDupes

@@ -223,8 +223,8 @@ llvm::Value *irgen::maskMetadataPackPointer(IRGenFunction &IGF,
   // If the pack is on the heap, the LSB is set, so mask it off.
   patternPack =
       IGF.Builder.CreatePtrToInt(patternPack, IGF.IGM.SizeTy);
-  patternPack =
-      IGF.Builder.CreateAnd(patternPack, llvm::ConstantInt::get(IGF.IGM.SizeTy, -2));
+  patternPack = IGF.Builder.CreateAnd(
+      patternPack, llvm::ConstantInt::getSigned(IGF.IGM.SizeTy, -2));
   patternPack =
       IGF.Builder.CreateIntToPtr(patternPack, IGF.IGM.TypeMetadataPtrPtrTy);
   return patternPack;
@@ -271,8 +271,8 @@ static llvm::Value *loadWitnessTableAtIndex(IRGenFunction &IGF,
   // If the pack is on the heap, the LSB is set, so mask it off.
   wtablePack =
       IGF.Builder.CreatePtrToInt(wtablePack, IGF.IGM.SizeTy);
-  wtablePack =
-      IGF.Builder.CreateAnd(wtablePack, llvm::ConstantInt::get(IGF.IGM.SizeTy, -2));
+  wtablePack = IGF.Builder.CreateAnd(
+      wtablePack, llvm::ConstantInt::getSigned(IGF.IGM.SizeTy, -2));
   wtablePack =
       IGF.Builder.CreateIntToPtr(wtablePack, IGF.IGM.WitnessTablePtrPtrTy);
 
@@ -767,8 +767,15 @@ llvm::Value *irgen::emitTypeMetadataPackElementRef(
     DynamicMetadataRequest request,
     llvm::SmallVectorImpl<llvm::Value *> &wtables) {
   // If the packs have already been materialized, just gep into them.
+  //
+  // Request the pack at Abstract state: a metadata pack pointer is not a scalar
+  // Metadata* and must never be passed to swift_checkMetadataState (which is
+  // what forwarding a higher request would emit via the local-type-data cache).
+  // We only need the pack pointer to index into; the extracted element's state
+  // is checked by the caller.
   auto materializedMetadataPack =
-      tryGetLocalPackTypeMetadata(IGF, packType, request);
+      tryGetLocalPackTypeMetadata(IGF, packType,
+                                  DynamicMetadataRequest(MetadataState::Abstract));
   llvm::SmallVector<llvm::Value *> materializedWtablePacks;
   for (auto conformance : conformances) {
     auto *wtablePack = tryGetLocalPackTypeData(

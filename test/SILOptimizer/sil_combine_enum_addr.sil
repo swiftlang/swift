@@ -337,7 +337,7 @@ bb3:
 sil @no_init_c_union : $@convention(thin) () -> (@out EmptyCUnion)
 
 // CHECK-LABEL: sil @test_empty_c_union : $@convention(thin) () -> () {
-// CHECK-NOT: inject_enum_addr
+// CHECK: inject_enum_addr
 // CHECK-LABEL: } // end sil function 'test_empty_c_union'
 sil @test_empty_c_union : $@convention(thin) () -> () {
 bb0:
@@ -355,6 +355,7 @@ bb2:
   br bb3
 
 bb3:
+  %7 = apply undef(%0) :  $@convention(thin) (@in_guaranteed Optional<EmptyCUnion>) -> ()
   dealloc_stack %0 : $*Optional<EmptyCUnion>
   %8 = tuple ()
   return %8 : $()
@@ -367,7 +368,7 @@ struct NestedUnreferenceableStorage {
 sil @no_init_nested_c_union : $@convention(thin) () -> (@out NestedUnreferenceableStorage)
 
 // CHECK-LABEL: sil @test_empty_nested_c_union : $@convention(thin) () -> () {
-// CHECK-NOT: inject_enum_addr
+// CHECK: inject_enum_addr
 // CHECK-LABEL: } // end sil function 'test_empty_nested_c_union'
 sil @test_empty_nested_c_union : $@convention(thin) () -> () {
 bb0:
@@ -385,6 +386,7 @@ bb2:
   br bb3
 
 bb3:
+  %7 = apply undef(%0) :  $@convention(thin) (@in_guaranteed Optional<NestedUnreferenceableStorage>) -> ()
   dealloc_stack %0 : $*Optional<NestedUnreferenceableStorage>
   %8 = tuple ()
   return %8 : $()

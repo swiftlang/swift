@@ -568,9 +568,9 @@ right:
 // CHECK-NEXT:  end running test {{.*}} on type_dependent_operand: liveness_partial_boundary_outside_users
 sil [ossa] @type_dependent_operand : $@convention(thin) (@owned any P) -> @owned AnyObject {
 bb0(%existential : @owned $any P):
-  %opened = open_existential_ref %existential : $any P to $@opened("00000000-0000-0000-0000-000000000000", any P) Self
+  %opened = open_existential_ref %existential : $any P to $@opened(1, any P) Self
   specify_test "liveness_partial_boundary_outside_users %opened"
-  %ref_existential = init_existential_ref %opened : $@opened("00000000-0000-0000-0000-000000000000", any P) Self : $@opened("00000000-0000-0000-0000-000000000000", any P) Self, $AnyObject
+  %ref_existential = init_existential_ref %opened : $@opened(1, any P) Self : $@opened(1, any P) Self, $AnyObject
   return %ref_existential : $AnyObject
 }
 

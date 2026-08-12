@@ -119,6 +119,16 @@ classifyDynamicCastToProtocol(SILFunction *function, CanType source, CanType tar
     if (!matchesActorIsolation(conformance, function))
       return DynamicCastFeasibility::MaySucceed;
 
+    // The compile-time conformance may be provided by a @reparented
+    // extension whose availability isn't the same as the availability of
+    // the resilient-parent protocol itself. In that case, if the deployment
+    // target is older than the extension, the cast may not succeed.
+    //
+    // For now, conservatively say that all casts to resilient-parent protocols
+    // are not statically optimizable.
+    if (TargetProtocol->getAttrs().hasAttribute<ReparentableAttr>())
+      return DynamicCastFeasibility::MaySucceed;
+
     return DynamicCastFeasibility::WillSucceed;
   }
 
@@ -1338,15 +1348,19 @@ bool swift::emitSuccessfulIndirectUnconditionalCast(
 /// Can the given cast be performed by the scalar checked-cast
 /// instructions at the current SIL stage?
 ///
-/// Always returns true for !useLoweredAddresses. Scalar casts are always
-/// valid for owned values. If the operand is +1, the case will always destroy
-/// or forward it. The result is always either +1 or trivial. The cast never
-/// hides a copy. doesCastPreserveOwnershipForTypes determines whether the
-/// scalar cast is also compatible with guaranteed values.
+/// Always returns true while the function still carries opaque values. Scalar
+/// casts are always valid for owned values. If the operand is +1, the case will
+/// always destroy or forward it. The result is always either +1 or trivial. The
+/// cast never hides a copy. doesCastPreserveOwnershipForTypes determines
+/// whether the scalar cast is also compatible with guaranteed values.
 bool swift::canSILUseScalarCheckedCastInstructions(SILModule &M,
+                                                   bool loweredAddresses,
                                                    CanType sourceFormalType,
                                                    CanType targetFormalType) {
-  if (!M.useLoweredAddresses())
+  // While a function still carries opaque values, a scalar checked cast is
+  // always valid. Once the function is in lowered-address form, only the casts
+  // IRGen can perform on scalars are available.
+  if (!loweredAddresses)
     return true;
 
   return canIRGenUseScalarCheckedCastInstructions(M, sourceFormalType,
@@ -1356,8 +1370,9 @@ bool swift::canSILUseScalarCheckedCastInstructions(SILModule &M,
 bool swift::canOptimizeToScalarCheckedCastInstructions(
     SILFunction *func, CanType sourceType, CanType targetType,
     CastConsumptionKind consumption) {
-  if (!canSILUseScalarCheckedCastInstructions(func->getModule(), sourceType,
-                                              targetType)) {
+  if (!canSILUseScalarCheckedCastInstructions(
+          func->getModule(), func->hasLoweredAddresses(), sourceType,
+          targetType)) {
     return false;
   }
 
@@ -1456,9 +1471,9 @@ void swift::emitIndirectConditionalCastWithScalar(
     SILValue destAddr, CanType targetFormalType,
     SILBasicBlock *indirectSuccBB, SILBasicBlock *indirectFailBB,
     ProfileCounter TrueCount, ProfileCounter FalseCount) {
-  assert(canSILUseScalarCheckedCastInstructions(B.getModule(),
-                                                sourceFormalType,
-                                                targetFormalType));
+  assert(canSILUseScalarCheckedCastInstructions(
+      B.getModule(), B.getFunction().hasLoweredAddresses(), sourceFormalType,
+      targetFormalType));
 
   // Create our successor and fail blocks.
   SILBasicBlock *scalarFailBB = B.splitBlockForFallthrough();
