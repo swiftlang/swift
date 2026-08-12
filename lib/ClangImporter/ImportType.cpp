@@ -52,6 +52,7 @@
 #include "clang/Sema/Lookup.h"
 #include "clang/Sema/Sema.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/Compiler.h"
 #include <optional>
 
@@ -965,27 +966,21 @@ namespace {
           break;
         }
 
-        static const llvm::StringLiteral vaListNames[] = {
-          "va_list", "__gnuc_va_list", "__va_list"
-        };
-
-        ImportHint hint = ImportHint::None;
-        if (type->getDecl()->getName() == "BOOL") {
-          hint = ImportHint::Boolean;
-        } else if (type->getDecl()->getName() == "Boolean") {
-          // FIXME: Darwin only?
-          hint = ImportHint::Boolean;
-        } else if (type->getDecl()->getName() == "NSUInteger") {
-          hint = ImportHint::NSUInteger;
-        } else if (llvm::is_contained(vaListNames,
-                                      type->getDecl()->getName())) {
-          hint = ImportHint::VAList;
-        } else if (isImportedCFPointer(type->desugar(), mappedType)) {
-          hint = ImportHint::CFPointer;
-        } else if (mappedType->isAnyExistentialType()) { // id, Class
-          hint = ImportHint::ObjCPointer;
-        } else if (type->isPointerType() || type->isBlockPointerType()) {
-          hint = ImportHint::OtherPointer;
+        ImportHint hint =
+            llvm::StringSwitch<ImportHint>(type->getDecl()->getName())
+                // FIXME: Is "Boolean" Darwin only?
+                .Cases({"BOOL", "Boolean"}, ImportHint::Boolean)
+                .Case("NSUInteger", ImportHint::NSUInteger)
+                .Cases({"va_list", "__gnuc_va_list", "__va_list"},
+                       ImportHint::VAList)
+                .Default(ImportHint::None);
+        if (hint == ImportHint::None) {
+          if (isImportedCFPointer(type->desugar(), mappedType))
+            hint = ImportHint::CFPointer;
+          else if (mappedType->isAnyExistentialType()) // id, Class
+            hint = ImportHint::ObjCPointer;
+          else if (type->isPointerType() || type->isBlockPointerType())
+            hint = ImportHint::OtherPointer;
         }
         // Any other interesting mapped types should be hinted here.
         return { mappedType, hint };

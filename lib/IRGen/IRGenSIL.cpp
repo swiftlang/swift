@@ -3638,7 +3638,7 @@ Callee LoweredValue::getCallee(IRGenFunction &IGF,
     assert(vector.size() == 2 && "thick function pointer with size != 2");
     llvm::Value *functionValue = vector[0];
     llvm::Value *contextValue = vector[1];
-    bool castToRefcountedContext = calleeInfo.OrigFnType->isNoEscape();
+    bool castToRefcountedContext = calleeInfo.OrigFnType->isTrivialNoEscape();
     return getSwiftFunctionPointerCallee(IGF, functionValue, contextValue,
                                          std::move(calleeInfo),
                                          castToRefcountedContext, true);
@@ -6133,16 +6133,18 @@ static void salvageDebugReconstructionInst(llvm::Instruction *I) {
 }
 
 void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
-  auto SILVal = i->getOperand();
-  bool IsAddrVal = SILVal->getType().isAddress();
+  auto *DebugBB = i->getDebugReconstructionBlock();
+  // If there is a debug reconstruction block, the debug_value operand isn't
+  // the value of the variable.
+  SILValue SILVal = DebugBB ? SILValue() : i->getSingleOperand();
   if (i->getDebugScope()->getInlinedFunction()->isTransparent())
     return;
 
   auto VarInfo = i->getCompleteVarInfo();
-  if (isa<SILUndef>(SILVal) && VarInfo.Name == "$error") {
+  if (SILVal && isa<SILUndef>(SILVal) && VarInfo.Name == "$error") {
     // We cannot track the location of inlined error arguments because it has no
     // representation in SIL.
-    if (!IsAddrVal && !i->getDebugScope()->InlinedCallSite) {
+    if (!SILVal->getType().isAddress() && !i->getDebugScope()->InlinedCallSite) {
       auto funcTy = CurSILFn->getLoweredFunctionType();
       emitErrorResultVar(funcTy, funcTy->getErrorResult(), i);
     }
@@ -6180,7 +6182,7 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
   // Put the value into a shadow-copy stack slot at -Onone.
   llvm::SmallVector<llvm::Value *, 8> Copy;
   llvm::SmallVector<llvm::Instruction *, 4> DebugBBInsts;
-  if (auto *DebugBB = i->getDebugReconstructionBlock()) {
+  if (DebugBB) {
     // Debug basic blocks should not exist at -Onone. They don't support
     // shadow copies or async lifetime extension.
     auto *BB = Builder.GetInsertBlock();
@@ -6195,10 +6197,15 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
     // entries added during the emission are cleaned up.
     ConditionalDominanceScope condScope(*this);
 
-    if (!DebugBB->args_empty()) {
-      // Bind the block argument to the operand.
-      SILValue operand = i->getOperand();
-      SILArgument *blockArg = DebugBB->getArgument(0);
+    // Bind each block argument to its operand.
+    // There can be less arguments than operands because constant values are
+    // currently represented with one undef operand and zero bb arguments.
+    auto Operands = i->getAllOperands();
+    assert(DebugBB->getNumArguments() <= Operands.size() &&
+           "debug block has more arguments than operands");
+    for (auto Idx : indices(DebugBB->getArguments())) {
+      SILValue operand = Operands[Idx].get();
+      SILArgument *blockArg = DebugBB->getArgument(Idx);
       if (operand->getType().isAddress()) {
         setLoweredAddress(blockArg, getLoweredAddress(operand));
       } else {
@@ -6246,7 +6253,7 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
         Storage, TI.getStorageType(),
         i->getDebugScope(), VarInfo, IsAnonymous,
         i->usesMoveableValueDebugInfo(), &VarInfo.DIExpr));
-  } else if (IsAddrVal) {
+  } else if (SILVal->getType().isAddress()) {
     auto &TI = getTypeInfo(SILVal->getType());
     auto Addr = getLoweredAddress(SILVal);
     auto *Storage = Addr.getAddress();
@@ -7460,7 +7467,11 @@ void IRGenSILFunction::visitConvertFunctionInst(swift::ConvertFunctionInst *i) {
 
 void IRGenSILFunction::visitConvertEscapeToNoEscapeInst(
     swift::ConvertEscapeToNoEscapeInst *i) {
-  // This instruction makes the context trivial.
+  // This instruction makes the context trivial, unless the result is a
+  // `@called(once)` closure, whose context remains a real refcounted object
+  // that must still be retained/released/destroyed correctly.
+  bool contextIsTrivial =
+      i->getType().castTo<SILFunctionType>()->isTrivialNoEscape();
   Explosion in = getLoweredExplosion(i->getOperand());
   Explosion out;
   // Differentiable functions contain multiple pairs of fn and ctx pointer.
@@ -7469,7 +7480,8 @@ void IRGenSILFunction::visitConvertEscapeToNoEscapeInst(
     llvm::Value *fn = in.claimNext();
     llvm::Value *ctx = in.claimNext();
     out.add(fn);
-    out.add(Builder.CreateBitCast(ctx, IGM.OpaquePtrTy));
+    out.add(contextIsTrivial ? Builder.CreateBitCast(ctx, IGM.OpaquePtrTy)
+                             : ctx);
   }
   setLoweredExplosion(i, out);
 }
@@ -7732,7 +7744,7 @@ void IRGenSILFunction::visitThinToThickFunctionInst(
   Explosion from = getLoweredExplosion(i->getOperand());
   Explosion to;
   to.add(Builder.CreateBitCast(from.claimNext(), IGM.FunctionPtrTy));
-  if (i->getType().castTo<SILFunctionType>()->isNoEscape())
+  if (i->getType().castTo<SILFunctionType>()->isTrivialNoEscape())
     to.add(llvm::ConstantPointerNull::get(IGM.OpaquePtrTy));
   else
     to.add(IGM.RefCountedNull);

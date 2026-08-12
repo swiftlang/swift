@@ -100,9 +100,11 @@
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/CAS/CASReference.h"
 #include "llvm/CAS/ObjectStore.h"
@@ -555,8 +557,7 @@ void importer::getNormalInvocationArguments(
 
   auto bridgingPCH = importerOpts.getPCHInputPath();
   if (!bridgingPCH.empty())
-    invocationArgStrs.insert(invocationArgStrs.end(),
-                             {"-include-pch", bridgingPCH});
+    llvm::append_values(invocationArgStrs, "-include-pch", bridgingPCH);
 
   // If there are no shims in the resource dir, add a search path in the SDK.
   SmallString<128> shimsPath(searchPathOpts.RuntimeResourcePath);
@@ -564,13 +565,13 @@ void importer::getNormalInvocationArguments(
   if (!llvm::sys::fs::exists(shimsPath)) {
     shimsPath = searchPathOpts.getSDKPath();
     llvm::sys::path::append(shimsPath, "usr", "lib", "swift", "shims");
-    invocationArgStrs.insert(invocationArgStrs.end(),
-                             {"-isystem", std::string(shimsPath.str())});
+    llvm::append_values(invocationArgStrs, "-isystem",
+                        std::string(shimsPath.str()));
   }
 
   // Construct the invocation arguments for the current target.
   // Add target-independent options first.
-  invocationArgStrs.insert(invocationArgStrs.end(), {
+  llvm::append_values(invocationArgStrs,
       // Don't emit LLVM IR.
       "-fsyntax-only",
 
@@ -581,11 +582,11 @@ void importer::getNormalInvocationArguments(
 
       "-fretain-comments-from-system-headers",
 
-      "-isystem", searchPathOpts.RuntimeResourcePath,
-  });
+      "-isystem", searchPathOpts.RuntimeResourcePath
+  );
 
   if (LangOpts.hasFeature(Feature::Embedded)) {
-    invocationArgStrs.insert(invocationArgStrs.end(), {"-D__swift_embedded__"});
+    llvm::append_values(invocationArgStrs, "-D__swift_embedded__");
   }
 
   // Swift generates position-independent code by default, so establish `-fPIC`
@@ -602,30 +603,25 @@ void importer::getNormalInvocationArguments(
   bool bareMetalEmbedded =
       LangOpts.hasFeature(Feature::Embedded) && triple.getOSName() == "none";
   if (!triple.isOSWindows() && !bareMetalEmbedded)
-    invocationArgStrs.insert(invocationArgStrs.end(), {"-fPIC"});
+    llvm::append_values(invocationArgStrs, "-fPIC");
 
   // Enable modules.
-  invocationArgStrs.insert(invocationArgStrs.end(), {
-      "-fmodules",
-      "-Xclang", "-fmodule-feature", "-Xclang", "swift"
-  });
+  llvm::append_values(invocationArgStrs, "-fmodules", "-Xclang",
+                      "-fmodule-feature", "-Xclang", "swift");
 
   bool EnableCXXInterop = LangOpts.EnableCXXInterop;
 
   if (LangOpts.EnableObjCInterop) {
-    invocationArgStrs.insert(invocationArgStrs.end(), {"-fobjc-arc"});
+    llvm::append_values(invocationArgStrs, "-fobjc-arc");
     // TODO: Investigate whether 7.0 is a suitable default version.
     if (!triple.isOSDarwin())
-      invocationArgStrs.insert(invocationArgStrs.end(),
-                               {"-fobjc-runtime=ios-7.0"});
+      llvm::append_values(invocationArgStrs, "-fobjc-runtime=ios-7.0");
 
-    invocationArgStrs.insert(invocationArgStrs.end(), {
-      "-x", EnableCXXInterop ? "objective-c++" : "objective-c",
-    });
+    llvm::append_values(invocationArgStrs, "-x",
+                        EnableCXXInterop ? "objective-c++" : "objective-c");
   } else {
-    invocationArgStrs.insert(invocationArgStrs.end(), {
-      "-x", EnableCXXInterop ? "c++" : "c",
-    });
+    llvm::append_values(invocationArgStrs, "-x",
+                        EnableCXXInterop ? "c++" : "c");
   }
 
   {
@@ -645,10 +641,11 @@ void importer::getNormalInvocationArguments(
             clang::LangStandard::lang_gnu11);
 #endif
 
-    invocationArgStrs.insert(invocationArgStrs.end(), {
-      (Twine("-std=") + StringRef(EnableCXXInterop ? stdcxx.getName()
-                                                   : stdc.getName())).str()
-    });
+    llvm::append_values(
+        invocationArgStrs,
+        (Twine("-std=") +
+         StringRef(EnableCXXInterop ? stdcxx.getName() : stdc.getName()))
+            .str());
   }
 
   if (LangOpts.EnableCXXInterop) {
@@ -659,7 +656,7 @@ void importer::getNormalInvocationArguments(
 
   // Set C language options.
   if (triple.isOSDarwin()) {
-    invocationArgStrs.insert(invocationArgStrs.end(), {
+    llvm::append_values(invocationArgStrs,
       // Avoid including the iso646.h header because some headers from OS X
       // frameworks are broken by it.
       "-D_ISO646_H_", "-D__ISO646_H",
@@ -696,8 +693,8 @@ void importer::getNormalInvocationArguments(
 
       // Backwards compatibility for headers that were checking this instead of
       // '__swift__'.
-      "-DSWIFT_CLASS_EXTRA=",
-    });
+      "-DSWIFT_CLASS_EXTRA="
+    );
 
     // Indicate that using '__attribute__((swift_attr))' with '@Sendable' and
     // '@_nonSendable' on Clang declarations is fully supported, including the
@@ -707,9 +704,7 @@ void importer::getNormalInvocationArguments(
 
     if (triple.isXROS()) {
       // FIXME: This is a gnarly hack until some macros get adjusted in the SDK.
-      invocationArgStrs.insert(invocationArgStrs.end(), {
-        "-DOS_OBJECT_HAVE_OBJC_SUPPORT=1",
-      });
+      llvm::append_values(invocationArgStrs, "-DOS_OBJECT_HAVE_OBJC_SUPPORT=1");
     }
 
     // Get the version of this compiler and pass it to C/Objective-C
@@ -718,14 +713,13 @@ void importer::getNormalInvocationArguments(
     if (!V.empty()) {
       // Note: Prior to Swift 5.7, the "Y" version component was omitted and the
       // "X" component resided in its digits.
-      invocationArgStrs.insert(invocationArgStrs.end(), {
+      llvm::append_values(invocationArgStrs,
         V.preprocessorDefinition("__SWIFT_COMPILER_VERSION",
                                  {1000000000000,   // X
                                      1000000000,   // Y
                                         1000000,   // Z
                                            1000,   // a
-                                              1}), // b
-      });
+                                              1})); // b
     }
   } else {
     // Ideally we should turn this on for all Glibc targets that are actually
@@ -735,15 +729,12 @@ void importer::getNormalInvocationArguments(
     if (triple.isOSFuchsia() || triple.isAndroid() || triple.isMusl()) {
       // Many of the modern libc features are hidden behind feature macros like
       // _GNU_SOURCE or _XOPEN_SOURCE.
-      invocationArgStrs.insert(invocationArgStrs.end(), {
-        "-D_GNU_SOURCE",
-      });
+      llvm::append_values(invocationArgStrs, "-D_GNU_SOURCE");
     }
 
     if (triple.isAndroid()) {
-      invocationArgStrs.insert(invocationArgStrs.end(), {
-        "-D__ANDROID_UNAVAILABLE_SYMBOLS_ARE_WEAK__",
-      });
+      llvm::append_values(invocationArgStrs,
+                          "-D__ANDROID_UNAVAILABLE_SYMBOLS_ARE_WEAK__");
     }
 
     if (triple.isOSWindows()) {
@@ -751,17 +742,17 @@ void importer::getNormalInvocationArguments(
       default: llvm_unreachable("unsupported Windows architecture");
       case llvm::Triple::arm:
       case llvm::Triple::thumb:
-        invocationArgStrs.insert(invocationArgStrs.end(), {"-D_ARM_"});
+        llvm::append_values(invocationArgStrs, "-D_ARM_");
         break;
       case llvm::Triple::aarch64:
       case llvm::Triple::aarch64_32:
-        invocationArgStrs.insert(invocationArgStrs.end(), {"-D_ARM64_"});
+        llvm::append_values(invocationArgStrs, "-D_ARM64_");
         break;
       case llvm::Triple::x86:
-        invocationArgStrs.insert(invocationArgStrs.end(), {"-D_X86_"});
+        llvm::append_values(invocationArgStrs, "-D_X86_");
         break;
       case llvm::Triple::x86_64:
-        invocationArgStrs.insert(invocationArgStrs.end(), {"-D_AMD64_"});
+        llvm::append_values(invocationArgStrs, "-D_AMD64_");
         break;
       }
     }
@@ -837,14 +828,11 @@ void importer::getNormalInvocationArguments(
   }
 
   if (importerOpts.DetailedPreprocessingRecord) {
-    invocationArgStrs.insert(invocationArgStrs.end(), {
-      "-Xclang", "-detailed-preprocessing-record",
-      "-Xclang", "-fmodule-format=raw",
-    });
+    llvm::append_values(invocationArgStrs, "-Xclang",
+                        "-detailed-preprocessing-record", "-Xclang",
+                        "-fmodule-format=raw");
   } else {
-    invocationArgStrs.insert(invocationArgStrs.end(), {
-      "-Xclang", "-fmodule-format=obj",
-    });
+    llvm::append_values(invocationArgStrs, "-Xclang", "-fmodule-format=obj");
   }
 
   // Enable API notes alongside headers/in frameworks.
@@ -871,8 +859,8 @@ void importer::getNormalInvocationArguments(
   }
 
   if (importerOpts.LoadVersionIndependentAPINotes)
-    invocationArgStrs.insert(invocationArgStrs.end(),
-                             {"-fswift-version-independent-apinotes"});
+    llvm::append_values(invocationArgStrs,
+                        "-fswift-version-independent-apinotes");
 
   if (!LangOpts.DisableSafeInteropWrappers)
     invocationArgStrs.push_back("-fexperimental-bounds-safety-attributes");
@@ -907,15 +895,15 @@ void importer::getNormalInvocationArguments(
 static void
 getEmbedBitcodeInvocationArguments(std::vector<std::string> &invocationArgStrs,
                                    ASTContext &ctx) {
-  invocationArgStrs.insert(invocationArgStrs.end(), {
+  llvm::append_values(invocationArgStrs,
     // Backend mode.
     "-fembed-bitcode",
 
     // ...but Clang isn't doing the emission.
     "-fsyntax-only",
 
-    "-x", "ir",
-  });
+    "-x", "ir"
+  );
 }
 
 void importer::addCommonInvocationArguments(
@@ -945,7 +933,7 @@ void importer::addCommonInvocationArguments(
         "-target-sdk-version=" + ctx.LangOpts.SDKVersion->getAsString());
   }
 
-  invocationArgStrs.push_back(ImporterImpl::moduleImportBufferName);
+  invocationArgStrs.push_back(ImporterImpl::moduleImportBufferName.str());
 
   if (ctx.LangOpts.EnableAppExtensionRestrictions) {
     invocationArgStrs.push_back("-fapplication-extension");
@@ -1795,9 +1783,8 @@ bool ClangImporter::addSearchPath(StringRef newSearchPath, bool isFramework,
   auto entry = *optionalEntry;
 
   auto &headerSearchInfo = Impl.getClangPreprocessor().getHeaderSearchInfo();
-  auto exists = std::any_of(headerSearchInfo.search_dir_begin(),
-                            headerSearchInfo.search_dir_end(),
-                            [&](const clang::DirectoryLookup &lookup) -> bool {
+  auto exists = llvm::any_of(headerSearchInfo.search_dir_range(),
+                             [&](const clang::DirectoryLookup &lookup) -> bool {
     if (isFramework)
       return lookup.getFrameworkDir() == &entry.getDirEntry();
     return lookup.getDir() == &entry.getDirEntry();
@@ -1838,7 +1825,7 @@ ClangImporter::Implementation::getNextIncludeLoc() {
     includeLoc = includeLoc.getLocWithOffset(1);
     DummyIncludeBuffer = srcMgr.createFileID(
         std::make_unique<ZeroFilledMemoryBuffer>(
-          256*1024, StringRef(moduleImportBufferName)),
+          256*1024, moduleImportBufferName),
         clang::SrcMgr::C_User, /*LoadedID*/0, /*LoadedOffset*/0, includeLoc);
   }
 
@@ -3118,14 +3105,14 @@ ClangModuleUnit *ClangImporter::Implementation::getWrapperForModule(
         // a tree, so these don't require deduplication.
         addImplicitImport(CurrModule, /*guaranteedUnique=*/true);
       }
-      for (auto *I : CurrModule->Imports) {
+      for (clang::Module *I : CurrModule->Imports) {
         // `underlying` is the current TLM. Only explicit submodules need to
         // be imported under the same TLM, which is handled above.
         if (I->getTopLevelModule() == underlying)
           continue;
         addImplicitImport(I, /*guaranteedUnique=*/false);
       }
-      for (auto *Submodule : CurrModule->submodules())
+      for (clang::Module *Submodule : CurrModule->submodules())
         SubmoduleWorklist.push_back(Submodule);
     }
   }
@@ -4094,7 +4081,7 @@ static void getImportDecls(ClangModuleUnit *ClangUnit, const clang::Module *M,
 
   ASTContext &Ctx = ClangUnit->getASTContext();
 
-  for (auto *ImportedMod : M->Imports) {
+  for (clang::Module *ImportedMod : M->Imports) {
     auto *ID = createImportDecl(Ctx, ClangUnit, ImportedMod, Exported);
     Results.push_back(ID);
   }
@@ -5547,49 +5534,44 @@ bool ClangImporter::Implementation::emitDiagnosticsForTarget(
   return ImportDiagnostics[target].size();
 }
 
-// These conditional "conformances" are used for both escapability and
-// copiability.
-static const llvm::StringMap<SmallVector<int>> STLConditionalParams{
-    {"basic_string", {0}},
-    {"vector", {0}},
-    {"array", {0}},
-    {"inplace_vector", {0}},
-    {"deque", {0}},
-    {"forward_list", {0}},
-    {"list", {0}},
-    {"set", {0}},
-    {"flat_set", {0}},
-    {"unordered_set", {0}},
-    {"multiset", {0}},
-    {"flat_multiset", {0}},
-    {"unordered_multiset", {0}},
-    {"stack", {0}},
-    {"queue", {0}},
-    {"priority_queue", {0}},
-    {"tuple", {0}},
-    {"variant", {0}},
-    {"optional", {0}},
-    {"pair", {0, 1}},
-    {"expected", {0, 1}},
-    {"map", {0, 1}},
-    {"flat_map", {0, 1}},
-    {"unordered_map", {0, 1}},
-    {"multimap", {0, 1}},
-    {"flat_multimap", {0, 1}},
-    {"unordered_multimap", {0, 1}},
-};
+/// The indices of the template parameters that a std type's escapability and
+/// copiability are conditional on, or an empty range if it has none.
+///
+/// These conditional "conformances" are used for both escapability and
+/// copiability.
+static llvm::ArrayRef<int> getSTLConditionalParams(StringRef name) {
+  static constexpr int FirstParam[] = {0};
+  static constexpr int FirstTwoParams[] = {0, 1};
+  return llvm::StringSwitch<llvm::ArrayRef<int>>(name)
+      .Cases({"basic_string", "vector", "array", "inplace_vector", "deque",
+              "forward_list", "list", "set", "flat_set", "unordered_set",
+              "multiset", "flat_multiset", "unordered_multiset", "stack",
+              "queue", "priority_queue", "tuple", "variant", "optional"},
+             FirstParam)
+      .Cases({"pair", "expected", "map", "flat_map", "unordered_map",
+              "multimap", "flat_multimap", "unordered_multimap"},
+             FirstTwoParams)
+      .Default({});
+}
 
-static const llvm::StringMap<SmallVector<int>> STLConditionalEscapabilityParams{
-    {"unique_ptr", {0}},
-    {"shared_ptr", {0}},
-    {"weak_ptr", {0}},
-    {"auto_ptr", {0}},
-};
+/// Like getSTLConditionalParams, but for the std types whose copiability is
+/// unconditional and only whose escapability depends on a template parameter.
+static llvm::ArrayRef<int>
+getSTLConditionalEscapabilityParams(StringRef name) {
+  static constexpr int FirstParam[] = {0};
+  return llvm::StringSwitch<llvm::ArrayRef<int>>(name)
+      .Cases({"unique_ptr", "shared_ptr", "weak_ptr", "auto_ptr"}, FirstParam)
+      .Default({});
+}
+
+/// The template parameter names listed by a conditional annotation such as
+/// `SWIFT_ESCAPABLE_IF(T, U)`. These are always few enough to stay inline.
+using ConditionalAttrParams = llvm::SmallSet<StringRef, 4>;
 
 template <typename Kind>
 static bool checkConditionalParams(
     const clang::RecordDecl *recordDecl, ClangImporter::Implementation *impl,
-    llvm::ArrayRef<int> STLParams, std::set<StringRef> &conditionalParams,
+    llvm::ArrayRef<int> STLParams, ConditionalAttrParams &conditionalParams,
     llvm::function_ref<void(const clang::Type *, bool)> maybePushToStack) {
   bool foundErrors = false;
   auto specDecl = cast<clang::ClassTemplateSpecializationDecl>(recordDecl);
@@ -5628,8 +5610,9 @@ static bool checkConditionalParams(
           maybePushToStack(
               nonPackArg.getAsType()->getUnqualifiedDesugaredType(),
               /*isBase=*/false); // None of the STL template parameters (for the
-                                 // classes enumerated in STLConditionalParams)
-                                 // are used as base classes.
+                                 // classes enumerated in
+                                 // getSTLConditionalParams) are used as base
+                                 // classes.
         }
       }
     }
@@ -5646,9 +5629,9 @@ static bool checkConditionalParams(
   return foundErrors;
 }
 
-static std::set<StringRef>
+static ConditionalAttrParams
 getConditionalAttrParams(clang::SwiftAttrAttr *swiftAttr, StringRef attrName) {
-  std::set<StringRef> result;
+  ConditionalAttrParams result;
   StringRef params = swiftAttr->getAttribute();
   if (params.consume_front(attrName)) {
     auto commaPos = params.find(',');
@@ -5663,7 +5646,7 @@ getConditionalAttrParams(clang::SwiftAttrAttr *swiftAttr, StringRef attrName) {
   return result;
 }
 
-static std::set<StringRef>
+static ConditionalAttrParams
 getConditionalAttrParams(const clang::NamedDecl *decl, StringRef attrName) {
   if (decl->hasAttrs()) {
     for (auto attr : decl->getAttrs()) {
@@ -5675,12 +5658,12 @@ getConditionalAttrParams(const clang::NamedDecl *decl, StringRef attrName) {
   return {};
 }
 
-static std::set<StringRef>
+static ConditionalAttrParams
 getConditionalEscapableAttrParams(const clang::RecordDecl *decl) {
   return getConditionalAttrParams(decl, "escapable_if:");
 }
 
-static std::set<StringRef>
+static ConditionalAttrParams
 getConditionalCopyableAttrParams(const clang::RecordDecl *decl) {
   return getConditionalAttrParams(decl, "copyable_if:");
 }
@@ -5759,12 +5742,12 @@ ClangTypeEscapability::evaluate(Evaluator &evaluator,
         continue;
       if (hasSwiftAttribute(recordDecl, {"unsafe", "unsafe(always)"}))
         return CxxEscapability::Unknown;
-      SmallVector<int> STLParams;
+      llvm::ArrayRef<int> STLParams;
       if (recordDecl->isInStdNamespace()) {
-        STLParams = STLConditionalParams.lookup(recordDecl->getName());
+        STLParams = getSTLConditionalParams(recordDecl->getName());
         if (STLParams.empty())
           STLParams =
-              STLConditionalEscapabilityParams.lookup(recordDecl->getName());
+              getSTLConditionalEscapabilityParams(recordDecl->getName());
       }
       auto conditionalParams = getConditionalEscapableAttrParams(recordDecl);
 
@@ -8324,10 +8307,8 @@ importer::getValueDeclsForName(NominalTypeDecl *decl, StringRef name) {
         NLFlags::UnqualifiedDefault);
 
     // Filter out any declarations that didn't come from Clang.
-    auto newEnd =
-        std::remove_if(results.begin(), results.end(),
-                       [&](ValueDecl *decl) { return !decl->getClangDecl(); });
-    results.erase(newEnd, results.end());
+    llvm::erase_if(results,
+                   [&](ValueDecl *decl) { return !decl->getClangDecl(); });
   }
   return TinyPtrVector<ValueDecl *>(ArrayRef(results));
 }
@@ -8557,8 +8538,8 @@ CxxValueSemantics::evaluate(Evaluator &evaluator,
   // - The type has a SWIFT_NONCOPYABLE annotation
   // - The type has a SWIFT_COPYABLE_IF(T...) annotation, where at least one of
   // T is ~Copyable
-  // - It is one of the STL types in `STLConditionalParams`, and at least one of
-  // its revelant types is ~Copyable
+  // - It is one of the STL types in `getSTLConditionalParams`, and at least one
+  // of its revelant types is ~Copyable
 
   const auto *type = desc.type->getUnqualifiedDesugaredType();
   auto *importerImpl = desc.importerImpl;
@@ -8606,9 +8587,9 @@ CxxValueSemantics::evaluate(Evaluator &evaluator,
     stack.pop_back();
     bool isExplicitlyNonCopyable = hasNonCopyableAttr(recordDecl);
     if (!isExplicitlyNonCopyable) {
-      SmallVector<int> STLParams;
+      llvm::ArrayRef<int> STLParams;
       if (recordDecl->isInStdNamespace())
-        STLParams = STLConditionalParams.lookup(recordDecl->getName());
+        STLParams = getSTLConditionalParams(recordDecl->getName());
       auto conditionalParams = getConditionalCopyableAttrParams(recordDecl);
 
       if (!STLParams.empty() || !conditionalParams.empty()) {
@@ -8733,16 +8714,12 @@ ExplicitSafety ClangDeclExplicitSafety::evaluate(
     Evaluator &evaluator, ClangDeclExplicitSafetyDescriptor desc) const {
   // FIXME: Also similar to hasPointerInSubobjects
 
-  if (desc.isClass)
-    // Safety for class types is handled a bit differently than other types.
-    // If it is not explicitly marked unsafe, it is always explicitly safe.
-    return hasSwiftAttribute(desc.decl, {"unsafe", "unsafe(always)"})
-               ? ExplicitSafety::Unsafe
-               : ExplicitSafety::Safe;
-
   // Clang record types are considered explicitly unsafe if any of their fields,
-  // base classes, and template type parameters are unsafe. We use a stack for
-  // this recursive traversal.
+  // base classes, and template type parameters are unsafe. Types imported as
+  // classes are treated differently: the lifetime of their storage is managed
+  // automatically and safely by reference counting, so their fields do not make
+  // them unsafe; only annotations on themselves and on their base classes do.
+  // We use a stack for this recursive traversal.
   //
   // Invariant: if any Decl in the stack is unsafe, then desc.decl is unsafe.
   llvm::SmallVector<const clang::Decl *, 4> stack;
@@ -8783,6 +8760,28 @@ ExplicitSafety ClangDeclExplicitSafety::evaluate(
 
     if (hasSwiftAttribute(decl, {"safe"}))
       continue;
+
+    if (desc.isClass) {
+      // Safety for class types is handled a bit differently than other types:
+      // unsafety is inherited from the base classes, but nothing else makes a
+      // class unsafe. Note that the bases of a type imported as a class are
+      // imported as classes as well.
+      auto *cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(decl);
+      if (!cxxRecordDecl || !cxxRecordDecl->hasDefinition())
+        continue;
+      for (auto base : cxxRecordDecl->getDefinition()->bases()) {
+        // The base may be a `clang::TemplateSpecializationType`, which has no
+        // record decl to check.
+        auto *baseDecl = base.getType()->getAsCXXRecordDecl();
+        if (!baseDecl)
+          continue;
+        if (auto *baseDefinition = baseDecl->getDefinition())
+          baseDecl = baseDefinition;
+        if (seen.insert(baseDecl).second)
+          stack.push_back(baseDecl);
+      }
+      continue;
+    }
 
     // Enums are always safe
     if (isa<clang::EnumDecl>(decl))
@@ -9155,7 +9154,7 @@ bool ClangInheritanceInfo::setUnavailableIfNecessary(
 SmallVector<std::pair<StringRef, clang::SourceLocation>, 1>
 importer::getPrivateFileIDAttrs(const clang::CXXRecordDecl *decl) {
   llvm::SmallVector<std::pair<StringRef, clang::SourceLocation>, 1> files;
-  constexpr auto prefix = StringRef("private_fileid:");
+  constexpr llvm::StringLiteral prefix = "private_fileid:";
 
   if (decl->hasAttrs()) {
     for (const auto *attr : decl->getAttrs()) {

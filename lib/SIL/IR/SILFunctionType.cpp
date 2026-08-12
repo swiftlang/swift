@@ -2168,9 +2168,16 @@ private:
     }
 
     // Tuples get expanded unless they're inout.
-    if (origType.isTuple() && ownership != ValueOwnership::InOut) {
-      expandTuple(ownership, formalParamIndex,
-                  forSelf, origType, substType, origFlags);
+    //
+    // However, a C++ reference to an aggregate imported as a tuple is
+    // passed as a single indirect value rather than exploded into its
+    // elements, so fall through to the indirect handling below.
+    bool isClangReference =
+        origType.isClangType() && origType.getClangType()->isReferenceType();
+    if (origType.isTuple() && ownership != ValueOwnership::InOut &&
+        !isClangReference) {
+      expandTuple(ownership, formalParamIndex, forSelf, origType, substType,
+                  origFlags);
       return;
     }
 
@@ -3719,6 +3726,12 @@ CanSILFunctionType swift::buildSILFunctionThunkType(
   if (withoutActuallyEscaping)
     extInfoBuilder = extInfoBuilder.withNoEscape(false);
 
+  // The thunk itself cannot be `@called(once)` just like a closure cannot
+  // be since the constraint is about the value and is expressed on
+  // `partial_apply` instruction that forms the value of the thunk.
+  if (extInfoBuilder.isCalledOnce())
+    extInfoBuilder = extInfoBuilder.withCalledOnce(false);
+
   // Does the thunk type involve a local archetype type?
   SmallVector<GenericEnvironment *, 2> capturedEnvs;
   auto archetypeVisitor = [&](CanType t) {
@@ -3798,10 +3811,15 @@ CanSILFunctionType swift::buildSILFunctionThunkType(
       extInfoBuilder = extInfoBuilder.withIsPseudogeneric();
 
   // Add the formal parameters of the expected type to the thunk.
-  auto contextConvention =
-      fn->getTypeProperties(sourceType).isTrivial()
-          ? ParameterConvention::Direct_Unowned
-          : ParameterConvention::Direct_Guaranteed;
+  //
+  // A `@called(once)` source function is applied inside the thunk body,
+  // which is itself the consuming use that enforces call-at-most-once, so
+  // it must be captured as `Direct_Owned`.
+  auto contextConvention = fn->getTypeProperties(sourceType).isTrivial()
+                               ? ParameterConvention::Direct_Unowned
+                           : sourceType->isCalledOnce()
+                               ? ParameterConvention::Direct_Owned
+                               : ParameterConvention::Direct_Guaranteed;
   SmallVector<SILParameterInfo, 4> params;
   params.append(expectedType->getParameters().begin(),
                 expectedType->getParameters().end());
@@ -4950,10 +4968,7 @@ TypeConverter::getConstantInfo(TypeExpansionContext expansion,
   auto bridgedTypes = getLoweredFormalTypes(constant, formalInterfaceType);
 
   CanAnyFunctionType loweredInterfaceType = bridgedTypes.Uncurried;
-
-  // The SIL type encodes conventions according to the original type.
-  CanSILFunctionType silFnType = ::getUncachedSILFunctionTypeForConstant(
-      *this, expansion, constant, bridgedTypes);
+  CanSILFunctionType silFnType;
 
   // If the constant refers to a derivative function, get the SIL type of the
   // original function and use it to compute the derivative SIL type.
@@ -4996,6 +5011,10 @@ TypeConverter::getConstantInfo(TypeExpansionContext expansion,
     silFnType = origFnConstantInfo.SILFnType->getAutoDiffDerivativeFunctionType(
         loweredParamIndices, loweredResultIndices, derivativeId->getKind(),
         *this, LookUpConformanceInModule());
+  } else {
+    // The SIL type encodes conventions according to the original type.
+    silFnType = ::getUncachedSILFunctionTypeForConstant(*this, expansion,
+                                                        constant, bridgedTypes);
   }
 
   LLVM_DEBUG(llvm::dbgs() << "lowering type for constant ";

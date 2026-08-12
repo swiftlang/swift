@@ -195,14 +195,9 @@ void SILInstruction::dropNonOperandReferences() {
     return;
   }
 
-  // If we have a DebugValueInst with a debug reconstruction block, drop it.
-  if (auto *DVI = dyn_cast<DebugValueInst>(this)) {
-    if (auto *DebugBB = DVI->getDebugReconstructionBlock()) {
-      DebugBB->dropAllReferences();
-      DebugBB->eraseAllInstructions(getModule());
-      DVI->setDebugReconstructionBlock(nullptr);
-    }
-  }
+  // If we have a DebugValueInst with a debug reconstruction block, free it.
+  if (auto *DVI = dyn_cast<DebugValueInst>(this))
+    DVI->setDebugReconstructionBlock(nullptr);
 }
 
 namespace {
@@ -1554,7 +1549,6 @@ bool SILInstruction::mayRequirePackMetadata(SILFunction const &F) const {
     return false;
   }
   case SILInstructionKind::ClassMethodInst:
-  case SILInstructionKind::DebugValueInst: 
   case SILInstructionKind::DestroyAddrInst:
   case SILInstructionKind::DestroyValueInst:
   // Unary instructions.

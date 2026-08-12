@@ -31,14 +31,40 @@ typedef enum {
 
 using namespace swift;
 
+#ifdef SWIFT_STDLIB_ENABLE_LAZY_LINK
+
+extern "C" CFHashCode CFStringHashNSString(CFStringRef str);
+#define _CFStringHashNSString CFStringHashNSString
+
+extern "C" CFHashCode CFStringHashCString(const uint8_t *bytes, CFIndex len);
+#define _CFStringHashCString CFStringHashCString
+
+#else
+
 static CFHashCode(*_CFStringHashCString)(const uint8_t *bytes, CFIndex len);
-static CFHashCode(*_CFStringHashNSString)(id str);
+static CFHashCode(*_CFStringHashNSString)(CFStringRef str);
 static CFTypeID(*_CFGetTypeID)(CFTypeRef obj);
 static CFTypeID _CFStringTypeID = 0;
+
 static swift_once_t initializeBridgingFuncsOnce;
+
+#endif
 
 extern "C" bool _dyld_is_objc_constant(DyldObjCConstantKind kind,
                                        const void *addr) SWIFT_RUNTIME_WEAK_IMPORT;
+
+#ifdef SWIFT_STDLIB_ENABLE_LAZY_LINK
+
+static inline void initializeBridgingFunctions() {}
+
+extern "C" BOOL _NSIsNSString(id _Nullable arg);
+
+__swift_uint8_t
+_swift_stdlib_isNSString(id obj) {
+  return _NSIsNSString(obj) ? 1 : 0;
+}
+
+#else
 
 static void _initializeBridgingFunctionsImpl(void *ctxt) {
   auto getStringTypeID =
@@ -48,8 +74,8 @@ static void _initializeBridgingFunctionsImpl(void *ctxt) {
   _CFStringTypeID = getStringTypeID();
   
   _CFGetTypeID = (CFTypeID(*)(CFTypeRef obj))dlsym(RTLD_DEFAULT, "CFGetTypeID");
-  _CFStringHashNSString = (CFHashCode(*)(id))dlsym(RTLD_DEFAULT,
-                                                   "CFStringHashNSString");
+  _CFStringHashNSString =
+      (CFHashCode(*)(CFStringRef))dlsym(RTLD_DEFAULT, "CFStringHashNSString");
   _CFStringHashCString = (CFHashCode(*)(const uint8_t *, CFIndex))dlsym(
                                                    RTLD_DEFAULT,
                                                    "CFStringHashCString");
@@ -67,10 +93,12 @@ _swift_stdlib_isNSString(id obj) {
   return _CFGetTypeID((CFTypeRef)obj) == _CFStringTypeID ? 1 : 0;
 }
 
+#endif
+
 _swift_shims_CFHashCode
 _swift_stdlib_CFStringHashNSString(id _Nonnull obj) {
   initializeBridgingFunctions();
-  return _CFStringHashNSString(obj);
+  return _CFStringHashNSString((CFStringRef)obj);
 }
 
 _swift_shims_CFHashCode

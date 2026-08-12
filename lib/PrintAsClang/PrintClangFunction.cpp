@@ -1907,7 +1907,7 @@ bool DeclAndTypeClangFunctionPrinter::hasKnownOptionalNullableCxxMapping(
 }
 
 void DeclAndTypeClangFunctionPrinter::printCustomCxxFunction(
-    const SmallVector<Type> &neededTypes, bool NeedsReturnTypes,
+    ArrayRef<Type> neededTypes, bool NeedsReturnTypes,
     PrinterTy retTypeAndNamePrinter, PrinterTy paramPrinter, bool isConstFunc,
     PrinterTy bodyPrinter, ValueDecl *valueDecl, ModuleDecl *emittedModule,
     raw_ostream &outOfLineOS) {

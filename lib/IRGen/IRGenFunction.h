@@ -487,7 +487,14 @@ public:
                                 const llvm::Twine &name ="");
   void emitDeallocRawCall(llvm::Value *pointer, llvm::Value *size,
                           llvm::Value *alignMask);
-  
+  llvm::Value *emitAllocRawTypedCall(llvm::Value *size,
+                                     llvm::Value *alignMask,
+                                     llvm::Value *typeDescriptor,
+                                     const llvm::Twine &name = "");
+  void emitDeallocRawTypedCall(llvm::Value *pointer, llvm::Value *size,
+                               llvm::Value *alignMask,
+                               llvm::Value *typeDescriptor);
+
   void emitAllocBoxCall(llvm::Value *typeMetadata,
                          llvm::Value *&box,
                          llvm::Value *&valueAddress);

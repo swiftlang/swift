@@ -1,26 +1,16 @@
 // RUN: %empty-directory(%t)
-// RUN: %gyb %s > %t/main.swift
-
-// The compiler should finish in less than 2 minutes. To give some slack,
-// specify a timeout of 20 minutes.
+// RUN: %timer-scale-test --begin 500 --end 800 --superlinear-threshold 2 --ignore-no-data --trace --select SIL-processing.instr -O %s
 
 // TODO: 75% of compile time is spent in ARCSequenceOpts: rdar://144863155
-// The timeout should be decreased once we can get rid of ARCSequenceOpts
+// The threshold should be decreased once we can get rid of ARCSequenceOpts
 
-// If the compiler needs more than 20 minutes, there is probably a real problem.
-// So please don't just increase the timeout in case this fails.
-
-// RUN: %{python} %S/../../test/Inputs/timeout.py 1200 %target-swift-frontend -O -parse-as-library -sil-verify-none -c %t/main.swift -o %t/main.o
-
-// REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
-// REQUIRES: long_test
-// REQUIRES: CPU=arm64 || CPU=x86_64
+// REQUIRES: swift_stdlib_no_asserts,optimized_stdlib,asserts
 
 public struct TestStruct {
   public static var a: [[Int]] {
-    var a: [[Int]] = Array(repeating: Array(repeating: 0, count: 4), count: 2000)
+    var a: [[Int]] = Array(repeating: Array(repeating: 0, count: 4), count: ${N})
 
-% for i in range(2000):
+% for i in range(N):
     a[${i}] = [${i * 4}, ${i * 4 + 1}, ${i * 4 + 2}, ${i * 4 + 3}]
 % end
 

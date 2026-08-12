@@ -47,6 +47,7 @@
 #include "clang/Sema/Sema.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallBitVector.h"
+#include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/ErrorHandling.h"
 #include <algorithm>
 #include <memory>
@@ -429,13 +430,9 @@ namespace {
     using OverriddenName = std::pair<const DeclType *, ImportedName>;
     llvm::SmallPtrSet<DeclName, 4> known;
     (void)known.insert(DeclName());
-    overriddenNames.erase(
-        std::remove_if(overriddenNames.begin(), overriddenNames.end(),
-                       [&](OverriddenName overridden) {
-                         return !known.insert(overridden.second.getDeclName())
-                                     .second;
-                       }),
-        overriddenNames.end());
+    llvm::erase_if(overriddenNames, [&](OverriddenName overridden) {
+      return !known.insert(overridden.second.getDeclName()).second;
+    });
 
     if (overriddenNames.size() < 2)
       return;
@@ -1323,12 +1320,12 @@ NameImporter::considerErrorImport(const clang::ObjCMethodDecl *clangDecl,
 }
 
 bool swift::isCompletionHandlerParamName(StringRef paramName) {
-  return paramName == "completionHandler" ||
-      paramName == "withCompletionHandler" ||
-      paramName == "completion" || paramName == "withCompletion" ||
-      paramName == "completionBlock" || paramName == "withCompletionBlock" ||
-      paramName == "reply" || paramName == "withReply" ||
-      paramName == "replyTo" || paramName == "withReplyTo";
+  return llvm::StringSwitch<bool>(paramName)
+      .Cases({"completionHandler", "withCompletionHandler", "completion",
+              "withCompletion", "completionBlock", "withCompletionBlock"},
+             true)
+      .Cases({"reply", "withReply", "replyTo", "withReplyTo"}, true)
+      .Default(false);
 }
 
 // Determine whether the given type is a nullable NSError type.
@@ -2255,11 +2252,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
       auto argName = selector.getNameForSlot(0).substr(initializerPrefixLen);
 
       // Drop "With" if present after the "init".
-      bool droppedWith = false;
-      if (argName.starts_with("With")) {
-        argName = argName.substr(4);
-        droppedWith = true;
-      }
+      bool droppedWith = argName.consume_front("With");
 
       // Lowercase the remaining argument name.
       argName = camel_case::toLowercaseWord(argName, selectorSplitScratch);
@@ -2336,8 +2329,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
 
     StringRef removePrefix = enumInfo.getConstantNamePrefix();
     if (!removePrefix.empty()) {
-      if (baseName.starts_with(removePrefix)) {
-        baseName = baseName.substr(removePrefix.size());
+      if (baseName.consume_front(removePrefix)) {
         strippedPrefix = true;
       } else if (givenName) {
         // Calculate the new prefix.
@@ -2377,7 +2369,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     if (objcProto->hasDefinition()) {
       if (hasNamingConflict(D, objcProto->getIdentifier(), nullptr)) {
         baseNameWithProtocolSuffix = baseName;
-        baseNameWithProtocolSuffix += SWIFT_PROTOCOL_SUFFIX;
+        baseNameWithProtocolSuffix += ProtocolSuffix;
         baseName = baseNameWithProtocolSuffix;
       }
     }
@@ -2453,12 +2445,13 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
         newName += "Consuming";
       baseName = newName;
     }
-    if (method->isImplicit() &&
-        baseName.starts_with("__synthesizedVirtualCall_")) {
+    constexpr llvm::StringLiteral virtualCallPrefix =
+        "__synthesizedVirtualCall_";
+    if (method->isImplicit() && baseName.starts_with(virtualCallPrefix)) {
       // If this is a thunk for a virtual method of a C++ reference type, we
       // strip away the underscored prefix. This method should be visible and
       // callable from Swift.
-      newName = baseName.substr(StringRef("__synthesizedVirtualCall_").size());
+      newName = baseName.substr(virtualCallPrefix.size());
       baseName = newName;
     }
 

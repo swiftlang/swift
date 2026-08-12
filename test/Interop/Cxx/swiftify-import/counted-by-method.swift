@@ -11,6 +11,7 @@
 // RUN:   -verify-additional-prefix %target-vendor- \
 // RUN:   %if OS_FAMILY=darwin && !OS=xros %{ -verify-additional-prefix nonxros- %}
 
+
 //--- test.h
 #define __counted_by(x) __attribute__((__counted_by__(x)))
 

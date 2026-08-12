@@ -47,4 +47,20 @@ const T &constRefToTemplate(const T &t) { return t; }
 template<class T>
 void refToDependentParam(ClassTemplate<T> &param) { }
 
+inline unsigned sumArrayRef4(const unsigned char (&a)[4]) {
+  return a[0] + a[1] + a[2] + a[3];
+}
+
+inline unsigned sumArrayRValueRef4(unsigned char (&&a)[4]) {
+  return a[0] + a[1] + a[2] + a[3];
+}
+
+// A typedef of a typedef of an array, mirroring the shape of Darwin's uuid_t.
+typedef unsigned char ByteArray16[16];
+typedef ByteArray16 ByteArray16Typealias;
+
+inline unsigned firstByteOfArrayRefTypealias(const ByteArray16Typealias &a) {
+  return a[0];
+}
+
 #endif // TEST_INTEROP_CXX_REFERENCE_INPUTS_REFERENCE_H

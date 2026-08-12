@@ -183,11 +183,11 @@ func testMixedConsumingAndBorrowingCaptures(_ consumed: consuming Resource, _ bo
 // CHECK:  [[CLOSURE_G:%.*]] = function_ref @$s30called_once_consuming_captures27tesReassignmentOfProperties2r12r2yAA8ResourceVn_AFntFyyXOfU_
 // CHECK:  [[R1_TAKE_ADDR:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[R1_PROJ]] : $*Resource
 // CHECK:  [[R1_VALUE:%.*]] = load [take] [[R1_TAKE_ADDR]] : $*Resource
-// CHECK:  partial_apply [[CLOSURE_G]]({{.*}}, [[R1_VALUE]]) : $@convention(thin) (@guaranteed { var S }, @owned Resource) -> ()
+// CHECK:  partial_apply [called_once] [[CLOSURE_G]]({{.*}}, [[R1_VALUE]]) : $@convention(thin) (@guaranteed { var S }, @owned Resource) -> ()
 // CHECK:  [[CLOSURE_H:%.*]] = function_ref @$s30called_once_consuming_captures27tesReassignmentOfProperties2r12r2yAA8ResourceVn_AFntFyyXOfU0_
 // CHECK:  [[R2_TAKE_ADDR:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[R2_PROJ]] : $*Resource
 // CHECK:  [[R2_VALUE:%.*]] = load [take] [[R2_TAKE_ADDR]] : $*Resource
-// CHECK:  partial_apply [[CLOSURE_H]]({{.*}}, [[R2_VALUE]]) : $@convention(thin) (@guaranteed C, @owned Resource) -> ()
+// CHECK:  partial_apply [called_once] [[CLOSURE_H]]({{.*}}, [[R2_VALUE]]) : $@convention(thin) (@guaranteed C, @owned Resource) -> ()
 // CHECK: } // end sil function '$s30called_once_consuming_captures27tesReassignmentOfProperties2r12r2yAA8ResourceVn_AFntF'
 
 // CHECK-LABEL: sil private [ossa] @$s30called_once_consuming_captures27tesReassignmentOfProperties2r12r2yAA8ResourceVn_AFntFyyXOfU_ : $@convention(thin) (@guaranteed { var S }, @owned Resource) -> () {

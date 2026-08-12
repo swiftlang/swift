@@ -287,6 +287,10 @@ option(SWIFT_STDLIB_OVERRIDABLE_RETAIN_RELEASE
        "Allow retain/release functions to be overridden by indirecting through function pointers."
        TRUE)
 
+option(SWIFT_STDLIB_ENABLE_LAZY_LINK
+       "Use lazy linking instead of dlsym for upward-linked symbols"
+       FALSE)
+
 set(SWIFT_RUNTIME_FIXED_BACKTRACER_PATH "" CACHE STRING
   "If set, provides a fixed path to the swift-backtrace binary.  This
    will disable dynamic determination of the path and will also disable

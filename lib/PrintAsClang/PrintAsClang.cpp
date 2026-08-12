@@ -30,6 +30,7 @@
 #include "clang/Basic/Module.h"
 #include "clang/Lex/HeaderSearch.h"
 
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
@@ -589,11 +590,10 @@ writeImports(raw_ostream &out, llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
         } else {
           SmallVector<llvm::SmallString<128>, 4> sortedIncludes{
               quotedIncludes.begin(), quotedIncludes.end()};
-          std::sort(sortedIncludes.begin(), sortedIncludes.end(),
-                    [](const llvm::SmallString<128> &lhs,
-                       const llvm::SmallString<128> &rhs) {
-                      return lhs.str() < rhs.str();
-                    });
+          llvm::sort(sortedIncludes, [](const llvm::SmallString<128> &lhs,
+                                        const llvm::SmallString<128> &rhs) {
+            return lhs.str() < rhs.str();
+          });
           for (const auto &header : sortedIncludes) {
             out << "#import \"" << header << "\"\n";
           }

@@ -1086,3 +1086,96 @@ bb0:
   %r = tuple ()
   return %r
 }
+
+// Passing a trivial address as a @in parameter with read-only memory effects
+// does not deinitialise the address.
+sil @read_in : $@convention(thin) (@in Int) -> () {
+[%0: read v**]
+[global: ]
+}
+
+sil @make_index : $@convention(thin) () -> @out Int {
+[%0: write v**]
+[global: ]
+}
+
+sil [ossa] @in_read_only_trivial_no_deinit : $@convention(thin) (Int, Int) -> () {
+bb0(%0 : $Int, %1 : $Int):
+  %2 = integer_literal $Builtin.Int64, 1
+  %3 = integer_literal $Builtin.Int1, -1
+  %4 = struct_extract %1, #Int._value
+  %5 = integer_literal $Builtin.Int64, 0
+  %6 = builtin "cmp_eq_Int64"(%4, %5) : $Builtin.Int1
+  cond_br %6, bb5, bb1
+
+bb1:
+  %8 = alloc_stack $Int
+  store %0 to [trivial] %8
+  %10 = function_ref @make_index : $@convention(thin) () -> @out Int
+  %11 = function_ref @read_in : $@convention(thin) (@in Int) -> ()
+  br bb2(%5)
+
+bb2(%13 : $Builtin.Int64):
+  %16 = apply %11(%8) : $@convention(thin) (@in Int) -> ()
+  %18 = builtin "sadd_with_overflow_Int64"(%13, %2, %3) : $(Builtin.Int64, Builtin.Int1)
+  %19 = tuple_extract %18, 0
+  %20 = builtin "cmp_eq_Int64"(%19, %4) : $Builtin.Int1
+  cond_br %20, bb4, bb3
+
+bb3:
+  br bb2(%19)
+
+bb4:
+  dealloc_stack %8
+  br bb6
+
+bb5:
+  br bb6
+
+bb6:
+  %26 = tuple ()
+  return %26
+}
+
+
+sil @global_write : $@convention(thin) (@in Int) -> () {
+[global: write]
+}
+
+sil [ossa] @call_global_write : $@convention(thin) (Int, Int) -> () {
+bb0(%0 : $Int, %1 : $Int):
+  %2 = integer_literal $Builtin.Int64, 1
+  %3 = integer_literal $Builtin.Int1, -1
+  %4 = struct_extract %1, #Int._value
+  %5 = integer_literal $Builtin.Int64, 0
+  %6 = builtin "cmp_eq_Int64"(%4, %5) : $Builtin.Int1
+  cond_br %6, bb5, bb1
+
+bb1:
+  %8 = alloc_stack $Int
+  store %0 to [trivial] %8
+  %11 = function_ref @global_write : $@convention(thin) (@in Int) -> ()
+  br bb2(%5)
+
+bb2(%13 : $Builtin.Int64):
+  %16 = apply %11(%8) : $@convention(thin) (@in Int) -> ()
+  %18 = builtin "sadd_with_overflow_Int64"(%13, %2, %3) : $(Builtin.Int64, Builtin.Int1)
+  %19 = tuple_extract %18, 0
+  %20 = builtin "cmp_eq_Int64"(%19, %4) : $Builtin.Int1
+  cond_br %20, bb4, bb3
+
+bb3:
+  br bb2(%19)
+
+bb4:
+  dealloc_stack %8
+  br bb6
+
+bb5:
+  br bb6
+
+bb6:
+  %26 = tuple ()
+  return %26
+}
+
