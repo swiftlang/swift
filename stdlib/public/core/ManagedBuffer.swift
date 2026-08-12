@@ -36,6 +36,11 @@ internal func _swift_bufferAllocate(
 ///   needed should be included in `Header`.
 @_fixed_layout
 open class ManagedBuffer<Header, Element: ~Copyable> {
+  #if $Embedded
+  @usableFromInline
+  final var _capacity: Int
+  #endif
+
   /// The stored `Header` instance.
   ///
   /// During instance creation, in particular during
@@ -44,11 +49,6 @@ open class ManagedBuffer<Header, Element: ~Copyable> {
   /// reading the `header` property during `ManagedBuffer.create` is undefined.
   @_preInverseGenerics
   public final var header: Header
-
-  #if $Embedded
-  @usableFromInline
-  final var _capacity: Int
-  #endif
 
   #if $Embedded
   // In embedded mode this initializer has to be public, otherwise derived
@@ -95,12 +95,14 @@ extension ManagedBuffer where Element: ~Copyable {
          self,
          minimumCapacity._builtinWordValue, Element.self)
 
-    let initHeaderVal = try factory(p)
-    unsafe p.headerAddress.initialize(to: initHeaderVal)
-
     #if $Embedded
+    // Initialize the capacity before calling out to the factory because it may
+    // end up querying the capacity field of this ManagedBuffer.
     unsafe p._capacityAddress.initialize(to: minimumCapacity)
     #endif
+
+    let initHeaderVal = try factory(p)
+    unsafe p.headerAddress.initialize(to: initHeaderVal)
 
     // The _fixLifetime is not really needed, because p is used afterwards.
     // But let's be conservative and fix the lifetime after we use the
