@@ -5854,7 +5854,8 @@ static ManagedValue createPartialApplyOfThunk(SILGenFunction &SGF,
     SGF.B.createPartialApply(loc, thunkValue,
                              interfaceSubs, thunkArgs,
                              toType->getCalleeConvention(),
-                             toType->getIsolation());
+                             toType->getIsolation(),
+                             toType->isCalledOnce());
 }
 
 static ManagedValue createDifferentiableFunctionThunk(

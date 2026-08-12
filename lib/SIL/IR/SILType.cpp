@@ -920,6 +920,12 @@ bool SILType::isDifferentiable(SILModule &M) const {
       .has_value();
 }
 
+bool SILType::isCalledOnce() const {
+  if (auto F = dyn_cast<SILFunctionType>(getASTType()))
+    return F->isCalledOnce();
+  return false;
+}
+
 Type
 TypeBase::replaceSubstitutedSILFunctionTypesWithUnsubstituted(SILModule &M) const {
   return Type(const_cast<TypeBase *>(this)).transformRec([&](TypeBase *t) -> std::optional<Type> {
