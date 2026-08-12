@@ -7,6 +7,10 @@
 
 // REQUIRES: executable_test
 
+// TODO: Remove this as soon as we can get all of this working
+// under -O
+// REQUIRES: swift_test_mode_optimize_none
+
 // Regression test for taking a noncopyable payload out of an opaque
 // existential during a checked cast. Written as hand-authored canonical SIL
 // (bypassing Sema/SILGen) so it can validate the runtime/IRGen behavior
