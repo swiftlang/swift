@@ -1948,3 +1948,64 @@ bb0(%0 : $Int):
   %3 = load [trivial] %1
   return %3
 }
+
+sil @getOptInt : $@convention(thin) () -> Optional<Int>
+
+// The available value of the load in the outer loop is `%15`, which is a block argument of `bb4`
+// (the `switch_enum` payload of the inner loop). The SSA-updater must not mistake such a
+// pre-existing block argument for a phi it inserted itself, otherwise it doesn't insert the
+// required phi in `bb7` and the store in `bb5` is incorrectly forwarded on the `bb6` path, too.
+//
+// CHECK-LABEL: sil hidden [ossa] @conditional_store_in_nested_loop :
+// CHECK:       bb5:
+// CHECK:         store [[STORED:%.*]] to [trivial]
+// CHECK:         br bb7([[STORED]] : $Int)
+// CHECK:       bb6:
+// CHECK:         br bb7([[OUTER:%.*]] : $Int)
+// CHECK:       bb7([[PHI:%.*]] : $Int):
+// CHECK-NEXT:    br bb3([[PHI]] : $Int)
+// CHECK:       } // end sil function 'conditional_store_in_nested_loop'
+sil hidden [ossa] @conditional_store_in_nested_loop : $@convention(thin) (Int) -> Int {
+bb0(%0 : $Int):
+  %1 = alloc_stack [var_decl] $Int, var, name "b", type $Int
+  store %0 to [trivial] %1
+  br bb1
+
+bb1:
+  %f1 = function_ref @getOptInt : $@convention(thin) () -> Optional<Int>
+  %o1 = apply %f1() : $@convention(thin) () -> Optional<Int>
+  switch_enum %o1, case #Optional.some!enumelt: bb2, case #Optional.none!enumelt: bb9
+
+bb2(%i : $Int):
+  br bb3
+
+bb3:
+  %f2 = function_ref @getOptInt : $@convention(thin) () -> Optional<Int>
+  %o2 = apply %f2() : $@convention(thin) () -> Optional<Int>
+  switch_enum %o2, case #Optional.some!enumelt: bb4, case #Optional.none!enumelt: bb8
+
+bb4(%j : $Int):
+  cond_br undef, bb5, bb6
+
+bb5:
+  %acc = begin_access [modify] [static] %1
+  store %j to [trivial] %acc
+  end_access %acc
+  br bb7
+
+bb6:
+  br bb7
+
+bb7:
+  br bb3
+
+bb8:
+  br bb1
+
+bb9:
+  %racc = begin_access [read] [static] %1
+  %r = load [trivial] %racc
+  end_access %racc
+  dealloc_stack %1
+  return %r
+}
