@@ -26,6 +26,7 @@ add_swift_macro_library(SwiftMacros
   DerivedConformances/DeriveHashable.swift
   DerivedConformances/DeriveError.swift
   DerivedConformances/DeriveCodingKey.swift
+  DerivedConformances/DeriveCodingKeysEnum.swift
   SWIFT_DEPENDENCIES
     SwiftDiagnostics
     SwiftSyntax
