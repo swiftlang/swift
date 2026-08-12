@@ -36,11 +36,6 @@ internal func _swift_bufferAllocate(
 ///   needed should be included in `Header`.
 @_fixed_layout
 open class ManagedBuffer<Header, Element: ~Copyable> {
-  #if $Embedded
-  @usableFromInline
-  final var _capacity: Int
-  #endif
-
   /// The stored `Header` instance.
   ///
   /// During instance creation, in particular during
@@ -95,15 +90,8 @@ extension ManagedBuffer where Element: ~Copyable {
          self,
          minimumCapacity._builtinWordValue, Element.self)
 
-    #if $Embedded
-    // Initialize the capacity before calling out to the factory because it may
-    // end up querying the capacity field of this ManagedBuffer.
-    unsafe p._capacityAddress.initialize(to: minimumCapacity)
-    #endif
-
     let initHeaderVal = try factory(p)
     unsafe p.headerAddress.initialize(to: initHeaderVal)
-
     // The _fixLifetime is not really needed, because p is used afterwards.
     // But let's be conservative and fix the lifetime after we use the
     // headerAddress.
@@ -119,16 +107,13 @@ extension ManagedBuffer where Element: ~Copyable {
   @_preInverseGenerics
   @inlinable
   @available(OpenBSD, unavailable, message: "malloc_size is unavailable.")
+  @_unavailableInEmbedded
   public final var capacity: Int {
-    #if $Embedded
-    return unsafe _capacityAddress.pointee
-    #else
     let storageAddr = UnsafeMutableRawPointer(Builtin.bridgeToRawPointer(self))
     let endAddr = unsafe storageAddr + _swift_stdlib_malloc_size(storageAddr)
     let realCapacity = unsafe endAddr.assumingMemoryBound(to: Element.self) -
       firstElementAddress
     return realCapacity
-    #endif
   }
 
   @_preInverseGenerics
@@ -143,13 +128,6 @@ extension ManagedBuffer where Element: ~Copyable {
   internal final var headerAddress: UnsafeMutablePointer<Header> {
     return unsafe UnsafeMutablePointer<Header>(Builtin.addressof(&header))
   }
-
-  #if $Embedded
-  @inlinable
-  internal final var _capacityAddress: UnsafeMutablePointer<Int> {
-    unsafe UnsafeMutablePointer<Int>(Builtin.addressof(&_capacity))
-  }
-  #endif
 }
 
 extension ManagedBuffer where Element: ~Copyable {
