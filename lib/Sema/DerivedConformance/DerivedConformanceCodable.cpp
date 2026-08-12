@@ -141,12 +141,85 @@ static NominalTypeDecl *lookupErrorContext(ASTContext &C,
   return dyn_cast<NominalTypeDecl>(decl);
 }
 
+static bool shouldDeriveCodableViaMacro(DerivedConformance &derived);
+
+static std::string getCodingKeysEnumMacroText(DerivedConformance &derived,
+                                              ValueDecl *requirement,
+                                              Identifier enumName,
+                                              ArrayRef<Identifier> keys) {
+  auto escaped = [](Identifier identifier) {
+    return identifierEscapingIfNeeded(identifier.str(),
+                                      PrintNameContext::TypeMember);
+  };
+
+  std::string infos;
+  auto infosOut = llvm::raw_string_ostream(infos);
+  infosOut << "CodingKeysEnumInfo(name: " << QuotedString(escaped(enumName))
+           << ", keys: [";
+  llvm::interleaveComma(keys, infosOut, [&](Identifier key) {
+    infosOut << QuotedString(escaped(key));
+  });
+  infosOut << "])";
+
+  std::string code;
+  auto out = llvm::raw_string_ostream(code);
+  out << "#_deriveCodingKeysEnum(" << QuotedString(infos) << ")";
+  return code;
+}
+
+static EnumDecl *deriveCodingKeysEnumViaMacro(DerivedConformance &derived,
+                                              ValueDecl *requirement,
+                                              Identifier enumName,
+                                              ArrayRef<Identifier> keys) {
+  auto code = getCodingKeysEnumMacroText(derived, requirement, enumName, keys);
+  auto *expansion = expandDerivationMacro(
+      derived, requirement, code,
+      BuiltinDerivedConformanceMacroKind::DeriveCodingKeysEnum,
+      /*alwaysAttachToNominal=*/true);
+
+  EnumDecl *keysEnum = nullptr;
+  expansion->forEachExpandedNode([&](ASTNode node) {
+    auto *decl = node.dyn_cast<Decl *>();
+    if (!decl)
+      return;
+
+    auto *enumDecl = dyn_cast<EnumDecl>(decl);
+    if (!enumDecl)
+      return;
+
+    ASSERT(!keysEnum && "Expected a single EnumDecl * from the expansion of "
+                        "the synthesized macro decl.");
+
+    keysEnum = enumDecl;
+  });
+  ASSERT(keysEnum && "Expected a CodingKeys enum but got NULL");
+
+  keysEnum->setImplicit();
+  keysEnum->setSynthesized();
+  keysEnum->setAccess(AccessLevel::Private);
+  for (auto *element : keysEnum->getAllElements())
+    element->setImplicit();
+
+  derived.Nominal->addMember(keysEnum);
+
+  // Forcibly derive conformance to CodingKey.
+  TypeChecker::checkConformancesInContext(keysEnum);
+
+  return keysEnum;
+}
+
 static EnumDecl *
-addImplicitCodingKeys(NominalTypeDecl *target,
+addImplicitCodingKeys(DerivedConformance &derived, ValueDecl *requirement,
+                      NominalTypeDecl *target,
                       llvm::SmallVectorImpl<Identifier> &caseIdentifiers,
                       Identifier codingKeysEnumIdentifier) {
   auto &C = target->getASTContext();
   assert(target->lookupDirect(DeclName(codingKeysEnumIdentifier)).empty());
+
+  if (shouldDeriveCodableViaMacro(derived))
+    return deriveCodingKeysEnumViaMacro(derived, requirement,
+                                        codingKeysEnumIdentifier,
+                                        caseIdentifiers);
 
   // We want to look through all the var declarations of this type to create
   // enum cases based on those var names.
@@ -193,7 +266,9 @@ addImplicitCodingKeys(NominalTypeDecl *target,
   return enumDecl;
 }
 
-static EnumDecl *addImplicitCaseCodingKeys(EnumDecl *target,
+static EnumDecl *addImplicitCaseCodingKeys(DerivedConformance &derived,
+                                           ValueDecl *requirement,
+                                           EnumDecl *target,
                                            EnumElementDecl *elementDecl,
                                            EnumDecl *codingKeysEnum) {
   auto &C = target->getASTContext();
@@ -219,7 +294,8 @@ static EnumDecl *addImplicitCaseCodingKeys(EnumDecl *target,
     }
   }
 
-  return addImplicitCodingKeys(target, caseIdentifiers, enumIdentifier);
+  return addImplicitCodingKeys(derived, requirement, target, caseIdentifiers,
+                               enumIdentifier);
 }
 
 // Create CodingKeys in the parent type always, because both
@@ -231,7 +307,9 @@ static EnumDecl *addImplicitCaseCodingKeys(EnumDecl *target,
 // machinery so it no longer costs two protocol conformance lookups to retrieve
 // CodingKeys. It will also help in our quest to separate semantic and parsed
 // members.
-static EnumDecl *addImplicitCodingKeys(NominalTypeDecl *target) {
+static EnumDecl *addImplicitCodingKeys(DerivedConformance &derived,
+                                       ValueDecl *requirement) {
+  auto *target = derived.Nominal;
   auto &C = target->getASTContext();
 
   llvm::SmallVector<Identifier, 4> caseIdentifiers;
@@ -249,7 +327,8 @@ static EnumDecl *addImplicitCodingKeys(NominalTypeDecl *target) {
     }
   }
 
-  return addImplicitCodingKeys(target, caseIdentifiers, C.Id_CodingKeys);
+  return addImplicitCodingKeys(derived, requirement, target, caseIdentifiers,
+                               C.Id_CodingKeys);
 }
 
 namespace {
@@ -433,7 +512,8 @@ static bool validateCodingKeysEnum_enum(const DerivedConformance &derived,
 
 /// Looks up and validates a CodingKeys enum for the given DerivedConformance.
 /// If a CodingKeys enum does not exist, one will be derived.
-static bool validateCodingKeysEnum(const DerivedConformance &derived,
+static bool validateCodingKeysEnum(DerivedConformance &derived,
+                                   ValueDecl *requirement,
                                    DelayedNotes &delayedNotes) {
   auto &C = derived.Context;
 
@@ -445,7 +525,7 @@ static bool validateCodingKeysEnum(const DerivedConformance &derived,
   }
 
   ValueDecl *result = codingKeysDecls.empty()
-                          ? addImplicitCodingKeys(derived.Nominal)
+                          ? addImplicitCodingKeys(derived, requirement)
                           : codingKeysDecls.front();
   auto *codingKeysTypeDecl = dyn_cast<TypeDecl>(result);
   if (!codingKeysTypeDecl) {
@@ -484,7 +564,8 @@ static bool validateCodingKeysEnum(const DerivedConformance &derived,
 /// If a CaseCodingKeys enum does not exist, one will be derived.
 ///
 /// \param elementDecl The \c EnumElementDecl to validate against.
-static bool validateCaseCodingKeysEnum(const DerivedConformance &derived,
+static bool validateCaseCodingKeysEnum(DerivedConformance &derived,
+                                       ValueDecl *requirement,
                                        EnumElementDecl *elementDecl,
                                        DelayedNotes &delayedNotes) {
   auto &C = derived.Context;
@@ -509,7 +590,8 @@ static bool validateCaseCodingKeysEnum(const DerivedConformance &derived,
 
   ValueDecl *result = caseCodingKeysDecls.empty()
                           ? addImplicitCaseCodingKeys(
-                              enumDecl, elementDecl, codingKeysEnum)
+                              derived, requirement, enumDecl, elementDecl,
+                              codingKeysEnum)
                           : caseCodingKeysDecls.front();
 
   if (!result) {
@@ -2201,7 +2283,7 @@ static bool canSynthesize(DerivedConformance &derived, ValueDecl *requirement,
     }
   }
 
-  if (!validateCodingKeysEnum(derived, delayedNotes)) {
+  if (!validateCodingKeysEnum(derived, requirement, delayedNotes)) {
     return false;
   }
 
@@ -2255,7 +2337,8 @@ static bool canSynthesize(DerivedConformance &derived, ValueDecl *requirement,
       }
 
       if (!duplicate &&
-          !validateCaseCodingKeysEnum(derived, elementDecl, delayedNotes)) {
+          !validateCaseCodingKeysEnum(derived, requirement, elementDecl,
+                                      delayedNotes)) {
         allValid = false;
       }
     }
