@@ -4957,10 +4957,7 @@ TypeConverter::getConstantInfo(TypeExpansionContext expansion,
   auto bridgedTypes = getLoweredFormalTypes(constant, formalInterfaceType);
 
   CanAnyFunctionType loweredInterfaceType = bridgedTypes.Uncurried;
-
-  // The SIL type encodes conventions according to the original type.
-  CanSILFunctionType silFnType = ::getUncachedSILFunctionTypeForConstant(
-      *this, expansion, constant, bridgedTypes);
+  CanSILFunctionType silFnType;
 
   // If the constant refers to a derivative function, get the SIL type of the
   // original function and use it to compute the derivative SIL type.
@@ -5003,6 +5000,10 @@ TypeConverter::getConstantInfo(TypeExpansionContext expansion,
     silFnType = origFnConstantInfo.SILFnType->getAutoDiffDerivativeFunctionType(
         loweredParamIndices, loweredResultIndices, derivativeId->getKind(),
         *this, LookUpConformanceInModule());
+  } else {
+    // The SIL type encodes conventions according to the original type.
+    silFnType = ::getUncachedSILFunctionTypeForConstant(*this, expansion,
+                                                        constant, bridgedTypes);
   }
 
   LLVM_DEBUG(llvm::dbgs() << "lowering type for constant ";
