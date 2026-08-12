@@ -12,6 +12,8 @@
 // REQUIRES: concurrency_runtime
 // REQUIRES: swift_feature_CoroutineAccessors
 
+// REQUIRES: OS=macosx || OS=ios || OS=tvos || OS=watchos
+
 // CHECK-LABEL: %swift.back_deploy.task.pre_57 = type {
 //                  object header
 // CHECK-SAME:      %swift.refcounted

@@ -1,5 +1,4 @@
 // REQUIRES: VENDOR=apple
-// XFAIL: OS=xros
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/cache)
 // RUN: split-file %s %t
