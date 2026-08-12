@@ -3347,6 +3347,15 @@ public struct ExpressionThatEmitsCodeMacro: ExpressionMacro {
   }
 }
 
+public struct CodeItemThatEmitsCodeMacro: CodeItemMacro {
+  public static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [CodeBlockItemSyntax] {
+    ["\(raw: try verbatimCode(node.arguments))"]
+  }
+}
+
 public struct MemberAttributeThatAddsPeerMacro: MemberAttributeMacro {
   public static func expansion(
     of node: AttributeSyntax,
