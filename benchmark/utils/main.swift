@@ -226,7 +226,7 @@ import TypeFlood
 import UTF8Decode
 import UTF16Decode
 import Walsh
-import WithDeadlineVsTaskGroup
+import TaskDeadlines
 import WithUnsafeCurrentTask
 import WordCount
 import XorLoop
@@ -448,7 +448,7 @@ register(TypeFlood.benchmarks)
 register(UTF8Decode.benchmarks)
 register(UTF16Decode.benchmarks)
 register(Walsh.benchmarks)
-register(WithDeadlineVsTaskGroup.benchmarks)
+register(TaskDeadlines.benchmarks)
 register(WithUnsafeCurrentTask.benchmarks)
 register(WordCount.benchmarks)
 register(XorLoop.benchmarks)

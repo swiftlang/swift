@@ -1,4 +1,4 @@
-//===--- WithDeadlineVsTaskGroup.swift -----------------------------------===//
+//===--- TaskDeadlines.swift ----------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -11,14 +11,10 @@
 //===----------------------------------------------------------------------===//
 
 // Compare the built-in `withDeadline` (scope + timer, no child tasks) against
-// the "naive" implementation a user would write without it: a
-// `withTaskGroup` with two child tasks (work + timer) and a `cancelAll` on
-// first completion. The interesting number is the ratio between
-// `WithDeadline_*` and `NaiveTaskGroupDeadline_*`.
+// the "naive" implementation a user would write without it.
 //
-// All variants use a far-future deadline so the deadline never fires; the
-// timer path never wakes, and the operation returns normally. This isolates
-// the setup/teardown cost of the two approaches.
+// All variants use a far-future deadline so the deadline never fires,
+// this benchmark is about the cost of setting up the deadlines.
 
 @_spi(Concurrency) import _Concurrency
 import TestsUtils
@@ -73,10 +69,7 @@ public func run_NaiveTaskGroupDeadline_WorkChild(n: Int) async {
   let clock = ContinuousClock()
   for _ in 0..<n {
     let deadline = clock.now.advanced(by: .seconds(3600))
-    // The shape a user would reach for without withDeadline: two child
-    // tasks in a group, whichever finishes first wins, then cancel the
-    // rest. Two child-task allocations, two enqueues, one cancelAll,
-    // plus the group teardown per iteration.
+    // The shape withDeadline that's implementable outside of the stdlib.
     let result = await withTaskGroup(of: Int?.self) { group in
       group.addTask { doWork() }
       group.addTask {

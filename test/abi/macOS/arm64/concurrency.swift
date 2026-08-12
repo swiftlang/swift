@@ -492,10 +492,16 @@ Added: _$ss21TaskCancellationScopeVMn
 Added: _$ss21TaskCancellationScopeVN
 Added: _$sScE11descriptionSSvg
 Added: _$sScE11descriptionSSvpMV
+Added: _$sScE6ReasonO11descriptionSSvg
+Added: _$sScE6ReasonO11descriptionSSvpMV
 Added: _$sScE6ReasonO11unspecifiedyA2BmFWC
 Added: _$sScE6ReasonO15deadlineExpiredyA2BmFWC
+Added: _$sScE6ReasonO16debugDescriptionSSvg
+Added: _$sScE6ReasonO16debugDescriptionSSvpMV
 Added: _$sScE6ReasonO2eeoiySbAB_ABtFZ
 Added: _$sScE6ReasonO4hash4intoys6HasherVz_tF
+Added: _$sScE6ReasonO8allCasesSayABGvgZ
+Added: _$sScE6ReasonO8allCasesSayABGvpZMV
 Added: _$sScE6ReasonO9_rawValues5UInt8VvpMV
 Added: _$sScE6ReasonO9hashValueSivg
 Added: _$sScE6ReasonO9hashValueSivpMV
@@ -504,6 +510,9 @@ Added: _$sScE6ReasonOMn
 Added: _$sScE6ReasonON
 Added: _$sScE6ReasonOSHsMc
 Added: _$sScE6ReasonOSQsMc
+Added: _$sScE6ReasonOs12CaseIterablesMc
+Added: _$sScE6ReasonOs23CustomStringConvertiblesMc
+Added: _$sScE6ReasonOs28CustomDebugStringConvertiblesMc
 Added: _$sScE6reasonS2cE6ReasonO_tcfC
 Added: _$sScE6reasonScE6ReasonOvg
 Added: _$sScE6reasonScE6ReasonOvpMV
