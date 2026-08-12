@@ -711,8 +711,8 @@ void BindingSet::inferTransitiveProtocolRequirements() {
 
   auto propagateProtocolsTo =
       [&protocols](TypeVariableType *dstVar,
-                   const ArrayRef<Constraint *> &direct,
-                   const SmallPtrSetImpl<Constraint *> &transitive) {
+                   ArrayRef<Constraint *> direct,
+                   SmallPtrSet<Constraint *, 4> transitive) {
         auto &destination = protocols[dstVar];
 
         if (direct.size() > 0)
@@ -789,7 +789,7 @@ void BindingSet::inferTransitiveProtocolRequirements() {
       auto conformanceReqs =
           node.getPotentialBindings().getConformanceRequirements();
 
-      llvm::SmallPtrSet<Constraint *, 2> placeholder;
+      llvm::SmallPtrSet<Constraint *, 4> placeholder;
       // Add any direct protocols from members of the
       // equivalence class, so they could be propagated
       // to all of the members.

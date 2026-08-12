@@ -1992,16 +1992,15 @@ namespace {
     /// of its words typed as pointers (`ptr`) rather than as opaque integer
     /// words. On success `types` receives the payload's element types.
     ///
-    /// This holds when the payload holds a managed reference and stores the
-    /// enum's tag in that reference's extra inhabitants:
+    /// This holds when the payload contains a pointer and stores the enum's
+    /// tag in that pointer's extra inhabitants:
     ///   * the payload has at least as many extra inhabitants as the enum has
     ///     no-payload cases, so every empty case is one of the payload's low,
     ///     invalid-pointer extra inhabitants and no separate tag storage is
     ///     needed (the enum keeps the payload's own layout); and
-    ///   * the payload is non-trivial, i.e. it contains a managed reference
-    ///     (whose extra inhabitants the tag rides in) -- this also keeps
-    ///     unrelated pointer-shaped-but-trivial types (metatypes, unsafe
-    ///     pointers, ...) on their existing integer representation.
+    ///   * the payload's explosion contains at least one pointer word (a bare
+    ///     reference, or a raw/unsafe pointer such as `UnsafeMutablePointer`)
+    ///     whose extra inhabitants the tag rides in.
     /// Only genuine (valid) pointer values are ever loaded or dereferenced, so
     /// carrying the empty cases' sentinel bit patterns in a `ptr` is safe.
     ///
@@ -2040,12 +2039,6 @@ namespace {
       // The tag must fit in the payload's extra inhabitants, so the enum adds
       // no separate tag storage and keeps the payload's own layout.
       if (fixedTI->getFixedExtraInhabitantCount(IGM) < numNoPayloadCases)
-        return false;
-      // The payload must hold a managed reference (whose extra inhabitants the
-      // tag rides in). Excluding trivially-destroyable payloads keeps unrelated
-      // pointer-shaped types (metatypes, unsafe pointers, ...) on their integer
-      // representation.
-      if (payloadTI.isTriviallyDestroyable(ResilienceExpansion::Maximal))
         return false;
 
       auto &DL = IGM.DataLayout;
