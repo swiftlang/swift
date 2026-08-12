@@ -986,6 +986,11 @@ bool IRGenModule::isResilientConformance(
     const NormalProtocolConformance *conformance,
     bool disableOptimizations
 ) {
+  // An IID fixes a COM interface's complete ABI. Adding requirements requires a
+  // new interface identity, so COM witnes layouts are never resilient.
+  if (conformance->getProtocol()->isCOMInterface())
+    return false;
+
   // If the protocol is not resilient, the conformance is not resilient
   // either.
   bool shouldTreatProtocolNonResilient =
