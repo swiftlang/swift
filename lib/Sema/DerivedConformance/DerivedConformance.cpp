@@ -1241,6 +1241,7 @@ static void printEnumCaseInfo(llvm::raw_ostream &out,
       << QuotedString(
              identifierEscapingIfNeeded(decl->getNameStr(),
                                         PrintNameContext::TypeMember))
+      << ", unescapedName: " << QuotedString(decl->getNameStr())
       << ", associatedValueLabels: [";
   llvm::interleaveComma(decl->getName().getArgumentNames(), out,
                         [&](Identifier name) {

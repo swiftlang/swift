@@ -52,6 +52,10 @@ public struct EnumCaseInfo {
   /// The case's name, escaped as it must appear in Swift source
   var name: String
 
+  /// The case's name as written by the user, without any escaping. This is the
+  /// spelling to use inside string literals.
+  var unescapedName: String
+
   /// For each associated value, we have the label's name (escaped as it must
   /// appear in Swift source) and `nil` if there isn't one
   var associatedValueLabels: [String?]
@@ -334,6 +338,25 @@ extension LabeledExprListSyntax {
       try e.expect(arg: lst[4])
     )
   }
+
+  /// Parses six labelled arguments from the argument list.
+  func expect<A, B, C, D, E, F>(
+    _ a: ArgParser<A>, _ b: ArgParser<B>, _ c: ArgParser<C>, _ d: ArgParser<D>,
+    _ e: ArgParser<E>, _ f: ArgParser<F>
+  ) throws -> (A, B, C, D, E, F) {
+    let lst = Array(self)
+    guard lst.count == 6 else {
+      throw TypeInfoParseError.argCountMismatch(expected: 6, args: self)
+    }
+    return (
+      try a.expect(arg: lst[0]),
+      try b.expect(arg: lst[1]),
+      try c.expect(arg: lst[2]),
+      try d.expect(arg: lst[3]),
+      try e.expect(arg: lst[4]),
+      try f.expect(arg: lst[5])
+    )
+  }
 }
 
 /// Protocol for `NominalTypeInfo` and associated types to conform to.
@@ -532,17 +555,20 @@ extension EnumCaseInfo: TypeInfoProtocol {
   public static func fromSyntax(node: ExprSyntax) throws -> Self {
     // Expecting:
     //   EnumCaseInfo(name: <String>,
+    //                unescapedName: <String>,
     //                associatedValueLabels: <[String?]>,
     //                isReachable: <Bool>,
     //                rawValue: <String?>,
     //                runtimeAvailability: <CaseRuntimeAvailability>)
 
-    let (name, associatedValueLabels, isReachable, rawValue, runtimeAvailability) =
+    let (name, unescapedName, associatedValueLabels, isReachable, rawValue,
+         runtimeAvailability) =
       try getNamedFuncallArgs(
         node: node,
         name: "EnumCaseInfo"
       ).expect(
         .stringArg("name"),
+        .stringArg("unescapedName"),
         .stringArg("associatedValueLabels").toOptional().toArray(),
         .boolArg("isReachable"),
         .stringArg("rawValue").toOptional(),
@@ -551,6 +577,7 @@ extension EnumCaseInfo: TypeInfoProtocol {
 
     return Self(
       name: name,
+      unescapedName: unescapedName,
       associatedValueLabels: associatedValueLabels,
       isReachable: isReachable,
       rawValue: rawValue,
@@ -559,7 +586,7 @@ extension EnumCaseInfo: TypeInfoProtocol {
 
   public var syntax: ExprSyntax {
     """
-    EnumCaseInfo(name: \(stringlit(name)), associatedValueLabels: \(arraySyntax(associatedValueLabels, {optionalSyntax($0, stringlit)})), isReachable: \(boollit(isReachable)), rawValue: \(optionalSyntax(rawValue, stringlit)), runtimeAvailability: \(runtimeAvailability.syntax))
+    EnumCaseInfo(name: \(stringlit(name)), unescapedName: \(stringlit(unescapedName)), associatedValueLabels: \(arraySyntax(associatedValueLabels, {optionalSyntax($0, stringlit)})), isReachable: \(boollit(isReachable)), rawValue: \(optionalSyntax(rawValue, stringlit)), runtimeAvailability: \(runtimeAvailability.syntax))
     """
   }
 }

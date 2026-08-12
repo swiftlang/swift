@@ -127,12 +127,12 @@ public struct DeriveCodingKeyMacro: DeclarationMacro {
         case .always:
           return
             """
-            case "\(c.name)": self = .\(c.name)
+            case "\(c.unescapedName)": self = .\(c.name)
             """
         case .conditional(let platform, let version):
           return
             """
-            case "\(c.name)":
+            case "\(c.unescapedName)":
               guard #available(\(platform) \(version), *) else { return nil }
               self = .\(c.name)
             """
@@ -172,7 +172,7 @@ public struct DeriveCodingKeyMacro: DeclarationMacro {
       case .string:
         let cases = enumInfo.cases.map { c in
           """
-          case .\(c.name): return "\(c.name)"
+          case .\(c.name): return "\(c.unescapedName)"
           """
         }.joined(separator: "\n")
 
