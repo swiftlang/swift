@@ -431,6 +431,10 @@ void ExistentialTransform::populateThunkBody() {
   struct Temp {
     SILValue DeallocStackEntry;
     SILValue DestroyValue;
+    // If set, we moved the (non-copyable) value out of an existential box and
+    // so we need to clean up the empty box with deinit_existential_addr instead
+    // of destroy_addr.
+    bool DestroyEmptyBox = false;
   };
   SmallVector<Temp, 8> Temps;
   SmallDenseMap<GenericTypeParamType *, Type> GenericToOpenedTypeMap;
@@ -457,12 +461,16 @@ void ExistentialTransform::populateThunkBody() {
         if (OriginallyConsumed) {
           // open_existential_addr projects a borrowed address into the
           // existential box. Since the callee consumes the generic value, we
-          // must pass in a copy.
+          // must pass in a copy -- unless the value is move-only, in which
+          // case we use a take instead: the callee already consumes the whole
+          // existential, so nothing else can observe OrigOperand's payload afterward.
+          bool isMoveOnly = OpenedSILType.isMoveOnly();
           auto *ASI =
             Builder.createAllocStack(Loc, OpenedSILType);
-          Builder.createCopyAddr(Loc, archetypeValue, ASI, IsNotTake,
+          Builder.createCopyAddr(Loc, archetypeValue, ASI,
+                                 isMoveOnly ? IsTake : IsNotTake,
                                  IsInitialization_t::IsInitialization);
-          Temps.push_back({ASI, OrigOperand});
+          Temps.push_back({ASI, OrigOperand, isMoveOnly});
           calleeArg = ASI;
         }
         ApplyArgs.push_back(calleeArg);
@@ -602,8 +610,17 @@ void ExistentialTransform::populateThunkBody() {
     //     dealloc_stack %temp : $*T
     //
     // Otherwise, if we had an object, we just emit a destroy_value.
-    if (Temp.DestroyValue)
-      Builder.emitDestroyOperation(cleanupLoc, Temp.DestroyValue);
+    //
+    // If the payload is move-only, the copy_addr above was actually a take,
+    // so %consumedExistential's payload is already gone; only the (now
+    // empty) existential container itself still needs to be torn down, via
+    // deinit_existential_addr rather than destroy_addr.
+    if (Temp.DestroyValue) {
+      if (Temp.DestroyEmptyBox)
+        Builder.createDeinitExistentialAddr(cleanupLoc, Temp.DestroyValue);
+      else
+        Builder.emitDestroyOperation(cleanupLoc, Temp.DestroyValue);
+    }
     if (Temp.DeallocStackEntry)
       Builder.createDeallocStack(cleanupLoc, Temp.DeallocStackEntry);
   }
