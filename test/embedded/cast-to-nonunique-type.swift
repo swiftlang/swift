@@ -30,9 +30,9 @@ import Lib
 // the cast cannot be folded away.
 
 public func conditionalCast(_ w: any ResourceWriter) -> PSWriterM3Demo? {
-  return w as? PSWriterM3Demo // expected-error {{cannot cast to 'PSWriterM3Demo' across a module boundary in embedded Swift because its type metadata is not unique; mark 'PSWriterM3Demo' with '@export(interface)' in its defining module}}
+  return w as? PSWriterM3Demo // expected-warning {{casting to 'PSWriterM3Demo' across a module boundary in embedded Swift may fail at runtime because its type metadata is not unique; mark 'PSWriterM3Demo' with '@export(interface)' in its defining module}}
 }
 
 public func forcedCast(_ w: any ResourceWriter) -> PSWriterM3Demo {
-  return w as! PSWriterM3Demo // expected-error {{cannot cast to 'PSWriterM3Demo' across a module boundary in embedded Swift because its type metadata is not unique; mark 'PSWriterM3Demo' with '@export(interface)' in its defining module}}
+  return w as! PSWriterM3Demo // expected-warning {{casting to 'PSWriterM3Demo' across a module boundary in embedded Swift may fail at runtime because its type metadata is not unique; mark 'PSWriterM3Demo' with '@export(interface)' in its defining module}}
 }
