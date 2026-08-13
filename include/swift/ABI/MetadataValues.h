@@ -68,6 +68,9 @@ enum {
   /// The number of words in an AsyncLet (flags + child task context & allocation)
   NumWords_AsyncLet = 80, // 640 bytes ought to be enough for anyone
 
+  /// The number of words in a task deadline record.
+  NumWords_TaskDeadline = 16,
+
   /// The size of a unique hash.
   NumBytes_UniqueHash = 16,
 
@@ -155,6 +158,9 @@ const size_t Alignment_TaskGroup = MaximumAlignment;
 
 /// The alignment of an AsyncLet.
 const size_t Alignment_AsyncLet = MaximumAlignment;
+
+/// The alignment of a TaskDeadline record slot.
+const size_t Alignment_TaskDeadline = MaximumAlignment;
 
 /// Flags stored in the value-witness table.
 template <typename int_type>
@@ -1783,6 +1789,7 @@ namespace SpecialPointerAuthDiscriminators {
   const uint16_t AsyncContextResume = 0xd707; // = 55047
   const uint16_t AsyncContextYield = 0xe207; // = 57863
   const uint16_t CancellationNotificationFunction = 0x0f08; // = 3848
+  const uint16_t CancellationNotificationWithReasonFunction = 0x89d1; // = 35281
   const uint16_t EscalationNotificationFunction = 0x7861; // = 30817
   const uint16_t AsyncThinNullaryFunction = 0x0f08; // = 3848
   const uint16_t AsyncFutureFunction = 0x720f; // = 29199
@@ -2920,6 +2927,28 @@ enum class TaskStatusRecordKind : uint8_t {
 
   /// Deprecated: A human-readable task name, replaced by `NameFragment`.
   // DEPRECATED: TaskName = 6,
+
+  /// A TaskDeadlineStatusRecord, which represents a point in time at which
+  /// the deadline scope should trigger scope cancellation.
+  ///
+  /// Introduced in Swift 6.5
+  Deadline = 7,
+
+  /// A TaskCancellationScopeRecord, which represents a scoped cancellation
+  /// domain that is independent of whole-task cancellation. Not public API.
+  ///
+  /// Introduced in Swift 6.5
+  TaskCancellationScope = 8,
+
+  /// A TaskCancellationShieldRecord, present iff a cancellation shield is
+  /// currently active.
+  ///
+  /// This was introduced after the initial task cancellation shield
+  /// introduction, / because task cancellation scope nesting necessitates
+  /// tracking nesting of shields and scopes.
+  ///
+  /// Introduced in Swift 6.5
+  CancellationShield = 9,
 
   // Kinds >= 192 are private to the implementation.
   First_Reserved = 192,

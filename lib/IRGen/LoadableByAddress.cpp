@@ -4790,6 +4790,14 @@ protected:
     assignment.markForDeletion(m);
   }
 
+  void visitMarkDependenceAddrInst(MarkDependenceAddrInst *m) {
+    auto builder = assignment.getBuilder(m->getIterator());
+    auto opdAddr = assignment.getAddressForValue(m->getBase());
+    builder.createMarkDependenceAddr(m->getLoc(), m->getAddress(), opdAddr,
+                                     m->dependenceKind());
+    assignment.markForDeletion(m);
+  }
+
   void visitStoreInst(StoreInst *store) {
     auto builder = assignment.getBuilder(store->getIterator());
     SILValue addr = assignment.getAddressForValue(store->getSrc());

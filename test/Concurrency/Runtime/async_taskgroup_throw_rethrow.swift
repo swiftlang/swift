@@ -88,7 +88,7 @@ func test_taskGroup_throw_rethrows_waitForAll() async {
         try await group.waitForAll()
       } catch {
         print("waitAll rethrown: ", error)
-        // CHECK: waitAll rethrown: CancellationError()
+        // CHECK: waitAll rethrown: CancellationError(reason: unspecified)
         print("isEmpty: ", group.isEmpty)
         // CHECK: isEmpty: true
         throw error
@@ -96,7 +96,7 @@ func test_taskGroup_throw_rethrows_waitForAll() async {
     }
   } catch {
     print("rethrown: ", error)
-    // CHECK: rethrown: CancellationError()
+    // CHECK: rethrown: CancellationError(reason: unspecified)
   }
 }
 
@@ -146,7 +146,7 @@ func test_discardingTaskGroup_automaticallyRethrowsOnlyFirst() async {
     print("Expected error to be thrown, but got: \(got)")
   } catch {
     // CHECK: Throwing: Boom(id: "first, isCancelled:false
-    // CHECK: Awoken, throwing: CancellationError()
+    // CHECK: Awoken, throwing: CancellationError(reason: unspecified)
     // and only then the re-throw happens:
     // CHECK: rethrown: Boom(id: "first
     print("rethrown: \(error)")

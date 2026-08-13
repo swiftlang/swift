@@ -1113,6 +1113,8 @@ BUILTIN_OPERAND_OWNERSHIP(TrivialUse, AutoDiffCreateLinearMapContextWithType)
 
 // InstantaneousUse since we take in a closure at +0.
 BUILTIN_OPERAND_OWNERSHIP(BitwiseEscape, TaskAddCancellationHandler)
+// InstantaneousUse since we take in a closure at +0.
+BUILTIN_OPERAND_OWNERSHIP(BitwiseEscape, TaskAddCancellationHandlerWithReason)
 // Trivial use since our operand is just an UnsafeRawPointer.
 BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskRemoveCancellationHandler)
 // InstantaneousUse since we take in a closure at +0.
@@ -1128,6 +1130,17 @@ BUILTIN_OPERAND_OWNERSHIP(TrivialUse, RemoveTaskLocalValue)
 
 BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskCancellationShieldPush)
 BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskCancellationShieldPop)
+
+// TaskCancellationScopePush takes no operands.
+BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskCancellationScopePush)
+// Trivial use since our operand is just an UnsafeRawPointer.
+BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskCancellationScopePop)
+
+// TaskPushDeadline takes two borrowed generic operands passed by
+// address; at the SIL level address operands are trivial.
+BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskPushDeadline)
+// Trivial use since our operand is just an UnsafeRawPointer.
+BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskPopDeadline)
 
 #undef BUILTIN_OPERAND_OWNERSHIP
 
