@@ -2029,7 +2029,18 @@ public:
                            const clang::DeclContext *container);
 
   /// Emit any import diagnostics associated with the given Clang node.
-  void diagnoseTargetDirectly(ImportDiagnosticTarget target);
+  ///
+  /// \param visited Declarations already traversed for the current lookup, so
+  /// that a definition reachable from several entries is diagnosed once.
+  void diagnoseTargetDirectly(
+      ImportDiagnosticTarget target,
+      llvm::SmallPtrSetImpl<const clang::Decl *> &visited);
+
+  /// Emit any import diagnostics associated with the given Clang node.
+  void diagnoseTargetDirectly(ImportDiagnosticTarget target) {
+    llvm::SmallPtrSet<const clang::Decl *, 4> visited;
+    diagnoseTargetDirectly(target, visited);
+  }
 
 private:
   static ImportDiagnosticTarget importDiagnosticTargetFromLookupTableEntry(
@@ -2324,6 +2335,11 @@ bool hasEscapableAttr(const clang::RecordDecl *decl);
 /// The \c @_refCountedPtr attribute marking \p decl as a reference counting
 /// smart pointer, or null if it does not have one.
 CustomAttr *getRefCountedPtrAttr(Decl *decl);
+
+/// The macro that spells \p attr in a header, e.g. \c SWIFT_ESCAPABLE for
+/// \c swift_attr("Escapable"), for use in diagnostics. Falls back to the
+/// attribute string itself when it has no documented macro.
+StringRef getPrettySwiftAttributeName(const clang::SwiftAttrAttr *attr);
 
 CxxValueSemanticsKind
 getCxxValueSemanticsKind(const clang::Type *type,
