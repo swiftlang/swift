@@ -1829,11 +1829,35 @@ tryCastUnwrappingExistentialSource(
   }
 
   srcFailureType = srcInnerType;
-  return tryCast(destLocation, destType,
-                 srcInnerValue, srcInnerType,
-                 destFailureType, srcFailureType,
-                 takeOnSuccess && (srcInnerValue == srcValue),
-                 mayDeferChecks, prohibitIsolatedConformances);
+
+  // If the source is non-copyable, then we must try to take/move it
+  bool srcInnerIsNoncopyable =
+      !srcInnerType->getValueWitnesses()->flags.isCopyable();
+  // If the value is boxed, there might be another reference, but
+  // if it's inline, we can optimize by using take/move semantics:
+  bool srcIsInline = (srcInnerValue == srcValue);
+  bool takeInnerValue =
+      takeOnSuccess && (srcInnerIsNoncopyable || srcIsInline);
+
+  auto result = tryCast(destLocation, destType,
+                        srcInnerValue, srcInnerType,
+                        destFailureType, srcFailureType,
+                        takeInnerValue,
+                        mayDeferChecks, prohibitIsolatedConformances);
+
+  // If we (a) moved the payload out of a (b) boxed (out-of-line) (c) opaque
+  // existential container, the box itself still needs to be freed.
+  if (result == DynamicCastResult::SuccessViaTake && // (a)
+      !srcIsInline && // (b)
+      srcExistentialType->getRepresentation() ==
+      ExistentialTypeRepresentation::Opaque) // (c)
+  {
+    auto *vwt = srcInnerType->getValueWitnesses();
+    auto *box = *reinterpret_cast<HeapObject **>(srcValue);
+    swift_deallocUninitializedObject(box, vwt->size, vwt->getAlignmentMask());
+  }
+
+  return result;
 }
 
 static DynamicCastResult tryCastUnwrappingExtendedExistentialSource(
@@ -1878,10 +1902,33 @@ static DynamicCastResult tryCastUnwrappingExtendedExistentialSource(
   }
 
   srcFailureType = srcInnerType;
-  return tryCast(destLocation, destType, srcInnerValue, srcInnerType,
-                 destFailureType, srcFailureType,
-                 takeOnSuccess && (srcInnerValue == srcValue), mayDeferChecks,
-                 prohibitIsolatedConformances);
+
+  // Noncopyable payload must be moved, not copied.
+  bool srcInnerIsNoncopyable =
+      !srcInnerType->getValueWitnesses()->flags.isCopyable();
+  // If the value is boxed, there might be another reference, but
+  // if it's inline, we can optimize by using take/move semantics:
+  bool srcIsInline = (srcInnerValue == srcValue);
+  bool takeInnerValue =
+      takeOnSuccess && (srcInnerIsNoncopyable || srcIsInline);
+
+  auto result = tryCast(destLocation, destType, srcInnerValue, srcInnerType,
+                        destFailureType, srcFailureType,
+                        takeInnerValue, mayDeferChecks,
+                        prohibitIsolatedConformances);
+
+  if (result == DynamicCastResult::SuccessViaTake &&
+      !srcIsInline &&
+      srcExistentialType->Shape->Flags.getSpecialKind() ==
+          ExtendedExistentialTypeShape::SpecialKind::None) {
+    // Value was moved out of a heap-allocated box, so we
+    // need to free the empty box:
+    auto *vwt = srcInnerType->getValueWitnesses();
+    auto *box = *reinterpret_cast<HeapObject **>(srcValue);
+    swift_deallocUninitializedObject(box, vwt->size, vwt->getAlignmentMask());
+  }
+
+  return result;
 }
 
 static DynamicCastResult
