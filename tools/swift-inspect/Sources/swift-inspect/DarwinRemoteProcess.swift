@@ -42,6 +42,14 @@ internal final class DarwinRemoteProcess: RemoteProcess {
   private var swiftCore: CSTypeRef
   private let swiftConcurrency: CSTypeRef
 
+  /// The reference passed to the reflection context, which the context holds
+  /// until `releaseContextRef()` clears it.
+  private var contextRef: OpaqueRef?
+
+  func releaseContextRef() {
+    contextRef = nil
+  }
+
   private lazy var threadInfos = getThreadInfos()
 
   static var QueryDataLayout: QueryDataLayoutFunction {
@@ -166,7 +174,7 @@ internal final class DarwinRemoteProcess: RemoteProcess {
     if forkCorpse || forceForkCorpse {
       var corpse = task_t()
       let maxRetry = 6
-      for retry in 0..<maxRetry {
+      for retry in 1...maxRetry {
         let corpseResult = task_generate_corpse(task.value, &corpse)
         if corpseResult == KERN_SUCCESS {
           task.value = corpse
@@ -177,7 +185,7 @@ internal final class DarwinRemoteProcess: RemoteProcess {
             to: &Std.err)
           return nil
         }
-        sleep(UInt32(1 << retry))
+        sleep(UInt32(1 << (retry - 1)))
       }
     }
 
@@ -195,8 +203,9 @@ internal final class DarwinRemoteProcess: RemoteProcess {
 
     _ = task_start_peeking(self.task.value)
 
+    self.contextRef = OpaqueRef(self)
     guard let context =
-        swift_reflection_createReflectionContextWithDataLayout(self.toOpaqueRef(),
+        swift_reflection_createReflectionContextWithDataLayout(self.contextRef?.pointer,
                                                                Self.QueryDataLayout,
                                                                Self.Free,
                                                                Self.ReadBytes,
