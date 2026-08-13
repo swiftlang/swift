@@ -185,7 +185,7 @@ extension _RigidArray {
     _precondition(
       newElements.count <= freeCapacity,
       "RigidArray capacity overflow")
-    _appendUnchecked(copying: newElements)
+    unsafe _appendUnchecked(copying: newElements)
   }
 
   /// Copies the elements of a buffer to the end of this array.
