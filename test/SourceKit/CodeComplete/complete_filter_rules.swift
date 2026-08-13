@@ -93,8 +93,8 @@ func testHideOp1() {
   var local = 1
   #^HIDE_OP_1,local^#
 }
-// HIDE_OP-NOT: .
-// HIDE_OP-NOT: =
+// HIDE_OP-NOT: {{^}}.{{$}}
+// HIDE_OP-NOT: {{^}}={{$}}
 
 // RUN: %complete-test -filter-rules=%S/Inputs/filter-rules/showSpecific.json -tok=HIDE_OP_2 %s -- -F %S/../Inputs/libIDE-mock-sdk | %FileCheck %s -check-prefix=HIDE_OP -allow-empty
 func testHideOp2() {

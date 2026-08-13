@@ -970,3 +970,18 @@ void SILGenFunction::finalizeAddTaskLocalValue(BuiltinInst *BI) {
   // SILGen emits the argument without a temporary.
   StackNesting::fixNesting(&F);
 }
+
+void SILGenFunction::finalizeTaskPushDeadline(BuiltinInst *BI) {
+  // Same shape of workaround as `finalizeAddTaskLocalValue` above.
+  //
+  // `Builtin.taskPushDeadline` is
+  // `<C: Clock & Identifiable, I>(borrowing C, borrowing I) -> UnsafeRawPointer`.
+  // Callers whose `clock` / `instant` don't already live at a stable
+  // indirect address (e.g. we come from an `@in_guaranteed` parameter but
+  // SILGen still materializes fresh `alloc_stack`s during argument scope
+  // building) end up with temporaries whose `dealloc_stack` sits between
+  // the paired `taskPushDeadline` and `taskPopDeadline`. These locals
+  // break strict SIL stack nesting, so we mark the push allocation
+  // `[non_nested]` to allow the intervening `dealloc_stack`s.
+  StackNesting::fixNesting(&F);
+}
