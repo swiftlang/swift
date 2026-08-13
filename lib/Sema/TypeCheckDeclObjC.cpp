@@ -31,6 +31,7 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/StringExtras.h"
 
+#include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclObjC.h"
 
 using namespace swift;
@@ -815,31 +816,44 @@ bool swift::isRepresentableInLanguage(
   if (auto init = dyn_cast<ConstructorDecl>(AFD))
     isSpecialInit = init->isObjCZeroParameterWithLongSelector();
 
-  if (!isSpecialInit &&
-      !isParamListRepresentableInLanguage(AFD,
-                                          AFD->getParameters(),
-                                          Reason)) {
-    return false;
+  // When overriding a Clang-imported ObjC(++) method, the parameter and return
+  // types are guaranteed to match the base (enforced by the override matcher).
+  // Clang already validated those types for ObjC++, so skip the Swift-side
+  // representability checks that would otherwise reject C++ record types.
+  bool overridesClangImport = false;
+  if (Reason == ObjCReason::OverridesObjC) {
+    if (auto *overridden = AFD->getOverriddenDecl())
+      overridesClangImport = overridden->hasClangNode();
   }
 
-  if (auto FD = dyn_cast<FuncDecl>(AFD)) {
-    Type ResultType = FD->mapTypeIntoEnvironment(FD->getResultInterfaceType());
-    if (!FD->hasAsync() &&
-        !ResultType->hasError() &&
-        !ResultType->isVoid() &&
-        !ResultType->isUninhabited() &&
-        !ResultType->isRepresentableIn(language,
-                                       const_cast<FuncDecl *>(FD))) {
-      softenIfAccessNote(AFD, Reason.getAttr(),
-       AFD->diagnose(diag::objc_invalid_on_func_result_type,
-                     FD, getObjCDiagnosticAttrKind(Reason),
-                     language)
-            .limitBehavior(behavior));
-      diagnoseTypeNotRepresentableInObjC(FD, ResultType,
-                                         FD->getResultTypeSourceRange(),
-                                         behavior, Reason);
-      Reason.describe(FD);
+  if (!overridesClangImport) {
+    if (!isSpecialInit &&
+        !isParamListRepresentableInLanguage(AFD,
+                                            AFD->getParameters(),
+                                            Reason)) {
       return false;
+    }
+
+    if (auto FD = dyn_cast<FuncDecl>(AFD)) {
+      Type ResultType =
+          FD->mapTypeIntoEnvironment(FD->getResultInterfaceType());
+      if (!FD->hasAsync() &&
+          !ResultType->hasError() &&
+          !ResultType->isVoid() &&
+          !ResultType->isUninhabited() &&
+          !ResultType->isRepresentableIn(language,
+                                         const_cast<FuncDecl *>(FD))) {
+        softenIfAccessNote(AFD, Reason.getAttr(),
+         AFD->diagnose(diag::objc_invalid_on_func_result_type,
+                       FD, getObjCDiagnosticAttrKind(Reason),
+                       language)
+              .limitBehavior(behavior));
+        diagnoseTypeNotRepresentableInObjC(FD, ResultType,
+                                           FD->getResultTypeSourceRange(),
+                                           behavior, Reason);
+        Reason.describe(FD);
+        return false;
+      }
     }
   }
 
