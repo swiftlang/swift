@@ -2,7 +2,7 @@
 
 // ModernImportedCArrays, default target
 // C arrays are imported as tuples, as though the feature flag was not used.
-// RUN: %target-typecheck-verify-swift %clang-importer-sdk -enable-experimental-feature ModernImportedCArrays -verify-additional-prefix not-an-inline-array-
+// RUN: %target-typecheck-verify-swift %clang-importer-sdk -enable-experimental-feature ModernImportedCArrays -verify-additional-prefix not-an-inline-array- -verify-additional-prefix flag-ignored-
 
 // ModernImportedCArrays, high enough target
 // C arrays are imported as InlineArrays.
@@ -20,6 +20,8 @@
 // REQUIRES: swift_feature_ModernImportedCArraysOnly
 
 import Foundation
+
+// expected-flag-ignored-warning@<unknown> {{feature 'ModernImportedCArrays' disabled: module can run on }}
 
 // expected-not-available-note@+1 {{add '@available' attribute to enclosing global function}}
 func fn(_ state: NSFastEnumerationState) {

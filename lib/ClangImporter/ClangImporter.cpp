@@ -3090,7 +3090,10 @@ static CArrayProjection selectCArrayProjection(ASTContext &ctx) {
       auto langMode = Feature::ModernImportedCArrays.getLanguageMode()
                           .value_or(LanguageMode::future);
       if (!ctx.LangOpts.isLanguageModeAtLeast(langMode)) {
-        // FIXME: Diagnose
+        ctx.Diags.diagnose(SourceLoc(),
+                           diag::cannot_enable_modern_imported_c_arrays,
+                           ctx.getTargetAvailabilityDomain(),
+                           targetAvailability, typeAvailability);
       }
     }
   }
