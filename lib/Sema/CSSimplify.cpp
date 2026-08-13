@@ -16528,7 +16528,9 @@ void ConstraintSystem::addConstraint(Requirement req,
       }
     }
 
-    conformsToAnyObject = true;
+    // Native classes conform to AnyObject, but foreign reference types do not,
+    // so only imply the AnyObject requirement when the bound isn't an FRT.
+    conformsToAnyObject = !req.getSecondType()->isForeignReferenceType();
     kind = ConstraintKind::Subtype;
     break;
   }
