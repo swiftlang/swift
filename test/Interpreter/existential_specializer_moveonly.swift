@@ -10,7 +10,6 @@
 // RUN: %target-run %t/main_ounchecked | %FileCheck %s
 
 // REQUIRES: executable_test
-// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 // Regression test: ExistentialSpecializer clones a function that consumes
 // an existential parameter into a version taking the concrete type
