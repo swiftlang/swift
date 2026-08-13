@@ -4677,8 +4677,12 @@ namespace {
 
     void addInstanceAddressPoint() {
       assert(!isPureObjC());
-      // Right now, we never allocate fields before the address point.
-      B.addInt32(0);
+
+      auto addressPoint = getCOMObjectPrefixSize(IGM, Target);
+      if (asImpl().hasFixedLayout())
+        addressPoint =
+            addressPoint.roundUpToAlignment(FieldLayout.getAlignment());
+      B.addInt32(addressPoint.getValue());
     }
 
     bool hasFixedLayout() { return FieldLayout.isFixedLayout(); }
@@ -4688,7 +4692,11 @@ namespace {
     void addInstanceSize() {
       assert(!isPureObjC());
       if (asImpl().hasFixedLayout()) {
-        B.addInt32(asImpl().getFieldLayout().getSize().getValue());
+        auto &layout = asImpl().getFieldLayout();
+        Size size = layout.getSize();
+        Size prefix =
+            getClassInstanceAddressPoint(IGM, Target, layout.getAlignment());
+        B.addInt32((prefix + size).getValue());
       } else {
         // Leave a zero placeholder to be filled at runtime
         B.addInt32(0);
@@ -5119,8 +5127,8 @@ namespace {
       else
         B.addInt16(0);
 
-      // uint16_t Reserved;
-      B.addInt16(0);
+      // uint16_t InstancePrefixSizeInWords;
+      B.addInt16(getCOMObjectPrefixSize(IGM, Target) / IGM.getPointerSize());
     }
 
     llvm::Constant *emitNominalTypeDescriptor() {

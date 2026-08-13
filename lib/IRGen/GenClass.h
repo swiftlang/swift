@@ -31,12 +31,14 @@ namespace llvm {
 namespace swift {
   class ClassDecl;
   class ExtensionDecl;
+  class ProtocolConformanceRef;
   class ProtocolDecl;
   struct SILDeclRef;
   class SILType;
   class VarDecl;
 
 namespace irgen {
+  class Alignment;
   class ConstantStructBuilder;
   class FunctionPointer;
   class HeapLayout;
@@ -198,12 +200,28 @@ namespace irgen {
                            SILType baseType,
                            VarDecl *field);
 
+  /// The size of the COM interface-pointer prefix that precedes the Swift
+  /// heap-object address point. There is one word for each independent
+  /// physical interface projection.
+  Size getCOMObjectPrefixSize(IRGenModule &IGM, ClassDecl *CD);
+
+  /// The offset from the allocation base to the native heap-object address
+  /// point. This rounds the physical COM projection words up so the native
+  /// object retains its required alignment.
+  Size getClassInstanceAddressPoint(IRGenModule &IGM, ClassDecl *CD,
+                                    Alignment alignment);
+
   /// Load the instance size and alignment mask from a reference to
   /// class type metadata of the given type.
   std::pair<llvm::Value *, llvm::Value *>
   emitClassResilientInstanceSizeAndAlignMask(IRGenFunction &IGF,
                                              ClassDecl *theClass,
                                              llvm::Value *metadata);
+
+  /// Load the allocation-base-to-object offset from dynamic class metadata.
+  llvm::Value *
+  emitClassResilientInstanceAddressPoint(IRGenFunction &IGF, ClassDecl *CD,
+                                         llvm::Value *metadata);
 
   /// For VFE, returns a type identifier for the given base method on a class.
   llvm::MDString *typeIdForMethod(IRGenModule &IGM, SILDeclRef method);
