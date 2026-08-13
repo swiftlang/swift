@@ -1563,7 +1563,27 @@ tryCastToClassExistential(
     auto metatype = *metatypePtr;
     if (auto tmp = swift_dynamicCastMetatypeToObjectConditional(metatype)) {
       auto value = reinterpret_cast<OpaqueValue *>(&tmp);
-      auto type = reinterpret_cast<const Metadata *>(tmp);
+
+      // When ObjC interop is enabled, metatypes may be able to fulfill a
+      // superclass constraint, since a class is also an instance of its root
+      // class.
+      if (auto *superclass = destExistentialType->getSuperclassConstraint()) {
+        auto *superclassObjC = superclass->getClassObject();
+        if (superclassObjC == nullptr ||
+            swift_dynamicCastObjCClass(tmp, superclassObjC) == nullptr) {
+          return DynamicCastResult::Failure;
+        }
+      }
+
+      // Conformances have to be looked up on the metaclass, which is the class
+      // object's type. Reinterpreting the class object as metadata would find
+      // the instance type's conformances instead, producing a witness table
+      // that expects an instance. Walking the metaclass chain finds only
+      // conformances declared on a class the class object is an instance of,
+      // i.e. its root class.
+      auto *type = swift_getObjCClassMetadata(
+          reinterpret_cast<const ClassMetadata *>(object_getClass((id)tmp)));
+
       if (_conformsToProtocols(value, type, destExistentialType,
                                destExistentialLocation->getWitnessTables(),
                                prohibitIsolatedConformances)) {
