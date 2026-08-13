@@ -185,6 +185,32 @@ AbstractFunctionDecl *
 getRemoteCallOnDistributedActorSystem(NominalTypeDecl *actorOrSystem,
                                       bool isVoidReturn);
 
+/// Determine whether the concrete `remoteCall` (or `remoteCallVoid`) witness
+/// on the given actor system is declared `nonisolated(nonsending)`.
+///
+/// When the witness is `nonisolated(nonsending)`,
+/// distributed thunks for actors using this system are emitted `nonisolated(nonsending)` too,
+/// so the caller's actor isolation is forwarded straight into `system.remoteCall`
+/// without ever hopping off the caller.
+///
+/// This optimization only works when the concrete actor system is known
+/// at time of emitting the distributed thunks.
+///
+/// ### Backwards compatibility
+/// When the witness is not `nonisolated(nonsending)`,
+/// distributed thunks use the default `@concurrent nonisolated` combination.
+///
+/// ### Generic actor systems
+/// When the `ActorSystem` is a generic parameter we don't know if the system's
+/// remoteCall is `nonisolated(nonsending)` so thunks use the old shape.
+/// This works because the isolation will be filled in as `nil` by a different
+/// adapter thunk.
+///
+/// \param isVoidReturn true for `remoteCallVoid`, false for `remoteCall`.
+/// \return true iff the witness is declared `nonisolated(nonsending)`.
+bool isDistributedActorSystemRemoteCallWitnessNonisolatedNonsending(
+    NominalTypeDecl *actorOrSystem, bool isVoidReturn);
+
 /// Retrieve the declaration of DistributedActorSystem.make().
 ///
 /// \param thunk the function from which we'll be invoking things on the

@@ -235,6 +235,19 @@ public:
 
   CanSILFunctionType getType() const { return Type; }
 
+  /// When the target 'nonisolated(nonsending)' the function needs
+  /// to be passed an implicitly added leading `Builtin.ImplicitActor` argument.
+  bool hasImplicitActorParameter() const {
+    auto isolated = Type->maybeGetIsolatedParameter();
+    return isolated && isolated->hasOption(SILParameterInfo::ImplicitLeading);
+  }
+
+  /// Number of leading parameters that are not part of the formal argument
+  /// list and therefore are never decoded from the invocation.
+  unsigned getNumImplicitLeadingParameters() const {
+    return hasImplicitActorParameter() ? 1 : 0;
+  }
+
   bool isGeneric() const {
     auto sig = Type->getInvocationGenericSignature();
     return sig && !sig->areAllParamsConcrete();
@@ -487,8 +500,12 @@ void DistributedAccessor::decodeArguments(const ArgumentDecoderInfo &decoder,
                                           Explosion &arguments) {
   auto fnType = Target.getType();
 
-  // Cover all of the arguments except to `self` of the actor.
-  auto parameters = fnType->getParameters().drop_back();
+  // Cover all of the arguments except:
+  auto parameters = fnType->getParameters()
+    // - the `self` of the actor:
+    .drop_back()
+    // -  the implicit leading isolation parameter, when the func is `nonisolated(nonsending)`:
+    .drop_front(Target.getNumImplicitLeadingParameters());
 
   // If there are no parameters to extract, we are done.
   if (parameters.empty())
@@ -889,9 +906,31 @@ void DistributedAccessor::emit() {
     arguments.add(typedResultBuffer);
   }
 
+  // It is invoked by `swift_distributed_execute_target` and has no caller whose isolation could
+  // be inherited, so pass a null actor. The thunk's entry hop then becomes a
+  // no-op and its local branch hops onto the target actor exactly as it does
+  // for a plain thunk.
+  if (Target.hasImplicitActorParameter()) {
+    // The thunk is nonisolated(nonsending) and needs to be passed
+    // an isolation `Builtin.ImplicitActor` as first parameter first.
+    auto implicitParamTy = targetConv.getSILType(
+        targetTy->getParameters().front(), expansionContext);
+    auto &implicitParamTI =
+        cast<LoadableTypeInfo>(IGM.getTypeInfo(implicitParamTy));
+    auto *pairTy = cast<llvm::StructType>(implicitParamTI.getStorageType());
+    assert(pairTy->getNumElements() == 2 &&
+           "Builtin.ImplicitActor is expected to be a scalar pair");
+
+    // We pass `(null, null)` as the isolation, it represents the global generic executor.
+    arguments.add(llvm::Constant::getNullValue(pairTy->getElementType(0)));
+    arguments.add(llvm::Constant::getNullValue(pairTy->getElementType(1)));
+  }
+
   // There is always at least one parameter associated with accessor - `self`
-  // of the distributed actor.
-  if (targetTy->getNumParameters() > 1) {
+  // of the distributed actor - plus any implicit leading parameters, none of
+  // which are encoded in the invocation.
+  if (targetTy->getNumParameters() >
+      1 + Target.getNumImplicitLeadingParameters()) {
     /// The argument decoder associated with the distributed actor
     /// this accessor belong to.
     ArgumentDecoderInfo decoder =

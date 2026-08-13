@@ -30,6 +30,9 @@ public enum BenchmarkCategory : String {
   case abstraction, safetychecks, exceptions, bridging, concurrency, existential, cxxInterop
   case exclusivity, differentiation
 
+  // Benchmarks of distributed actors and the distributed actor system.
+  distributed
+
   // Algorithms are "micro" that test some well-known algorithm in isolation:
   // sorting, searching, hashing, fibonacci, crypto, etc.
   case algorithm

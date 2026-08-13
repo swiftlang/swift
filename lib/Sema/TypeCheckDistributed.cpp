@@ -257,7 +257,8 @@ static bool diagnoseMissingAdHocProtocolRequirement(ASTContext &C, Identifier id
   Printer << (decl->getFormalAccess() == AccessLevel::Public ? "public " : "");
 
   if (identifier == C.Id_remoteCall) {
-    Printer << "func remoteCall<Act, Err, Res>("
+    Printer << "nonisolated(nonsending) "
+               "func remoteCall<Act, Err, Res>("
                "on actor: Act, "
                "target: RemoteCallTarget, "
                "invocation: inout InvocationEncoder, "
@@ -269,7 +270,8 @@ static bool diagnoseMissingAdHocProtocolRequirement(ASTContext &C, Identifier id
                "Err: Error, "
                "Res: SerializationRequirement";
   } else if (identifier == C.Id_remoteCallVoid) {
-    Printer << "func remoteCallVoid<Act, Err>("
+    Printer << "nonisolated(nonsending) "
+               "func remoteCallVoid<Act, Err>("
                "on actor: Act, "
                "target: RemoteCallTarget, "
                "invocation: inout InvocationEncoder, "

@@ -3077,6 +3077,10 @@ public:
   enum {
     /// Whether this is a "distributed" actor function.
     Distributed = 0,
+    /// Whether the function this record points at is 'nonisolated(nonsending)'.
+    /// I.e. its lowered signature has a leading implicit `Builtin.ImplicitActor`
+    /// parameter.
+    NonisolatedNonsending = 1,
   };
 
   explicit AccessibleFunctionFlags(uint32_t bits) : FlagSet(bits) {}
@@ -3084,6 +3088,10 @@ public:
 
   /// Whether the this is a "distributed" actor function.
   FLAGSET_DEFINE_FLAG_ACCESSORS(Distributed, isDistributed, setDistributed)
+
+  /// Whether the target function is 'nonisolated(nonsending).
+  FLAGSET_DEFINE_FLAG_ACCESSORS(NonisolatedNonsending, isNonisolatedNonsending,
+                                setNonisolatedNonsending)
 };
 
 } // end namespace swift
