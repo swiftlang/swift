@@ -176,6 +176,8 @@ NOTE(incomplete_protocol, none, "protocol %0 is incomplete", (const clang::Named
 NOTE(incomplete_record, none, "record '%0' is not defined (incomplete)", (StringRef))
 NOTE(record_over_aligned, none, "record '%0' is over aligned", (StringRef))
 NOTE(record_non_trivial_copy_destroy, none, "record '%0' is not trivial to copy or destroy", (StringRef))
+NOTE(record_non_trivial_weak_ref, none, "record '%0' contains a weak reference and cannot be imported", (StringRef))
+NOTE(record_non_trivial_strong_ref, none, "record '%0' contains strong references and cannot be imported without enabling experimental feature ImportCStructsWithArcFields", (StringRef))
 NOTE(record_is_dependent, none, "record '%0' is dependent", (StringRef))
 NOTE(record_parent_unimportable, none, "record %0's parent is not importable", (StringRef))
 NOTE(reference_passed_by_value, none, "function uses foreign reference type "
