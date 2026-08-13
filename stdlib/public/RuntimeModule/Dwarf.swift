@@ -340,7 +340,7 @@ extension ImageSource {
     }
 
     if shift < 64 && sign != 0 {
-      value |= -(1 << shift)
+      value |= Int64(-1) << shift
     }
 
     return (addr, value)
