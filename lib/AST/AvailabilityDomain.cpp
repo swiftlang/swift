@@ -673,14 +673,12 @@ AvailabilityDomainOrIdentifier::lookUpInDeclContext(
         !hasCustomAvailability || declContext->isInSwiftinterface();
     if (auto suggestion = closestCorrectedPlatformString(domainString)) {
       diags
-          .diagnose(loc, diag::availability_suggest_platform_name, identifier,
+          .diagnose(loc, diag::availability_suggest_domain, identifier,
                     *suggestion)
           .limitBehaviorIf(downgradeErrors, DiagnosticBehavior::Warning)
           .fixItReplace(SourceRange(loc), *suggestion);
     } else {
-      diags
-          .diagnose(loc, diag::availability_unrecognized_platform_name,
-                    identifier)
+      diags.diagnose(loc, diag::availability_domain_not_found, identifier)
           .limitBehaviorIf(downgradeErrors, DiagnosticBehavior::Warning);
     }
     return std::nullopt;

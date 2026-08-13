@@ -47,7 +47,7 @@ func availableInPacific() { }
 func unavailableInColorado() { } // expected-note {{'unavailableInColorado()' has been explicitly marked unavailable here}}
 
 // The Seas module is only imported directly by the other source file.
-@available(Baltic) // expected-error {{unrecognized platform name 'Baltic'}}
+@available(Baltic) // expected-error {{cannot find availability domain 'Baltic'}}
 func availableInBaltic() { } // expected-note {{did you mean 'availableInBaltic'}}
 
 func testSwiftDecls() { // expected-note 3 {{add '@available' attribute to enclosing global function}}
