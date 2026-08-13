@@ -7,9 +7,6 @@
 // REQUIRES: distributed
 // UNSUPPORTED: back_deploy_concurrency
 
-// Reproduces a SILFunction type mismatch uncovered by DistributedCluster.
-// This happens only for a synchronous distributed var decl, across modules.
-
 import Distributed
 import FakeDistributedActorSystems
 
@@ -31,6 +28,15 @@ public distributed actor WorkerPool<W: DistWorker>: DistributedActor {
   public distributed func count() async throws -> Int {
     self.workers.count
   }
+}
+
+public protocol Greeter: DistributedActor where ActorSystem == FakeActorSystem {
+  distributed var greeting: String { get }
+}
+
+public distributed actor Host: Greeter {
+  public typealias ActorSystem = FakeActorSystem
+  public distributed var greeting: String { "hello" }
 }
 
 #endif
@@ -58,5 +64,12 @@ public func use(_ system: FakeActorSystem) async throws {
   // distributed thunk to be deserialized.
   _ = try await pool.size
   _ = try await pool.count()
+}
+
+public func useGreeter(_ system: FakeActorSystem) async throws {
+  let host = Host(actorSystem: system)
+  // Reading a distributed var declared as a protocol requirement across
+  // modules forces the getter thunk (mangled ...vgTE) to be deserialized.
+  _ = try await host.greeting
 }
 #endif
