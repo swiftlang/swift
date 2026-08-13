@@ -701,10 +701,7 @@ public:
     if (!ref)
       return nullptr;
 
-    auto type = ref.getDecl()->getInterfaceType();
-    if (ref.isSpecialized())
-      type = type.subst(ref.getSubstitutions());
-
+    auto type = DRE->getType()->getWithoutSpecifierType();
     return type->isNoncopyable() ? ref.getDecl() : nullptr;
   }
 
