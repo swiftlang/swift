@@ -208,6 +208,12 @@ bool noncopyable::memInstMustInitialize(Operand *memOper) {
   case SILInstructionKind::InitBorrowAddrInst:
     return cast<InitBorrowAddrInst>(memInst)->getDest() == address;
 
+  case SILInstructionKind::UnconditionalCheckedCastAddrInst:
+    // The instruction traps on failure, so if we're still executing, Dest
+    // was successfully initialized with the cast result.
+    return cast<UnconditionalCheckedCastAddrInst>(memInst)->getDest() ==
+           address;
+
   case SILInstructionKind::BeginApplyInst:
   case SILInstructionKind::TryApplyInst:
   case SILInstructionKind::ApplyInst: {
@@ -329,6 +335,20 @@ bool noncopyable::memInstMustConsume(Operand *memOper) {
   }
   case SILInstructionKind::UncheckedTakeEnumDataAddrInst:
     return true;
+  case SILInstructionKind::UnconditionalCheckedCastAddrInst:
+    // Src is always taken, unconditionally (the instruction traps on
+    // failure, so if we're still executing, Src was consumed).
+    return cast<UnconditionalCheckedCastAddrInst>(memInst)->getSrc() ==
+           address;
+  case SILInstructionKind::CheckedCastAddrBranchInst: {
+    auto *ccabi = cast<CheckedCastAddrBranchInst>(memInst);
+    // Only a source operand consumed under TakeAlways is unconditionally
+    // consumed by this instruction, regardless of which successor is
+    // taken. TakeOnSuccess/CopyOnSuccess/BorrowAlways all leave Src valid
+    // on at least one path, so they aren't a *must*-consume here.
+    return ccabi->getSrc() == address &&
+           ccabi->getConsumptionKind() == CastConsumptionKind::TakeAlways;
+  }
   }
 }
 
