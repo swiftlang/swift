@@ -6696,6 +6696,14 @@ static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
   // declaration. All of the logic for FuncDecls below only applies to
   // non-accessor functions.
   if (auto accessor = dyn_cast<AccessorDecl>(value)) {
+    // A synthesized distributed thunk accessor is always '@concurrent',
+    // regardless of the storage's isolation. We can't put that attribute
+    // on the accessor itself, and there is no "thunk var" to attach it to,
+    // so we handle the semantics here instead.
+    if (accessor->isDistributedThunk()) {
+      return {ActorIsolation::forNonisolatedConcurrent(),
+              IsolationSource(/*source*/ nullptr, IsolationSource::Explicit)};
+    }
     return getInferredActorIsolation(accessor->getStorage());
   }
 
