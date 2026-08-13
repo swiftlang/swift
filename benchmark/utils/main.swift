@@ -127,6 +127,8 @@ import Monoids
 import MonteCarloE
 import MonteCarloPi
 import NaiveRangeReplaceableCollectionConformance
+import NestedEnumValueTypes
+import NestedStructValueTypes
 import NibbleSort
 import NIOChannelPipeline
 import NSDictionaryCastToSwift
@@ -341,6 +343,8 @@ register(Monoids.benchmarks)
 register(MonteCarloE.benchmarks)
 register(MonteCarloPi.benchmarks)
 register(NaiveRangeReplaceableCollectionConformance.benchmarks)
+register(NestedEnumValueTypes.benchmarks)
+register(NestedStructValueTypes.benchmarks)
 register(NSDictionaryCastToSwift.benchmarks)
 register(NSErrorTest.benchmarks)
 #if canImport(Darwin)
