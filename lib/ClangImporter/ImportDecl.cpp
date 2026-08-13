@@ -19,15 +19,16 @@
 #include "ClangDerivedConformances.h"
 #include "ImporterImpl.h"
 #include "SwiftDeclSynthesizer.h"
-#include "swift/AST/AbstractLayout.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/AbstractLayout.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/DiagnosticSuppression.h"
 #include "swift/AST/DiagnosticsClangImporter.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
@@ -2480,6 +2481,16 @@ namespace {
           return nullptr;
         }
 
+        // Escapability annotations have no effect on a foreign reference type.
+        for (auto *swiftAttr : decl->specific_attrs<clang::SwiftAttrAttr>()) {
+          if (swiftAttr->getAttribute() == "Escapable" ||
+              swiftAttr->getAttribute().starts_with("escapable_if:"))
+            Impl.diagnose(HeaderLoc(decl->getLocation()),
+                          diag::escapable_foreign_reference_type,
+                          importer::getPrettySwiftAttributeName(swiftAttr),
+                          decl);
+        }
+
         result = Impl.createDeclWithClangNode<ClassDecl>(
             decl, importer::convertClangAccess(decl->getAccess()), loc, name,
             loc, ArrayRef<InheritedEntry>{}, nullptr, dc, false);
@@ -4536,7 +4547,30 @@ namespace {
       Impl.swiftify(result);
     }
 
+    /// Whether the C++ standard library overlay in stdlib/public/Cxx still
+    /// spells \a stubName in a protocol requirement. Uses of these stubs are
+    /// not deprecated yet, because Swift itself asks for them by name.
+    ///
+    /// Matching is on the stub name rather than the C++ base name because
+    /// '__beginMutatingUnsafe' derives from the imported name 'beginMutating',
+    /// not from 'begin'.
+    static bool overlayStillSpellsUnsafeStub(DeclBaseName stubName) {
+      if (stubName.isSpecial())
+        return false;
+      return llvm::StringSwitch<bool>(stubName.getIdentifier().str())
+          .Cases({"__beginUnsafe", "__endUnsafe", "__beginMutatingUnsafe",
+                  "__endMutatingUnsafe", "__findUnsafe", "__findMutatingUnsafe",
+                  "__eraseUnsafe", "__dataUnsafe"},
+                 true)
+          .Default(false);
+    }
+
     /// Apply the __Unsafe-method rename to \a imported, imported from \a decl.
+    ///
+    /// With ImportUnsafeCxxMethodsAsAlwaysUnsafe, the method keeps its original
+    /// name (it is marked '@unsafe(always)' by importAttributes instead), and
+    /// the renamed spelling is imported a second time as a deprecated migration
+    /// stub, which is only '@unsafe'.
     ///
     /// Instantiation is gated on ImportCxxMembersLazily; without that
     /// feature ClangImporter eagerly instantiates typedef members, so the
@@ -4544,8 +4578,9 @@ namespace {
     ///
     /// This is done post-import so we don't eagerly instantiate templates for
     /// methods we may not import.
-    void renameToUnsafeIfNeeded(const clang::CXXMethodDecl *clangDecl,
-                                ValueDecl *swiftDecl) {
+    void renameToUnsafeIfNeeded(
+        const clang::CXXMethodDecl *clangDecl, ValueDecl *swiftDecl,
+        const clang::FunctionTemplateDecl *funcTemplate = nullptr) {
       if (isa<clang::CXXConstructorDecl, clang::CXXDestructorDecl,
               clang::CXXConversionDecl>(clangDecl) ||
           clangDecl->getOverloadedOperator() !=
@@ -4585,8 +4620,67 @@ namespace {
                                 ? DeclName(Impl.SwiftContext, unsafeId,
                                            currentName.getArgumentNames())
                                 : DeclName(unsafeId);
-      if (currentName != unsafeName)
+      if (currentName == unsafeName)
+        return;
+
+      if (!keepsNameWhenImportedAsUnsafe(clangDecl, Impl.SwiftContext)) {
         swiftDecl->setName(unsafeName);
+        return;
+      }
+
+      // Keep the original name, and import the method a second time under the
+      // renamed spelling as a migration stub.
+      //
+      // Every diagnostic this import could produce was already produced by the
+      // primary import of the same Clang declaration, so don't repeat them.
+      ImportedName legacyName = importedName;
+      legacyName.setDeclName(unsafeName);
+      ValueDecl *stub = nullptr;
+      {
+        DiagnosticSuppression suppression(Impl.SwiftContext.Diags);
+        stub = dyn_cast_or_null<ValueDecl>(
+            importFunctionDecl(clangDecl, legacyName,
+                               /*correctSwiftName=*/std::nullopt,
+                               /*accessorInfo=*/std::nullopt, funcTemplate));
+      }
+      if (!stub || stub == swiftDecl)
+        return;
+
+      // The stub's own name says 'Unsafe', so its uses don't have to be
+      // acknowledged with 'unsafe' unless strict memory safety is on; that
+      // also keeps existing code that already calls the renamed spelling
+      // compiling. Only the original name is '@unsafe(always)'.
+      //
+      // An implicit '@unsafe(always)' here is necessarily the one the rename
+      // heuristic asked importSwiftAttrAttributes() for; an 'unsafe(always)'
+      // spelled in C++ is explicit, and still wins.
+      if (auto *unsafeAttr = stub->getAttrs().getAttribute<UnsafeAttr>();
+          unsafeAttr && unsafeAttr->isAlways() && unsafeAttr->isImplicit()) {
+        stub->getAttrs().removeAttribute(unsafeAttr);
+        stub->addAttribute(new (Impl.SwiftContext)
+                               UnsafeAttr(/*implicit=*/true));
+      }
+
+      // A method that C++ already deprecates keeps that deprecation; Clang's
+      // message wins at the use site either way.
+      if (!overlayStillSpellsUnsafeStub(unsafeName.getBaseName()) &&
+          !clangDecl->isDeprecated()) {
+        ImportedName primaryName = importedName;
+        primaryName.setDeclName(currentName);
+        llvm::SmallString<32> renamed;
+        {
+          llvm::raw_svector_ostream os(renamed);
+          Impl.printSwiftName(primaryName, Impl.CurrentVersion,
+                              /*fullyQualified=*/false, os);
+        }
+        stub->addAttribute(AvailableAttr::createUniversallyDeprecated(
+            Impl.SwiftContext, /*Message=*/"",
+            Impl.SwiftContext.AllocateCopy(renamed.str())));
+      }
+
+      // importDeclImpl() finalizes every alternate declaration, and
+      // loadAllMembers() adds the stub to the record's members.
+      Impl.addAlternateDecl(swiftDecl, stub);
     }
 
     Decl *VisitCXXMethodDecl(const clang::CXXMethodDecl *decl) {
@@ -5012,7 +5106,7 @@ namespace {
         // Member function templates bypass VisitCXXMethodDecl, so the unsafe
         // method rename that that performs must be applied here too.
         if (auto *MD = dyn_cast<clang::CXXMethodDecl>(decl->getAsFunction()))
-          renameToUnsafeIfNeeded(MD, cast<ValueDecl>(imported));
+          renameToUnsafeIfNeeded(MD, cast<ValueDecl>(imported), decl);
       }
 
       return imported;
@@ -9340,13 +9434,21 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
     }
 
     bool importUnsafeHeuristic = false;
+    bool heuristicIsAlways = false;
     if (const auto *CXXMethod = dyn_cast<clang::CXXMethodDecl>(ClangDecl);
-        CXXMethod && shouldRenameCXXMethodAsUnsafe(CXXMethod, SwiftContext))
+        CXXMethod && shouldRenameCXXMethodAsUnsafe(CXXMethod, SwiftContext)) {
       importUnsafeHeuristic = true;
+      // Only require every use to be acknowledged for methods that actually
+      // kept their original name; a method that is still renamed has no
+      // un-renamed spelling to migrate to.
+      heuristicIsAlways =
+          keepsNameWhenImportedAsUnsafe(CXXMethod, SwiftContext);
+    }
 
     if (seenUnsafe || importUnsafeHeuristic) {
       auto attr = new (SwiftContext)
-          UnsafeAttr(SourceLoc(), SourceRange(), seenUnsafe.value_or(false),
+          UnsafeAttr(SourceLoc(), SourceRange(),
+                     seenUnsafe.value_or(false) || heuristicIsAlways,
                      /*implicit=*/!seenUnsafe.has_value());
       MappedDecl->addAttribute(attr);
     }

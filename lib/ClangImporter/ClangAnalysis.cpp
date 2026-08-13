@@ -1113,3 +1113,28 @@ bool importer::shouldRenameCXXMethodAsUnsafe(const clang::CXXMethodDecl *method,
   // Otherwise, it's safe.
   return false;
 }
+
+/// Whether the C++ standard library overlay in stdlib/public/Cxx already
+/// provides a safe Swift API named after \p method:
+///
+/// - 'basic_string::append' vs 'std.string.append(_:)', which differs only in
+///   its result type and so ambiguates every discarded-result call;
+/// - 'set::insert' etc. vs 'CxxUniqueSet.insert(_:)', a protocol extension
+///   member that a concrete C++ 'insert' would shadow outright;
+/// - 'optional::value' vs the 'CxxOptional.value' property.
+static bool overlayProvidesSafeWrapperNamed(const clang::CXXMethodDecl *method) {
+  if (!method->getParent()->isInStdNamespace() || !method->getIdentifier())
+    return false;
+
+  return llvm::StringSwitch<bool>(method->getName())
+      .Cases({"append", "insert", "value"}, true)
+      .Default(false);
+}
+
+bool importer::keepsNameWhenImportedAsUnsafe(const clang::CXXMethodDecl *method,
+                                             ASTContext &ctx) {
+  return ctx.LangOpts.hasFeature(
+             Feature::ImportUnsafeCxxMethodsAsAlwaysUnsafe) &&
+         shouldRenameCXXMethodAsUnsafe(method, ctx) &&
+         !overlayProvidesSafeWrapperNamed(method);
+}

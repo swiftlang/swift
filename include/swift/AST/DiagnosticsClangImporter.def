@@ -308,6 +308,11 @@ ERROR(nonescapable_foreign_reference_type, none,
       "escapable",
       (const clang::NamedDecl *))
 
+GROUPED_WARNING(escapable_foreign_reference_type, ForeignReferenceType, none,
+      "%0 has no effect on %1; foreign reference types are imported as Swift "
+      "classes, which are always escapable",
+      (StringRef, const clang::NamedDecl *))
+
 GROUPED_WARNING(unannotated_cxx_func_returning_frt, ForeignReferenceType, none,
         "cannot infer ownership of foreign reference value returned by %0",
         (const ValueDecl *))

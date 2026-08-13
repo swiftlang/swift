@@ -2029,7 +2029,18 @@ public:
                            const clang::DeclContext *container);
 
   /// Emit any import diagnostics associated with the given Clang node.
-  void diagnoseTargetDirectly(ImportDiagnosticTarget target);
+  ///
+  /// \param visited Declarations already traversed for the current lookup, so
+  /// that a definition reachable from several entries is diagnosed once.
+  void diagnoseTargetDirectly(
+      ImportDiagnosticTarget target,
+      llvm::SmallPtrSetImpl<const clang::Decl *> &visited);
+
+  /// Emit any import diagnostics associated with the given Clang node.
+  void diagnoseTargetDirectly(ImportDiagnosticTarget target) {
+    llvm::SmallPtrSet<const clang::Decl *, 4> visited;
+    diagnoseTargetDirectly(target, visited);
+  }
 
 private:
   static ImportDiagnosticTarget importDiagnosticTargetFromLookupTableEntry(
@@ -2325,6 +2336,11 @@ bool hasEscapableAttr(const clang::RecordDecl *decl);
 /// smart pointer, or null if it does not have one.
 CustomAttr *getRefCountedPtrAttr(Decl *decl);
 
+/// The macro that spells \p attr in a header, e.g. \c SWIFT_ESCAPABLE for
+/// \c swift_attr("Escapable"), for use in diagnostics. Falls back to the
+/// attribute string itself when it has no documented macro.
+StringRef getPrettySwiftAttributeName(const clang::SwiftAttrAttr *attr);
+
 CxxValueSemanticsKind
 getCxxValueSemanticsKind(const clang::Type *type,
                          ClangImporter::Implementation &Impl);
@@ -2355,6 +2371,16 @@ bool isSwiftClassType(const clang::CXXRecordDecl *decl);
 /// that are not safe are imported under a \c __<name>Unsafe name and/or marked
 /// \c @unsafe. See also PrintOptions::SkipUnsafeCXXMethods.
 bool shouldRenameCXXMethodAsUnsafe(const clang::CXXMethodDecl *method,
+                                   ASTContext &ctx);
+
+/// Whether \p method keeps its original Swift name, and is imported
+/// \c @unsafe(always) rather than renamed to \c __<name>Unsafe .
+///
+/// False unless \c ImportUnsafeCxxMethodsAsAlwaysUnsafe is enabled. Also false
+/// for the handful of C++ standard library methods that the overlay in
+/// stdlib/public/Cxx wraps in a safe Swift API of the same name, since the
+/// original-named import would shadow or ambiguate the wrapper.
+bool keepsNameWhenImportedAsUnsafe(const clang::CXXMethodDecl *method,
                                    ASTContext &ctx);
 
 inline const clang::Type *desugarIfElaborated(const clang::Type *type) {
