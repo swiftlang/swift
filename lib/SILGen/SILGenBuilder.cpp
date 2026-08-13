@@ -638,6 +638,11 @@ static ManagedValue createInputFunctionArgument(
     return SGF.emitManagedPackWithCleanup(arg);
 
   case SILArgumentConvention::Indirect_In_CXX:
+    // An @in_cxx parameter is destroyed by the caller (this is the
+    // parameter-passing convention of the Itanium C++ ABI), so don't enter a
+    // cleanup for it here.
+    return ManagedValue::forOwnedRValue(arg, CleanupHandle::invalid());
+
   case SILArgumentConvention::Indirect_In:
     if (SGF.silConv.useLoweredAddresses())
       return SGF.emitManagedBufferWithCleanup(arg);
