@@ -44,10 +44,10 @@ struct MyView: View {
     })) {
       ForEach(data, id: \.id) { v in
         NavigationLink(value: v.name) {
-          HStack {
-            MySettingsView(x: 42, y: v.name)
-            // expected-error@-1 {{reasonable time}}
-          }
+          // Note: This is on a single line to ensure we get the correct location
+          // for the diagnostic on all the SDKs we test in CI.
+          HStack { MySettingsView(x: 42, y: v.name) }
+          // expected-error@-1 {{reasonable time}}
         }
       }
     }
