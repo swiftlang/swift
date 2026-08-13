@@ -17,26 +17,26 @@ func noArgs() {}
 @available(*) // expected-error {{expected ',' in 'available' attribute}}
 func noKind() {}
 
-@available(badPlatform, unavailable) // expected-warning {{unrecognized platform name 'badPlatform'}}
+@available(badPlatform, unavailable) // expected-warning {{cannot find availability domain 'badPlatform'}}
 func unavailable_bad_platform() {}
 
-@available(macos, unavailable) // expected-warning {{unrecognized platform name 'macos'; did you mean 'macOS'?}} {{12-17=macOS}}
+@available(macos, unavailable) // expected-warning {{cannot find availability domain 'macos'; did you mean 'macOS'?}} {{12-17=macOS}}
 func incorrect_platform_case() {}
 
-@available(mscos, unavailable) // expected-warning {{unrecognized platform name 'mscos'; did you mean 'macOS'?}} {{12-17=macOS}}
+@available(mscos, unavailable) // expected-warning {{cannot find availability domain 'mscos'; did you mean 'macOS'?}} {{12-17=macOS}}
 func incorrect_platform_similar1() {}
 
-@available(macoss, unavailable) // expected-warning {{unrecognized platform name 'macoss'; did you mean 'macOS'?}} {{12-18=macOS}}
+@available(macoss, unavailable) // expected-warning {{cannot find availability domain 'macoss'; did you mean 'macOS'?}} {{12-18=macOS}}
 func incorrect_platform_similar2() {}
 
-@available(mac, unavailable) // expected-warning {{unrecognized platform name 'mac'; did you mean 'macOS'?}} {{12-15=macOS}}
+@available(mac, unavailable) // expected-warning {{cannot find availability domain 'mac'; did you mean 'macOS'?}} {{12-15=macOS}}
 func incorrect_platform_similar3() {}
 
-@available(notValid, unavailable) // expected-warning {{unrecognized platform name 'notValid'}} {{none}}
+@available(notValid, unavailable) // expected-warning {{cannot find availability domain 'notValid'}} {{none}}
 func incorrect_platform_not_similar() {}
 
 // Handle unknown platform.
-@available(HAL9000, unavailable) // expected-warning {{unrecognized platform name 'HAL9000'}}
+@available(HAL9000, unavailable) // expected-warning {{cannot find availability domain 'HAL9000'}}
 func availabilityUnknownPlatform() {}
 
 @available(Swift 6.2, *) // expected-error {{Swift requires '-enable-experimental-feature SwiftRuntimeAvailability'}}
@@ -272,35 +272,35 @@ func shortFormMissingParen() { // expected-error {{expected ')' in 'available' a
 func shortFormMissingPlatform() {
 }
 
-@available(iOS 8.0, iDishwasherOS 22.0, *) // expected-warning {{unrecognized platform name 'iDishwasherOS'}}
+@available(iOS 8.0, iDishwasherOS 22.0, *) // expected-warning {{cannot find availability domain 'iDishwasherOS'}}
 func shortFormWithUnrecognizedPlatform() {
 }
 
 @available(iOS 8.0, iDishwasherOS 22.0, iRefrigeratorOS 18.0, *)
-// expected-warning@-1 {{unrecognized platform name 'iDishwasherOS'}}
-// expected-warning@-2 {{unrecognized platform name 'iRefrigeratorOS'}}
+// expected-warning@-1 {{cannot find availability domain 'iDishwasherOS'}}
+// expected-warning@-2 {{cannot find availability domain 'iRefrigeratorOS'}}
 func shortFormWithTwoUnrecognizedPlatforms() {
 }
 
 @available(macOS 10.9, iOS 7.0, watchOS 2.0, tvOS 9.0, iDishwasherOS 22.0, visionOS 1.0, *)
-// expected-warning@-1 {{unrecognized platform name 'iDishwasherOS'}}
+// expected-warning@-1 {{cannot find availability domain 'iDishwasherOS'}}
 func shortFormWithInteriorUnrecognizedPlatform() {
 }
 
 @available(ios 8.0, macos 10.12, *)
-// expected-warning@-1 {{unrecognized platform name 'ios'; did you mean 'iOS'?}}
-// expected-warning@-2 {{unrecognized platform name 'macos'; did you mean 'macOS'?}}
+// expected-warning@-1 {{cannot find availability domain 'ios'; did you mean 'iOS'?}}
+// expected-warning@-2 {{cannot find availability domain 'macos'; did you mean 'macOS'?}}
 func shortFormWithTwoPlatformsIncorrectCase() {
 }
 
 @available(os 8.0, *)
-// expected-warning@-1 {{unrecognized platform name 'os'; did you mean 'iOS'?}} {{12-14=iOS}}
+// expected-warning@-1 {{cannot find availability domain 'os'; did you mean 'iOS'?}} {{12-14=iOS}}
 func iosIsClosestThanMacOS() {}
 
 // Make sure that even after the parser hits an unrecognized
 // platform it validates the availability.
 @available(iOS 8.0, iDishwasherOS 22.0, iOS 9.0, *)
-// expected-warning@-1 {{unrecognized platform name 'iDishwasherOS'}}
+// expected-warning@-1 {{cannot find availability domain 'iDishwasherOS'}}
 // expected-error@-2 {{version for iOS already specified}}
 func shortFormWithUnrecognizedPlatformContinueValidating() {
 }
