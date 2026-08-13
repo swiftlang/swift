@@ -86,8 +86,8 @@ class ClassWithLimitedAvailabilityAccessors {
   }
 }
 
-@available(*, unavailable)
-func unavailableFunction() -> Int { return 10 } // expected-note 3{{'unavailableFunction()' has been explicitly marked unavailable here}}
+@available(*, unavailable) // expected-note 3{{'unavailableFunction()' has been explicitly marked unavailable here}}
+func unavailableFunction() -> Int { return 10 }
 
 class ClassWithReferencesLazyInitializers {
   var propWithUnavailableInInitializer: Int = unavailableFunction() // expected-error {{'unavailableFunction()' is unavailable}}

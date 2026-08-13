@@ -35,24 +35,34 @@ func outOfOrderArguments() { labeled(b: 1, a: 2) }
 
 @unsafe @safe func safeAndUnsafe() {}
 
-@available(*, unavailable) func unavailableFn() {}
+@available(*, unavailable)
+func unavailableFn() {}
+
 func useUnavailable() { unavailableFn() }
 
-@available(swift, obsoleted: 3.0) func obsoletedFn() {}
+@available(swift, obsoleted: 3.0)
+func obsoletedFn() {}
+
 func useObsoleted() { obsoletedFn() }
 
-@available(swift, introduced: 99) func unintroducedFn() {}
+@available(swift, introduced: 99)
+func unintroducedFn() {}
+
 func useUnintroduced() { unintroducedFn() }
 
 protocol P {}
 func requiresP<T: P>(_ t: T) {}
 
 struct Unavail {}
-@available(*, unavailable) extension Unavail: P {}
+@available(*, unavailable)
+extension Unavail: P {}
+
 func useUnavailableConformance(v: Unavail) { requiresP(v) }
 
 struct Obs {}
-@available(swift, obsoleted: 3.0) extension Obs: P {}
+@available(swift, obsoleted: 3.0)
+extension Obs: P {}
+
 func useObsoletedConformance(v: Obs) { requiresP(v) }
 
 // CHECK:      error: result builder attributes cannot have arguments
@@ -108,37 +118,37 @@ func useObsoletedConformance(v: Obs) { requiresP(v) }
 // CHECK-NEXT: {{^}}                        ^~~~~~~~~~~~~{{$}}
 
 // CHECK:      note: 'unavailableFn()' has been explicitly marked unavailable here
-// CHECK-NEXT: {{^}}@available(*, unavailable) func unavailableFn() {}
-// CHECK-NEXT: {{^}}~~~~~~~~~~~~~~~~~~~~~~~~~~      ^{{$}}
+// CHECK-NEXT: {{^}}@available(*, unavailable)
+// CHECK-NEXT: {{^}}^~~~~~~~~~~~~~~~~~~~~~~~~~{{$}}
 
 // CHECK:      error: 'obsoletedFn()' is unavailable
 // CHECK-NEXT: {{^}}func useObsoleted() { obsoletedFn() }
 // CHECK-NEXT: {{^}}                      ^~~~~~~~~~~{{$}}
 
 // CHECK:      note: 'obsoletedFn()' was obsoleted in Swift 3.0
-// CHECK-NEXT: {{^}}@available(swift, obsoleted: 3.0) func obsoletedFn() {}
-// CHECK-NEXT: {{^}}~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~      ^{{$}}
+// CHECK-NEXT: {{^}}@available(swift, obsoleted: 3.0)
+// CHECK-NEXT: {{^}}^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~{{$}}
 
 // CHECK:      error: 'unintroducedFn()' is unavailable in Swift
 // CHECK-NEXT: {{^}}func useUnintroduced() { unintroducedFn() }
 // CHECK-NEXT: {{^}}                         ^~~~~~~~~~~~~~{{$}}
 
 // CHECK:      note: 'unintroducedFn()' was introduced in Swift 99
-// CHECK-NEXT: {{^}}@available(swift, introduced: 99) func unintroducedFn() {}
-// CHECK-NEXT: {{^}}~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~      ^{{$}}
+// CHECK-NEXT: {{^}}@available(swift, introduced: 99)
+// CHECK-NEXT: {{^}}^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~{{$}}
 
 // CHECK:      error: conformance of 'Unavail' to 'P' is unavailable
 // CHECK-NEXT: {{^}}func useUnavailableConformance(v: Unavail) { requiresP(v) }
 // CHECK-NEXT: {{^}}                                             ^{{$}}
 
 // CHECK:      note: conformance of 'Unavail' to 'P' has been explicitly marked unavailable here
-// CHECK-NEXT: {{^}}@available(*, unavailable) extension Unavail: P {}
-// CHECK-NEXT: {{^}}~~~~~~~~~~~~~~~~~~~~~~~~~~ ^{{$}}
+// CHECK-NEXT: {{^}}@available(*, unavailable)
+// CHECK-NEXT: {{^}}^~~~~~~~~~~~~~~~~~~~~~~~~~{{$}}
 
 // CHECK:      error: conformance of 'Obs' to 'P' is unavailable
 // CHECK-NEXT: {{^}}func useObsoletedConformance(v: Obs) { requiresP(v) }
 // CHECK-NEXT: {{^}}                                       ^{{$}}
 
 // CHECK:      note: conformance of 'Obs' to 'P' was obsoleted in Swift 3.0
-// CHECK-NEXT: {{^}}@available(swift, obsoleted: 3.0) extension Obs: P {}
-// CHECK-NEXT: {{^}}~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ^{{$}}
+// CHECK-NEXT: {{^}}@available(swift, obsoleted: 3.0)
+// CHECK-NEXT: {{^}}^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~{{$}}

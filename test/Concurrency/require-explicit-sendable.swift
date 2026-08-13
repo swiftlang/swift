@@ -49,7 +49,7 @@ public struct S5 { } // no diagnostic: S5 is not Sendable
 
 @available(*, unavailable)
 extension S5: Sendable { }
-// expected-note@-1{{conformance of 'S5' to 'Sendable' has been explicitly marked unavailable here}}
+// expected-note@-2{{conformance of 'S5' to 'Sendable' has been explicitly marked unavailable here}}
 
 // Public type with a conditional conformance, so don't complain
 public struct S6<T, U> {
@@ -67,7 +67,7 @@ struct S7 { // FIXME: expected-note{{consider making struct 'S7' conform to the 
 
 @available(*, unavailable)
 extension S7: Sendable { }
-// expected-note@-1{{conformance of 'S7' to 'Sendable' has been explicitly marked unavailable here}}
+// expected-note@-2{{conformance of 'S7' to 'Sendable' has been explicitly marked unavailable here}}
 
 
 func testMe(s5: S5, s7: S7) {

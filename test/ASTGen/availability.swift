@@ -73,14 +73,14 @@ public class ClassWithMembers {
   public func spiFunc() {}
 }
 
-@available(*, unavailable, renamed: "`class`")
-func keyword_renamed() {} // expected-note {{'keyword_renamed()' has been explicitly marked unavailable here}}
+@available(*, unavailable, renamed: "`class`") // expected-note {{'keyword_renamed()' has been explicitly marked unavailable here}}
+func keyword_renamed() {}
 
-@available(*, unavailable, renamed: "`foo bar`")
-func spaces_renamed() {} // expected-note {{'spaces_renamed()' has been explicitly marked unavailable here}}
+@available(*, unavailable, renamed: "`foo bar`") // expected-note {{'spaces_renamed()' has been explicitly marked unavailable here}}
+func spaces_renamed() {}
 
-@available(*, unavailable, renamed: "foo(`3bar baz`:)")
-func keywords_in_arguments(x: Int) {} // expected-note {{'keywords_in_arguments(x:)' has been explicitly marked unavailable here}}
+@available(*, unavailable, renamed: "foo(`3bar baz`:)") // expected-note {{'keywords_in_arguments(x:)' has been explicitly marked unavailable here}}
+func keywords_in_arguments(x: Int) {}
 
 func testEscapedRenamed() {
   keyword_renamed() // expected-error {{'keyword_renamed()' has been renamed to '`class`'}}

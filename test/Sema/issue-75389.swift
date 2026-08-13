@@ -4,7 +4,7 @@
 
 @available(*, unavailable)
 func unavailableFn() -> Int { 0 }
-// expected-note@-1 5{{'unavailableFn()' has been explicitly marked unavailable here}}
+// expected-note@-2 5{{'unavailableFn()' has been explicitly marked unavailable here}}
 
 if case unavailableFn() = 0 {}
 // expected-error@-1 {{'unavailableFn()' is unavailable}}
