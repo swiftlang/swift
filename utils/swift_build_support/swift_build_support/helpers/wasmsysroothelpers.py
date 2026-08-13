@@ -65,14 +65,6 @@ def build_runtimes(args, toolchain, runtimes_source_dir, runtimes_build_dir,
                                'FALSE')
     cmake.cmake_options.define('LIBCXX_ENABLE_EXCEPTIONS:BOOL', 'FALSE')
     cmake.cmake_options.define('LIBCXX_ENABLE_FILESYSTEM:BOOL', 'TRUE')
-    # wasm32-wasip1 matches none of the platform branches in libc++'s
-    # __locale_dir/locale_base_api.h, so enabling localization falls back to the
-    # legacy __locale_dir/locale_base_api/ibm.h shim. That shim declares a
-    # global vasprintf carrying _LIBCPP_HIDE_FROM_ABI, which conflicts with the
-    # attribute-less declaration wasi-libc already provides in <stdio.h>.
-    # FIXME: Drop this once libc++ grows a __locale_dir/support/wasi.h.
-    # rdar://184247996
-    cmake.cmake_options.define('LIBCXX_ENABLE_LOCALIZATION:BOOL', 'FALSE')
     cmake.cmake_options.define('LIBCXX_CXX_ABI', 'libcxxabi')
     cmake.cmake_options.define('LIBCXX_HAS_MUSL_LIBC:BOOL', 'TRUE')
 
