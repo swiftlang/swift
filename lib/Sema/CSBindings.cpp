@@ -116,7 +116,9 @@ BindingSet::BindingSet(ConstraintSystem &CS, TypeVariableType *TypeVar,
 
   Type elementType;
   if (Info.ElementTypes.size() == 1) {
-    elementType = Info.ElementTypes[0].first;
+    // We must unwrap LValueType here, because those cannot appear in
+    // structural position.
+    elementType = Info.ElementTypes[0].first->getRValueType();
     if (elementType->hasTypeVariable()) {
       elementType = Type();
     }
