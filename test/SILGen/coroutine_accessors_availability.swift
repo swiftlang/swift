@@ -224,6 +224,19 @@ public func modifyOldNoninlinableNew(_ n: inout StructOld) {
 public func takeInt(_ i: Int) {
 }
 
+// A resilient global with coroutine accessors that is available before the
+// feature: it has both the old (yield_once) and new (yield_once_2) ABIs, so
+// which one a cross-module caller uses is decided at the call site.
+public var _gStore: Int = 0
+public var gOld: Int {
+  yielding borrow {
+    yield _gStore
+  }
+  yielding mutate {
+    yield &_gStore
+  }
+}
+
 open class BaseClassOld {
   public init(_ i : Int) {
     self._i = i
@@ -365,6 +378,95 @@ func modifyOldOld() {
   n.i.increment()
 }
 
+// Global access, read.  Across a resilience boundary the ABI is chosen by the
+// caller: a caller that may run before the feature is available must use the
+// old ABI; one that cannot must use the new.
+@_silgen_name("readGlobalOld")
+func readGlobalOld() -> Int {
+// CHECK-LABEL: sil {{.*}}@readGlobalOld : {{.*}} {
+// Deployment target predates the feature--must use the old read.
+                  // function_ref gOld.read
+// CHECK-OLD:     function_ref @$s7Library4gOldSivr
+// Deployment target postdates the feature--can use read2.
+                  // function_ref gOld.read2
+// CHECK-NEW:     function_ref @$s7Library4gOldSivy
+// CHECK-LABEL: } // end sil function 'readGlobalOld'
+  return gOld
+}
+
+// Global access, modify.
+@_silgen_name("modifyGlobalOld")
+func modifyGlobalOld() {
+// CHECK-LABEL: sil {{.*}}@modifyGlobalOld : {{.*}} {
+                  // function_ref gOld.modify
+// CHECK-OLD:     function_ref @$s7Library4gOldSivM
+                  // function_ref gOld.modify2
+// CHECK-NEW:     function_ref @$s7Library4gOldSivx
+// CHECK-LABEL: } // end sil function 'modifyGlobalOld'
+  gOld.increment()
+}
+
+// Global access from a context that postdates the feature: the new ABI is used
+// regardless of the deployment target.
+@available(SwiftStdlib 9999, *)
+@_silgen_name("readGlobalNew")
+func readGlobalNew() -> Int {
+// CHECK-LABEL: sil {{.*}}@readGlobalNew : {{.*}} {
+                  // function_ref gOld.read2
+// CHECK:         function_ref @$s7Library4gOldSivy
+// CHECK-LABEL: } // end sil function 'readGlobalNew'
+  return gOld
+}
+
+@available(SwiftStdlib 9999, *)
+@_silgen_name("modifyGlobalNew")
+func modifyGlobalNew() {
+// CHECK-LABEL: sil {{.*}}@modifyGlobalNew : {{.*}} {
+                  // function_ref gOld.modify2
+// CHECK:         function_ref @$s7Library4gOldSivx
+// CHECK-LABEL: } // end sil function 'modifyGlobalNew'
+  gOld.increment()
+}
+
+// Class instance property, read.  Dispatched dynamically through the vtable,
+// which carries both ABIs' slots; the caller selects the slot the same way.
+@_silgen_name("readClassOld")
+func readClassOld(_ c: BaseClassOld) -> Int {
+// CHECK-LABEL: sil {{.*}}@readClassOld : {{.*}} {
+// CHECK-OLD:     class_method {{.*}}, #BaseClassOld.i!read
+// CHECK-NEW:     class_method {{.*}}, #BaseClassOld.i!yielding_borrow
+// CHECK-LABEL: } // end sil function 'readClassOld'
+  return c.i
+}
+
+// Class instance property, modify.
+@_silgen_name("modifyClassOld")
+func modifyClassOld(_ c: BaseClassOld) {
+// CHECK-LABEL: sil {{.*}}@modifyClassOld : {{.*}} {
+// CHECK-OLD:     class_method {{.*}}, #BaseClassOld.i!modify
+// CHECK-NEW:     class_method {{.*}}, #BaseClassOld.i!yielding_mutate
+// CHECK-LABEL: } // end sil function 'modifyClassOld'
+  c.i.increment()
+}
+
+@available(SwiftStdlib 9999, *)
+@_silgen_name("readClassNew")
+func readClassNew(_ c: BaseClassOld) -> Int {
+// CHECK-LABEL: sil {{.*}}@readClassNew : {{.*}} {
+// CHECK:         class_method {{.*}}, #BaseClassOld.i!yielding_borrow
+// CHECK-LABEL: } // end sil function 'readClassNew'
+  return c.i
+}
+
+@available(SwiftStdlib 9999, *)
+@_silgen_name("modifyClassNew")
+func modifyClassNew(_ c: BaseClassOld) {
+// CHECK-LABEL: sil {{.*}}@modifyClassNew : {{.*}} {
+// CHECK:         class_method {{.*}}, #BaseClassOld.i!yielding_mutate
+// CHECK-LABEL: } // end sil function 'modifyClassNew'
+  c.i.increment()
+}
+
 public class DerivedOldFromBaseClassOld : BaseClassOld {
   public init(_ i : Int, _ j : Int) {
     self._j = j
@@ -383,6 +485,7 @@ public class DerivedOldFromBaseClassOld : BaseClassOld {
 
 // CHECK-LABEL: sil_vtable [serialized] DerivedOldFromBaseClassOld {
 // CHECK-NEXT:    #BaseClassOld.init!allocator
+// CHECK-NEXT:    #BaseClassOld.i!getter
 // CHECK-NEXT:    #BaseClassOld.i!read
 // CHECK-NEXT:    #BaseClassOld.i!yielding_borrow
 // CHECK-NEXT:    #BaseClassOld.i!setter

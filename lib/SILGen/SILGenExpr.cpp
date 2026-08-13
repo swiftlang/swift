@@ -3691,8 +3691,14 @@ static AccessorDecl *
 getRepresentativeAccessorForKeyPath(AbstractStorageDecl *storage) {
   if (storage->requiresOpaqueGetter())
     return storage->getOpaqueAccessor(AccessorKind::Get);
-  assert(storage->requiresOpaqueReadCoroutine());
-  return storage->getOpaqueAccessor(AccessorKind::Read);
+  // Prefer the old read coroutine when it exists (so key paths for storage that
+  // predates the CoroutineAccessors feature keep referring to it); otherwise use
+  // the new yielding-borrow coroutine, which is the only read accessor a
+  // new-only property has.
+  if (storage->requiresOpaqueReadCoroutine())
+    return storage->getOpaqueAccessor(AccessorKind::Read);
+  assert(storage->requiresOpaqueYieldingBorrowCoroutine());
+  return storage->getOpaqueAccessor(AccessorKind::YieldingBorrow);
 }
 
 static CanType buildKeyPathIndicesTuple(ASTContext &C,
