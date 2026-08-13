@@ -716,7 +716,6 @@ char memserver_stack[4096] __attribute__((aligned(SWIFT_PAGE_SIZE)));
 char memserver_buffer[4096];
 int memserver_fd;
 sigjmp_buf memserver_fault_buf;
-pid_t memserver_pid;
 
 #define MIN_FD_TO_CLOSE 3
 
@@ -764,10 +763,6 @@ memserver_start()
     memserver_error("memserver_start: clone failed");
     return ret;
   }
-
-  memserver_pid = getpid();
-  // FIXME: variable 'memserver_pid' set but not used. Forgot to use or remove?
-  (void)memserver_pid;
 
   return fds[1];
 }
