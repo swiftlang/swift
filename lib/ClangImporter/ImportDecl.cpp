@@ -4783,6 +4783,9 @@ namespace {
                            Impl.SwiftContext.getIdentifier(staticCallName),
                            funcDecl->getName().getArgumentNames()));
               Impl.virtualThunkToOriginal[result] = funcDecl;
+              // swiftify is called on import, but the virtualThunkToOriginal
+              // mapping is not yet ready at that time, so call it again.
+              Impl.swiftify(result);
               return result;
             }
             Impl.markUnavailable(funcDecl,
