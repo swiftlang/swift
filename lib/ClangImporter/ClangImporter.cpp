@@ -6569,6 +6569,10 @@ static void cloneImportedAttributes(ValueDecl *fromDecl, ValueDecl *toDecl) {
       toDecl->addAttribute(new (context) TransparentAttr(true));
       break;
     }
+    case DeclAttrKind::Unsafe: {
+      toDecl->addAttribute(cast<UnsafeAttr>(attr)->clone(context));
+      break;
+    }
     case DeclAttrKind::WarnUnqualifiedAccess: {
       toDecl->addAttribute(new (context) WarnUnqualifiedAccessAttr(true));
       break;

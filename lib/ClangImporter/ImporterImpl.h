@@ -2373,6 +2373,16 @@ bool isSwiftClassType(const clang::CXXRecordDecl *decl);
 bool shouldRenameCXXMethodAsUnsafe(const clang::CXXMethodDecl *method,
                                    ASTContext &ctx);
 
+/// Whether \p method keeps its original Swift name, and is imported
+/// \c @unsafe(always) rather than renamed to \c __<name>Unsafe .
+///
+/// False unless \c ImportUnsafeCxxMethodsAsAlwaysUnsafe is enabled. Also false
+/// for the handful of C++ standard library methods that the overlay in
+/// stdlib/public/Cxx wraps in a safe Swift API of the same name, since the
+/// original-named import would shadow or ambiguate the wrapper.
+bool keepsNameWhenImportedAsUnsafe(const clang::CXXMethodDecl *method,
+                                   ASTContext &ctx);
+
 inline const clang::Type *desugarIfElaborated(const clang::Type *type) {
   if (auto elaborated = dyn_cast<clang::ElaboratedType>(type))
     return elaborated->desugar().getTypePtr();

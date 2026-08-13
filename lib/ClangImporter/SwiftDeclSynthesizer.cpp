@@ -2706,29 +2706,36 @@ SwiftDeclSynthesizer::makeDefaultArgument(const clang::ParmVarDecl *param,
   auto clangFunc =
       cast<clang::FunctionDecl>(param->getParentFunctionOrMethod());
 
-  std::string s;
-  llvm::raw_string_ostream os(s);
-  os << "__defaultArg_" << param->getFunctionScopeIndex() << "_";
-  ClangImporter::Implementation::getItaniumMangledName(clangFunc, os);
+  // The generator's name is derived from the Clang declaration, so a Clang
+  // parameter that gets imported twice -- as happens for an unsafe C++ method
+  // imported under both its original name and its '__<name>Unsafe' spelling --
+  // must share one generator, or the two would collide at link time.
+  FuncDecl *funcDecl = ImporterImpl.defaultArgGenerators.lookup(param);
+  if (!funcDecl) {
+    std::string s;
+    llvm::raw_string_ostream os(s);
+    os << "__defaultArg_" << param->getFunctionScopeIndex() << "_";
+    ClangImporter::Implementation::getItaniumMangledName(clangFunc, os);
 
-  // Synthesize `func __defaultArg_XYZ() -> ParamTy { ... }`.
-  DeclName funcName(ctx, DeclBaseName(ctx.getIdentifier(s)),
-                    ParameterList::createEmpty(ctx));
-  auto funcDecl = FuncDecl::createImplicit(
-      ctx, StaticSpellingKind::None, funcName, paramLoc, false, false, Type(),
-      {}, ParameterList::createEmpty(ctx), swiftParamTy,
-      ImporterImpl.ImportedHeaderUnit);
-  funcDecl->setBodySynthesizer(synthesizeDefaultArgumentBody, (void *)param);
-  funcDecl->setAccess(AccessLevel::Public);
-  funcDecl->addAttribute(
-      new (ctx) ExportAttr(ExportKind::Implementation, /*IsImplicit=*/true));
-  // At this point, the parameter/return types of funcDecl might not be imported
-  // into Swift completely, meaning that their protocol conformances might not
-  // be populated yet. Prevent LifetimeDependenceInfoRequest from prematurely
-  // populating the conformance table for the types involved.
-  ctx.evaluator.cacheOutput(LifetimeDependenceInfoRequest{funcDecl}, {});
+    // Synthesize `func __defaultArg_XYZ() -> ParamTy { ... }`.
+    DeclName funcName(ctx, DeclBaseName(ctx.getIdentifier(s)),
+                      ParameterList::createEmpty(ctx));
+    funcDecl = FuncDecl::createImplicit(
+        ctx, StaticSpellingKind::None, funcName, paramLoc, false, false, Type(),
+        {}, ParameterList::createEmpty(ctx), swiftParamTy,
+        ImporterImpl.ImportedHeaderUnit);
+    funcDecl->setBodySynthesizer(synthesizeDefaultArgumentBody, (void *)param);
+    funcDecl->setAccess(AccessLevel::Public);
+    funcDecl->addAttribute(
+        new (ctx) ExportAttr(ExportKind::Implementation, /*IsImplicit=*/true));
+    // At this point, the parameter/return types of funcDecl might not be
+    // imported into Swift completely, meaning that their protocol conformances
+    // might not be populated yet. Prevent LifetimeDependenceInfoRequest from
+    // prematurely populating the conformance table for the types involved.
+    ctx.evaluator.cacheOutput(LifetimeDependenceInfoRequest{funcDecl}, {});
 
-  ImporterImpl.defaultArgGenerators[param] = funcDecl;
+    ImporterImpl.defaultArgGenerators[param] = funcDecl;
+  }
 
   auto declRefExpr = new (ctx)
       DeclRefExpr(ConcreteDeclRef(funcDecl), DeclNameLoc(), /*Implicit*/ true);
