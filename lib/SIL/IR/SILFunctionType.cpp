@@ -2615,9 +2615,14 @@ lowerCaptureContextParameters(TypeConverter &TC, SILDeclRef function,
       break;
     }
     case CaptureKind::Consuming: {
-      assert(!loweredTL.isAddressOnly());
-      auto param = SILParameterInfo(loweredTy.getASTType(),
-                                    ParameterConvention::Direct_Owned, options);
+      // Address-only consumed captures (e.g. a non-Copyable generic parameter)
+      // are passed indirectly, like any other owned address-only value.
+      auto convention = loweredTL.isAddressOnly()
+                            ? ParameterConvention::Indirect_In
+                            : ParameterConvention::Direct_Owned;
+      SILType ty =
+          loweredTL.isAddressOnly() ? loweredTy.getAddressType() : loweredTy;
+      auto param = SILParameterInfo(ty.getASTType(), convention, options);
       inputs.push_back(param);
       break;
     }
