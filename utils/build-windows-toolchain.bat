@@ -62,16 +62,9 @@ set TMPDIR=%BuildRoot%\tmp
 
 set NINJA_STATUS=[%%f/%%t][%%p][%%es] 
 
-:: Build the -Test argument, if any, by subtracting skipped tests
-set TestsList=lld,lldb,lldb-swift,swift,dispatch,foundation,xctest,swift-format,sourcekit-lsp
+:: Skip all testing, regardless of what the caller requested.
+:: build.ps1 runs no tests when -Test is absent, so pass nothing at all.
 set "TestArg="
-set "Skip=,%SKIP_TESTS%,"
-for %%I in (%TestsList%) do (
-  if "!Skip:,%%I,=!" == "!Skip!" (
-      set "TestArg=!TestArg!%%I,"
-  )
-)
-set "TestArg=-Test !TestArg!"
 
 :: Build the packaging arguments (skipped for normal PRs and an added stage for toolchain PRs)
 set "PackagingArg="
