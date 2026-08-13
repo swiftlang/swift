@@ -17,6 +17,12 @@
 // REQUIRES: swift_feature_CoroutineAccessors
 // REQUIRES: swift_feature_BuiltinModule
 
+// This test is about the default-override forwarding thunks that bridge the
+// old and new coroutine-accessor ABIs across a resilience boundary for `open`
+// members; that bridge only exists where the old ABI is emitted at all, which
+// only happens on an ABI-stable platform.
+// REQUIRES: swift_stable_abi
+
 import Builtin
 
 public enum Open {}

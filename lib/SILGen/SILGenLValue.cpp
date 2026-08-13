@@ -3672,7 +3672,9 @@ static LValue emitLValueForNonMemberVarDecl(
   auto access = getFormalAccessKind(accessKind);
   auto strategy = var->getAccessStrategy(
       semantics, access, SGF.SGM.M.getSwiftModule(),
-      SGF.F.getResilienceExpansion(), std::nullopt, /*useOldABI=*/false);
+      SGF.F.getResilienceExpansion(),
+      std::make_pair(loc.getSourceRange(), SGF.FunctionDC),
+      /*useOldABI=*/false);
 
   lv.addNonMemberVarComponent(SGF, loc, var, subs, options, accessKind,
                               strategy, formalRValueType, actorIso);
@@ -5047,7 +5049,8 @@ LValue SILGenFunction::emitPropertyLValue(SILLocation loc, ManagedValue base,
 
   AccessStrategy strategy = ivar->getAccessStrategy(
       semantics, getFormalAccessKind(accessKind), SGM.M.getSwiftModule(),
-      F.getResilienceExpansion(), std::nullopt, /*useOldABI=*/false);
+      F.getResilienceExpansion(),
+      std::make_pair(loc.getSourceRange(), FunctionDC), /*useOldABI=*/false);
 
   auto baseAccessKind =
     getBaseAccessKind(SGM, ivar, accessKind, strategy, baseFormalType,
@@ -5809,7 +5812,8 @@ RValue SILGenFunction::emitRValueForStorageLoad(
     bool isBaseGuaranteed) {
   AccessStrategy strategy = storage->getAccessStrategy(
       semantics, AccessKind::Read, SGM.M.getSwiftModule(),
-      F.getResilienceExpansion(), std::nullopt, /*useOldABI=*/false);
+      F.getResilienceExpansion(),
+      std::make_pair(loc.getSourceRange(), FunctionDC), /*useOldABI=*/false);
 
   // If we should call an accessor of some kind, do so.
   if (strategy.getKind() != AccessStrategy::Storage) {
