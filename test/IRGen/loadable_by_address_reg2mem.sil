@@ -499,3 +499,35 @@ bb0:
   return %ret : $()
 }
 
+
+struct LargeRef {
+  var c: C1
+  var p: (Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int, Int)
+}
+
+// CHECK-LABEL: sil @test_mark_dependence_addr_large_argument
+// CHECK:       bb0(%0 : $*LargeRef, %1 : $*Builtin.NativeObject):
+// CHECK:         [[STK:%.*]] = alloc_stack $LargeRef
+// CHECK:         copy_addr [take] %0 to [init] [[STK]]
+// CHECK:         mark_dependence_addr [nonescaping] %1 : $*Builtin.NativeObject on [[STK]] : $*LargeRef
+// CHECK:       } // end sil function 'test_mark_dependence_addr_large_argument'
+sil @test_mark_dependence_addr_large_argument : $@convention(thin) (@guaranteed LargeRef, @in_guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : $LargeRef, %1 : $*Builtin.NativeObject):
+  mark_dependence_addr [nonescaping] %1 : $*Builtin.NativeObject on %0 : $LargeRef
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: sil @test_mark_dependence_addr_large_loaded_value
+// CHECK:       bb0(%0 : $*LargeRef, %1 : $*Builtin.NativeObject):
+// CHECK-NOT:     alloc_stack
+// CHECK:         mark_dependence_addr [nonescaping] %1 : $*Builtin.NativeObject on %0 : $*LargeRef
+// CHECK:       } // end sil function 'test_mark_dependence_addr_large_loaded_value'
+sil @test_mark_dependence_addr_large_loaded_value : $@convention(thin) (@in_guaranteed LargeRef, @in_guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : $*LargeRef, %1 : $*Builtin.NativeObject):
+  %2 = load %0 : $*LargeRef
+  mark_dependence_addr [nonescaping] %1 : $*Builtin.NativeObject on %2 : $LargeRef
+  %4 = tuple ()
+  return %4 : $()
+}
+
