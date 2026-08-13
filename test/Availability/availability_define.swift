@@ -72,7 +72,7 @@ func client() {
     onMacOS51_0()
   }
 
-  if #available(_unknownMacro, *) { } // expected-warning {{unrecognized platform name '_unknownMacro'}}
+  if #available(_unknownMacro, *) { } // expected-warning {{cannot find availability domain '_unknownMacro'}}
 }
 
 public func doIt(_ closure: () -> ()) {
