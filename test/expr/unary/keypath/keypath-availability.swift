@@ -19,8 +19,8 @@ struct Butt {
   var setter_universally_unavailable: Int {
     get { fatalError() }
 
-    @available(*, unavailable)
-    set { fatalError() } // expected-note 2 {{setter for 'setter_universally_unavailable' has been explicitly marked unavailable here}}
+    @available(*, unavailable) // expected-note 2 {{setter for 'setter_universally_unavailable' has been explicitly marked unavailable here}}
+    set { fatalError() }
   }
 }
 

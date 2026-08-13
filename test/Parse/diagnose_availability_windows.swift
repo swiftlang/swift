@@ -1,7 +1,7 @@
 // RUN: %target-typecheck-verify-swift -target x86_64-unknown-windows-msvc -parse-stdlib -verify-additional-prefix no-target-
 // RUN: %target-typecheck-verify-swift -target x86_64-unknown-windows8.0-msvc -parse-stdlib
 
-// expected-note@+2{{'unavailable()' has been explicitly marked unavailable here}}
+// expected-note@+1{{'unavailable()' has been explicitly marked unavailable here}}
 @available(Windows, unavailable, message: "unsupported")
 func unavailable() {}
 

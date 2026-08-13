@@ -8,8 +8,8 @@
 class C1 { } // expected-note{{class 'C1' does not conform to the 'Sendable' protocol}}
 class C2 { }
 
-@available(*, unavailable)
-extension C2: Sendable {} // expected-note{{conformance of 'C2' to 'Sendable' has been explicitly marked unavailable here}}
+@available(*, unavailable) // expected-note{{conformance of 'C2' to 'Sendable' has been explicitly marked unavailable here}}
+extension C2: Sendable {}
 
 protocol TestProtocol {
   associatedtype Value: Sendable

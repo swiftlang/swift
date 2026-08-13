@@ -8,7 +8,7 @@ public func doSomethingFarFuture() { }
 
 @available(iOS, introduced: 16.0, obsoleted: 17.0, message: "you don't want to do that anyway")
 public func doSomethingElse() { }
-// expected-note@-1 3 {{'doSomethingElse()' was obsoleted in visionOS 1.0}}
+// expected-note@-2 3 {{'doSomethingElse()' was obsoleted in visionOS 1.0}}
 
 @available(iOS, introduced: 16.0, deprecated: 17.0, message: "please don't")
 public func doSomethingInadvisable() { }
@@ -42,7 +42,7 @@ public struct ConformsToProtoObsoletedIniOS17 { }
 
 @available(iOS, introduced: 16.0, obsoleted: 17.0, message: "you don't want to do that anyway")
 extension ConformsToProtoObsoletedIniOS17: SomeProto { }
-// expected-note@-1 {{conformance of 'ConformsToProtoObsoletedIniOS17' to 'SomeProto' was obsoleted in visionOS 1.0}}
+// expected-note@-2 {{conformance of 'ConformsToProtoObsoletedIniOS17' to 'SomeProto' was obsoleted in visionOS 1.0}}
 
 
 func testDeploymentTarget() {

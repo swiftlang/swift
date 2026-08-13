@@ -2,8 +2,8 @@
 
 // https://github.com/apple/swift/issues/61890
 
-@available(*, unavailable)
-struct S: ExpressibleByStringLiteral { // expected-note{{'S' has been explicitly marked unavailable here}}
+@available(*, unavailable) // expected-note{{'S' has been explicitly marked unavailable here}}
+struct S: ExpressibleByStringLiteral {
   init(stringLiteral value: String) {}
 }
 @available(*, unavailable)
@@ -11,8 +11,8 @@ typealias StringLiteralType = S
 
 let i = "" // expected-error{{'S' is unavailable}}
 
-@available(*, unavailable)
-struct S1<T>: ExpressibleByIntegerLiteral { // expected-note{{'S1' has been explicitly marked unavailable here}}
+@available(*, unavailable) // expected-note{{'S1' has been explicitly marked unavailable here}}
+struct S1<T>: ExpressibleByIntegerLiteral {
   init(integerLiteral value: Int) {}
 }
 @available(*, unavailable)

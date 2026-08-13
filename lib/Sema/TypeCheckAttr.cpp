@@ -5848,6 +5848,7 @@ void AttributeChecker::checkBackDeployedAttrs(
       // Find the attribute that makes the declaration unavailable.
       const Decl *attrDecl = D;
       do {
+        // FIXME: Adopt AvailabilityRestriction::emitNoteForDecl()
         if (auto unavailableAttr = attrDecl->getUnavailableAttr()) {
           diagnose(unavailableAttr->getParsedAttr()->AtLoc,
                    diag::availability_marked_unavailable, VD)

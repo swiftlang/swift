@@ -3,21 +3,21 @@
 @available(visionOS, introduced: 1.0, deprecated: 1.5, obsoleted: 2.0,
            message: "you don't want to do that anyway")
 public func doSomething() { }
-// expected-note @-1{{'doSomething()' was obsoleted in visionOS 2.0}}
+// expected-note @-3{{'doSomething()' was obsoleted in visionOS 2.0}}
 
 doSomething() // expected-error{{'doSomething()' is unavailable in visionOS: you don't want to do that anyway}}
 
 // Preservation of major.minor.micro
 @available(visionOS, introduced: 1.0, deprecated: 1.5, obsoleted: 1.5.3)
 func doSomethingElse() { }
-// expected-note @-1{{'doSomethingElse()' was obsoleted in visionOS 1.5.3}}
+// expected-note @-2{{'doSomethingElse()' was obsoleted in visionOS 1.5.3}}
 
 doSomethingElse() // expected-error{{'doSomethingElse()' is unavailable in visionOS}}
 
 // Preservation of minor-only version
 @available(visionOS, introduced: 1.0, deprecated: 1.5, obsoleted: 2)
 func doSomethingReallyOld() { }
-// expected-note @-1{{'doSomethingReallyOld()' was obsoleted in visionOS 2}}
+// expected-note @-2{{'doSomethingReallyOld()' was obsoleted in visionOS 2}}
 
 doSomethingReallyOld() // expected-error{{'doSomethingReallyOld()' is unavailable in visionOS}}
 
