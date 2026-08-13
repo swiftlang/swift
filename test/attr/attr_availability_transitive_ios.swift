@@ -2,8 +2,8 @@
 
 // Allow referencing unavailable API in situations where the caller is marked unavailable in the same circumstances.
 
-@available(iOS, unavailable)
-func ios() {} // expected-note 2{{'ios()' has been explicitly marked unavailable here}}
+@available(iOS, unavailable) // expected-note 2{{'ios()' has been explicitly marked unavailable here}}
+func ios() {}
 
 @available(iOSApplicationExtension, unavailable)
 func ios_extension() {}
