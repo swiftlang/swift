@@ -144,3 +144,8 @@ module VirtualMethodAttrs {
   header "virtual-methods-attrs.h"
   requires cplusplus
 }
+
+module InheritedGenericArgument {
+  header "inherited-generic-argument.h"
+  requires cplusplus
+}
