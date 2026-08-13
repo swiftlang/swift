@@ -59,6 +59,9 @@ import Foundation
   // CHECK-NOT: func mainMethod
   @objc public func mainMethod(_: Int32) { print(implProperty) }
 
+  // CHECK-NOT: func baseMethod
+  @objc public override func baseMethod(_: Int32) { print("override") }
+
   // CHECK-NOT: deinit
 }
 // CHECK: }
@@ -101,6 +104,13 @@ open class SwiftSubclass: ImplClass {
   // CHECK-DAG: @objc override dynamic open func mainMethod
   override open func mainMethod(_: Int32) {
     print("subclass mainMethod")
+  }
+
+  // rdar://184617707 - `override` must still be printed when the immediate
+  // overridden decl is itself an override implemented via `@_objcImplementation`.
+  // CHECK-DAG: @objc override dynamic open func baseMethod
+  override open func baseMethod(_: Int32) {
+    print("subclass baseMethod")
   }
 
   // CHECK-DAG: @objc override dynamic public init()
