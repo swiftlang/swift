@@ -3,7 +3,6 @@
 // REQUIRES: executable_test
 
 // UNSUPPORTED: back_deployment_runtime || use_os_stdlib
-// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 // RUN: %target-run-simple-swift-split-file(test.swift -I %t%{fs-sep}Inputs -target %target-swift-6.2-abi-triple \
 // RUN:   -cxx-interoperability-mode=default -Xcc -std=c++20 -enable-experimental-feature SafeInteropWrappers)
