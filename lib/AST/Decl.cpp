@@ -3614,21 +3614,23 @@ static bool mayReferenceUseCoroutineAccessorOnStorage(
   if (!resilient)
     return true;
 
-  // Without knowing where the storage is referenced, it can't be known that
-  // a coroutine accessor is available.
-  if (!reference) {
-    return false;
-  }
+  // A resilient access may use the new (yield_once_2) coroutine accessor only
+  // if the caller is guaranteed to run at or after the feature's availability.
+  // With a source location, use the (possibly `if #available`-refined)
+  // availability there; without one, fall back to the caller's deployment
+  // target.  If the caller's deployment target predates the feature we must call
+  // the old ABI -- such a target may run against pre-feature frameworks that
+  // only have it -- and the emission policy guarantees that any accessor
+  // reachable from pre-feature code (i.e. itself available before the feature)
+  // has that old ABI, so this can never select a missing symbol.
+  auto callerAvailability =
+      reference ? AvailabilityContext::forLocation(reference->first.Start,
+                                                   reference->second)
+                      .getPlatformRange()
+                : AvailabilityContext::forDeploymentTarget(ctx).getPlatformRange();
+  auto featureAvailability = ctx.getCoroutineAccessorsAvailability();
 
-  // A resilient access to storage may only use a coroutine accessor if the
-  // storage became available no earlier than the feature.
-  auto referenceAvailability = AvailabilityContext::forLocation(
-                                   reference->first.Start, reference->second)
-                                   .getPlatformRange();
-  auto featureAvailability =
-      storage->getASTContext().getCoroutineAccessorsAvailability();
-
-  return referenceAvailability.isContainedIn(featureAvailability);
+  return callerAvailability.isContainedIn(featureAvailability);
 }
 
 static AccessStrategy getOpaqueReadAccessStrategy(
@@ -3836,7 +3838,7 @@ bool AbstractStorageDecl::requiresOpaqueSetter() const {
 bool AbstractStorageDecl::requiresOpaqueReadCoroutine() const {
   ASTContext &ctx = getASTContext();
   if (ctx.LangOpts.hasFeature(Feature::CoroutineAccessors))
-    return requiresCorrespondingUnderscoredCoroutineAccessor(
+    return requiresCorrespondingLegacyCoroutineAccessor(
         AccessorKind::YieldingBorrow);
 
   return getOpaqueReadOwnership() == OpaqueReadOwnership::YieldingBorrow ||
@@ -8157,8 +8159,18 @@ StringRef swift::getAccessorNameForDiagnostic(AccessorKind accessorKind,
 StringRef swift::getAccessorNameForDiagnostic(AccessorDecl *accessor,
                                               bool article,
                                               std::optional<bool> underscored) {
+  auto kind = accessor->getAccessorKind();
+  // A yield_once_2 coroutine accessor that the user spelled with the
+  // underscored keyword (`_read`/`_modify`) should be named with that spelling
+  // in diagnostics rather than as `yielding borrow`/`yielding mutate`.
+  if (accessor->isSpelledWithLegacyCoroutineSyntax()) {
+    if (kind == AccessorKind::YieldingBorrow)
+      kind = AccessorKind::Read;
+    else if (kind == AccessorKind::YieldingMutate)
+      kind = AccessorKind::Modify;
+  }
   return getAccessorNameForDiagnostic(
-      accessor->getAccessorKind(), article,
+      kind, article,
       underscored.value_or(accessor->getASTContext().LangOpts.hasFeature(
           Feature::CoroutineAccessors)));
 }
@@ -11998,6 +12010,22 @@ AccessorDecl *AccessorDecl::createParsed(
   return accessor;
 }
 
+void AccessorDecl::changeLegacyCoroutineAccessorToYielding() {
+  // The yielding counterpart has the same signature (parameters and yielded
+  // type) as the underscored one, so only the kind changes.
+  switch (getAccessorKind()) {
+  case AccessorKind::Read:
+    Bits.AccessorDecl.AccessorKind = unsigned(AccessorKind::YieldingBorrow);
+    break;
+  case AccessorKind::Modify:
+    Bits.AccessorDecl.AccessorKind = unsigned(AccessorKind::YieldingMutate);
+    break;
+  default:
+    llvm_unreachable("not an underscored coroutine accessor");
+  }
+  SpelledWithLegacyCoroutineSyntax = true;
+}
+
 StringRef AccessorDecl::implicitParameterNameFor(AccessorKind kind) {
   switch (kind) {
   case AccessorKind::Set:
@@ -12112,7 +12140,7 @@ bool AccessorDecl::isRequirementWithSynthesizedDefaultImplementation() const {
   if (!requiresNewWitnessTableEntry()) {
     return false;
   }
-  return getStorage()->requiresCorrespondingUnderscoredCoroutineAccessor(
+  return getStorage()->requiresCorrespondingLegacyCoroutineAccessor(
       getAccessorKind(), this);
 }
 

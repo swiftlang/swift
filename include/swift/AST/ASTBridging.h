@@ -1469,6 +1469,15 @@ BridgedAccessorDecl BridgedAccessorDecl_createParsed(
     BridgedNullableParameterList cParamList, swift::SourceLoc asyncLoc,
     swift::SourceLoc throwsLoc, BridgedNullableTypeRepr cThrownType);
 
+// When the CoroutineAccessors feature is enabled, rewrite a parsed
+// `_read`/`_modify` accessor to its yielding counterpart, mirroring the C++
+// parser's ParsedAccessors::record.  A no-op for any other accessor kind.  Only
+// valid for accessors parsed from surface source (ASTGen never parses
+// .swiftinterface/.sil, where `_read`/`_modify` are ABI declarations).
+SWIFT_NAME("BridgedAccessorDecl.remapLegacyCoroutineAccessorIfEnabled(self:)")
+void BridgedAccessorDecl_remapLegacyCoroutineAccessorIfEnabled(
+    BridgedAccessorDecl cAccessor);
+
 enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedVarDeclIntroducer {
   BridgedVarDeclIntroducerLet = 0,
   BridgedVarDeclIntroducerVar = 1,
