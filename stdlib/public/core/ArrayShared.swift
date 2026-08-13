@@ -283,7 +283,10 @@ extension _ArrayBufferProtocol {
     // Count of trailing source elements to copy/move
     let sourceCount = self.count
     let tailCount = dest.count - headCount - newCount
-    _internalInvariant(headCount + tailCount <= sourceCount)
+
+    _precondition(headCount + tailCount <= sourceCount,
+      "invalid array buffer: count differed in successive reads")
+    _internalInvariant(tailCount >= 0, "dest is too small to update in place")
 
     let oldCount = sourceCount - headCount - tailCount
     let destStart = unsafe dest.firstElementAddress
@@ -329,7 +332,8 @@ extension _ArrayBufferProtocol {
         initializing: destStart)
       unsafe initializeNewElements(newStart, newCount)
       let tailStart = headEnd + oldCount
-      let tailEnd = endIndex
+      // Don't re-read `endIndex` since that calls `-count` on bridged NSArray
+      let tailEnd = headStart + sourceCount
       unsafe _copyContents(subRange: tailStart..<tailEnd, initializing: newEnd)
     }
     self = Self(_buffer: dest, shiftedToStartIndex: startIndex)
