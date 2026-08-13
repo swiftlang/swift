@@ -207,3 +207,13 @@ extension ContinuousClock.Instant: InstantProtocol {
     rhs.duration(to: lhs)
   }
 }
+
+// ==== -----------------------------------------------------------------------
+// MARK: Identifiable
+
+@_unavailableInEmbedded
+@available(StdlibDeploymentTarget 6.5, *)
+extension ContinuousClock: Identifiable {
+  /// The stable identity of the continuous system clock.
+  public var id: SystemClockID { .continuous }
+}

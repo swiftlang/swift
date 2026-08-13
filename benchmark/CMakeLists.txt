@@ -219,6 +219,9 @@ set(SWIFT_BENCH_MODULES
     single-source/UTF8Decode
     single-source/UTF16Decode
     single-source/Walsh
+    single-source/Concurrency/ChildTaskCreation
+    single-source/Concurrency/TaskIsCancelledCancellationScopes
+    single-source/Concurrency/TaskDeadlines
     single-source/WithUnsafeCurrentTask
     single-source/WordCount
     single-source/XorLoop

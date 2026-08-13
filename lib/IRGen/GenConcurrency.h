@@ -117,7 +117,8 @@ llvm::Value *clearImplicitIsolatedActorBits(IRGenFunction &IGF,
 ///
 /// \returns the record that can be used to refer to and cancel the handler.
 ///
-/// Currently supports TaskAddCancellationHandler and
+/// Currently supports TaskAddCancellationHandler,
+/// TaskAddCancellationHandlerWithReason, and
 /// TaskAddPriorityEscalationHandler.
 llvm::Value *emitBuiltinTaskAddHandler(IRGenFunction &IGF,
                                        BuiltinValueKind kind, llvm::Value *func,
@@ -139,6 +140,27 @@ void emitBuiltinTaskLocalValuePop(IRGenFunction &IGF);
 llvm::Value *emitBuiltinTaskCancellationShieldPush(IRGenFunction &IGF);
 
 void emitBuiltinTaskCancellationShieldPop(IRGenFunction &IGF);
+
+/// Emit IR for the taskPushDeadline builtin.
+///
+/// \returns the record pointer to hand back to emitBuiltinTaskPopDeadline.
+llvm::Value *emitBuiltinTaskPushDeadline(IRGenFunction &IGF,
+                                         llvm::Value *clockPtr,
+                                         llvm::Value *instantPtr,
+                                         llvm::Value *clockType,
+                                         llvm::Value *instantType);
+
+/// Emit IR for the taskPopDeadline builtin.
+void emitBuiltinTaskPopDeadline(IRGenFunction &IGF, llvm::Value *record);
+
+/// Emit IR for the taskCancellationScopePush builtin.
+///
+/// \returns the record pointer to hand back to
+/// emitBuiltinTaskCancellationScopePop.
+llvm::Value *emitBuiltinTaskCancellationScopePush(IRGenFunction &IGF);
+
+/// Emit IR for the taskCancellationScopePop builtin.
+void emitBuiltinTaskCancellationScopePop(IRGenFunction &IGF, llvm::Value *record);
 
 } // end namespace irgen
 } // end namespace swift

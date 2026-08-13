@@ -2269,6 +2269,16 @@ static ManagedValue emitBuiltinTaskAddCancellationHandler(
   return ManagedValue::forRValueWithoutOwnership(b);
 }
 
+static ManagedValue emitBuiltinTaskAddCancellationHandlerWithReason(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
+    ArrayRef<ManagedValue> args, SGFContext C) {
+  auto *b =
+      SGF.B.createBuiltin(loc, BuiltinNames::TaskAddCancellationHandlerWithReason,
+                          SILType::getUnsafeRawPointer(SGF.getASTContext()),
+                          subs, {args[0].getValue()});
+  return ManagedValue::forRValueWithoutOwnership(b);
+}
+
 static ManagedValue emitBuiltinTaskAddPriorityEscalationHandler(
     SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
     ArrayRef<ManagedValue> args, SGFContext C) {
