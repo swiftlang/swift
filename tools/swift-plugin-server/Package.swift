@@ -5,7 +5,7 @@ import PackageDescription
 let package = Package(
   name: "swift-plugin-server",
   platforms: [
-    .macOS(.v13)
+    .macOS(.v14)
   ],
   products: [
     .executable(name: "swift-plugin-server", targets: ["swift-plugin-server"]),
@@ -13,6 +13,8 @@ let package = Package(
   ],
   dependencies: [
     .package(path: "../../../swift-syntax"),
+    .package(path: "../../../wasmkit"),
+    .package(path: "../../../swift-system"),
   ],
   targets: [
     .executableTarget(
@@ -20,6 +22,8 @@ let package = Package(
       dependencies: [
         .product(name: "_SwiftCompilerPluginMessageHandling", package: "swift-syntax"),
         .product(name: "_SwiftLibraryPluginProvider", package: "swift-syntax"),
+        .product(name: "WASI", package: "WasmKit"),
+        .product(name: "WasmKitWASI", package: "WasmKit"),
       ]
     ),
     .target(
@@ -27,6 +31,14 @@ let package = Package(
       dependencies: [
         .product(name: "_SwiftCompilerPluginMessageHandling", package: "swift-syntax"),
         .product(name: "_SwiftLibraryPluginProvider", package: "swift-syntax"),
+      ]
+    ),
+    .testTarget(
+      name: "PluginServerTests",
+      dependencies: [
+        .product(name: "WAT", package: "WasmKit"),
+        .product(name: "WasmKit", package: "WasmKit"),
+        "swift-plugin-server",
       ]
     ),
   ],
