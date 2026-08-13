@@ -707,10 +707,10 @@ struct ASTContext::Implementation {
   /// Temporary arena used for a constraint solver.
   struct ConstraintSolverArena : public Arena {
     /// The allocator used for all allocations within this arena.
-    llvm::BumpPtrAllocator &Allocator;
+    ConstraintSolverAllocator &Allocator;
 
-    ConstraintSolverArena(llvm::BumpPtrAllocator &allocator)
-      : Allocator(allocator) { }
+    ConstraintSolverArena(ConstraintSolverAllocator &allocator)
+        : Allocator(allocator) {}
 
     ConstraintSolverArena(const ConstraintSolverArena &) = delete;
     ConstraintSolverArena(ConstraintSolverArena &&) = delete;
@@ -772,10 +772,9 @@ ASTContext::Implementation::~Implementation() {
     cleanup();
 }
 
-ConstraintCheckerArenaRAII::
-ConstraintCheckerArenaRAII(ASTContext &self, llvm::BumpPtrAllocator &allocator)
-  : Self(self), Data(self.getImpl().CurrentConstraintSolverArena.release())
-{
+ConstraintCheckerArenaRAII::ConstraintCheckerArenaRAII(
+    ASTContext &self, ConstraintSolverAllocator &allocator)
+    : Self(self), Data(self.getImpl().CurrentConstraintSolverArena.release()) {
   Self.getImpl().CurrentConstraintSolverArena.reset(
     new ASTContext::Implementation::ConstraintSolverArena(allocator));
 }
