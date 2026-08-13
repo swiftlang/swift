@@ -6,6 +6,7 @@
 // we should turn this into a REQUIRES instead.
 // UNSUPPORTED: CPU=i386
 // UNSUPPORTED: CPU=arm64_32
+// UNSUPPORTED: CPU=wasm32
 
 import Builtin
 import Swift
