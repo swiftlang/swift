@@ -35,8 +35,8 @@ struct AssetBrowserView: View {
         ForEach(0..<(Int(assetsFetchResult.count/3))) { i in
           HStack {
             ForEach(0..<3) { j in
-              ZStack(alignment: .center) { // expected-error {{reasonable time}}
-                Image(uiImage: PHAsset.getUIImageFromPHAsset(asset: assetsFetchResult[j]()!)!)
+              ZStack(alignment: .center) {
+                Image(uiImage: PHAsset.getUIImageFromPHAsset(asset: assetsFetchResult[j]()!)!)  // expected-error {{reasonable time}}
                   .frame(width: 0, height: 0)
               }
               .frame(width: 0, height: 0)
