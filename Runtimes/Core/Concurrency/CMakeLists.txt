@@ -112,6 +112,8 @@ if(APPLE)
   target_sources(swift_Concurrency PRIVATE
     CFExecutor.swift
     CFExecutor.cpp)
+  target_compile_options(swift_Concurrency PRIVATE
+    $<$<AND:$<BOOL:${SwiftCore_ENABLE_STDLIB_LAZY_LINK}>,$<COMPILE_LANGUAGE:Swift>>:-DSWIFT_STDLIB_ENABLE_LAZY_LINK>)
 endif()
 
 include(${SwiftCore_CONCURRENCY_GLOBAL_EXECUTOR}.cmake)
