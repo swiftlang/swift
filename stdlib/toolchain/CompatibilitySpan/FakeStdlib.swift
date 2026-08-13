@@ -37,7 +37,7 @@ internal func _internalInvariantFailure(
 @_unsafeNonescapableResult
 @export(implementation)
 @_transparent
-@lifetime(borrow source)
+@_lifetime(borrow source)
 internal func _overrideLifetime<
   T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
 >(
@@ -50,7 +50,7 @@ internal func _overrideLifetime<
 @_unsafeNonescapableResult
 @export(implementation)
 @_transparent
-@lifetime(copy source)
+@_lifetime(copy source)
 internal func _overrideLifetime<
   T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
 >(
@@ -63,7 +63,7 @@ internal func _overrideLifetime<
 @_unsafeNonescapableResult
 @export(implementation)
 @_transparent
-@lifetime(&source)
+@_lifetime(&source)
 internal func _overrideLifetime<
   T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
 >(
