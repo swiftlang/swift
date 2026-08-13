@@ -67,6 +67,8 @@
 #include "MetadataLayout.h"
 #include "MetadataRequest.h"
 
+#include <limits>
+
 using namespace swift;
 using namespace irgen;
 
@@ -633,6 +635,21 @@ irgen::getClassFieldOffset(IRGenModule &IGM, SILType baseType, VarDecl *field) {
   return element.getByteOffset();
 }
 
+Size irgen::getCOMObjectPrefixSize(IRGenModule &IGM, ClassDecl *CD) {
+  auto *info = CD->getCOMDeclInfo();
+  if (!info || !info->isImplementation())
+    return Size(0);
+
+  if (info->getInterfaceSlots().size() > std::numeric_limits<uint16_t>::max())
+    llvm::report_fatal_error("COM object prefix does not fit in the generic metadata pattern");
+  return IGM.getPointerSize() * info->getInterfaceSlots().size();
+}
+
+Size irgen::getClassInstanceAddressPoint(IRGenModule &IGM, ClassDecl *CD,
+                                         Alignment alignment) {
+  return getCOMObjectPrefixSize(IGM, CD).roundUpToAlignment(alignment);
+}
+
 StructLayout *
 irgen::getClassLayoutWithTailElems(IRGenModule &IGM, SILType classType,
                                    ArrayRef<SILType> tailTypes) {
@@ -740,6 +757,12 @@ Address irgen::emitTailProjection(IRGenFunction &IGF, llvm::Value *Base,
     Offset = emitClassResilientInstanceSizeAndAlignMask(IGF,
                                         ClassType.getClassOrBoundGenericClass(),
                                         metadata).first;
+
+    auto *addressPoint =
+        emitClassResilientInstanceAddressPoint(IGF,
+                                               ClassType.getClassOrBoundGenericClass(),
+                                               metadata);
+    Offset = IGF.Builder.CreateSub(Offset, addressPoint);
   }
   // Align up to the TailType.
   assert(TailType.isObject());
@@ -870,9 +893,19 @@ llvm::Value *irgen::emitClassAllocation(IRGenFunction &IGF, SILType selfType,
   auto &classLayout = classTI.getClassLayout(IGF.IGM, selfType,
                                              /*forBackwardDeployment=*/false);
 
+  bool hasPrefix =
+      !getCOMObjectPrefixSize(IGF.IGM,selfType.getClassOrBoundGenericClass())
+          .isZero();
+
+  // Stack object prefix materialization is a separate optimization concern.
+  // Keep prefixed objects on the common heap allocation path for now.
+  if (hasPrefix)
+    StackAllocSize = -1;
+
   llvm::Value *val = nullptr;
-  if (llvm::Value *Promoted = stackPromote(IGF, classLayout, StackAllocSize,
-                                           TailArrays)) {
+  if (llvm::Value *Promoted =
+          hasPrefix ? nullptr : stackPromote(IGF, classLayout,
+                                             StackAllocSize, TailArrays)) {
     if (isBare) {
       val = Promoted;
     } else {
@@ -890,7 +923,11 @@ llvm::Value *irgen::emitClassAllocation(IRGenFunction &IGF, SILType selfType,
 
     llvm::Value *size, *alignMask;
     if (classLayout.isFixedSize()) {
-      size = IGF.IGM.getSize(classLayout.getSize());
+      auto prefix =
+          getClassInstanceAddressPoint(IGF.IGM,
+                                       selfType.getClassOrBoundGenericClass(),
+                                       classLayout.getAlignment());
+      size = IGF.IGM.getSize(prefix + classLayout.getSize());
       alignMask = IGF.IGM.getSize(classLayout.getAlignMask());
     } else {
       std::tie(size, alignMask)
@@ -931,11 +968,19 @@ llvm::Value *irgen::emitClassAllocationDynamic(IRGenFunction &IGF,
                                           /*forBackwardDeployment=*/false);
   auto *destType = IGF.IGM.PtrTy;
 
+  bool hasPrefix =
+      !getCOMObjectPrefixSize(IGF.IGM, selfType.getClassOrBoundGenericClass())
+          .isZero();
+
+  // Stack object prefix materialization is a separate optimization concern.
+  // Keep prefixed objects on the common heap allocation path for now.
+  if (hasPrefix)
+    StackAllocSize = -1;
+
   // If we are allowed to allocate on the stack we are allowed to use
   // `selfType`'s size assumptions.
-  if (StackAllocSize >= 0 &&
-      (Promoted = stackPromote(IGF, classLayout, StackAllocSize,
-                                           TailArrays))) {
+  if (!hasPrefix && StackAllocSize >= 0 &&
+      (Promoted = stackPromote(IGF, classLayout, StackAllocSize, TailArrays))) {
     llvm::Value *val = IGF.Builder.CreateBitCast(Promoted,
                                                  IGF.IGM.RefCountedPtrTy);
     val = IGF.emitInitStackObjectCall(metadata, val, "reference.new");
@@ -973,7 +1018,9 @@ static void getInstanceSizeAndAlignMask(IRGenFunction &IGF,
 
   // If it's fixed, emit the constant size and alignment mask.
   if (layout.isFixedLayout()) {
-    size = IGF.IGM.getSize(layout.getSize());
+    Size prefix =
+        getClassInstanceAddressPoint(IGF.IGM, selfClass, layout.getAlignment());
+    size = IGF.IGM.getSize(prefix + layout.getSize());
     alignMask = IGF.IGM.getSize(layout.getAlignMask());
     return;
   }
@@ -3080,6 +3127,22 @@ irgen::emitClassResilientInstanceSizeAndAlignMask(IRGenFunction &IGF,
   alignMask = IGF.Builder.CreateZExt(alignMask, IGF.IGM.SizeTy);
 
   return {size, alignMask};
+}
+
+llvm::Value *
+irgen::emitClassResilientInstanceAddressPoint(IRGenFunction &IGF, ClassDecl *CD,
+                                              llvm::Value *metadata) {
+  auto &layout = IGF.IGM.getClassMetadataLayout(CD);
+  Address data(IGF.Builder.CreateBitCast(metadata, IGF.IGM.Int8PtrTy),
+               IGF.IGM.Int8Ty, IGF.IGM.getPointerAlignment());
+  Address slot =
+      IGF.Builder.CreateConstByteArrayGEP(data,
+                                          layout.getInstanceAddressPointOffset());
+  slot = IGF.Builder.CreateElementBitCast(slot, IGF.IGM.Int32Ty);
+  llvm::Value *result = IGF.Builder.CreateLoad(slot);
+  if (IGF.IGM.SizeTy == IGF.IGM.Int32Ty)
+    return result;
+  return IGF.Builder.CreateZExt(result, IGF.IGM.SizeTy);
 }
 
 llvm::MDString *irgen::typeIdForMethod(IRGenModule &IGM, SILDeclRef method) {
