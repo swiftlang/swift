@@ -33,6 +33,8 @@ class TaskGroup;
 
 class TaskLocal {
 public:
+  class Snapshot;  // defined below; friend of Storage
+
   class Item {
   public:
     enum class Kind {
@@ -157,6 +159,7 @@ public:
 
   class Storage {
     friend class TaskLocal::ValueItem;
+    friend class TaskLocal::Snapshot;
 
   private:
     /// A stack (single-linked list) of task local values.
@@ -239,6 +242,73 @@ public:
   public:
     StopLookupScope();
     ~StopLookupScope();
+  };
+
+  /// Heap-allocated, type-erased snapshot of the currently visible task-local
+  /// bindings — one entry per key, holding the most-specific value. Used by
+  /// `TaskLocalContext` (Swift API) to let external libraries copy task locals
+  /// into arbitrary execution contexts without spawning a structured task.
+  ///
+  /// Ownership:
+  ///  * Each `Entry::key` is `swift_retain`d at capture; released on destroy.
+  ///  * Each value payload is `vw_initializeWithCopy`d at capture; destroyed
+  ///    via `vw_destroy` on destroy.
+  ///  * The snapshot itself lives on the C heap (`swift_slowAlloc`) so it
+  ///    may safely outlive the task that captured it.
+  class Snapshot {
+  public:
+    struct Entry {
+      const HeapObject *key;      // +1 retained
+      const Metadata *valueType;
+      size_t valueOffset;         // byte offset from `this` (Snapshot*)
+    };
+
+  private:
+    size_t count;
+    size_t bufferSize;
+    // Alignment mask used at swift_slowAlloc time — remembered so destroy()
+    // can hand the same mask back to swift_slowDealloc. Set by capture().
+    size_t allocAlignMask;
+    // Trailing layout (single contiguous heap allocation):
+    //   Snapshot header
+    //   Entry entries[count]
+    //   value payloads, each aligned to valueType->vw_alignment()
+
+    Snapshot(size_t count, size_t bufferSize)
+        : count(count), bufferSize(bufferSize), allocAlignMask(0) {}
+
+  public:
+    /// Walk `from` (head → parent chain), dedup by key, and materialise a
+    /// snapshot. Stops at any `StopLookupMarker`. Returns nullptr if the
+    /// captured set would be empty (including when `from` is null).
+    static Snapshot *capture(TaskLocal::Storage *from);
+
+    size_t getCount() const { return count; }
+
+    Entry *entries() {
+      return reinterpret_cast<Entry *>(
+          reinterpret_cast<char *>(this) + sizeof(Snapshot));
+    }
+    const Entry *entries() const {
+      return reinterpret_cast<const Entry *>(
+          reinterpret_cast<const char *>(this) + sizeof(Snapshot));
+    }
+    OpaqueValue *valueStorage(size_t i) {
+      return reinterpret_cast<OpaqueValue *>(
+          reinterpret_cast<char *>(this) + entries()[i].valueOffset);
+    }
+
+    /// Push every captured entry, via the standard `swift_task_localValuePush`
+    /// runtime path (so `ValueInTaskGroupBody` tagging and fallback-TLS
+    /// selection happen for free). Returns `count` — pass this to `popN` in a
+    /// `defer` to restore state.
+    size_t pushAll();
+
+    /// Pop `n` items via `swift_task_localValuePop`.
+    static void popN(size_t n);
+
+    /// Value-witness-destroy every entry, release every key, free self.
+    void destroy();
   };
 };
 

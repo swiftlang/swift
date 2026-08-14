@@ -23,6 +23,7 @@
 #include "swift/Runtime/SmallPtrSet.h"
 #include "swift/Threading/ThreadLocalStorage.h"
 #include "llvm/ADT/PointerIntPair.h"
+#include "llvm/ADT/SmallVector.h"
 #include <new>
 
 #if SWIFT_STDLIB_HAS_ASL
@@ -153,6 +154,49 @@ static void swift_task_localsCopyToImpl(AsyncTask *target) {
   if (auto Current = TaskLocal::Storage::getCurrent(swift_task_getCurrent())) {
     Current->copyTo(target);
   }
+}
+
+// ==== TaskLocalContext (snapshot) --------------------------------------------
+//
+// The five entry points below back the public `TaskLocalContext` Swift type
+// (stdlib/public/Concurrency/TaskLocalContext.swift). They let external
+// libraries snapshot the current task-local bindings (most-specific per key)
+// and later re-apply them onto an arbitrary execution context, mirroring the
+// implicit copy that `Task.init { ... }` performs today.
+//
+// These are exported directly (no CompatibilityOverride table entries) — the
+// API is additive, has no back-deployment story yet, and only the Swift
+// stdlib calls them via @_silgen_name.
+
+SWIFT_EXPORT_FROM(swift_Concurrency)
+SWIFT_CC(swift)
+void *swift_task_localsCopyToSnapshot() {
+  auto *storage = TaskLocal::Storage::getCurrent(swift_task_getCurrent());
+  return TaskLocal::Snapshot::capture(storage);
+}
+
+SWIFT_EXPORT_FROM(swift_Concurrency)
+SWIFT_CC(swift)
+size_t swift_task_localsSnapshotCount(void *snap) {
+  return snap ? static_cast<TaskLocal::Snapshot *>(snap)->getCount() : 0;
+}
+
+SWIFT_EXPORT_FROM(swift_Concurrency)
+SWIFT_CC(swift)
+size_t swift_task_localsSnapshotPush(void *snap) {
+  return snap ? static_cast<TaskLocal::Snapshot *>(snap)->pushAll() : 0;
+}
+
+SWIFT_EXPORT_FROM(swift_Concurrency)
+SWIFT_CC(swift)
+void swift_task_localsSnapshotPop(size_t count) {
+  TaskLocal::Snapshot::popN(count);
+}
+
+SWIFT_EXPORT_FROM(swift_Concurrency)
+SWIFT_CC(swift)
+void swift_task_localsSnapshotDestroy(void *snap) {
+  if (snap) static_cast<TaskLocal::Snapshot *>(snap)->destroy();
 }
 
 // =============================================================================
@@ -530,6 +574,126 @@ void TaskLocal::Storage::copyTo(AsyncTask *target) {
     }
     item = item->getNext();
   }
+}
+
+// ==== Snapshot ---------------------------------------------------------------
+
+TaskLocal::Snapshot *TaskLocal::Snapshot::capture(TaskLocal::Storage *from) {
+  if (!from || from->isEmpty()) return nullptr;
+
+  // Pass 1: walk head → parent chain, dedup by key, stop at StopLookupMarker.
+  // Also remember the live storage pointer so we don't have to walk the chain
+  // a second time when we copy values into the snapshot buffer. Snapshot is
+  // declared as a friend of Storage in TaskLocal.h so `from->head` is visible.
+  struct Kept {
+    const HeapObject *key;
+    const Metadata *valueType;
+    OpaqueValue *live;   // borrowed pointer into the live ValueItem storage
+  };
+  llvm::SmallVector<Kept, 8> kept;
+  swift::runtime::SmallPtrSet<const HeapObject *, 8> seen;
+
+  for (auto *item = from->head; item; item = item->getNext()) {
+    if (item->getKind() == Item::Kind::StopLookupMarker) break;
+    auto *vi = dyn_cast<ValueItem>(item);
+    if (!vi) continue;
+    if (seen.insert(vi->key)) {
+      kept.push_back(Kept{vi->key, vi->valueType, vi->getStoragePtr()});
+    }
+  }
+  if (kept.empty()) return nullptr;
+
+  // Pass 2: compute buffer layout — header, entry array, then padded payloads.
+  // Also track the strictest value payload alignment so the entire base
+  // allocation is over-aligned enough for the most-demanding payload (matters
+  // on 32-bit targets or with over-aligned Swift types, where a payload's
+  // `vw_alignment` can exceed `alignof(void*)`).
+  const size_t entriesOffset = sizeof(Snapshot);
+  size_t offset = entriesOffset + kept.size() * sizeof(Entry);
+  size_t maxValueAlign = 1;
+
+  llvm::SmallVector<size_t, 8> offsets;
+  offsets.reserve(kept.size());
+  for (auto &k : kept) {
+    const size_t align = k.valueType->vw_alignment();
+    if (align > maxValueAlign) maxValueAlign = align;
+    offset = (offset + align - 1) & ~(align - 1);
+    offsets.push_back(offset);
+    offset += k.valueType->vw_size();
+  }
+  const size_t bufferSize = offset;
+
+  // Base alignment must satisfy header, entry array, AND the most
+  // strictly-aligned payload — the payload offsets above are relative to the
+  // base pointer, so an under-aligned base would carry misalignment through.
+  size_t baseAlign = alignof(Snapshot);
+  if (alignof(Entry) > baseAlign) baseAlign = alignof(Entry);
+  if (maxValueAlign > baseAlign) baseAlign = maxValueAlign;
+  const size_t alignMask = baseAlign - 1;
+  void *raw = swift_slowAlloc(bufferSize, alignMask);
+  auto *snap = ::new (raw) Snapshot(kept.size(), bufferSize);
+  snap->allocAlignMask = alignMask;
+
+  // Pass 3: fill entries, retain keys, initialize-copy value payloads.
+  Entry *entriesArr = snap->entries();
+  for (size_t i = 0; i < kept.size(); ++i) {
+    entriesArr[i].key = kept[i].key;
+    entriesArr[i].valueType = kept[i].valueType;
+    entriesArr[i].valueOffset = offsets[i];
+    swift_retain(const_cast<HeapObject *>(kept[i].key));
+    kept[i].valueType->vw_initializeWithCopy(
+        snap->valueStorage(i), kept[i].live);
+  }
+
+  return snap;
+}
+
+size_t TaskLocal::Snapshot::pushAll() {
+  // Push each captured binding via the standard runtime push. This
+  // automatically:
+  //   * Selects task storage vs fallback-TLS at the push site.
+  //   * Tags the new ValueItem as ValueInTaskGroupBody when appropriate.
+  //
+  // We must copy (not take) our snapshot value into a scratch buffer that
+  // becomes the +1 argument to swift_task_localValuePush, because the
+  // snapshot must remain reusable across multiple pushAll invocations.
+  //
+  // TODO(perf): a future entrypoint that does the copy inside the runtime
+  // (e.g. swift_task_localValuePushCopying(key, srcValue, type)) would let
+  // us avoid the scratch buffer traffic entirely on the hot path.
+  for (size_t i = 0; i < count; ++i) {
+    Entry &e = entries()[i];
+    const size_t sz = e.valueType->vw_size();
+    const size_t alignMask = e.valueType->vw_alignment() - 1;
+    void *scratch = swift_slowAlloc(sz, alignMask);
+    e.valueType->vw_initializeWithCopy(
+        static_cast<OpaqueValue *>(scratch), valueStorage(i));
+    swift_task_localValuePush(e.key, static_cast<OpaqueValue *>(scratch),
+                              e.valueType);
+    // swift_task_localValuePush takes ownership (+1) and vw_initializeWithTakes
+    // the scratch into its own ValueItem storage; we just free the empty
+    // scratch shell.
+    swift_slowDealloc(scratch, sz, alignMask);
+  }
+  return count;
+}
+
+void TaskLocal::Snapshot::popN(size_t n) {
+  for (size_t i = 0; i < n; ++i) {
+    swift_task_localValuePop();
+  }
+}
+
+void TaskLocal::Snapshot::destroy() {
+  Entry *entriesArr = entries();
+  for (size_t i = 0; i < count; ++i) {
+    entriesArr[i].valueType->vw_destroy(valueStorage(i));
+    swift_release(const_cast<HeapObject *>(entriesArr[i].key));
+  }
+  const size_t sz = bufferSize;
+  const size_t alignMask = allocAlignMask;
+  this->~Snapshot();
+  swift_slowDealloc(this, sz, alignMask);
 }
 
 TaskLocal::StopLookupScope::StopLookupScope() {

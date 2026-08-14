@@ -882,6 +882,43 @@ void swift_task_localValuePop();
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_localsCopyTo(AsyncTask* target);
 
+// ==== TaskLocalContext snapshot API ------------------------------------------
+//
+// Backs the public `TaskLocalContext` Swift type. Implementations live in
+// stdlib/public/Concurrency/TaskLocal.cpp; the snapshot object is
+// `TaskLocal::Snapshot` from that file (opaque to consumers of this header).
+
+/// Snapshot the currently visible task-local bindings (most-specific per key,
+/// respecting `StopLookupMarker`). Returns nullptr if there is nothing to
+/// capture (no visible bindings, or no task/fallback storage).
+///
+/// The returned snapshot lives on the heap and may safely outlive the calling
+/// task; the caller must eventually pass it to
+/// `swift_task_localsSnapshotDestroy`.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void *swift_task_localsCopyToSnapshot();
+
+/// Number of key/value pairs held by the snapshot. Zero for nullptr.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+size_t swift_task_localsSnapshotCount(void *snapshot);
+
+/// Push every binding from the snapshot onto the current task-local storage
+/// (task or fallback TLS), via the standard `swift_task_localValuePush` path.
+/// Returns the number of pushes performed — pass this to
+/// `swift_task_localsSnapshotPop` to unwind.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+size_t swift_task_localsSnapshotPush(void *snapshot);
+
+/// Pop `count` bindings via `swift_task_localValuePop`. Must exactly match a
+/// preceding push count on the same task/thread.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_task_localsSnapshotPop(size_t count);
+
+/// Value-witness-destroy every entry, release every key, free the snapshot.
+/// No-op on nullptr.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_task_localsSnapshotDestroy(void *snapshot);
+
 /// Install a task cancellation shield in the current task.
 ///
 /// Returns `true` if the shield was installed and we need to pop it when leaving the shielded scope.

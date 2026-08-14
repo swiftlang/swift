@@ -148,6 +148,7 @@ set(SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES
   TaskGroup.swift
   DiscardingTaskGroup.swift
   TaskLocal.swift
+  TaskLocalContext.swift
   TaskSleep.swift
   AsyncStreamBuffer.swift
   AsyncStreamShims.swift
