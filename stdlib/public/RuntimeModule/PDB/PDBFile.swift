@@ -237,7 +237,7 @@ public class PDBFile {
 
       age = dbiHdr.age
 
-      if dbiHdr.cbDbgHdr > 0 {
+      if dbiHdr.cbDbgHdr > 0 && dbiHdr.cbDbgHdr <= debugInfoStream.size {
         let numStreams = Int(dbiHdr.cbDbgHdr) / MemoryLayout<SN>.stride
         let offset = debugInfoStream.size - Int(dbiHdr.cbDbgHdr)
 
@@ -363,15 +363,18 @@ public class PDBFile {
 
         // Now extract all the strings
         var crefsDone = 0
-        for ndx in 0..<modules.count {
-          for nfile in 0..<crefs[ndx] {
+        for (ndx, numRefs) in crefs.enumerated() {
+          for nfile in 0..<numRefs {
             let iref = crefsDone + Int(nfile)
+            guard iref < ichs.count else {
+              continue
+            }
             let ich = Int(ichs[iref])
             let filename = try debugInfoStream.preadString(from: chbase + ich)
 
             modules[ndx].files.append(filename)
           }
-          crefsDone += Int(crefs[ndx])
+          crefsDone += Int(numRefs)
         }
       }
     } catch {
@@ -433,7 +436,7 @@ public class PDBFile {
 
             if section >= 0 && section < sections.count {
               let rawName = try symbols.readString()
-              let address = sections[Int(info.seg) - 1].virtualAddress + info.off
+              let address = sections[section].virtualAddress + info.off
 
               rawNames[address] = rawName
 
@@ -484,25 +487,27 @@ public class PDBFile {
           if type == S_LPROC32 || type == S_GPROC32
                || type == S_LPROC32_ID || type == S_GPROC32_ID {
             let info = try moduleStream.read(as: PDB_CV_PROCSYM32.self)
+            let section = Int(info.seg) - 1
 
-            let name = try moduleStream.readString()
-            let address = sections[Int(info.seg) - 1].virtualAddress + info.off
-            let scope: FunctionInfo.Scope
-              = (type == S_LPROC32 || type == S_LPROC32_ID) ? .local : .global
+            if section >= 0 && section < sections.count {
+              let name = try moduleStream.readString()
+              let address = sections[section].virtualAddress + info.off
+              let scope: FunctionInfo.Scope
+                = (type == S_LPROC32 || type == S_LPROC32_ID) ? .local : .global
 
-            functions.append(FunctionInfo(rawName: rawNames[address],
-                                          name: name,
-                                          address: address,
-                                          length: info.len,
-                                          scope: scope,
-                                          moduleIndex: ndx))
+              functions.append(FunctionInfo(rawName: rawNames[address],
+                                            name: name,
+                                            address: address,
+                                            length: info.len,
+                                            scope: scope,
+                                            moduleIndex: ndx))
+            }
           }
 
           _ = moduleStream.seek(offset: pos + Int(length) + 2)
         }
       }
     } catch {
-      print(error)
       return nil
     }
 
@@ -685,7 +690,7 @@ public class PDBFile {
                                in: module) {
       (stream: inout MultiStreamFile.Stream, length: UInt32) -> Bool? in
 
-      if offset + 5 >= length {
+      if length < 5 || offset >= length - 5 {
         return false
       }
 
@@ -799,9 +804,13 @@ public class PDBFile {
       do {
         let end = stream.offset + Int(length)
         let header = try stream.read(as: PDB_CV_LINE_HEADER.self)
-        let sectionBase = sections[Int(header.segCon) - 1].virtualAddress
-        let baseAddress = header.offCon + sectionBase
-        if address < baseAddress {
+        let section = Int(header.segCon) - 1
+        guard section >= 0 && section < sections.count else {
+          return nil
+        }
+        let sectionBase = sections[section].virtualAddress
+        let (baseAddress, ov) = sectionBase.addingReportingOverflow(header.offCon)
+        if ov || address < baseAddress {
           return nil
         }
         let offset = address - baseAddress
@@ -822,14 +831,14 @@ public class PDBFile {
                        && ndx + 1 < lines.count
                        && offset < lines[ndx + 1].offset) {
               lineIndex = ndx
-              filename = lookup(file: block.offFile, in: module)!
+              filename = lookup(file: block.offFile, in: module) ?? "<unknown>"
               let start = Int(pdb_line_start(line.lineInfo))
               let end = start + Int(pdb_line_delta(line.lineInfo))
               if start == 0xfeefee {
                 flags = [.noStepOnto]
               } else if start == 0xf00f00 {
                 flags = [.noStepInto]
-              } else {
+              } else if start <= end {
                 lineRange = start..<end
               }
               break
@@ -842,9 +851,13 @@ public class PDBFile {
 
           if (header.flags & UInt16(CV_LINES_HAVE_COLUMNS)) != 0 {
             let columns = try stream.read(as: PDB_CV_COLUMN.self, count: count)
-            let start = Int(columns[lineIndex].offColumnStart)
-            let end = Int(columns[lineIndex].offColumnEnd)
-            columnRange = start..<end
+            if lineIndex < columns.count {
+              let start = Int(columns[lineIndex].offColumnStart)
+              let end = Int(columns[lineIndex].offColumnEnd)
+              if start <= end {
+                columnRange = start..<end
+              }
+            }
           }
 
           return SourceLocation(filename: filename!,
