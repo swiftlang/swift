@@ -3384,7 +3384,15 @@ public:
 
     if (isa<AbstractFunctionDecl>(D)) {
       addCandidate(D);
-      addRequirement(D->getImplementedObjCDecl());
+
+      // Unlike the members of an imported interface, which are discovered by
+      // scanning it, the requirement implemented by a function is named by its
+      // attribute, so the filtering that `addRequirement()` performs to weed
+      // out members that cannot be implemented does not apply to it. Add it
+      // directly so that a mismatch is diagnosed instead of leaving the
+      // function unmatched.
+      if (auto *req = dyn_cast<ValueDecl>(D->getImplementedObjCDecl()))
+        unmatchedRequirements.insert(req);
 
       return;
     }

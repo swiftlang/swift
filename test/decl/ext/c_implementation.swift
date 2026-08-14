@@ -50,6 +50,12 @@ func CImplFuncNameMismatch2(_: Int32) {
   // FIXME: Improve diagnostic for a partial match.
 }
 
+// The declaration in the header is unavailable, which used to leave this
+// function unmatched and crash while diagnosing it as an unimplementable
+// member.
+@implementation @c
+func CImplFuncUnavailable1(_: Int32) { }
+
 //
 // TODO: @c for global functions imported as computed vars
 //

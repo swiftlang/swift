@@ -246,6 +246,8 @@ void CImplFuncMismatch2(int param);
 
 void CImplDuplicate(int param);
 
+void CImplFuncUnavailable1(int param) __attribute__((unavailable));
+
 #if __OBJC__
 void CImplFuncMismatch3(_Nullable id param);
 void CImplFuncMismatch4(_Nullable id param);
