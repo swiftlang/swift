@@ -1,0 +1,38 @@
+---
+Name: SwiftGlibc
+Functions:
+# Clang's ABI passes a transparent union as its first member. The following
+# rewrites the union parameter type as the first member type, so that
+# these functions import as they did before we defined '_GNU_SOURCE'.
+- Name: accept
+  Parameters:
+  - Position: 1
+    Type: "struct sockaddr * _Null_unspecified"
+- Name: accept4
+  Parameters:
+  - Position: 1
+    Type: "struct sockaddr * _Null_unspecified"
+- Name: bind
+  Parameters:
+  - Position: 1
+    Type: "const struct sockaddr * _Null_unspecified"
+- Name: connect
+  Parameters:
+  - Position: 1
+    Type: "const struct sockaddr * _Null_unspecified"
+- Name: getpeername
+  Parameters:
+  - Position: 1
+    Type: "struct sockaddr * _Null_unspecified"
+- Name: getsockname
+  Parameters:
+  - Position: 1
+    Type: "struct sockaddr * _Null_unspecified"
+- Name: recvfrom
+  Parameters:
+  - Position: 4
+    Type: "struct sockaddr * _Null_unspecified"
+- Name: sendto
+  Parameters:
+  - Position: 4
+    Type: "const struct sockaddr * _Null_unspecified"
