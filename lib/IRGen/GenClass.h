@@ -211,6 +211,10 @@ namespace irgen {
   Size getClassInstanceAddressPoint(IRGenModule &IGM, ClassDecl *CD,
                                     Alignment alignment);
 
+  /// Recover the native Swift heap-object address point from a COM interface
+  /// pointer using the adjustment stored immediately before its vtable.
+  llvm::Value *emitCOMObjectRecovery(IRGenFunction &IGF, llvm::Value *interface);
+
   /// Load the instance size and alignment mask from a reference to
   /// class type metadata of the given type.
   std::pair<llvm::Value *, llvm::Value *>
