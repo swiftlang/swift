@@ -1747,8 +1747,6 @@ ERROR(rethrows_with_thrown_error,none,
 
 ERROR(expected_yield_type,none,
       "expected yield type after 'yields('", ())
-ERROR(expected_rparen_after_yield_type,none,
-      "expected ')' after yield type", ())
 
 ERROR(attr_isolated_expected_lparen,none,
       "expected '(' after '@isolated'; did you mean the 'isolated' modifier?",

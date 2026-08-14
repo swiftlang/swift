@@ -9122,6 +9122,8 @@ class AccessorDecl final : public FuncDecl {
     return std::nullopt;
   }
 
+  void inferYieldType();
+
   friend class IsAccessorTransparentRequest;
 
 public:
