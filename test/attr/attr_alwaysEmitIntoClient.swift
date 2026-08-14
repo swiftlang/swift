@@ -9,10 +9,10 @@ func internalFunction() {}
 @usableFromInline func versionedFunction() {}
 public func publicFunction() {}
 
-@_alwaysEmitIntoClient public func alwaysEmitIntoClientFunction() {
-  privateFunction() // expected-error {{global function 'privateFunction()' is private and cannot be referenced from an '@_alwaysEmitIntoClient' function}}
-  fileprivateFunction() // expected-error {{global function 'fileprivateFunction()' is fileprivate and cannot be referenced from an '@_alwaysEmitIntoClient' function}}
-  internalFunction() // expected-error {{global function 'internalFunction()' is internal and cannot be referenced from an '@_alwaysEmitIntoClient' function}}
+@export(implementation) public func alwaysEmitIntoClientFunction() {
+  privateFunction() // expected-error {{global function 'privateFunction()' is private and cannot be referenced from an '@export(implementation)' function}}
+  fileprivateFunction() // expected-error {{global function 'fileprivateFunction()' is fileprivate and cannot be referenced from an '@export(implementation)' function}}
+  internalFunction() // expected-error {{global function 'internalFunction()' is internal and cannot be referenced from an '@export(implementation)' function}}
   versionedFunction()
   publicFunction()
 }
@@ -33,9 +33,9 @@ public struct TestInitAccessors {
      set {}
    }
 
-   @_alwaysEmitIntoClient
+   @export(implementation)
    public init(x: Int) {
-     self.x = 0 // expected-error {{init accessor for property 'x' is internal and cannot be referenced from an '@_alwaysEmitIntoClient' function}}
+     self.x = 0 // expected-error {{init accessor for property 'x' is internal and cannot be referenced from an '@export(implementation)' function}}
    }
 
    @inlinable
