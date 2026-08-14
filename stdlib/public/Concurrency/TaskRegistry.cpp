@@ -49,7 +49,7 @@ void swift::taskRegistryInsert(AsyncTask *task) {
     head->_private().registryPrev = task;
   }
   shard.head = task;
-  shard.count.fetch_add(1, std::memory_order_relaxed);
+  ++shard.count;
 
   SWIFT_TASK_DEBUG_LOG("TaskRegistry: inserted task %p id=%llu", task,
                        (unsigned long long)task->getTaskId());
@@ -83,7 +83,7 @@ void swift::taskRegistryRemove(AsyncTask *task) {
 
   // Do not clear registryNext so concurrent readers can continue traversal
   task->_private().registryPrev = nullptr;
-  shard.count.fetch_sub(1, std::memory_order_relaxed);
+  --shard.count;
 
   SWIFT_TASK_DEBUG_LOG("TaskRegistry: removed task %p id=%llu", task,
                        (unsigned long long)task->getTaskId());

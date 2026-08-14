@@ -38,7 +38,7 @@ static constexpr size_t TaskRegistryShardCount = 64;
 struct alignas(SWIFT_CACHE_LINE_SIZE) TaskRegistryShard {
   AsyncTask * head{nullptr};
   LazyMutex mutex;
-  std::atomic<size_t> count{0};
+  size_t count{0};
 };
 
 /// Head pointers for the global live-task registry shards.
