@@ -1,4 +1,6 @@
-// RUN: %target-swift-emit-irgen %s -I %S/Inputs -cxx-interoperability-mode=default -validate-tbd-against-ir=none -disable-llvm-verify -Xcc -fignore-exceptions -disable-availability-checking | %FileCheck %s
+// RUN: %target-swift-emit-irgen %s -I %S/Inputs -cxx-interoperability-mode=default -enable-experimental-feature ForeignReferenceTypeInheritance -validate-tbd-against-ir=none -disable-llvm-verify -Xcc -fignore-exceptions -disable-availability-checking | %FileCheck %s
+
+// REQUIRES: swift_feature_ForeignReferenceTypeInheritance
 
 import Upcast
 
