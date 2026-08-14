@@ -183,10 +183,18 @@ void ClangImporter::Implementation::makeComputed(AbstractStorageDecl *storage,
 
 importer::ReturnOwnershipInfo::ReturnOwnershipInfo(
     const clang::NamedDecl *decl) {
-  for (const auto *swiftAttr : decl->specific_attrs<clang::SwiftAttrAttr>()) {
-    if (swiftAttr->getAttribute() == "returns_unretained") {
+  if (!decl->hasAttrs())
+    return;
+
+  for (const auto *attr : decl->getAttrs()) {
+    if (const auto *swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr)) {
+      if (swiftAttr->getAttribute() == "returns_unretained")
+        hasReturnsUnretained = true;
+      else if (swiftAttr->getAttribute() == "returns_retained")
+        hasReturnsRetained = true;
+    } else if (isa<clang::OSReturnsNotRetainedAttr>(attr)) {
       hasReturnsUnretained = true;
-    } else if (swiftAttr->getAttribute() == "returns_retained") {
+    } else if (isa<clang::OSReturnsRetainedAttr>(attr)) {
       hasReturnsRetained = true;
     }
   }
