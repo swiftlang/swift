@@ -20,7 +20,7 @@ struct Job: ~Copyable {
 // CHECK:             return %1 : $Builtin.Int64
 // CHECK:         }
 // CHECK:         release_value %0
-// CHECK:         debug_value undef : $Job, let, name "after_destroy", {{.*}}transform
+// CHECK:         debug_value (), let, name "after_destroy", {{.*}}transform
 // CHECK-LABEL: } // end sil function 'test_destroy_kills_debug_value'
 sil [ossa] @test_destroy_kills_debug_value : $@convention(thin) (@owned Job) -> () {
 bb0(%0 : @owned $Job):

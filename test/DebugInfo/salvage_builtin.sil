@@ -10,7 +10,7 @@ import Swift
 // Nullary builtin (zeroInitializer): salvaged by cloning into debug BB.
 
 // CHECK-LABEL: sil @test_nullary_builtin
-// CHECK:         debug_value undef : $Builtin.Int64, let, name "zero", {{.*}}transform {
+// CHECK:         debug_value (), let, name "zero", {{.*}}transform {
 // CHECK:           %0 = builtin "zeroInitializer"() : $Builtin.Int64
 // CHECK:           return %0 : $Builtin.Int64
 // CHECK:         }
@@ -124,7 +124,7 @@ bb0(%0 : $Builtin.Int64):
 // pattern after prior cascading salvage of the tuple_extract).
 
 // CHECK-LABEL: sil @test_checked_trunc_intliteral
-// CHECK:         debug_value undef : {{.*}}, let, name "truncated", {{.*}}transform {
+// CHECK:         debug_value (), let, name "truncated", {{.*}}transform {
 // CHECK:           %0 = integer_literal $Builtin.Int1, 0
 // CHECK:           %1 = integer_literal $Builtin.Int64, 42
 // CHECK:           %2 = tuple (%1 : $Builtin.Int64, %0 : $Builtin.Int1)

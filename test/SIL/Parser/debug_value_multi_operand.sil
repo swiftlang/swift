@@ -1,5 +1,4 @@
-// RUN: %target-sil-opt -sil-verify-none -sil-print-types %s | %target-sil-opt -sil-verify-none -sil-print-types | %FileCheck %s
-// TODO: Remove -sil-verify-none when multi-operand debug_value is supported
+// RUN: %target-sil-opt -sil-print-types %s | %target-sil-opt -sil-print-types | %FileCheck %s
 sil_stage canonical
 
 import Builtin
@@ -20,21 +19,3 @@ bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int32):
   return %r : $()
 }
 // CHECK: } // end sil function 'test_multi_operand_transform'
-
-// CHECK-LABEL: sil @test_zero_operand_transform :
-sil @test_zero_operand_transform : $@convention(thin) () -> () {
-bb0:
-  // CHECK: debug_value (), let, name "const", transform {
-  // CHECK:   bb0:
-  // CHECK:     %0 = integer_literal $Builtin.Int64, 42
-  // CHECK:     return %0 : $Builtin.Int64
-  // CHECK:   }
-  debug_value (), let, name "const", transform {
-  bb0:
-    %0 = integer_literal $Builtin.Int64, 42
-    return %0 : $Builtin.Int64
-  }
-  %r = tuple ()
-  return %r : $()
-}
-// CHECK: } // end sil function 'test_zero_operand_transform'

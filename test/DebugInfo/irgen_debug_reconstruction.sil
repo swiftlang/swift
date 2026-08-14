@@ -1,5 +1,4 @@
-// RUN: %target-swiftc_driver -Xfrontend -disable-debugger-shadow-copies -Xfrontend -sil-verify-none -O -g -emit-ir %s | %FileCheck %s
-// TODO: Remove -sil-verify-none once isExprTypeValid() accepts multiple operands.
+// RUN: %target-swiftc_driver -Xfrontend -disable-debugger-shadow-copies -O -g -emit-ir %s | %FileCheck %s
 sil_stage canonical
 
 import Swift
