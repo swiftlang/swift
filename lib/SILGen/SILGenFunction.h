@@ -1333,7 +1333,6 @@ public:
 
   void finalizeEmission();
   void finalizeAddTaskLocalValue(BuiltinInst *builtin);
-  void finalizeTaskPushDeadline(BuiltinInst *builtin);
 
   /// Add a callback that will run when emission is complete for the
   /// current function. The callback is expected to have signature:
