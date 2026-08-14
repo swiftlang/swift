@@ -708,38 +708,35 @@ public:
   bool readExtraInhabitantIndex(remote::MemoryReader &reader,
                        remote::RemoteAddress address,
                        int *extraInhabitantIndex) const override {
-    FieldInfo PayloadCase = getCases()[0];
+    const FieldInfo &PayloadCase = getCases()[0];
     if (getSize() < PayloadCase.TI.getSize()) {
       // Single payload enums that use a separate tag don't export any XIs
       // So this is an invalid request.
       return false;
     }
 
-    // Single payload enums inherit XIs from their payload type
-    auto NumCases = getNumCases();
-    if (NumCases == 1) {
-      *extraInhabitantIndex = -1;
-      return true;
-    } else {
-      if (!PayloadCase.TI.readExtraInhabitantIndex(reader, address,
-                                                   extraInhabitantIndex)) {
-        return false;
-      }
-      auto NumNonPayloadCases = NumCases - 1;
-      if (*extraInhabitantIndex < 0
-          || (unsigned long)*extraInhabitantIndex < NumNonPayloadCases) {
-        *extraInhabitantIndex = -1;
-      } else {
-        *extraInhabitantIndex -= NumNonPayloadCases;
-      }
-      return true;
+    // Single payload enums inherit XIs from their payload type, less the ones
+    // the non-payload cases are encoded in.
+    if (!PayloadCase.TI.readExtraInhabitantIndex(reader, address,
+                                                 extraInhabitantIndex)) {
+      return false;
     }
+    int NumNonPayloadCases = getNumCases() - 1;
+    if (*extraInhabitantIndex < NumNonPayloadCases) {
+      *extraInhabitantIndex = -1;
+    } else {
+      *extraInhabitantIndex -= NumNonPayloadCases;
+    }
+    return true;
   }
 
   BitMask getSpareBits(TypeConverter &TC, bool &hasAddrOnly) const override {
-    FieldInfo PayloadCase = getCases()[0];
+    const FieldInfo &PayloadCase = getCases()[0];
     size_t payloadSize = PayloadCase.TI.getSize();
     if (getSize() <= payloadSize) {
+      // With no non-payload cases the representation is exactly the payload's.
+      if (getNumCases() == 1)
+        return PayloadCase.TI.getSpareBits(TC, hasAddrOnly);
       return BitMask::zeroMask(getSize());
     }
     size_t tagSize = getSize() - payloadSize;
@@ -2249,8 +2246,16 @@ public:
         // Zero-sized enum with only one empty case
         return TC.makeTypeInfo<TrivialEnumTypeInfo>(Kind, Cases);
       } else {
-        // Enum that has only one payload case is represented as that case
-        return TC.getTypeInfo(LastPayloadCaseTR, ExternalTypeInfo);
+        // Single-case enum with a payload: same layout as the payload,
+        // but wrapped in a SinglePayloadEnumTypeInfo to preserve case metadata.
+        auto *CaseTI = TC.getTypeInfo(LastPayloadCaseTR, ExternalTypeInfo);
+        if (CaseTI == nullptr)
+          return nullptr;
+        NumExtraInhabitants = CaseTI->getNumExtraInhabitants();
+        unsigned Stride = CaseTI->getStride();
+        return TC.makeTypeInfo<SinglePayloadEnumTypeInfo>(
+            Size, Alignment, Stride, NumExtraInhabitants, Borrowability,
+            AddressableForDependencies, Kind, Cases);
       }
     }
 
