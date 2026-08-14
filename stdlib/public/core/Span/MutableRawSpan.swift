@@ -84,6 +84,31 @@ extension MutableRawSpan {
     self = unsafe _overrideLifetime(span, borrowing: bytes)
   }
 
+  /// Unsafely create a `MutableRawSpan` over the given bytes, based on the
+  /// mutating lifetime of `owner` rather than that of `bytes`.
+  ///
+  /// Use this initializer when the memory referenced by `bytes` is also referenced
+  /// by another longer-lived value.
+  ///
+  /// The memory referenced by `bytes` must remain valid for as long as this
+  /// span exists, and `owner` must be a value that keeps that memory alive.
+  /// This initializer cannot verify either condition, therefore, this is an unsafe operation.
+  ///
+  /// - Parameters:
+  ///   - bytes: An `UnsafeMutableRawBufferPointer` to initialized bytes.
+  ///   - owner: The value whose mutating lifetime the new span depends on.
+  @unsafe
+  @export(implementation)
+  @_transparent
+  @_lifetime(&owner)
+  public init<Owner: ~Copyable & ~Escapable>(
+    _unsafeBytes bytes: UnsafeMutableRawBufferPointer,
+    mutating owner: inout Owner
+  ) {
+    let span = unsafe MutableRawSpan(_unsafeBytes: bytes)
+    self = unsafe _overrideLifetime(span, mutating: &owner)
+  }
+
   @unsafe
   @export(implementation)
   @_lifetime(borrow pointer)

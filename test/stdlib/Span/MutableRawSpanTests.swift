@@ -71,6 +71,21 @@ suite.test("Initializer from MutableSpan")
   expectEqual(slice[0].storage.0, 3)
 }
 
+suite.test("Initialize with custom owner")
+.require(.stdlib_6_2).code {
+  var array = ContiguousArray<UInt8>(0..<4)
+  array.withUnsafeMutableBytes { bytes in
+    var owner = bytes
+    var span = unsafe MutableRawSpan(
+      _unsafeBytes: UnsafeMutableRawBufferPointer(rebasing: owner[1..<3]),
+      mutating: &owner
+    )
+    expectEqual(span.byteCount, 2)
+    span.storeBytes(of: 99, toByteOffset: 0, as: UInt8.self)
+  }
+  expectEqual(array, [0, 99, 2, 3])
+}
+
 suite.test("isEmpty property")
 .skip(.custom(
   { if #available(SwiftStdlib 6.2, *) { false } else { true } },
