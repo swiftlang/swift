@@ -34,12 +34,7 @@
 #endif
 
 #if SWIFT_HAVE_CRASHREPORTERCLIENT
-#include <atomic>
-#include <malloc/malloc.h>
-
-#include "swift/Runtime/Atomic.h"
-
-#include "CrashReporter.h"
+#include "swift/Runtime/CrashReporter.h"
 #endif // SWIFT_HAVE_CRASHREPORTERCLIENT
 
 // -- Declarations -----------------------------------------------------------
@@ -50,43 +45,12 @@ static void demangleWarn(uint32_t flags, const char *format, va_list val);
 
 static int demangle_vasprintf(char **strp, const char *format, va_list val);
 
-#if SWIFT_HAVE_CRASHREPORTERCLIENT
-static int demangle_asprintf(char **strp, const char *format, ...);
-#endif
-
 // -- Crash reporter integration ---------------------------------------------
 
 // Report a message to any forthcoming crash log.
 static void reportOnCrash(uint32_t flags, const char *message) {
 #if SWIFT_HAVE_CRASHREPORTERCLIENT
-  char *oldMessage = nullptr;
-  char *newMessage = nullptr;
-
-  oldMessage = std::atomic_load_explicit(
-    (volatile std::atomic<char *> *)&gCRAnnotations.message,
-    SWIFT_MEMORY_ORDER_CONSUME);
-
-  do {
-    if (newMessage) {
-      free(newMessage);
-      newMessage = nullptr;
-    }
-
-    if (oldMessage) {
-      demangle_asprintf(&newMessage, "%s%s", oldMessage, message);
-    } else {
-      newMessage = strdup(message);
-    }
-  } while (!std::atomic_compare_exchange_strong_explicit(
-             (volatile std::atomic<char *> *)&gCRAnnotations.message,
-             &oldMessage, newMessage,
-             std::memory_order_release,
-             SWIFT_MEMORY_ORDER_CONSUME));
-
-  if (oldMessage && malloc_size(oldMessage))
-    free(oldMessage);
-#else
-  // empty
+  swift::appendCrashLogMessage(message);
 #endif // SWIFT_HAVE_CRASHREPORTERCLIENT
 }
 
@@ -146,19 +110,6 @@ static int demangle_vasprintf(char **strp, const char *format, va_list args) {
   *strp = buffer;
   return result;
 }
-
-#if SWIFT_HAVE_CRASHREPORTERCLIENT
-SWIFT_FORMAT(2,3)
-static int demangle_asprintf(char **strp, const char *format, ...) {
-  va_list val;
-
-  va_start(val, format);
-  int ret = demangle_vasprintf(strp, format, val);
-  va_end(val);
-
-  return ret;
-}
-#endif // SWIFT_HAVE_CRASHREPORTERCLIENT
 
 // -- Implementation ---------------------------------------------------------
 
