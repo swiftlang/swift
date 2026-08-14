@@ -94,6 +94,8 @@ enum CompactBacktraceFormat {
     case rep(external: Bool, count: Int)
   }
 
+  // The maximum repeat count
+  static let maxRepeatCount = 1_048_576
 
   /// Accumulates bytes until the end of a Compact Backtrace Format
   /// sequence is detected.
@@ -382,7 +384,17 @@ enum CompactBacktraceFormat {
                 finished()
                 return .truncated
               }
-              repeatCount = word - 1
+
+              let iterations = word - 1
+
+              guard iterations > 1 
+                    && iterations <= CompactBacktraceFormat.maxRepeatCount
+              else {
+                finished()
+                return .truncated
+              }
+
+              repeatCount = iterations
             }
             result = lastFrame!
         }
@@ -590,6 +602,10 @@ enum CompactBacktraceFormat {
                   break
                 } else {
                   count += 1
+
+                  if count == maxRepeatCount {
+                    break
+                  }
                 }
               }
 
