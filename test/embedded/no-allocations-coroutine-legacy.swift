@@ -2,7 +2,10 @@
 // so calling one is rejected under -no-allocations.  (A callee-allocated
 // yield_once_2 accessor is allowed; see no-allocations-coroutine.swift.)
 
-// RUN: not %target-swift-emit-ir %s -enable-experimental-feature Embedded -enable-experimental-feature CoroutineAccessors -no-allocations -wmo 2>&1 | %FileCheck %s
+// Note: this test is invalid with `-enable-experimental-feature CoroutineAccessors`
+// and should simply be deleted when that feature is permanently enabled.
+
+// RUN: not %target-swift-emit-ir %s -enable-experimental-feature Embedded -no-allocations -wmo 2>&1 | %FileCheck %s
 
 // REQUIRES: optimized_stdlib
 // REQUIRES: OS=macosx || OS=linux-gnu || OS=wasip1
