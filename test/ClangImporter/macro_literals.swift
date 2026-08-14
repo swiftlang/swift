@@ -2,6 +2,9 @@
 
 // REQUIRES: optimized_stdlib
 
+// Failing for Android since #91256
+// XFAIL: OS=linux-android, OS=linux-androideabi
+
 import macros
 
 // CHECK-LABEL: // testBitwiseOperations()
