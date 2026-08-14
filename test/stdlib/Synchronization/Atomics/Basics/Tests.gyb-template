@@ -352,6 +352,23 @@ suite.test("Atomic${label} ${name} ${order}") {
   expectEqual(val2.oldValue, result1)
   expectEqual(val2.newValue, result2)
   expectEqual(v.load(ordering: .relaxed), result2)
+
+  // The operands above stay in a narrow low range, where wrapping never occurs
+  // and signed and unsigned comparison agree. Repeat at the bounds of the type.
+  // https://github.com/swiftlang/swift/issues/91176
+  for extreme in [${type}.min, ${type}.max] {
+%       if name == "Min" or name == "Max":
+    let expected: ${type} = Swift.${lowerFirst(name)}(extreme, 1)
+%       else:
+    let expected: ${type} = extreme ${operator} 1
+%       end
+    let w = Atomic<${type}>(extreme)
+
+    let val3 = w.${lowerFirst(name)}(1, ordering: .${order})
+    expectEqual(val3.oldValue, extreme)
+    expectEqual(val3.newValue, expected)
+    expectEqual(w.load(ordering: .relaxed), expected)
+  }
 }
 
 %     end
