@@ -278,6 +278,12 @@ private struct UseCollector : AddressDefUseWalker {
   // there are also loads, because a trivial store has no ownership consequences.
   private var hasTrivialStoresToUnknownStorage = false
 
+  // `mark_dependence_addr` instructions whose address operand is derived from the allocation.
+  // Each records a lifetime dependence carried by memory at that program point. When the
+  // allocation is eliminated we lift each entry into an SSA-form `mark_dependence` wrapping
+  // the forwarded value produced by every load-like access it dominates.
+  private var addrDependencies: [MarkDependenceAddrInst] = []
+
   init(of startInstruction: SingleValueInstruction, _ context: FunctionPassContext) {
     self.context = context
     self.objectLiverange = BasicBlockRange(begin: startInstruction.parentBlock, context)
@@ -364,7 +370,65 @@ private struct UseCollector : AddressDefUseWalker {
     guard walkDownUses(ofAddress: allocStack, path: UnusedWalkingPath()) == .continueWalk else {
       return false
     }
-    return validateAccessTree()
+    guard validateAccessTree() else {
+      return false
+    }
+    return validateAddrDependenceCoverage()
+  }
+
+  /// Returns true if every collected `mark_dependence_addr` can be lowered to an SSA-form
+  /// `mark_dependence` wrapping the forwarded value at each load-like access.
+  ///
+  /// Require every `mark_dependence_addr` to dominate every load-like access we
+  /// would need to wrap, in the same block.
+  private func validateAddrDependenceCoverage() -> Bool {
+    if addrDependencies.isEmpty {
+      return true
+    }
+    for (_, access) in accessTree {
+      switch access {
+      case .load(let load):
+        // FixLifetimeInst doesn't propagate an SSA value, so it needs no wrapping.
+        if load is FixLifetimeInst {
+          continue
+        }
+        // Anything other than a plain LoadInst is a bail case for now.
+        guard let loadInst = load as? LoadInst else {
+          return false
+        }
+        for mda in addrDependencies where !mdaDominates(mda: mda, use: loadInst) {
+          return false
+        }
+      case .loadTake(let load):
+        for mda in addrDependencies where !mdaDominates(mda: mda, use: load) {
+          return false
+        }
+      case .store, .destroy:
+        break
+      }
+    }
+    return true
+  }
+
+  /// Conservative same-BB dominance: `mda` must strictly precede `use` in the same basic block.
+  private func mdaDominates(mda: MarkDependenceAddrInst, use: Instruction) -> Bool {
+    return mda.parentBlock == use.parentBlock && mda.strictlyDominatesInBlock(use)
+  }
+
+  /// Wraps `value` in one `mark_dependence` per collected `mark_dependence_addr`, inserted
+  /// just before `insertBefore`. Preserves each entry's `dependenceKind` (e.g. `[nonescaping]`).
+  private func wrapWithAddrDependences(value: Value, insertBefore: Instruction) -> Value {
+    if addrDependencies.isEmpty {
+      return value
+    }
+    let builder = Builder(before: insertBefore, context)
+    var result = value
+    for mda in addrDependencies {
+      result = builder.createMarkDependence(value: result, base: mda.base,
+                                            ownership: result.ownership,
+                                            kind: mda.dependenceKind)
+    }
+    return result
   }
 
   mutating func walkDown(address operand: Operand, path: Path) -> WalkResult {
@@ -478,6 +542,11 @@ private struct UseCollector : AddressDefUseWalker {
         return .continueWalk
       }
       return .abortWalk
+
+    case let mda as MarkDependenceAddrInst:
+      assert(address == mda.addressOperand)
+      addrDependencies.append(mda)
+      return .continueWalk
 
     default:
       return .abortWalk
@@ -831,8 +900,9 @@ private struct UseCollector : AddressDefUseWalker {
       case .loadTake(let load):
         let undef = Undef.get(type: load.type, context)
         let (projected, updated) = value.createProjectionAndReplace(with: undef, path: path, builder: builder)
+        let wrapped = wrapWithAddrDependences(value: projected, insertBefore: load)
         insertMarkDependencies(for: load, context)
-        load.replace(with: projected, context)
+        load.replace(with: wrapped, context)
         updatedValue = updated
 
       case .load:
@@ -855,6 +925,22 @@ private struct UseCollector : AddressDefUseWalker {
   {
     for (subPath, load) in loads {
       let value = ssaUpdater.getValue(before: load)
+      // For a plain `load [copy]`/`load [trivial]` covered by `mark_dependence_addr`
+      // entries, inline the projection+copy so we can wrap the projected result with an
+      // SSA-form `mark_dependence` before replacing the load. Delegating to
+      // `LoadInst.rewrite` would replace the load directly with the projected copy and
+      // leave nowhere to insert the wrap.
+      if let loadInst = load as? LoadInst,
+         !addrDependencies.isEmpty,
+         loadInst.loadOwnership != .take
+      {
+        let builder = Builder(before: loadInst, context)
+        let projectedValue = value.createProjectionAndCopy(path: subPath, builder: builder)
+        let wrapped = wrapWithAddrDependences(value: projectedValue, insertBefore: loadInst)
+        insertMarkDependencies(for: loadInst, context)
+        loadInst.replace(with: wrapped, context)
+        continue
+      }
       if let loadInst = load as? LoadInstruction {
         insertMarkDependencies(for: loadInst, context)
       }
