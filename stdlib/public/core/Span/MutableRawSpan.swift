@@ -329,6 +329,55 @@ extension MutableRawSpan {
   ) throws(E) -> Result {
     try unsafe body(.init(start: _pointer, count: _count))
   }
+
+  /// Consume this span and call a closure with a pointer to the viewed mutable
+  /// contiguous storage.
+  ///
+  /// Use this method to derive a new type with exclusive access to the memory
+  /// represented by this span. It is an alternative to `MutableRawSpan`'s
+  /// `extracting` methods for deriving types other than `MutableRawSpan`.
+  ///
+  /// The buffer pointer passed as an argument to `body` is valid only
+  /// during the execution of `consumingWithUnsafeMutableBytes(_:)`.
+  /// Do not store or return the pointer for later use. The pointer is passed as
+  /// `inout` so that `body` has something to anchor the lifetime of its
+  /// return value. On return, that dependency is replaced by this span's
+  /// dependency.
+  ///
+  /// On return from `body`, `bytes` must still address the same region it was
+  /// given. Changing its base address or count traps. Any pointer `body`
+  /// derives must also lie within that region, which this method cannot verify.
+  /// Therefore, this is an unsafe operation.
+  ///
+  /// - Parameter body: A closure with an `UnsafeMutableRawBufferPointer`
+  ///   parameter that points to the viewed contiguous storage. If `body`
+  ///   has a return value, that value is also used as the return value
+  ///   for the `consumingWithUnsafeMutableBytes(_:)` method.
+  ///   The closure's parameter is valid only for the duration of its execution.
+  /// - Returns: The return value of the `body` closure parameter.
+  @unsafe
+  @export(implementation)
+  @_transparent
+  @_lifetime(copy self)
+  public consuming func consumingWithUnsafeMutableBytes<
+    E: Error, R: ~Copyable & ~Escapable
+  >(
+    _ body: @_lifetime(&bytes) (
+      _ bytes: inout UnsafeMutableRawBufferPointer
+    ) throws(E) -> R
+  ) throws(E) -> R {
+    var bytes = unsafe UnsafeMutableRawBufferPointer(
+      start: _pointer, count: _count
+    )
+    let original = unsafe bytes
+    defer {
+      _precondition(
+        original.isTriviallyIdentical(to: bytes),
+        "bytes must address the same region on return from consumingWithUnsafeMutableBytes(_:)"
+      )
+    }
+    return unsafe _overrideLifetime(try unsafe body(&bytes), copying: self)
+  }
 }
 
 @available(SwiftCompatibilitySpan 5.0, *)

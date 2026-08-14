@@ -178,6 +178,54 @@ suite.test("withUnsafeMutableBytes")
   expectEqual(Int(a[i]), i+1)
 }
 
+suite.test("consumingWithUnsafeMutableBytes to a MutableRef")
+.skip(.custom({
+  if #available(StdlibDeploymentTarget 6.4, *) { false } else { true }
+}, reason: "Requires Swift stdlib 6.4"))
+.code {
+  guard #available(StdlibDeploymentTarget 6.4, *) else { return }
+
+  var array = ContiguousArray<UInt8>(0..<4)
+  array.withUnsafeMutableBytes {
+    var ref = unsafe MutableRawSpan(_unsafeBytes: $0)
+      .consumingWithUnsafeMutableBytes { bytes in
+        unsafe MutableRef(
+          unsafeAddress: bytes.baseAddress!.assumingMemoryBound(to: UInt8.self) + 1,
+          mutating: &bytes
+        )
+      }
+    expectEqual(ref.value, 1)
+    ref.value = 99
+  }
+  expectEqual(array, [0, 99, 2, 3])
+}
+
+suite.test("consumingWithUnsafeMutableBytes traps on buffer region change")
+.require(.stdlib_6_2)
+.require(.crashTesting)
+.code {
+  var array = ContiguousArray<UInt8>(0..<4)
+
+  array.withUnsafeMutableBytes {
+    unsafe MutableRawSpan(_unsafeBytes: $0)
+      .consumingWithUnsafeMutableBytes { bytes in
+        let exactRegion = unsafe UnsafeMutableRawBufferPointer(
+          start: bytes.baseAddress, count: bytes.count
+        )
+        bytes = exactRegion
+      }
+
+    expectCrashLater()
+    unsafe MutableRawSpan(_unsafeBytes: $0)
+      .consumingWithUnsafeMutableBytes { bytes in
+        let otherRegion = unsafe UnsafeMutableRawBufferPointer(
+          start: bytes.baseAddress, count: bytes.count - 1
+        )
+        bytes = otherRegion
+      }
+  }
+}
+
 suite.test("bytes property")
 .skip(.custom(
   { if #available(SwiftStdlib 6.2, *) { false } else { true } },
