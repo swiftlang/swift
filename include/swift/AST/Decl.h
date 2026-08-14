@@ -496,12 +496,16 @@ protected:
     IsStatic : 1
   );
 
-  SWIFT_INLINE_BITFIELD(VarDecl, AbstractStorageDecl, 2+1+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(VarDecl, AbstractStorageDecl, 2+1+1+1+1+1+1+1+1,
     /// Encodes whether this is a 'let' binding.
     Introducer : 2,
 
     /// Whether this declaration captures the 'self' param under the same name.
     IsSelfParamCapture : 1,
+
+    /// Whether this declaration represents a `sending` capture i.e.
+    /// `[sending x]` where `x` is this declaration.
+    IsSendingCapture : 1,
 
     /// Whether this is a property used in expressions in the debugger.
     /// It is up to the debugger to instruct SIL how to access this variable.
@@ -7049,6 +7053,11 @@ public:
   bool isSelfParamCapture() const { return Bits.VarDecl.IsSelfParamCapture; }
   void setIsSelfParamCapture(bool IsSelfParamCapture = true) {
       Bits.VarDecl.IsSelfParamCapture = IsSelfParamCapture;
+  }
+
+  bool isSendingCapture() const { return Bits.VarDecl.IsSendingCapture; }
+  void setIsSendingCapture(bool isSending = true) {
+    Bits.VarDecl.IsSendingCapture = isSending;
   }
 
   /// Check whether this capture of the self param is actor-isolated.
