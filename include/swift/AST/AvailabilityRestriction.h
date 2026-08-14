@@ -209,6 +209,10 @@ public:
   bool emitNoteForConformance(const ExtensionDecl *ext,
                               const RootProtocolConformance *rootConf) const;
 
+  /// Returns true if the name of the domain of \p restriction should be omitted
+  /// from diagnostics describing the restriction.
+  bool shouldHideDomainNameInDiagnostics() const;
+
   void print(raw_ostream &os) const;
 };
 
