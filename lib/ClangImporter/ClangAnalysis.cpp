@@ -25,6 +25,30 @@ bool importer::hasImportReferenceAttr(const clang::RecordDecl *decl) {
   return hasSwiftAttribute(decl, {"import_reference"});
 }
 
+bool importer::hasSwiftAttributeOnAnyRedecl(const clang::RecordDecl *decl,
+                                            ArrayRef<StringRef> attrs) {
+  return llvm::any_of(decl->redecls(), [&](const clang::Decl *redecl) {
+    return hasSwiftAttribute(redecl, attrs);
+  });
+}
+
+bool importer::isForeignReferenceRecord(const clang::RecordDecl *decl,
+                                        Evaluator &eval) {
+  // Only ask the request once there is a definition. It is cached per
+  // declaration, so asking about a class template specialization that has not
+  // been instantiated yet would cache "not a reference" for good, even though
+  // instantiating it may reveal a reference base.
+  if (decl->getDefinition())
+    return evaluateOrDefault(eval, ForeignReferenceTypeInfoRequest({decl}),
+                             ForeignReferenceTypeInfo())
+        .isReference();
+
+  // Without one, a direct annotation is all there is to go on.
+  return llvm::any_of(decl->redecls(), [](const clang::Decl *redecl) {
+    return hasImportReferenceAttr(cast<clang::RecordDecl>(redecl));
+  });
+}
+
 bool importer::hasImportAsOpaquePointerAttr(const clang::RecordDecl *decl) {
   return llvm::any_of(decl->specific_attrs<clang::SwiftAttrAttr>(),
                       [](const clang::SwiftAttrAttr *swiftAttr) {
@@ -55,21 +79,20 @@ bool isSelfContainedForDirectView(const clang::Type *type, Evaluator &eval) {
     return true;
 
   if (const auto *recordType = type->getAs<clang::RecordType>()) {
-    auto *definition = recordType->getDecl()->getDefinition();
-    if (!definition)
-      return false;
+    auto *recordDecl = recordType->getDecl();
+    auto *definition = recordDecl->getDefinition();
     // An explicitly unsafe type is never self-contained, so its unsafety is
-    // not silently dropped by an enclosing view.
-    if (importer::hasSwiftAttribute(definition, {"unsafe"}))
+    // not silently dropped by an enclosing view. The annotation may sit on any
+    // declaration of the type, so consider the whole chain.
+    if (importer::hasSwiftAttributeOnAnyRedecl(recordDecl, {"unsafe"}))
       return false;
     // Reference types are managed by Swift, so a pointer to one does not
-    // introduce a lifetime dependency. Use the request rather than a raw
-    // attribute lookup, so that reference-ness inherited from a base class is
-    // taken into account.
-    if (evaluateOrDefault(eval, ForeignReferenceTypeInfoRequest({definition}),
-                          ForeignReferenceTypeInfo())
-            .isReference())
+    // introduce a lifetime dependency. This holds for a reference type that has
+    // only been declared, too.
+    if (importer::isForeignReferenceRecord(recordDecl, eval))
       return true;
+    if (!definition)
+      return false;
     if (importer::hasOwnedValueAttr(definition))
       return true;
   }
@@ -151,7 +174,29 @@ namespace {
 /// The retain:/release: attributes written directly on a record.
 struct RetainReleaseInfo {
   RetainReleaseInfo(const clang::RecordDecl *decl) : decl(decl) {
-    for (auto *attr : decl->specific_attrs<clang::SwiftAttrAttr>()) {
+    // Only the first swift_attr is propagated to a redeclaration, so
+    // retain:/release: are often missing from the declaration at hand even
+    // though the type is annotated. Read them from the declaration that spells
+    // them, and from that one alone, so inherited copies are not counted twice.
+    auto spellsRetainRelease = [](const clang::RecordDecl *record) {
+      return llvm::any_of(record->specific_attrs<clang::SwiftAttrAttr>(),
+                          [](const clang::SwiftAttrAttr *attr) {
+                            return attr->getAttribute().starts_with("retain:") ||
+                                   attr->getAttribute().starts_with("release:");
+                          });
+    };
+    const clang::RecordDecl *carrier = decl;
+    if (!spellsRetainRelease(carrier)) {
+      for (auto *redecl : decl->redecls()) {
+        auto *record = cast<clang::RecordDecl>(redecl);
+        if (spellsRetainRelease(record)) {
+          carrier = record;
+          break;
+        }
+      }
+    }
+
+    for (auto *attr : carrier->specific_attrs<clang::SwiftAttrAttr>()) {
       StringRef attrStr = attr->getAttribute();
       if (attrStr.consume_front("retain:")) {
         ++retainCount;
@@ -419,6 +464,25 @@ swift::extractNearestSourceLoc(const ForeignReferenceTypeInfoDescriptor &desc) {
 ForeignReferenceTypeInfo ForeignReferenceTypeInfoRequest::evaluate(
     Evaluator &evaluator, ForeignReferenceTypeInfoDescriptor desc) const {
   auto *decl = desc.decl;
+
+  // A swift_attr propagates to later redeclarations only, so an earlier
+  // declaration does not see the annotation, and the retain/release parameters
+  // of SWIFT_SHARED_REFERENCE declare the type before the annotated declaration
+  // is reached. Answer for the declaration that carries the information: the
+  // definition when there is one, since reference-ness can also be inherited
+  // from a base class, and otherwise the declaration spelling the annotation.
+  // Clients can then use the request without walking the chain themselves.
+  if (auto *definition = decl->getDefinition()) {
+    decl = definition;
+  } else if (!importer::hasImportReferenceAttr(decl)) {
+    for (auto *redecl : decl->redecls()) {
+      auto *record = cast<clang::RecordDecl>(redecl);
+      if (importer::hasImportReferenceAttr(record)) {
+        decl = record;
+        break;
+      }
+    }
+  }
 
   if (auto *cxxDecl = dyn_cast<clang::CXXRecordDecl>(decl))
     return ForeignReferenceTypeChecker(cxxDecl).check();
@@ -851,7 +915,10 @@ void importer::checkRetainReleaseFunctions(
   // FIXME: should not be necessary to keep track of this, it is confusing.
   const ClassDecl *annotatedClassDecl = classDecl;
 
-  if (cxxRecordDecl && baseCxxRecordDecl && baseCxxRecordDecl != cxxRecordDecl)
+  // Compare canonical decls: frtInfo may name a different redeclaration of
+  // recordDecl, which is not inheritance.
+  if (cxxRecordDecl && baseCxxRecordDecl &&
+      baseCxxRecordDecl->getCanonicalDecl() != cxxRecordDecl->getCanonicalDecl())
     annotatedClassDecl = cast<ClassDecl>(
         Impl.importDecl(baseCxxRecordDecl, Impl.CurrentVersion));
   else
@@ -860,8 +927,12 @@ void importer::checkRetainReleaseFunctions(
   // Check that the record carrying the retain:/release: attributes has exactly
   // one of each. Only diagnose when those attributes are on this type, to avoid
   // repeating diagnostics once per derived type.
+  //
+  // frtInfo names the declaration the annotation was found on, which for a
+  // forward-declared type need not be the one classDecl was imported from.
   const clang::RecordDecl *annotatedDecl =
-      baseCxxRecordDecl ? baseCxxRecordDecl : recordDecl;
+      baseCxxRecordDecl ? baseCxxRecordDecl
+                        : (frtInfo.getDecl() ? frtInfo.getDecl() : recordDecl);
 
   auto rrInfo = RetainReleaseInfo(annotatedDecl);
   if (!rrInfo.checkShape(/*Impl=*/baseCxxRecordDecl ? nullptr : &Impl))

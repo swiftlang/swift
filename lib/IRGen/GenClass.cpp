@@ -297,6 +297,11 @@ namespace {
       if (!cxxRecord)
         return;
 
+      // A foreign reference type is imported even when it is only declared, and
+      // an incomplete type has neither bases nor a layout to ask for.
+      if (!cxxRecord->isCompleteDefinition())
+        return;
+
       auto bases = getBasesAndOffsets(cxxRecord);
       for (auto base : bases) {
         if (base.offset != CurSize) {
