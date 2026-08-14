@@ -2455,9 +2455,45 @@ static void emitEntryPointArgumentsCOrObjC(IRGenSILFunction &IGF,
 
   unsigned nextArgTyIdx = 0;
 
-  // Handle the arguments of an ObjC method.
-  if (IGF.CurSILFn->getRepresentation() ==
-        SILFunctionTypeRepresentation::ObjCMethod) {
+  switch (IGF.CurSILFn->getRepresentation()) {
+  case SILFunctionTypeRepresentation::COMMethod: {
+    // A native COM entry receives its interface pointer as physical argument
+    // zero. Recover the native object and bind it as the thunk's logical self.
+
+    SILArgument *self = args.back();
+    args = args.drop_back();
+
+    auto *object = emitCOMObjectRecovery(IGF, params.claimNext());
+    auto &TI = IGF.getTypeInfo(self->getType());
+    auto *value = object;
+
+    if (self->getType().isAddress()) {
+      auto storage =
+          IGF.createAlloca(TI.getStorageType(), TI.getBestKnownAlignment(),
+                           "com.object.storage");
+      if (value->getType() != TI.getStorageType())
+        value = IGF.Builder.CreateBitCast(value, TI.getStorageType());
+      IGF.Builder.CreateStore(value, storage);
+      IGF.setLoweredAddress(self, TI.getAddressForPointer(storage.getAddress()));
+    } else {
+      auto &LTI = cast<LoadableTypeInfo>(TI);
+      auto schema = LTI.getSchema();
+      assert(schema.size() == 1 && "COM method self must be a single value");
+      auto *Ty = schema.begin()->getScalarType();
+      if (value->getType() != Ty)
+        value = IGF.coerceValue(value, Ty, IGF.IGM.DataLayout);
+
+      Explosion result;
+      result.add(value);
+      IGF.setLoweredExplosion(self, result);
+    }
+
+    nextArgTyIdx = 1;
+    break;
+  }
+  case SILFunctionTypeRepresentation::ObjCMethod: {
+    // Handle the arguments of an ObjC method.
+
     // Claim the self argument from the end of the formal arguments.
     SILArgument *selfArg = args.back();
     args = args.slice(0, args.size() - 1);
@@ -2483,6 +2519,8 @@ static void emitEntryPointArgumentsCOrObjC(IRGenSILFunction &IGF,
     // generating explosions for the remaining arguments we can skip
     // these.
     nextArgTyIdx = 2;
+    break;
+  }
   }
 
   assert(args.size() == (FI.arg_size() - nextArgTyIdx) &&

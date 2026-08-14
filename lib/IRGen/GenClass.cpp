@@ -645,6 +645,23 @@ Size irgen::getClassInstanceAddressPoint(IRGenModule &IGM, ClassDecl *CD,
   return getCOMObjectPrefixSize(IGM, CD).roundUpToAlignment(alignment);
 }
 
+llvm::Value *
+irgen::emitCOMObjectRecovery(IRGenFunction &IGF, llvm::Value *interface) {
+  auto &IGM = IGF.IGM;
+  Address storage(interface, IGM.Int8PtrTy, IGM.getPointerAlignment());
+  auto *vtable = IGF.Builder.CreateLoad(storage, "com.vtable");
+  auto *slot =
+      IGF.Builder.CreateInBoundsGEP(IGM.Int8PtrTy, vtable,
+                                    llvm::ConstantInt::getSigned(IGM.Int32Ty, -1),
+                                    "com.adjustment.slot");
+  auto *adjustment =
+      IGF.Builder.CreateLoad(Address(slot, IGM.IntPtrTy,
+                                     IGM.getPointerAlignment()),
+                             "com.adjustment");
+  return IGF.Builder.CreateInBoundsGEP(IGM.Int8Ty, interface, adjustment,
+                                       "com.object");
+}
+
 StructLayout *
 irgen::getClassLayoutWithTailElems(IRGenModule &IGM, SILType classType,
                                    ArrayRef<SILType> tailTypes) {
