@@ -10,9 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-// RUN: %target-run-stdlib-swift
+// RUN: %target-run-stdlib-swift(-enable-experimental-feature Lifetimes)
 
 // REQUIRES: executable_test
+// REQUIRES: swift_feature_Lifetimes
 // XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 import StdlibUnittest
@@ -69,6 +70,46 @@ suite.test("Initialize with BitwiseCopyable element")
   let v = UnsafeMutableRawBufferPointer(start: nil, count: 0)
   let m = MutableSpan<Int>(_unsafeBytes: v)
   expectEqual(m.count, 0)
+}
+
+suite.test("Initialize with custom owner")
+.require(.stdlib_6_5).code {
+  struct RigidList: ~Copyable {
+    private let storage: UnsafeMutableBufferPointer<Int>
+    private let count: Int
+
+    init(_ elements: [Int]) {
+      unsafe storage = .allocate(capacity: elements.count)
+      count = elements.count
+      _ = unsafe storage.initialize(fromContentsOf: elements)
+    }
+
+    deinit {
+      unsafe storage.prefix(count).deinitialize()
+      unsafe storage.deallocate()
+    }
+
+    @_lifetime(&self)
+    mutating func mutableSpan(in range: Range<Int>) -> MutableSpan<Int> {
+      unsafe MutableSpan(
+        _unsafeElements: UnsafeMutableBufferPointer(rebasing: storage[range]),
+        mutating: &self
+      )
+    }
+
+    subscript(i: Int) -> Int { unsafe storage[i] }
+  }
+
+  var list = RigidList([0, 1, 2, 3])
+  var span = list.mutableSpan(in: 1..<3)
+  expectEqual(span.count, 2)
+  expectEqual(span[0], 1)
+  span[0] = 99
+
+  expectEqual(list[0], 0)
+  expectEqual(list[1], 99)
+  expectEqual(list[2], 2)
+  expectEqual(list[3], 3)
 }
 
 suite.test("isEmpty")
