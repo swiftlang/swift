@@ -71,7 +71,7 @@ Build Android SDKs. Requires Android NDK to be available.
 
 .PARAMETER AndroidNDKVersion
 The version number of the Android NDK to be used.
-Format: r{number}[{letter}] (e.g., r28c)
+Format: r{number}[{letter}][-revision-suffix] (e.g., r28c or r30-beta2)
 Default: "r28c"
 
 .PARAMETER AndroidAPILevel
@@ -166,7 +166,7 @@ param
 
   # Android SDK Options
   [switch] $Android = $false,
-  [ValidatePattern("^r(?:[1-9]|[1-9][0-9])(?:[a-z])?$")]
+  [ValidatePattern("^r(?:[1-9]|[1-9][0-9])(?:[a-z])?(-beta[1-9])?$")]
   [string] $AndroidNDKVersion = "r28c",
   [ValidateRange(21, 36)]
   [int] $AndroidAPILevel = 23,
@@ -448,6 +448,11 @@ $KnownNDKs = @{
     URL = "https://dl.google.com/android/repository/android-ndk-r28c-windows.zip"
     SHA256 = "6bec98ac2354d8a919760889a1a41d020132e5e8cfa1b1fe51610a72c36a466b"
     ClangVersion = 19
+  }
+  "r30-beta2" = @{
+    URL = "https://dl.google.com/android/repository/android-ndk-r30-beta2-windows.zip"
+    SHA256 = "e2c01b70794365a95ad84b5a68b7a52df11b7672097fc3f487cdfd205483d6b5"
+    ClangVersion = 21
   }
 }
 
