@@ -112,8 +112,6 @@ if(APPLE)
   target_sources(swift_Concurrency PRIVATE
     CFExecutor.swift
     CFExecutor.cpp)
-  target_compile_options(swift_Concurrency PRIVATE
-    $<$<AND:$<BOOL:${SwiftCore_ENABLE_STDLIB_LAZY_LINK}>,$<COMPILE_LANGUAGE:Swift>>:-DSWIFT_STDLIB_ENABLE_LAZY_LINK>)
 endif()
 
 include(${SwiftCore_CONCURRENCY_GLOBAL_EXECUTOR}.cmake)
@@ -123,7 +121,8 @@ target_compile_definitions(swift_Concurrency PRIVATE
   # NOTE: VS2017 <15.8 would round clamp alignment to alignof(max_align_t) which
   # was non-conformant. Indicate that we wish to use extended alignment.
   $<$<AND:$<PLATFORM_ID:Windows>,$<COMPILE_LANGUAGE:C,CXX>>:-D_ENABLE_EXTENDED_ALIGNED_STORAGE=1>
-  $<$<COMPILE_LANGUAGE:C,CXX>:-D__STDC_WANT_LIB_EXT1__=1>)
+  $<$<COMPILE_LANGUAGE:C,CXX>:-D__STDC_WANT_LIB_EXT1__=1>
+  $<$<AND:$<BOOL:${SwiftCore_ENABLE_STDLIB_LAZY_LINK}>,$<COMPILE_LANGUAGE:Swift>>:-DSWIFT_STDLIB_ENABLE_LAZY_LINK>)
 target_compile_options(swift_Concurrency PRIVATE
   $<$<COMPILE_LANGUAGE:Swift>:-parse-stdlib>
   # NOTE: do not remove until `IsolatedAny` is on by default in all supported
