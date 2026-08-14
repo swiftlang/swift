@@ -219,6 +219,7 @@ import Suffix
 import SuperChars
 import TaskGroups
 import TaskIsCancelledCancellationScopes
+import TaskLocalContextCapture
 import TaskLocalGet
 import ToddCoxeter
 import TwoSum
@@ -441,6 +442,7 @@ register(Suffix.benchmarks)
 register(SuperChars.benchmarks)
 register(TaskGroups.benchmarks)
 register(TaskIsCancelledCancellationScopes.benchmarks)
+register(TaskLocalContextCapture.benchmarks)
 register(TaskLocalGet.benchmarks)
 register(ToddCoxeter.benchmarks)
 register(TwoSum.benchmarks)

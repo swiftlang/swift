@@ -884,9 +884,12 @@ void swift_task_localsCopyTo(AsyncTask* target);
 
 // ==== TaskLocalContext snapshot API ------------------------------------------
 //
-// Backs the public `TaskLocalContext` Swift type. Implementations live in
-// stdlib/public/Concurrency/TaskLocal.cpp; the snapshot object is
-// `TaskLocal::Snapshot` from that file (opaque to consumers of this header).
+// Backs the public `TaskLocalContext` Swift type (SwiftStdlib 6.5).
+// Implementations live in stdlib/public/Concurrency/TaskLocal.cpp; the
+// snapshot object is `TaskLocal::Snapshot` from that file (opaque to consumers
+// of this header). These entry points are routed through the standard
+// CompatibilityOverride table — see the `OVERRIDE_TASK_LOCAL` entries in
+// stdlib/public/CompatibilityOverride/CompatibilityOverrideConcurrency.def.
 
 /// Snapshot the currently visible task-local bindings (most-specific per key,
 /// respecting `StopLookupMarker`). Returns nullptr if there is nothing to

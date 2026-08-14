@@ -59,7 +59,7 @@ import Swift
 /// reflects only what was visible above the marker — possibly empty.
 ///
 /// - SeeAlso: ``TaskLocal``
-@available(SwiftStdlib 6.4, *)
+@available(SwiftStdlib 6.5, *)
 public struct TaskLocalContext: @unchecked Sendable {
   @usableFromInline
   internal let _storage: _TaskLocalContextStorage
@@ -75,13 +75,25 @@ public struct TaskLocalContext: @unchecked Sendable {
 
   /// An empty context. `withValues` runs the body without pushing anything.
   public init() {
-    self._storage = _TaskLocalContextStorage.empty
+    self.init(_storage: _TaskLocalContextStorage.empty)
+  }
+
+  @usableFromInline
+  internal init(_storage: _TaskLocalContextStorage) {
+    self._storage = _storage
   }
 
   @inlinable
   internal init(_captureCurrent: ()) {
     let raw = unsafe _swift_task_localsCopyToSnapshot()
-    self._storage = _TaskLocalContextStorage(adopting: raw)
+    // Fast path: the runtime returns nullptr when there are no visible
+    // bindings — reuse the process-wide `.empty` singleton instead of
+    // allocating a fresh storage class just to hold a nil pointer.
+    guard let raw = unsafe raw else {
+      self.init(_storage: _TaskLocalContextStorage.empty)
+      return
+    }
+    self.init(_storage: unsafe _TaskLocalContextStorage(adopting: raw))
   }
 
   /// The number of distinct task-local keys captured in this snapshot.
@@ -134,41 +146,46 @@ public struct TaskLocalContext: @unchecked Sendable {
 /// A class is used so that ARC reliably runs `deinit` (and therefore the
 /// runtime destroy) exactly once regardless of how the surrounding
 /// `TaskLocalContext` value is copied.
-@available(SwiftStdlib 6.4, *)
+@available(SwiftStdlib 6.5, *)
 @usableFromInline
+@safe
 internal final class _TaskLocalContextStorage: @unchecked Sendable {
   /// Opaque `TaskLocal::Snapshot *`; nil for empty contexts.
   @usableFromInline
   internal let snapshot: UnsafeMutableRawPointer?
 
-  /// Cached at init so `TaskLocalContext.count` does not hop into the runtime.
-  @usableFromInline
-  internal let count: Int
-
   @usableFromInline
   internal static let empty: _TaskLocalContextStorage =
-    _TaskLocalContextStorage(adopting: nil)
+    unsafe _TaskLocalContextStorage(adopting: nil)
 
   @usableFromInline
   internal init(adopting raw: UnsafeMutableRawPointer?) {
-    self.snapshot = raw
-    self.count = unsafe raw.map { _swift_task_localsSnapshotCount($0) } ?? 0
+    unsafe self.snapshot = raw
+  }
+
+  /// Number of distinct keys captured in the snapshot. Reads from the runtime
+  /// each time — the underlying access is just a `size_t` field read on the
+  /// snapshot header, cheaper than caching a copy in this class.
+  @usableFromInline
+  internal var count: Int {
+    guard let s = unsafe snapshot else { return 0 }
+    return unsafe _swift_task_localsSnapshotCount(s)
   }
 
   @usableFromInline
   internal func pushAll() -> Int {
-    guard let s = snapshot else { return 0 }
+    guard let s = unsafe snapshot else { return 0 }
     return unsafe _swift_task_localsSnapshotPush(s)
   }
 
   @usableFromInline
   internal func popAll(_ n: Int) {
     guard n > 0 else { return }
-    unsafe _swift_task_localsSnapshotPop(n)
+    _swift_task_localsSnapshotPop(n)
   }
 
   deinit {
-    if let s = snapshot {
+    if let s = unsafe snapshot {
       unsafe _swift_task_localsSnapshotDestroy(s)
     }
   }
@@ -177,31 +194,31 @@ internal final class _TaskLocalContextStorage: @unchecked Sendable {
 // ==== -----------------------------------------------------------------------
 // MARK: Runtime shims
 
-@available(SwiftStdlib 6.4, *)
+@available(SwiftStdlib 6.5, *)
 @usableFromInline
 @_silgen_name("swift_task_localsCopyToSnapshot")
 internal func _swift_task_localsCopyToSnapshot() -> UnsafeMutableRawPointer?
 
-@available(SwiftStdlib 6.4, *)
+@available(SwiftStdlib 6.5, *)
 @usableFromInline
 @_silgen_name("swift_task_localsSnapshotCount")
 internal func _swift_task_localsSnapshotCount(
   _ snapshot: UnsafeMutableRawPointer
 ) -> Int
 
-@available(SwiftStdlib 6.4, *)
+@available(SwiftStdlib 6.5, *)
 @usableFromInline
 @_silgen_name("swift_task_localsSnapshotPush")
 internal func _swift_task_localsSnapshotPush(
   _ snapshot: UnsafeMutableRawPointer
 ) -> Int
 
-@available(SwiftStdlib 6.4, *)
+@available(SwiftStdlib 6.5, *)
 @usableFromInline
 @_silgen_name("swift_task_localsSnapshotPop")
 internal func _swift_task_localsSnapshotPop(_ count: Int)
 
-@available(SwiftStdlib 6.4, *)
+@available(SwiftStdlib 6.5, *)
 @usableFromInline
 @_silgen_name("swift_task_localsSnapshotDestroy")
 internal func _swift_task_localsSnapshotDestroy(

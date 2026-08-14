@@ -503,6 +503,31 @@ OVERRIDE_ACTOR(task_immediate, void,
                swift::, (AsyncTask *task, SerialExecutorRef targetExecutor),
                (task, targetExecutor))
 
+// ---- TaskLocalContext snapshot API (SwiftStdlib 6.5) ------------------------
+//
+// New entries appended at the end so the compatibility override table layout
+// remains stable for pre-6.5 runtimes (older runtimes simply don't read these
+// trailing fields). See the ABI-stability note at the top of this file.
+OVERRIDE_TASK_LOCAL(task_localsCopyToSnapshot, void *,
+                    SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
+                    swift::, , )
+
+OVERRIDE_TASK_LOCAL(task_localsSnapshotCount, size_t,
+                    SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
+                    swift::, (void *snapshot), (snapshot))
+
+OVERRIDE_TASK_LOCAL(task_localsSnapshotPush, size_t,
+                    SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
+                    swift::, (void *snapshot), (snapshot))
+
+OVERRIDE_TASK_LOCAL(task_localsSnapshotPop, void,
+                    SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
+                    swift::, (size_t count), (count))
+
+OVERRIDE_TASK_LOCAL(task_localsSnapshotDestroy, void,
+                    SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
+                    swift::, (void *snapshot), (snapshot))
+
 #undef OVERRIDE
 #undef OVERRIDE_ACTOR
 #undef OVERRIDE_TASK

@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift( -plugin-path %swift-plugin-dir -target %target-swift-6.4-abi-triple -parse-as-library %import-libdispatch) | %FileCheck %s
+// RUN: %target-run-simple-swift( -plugin-path %swift-plugin-dir -target %target-swift-6.5-abi-triple -parse-as-library %import-libdispatch) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -16,7 +16,7 @@ import Glibc
 #endif
 
 // Task locals used across all cases.
-@available(SwiftStdlib 6.4, *)
+@available(SwiftStdlib 6.5, *)
 enum TL {
   @TaskLocal static var number: Int = 0
   @TaskLocal static var other: Int = 0
@@ -24,7 +24,7 @@ enum TL {
 }
 
 // Class value with instance counter for lifetime checks.
-@available(SwiftStdlib 6.4, *)
+@available(SwiftStdlib 6.5, *)
 final class Payload: Sendable {
   static let liveCount = LiveCounter()
   let tag: Int
@@ -41,7 +41,7 @@ final class LiveCounter: @unchecked Sendable {
 }
 
 // A separate task-local of class type, isolated from `Payload.liveCount`.
-@available(SwiftStdlib 6.4, *)
+@available(SwiftStdlib 6.5, *)
 enum PayloadTL {
   @TaskLocal static var payload: Payload? = nil
 }
@@ -56,7 +56,7 @@ import Foundation
 // ==== -----------------------------------------------------------------------
 // MARK: 1) Basic capture-and-apply.
 
-@available(SwiftStdlib 6.4, *)
+@available(SwiftStdlib 6.5, *)
 func case_basic() async {
   print("--- case_basic ---")
   await TL.$number.withValue(1) {
@@ -73,7 +73,7 @@ func case_basic() async {
 // ==== -----------------------------------------------------------------------
 // MARK: 2) Shadowing — most-specific value wins.
 
-@available(SwiftStdlib 6.4, *)
+@available(SwiftStdlib 6.5, *)
 func case_shadowing() async {
   print("--- case_shadowing ---")
   await TL.$number.withValue(1) {
@@ -92,7 +92,7 @@ func case_shadowing() async {
 // ==== -----------------------------------------------------------------------
 // MARK: 3) Multiple keys.
 
-@available(SwiftStdlib 6.4, *)
+@available(SwiftStdlib 6.5, *)
 func case_multi() async {
   print("--- case_multi ---")
   await TL.$number.withValue(10) {
@@ -115,7 +115,7 @@ func case_multi() async {
 // ==== -----------------------------------------------------------------------
 // MARK: 4) Async closure — value stable across await points.
 
-@available(SwiftStdlib 6.4, *)
+@available(SwiftStdlib 6.5, *)
 func case_async() async {
   print("--- case_async ---")
   await TL.$name.withValue("across-await") {
@@ -135,7 +135,7 @@ func case_async() async {
 // ==== -----------------------------------------------------------------------
 // MARK: 5) Escape — snapshot outlives the capturing scope.
 
-@available(SwiftStdlib 6.4, *)
+@available(SwiftStdlib 6.5, *)
 func case_escape() async {
   print("--- case_escape ---")
   var escaped: TaskLocalContext = TaskLocalContext()
@@ -154,7 +154,7 @@ func case_escape() async {
 // ==== -----------------------------------------------------------------------
 // MARK: 6) Concurrent applies of the same snapshot.
 
-@available(SwiftStdlib 6.4, *)
+@available(SwiftStdlib 6.5, *)
 func case_concurrent() async {
   print("--- case_concurrent ---")
   await TL.$number.withValue(42) {
@@ -176,7 +176,7 @@ func case_concurrent() async {
 // ==== -----------------------------------------------------------------------
 // MARK: 7) Empty capture — body runs unchanged.
 
-@available(SwiftStdlib 6.4, *)
+@available(SwiftStdlib 6.5, *)
 func case_empty() async {
   print("--- case_empty ---")
   // Fresh detached task — no bindings visible.
@@ -194,7 +194,7 @@ func case_empty() async {
 // ==== -----------------------------------------------------------------------
 // MARK: 8) Nested apply — inner withValue shadows, then restores.
 
-@available(SwiftStdlib 6.4, *)
+@available(SwiftStdlib 6.5, *)
 func case_nested() async {
   print("--- case_nested ---")
   await TL.$number.withValue(1) {
@@ -217,7 +217,7 @@ func case_nested() async {
 // ==== -----------------------------------------------------------------------
 // MARK: 9) Cross-boundary — plain thread → task.
 
-@available(SwiftStdlib 6.4, *)
+@available(SwiftStdlib 6.5, *)
 func case_thread_to_task() async {
 #if canImport(Dispatch)
   print("--- case_thread_to_task ---")
@@ -246,7 +246,7 @@ func case_thread_to_task() async {
 // ==== -----------------------------------------------------------------------
 // MARK: 10) Cross-boundary — task → plain thread.
 
-@available(SwiftStdlib 6.4, *)
+@available(SwiftStdlib 6.5, *)
 func case_task_to_thread() async {
 #if canImport(Dispatch)
   print("--- case_task_to_thread ---")
@@ -271,7 +271,7 @@ func case_task_to_thread() async {
 // ==== -----------------------------------------------------------------------
 // MARK: 11) withValues inside a task group body — child observes.
 
-@available(SwiftStdlib 6.4, *)
+@available(SwiftStdlib 6.5, *)
 func case_taskgroup() async {
   print("--- case_taskgroup ---")
   await TL.$number.withValue(123) {
@@ -292,7 +292,7 @@ func case_taskgroup() async {
 // ==== -----------------------------------------------------------------------
 // MARK: 12) Leak / deinit counter — values released on snapshot destroy.
 
-@available(SwiftStdlib 6.4, *)
+@available(SwiftStdlib 6.5, *)
 func case_leak() async {
   print("--- case_leak ---")
   let before = Payload.liveCount.get()
@@ -321,7 +321,7 @@ func case_leak() async {
 // ==== -----------------------------------------------------------------------
 // MARK: Driver
 
-@available(SwiftStdlib 6.4, *)
+@available(SwiftStdlib 6.5, *)
 @main
 struct Main {
   static func main() async {
