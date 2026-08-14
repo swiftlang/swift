@@ -46,18 +46,9 @@ func getSingleSourceLibraries(subDirectory: String) -> [String] {
 
 var singleSourceLibraryDirs: [String] = []
 singleSourceLibraryDirs.append("single-source")
-singleSourceLibraryDirs.append("single-source/Concurrency")
 
-var singleSourceLibraryPaths: [String: String] = [:]
-var singleSourceLibraries: [String] = singleSourceLibraryDirs.flatMap { dir -> [String] in
-  let names = getSingleSourceLibraries(subDirectory: dir)
-  for name in names {
-    if let existingDir = singleSourceLibraryPaths[name] {
-      fatalError("Duplicate benchmark name '\(name)' found in both '\(existingDir)' and '\(dir)'; benchmark names must be unique")
-    }
-    singleSourceLibraryPaths[name] = dir
-  }
-  return names
+var singleSourceLibraries: [String] = singleSourceLibraryDirs.flatMap {
+  getSingleSourceLibraries(subDirectory: $0)
 }
 
 var cxxSingleSourceLibraryDirs: [String] = ["cxx-source"]
@@ -152,19 +143,18 @@ singleSourceDeps.append(.target(name: "ObjectiveCTests"))
 #endif
 
 targets += singleSourceLibraries.map { name in
-  let path = singleSourceLibraryPaths[name]!
   if name == "ObjectiveCNoBridgingStubs" {
     return .target(
       name: name,
       dependencies: singleSourceDeps,
-      path: path,
+      path: "single-source",
       sources: ["\(name).swift"],
       swiftSettings: [.unsafeFlags(["-Xfrontend",
                                     "-disable-swift-bridge-attr"])])
   }
   return .target(name: name,
       dependencies: singleSourceDeps,
-      path: path,
+      path: "single-source",
       sources: ["\(name).swift"])
 }
 
