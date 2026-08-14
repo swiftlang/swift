@@ -572,14 +572,14 @@ private extension DebugValueInst {
     // Strip deref: removes the enum load it becomes an object type.
     self.stripDeref(index: index)
 
-    let debugBB = self.getOrCreateDebugReconstructionBlock()
-    guard debugBB.arguments.count > 0 else {
+    guard index < operands.count, !(operands[index].value is Undef) else {
       // The debug_value was killed if it relied on the address itself.
       // No salvaging possible.
       return
     }
 
-    let oldArg = debugBB.arguments[0]
+    let debugBB = self.getOrCreateDebugReconstructionBlock()
+    let oldArg = debugBB.arguments[index]
 
     // Load from the new alloc_stack (undef placeholder) and wrap it in an enum.
     let bbBuilder = Builder(atBeginOf: debugBB, location: self.location, context)
@@ -590,9 +590,9 @@ private extension DebugValueInst {
     oldArg.uses.replaceAll(with: enumVal, context)
 
     // Replace the phi arg with correct type, and wire the load's operand.
-    debugBB.eraseArgument(at: 0, context)
+    debugBB.eraseArgument(at: index, context)
     let newArg = debugBB.insertPhiArgument(
-      atPosition: 0, type: operandType, ownership: .none, context)
+      atPosition: index, type: operandType, ownership: .none, context)
     loadVal.operand.set(to: newArg, context)
   }
 }
