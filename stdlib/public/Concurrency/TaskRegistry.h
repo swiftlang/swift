@@ -36,7 +36,7 @@ namespace swift {
 static constexpr size_t TaskRegistryShardCount = 64;
 
 struct alignas(SWIFT_CACHE_LINE_SIZE) TaskRegistryShard {
-  std::atomic<AsyncTask *> head{nullptr};
+  AsyncTask * head{nullptr};
   LazyMutex mutex;
   std::atomic<size_t> count{0};
 };

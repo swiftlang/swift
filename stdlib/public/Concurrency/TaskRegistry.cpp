@@ -42,13 +42,13 @@ void swift::taskRegistryInsert(AsyncTask *task) {
 
   LazyMutex::ScopedLock guard(shard.mutex);
 
-  AsyncTask *head = shard.head.load(std::memory_order_relaxed);
-  task->_private().registryNext.store(head, std::memory_order_relaxed);
-  task->_private().registryPrev.store(nullptr, std::memory_order_relaxed);
+  AsyncTask *head = shard.head;
+  task->_private().registryNext = head;
+  task->_private().registryPrev = nullptr;
   if (head) {
-    head->_private().registryPrev.store(task, std::memory_order_relaxed);
+    head->_private().registryPrev = task;
   }
-  shard.head.store(task, std::memory_order_release);
+  shard.head = task;
   shard.count.fetch_add(1, std::memory_order_relaxed);
 
   SWIFT_TASK_DEBUG_LOG("TaskRegistry: inserted task %p id=%llu", task,
@@ -64,27 +64,25 @@ void swift::taskRegistryRemove(AsyncTask *task) {
 
   LazyMutex::ScopedLock guard(shard.mutex);
 
-  AsyncTask *prev =
-      task->_private().registryPrev.load(std::memory_order_relaxed);
-  AsyncTask *next =
-      task->_private().registryNext.load(std::memory_order_relaxed);
+  AsyncTask *prev = task->_private().registryPrev;
+  AsyncTask *next = task->_private().registryNext;
 
-  if (prev == nullptr && shard.head.load(std::memory_order_relaxed) != task) {
+  if (prev == nullptr && shard.head != task) {
     return; // Task was not in the registry.
   }
 
   if (prev) {
-    prev->_private().registryNext.store(next, std::memory_order_release);
+    prev->_private().registryNext = next;
   } else {
-    shard.head.store(next, std::memory_order_release);
+    shard.head = next;
   }
 
   if (next) {
-    next->_private().registryPrev.store(prev, std::memory_order_release);
+    next->_private().registryPrev = prev;
   }
 
   // Do not clear registryNext so concurrent readers can continue traversal
-  task->_private().registryPrev.store(nullptr, std::memory_order_relaxed);
+  task->_private().registryPrev = nullptr;
   shard.count.fetch_sub(1, std::memory_order_relaxed);
 
   SWIFT_TASK_DEBUG_LOG("TaskRegistry: removed task %p id=%llu", task,

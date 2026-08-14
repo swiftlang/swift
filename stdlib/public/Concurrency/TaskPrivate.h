@@ -1006,8 +1006,8 @@ struct AsyncTask::PrivateStorage {
 
 #if SWIFT_CONCURRENCY_ENABLE_TASK_REGISTRY
   /// Intrusive live-task registry links.
-  std::atomic<AsyncTask *> registryNext{nullptr};
-  std::atomic<AsyncTask *> registryPrev{nullptr};
+  AsyncTask * registryNext{nullptr};
+  AsyncTask * registryPrev{nullptr};
 #endif
 
   // The lock used to protect more complicated operations on the task status.
