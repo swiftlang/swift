@@ -66,6 +66,10 @@ struct NameTableNI: Sequence {
         let stringOffset = Int(try stream.read(as: UInt32.self))
         let ni = try stream.read(as: UInt32.self)
 
+        guard stringOffset < buffer.count else {
+          continue
+        }
+
         // Get the string
         let string = buffer.withUnsafeBytes {
           (buf8: UnsafeRawBufferPointer) -> String in
