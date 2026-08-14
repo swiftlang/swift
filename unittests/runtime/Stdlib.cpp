@@ -501,10 +501,15 @@ struct swift_closure {
   void *fptr;
   HeapObject *context;
 };
+#if SWIFT_LIBRARY_EVOLUTION
 SWIFT_RUNTIME_STDLIB_API SWIFT_CC(swift) swift_closure
 MANGLE_SYM(s20_playgroundPrintHookySScSgvg)() {
   return {nullptr, nullptr};
 }
+#else
+SWIFT_RUNTIME_STDLIB_API swift_closure
+MANGLE_SYM(s20_playgroundPrintHookySScSgvp) = {nullptr, nullptr};
+#endif
 
 // ObjectiveC Bridgeable
 
