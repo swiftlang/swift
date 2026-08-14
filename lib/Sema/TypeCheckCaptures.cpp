@@ -690,6 +690,9 @@ public:
     if (auto *L = dyn_cast<LoadExpr>(E))
       return getReferencedNonCopyableValue(L->getSubExpr());
 
+    if (auto *FCE = dyn_cast<FunctionConversionExpr>(E))
+      return getReferencedNonCopyableValue(FCE->getSubExpr());
+
     auto *DRE = dyn_cast<DeclRefExpr>(E);
     if (!DRE)
       return nullptr;
@@ -698,10 +701,7 @@ public:
     if (!ref)
       return nullptr;
 
-    auto type = ref.getDecl()->getInterfaceType();
-    if (ref.isSpecialized())
-      type = type.subst(ref.getSubstitutions());
-
+    auto type = DRE->getType()->getWithoutSpecifierType();
     return type->isNoncopyable() ? ref.getDecl() : nullptr;
   }
 

@@ -209,6 +209,12 @@ namespace swift {
     /// declarations introduced at the deployment target.
     bool WeakLinkAtTarget = false;
 
+    /// Causes the compiler to use weak linkage for symbols belonging to
+    /// declarations that are back deployed by the Span compatibility library
+    /// when the deployment target predates the OS release that introduced
+    /// those declarations.
+    bool WeakLinkSpanCompatibilityLib = false;
+
     /// Should the editor placeholder error be downgraded to a warning?
     bool WarnOnEditorPlaceholder = false;
 

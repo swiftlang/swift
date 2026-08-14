@@ -1,0 +1,71 @@
+// RUN: %target-sil-opt -sil-print-types -sil-print-debuginfo -emit-verbose-sil -enable-sil-verify-all %s -constant-capture-propagation | %FileCheck %s
+
+// When a constant is moved from a closure capture to the closure itself, the
+// location must be correct and not take the return statement's location which
+// has a ReturnKind and would be invalid.
+//
+// As that instruction sets up the argument, it should be a prologue location
+// in the function's scope.
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+sil_scope 1 { loc "loc.swift":1:1 parent @closure_with_leading_debug_value : $@convention(thin) (Int32) -> Int32 }
+sil_scope 2 { loc "loc.swift":2:2 parent 1 }
+sil_scope 3 { loc "loc.swift":20:1 parent @closure_returning_capture : $@convention(thin) (Int32) -> Int32 }
+sil_scope 4 { loc "loc.swift":30:1 parent @caller : $@convention(thin) () -> Int32 }
+
+// This first closure has a debug_value. It is always wrong to inherit a debug_value's location.
+
+// CHECK-LABEL: sil private [ossa] @$s32closure_with_leading_debug_values5Int32VTf3pSi42_n
+// CHECK:       bb0:
+// CHECK-NEXT:    [[LIT:%[0-9]+]] = integer_literal $Builtin.Int32, 42, loc "{{.*}}constant_capture_propagation_location.sil"{{.*}}in_prologue
+// CHECK-NEXT:    [[VAL:%[0-9]+]] = struct $Int32 ([[LIT]] : $Builtin.Int32), loc "{{.*}}constant_capture_propagation_location.sil"{{.*}}in_prologue
+// CHECK-NEXT:    debug_value [[VAL]] : $Int32, let, name "x", argno 1, loc "loc.swift":3:3
+// CHECK-NEXT:    return [[VAL]] : $Int32, loc "loc.swift":4:4
+// CHECK:       } // end sil function '$s32closure_with_leading_debug_values5Int32VTf3pSi42_n'
+sil private [ossa] @closure_with_leading_debug_value : $@convention(thin) (Int32) -> Int32 {
+bb0(%0 : $Int32):
+  debug_value %0, let, name "x", argno 1, loc "loc.swift":3:3, scope 2
+  return %0, loc "loc.swift":4:4, scope 1
+}
+
+// This second closure only has a terminator, which usually have a ReturnKind location.
+// Inheriting this location would crash with a DebugInfoVerifier failure.
+// Note that there is no way to express a ReturnKind location in parsed SIL.
+
+// CHECK-LABEL: sil private [ossa] @$s25closure_returning_captures5Int32VTf3pSi42_n
+// CHECK:       bb0:
+// CHECK-NEXT:    [[LIT:%[0-9]+]] = integer_literal $Builtin.Int32, 42, loc "{{.*}}constant_capture_propagation_location.sil"{{.*}}in_prologue
+// CHECK-NEXT:    [[VAL:%[0-9]+]] = struct $Int32 ([[LIT]] : $Builtin.Int32), loc "{{.*}}constant_capture_propagation_location.sil"{{.*}}in_prologue
+// CHECK-NEXT:    return [[VAL]] : $Int32, loc "loc.swift":21:21
+// CHECK:       } // end sil function '$s25closure_returning_captures5Int32VTf3pSi42_n'
+sil private [ossa] @closure_returning_capture : $@convention(thin) (Int32) -> Int32 {
+bb0(%0 : $Int32):
+  return %0, loc "loc.swift":21:21, scope 3
+}
+
+// CHECK-LABEL: sil [ossa] @caller
+// CHECK:         function_ref @$s32closure_with_leading_debug_values5Int32VTf3pSi42_n
+// CHECK:         function_ref @$s25closure_returning_captures5Int32VTf3pSi42_n
+// CHECK:       } // end sil function 'caller'
+sil [ossa] @caller : $@convention(thin) () -> Int32 {
+bb0:
+  %0 = integer_literal $Builtin.Int32, 42, loc "loc.swift":31:31, scope 4
+  %1 = struct $Int32 (%0 : $Builtin.Int32), loc "loc.swift":32:32, scope 4
+  %2 = function_ref @closure_with_leading_debug_value : $@convention(thin) (Int32) -> Int32, loc "loc.swift":33:33, scope 4
+  %3 = partial_apply [callee_guaranteed] %2(%1) : $@convention(thin) (Int32) -> Int32, loc "loc.swift":34:34, scope 4
+  %4 = begin_borrow %3 : $@callee_guaranteed () -> Int32, loc "loc.swift":35:35, scope 4
+  %5 = apply %4() : $@callee_guaranteed () -> Int32, loc "loc.swift":36:36, scope 4
+  end_borrow %4 : $@callee_guaranteed () -> Int32, loc "loc.swift":37:37, scope 4
+  destroy_value %3 : $@callee_guaranteed () -> Int32, loc "loc.swift":38:38, scope 4
+  %6 = function_ref @closure_returning_capture : $@convention(thin) (Int32) -> Int32, loc "loc.swift":43:43, scope 4
+  %7 = partial_apply [callee_guaranteed] %6(%1) : $@convention(thin) (Int32) -> Int32, loc "loc.swift":44:44, scope 4
+  %8 = begin_borrow %7 : $@callee_guaranteed () -> Int32, loc "loc.swift":45:45, scope 4
+  %9 = apply %8() : $@callee_guaranteed () -> Int32, loc "loc.swift":46:46, scope 4
+  end_borrow %8 : $@callee_guaranteed () -> Int32, loc "loc.swift":47:47, scope 4
+  destroy_value %7 : $@callee_guaranteed () -> Int32, loc "loc.swift":48:48, scope 4
+  return %5, loc "loc.swift":49:49, scope 4
+}

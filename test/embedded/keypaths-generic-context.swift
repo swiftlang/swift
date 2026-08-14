@@ -3,7 +3,7 @@
 // instruction's substitution map into the pattern so IRGen can emit a static
 // instance. See `KeyPathInst::getStaticInstanceClassType`.
 
-// RUN: %target-swift-emit-sil %s -module-name kpgc -enable-experimental-feature Embedded -enable-experimental-feature EmbeddedKeyPaths -wmo -o - | %FileCheck -check-prefix=CHECK-SIL %s
+// RUN: %target-swift-emit-sil %s -module-name kpgc -enable-experimental-feature Embedded -wmo -o - | %FileCheck -check-prefix=CHECK-SIL %s
 
 // The capturing key paths below hash their captured index, which pulls in the
 // hash-seed initializer and so `arc4random_buf`. Ubuntu 22.04's glibc predates
@@ -11,14 +11,13 @@
 // shim on Linux -- rather than `%target-run-simple-swift`, which would cost
 // this test its Linux coverage the way `keypaths-hashable.swift` had to.
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -O -enable-experimental-feature Embedded -enable-experimental-feature EmbeddedKeyPaths -wmo -c -o %t/main.o
+// RUN: %target-swift-frontend %s -O -enable-experimental-feature Embedded -wmo -c -o %t/main.o
 // RUN: %target-embedded-link %target-clang-resource-dir-opt %t/main.o -o %t/a.out -dead_strip
 // RUN: %target-run %t/a.out | %FileCheck -check-prefix=CHECK-OUT %s
 
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
 // REQUIRES: swift_feature_Embedded
-// REQUIRES: swift_feature_EmbeddedKeyPaths
 
 public struct G<T> {
   public var stored: T

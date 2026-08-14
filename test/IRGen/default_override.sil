@@ -9,6 +9,12 @@
 
 // REQUIRES: swift_feature_CoroutineAccessors
 
+// The old (legacy) accessor vtable/default-override slots this test exercises
+// on the concrete resilient class B are additively present only on an
+// ABI-stable platform; elsewhere there is no prebuilt binary to stay
+// compatible with, so only the new accessors exist.
+// REQUIRES: swift_stable_abi
+
 sil_stage canonical
 
 import Builtin

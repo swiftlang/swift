@@ -183,11 +183,11 @@ func testMixedConsumingAndBorrowingCaptures(_ consumed: consuming Resource, _ bo
 // CHECK:  [[CLOSURE_G:%.*]] = function_ref @$s30called_once_consuming_captures27tesReassignmentOfProperties2r12r2yAA8ResourceVn_AFntFyyXOfU_
 // CHECK:  [[R1_TAKE_ADDR:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[R1_PROJ]] : $*Resource
 // CHECK:  [[R1_VALUE:%.*]] = load [take] [[R1_TAKE_ADDR]] : $*Resource
-// CHECK:  partial_apply [[CLOSURE_G]]({{.*}}, [[R1_VALUE]]) : $@convention(thin) (@guaranteed { var S }, @owned Resource) -> ()
+// CHECK:  partial_apply [called_once] [[CLOSURE_G]]({{.*}}, [[R1_VALUE]]) : $@convention(thin) (@guaranteed { var S }, @owned Resource) -> ()
 // CHECK:  [[CLOSURE_H:%.*]] = function_ref @$s30called_once_consuming_captures27tesReassignmentOfProperties2r12r2yAA8ResourceVn_AFntFyyXOfU0_
 // CHECK:  [[R2_TAKE_ADDR:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[R2_PROJ]] : $*Resource
 // CHECK:  [[R2_VALUE:%.*]] = load [take] [[R2_TAKE_ADDR]] : $*Resource
-// CHECK:  partial_apply [[CLOSURE_H]]({{.*}}, [[R2_VALUE]]) : $@convention(thin) (@guaranteed C, @owned Resource) -> ()
+// CHECK:  partial_apply [called_once] [[CLOSURE_H]]({{.*}}, [[R2_VALUE]]) : $@convention(thin) (@guaranteed C, @owned Resource) -> ()
 // CHECK: } // end sil function '$s30called_once_consuming_captures27tesReassignmentOfProperties2r12r2yAA8ResourceVn_AFntF'
 
 // CHECK-LABEL: sil private [ossa] @$s30called_once_consuming_captures27tesReassignmentOfProperties2r12r2yAA8ResourceVn_AFntFyyXOfU_ : $@convention(thin) (@guaranteed { var S }, @owned Resource) -> () {
@@ -305,6 +305,33 @@ func testConsumingGetterConsumesCapture(_ box: consuming Box) {
 func testConsumingSetterConsumesCapture(_ slot: consuming Slot, _ r: consuming Resource) {
   let g = { @called(once) in
     slot.r = r
+  }
+  g()
+}
+
+protocol Usable: ~Copyable {
+  consuming func use()
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s30called_once_consuming_captures40testGenericConsumingCaptureIsAddressOnlyyyxnAA6UsableRzRi_zlF : $@convention(thin) <T where T : Usable, T : ~Copyable> (@in T) -> () {
+// CHECK: bb0(%0 : $*T):
+// CHECK:  [[T_PROJ:%.*]] = project_box {{.*}} : $<{{.*}}> { var {{.*}} } <T>, 0
+// CHECK:  [[T_TAKE_ADDR:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[T_PROJ]] : $*T
+// CHECK:  [[T_STACK:%.*]] = alloc_stack $T
+// CHECK:  copy_addr [take] [[T_TAKE_ADDR]] to [init] [[T_STACK]] : $*T
+// CHECK:  partial_apply [called_once] {{.*}}<T>([[T_STACK]]) : $@convention(thin) <{{.*}}> (@in {{.*}}) -> ()
+// CHECK: } // end sil function '$s30called_once_consuming_captures40testGenericConsumingCaptureIsAddressOnlyyyxnAA6UsableRzRi_zlF'
+
+// CHECK-LABEL: sil private [ossa] @$s30called_once_consuming_captures40testGenericConsumingCaptureIsAddressOnlyyyxnAA6UsableRzRi_zlFyyXOfU_ : $@convention(thin) <T where T : Usable, T : ~Copyable> (@in T) -> () {
+// CHECK: bb0([[T_CAPTURE:%.*]] : @closureCapture $*T):
+// CHECK:  [[T_ADDR:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[T_CAPTURE]] : $*T
+// CHECK:  [[T_DEINIT_ACCESS:%.*]] = begin_access [deinit] [unknown] [[T_ADDR]] : $*T
+// CHECK:  witness_method $T, #Usable.use
+// CHECK:  end_access [[T_DEINIT_ACCESS]] : $*T
+// CHECK: } // end sil function '$s30called_once_consuming_captures40testGenericConsumingCaptureIsAddressOnlyyyxnAA6UsableRzRi_zlFyyXOfU_'
+func testGenericConsumingCaptureIsAddressOnly<T: Usable & ~Copyable>(_ t: consuming T) {
+  let g = { @called(once) in
+    t.use()
   }
   g()
 }

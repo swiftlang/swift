@@ -6800,6 +6800,9 @@ ERROR(downcast_to_foreign_reference_type,none,
 ERROR(cxx_super_pure_virtual_call,none,
       "cannot use 'super' to call C++ pure virtual method %0; it has no base "
       "class implementation", (const ValueDecl *))
+ERROR(cxx_super_safe_interop_wrapper_call,none,
+      "calling safe interop wrapper %0 in foreign reference type %1 using "
+      "'super' is not supported", (const ValueDecl *, const ValueDecl *))
 ERROR(invalid_ownership_with_optional,none,
       "%0 variable cannot have optional type", (ReferenceOwnership))
 ERROR(invalid_ownership_not_optional,none,
@@ -7419,12 +7422,12 @@ ERROR(availability_must_occur_alone, none,
       (AvailabilityDomain, bool))
 ERROR(availability_unexpected_version, none,
       "unexpected version number for %0", (AvailabilityDomain))
-GROUPED_ERROR(availability_unrecognized_platform_name,
+GROUPED_ERROR(availability_domain_not_found,
         AvailabilityUnrecognizedName, PointsToFirstBadToken,
-        "unrecognized platform name %0", (Identifier))
-GROUPED_ERROR(availability_suggest_platform_name,
+        "cannot find availability domain %0", (Identifier))
+GROUPED_ERROR(availability_suggest_domain,
         AvailabilityUnrecognizedName, PointsToFirstBadToken,
-        "unrecognized platform name %0; did you mean '%1'?",
+        "cannot find availability domain %0; did you mean '%1'?",
         (Identifier, StringRef))
 WARNING(availability_unsupported_version_number, none,
         "'%0' is not a supported version number", (llvm::VersionTuple))
@@ -8939,7 +8942,7 @@ ERROR(lifetime_dependence_cannot_infer_kind, none,
 ERROR(lifetime_dependence_cannot_infer_scope_ownership, none,
       "cannot borrow the lifetime of '%0', which has consuming ownership on %1",
       (StringRef, StringRef))
-ERROR(lifetime_dependence_cannot_infer_scope_foreign_by_value, none,
+ERROR(lifetime_dependence_scope_foreign_by_value, none,
       "cannot borrow the lifetime of '%0', which is passed by value on %1",
       (StringRef, StringRef))
 NOTE(lifetime_dependence_cannot_infer_inout_suggest, none,
@@ -9131,6 +9134,13 @@ GROUPED_WARNING(generic_nonfinal_in_embedded_swift, EmbeddedRestrictions,
                 none,
                 "generic %kind0 in a class %select{must be 'final'|cannot be 'required'}1 in Embedded Swift",
                 (const Decl *, bool))
+GROUPED_ERROR(generic_open_in_embedded_swift, EmbeddedRestrictions, none,
+              "generic %kind0 in a class cannot be 'open' in Embedded Swift",
+              (const Decl *))
+GROUPED_ERROR(generic_override_in_embedded_swift, EmbeddedRestrictions, none,
+              "generic %kind0 in a class cannot override another method in "
+              "Embedded Swift",
+              (const Decl *))
 GROUPED_WARNING(use_generic_member_of_existential_in_embedded_swift,
                 EmbeddedRestrictions, none,
                 "cannot use generic %kind0 on a value of type %1 in Embedded Swift",

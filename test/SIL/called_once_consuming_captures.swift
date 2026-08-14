@@ -212,3 +212,23 @@ func testConsumingSetterConsumesCapture(_ slot: consuming Slot, _ r: consuming R
   }
   g()
 }
+
+protocol Usable: ~Copyable {
+  consuming func use()
+  func test()
+}
+
+func testGenericConsumingCaptureIsAddressOnly<T: Usable & ~Copyable>(_ t: consuming T) {
+  let g = { @called(once) in
+    t.use()
+  }
+  g()
+}
+
+func testGenericConsumingCaptureIsAddressOnlyMultiUse<T: Usable & ~Copyable>(_ t: consuming T) { // expected-error {{'t' used after consume}}
+  let g = { @called(once) in // expected-note {{consumed here}}
+    t.use()
+  }
+  _ = g
+  t.test() // expected-note {{used here}}
+}

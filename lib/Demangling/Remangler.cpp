@@ -4222,6 +4222,8 @@ ManglingErrorOr<std::string> Demangle::mangleNode(NodePointer node,
   ManglingError err = remangler.mangle(node, 0);
   if (!err.isSuccess())
     return err;
+  if (Factory.isTooComplex())
+    return ManglingError(ManglingError::TooComplex, node, 0);
 
   return remangler.str();
 }
@@ -4237,6 +4239,8 @@ ManglingErrorOr<llvm::StringRef> Demangle::mangleNode(NodePointer node,
   ManglingError err = remangler.mangle(node, 0);
   if (!err.isSuccess())
     return err;
+  if (Factory.isTooComplex())
+    return ManglingError(ManglingError::TooComplex, node, 0);
 
   return remangler.getBufferStr();
 }

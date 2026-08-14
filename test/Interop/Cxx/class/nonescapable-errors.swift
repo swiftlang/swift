@@ -129,6 +129,18 @@ MyPair<Owner, View> h2(int* x);
 // OK; MyPair<Owner, Owner> is not ~Escapable
 MyPair<Owner, Owner> h3(int* x);
 
+// SWIFT_ESCAPABLE_IF is found even when another swift_attr precedes it.
+template<typename F>
+struct SWIFT_UNCHECKED_SENDABLE SWIFT_ESCAPABLE_IF(F) MySendablePair {
+    F first;
+};
+
+// expected-NO-LIFETIMES-error@+1 {{a function cannot return a ~Escapable result}}
+MySendablePair<View> h4(int* x);
+
+// OK; MySendablePair<Owner> is not ~Escapable
+MySendablePair<Owner> h5(int* x);
+
 // expected-error@+3 {{template parameter 'Missing' does not exist}}
 // expected-error@+2 {{template parameter 'Missing' does not exist}}
 template<typename F, typename S>
@@ -200,6 +212,8 @@ OwnerVector l2();
 const View* usedToCrash(const View* p) {
     return p;
 }
+
+View* usedToCrashAsInit(const int* p) SWIFT_NAME(View.init(p:));
 
 // expected-note@+1 {{escapable record 'Invalid' cannot have non-escapable field 'v'}}
 struct SWIFT_ESCAPABLE Invalid {
@@ -370,6 +384,12 @@ public func importInvalid(_ x: Invalid) {}
 // expected-error@+1 {{cannot find type 'Invalid2' in scope}}
 public func importInvalid(_ x: Invalid2) {}
 
+// 'usedToCrashAsInit' returns a pointer to a non-escapable type, which cannot
+// be imported, so no 'init(p:)' is added to 'View'.
+public func droppedInitializer() {
+    _ = View(p: nil) // expected-error {{extraneous argument label 'p:' in call}}
+}
+
 // expected-LIFETIMES-error@+3 {{a function with a ~Escapable result needs a parameter to depend on}}
 // expected-LIFETIMES-note@+2 {{'@_lifetime(immortal)' can be used to indicate that values produced by this initializer have no lifetime dependencies}}
 // expected-NO-LIFETIMES-error@+1 {{a function cannot return a ~Escapable result}}
@@ -382,6 +402,8 @@ public func noAnnotations() -> View {
     h1(nil)
     h2(nil)
     h3(nil)
+    h4(nil)
+    h5(nil)
     i1()
     i2()
     j1()

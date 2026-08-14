@@ -10,13 +10,12 @@
 //   * computed properties on structs (get-only and settable mutating)
 //   * class ivar (emitted as computed settable_property in SIL)
 
-// RUN: %target-swift-emit-ir %s -enable-experimental-feature Embedded -enable-experimental-feature EmbeddedKeyPaths -enable-experimental-feature KeyPathWithMethodMembers -wmo -o - | %FileCheck -check-prefix=CHECK-IR %s
-// RUN: %target-run-simple-swift(-O -enable-experimental-feature Embedded -enable-experimental-feature EmbeddedKeyPaths -enable-experimental-feature KeyPathWithMethodMembers -wmo -runtime-compatibility-version none %target-embedded-posix-shim) | %FileCheck -check-prefix=CHECK-OUT %s
+// RUN: %target-swift-emit-ir %s -enable-experimental-feature Embedded -enable-experimental-feature KeyPathWithMethodMembers -wmo -o - | %FileCheck -check-prefix=CHECK-IR %s
+// RUN: %target-run-simple-swift(-O -enable-experimental-feature Embedded -enable-experimental-feature KeyPathWithMethodMembers -wmo -runtime-compatibility-version none %target-embedded-posix-shim) | %FileCheck -check-prefix=CHECK-OUT %s
 
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
 // REQUIRES: swift_feature_Embedded
-// REQUIRES: swift_feature_EmbeddedKeyPaths
 // REQUIRES: swift_feature_KeyPathWithMethodMembers
 // XFAIL: swift_test_mode_optimize_none_with_opaque_values
 

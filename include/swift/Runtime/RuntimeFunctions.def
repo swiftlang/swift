@@ -214,6 +214,22 @@ FUNCTION(SlowDealloc, Swift, swift_slowDealloc, C_CC, AlwaysAvailable,
          EFFECT(RuntimeEffect::Deallocating),
          UNKNOWN_MEMEFFECTS)
 
+// void *swift_allocRawTyped(size_t size, size_t alignMask, int64_t typeId);
+FUNCTION(AllocRawTyped, Swift, swift_allocRawTyped, C_CC, AlwaysAvailable,
+         RETURNS(Int8PtrTy),
+         ARGS(SizeTy, SizeTy, Int64Ty),
+         ATTRS(NoUnwind),
+         EFFECT(RuntimeEffect::Allocating),
+         UNKNOWN_MEMEFFECTS)
+
+// void swift_deallocRawTyped(void *ptr, size_t size, size_t alignMask, int64_t typeId);
+FUNCTION(DeallocRawTyped, Swift, swift_deallocRawTyped, C_CC, AlwaysAvailable,
+         RETURNS(VoidTy),
+         ARGS(Int8PtrTy, SizeTy, SizeTy, Int64Ty),
+         ATTRS(NoUnwind),
+         EFFECT(RuntimeEffect::Deallocating),
+         UNKNOWN_MEMEFFECTS)
+
 // void swift_willThrow(error *ptr);
 FUNCTION(WillThrow, Swift, swift_willThrow, SwiftCC, AlwaysAvailable,
          RETURNS(VoidTy),

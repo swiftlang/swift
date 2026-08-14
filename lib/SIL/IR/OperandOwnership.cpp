@@ -272,7 +272,25 @@ OPERAND_OWNERSHIP(UnownedInstantaneousUse, UnmanagedAutoreleaseValue)
 OPERAND_OWNERSHIP(PointerEscape, ProjectBox) // The result is a T*.
 OPERAND_OWNERSHIP(PointerEscape, ProjectExistentialBox)
 OPERAND_OWNERSHIP(PointerEscape, UncheckedOwnershipConversion)
-OPERAND_OWNERSHIP(PointerEscape, ConvertEscapeToNoEscape)
+
+// For an ordinary (copyable) escaping closure, the pre-conversion operand
+// may still be used again after the conversion (e.g. a `var` read again
+// later), so treat the conversion conservatively as a non-consuming pointer
+// escape.
+//
+// A `@called(once)` function value is single-owner and move-only-checked,
+// so pre-conversion value doesn't survive to be used again -- any further
+// use would already be diagnosed as a double consumption by the move-only
+// checker. Treat the conversion as an ordinary forwarding consume in that
+// case, matching how `convert_function` and other function type conversions
+// are already treated, so ownership-based analyses don't need to
+// special-case this instruction.
+OperandOwnership OperandOwnershipClassifier::visitConvertEscapeToNoEscapeInst(
+    ConvertEscapeToNoEscapeInst *i) {
+  return i->getType().castTo<SILFunctionType>()->isCalledOnce()
+             ? OperandOwnership::ForwardingConsume
+             : OperandOwnership::PointerEscape;
+}
 
 // UncheckedBitwiseCast ownership behaves like RefToUnowned. It produces an
 // Unowned value from a non-trivial value, without consuming or borrowing the
@@ -825,6 +843,7 @@ BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, Add)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, GenericAdd)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, Alignof)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, AllocRaw)
+BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, AllocRawTyped)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, And)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, GenericAnd)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, AssertConf)
@@ -847,6 +866,7 @@ BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, CmpXChg)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, CondUnreachable)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, CopyArray)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, DeallocRaw)
+BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, DeallocRawTyped)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, DestroyArray)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, ExactSDiv)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, GenericExactSDiv)

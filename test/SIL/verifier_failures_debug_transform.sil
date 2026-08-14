@@ -9,10 +9,12 @@ import Swift
 
 sil_scope 1 { parent @test_type_mismatch : $@convention(thin) () -> () }
 sil_scope 2 { parent @test_arg_type_mismatch : $@convention(thin) (Builtin.Int64) -> () }
-sil_scope 3 { parent @test_deref_mismatch : $@convention(thin) () -> () }
+sil_scope 3 { parent @test_deref_mismatch : $@convention(thin) (Builtin.Int64) -> () }
 sil_scope 4 { parent @test_no_transform_type_mismatch : $@convention(thin) (Builtin.Int32) -> () }
 sil_scope 5 { parent @test_fragment_wrong_parent : $@convention(thin) (Builtin.Int64) -> () }
 sil_scope 6 { parent @test_tuple_fragment_type_mismatch : $@convention(thin) (Builtin.Int64) -> () }
+sil_scope 7 { parent @test_arg_count_mismatch : $@convention(thin) (Builtin.Int64) -> () }
+sil_scope 8 { parent @test_no_operand_without_transform : $@convention(thin) () -> () }
 
 // The transform block returns Builtin.Int32 but the fragment narrows to
 // Builtin.Int64.
@@ -21,7 +23,7 @@ sil_scope 6 { parent @test_tuple_fragment_type_mismatch : $@convention(thin) (Bu
 // CHECK-LABEL: End Error in function test_type_mismatch
 sil @test_type_mismatch : $@convention(thin) () -> () {
 bb0:
-  debug_value undef : $Builtin.Int32, let, name "x", type $Int64, expr op_fragment:#Int64._value, transform {
+  debug_value (), let, name "x", type $Int64, expr op_fragment:#Int64._value, transform {
   bb0:
     %0 = integer_literal $Builtin.Int32, 42
     return %0 : $Builtin.Int32
@@ -49,11 +51,10 @@ bb0(%arg : $Builtin.Int64):
 // CHECK-LABEL: Begin Error in function test_deref_mismatch
 // CHECK:       SIL verification failed: debug_value type chain should hold
 // CHECK-LABEL: End Error in function test_deref_mismatch
-sil @test_deref_mismatch : $@convention(thin) () -> () {
-bb0:
-  debug_value undef : $Builtin.Int64, let, name "x", type $Int64, expr op_deref:op_fragment:#Int64._value, transform {
-  bb0:
-    %0 = integer_literal $Builtin.Int64, 42
+sil @test_deref_mismatch : $@convention(thin) (Builtin.Int64) -> () {
+bb0(%arg : $Builtin.Int64):
+  debug_value %arg : $Builtin.Int64, let, name "x", type $Int64, expr op_deref:op_fragment:#Int64._value, transform {
+  bb0(%0 : $Builtin.Int64):
     return %0 : $Builtin.Int64
   }
   %r = tuple ()
@@ -89,6 +90,34 @@ bb0(%arg : $Builtin.Int64):
 sil @test_tuple_fragment_type_mismatch : $@convention(thin) (Builtin.Int64) -> () {
 bb0(%arg : $Builtin.Int64):
   debug_value %arg : $Builtin.Int64, let, name "x", type $(Int64, Int64), expr op_tuple_fragment:$(Int32, Int32):0:op_fragment:#Int64._value
+  %r = tuple ()
+  return %r : $()
+}
+
+// The transform block must have one argument per operand: here it has no args,
+// while the debug_value has an operand.
+// CHECK-LABEL: Begin Error in function test_arg_count_mismatch
+// CHECK:       SIL verification failed: debug_value type chain should hold
+// CHECK-LABEL: End Error in function test_arg_count_mismatch
+sil @test_arg_count_mismatch : $@convention(thin) (Builtin.Int64) -> () {
+bb0(%arg : $Builtin.Int64):
+  debug_value %arg : $Builtin.Int64, let, name "x", type $Int64, expr op_fragment:#Int64._value, transform {
+  bb0:
+    %0 = integer_literal $Builtin.Int64, 42
+    return %0 : $Builtin.Int64
+  }
+  %r = tuple ()
+  return %r : $()
+}
+
+// A debug_value without operands can only describe its variable through a
+// transform block.
+// CHECK-LABEL: Begin Error in function test_no_operand_without_transform
+// CHECK:       SIL verification failed: debug_value type chain should hold
+// CHECK-LABEL: End Error in function test_no_operand_without_transform
+sil @test_no_operand_without_transform : $@convention(thin) () -> () {
+bb0:
+  debug_value (), let, name "x", type $Int64
   %r = tuple ()
   return %r : $()
 }

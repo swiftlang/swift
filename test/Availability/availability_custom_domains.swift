@@ -15,17 +15,17 @@ func availableInEnabledDomain() { }
 @available(AlwaysEnabledDomain)
 func availableInAlwaysEnabledDomain() { }
 
-@available(EnabledDomain, unavailable)
-func unavailableInEnabledDomain() { } // expected-note * {{'unavailableInEnabledDomain()' has been explicitly marked unavailable here}}
+@available(EnabledDomain, unavailable) // expected-note * {{'unavailableInEnabledDomain()' has been explicitly marked unavailable here}}
+func unavailableInEnabledDomain() { }
 
-@available(AlwaysEnabledDomain, unavailable)
-func unavailableInAlwaysEnabledDomain() { } // expected-note * {{'unavailableInAlwaysEnabledDomain()' has been explicitly marked unavailable here}}
+@available(AlwaysEnabledDomain, unavailable) // expected-note * {{'unavailableInAlwaysEnabledDomain()' has been explicitly marked unavailable here}}
+func unavailableInAlwaysEnabledDomain() { }
 
 @available(AlwaysEnabledDomain, deprecated)
 func deprecatedInAlwaysEnabledDomain() { }
 
-@available(DisabledDomain, unavailable)
-func unavailableInDisabledDomain() { } // expected-note * {{'unavailableInDisabledDomain()' has been explicitly marked unavailable here}}
+@available(DisabledDomain, unavailable) // expected-note * {{'unavailableInDisabledDomain()' has been explicitly marked unavailable here}}
+func unavailableInDisabledDomain() { }
 
 @available(DynamicDomain)
 func availableInDynamicDomain() { }
@@ -33,10 +33,10 @@ func availableInDynamicDomain() { }
 @available(DynamicDomain, deprecated, message: "Use something else")
 func deprecatedInDynamicDomain() { }
 
-@available(DynamicDomain, unavailable)
-func unavailableInDynamicDomain() { } // expected-note * {{'unavailableInDynamicDomain()' has been explicitly marked unavailable here}}
+@available(DynamicDomain, unavailable) // expected-note * {{'unavailableInDynamicDomain()' has been explicitly marked unavailable here}}
+func unavailableInDynamicDomain() { }
 
-@available(UnknownDomain) // expected-error {{unrecognized platform name 'UnknownDomain'}}
+@available(UnknownDomain) // expected-error {{cannot find availability domain 'UnknownDomain'}}
 func availableInUnknownDomain() { }
 
 @available(EnabledDomain)
@@ -44,8 +44,8 @@ func availableInUnknownDomain() { }
 func availableInEnabledDomainTwice() { }
 
 @available(EnabledDomain)
-@available(EnabledDomain, unavailable)
-func availableAndUnavailableInEnabledDomain() { } // expected-note {{'availableAndUnavailableInEnabledDomain()' has been explicitly marked unavailable here}}
+@available(EnabledDomain, unavailable) // expected-note {{'availableAndUnavailableInEnabledDomain()' has been explicitly marked unavailable here}}
+func availableAndUnavailableInEnabledDomain() { }
 
 func testDeployment() { // expected-note 3 {{add '@available' attribute to enclosing global function}}
   alwaysAvailable()
@@ -284,6 +284,62 @@ func testUniversallyUnavailable() {
   if #available(EnabledDomain) {} // FIXME: [availability] Diagnose?
   if #unavailable(EnabledDomain) {} // FIXME: [availability] Diagnose?
 }
+
+func testLocalDeclsWithExplicitAvailability() {
+  // expected-note@-1 {{add '@available' attribute to enclosing global function}}
+  if #available(EnabledDomain) {
+    @available(DynamicDomain)
+    func restrictedInAnotherDomain() {
+      availableInEnabledDomain()
+      availableInDynamicDomain()
+    }
+
+    restrictedInAnotherDomain() // expected-error {{'restrictedInAnotherDomain()' is only available in DynamicDomain}}
+    // expected-note@-1 {{add 'if #available' version check}}
+
+    if #available(DynamicDomain) {
+      restrictedInAnotherDomain()
+    }
+
+    @available(EnabledDomain)
+    func redundantlyRestricted() {
+      availableInEnabledDomain()
+    }
+    redundantlyRestricted()
+
+    @available(EnabledDomain, unavailable)
+    func localUnavailableInEnabledDomain() { }
+    // expected-note@-2 2 {{'localUnavailableInEnabledDomain()' has been explicitly marked unavailable here}}
+    localUnavailableInEnabledDomain() // expected-error {{'localUnavailableInEnabledDomain()' is unavailable}}
+
+    if #unavailable(EnabledDomain) {
+      // FIXME: [availability] Should not be diagnosed
+      localUnavailableInEnabledDomain() // expected-error {{'localUnavailableInEnabledDomain()' is unavailable}}
+    }
+  }
+}
+
+func testLocalDeclsAfterGuard() { // expected-note 3 {{add '@available' attribute to enclosing global function}}
+  useAfterGuard() // expected-error {{'useAfterGuard()' is only available in EnabledDomain}}
+  // expected-note@-1 {{add 'if #available' version check}}
+  useAfterGuardInDynamicDomain() // expected-error {{'useAfterGuardInDynamicDomain()' is only available in EnabledDomain}}
+  // expected-note@-1 {{add 'if #available' version check}}
+
+  guard #available(EnabledDomain) else { return }
+
+  func useAfterGuard() {
+    availableInEnabledDomain()
+  }
+  useAfterGuard()
+
+  @available(DynamicDomain)
+  func useAfterGuardInDynamicDomain() {
+    availableInDynamicDomain()
+  }
+  useAfterGuardInDynamicDomain() // expected-error {{'useAfterGuardInDynamicDomain()' is only available in DynamicDomain}}
+  // expected-note@-1 {{add 'if #available' version check}}
+}
+
 
 @available(EnabledDomain)
 struct EnabledDomainAvailable {

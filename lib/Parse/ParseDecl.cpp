@@ -2731,6 +2731,11 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
   // diagnostic this can be used for better error presentation.
   SourceRange AttrRange;
 
+  auto attrRangeWithAt = [&]() -> SourceRange {
+    SourceLoc end = AttrRange.End.isValid() ? AttrRange.End : Loc;
+    return SourceRange(AtLoc.isValid() ? AtLoc : Loc, end);
+  };
+
   ParserStatus Status;
 
   switch (DK) {
@@ -2993,10 +2998,10 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       // this declaration with a different access level.
       if (access != cast<AccessControlAttr>(DuplicateAttribute)->getAccess()) {
         diagnose(Loc, diag::multiple_access_level_modifiers)
-            .highlight(AttrRange);
+            .highlight(attrRangeWithAt());
         diagnose(DuplicateAttribute->getLocation(),
                  diag::previous_access_level_modifier)
-            .highlight(DuplicateAttribute->getRange());
+            .highlight(DuplicateAttribute->getRangeWithAt());
 
         // Remove the reference to the duplicate attribute
         // to avoid the extra diagnostic.
@@ -3069,10 +3074,10 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     // this declaration with a different access level.
     if (access != cast<SetterAccessAttr>(DuplicateAttribute)->getAccess()) {
       diagnose(Loc, diag::multiple_access_level_modifiers)
-        .highlight(AttrRange);
+          .highlight(attrRangeWithAt());
       diagnose(DuplicateAttribute->getLocation(),
                diag::previous_access_level_modifier)
-          .highlight(DuplicateAttribute->getRange());
+          .highlight(DuplicateAttribute->getRangeWithAt());
 
       // Remove the reference to the duplicate attribute
       // to avoid the extra diagnostic.
@@ -4381,11 +4386,11 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
 
   if (DuplicateAttribute) {
     diagnose(Loc, diag::duplicate_attribute, DeclAttribute::isDeclModifier(DK))
-      .highlight(AttrRange);
+        .highlight(attrRangeWithAt());
     diagnose(DuplicateAttribute->getLocation(),
              diag::previous_attribute,
              DeclAttribute::isDeclModifier(DK))
-      .highlight(DuplicateAttribute->getRange());
+        .highlight(DuplicateAttribute->getRangeWithAt());
   }
 
   // If this is a decl modifier spelled with an @, emit an error and remove it
@@ -8931,6 +8936,35 @@ AccessorDecl *Parser::ParsedAccessors::add(AccessorDecl *accessor) {
 void Parser::ParsedAccessors::record(Parser &P, AbstractStorageDecl *storage,
                                      bool invalid) {
   classify(P, storage, invalid);
+
+  // When the CoroutineAccessors feature is enabled, in *surface source* the
+  // keywords `_read`/`_modify` and `yielding borrow`/`yielding mutate` are just
+  // two spellings of the same coroutine accessor.  Now that classify() has run
+  // its spelling-aware conflict diagnostics on the distinct kinds, rewrite a
+  // written `_read`/`_modify` to its yielding counterpart, remembering the
+  // underscored spelling for later diagnostics.
+  //
+  // The point is to make the accessor's *representation* independent of the
+  // source spelling.  The ABI -- in particular whether the old yield_once
+  // (`_read`/`_modify`) accessor is also emitted for backwards compatibility --
+  // is then determined by a consistent set of rules that do not depend on how
+  // the accessor was spelled; the rewrite does not itself dictate the ABI.
+  //
+  // This applies only to surface source.  In a .swiftinterface or .sil file,
+  // `_read`/`_modify` are ABI-level declarations -- synonyms for the yield_once
+  // accessor -- not surface spellings, so they already denote the correct
+  // accessor and must be taken literally.  (Post-parse, this leaves
+  // AccessorKind::Read/Modify uniformly meaning "the yield_once ABI accessor".)
+  if (P.Context.LangOpts.hasFeature(Feature::CoroutineAccessors) &&
+      P.SF.Kind != SourceFileKind::Interface &&
+      P.SF.Kind != SourceFileKind::SIL) {
+    for (auto *accessor : Accessors) {
+      auto kind = accessor->getAccessorKind();
+      if (kind == AccessorKind::Read || kind == AccessorKind::Modify)
+        accessor->changeLegacyCoroutineAccessorToYielding();
+    }
+  }
+
   storage->setAccessors(LBLoc, Accessors, RBLoc);
 }
 

@@ -13,6 +13,7 @@
 #include "SILGenFunction.h"
 #include "SILGenFunctionBuilder.h"
 #include "Scope.h"
+#include "swift/AST/AvailabilityContext.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Platform.h"
 #include "swift/SIL/SILDeclRef.h"
@@ -285,6 +286,17 @@ SILGenFunction::emitIfAvailableQuery(SILLocation loc,
                                      PoundAvailableInfo *availability) {
   auto &ctx = getASTContext();
   SILType i1 = SILType::getBuiltinIntegerType(1, ctx);
+
+  if (!availability->getAvailabilityQuery() &&
+      !ctx.LangOpts.DisableAvailabilityChecking) {
+    // Sema computes the query as a side effect of building the availability
+    // scopes that enclose it, and some of those scopes are only expanded on
+    // demand.
+    // FIXME: [availability] Request-ify availability query resolution.
+    (void)AvailabilityContext::forLocation(availability->getStartLoc(),
+                                           FunctionDC);
+  }
+
   auto query = availability->getAvailabilityQuery();
 
   // The query may not have been computed by Sema under the following

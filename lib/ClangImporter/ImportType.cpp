@@ -52,6 +52,7 @@
 #include "clang/Sema/Lookup.h"
 #include "clang/Sema/Sema.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/Compiler.h"
 #include <optional>
 
@@ -965,27 +966,21 @@ namespace {
           break;
         }
 
-        static const llvm::StringLiteral vaListNames[] = {
-          "va_list", "__gnuc_va_list", "__va_list"
-        };
-
-        ImportHint hint = ImportHint::None;
-        if (type->getDecl()->getName() == "BOOL") {
-          hint = ImportHint::Boolean;
-        } else if (type->getDecl()->getName() == "Boolean") {
-          // FIXME: Darwin only?
-          hint = ImportHint::Boolean;
-        } else if (type->getDecl()->getName() == "NSUInteger") {
-          hint = ImportHint::NSUInteger;
-        } else if (llvm::is_contained(vaListNames,
-                                      type->getDecl()->getName())) {
-          hint = ImportHint::VAList;
-        } else if (isImportedCFPointer(type->desugar(), mappedType)) {
-          hint = ImportHint::CFPointer;
-        } else if (mappedType->isAnyExistentialType()) { // id, Class
-          hint = ImportHint::ObjCPointer;
-        } else if (type->isPointerType() || type->isBlockPointerType()) {
-          hint = ImportHint::OtherPointer;
+        ImportHint hint =
+            llvm::StringSwitch<ImportHint>(type->getDecl()->getName())
+                // FIXME: Is "Boolean" Darwin only?
+                .Cases({"BOOL", "Boolean"}, ImportHint::Boolean)
+                .Case("NSUInteger", ImportHint::NSUInteger)
+                .Cases({"va_list", "__gnuc_va_list", "__va_list"},
+                       ImportHint::VAList)
+                .Default(ImportHint::None);
+        if (hint == ImportHint::None) {
+          if (isImportedCFPointer(type->desugar(), mappedType))
+            hint = ImportHint::CFPointer;
+          else if (mappedType->isAnyExistentialType()) // id, Class
+            hint = ImportHint::ObjCPointer;
+          else if (type->isPointerType() || type->isBlockPointerType())
+            hint = ImportHint::OtherPointer;
         }
         // Any other interesting mapped types should be hinted here.
         return { mappedType, hint };
@@ -1080,14 +1075,10 @@ namespace {
       if (!decl)
         return nullptr;
 
-      if (Bridging == Bridgeability::Full)
-        for (const auto *attr : decl->getAttrs())
-          if (const auto *customAttr = dyn_cast<CustomAttr>(attr))
-            if (customAttr->getTypeRepr()->isSimpleUnqualifiedIdentifier(
-                    "_refCountedPtr")) {
-              return ImportResult(decl->getDeclaredInterfaceType(),
-                                  ImportHint::IntrusivelyRefCountedSmartPtr);
-            }
+      if (Bridging == Bridgeability::Full &&
+          importer::getRefCountedPtrAttr(decl))
+        return ImportResult(decl->getDeclaredInterfaceType(),
+                            ImportHint::IntrusivelyRefCountedSmartPtr);
 
       return decl->getDeclaredInterfaceType();
     }
@@ -2545,14 +2536,9 @@ static bool isParameterContextGlobalActorIsolated(DeclContext *dc,
   if (getActorIsolationOfContext(dc).isGlobalActor())
     return true;
 
-  if (!parent->hasAttrs())
-    return false;
-
-  for (const auto *attr : parent->getAttrs()) {
-    if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr)) {
-      if (isMainActorAttr(swiftAttr))
-        return true;
-    }
+  for (const auto *swiftAttr : parent->specific_attrs<clang::SwiftAttrAttr>()) {
+    if (isMainActorAttr(swiftAttr))
+      return true;
   }
 
   return false;
@@ -2818,9 +2804,10 @@ static ParamDecl *getParameterInfo(ClangImporter::Implementation *impl,
   // If SendingArgsAndResults are enabled and we have a sending argument,
   // set that the param was sending.
   if (ASTContext.LangOpts.hasFeature(Feature::SendingArgsAndResults)) {
-    if (auto *attr = param->getAttr<clang::SwiftAttrAttr>()) {
+    for (auto *attr : param->specific_attrs<clang::SwiftAttrAttr>()) {
       if (attr->getAttribute() == "sending") {
         paramInfo->setSending();
+        break;
       }
     }
   }

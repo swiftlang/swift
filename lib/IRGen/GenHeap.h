@@ -122,6 +122,14 @@ void emitDeallocateHeapObjectTyped(IRGenFunction &IGF,
                                    llvm::Value *alignMask,
                                    llvm::Value *typeDescriptor);
 
+/// Emit a heap object deallocation for an object none of whose fields were
+/// ever initialized (skips running any field destructors).
+void emitDeallocateUninitializedHeapObject(IRGenFunction &IGF,
+                                           llvm::Value *object,
+                                           llvm::Value *size,
+                                           llvm::Value *alignMask,
+                                           std::optional<uint64_t> mallocTypeId);
+
 /// Emit a class instance deallocation.
 void emitDeallocateClassInstance(IRGenFunction &IGF,
                                  llvm::Value *object,
@@ -213,7 +221,8 @@ IsaEncoding getIsaEncodingForType(IRGenModule &IGM, CanType type);
 
 std::optional<uint64_t>
 computeTypedMallocTypeDescriptor(IRGenModule &IGM,
-                                 llvm::SmallVectorImpl<SILType> &fieldTypes);
+                                 llvm::SmallVectorImpl<SILType> &fieldTypes,
+                                 bool isArray = false);
 
 } // end namespace irgen
 } // end namespace swift

@@ -644,12 +644,13 @@ public struct Builder {
     isOnStack: Bool,
     /// If true this `partial_apply [on_stack]` must follow proper stack allocation nesting rules.
     isNested: Bool,
+    isCalledOnce: Bool,
     argumentLocationsFrom: ApplySite? = nil
   ) -> PartialApplyInst {
     return capturedArguments.withBridgedValues { capturedArgsRef in
       let pai = bridged.createPartialApply(function.bridged, capturedArgsRef, calleeConvention.bridged,
                                            substitutionMap.bridged, hasUnknownResultIsolation, isOnStack, isNested,
-                                           argumentLocationsFrom.bridged)
+                                           isCalledOnce, argumentLocationsFrom.bridged)
       return notifyNew(pai.getAs(PartialApplyInst.self))
     }
   }

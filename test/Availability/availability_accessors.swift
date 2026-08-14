@@ -55,22 +55,22 @@ struct BaseStruct<T> {
   }
 
   var unavailableGetter: T {
-    @available(*, unavailable)
-    get { fatalError() } // expected-note 73 {{getter for 'unavailableGetter' has been explicitly marked unavailable here}}
+    @available(*, unavailable) // expected-note 73 {{getter for 'unavailableGetter' has been explicitly marked unavailable here}}
+    get { fatalError() }
     set { }
   }
 
   var unavailableSetter: T {
     get { fatalError() }
-    @available(*, unavailable)
-    set { fatalError() } // expected-note 34 {{setter for 'unavailableSetter' has been explicitly marked unavailable here}}
+    @available(*, unavailable) // expected-note 34 {{setter for 'unavailableSetter' has been explicitly marked unavailable here}}
+    set { fatalError() }
   }
 
   var unavailableGetterAndSetter: T {
-    @available(*, unavailable)
-    get { fatalError() } // expected-note 71 {{getter for 'unavailableGetterAndSetter' has been explicitly marked unavailable here}}
-    @available(*, unavailable)
-    set { fatalError() } // expected-note 34 {{setter for 'unavailableGetterAndSetter' has been explicitly marked unavailable here}}
+    @available(*, unavailable) // expected-note 71 {{getter for 'unavailableGetterAndSetter' has been explicitly marked unavailable here}}
+    get { fatalError() }
+    @available(*, unavailable) // expected-note 34 {{setter for 'unavailableGetterAndSetter' has been explicitly marked unavailable here}}
+    set { fatalError() }
   }
 
   var deprecatedGetter: T {
@@ -93,22 +93,22 @@ struct SubscriptHelper {
   }
 
   subscript<T>(unavailableGetter t: T) -> () {
-    @available(*, unavailable)
-    get { } // expected-note {{getter for 'subscript(unavailableGetter:)' has been explicitly marked unavailable here}}
+    @available(*, unavailable) // expected-note {{getter for 'subscript(unavailableGetter:)' has been explicitly marked unavailable here}}
+    get { }
     set { }
   }
 
   subscript<T>(unavailableSetter t: T) -> () {
     get { }
-    @available(*, unavailable)
-    set { } // expected-note {{setter for 'subscript(unavailableSetter:)' has been explicitly marked unavailable here}}
+    @available(*, unavailable) // expected-note {{setter for 'subscript(unavailableSetter:)' has been explicitly marked unavailable here}}
+    set { }
   }
 
   subscript<T>(unavailableGetterAndSetter t: T) -> () {
-    @available(*, unavailable)
-    get { } // expected-note {{getter for 'subscript(unavailableGetterAndSetter:)' has been explicitly marked unavailable here}}
-    @available(*, unavailable)
-    set { } // expected-note {{setter for 'subscript(unavailableGetterAndSetter:)' has been explicitly marked unavailable here}}
+    @available(*, unavailable) // expected-note {{getter for 'subscript(unavailableGetterAndSetter:)' has been explicitly marked unavailable here}}
+    get { }
+    @available(*, unavailable) // expected-note {{setter for 'subscript(unavailableGetterAndSetter:)' has been explicitly marked unavailable here}}
+    set { }
   }
 }
 

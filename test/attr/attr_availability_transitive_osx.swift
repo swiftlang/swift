@@ -4,8 +4,8 @@
 
 struct AlwaysAvailable {}
 
-@available(*, unavailable)
-struct NeverAvailable {} // expected-note * {{'NeverAvailable' has been explicitly marked unavailable here}}
+@available(*, unavailable) // expected-note * {{'NeverAvailable' has been explicitly marked unavailable here}}
+struct NeverAvailable {}
 
 @available(OSX 99, *)
 struct OSXFutureAvailable {}
@@ -13,12 +13,12 @@ struct OSXFutureAvailable {}
 @available(anyAppleOS 99, *)
 struct AnyAppleOSFutureAvailable {}
 
-@available(OSX, unavailable)
-struct OSXUnavailable {} // expected-note * {{'OSXUnavailable' has been explicitly marked unavailable here}}
+@available(OSX, unavailable) // expected-note * {{'OSXUnavailable' has been explicitly marked unavailable here}}
+struct OSXUnavailable {}
 
 @available(iOS, unavailable)
-@available(OSX, unavailable)
-struct MultiPlatformUnavailable {} // expected-note * {{'MultiPlatformUnavailable' has been explicitly marked unavailable here}}
+@available(OSX, unavailable) // expected-note * {{'MultiPlatformUnavailable' has been explicitly marked unavailable here}}
+struct MultiPlatformUnavailable {}
 
 @available(OSXApplicationExtension, unavailable)
 struct OSXAppExtensionsUnavailable {}
@@ -28,9 +28,9 @@ func always() -> AlwaysAvailable {
   AlwaysAvailable()
 }
 
-@available(*, unavailable)
+@available(*, unavailable) // expected-note * {{'never()' has been explicitly marked unavailable here}}
 @discardableResult
-func never() -> NeverAvailable { // expected-note * {{'never()' has been explicitly marked unavailable here}}
+func never() -> NeverAvailable {
   NeverAvailable()
 }
 
@@ -46,16 +46,16 @@ func any_apple_os_future() -> AnyAppleOSFutureAvailable {
   AnyAppleOSFutureAvailable()
 }
 
-@available(OSX, unavailable)
+@available(OSX, unavailable) // expected-note * {{'osx()' has been explicitly marked unavailable here}}
 @discardableResult
-func osx() -> OSXUnavailable { // expected-note * {{'osx()' has been explicitly marked unavailable here}}
+func osx() -> OSXUnavailable {
   OSXUnavailable()
 }
 
 @available(iOS, unavailable)
-@available(OSX, unavailable)
+@available(OSX, unavailable) // expected-note * {{'osx_ios()' has been explicitly marked unavailable here}}
 @discardableResult
-func osx_ios() -> MultiPlatformUnavailable { // expected-note * {{'osx_ios()' has been explicitly marked unavailable here}}
+func osx_ios() -> MultiPlatformUnavailable {
   MultiPlatformUnavailable()
 }
 
@@ -240,8 +240,8 @@ struct AlwaysAvailableContainer { // expected-note 4 {{add '@available' attribut
   let osx_extension_var: OSXAppExtensionsUnavailable = osx_extension()
 }
 
-@available(*, unavailable)
-struct NeverAvailableContainer { // expected-note 3 {{'NeverAvailableContainer' has been explicitly marked unavailable here}}
+@available(*, unavailable) // expected-note 3 {{'NeverAvailableContainer' has been explicitly marked unavailable here}}
+struct NeverAvailableContainer {
   let always_var: AlwaysAvailable = always()
   let never_var: NeverAvailable = never() // expected-error {{'never()' is unavailable}}
   let osx_future_var: OSXFutureAvailable = osx_future()
@@ -251,8 +251,8 @@ struct NeverAvailableContainer { // expected-note 3 {{'NeverAvailableContainer' 
   let osx_extension_var: OSXAppExtensionsUnavailable = osx_extension()
 }
 
-@available(OSX, unavailable)
-struct OSXUnavailableContainer { // expected-note 2 {{'OSXUnavailableContainer' has been explicitly marked unavailable here}}
+@available(OSX, unavailable) // expected-note 2 {{'OSXUnavailableContainer' has been explicitly marked unavailable here}}
+struct OSXUnavailableContainer {
   let always_var: AlwaysAvailable = always()
   let never_var: NeverAvailable = never() // expected-error {{'never()' is unavailable}}
   // expected-error@-1 {{'NeverAvailable' is unavailable}}
@@ -317,10 +317,10 @@ struct ExtendMe {}
 
 @available(*, unavailable)
 extension ExtendMe {
-  func never_available_extension_available_method() {} // expected-note {{has been explicitly marked unavailable here}}
+  func never_available_extension_available_method() {} // expected-note@-2 {{has been explicitly marked unavailable here}}
 
   @available(OSX 99, *)
-  func never_available_extension_osx_future_method() {} // expected-note {{has been explicitly marked unavailable here}}
+  func never_available_extension_osx_future_method() {} // expected-note@-5 {{has been explicitly marked unavailable here}}
 
   func never_available_extension_available_method( // expected-note * {{add '@available' attribute to enclosing instance method}}
     _: AlwaysAvailable,
@@ -400,10 +400,10 @@ extension ExtendMe {
 
 @available(OSX, unavailable)
 extension ExtendMe {
-  func osx_extension_available_method() {} // expected-note {{has been explicitly marked unavailable here}}
+  func osx_extension_available_method() {} // expected-note@-2 {{has been explicitly marked unavailable here}}
 
   @available(OSX 99, *)
-  func osx_extension_osx_future_method() {} // expected-note {{has been explicitly marked unavailable here}}
+  func osx_extension_osx_future_method() {} // expected-note@-5 {{has been explicitly marked unavailable here}}
 
   func osx_extension_available_method( // expected-note * {{add '@available' attribute to enclosing instance method}}
     _: AlwaysAvailable,

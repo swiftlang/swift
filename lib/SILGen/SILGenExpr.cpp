@@ -1516,6 +1516,7 @@ RValue RValueEmitter::visitDerivedToBaseExpr(DerivedToBaseExpr *E,
   // actually implemented emit into here, so we are not changing behavior.
   ManagedValue original =
       SGF.emitRValueAsSingleValue(E->getSubExpr(), C.withFollowingProjection());
+  original = SGF.emitMoveOnlyWrapperToCopyableValueIfNeeded(E, original);
 
   // Derived-to-base casts in the AST might not be reflected as such
   // in the SIL type system, for example, a cast from DynamicSelf
@@ -1732,6 +1733,7 @@ RValueEmitter::visitMaterializePackExpr(MaterializePackExpr *E, SGFContext C) {
 RValue RValueEmitter::visitArchetypeToSuperExpr(ArchetypeToSuperExpr *E,
                                                 SGFContext C) {
   ManagedValue archetype = SGF.emitRValueAsSingleValue(E->getSubExpr());
+  archetype = SGF.emitMoveOnlyWrapperToCopyableValueIfNeeded(E, archetype);
   auto loweredTy = SGF.getLoweredLoadableType(E->getType());
   if (loweredTy == archetype.getType())
     return RValue(SGF, E, archetype);
@@ -3166,6 +3168,7 @@ SILValue SILGenFunction::emitMetatypeOfValue(SILLocation loc, Expr *baseExpr) {
 
     Scope S(*this, loc);
     auto base = emitRValueAsSingleValue(baseExpr, SGFContext::AllowImmediatePlusZero);
+    base = emitMoveOnlyWrapperToCopyableValueIfNeeded(loc, base);
     return S.popPreservingValue(B.createValueMetatype(loc, metaTy, base))
         .getValue();
   }
@@ -3688,8 +3691,14 @@ static AccessorDecl *
 getRepresentativeAccessorForKeyPath(AbstractStorageDecl *storage) {
   if (storage->requiresOpaqueGetter())
     return storage->getOpaqueAccessor(AccessorKind::Get);
-  assert(storage->requiresOpaqueReadCoroutine());
-  return storage->getOpaqueAccessor(AccessorKind::Read);
+  // Prefer the old read coroutine when it exists (so key paths for storage that
+  // predates the CoroutineAccessors feature keep referring to it); otherwise use
+  // the new yielding-borrow coroutine, which is the only read accessor a
+  // new-only property has.
+  if (storage->requiresOpaqueReadCoroutine())
+    return storage->getOpaqueAccessor(AccessorKind::Read);
+  assert(storage->requiresOpaqueYieldingBorrowCoroutine());
+  return storage->getOpaqueAccessor(AccessorKind::YieldingBorrow);
 }
 
 static CanType buildKeyPathIndicesTuple(ASTContext &C,

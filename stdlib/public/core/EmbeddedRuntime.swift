@@ -225,6 +225,24 @@ public func swift_slowDealloc(_ ptr: UnsafeMutableRawPointer, _ size: Int, _ ali
 }
 
 @c
+public func swift_allocRawTyped(_ size: Int, _ alignMask: Int, _ typeId: UInt64) -> UnsafeMutableRawPointer? {
+#if SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
+  return unsafe _swift_typedAllocate(size, alignMask, 0, typeId)
+#else
+  return unsafe swift_slowAlloc(size, alignMask)
+#endif
+}
+
+@c
+public func swift_deallocRawTyped(_ ptr: UnsafeMutableRawPointer, _ size: Int, _ alignMask: Int, _ typeId: UInt64) {
+#if SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
+  unsafe _swift_typedDeallocate(ptr, size, alignMask, 0, typeId)
+#else
+  unsafe swift_slowDealloc(ptr, size, alignMask)
+#endif
+}
+
+@c
 public func swift_allocObject(metadata: Builtin.RawPointer, requiredSize: Int, requiredAlignmentMask: Int) -> Builtin.RawPointer {
   return unsafe swift_allocObject(metadata: UnsafeMutablePointer<ClassMetadata>(metadata), requiredSize: requiredSize, requiredAlignmentMask: requiredAlignmentMask)._rawValue
 }

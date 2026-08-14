@@ -27,7 +27,7 @@ internal func unsafeBitCast<T: ~Escapable & ~Copyable, U>(
 @_unsafeNonescapableResult
 @export(implementation)
 @_transparent
-@lifetime(borrow source)
+@_lifetime(borrow source)
 public func _cxxOverrideLifetime<
   T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
 >(
@@ -47,7 +47,7 @@ public func _cxxOverrideLifetime<
 @_unsafeNonescapableResult
 @export(implementation)
 @_transparent
-@lifetime(copy source)
+@_lifetime(copy source)
 public func _cxxOverrideLifetime<
   T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
 >(
@@ -107,7 +107,7 @@ extension Span where Element: ~Copyable {
   @export(implementation)
   @unsafe
   @_unsafeNonescapableResult
-  @lifetime(borrow span)
+  @_lifetime(borrow span)
   public init<T: CxxSpan<Element>>(
     _unsafeCxxSpan span: borrowing T,
   ) {
@@ -123,7 +123,7 @@ extension MutableSpan where Element: ~Copyable {
   @export(implementation)
   @unsafe
   @_unsafeNonescapableResult
-  @lifetime(borrow span)
+  @_lifetime(borrow span)
   public init<T: CxxMutableSpan<Element>>(
     _unsafeCxxSpan span: borrowing T,
   ) {

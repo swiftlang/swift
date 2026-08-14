@@ -113,6 +113,8 @@ private func registerSwiftPasses() {
   registerPass(lifetimeDependenceDiagnosticsPass, { lifetimeDependenceDiagnosticsPass.run($0) })
   registerPass(lifetimeDependenceInsertionPass, { lifetimeDependenceInsertionPass.run($0) })
   registerPass(lifetimeDependenceScopeFixupPass, { lifetimeDependenceScopeFixupPass.run($0) })
+  registerPass(removeSILGenLifetimesPass, { removeSILGenLifetimesPass.run($0) })
+  registerPass(lifetimeResolutionPass, { lifetimeResolutionPass.run($0) })
   registerPass(copyToBorrowOptimization, { copyToBorrowOptimization.run($0) })
   registerPass(tempRValueElimination, { tempRValueElimination.run($0) })
   registerPass(mandatoryTempRValueElimination, { mandatoryTempRValueElimination.run($0) })
@@ -121,6 +123,7 @@ private func registerSwiftPasses() {
   registerPass(autodiffClosureSpecialization, { autodiffClosureSpecialization.run($0) })
   registerPass(loopInvariantCodeMotionPass, { loopInvariantCodeMotionPass.run($0) })
   registerPass(killInvalidDebugValuesPass, { killInvalidDebugValuesPass.run($0) })
+  registerPass(deadDebugVariableEliminationPass, { deadDebugVariableEliminationPass.run($0) })
   registerPass(packSpecialization, { packSpecialization.run($0) })
 
   // Instruction passes

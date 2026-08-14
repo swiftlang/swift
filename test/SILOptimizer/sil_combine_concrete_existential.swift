@@ -57,12 +57,22 @@ final class CC: PP {
   }
 }
 
+// The second call is not devirtualized: after the first call is devirtualized
+// and inlined, the concrete type sil-combine can prove for its `self` operand
+// is the opened archetype [[O1]] rather than $CC, and propagating an opened
+// archetype is neither ownership-correct (it would consume the owned
+// `open_existential_ref` that the @guaranteed apply only borrows) nor
+// convergent (sil-combine re-simplifies such a cast away and rebuilds it
+// forever). So [[O2]] stays as the operand.
+//
 // CHECK-LABEL: sil @$s32sil_combine_concrete_existential29testWitnessReturnOptionalSelfAA2PP_pSgyF : $@convention(thin) () -> @owned Optional<any PP> {
 // CHECK: [[EI:%.*]] = end_init_let_ref %0
 // CHECK: [[E1:%.*]] = init_existential_ref [[EI]] : $CC : $CC, $any PP
 // CHECK: [[O1:%.*]] = open_existential_ref [[E1]] : $any PP to $@opened({{.*}}, any PP) Self
-// CHECK: [[E2:%.*]] = init_existential_ref %{{.*}} : $@opened({{.*}}, any PP) Self : $@opened({{.*}}, any PP) Self, $any PP
+// CHECK: [[U1:%.*]] = unchecked_ref_cast [[EI]] : $CC to $@opened({{.*}}, any PP) Self
+// CHECK: [[E2:%.*]] = init_existential_ref [[U1]] : $@opened({{.*}}, any PP) Self : $@opened({{.*}}, any PP) Self, $any PP
 // CHECK: [[O2:%.*]] = open_existential_ref [[E2]] : $any PP to $@opened({{.*}}, any PP) Self
+// CHECK: apply {{%.*}}<@opened({{.*}}, any PP) Self>([[O2]])
 // CHECK-NOT:     apply
 // CHECK-LABEL: } // end sil function '$s32sil_combine_concrete_existential29testWitnessReturnOptionalSelfAA2PP_pSgyF'
 public func testWitnessReturnOptionalSelf() -> PP? {

@@ -358,6 +358,7 @@ struct BridgedDeclObj {
   BRIDGED_INLINE bool AbstractStorage_isConst() const;
   BRIDGED_INLINE bool GenericType_isGenericAtAnyLevel() const;
   BRIDGED_INLINE bool NominalType_isGlobalActor() const;
+  BRIDGED_INLINE bool NominalType_hasNonUniqueDefinition() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType
   NominalType_getDeclaredInterfaceType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType NominalType_getSelfInterfaceType() const;
@@ -1467,6 +1468,15 @@ BridgedAccessorDecl BridgedAccessorDecl_createParsed(
     swift::SourceLoc declLoc, swift::SourceLoc accessorKeywordLoc,
     BridgedNullableParameterList cParamList, swift::SourceLoc asyncLoc,
     swift::SourceLoc throwsLoc, BridgedNullableTypeRepr cThrownType);
+
+// When the CoroutineAccessors feature is enabled, rewrite a parsed
+// `_read`/`_modify` accessor to its yielding counterpart, mirroring the C++
+// parser's ParsedAccessors::record.  A no-op for any other accessor kind.  Only
+// valid for accessors parsed from surface source (ASTGen never parses
+// .swiftinterface/.sil, where `_read`/`_modify` are ABI declarations).
+SWIFT_NAME("BridgedAccessorDecl.remapLegacyCoroutineAccessorIfEnabled(self:)")
+void BridgedAccessorDecl_remapLegacyCoroutineAccessorIfEnabled(
+    BridgedAccessorDecl cAccessor);
 
 enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedVarDeclIntroducer {
   BridgedVarDeclIntroducerLet = 0,

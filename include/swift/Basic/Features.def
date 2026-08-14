@@ -368,6 +368,10 @@ EXPERIMENTAL_FEATURE(MoveOnlyTuples, true)
 EXPERIMENTAL_FEATURE(MoveOnlyPartialReinitialization, true)
 EXPERIMENTAL_FEATURE(ConsumeSelfInDeinit, true)
 
+// Whether `as?`/`as!`/`is` are permitted from a noncopyable existential
+// value to a concrete type.
+EXPERIMENTAL_FEATURE(NoncopyableCasting, false)
+
 EXPERIMENTAL_FEATURE(AccessLevelOnImport, true)
 
 /// Disable the special behavior of of explicit 'nonisolated' vs. being
@@ -609,9 +613,6 @@ EXPERIMENTAL_FEATURE(StandaloneSwiftAvailability, true)
 /// Allow enabling dynamic exclusivity in Embedded Swift.
 EXPERIMENTAL_FEATURE(EmbeddedDynamicExclusivity, true)
 
-/// Allow enabling dynamic keypaths in Embedded Swift.
-EXPERIMENTAL_FEATURE(EmbeddedKeyPaths, true)
-
 /// Emit typed allocation calls in Embedded Swift.
 EXPERIMENTAL_FEATURE(TypedAllocation, true)
 
@@ -654,6 +655,10 @@ EXPERIMENTAL_FEATURE(CalledAttribute, false)
 
 /// Allow `self` to be mutated or consumed inside of non-`Copyable` type `deinit`s.
 EXPERIMENTAL_FEATURE(MutateAndConsumeInDeinit, true)
+
+/// Import C++ methods that are hard to use correctly under their original name
+/// as '@unsafe(always)', instead of renaming them to '__<name>Unsafe'.
+EXPERIMENTAL_FEATURE(ImportUnsafeCxxMethodsAsAlwaysUnsafe, true)
 
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE

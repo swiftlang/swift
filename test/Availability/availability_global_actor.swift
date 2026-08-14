@@ -14,8 +14,8 @@ actor SomeActor {}
   static let shared = SomeActor()
 }
 
-@available(*, unavailable)
-@globalActor struct UnavailableGA { // expected-note {{'UnavailableGA' has been explicitly marked unavailable here}}
+@available(*, unavailable) // expected-note {{'UnavailableGA' has been explicitly marked unavailable here}}
+@globalActor struct UnavailableGA {
   static let shared = SomeActor()
 }
 

@@ -38,5 +38,50 @@ bb0(%0 : $*MyStruct):
   return %v : $Builtin.Int64
 }
 
+// CHECK-LABEL: define {{.*}} @combine_two_operands
+sil @combine_two_operands : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64):
+  // Each operand becomes one fragment of the variable.
+  // CHECK: #dbg_value(i64 %0, ![[COMBINED:[0-9]+]], !DIExpression(DW_OP_LLVM_fragment, 0, 64)
+  // CHECK: #dbg_value(i64 %1, ![[COMBINED]], !DIExpression(DW_OP_LLVM_fragment, 64, 64)
+  debug_value (%0 : $Builtin.Int64, %1 : $Builtin.Int64), var, name "combined", type $MyStruct, transform {
+  bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64):
+    %2 = struct $MyStruct (%0 : $Builtin.Int64, %1 : $Builtin.Int64)
+    return %2 : $MyStruct
+  }
+  %5 = builtin "add_Int64"(%0 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int64
+  return %5 : $Builtin.Int64
+}
+
+// CHECK-LABEL: define {{.*}} @or_two_operands
+sil @or_two_operands : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64):
+  // Both operands are referenced by a single DWARF expression.
+  // CHECK: #dbg_value(!DIArgList(i64 %0, i64 %1), ![[ORED:[0-9]+]], !DIExpression(DW_OP_LLVM_arg, 0, DW_OP_LLVM_arg, 1, DW_OP_or, DW_OP_stack_value)
+  debug_value (%0 : $Builtin.Int64, %1 : $Builtin.Int64), var, name "ored", type $Builtin.Int64, transform {
+  bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64):
+    %2 = builtin "or_Int64"(%0 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int64
+    return %2 : $Builtin.Int64
+  }
+  %5 = builtin "and_Int64"(%0 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int64
+  return %5 : $Builtin.Int64
+}
+
+// CHECK-LABEL: define {{.*}} @no_operands
+sil @no_operands : $@convention(thin) () -> () {
+bb0:
+  // CHECK: #dbg_value(i64 42, ![[CONST:[0-9]+]], !DIExpression()
+  debug_value (), var, name "constant", type $Builtin.Int64, transform {
+  bb0:
+    %0 = integer_literal $Builtin.Int64, 42
+    return %0 : $Builtin.Int64
+  }
+  %r = tuple ()
+  return %r : $()
+}
+
 // CHECK: ![[LOAD_VAR]] = !DILocalVariable(name: "loaded"
 // CHECK: ![[LOAD_FIELD_VAR]] = !DILocalVariable(name: "field_y"
+// CHECK: ![[COMBINED]] = !DILocalVariable(name: "combined"
+// CHECK: ![[ORED]] = !DILocalVariable(name: "ored"
+// CHECK: ![[CONST]] = !DILocalVariable(name: "constant"

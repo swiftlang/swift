@@ -83,6 +83,7 @@
 #include "clang/AST/ASTContext.h"
 #include "clang/Basic/CodeGenOptions.h"
 #include "clang/CodeGen/CodeGenABITypes.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DerivedTypes.h"
@@ -654,8 +655,8 @@ const TypeInfo *TypeConverter::convertFunctionType(SILFunctionType *T) {
     // contexts into the pointer value, so let's not take any spare bits from
     // it.
     spareBits.appendClearBits(IGM.getPointerSize().getValueInBits());
-    
-    if (T->isNoEscape()) {
+
+    if (T->isTrivialNoEscape()) {
       // @noescape thick functions are trivial types.
       return FuncTypeInfo::create(
           CanSILFunctionType(T), IGM.NoEscapeFunctionPairTy,
@@ -1744,6 +1745,52 @@ getPartialApplicationForwarderEmission(
   }
 }
 
+/// This is a parameter convention-aware version of \c createDtorFn.
+///
+/// It's used by the partial application forwarder emitter to avoid
+/// destroying non-Copyable value captures that are moved into the
+/// call when the parameter convention is `Direct_Owned`.
+void destroyClosureContext(IRGenModule &IGM, IRGenFunction &forwarder,
+                           HeapLayout const *layout, llvm::Value *rawContextPtr,
+                           Address contextPtr,
+                           const llvm::BitVector &consumedFields) {
+  if (!layout) {
+    forwarder.emitNativeStrongRelease(rawContextPtr,
+                                      forwarder.getDefaultAtomicity());
+    return;
+  }
+
+  // If none of the parameters are owned, let's use release that would
+  // destroy all of the captures (fields of the closure context).
+  if (consumedFields.empty() || consumedFields.none()) {
+    forwarder.emitNativeStrongRelease(rawContextPtr,
+                                      forwarder.getDefaultAtomicity());
+    return;
+  }
+
+  HeapNonFixedOffsets offsets(forwarder, *layout);
+
+  // If not all of the parameters are owned by the call, let's destroy
+  // the un-owned ones which would completely de-initialize the
+  // context object and let us deallocate it as-if it was uninitialized.
+  llvm::BitVector fieldsToDestroy(consumedFields);
+  fieldsToDestroy.flip();
+  for (unsigned elementIdx : fieldsToDestroy.set_bits()) {
+    auto &field = layout->getElement(elementIdx);
+    if (field.isTriviallyDestroyable())
+      continue;
+
+    auto fieldTy = layout->getElementTypes()[elementIdx];
+    field.getType().destroy(
+        forwarder, field.project(forwarder, contextPtr, offsets), fieldTy,
+        /*isOutlined=*/true);
+  }
+
+  emitDeallocateUninitializedHeapObject(
+      forwarder, rawContextPtr, offsets.getSize(), offsets.getAlignMask(),
+      layout->computeTypedMallocTypeDescriptor(IGM));
+}
+
 } // end anonymous namespace
 
 /// Emit the forwarding stub function for a partial application.
@@ -1934,8 +1981,8 @@ static llvm::Value *emitPartialApplicationForwarder(
   bool isMethodCallee =
       origType->getRepresentation() == SILFunctionTypeRepresentation::Method;
   Explosion witnessMethodSelfValue;
-
   llvm::Value *lastCapturedFieldPtr = nullptr;
+  llvm::BitVector consumedFields(layout ? layout->getElements().size() : 0);
 
   // If there's a data pointer required, but it's a swift-retainable
   // value being passed as the context, just forward it down.
@@ -2112,8 +2159,14 @@ static llvm::Value *emitPartialApplicationForwarder(
         cast<LoadableTypeInfo>(fieldTI).loadAsTake(subIGF, fieldAddr, param);
         break;
       case ParameterConvention::Direct_Owned:
-        // Copy the value out at +1.
-        cast<LoadableTypeInfo>(fieldTI).loadAsCopy(subIGF, fieldAddr, param);
+        if (outType->isCalledOnce()) {
+          // Move value into the apply.
+          cast<LoadableTypeInfo>(fieldTI).loadAsTake(subIGF, fieldAddr, param);
+          consumedFields.set(fieldIndex);
+        } else {
+          // Copy the value out at +1.
+          cast<LoadableTypeInfo>(fieldTI).loadAsCopy(subIGF, fieldAddr, param);
+        }
         break;
       }
       
@@ -2167,7 +2220,7 @@ static llvm::Value *emitPartialApplicationForwarder(
     // nor any of the loads can throw.
     if (consumesContext && !dependsOnContextLifetime && rawData) {
       assert(!outType->isNoEscape() && "Trivial context must not be released");
-      subIGF.emitNativeStrongRelease(rawData, subIGF.getDefaultAtomicity());
+      destroyClosureContext(IGM, subIGF, layout, rawData, data, consumedFields);
     }
 
     // Now that we have bound generic parameters from the captured arguments
@@ -2288,7 +2341,7 @@ static llvm::Value *emitPartialApplicationForwarder(
   // If the parameters depended on the context, consume the context now.
   if (rawData && consumesContext && dependsOnContextLifetime) {
     assert(!outType->isNoEscape() && "Trivial context must not be released");
-    subIGF.emitNativeStrongRelease(rawData, subIGF.getDefaultAtomicity());
+    destroyClosureContext(IGM, subIGF, layout, rawData, data, consumedFields);
   }
 
   emission->createReturn(call);
@@ -2350,9 +2403,12 @@ std::optional<StackAddress> irgen::emitFunctionPartialApplication(
 
     auto &ti = IGF.getTypeInfoForLowered(argLoweringTy);
 
-    // Empty values don't matter.
+    // Empty values don't matter, unless they still require a nontrivial
+    // destroy (e.g. a zero-sized `~Copyable` type with a user-defined
+    // deinit captured by a `@called(once)` closure).
     auto schema = ti.getSchema();
-    if (schema.empty() && !param.isFormalIndirect())
+    if (schema.empty() && !param.isFormalIndirect() &&
+        ti.isTriviallyDestroyable(ResilienceExpansion::Maximal))
       return;
 
     argValTypes.push_back(argType);
@@ -2568,7 +2624,8 @@ std::optional<StackAddress> irgen::emitFunctionPartialApplication(
 
   std::optional<StackAddress> stackAddr;
 
-  if (args.empty() && layout.isKnownEmpty()) {
+  if (args.empty() && layout.isKnownEmpty() &&
+      layout.isTriviallyDestroyable()) {
     if (outType->isNoEscape())
       data = llvm::ConstantPointerNull::get(IGF.IGM.OpaquePtrTy);
     else

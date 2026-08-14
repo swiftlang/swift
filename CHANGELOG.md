@@ -43,6 +43,27 @@
   }
   ```
 
+* Embedded Swift now has complete support for key paths. Key paths that
+  are not entirely folded away at compile time will be emitted as
+  static immortal objects when there are no captures. For example:
+
+  ```swift
+  struct Point {
+    var x, y: Double
+  }
+
+  struct DataPoint {
+    var location: Point
+    var label: String
+  }
+
+  let kp: KeyPath = \DataPoint.location.y
+  ```
+
+  When there are captures, such as `\Array<Double>.[i]`, a key path
+  instance will still dynamically allocated, Such cases can be detected
+  by enabling the KeyPathAllocation diagnostic group.
+
 ## Swift 6.4
 
 * [SE-0522][]: Introduced the `@diagnose` declaration attribute for source-level

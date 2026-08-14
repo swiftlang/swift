@@ -2135,7 +2135,7 @@ bool PreCheckTarget::correctInterpolationIfStrange(
             Context.Diags
                 .diagnose(argLabelLoc,
                           diag::string_interpolation_label_changing)
-                .highlightChars(argLabelLoc, argLoc);
+                .highlight(SourceRange(argLabelLoc));
             Context.Diags
                 .diagnose(argLabelLoc,
                           diag::string_interpolation_remove_label,

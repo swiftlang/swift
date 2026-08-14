@@ -852,7 +852,10 @@ swift_dynamicCastMetatypeToObjectUnconditional(const Metadata *metatype,
 static const void *
 _dynamicCastUnknownClassToExistential(const void *object,
                                     const ExistentialTypeMetadata *targetType) {
-  // FIXME: check superclass constraint here.
+  if (auto *superclass = targetType->getSuperclassConstraint()) {
+    if (swift_dynamicCastUnknownClass(object, superclass) == nullptr)
+      return nullptr;
+  }
 
   for (auto protocol : targetType->getProtocols()) {
     switch (protocol.getDispatchStrategy()) {

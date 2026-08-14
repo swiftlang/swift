@@ -116,7 +116,7 @@ bool popOnePartitionOp(Partition &p, SmallVectorImpl<SILBasicBlock *> &blocks) {
 // walker assumes when it commits pendingTargetMerge.
 TEST(IsolationHistory, BoundaryAtHead) {
   llvm::BumpPtrAllocator allocator;
-  IsolationHistory::Factory historyFactory(allocator);
+  IsolationHistory::Factory historyFactory(allocator, /*enabled=*/true);
 
   Partition p(historyFactory.get());
   EXPECT_FALSE(p.hasHistory());
@@ -133,7 +133,7 @@ TEST(IsolationHistory, BoundaryAtHead) {
 // the element stored at firstArg. The returned Node* is the new head.
 TEST(IsolationHistory, PushNewElementRegionPrimitive) {
   llvm::BumpPtrAllocator allocator;
-  IsolationHistory::Factory historyFactory(allocator);
+  IsolationHistory::Factory historyFactory(allocator, /*enabled=*/true);
 
   IsolationHistory history = historyFactory.get();
   auto *node = history.pushNewElementRegion(Element(7));
@@ -150,7 +150,7 @@ TEST(IsolationHistory, PushNewElementRegionPrimitive) {
 // additionalElementArgs.
 TEST(IsolationHistory, PushMergeElementRegionsPrimitive) {
   llvm::BumpPtrAllocator allocator;
-  IsolationHistory::Factory historyFactory(allocator);
+  IsolationHistory::Factory historyFactory(allocator, /*enabled=*/true);
 
   IsolationHistory history = historyFactory.get();
   history.pushMergeElementRegions(Element(0), Element(2), {Element(5)});
@@ -172,7 +172,7 @@ TEST(IsolationHistory, PushMergeElementRegionsPrimitive) {
 // An empty singleRegion records nothing — no boundary, no add, no merge.
 TEST(IsolationHistory, SingleRegionEmpty) {
   llvm::BumpPtrAllocator allocator;
-  IsolationHistory::Factory historyFactory(allocator);
+  IsolationHistory::Factory historyFactory(allocator, /*enabled=*/true);
 
   SILLocation loc = SILLocation::invalid();
   auto p = Partition::singleRegion(loc, {}, historyFactory.get());
@@ -184,7 +184,7 @@ TEST(IsolationHistory, SingleRegionEmpty) {
 // A single element: one boundary + one AddNewRegionForElement, no merges.
 TEST(IsolationHistory, SingleRegionOneElement) {
   llvm::BumpPtrAllocator allocator;
-  IsolationHistory::Factory historyFactory(allocator);
+  IsolationHistory::Factory historyFactory(allocator, /*enabled=*/true);
 
   SILLocation loc = SILLocation::invalid();
   auto p = Partition::singleRegion(loc, {Element(7)}, historyFactory.get());
@@ -210,7 +210,7 @@ TEST(IsolationHistory, SingleRegionOneElement) {
 // lived in their own region, so each peer needs its own merge node.
 TEST(IsolationHistory, SingleRegionRecordsOneMergePerPeer) {
   llvm::BumpPtrAllocator allocator;
-  IsolationHistory::Factory historyFactory(allocator);
+  IsolationHistory::Factory historyFactory(allocator, /*enabled=*/true);
 
   SILLocation loc = SILLocation::invalid();
   auto p = Partition::singleRegion(
@@ -229,7 +229,7 @@ TEST(IsolationHistory, SingleRegionRecordsOneMergePerPeer) {
 // nodes cover the non-rep elements without duplicates.
 TEST(IsolationHistory, SingleRegionMergeNodesAreSinglePeer) {
   llvm::BumpPtrAllocator allocator;
-  IsolationHistory::Factory historyFactory(allocator);
+  IsolationHistory::Factory historyFactory(allocator, /*enabled=*/true);
 
   SILLocation loc = SILLocation::invalid();
   auto p = Partition::singleRegion(
@@ -263,7 +263,7 @@ TEST(IsolationHistory, SingleRegionMergeNodesAreSinglePeer) {
 // already removed.
 TEST(IsolationHistory, SingleRegionRoundTrip) {
   llvm::BumpPtrAllocator allocator;
-  IsolationHistory::Factory historyFactory(allocator);
+  IsolationHistory::Factory historyFactory(allocator, /*enabled=*/true);
 
   SILLocation loc = SILLocation::invalid();
   auto p = Partition::singleRegion(
@@ -304,7 +304,7 @@ TEST(IsolationHistory, SingleRegionRoundTrip) {
 // know.
 TEST(IsolationHistory, SingleRegionParentChainShape) {
   llvm::BumpPtrAllocator allocator;
-  IsolationHistory::Factory historyFactory(allocator);
+  IsolationHistory::Factory historyFactory(allocator, /*enabled=*/true);
 
   SILLocation loc = SILLocation::invalid();
   auto p = Partition::singleRegion(
@@ -352,7 +352,7 @@ TEST(IsolationHistory, SingleRegionParentChainShape) {
 // the smallest element. Here indices[0] == 3 but the rep must be 0.
 TEST(IsolationHistory, SingleRegionUnsortedRepIsMinimum) {
   llvm::BumpPtrAllocator allocator;
-  IsolationHistory::Factory historyFactory(allocator);
+  IsolationHistory::Factory historyFactory(allocator, /*enabled=*/true);
 
   SILLocation loc = SILLocation::invalid();
   auto p = Partition::singleRegion(
@@ -391,7 +391,7 @@ TEST(IsolationHistory, SingleRegionUnsortedRepIsMinimum) {
 #ifndef NDEBUG
 TEST(IsolationHistoryDeathTest, SingleRegionDuplicateIndexAsserts) {
   llvm::BumpPtrAllocator allocator;
-  IsolationHistory::Factory historyFactory(allocator);
+  IsolationHistory::Factory historyFactory(allocator, /*enabled=*/true);
   SILLocation loc = SILLocation::invalid();
 
   // Element 1 listed twice — caller bug.
@@ -408,7 +408,7 @@ TEST(IsolationHistoryDeathTest, SingleRegionDuplicateIndexAsserts) {
 // that each lives in a distinct region.
 TEST(IsolationHistory, SeparateRegionsShape) {
   llvm::BumpPtrAllocator allocator;
-  IsolationHistory::Factory historyFactory(allocator);
+  IsolationHistory::Factory historyFactory(allocator, /*enabled=*/true);
 
   SILLocation loc = SILLocation::invalid();
   auto p = makePartitionWithSeparateRegions(
@@ -440,7 +440,7 @@ TEST(IsolationHistory, SeparateRegionsShape) {
 // with — so the round-trip works on today's tree (with distinct indices).
 TEST(IsolationHistory, SeparateRegionsRoundTrip) {
   llvm::BumpPtrAllocator allocator;
-  IsolationHistory::Factory historyFactory(allocator);
+  IsolationHistory::Factory historyFactory(allocator, /*enabled=*/true);
 
   SILLocation loc = SILLocation::invalid();
   auto p = makePartitionWithSeparateRegions(
@@ -465,7 +465,7 @@ TEST(IsolationHistory, SeparateRegionsRoundTrip) {
 // history is caught.
 TEST(IsolationHistory, JoinPreservesAncestorBoundaryForExistingMerges) {
   llvm::BumpPtrAllocator allocator;
-  IsolationHistory::Factory historyFactory(allocator);
+  IsolationHistory::Factory historyFactory(allocator, /*enabled=*/true);
 
   SILLocation loc = SILLocation::invalid();
 
@@ -499,7 +499,7 @@ TEST(IsolationHistory, JoinPreservesAncestorBoundaryForExistingMerges) {
 // added to existing region" path, both push the AddNewRegionForElement.
 TEST(IsolationHistory, JoinSecondBranchPushPopAsymmetry) {
   llvm::BumpPtrAllocator allocator;
-  IsolationHistory::Factory historyFactory(allocator);
+  IsolationHistory::Factory historyFactory(allocator, /*enabled=*/true);
   SILLocation loc = SILLocation::invalid();
 
   // fst tracks only element 0.
@@ -538,7 +538,7 @@ TEST(IsolationHistory, JoinSecondBranchPushPopAsymmetry) {
 TEST(IsolationHistory, CreateVariable) {
   llvm::BumpPtrAllocator allocator;
   Partition::SendingOperandSetFactory factory(allocator);
-  IsolationHistory::Factory historyFactory(allocator);
+  IsolationHistory::Factory historyFactory(allocator, /*enabled=*/true);
   SmallVector<SILBasicBlock *, 8> joinedHistories;
   SendingOperandToStateMap transferringOpToStateMap(historyFactory);
 
@@ -566,7 +566,7 @@ TEST(IsolationHistory, CreateVariable) {
 TEST(IsolationHistory, AssignRegion) {
   llvm::BumpPtrAllocator allocator;
   Partition::SendingOperandSetFactory factory(allocator);
-  IsolationHistory::Factory historyFactory(allocator);
+  IsolationHistory::Factory historyFactory(allocator, /*enabled=*/true);
   SendingOperandToStateMap transferringOpToStateMap(historyFactory);
   SmallVector<SILBasicBlock *, 8> joinedHistories;
 
@@ -606,7 +606,7 @@ TEST(IsolationHistory, AssignRegion) {
 TEST(IsolationHistory, BuildNewRegionRepIsMerge) {
   llvm::BumpPtrAllocator allocator;
   Partition::SendingOperandSetFactory factory(allocator);
-  IsolationHistory::Factory historyFactory(allocator);
+  IsolationHistory::Factory historyFactory(allocator, /*enabled=*/true);
   SendingOperandToStateMap transferringOpToStateMap(historyFactory);
   SmallVector<SILBasicBlock *, 8> joinedHistories;
 
@@ -655,7 +655,7 @@ TEST(IsolationHistory, BuildNewRegionRepIsMerge) {
 TEST(IsolationHistory, ReturnFalseWhenNoneLeft) {
   llvm::BumpPtrAllocator allocator;
   Partition::SendingOperandSetFactory factory(allocator);
-  IsolationHistory::Factory historyFactory(allocator);
+  IsolationHistory::Factory historyFactory(allocator, /*enabled=*/true);
   SmallVector<SILBasicBlock *, 8> joinedHistories;
   SendingOperandToStateMap transferringOpToStateMap(historyFactory);
 
@@ -681,7 +681,7 @@ TEST(IsolationHistory, JoiningTwoEmpty) {
   // Make sure that we do sane things when we join empty history.
   llvm::BumpPtrAllocator allocator;
   Partition::SendingOperandSetFactory factory(allocator);
-  IsolationHistory::Factory historyFactory(allocator);
+  IsolationHistory::Factory historyFactory(allocator, /*enabled=*/true);
   SmallVector<SILBasicBlock *, 8> joinedHistories;
 
   Partition p1(historyFactory.get());
@@ -697,7 +697,7 @@ TEST(IsolationHistory, JoiningNotEmptyAndEmpty) {
   // Make sure that we do sane things when we join empty history.
   llvm::BumpPtrAllocator allocator;
   Partition::SendingOperandSetFactory factory(allocator);
-  IsolationHistory::Factory historyFactory(allocator);
+  IsolationHistory::Factory historyFactory(allocator, /*enabled=*/true);
   SmallVector<SILBasicBlock *, 8> joinedHistories;
   SendingOperandToStateMap transferringOpToStateMap(historyFactory);
 
@@ -723,7 +723,7 @@ TEST(IsolationHistory, JoiningEmptyAndNotEmpty) {
   // Make sure that we do sane things when we join empty history.
   llvm::BumpPtrAllocator allocator;
   Partition::SendingOperandSetFactory factory(allocator);
-  IsolationHistory::Factory historyFactory(allocator);
+  IsolationHistory::Factory historyFactory(allocator, /*enabled=*/true);
   SendingOperandToStateMap transferringOpToStateMap(historyFactory);
   SmallVector<SILBasicBlock *, 8> joinedHistories;
 
@@ -745,6 +745,136 @@ TEST(IsolationHistory, JoiningEmptyAndNotEmpty) {
   EXPECT_TRUE(result.historySize() == 2);
 }
 
+// Partition::merge moves *every* element of snd's region into fst's region
+// (horizontalUpdate collects them into mergedElements), but the recorded
+// MergeElementRegions node names only the two operands. popHistoryOnce
+// reverses a merge by extracting additionalElementArgs, so an element that
+// came along as a passenger is left behind in fst's region.
+//
+// That stranding is not self-correcting. Extraction only ever moves
+// additionalElementArgs, never getFirstArgAsElement, and merge() orders the
+// node so the operand from the lower-labelled region is the survivor. So the
+// passenger is only pulled back out if some older node happens to name it as
+// its own snd -- and the node that put it in fst's region does not mention it
+// at all.
+//
+// Here {1, 2} is merged into {0}'s region using 2 as the operand, so the node
+// is (0, [2]) and element 1 is the passenger. Rewinding that merge must
+// restore {0} | {1, 2}.
+TEST(IsolationHistory, MergePassengerRoundTrip) {
+  llvm::BumpPtrAllocator allocator;
+  Partition::SendingOperandSetFactory factory(allocator);
+  IsolationHistory::Factory historyFactory(allocator, /*enabled=*/true);
+  SendingOperandToStateMap opToStateMap(historyFactory);
+  SmallVector<SILBasicBlock *, 8> joins;
+
+  // Two regions: {1, 2} and {0}. Region labels are the minimum element, so
+  // {1, 2} is labelled 1 and {0} is labelled 0.
+  Partition p(historyFactory.get());
+  {
+    MockedPartitionOpEvaluator eval(p, factory, opToStateMap);
+    eval.apply({PartitionOp::AssignFresh(Element(0)),
+                PartitionOp::AssignFresh(Element(1)),
+                PartitionOp::AssignFresh(Element(2)),
+                PartitionOp::Merge(Element(1), Element(2),
+                                   RegionMergeReason::Unknown)});
+  }
+  Partition snapshot = p;
+
+  {
+    PartitionTester before(p);
+    ASSERT_EQ(before.getRegion(1), before.getRegion(2));
+    ASSERT_NE(before.getRegion(0), before.getRegion(1));
+  }
+
+  // Merge {1, 2} into {0}'s region via operand 2. Since region(0) < region(1),
+  // 0 is the survivor and 2 is the extracted operand; 1 is carried along by
+  // horizontalUpdate without being named in the history node.
+  {
+    MockedPartitionOpEvaluator eval(p, factory, opToStateMap);
+    eval.apply({PartitionOp::Merge(Element(0), Element(2),
+                                   RegionMergeReason::Unknown)});
+  }
+
+  {
+    PartitionTester after(p);
+    ASSERT_EQ(after.getRegion(0), after.getRegion(1));
+    ASSERT_EQ(after.getRegion(0), after.getRegion(2));
+  }
+
+  popOnePartitionOp(p, joins);
+  EXPECT_TRUE(joins.empty());
+
+  PartitionTester rewound(p);
+  EXPECT_EQ(rewound.getRegion(1), rewound.getRegion(2))
+      << "Element 1 was a passenger of the merge and must return to element "
+         "2's region.";
+  EXPECT_NE(rewound.getRegion(0), rewound.getRegion(1))
+      << "Element 1 is stranded in element 0's region: Partition::merge "
+         "recorded only its two operands, so popHistoryOnce extracted 2 and "
+         "left 1 behind.";
+  EXPECT_TRUE(Partition::equals(p, snapshot))
+      << "Merge with a passenger element did not rewind cleanly.";
+}
+
+// The passengers must come back as *one* region, not as singletons. They were
+// region-mates of the extracted operand before the merge, so popHistoryOnce
+// re-merges each of them onto additionalElementArgs[0] after re-tracking it.
+// Dropping that re-merge splits a region the program never split: each
+// passenger would land in a fresh region of its own.
+//
+// Here {1, 2, 3} is merged into {0}'s region using 3 as the operand, so the
+// node is (0, [3, 1, 2]) and rewinding must restore {0} | {1, 2, 3}.
+TEST(IsolationHistory, MergePassengersRejoinOneRegion) {
+  llvm::BumpPtrAllocator allocator;
+  Partition::SendingOperandSetFactory factory(allocator);
+  IsolationHistory::Factory historyFactory(allocator, /*enabled=*/true);
+  SendingOperandToStateMap opToStateMap(historyFactory);
+  SmallVector<SILBasicBlock *, 8> joins;
+
+  Partition p(historyFactory.get());
+  {
+    MockedPartitionOpEvaluator eval(p, factory, opToStateMap);
+    eval.apply(
+        {PartitionOp::AssignFresh(Element(0)),
+         PartitionOp::AssignFresh(Element(1)),
+         PartitionOp::AssignFresh(Element(2)),
+         PartitionOp::AssignFresh(Element(3)),
+         PartitionOp::Merge(Element(1), Element(2), RegionMergeReason::Unknown),
+         PartitionOp::Merge(Element(1), Element(3),
+                            RegionMergeReason::Unknown)});
+  }
+  Partition snapshot = p;
+
+  {
+    PartitionTester before(p);
+    ASSERT_EQ(before.getRegion(1), before.getRegion(2));
+    ASSERT_EQ(before.getRegion(1), before.getRegion(3));
+    ASSERT_NE(before.getRegion(0), before.getRegion(1));
+  }
+
+  // 3 is the operand, so 1 and 2 ride along as passengers.
+  {
+    MockedPartitionOpEvaluator eval(p, factory, opToStateMap);
+    eval.apply({PartitionOp::Merge(Element(0), Element(3),
+                                   RegionMergeReason::Unknown)});
+  }
+
+  popOnePartitionOp(p, joins);
+  EXPECT_TRUE(joins.empty());
+
+  PartitionTester rewound(p);
+  EXPECT_EQ(rewound.getRegion(1), rewound.getRegion(2))
+      << "Passengers 1 and 2 were region-mates before the merge and must be "
+         "region-mates again.";
+  EXPECT_EQ(rewound.getRegion(1), rewound.getRegion(3))
+      << "Passengers must rejoin the extracted operand's region, not sit in "
+         "fresh regions of their own.";
+  EXPECT_NE(rewound.getRegion(0), rewound.getRegion(1));
+  EXPECT_TRUE(Partition::equals(p, snapshot))
+      << "Merge with multiple passengers did not rewind cleanly.";
+}
+
 // popHistoryOnce off-by-one when reversing RemoveElementFromRegion:
 // pushRemoveElementFromRegion stores the surviving sibling at
 // additionalElementArgs[0] (the only entry), but popHistoryOnce previously
@@ -756,7 +886,7 @@ TEST(IsolationHistory, JoiningEmptyAndNotEmpty) {
 TEST(IsolationHistory, AssignDirectMovesElementRoundTrip) {
   llvm::BumpPtrAllocator allocator;
   Partition::SendingOperandSetFactory factory(allocator);
-  IsolationHistory::Factory historyFactory(allocator);
+  IsolationHistory::Factory historyFactory(allocator, /*enabled=*/true);
   SendingOperandToStateMap opToStateMap(historyFactory);
   SmallVector<SILBasicBlock *, 8> joins;
 
@@ -796,4 +926,90 @@ TEST(IsolationHistory, AssignDirectMovesElementRoundTrip) {
   EXPECT_TRUE(Partition::equals(p, snapshot))
       << "AssignDirect that moved an element across regions did not "
          "rewind cleanly.";
+}
+
+//===----------------------------------------------------------------------===//
+//                      MARK: History recording gate
+//===----------------------------------------------------------------------===//
+
+// A partition built from a disabled Factory records nothing at all, no matter
+// what is done to it. isRecordingIsolationHistory() is the gate every consumer
+// keys off before it snapshots a partition to rewind later, so pin that it
+// tracks the thing that actually controls recording: with it false, there is no
+// history to walk and popHistoryOnce would assert.
+TEST(IsolationHistory, RecordingDisabledPartitionHasNoHistory) {
+  llvm::BumpPtrAllocator allocator;
+  IsolationHistory::Factory historyFactory(allocator, /*enabled=*/false);
+
+  SILLocation loc = SILLocation::invalid();
+  // Same mutations as SingleRegionRecordsOneMergePerPeer, which records a
+  // boundary, four AddNewRegionForElement nodes and three merges when enabled.
+  auto p = Partition::singleRegion(
+      loc, {Element(0), Element(1), Element(2), Element(3)},
+      historyFactory.get());
+
+  EXPECT_FALSE(p.isRecordingIsolationHistory());
+  EXPECT_FALSE(p.hasHistory());
+  EXPECT_EQ(p.historySize(), 0u);
+  EXPECT_EQ(p.getIsolationHistory().getHead(), nullptr);
+
+  // The region mapping itself is unaffected by the gate -- only the history is.
+  PartitionTester tester(p);
+  EXPECT_EQ(tester.getRegion(0), tester.getRegion(3));
+}
+
+// isRecordingIsolationHistory() is not a synonym for hasHistory(): an enabled
+// partition reports recording before anything has been pushed to it. Consumers
+// rely on the distinction, since they decide whether to snapshot a partition
+// before knowing whether the walk will find anything in it.
+TEST(IsolationHistory, RecordingEnabledPartitionReportsRecording) {
+  llvm::BumpPtrAllocator allocator;
+  IsolationHistory::Factory historyFactory(allocator, /*enabled=*/true);
+
+  Partition p(historyFactory.get());
+  EXPECT_TRUE(p.isRecordingIsolationHistory());
+  EXPECT_FALSE(p.hasHistory());
+  EXPECT_EQ(p.historySize(), 0u);
+
+  p.pushHistorySequenceBoundary(SILLocation::invalid());
+
+  EXPECT_TRUE(p.isRecordingIsolationHistory());
+  EXPECT_TRUE(p.hasHistory());
+}
+
+// Copying a Partition shares the immutable history node chain rather than
+// duplicating it, and rewinding the copy leaves the source's history alone.
+// This is what makes snapshotting a partition for a later isolation-history
+// walk cheap, and what lets two walks run off one snapshot: each walk rewinds
+// its own copy.
+TEST(IsolationHistory, SnapshotSharesHistoryWithSource) {
+  llvm::BumpPtrAllocator allocator;
+  IsolationHistory::Factory historyFactory(allocator, /*enabled=*/true);
+
+  SILLocation loc = SILLocation::invalid();
+  auto p = Partition::singleRegion(
+      loc, {Element(0), Element(1), Element(2), Element(3)},
+      historyFactory.get());
+  ASSERT_TRUE(p.hasHistory());
+
+  Partition snapshot = p;
+  EXPECT_TRUE(snapshot.isRecordingIsolationHistory());
+  EXPECT_EQ(snapshot.historySize(), p.historySize());
+  // The chain is shared, not copied: both heads are the same node.
+  EXPECT_EQ(snapshot.getIsolationHistory().getHead(),
+            p.getIsolationHistory().getHead());
+
+  const IsolationHistory::Node *sourceHead = p.getIsolationHistory().getHead();
+  unsigned sourceSize = p.historySize();
+
+  llvm::SmallVector<SILBasicBlock *, 4> joins;
+  while (popOnePartitionOp(snapshot, joins))
+    continue;
+  EXPECT_FALSE(snapshot.hasHistory());
+  EXPECT_TRUE(joins.empty());
+
+  EXPECT_EQ(p.getIsolationHistory().getHead(), sourceHead)
+      << "Rewinding a snapshot moved the source partition's history head.";
+  EXPECT_EQ(p.historySize(), sourceSize)
+      << "Rewinding a snapshot consumed the source partition's history.";
 }

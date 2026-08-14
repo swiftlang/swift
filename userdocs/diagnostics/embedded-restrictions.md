@@ -21,14 +21,18 @@ Diagnostics in the `EmbeddedRestrictions` group describe those language features
         }
       }
 
-* Non-final generic methods in a class, which are prohibited because they cannot be specialized for every possible call site. For example:
+* Overriding and `open` generic methods in a class, which are prohibited because they cannot be specialized for every possible call site. For example:
 
-      class MyGenericClass<T> {
-        func f<U>(value: U) { } // warning: generic instance method 'f(value:)' in a class must be 'final' in Embedded Swift
+      open class MyGenericClass<T> {
+        open func f<U>(value: U) { }  // warning: generic instance method 'f(value:)' in a class cannot be 'open' in Embedded Swift
 
         func g() { } // okay, not generic relative to the class itself
 
-        class func h() where T: P { } // warning: generic class method 'h()' in a class must be 'final' in Embedded Swift
+        class func h() where T: P { }
+      }
+
+      class MyGenericSubclass<T>: MyGenericClass<T> {
+        override class func h() where T: P { } // warning: generic class method 'h' in a class cannot override another method in Embedded Swift
       }
 
 * Generic methods used on values of protocol type, which are prohibited because they cannot be specialized for every possible call site. For example:

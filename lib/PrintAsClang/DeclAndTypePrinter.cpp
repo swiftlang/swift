@@ -193,8 +193,7 @@ public:
 
   bool isEmptyExtensionDecl(const ExtensionDecl *ED) {
     auto members = ED->getAllMembers();
-    auto hasMembers = std::any_of(members.begin(), members.end(),
-                                  [this](const Decl *D) -> bool {
+    auto hasMembers = llvm::any_of(members, [this](const Decl *D) -> bool {
       if (auto VD = dyn_cast<ValueDecl>(D))
         if (shouldInclude(VD))
           return true;
@@ -202,10 +201,9 @@ public:
     });
 
     auto protocols = ED->getLocalProtocols(ConformanceLookupKind::OnlyExplicit);
-    auto hasProtocols = std::any_of(protocols.begin(), protocols.end(),
-                                    [this](const ProtocolDecl *PD) -> bool {
-      return shouldInclude(PD);
-    });
+    auto hasProtocols = llvm::any_of(
+        protocols,
+        [this](const ProtocolDecl *PD) -> bool { return shouldInclude(PD); });
 
     return (!hasMembers && !hasProtocols);
   }

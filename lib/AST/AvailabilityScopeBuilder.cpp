@@ -331,6 +331,14 @@ private:
     if (isa<ExtensionDecl>(decl))
       return true;
 
+    // Declarations in local contexts may have availability attributes that are
+    // synthesized from the availability scopes that contain them (see
+    // SynthesizeLocalAvailableAttrsRequest). Expanding lazily ensures that
+    // building out the scopes for the enclosing function body does not query
+    // the availability of these declarations, which would be circular.
+    if (SynthesizeLocalAvailableAttrsRequest::appliesTo(decl))
+      return true;
+
     return false;
   }
 

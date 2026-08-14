@@ -1,10 +1,9 @@
-// RUN: %target-run-simple-swift(   -enable-experimental-feature Embedded -wmo -Xfrontend -disable-access-control -runtime-compatibility-version none %target-embedded-posix-shim -enable-experimental-feature EmbeddedKeyPaths -enable-experimental-feature KeyPathWithMethodMembers) | %FileCheck %s
-// RUN: %target-run-simple-swift(-O -enable-experimental-feature Embedded -wmo -Xfrontend -disable-access-control -runtime-compatibility-version none %target-embedded-posix-shim -enable-experimental-feature EmbeddedKeyPaths -enable-experimental-feature KeyPathWithMethodMembers) | %FileCheck %s
+// RUN: %target-run-simple-swift(   -enable-experimental-feature Embedded -wmo -Xfrontend -disable-access-control -runtime-compatibility-version none %target-embedded-posix-shim -enable-experimental-feature KeyPathWithMethodMembers) | %FileCheck %s
+// RUN: %target-run-simple-swift(-O -enable-experimental-feature Embedded -wmo -Xfrontend -disable-access-control -runtime-compatibility-version none %target-embedded-posix-shim -enable-experimental-feature KeyPathWithMethodMembers) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
 // REQUIRES: swift_feature_Embedded
-// REQUIRES: swift_feature_EmbeddedKeyPaths
 // REQUIRES: swift_feature_KeyPathWithMethodMembers
 // XFAIL: swift_test_mode_optimize_none_with_opaque_values
 

@@ -1,6 +1,6 @@
 import Seas
 
-@available(Arctic) // expected-error {{unrecognized platform name 'Arctic'}}
+@available(Arctic) // expected-error {{cannot find availability domain 'Arctic'}}
 func availableInArctic() { }
 
 @available(Mediterranean)
