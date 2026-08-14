@@ -687,7 +687,6 @@ CONSTANT_OWNERSHIP_BUILTIN(Guaranteed, ExtractFunctionIsolation) // unreachable
 CONSTANT_OWNERSHIP_BUILTIN(None, AddressOfRawLayout)
 
 CONSTANT_OWNERSHIP_BUILTIN(None, TaskAddCancellationHandler)
-CONSTANT_OWNERSHIP_BUILTIN(None, TaskAddCancellationHandlerWithReason)
 CONSTANT_OWNERSHIP_BUILTIN(None, TaskRemoveCancellationHandler)
 CONSTANT_OWNERSHIP_BUILTIN(None, TaskAddPriorityEscalationHandler)
 CONSTANT_OWNERSHIP_BUILTIN(None, TaskRemovePriorityEscalationHandler)
@@ -697,10 +696,6 @@ CONSTANT_OWNERSHIP_BUILTIN(None, AddTaskLocalValue)
 CONSTANT_OWNERSHIP_BUILTIN(None, RemoveTaskLocalValue)
 CONSTANT_OWNERSHIP_BUILTIN(None, TaskCancellationShieldPush)
 CONSTANT_OWNERSHIP_BUILTIN(None, TaskCancellationShieldPop)
-CONSTANT_OWNERSHIP_BUILTIN(None, TaskCancellationScopePush)
-CONSTANT_OWNERSHIP_BUILTIN(None, TaskCancellationScopePop)
-CONSTANT_OWNERSHIP_BUILTIN(None, TaskPushDeadline)
-CONSTANT_OWNERSHIP_BUILTIN(None, TaskPopDeadline)
 
 #undef CONSTANT_OWNERSHIP_BUILTIN
 

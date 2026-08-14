@@ -610,11 +610,6 @@ public:
   /// `swift_task_popTaskExecutorPreference(record)` method pair.
   void dropInitialTaskExecutorPreferenceRecord();
 
-  // ==== Task Deadlines -------------------------------------------------------
-
-  /// Inherit the deadline status from parent task if present.
-  void inheritDeadlineFrom(AsyncTask *parent);
-
   // ==== Task Local Values ----------------------------------------------------
 
   void localValuePush(const HeapObject *key,
