@@ -308,3 +308,30 @@ func testConsumingSetterConsumesCapture(_ slot: consuming Slot, _ r: consuming R
   }
   g()
 }
+
+protocol Usable: ~Copyable {
+  consuming func use()
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s30called_once_consuming_captures40testGenericConsumingCaptureIsAddressOnlyyyxnAA6UsableRzRi_zlF : $@convention(thin) <T where T : Usable, T : ~Copyable> (@in T) -> () {
+// CHECK: bb0(%0 : $*T):
+// CHECK:  [[T_PROJ:%.*]] = project_box {{.*}} : $<{{.*}}> { var {{.*}} } <T>, 0
+// CHECK:  [[T_TAKE_ADDR:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[T_PROJ]] : $*T
+// CHECK:  [[T_STACK:%.*]] = alloc_stack $T
+// CHECK:  copy_addr [take] [[T_TAKE_ADDR]] to [init] [[T_STACK]] : $*T
+// CHECK:  partial_apply [called_once] {{.*}}<T>([[T_STACK]]) : $@convention(thin) <{{.*}}> (@in {{.*}}) -> ()
+// CHECK: } // end sil function '$s30called_once_consuming_captures40testGenericConsumingCaptureIsAddressOnlyyyxnAA6UsableRzRi_zlF'
+
+// CHECK-LABEL: sil private [ossa] @$s30called_once_consuming_captures40testGenericConsumingCaptureIsAddressOnlyyyxnAA6UsableRzRi_zlFyyXOfU_ : $@convention(thin) <T where T : Usable, T : ~Copyable> (@in T) -> () {
+// CHECK: bb0([[T_CAPTURE:%.*]] : @closureCapture $*T):
+// CHECK:  [[T_ADDR:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[T_CAPTURE]] : $*T
+// CHECK:  [[T_DEINIT_ACCESS:%.*]] = begin_access [deinit] [unknown] [[T_ADDR]] : $*T
+// CHECK:  witness_method $T, #Usable.use
+// CHECK:  end_access [[T_DEINIT_ACCESS]] : $*T
+// CHECK: } // end sil function '$s30called_once_consuming_captures40testGenericConsumingCaptureIsAddressOnlyyyxnAA6UsableRzRi_zlFyyXOfU_'
+func testGenericConsumingCaptureIsAddressOnly<T: Usable & ~Copyable>(_ t: consuming T) {
+  let g = { @called(once) in
+    t.use()
+  }
+  g()
+}

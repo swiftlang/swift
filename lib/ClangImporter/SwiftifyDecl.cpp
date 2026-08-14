@@ -32,6 +32,7 @@
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/Decl.h"
+#include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclObjC.h"
 #include "clang/AST/DeclTemplate.h"
 #include "clang/AST/DeclarationName.h"
@@ -41,6 +42,8 @@
 #include "clang/AST/Type.h"
 #include "clang/Basic/Module.h"
 #include "clang/Sema/Overload.h"
+#include "llvm-c/Types.h"
+#include "llvm/ADT/SmallPtrSet.h"
 #include <optional>
 
 using namespace swift;
@@ -916,6 +919,53 @@ void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
   if (!SwiftifyImportDecl) {
     DLOG("_SwiftifyImport macro not found\n");
     return;
+  }
+
+  if (ClangDecl->isImplicit()) {
+    if (auto *F = dyn_cast<FuncDecl>(MappedDecl)) {
+      if (const FuncDecl *Orig = getOriginalForVirtualThunk(F)) {
+        DLOG("Remapping virtual thunk to original clang decl\n");
+        ClangDecl = dyn_cast<clang::FunctionDecl>(Orig->getClangDecl());
+      }
+    }
+  }
+
+  // A method that overrides a virtual method needs no wrapper of its own if it
+  // inherits one: the base class wrapper calls the virtual method, so it already
+  // dispatches to this override, and a second wrapper here would only add an
+  // overload that cannot be resolved against the inherited one.
+  //
+  // The wrapper is only inherited when the C++ base class is imported as the
+  // Swift superclass. Reached any other way - through a value type base, or a
+  // base that is not the primary one - the base class wrapper is cloned rather
+  // than inherited and cannot be called, so this override does need its own. Ask
+  // for the primary superclass in Clang terms rather than looking at the Swift
+  // superclass, which is not necessarily set up yet while importing a member.
+  if (auto *CxxMethod = dyn_cast<clang::CXXMethodDecl>(ClangDecl)) {
+    auto primarySuperclassOf = [&](const clang::CXXRecordDecl *Record) {
+      return evaluateOrDefault(SwiftContext.evaluator,
+                               ForeignReferenceTypeInfoRequest({Record}), {})
+          .getPrimarySuperclass();
+    };
+    if (CxxMethod->size_overridden_methods() > 0) {
+      llvm::SmallPtrSet<const clang::CXXRecordDecl *, 16> SuperClasses;
+      for (auto *Super = primarySuperclassOf(CxxMethod->getParent()); Super;
+           Super = primarySuperclassOf(Super)) {
+        SuperClasses.insert(Super->getCanonicalDecl());
+      }
+      if (SuperClasses.size() > 0) {
+        for (auto *Overridden : CxxMethod->overridden_methods()) {
+          if (SuperClasses.count(Overridden->getParent()->getCanonicalDecl())) {
+            // FIXME: We should still generate a safe wrapper if the superclass
+            // is missing one, or if this one would produce a different
+            // signature.
+            DLOG("Inherits the wrapper of an overridden virtual method, which "
+                 "dispatches here\n");
+            return;
+          }
+        }
+      }
+    }
   }
 
   // For projects adopting SafeInteropWrappers we preserve the original

@@ -382,15 +382,15 @@ bool PhiExpansionPass::optimizeArg(SILPhiArgument *initialArg) {
     SILArgument *newArg = block->replacePhiArgumentAndReplaceAllUses(
                              arg->getIndex(), newType, arg->getOwnershipKind());
 
-    // First collect all users, then do the transformation.
+    // First collect all uses, then do the transformation.
     // We don't want to modify the use list while iterating over it.
-    llvm::SmallVector<DebugValueInst *, 8> debugValueUsers;
+    llvm::SmallVector<Operand *, 8> debugValueUses;
     llvm::SmallVector<StructExtractInst *, 8> structExtractUsers;
 
     for (Operand *use : newArg->getUses()) {
       SILInstruction *user = use->getUser();
-      if (auto *dvi = dyn_cast<DebugValueInst>(user)) {
-        debugValueUsers.push_back(dvi);
+      if (isa<DebugValueInst>(user)) {
+        debugValueUses.push_back(use);
         continue;
       }
       if (auto *sei = dyn_cast<StructExtractInst>(user)) {
@@ -400,8 +400,10 @@ bool PhiExpansionPass::optimizeArg(SILPhiArgument *initialArg) {
       // Branches are handled below by handling incoming phi operands.
       assert(isa<BranchInst>(user) || isa<CondBranchInst>(user));
     }
-  
-    for (DebugValueInst *dvi : debugValueUsers) {
+
+    for (Operand *use : debugValueUses) {
+      auto *dvi = cast<DebugValueInst>(use->getUser());
+      unsigned operandIdx = use->getOperandNumber();
       // Build a debug reconstruction block that rebuilds the struct from
       // the single known field, using undef for the remaining fields.
       SILBasicBlock *debugBB = dvi->getOrCreateDebugReconstructionBlock();
@@ -424,10 +426,10 @@ bool PhiExpansionPass::optimizeArg(SILPhiArgument *initialArg) {
               .createStruct(dvi->getLoc(), structType, structFields);
 
       // Replace the known field operand with the new phi argument.
-      SILArgument *oldArg = debugBB->getArgument(0);
+      SILArgument *oldArg = debugBB->getArgument(operandIdx);
       oldArg->replaceAllUsesWith(structVal);
       SILPhiArgument *newArg = debugBB->replacePhiArgument(
-          0, newType, OwnershipKind::None);
+          operandIdx, newType, OwnershipKind::None);
       structVal->setOperand(fieldIdx, newArg);
     }
     for (StructExtractInst *sei : structExtractUsers) {

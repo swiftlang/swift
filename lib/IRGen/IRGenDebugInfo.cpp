@@ -2757,6 +2757,32 @@ private:
 #undef MAP_BUILTIN_TYPE
   }
 
+  /// Anchor DIEs for the concurrency types a debugger presents a task through.
+  /// A debugger builds values of these itself, out of task state it reads from
+  /// the process, so nothing in the program has to name them and nothing else
+  /// pulls them into the debug info.
+  void anchorConcurrencyTypes() {
+    if (Opts.DebugInfoLevel <= IRGenDebugInfoLevel::ASTTypes)
+      return;
+
+    ASTContext &Ctx = IGM.Context;
+    for (StructDecl *Decl :
+         {Ctx.getUnsafeCurrentTaskDecl(), Ctx.getTaskPriorityDecl()}) {
+      // Null when the concurrency module was never imported; such a program has
+      // no task to present.
+      if (!Decl)
+        continue;
+      // Across a resilience boundary the layout is not this module's to
+      // describe, and a debugger there has reflection metadata to read instead.
+      if (IGM.isResilient(Decl, ResilienceExpansion::Maximal))
+        continue;
+      Type Ty = Decl->getDeclaredInterfaceType();
+      auto DbgTy = DebugTypeInfo::getFromTypeInfo(
+          Ty, IGM.getTypeInfoForUnlowered(Ty), IGM);
+      anchorType(getOrCreateType(DbgTy));
+    }
+  }
+
   /// Forward-declared composite types may still refer refer to a type alias by
   /// name in their mangled name. We need to make sure they are emitted in
   /// DWARF.
@@ -3274,6 +3300,7 @@ IRGenDebugInfoImpl::IRGenDebugInfoImpl(const IRGenOptions &Opts,
   }
   createSpecialStlibBuiltinTypes();
   anchorClangInteropTypeAliases();
+  anchorConcurrencyTypes();
 }
 
 void IRGenDebugInfoImpl::finalize() {

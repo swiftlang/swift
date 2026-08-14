@@ -5440,12 +5440,14 @@ void ClangImporter::Implementation::lookupAllObjCMembers(
 
 void ClangImporter::Implementation::diagnoseTopLevelValue(
     const DeclName &name) {
+  llvm::SmallPtrSet<const clang::Decl *, 4> visited;
   forEachLookupTable([&](SwiftLookupTable &table) -> bool {
     for (const auto &entry :
          table.lookup(name.getBaseName(),
                       EffectiveClangContext(
                           getClangASTContext().getTranslationUnitDecl()))) {
-      diagnoseTargetDirectly(importDiagnosticTargetFromLookupTableEntry(entry));
+      diagnoseTargetDirectly(importDiagnosticTargetFromLookupTableEntry(entry),
+                             visited);
     }
     return false;
   });
@@ -5453,6 +5455,7 @@ void ClangImporter::Implementation::diagnoseTopLevelValue(
 
 void ClangImporter::Implementation::diagnoseMemberValue(
     const DeclName &name, const clang::DeclContext *container) {
+  llvm::SmallPtrSet<const clang::Decl *, 4> visited;
   forEachLookupTable([&](SwiftLookupTable &table) -> bool {
     for (const auto &entry :
          table.lookup(name.getBaseName(), EffectiveClangContext(container))) {
@@ -5465,16 +5468,30 @@ void ClangImporter::Implementation::diagnoseMemberValue(
       if (nd->getDeclContext() != container)
         continue;
 
-      diagnoseTargetDirectly(importDiagnosticTargetFromLookupTableEntry(entry));
+      diagnoseTargetDirectly(importDiagnosticTargetFromLookupTableEntry(entry),
+                             visited);
     }
     return false;
   });
 }
 
 void ClangImporter::Implementation::diagnoseTargetDirectly(
-    ImportDiagnosticTarget target) {
+    ImportDiagnosticTarget target,
+    llvm::SmallPtrSetImpl<const clang::Decl *> &visited) {
   if (const clang::Decl *decl = target.dyn_cast<const clang::Decl *>()) {
-    Walker.TraverseDecl(const_cast<clang::Decl *>(decl));
+    if (visited.insert(decl).second)
+      Walker.TraverseDecl(const_cast<clang::Decl *>(decl));
+
+    // Import diagnostics are queued against a tag's definition, but a lookup
+    // entry is often a forward declaration or a typedef, and several entries for
+    // one name can reach the same definition, hence the visited set.
+    if (const auto *typedefDecl = dyn_cast<clang::TypedefNameDecl>(decl))
+      if (const auto *tagDecl =
+              typedefDecl->getUnderlyingType()->getAsTagDecl())
+        decl = tagDecl;
+    if (auto definition = importer::getDefinitionForClangTypeDecl(decl))
+      if (*definition && visited.insert(*definition).second)
+        Walker.TraverseDecl(const_cast<clang::Decl *>(*definition));
   } else if (const clang::MacroInfo *macro =
                  target.dyn_cast<const clang::MacroInfo *>()) {
     Walker.VisitMacro(macro);
@@ -5648,11 +5665,9 @@ getConditionalAttrParams(clang::SwiftAttrAttr *swiftAttr, StringRef attrName) {
 
 static ConditionalAttrParams
 getConditionalAttrParams(const clang::NamedDecl *decl, StringRef attrName) {
-  if (decl->hasAttrs()) {
-    for (auto attr : decl->getAttrs()) {
-      if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
-        return getConditionalAttrParams(swiftAttr, attrName);
-    }
+  for (auto *swiftAttr : decl->specific_attrs<clang::SwiftAttrAttr>()) {
+    if (swiftAttr->getAttribute().starts_with(attrName))
+      return getConditionalAttrParams(swiftAttr, attrName);
   }
 
   return {};
@@ -5740,6 +5755,25 @@ ClangTypeEscapability::evaluate(Evaluator &evaluator,
         return CxxEscapability::NonEscapable;
       if (hasEscapableAttr(recordDecl))
         continue;
+      // A foreign reference type is imported as a Swift class, which is always
+      // escapable, including a SWIFT_UNSAFE_REFERENCE, whose unsafety is a
+      // separate axis. Non-escapable fields and bases are rejected separately,
+      // where the type is imported.
+      if (auto *definition = recordDecl->getDefinition()) {
+        if (evaluateOrDefault(evaluator,
+                              ForeignReferenceTypeInfoRequest({definition}), {})
+                .isReference())
+          continue;
+      } else if (llvm::any_of(recordDecl->redecls(), [](const auto *redecl) {
+                   return hasImportReferenceAttr(
+                       cast<clang::RecordDecl>(redecl));
+                 })) {
+        // Inherited reference-ness needs a definition, but a direct annotation
+        // is enough. Ask the attribute, not the request: the request is cached
+        // per decl, so an uninstantiated class template would cache
+        // "not a reference" for good.
+        continue;
+      }
       if (hasSwiftAttribute(recordDecl, {"unsafe", "unsafe(always)"}))
         return CxxEscapability::Unknown;
       llvm::ArrayRef<int> STLParams;
@@ -6533,6 +6567,10 @@ static void cloneImportedAttributes(ValueDecl *fromDecl, ValueDecl *toDecl) {
     }
     case DeclAttrKind::Transparent: {
       toDecl->addAttribute(new (context) TransparentAttr(true));
+      break;
+    }
+    case DeclAttrKind::Unsafe: {
+      toDecl->addAttribute(cast<UnsafeAttr>(attr)->clone(context));
       break;
     }
     case DeclAttrKind::WarnUnqualifiedAccess: {
@@ -8315,11 +8353,11 @@ importer::getValueDeclsForName(NominalTypeDecl *decl, StringRef name) {
 
 bool importer::hasSwiftAttribute(const clang::Decl *decl,
                                  ArrayRef<StringRef> attrs) {
-  if (decl->hasAttrs() && llvm::any_of(decl->getAttrs(), [&](auto *A) {
-        if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(A))
-          return llvm::is_contained(attrs, swiftAttr->getAttribute());
-        return false;
-      }))
+  if (llvm::any_of(decl->specific_attrs<clang::SwiftAttrAttr>(),
+                   [&](const clang::SwiftAttrAttr *swiftAttr) {
+                     return llvm::is_contained(attrs,
+                                               swiftAttr->getAttribute());
+                   }))
     return true;
 
   if (auto *P = dyn_cast<clang::ParmVarDecl>(decl)) {
@@ -8885,99 +8923,104 @@ swift::extractNearestSourceLoc(ClangRefCountedSmartPointerDescriptor desc) {
   return SourceLoc();
 }
 
+CustomAttr *importer::getRefCountedPtrAttr(Decl *decl) {
+  for (auto *attr : decl->getAttrs().getAttributes<CustomAttr>()) {
+    if (attr->getTypeRepr()->isSimpleUnqualifiedIdentifier("_refCountedPtr"))
+      return attr;
+  }
+
+  return nullptr;
+}
+
 RefCountedPtrRequestResult ClangRefCountedSmartPointer::evaluate(
     Evaluator &evaluator, ClangRefCountedSmartPointerDescriptor desc) const {
-  for (const auto *attr : desc.smartPtr->getAttrs()) {
-    if (const auto *customAttr = dyn_cast<CustomAttr>(attr)) {
-      if (!customAttr->getTypeRepr()->isSimpleUnqualifiedIdentifier(
-              "_refCountedPtr"))
-        continue;
-      StringRef ToRawPtrFuncName;
-      for (auto arg : *customAttr->getArgs()) {
-        if (arg.getLabel().str() == "ToRawPointer") {
-          if (const auto *literal = dyn_cast<StringLiteralExpr>(arg.getExpr()))
-            ToRawPtrFuncName = literal->getValue();
-        }
-      }
-      if (ToRawPtrFuncName.empty())
-        return {RefCountedPtrError::MissingToRawPointer, nullptr};
+  auto *customAttr = importer::getRefCountedPtrAttr(desc.smartPtr);
+  if (!customAttr)
+    return {RefCountedPtrError::NotAnnotated, nullptr};
 
-      auto results = getValueDeclsForName(desc.smartPtr, ToRawPtrFuncName);
-      if (results.empty())
-        return {RefCountedPtrError::ToRawPointerLookupFailure, nullptr,
-                ToRawPtrFuncName};
-
-      if (results.size() > 1)
-        return {RefCountedPtrError::ToRawPointerLookupAmbiguity, nullptr,
-                ToRawPtrFuncName};
-
-      auto toRawPtrFunc = dyn_cast<FuncDecl>(results.front());
-      if (!toRawPtrFunc)
-        return {RefCountedPtrError::ToRawPointerNotFunction, toRawPtrFunc};
-
-      auto pointeeType = toRawPtrFunc->getResultInterfaceType()
-                             ->lookThroughSingleOptionalType();
-      ClassDecl *referenceDecl = pointeeType->getClassOrBoundGenericClass();
-
-      if (toRawPtrFunc->getParameters()->size() != 0 || !referenceDecl)
-        return {RefCountedPtrError::ToRawPointerWrongSignature, toRawPtrFunc};
-
-      auto ctors =
-          desc.smartPtr->lookupDirect(DeclBaseName::createConstructor());
-      // We accept a constructor whose parameter imports as the foreign
-      // reference type. In C++ that means a raw pointer (T*, possibly
-      // const-qualified) or an lvalue reference (T&, possibly
-      // const-qualified). We rank candidates so that more-specific
-      // forms win when several are available:
-      //   T*  >  const T*  >  T&  >  const T&
-      // Per-rank duplicates are still ambiguous. Rvalue-reference and
-      // deleted ctors aren't bridgeable. The selected constructor is
-      // relied on during SILGen to introduce implicit bridging.
-      ConstructorDecl *selected = nullptr;
-      std::optional<int> selectedRank;
-      for (auto result : ctors) {
-        auto ctor = cast<ConstructorDecl>(result);
-        if (ctor->getParameters()->size() != 1)
-          continue;
-        Type ctorParamType = ctor->getParameters()->get(0)->getInterfaceType();
-        if (!ctorParamType->isForeignReferenceType())
-          continue;
-
-        auto *clangCtor =
-            dyn_cast_or_null<clang::CXXConstructorDecl>(ctor->getClangDecl());
-        if (!clangCtor || clangCtor->isDeleted())
-          continue;
-
-        clang::QualType paramTy = clangCtor->getParamDecl(0)->getType();
-        int rank;
-        if (paramTy->isLValueReferenceType()) {
-          rank = paramTy->getPointeeType().isConstQualified() ? 3 : 2;
-        } else if (paramTy->isPointerType()) {
-          rank = paramTy->getPointeeType().isConstQualified() ? 1 : 0;
-        } else {
-          // Not a pointer or lvalue reference (e.g., rvalue ref).
-          continue;
-        }
-
-        if (!selectedRank || rank < *selectedRank) {
-          selected = ctor;
-          selectedRank = rank;
-        } else if (rank == *selectedRank) {
-          return {RefCountedPtrError::CtorLookupAmbiguity, toRawPtrFunc};
-        }
-      }
-      if (!selected)
-        return {RefCountedPtrError::CtorLookupFailure, toRawPtrFunc};
-      Type selectedCtorParamType =
-          selected->getParameters()->get(0)->getInterfaceType();
-      if (!selectedCtorParamType->lookThroughSingleOptionalType()->isEqual(
-              pointeeType))
-        return {RefCountedPtrError::CtorWrongParamType, toRawPtrFunc};
-
-      return {RefCountedPtrInfo{selected}, toRawPtrFunc};
+  StringRef ToRawPtrFuncName;
+  for (auto arg : *customAttr->getArgs()) {
+    if (arg.getLabel().str() == "ToRawPointer") {
+      if (const auto *literal = dyn_cast<StringLiteralExpr>(arg.getExpr()))
+        ToRawPtrFuncName = literal->getValue();
     }
   }
-  return {RefCountedPtrError::NotAnnotated, nullptr};
+  if (ToRawPtrFuncName.empty())
+    return {RefCountedPtrError::MissingToRawPointer, nullptr};
+
+  auto results = getValueDeclsForName(desc.smartPtr, ToRawPtrFuncName);
+  if (results.empty())
+    return {RefCountedPtrError::ToRawPointerLookupFailure, nullptr,
+            ToRawPtrFuncName};
+
+  if (results.size() > 1)
+    return {RefCountedPtrError::ToRawPointerLookupAmbiguity, nullptr,
+            ToRawPtrFuncName};
+
+  auto toRawPtrFunc = dyn_cast<FuncDecl>(results.front());
+  if (!toRawPtrFunc)
+    return {RefCountedPtrError::ToRawPointerNotFunction, toRawPtrFunc};
+
+  auto pointeeType = toRawPtrFunc->getResultInterfaceType()
+                         ->lookThroughSingleOptionalType();
+  ClassDecl *referenceDecl = pointeeType->getClassOrBoundGenericClass();
+
+  if (toRawPtrFunc->getParameters()->size() != 0 || !referenceDecl)
+    return {RefCountedPtrError::ToRawPointerWrongSignature, toRawPtrFunc};
+
+  auto ctors =
+      desc.smartPtr->lookupDirect(DeclBaseName::createConstructor());
+  // We accept a constructor whose parameter imports as the foreign
+  // reference type. In C++ that means a raw pointer (T*, possibly
+  // const-qualified) or an lvalue reference (T&, possibly
+  // const-qualified). We rank candidates so that more-specific
+  // forms win when several are available:
+  //   T*  >  const T*  >  T&  >  const T&
+  // Per-rank duplicates are still ambiguous. Rvalue-reference and
+  // deleted ctors aren't bridgeable. The selected constructor is
+  // relied on during SILGen to introduce implicit bridging.
+  ConstructorDecl *selected = nullptr;
+  std::optional<int> selectedRank;
+  for (auto result : ctors) {
+    auto ctor = cast<ConstructorDecl>(result);
+    if (ctor->getParameters()->size() != 1)
+      continue;
+    Type ctorParamType = ctor->getParameters()->get(0)->getInterfaceType();
+    if (!ctorParamType->isForeignReferenceType())
+      continue;
+
+    auto *clangCtor =
+        dyn_cast_or_null<clang::CXXConstructorDecl>(ctor->getClangDecl());
+    if (!clangCtor || clangCtor->isDeleted())
+      continue;
+
+    clang::QualType paramTy = clangCtor->getParamDecl(0)->getType();
+    int rank;
+    if (paramTy->isLValueReferenceType()) {
+      rank = paramTy->getPointeeType().isConstQualified() ? 3 : 2;
+    } else if (paramTy->isPointerType()) {
+      rank = paramTy->getPointeeType().isConstQualified() ? 1 : 0;
+    } else {
+      // Not a pointer or lvalue reference (e.g., rvalue ref).
+      continue;
+    }
+
+    if (!selectedRank || rank < *selectedRank) {
+      selected = ctor;
+      selectedRank = rank;
+    } else if (rank == *selectedRank) {
+      return {RefCountedPtrError::CtorLookupAmbiguity, toRawPtrFunc};
+    }
+  }
+  if (!selected)
+    return {RefCountedPtrError::CtorLookupFailure, toRawPtrFunc};
+  Type selectedCtorParamType =
+      selected->getParameters()->get(0)->getInterfaceType();
+  if (!selectedCtorParamType->lookThroughSingleOptionalType()->isEqual(
+          pointeeType))
+    return {RefCountedPtrError::CtorWrongParamType, toRawPtrFunc};
+
+  return {RefCountedPtrInfo{selected}, toRawPtrFunc};
 }
 
 RefCountedPtrRequestResult
@@ -9156,13 +9199,10 @@ importer::getPrivateFileIDAttrs(const clang::CXXRecordDecl *decl) {
   llvm::SmallVector<std::pair<StringRef, clang::SourceLocation>, 1> files;
   constexpr llvm::StringLiteral prefix = "private_fileid:";
 
-  if (decl->hasAttrs()) {
-    for (const auto *attr : decl->getAttrs()) {
-      const auto *swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr);
-      if (swiftAttr && swiftAttr->getAttribute().starts_with(prefix))
-        files.push_back({swiftAttr->getAttribute().drop_front(prefix.size()),
-                         attr->getLocation()});
-    }
+  for (const auto *swiftAttr : decl->specific_attrs<clang::SwiftAttrAttr>()) {
+    StringRef attribute = swiftAttr->getAttribute();
+    if (attribute.consume_front(prefix))
+      files.push_back({attribute, swiftAttr->getLocation()});
   }
 
   return files;
@@ -9222,19 +9262,25 @@ static bool isConditionalAttr(StringRef attrName) {
   return attrName == "escapable_if:" || attrName == "copyable_if:";
 }
 
+StringRef
+importer::getPrettySwiftAttributeName(const clang::SwiftAttrAttr *attr) {
+  for (const auto &groupOfAttrs : ConflictingSwiftAttrs)
+    for (auto [attrName, annotationName] : groupOfAttrs)
+      if (attr->getAttribute().starts_with(attrName))
+        return annotationName;
+
+  return attr->getAttribute();
+}
+
 void ClangImporter::Implementation::validateSwiftAttributes(
     const clang::NamedDecl *decl) {
-  if (!decl->hasAttrs())
-    return;
-
   for (const auto &groupOfAttrs : ConflictingSwiftAttrs) {
     // stores this decl's attributes, grouped by annotation kind
     llvm::StringMap<std::vector<clang::SwiftAttrAttr *>> found;
     unsigned count = 0;
     for (auto [attrName, annotationName] : groupOfAttrs) {
-      for (auto attr : decl->getAttrs()) {
-        auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr);
-        if (swiftAttr && swiftAttr->getAttribute().starts_with(attrName)) {
+      for (auto *swiftAttr : decl->specific_attrs<clang::SwiftAttrAttr>()) {
+        if (swiftAttr->getAttribute().starts_with(attrName)) {
           found[annotationName].push_back(swiftAttr);
           count += 1;
 

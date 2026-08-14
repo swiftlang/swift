@@ -129,6 +129,18 @@ MyPair<Owner, View> h2(int* x);
 // OK; MyPair<Owner, Owner> is not ~Escapable
 MyPair<Owner, Owner> h3(int* x);
 
+// SWIFT_ESCAPABLE_IF is found even when another swift_attr precedes it.
+template<typename F>
+struct SWIFT_UNCHECKED_SENDABLE SWIFT_ESCAPABLE_IF(F) MySendablePair {
+    F first;
+};
+
+// expected-NO-LIFETIMES-error@+1 {{a function cannot return a ~Escapable result}}
+MySendablePair<View> h4(int* x);
+
+// OK; MySendablePair<Owner> is not ~Escapable
+MySendablePair<Owner> h5(int* x);
+
 // expected-error@+3 {{template parameter 'Missing' does not exist}}
 // expected-error@+2 {{template parameter 'Missing' does not exist}}
 template<typename F, typename S>
@@ -390,6 +402,8 @@ public func noAnnotations() -> View {
     h1(nil)
     h2(nil)
     h3(nil)
+    h4(nil)
+    h5(nil)
     i1()
     i2()
     j1()

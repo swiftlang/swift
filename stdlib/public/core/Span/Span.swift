@@ -54,7 +54,7 @@ public struct Span<Element: ~Copyable>: ~Escapable, Copyable, BitwiseCopyable {
   /// Create an empty span.
   @export(implementation)
   @inline(__always)
-  @lifetime(immortal)
+  @_lifetime(immortal)
   public init() {
     unsafe _pointer = nil
     _count = 0
@@ -76,7 +76,7 @@ public struct Span<Element: ~Copyable>: ~Escapable, Copyable, BitwiseCopyable {
   @unsafe
   @export(implementation)
   @inline(__always)
-  @lifetime(borrow pointer)
+  @_lifetime(borrow pointer)
   @_disfavoredOverload
   internal init(
     _unchecked pointer: UnsafeRawPointer?,
@@ -98,9 +98,9 @@ public struct Span<Element: ~Copyable>: ~Escapable, Copyable, BitwiseCopyable {
   /// - Parameters:
   ///   - pointer: a pointer to the first initialized element.
   ///   - count: the number of initialized elements in the span.
-  @lifetime(borrow pointer)
+  @_lifetime(borrow pointer)
   @unsafe
-  @_alwaysEmitIntoClient
+  @export(implementation)
   @_transparent
   internal init(
     _unchecked pointer: UnsafePointer<Element>,
@@ -128,7 +128,7 @@ extension Span where Element: ~Copyable {
   /// - Parameters:
   ///   - buffer: an `UnsafeBufferPointer` to initialized elements.
   @export(implementation)
-  @lifetime(borrow buffer)
+  @_lifetime(borrow buffer)
   @unsafe
   public init(
     _unsafeElements buffer: UnsafeBufferPointer<Element>
@@ -157,7 +157,7 @@ extension Span where Element: ~Copyable {
   /// - Parameters:
   ///   - buffer: an `UnsafeMutableBufferPointer` to initialized elements.
   @export(implementation)
-  @lifetime(borrow buffer)
+  @_lifetime(borrow buffer)
   @unsafe
   public init(
     _unsafeElements buffer: UnsafeMutableBufferPointer<Element>
@@ -180,7 +180,7 @@ extension Span where Element: ~Copyable {
   ///   - pointer: a pointer to the first initialized element.
   ///   - count: the number of initialized elements in the span.
   @export(implementation)
-  @lifetime(borrow pointer)
+  @_lifetime(borrow pointer)
   @unsafe
   public init(
     _unsafeStart pointer: UnsafePointer<Element>,
@@ -208,7 +208,7 @@ extension Span /*where Element: Copyable*/ {
   /// - Parameters:
   ///   - buffer: an `UnsafeBufferPointer` to initialized elements.
   @export(implementation)
-  @lifetime(borrow buffer)
+  @_lifetime(borrow buffer)
   @unsafe
   public init(
     _unsafeElements buffer: borrowing Slice<UnsafeBufferPointer<Element>>
@@ -229,7 +229,7 @@ extension Span /*where Element: Copyable*/ {
   /// - Parameters:
   ///   - buffer: an `UnsafeMutableBufferPointer` to initialized elements.
   @export(implementation)
-  @lifetime(borrow buffer)
+  @_lifetime(borrow buffer)
   @unsafe
   public init(
     _unsafeElements buffer: borrowing Slice<UnsafeMutableBufferPointer<Element>>
@@ -259,7 +259,7 @@ extension Span where Element: BitwiseCopyable {
   /// - Parameters:
   ///   - buffer: a buffer to initialized elements.
   @export(implementation)
-  @lifetime(borrow buffer)
+  @_lifetime(borrow buffer)
   @unsafe
   public init(
     _unsafeBytes buffer: UnsafeRawBufferPointer
@@ -295,7 +295,7 @@ extension Span where Element: BitwiseCopyable {
   /// - Parameters:
   ///   - buffer: a buffer to initialized elements.
   @export(implementation)
-  @lifetime(borrow buffer)
+  @_lifetime(borrow buffer)
   @unsafe
   public init(
     _unsafeBytes buffer: UnsafeMutableRawBufferPointer
@@ -322,7 +322,7 @@ extension Span where Element: BitwiseCopyable {
   ///   - pointer: a pointer to the first initialized element.
   ///   - byteCount: the number of bytes in the span.
   @export(implementation)
-  @lifetime(borrow pointer)
+  @_lifetime(borrow pointer)
   @unsafe
   public init(
     _unsafeStart pointer: UnsafeRawPointer,
@@ -351,7 +351,7 @@ extension Span where Element: BitwiseCopyable {
   /// - Parameters:
   ///   - buffer: a buffer to initialized elements.
   @export(implementation)
-  @lifetime(borrow buffer)
+  @_lifetime(borrow buffer)
   @unsafe
   public init(
     _unsafeBytes buffer: borrowing Slice<UnsafeRawBufferPointer>
@@ -376,7 +376,7 @@ extension Span where Element: BitwiseCopyable {
   /// - Parameters:
   ///   - buffer: a buffer to initialized elements.
   @export(implementation)
-  @lifetime(borrow buffer)
+  @_lifetime(borrow buffer)
   @unsafe
   public init(
     _unsafeBytes buffer: borrowing Slice<UnsafeMutableRawBufferPointer>
@@ -395,7 +395,7 @@ extension Span where Element: BitwiseCopyable {
   ///            `Span`'s lifetime and the memory it represents.
   @export(implementation)
   @unsafe
-  @lifetime(copy bytes)
+  @_lifetime(copy bytes)
   public init(_bytes bytes: consuming RawSpan) {
     let rawBuffer = unsafe UnsafeRawBufferPointer(
       start: bytes._pointer, count: bytes.byteCount
@@ -610,7 +610,7 @@ extension Span where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @export(implementation)
-  @lifetime(copy self)
+  @_lifetime(copy self)
   public func extracting(_ bounds: Range<Index>) -> Self {
     _precondition(
       UInt(bitPattern: bounds.lowerBound) <= UInt(bitPattern: _count) &&
@@ -622,7 +622,7 @@ extension Span where Element: ~Copyable {
 
   @available(*, deprecated, renamed: "extracting(_:)")
   @export(implementation)
-  @lifetime(copy self)
+  @_lifetime(copy self)
   public func _extracting(_ bounds: Range<Index>) -> Self {
     extracting(bounds)
   }
@@ -642,7 +642,7 @@ extension Span where Element: ~Copyable {
   /// - Complexity: O(1)
   @unsafe
   @export(implementation)
-  @lifetime(copy self)
+  @_lifetime(copy self)
   public func extracting(unchecked bounds: Range<Index>) -> Self {
     let delta = bounds.lowerBound &* MemoryLayout<Element>.stride
     let newStart = unsafe _pointer?.advanced(by: delta)
@@ -655,7 +655,7 @@ extension Span where Element: ~Copyable {
   @unsafe
   @available(*, deprecated, renamed: "extracting(unchecked:)")
   @export(implementation)
-  @lifetime(copy self)
+  @_lifetime(copy self)
   public func _extracting(unchecked bounds: Range<Index>) -> Self {
     unsafe extracting(unchecked: bounds)
   }
@@ -672,7 +672,7 @@ extension Span where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @export(implementation)
-  @lifetime(copy self)
+  @_lifetime(copy self)
   public func extracting(
     _ bounds: some RangeExpression<Index>
   ) -> Self {
@@ -681,7 +681,7 @@ extension Span where Element: ~Copyable {
 
   @available(*, deprecated, renamed: "extracting(_:)")
   @export(implementation)
-  @lifetime(copy self)
+  @_lifetime(copy self)
   public func _extracting(_ bounds: some RangeExpression<Index>) -> Self {
     extracting(bounds)
   }
@@ -701,7 +701,7 @@ extension Span where Element: ~Copyable {
   /// - Complexity: O(1)
   @unsafe
   @export(implementation)
-  @lifetime(copy self)
+  @_lifetime(copy self)
   public func extracting(
     unchecked bounds: ClosedRange<Index>
   ) -> Self {
@@ -714,7 +714,7 @@ extension Span where Element: ~Copyable {
   @unsafe
   @available(*, deprecated, renamed: "extracting(unchecked:)")
   @export(implementation)
-  @lifetime(copy self)
+  @_lifetime(copy self)
   public func _extracting(unchecked bounds: ClosedRange<Index>) -> Self {
     unsafe extracting(unchecked: bounds)
   }
@@ -728,14 +728,14 @@ extension Span where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @export(implementation)
-  @lifetime(copy self)
+  @_lifetime(copy self)
   public func extracting(_: UnboundedRange) -> Self {
     self
   }
 
   @available(*, deprecated, renamed: "extracting(_:)")
   @export(implementation)
-  @lifetime(copy self)
+  @_lifetime(copy self)
   public func _extracting(_: UnboundedRange) -> Self {
     self
   }
@@ -882,7 +882,7 @@ extension Span where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @export(implementation)
-  @lifetime(copy self)
+  @_lifetime(copy self)
   public func extracting(first maxLength: Int) -> Self {
     _precondition(maxLength >= 0, "Can't have a prefix of negative length")
     let newCount = min(maxLength, count)
@@ -892,7 +892,7 @@ extension Span where Element: ~Copyable {
 
   @available(*, deprecated, renamed: "extracting(first:)")
   @export(implementation)
-  @lifetime(copy self)
+  @_lifetime(copy self)
   public func _extracting(first maxLength: Int) -> Self {
     extracting(first: maxLength)
   }
@@ -908,7 +908,7 @@ extension Span where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @export(implementation)
-  @lifetime(copy self)
+  @_lifetime(copy self)
   public func extracting(droppingLast k: Int) -> Self {
     _precondition(k >= 0, "Can't drop a negative number of elements")
     let droppedCount = min(k, count)
@@ -918,7 +918,7 @@ extension Span where Element: ~Copyable {
 
   @available(*, deprecated, renamed: "extracting(droppingLast:)")
   @export(implementation)
-  @lifetime(copy self)
+  @_lifetime(copy self)
   public func _extracting(droppingLast k: Int) -> Self {
     extracting(droppingLast: k)
   }
@@ -938,7 +938,7 @@ extension Span where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @export(implementation)
-  @lifetime(copy self)
+  @_lifetime(copy self)
   public func extracting(last maxLength: Int) -> Self {
     _precondition(maxLength >= 0, "Can't have a suffix of negative length")
     let newCount = min(maxLength, count)
@@ -952,7 +952,7 @@ extension Span where Element: ~Copyable {
 
   @available(*, deprecated, renamed: "extracting(last:)")
   @export(implementation)
-  @lifetime(copy self)
+  @_lifetime(copy self)
   public func _extracting(last maxLength: Int) -> Self {
     extracting(last: maxLength)
   }
@@ -971,7 +971,7 @@ extension Span where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @export(implementation)
-  @lifetime(copy self)
+  @_lifetime(copy self)
   public func extracting(droppingFirst k: Int) -> Self {
     _precondition(k >= 0, "Can't drop a negative number of elements")
     let droppedCount = min(k, count)
@@ -986,7 +986,7 @@ extension Span where Element: ~Copyable {
 
   @available(*, deprecated, renamed: "extracting(droppingFirst:)")
   @export(implementation)
-  @lifetime(copy self)
+  @_lifetime(copy self)
   public func _extracting(droppingFirst k: Int) -> Self {
     extracting(droppingFirst: k)
   }
@@ -1073,7 +1073,7 @@ extension Span: Iterable where Element: ~Copyable {
 
   @available(SwiftStdlib 6.4, *)
   @export(implementation)
-  @lifetime(borrow self)
+  @_lifetime(borrow self)
   public func makeBorrowingIterator() -> BorrowingIterator {
     .init(self)
   }

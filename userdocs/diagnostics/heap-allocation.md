@@ -13,7 +13,7 @@ Embedded Swift is designed to fit constrained environments. In some cases, it is
   let p = UnsafeMutableBufferPointer<Double>.allocate(capacity: count) // warning: explicit heap allocation
   ```
 
-* Forming a non-escaping closure that has captures:
+* Forming an escaping closure that has captures:
   ```swift
   func acceptClosure(body: @escaping () -> Void) { }
 

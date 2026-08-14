@@ -26,11 +26,11 @@ bool importer::hasImportReferenceAttr(const clang::RecordDecl *decl) {
 }
 
 bool importer::hasImportAsOpaquePointerAttr(const clang::RecordDecl *decl) {
-  return decl->hasAttrs() && llvm::any_of(decl->getAttrs(), [](auto *attr) {
-           if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
-             return swiftAttr->getAttribute() == "import_opaque_pointer";
-           return false;
-         });
+  return llvm::any_of(decl->specific_attrs<clang::SwiftAttrAttr>(),
+                      [](const clang::SwiftAttrAttr *swiftAttr) {
+                        return swiftAttr->getAttribute() ==
+                               "import_opaque_pointer";
+                      });
 }
 
 //===----------------------------------------------------------------------===//
@@ -151,8 +151,6 @@ namespace {
 /// The retain:/release: attributes written directly on a record.
 struct RetainReleaseInfo {
   RetainReleaseInfo(const clang::RecordDecl *decl) : decl(decl) {
-    if (!decl->hasAttrs())
-      return;
     for (auto *attr : decl->specific_attrs<clang::SwiftAttrAttr>()) {
       StringRef attrStr = attr->getAttribute();
       if (attrStr.consume_front("retain:")) {
@@ -1114,4 +1112,29 @@ bool importer::shouldRenameCXXMethodAsUnsafe(const clang::CXXMethodDecl *method,
 
   // Otherwise, it's safe.
   return false;
+}
+
+/// Whether the C++ standard library overlay in stdlib/public/Cxx already
+/// provides a safe Swift API named after \p method:
+///
+/// - 'basic_string::append' vs 'std.string.append(_:)', which differs only in
+///   its result type and so ambiguates every discarded-result call;
+/// - 'set::insert' etc. vs 'CxxUniqueSet.insert(_:)', a protocol extension
+///   member that a concrete C++ 'insert' would shadow outright;
+/// - 'optional::value' vs the 'CxxOptional.value' property.
+static bool overlayProvidesSafeWrapperNamed(const clang::CXXMethodDecl *method) {
+  if (!method->getParent()->isInStdNamespace() || !method->getIdentifier())
+    return false;
+
+  return llvm::StringSwitch<bool>(method->getName())
+      .Cases({"append", "insert", "value"}, true)
+      .Default(false);
+}
+
+bool importer::keepsNameWhenImportedAsUnsafe(const clang::CXXMethodDecl *method,
+                                             ASTContext &ctx) {
+  return ctx.LangOpts.hasFeature(
+             Feature::ImportUnsafeCxxMethodsAsAlwaysUnsafe) &&
+         shouldRenameCXXMethodAsUnsafe(method, ctx) &&
+         !overlayProvidesSafeWrapperNamed(method);
 }

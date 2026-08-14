@@ -29,8 +29,14 @@ public struct UnavailableMembersMacro: MemberAttributeMacro {
 macro UnavailableMembers() = #externalMacro(module: "MacroDefinition", type: "UnavailableMembersMacro")
 
 @UnavailableMembers
+// expected-note@-1 {{in expansion of macro 'UnavailableMembers' on instance method 'member()' here}}
 class Base {
-  func member() {} // expected-note 2 {{'member()' has been explicitly marked unavailable here}}
+  func member() {} // expected-note {{'member()' has been explicitly marked unavailable here}}
+  /*
+  expected-expansion@-2:3{{
+    expected-note@1{{'member()' has been explicitly marked unavailable here}}
+  }}
+  */
 }
 
 class Sub: Base {

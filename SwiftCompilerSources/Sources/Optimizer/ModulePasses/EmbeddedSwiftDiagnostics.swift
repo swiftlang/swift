@@ -159,13 +159,13 @@ private struct FunctionChecker {
          if !checkedCast.supportedInEmbeddedSwift {
            throw Violation(.embedded_swift_dynamic_cast, in: instruction)
          }
-         try checkCastTargetUniqueness(checkedCast.targetFormalType, in: instruction)
+         checkCastTargetUniqueness(checkedCast.targetFormalType, in: instruction)
        } else {
          let checkedCast = instruction as! UnconditionalCheckedCastAddrInst
          if !checkedCast.supportedInEmbeddedSwift {
            throw Violation(.embedded_swift_dynamic_cast, in: instruction)
          }
-         try checkCastTargetUniqueness(checkedCast.targetFormalType, in: instruction)
+         checkCastTargetUniqueness(checkedCast.targetFormalType, in: instruction)
        }
 
     // The value-form checked casts (e.g. a class-bound `any P` downcast to a
@@ -174,10 +174,10 @@ private struct FunctionChecker {
     // allocating module and this module may see different metadata records, so
     // the cast silently fails at runtime. Diagnose it.
     case let ccb as CheckedCastBranchInst:
-      try checkCastTargetUniqueness(ccb.targetFormalType, in: instruction)
+      checkCastTargetUniqueness(ccb.targetFormalType, in: instruction)
 
     case let ucc as UnconditionalCheckedCastInst:
-      try checkCastTargetUniqueness(ucc.targetFormalType, in: instruction)
+      checkCastTargetUniqueness(ucc.targetFormalType, in: instruction)
 
     case let abi as AllocBoxInst:
       // It needs a bit of work to support alloc_box of generic non-copyable structs/enums with deinit,
@@ -200,16 +200,10 @@ private struct FunctionChecker {
       )
 
     case let ba as BeginApplyInst:
-      // The old yield_once_1 coroutine uses a heap-allocated frame, so it
-      // cannot be used in no-allocations mode.
-      if !ba.isCalleeAllocated {
-        try diagnoseHeapAllocation(
-          Violation(.embedded_swift_allocating_coroutine, in: instruction)
-        )
-      }
+      try diagnoseHeapAllocation(
+        Violation(.embedded_swift_allocating_coroutine, in: instruction)
+      )
 
-      // For yield_once_2, whether it allocates on the heap or the stack
-      // depends on the provided allocator, which isn't knowable here.
       try checkApply(apply: ba)
 
     case let pai as PartialApplyInst:
@@ -278,8 +272,8 @@ private struct FunctionChecker {
   // definition unless the type is `@export(interface)` (or defined in the main
   // module), so an object allocated in one module and downcast in another can
   // compare against a different metadata record and the cast silently fails.
-  // Reject casting to such a type here (rdar://179424428).
-  mutating func checkCastTargetUniqueness(_ targetType: CanonicalType, in instruction: Instruction) throws {
+  // Warn about casting to such a type here (rdar://179424428).
+  mutating func checkCastTargetUniqueness(_ targetType: CanonicalType, in instruction: Instruction) {
     // Only class metadata identity is at stake: `swift_dynamicCastClass`
     // compares isa pointers. Struct/enum casts don't rely on a unique metadata
     // record the same way.
@@ -294,7 +288,8 @@ private struct FunctionChecker {
     else {
       return
     }
-    throw Violation(.embedded_swift_cast_to_nonunique_type, targetType.rawType, in: instruction)
+    diagnose(Violation(.embedded_swift_cast_to_nonunique_type, targetType.rawType, in: instruction),
+             popCallStack: false)
   }
 
   mutating func checkApply(apply: ApplySite) throws {

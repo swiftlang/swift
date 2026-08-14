@@ -254,9 +254,7 @@ private struct CollectedEffects {
       break
 
     case is BeginCOWMutationInst, is IsUniqueInst:
-      // Model reference count reading as "destroy" for now. Although we could introduce a "read-refcount"
-      // effect, it would not give any significant benefit in any of our current optimizations.
-      addEffects(.destroy, to: inst.operands[0].value, fromInitialPath: SmallProjectionPath(.anyValueFields))
+      addEffects(.read, to: inst.operands[0].value, fromInitialPath: SmallProjectionPath(.anyValueFields))
 
     case isReturnInstruction:
       if inst.parentFunction.convention.hasAddressResult {

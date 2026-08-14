@@ -12,8 +12,8 @@ func sometimesOpaque() -> some P { return X() }
 
 struct NeverConformsToP {}
 
-@available(*, unavailable)
-extension NeverConformsToP: P {} // expected-note 2 {{conformance of 'NeverConformsToP' to 'P' has been explicitly marked unavailable here}}
+@available(*, unavailable) // expected-note 2 {{conformance of 'NeverConformsToP' to 'P' has been explicitly marked unavailable here}}
+extension NeverConformsToP: P {}
 
 @available(SwiftStdlib 5.1, *)
 struct Outer {
@@ -34,8 +34,8 @@ struct Outer {
 
 struct ConformsToPExeceptOnMacOS {}
 
-@available(macOS, unavailable)
-extension ConformsToPExeceptOnMacOS: P {} // expected-note {{conformance of 'ConformsToPExeceptOnMacOS' to 'P' has been explicitly marked unavailable here}}
+@available(macOS, unavailable) // expected-note {{conformance of 'ConformsToPExeceptOnMacOS' to 'P' has been explicitly marked unavailable here}}
+extension ConformsToPExeceptOnMacOS: P {}
 
 @available(SwiftStdlib 5.1, *)
 extension Outer {

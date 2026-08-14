@@ -51,6 +51,10 @@
 // CHECK:   init(_ a: CInt, _ b: CInt = cxxDefaultArg, _ c: CInt = cxxDefaultArg)
 // CHECK: }
 
+// CHECK: struct SelfContainedHasMethodWithDefaultArg {
+// CHECK:   mutating func __withDefaultUnsafe(_ a: CInt = cxxDefaultArg) -> UnsafeMutablePointer<CInt>!
+// CHECK: }
+
 // CHECK: struct TemplatedHasMethodWithDefaultArg<CFloat> {
 // CHECK:   func isZero(_ v: CFloat = cxxDefaultArg) -> CBool
 // CHECK:   func isNonZero(_ v: CFloat = cxxDefaultArg) -> CBool

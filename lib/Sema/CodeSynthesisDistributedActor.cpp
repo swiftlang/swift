@@ -671,11 +671,12 @@ static FuncDecl *createSameSignatureDistributedThunkDecl(DeclContext *DC,
 
   thunk->setSynthesized(true);
   thunk->setDistributedThunk(true);
-  thunk->addAttribute(NonisolatedAttr::createImplicit(C));
+
   // TODO(distributed): It would be nicer to make distributed thunks nonisolated(nonsending) instead;
   //                    this way we would not hop off the caller when calling system.remoteCall;
   //                    it'd need new ABI and the remoteCall also to become nonisolated(nonsending)
-  thunk->addAttribute(new (C) ConcurrentAttr(/*IsImplicit=*/true));
+  if (DeclAttribute::canAttributeAppearOnDecl(DeclAttrKind::Concurrent, thunk))
+    thunk->addAttribute(new (C) ConcurrentAttr(/*IsImplicit=*/true));
 
   return thunk;
 }

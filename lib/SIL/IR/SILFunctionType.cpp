@@ -2615,9 +2615,14 @@ lowerCaptureContextParameters(TypeConverter &TC, SILDeclRef function,
       break;
     }
     case CaptureKind::Consuming: {
-      assert(!loweredTL.isAddressOnly());
-      auto param = SILParameterInfo(loweredTy.getASTType(),
-                                    ParameterConvention::Direct_Owned, options);
+      // Address-only consumed captures (e.g. a non-Copyable generic parameter)
+      // are passed indirectly, like any other owned address-only value.
+      auto convention = loweredTL.isAddressOnly()
+                            ? ParameterConvention::Indirect_In
+                            : ParameterConvention::Direct_Owned;
+      SILType ty =
+          loweredTL.isAddressOnly() ? loweredTy.getAddressType() : loweredTy;
+      auto param = SILParameterInfo(ty.getASTType(), convention, options);
       inputs.push_back(param);
       break;
     }
@@ -3957,17 +3962,11 @@ getDirectCParameterConvention(clang::QualType type,
     // the deinit synthesizer would mark that call site specially so we can
     // drop this exception.
     if (clangModuleLoader && clangModuleLoader->isCxxMoveOnlyType(cxxRecord)) {
-      bool hasDestroyAttr = false;
-      if (cxxRecord->hasAttrs()) {
-        for (const clang::Attr *attr : cxxRecord->getAttrs()) {
-          if (auto *swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr)) {
-            if (swiftAttr->getAttribute().starts_with("destroy:")) {
-              hasDestroyAttr = true;
-              break;
-            }
-          }
-        }
-      }
+      bool hasDestroyAttr = llvm::any_of(
+          cxxRecord->specific_attrs<clang::SwiftAttrAttr>(),
+          [](const clang::SwiftAttrAttr *swiftAttr) {
+            return swiftAttr->getAttribute().starts_with("destroy:");
+          });
       if (!hasDestroyAttr)
         return ParameterConvention::Direct_Owned;
     }

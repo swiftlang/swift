@@ -1295,14 +1295,14 @@ extension ASTGenVisitor {
     }
 
     // TODO: Diangose
-    fatalError("expected identifier, 'self', or integer in @lifetime")
+    fatalError("expected identifier, 'self', or integer in @_lifetime")
   }
 
   func generateLifetimeEntry(attribute node: AttributeSyntax) -> BridgedLifetimeEntry? {
     self.generateWithLabeledExprListArguments(attribute: node) { args in
       guard !args.isEmpty else {
         // TODO: Diagnose
-        fatalError("expected arguments in @lifetime attribute")
+        fatalError("expected arguments in @_lifetime attribute")
       }
 
       var target: BridgedLifetimeDescriptor? = nil
@@ -1317,7 +1317,7 @@ extension ASTGenVisitor {
         } else {
           if arg.label != nil {
             // TODO: Diagnose.
-            fatalError("invalid argument label in @lifetime attribute")
+            fatalError("invalid argument label in @_lifetime attribute")
           }
         }
 
@@ -1345,10 +1345,10 @@ extension ASTGenVisitor {
 
   /// E.g.
   ///   ```
-  ///   @lifetime(src1, src2)
-  ///   @lifetime(target: borrow src1, copy src2)
-  ///   @lifetime(2)
-  ///   @lifetime(self)
+  ///   @_lifetime(src1, src2)
+  ///   @_lifetime(target: borrow src1, copy src2)
+  ///   @_lifetime(2)
+  ///   @_lifetime(self)
   ///   ```
   func generateLifetimeAttr(attribute node: AttributeSyntax) -> BridgedLifetimeAttr? {
     guard let entry = self.generateLifetimeEntry(attribute: node) else {

@@ -1,8 +1,17 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems %S/../Inputs/FakeDistributedActorSystems.swift
+
+// Default (unoptimized) build + run.
 // RUN: %target-build-swift -module-name main -target %target-swift-6.0-abi-triple -plugin-path %swift-plugin-dir -j2 -parse-as-library -I %t %s %S/../Inputs/FakeDistributedActorSystems.swift -o %t/a.out
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s
+
+// Re-build at -O and run again to ensure the optimized pipeline preserves
+// the synthesized $distributedProxyAdapter$<base> thunks and produces the
+// same wire round-trip behavior.
+// RUN: %target-build-swift -O -module-name main -target %target-swift-6.0-abi-triple -plugin-path %swift-plugin-dir -j2 -parse-as-library -I %t %s %S/../Inputs/FakeDistributedActorSystems.swift -o %t/a-O.out
+// RUN: %target-codesign %t/a-O.out
+// RUN: %target-run %t/a-O.out | %FileCheck %s
 //
 // REQUIRES: executable_test
 // REQUIRES: concurrency
