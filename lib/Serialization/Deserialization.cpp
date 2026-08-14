@@ -4197,15 +4197,15 @@ public:
     var->setIsSetterMutating(isSetterMutating);
     declOrOffset = var;
 
-    MF.configureStorage(var, opaqueReadOwnership,
-                        readImpl, writeImpl, readWriteImpl, accessors);
-
     auto interfaceTypeOrError = MF.getTypeChecked(interfaceTypeID);
     if (!interfaceTypeOrError)
       return interfaceTypeOrError.takeError();
     Type interfaceType = interfaceTypeOrError.get();
     var->setInterfaceType(interfaceType);
     var->setImplicitlyUnwrappedOptional(isIUO);
+
+    MF.configureStorage(var, opaqueReadOwnership,
+                        readImpl, writeImpl, readWriteImpl, accessors);
 
     if (auto referenceStorage = interfaceType->getAs<ReferenceStorageType>())
       AddAttribute(
@@ -4654,7 +4654,8 @@ public:
     ParameterList *paramList;
     SET_OR_RETURN_ERROR(paramList, MF.readParameterList());
     fn->setParameters(paramList);
-    {
+    // Accessors automatically infer they yield type from the storage
+    if (!isAccessor) {
       SmallVector<AnyFunctionType::Yield, 1> yields;
       SET_OR_RETURN_ERROR(yields, MF.readYieldList());
 

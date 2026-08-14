@@ -5224,14 +5224,7 @@ public:
     // Write the body parameters.
     writeParameterList(fn->getParameters());
 
-    // Write the body yields
-    {
-      SmallVector<AnyFunctionType::Yield, 1> yields;
-      fn->getYieldInterfaceTypes(yields);
-      assert(yields.empty() == !fn->isCoroutine());
-      WriteYieldList(yields);
-    }
-
+    // We do not write yields, these are inferred from the storage
     writeLifetimeDependenciesIfNeeded(fn);
 
     if (auto errorConvention = fn->getForeignErrorConvention())

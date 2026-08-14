@@ -412,7 +412,7 @@ class alignas(1 << TypeAlignInBits) TypeBase
   }
 
 protected:
-  enum { NumAFTExtInfoBits = 17 };
+  enum { NumAFTExtInfoBits = 18 };
   enum { NumSILExtInfoBits = 16 };
 
   // clang-format off
@@ -3688,6 +3688,10 @@ public:
     Yield subst(SubstitutionMap subs,
                 SubstOptions options = std::nullopt) const {
       return Yield(getType().subst(subs, options), getFlags());
+    }
+
+    Yield withType(Type newType) const {
+      return Yield(newType, Flags);
     }
 
     bool operator==(const Yield &other) const {

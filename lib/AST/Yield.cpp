@@ -95,8 +95,16 @@ Type Yield::getInterfaceType(const FuncDecl *parent) const {
   ASSERT(idx < parent->getYields()->size());
 
   auto mutableParent = const_cast<FuncDecl *>(parent);
-
   auto &ctx = mutableParent->getASTContext();
   return ctx.evaluator(YieldsTypeRequest{mutableParent, unsigned(idx)},
                        [&ctx]() { return ErrorType::get(ctx); });
+}
+
+std::optional<Type> Yield::getCachedInterfaceType(const FuncDecl *parent) const {
+  // Figure out our position in parent's yield list
+  size_t idx = std::distance(parent->getYields()->getArray().data(), this);
+  ASSERT(idx < parent->getYields()->size());
+
+  auto mutableParent = const_cast<FuncDecl *>(parent);
+  return YieldsTypeRequest(mutableParent, unsigned(idx)).getCachedResult();
 }

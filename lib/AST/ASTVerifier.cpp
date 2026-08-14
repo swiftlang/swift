@@ -3450,6 +3450,21 @@ public:
         abort();
       }
 
+      // Yield list is nullable: it is non-null only for coroutines (functions and
+      // coroutine accessors) and then cannot be empty.
+      if (AFD->isCoroutine()) {
+        auto *Yields = AFD->getYields();
+        if (!Yields || !Yields->size()) {
+          Out << "empty yield list for a coroutine\n";
+          AFD->dump(Out);
+          abort();
+        }
+      } else if (AFD->getYields()) {
+        Out << "non-null yield list for non-coroutine\n";
+        AFD->dump(Out);
+        abort();
+      }
+      
       if (AFD->getForeignErrorConvention()
           && !AFD->isObjC() && !AFD->getAttrs().hasAttribute<CDeclAttr>()) {
         Out << "foreign error convention on non-@objc, non-@_cdecl function\n";

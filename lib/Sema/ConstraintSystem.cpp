@@ -3833,6 +3833,9 @@ void constraints::simplifyLocator(ASTNode &anchor,
     case ConstraintLocator::SynthesizedArgument:
       break;
 
+    case ConstraintLocator::FunctionYield:
+      break;
+
     case ConstraintLocator::FunctionResult:
     case ConstraintLocator::DynamicLookupResult:
     case ConstraintLocator::KeyPathComponentResult:

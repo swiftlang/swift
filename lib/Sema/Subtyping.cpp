@@ -1508,13 +1508,54 @@ static Type subtypeJoinMeetImpl(Operation op, Type lhs, Type rhs,
         params.push_back(lhsParam.withType(paramType));
       }
 
+      if (lhsFunc->getNumYields() != rhsFunc->getNumYields())
+        return fail();
+
+      SmallVector<AnyFunctionType::Yield, 4> yields;
+      for (unsigned i : indices(lhsFunc->getYields())) {
+        auto lhsYield = lhsFunc->getYields()[i];
+        auto rhsYield = rhsFunc->getYields()[i];
+
+        if (lhsYield.getFlags() != rhsYield.getFlags())
+          return fail();
+        
+        Type yieldType;
+        if (lhsYield.isInOut()) {
+          ASSERT(rhsYield.isInOut());
+          auto result = isLikelyExactMatch(lhsYield.getType(),
+                                           rhsYield.getType());
+          if (!result)
+            return fail();
+          if (!*result)
+            return fail();
+
+          yieldType = lhsYield.getType();
+        } else if (op == Operation::Join) {
+          bool uninhabited = false;
+          yieldType = subtypeMeet(lhsYield.getType(),
+                                  rhsYield.getType(),
+                                  &uninhabited);
+          if (uninhabited)
+            return fail();
+        } else {
+          bool existentialUpperBound = false;
+          yieldType = subtypeJoin(lhsYield.getType(),
+                                  rhsYield.getType(),
+                                  &existentialUpperBound);
+          if (existentialUpperBound)
+            return fail();
+        }
+
+        yields.push_back(lhsYield.withType(yieldType));
+      }
+      
       auto extInfo = extInfoJoinMeetImpl(op,
                                          lhsFunc->getExtInfo(),
                                          rhsFunc->getExtInfo());
-      if(!extInfo.has_value())
+      if (!extInfo.has_value())
         return fail();
 
-      return FunctionType::get(params, result, *extInfo);
+      return FunctionType::get(params, yields, result, *extInfo);
     }
 
     case ConversionBehavior::Metatype: {
@@ -1808,7 +1849,16 @@ static Type openTypeJoinsAndMeetsRec(ConstraintSystem &cs, Type type,
       params.push_back(param.withType(paramType));
     }
 
-    return FunctionType::get(params, result, funcTy->getExtInfo());
+    SmallVector<AnyFunctionType::Yield, 1> yields;
+    for (unsigned i : indices(funcTy->getYields())) {
+      const auto &yield = funcTy->getYields()[i];
+      auto yieldType = rec(yield.getType(),
+                           LocatorPathElt::FunctionYield(),
+                           LocatorPathElt::TupleElement(i));
+      yields.push_back(yield.withType(yieldType));
+    }
+
+    return FunctionType::get(params, yields, result, funcTy->getExtInfo());
   }
 
   case ConversionBehavior::Metatype: {

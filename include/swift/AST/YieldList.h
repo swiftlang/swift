@@ -40,6 +40,7 @@ public:
 
   TypeRepr *getTypeRepr() const { return typeRepr; }
   Type getInterfaceType(const FuncDecl *parent) const;
+  std::optional<Type> getCachedInterfaceType(const FuncDecl *parent) const;
 
   YieldTypeFlags getFlags() const {
     return YieldTypeFlags::fromRaw(typeAndFlags.getInt());
