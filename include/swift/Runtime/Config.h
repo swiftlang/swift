@@ -310,9 +310,6 @@ extern uintptr_t __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTL
 #define __ptrauth_swift_cancellation_notification_function                     \
   __ptrauth(ptrauth_key_function_pointer, 1,                                   \
             SpecialPointerAuthDiscriminators::CancellationNotificationFunction)
-#define __ptrauth_swift_cancellation_notification_with_reason_function         \
-  __ptrauth(ptrauth_key_function_pointer, 1,                                   \
-            SpecialPointerAuthDiscriminators::CancellationNotificationWithReasonFunction)
 #define __ptrauth_swift_escalation_notification_function                       \
   __ptrauth(ptrauth_key_function_pointer, 1,                                   \
             SpecialPointerAuthDiscriminators::EscalationNotificationFunction)
@@ -373,7 +370,6 @@ extern uintptr_t __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTL
 #define __ptrauth_swift_async_context_resume
 #define __ptrauth_swift_async_context_yield
 #define __ptrauth_swift_cancellation_notification_function
-#define __ptrauth_swift_cancellation_notification_with_reason_function
 #define __ptrauth_swift_escalation_notification_function
 #define __ptrauth_swift_dispatch_invoke_function
 #define __ptrauth_swift_accessible_function_record
