@@ -1,4 +1,6 @@
-// RUN: %target-typecheck-verify-swift -I %S/Inputs -cxx-interoperability-mode=default -disable-availability-checking
+// RUN: %target-typecheck-verify-swift -I %S/Inputs -cxx-interoperability-mode=default -enable-experimental-feature ForeignReferenceTypeInheritance -disable-availability-checking
+
+// REQUIRES: swift_feature_ForeignReferenceTypeInheritance
 
 // Native classes conform to AnyObject, but foreign reference types do not, so a
 // base-constrained generic called with a derived FRT must not be ambiguous.
