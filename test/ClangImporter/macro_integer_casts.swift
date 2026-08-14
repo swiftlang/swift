@@ -4,6 +4,9 @@
 // SILGen.
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-sil %s -verify -o /dev/null
 
+// Failing for Android since #91256
+// XFAIL: OS=linux-android, OS=linux-androideabi
+
 import macros
 
 let _: CUnsignedInt = CAST_UNSIGNED_MINUS_ONE
