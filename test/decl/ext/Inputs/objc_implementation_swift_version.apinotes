@@ -1,0 +1,25 @@
+Name: objc_implementation_swift_version
+Classes:
+  - Name: ImplementedWithCurrentName
+    Methods:
+      - Selector: "methodWithVersionedName"
+        MethodKind: Instance
+        SwiftName: "currentSwiftName()"
+  - Name: ImplementedWithSwift4Name
+    Methods:
+      - Selector: "methodWithVersionedName"
+        MethodKind: Instance
+        SwiftName: "currentSwiftName()"
+SwiftVersions:
+  - Version: 5
+    Classes:
+      - Name: ImplementedWithCurrentName
+        Methods:
+          - Selector: "methodWithVersionedName"
+            MethodKind: Instance
+            SwiftName: "swift5Name()"
+      - Name: ImplementedWithSwift4Name
+        Methods:
+          - Selector: "methodWithVersionedName"
+            MethodKind: Instance
+            SwiftName: "swift5Name()"

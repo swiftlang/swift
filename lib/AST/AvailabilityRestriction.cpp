@@ -65,7 +65,7 @@ bool AvailabilityRestriction::isActiveForRuntimeQueries(
                                  /*forRuntimeQuery=*/true);
 }
 
-bool AvailabilityRestriction::emitNoteForDecl(const ValueDecl *decl) const {
+bool AvailabilityRestriction::emitNoteForDecl(const Decl *decl) const {
   auto &ctx = decl->getASTContext();
   auto &diags = ctx.Diags;
   auto parsedAttr = getAttr().getParsedAttr();

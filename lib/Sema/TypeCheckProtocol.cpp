@@ -2024,6 +2024,8 @@ checkWitnessAvailability(const ValueDecl *requirement, const ValueDecl *witness,
   assert(dc->getSelfNominalTypeDecl() &&
          "Must have a nominal or extension context");
 
+  // FIXME: [availability] Adopt getRequirementMatchAvailabilityRestriction().
+
   auto requirementAvailability =
       AvailabilityContext::forDeclSignature(requirement);
   requiredContext.constrainWithContext(requirementAvailability, ctx);

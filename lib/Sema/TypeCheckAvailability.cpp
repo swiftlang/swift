@@ -3659,3 +3659,25 @@ void swift::checkExplicitAvailability(Decl *decl) {
     }
   }
 }
+
+std::optional<AvailabilityRestriction>
+swift::getRequirementMatchAvailabilityRestriction(
+    const Decl *requirement, const Decl *candidate,
+    AvailabilityRestrictionFlags flags,
+    std::optional<AvailabilityContext> baseAvailability) {
+  auto &ctx = requirement->getASTContext();
+  auto availability = AvailabilityContext::forDeclSignature(requirement);
+
+  if (auto *parent = candidate->parentDeclForAvailability()) {
+    // The candidate cannot be any more available than the decl it is contained
+    // by so only report availability restrictions that are unmet beyond the
+    // parent's availability.
+    auto parentAvailability = AvailabilityContext::forDeclSignature(parent);
+    availability.constrainWithContext(parentAvailability, ctx);
+  }
+
+  if (baseAvailability)
+    availability.constrainWithContext(*baseAvailability, ctx);
+
+  return availability.unsatisfiedRestrictionForDecl(candidate, flags);
+}

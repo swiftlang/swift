@@ -28,22 +28,25 @@ func testObjCClasses( // expected-note {{add '@available' attribute to enclosing
 
 @objc @implementation
 extension ImplementMe {
-  // FIXME: [availability] @available(BayBridge) should be required
   func availableInBayBridge() { }
+  // expected-error@-1 {{instance method 'availableInBayBridge()' does not match the declaration in the header because it must be only available in BayBridge}} {{3-3=@available(BayBridge)\n  }}
 
-  // FIXME: [availability] Should match and suggest @available(BayBridge, unavailable)
-  func unavailableInBayBridge() { } // expected-error {{instance method 'unavailableInBayBridge()' does not match any instance method declared in the headers for 'ImplementMe'}}
-  // expected-note@-1 {{add 'private' or 'fileprivate'}}
-  // expected-note@-2 {{add 'final' to define a Swift-only instance method}}
+  func unavailableInBayBridge() { }
+  // expected-error@-1 {{instance method 'unavailableInBayBridge()' does not match the declaration in the header because it must be unavailable in BayBridge}} {{3-3=@available(BayBridge, unavailable)\n  }}
 
   @available(GoldenGateBridge)
   func availableInGoldenGateBridge() { }
 
-  // FIXME: [availability] This should be accepted
   @available(GoldenGateBridge, unavailable)
-  func unavailableInGoldenGateBridge() { } // expected-error {{instance method 'unavailableInGoldenGateBridge()' does not match any instance method declared in the headers for 'ImplementMe'}}
-  // expected-note@-1 {{add 'private' or 'fileprivate'}}
-  // expected-note@-2 {{add 'final' to define a Swift-only instance method}}
+  func unavailableInGoldenGateBridge() { }
+}
+
+@objc @implementation
+extension ImplementMe2 {
+  // expected-error@-1 {{extension for main class interface does not provide all required implementations}}
+  // expected-note@-2 {{missing instance method 'availableInBayBridge()'}}
+  // expected-note@-3 {{missing instance method 'unavailableInBayBridge()'}}
+  // expected-note@-4 {{add stubs for missing '@implementation' requirements}}
 }
 
 @objc @implementation
@@ -63,15 +66,17 @@ extension ImplementMeGoldenGateBridgeAvailable {
 @available(BayBridge)
 @objc @implementation
 extension ImplementMeGoldenGateBridgeAvailable2 { // expected-error {{'ImplementMeGoldenGateBridgeAvailable2' is only available in GoldenGateBridge}}
-  // expected-note@-1 {{add '@available' attribute to enclosing extension}}
+  // expected-error@-1 {{'@objc @implementation' extension cannot implement class 'ImplementMeGoldenGateBridgeAvailable2' because it is only available in BayBridge}}
+  // expected-note@-2 {{add '@available' attribute to enclosing extension}}
 }
 
-// FIXME: [availability] This implementation should be rejected because its less
-// available than the original class declaration.
+// This implementation is rejected because it is less available than the
+// original class declaration.
 @available(BayBridge)
 @available(GoldenGateBridge)
 @objc @implementation
 extension ImplementMeGoldenGateBridgeAvailable3 {
+  // expected-error@-1 {{'@objc @implementation' extension cannot implement class 'ImplementMeGoldenGateBridgeAvailable3' because it is only available in BayBridge}}
 }
 
 @available(GoldenGateBridge, unavailable)

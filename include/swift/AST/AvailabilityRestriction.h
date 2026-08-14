@@ -203,7 +203,7 @@ public:
   bool isActiveForRuntimeQueries(const ASTContext &ctx) const;
 
   /// Emit a note indicating the source of availability restriction.
-  bool emitNoteForDecl(const ValueDecl *decl) const;
+  bool emitNoteForDecl(const Decl *decl) const;
 
   /// Emit a note indicating the source of availability restriction.
   bool emitNoteForConformance(const ExtensionDecl *ext,

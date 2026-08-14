@@ -1,0 +1,4 @@
+module objc_implementation_swift_version {
+  header "objc_implementation_swift_version.h"
+  export *
+}
