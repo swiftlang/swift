@@ -116,11 +116,8 @@ public struct HeapObject {
 #endif
 
 #if _pointerBitWidth(_64)
-  static let immortalObjectPointerBit = UInt(0x8000_0000_0000_0000)
-#endif
-
-#if _pointerBitWidth(_64)
-  static let bridgeObjectToPlainObjectMask = UInt(0x8fff_ffff_ffff_fff8)
+  static let immortalObjectPointerBit = _bridgeObjectTaggedPointerBits
+  static let bridgeObjectToPlainObjectMask = ~_objectPointerSpareBits
 #elseif _pointerBitWidth(_32)
   static let bridgeObjectToPlainObjectMask = UInt(0xffff_ffff)
 #elseif _pointerBitWidth(_16)
