@@ -2294,6 +2294,13 @@ public:
       return false;
     }
 
+    // Escaping `@called(once)` closures are allowed to implicitly capture
+    // `self` because the call (which is a consuming operation) would break
+    // the cycle.
+    if (isCalledOnce(CE)) {
+      return false;
+    }
+
     if (auto autoclosure = dyn_cast<AutoClosureExpr>(CE)) {
       if (autoclosure->getThunkKind() == AutoClosureExpr::Kind::AsyncLet)
         return false;
@@ -2312,6 +2319,14 @@ public:
   static bool isNonEscaping(const AbstractClosureExpr *ACE) {
     if (auto funcTy = ACE->getType()->getAs<FunctionType>()) {
       return funcTy->isNoEscape();
+    }
+
+    return false;
+  }
+
+  static bool isCalledOnce(const AbstractClosureExpr *ACE) {
+    if (auto funcTy = ACE->getType()->getAs<FunctionType>()) {
+      return funcTy->isCalledOnce();
     }
 
     return false;
