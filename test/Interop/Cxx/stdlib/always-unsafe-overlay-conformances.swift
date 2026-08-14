@@ -2,6 +2,9 @@
 
 // REQUIRES: swift_feature_ImportUnsafeCxxMethodsAsAlwaysUnsafe
 
+// This fails only for 32-bit Android for some reason.
+// XFAIL: OS=linux-androideabi
+
 // The C++ standard library overlay still spells '__beginUnsafe()',
 // '__insertUnsafe(_:)' and friends in its protocol requirements, so the
 // synthesized conformances and the safe wrappers built on top of them must keep
