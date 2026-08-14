@@ -21,6 +21,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/AccessRequests.h"
 #include "swift/AST/AccessScope.h"
+#include "swift/AST/AccessorKind.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/AvailabilityContext.h"
 #include "swift/AST/AvailabilityInference.h"
@@ -12002,6 +12003,17 @@ bool FuncDecl::isStatic() const {
     false);
 }
 
+void AccessorDecl::inferYieldType() {
+  if (!isYieldingAccessor(getAccessorKind()))
+    return;
+
+  ASTContext &ctx = getASTContext();
+  YieldTypeFlags flags;
+  flags = flags.withInOut(isYieldingMutableAccessor(getAccessorKind()));
+  setYields(
+    YieldList::create(ctx, Yield(getStorage()->getValueInterfaceType(), flags)));
+}
+
 AccessorDecl *AccessorDecl::createImpl(
     ASTContext &ctx, SourceLoc declLoc, SourceLoc accessorKeywordLoc,
     AccessorKind accessorKind, AbstractStorageDecl *storage, bool async,
@@ -12036,6 +12048,7 @@ AccessorDecl *AccessorDecl::createDeserialized(ASTContext &ctx,
       throws, SourceLoc(), TypeLoc::withoutLoc(thrownType), parent,
       ClangNode());
   D->setResultInterfaceType(fnRetType);
+  D->inferYieldType();
 
   return D;
 }
@@ -12053,12 +12066,7 @@ AccessorDecl *AccessorDecl::create(ASTContext &ctx, SourceLoc declLoc,
       throws, throwsLoc, thrownType, parent, clangNode);
   D->setParameters(bodyParams);
   D->setResultInterfaceType(fnRetType);
-  if (isYieldingAccessor(accessorKind)) {
-    YieldTypeFlags flags;
-    flags = flags.withInOut(isYieldingMutableAccessor(accessorKind));
-    D->setYields(
-        YieldList::create(ctx, Yield(storage->getValueInterfaceType(), flags)));
-  }
+  D->inferYieldType();
   return D;
 }
 
@@ -12078,13 +12086,7 @@ AccessorDecl *AccessorDecl::createImplicit(ASTContext &ctx,
       /*clangNode=*/ClangNode());
   D->setImplicit();
   D->setResultInterfaceType(fnRetType);
-  if (isYieldingAccessor(accessorKind)) {
-    YieldTypeFlags flags;
-    flags = flags.withInOut(isYieldingMutableAccessor(accessorKind));
-    D->setYields(
-        YieldList::create(ctx, Yield(storage->getValueInterfaceType(), flags)));
-  }
-
+  D->inferYieldType();
   return D;
 }
 
@@ -12143,6 +12145,8 @@ AccessorDecl *AccessorDecl::createParsed(
   }
   accessor->setParameters(
       ParameterList::create(ctx, paramsStart, newParams, paramsEnd));
+  // Note that we do not use inferYieldType() here as we do not want to
+  // trigger type-checking request yet.
   if (isYieldingAccessor(accessorKind)) {
     YieldTypeFlags flags;
     flags = flags.withInOut(isYieldingMutableAccessor(accessorKind));

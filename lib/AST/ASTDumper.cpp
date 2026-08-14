@@ -22,6 +22,7 @@
 #include "swift/AST/AutoDiff.h"
 #include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/ClangModuleLoader.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/ForeignAsyncConvention.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -1312,18 +1313,18 @@ namespace {
     }
 
     /// Print a yield list as a child node.
-    void printRec(const YieldList *yields, Label label,
+    void printRec(const YieldList *yields, const FuncDecl *parent, Label label,
                   const ASTContext *ctx = nullptr) {
       if (!yields) {
         printHead("<<NULL yields>>", ParameterColor, label);
       } else {
         printRecArbitrary(
-            [&](Label label) { visitYieldList(yields, label, ctx); }, label);
+            [&](Label label) { visitYieldList(yields, parent, label, ctx); }, label);
       }
     }
 
     /// Print a yield list node.
-    void visitYieldList(const YieldList *yields, Label label,
+    void visitYieldList(const YieldList *yields, const FuncDecl *parent, Label label,
                         const ASTContext *ctx = nullptr) {
       printHead("yield_list", ParameterColor, label);
 
@@ -1331,7 +1332,9 @@ namespace {
 
       printList(
           *yields,
-          [&](auto &Y, Label label) { printRec(Y.getTypeRepr(), label); },
+          [&](auto &Y, Label label) {
+            printTypeOrTypeRepr(Y.getCachedInterfaceType(parent), Y.getTypeRepr(), label);
+          },
           Label::optional("yields"));
 
       printFoot();
@@ -2914,7 +2917,7 @@ namespace {
         }
 
         if (FD->isCoroutine()) {
-          printRec(D->getYields(), Label::optional("yields"),
+          printRec(D->getYields(), FD, Label::optional("yields"),
                    &D->getASTContext());
         }
       }
