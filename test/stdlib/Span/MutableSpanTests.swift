@@ -71,6 +71,20 @@ suite.test("Initialize with BitwiseCopyable element")
   expectEqual(m.count, 0)
 }
 
+suite.test("Initialize with custom owner")
+.require(.stdlib_6_2).code {
+  var array = ContiguousArray(0..<4)
+  array.withUnsafeMutableBufferPointer { buffer in
+    var span = unsafe MutableSpan(
+      _unsafeElements: UnsafeMutableBufferPointer(rebasing: buffer[1..<3]),
+      mutating: &buffer
+    )
+    expectEqual(span.count, 2)
+    span[0] = 99
+  }
+  expectEqual(array, [0, 99, 2, 3])
+}
+
 suite.test("isEmpty")
 .skip(.custom(
   { if #available(SwiftStdlib 6.2, *) { false } else { true } },
