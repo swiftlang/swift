@@ -95,14 +95,25 @@ SolverTrail::~SolverTrail() {
     result.TheConstraint.Constraint = constraint; \
     return result; \
   }
-#define BINDING_RELATION_CHANGE(Name)                                          \
+#define BINDING_VAR_RELATION_CHANGE(Name)                                      \
   SolverTrail::Change SolverTrail::Change::Name(                               \
       TypeVariableType *typeVar, TypeVariableType *otherTypeVar,               \
       Constraint *constraint) {                                                \
     Change result;                                                             \
     result.Kind = ChangeKind::Name;                                            \
     result.BindingRelation.TypeVar = typeVar;                                  \
-    result.BindingRelation.OtherTypeVar = otherTypeVar;                        \
+    result.BindingRelation.OtherType = otherTypeVar;                           \
+    result.BindingRelation.Constraint = constraint;                            \
+    return result;                                                             \
+  }
+#define BINDING_TYPE_RELATION_CHANGE(Name)                                     \
+  SolverTrail::Change SolverTrail::Change::Name(                               \
+      TypeVariableType *typeVar, Type otherType,                               \
+      Constraint *constraint) {                                                \
+    Change result;                                                             \
+    result.Kind = ChangeKind::Name;                                            \
+    result.BindingRelation.TypeVar = typeVar;                                  \
+    result.BindingRelation.OtherType = otherType;                              \
     result.BindingRelation.Constraint = constraint;                            \
     return result;                                                             \
   }
@@ -408,7 +419,7 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
     ASSERT(erased); \
     break; \
   }
-#define COMMON_BINDING_INFORMATION_ADDITION(PropertyName, Storage)             \
+#define BINDING_CONSTRAINT_ADDITION(PropertyName, Storage)                     \
   case ChangeKind::Added##PropertyName: {                                      \
     auto &bindings = cg[TheConstraint.TypeVar].getPotentialBindings();         \
     bindings.Storage.erase(llvm::remove_if(bindings.Storage,                   \
@@ -420,21 +431,21 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
     ++bindings.GenerationNumber;                                               \
     break;                                                                     \
   }
-#define COMMON_BINDING_INFORMATION_RETRACTION(PropertyName, Storage)           \
+#define BINDING_CONSTRAINT_RETRACTION(PropertyName, Storage)                     \
   case ChangeKind::Retracted##PropertyName: {                                  \
     auto &bindings = cg[TheConstraint.TypeVar].getPotentialBindings();         \
     bindings.Storage.push_back(TheConstraint.Constraint);                      \
     ++bindings.GenerationNumber;                                               \
     break;                                                                     \
   }
-#define BINDING_RELATION_ADDITION(RelationName, Storage)                       \
+#define BINDING_VAR_RELATION_ADDITION(RelationName, Storage)                   \
   case ChangeKind::Added##RelationName: {                                      \
     auto &bindings = cg[BindingRelation.TypeVar].getPotentialBindings();       \
     bindings.Storage.erase(                                                    \
         llvm::remove_if(bindings.Storage,                                      \
                         [&](const auto &relation) {                            \
                           return relation.first ==                             \
-                                     BindingRelation.OtherTypeVar &&           \
+                                     BindingRelation.OtherType.getPointer() && \
                                  relation.second ==                            \
                                      BindingRelation.Constraint;               \
                         }),                                                    \
@@ -442,10 +453,34 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
     ++bindings.GenerationNumber;                                               \
     break;                                                                     \
   }
-#define BINDING_RELATION_RETRACTION(RelationName, Storage)                     \
+#define BINDING_VAR_RELATION_RETRACTION(RelationName, Storage)                 \
   case ChangeKind::Retracted##RelationName: {                                  \
     auto &bindings = cg[BindingRelation.TypeVar].getPotentialBindings();       \
-    bindings.Storage.emplace_back(BindingRelation.OtherTypeVar,                \
+    bindings.Storage.emplace_back(                                             \
+        cast<TypeVariableType>(BindingRelation.OtherType.getPointer()),        \
+        BindingRelation.Constraint);                                           \
+    ++bindings.GenerationNumber;                                               \
+    break;                                                                     \
+  }
+#define BINDING_TYPE_RELATION_ADDITION(RelationName, Storage)                  \
+  case ChangeKind::Added##RelationName: {                                      \
+    auto &bindings = cg[BindingRelation.TypeVar].getPotentialBindings();       \
+    bindings.Storage.erase(                                                    \
+        llvm::remove_if(bindings.Storage,                                      \
+                        [&](const auto &relation) {                            \
+                          return relation.first.getPointer() ==                \
+                                     BindingRelation.OtherType.getPointer() && \
+                                 relation.second ==                            \
+                                     BindingRelation.Constraint;               \
+                        }),                                                    \
+        bindings.Storage.end());                                               \
+    ++bindings.GenerationNumber;                                               \
+    break;                                                                     \
+  }
+#define BINDING_TYPE_RELATION_RETRACTION(RelationName, Storage)                \
+  case ChangeKind::Retracted##RelationName: {                                  \
+    auto &bindings = cg[BindingRelation.TypeVar].getPotentialBindings();       \
+    bindings.Storage.emplace_back(BindingRelation.OtherType,                   \
                                   BindingRelation.Constraint);                 \
     ++bindings.GenerationNumber;                                               \
     break;                                                                     \
@@ -712,7 +747,7 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
       TheConstraint.TypeVar->print(out, PO); \
       out << ")\n"; \
       break;
-#define BINDING_RELATION_CHANGE(Name) \
+#define BINDING_VAR_RELATION_CHANGE(Name) \
     case ChangeKind::Name: \
       out << "(" << #Name << " "; \
       BindingRelation.Constraint->print(out, &cs.getASTContext().SourceMgr, \
@@ -720,7 +755,18 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
       out << " on type variable "; \
       BindingRelation.TypeVar->print(out, PO); \
       out << " and "; \
-      BindingRelation.OtherTypeVar->print(out, PO); \
+      BindingRelation.OtherType->print(out, PO); \
+      out << ")\n"; \
+      break;
+#define BINDING_TYPE_RELATION_CHANGE(Name) \
+    case ChangeKind::Name: \
+      out << "(" << #Name << " "; \
+      BindingRelation.Constraint->print(out, &cs.getASTContext().SourceMgr, \
+                                        indent + 2); \
+      out << " on type variable "; \
+      BindingRelation.TypeVar->print(out, PO); \
+      out << " with "; \
+      BindingRelation.OtherType->print(out, PO); \
       out << ")\n"; \
       break;
 #define SCORE_CHANGE(Name) \
