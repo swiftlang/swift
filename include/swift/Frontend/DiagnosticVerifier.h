@@ -74,7 +74,7 @@ public:
 
 struct CapturedDiagnosticInfo {
   llvm::SmallString<128> Message;
-  std::optional<unsigned> SourceBufferID;
+  unsigned SourceBufferID;
   DiagnosticKind Classification;
   SourceLoc Loc;
   unsigned Line;
@@ -92,7 +92,7 @@ struct CapturedDiagnosticInfo {
   bool HasChildren;
 
   CapturedDiagnosticInfo(llvm::SmallString<128> Message,
-                         std::optional<unsigned> SourceBufferID,
+                         unsigned SourceBufferID,
                          DiagnosticKind Classification, SourceLoc Loc,
                          unsigned Line, unsigned Column,
                          SmallVector<CapturedFixItInfo, 2> FixIts,
@@ -158,6 +158,12 @@ private:
     /// - Errors in the definition of expected diagnostics
     bool HadError;
     bool HadUnexpectedDiag;
+
+    Result &operator |= (const Result &rhs) {
+      HadError |= rhs.HadError;
+      HadUnexpectedDiag |= rhs.HadUnexpectedDiag;
+      return *this;
+    }
   };
 
   void printDiagnostic(const llvm::SMDiagnostic &Diag) const;
@@ -167,9 +173,6 @@ private:
   /// diagnostics
   bool verifyUnrelated(
       std::vector<CapturedDiagnosticInfo> &CapturedDiagnostics) const;
-
-  bool
-  verifyUnknown(std::vector<CapturedDiagnosticInfo> &CapturedDiagnostics) const;
 
   std::vector<SMDiagnosticWithNotes> Errors;
 
@@ -208,11 +211,11 @@ private:
   parseExpectedFixItRange(StringRef &Str, unsigned DiagnosticLineNo);
 
   bool checkForFixIt(const std::vector<ExpectedFixIt> &ExpectedAlts,
-                     const CapturedDiagnosticInfo &D, unsigned BufferID) const;
+                     const CapturedDiagnosticInfo &D) const;
 
   // Render the verifier syntax for a given set of fix-its.
   std::string renderFixits(ArrayRef<CapturedFixItInfo> ActualFixIts,
-                           unsigned BufferID, unsigned DiagnosticLineNo) const;
+                           unsigned DiagnosticLineNo) const;
 
   public:
   /// Tracks the set of macro-expansion buffers produced at a single source
@@ -321,14 +324,15 @@ private:
   llvm::DenseMap<SourceLoc, ExpansionContext> Expansions;
 
   struct MarkerLocation {
-    unsigned BufferID;
+    // nullopt: resolution of the buffer ID has been deferred
+    std::optional<unsigned> BufferID;
     unsigned Line;
   };
 
   /// Map from location marker names to their buffer and line number.
   /// Populated by scanForMarkers() before parsing expected diagnostics. Plain
   /// '// #name' markers are recorded with their resolved location. Expansion-
-  /// relative '// #name@N' markers are recorded with a sentinel buffer of 0
+  /// relative '// #name@N' markers are recorded with a null buffer ID
   /// until the enclosing expected-expansion block is parsed and
   /// processExpansionMarkerDefinitions() binds them.
   llvm::StringMap<MarkerLocation> LocationMarkers;

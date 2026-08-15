@@ -6,6 +6,8 @@
 
 // REQUIRES: std_coroutine
 
+// expected-warning@<unknown> * {{argument unused during compilation: '-fcoroutines'}}
+
 import StdCoroutine
 
 let _ = isSuspendNeverReady()
