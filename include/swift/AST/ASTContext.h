@@ -935,17 +935,26 @@ public:
 
   /// Get the availability of features introduced in the specified version
   /// of the Swift compiler for the target platform.
-  AvailabilityRange getSwiftAvailability(unsigned major, unsigned minor) const;
+  ///
+  /// Some targets have a minimum supported OS version that postdates the
+  /// introduction of an older Swift runtime, and features from that runtime are
+  /// therefore reported as being always available. Pass \p ignoreMinOS to get
+  /// the OS version in which the features actually appeared instead.
+  AvailabilityRange getSwiftAvailability(unsigned major, unsigned minor,
+                                         bool ignoreMinOS = false) const;
 
   // For each feature defined in FeatureAvailability, define two functions;
   // the latter, with the suffix RuntimeAvailability, is for use with
   // AvailabilityRange::forRuntimeTarget(), and only looks at the Swift
   // runtime version.
 #define FEATURE(N, V)                                                          \
-  inline AvailabilityRange get##N##Availability() const {                      \
+  inline AvailabilityRange get##N##Availability(bool ignoreMinOS = false)      \
+      const {                                                                  \
     if (LangOpts.hasFeature(Feature::Embedded))                                \
       return AvailabilityRange::alwaysAvailable();                             \
-    return getSwiftAvailability V;                                             \
+    auto version = llvm::VersionTuple V;                                       \
+    return getSwiftAvailability(version.getMajor(), *version.getMinor(),       \
+                                ignoreMinOS);                                  \
   }                                                                            \
   inline AvailabilityRange get##N##RuntimeAvailability() const {               \
     return AvailabilityRange(VersionRange::allGTE(llvm::VersionTuple V));      \

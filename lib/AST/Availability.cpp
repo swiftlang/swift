@@ -982,11 +982,12 @@ AvailabilityRange ASTContext::getSwiftFutureAvailability() const {
 }
 
 AvailabilityRange ASTContext::getSwiftAvailability(unsigned major,
-                                                   unsigned minor) const {
+                                                   unsigned minor,
+                                                   bool ignoreMinOS) const {
   auto target = LangOpts.Target;
 
   // Deal with special cases for Swift 5.3 and lower
-  if (major == 5 && minor <= 3) {
+  if (major == 5 && minor <= 3 && !ignoreMinOS) {
     if (target.getArchName() == "arm64e")
       return AvailabilityRange::alwaysAvailable();
     if (target.isMacOSX() && target.isAArch64())

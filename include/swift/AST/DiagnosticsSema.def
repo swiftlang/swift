@@ -2002,6 +2002,14 @@ ERROR(attr_objc_implementation_raise_minimum_deployment_target,none,
       "'@implementation' of an Objective-C class requires a minimum deployment "
       "target of at least %0 %1",
       (AvailabilityDomain, AvailabilityRange))
+ERROR(objc_implementation_extension_only_available_in,none,
+      "'@objc @implementation' extension cannot implement %kind0 because it is "
+      "only available in %1%select{| %3 or newer}2",
+      (const ValueDecl *, AvailabilityDomain, bool, AvailabilityRange))
+ERROR(objc_implementation_extension_unavailable,none,
+      "'@objc @implementation' extension cannot implement %kind0 because it is "
+      "unavailable%select{ in %2|}1",
+      (const ValueDecl *, bool, AvailabilityDomain))
 ERROR(attr_implementation_requires_language,none,
       "'@implementation' used without specifying the language being "
       "implemented",
@@ -2115,6 +2123,17 @@ ERROR(objc_implementation_mismatched_error_convention_other,none,
       "different Objective-C error convention; please file a bug report with a "
       "sample project, as the compiler should be able to describe the mismatch",
       (const ValueDecl *))
+
+ERROR(objc_implementation_availability_mismatch_only_available_in,none,
+      "%kind0 does not match the declaration in the header because it "
+      "%select{is|must be}1 only available in %2%select{| %4 or newer}3",
+      (const ValueDecl *, /*mustBe=*/bool, AvailabilityDomain, bool,
+       AvailabilityRange))
+
+ERROR(objc_implementation_availability_mismatch_unavailable,none,
+      "%kind0 does not match the declaration in the header because it "
+      "%select{is|must be}1 unavailable%select{ in %3|}2",
+      (const ValueDecl *, /*mustBe=*/bool, bool, AvailabilityDomain))
 
 ERROR(objc_implementation_wrong_objc_name,none,
       "selector %0 for %kind1 not found in header; did you mean %2?",
@@ -7483,15 +7502,15 @@ ERROR(availability_decl_unavailable_rename, none,
 
 NOTE(availability_marked_unavailable, none,
      "%0 has been explicitly marked unavailable here",
-     (const ValueDecl *))
+     (const Decl *))
 
 NOTE(availability_introduced_in_version, none,
      "%0 was introduced in %1 %2",
-     (const ValueDecl *, AvailabilityDomain, AvailabilityRange))
+     (const Decl *, AvailabilityDomain, AvailabilityRange))
 
 NOTE(availability_obsoleted, none,
      "%0 was obsoleted in %1 %2",
-     (const ValueDecl *, AvailabilityDomain, AvailabilityRange))
+     (const Decl *, AvailabilityDomain, AvailabilityRange))
 
 GROUPED_WARNING(availability_deprecated, DeprecatedDeclaration, Deprecation,
                 "%0 %select{is|%select{is|was}3}1 "
