@@ -573,7 +573,9 @@ entry(%intIndex : $Builtin.Word):
 // CHECK-LL:  [[PACK_ADDR:%.*]] = ptrtoint ptr [[PACK]] to i{{(32|64)}}
 // CHECK-LL:  [[PACK_ADDR2:%.*]] = and i{{(32|64)}} [[PACK_ADDR]], -2
 // CHECK-LL:  [[PACK:%.*]] = inttoptr i{{(32|64)}} [[PACK_ADDR2]] to ptr
-// CHECK-LL:   [[ELEMENT_ADDRESS:%[^,]+]] = getelementptr inbounds ptr, ptr [[PACK]], i{{(32|64)}} [[INDEX]]
+// CHECK-LL-UNOPT: [[ELEMENT_ADDRESS:%[^,]+]] = getelementptr inbounds ptr, ptr [[PACK]], i{{(32|64)}} [[INDEX]]
+// Note(stable/23.x): at -O, InstCombine canonicalizes the source element type of a single-index getelementptr from `ptr` to the equally sized byte array `[(4|8) x i8]`
+// CHECK-LL-OPT:   [[ELEMENT_ADDRESS:%[^,]+]] = getelementptr inbounds {{(ptr|\[(4|8) x i8\])}}, ptr [[PACK]], i{{(32|64)}} [[INDEX]]
 // CHECK-LL:   [[ELEMENT:%[^,]+]] = load ptr, ptr [[ELEMENT_ADDRESS]]
 // CHECK-LL:   call swiftcc void @printGenericType(ptr [[ELEMENT]], ptr [[ELEMENT]])
 sil @direct_access_from_parameter : $<each T_1> (Builtin.Word) -> () {
@@ -597,12 +599,16 @@ entry(%intIndex : $Builtin.Word):
 // CHECK-LL:         [[PACK_ADDR:%.*]] = ptrtoint ptr [[METADATA_PACK]] to i{{(32|64)}}
 // CHECK-LL:         [[PACK_ADDR2:%.*]] = and i{{(32|64)}} [[PACK_ADDR]], -2
 // CHECK-LL:         [[METADATA_PACK:%.*]] = inttoptr i{{(32|64)}} [[PACK_ADDR2]] to ptr
-// CHECK-LL:         [[METADATA_ADDRESS:%[^,]+]] = getelementptr inbounds ptr, ptr        [[METADATA_PACK]], i{{(32|64)}} [[INDEX]]
+// CHECK-LL-UNOPT:   [[METADATA_ADDRESS:%[^,]+]] = getelementptr inbounds ptr, ptr [[METADATA_PACK]], i{{(32|64)}} [[INDEX]]
+// Note(stable/23.x): at -O, InstCombine canonicalizes the source element type of a single-index getelementptr from `ptr` to the equally sized byte array `[(4|8) x i8]`
+// CHECK-LL-OPT:     [[METADATA_ADDRESS:%[^,]+]] = getelementptr inbounds {{(ptr|\[(4|8) x i8\])}}, ptr [[METADATA_PACK]], i{{(32|64)}} [[INDEX]]
 // CHECK-LL:         [[METADATA:%[^,]+]] = load ptr, ptr [[METADATA_ADDRESS]]
 // CHECK-LL:         [[PACK_ADDR:%.*]] = ptrtoint ptr [[WTABLE_PACK]] to i{{(32|64)}}
 // CHECK-LL:         [[PACK_ADDR2:%.*]] = and i{{(32|64)}} [[PACK_ADDR]], -2
 // CHECK-LL:         [[WTABLE_PACK:%.*]] = inttoptr i{{(32|64)}} [[PACK_ADDR2]] to ptr
-// CHECK-LL:         [[WTABLE_ADDRESS:%[^,]+]] = getelementptr inbounds ptr, ptr [[WTABLE_PACK]], i{{(32|64)}} [[INDEX]]
+// CHECK-LL-UNOPT:   [[WTABLE_ADDRESS:%[^,]+]] = getelementptr inbounds ptr, ptr [[WTABLE_PACK]], i{{(32|64)}} [[INDEX]]
+// Note(stable/23.x): at -O, InstCombine canonicalizes the source element type of a single-index getelementptr from `ptr` to the equally sized byte array `[(4|8) x i8]`
+// CHECK-LL-OPT:     [[WTABLE_ADDRESS:%[^,]+]] = getelementptr inbounds {{(ptr|\[(4|8) x i8\])}}, ptr [[WTABLE_PACK]], i{{(32|64)}} [[INDEX]]
 // CHECK-LL:         [[WTABLE:%[^,]+]] = load ptr, ptr [[WTABLE_ADDRESS]], align
 // CHECK-LL:         call swiftcc void @printGenericType(ptr [[METADATA]], ptr [[METADATA]])
 sil @direct_access_from_parameter_with_conformance : $<each T_1 : P> (Builtin.Word) -> () {
