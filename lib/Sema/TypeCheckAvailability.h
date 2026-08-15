@@ -281,6 +281,19 @@ void fixAvailability(SourceRange ReferenceRange, const DeclContext *ReferenceDC,
                      const AvailabilityDomainAndRange &DomainAndRange,
                      ASTContext &Context);
 
+/// If \p candidate is not available in all contexts in which \p requirement is
+/// available, returns the primary availability restriction that makes
+/// \p candidate less available.
+///
+/// If \p baseAvailability is given, the availability of \p requirement is
+/// further constrained by it, so that \p candidate may be restricted to that
+/// range without being considered less available.
+std::optional<AvailabilityRestriction>
+getRequirementMatchAvailabilityRestriction(
+    const Decl *requirement, const Decl *candidate,
+    AvailabilityRestrictionFlags flags = std::nullopt,
+    std::optional<AvailabilityContext> baseAvailability = std::nullopt);
+
 } // namespace swift
 
 #endif // SWIFT_SEMA_TYPE_CHECK_AVAILABILITY_H
