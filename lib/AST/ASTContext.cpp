@@ -707,10 +707,10 @@ struct ASTContext::Implementation {
   /// Temporary arena used for a constraint solver.
   struct ConstraintSolverArena : public Arena {
     /// The allocator used for all allocations within this arena.
-    llvm::BumpPtrAllocator &Allocator;
+    ConstraintSolverAllocator &Allocator;
 
-    ConstraintSolverArena(llvm::BumpPtrAllocator &allocator)
-      : Allocator(allocator) { }
+    ConstraintSolverArena(ConstraintSolverAllocator &allocator)
+        : Allocator(allocator) {}
 
     ConstraintSolverArena(const ConstraintSolverArena &) = delete;
     ConstraintSolverArena(ConstraintSolverArena &&) = delete;
@@ -772,10 +772,9 @@ ASTContext::Implementation::~Implementation() {
     cleanup();
 }
 
-ConstraintCheckerArenaRAII::
-ConstraintCheckerArenaRAII(ASTContext &self, llvm::BumpPtrAllocator &allocator)
-  : Self(self), Data(self.getImpl().CurrentConstraintSolverArena.release())
-{
+ConstraintCheckerArenaRAII::ConstraintCheckerArenaRAII(
+    ASTContext &self, ConstraintSolverAllocator &allocator)
+    : Self(self), Data(self.getImpl().CurrentConstraintSolverArena.release()) {
   Self.getImpl().CurrentConstraintSolverArena.reset(
     new ASTContext::Implementation::ConstraintSolverArena(allocator));
 }
@@ -911,7 +910,7 @@ ASTContext::ASTContext(
 
 void ASTContext::Implementation::dump(llvm::raw_ostream &os) const {
   os << "-------------------------------------------------\n";
-  os << "Arena\t0\t" << Allocator.getBytesAllocated() << "\n";
+  os << "Arena\t0\t" << Allocator.getTotalMemory() << "\n";
   Permanent.dump(os);
 
 #define SIZE(Name) os << #Name << "\t" << Name.size() << "\t0\n"
@@ -1015,7 +1014,7 @@ void ASTContext::setStatsReporter(UnifiedStatsReporter *stats) {
   Stats = stats;
 
   stats->getFrontendCounters().NumASTBytesAllocated =
-      getAllocator().getBytesAllocated();
+      getAllocator().getTotalMemory();
 
   if (stats->fineGrainedTimers())
     evaluator.setStatsReporter(stats);
@@ -3531,7 +3530,7 @@ size_t ASTContext::getSolverMemory() const {
 
   if (getImpl().CurrentConstraintSolverArena) {
     Size += getImpl().CurrentConstraintSolverArena->getTotalMemory();
-    Size += getImpl().CurrentConstraintSolverArena->Allocator.getBytesAllocated();
+    Size += getImpl().CurrentConstraintSolverArena->Allocator.getTotalMemory();
   }
 
   return Size;

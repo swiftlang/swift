@@ -995,7 +995,7 @@ namespace swift {
 
     /// The upper bound, in bytes, of temporary data that can be
     /// allocated by the constraint solver.
-    unsigned SolverMemoryThreshold = 512 * 1024 * 1024;
+    unsigned SolverMemoryThreshold = 516 * 1024 * 1024;
 
     /// The maximum number of scopes we explore before giving up.
     unsigned SolverScopeThreshold = 1024 * 1024;
