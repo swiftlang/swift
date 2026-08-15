@@ -39,10 +39,13 @@
 % Theorem-like environments: proposition, example, algorithm, etc.
 \usepackage{amsthm}
 
-\makeatletter
+% For \currfiledir
+\usepackage{currfile}
 
 % For the 'List of Algorithms'. Must load before hyperref.
 \usepackage{thmtools}
+
+\makeatletter
 
 % Workaround from https://github.com/muzimuzhi/thmtools/issues/72
 \IfFormatAtLeastTF{2024-11-01}{
@@ -107,9 +110,10 @@
 
 % TikZ for figures
 \usepackage{tikz}
+\usepackage[edges]{forest}
 \usepackage{tikz-cd}
 \usetikzlibrary{positioning,shapes,arrows,trees,calc,fit,backgrounds,shapes.multipart}
-\tikzstyle{class}=[rounded corners,draw=black,thick,anchor=west, outer sep=0.2em]
+\tikzstyle{class}=[rounded corners,draw=black,thick,anchor=west,outer sep=0.2em]
 \tikzstyle{stage}=[rounded corners, draw=darkgray, thick, fill=lightgray, text centered, outer sep=0.2em]
 \tikzstyle{data}=[draw=darkgray, thick, fill=light-gray, text centered, outer sep=0.2em]
 \tikzstyle{arrow}=[->,>=stealth]
@@ -175,7 +179,6 @@
 
 % Use the same counter for all three so you get Definition 12.1, Proposition 12.2, Example 12.3 etc.
 \newtheorem{example}[definition]{Example}
-\newtheorem{remark}[definition]{Remark}
 
 % We don't want the statement of the theorem to use italics...
 % \theoremstyle{theorem}
@@ -183,7 +186,7 @@
 \newtheorem{lemma}[definition]{Lemma}
 \newtheorem{corollary}[definition]{Corollary}
 \newtheorem{theorem}[definition]{Theorem}
-\newtheorem{conjecture}[definition]{Conjecture}
+\newtheorem{remark}[definition]{Remark}
 
 % 'listing' floating environment for source listings
 \DeclareNewTOC[
@@ -194,6 +197,7 @@
 
 % 'Verbatim' environment for fancy source listings
 \RecustomVerbatimEnvironment{Verbatim}{Verbatim}{frame=single}
+\newcommand{\VerbInput}[1]{\VerbatimInput[frame=single]{\currfiledir #1}}
 
 % 'More Details' boxes in Introduction
 \newenvironment{MoreDetails}{\medskip\begin{mdframed}[rightline=true,frametitlerule=true,frametitlerulecolor=gray,frametitlebackgroundcolor=light-gray,frametitlerulewidth=2pt,backgroundcolor=light-gray,linecolor=gray,frametitle={More details}]\begin{itemize}}{\end{itemize}\end{mdframed}}
@@ -226,8 +230,6 @@
 \newcommand{\LemmaRef}[1]{\hyperref[#1]{Lemma~\ref*{#1}}}
 \newcommand{\AlgRef}[1]{\hyperref[#1]{Algorithm~\ref*{#1}}}
 \newcommand{\ExRef}[1]{\hyperref[#1]{Example~\ref*{#1}}}
-\newcommand{\RemarkRef}[1]{\hyperref[#1]{Remark~\ref*{#1}}}
-\newcommand{\ConjectureRef}[1]{\hyperref[#1]{Conjecture~\ref*{#1}}}
 \newcommand{\FigRef}[1]{\hyperref[#1]{Figure~\ref*{#1}}}
 \newcommand{\ListingRef}[1]{\hyperref[#1]{Listing~\ref*{#1}}}
 
@@ -290,8 +292,8 @@
 \newcommand{\nIterator}{\texttt{Iterator}}
 
 % Identifiers with '
-\newcommand{\tTp}{\tT^\prime}
-\newcommand{\tUp}{\tU^\prime}
+\newcommand{\tTp}{\tT'}
+\newcommand{\tUp}{\tU'}
 
 % Declared interface type
 \newcommand{\tXd}{\texttt{X}_d}
@@ -316,9 +318,9 @@
 \newcommand{\TU}{\SameReq{T}{U}}
 \newcommand{\TX}{\SameReq{T}{X}}
 
-\newcommand{\Tprime}{\texttt{T}^\prime}
-\newcommand{\Xprime}{\texttt{X}^\prime}
-\newcommand{\Cprime}{\texttt{C}^\prime}
+\newcommand{\Tprime}{\texttt{T}'}
+\newcommand{\Xprime}{\texttt{X}'}
+\newcommand{\Cprime}{\texttt{C}'}
 
 % Derivation step definitions for induction proofs and Appendix B
 \newcommand{\GenericStepDef}{\ttgp{d}{i}\tag{\textsc{Generic}}}
@@ -464,8 +466,13 @@
 \newcommand{\Oy}{\Opaque{\ttgp{1}{0}}}
 
 % Existential archetypes for Chapter 13
-\newcommand{\Exist}[1]{\EquivClass{\exists\,\texttt{#1}}}
+\newcommand{\Exist}[1]{\EquivClass{\Box\,\texttt{#1}}}
 \newcommand{\Et}{\Exist{T}}
+\newcommand{\ESelf}{\Exist{Self}}
+\newcommand{\AnyP}{\texttt{any~P}}
+\newcommand{\AnyQ}{\texttt{any~Q}}
+\newcommand{\AnyX}{\texttt{any~X}}
+\newcommand{\AnyY}{\texttt{any~Y}}
 
 % Generic environment operations
 \newcommand{\MapIn}{\mathsf{in}_G}
@@ -475,7 +482,7 @@
 % Monoids, etc
 %%%
 
-\newcommand{\Pres}[2]{\langle #1\,|\,#2\rangle}
+\newcommand{\Pres}[2]{\langle #1 \mid #2\rangle}
 \newcommand{\AR}{\Pres{A}{R}}
 \newcommand{\PhiInv}{\varphi^{-1}}
 \newcommand{\NN}{\mathbb{N}}
@@ -498,6 +505,7 @@
 
 \newcommand{\Type}{\mathsf{type}}
 
+\newcommand{\pN}{\protosym{N}}
 \newcommand{\pP}{\protosym{P}}
 \newcommand{\pQ}{\protosym{Q}}
 \newcommand{\pR}{\protosym{R}}
@@ -509,15 +517,17 @@
 
 \newcommand{\aNA}{\assocsym{N}{A}}
 
+\newcommand{\aQA}{\assocsym{Q}{A}}
+
 \newcommand{\pSequence}{\protosym{Sequence}}
 \newcommand{\pCollection}{\protosym{Collection}}
 \newcommand{\pIterator}{\protosym{IteratorProtocol}}
 \newcommand{\pEquatable}{\protosym{Equatable}}
 \newcommand{\pComparable}{\protosym{Comparable}}
 
-\newcommand{\ConfRule}[2]{#1 \cdot #2 \sim #1}
-\newcommand{\SameRule}[2]{#1 \sim #2}
-\newcommand{\AssocRule}[2]{\protosym{#1}\cdot\texttt{#2} \sim \assocsym{#1}{#2}}
+\newcommand{\ConfRule}[2]{#1 \cdot #2 \Eq #1}
+\newcommand{\SameRule}[2]{#1 \Eq #2}
+\newcommand{\AssocRule}[2]{\protosym{#1}\cdot\texttt{#2} \Eq \assocsym{#1}{#2}}
 
 \newcommand{\CRule}[1]{$\diamond\, #1$}
 
@@ -606,6 +616,9 @@
 \RedeclareSectionCommands[tocpagenumberformat=]{chapter}
 \RedeclareSectionCommands[tocpagenumberformat=]{part}
 
+% Tweak the spacing in the table of contents to get better page breaks.
+\RedeclareSectionCommands[tocbeforeskip=1.5em]{part}
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Index
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -652,6 +665,9 @@
 \newcommand{\IndexQuery}[1]{\Index{#1()@$\texttt{#1}()$}}
 
 \newcommand{\IndexSelf}{\Index{protocol Self type@protocol \tSelf\ type}}
+
+% Standard library protocols
+\newcommand{\IndexProto}[1]{\Index{#1 protocol@\texttt{#1} protocol}}
 
 % Normally a seealso index entry elides the page number, but sometimes we want index entries that look like this:
 %
@@ -704,7 +720,7 @@
 
 \subfile{chapters/preface}
 
-\part{Syntax}\label{part syntax}
+\part{Nuts and Bolts}\label{part:nuts and bolts}
 
 \subfile{chapters/introduction}
 
@@ -714,19 +730,17 @@
 
 \subfile{chapters/declarations}
 
-\part{Semantics}\label{part semantics}
-
 \subfile{chapters/generic-signatures}
 
 \subfile{chapters/substitution-maps}
 
 \subfile{chapters/conformances}
 
+\part{Odds and Ends}\label{part:odds and ends}
+
 \subfile{chapters/archetypes}
 
 \subfile{chapters/type-resolution}
-
-\part{Subtleties}\label{part subtleties}
 
 \subfile{chapters/extensions}
 
@@ -738,7 +752,7 @@
 
 \subfile{chapters/existential-types}
 
-\part{The Requirement Machine}\label{part rqm}
+\part{The Requirement Machine}\label{part:rqm}
 
 \subfile{chapters/basic-operation}
 

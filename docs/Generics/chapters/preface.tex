@@ -7,75 +7,102 @@
 % Emit this before the first citation to customize bibliography
 \bstctlcite{IEEEexample:BSTcontrol}
 
-\lettrine{T}{his is a book} about the implementation of generic programming---also known as parametric polymorphism---in the \index{Swift}Swift compiler. You won't learn how to \emph{write} generic code in Swift here; the best reference for that is, of course, the official language guide \cite{tspl}. This book is intended mainly for Swift compiler developers who interact with the generics implementation, other language designers who want to understand how Swift evolved, Swift programmers curious to peek under the hood, and finally, mathematicians interested in a practical application of string rewriting and the Knuth-Bendix completion procedure.
+\lettrine{T}{his is a book} about the implementation of generic programming---also known as parametric polymorphism---in the \index{Swift}Swift compiler. You won't learn how to \emph{write} generic code in Swift here; the best reference for that is, of course, the official language guide \cite{tspl}. Rather, this book is intended for Swift compiler developers who interact with the generics implementation, other language designers who wish to understand how Swift evolved, Swift programmers curious to peek under the hood, and last but not least, mathematicians interested in a practical application of finitely-presented monoids and finite complete rewriting systems.
 
-From the compiler developer's point of view, the \emph{user} is the developer writing the code being compiled. The declarations, types, statements, and expressions that comprise the user's program become \emph{data structures} the compiler must then analyze and manipulate. I assume some basic familiarity with these concepts, and compiler construction in general. For background reading, see \cite{muchnick1997advanced,cooper2004engineering,craftinginterpreter,incrementalracket}.
+From the compiler developer's point of view, the \emph{user} is the developer writing the code being compiled. The declarations, types, statements, and expressions that make up the user's program become \emph{data structures} the compiler must then analyze and manipulate. I assume some basic familiarity with these concepts. If you want to learn about compiler construction first, I recommend \cite{muchnick1997advanced,cooper2004engineering,appel,incrementalracket,craftinginterpreter}.
 
-This book is divided into five parts. \PartRef{part syntax} gives a high-level overview of the Swift compiler architecture, and describes how types and declarations, and specifically, generic types and declarations, are modeled by the compiler.
+This book is divided into three parts. \PartRef{part:nuts and bolts} begins with a high-level overview of the Swift compiler architecture, followed by a description of how types and declarations, and specifically, generic types and declarations, are modeled by the compiler:
 \begin{itemize}
 \item \ChapRef{chap:introduction} summarizes every key concept in the generics implementation with a series of worked examples, and surveys capabilities for generic programming found in other programming languages.
-\item \ChapRef{chap:compilation model} covers Swift's compilation model and module system as well as the \emph{request evaluator}, which adds an element of lazy evaluation to the typical ``compilation pipeline'' of parsing, type checking and code generation.
-\item \ChapRef{chap:types} describes how the compiler models the \emph{types} of values declared by the source program. Types form a miniature language of their own, and we often find ourselves taking them apart and re-assembling them in new ways. Generic parameter types, dependent member types, and generic nominal types are the three fundamental kinds; others are also summarized.
-\item \ChapRef{chap:decls} is about \emph{declarations}, the building blocks of Swift code. Functions, structs, and protocols are examples of declarations. Various kinds of declarations can be \emph{generic}. There is a common syntax for declaring generic parameters and stating \emph{requirements}. Protocols can declare associated types and impose \emph{associated requirements} on their associated types in a similar manner.
+\item \ChapRef{chap:compilation model} covers Swift's compilation model and module system, as well as the \emph{request evaluator}, which adds an element of lazy evaluation to the typical ``compilation pipeline'' of parsing, type checking and code generation.
+\item \ChapRef{chap:types} describes how the compiler models the \emph{types} of values declared by the source program. Types form a miniature language of their own, and they can be taken apart and re-assembled in various ways. Generic parameter types, dependent member types, and nominal types are the three fundamental kinds of types in Swift; the rest are also summarized here.
+\item \ChapRef{chap:decls} is about \emph{declarations}, the building blocks of Swift programs. Functions, structs, and protocols are examples of declarations. Various kinds of declarations can be \emph{generic}. There is a common syntax for declaring generic parameters and stating \emph{requirements}. Protocols can declare associated types and impose \emph{associated requirements} on their associated types in a similar manner.
+\end{itemize}
+The next three chapters focus on the \emph{semantic objects} of Swift generics: 
+\begin{itemize}
+\item \ChapRef{chap:generic signatures} defines the \emph{generic signature}, which collects the generic parameters and explicit requirements of a generic declaration. The explicit requirements of a generic signature generate a set of \emph{derived requirements} and \emph{valid type parameters}, which explain how to type check code \emph{inside} a generic declaration. This formalism is realized in the implementation via \emph{generic signature queries}.
+
+\item \ChapRef{chap:substitution maps} defines the \emph{substitution map}, a mapping from generic parameter types to replacement types. The \emph{type substitution algebra} is introduced here, which explains how to type check a \emph{reference} to a generic declaration. Also, this chapter covers two topics closely related to substitution: how subclassing intersects with generics, and \emph{re-abstraction} of function values.
+
+\item \ChapRef{chap:conformances} defines the \emph{conformance}, a description of how a concrete type fulfills the requirements of a protocol, and in particular, the protocol's associated types. This chapter also describes \emph{associated type inference}, which is an \emph{NP-hard} problem, so the best known algorithm takes exponential time.
 \end{itemize}
 
-\PartRef{part semantics} focuses on the core \emph{semantic} objects in the generics implementation. To grasp the mathematical asides, it helps to have had some practice working with definitions and proofs, at the level of an introductory course in calculus, linear algebra, or combinatorics. A summary of basic math appears in \AppendixRef{math summary}.
+\PartRef{part:odds and ends} covers some additional language features and compiler internals, while further developing the derived requirements formalism and the type substitution algebra:
 \begin{itemize}
-\item \ChapRef{chap:generic signatures} defines the \emph{generic signature}, which collects the generic parameters and explicit requirements of a generic declaration. The explicit requirements of a generate signature generate a set of \emph{derived requirements} and \emph{valid type parameters}, which explains how we type check code \emph{inside} a generic declaration. This formalism is realized in the implementation via \emph{generic signature queries}.
-
-\item \ChapRef{chap:substitution maps} defines the \emph{substitution map}, a mapping from generic parameter types to replacement types. The \emph{type substitution algebra} will explain the operations of type substitution and substitution map composition. This explains how we type check a \emph{reference} to (sometimes called a \emph{specialization} of) a generic declaration.
-
-\item \ChapRef{chap:conformances} defines the \emph{conformance}, a description of how a concrete type fulfills the requirements of a protocol, in particular its associated types. In the type substitution algebra, conformances are to protocols what substitution maps are to generic signatures.
-
-\item \ChapRef{chap:archetypes} defines \emph{archetypes} and \emph{generic environments}, two abstractions used throughout the compiler. Also describes the \emph{type parameter graph} that gives us an intuitive visualization of a generic signature.
+\item \ChapRef{chap:archetypes} defines \emph{archetypes} and \emph{generic environments}, two abstractions used throughout the compiler. Also describes the \emph{type parameter graph}, which is a more visual way of thinking about the type parameters of a generic signature, as well as the Swift 3-era \emph{archetype builder} algorithm, which could completely decide the derived requirements formalism in the absence of \emph{recursive conformances}.
 
 \item \ChapRef{chap:type resolution} describes \emph{type resolution}, which uses name lookup and substitution to resolve syntactic representations to semantic types. Checking if a substitution map satisfies the requirements of its generic signature links our two formalisms.
-\end{itemize}
 
-\PartRef{part subtleties} covers some additional language features and compiler internals, while further developing the derived requirements formalism and type substitution:
-\begin{itemize}
-\item \ChapRef{chap:extensions} discusses extension declarations, which add members and conformances to existing types. Extensions can also declare \emph{conditional conformances}, which have some interesting behaviors.
+\item \ChapRef{chap:extensions} discusses extension declarations, which add members and conformances to existing types. Extensions can also declare \emph{conditional conformances}, which have some interesting behaviors. A soundness hole in their design is described, which remains unfixed for now.
 
 \item \ChapRef{chap:building generic signatures} explains how we build a generic signature from syntax written in source, and gives a formal description of \emph{requirement minimization}. This chapter also shows how invalid requirements are diagnosed, and defines a \emph{well-formed generic signature} as one that passes these checks.
 
-\item \ChapRef{conformance paths} shows that \emph{conformance paths} give us a way to evaluate expressions in the type substitution algebra, which completes the formalism. The concept of a \emph{recursive conformance} is explored, and finally, the type substitution algebra is shown to be Turing-complete.
+\item \ChapRef{conformance paths} describes \emph{conformance paths}, which complete the description of the type substitution algebra. A further exploration of recursive conformances shows that the type substitution algebra is Turing-complete.
 
-\item \ChapRef{chap:opaque result types} describes \emph{opaque result types}, another kind of generic abstraction that allows a function to hide its concrete return type from its caller, by specifying the generic requirements this return type satisfies instead. This capability is built in terms of generic signatures, substitution maps, and archetypes.
+\item \ChapRef{chap:opaque result types} describes \emph{opaque result types}, which are a generic abstraction that allows a function to hide its concrete return type from its caller, by specifying the generic requirements this return type satisfies instead. This capability is built in terms of generic signatures, substitution maps, and archetypes.
 
-\item \ChapRef{chap:existential types} is unfinished. It will describe existential types.
+\item \ChapRef{chap:existential types} describes \emph{existential types}, which provide another kind of abstraction for situations where the concrete type stored within a value can vary dynamically. As with opaque result types, existential types are implemented by re-assembling the same fundamental abstractions of the generics system in a new way.
 \end{itemize}
 
-\PartRef{part rqm} describes the Requirement Machine, a \emph{decision procedure} for the derived requirements of \ChapRef{chap:generic signatures}. The original contribution here is that generic signature queries and requirement minimization are problems in the theory of \emph{string rewriting}:
+\PartRef{part:rqm} is devoted to the Requirement Machine, a \emph{decision procedure} for the derived requirements of \ChapRef{chap:generic signatures} and requirement minimization of \ChapRef{chap:building generic signatures}. The main result is that, once recursive conformances are permitted, generic signature queries and requirement minimization become questions about \emph{finitely-presented monoids}:
 \begin{itemize}
 \item \ChapRef{rqm basic operation} gives a high level overview of how both generic signature queries and requirement minimization recursively build a \emph{requirement machine} for a generic signature from the requirement machines of its \emph{protocol components}.
 
-\item \ChapRef{monoids} introduces \emph{finitely-presented monoids} and the \emph{word problem}, and then presents the theoretical result that a finitely-presented monoid can be encoded as a generic signature, such that word problems become generic signature queries. Therefore, generic signature queries are \emph{at least} as hard as the word problem; that is, undecidable in the general case.
+\item \ChapRef{monoids} introduces finitely-presented monoids and the \emph{word problem}, and then presents the theoretical result that a finitely-presented monoid can be encoded as a generic signature, such that word problems become generic signature queries. Therefore, generic signature queries are \emph{at least} as hard as the word problem, so \emph{undecidable} in the general case.
 
-\item \ChapRef{chap:symbols terms rules} goes in the other direction and shows that a generic signature can be encoded in the form of a finitely-presented monoid, such that generic signature queries become word problems. Thus, derived requirements are \emph{at most} as hard as the word problem---and the word problem can be solved in many cases using known techniques. This is the heart of our decision procedure.
+\item \ChapRef{chap:symbols terms rules} goes in the other direction and shows that a generic signature can be encoded in the form of a finitely-presented monoid, such that generic signature queries become word problems. Thus, derived requirements are \emph{at most} as hard as the word problem---and the word problem can be solved in many cases using known techniques. This is the heart of the Requirement Machine.
 
-\item \ChapRef{chap:completion} describes the Knuth-Bendix algorithm, which attempts to solve the word problem by constructing a \emph{convergent rewriting system}. Fundamental generic signature queries can then be answered via the \emph{normal form algorithm}. This is the brain of our decision procedure.
+\item \ChapRef{chap:completion} describes the Knuth-Bendix algorithm, which attempts to solve the word problem by constructing a \emph{finite complete rewriting system} from a monoid presentation. Simple generic signature queries can then be answered via the \emph{normal form algorithm}. This is the brain of the Requirement Machine.
 
-\item \ChapRef{propertymap} is unfinished. It will describe the construction of a \emph{property map} from a convergent rewriting system; the property map answers trickier generic signature queries.
+\item \ChapRef{chap:property map} describes the construction of a \emph{property map} from a finite complete rewriting system. The property map can then answer certain more complex generic signature queries. The property map also plays a role in the implementation of concrete same-type requirements, and superclass requirements. (Unfinished)
 
-\item \ChapRef{rqm minimization} is unfinished. It will present the algorithm for rewrite rule minimization, which is the final step in building a new generic signature.
+\item \ChapRef{chap:minimization} presents an extension of the Knuth-Bendix algorithm which records identities among rewrite rules. This is the basis of the requirement minimization algorithm, which is the final step in the construction of a generic signature for a declaration written in source. (Unfinished)
 \end{itemize}
 
-The Swift compiler is written in \index{C++}C++. To avoid incidental complexity, concepts are described without direct reference to the source code. Instead, some chapters end with a \textbf{Source Code Reference} section, structured like an API reference. You can skip this material if you're only interested in the theory. No knowledge of C++ is assumed outside of these sections.
+\paragraph{C++.}
+The Swift compiler is written in \index{C++}C++. To avoid incidental complexity, concepts are described without direct reference to the source code. Instead, most chapters end with a \textbf{Source Code Reference} section, structured like an API reference. You can skip this material if you're only interested in the theory. No knowledge of C++ is assumed outside of these sections.
 
-Occasional \IndexDefinition{history}historical asides talk about how things came to be. Starting with Swift~2.2, the design of the Swift language has been guided by the Swift evolution process, where language changes are pitched, debated, and formalized in the open \cite{evolution}. I will cite Swift evolution proposals when describing various language features. You will find a lot of other interesting material in the bibliography as well, not just evolution proposals.
+\paragraph{Math.}
+To grasp the mathematical asides, it helps to have some experience working with definitions and proofs, at the level of an introductory course in calculus, linear algebra, or combinatorics. A summary of basic math appears in \AppendixRef{math summary}. Various other mathematical concepts are introduced along the way:
+\begin{itemize}
+\item Formal systems (\SecRef{derived req}).
+\item Equivalence relations (\SecRef{valid type params}, \SecRef{sec:rewriting}).
+\item Partial and linear orders (\SecRef{reduced types}, \SecRef{sec:normal form algorithm}, \SecRef{building terms}).
+\item Category theory (\SecRef{sec:composition}).
+\item Boolean satisfiability (\SecRef{associated type inference}).
+\item Directed graphs (\SecRef{type parameter graph}, \SecRef{finding conformance paths}, \SecRef{recursive conformances}, \SecRef{protocol component}).
+\item Proof by induction (\SecRef{generic signature validity}).
+\item Computability theory (\SecRef{halting problem}, \SecRef{word problem}).
+\item Finitely-presented monoids (\ChapRef{monoids}, \ChapRef{chap:completion}).
+\item Regular languages and the pumping lemma (\SecRef{sec:regular languages}).
+\end{itemize}
 
-This book does not say much about the runtime side of the separate compilation of generics, except for a brief overview of the model in relation to the type checker in \ChapRef{chap:introduction}. To learn more, I recommend watching a pair of LLVM Developer's Conference talks: \cite{llvmtalk} which gives a summary of the whole design, and \cite{cvwtalk} which describes some recent optimizations.
+\paragraph{History.}
+Occasional \IndexDefinition{history}historical asides talk about how things came to be. Starting with Swift~2.2, the design of the Swift language has been guided by the Swift evolution process, where language changes are pitched, debated, and formalized in the open \cite{evolution}. I will cite Swift evolution proposals when describing various language features. The bibliography lists many relevant books, papers, and articles that you may enjoy reading as well.
 
-Also, while most of the material should be current as of Swift~6.2, some recent language extensions are not covered. These features are mostly additive and can be understood by reading the evolution proposals:
-\begin{enumerate}
-\item \index{parameter pack}Parameter packs (or \index{variadic generics}variadic generics), introduced in \IndexSwift{5.9}Swift~5.9 (\cite{se0393,se0398,se0399}).
-\item \index{noncopyable type}Noncopyable types, introduced in \IndexSwift{6.0}Swift~6 (\cite{se0390,se0427}).
-\item \index{nonescapable type}Nonescapable types, introduced in \IndexSwift{6.2}Swift~6.2 (\cite{se0446}).
-\item Integer generic parameters, introduced in \IndexSwift{6.2}Swift~6.2 (\cite{se0452}).
-\end{enumerate}
+\paragraph{What's missing.}
+This book focuses mostly on type checking, so it does not say much about the runtime side of Swift generics, except for a brief overview of the separate compilation model in \ChapRef{chap:introduction}. To learn more, I recommend watching a pair of LLVM Developer's Conference talks:
+\begin{itemize}
+\item ``Implementing Swift generics'' which gives an overview of the whole design \cite{llvmtalk}.
+\item ``Compact value witnesses in Swift'' which describes some recent optimizations \cite{cvwtalk}.
+\end{itemize}
 
-\section*{Source Code}
+To guarantee that I could complete this book in finite time, I decided not to discuss any generics features that were introduced after I began working on the book:
+\begin{itemize}
+\item \index{parameter pack}Parameter packs (or \index{variadic generics}variadic generics), introduced in \IndexSwift{5.9}Swift~5.9 \cite{se0393,se0398,se0399}.
+\item \index{typed throws}Typed throws, introduced in \IndexSwift{6.0}Swift~6 \cite{se0413}.
+\item \index{non-copyable type}Non-copyable types, introduced in \IndexSwift{5.9}Swift~5.9 \cite{se0390}, and then extended in \IndexSwift{6.0}Swift~6 \cite{se0427}.
+\item \index{non-escapable type}Non-escapable types, introduced in \IndexSwift{6.2}Swift~6.2 \cite{se0446}.
+\item Integer generic parameters, introduced in \IndexSwift{6.2}Swift~6.2 \cite{se0452}.
+\end{itemize}
+These features are mostly additive, and can be understood by reading the evolution proposals. Otherwise, all of the material in this book is current as of Swift~6.3.
 
+Finally, while there is some discussion of \index{expression type checker}the type checking of \emph{expressions} throughout, I don't talk about overload resolution, which is arguably the expression type checker's primary responsibility; this is a very involved topic and the challenges there probably warrant their own book.
+
+\paragraph{Acknowledgments.}
+I'd like to thank everyone who read previous versions of this book, reported typos, and asked questions. The Swift generics system itself is the result of over a decade of collaborative design work by countless people. This includes compiler developers, Swift evolution proposal authors, participants in the evolution process, and users who reported bugs. This book is my tribute to this effort in which I only played a small part, and it could not exist without everyone else's contributions.
+
+\paragraph{Source code.}
 The \TeX{} code for this book lives in the Swift source repository:
 \begin{quote}
 \url{https://github.com/swiftlang/swift/tree/main/docs/Generics}
@@ -85,8 +112,15 @@ A periodically-updated typeset PDF is available from the Swift website:
 \url{https://download.swift.org/docs/assets/generics.pdf}
 \end{quote}
 
-\section*{Acknowledgments}
 
-I'd like to thank everyone who read earlier versions of the text, pointed out typos, and asked clarifying questions. Also, the Swift generics system itself is the result of over a decade of collaborative effort by countless people. This includes compiler developers, Swift evolution proposal authors, members of the evolution community, and all the users who reported bugs. This book attempts to give an overview of the sum total of all these contributions.
-
+\paragraph{Citing this book.} To cite this book with BibTeX, use something like the following, and please ensure the URL is visible in your output:
+\begin{Verbatim}
+@misc{csg,
+  title  = "Compiling {S}wift {G}enerics",
+  author = "Slava Pestov",
+  url    = "https://download.swift.org/docs/assets/generics.pdf",
+  year   = {2026}
+}
+\end{Verbatim}
+Do not say something like ``Unpublished,'' in lieu of a URL. This book was published, at the above URL; there are no plans for a print edition.
 \end{document}
