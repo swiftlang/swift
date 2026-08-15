@@ -4,21 +4,20 @@
 
 \chapter{Conformances}\label{chap:conformances}
 
-\lettrine{C}{onformances relate} types with the protocols they conform to. To be precise, a \index{protocol conformance|see{conformance}}\IndexDefinition{conformance}\emph{conformance} describes how its conforming type \emph{witnesses} the requirements of a protocol. We will start by looking at the representation of conformances, and then discuss conformance lookup. Finally, conformances also play an important role in type substitution, so we will fill the gaps in the previous chapter's discussion of substitution maps, by showing how we use conformances to substitute dependent member types.
+\lettrine{C}{onformances relate} types with the protocols they conform to. To be precise, a \index{protocol conformance|see{conformance}}\IndexDefinition{conformance}\emph{conformance} is a semantic object in the compiler for describing how its conforming type \emph{witnesses} the requirements of a protocol. We start by describing the representation of conformances, then move on to conformance lookup in \SecRef{conformance lookup}. We then expand the previous chapter's type substitution algebra to include conformances, which leads to substitution of dependent member types in \SecRef{abstract conformances}. Finally, we will study associated type inference, and its connection to Boolean satisfiability, in \SecRef{associated type inference}.
 
 Conformances come in three distinct varieties:
 \begin{enumerate}
-\item A \IndexDefinition{concrete conformance}\textbf{concrete conformance} records that a nominal type conforms to a protocol, in which case we know the original declaration of the conformance, and thus all of the witnesses.
+\item A \IndexDefinition{concrete conformance}\textbf{concrete conformance} records how a nominal type conforms to a protocol, in which case we know where the conformance was declared, and all of its witnesses.
 \item An \index{abstract conformance}\textbf{abstract conformance} records that a type parameter or archetype satisfies a conformance requirement, but we don't know ``how'' (\SecRef{abstract conformances}).
-\item The \IndexDefinition{invalid conformance}\textbf{invalid conformance} records that some type does not conform.
+\item An \IndexDefinition{invalid conformance}\textbf{invalid conformance} records that some type does not conform.
 \end{enumerate}
-
 Concrete conformances break down further into four kinds:
 \begin{enumerate}
-\item A \IndexDefinition{normal conformance}\textbf{normal conformance} represents the actual declaration of a conformance on a nominal type, or extension.
+\item A \IndexDefinition{normal conformance}\textbf{normal conformance} represents the actual declaration of a conformance on a nominal type or extension.
 \item A \index{specialized conformance}\textbf{specialized conformance} represents a normal conformance with a substitution map applied (\SecRef{conformance subst}).
 \item An \index{inherited conformance}\textbf{inherited conformance} represents a conformance inherited by a subclass from its superclass.
-\item A \IndexDefinition{self conformance}\textbf{self conformance} represents the conformance of an existential type to its own protocol. This is possible only in special circumstances (\SecRef{selfconformingprotocols}).
+\item An \index{existential conformance}\textbf{existential conformance} represents the conformance of an existential type to a protocol. This is possible only in special circumstances (\SecRef{sec:existential conformances}).
 \end{enumerate}
 
 \paragraph{Normal conformances.} In the language, a normal conformance is declared by stating the name of a protocol in the inheritance clause of a \index{inheritance clause!nominal type declaration}\index{nominal type declaration}nominal type or \index{inheritance clause!extension declaration}\index{extension declaration}extension:\index{horse}
@@ -36,9 +35,9 @@ The constituent parts of a normal conformance are the following:
 \item The \index{conforming type!normal conformance}\textbf{conforming type}, which is the \index{declared interface type!normal conformance}declared interface type of the nominal type declaration.
 \item The \textbf{protocol declaration} being conformed to.
 \item The \textbf{conforming context} where this normal conformance is declared, either the nominal type declaration itself, or one of its extensions. This is a \index{declaration context!normal conformance}declaration context (\ChapRef{chap:decls}).
-\item The \index{generic signature!normal conformance}\textbf{generic signature} of the conforming context. If the conformance context is a constrained extension, this generic signature has additional requirements not present in the nominal type's generic signature; we say that we have a \emph{conditional conformance} (\SecRef{sec:conditional conformances}).
+\item The \index{generic signature!normal conformance}\textbf{generic signature} of the conforming context. If the conformance context is a constrained extension, this generic signature has additional requirements not present in the extended type's generic signature; we say that we have a \emph{conditional conformance} (\SecRef{sec:conditional conformances}).
 \item A \textbf{type witness} for each associated type declared by the protocol. This is an interface type written using the generic signature of the conformance (\SecRef{type witnesses}).
-\item An \textbf{associated conformance} for each associated conformance requirement of the protocol. This is another conformance with the appropriate subject type. Among other things, given a conformance to a derived protocol, this allows us to recover the conformance of the same type to a base protocol (\SecRef{associated conformances}).
+\item An \textbf{associated conformance} for each associated conformance requirement of the protocol. This is another conformance, with the appropriate subject type. Among other things, given a conformance to a derived protocol, this allows us to recover the conformance of the same type to a base protocol (\SecRef{associated conformances}).
 \item A \textbf{value witness} for each \index{value requirement}value requirement of the protocol. This is a reference to a value declaration, together with a substitution map. The value declaration is either a member of the conforming nominal type, an extension, a \index{superclass type}superclass, or a \index{protocol extension}protocol extension.
 \end{itemize}
 
@@ -53,7 +52,7 @@ protocol Shape {}
 class Polygon: Shape {}
 class Square: Polygon {}
 \end{Verbatim}
-When building the conformance lookup table for a subclass, we wrap each superclass conformance in a new \IndexDefinition{inherited conformance}\emph{inherited conformance} structure, which consists of the subclass type, together with the superclass conformance:
+When building the conformance lookup table for a subclass, we wrap each superclass conformance in a new \index{subclassing}\IndexDefinition{inherited conformance}\emph{inherited conformance} structure, which consists of the subclass type, together with the superclass conformance:
 \begin{center}
 \begin{tikzpicture}[node distance=0.5cm]
 \node (SquareShape) [type, rectangle split, rectangle split parts=2] {\vphantom{p}inherited conformance\nodepart{two}\texttt{Square:~Shape}};
@@ -68,30 +67,30 @@ We denote this inherited conformance by $\ConfReq{Square}{Shape}$. It behaves id
 
 \section{Conformance Lookup}\label{conformance lookup}
 
-The principal mechanism to find the conformance of a given type to a protocol is called \IndexDefinition{global conformance lookup}\emph{global conformance lookup}. We implement it with a case analysis.
+We use \IndexDefinition{global conformance lookup}\emph{global conformance lookup} to find the conformance of a given type to a protocol. In particular, we can answer the ``yes/no'' question of whether a type conforms by checking if the result is anything but an invalid conformance. (But for \emph{conditional conformances}, we also need to check conditional requirements; see \SecRef{sec:conditional conformances}.)
 
 \begin{algorithm}[Global conformance lookup]\label{conformance lookup algo}
 Takes a type~\tX\ and a \index{protocol declaration!global conformance lookup}protocol~\tP\ as input. Outputs a conformance $\ConfReq{X}{P}$ if one exists, the invalid conformance otherwise.
-\begin{itemize}
+\begin{enumerate}
 \item If \tX\ is the \index{declared interface type!global conformance lookup}declared interface type of a \index{nominal type declaration!global conformance lookup}nominal type declaration $d$: look for a normal or inherited conformance in the \index{conformance lookup table}conformance lookup table of~$d$, and return it if present, otherwise return the invalid conformance.
 \item If \tX\ is some other \index{specialized type!global conformance lookup}specialized type: recursively look up the conformance of its declared interface type $\tXd$ to \tP\ first, and then apply the context substitution map of~\tX\ to this conformance~$\NormalConf$ (\SecRef{conformance subst}).
 \item If \tX\ is a type parameter: form the abstract conformance for \tX\ and \tP\ (\SecRef{abstract conformances}).
-\item If \tX\ is any other kind of type: return the invalid conformance.
-\end{itemize}
+\item If \tX\ is an \index{archetype!global conformance lookup}archetype: proceed as described in \SecRef{sec:local requirements}.
+\item If \tX\ is an \index{existential type!global conformance lookup}existential type: proceed as described in \SecRef{sec:existential conformances}.
+\item If \tX\ is any other kind of type: return an invalid conformance.
+\end{enumerate}
 \end{algorithm}
 
-We can use global conformance lookup to answer the ``yes/no'' question of whether a type actually conforms, by performing a lookup and checking if the result is anything but an invalid conformance. We can also pick any valid conformance $\XP$ apart, and get back the conforming type~\tX\ and the protocol~\tP. We relate this destructuring to global conformance lookup in the form of a \index{commutative diagram!global conformance lookup}commutative diagram:
+We can pick any valid conformance $\XP$ apart, and get back the conforming type~\tX\ and the protocol~\tP. We relate this destructuring to global conformance lookup in the form of a \index{commutative diagram!global conformance lookup}commutative diagram:
 \begin{center}
 \begin{tikzcd}[column sep=3cm]
 \tX \arrow[r, yshift=5pt, "\text{look up conformance}"] &{\XP}\arrow[l, yshift=-5pt, "\text{get conforming type}"]
 \end{tikzcd}
 \end{center}
 
-If we start with a type~\tX, look up the conformance to~\tP, and get the conforming type out of this conformance, we end up with a type canonically equivalent to \tX. (The two types might be \index{type pointer equality}distinct pointers, because conformance lookup does not always preserve \index{sugared type}type sugar.)
+If we start with a type~\tX, look up the conformance to~\tP, and get the conforming type out of this conformance, we end up with a type canonically equivalent to \tX. (The two types might be \index{type pointer equality}distinct pointers, because conformance lookup does not always preserve \index{sugared type}type sugar.) The other direction is more subtle. If we start with a conformance~$\XP$, get the conforming type~\tX, and look up the conformance of \tX\ to \tP, we would like to find the \emph{same} conformance. We say that global conformance lookup is \emph{coherent} if this property holds. We follow the simplest approach, and only guarantee coherence if there is \emph{at most} one conformance for every possible pairing of type with protocol.
 
-The opposite direction is more subtle. If we start with a conformance~$\XP$, get the conforming type~\tX, and look up the conformance of \tX\ to \tP, we would like to find the \emph{same} conformance. We say that global conformance lookup is \emph{coherent} if this property holds. We follow the simplest approach, and only promise coherence if there is \emph{at most} one conformance for every possible pairing of type with protocol.
-
-\paragraph{Coherence.} When a conformance is stated on an extension, we allow the extended type, the conformed protocol, and the extension itself to be in different \index{module declaration!conformance}modules. There are three possibilities. First, we can conform our own type to a protocol from another module:
+\paragraph{Coherence.} When a conformance is stated on an extension, we allow the extended type, the conformed protocol, and the extension itself to be in different \index{module declaration!conformance}modules. There are three possibilities. First, we can conform our type to a protocol from another module:
 \begin{Verbatim}
 struct MyType {...}
 extension MyType: Hashable {...}
@@ -113,13 +112,13 @@ To bypass the \index{diagnostic!retroactive conformance}\index{warning}warning, 
 \begin{Verbatim}
 extension String.UTF8View: @retroactive Hashable {...}
 \end{Verbatim}
-When used incorrectly, retroactive conformances can create a situation where we have two \emph{overlapping} conformances for the same conforming type and protocol. This can lead to inconsistent behavior.
+When used incorrectly, retroactive conformances can create a situation where we have two \emph{overlapping} conformances for the same conforming type and protocol. This violates coherence, which can lead to inconsistent behavior.
 
 Suppose we declare a concrete \texttt{MyKey} type in a common module, and then two other modules both import \texttt{MyKey} and declare a retroactive conformance of \texttt{MyKey} to \texttt{Hashable}. If a downstream module then imports all three modules, both normal conformances of \texttt{MyKey} to \texttt{Hashable} will be visible. The compiler will pick the first one it finds, but this may not be consistent between invocations.
 
 We run into the same problem at run time, with library evolution. Suppose a vendor publishes \texttt{MyKey} in a shared library, and a third party defines a retroactive conformance of \texttt{MyKey} to \texttt{Hashable} in their binary. If the vendor then updates their library to include a conformance of \texttt{MyKey} to \texttt{Hashable} and the client runs their binary without recompiling, both witness tables will be visible to the Swift runtime. A \index{dynamic cast}dynamic cast of \texttt{MyKey} to \texttt{Hashable} may end up using the witness table for either conformance.
 
-Avoiding the use of \verb|@retroactive| mostly eliminates this possibility, but does not foreclose it entirely, because in combination with library evolution, subclassing can also \index{limitation!conformance coherence and subclassing}introduce overlapping conformances. Suppose that a vendor publishes a shared library declaring an open class and a protocol:
+Avoiding the declaration of conformances which require the \verb|@retroactive| attribute mostly eliminates this possibility, but it does not foreclose it entirely, because \index{subclassing!coherence}subclassing, in conjunction with library evolution, can \index{limitation!conformance coherence and subclassing}introduce overlapping conformances. Suppose that a vendor publishes a \texttt{Farm} shared library which declares an open class and a protocol:
 \begin{Verbatim}
 public protocol Crop {}
 
@@ -132,15 +131,15 @@ import Farm
 class Alfalfa: Hay {}
 extension Alfalfa: Crop {}
 \end{Verbatim}
-Now, if the vendor subsequently adds a conformance of \texttt{Hay} to \texttt{Crop} in a future version of the library and the client runs their binary without recompiling, the client binary will now observe two overlapping conformances of \texttt{Alfalfa} to \texttt{Crop} at run time: the conformance inherited from \texttt{Hay}, and the local conformance of \texttt{Alfalfa} to \texttt{Crop}.
+Now, if the vendor subsequently conforms \texttt{Hay} to \texttt{Crop} in a future version of \texttt{Farm}, and the client runs their binary without recompiling, the client binary will now observe two overlapping conformances of \texttt{Alfalfa} to \texttt{Crop} at run time: the conformance declared in \texttt{Farm} that they inherited from \texttt{Hay}, and their local conformance of \texttt{Alfalfa} to \texttt{Crop}.
 
 \paragraph{Future directions.} Extending the language implementation to guarantee correctness in the presence of overlapping conformances is a major undertaking, as it would require several architectural changes in the compiler and runtime.
 
-The global conformance lookup operation would need a disambiguation rule, perhaps by taking additional \index{source location}source location information into account. Parts of the compiler that rely on coherence would need to be redesigned to perform each lookup exactly once and save the result for later, instead of freely performing another lookup and assuming the same conformance will be found.
+Global conformance lookup would need a disambiguation rule, perhaps by taking additional \index{source location}source location information into account. Parts of the compiler that require coherence would need to be redesigned to perform each lookup exactly once and save the result for later, instead of freely performing another lookup and assuming the same conformance will be found.
 
-For example, when we resolve a generic nominal type written in source, we perform global conformance lookup to ensure that the generic arguments satisfy the conformance requirements of the nominal type. If we later need the context substitution map of this \index{generic nominal type}generic nominal type, we currently call global conformance lookup again, to populate the substitution map's conformances. We could avoid the second lookup by changing the representation of a generic nominal type to store a substitution map, instead of just the generic arguments.
+For example, after we resolve a generic nominal type written in source, we use global conformance lookup to construct its context substitution map, which we use to determine the types of its stored properties, for example. If we serialize this type in a \index{binary module}binary module and deserialize it from another compiler invocation, global conformance lookup might produce different results, giving us a different context substitution map. To ensure coherence, we would need to change the representation of a generic nominal type to store its context substitution map, avoiding the second lookup.
 
-Dynamic casts at runtime pose similar challenges. One valid design is to exclude retroactive conformances from dynamic cast behavior entirely. Another would be to introduce a new runtime entry point for dynamic casting that takes the reified lexical environment into account, allowing a shared library to use its own private conformances without changing the behavior of binaries that link against it.
+Dynamic casts at runtime pose similar challenges. One valid (but source-breaking) design would exclude retroactive conformances from dynamic cast behavior entirely. Another option is to introduce a new runtime entry point for dynamic casting that takes the reified lexical environment into account, allowing a shared library to use its own private conformances without changing the behavior of binaries that link against it.
 
 \section{Conformance Substitution}\label{conformance subst}
 
@@ -149,11 +148,11 @@ In this section, we will see that we can apply substitution maps to normal, spec
 To begin, we will incorporate global conformance lookup into the \index{type substitution}type substitution algebra with a new form of the \index{$\otimes$}$\otimes$ operator. Given a type \tX\ and a protocol \tP, we denote the result of global conformance lookup by $\PP \otimes \tX$. Recall that if $d$ is a nominal type declaration conforming to \tP, and $\tXd$ is the declared interface type of $d$, we defined \AlgRef{conformance lookup algo} to output the normal conformance of $\tXd$ to \tP:
 \[\PP\otimes\tXd := \NormalConf\]
 
-\paragraph{Normal conformances.} Now, we suppose that \tX\ is a generic nominal type with declaration $d$, but with arbitrary generic arguments, so \tX\ is not necessarily equal to $\tXd$. We will use the type substitution algebra to figure out $\PP \otimes \tX$. From \SecRef{contextsubstmap}, we know we can split up \tX\ into the \index{declared interface type!nominal type declaration}declared interface type $\tXd$, and a substitution map~$\Sigma$, called the \index{context substitution map!conformance lookup}context substitution map of \tX. Thus, we have:
+\paragraph{Normal conformances.} Now, we suppose that \tX\ is a generic nominal type with declaration $d$, but with arbitrary generic arguments, so \tX\ is not necessarily equal to $\tXd$. We will use the type substitution algebra to figure out $\PP \otimes \tX$. From \SecRef{sec:nominal types}, we know we can factor \tX\ into the \index{declared interface type!nominal type declaration}declared interface type $\tXd$, and a substitution map~$\Sigma$, called the \index{context substitution map!conformance lookup}context substitution map of \tX. Thus, we have:
 \[
 \PP \otimes \tX = \PP \otimes (\tXd \otimes \Sigma)
 \]
-In order to reduce the right-hand side further, we will define it in a way that makes $\otimes$ into an \index{associative operation}associative operation. This is a reasonable assumption, because we already saw that $\otimes$ is associative when operating on types and substitution maps. Indeed, recall that if \tX\ is a type, and $\Sigma_1$, $\Sigma_2$, $\Sigma_3$ are substitution maps, we were able to show that order of operations does not matter in the expressions below:
+In order to reduce the right-hand side further, we will define it in a way that makes $\otimes$ into an \index{associative operation}associative operation. This is a reasonable assumption, because we already saw that $\otimes$ is associative when operating on types and substitution maps. Indeed, recall from \SecRef{sec:composition} that if \tX\ is a type, and $\Sigma_1$, $\Sigma_2$, $\Sigma_3$ are substitution maps, the order of operations does not matter in the expressions below:
 \begin{gather*}
 \tX\otimes(\Sigma_1\otimes\Sigma_2)=(\tX\otimes\Sigma_1)\otimes\Sigma_2\\
 \Sigma_1\otimes(\Sigma_2\otimes\Sigma_3)=(\Sigma_1\otimes\Sigma_2)\otimes\Sigma_3
@@ -169,13 +168,13 @@ In the above, we know that $\PP \otimes \tXd=\NormalConf$ is the normal conforma
 
 When we \index{normal conformance!substitution}apply a non-identity substitution map $\Sigma$ to the normal conformance $\NormalConf$, we form a \IndexDefinition{specialized conformance}\emph{specialized conformance} from $\NormalConf$ and $\Sigma$. We denote it by $\XP$, where $\tX=\tXd\otimes\Sigma$. We say that $\Sigma$ is the \IndexDefinition{conformance substitution map}\emph{conformance substitution map} of $\XP$.
 
-In the case where $\Sigma$ is the \index{identity substitution map}identity substitution map for the generic signature of the conforming context, we don't need to form a specialized conformance. Instead, we just return the original normal conformance; that is, $\NormalConf \otimes 1_G := \NormalConf$.
+In the case where $\Sigma$ is the \index{identity substitution map}identity substitution map for the generic signature of the conforming context, say $G$, we don't form a specialized conformance. Instead, we just return the original normal conformance; that is, $\NormalConf \otimes 1_G := \NormalConf$.
 
-\paragraph{Output generic signatures.} Before we proceed, we introduce a new concept. We associate an \index{output generic signature!of conformance}\emph{output generic signature} with each conformance:
+\paragraph{Output generic signatures.} Before we proceed, we introduce a new concept. We associate an \index{output generic signature!conformance}\emph{output generic signature} with each conformance:
 \begin{itemize}
-\item The output generic signature of a \index{normal conformance!output generic signature}normal conformance is the generic signature of the conformance context (the nominal itself, or an extension). 
+\item The output generic signature of a \index{normal conformance!output generic signature}normal conformance is the generic signature of the conformance context (the nominal itself, or an extension).
 
-\item The output generic signature of a \index{specialized conformance!output generic signature}specialized conformance is the \index{output generic signature!of substitution map}output generic signature of its \index{conformance substitution map}conformance substitution map.
+\item The output generic signature of a \index{specialized conformance!output generic signature}specialized conformance is the \index{output generic signature!substitution map}output generic signature of its \index{conformance substitution map}conformance substitution map.
 
 \item The output generic signature of an \index{inherited conformance!output generic signature}inherited conformance is the output generic signature of its underlying superclass conformance.
 \end{itemize}
@@ -185,10 +184,10 @@ The set of conformances with output generic signature~$G$ is denoted by \IndexSe
 We've only seen substitution maps applied to normal conformances so far, but shortly we will generalize this and define $\XP\otimes\Sigma \in \ConfObj{H}$ for any concrete conformance $\XP\in\ConfObj{G}$ and substitution map $\Sigma\in\SubMapObj{G}{H}$.
 
 \begin{example}\label{specialized conf example}
-The standard library declares a conformance of \texttt{Array} to \tSequence.
-If we look up the conformance of \texttt{Array<\rT>} to \tSequence, we get this normal conformance back, because \texttt{Array<\rT>} is the declared interface type of \texttt{Array}:
+The standard library declares an \texttt{Array} nominal type, conforming to \IndexProto{Sequence}\tSequence.
+If we look up the conformance of \texttt{Array<\rT>} to \tSequence, we get its normal conformance, because \texttt{Array<\rT>} is the declared interface type of \texttt{Array}:
 \[ \PSequence\otimes\texttt{Array<\rT>} = \ArraySequence \]
-Next, we consider how \texttt{Array<Int>} conforms to \tSequence. We observe that:
+Next, consider how \texttt{Array<Int>} conforms to \tSequence. Observe that:
 \[\texttt{Array<Int>} = \texttt{Array<\rT>} \otimes \SubMapInt\]
 Global conformance lookup applies this substitution map to the normal conformance:
 \begin{gather*}
@@ -213,11 +212,11 @@ We denote this specialized conformance by $\ArrayIntSequence$, but the in-memory
 \end{example}
 
 \paragraph{Specialized conformances.}
-Now, suppose we're given a specialized conformance $\NormalConf\otimes\Sigma_1\in\ConfObj{H}$ where $\Sigma_1\in\SubMapObj{G}{H}$, and we wish to apply some other substitution map $\Sigma_2\in\SubMapObj{H}{I}$ to this \index{specialized conformance!substitution}specialized conformance. To implement this, we form a new specialized conformance from $\NormalConf$ and $\Sigma_1 \otimes \Sigma_2 \in \SubMapObj{G}{I}$, so that $\NormalConf \otimes (\Sigma_1\otimes\Sigma_2) \in \ConfObj{I}$. This relates conformance substitution with \index{substitution map composition}substitution map composition, and continues with the trend of $\otimes$ being an \index{associative operation}associative operation:
+Now, suppose we're given a specialized conformance $\NormalConf\otimes\Sigma_1\in\ConfObj{H}$ where $\Sigma_1\in\SubMapObj{G}{H}$, and we wish to apply some other substitution map $\Sigma_2\in\SubMapObj{H}{I}$ to this \index{specialized conformance!substitution}specialized conformance. To implement this, we form a new specialized conformance from $\NormalConf$ and $\Sigma_1 \otimes \Sigma_2 \in \SubMapObj{G}{I}$, so that $\NormalConf \otimes (\Sigma_1\otimes\Sigma_2) \in \ConfObj{I}$. This relates conformance substitution with \index{substitution map composition}substitution map composition, and continues the trend of $\otimes$ being an \index{associative operation}associative operation:
 \[(\NormalConf\otimes\Sigma_1)\otimes\Sigma_2 := \NormalConf\otimes(\Sigma_1\otimes\Sigma_2)\]
 
 \paragraph{Inherited conformances.}
-Finally, we can apply a substitution map to an \index{inherited conformance!substitution}inherited conformance. Suppose that $\ConfReq{C}{P}$ is an inherited conformance with conforming type $\tC \in \TypeObj{G}$ and superclass conformance $\ConfReq{$\tC^\prime$}{P} \in \ConfObj{G}$, where $\tC^\prime$ is a \index{superclass type!inherited conformance}superclass type of \tC. If $\Sigma \in \SubMapObj{G}{H}$ is a substitution map, then  $\ConfReq{C}{P} \otimes \Sigma \in \ConfObj{H}$ is the inherited conformance built from $\tC \otimes \Sigma$ and $\ConfReq{$\tC^\prime$}{P} \otimes \Sigma$.
+Finally, we can apply a substitution map to an \index{inherited conformance!substitution}inherited conformance. Suppose that $\ConfReq{C}{P}$ is an inherited conformance with conforming type $\tC \in \TypeObj{G}$ and superclass conformance $\ConfReq{$\tC'$}{P} \in \ConfObj{G}$, where $\tC'$ is an (iterated) \index{superclass type!inherited conformance}superclass type of \tC. If $\Sigma \in \SubMapObj{G}{H}$ is a substitution map, then  $\ConfReq{C}{P} \otimes \Sigma \in \ConfObj{H}$ is the inherited conformance built from $\tC \otimes \Sigma$ and $\ConfReq{$\tC'$}{P} \otimes \Sigma$.
 
 \begin{example}\label{inherited specialized conf}
 Consider \texttt{Mid} below, which inherits the conformance to \tP\ from \texttt{Top}:
@@ -228,10 +227,10 @@ class Mid<X, Y>: Top<(Y, X)> {}
 \end{Verbatim}
 The superclass type of \texttt{Mid} is \texttt{Top<(\rU, \rT)>}, with context substitution map:
 \[\Sigma_1 := \SubstMap{\SubstType{\rT}{(\rU, \rT)}}\]
-When we build the conformance lookup table of \texttt{Mid}, we look up the conformance of the superclass type \texttt{Top<(\rU, \rT)>} to \tP, which gives us a specialized conformance with the above substitution map. We then wrap this specialized conformance in an inherited conformance, to give it the correct conforming type \texttt{Mid<\rT, \rU>}. We record the resulting structure in the table:
+When we build the conformance lookup table of \texttt{Mid}, we look up the conformance of the superclass type \texttt{Top<(\rU, \rT)>} to \tP, which gives us a specialized conformance with the above substitution map. We then wrap this specialized conformance in an inherited conformance, to give it the correct conforming type \texttt{Mid<\rT, \rU>}. We record the resulting structure in the conformance lookup table:
 \begin{center}
 \begin{tikzpicture}[node distance=0.5cm]
-\node (Inherited) [type, rectangle split, rectangle split parts=2] {\vphantom{p}inherited conformance\nodepart{two}\texttt{\vphantom{p()}Top<\rT, \rU>:~P}};
+\node (Inherited) [type, rectangle split, rectangle split parts=2] {\vphantom{p}inherited conformance\nodepart{two}\texttt{\vphantom{p()}Mid<\rT, \rU>:~P}};
 \node (Specialized) [type, rectangle split, rectangle split parts=2, right=of Inherited] {specialized conformance\nodepart{two}\texttt{\vphantom{p()}Top<(\rU, \rT)>:~P}};
 \node (Normal) [type, rectangle split, rectangle split parts=2, right=of Specialized] {\vphantom{p}normal conformance\nodepart{two}\texttt{\vphantom{p()}Top<\rT>:~P}};
 \node (Type) [type, rectangle split, rectangle split parts=2, below=of Inherited] {conforming type\nodepart{two}\texttt{\vphantom{p()}Mid<\rT, \rU>}};
@@ -287,10 +286,10 @@ Furthermore, we saw that the $\otimes$ operator is associative, so parentheses a
 
 In order to conform to a protocol with associated types, a nominal type declaration must declare a \IndexDefinition{type witness}\emph{type witness} for each \index{associated type declaration!type witness}associated type. There are four ways to declare a type witness in the source language:
 \begin{enumerate}
-\item With a \textbf{member type declaration}---that is, a nested nominal type or \index{type alias declaration}type alias declaration---having the same name as the associated type. This member type might be a child of the conforming nominal type, one of its extensions, or if the conforming type is a class, one of its \index{superclass type!type witness}superclasses.
-\item With \index{associated type inference}\textbf{associated type inference}, which deduces type witnesses by considering the candidate value witnesses for each \index{value requirement}value requirement in the protocol.
+\item With a \textbf{member type declaration}---that is, a nested nominal type or \index{type alias declaration}type alias declaration---having the same name as the associated type.
+\item With \index{associated type inference}\textbf{associated type inference}, which deduces type witnesses by considering the candidate value witnesses for each \index{value requirement}value requirement in the protocol. (After a quick example below, we further examine this in \SecRef{associated type inference}.)
 \item With a \index{generic parameter declaration!type witness}\textbf{generic parameter} having the same name as the associated type.
-\item With a \index{default type witness}\textbf{default type witness} on the associated type declaration, if one is present. This is the fallback if all else fails.
+\item With a \IndexDefinition{default type witness}\textbf{default type witness} on the associated type declaration, if one is present. This is the fallback if all else fails.
 \end{enumerate}
 
 \begin{example}\label{type witness example}
@@ -326,14 +325,14 @@ struct Dog<Toy>: Pet {
   // synthesized: typealias Toy = Toy
 }
 \end{Verbatim}
-When we check the conformance $\ConfReq{Dog}{Pet}$, we synthesize a type alias member named \texttt{Toy}, whose underlying type is \texttt{Dog}'s generic parameter, also named \texttt{Toy}. While generic parameter declarations are not themselves visible as \emph{members}, in this case we have a type alias that just happens to have the same name, so in fact the type representation \texttt{Dog<Ball>.Toy} resolves to \texttt{Ball}:
+When we check the conformance $\ConfReq{Dog}{Pet}$, we synthesize a type alias member named \texttt{Toy}, whose underlying type is \texttt{Dog}'s generic parameter, also named \texttt{Toy}. While generic parameter declarations are not themselves visible via \index{qualified lookup}qualified lookup as \emph{members} of another type, in this case we have a type alias that just happens to have the same name, so in fact the type representation \texttt{Dog<Ball>.Toy} resolves to \texttt{Ball}:
 \begin{Verbatim}
 struct Ball {}
 
 // same as play(_: Ball):
 func play(_: Dog<Ball>.Toy)
 \end{Verbatim}
-(However, if \texttt{Dog} did not state a conformance to \texttt{Pet}, there would be no such type alias, and type resolution would diagnose an error while resolving \texttt{Dog<Ball>.Toy}. The interaction between type resolution and associated type inference is discussed further in \SecRef{member type repr}.)
+However, if \texttt{Dog} did \emph{not} state conformance to \texttt{Pet}, there would be no such type alias, and type resolution would diagnose an error while resolving \texttt{Dog<Ball>.Toy}!
 
 Last but not least, \index{horse}\texttt{Horse} does not declare a member type named \texttt{Toy}, nor does it implement \texttt{play()}. We use the \index{default type witness}default type witness for \texttt{Toy}, which was declared to be \texttt{Int} inside \texttt{Pet}. This is Case~4:
 \begin{Verbatim}
@@ -344,14 +343,14 @@ struct Horse: Pet {
 \end{example}
 
 \paragraph{Normal conformances.}
-Every \index{normal conformance!type witness}normal conformance contains a table that maps the protocol's associated type declarations to the type witnesses of the conformance. This table is lazily populated by the \IndexDefinition{type witness request}\Request{type witness request}, which attempts to resolve a single type witness using \index{qualified lookup!type witness}qualified lookup, which handles Case~1.
+Every \index{normal conformance!type witness}normal conformance contains a table that maps the protocol's associated type declarations to the type witnesses of the conformance. This table is lazily populated by the \IndexDefinition{type witness request}\Request{type witness request}, which attempts to resolve a single type witness using \index{qualified lookup!type witness}qualified lookup, which handles Case~1. (One possibility here we haven't discussed yet is that qualified lookup might find a type witness from an extension, a superclass, or protocol extension.)
 
-If no such member type declaration exists, we then evaluate the \IndexDefinition{type witnesses request}\Request{type witnesses request}, which attempts to simultaneously resolve all type witnesses in the normal conformance via associated type inference. This code path implements Case~2, but also Case~3 and Case~4, which users might not think of as being part of associated type inference. We will discuss associated type inference in \SecRef{associated type inference}.
+If no such member type declaration exists, we then evaluate the \IndexDefinition{type witnesses request}\Request{type witnesses request}, which attempts to simultaneously resolve all type witnesses in the normal conformance via associated type inference. This code path implements Case~2, but also Case~3 and Case~4, which users might not think of as being part of associated type inference. We will discuss associated type inference in \SecRef{associated type inference}, and its interaction with type resolution in \SecRef{member type repr}.
 
-When a conformance is declared in a \index{secondary file}secondary file of a \index{frontend job}frontend job, we resolve its type witnesses only if we need to while type checking something else. On the other hand, when a conformance is declared in a \index{primary file}primary file, we also run the \IndexDefinition{conformance checker}\emph{conformance checker} as part of the \index{type-check primary file request}\Request{type-check primary file request}. The conformance checker resolves all type and value witnesses and performs various additional checks. If the conformance checker does not emit any diagnostics, we know the conformance provides a complete set of type and value witnesses, and we can move on to code generation.
+When a conformance is declared in a \index{secondary file}secondary file of a \index{frontend job}frontend job, we resolve its type witnesses only when needed for type substitution operations. On the other hand, when a conformance is declared in a \index{primary file}primary file, we also run the \IndexDefinition{conformance checker}\emph{conformance checker} as part of the \index{type-check primary file request}\Request{type-check primary file request}. Checking a conformance forces resolution of all type and value witnesses, fully populating it. If no \index{errors}errors are diagnosed here, we can generate a \index{witness table}\emph{witness table} for this conformance in \index{SILGen}SILGen.
 
 \paragraph{Projection.}
-We incorporate type witnesses into the \index{type substitution}type substitution algebra with a new form of the $\otimes$ operator. Suppose $\NormalConf$ is a normal conformance, and \tP\ declares an associated type~\nA. We introduce the notation $\APA$ for the \index{associated type declaration!type witness}associated type declaration, and then we denote the type witness for \nA\ with the following expression:
+We incorporate type witnesses into the \index{type substitution}type substitution algebra with a new form of the $\otimes$ operator. Suppose $\NormalConf$ is a normal conformance, and \tP\ declares an associated type~\nA. We introduce the notation $\APA$ for this \index{associated type declaration!type witness}associated type declaration, and then we denote the type witness for \nA\ with the following expression:
 \[\APA \otimes \NormalConf\]
 
 \begin{example}
@@ -371,7 +370,7 @@ The type witnesses of a \index{specialized conformance!type witness}specialized 
 \]
 
 \begin{example}\label{array type witness example}
-The standard library's $\ArraySequence$ normal conformance witnesses the \texttt{Element} and \texttt{Iterator} associated types of \tSequence\ as follows:
+The standard library's $\ArraySequence$ normal conformance witnesses the \texttt{Element} and \texttt{Iterator} associated types of \IndexProto{Sequence}\tSequence\ as follows:
 \begin{gather*}
 \AElement \otimes \ArraySequence \\
 \qquad {}  = \rT\\
@@ -389,7 +388,7 @@ Recall the specialized conformance $\ArrayIntSequence$ from \ExRef{specialized c
 \end{gather*}
 \end{example}
 
-An important invariant is that any type parameters appearing in the type witness of a normal or specialized conformance are valid in the output generic signature of the conformance. In other words, if $\XP\in\ConfObj{G}$ and \nA\ is an associated type of \tP, then $\APA\otimes\XP\in\TypeObj{G}$. (When we get to abstract conformances, we will see the property holds there as well.) To summarize all of the above, if we take \IndexSetDefinition{assoctype}{\AssocTypeObj{P}}$\AssocTypeObj{P}$ to mean the set of all associated type declarations of a fixed protocol \tP, and $\ConfPObj{P}{G}$ as the subset of $\ConfObj{G}$ containing only conformances to this \tP, then for each protocol \tP, \IndexDefinition{type witness projection}type witness projection gives us this additional form of the \index{$\otimes$}$\otimes$ operation:
+An important invariant is that any type parameters appearing in a type witness of a normal or specialized conformance are valid in the output generic signature of the conformance. In other words, if $\XP\in\ConfObj{G}$ and \nA\ is an associated type of~\tP, then $\APA\otimes\XP\in\TypeObj{G}$. (When we get to abstract conformances, we will see the property holds there as well.) We define \IndexSetDefinition{assoctype}{\AssocTypeObj{P}}$\AssocTypeObj{P}$ to mean the set of all associated type declarations of a fixed protocol~\tP, and $\ConfPObj{P}{G}$ to be the subset of $\ConfObj{G}$ containing only conformances to some given protocol~\tP. Thus, for each protocol~\tP, \IndexDefinition{type witness projection}type witness projection gives us this additional form of the \index{$\otimes$}$\otimes$ operation:
 \[\AssocTypeObj{P}\otimes\ConfPObj{P}{G}\longrightarrow\TypeObj{G}\]
 
 Finally, we consider the relationship between \index{global conformance lookup}global conformance lookup and type witness projection. If $\tX=\tXd\otimes\Sigma$ conforms to \tP, and \tP\ declares an associated type \nA, one way to resolve the type representation ``\texttt{X.A}'' is via global conformance lookup followed by type witness projection:
@@ -404,11 +403,11 @@ Of the four possible ways to parenthesize this expression, there are three that 
 \end{gather*}
 Let's say that \texttt{$\tXd$.A} denotes the type witness for \nA\ in $\NormalConf$, and \texttt{X.A} denotes the type witness of \nA\ in $\XP$. Then, all three combinations above must output \texttt{X.A}, because we defined $\otimes$ to be associative in each case:
 \begin{enumerate}
-\item We can look up the conformance of $\tXd$ to \tP, project the type witness \texttt{$\tXd$.A} from this normal conformance, and apply $\Sigma$ to this type witness to get \texttt{X.A}.
-\item We can look up the conformance of $\tXd$ to \tP, apply $\Sigma$ to this normal conformance to get a specialized conformance, and project the type witness \texttt{X.A}.
-\item We can apply $\Sigma$ to $\tXd$, look up the conformance of \tX\ to \tP, and project the type witness \texttt{X.A}.
+\item We can look up the conformance of $\tXd$ to \tP, project the type witness \texttt{$\tXd$.A} from the normal conformance $\NormalConf$, and apply $\Sigma$ to this type witness to get \texttt{X.A}.
+\item We can look up the conformance of $\tXd$ to \tP, apply $\Sigma$ to this normal conformance to get a specialized conformance $\XP$, and project the type witness \texttt{X.A}.
+\item We can apply $\Sigma$ to $\tXd$ to get \tX, look up the conformance of \tX\ to \tP\ to get the specialized conformance $\XP$, and project the type witness \texttt{X.A} from $\XP$.
 \end{enumerate}
-We can also exhibit this with a \index{commutative diagram!type witness projection}commutative diagram. Each of the three evaluation orders corresponds to one of the three unique paths from $\tXd$ to $\texttt{X.A}$:
+We can also exhibit all of this with a \index{commutative diagram!type witness projection}commutative diagram. Each of the three evaluation orders of our expression corresponds to one of the three unique paths from $\tXd$ to $\texttt{X.A}$:
 \begin{center}
 \begin{tikzcd}[column sep=3cm,row sep=1cm]
 \tXd \arrow[d, "\PP"] \arrow[r, "\Sigma"] &\tX \arrow[d, "\PP"] \\
@@ -427,11 +426,12 @@ To make this concrete, with the \texttt{Element} type witness of $\ArrayIntSeque
 
 \section{Abstract Conformances}\label{abstract conformances}
 
-An \IndexDefinition{abstract conformance}\emph{abstract conformance} represents the conformance of a \index{type parameter}type parameter to a protocol. If \tT\ is a type parameter and \tP\ is a protocol, global conformance lookup forms an abstract conformance when given \tT\ and \tP:
+An \IndexDefinition{abstract conformance}\emph{abstract conformance} represents the conformance of a \index{type parameter}type parameter to a protocol:
 \[\PP\otimes\tT := \TP\]
-We say that an abstract conformance $\TP$ is \IndexDefinition{valid abstract conformance}\emph{valid} in a \index{generic signature}generic signature~$G$ if the \index{conformance requirement!type substitution}conformance requirement $\TP$ can be \index{derived requirement!abstract conformance}derived from~$G$ (\SecRef{derived req}). Thus, there is no ambiguity in our two respective formalisms using the same notation $\TP$ to denote both conformance requirements and abstract conformances.
 
-We will use abstract conformances to fill in the part of \AlgRef{type subst algo} we have not explained yet, namely, how to apply a substitution map to a bound dependent member type. Before we can do this, we must define type witness projection and conformance substitution with an abstract conformance. Suppose that $G\vdash\TP$, and~\tP\ declares an associated type~\nA. In \SecRef{bound type params}, we saw that we can derive the \index{bound dependent member type!validity}\index{dependent member type!validity}bound dependent member type \texttt{T.[P]A} by applying the \IndexStep{AssocDecl}\textsc{AssocDecl} inference rule to a derivation of $\TP$:
+If \tT\ is a type parameter and \tP\ is a protocol, global conformance lookup forms the abstract conformance $\TP$ without knowledge of any fixed \index{generic signature}generic signature $G$. An abstract conformance $\TP$ is \IndexDefinition{valid abstract conformance}\emph{valid} for~$G$ if the \index{conformance requirement!type substitution}conformance requirement $\TP$ can be \index{derived requirement!abstract conformance}derived from~$G$ (\SecRef{derived req}). The client of the lookup establishes this validity separately with the appropriate generic signature~$G$, and we say that $\TP \in \ConfObj{G}$. The use of the same notation for conformance requirements and abstract conformances in the two respective formalisms will be mostly unambiguous.
+
+We will use abstract conformances to fill in the part of \AlgRef{alg:substitute type} we have yet to explain, namely, how to apply a substitution map to a dependent member type. Before we can do this, we must define type witness projection and conformance substitution with an abstract conformance. Suppose that $G\vdash\TP$, and~\tP\ declares an associated type~\nA. In \SecRef{bound type params}, we saw that we can derive the \index{bound dependent member type!validity}\index{dependent member type!validity}bound dependent member type \texttt{T.[P]A} by applying the \IndexStep{AssocDecl}\textsc{AssocDecl} inference rule to a derivation of $\TP$:
 \begin{gather*}
 \AnyStep{\TP}{1}\\
 \AssocDeclStep{1}{T.[P]A}{2}
@@ -470,14 +470,14 @@ In other words, local conformance lookup of $\TP$ in $\Sigma$ must find the \emp
 \paragraph{Substitution maps.}
 Given any valid abstract conformance, local conformance lookup must be able to recover the corresponding substituted conformance from the substitution map. Indeed, in the previous chapter, we mentioned that in addition to replacement types, \index{substitution map!conformances}substitution maps also store conformances, when their input generic signature has \index{conformance requirement!type substitution}conformance requirements. We can expand upon this now.
 
-Suppose we have a substitution map $\Sigma\in\SubMapObj{G}{H}$. The abstract conformance for an \emph{explicit} conformance requirement $\TP$ of $G$ is called a \IndexDefinition{root abstract conformance}\emph{root abstract conformance}. For each root abstract conformance of~$G$, the substitution map $\Sigma$ contains a conformance with subject type $\tT\otimes\Sigma$ and protocol~\tP; we call these the \IndexDefinition{root conformance}\emph{root conformances} of $\Sigma$. Local conformance lookup with a root abstract conformance is easy to describe. Applying $\Sigma$ to a root abstract conformance of~$G$ projects the corresponding root conformance from~$\Sigma$:
+Suppose we have a substitution map $\Sigma\in\SubMapObj{G}{H}$. The abstract conformance for an \emph{explicit} conformance requirement $\TP$ of $G$ is called a \IndexDefinition{root abstract conformance}\emph{root abstract conformance}. For each root abstract conformance of~$G$, the substitution map $\Sigma$ contains a conformance with subject type $\tT\otimes\Sigma$ and protocol~\tP; we call these the \IndexDefinition{root conformance}\emph{root conformances} of $\Sigma$.
+
+When a generic declaration is referenced in the language, its generic arguments are either specified explicitly, or inferred. Once we have this list of replacement types, we augment it with a list of root conformances to form the substitution map. To get each root conformance, we take the subject type of each conformance requirement in the declaration's generic signature, substitute in our replacement types, and perform a \index{global conformance lookup!building substitution map}global conformance lookup. This construction guarantees that each root conformance has the same output generic signature as that which describes the replacement types of~$\Sigma$. Thus, if $\Sigma$ is in $\SubMapObj{G}{H}$, every root conformance of $\Sigma$ must be in $\ConfObj{H}$.
+
+Local conformance lookup with a root abstract conformance is very simple. Applying a substitution map $\Sigma$ to a root abstract conformance of its input generic signature~$G$ projects the corresponding root conformance from~$\Sigma$:
 \[ \TP \otimes \{\ldots,\, \SubstConf{T}{X}{P},\, \ldots\} := \ConfReq{X}{P} \]
 
-When a generic declaration is referenced in the language, its generic arguments are either specified explicitly, or inferred. Once we have this list of replacement types, we augment it with a list of root conformances to form a substitution map. To get each root conformance, we take the subject type of each conformance requirement in the declaration's generic signature, substitute in our replacement types, and perform a \index{global conformance lookup!building substitution map}global conformance lookup. This construction guarantees that each root conformance has the same output generic signature as that which describes the replacement types of~$\Sigma$. Thus, if $\Sigma$ is in $\SubMapObj{G}{H}$, every root conformance of $\Sigma$ must be in $\ConfObj{H}$.
-
-\pagebreak
-
-Setting aside the question of what local conformance lookup should do when the abstract conformance is more generally not a root abstract conformance, we can now describe the missing case of \AlgRef{type subst algo}:
+Setting aside the question of what local conformance lookup should do when the abstract conformance is more generally not a root abstract conformance, we can now describe the missing case of \AlgRef{alg:substitute type}:
 \begin{algorithm}[Substitute dependent member type]\label{dependent member type substitution}
 Takes a \index{dependent member type!type substitution}dependent member type \texttt{T.[P]A} and a substitution map $\Sigma$ as input. The dependent member type must be a \index{valid type parameter!type substitution}valid type parameter in the substitution map's \index{input generic signature}input generic signature. Outputs the substituted type $\texttt{T.[P]A}\otimes\Sigma$.
 \begin{enumerate}
@@ -549,7 +549,7 @@ In \ChapRef{chap:generic signatures}, we saw that a protocol declaration~\tP\ ha
 }{
 \SubstConf{Self}{X}{P}
 }\]
-Applying $\Sigma_{\XP}$ to \Index{protocol Self type@protocol \tSelf\ type}\tSelf\ outputs the conforming type, whereas applying $\Sigma_{\XP}$ to a \index{dependent member type}dependent member type \texttt{Self.[P]A}, where \nA\ is some associated type of \tP, outputs the type witness for \nA\ in the conformance:
+Applying $\Sigma_{\XP}$ to \IndexSelf\tSelf\ outputs the conforming type, whereas applying $\Sigma_{\XP}$ to a \index{dependent member type}dependent member type \texttt{Self.[P]A}, where \nA\ is some associated type of \tP, outputs the type witness for \nA\ in the conformance:
 \begin{gather*}
 \tSelf \otimes \Sigma_{\XP} = \tX\\
 \texttt{Self.[P]A}\otimes\Sigma_{\XP}=\APA\otimes\ConfReq{Self}{P}\otimes\Sigma=\APA\otimes\XP
@@ -563,7 +563,7 @@ Suppose that $d$ is a \index{nominal type declaration}nominal type declaration t
 \[
 \PQ \otimes \big(\SelfU \otimes \Sigma_{\NormalConf}\big)
 \]
-The result is the \IndexDefinition{associated conformance}\emph{associated conformance} that witnesses the associated conformance requirement $\AssocConfReq{Self.U}{Q}{P}$. Inside each normal conformance, we record a table of its associated conformances, indexed by the associated conformance requirements of its protocol. We lazily populate this table from the \IndexDefinition{associated conformance request}\Request{associated conformance request}. The request receives a normal conformance and an associated conformance requirement as input, and then proceeds as above; first applying the protocol substitution map to the requirement's subject type, and then performing a \index{global conformance lookup!associated conformance}global conformance lookup.
+The result is the \IndexDefinition{associated conformance}\emph{associated conformance} that witnesses the associated conformance requirement $\AssocConfReq{Self.U}{Q}{P}$. Inside each normal conformance, we record a table of its associated conformances, indexed by the associated conformance requirements of its protocol. We lazily populate this table from the \IndexDefinition{associated conformance request}\Request{associated conformance request}. The request receives a normal conformance and an associated conformance requirement as input, and then proceeds as above, by first applying the protocol substitution map to the requirement's subject type, and then performing a \index{global conformance lookup!associated conformance}global conformance lookup.
 
 \paragraph{Projection.}
 In the type substitution algebra, we denote an associated conformance requirement by $\SelfUQ$. \IndexDefinition{associated conformance projection}Associated conformance projection gives us this new form of the $\otimes$ operator. With a \index{normal conformance!associated conformance}normal conformance, projection evaluates the associated conformance request, as above:
@@ -574,7 +574,7 @@ The associativity of $\otimes$ determines associated conformance projection with
 \qquad {} = \SelfUQ\otimes\bigl(\NormalConf\otimes\Sigma\bigr)\\
 \qquad {} = \bigl(\SelfUQ\otimes\NormalConf\bigr)\otimes\Sigma
 \end{gather*}
-We also define associated conformance projection from an \index{abstract conformance!associated conformance}abstract conformance. Recall that if $G\vdash\TP$ and $\AssocConfReq{Self.U}{Q}{P}$ is an associated requirement of~\tP, we can apply the \IndexStep{AssocConf}\textsc{AssocConf} inference rule to derive the conformance requirement $\ConfReq{T.U}{Q}$, where \texttt{T.U} denotes the type parameter obtained from \SelfU\ by replacing \texttt{Self} with \tT:
+We also define associated conformance projection from an \index{abstract conformance!associated conformance}abstract conformance. Recall that if $G\vdash\TP$ and $\AssocConfReq{Self.U}{Q}{P}$ is an associated requirement of~\tP, we can apply the \IndexStep{AssocConf}\textsc{AssocConf} inference rule to derive the conformance requirement $\ConfReq{T.U}{Q}$, where \texttt{T.U} denotes the type parameter obtained from \SelfU\ by replacing \tSelf\ with \tT:
 \begin{gather*}
 \AnyStep{\TP}{1}\\
 \AssocConfStep{1}{T.U}{Q}{2}
@@ -595,7 +595,7 @@ Recall that when a protocol \tP\ \index{inherited protocol}inherits from another
 \]
 
 \begin{example}\label{protocol inherit assoc conf}
-We described the \tCollection\ protocol, which inherits from \tSequence, in \ExRef{protocol collection example}. The standard library \texttt{Array} also conforms to \tCollection, and not just \tSequence. Consider the specialized conformance $\ArrayIntCollection$. We can project $\SelfSequence$ from $\ArrayIntCollection$, which takes us back to the specialized conformance $\ArrayIntSequence$ of \ExRef{specialized conf example}:
+We described the \IndexProto{Collection}\tCollection\ protocol, which inherits from \tSequence, in \ExRef{protocol collection example}. The standard library \texttt{Array} also conforms to \tCollection, and not just \tSequence. Consider the specialized conformance $\ArrayIntCollection$. We can project $\SelfSequence$ from $\ArrayIntCollection$, which takes us back to the specialized conformance $\ArrayIntSequence$ of \ExRef{specialized conf example}:
 \begin{gather*}
 \SelfSequence \otimes \ArrayIntCollection \\
 \qquad {} = \SelfSequence \otimes \ArrayCollection \otimes \SubMapInt\\
@@ -643,7 +643,7 @@ As always, this specialized conformance consists of the following:
 \item The normal conformance $\ConfReq{IndexingIterator<\rT>}{IteratorProtocol}$.
 \item The context substitution map of \texttt{IndexingIterator<Array<\rT>>}.
 \end{enumerate}
-Let's look at (1) first. The standard library's \texttt{IndexingIterator} type is interesting, because it implements the requirements of \texttt{IteratorProtocol} in terms of an abstract conformance to \tCollection; that is, it can serve as the \nIterator\ type witness for any \tCollection:
+Let's look at (1) first. The standard library's \texttt{IndexingIterator} type is interesting, because it implements the requirements of \IndexProto{IteratorProtocol}\texttt{IteratorProtocol} in terms of an abstract conformance to \tCollection; that is, it can serve as the \nIterator\ type witness for any \tCollection:
 \begin{Verbatim}
 struct IndexingIterator<Elements: Collection>: IteratorProtocol {
   typealias Element = Elements.Element
@@ -676,7 +676,7 @@ This is like the previous example, except we're replacing \rT\ with \texttt{Arra
 \qquad {} = \AElement \otimes \ArraySequence \\
 \qquad {} = \rT
 \end{gather*}
-In terms of the input and output generic signature of $\Sigma$, this states that the \nElement\ associated type in the \nIterator\ associated conformance of \texttt{Array} is witnessed by the \nElement\ generic parameter of \texttt{Array}. While deriving this, we saw that the conformance substitution map of this \nIterator\ conformance contains $\ArrayCollection$, which is related to $\ArraySequence$ by an associated conformance projection, closing the cycle:
+In terms of the input and output generic signature of $\Sigma$, this states that the \nElement\ associated type in the \nIterator\ associated conformance of \texttt{Array} is witnessed by the \nElement\ generic parameter of \texttt{Array}. Notice how the conformance substitution map of the $\ConfReq{IndexingIterator<Array<\rT>>}{IteratorProtocol}$ conformance refers to $\ArrayCollection$, which in turn refers to $\ArraySequence$ via associated conformance projection, closing the cycle:
 \end{example}
 
 \medskip
@@ -717,7 +717,7 @@ Hence the four fundamental semantic objects in the Swift generics implementation
 
 The final section of this chapter is about \IndexDefinition{associated type inference}\emph{associated type inference}. A more accurate name for it would be ``type witness inference,'' because we're actually inferring the type witnesses in a conformance; but the current name is what we use. What follows is not a complete description of this language feature, but it is sufficient to serve as a quick reference, and also to demonstrate an important theoretical result.
 
-In \SecRef{type witnesses}, we listed four ways to declare a type witness in the language; associated type inference handles cases 2, 3, and 4 in that list. Therefore, we end up here if we are unable to resolve at least one type witness of a \index{normal conformance!associated type inference}normal conformance with a qualified lookup into the conforming type. We proceed as follows:
+The reader may wish to review \SecRef{type witnesses}, which listed four ways of declaring type witnesses. Associated type inference handles cases 2, 3, and 4 in that list. Therefore, we end up here if we are unable to resolve at least one type witness of a \index{normal conformance!associated type inference}normal conformance by case 1, that is, a qualified lookup into the conforming type. We proceed as follows:
 \begin{enumerate}
 \item We build a data structure to describe our problem.
 \item We find all solutions to the problem described by this data structure.
@@ -726,9 +726,9 @@ In \SecRef{type witnesses}, we listed four ways to declare a type witness in the
 \end{enumerate}
 
 \paragraph{The problem instance.}
-We start by looking at the protocol's \index{value requirement}\emph{value requirements}---those are its \index{function declaration!associated type inference}function, \index{subscript declaration!associated type inference}subscript, and \index{variable declaration!associated type inference}variable (or property) members. The interface type of a value requirement is written with respect to the protocol generic signature \verb|<Self where Self: P>|. We only need to consider a value requirement if its \index{interface type!associated type inference}interface type mentions a dependent member type \texttt{Self.[P]A}, where \texttt{A} is one of the associated types whose type witness we're trying to infer. According to the rules of the Swift language, the conforming type must witness each value requirement with some member declaration that has the same name and kind as the value requirement. The interface type of the witness must also match the interface type of the value requirement, if we substitute the conforming type in place of \texttt{Self}. In particular, if the interface type of the value requirement involves a dependent member type \texttt{Self.[P]A}, then the interface type of the value witness must contain the type witness for \texttt{A} in the same position.
+We start by looking at the protocol's \index{value requirement}\emph{value requirements}---those are its \index{function declaration!associated type inference}function, \index{subscript declaration!associated type inference}subscript, and \index{variable declaration!associated type inference}variable (or property) members. The interface type of a value requirement is written with respect to the protocol generic signature \verb|<Self where Self: P>|. We only need to consider a value requirement if its \index{interface type!associated type inference}interface type mentions a dependent member type \texttt{Self.[P]A}, where \texttt{A} is one of the associated types whose type witness we're trying to infer. According to the rules of the Swift language, the conforming type must witness each value requirement with some member declaration that has the same name and kind as the value requirement. The interface type of the witness must also match the interface type of the value requirement, if we substitute the conforming type in place of \tSelf. In particular, if the interface type of the value requirement involves a dependent member type \texttt{Self.[P]A}, then the interface type of the value witness must contain the type witness for \texttt{A} in the same position.
 
-In associated type inference, we don't know what the mapping from value requirements to value witnesses will be yet, and of course we don't even know all of the type witnesses either. However, at the very least, for each value requirement, we can perform a \index{qualified lookup}qualified lookup to find members of the conforming type that \emph{could} witness this value requirement, if their interface type would match. This gives us a set of \IndexDefinition{candidate value witness}\emph{candidate value witnesses} for each value requirement. 
+In associated type inference, we don't know what the mapping from value requirements to value witnesses will be yet, and of course we don't even know all of the type witnesses either. However, at the very least, for each value requirement, we can perform a \index{qualified lookup}qualified lookup to find members of the conforming type that \emph{could} witness this value requirement, if their interface type would match. This gives us a set of \IndexDefinition{candidate value witness}\emph{candidate value witnesses} for each value requirement.
 
 \begin{example}\label{assoc type inference example 1}
 Our first example involves this protocol:
@@ -771,7 +771,7 @@ Given the declarations of \ExRef{assoc type inference example 1}, the below tabl
 \toprule
 \textbf{Name}&\textbf{Requirement}&\textbf{Witnesses}\\
 \midrule
-\verb|eat(_:_:)|&\verb|(Self.Main, Self.Desert) -> ()|&\verb|(Int, Bool) -> ()|\\
+\verb|eat()|&\verb|(Self.Main, Self.Desert) -> ()|&\verb|(Int, Bool) -> ()|\\
 &&\verb|(Bool, Float) -> ()|\\
 &&\verb|(Int, Float) -> String|\\
 \midrule
@@ -780,7 +780,7 @@ Given the declarations of \ExRef{assoc type inference example 1}, the below tabl
 \bottomrule
 \end{tabular}
 \end{center}
-Consider the first candidate for \verb|eat(_:_:)|. If it were the witness, then replacing \tSelf\ with \texttt{Meal} in the type of the value requirement should give us \verb|(Int, Bool) -> ()|, which could only happen if the type witness for \texttt{Main} was \texttt{Int}, and the type witness for \texttt{Desert} was \texttt{Bool}. We denote this partial solution by $\{ \SubstType{Main}{Int},\, \SubstType{Desert}{Bool} \}$. On the other hand, the third candidate value witness for \verb|eat(_:_:)| doesn't match the return type of the requirement, so it does not contribute a partial solution to the disjunction. After we analyze all candidate value witnesses, we see that our problem instance has two disjunctions, with two partial solutions in each disjunction, and two type witness assignments in each partial solution:
+Consider the first candidate for \verb|eat()|. If it were the witness, then replacing \tSelf\ with \texttt{Meal} in the type of the value requirement should give us \verb|(Int, Bool) -> ()|, which could only happen if the type witness for \texttt{Main} was \texttt{Int}, and the type witness for \texttt{Desert} was \texttt{Bool}. We denote this partial solution by $\{ \SubstType{Main}{Int},\, \SubstType{Desert}{Bool} \}$. On the other hand, the third candidate value witness for \verb|eat()| doesn't match the return type of the requirement, so it does not contribute a partial solution to the disjunction. After we analyze all candidate value witnesses, we see that our problem instance has two disjunctions, with two partial solutions in each disjunction, and two type witness assignments in each partial solution:
 \begin{gather*}
 \{\{ \SubstType{Main}{Int},\, \SubstType{Desert}{Bool} \},\,
 \{ \SubstType{Main}{Bool},\, \SubstType{Desert}{Float} \}\}\\
@@ -801,7 +801,7 @@ This determines all type \emph{and} value witnesses in the conformance $\ConfReq
 We can observe more subtle behaviors when a candidate value witness is a member of a \index{protocol extension!associated type inference}protocol extension, because now dependent member types can appear on the \emph{right-hand side} of a match. We will not attempt to describe the full range of possibilities here, and instead just give one example.
 
 \begin{example}
-We will determine which of the three candidate value witnesses for \verb|P.f(_:_:)| is the actual witness, based on the possible type witness assignments:
+We will determine which of the three candidate value witnesses for \verb|P.f()| is the actual witness, based on the possible type witness assignments:
 \begin{Verbatim}
 protocol P {
   associatedtype A
@@ -826,21 +826,21 @@ This table shows the interface type of each requirement and candidate witness:
 \toprule
 \textbf{Name}&\textbf{Requirement}&\textbf{Witnesses}\\
 \midrule
-\verb|f(_:_:)|&\verb|(Self.A, Self.B) -> ()|&\verb|(String, Float) -> ()|\\
+\verb|f()|&\verb|(Self.A, Self.B) -> ()|&\verb|(String, Float) -> ()|\\
 &&\verb|(Int, Self.B) -> ()|\\
 &&\verb|(Void, Array<Self.B>) -> ()|\\
 \midrule
-\verb|g(_:)|&\verb|(Self.B) -> ()|&\verb|(Bool) -> ()|\\
+\verb|g()|&\verb|(Self.B) -> ()|&\verb|(Bool) -> ()|\\
 \bottomrule
 \end{tabular}
 \end{center}
 
-Consider the second candidate for \verb|f(_:_:)|. If it were the witness, then \texttt{A} would have to be \texttt{Int}, but we cannot say anything about \texttt{B}. We omit the \emph{tautological} assignment $\SubstType{B}{B}$, so our partial solution is just $\{\SubstType{A}{Int}\}$. The third candidate appears similar, but unlike the second, it does not contribute a partial solution to the disjunction at all. We cannot represent the assignment $\SubstType{B}{Array<Self.[P]B>}$ because it really involves the infinite type \texttt{Array<Array<Array<...>>>}. Thus, we do not need to consider the possibility that $\SubstType{A}{Void}$, either. The disjunction for \verb|foo(_:_:)| therefore only has two partial solutions. Here is our problem instance:
+Consider the second candidate for \verb|f()|. If this were the witness, then \texttt{A} would have to be \texttt{Int}, but we cannot say anything about \texttt{B}. We omit the \emph{tautological} assignment $\SubstType{B}{B}$, so our partial solution is just $\{\SubstType{A}{Int}\}$. The third candidate appears similar, but unlike the second, it does not contribute a partial solution to the disjunction at all. We cannot represent the assignment $\SubstType{B}{Array<Self.[P]B>}$ because it really involves the infinite type \texttt{Array<Array<Array<...>>>}. Thus, we do not need to consider the possibility that $\SubstType{A}{Void}$, either. The disjunction for \verb|foo()| therefore only has two partial solutions. Here is our problem instance:
 \begin{gather*}
 \{ \{ \SubstType{A}{String},\, \SubstType{B}{Float} \},\, \{ \SubstType{A}{Int} \}\}\\
 \{ \{ \SubstType{B}{Bool} \} \}
 \end{gather*}
-The only solution is $\{ \SubstType{A}{Int} \} \cup \{ \SubstType{B}{Bool} \} = \{ \SubstType{A}{Int},\, \SubstType{B}{Bool}\}$. Thus, (2) is the actual witness for \verb|P.f(_:_:)| in this conformance.
+The only solution is $\{ \SubstType{A}{Int} \} \cup \{ \SubstType{B}{Bool} \} = \{ \SubstType{A}{Int},\, \SubstType{B}{Bool}\}$. Thus, (2) is the actual witness for \verb|P.f()| in this conformance.
 \end{example}
 
 \paragraph{The solver.}
@@ -852,7 +852,7 @@ The algorithm consists of a recursive helper procedure, and the outer procedure.
 \item If $i$ equals the length of~$D$, we have a solution $S$. Call the visitor and return.
 \item Otherwise, let $D[i]$ be the $i$th disjunction in $D$. Set $j\leftarrow 0$.
 \item If $j$ equals the length of $D[i]$, there are no more solutions that contain $S$. Return.
-\item Otherwise, let $D[i][j]$ be the $j$th partial solution in $D[i]$. If $S \cup D[i][j]$ is also a consistent partial solution, recurse with $S\leftarrow S\cup D[i][j]$ and $i\leftarrow i+1$.
+\item Otherwise, let $D[i][j]$ be the $j$th partial solution in $D[i]$. If $S \cup D[i][j]$ is a consistent partial solution, recursively call Step~1 with $S\leftarrow S\cup D[i][j]$ and $i\leftarrow i+1$.
 \item Set $j\leftarrow j+1$. Go back to Step~3.
 \end{enumerate}
 \end{algorithm}
@@ -866,7 +866,7 @@ The algorithm consists of a recursive helper procedure, and the outer procedure.
 We will now look at an example of each behavior.
 
 \begin{example}\label{abstract type witness example}
-The first behavior handles a rather common scenario. Suppose we have a \tSequence\ conformance whose \nElement\ type is just some fixed concrete type. We could write it as follows:
+The first behavior handles a rather common scenario. Suppose we have a \tSequence\ conformance whose \nElement\ and \nIterator\ types are just fixed concrete types. We could write it as follows:
 \begin{Verbatim}
 struct Fibonacci: Sequence {
   struct Iterator: IteratorProtocol {
@@ -875,11 +875,11 @@ struct Fibonacci: Sequence {
   func makeIterator() -> Iterator {...}
 }
 \end{Verbatim}
-Consider the nested type declaration first. We deduce the type witness for \nElement\ from \texttt{next()} in the \tIterator\ conformance:
+Consider the nested type declaration first. In the \tIterator\ conformance, we deduce the type witness for \nElement\ from \texttt{next()}, and we get:
 \[\AIElement\otimes\ConfReq{Fibonacci.Iterator}{IteratorProtocol}=\texttt{Int}\]
-Now consider the outer type declaration. The \tSequence\ protocol has a single value requirement, which only determines the type witness for \nIterator:
+Now consider the outer type declaration. The \tSequence\ protocol has a single value requirement, \texttt{makeIterator()}, which determines the type witness for \nIterator:
 \[\AIterator\otimes\ConfReq{Fibonacci}{Sequence}=\texttt{Fibonacci.Iterator}\]
-We cannot deduce the \nElement\ type witness in $\ConfReq{Fibonacci}{Sequence}$ from the value requirements of \tSequence, so instead we consider the \index{associated same-type requirement!associated type inference}associated same-type requirement $\AssocSameReq{Self.Element}{Self.Iterator.Element}{Sequence}$. The left-hand side is exactly the type witness we're trying to infer, and the right-hand side can be resolved given the type witnesses known so far:
+However, we cannot deduce the \nElement\ type witness in $\ConfReq{Fibonacci}{Sequence}$ from the value requirements of \tSequence, so instead we consider the \index{associated same-type requirement!associated type inference}associated same-type requirement $\AssocSameReq{Self.Element}{Self.Iterator.Element}{Sequence}$. The left-hand side is exactly the type witness we're trying to infer, and the right-hand side can be resolved given the type witnesses known so far:
 \begin{gather*}
 \AIElement \otimes \SelfIterator \\
 \qquad {} \otimes \ConfReq{Fibonacci}{Sequence} = \tInt
@@ -888,7 +888,7 @@ This allows us to conclude that $\AElement \otimes\ConfReq{Fibonacci}{Sequence} 
 \end{example}
 
 \begin{example}
-The second behavior is peculiar, because we only attempt to resolve a type witness to a generic parameter \emph{after} we've already exhausted the possibility of inferring it from a candidate value witness. This was not immediately apparent in \ExRef{type witness example}, where the \texttt{Dog} struct just happened to witness the associated type \texttt{Toy} with the generic parameter \texttt{Toy}. However, we might have an associated type with the same name as a generic parameter, but a different type witness assigned, from a candidate value witness. Here, we have a hypothetical iterator that produces all permutations from a set of elements:
+The next behavior is peculiar, because we only attempt to resolve a type witness to a generic parameter \emph{after} we've already exhausted the possibility of inferring it from a candidate value witness. This was not immediately apparent in \ExRef{type witness example}, where the \texttt{Dog} struct just happened to witness the associated type \texttt{Toy} with the generic parameter \texttt{Toy}. However, we might have an associated type with the same name as a generic parameter, but a different type witness, deduced from a candidate value witness. In the below, we have a hypothetical iterator that produces all permutations from a set of elements:
 \begin{Verbatim}
 struct Permutations<Element>: IteratorProtocol {
   // synthesized: typealias Element = Array<Element>
@@ -902,15 +902,15 @@ func inspect(_: Permutations<Int>.Element) {...}
 \end{example}
 
 \begin{example}
-For the third behavior, we recall the \texttt{IndexingIterator} type from \ExRef{indexing iterator example}. We saw that \texttt{IndexingIterator} has the interesting property that it can witness the \texttt{Iterator} associated type of \tSequence\ for an \emph{arbitrary} \tCollection, so it should be the default. However, it cannot be the default for all \tSequence\ conformances, because it's generic argument must be a \tCollection. The standard library models this by having \tCollection\ re-state \texttt{Iterator} to give it a \index{default type witness}default type witness:
+For the third behavior, we recall the \texttt{IndexingIterator} type from \ExRef{indexing iterator example}. We saw that \texttt{IndexingIterator} has the interesting property that it can witness the \texttt{Iterator} associated type of \tSequence\ for an \emph{arbitrary} \tCollection, so it could be a default type witness for conformances to \tCollection. However, it cannot be the default for all \tSequence\ conformances, because it's generic argument must be a \IndexProto{Collection}\tCollection. The standard library models this by having \tCollection\ re-state \texttt{Iterator} to give it a \index{default type witness}default type witness:
 \begin{Verbatim}
 associatedtype Iterator = IndexingIterator<Self>
 \end{Verbatim}
-Re-stating an \index{inherited associated type}inherited associated type declaration does not change the equivalence class structure of a generic signature, but it allows a derived protocol to provide a more suitable default type witness for an inherited associated type. Thus, if we're asked to infer the \nIterator\ associated type in a \tSequence\ conformance, and the conforming type \emph{also} conforms to \tCollection, we use the above default.
+Re-stating an \index{inherited associated type}inherited associated type declaration does not change the equivalence class structure of a generic signature (\ExRef{assoc bind example}), but it allows a derived protocol to provide a more suitable default type witness for an inherited associated type. Thus, if we're asked to infer the \nIterator\ associated type in a \tSequence\ conformance, and the conforming type \emph{also} conforms to \tCollection, we use the above default.
 \end{example}
 
 \paragraph{Finishing up.}
-If the above produces a complete solution, we still need to check that our type witness assignment actually satisfies the protocol's associated requirements, using \AlgRef{check generic arguments algorithm} from \SecRef{checking generic arguments}. If the algorithm accepts, we have a \emph{valid} solution. Just like in the \index{expression type checker}expression type checker (\SecRef{sec:more types}), we collect all valid solutions, and consider the three possibilities:
+If after all of that, we get a complete solution, we still need to check that our type witness assignment actually satisfies the protocol's associated requirements. We haven't seen it yet, but we use \AlgRef{check generic arguments algorithm} from \SecRef{checking generic arguments}. If the algorithm accepts, we have a \emph{valid} solution. Just like in the \index{expression type checker}expression type checker (\SecRef{sec:more types}), we collect all valid solutions, and consider the three possibilities:
 \begin{itemize}
 \item \textbf{One solution}---there is just one unique way to assign a type witness to each associated type in the conformance.
 \item \textbf{No solutions}---no possible assignment of type witnesses could be deduced from the conformance.
@@ -944,7 +944,7 @@ struct Snack: Derived {
   func eat(_: Int) {}
 }
 \end{Verbatim}
-This is a long-standing bug; the workaround is to re-declare \texttt{Food} in \texttt{Derived}~\cite{sr2235}. 
+This is a long-standing bug; the workaround is to re-declare \texttt{Food} in \texttt{Derived}~\cite{sr2235}.
 \end{example}
 
 \paragraph{Boolean satisfiability.}
@@ -977,9 +977,9 @@ A Boolean formula is \emph{satisfiable} if there exists at least one \emph{satis
 
 We only need to consider a restricted form of the SAT problem. Let's say that a single variable~$x$ or its negation~$\neg x$ is a \index{literal!in SAT}\emph{literal}, while a \index{clause in SAT}\emph{clause} is a disjunction of one or more literals, for example $(\neg x_1 \vee x_2 \vee \neg x_3)$. A formula is in \index{conjunctive normal form}\emph{conjunctive normal form}, or \index{CNF|see{conjunctive normal form}}CNF, if it is a conjunction of clauses:
 \[(\neg x_1 \vee x_2 \vee x_3) \wedge (\neg x_1 \vee x_2 \vee \neg x_3) \wedge (\neg x_2 \vee x_3) \wedge (x_1 \vee x_2) \wedge (\neg x_1 \vee \neg x_2)\]
-The above formula is more precisely in 3CNF, meaning it has the additional property that no clause contains more than three literals. In fact, an arbitrary Boolean formula can always be converted first into CNF, and then 3CNF, in a way that preserves satisfiability (or lack thereof). Thus, for our purposes it suffices to solve 3SAT, as the restriction of the SAT problem to 3CNF is known.
+The above formula is more precisely in 3CNF, meaning it has the additional property that no clause contains more than three literals. We will not show this here, but in fact an arbitrary Boolean formula can always be converted first into CNF, and then 3CNF, in a way that preserves satisfiability (or lack thereof). Thus, for our purposes it suffices to solve 3SAT.
 
-We will encode the above 3CNF formula as an instance of associated type inference, but it will be obvious that this encoding works for any 3CNF formula. First, we need a pair of nominal types to represent true and false:
+We will encode the above 3CNF formula as an instance of associated type inference, but it will be obvious that this encoding works for any 3CNF formula. The full listing is shown in \ListingRef{listing:sat}. First, we use two structs to represent true and false:
 \begin{Verbatim}
 struct T {}
 struct F {}
@@ -988,12 +988,12 @@ We then declare a nominal type named \texttt{Solver} that is common to all 3CNF 
 \begin{Verbatim}
 struct Solver: Instance {
 \end{Verbatim}
-We have two overloads of \verb|literal(_:_:)|:
+We have two overloads of \verb|literal()|:
 \begin{Verbatim}
   func literal(_: T, _: F) {}
   func literal(_: F, _: T) {}
 \end{Verbatim}
-We also have $2^3-1=7$ overloads of \verb|clause(_:_:_:)|, one for each triple of true or false such that not all three are false:
+We also have $2^3-1=7$ overloads of \verb|clause()|, one for each triple of true or false such that not all three are false:
 \begin{Verbatim}
   func clause(_: T, _: F, _: F) {}
   func clause(_: F, _: T, _: F) {}
@@ -1016,13 +1016,13 @@ protocol Instance {
   associatedtype X2P; associatedtype X2N
   associatedtype X3P; associatedtype X3N
 \end{Verbatim}
-We also add a series of methods named \verb|literal(_:_:)| to our protocol, one for each variable $x_i$, to encode the fact that $x_i$ and $\neg x_i$ are complementary literals:
+We add a series of methods named \verb|literal()| to our protocol, one for each variable~$x_i$, to encode the fact that $x_i$ and $\neg x_i$ are complementary literals:
 \begin{Verbatim}
   func literal(_: X1P, _: X1N)
   func literal(_: X2P, _: X2N)
   func literal(_: X3P, _: X3N)
 \end{Verbatim}
-Finally, we add a series of methods named \verb|clause(_:_:_:)|, one for each clause. To get the three parameter types, we translate each literal $x_i$ or $\neg x_i$ appearing in the clause into a parameter of type \texttt{XiP} or \texttt{XiN}, and if a clause has fewer than three literals, we just repeat a literal. For example, the first clause in our formula is $(\neg x_1 \vee x_2 \vee x_3)$, which becomes \verb|(_: X1N, _: X2P, _: X3P)|, and so on:
+Finally, we add a series of methods named \verb|clause()|, one for each clause. To get the three parameter types, we translate each literal $x_i$ or $\neg x_i$ appearing in the clause into a parameter of type \texttt{XiP} or \texttt{XiN}. For example, the first clause in our formula is $(\neg x_1 \vee x_2 \vee x_3)$, which becomes \verb|(_: X1N, _: X2P, _: X3P)|, and so on. If a clause has fewer than three literals, we just repeat the last literal:
 \begin{Verbatim}
   func clause(_: X1N, _: X2P, _: X3P)
   func clause(_: X1N, _: X2P, _: X3N)
@@ -1033,8 +1033,8 @@ Finally, we add a series of methods named \verb|clause(_:_:_:)|, one for each cl
 \end{Verbatim}
 The above encodes a series of disjunctions for \AlgRef{associated type inference algo}:
 \begin{enumerate}
-\item Each \verb|Instance.literal(_:_:)| has the two \verb|Solver.literal(_:_:)| overloads as candidates, so each \texttt{XiP} must be \texttt{T} or \texttt{F}, and \texttt{XiN} must be the negation.
-\item Each \verb|Instance.clause(_:_:_:)| has seven \verb|Solver.clause(_:_:_:)| overloads as candidates, so we get a disjunction where each partial solution is a satisfying assignment for the clause, because at least one literal in the clause is true.
+\item Each \verb|Instance.literal()| has the two \verb|Solver.literal()| overloads as candidates, so each \texttt{XiP} must be \texttt{T} or \texttt{F}, and \texttt{XiN} must be the negation.
+\item Each \verb|Instance.clause()| has seven \verb|Solver.clause()| overloads as candidates, so we get a disjunction where each partial solution is a satisfying assignment for the clause, because at least one literal in the clause is true.
 \end{enumerate}
 In our example, associated type inference finds a unique solution, and we can even recover the satisfying assignment, by looking at the type witnesses for each \texttt{XiP}. For example, the following will print \verb|(F, T, T)|:
 \begin{Verbatim}
@@ -1046,7 +1046,11 @@ A quick calculation confirms that $\{x_1 := 0, x_2 := 1, x_3 := 1\}$ is a satisf
 \]
 There is one caveat with how we interpret the output of our ``SAT solver.'' Formally, SAT is a \emph{decision problem} with a true or false answer; it just asks if at least one satisfying assignment \emph{exists}. On the other hand, associate type inference will enumerate \emph{all} valid solutions and attempt to pick the best one. Our example formula was not only satisfiable, but it happened to have a unique satisfying assignment. In general, if associated type inference finds a unique solution, \emph{or} if it diagnoses an ambiguity because there is more than one valid solution, we can conclude that our Boolean formula is satisfiable. If there is no solution, there is no satisfying assignment. But what does this all \emph{mean}?
 
-\paragraph{Non-deterministic polynomial time.} We've arrived at one of the most celebrated ideas in theoretical computer science. A classic text on this topic is~\cite{garey1979computers}, while \cite{maccormick2018can} has a gentler introduction. We can start by describing a \emph{non-deterministic} algorithm to solve satisfiability. We fix an encoding of truth assignments as strings of symbols; for example, we can write down the 0~and~1 values assigned to each of our $n$ variables, in some fixed order. Our non-deterministic algorithm then simultaneously ``guesses'' all $2^n$ truth assignments, and ``checks'' each assignment in parallel with all others, by evaluating the formula to obtain a true or false result. The overall algorithm outputs success if at least one thread outputs success, otherwise it outputs failure.
+\begin{listing}\captionabove{Boolean satisfiability encoded with associated type inference}\label{listing:sat}
+\VerbInput{conformances/sat.swift}
+\end{listing}
+
+\paragraph{Non-deterministic polynomial time.} We now attempt to summarize one of the most celebrated ideas in theoretical computer science. A classic text on this topic is~\cite{garey1979computers}, while \cite{maccormick2018can} has a gentler introduction. First, we imagine a \emph{non-deterministic} algorithm to solve satisfiability. We fix an encoding of truth assignments as strings of symbols; for example, we write down the 0~and~1 values assigned to each of our $n$ variables, in some fixed order. Our non-deterministic algorithm then simultaneously ``guesses'' all $2^n$ truth assignments, and ``checks'' each assignment in parallel with all others, by evaluating the formula to obtain a true or false result. The overall algorithm outputs success if at least one thread outputs success, otherwise it outputs failure.
 
 As far as non-deterministic algorithms go, this one is extremely efficient. If someone hands us an assignment of truth values, we can \emph{check} if it is a satisfying assignment in $O(n)$ \index{asymptotic complexity}steps, where $n$ is the length of the formula. More generally, a decision problem belongs to the class of \index{non-deterministic polynomial time}\emph{non-deterministic polynomial time problems}, also known as \index{NP problem}NP for short, if we can check that a given solution satisfies the problem instance with an algorithm that always terminates in at most $O(n^k)$ steps, where $n$ is the size of the instance, and $k$ is a fixed constant.
 
@@ -1065,7 +1069,7 @@ Notice that the running time of \AlgRef{associated type inference algo} is worst
 This is, of course, the famous ``{P} $\stackrel{?}{=}$ {NP}'' problem, which remains unsolved at the present time. For a survey of the problem, see \cite{pvnp}.
 
 \paragraph{Overload resolution.}
-In realistic Swift programs, associated type inference is only ever presented with a handful of requirements and candidate witnesses at a time, and the search space explored by \AlgRef{associated type inference algo} is not large. However, this matching of requirements against candidate witnesses is just a special case of \index{overload resolution|see{expression type checker}}\emph{overload resolution}, performed by the \index{expression type checker}expression type checker. Swift programmers sometimes run into the NP-hardness of that problem, when \texttt{the compiler is unable to type-check this expression in reasonable time}. It can also be shown that overload resolution is NP-hard in the \index{C${}^\sharp$}$\mathrm{C}^\sharp$~programming language \cite{csharpsat}, using an encoding of the SAT problem quite similar to ours.
+In realistic Swift programs, associated type inference is only ever presented with a handful of requirements and candidate witnesses at a time, and the search space explored by \AlgRef{associated type inference algo} is not large. However, this matching of requirements against candidate witnesses is just a special case of \index{overload resolution|see{expression type checker}}\emph{overload resolution}, performed by the \index{expression type checker}expression type checker. Swift programmers sometimes run into the NP-hardness of that problem, when \texttt{the compiler is unable to type-check this expression in reasonable time}. It can also be shown that overload resolution is NP-hard in the \index{C${}^\sharp$}$\mathrm{C}^\sharp$~programming language \cite{csharpsat}, using an encoding of the SAT problem quite similar to that in this section.
 
 We will not explain it here, but in fact associated type inference can be seen as an instance of an \index{exact cover}\emph{exact cover with colors}, or \index{XCC problem}XCC problem. XCC is also NP-complete of course, but just as with SAT, clever algorithms have been devised that can solve many instances of XCC efficiently. This is a possible future direction if the time spent in associated type inference ever becomes non-trivial in a real-world project. Algorithms for solving XCC and SAT are discussed in~\cite{art4b}. Finally, another good reference about the SAT problem is~\cite{sataa}.
 
@@ -1175,34 +1179,29 @@ A \IndexSource{concrete conformance}concrete protocol conformance. Concrete prot
 \item \texttt{getAssociatedConformance()} returns the \IndexSource{associated conformance}associated conformance for a conformance requirement in the protocol's requirement signature.
 \item \texttt{subst()} returns the protocol conformance obtained by applying a substitution map to this conformance.
 \end{itemize}
-The \texttt{ProtocolConformance} class is the root of a class hierarchy shown in \FigRef{conformancehierarchy}. 
-
-\begin{figure}\captionabove{The \texttt{ProtocolConformance} class hierarchy}\label{conformancehierarchy}
+The \texttt{ProtocolConformance} class is the root of a class hierarchy:
 \begin{center}
-\begin{tikzpicture}[%
-  grow via three points={one child at (0.5,-0.7) and
-  two children at (0.5,-0.7) and (0.5,-1.4)},
-  edge from parent path={[->] (\tikzparentnode.south) |- (\tikzchildnode.west)}]
-  \node [class] {\texttt{\vphantom{p}ProtocolConformance}}
-    child { node [class] {\texttt{\vphantom{p}RootProtocolConformance}}
-      child { node [class] {\texttt{\vphantom{p}NormalProtocolConformance}}}
-      child { node [class] {\texttt{\vphantom{p}SelfProtocolConformance}}}
-    }
-    child [missing] {}
-    child [missing] {}
-    child { node [class] {\texttt{\vphantom{p}InheritedProtocolConformance}}}
-    child { node [class] {\texttt{\vphantom{p}SpecializedProtocolConformance}}};
-\end{tikzpicture}
+\begin{forest}
+for tree={folder, grow'=0, fit=band, s sep=2pt, draw=black, thick, rounded corners}
+[\texttt{\vphantom{p}ProtocolConformance}
+  [\texttt{\vphantom{p}RootProtocolConformance}
+    [\texttt{\vphantom{p}NormalProtocolConformance}]
+    [\texttt{\vphantom{p}ExistentialProtocolConformance}]
+  ]
+  [\texttt{\vphantom{p}InheritedProtocolConformance}]
+  [\texttt{\vphantom{p}SpecializedProtocolConformance}]
+]
+\end{forest}
 \end{center}
-\end{figure}
+The \texttt{ExistentialProtocolConformance} subclass is documented in \SecRef{src:existential types}.
 
 \apiref{RootProtocolConformance}{class}
-Abstract base class for \texttt{NormalProtocolConformance} and \texttt{SelfProtocolConformance}. Inherits from \texttt{ProtocolConformance}.
+Base class for \texttt{NormalProtocolConformance} and \texttt{ExistentialProtocolConformance}. Inherits from \texttt{ProtocolConformance}.
 
 \apiref{NormalProtocolConformance}{class}
 A \IndexSource{normal conformance}normal protocol conformance. Subclass of \texttt{RootProtocolConformance}.
 \begin{itemize}
-\item \texttt{getDeclContext()} returns the conforming declaration context, either a nominal type declaration or extension.
+\item \texttt{getDeclContext()} returns the declaration context where this conformance was declared, either a nominal type declaration or extension.
 \item \texttt{getGenericSignature()} returns the generic signature of the conforming context.
 \end{itemize}
 A normal conformance is always canonical.
@@ -1211,7 +1210,7 @@ A normal conformance is always canonical.
 \apiref{InheritedProtocolConformance}{class}
 An inherited protocol conformance. Subclass of \texttt{ProtocolConformance}.
 \begin{itemize}
-\item \texttt{getInheritedConformance()} returns the base conformance, which must be normal or specialized.
+\item \texttt{getInheritedConformance()} returns the base conformance, which is always normal or specialized.
 \end{itemize}
 An inherited conformance is canonical if its conforming type is a canonical type, and its base conformance is a canonical conformance.
 
@@ -1225,7 +1224,7 @@ A specialized protocol conformance. Subclass of \texttt{ProtocolConformance}.
 \end{itemize}
 A specialized conformance is canonical if its conformance substitution map is \index{canonical substitution map}canonical. To canonicalize a specialized conformance, we canonicalize the elements of its substitution map, and form a new specialized conformance.
 
-\subsection*{Type Substitution}
+\subsection*{Building Substitution Maps}
 
 Key source files:
 \begin{itemize}
@@ -1234,38 +1233,40 @@ Key source files:
 \end{itemize}
 
 \apiref{SubstitutionMap}{class}
-We discussed substitution maps in \SecRef{src:substitution maps}. Recall that a \IndexSource{substitution map}substitution map stores a list of conformances, one for each \IndexSource{conformance requirement}conformance requirement in its \IndexSource{input generic signature}input generic signature. Three overloads of the \texttt{get()} static method construct substitution maps. They differ in how the \IndexSource{replacement type}replacement types and conformances are specified:
+We discussed substitution maps in \SecRef{src:substitution maps}, but we postponed the entry points for constructing new substitution maps, because we hadn't met conformances yet. We introduce them now.
+
+Recall that a \IndexSource{substitution map}substitution map stores a list of conformances, one for each \IndexSource{conformance requirement}conformance requirement in its \IndexSource{input generic signature}input generic signature. Three overloads of the \texttt{get()} static method construct substitution maps. They differ in how the substitution map's \IndexSource{replacement type}replacement types and conformances are specified:
 
 \medskip
 \noindent
 \texttt{get(GenericSignature, ArrayRef<Type>, ArrayRef<ProtocolConformanceRef>)}:\newline
-Builds a new substitution map from an input generic signature, an array of replacement types, and array of conformances. The first array's elements are in one-to-one correspondence with the signature's generic parameters, and the second array's elements are in one-to-one correspondence with the signature's conformance requirements.
+Builds a new substitution map from an input generic signature, an array of replacement types, and an array of conformances. The first array's elements are in one-to-one correspondence with the signature's generic parameters, and the second array's elements are in one-to-one correspondence with the signature's conformance requirements.
 
 \medskip
 \noindent
 \texttt{get(GenericSignature, ArrayRef<Type>, LookupConformanceFn)}:\newline
-Builds a new substitution map from an input generic signature, an array of replacement types, and array of conformances. Instead of providing an array of conformances, this form takes a callback, which is invoked on each conformance requirement.
+Builds a new substitution map from an input generic signature, an array of replacement types, and a callback, which produces a conformance for each conformance requirement in the input generic signature.
 
 \medskip
 \noindent
 \texttt{get(GenericSignature, TypeSubstitutionFn, LookupConformanceFn)}:\newline
-Builds a new substitution map by invoking a pair of callbacks to produce each replacement type and conformance. This overload takes two callbacks, which are invoked to produce each replacement type and conformance.
+Builds a new substitution map, applying the first callback to each generic parameter of the input generic signature to produce the replacement types, and the second callback to the conformance requirements of the input generic signature to produce the root conformances.
 
 \medskip
 
-Finally, the \texttt{getProtocolSubstitutions()} static method builds a \IndexSource{protocol substitution map}protocol substitution map for a \IndexSource{protocol generic signature}protocol generic signature, given a conformance to this protocol.
+Finally, \texttt{SubstitutionMap::getProtocolSubstitutions()} takes a conformance to some protocol, and builds a \IndexSource{protocol substitution map}substitution map for this \IndexSource{protocol generic signature}protocol's generic signature.
 
 \apiref{TypeSubstitutionFn}{type alias}
-The type of a replacement type callback for the third form of \texttt{SubstitutionMap::get()}.
+The type of a replacement type callback for the third form of \texttt{SubstitutionMap::get()}:
 \begin{verbatim}
 using TypeSubstitutionFn
   = llvm::function_ref<Type(SubstitutableType *dependentType)>;
 \end{verbatim}
-The parameter type is always a \texttt{GenericTypeParamType *} when the callback is used with \texttt{SubstitutionMap::get()}.
+The \texttt{SubstitutableType} class is the common superclass of \texttt{GenericTypeParamType} and \texttt{ArchetypeType}. The actual type is always a \texttt{GenericTypeParamType} when the callback is used with \texttt{SubstitutionMap::get()}.
 
 \IndexSource{conformance lookup callback}
 \apiref{LookupConformanceFn}{type alias}
-The type signature of a conformance lookup callback for \texttt{SubstitutionMap::get()}.
+The type signature of a conformance lookup callback for the second and third forms of \texttt{SubstitutionMap::get()}:
 \begin{verbatim}
 using LookupConformanceFn = llvm::function_ref<
     ProtocolConformanceRef(InFlightSubstitution &IFS,
@@ -1310,10 +1311,10 @@ Key source file:
 Request evaluator request for \IndexSource{type witness request}lazily resolving a type witness in a normal conformance. Attempts a qualified lookup, and if that fails, evaluates a \texttt{TypeWitnessesRequest}.
 
 \apiref{TypeWitnessesRequest}{class}
-Request evaluator request for resolving all \IndexSource{type witnesses request}type witnesses in a normal conformance, first by attempting lookup and then associated type inference.
+Request evaluator request for resolving all \IndexSource{type witnesses request}type witnesses in a normal conformance, first by attempting lookup, and then associated type inference.
 
 \apiref{AssociatedConformanceRequest}{class}
-Request evaluator request for lazily looking up an \IndexSource{associated conformance request}associated conformance of a normal conformance that was parsed from source. Computes the substituted subject type of the requirement and calls global conformance lookup.
+Request evaluator request for lazily looking up an \IndexSource{associated conformance request}associated conformance of a normal conformance that was parsed from source. Computes the substituted subject type of the requirement, and calls global conformance lookup.
 
 \apiref{InferredAssociatedTypesByWitness}{struct}
 A partial solution.
@@ -1322,13 +1323,13 @@ A partial solution.
 A disjunction, represented as an \verb|llvm::SmallVector| of partial solutions.
 
 \apiref{InferredAssociatedTypesByWitnesses}{type alias}
-The problem instance, represented as a \verb|llvm::SmallVector| of pairs, where the first element in each pair is a value requirement and the second is a disjunction.
+The problem instance, represented as an \verb|llvm::SmallVector| of pairs, where the first element in each pair is a value requirement and the second is a disjunction.
 
 \apiref{AssociatedTypeInference}{class}
 The \IndexSource{associated type inference}associated type inference solver.
 \begin{itemize}
 \item \texttt{inferTypeWitnessesViaValueWitnesses()} builds the problem instance, consisting of a disjunction for each \IndexSource{value requirement}value requirement that mentions the given set of associated types.
-\item \texttt{getPotentialTypeWitnessesFromRequirement()} builds a disjunction for a value requirement, by finding all \IndexSource{candidate value witness}candidate value witnesses for this requirement and constructs a partial solution for each one.
+\item \texttt{getPotentialTypeWitnessesFromRequirement()} builds a disjunction for a value requirement, by finding all \IndexSource{candidate value witness}candidate value witnesses for this requirement, and constructing a partial solution for each one.
 \item \texttt{getPotentialTypeWitnessesByMatchingTypes()} builds a partial solution from a pairing of a value requirement with candidate value witness.
 \item \texttt{solve()} implements \AlgRef{associated type inference algo}.
 \end{itemize}
