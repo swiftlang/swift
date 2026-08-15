@@ -70,7 +70,7 @@ func useValueType(_ v: ValueType, _ p: UnsafePointer<CInt>!) {
   _ = v.sumVirtual(p, 1)
 }
 
-@available(macOS 13.3, *)
+@available(SwiftStdlib 5.8, *)
 func useRefType(_ r: RefType, _ p: UnsafePointer<CInt>!) {
   _ = r.sumNonVirtual(p, 1)
   _ = r.sumVirtual(p, 1)
