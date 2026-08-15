@@ -20,6 +20,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/ExtInfo.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/ParameterList.h"
@@ -8473,8 +8474,54 @@ void IRGenSILFunction::visitInitExistentialMetatypeInst(
 }
 
 void IRGenSILFunction::visitInitExistentialRefInst(InitExistentialRefInst *i) {
-  Explosion instance = getLoweredExplosion(i->getOperand());
   Explosion result;
+
+  if (i->getType().canUseExistentialRepresentation(ExistentialRepresentation::COM,
+                                                   i->getFormalConcreteType())) {
+    auto *interface =
+        i->getType().getASTType().getExistentialLayout().getCOMInterface();
+    assert(interface && "COM existential must identify an interface");
+
+    ProtocolConformanceRef concrete;
+    for (auto conformance : i->getConformances()) {
+      if (conformance.getProtocol() == interface) {
+        concrete = conformance;
+        break;
+      }
+    }
+
+    if (i->getOperand()->getType().isAddress()) {
+      auto value = getLoweredAddress(i->getOperand());
+
+      llvm::Value *projected =
+          i->getFormalConcreteType()->is<ExistentialArchetypeType>()
+              ? Builder.CreateLoad(value, "com.interface")
+              : emitCOMInterfaceProjection(*this, value.getAddress(),
+                                           i->getFormalConcreteType(), interface,
+                                           concrete);
+
+      // Projection from an opaque generic value borrows the stored object.
+      // Retain the interface pointer for the owned existential result before
+      // the generic source temporary is destroyed.
+      Explosion borrowed;
+      borrowed.add(projected);
+      cast<LoadableTypeInfo>(getTypeInfo(i->getType()))
+          .copy(*this, borrowed, result, getDefaultAtomicity());
+    } else {
+      Explosion instance = getLoweredExplosion(i->getOperand());
+      auto *value = instance.claimNext();
+      assert(instance.empty() &&
+             "a COM projection source must contain exactly one pointer");
+      result.add(emitCOMInterfaceProjection(*this, value,
+                                            i->getFormalConcreteType(),
+                                            interface, concrete));
+    }
+
+    setLoweredExplosion(i, result);
+    return;
+  }
+
+  Explosion instance = getLoweredExplosion(i->getOperand());
   emitClassExistentialContainer(*this,
                                result, i->getType(),
                                instance.claimNext(),

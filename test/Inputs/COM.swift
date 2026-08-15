@@ -54,6 +54,15 @@ public protocol COMAggregatable: AnyObject {
 
 #endif
 
+extension Unmanaged where Instance == AnyObject {
+  @usableFromInline
+  @inline(__always)
+  internal static func from(unsafeCOMPointer pUnk: UnsafeMutableRawPointer) -> Self {
+    let lpVtbl = pUnk.load(as: UnsafePointer<UnsafeRawPointer>.self)
+    return .fromOpaque(pUnk.advanced(by: Int(bitPattern: lpVtbl[-1])))
+  }
+}
+
 @c
 @_alwaysEmitIntoClient
 public func QueryInterface(_ pUnk: UnsafeMutableRawPointer,
@@ -66,13 +75,15 @@ public func QueryInterface(_ pUnk: UnsafeMutableRawPointer,
 @c
 @_alwaysEmitIntoClient
 public func AddRef(_ pUnk: UnsafeMutableRawPointer) -> UInt32 {
-  fatalError("AddRef")
+  _ = Unmanaged<AnyObject>.from(unsafeCOMPointer: pUnk).retain()
+  return 1
 }
 
 @c
 @_alwaysEmitIntoClient
 public func Release(_ pUnk: UnsafeMutableRawPointer) -> UInt32 {
-  fatalError("Release")
+  Unmanaged<AnyObject>.from(unsafeCOMPointer: pUnk).release()
+  return 1
 }
 
 #if $_MicrosoftCOM
