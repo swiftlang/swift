@@ -2,7 +2,7 @@
 
 \begin{document}
 
-\chapter[]{Minimization}\label{rqm minimization}
+\chapter[]{Minimization}\label{chap:minimization}
 
 \ifWIP
 TODO:
@@ -19,6 +19,152 @@ TODO:
 \item We fill in the hole, now the loop shrinks to a single point.
 \item Homotopy relation
 \end{itemize}
+
+\begin{algorithm}[Normal form algorithm using rule trie]\label{term reduction trie algo}
+Takes a mutable term $t$ as input. Mutates $t$, and outputs a \index{positive rewrite path}positive rewrite path~$p$ where $\Src(p)$ is the original term and $\Dst(p)$ is its normal form.
+\begin{enumerate}
+\item (Initialize) Let $p := 1_t$. Let $i := 0$.
+\item (Check) If $i=|t|$, the term $t$ is now irreducible. Return $p$.
+\item (Lookup) Invoke \AlgRef{trie lookup algo} with $t$ and $i$.
+\item (Rewrite) If we found a rewrite rule $(u, v)$ such that $t=xuy$ and $|x|=i$, then set $t\leftarrow xvy$, set $p\leftarrow p\circ x(u\Red v)y$, set $i\leftarrow 0$, and go back to Step~2.
+\item (Next) Otherwise, set $i\leftarrow i+1$, and go back to Step~2.
+\end{enumerate}
+\end{algorithm}
+
+\paragraph{Rewrite paths.}
+\AlgRef{term reduction trie algo} outputs a rewrite path describing the reduction that was performed. We now discuss the representation of \index{rewrite path!in requirement machine}rewrite paths and their \index{rewrite step!in requirement machine}rewrite steps in the implementation. While a rewrite step $x(u\Red v)y$ can be stored as a tuple of four terms $(x,u,v,y)$ as per \DefRef{rewrite step def}, we use a more compact encoding.
+
+First, either $(u,v)$ or $(v,u)$ is an existing rewrite rule, depending on whether this step is \index{positive rewrite step!in requirement machine}positive or \index{negative rewrite step!in requirement machine}negative. We place all rewrite rules in an array, so a rewrite step can store the index of its rewrite rule together with a ``$+$'' or ``$-$'' flag to specify the direction.
+
+Furthermore, we only need to know the lengths of the \index{left whisker}\index{right whisker}\index{whiskering}whiskers $x$~and~$y$, and not the terms themselves. To see why, suppose that $s:=x(u\Red v)y$, and we are given $\Src(s)=xuy$. We can recover $x$~and~$y$ from $\Src(s)$ if we know $|x|$~and~$|y|$. We can then use $x$ and $y$ to construct the term $\Dst(s)=xvy$.
+
+By \index{induction}induction, if we are given a rewrite path $p$ represented in this way together with the term $\Src(p)$, we can recover the left and right \index{whiskering}whisker, and thus the source and destination, of each rewrite step in $p$. Finally, we get $\Dst(p)$.
+
+Thus, we encode a rewrite step as three integers together with a boolean flag, while a rewrite path consists of the initial term together with a list of rewrite steps encoded in this manner. The \IndexDefinition{rewrite path evaluator}\emph{rewrite path evaluator} recovers the intermediate term at each step, as described above. This is used to print rewrite paths in debugging output.
+
+\paragraph{Rewrite loops.}
+Now we slightly change our point of view and introduce a new concept. If we take two parallel rewrite paths $p_1$ and $p_2$, we can form the rewrite path $\ell:=p_1\circ p_2^{-1}$ by composing the first path with the inverse of the second:
+\begin{ceqn}
+\[
+\begin{array}{ccc}
+\text{$p_1$:}&\text{$p_2$:}&\text{$p_1\circ p_2^{-1}$}\\
+\begin{tikzcd}
+&t\arrow[ld, Rightarrow, bend right]\\
+\vphantom{P}\cdots\arrow[rd, Rightarrow, bend right]\\
+&t'
+\end{tikzcd}&
+\begin{tikzcd}
+t\arrow[rd, Rightarrow, bend left]\\
+&\vphantom{P}\cdots\arrow[ld, Rightarrow, bend left]\\
+t'
+\end{tikzcd}&
+\begin{tikzcd}
+&t\arrow[ld, Rightarrow, bend right]\\
+\vphantom{P}\cdots\arrow[rd, Rightarrow, bend right]&&\vphantom{P}\cdots\arrow[lu, Rightarrow, bend right]\\
+&t'\arrow[ru, Rightarrow, bend right]
+\end{tikzcd}
+\end{array}
+\]
+\end{ceqn}
+This new rewrite path $\ell$ has the property that it begins and ends at the \emph{same} term $t$:
+\begin{gather*}
+\Src(\ell)=\Src(p_1)=t\qquad\qquad\Dst(\ell)=\Dst(p_2^{-1})=\Src(p_2)=t
+\end{gather*}
+We say that $\ell$ is a \IndexDefinition{rewrite loop}\emph{rewrite loop} with \IndexDefinition{basepoint}basepoint $t$. A rewrite loop applies some sequence of rewrite rules to the basepoint term $t$, then rewrites it ``back'' to $t$, via a possibly \emph{different} mix of rewrite rules. In the \index{rewrite graph}rewrite graph, a rewrite loop is a \index{cycle}cycle (sometimes called a ``closed path'' by graph theorists). Note that for each $t\in A^*$, the \index{empty rewrite path}empty rewrite path $1_t$ can also be seen as a trivial rewrite loop with basepoint $t$.
+
+In this new formulation, critical pair resolution ``completes'' the critical pair to form a rewrite loop.
+
+\fi
+
+\begin{algorithm}[Record rule with loop]\label{add rule derived algo}
+
+\ifWIP
+As input, takes terms $u$ and $v$, and a rewrite path $p$ with $\Src(p)=u$ and $\Dst(p)=v$. Records a rewrite loop, and possibly adds a new rule, returning true if a rule was added.
+\begin{enumerate}
+\item If $u=v$, then $p$ is already a loop; record it and return false.
+\item Compute the normal form of $u$ with \AlgRef{term reduction trie algo}, to get $\tilde{u}$ and $p_1$.
+\item Compute the normal form of $v$ with \AlgRef{term reduction trie algo}, to get $\tilde{v}$ and $p_2$.
+\item Compare $\tilde{u}$ and $\tilde{v}$ with \AlgRef{rqm reduction order}.
+\item \index{trivial critical pair}If $\tilde{u}=\tilde{v}$, record a loop $p_1^{-1}\circ p\circ p_2$ with basepoint $\tilde{u}=\tilde{v}$, and return false.
+\item If $\tilde{v}<\tilde{u}$, record a rule $(\tilde{u}, \tilde{v})$, record a loop $p_2^{-1}\circ p^{-1}\circ p_1\circ (\tilde{u}\Red \tilde{v})$ with basepoint~$\tilde{u}$, and return true.
+\item If $\tilde{u}<\tilde{v}$, record a rule $(\tilde{v}, \tilde{u})$, record a loop $p_1^{-1}\circ p \circ p_2 \circ (\tilde{v}\Red \tilde{u})$ with basepoint~$\tilde{v}$, and return true.
+\item If $\tilde{u}$ and $\tilde{v}$ are incomparable, signal an error.
+\end{enumerate}
+\fi
+
+\end{algorithm}
+
+\ifWIP
+Rewrite loops are not just a theoretical tool; our implementation of the Knuth-Bendix algorithm follows \cite{loggedrewriting} and \cite{homotopicalcompletion} in encoding and recording the rewrite loops that describe resolved critical pairs. This enables the computation of minimal requirements in \SecRef{homotopy reduction}. Only local rules are subject to \index{requirement minimization}minimization, so we only record rewrite loops involving local rules. If a requirement machine instance is only to be used for generic signature queries and not minimization, rewrite loops are not recorded at all.
+
+Right simplification:
+\begin{center}
+\begin{tikzcd}
+&xuz\arrow[dd, Rightarrow, "x(u\Red v)z"']\arrow[rrddd, Rightarrow, bend left, "x(u\Red v')z", dashed]&\\
+&\arrow[d, Rightarrow]&\\
+&xvz\arrow[dd, Rightarrow, "p"']\arrow[rrd, Rightarrow, "x\WL p_v\WR z"', bend left]\\
+&&&xv' z\arrow[lld, "p'", Rightarrow, bend left]\\
+&t'&
+\end{tikzcd}
+\end{center}
+
+The new rule is related with the existing rule by a rewrite loop:
+\begin{center}
+\begin{tikzcd}
+&v\arrow[ld, Rightarrow, "(v\Red u)"', bend right]&\\
+u\arrow[rr, Rightarrow, "(u\Red v')"', dashed, bend right]&&v'\arrow[lu, Rightarrow, "p_v^{-1}"', bend right]
+\end{tikzcd}
+\end{center}
+
+\begin{enumerate}
+\item (Relate) Add the rewrite loop $(u\Red v)\circ p\circ(v'\Red u)$ with basepoint $u$, relating the old rule $u\Red v$ with the new rule $u\Red v'$.
+\end{enumerate}
+
+\paragraph{Related concepts.}
+We previously saw in \SecRef{minimal requirements} that the same-type requirements in a generic signature are subject to similar conditions of being left-reduced and right-reduced. There is a connection here, because as we will see in \SecRef{requirement builder}, the minimal requirements of a generic signature are ultimately constructed from the rules of a reduced rewriting system. However, there are a few notational differences:
+\begin{itemize}
+\item The roles of ``left'' and ``right'' are reversed because requirements use a different convention; in a reduced same-type requirement $\SameReq{U}{V}$, we have $\texttt{U} < \texttt{V}$, whereas in a rewrite rule $(u, v)$ we have $v<u$.
+\item Reduced same-type requirements have the ``shortest'' distance between the left-hand and right-hand side, so if \tT, \texttt{U} and \texttt{V} are all equivalent and $\tT<\texttt{U}<\texttt{V}$, the corresponding requirements are $\TU$, $\SameReq{U}{V}$. On the other hand, if we have three terms $t$, $u$ and $v$ with $t<u<v$, then the two corresponding rewrite rules would be $(u, t)$ and $(v, t)$.
+\end{itemize}
+These differences are explained by the original \Index{GenericSignatureBuilder@\texttt{GenericSignatureBuilder}}\texttt{GenericSignatureBuilder} minimization algorithm, described as finding a minimum \index{spanning tree}spanning tree for a graph of connected components. The notion of reduced requirement output by this algorithm became part of the Swift stable \index{ABI}ABI. In \SecRef{requirement builder} we show that a list of rewrite rules in a reduced rewriting system defines a list of reduced requirements via a certain transformation.
+
+\section{Tietze Transformations}\label{tietze transformations}
+
+Both the \index{Knuth-Bendix algorithm}Knuth-Bendix completion and the \index{left simplification}rule simplification algorithms preserve the equivalence relation on terms. When completion adds a new rewrite rule, it is because the corresponding pair of terms are already joined by a \index{rewrite path}rewrite path. There is an analogous guarantee when \index{right simplification}rule simplification deletes a rewrite rule: the two terms are known to be joined by at least one other rewrite path that does not involve this rule. These transformations knead the \index{reduction relation}reduction relation into a better form, while the equivalence relation on terms remains completely determined by the rewrite rules of our initial \index{monoid presentation}monoid presentation.
+
+Mathematically speaking, both algorithms are defined as a transformation on monoid presentations. This transformation decomposes into a composition of sequential steps, where at each step the monoid presentation is changed in such a way that \index{monoid isomorphism}monoid isomorphism is preserved. So far, we've seen two of the four isomorphism-preserving transformations below, so named after \index{Heinrich Tietze}Heinrich Tietze, who introduced them in 1908:
+\begin{definition}
+Let $\AR$ be a finitely-presented monoid. An \IndexDefinition{Tietze transformation}\emph{elementary Tietze transformation}, or just Tietze transformation, is one of the following:
+\begin{enumerate}
+\item (Adding a rewrite rule) If a pair of terms $u$, $v\in A^*$ are already joined by a rewrite path from $u$ to $v$---that is, if $u\Eq v$ as elements of $\AR$---we can add $(u,v)$:
+\[\Pres{A}{R\cup\{(u,v)\}}\]
+\item (Removing a rewrite rule) If $(u,v)\in R$ and we have a rewrite path from $u$ to $v$ that does not contain the \index{rewrite step!Tietze transformation}rewrite step $x(u\Red v)y$ or $x(v\Red u)y$ for any $x$, $y\in A^*$, we can remove $(u,v)$:
+\[\Pres{A}{R\setminus\{(u,v)\}}\]
+\item (Adding a generator) If $a$ is some symbol distinct from all other symbols of $A$, and $t\in A^*$ is any term, we can simultaneously add $a$ and make it equivalent to $t$:
+\[\Pres{A\cup\{a\}}{R\cup\{(t,a)\}}\]
+\item (Removing a generator) If $a\in A$, $(t,a)\in R$ for some term $t$ not involving $a$, and no other $(u,v)\in R$ has a term $u$ or $v$ involving $a$, we can simultaneously remove $a$ and $(t,a)$:
+\[\Pres{A\setminus\{a\}}{R\setminus\{(t,a)\}}\]
+\end{enumerate}
+The following is the key result here: two finitely-presented monoids are isomorphic if and only if they are \emph{Tietze-equivalent}, meaning we can obtain one from the other by a finite sequence of elementary Tietze transformations.
+\end{definition}
+Some finer points:
+\begin{itemize}
+\item For every Tietze transformation, there is a complementary transformation which undoes the change; in this way (1) and (2) are inverses, and similarly (3) and (4).
+
+\item We already know that changing the order of the terms in a rewrite rule---replacing $(u,v)\in R$ with $(v,u)$---does not change the set of rewrite steps generated, and thus presents the same monoid. Now we see this operation is actually a composition of two elementary Tietze transformations; we first add $(v,u)$, and remove $(u,v)$.
+
+\item Some definitions of (4) drop the condition that the removed symbol $a$ not appear in any other rewrite rule $(u,v)\in R$. Our restriction does not cost us any generality, because if $a$ occurs in any other rewrite rule, we can always first perform a series of Tietze transformations to eliminate such occurrences: for each such $(u,v)$, we replace occurrences of $a$ with $t$ in $u$ and $v$, add the new rewrite rule, and finally remove the old rule $(u,v)$. However, we must still require that $a$ not occur in $t$; otherwise, replacing $a$~with~$t$ does not eliminate all occurrences of~$a$.
+\end{itemize}
+
+\paragraph{Associated type symbols.} Tietze transformations give us a new way to understand associated type symbols. The ultimate equivalence between rewriting systems built from user-written requirements and \index{requirement minimization}minimal requirements, shown in \SecRef{critical pairs}, means we could have defined Algorithms \ref{build term generic}~and~\ref{build term protocol} to only ever build terms from \index{protocol symbol}protocol and \index{name symbol}name symbols. After completion, we end up with the same rewriting system, it just takes a little bit more work to get there. In this setup, among the initial rewrite rules, the only occurrences of \index{associated type symbol}associated type symbols are on the right-hand sides of \index{associated type rule}associated type rules:
+\[\pP\cdot\nA\Red\aPA\]
+Thus, we can understand the associated type rules as having been added by a sequence of Tietze transformations of the third kind, applied to some monoid presentation. This ``primordial'' monoid presentation involves only protocol and name symbols, and it encodes the same monoid that ours does, up to isomorphism. So why do we bother with associated type symbols at all? In the next section, we will see the answer has to do with the interaction between recursive conformance requirements and completion.
+
+\paragraph{Further discussion.}
+The elementary Tietze transformations are ``higher dimensional'' rewrite steps, in that they define an edge relation on a graph whose vertices are \emph{monoid presentations}. A path in this graph witnesses the fact that the source and destination define an isomorphic pair of monoids. The problem of deciding if two presentations are joined by a path is the \index{monoid isomorphism problem}\emph{monoid isomorphism problem}. Like the \index{word problem}word problem, this is of course \index{undecidable problem!monoid isomorphism}undecidable in general.
+
+Tietze transformations are fundamental to the study of \emph{combinatorial group theory}, and are described in any book on the subject, such as \cite{combinatorialgroup}. Recall that in a group presentation, a rewrite rule $(u, v)$ can always be written as $(uv^{-1},\varepsilon)$, with the identity element on the right hand side. The term $uv^{-1}$ is called a \emph{relator}; a set of relators takes the place of rewrite rules in a group presentation. Tietze transformations of monoid presentations are described in \cite{book2012string} and \cite{henry2021tietze}.
+
 \fi
 
 \section[]{Homotopy Reduction}\label{homotopy reduction}
@@ -86,7 +232,9 @@ TODO:
 \item critical pairs: conformance vs conformance, conformance vs same-type
 \item the LHS simplified hack to keep requirements in their ``home protocol''
 \item example where we need to minimize entire connected component at once because two requirements in two different protocols are mutually redundant
+\item Revisit the soundness issue from \SecRef{sec:conditional conformances}. Preserving same-type requirements between same-name associated types.
 \end{itemize}
+
 \fi
 
 \section[]{Building Requirements}\label{requirement builder}
@@ -144,6 +292,50 @@ TODO:
 \end{itemize}
 \fi
 
-\section[]{Source Code Reference}\label{rqm minimization source ref}
+\section[]{Source Code Reference}\label{src:minimization}.
+
+\ifWIP
+Key source files:
+\begin{itemize}
+\item \SourceFile{lib/AST/RequirementMachine/RewriteLoop.h}
+\item \SourceFile{lib/AST/RequirementMachine/RewriteLoop.cpp}
+\item \SourceFile{lib/AST/RequirementMachine/RewriteSystem.cpp}
+\end{itemize}
+
+\apiref{rewriting::RewriteSystem}{class}
+See also \SecRef{src:symbols terms rules} and \SecRef{src:completion}.
+\begin{itemize}
+\item \texttt{recordRewriteLoop()} records a \index{rewrite loop}rewrite loop if this rewriting system is used for minimization.
+\item \texttt{addRule()} implements \AlgRef{add rule derived algo}.
+\end{itemize}
+
+\apiref{rewriting::RewriteStep::Kind}{enum}
+The \texttt{RewriteStep::Kind::Rule} kind represents the application of a rewrite rule to a term. Other rewrite step kinds appear in \SecRef{property map sourceref}.
+
+\apiref{rewriting::RewriteStep}{struct}
+A compact encoding of a \IndexSource{rewrite step!in requirement machine}rewrite step.
+\begin{itemize}
+\item \texttt{Kind} is a \texttt{RewriteStep::Kind}.
+\item \texttt{Inverse} is flag that encodes whether this is a \IndexSource{positive rewrite step!in requirement machine}positive rewrite step, or a \IndexSource{negative rewrite step!in requirement machine}negative rewrite step. For \texttt{Rule}, this specifies whether $(u,v)\in R$ or $(v,u)\in R$.
+\item \texttt{StartOffset} is the length of the \IndexSource{left whisker}left whisker $|x|$.
+\item \texttt{EndOffset} is the length of the \IndexSource{right whisker}left whisker $|y|$.
+\item \texttt{Arg} depends on kind; for \texttt{Rule}, it is the index of the rewrite rule being applied by this step in the \texttt{RewriteSystem}'s \index{rule array}array of rules.
+\item \texttt{getRuleID()} is a getter method that returns the above after asserting that the kind is \texttt{Rule}.
+\end{itemize}
+
+\apiref{rewriting::RewritePath}{class}
+A \IndexSource{rewrite path!in requirement machine}rewrite path, stored as a \texttt{std::vector} of \texttt{RewriteStep} elements.
+
+\begin{itemize}
+\item \texttt{empty()} checks if this is the \IndexSource{empty rewrite path}empty rewrite path $1_t$ for some term $t$.
+\item \texttt{size()} returns the number of rewrite steps in the path.
+\item \texttt{begin()} and \texttt{end()} return a pair of iterators for iterating over the rewrite steps in the path.
+\item \texttt{dump()} prints the rewrite path using a notation that resembles what we use in this book; the correct source \texttt{Term} and \texttt{RewriteSystem} must be provided.
+\end{itemize}
+
+\apiref{rewriting::RewritePathEvaluator}{class}
+A utility class to \IndexSource{rewrite path evaluator}evaluate a rewrite path starting from a source term. This covers each intermediate term in the path from the compact encoding described above. Among other things, this is used to implement \texttt{RewritePath::dump()}.
+
+\fi
 
 \end{document}
