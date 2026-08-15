@@ -187,6 +187,16 @@ std::optional<KnownFoundationEntity> getKnownFoundationEntity(StringRef name);
 /// "NS" prefix stripping will apply under omit-needless-words.
 StringRef getSwiftName(KnownFoundationEntity kind);
 
+// We explicitly define the BumpPtrAllocator template parameters here since the
+// solver memory limit is based on the total number of bytes allocated for the
+// slabs, so can be affected by the values chosen. Currently these values match
+// what is used in LLVM for stable/23.x.
+struct ConstraintSolverAllocator
+    : public llvm::BumpPtrAllocatorImpl<llvm::MallocAllocator,
+                                        /*SlabSize*/ 4096,
+                                        /*SizeThreshold*/ 4096,
+                                        /*GrowthDelay*/ 128> {};
+
 /// Introduces a new constraint checker arena, whose lifetime is
 /// tied to the lifetime of this RAII object.
 class ConstraintCheckerArenaRAII {
@@ -203,7 +213,7 @@ public:
   /// \param allocator The allocator used for allocating any data that
   /// goes into the constraint checker arena.
   ConstraintCheckerArenaRAII(ASTContext &self,
-                             llvm::BumpPtrAllocator &allocator);
+                             ConstraintSolverAllocator &allocator);
 
   ConstraintCheckerArenaRAII(const ConstraintCheckerArenaRAII &) = delete;
   ConstraintCheckerArenaRAII(ConstraintCheckerArenaRAII &&) = delete;
