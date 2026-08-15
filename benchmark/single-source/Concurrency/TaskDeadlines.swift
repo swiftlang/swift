@@ -20,7 +20,7 @@
 import TestsUtils
 
 public var benchmarks: [BenchmarkInfo] {
-  guard #available(macOS 9999, *) else { return [] }
+  guard #available(anyAppleOS 9999, *) else { return [] }
   return [
     BenchmarkInfo(name: "WithDeadline.FarFuture.NoOp",
                   runFunction: run_WithDeadline_NoOp, tags: [.concurrency]),
@@ -38,7 +38,7 @@ private func doWork() -> Int {
   return acc
 }
 
-@available(macOS 9999, *)
+@available(anyAppleOS 9999, *)
 @inline(never)
 public func run_WithDeadline_NoOp(n: Int) async {
   let clock = ContinuousClock()
@@ -50,7 +50,7 @@ public func run_WithDeadline_NoOp(n: Int) async {
   }
 }
 
-@available(macOS 9999, *)
+@available(anyAppleOS 9999, *)
 @inline(never)
 public func run_WithDeadline_WorkChild(n: Int) async {
   let clock = ContinuousClock()
@@ -63,7 +63,7 @@ public func run_WithDeadline_WorkChild(n: Int) async {
   }
 }
 
-@available(macOS 9999, *)
+@available(anyAppleOS 9999, *)
 @inline(never)
 public func run_NaiveTaskGroupDeadline_WorkChild(n: Int) async {
   let clock = ContinuousClock()

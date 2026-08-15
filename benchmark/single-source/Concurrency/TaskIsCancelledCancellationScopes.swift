@@ -18,7 +18,7 @@
 import TestsUtils
 
 public var benchmarks: [BenchmarkInfo] {
-  guard #available(macOS 9999, *) else { return [] }
+  guard #available(anyAppleOS 9999, *) else { return [] }
   return [
     BenchmarkInfo(name: "TaskIsCancelled.FastPath",
                   runFunction: run_FastPath, tags: [.concurrency]),
@@ -44,14 +44,14 @@ private func hotLoop(_ n: Int) -> Int {
   return trueCount
 }
 
-@available(macOS 9999, *)
+@available(anyAppleOS 9999, *)
 @inline(never)
 public func run_FastPath(n: Int) async {
   // No scope, no shield: pure bit check.
   blackHole(hotLoop(n * 1000))
 }
 
-@available(macOS 9999, *)
+@available(anyAppleOS 9999, *)
 @inline(never)
 public func run_ShieldOnly(n: Int) async {
   await withTaskCancellationShield {
@@ -60,7 +60,7 @@ public func run_ShieldOnly(n: Int) async {
   }
 }
 
-@available(macOS 9999, *)
+@available(anyAppleOS 9999, *)
 @inline(never)
 public func run_InScopeUncancelled(n: Int) async {
   await __withTaskCancellationScope { _ in
@@ -69,7 +69,7 @@ public func run_InScopeUncancelled(n: Int) async {
   }
 }
 
-@available(macOS 9999, *)
+@available(anyAppleOS 9999, *)
 @inline(never)
 public func run_InScopeCancelled(n: Int) async {
   await __withTaskCancellationScope { scope in
@@ -79,7 +79,7 @@ public func run_InScopeCancelled(n: Int) async {
   }
 }
 
-@available(macOS 9999, *)
+@available(anyAppleOS 9999, *)
 @inline(never)
 public func run_InScopeInnerShield(n: Int) async {
   await __withTaskCancellationScope { scope in
@@ -93,7 +93,7 @@ public func run_InScopeInnerShield(n: Int) async {
   }
 }
 
-@available(macOS 9999, *)
+@available(anyAppleOS 9999, *)
 @inline(never)
 public func run_InScopeOuterShield(n: Int) async {
   await withTaskCancellationShield {

@@ -17,6 +17,8 @@ import Swift
 // ==== -----------------------------------------------------------------------
 // MARK: withDeadline
 
+#if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+
 /// Executes an operation with the expectation it completes within a specified deadline.
 ///
 /// Use this function to limit the execution time of an asynchronous operation to a specific instant.
@@ -224,6 +226,7 @@ public nonisolated(nonsending) func withDeadline<Return, Failure, C>(
     operation: operation
   )
 }
+#endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 
 // ==== -----------------------------------------------------------------------
 // MARK: Task.hasActiveDeadline
