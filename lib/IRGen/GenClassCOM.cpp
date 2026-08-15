@@ -296,3 +296,41 @@ irgen::getOrCreateCOMObjectPrefixTemplate(IRGenModule &IGM, ClassDecl *CD) {
   GV->setAlignment(Align(IGM.getPointerAlignment().getValue()));
   return GV;
 }
+
+namespace {
+std::optional<unsigned>
+getCOMProjectionIndex(const COMDeclInfo *info, ProtocolDecl *PD) {
+  for (auto entry : getCOMInterfaceMapEntries(info))
+    if (entry.Interface == PD)
+      return entry.ProjectionIndex;
+  return std::nullopt;
+}
+}
+
+llvm::Value *
+irgen::emitCOMInterfaceProjection(IRGenFunction &IGF, llvm::Value *value,
+                                  CanType Ty, ProtocolDecl *PD,
+                                  ProtocolConformanceRef conformance) {
+  // An opened COM existential is already at its selected interface address
+  // point. Refinement shares that physical projection with every base in the
+  // same ABI chain.
+  if (Ty->is<ExistentialArchetypeType>() || Ty->isExistentialType())
+    return value;
+
+  auto *CD = Ty.getClassOrBoundGenericClass();
+  ASSERT(CD && "only native classes can implement COM interfaces");
+
+  auto *info = CD->getCOMDeclInfo();
+  ASSERT(info && info->isImplementation());
+
+  auto index = getCOMProjectionIndex(info, PD);
+  ASSERT(index &&
+         "COM implementation is missing the requested interface projection");
+
+  int64_t distance =
+      static_cast<int64_t>((*index + 1) * IGF.IGM.getPointerSize().getValue());
+  return IGF.Builder.CreateInBoundsGEP(IGF.IGM.Int8Ty, value,
+                                       ConstantInt::getSigned(IGF.IGM.IntPtrTy,
+                                                              -distance),
+                                       "com.interface");
+}

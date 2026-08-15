@@ -220,6 +220,13 @@ namespace irgen {
   llvm::Constant *
   getOrCreateCOMObjectPrefixTemplate(IRGenModule &IGM, ClassDecl *CD);
 
+  /// Project a native Swift object or an already-lowered COM value to the
+  /// address point for \p interface.
+  llvm::Value *
+  emitCOMInterfaceProjection(IRGenFunction &IGF, llvm::Value *value,
+                             CanType formalType, ProtocolDecl *interface,
+                             ProtocolConformanceRef conformance);
+
   /// Load the instance size and alignment mask from a reference to
   /// class type metadata of the given type.
   std::pair<llvm::Value *, llvm::Value *>
