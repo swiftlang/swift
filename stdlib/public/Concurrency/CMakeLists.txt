@@ -453,6 +453,9 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
         DispatchGlobalExecutor.cpp
         DispatchExecutor.swift
 
+        DEPENDS
+          "embedded-concurrency-${mod}"
+
         C_COMPILE_FLAGS
           ${dispatch_extra_c_compile_flags} ${SWIFT_RUNTIME_CONCURRENCY_C_FLAGS}
           -DSWIFT_CONCURRENCY_EMBEDDED=1 -DSWIFT_RUNTIME_EMBEDDED=1
