@@ -1858,30 +1858,6 @@ diagnoseExplicitUnavailability(const ValueDecl *D, SourceRange R,
       });
 }
 
-bool shouldHideDomainNameForRestrictionDiagnostic(
-    const AvailabilityRestriction &restriction) {
-  switch (restriction.getDomain().getKind()) {
-  case AvailabilityDomain::Kind::Universal:
-  case AvailabilityDomain::Kind::Embedded:
-  case AvailabilityDomain::Kind::Custom:
-  case AvailabilityDomain::Kind::PackageDescription:
-    return true;
-  case AvailabilityDomain::Kind::StandaloneSwiftRuntime:
-  case AvailabilityDomain::Kind::Platform:
-    return false;
-  case AvailabilityDomain::Kind::SwiftLanguageMode:
-    switch (restriction.getReason()) {
-    case AvailabilityRestriction::Reason::UnavailableUnconditionally:
-    case AvailabilityRestriction::Reason::UnavailableUnintroduced:
-      return false;
-    case AvailabilityRestriction::Reason::Unintroduced:
-    case AvailabilityRestriction::Reason::UnavailableObsolete:
-    case AvailabilityRestriction::Reason::Deprecated:
-      return true;
-    }
-  }
-}
-
 bool diagnoseExplicitUnavailability(SourceLoc loc,
                                     const AvailabilityRestriction &restriction,
                                     const RootProtocolConformance *rootConf,
@@ -1912,7 +1888,7 @@ bool diagnoseExplicitUnavailability(SourceLoc loc,
   EncodedDiagnosticMessage EncodedMessage(attr.getMessage());
   diags
       .diagnose(loc, diag::conformance_availability_unavailable, type, proto,
-                shouldHideDomainNameForRestrictionDiagnostic(restriction),
+                restriction.shouldHideDomainNameInDiagnostics(),
                 domainAndRange.getDomain(), EncodedMessage.Message)
       .limitBehaviorWithPreconcurrency(behavior, preconcurrency)
       .warnUntilLanguageModeIf(warnIfConformanceUnavailablePreSwift6,
@@ -2252,7 +2228,7 @@ bool diagnoseExplicitUnavailability(
     EncodedDiagnosticMessage EncodedMessage(message);
     diags
         .diagnose(Loc, diag::availability_decl_unavailable, D,
-                  shouldHideDomainNameForRestrictionDiagnostic(restriction),
+                  restriction.shouldHideDomainNameInDiagnostics(),
                   domainAndRange.getDomain(), EncodedMessage.Message)
         .highlight(R)
         .limitBehavior(limit);
@@ -3682,4 +3658,26 @@ void swift::checkExplicitAvailability(Decl *decl) {
       diag.fixItInsert(InsertLoc, AttrText);
     }
   }
+}
+
+std::optional<AvailabilityRestriction>
+swift::getRequirementMatchAvailabilityRestriction(
+    const Decl *requirement, const Decl *candidate,
+    AvailabilityRestrictionFlags flags,
+    std::optional<AvailabilityContext> baseAvailability) {
+  auto &ctx = requirement->getASTContext();
+  auto availability = AvailabilityContext::forDeclSignature(requirement);
+
+  if (auto *parent = candidate->parentDeclForAvailability()) {
+    // The candidate cannot be any more available than the decl it is contained
+    // by so only report availability restrictions that are unmet beyond the
+    // parent's availability.
+    auto parentAvailability = AvailabilityContext::forDeclSignature(parent);
+    availability.constrainWithContext(parentAvailability, ctx);
+  }
+
+  if (baseAvailability)
+    availability.constrainWithContext(*baseAvailability, ctx);
+
+  return availability.unsatisfiedRestrictionForDecl(candidate, flags);
 }

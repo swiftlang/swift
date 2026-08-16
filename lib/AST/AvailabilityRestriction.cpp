@@ -65,7 +65,7 @@ bool AvailabilityRestriction::isActiveForRuntimeQueries(
                                  /*forRuntimeQuery=*/true);
 }
 
-bool AvailabilityRestriction::emitNoteForDecl(const ValueDecl *decl) const {
+bool AvailabilityRestriction::emitNoteForDecl(const Decl *decl) const {
   auto &ctx = decl->getASTContext();
   auto &diags = ctx.Diags;
   auto parsedAttr = getAttr().getParsedAttr();
@@ -141,6 +141,29 @@ bool AvailabilityRestriction::emitNoteForConformance(
     return false;
   }
   return true;
+}
+
+bool AvailabilityRestriction::shouldHideDomainNameInDiagnostics() const {
+  switch (getDomain().getKind()) {
+  case AvailabilityDomain::Kind::Universal:
+  case AvailabilityDomain::Kind::Embedded:
+  case AvailabilityDomain::Kind::Custom:
+  case AvailabilityDomain::Kind::PackageDescription:
+    return true;
+  case AvailabilityDomain::Kind::StandaloneSwiftRuntime:
+  case AvailabilityDomain::Kind::Platform:
+    return false;
+  case AvailabilityDomain::Kind::SwiftLanguageMode:
+    switch (getReason()) {
+    case AvailabilityRestriction::Reason::UnavailableUnconditionally:
+    case AvailabilityRestriction::Reason::UnavailableUnintroduced:
+      return false;
+    case AvailabilityRestriction::Reason::Unintroduced:
+    case AvailabilityRestriction::Reason::UnavailableObsolete:
+    case AvailabilityRestriction::Reason::Deprecated:
+      return true;
+    }
+  }
 }
 
 void AvailabilityRestriction::print(llvm::raw_ostream &os) const {
