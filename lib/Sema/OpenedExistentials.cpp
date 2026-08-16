@@ -20,7 +20,6 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
-#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/TypeCheckRequests.h"
@@ -535,13 +534,6 @@ swift::isMemberAvailableOnExistential(Type baseTy, const ValueDecl *member) {
   // Metatype extension members are non-generic and don't reference Self.
   if (dc->isMetatypeExtension())
     return ExistentialMemberAccessLimitation::None;
-
-  // A COM existential only stores its interface pointer. Protocol extension
-  // members use the ordinary generic calling convention and require a witness
-  // table for `Self` which the existential cannot provide.
-  if (dc->getExtendedProtocolDecl() && baseTy->isExistentialType() &&
-      baseTy->getExistentialLayout().getCOMInterface())
-    return ExistentialMemberAccessLimitation::Unsupported;
 
   auto &ctx = member->getASTContext();
   auto existentialSig = ctx.getOpenedExistentialSignature(baseTy);
