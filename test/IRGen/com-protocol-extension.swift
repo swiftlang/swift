@@ -20,11 +20,13 @@ public protocol IInfo {
 extension IInfo {
   internal var value: DWORD {
     // CHECK-LABEL: define{{.*}} @"$s4main5IInfoPAAE5value
-    // CHECK:         [[INTERFACE:%.*]] = load ptr, ptr [[SELF:%.*]]
+    // CHECK:         [[OBJECT:%.*]] = load ptr, ptr [[SELF:%.*]]
+    // CHECK:         [[INTERFACE:%.*]] = getelementptr inbounds i8, ptr [[OBJECT]], i{{32|64}} [[ADJUSTMENT:%.*]]
     // CHECK:         [[VTABLE:%.*]] = load ptr, ptr [[INTERFACE]]
     // CHECK:         [[SLOT:%.*]] = getelementptr inbounds ptr, ptr [[VTABLE]], i{{32|64}} 3
     // CHECK:         [[METHOD:%.*]] = load ptr, ptr [[SLOT]]
-    // CHECK:         [[CALL_SELF:%.*]] = load ptr, ptr [[SELF]]
+    // CHECK:         [[CALL_OBJECT:%.*]] = load ptr, ptr [[SELF]]
+    // CHECK:         [[CALL_SELF:%.*]] = getelementptr inbounds i8, ptr [[CALL_OBJECT]], i{{32|64}} [[ADJUSTMENT]]
     // CHECK:         call i32 [[METHOD]](ptr [[CALL_SELF]], ptr
     get throws {
       var value: DWORD = .max
