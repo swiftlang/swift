@@ -17,6 +17,15 @@ public protocol IDerived: IBase {
   func refined(_ result: UnsafeMutablePointer<CInt>?) -> HRESULT
 }
 
+extension IDerived {
+  /// A Swift-only helper does not add a native vtable entry.
+  public var value: CInt {
+    var result: CInt = 0
+    _ = refined(&result)
+    return result
+  }
+}
+
 @com(interface: "20000000-0000-0000-0000-000000000003")
 public protocol IUnrelated {
   func function(_ result: UnsafeMutablePointer<CInt>?) -> HRESULT
@@ -46,7 +55,7 @@ internal final class CCOMObject: IDerived, IUnrelated {
 // ISwiftObject stores its two default property witnesses after the common COM
 // entries. The IDerived projection then stores IBase.method followed by
 // IDerived.refined, while IUnrelated starts its own method sequence at slot
-// three.
+// three. The extension property above does not participate in either vtable.
 
 // CHECK-DAG: @"$s{{.*}}10CCOMObjectCMn.com.vtable.$s3COM12ISwiftObjectMp" = private constant { ptr, i64, ptr, ptr, ptr, ptr, ptr } { ptr @"$s{{.*}}10CCOMObjectCMn.com.interface_map", i64  8, ptr @QueryInterface, ptr @AddRef, ptr @Release, ptr @"$s{{.*}}10CCOMObjectC{{.*}}ISwiftObject{{.*}}6object{{.*}}TW.com.entry", ptr @"$s{{.*}}10CCOMObjectC{{.*}}ISwiftObject{{.*}}8metadata{{.*}}TW.com.entry"
 // CHECK-DAG: @"$s{{.*}}10CCOMObjectCMn.com.vtable.$s{{.*}}8IDerivedMp"    = private constant { ptr, i64, ptr, ptr, ptr, ptr, ptr } { ptr @"$s{{.*}}10CCOMObjectCMn.com.interface_map", i64 16, ptr @QueryInterface, ptr @AddRef, ptr @Release, ptr @"$s{{.*}}10CCOMObjectCAA5IBaseA2aDP6methodys6UInt32VSpys5Int32VGSgFTW.com.entry", ptr @"$s{{.*}}10CCOMObjectCAA8IDerivedA2aDP7refinedys6UInt32VSpys5Int32VGSgFTW.com.entry"
