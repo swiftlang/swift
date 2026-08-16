@@ -7,6 +7,12 @@ public protocol IBase {
   func method(_ value: CInt) -> CInt
 }
 
+extension IBase {
+  var value: CInt {
+    method(1)
+  }
+}
+
 @com(interface: "10000000-0000-0000-0000-000000000002")
 public protocol IDerived: IBase {
   func derived(_ value: CInt) -> CInt
@@ -46,4 +52,17 @@ public func refined(_ interface: borrowing any IDerived, _ value: CInt) -> CInt 
 // CHECK:         apply [[METHOD]]<{{.*}}>({{%.*}}, [[BORROW]])
 public func derived(_ interface: borrowing any IDerived, _ value: CInt) -> CInt {
   interface.derived(value)
+}
+
+// A Swift-only extension member opens the existential and calls the generic
+// extension accessor. It does not use a COM vtable slot of its own.
+
+// CHECK-LABEL: sil [ossa] @$s{{.*}}5value
+// CHECK:         [[OPEN:%.*]] = open_com_existential {{%.*}} to $@opened{{.*}}IBase
+// CHECK:         [[STORAGE:%.*]] = alloc_stack $@opened
+// CHECK:         [[BORROW:%.*]] = store_borrow [[OPEN]] to [[STORAGE]]
+// CHECK:         [[GETTER:%.*]] = function_ref @$s{{.*}}5IBasePAAE5values5Int32Vvg
+// CHECK:         apply [[GETTER]]<@opened{{.*}}>([[BORROW]])
+public func value(_ interface: borrowing any IBase) -> CInt {
+  interface.value
 }
