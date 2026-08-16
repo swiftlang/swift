@@ -53,13 +53,14 @@ extension Outer {
 }
 
 
-// Same-arity overloads
-// TODO: This should work.
+// Same-arity overloads are told apart by parameter type, as at the top level.
 
 extension Outer {
-  // expected-error@+1{{could not find imported function 'sameArityOverload' matching static method 'sameArityOverload'; make sure you import the module or header that declares it}}
   @cxx @implementation
   static func sameArityOverload(_ x: Int32) -> Int32 { return x }
+
+  @cxx @implementation
+  static func sameArityOverload(_ x: Double) -> Double { return x }
 }
 
 
