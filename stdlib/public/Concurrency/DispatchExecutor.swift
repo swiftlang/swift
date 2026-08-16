@@ -17,9 +17,9 @@ import _Concurrency
 @_silgen_name("swift_dispatchEnqueueMain")
 private func _embeddedDispatchEnqueueMain(_ job: UnownedJob)
 
-private final class EmbeddedDispatchMainExecutor: SerialExecutor,
+private final class DispatchMainExecutor: SerialExecutor,
   @unchecked Sendable {
-  static let shared = EmbeddedDispatchMainExecutor()
+  static let shared = DispatchMainExecutor()
 
   func enqueue(_ job: consuming ExecutorJob) {
     _embeddedDispatchEnqueueMain(UnownedJob(job))
@@ -32,7 +32,7 @@ private final class EmbeddedDispatchMainExecutor: SerialExecutor,
 
 @_silgen_name("swift_embedded_dispatch_getMainExecutor")
 public func _embeddedDispatchGetMainExecutor() -> UnownedSerialExecutor {
-  EmbeddedDispatchMainExecutor.shared.asUnownedSerialExecutor()
+  DispatchMainExecutor.shared.asUnownedSerialExecutor()
 }
 
 #elseif !os(WASI) && !os(Emscripten)
