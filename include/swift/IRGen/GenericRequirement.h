@@ -38,8 +38,9 @@ class IRGenModule;
 /// Type metadata is emitted for each reduced generic parameter (that is,
 /// not same-type constrained to another generic parameter or concrete type).
 ///
-/// A witness table is emitted for each conformance requirement in the
-/// generic signature.
+/// A witness table is emitted for each ordinary conformance requirement in
+/// the generic signature. A COM conformance instead passes the signed
+/// adjustment from the native object to the interface address point.
 ///
 /// A value is emitted for each variable generic parameter, 'let N'.
 class GenericRequirement {
@@ -109,6 +110,9 @@ public:
   bool isAnyWitnessTable() const {
     return kind == Kind::WitnessTable || kind == Kind::WitnessTablePack;
   }
+  bool isCOMInterfaceAdjustment() const {
+    return isWitnessTable() && getProtocol()->isCOMInterface();
+  }
 
   bool isAnyPack() const {
     return kind == Kind::MetadataPack || kind == Kind::WitnessTablePack;
@@ -133,9 +137,7 @@ public:
   static llvm::Type *typeForKind(irgen::IRGenModule &IGM,
                                  GenericRequirement::Kind kind);
 
-  llvm::Type *getType(irgen::IRGenModule &IGM) const {
-    return typeForKind(IGM, getKind());
-  }
+  llvm::Type *getType(irgen::IRGenModule &IGM) const;
 
   void dump(llvm::raw_ostream &out) const {
     switch (kind) {
@@ -146,7 +148,10 @@ public:
       out << "metadata: " << type;
       break;
     case Kind::WitnessTable:
-      out << "witness_table: " << type << " : " << proto->getName();
+      out << (proto->isCOMInterface()
+                ? "interface_adjustment: "
+                : "witness_table: ")
+          << type << " : " << proto->getName();
       break;
     case Kind::MetadataPack:
       out << "metadata_pack: " << type;

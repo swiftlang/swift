@@ -317,6 +317,11 @@ irgen::emitCOMInterfaceProjection(IRGenFunction &IGF, llvm::Value *value,
   if (Ty->is<ExistentialArchetypeType>() || Ty->isExistentialType())
     return value;
 
+  if (Ty->is<ArchetypeType>()) {
+    ASSERT(conformance && conformance.getProtocol() == PD);
+    return emitGenericCOMInterfaceProjection(IGF, value, Ty, PD, conformance);
+  }
+
   auto *CD = Ty.getClassOrBoundGenericClass();
   ASSERT(CD && "only native classes can implement COM interfaces");
 
@@ -333,4 +338,27 @@ irgen::emitCOMInterfaceProjection(IRGenFunction &IGF, llvm::Value *value,
                                        ConstantInt::getSigned(IGF.IGM.IntPtrTy,
                                                               -distance),
                                        "com.interface");
+}
+
+Constant *
+irgen::getCOMInterfaceAdjustment(IRGenModule &IGM, CanType Ty, ProtocolDecl *PD) {
+  ASSERT(PD && PD->isCOMInterface());
+
+  auto *CD = Ty.getClassOrBoundGenericClass();
+  ASSERT(CD && "only native classes can implement COM interfaces");
+
+  auto *info = CD->getCOMDeclInfo();
+  ASSERT(info && info->isImplementation());
+
+  auto index = getCOMProjectionIndex(info, PD);
+  ASSERT(index &&
+         "COM implementation is missing the requested interface projection");
+
+  int64_t distance =
+      static_cast<int64_t>((*index + 1) * IGM.getPointerSize().getValue());
+  return ConstantInt::getSigned(IGM.IntPtrTy, -distance);
+}
+
+Constant *irgen::getCOMExistentialAdjustment(IRGenModule &IGM) {
+  return ConstantInt::get(IGM.IntPtrTy, 0);
 }

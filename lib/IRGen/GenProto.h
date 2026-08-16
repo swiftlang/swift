@@ -203,6 +203,13 @@ namespace irgen {
                                    CanType srcType,
                                    ProtocolConformanceRef conformance);
 
+  /// Project an ordinary generic Swift reference to a COM interface address
+  /// point using the adjustment passed with its generic conformance.
+  llvm::Value *
+  emitGenericCOMInterfaceProjection(IRGenFunction &IGF, llvm::Value *value,
+                                    CanType Ty, ProtocolDecl *PD,
+                                    ProtocolConformanceRef conformance);
+
   using GenericParamFulfillmentCallback =
     llvm::function_ref<void(GenericRequirement req,
                             const MetadataSource &source,
