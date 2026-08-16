@@ -556,6 +556,49 @@ func expandFreestandingMacroImpl(
   }
 }
 
+private func parseSyntax(from sref: BridgedStringRef) -> SourceFileSyntax? {
+  guard sref.data != nil, sref.count > 0 else {
+    return nil
+  }
+  
+  let text = String(bridged: sref)
+  var parser = Parser(text)
+  return SourceFileSyntax.parse(from: &parser)
+}
+
+private func varTypeAnnotation(in syntax: SourceFileSyntax) -> TypeAnnotationSyntax? {
+  guard
+    let firstStatement = syntax.statements.first,
+    let varDeclWithInference = firstStatement.item.as(VariableDeclSyntax.self),
+    // TODO: What if there are multiple bindings?
+    // like `var a = 1, b = "foo"`
+    varDeclWithInference.bindings.count == 1
+  else {
+    return nil
+  }
+  
+  return varDeclWithInference.bindings.first?.typeAnnotation
+}
+
+private func hasTypeAnnotation(_ binding: PatternBindingSyntax) -> Bool {
+  guard let typeAnnotation = binding.typeAnnotation else {
+    return false
+  }
+  let typeSyntax: TypeSyntax = typeAnnotation.type
+  if typeSyntax.is(MissingTypeSyntax.self) {
+    return false
+  }
+  // TODO: Maybe there are more cases?
+  // see https://swiftpackageindex.com/swiftlang/swift-syntax/main/documentation/swiftsyntax/typesyntax
+  if let namedOpaqueTypeSyntax = typeSyntax.as(NamedOpaqueReturnTypeSyntax.self) {
+    let typeSyntax = namedOpaqueTypeSyntax.type
+    if typeSyntax.is(MissingTypeSyntax.self) {
+      return false
+    }
+  }
+  return true
+}
+
 @_cdecl("swift_Macros_expandAttachedMacro")
 @usableFromInline
 func expandAttachedMacro(
@@ -569,6 +612,7 @@ func expandAttachedMacro(
   customAttrSourceLocPointer: UnsafePointer<UInt8>?,
   declarationSourceFilePtr: UnsafeRawPointer,
   attachedTo declarationSourceLocPointer: UnsafePointer<UInt8>?,
+  typeCheckedAttachedTo typeCheckedAttachedToDecl: BridgedStringRef,
   parentDeclSourceFilePtr: UnsafeRawPointer?,
   parentDeclSourceLocPointer: UnsafePointer<UInt8>?,
   expandedSourceOutPtr: UnsafeMutablePointer<BridgedStringRef>
@@ -615,6 +659,21 @@ func expandAttachedMacro(
   let discriminator = String(cString: discriminatorText)
   let qualifiedType = String(cString: qualifiedTypeText)
   let conformanceList = String(cString: conformanceListText)
+  
+  let nodeWithTypeInference: Syntax?
+  if var varDecl = node.as(VariableDeclSyntax.self),
+     varDecl.bindings.count == 1,
+     var binding = varDecl.bindings.first,
+     !hasTypeAnnotation(binding),
+     let typeCheckedAttachedTo = parseSyntax(from: typeCheckedAttachedToDecl),
+     let inferredTypeAnnotation = varTypeAnnotation(in: typeCheckedAttachedTo)
+  {
+    binding.typeAnnotation = inferredTypeAnnotation
+    varDecl.bindings = [binding]
+    nodeWithTypeInference = Syntax(varDecl)
+  } else {
+    nodeWithTypeInference = nil
+  }
 
   let expandedSource: String? = expandAttachedMacroImpl(
     cContext: cContext,
@@ -626,7 +685,7 @@ func expandAttachedMacro(
     customAttrSourceFilePtr: customAttrSourceFilePtr,
     customAttrNode: customAttrNode,
     declarationSourceFilePtr: declarationSourceFilePtr,
-    attachedTo: node,
+    attachedTo: nodeWithTypeInference ?? node,
     parentDeclSourceFilePtr: parentDeclSourceFilePtr,
     parentDeclNode: parentDeclNode
   )
