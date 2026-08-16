@@ -1899,7 +1899,8 @@ visitObjCImplementationAttr(ObjCImplementationAttr *attr) {
 
     // FIXME: if (AFD->getCDeclName().empty())
 
-    if (!AFD->getImplementedObjCDecl()) {
+    auto interfaces = AFD->getAllImplementedObjCDecls();
+    if (interfaces.size() != 1) {
       // A @cxx function whose signature is not representable in C++ cannot
       // match anything; the representability diagnostics explain the failure
       // better than "not found" would, so check them first and stand down if
@@ -1914,9 +1915,19 @@ visitObjCImplementationAttr(ObjCImplementationAttr *attr) {
           return;
       }
 
-      diagnose(attr->getLocation(),
-               diag::attr_objc_implementation_func_not_found,
-               AFD->getCDeclName(), AFD);
+      if (interfaces.empty()) {
+        diagnose(attr->getLocation(),
+                 diag::attr_objc_implementation_func_not_found,
+                 AFD->getCDeclName(), AFD);
+      } else {
+        // Several imported overloads have the same signature in Swift, so the
+        // function could implement any of them.
+        diagnose(attr->getLocation(),
+                 diag::attr_objc_implementation_func_ambiguous_overload, AFD,
+                 AFD->getCDeclName());
+        for (auto *interface : interfaces)
+          interface->diagnose(diag::found_candidate);
+      }
     }
   }
 }

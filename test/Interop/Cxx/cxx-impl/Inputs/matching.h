@@ -45,11 +45,6 @@ T templateFunc(T x);
 
 int variadicFunc(int x, ...);
 
-// Overloads
-
-int sameArityOverload(int x);
-double sameArityOverload(double x);
-
 // C++ references
 
 int takesConstRef(const int &x);
