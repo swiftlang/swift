@@ -6905,6 +6905,35 @@ static void lookupRelatedFuncs(AbstractFunctionDecl *func,
   }
 }
 
+/// Whether \p a and \p b have the same parameter types, ignoring `self` and
+/// the result type. Overloads are distinguished by their parameter types, so
+/// this is what identifies which member of an imported overload set an
+/// `@implementation` function implements.
+static bool haveSameParameterTypes(const ValueDecl *a, const ValueDecl *b) {
+  auto paramsOf =
+      [](const ValueDecl *decl) -> ArrayRef<AnyFunctionType::Param> {
+    Type type = decl->getInterfaceType();
+    if (const auto *fn = dyn_cast<AbstractFunctionDecl>(decl))
+      if (fn->hasImplicitSelfDecl())
+        type = fn->getMethodInterfaceType();
+    if (const auto *fnType = type->getAs<AnyFunctionType>())
+      return fnType->getParams();
+    return {};
+  };
+
+  auto paramsA = paramsOf(a), paramsB = paramsOf(b);
+  if (paramsA.size() != paramsB.size())
+    return false;
+  for (auto i : indices(paramsA)) {
+    // Compare canonical types, on the same `getOldType()`s, exactly what
+    // `ObjCImplementationChecker` does.
+    if (paramsA[i].getOldType()->getCanonicalType() !=
+        paramsB[i].getOldType()->getCanonicalType())
+      return false;
+  }
+  return true;
+}
+
 static ObjCInterfaceAndImplementation
 findFunctionInterfaceAndImplementation(AbstractFunctionDecl *func) {
   if (!func)
@@ -6926,9 +6955,10 @@ findFunctionInterfaceAndImplementation(AbstractFunctionDecl *func) {
   llvm::SmallSetVector<ValueDecl *, 4> results;
   lookupRelatedFuncs(func, results);
 
-  // Classify the `results` as either the interface or an implementation.
-  // (Multiple implementations are invalid but utterable.)
-  Decl *interface = nullptr;
+  // Classify the `results` as either interface candidates (imported
+  // declarations) or implementations. (Multiple implementations are invalid
+  // but utterable.)
+  TinyPtrVector<Decl *> candidates;
   TinyPtrVector<Decl *> impls;
 
   for (ValueDecl *result : results) {
@@ -6946,24 +6976,43 @@ findFunctionInterfaceAndImplementation(AbstractFunctionDecl *func) {
     if (resultFunc->getCDeclName() != clangName)
       continue;
 
-    if (resultFunc->hasClangNode()) {
-      if (interface) {
-        // This clang name is overloaded. That should only happen with C++
-        // functions/methods, which aren't currently supported.
-        return {};
-      }
-      interface = result;
-    } else if (resultFunc->isObjCImplementation()) {
+    if (resultFunc->hasClangNode())
+      candidates.push_back(result);
+    else if (resultFunc->isObjCImplementation())
       impls.push_back(result);
-    }
+  }
+
+  // Pick the interface. A single candidate is the common case; several
+  // candidates form an overload set.
+  TinyPtrVector<Decl *> interfaces;
+  if (candidates.size() == 1) {
+    interfaces = candidates;
+  } else if (candidates.size() > 1) {
+    // Keep the overloads with `func`'s parameter types. Several overloads may
+    // import with the same Swift signature; keep them all, and the attribute
+    // checker diagnoses the ambiguity.
+    for (Decl *candidate : candidates)
+      if (haveSameParameterTypes(func, cast<ValueDecl>(candidate)))
+        interfaces.push_back(candidate);
+    if (interfaces.empty())
+      return {};
+
+    // Implementations of the other overloads are unrelated to this one; drop
+    // them so they are not reported as duplicate implementations.
+    llvm::erase_if(impls, [&](Decl *impl) {
+      return !haveSameParameterTypes(cast<ValueDecl>(impl),
+                                     cast<ValueDecl>(interfaces.front()));
+    });
   }
 
   // If we found enough decls to construct a result, `func` should be among them
   // somewhere.
-  assert(interface == nullptr || impls.empty() ||
-         interface == func || llvm::is_contained(impls, func));
+  assert(interfaces.empty() || impls.empty() ||
+         llvm::is_contained(interfaces, func) ||
+         llvm::is_contained(impls, func));
 
-  return constructResult({ interface }, impls, interface,
+  return constructResult(interfaces, impls,
+                         interfaces.empty() ? nullptr : interfaces.front(),
                          /*categoryName=*/Identifier());
 }
 
