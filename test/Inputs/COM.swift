@@ -8,6 +8,14 @@ public typealias HRESULT = CLong
 public typealias HRESULT = Int32
 #endif
 
+public var S_OK: HRESULT {
+  0
+}
+
+public var E_NOINTERFACE: HRESULT {
+  HRESULT(truncatingIfNeeded: 0x8000_4002 as UInt32)
+}
+
 public struct GUID {
   public var data1: UInt32
   public var data2: UInt16
@@ -20,6 +28,16 @@ public struct GUID {
     self.data2 = data2
     self.data3 = data3
     self.data4 = data4
+  }
+}
+
+extension GUID: Equatable {
+  public static func == (_ lhs: GUID, _ rhs: GUID) -> Bool {
+    withUnsafeBytes(of: lhs) { lhs in
+      withUnsafeBytes(of: rhs) { rhs in
+        lhs.elementsEqual(rhs)
+      }
+    }
   }
 }
 
@@ -78,7 +96,36 @@ public func QueryInterface(_ pUnk: UnsafeMutableRawPointer,
                            _ riid: UnsafeRawPointer,
                            _ ppvObject: UnsafeMutablePointer<UnsafeMutableRawPointer?>)
     -> HRESULT {
-  fatalError("QueryInterface")
+  ppvObject.pointee = nil
+
+  let riid = riid.load(as: IID.self)
+  let lpVtbl = pUnk.load(as: UnsafePointer<UnsafeRawPointer>.self)
+  let object = pUnk.advanced(by: Int(bitPattern: lpVtbl[-1]))
+  let map = lpVtbl[-2]
+  let header = map.load(as: _SwiftCOMInterfaceMapHeader.self)
+  let entries = map.advanced(by: MemoryLayout<_SwiftCOMInterfaceMapHeader>.stride)
+
+  for index in 0 ..< Int(header.count) {
+    let address = entries.advanced(by: index * MemoryLayout<_SwiftCOMInterfaceMapEntry>.stride)
+    let entry = address.load(as: _SwiftCOMInterfaceMapEntry.self)
+
+    var descriptor = address.advanced(by: Int(entry.descriptor & -2))
+    if entry.descriptor & 1 == 1 {
+      descriptor = descriptor.load(as: UnsafeRawPointer.self)
+    }
+
+    let iid = descriptor.advanced(by: MemoryLayout<_SwiftProtocolDescriptorHeader>.stride)
+    guard iid.load(as: IID.self) == riid else {
+      continue
+    }
+
+    let projection = object.advanced(by: -(Int(entry.index) + 1) * MemoryLayout<UnsafeRawPointer>.stride)
+    ppvObject.pointee = projection
+    _ = AddRef(projection)
+    return S_OK
+  }
+
+  return E_NOINTERFACE
 }
 
 @implementation @c

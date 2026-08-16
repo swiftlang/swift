@@ -1120,6 +1120,41 @@ void irgen::emitScalarCheckedCast(IRGenFunction &IGF,
     return;
   }
 
+  // A COM existential contains an interface address, not the native Swift
+  // object address expected by the scalar class and existential cast paths.
+  // Let the runtime recover compiler-managed Swift identity through
+  // ISwiftObject before performing the ordinary Swift cast.
+  if (sourceFormalType.isExistentialType() &&
+      sourceFormalType.getExistentialLayout().getCOMInterface() &&
+      !(targetFormalType.isExistentialType() &&
+        targetFormalType.getExistentialLayout().getCOMInterface())) {
+    auto &sourceTI =
+        cast<LoadableTypeInfo>(IGF.getTypeInfo(sourceLoweredType));
+    auto sourceTemp =
+        sourceTI.allocateStack(IGF, sourceLoweredType, "com.cast.source");
+    sourceTI.initialize(IGF, value, sourceTemp.getAddress(),
+                        /*isOutlined=*/false);
+
+    auto &targetTI =
+        cast<LoadableTypeInfo>(IGF.getTypeInfo(targetLoweredType));
+    auto targetTemp =
+        targetTI.allocateStack(IGF, targetLoweredType, "com.cast.result");
+    IGF.Builder.CreateStore(llvm::Constant::getNullValue(targetTI.getStorageType()),
+                            targetTemp.getAddress());
+
+    emitCheckedCast(IGF, sourceTemp.getAddress(), sourceFormalType,
+                    targetTemp.getAddress(), targetFormalType,
+                    CastConsumptionKind::TakeOnSuccess, mode, options);
+
+    Explosion result;
+    targetTI.loadAsTake(IGF, targetTemp.getAddress(), result);
+    targetTI.deallocateStack(IGF, targetTemp, targetLoweredType);
+    sourceTI.deallocateStack(IGF, sourceTemp, sourceLoweredType);
+    returnNilCheckedResult(IGF.Builder, result);
+
+    return;
+  }
+
   // If the source type is existential, project out the class pointer.
   //
   // TODO: if we're casting to an existential type, don't throw away the
