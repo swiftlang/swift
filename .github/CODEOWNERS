@@ -19,14 +19,12 @@
 /.github/                                 @shahmishal
 /.github/CODEOWNERS                       @AnthonyLatsis @shahmishal
 /.github/ISSUE_TEMPLATE/                  @AnthonyLatsis @hborla @shahmishal @xedin
-/.github/PULL_REQUEST_TEMPLATE.md         @AnthonyLatsis @hborla @shahmishal @xedin
 
 /.gitignore           @shahmishal
 # TODO: /.mailmap
 # TODO: /Brewfile
 /CHANGELOG.md         @hborla
 # TODO: /CMakeLists.txt
-/CODE_OF_CONDUCT.md   @swiftlang/core-team
 /CODE_OWNERS.TXT      @swiftlang/core-team
 /CONTRIBUTING.md      @AnthonyLatsis @xedin
 /LICENSE.txt          @swiftlang/core-team
@@ -128,7 +126,7 @@
 /lib/AST/*Demangl*                                  @rjmccall
 /lib/AST/*Generic*                                  @hborla @slavapestov
 /lib/AST/*Requirement*                              @hborla @slavapestov
-/lib/AST/*Substitution                              @slavapestov
+/lib/AST/*Substitution*                             @slavapestov
 /lib/AST/ASTPrinter.cpp                             @hborla @slavapestov @xedin @tshortli
 /lib/AST/Evaluator*                                 @CodaFi @slavapestov
 /lib/AST/ModuleLoader.cpp                           @artemcm
@@ -180,7 +178,7 @@
 /lib/Sema/CodeSynthesisDistributed*                 @hborla @ktoso
 /lib/Sema/Constraint*                               @hborla @xedin @hamishknight @kathygray-pl
 /lib/Sema/DerivedConformance*                       @slavapestov
-/lib/Sema/DerivedConformanceDistributed*            @ktoso @slavapestov
+/lib/Sema/DerivedConformance/DerivedConformanceDistributed*  @ktoso @slavapestov
 /lib/Sema/OpenedExistentials*                       @AnthonyLatsis @slavapestov
 /lib/Sema/PreCheckTarget.cpp                        @hborla @slavapestov @xedin @hamishknight @kathygray-pl
 /lib/Sema/TypeCheckDistributed*                     @hborla @ktoso @xedin
@@ -263,7 +261,7 @@
 
 # tools
 # TODO: /tools
-/tools/*reflection/                                 @slavapestov
+/tools/*reflection*/                                @slavapestov
 /tools/SourceKit                                    @hamishknight @rintaro
 /tools/driver/                                      @artemcm
 /tools/lldb-moduleimport-test/                      @adrian-prantl
@@ -280,7 +278,6 @@
 /unittests/Frontend*/                     @artemcm @tshortli
 /unittests/Parse/                         @CodaFi @DougGregor @hamishknight @rintaro
 /unittests/Reflection/                    @slavapestov
-/unittests/SIL/                           @jckarter
 /unittests/Sema/                          @hborla @xedin @hamishknight
 /unittests/SourceKit/                     @rintaro @hamishknight
 /unittests/runtime/                       @rjmccall
@@ -303,13 +300,12 @@
 /utils/sourcekit_fuzzer/                                      @hamishknight @rintaro
 /utils/swift-dev-utils/                                       @hamishknight
 /utils/swift_build_support/                                   @etcwilde @justice-adams-apple @shahmishal @edymtt
-/utils/swift_build_support/products/earlyswiftsyntax.py       @hamishknight @rintaro
-/utils/swift_build_support/products/skstresstester.py         @hamishknight @rintaro
-/utils/swift_build_support/products/sourcekitlsp.py           @hamishknight @rintaro
-/utils/swift_build_support/products/swiftformat.py            @allevato @hamishknight @rintaro
-/utils/swift_build_support/products/swiftsyntax.py            @hamishknight @rintaro
-/utils/swift_build_support/products/wasm*                     @MaxDesiatov @kateinoigakukun
-/utils/swift_build_support/products/wasi*                     @MaxDesiatov @kateinoigakukun
+/utils/swift_build_support/swift_build_support/products/skstresstester.py  @hamishknight @rintaro
+/utils/swift_build_support/swift_build_support/products/sourcekitlsp.py    @hamishknight @rintaro
+/utils/swift_build_support/swift_build_support/products/swiftformat.py     @allevato @hamishknight @rintaro
+/utils/swift_build_support/swift_build_support/products/swiftsyntax.py     @hamishknight @rintaro
+/utils/swift_build_support/swift_build_support/products/wasm*              @MaxDesiatov @kateinoigakukun
+/utils/swift_build_support/swift_build_support/products/wasi*              @MaxDesiatov @kateinoigakukun
 /utils/update-checkout*                                       @etcwilde @justice-adams-apple @shahmishal
 /utils/update_checkout/                                       @etcwilde @justice-adams-apple @shahmishal
 /utils/update_checkout/update-checkout-config.json            @shahmishal
