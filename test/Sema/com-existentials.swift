@@ -48,13 +48,20 @@ func rejectCOMInterface(_: any COMInterface) {}
 extension IDerived {
   func method() {
   }
+
+  func dependent(_: Self) {
+  }
 }
 
-func rejectExtensionMember(_ value: any IDerived) {
+func acceptExtensionMember(_ value: any IDerived) {
   value.method()
-  // expected-error@-1 {{member 'method' cannot be used on value of type 'any IDerived'; consider using a generic constraint instead}}
 }
 
 func acceptGenericExtentionMember<Derived: IDerived>(_ value: Derived) {
   value.method()
+}
+
+func rejectDependentExtensionMember(_ value: any IDerived) {
+  _ = value.dependent
+  // expected-error@-1{{member 'dependent' cannot be used on value of type 'any IDerived'; consider using a generic constraint instead}}
 }
