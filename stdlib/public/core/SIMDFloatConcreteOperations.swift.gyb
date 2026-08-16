@@ -145,22 +145,20 @@ extension SIMD${n} where Scalar == ${Scalar} {
   @export(implementation) @_transparent
   public var evenHalf: SIMD${n//2}<${Scalar}> {
     get {
-      let map = SIMD${n//2}<Int32>(
-        ${", ".join(map(lambda i: str(2*i), range(n//2)))}
-      )
       var result = SIMD${n//2}<${Scalar}>()
-      result._storage._value = Builtin.shufflevector_${Builtin}_Vec${n//2}xInt32(
-        _storage._value, Builtin.zeroInitializer(), map._storage._value
-      )
+      result._storage._value = Builtin.deinterleave_Vec${n//2}xFPIEEE${bits}(
+        lowHalf._storage._value, highHalf._storage._value
+      ).0
       return result
     }
     
     set {
+      let ext = Self(lowHalf: newValue, highHalf: SIMD${n//2}<Scalar>())
       let map = SIMD${n}<Int32>(
-        ${", ".join(map(lambda i: str(i) + ", " + str(n//2 + i), range(n//2)))}
+        ${", ".join(map(lambda i: str(n+i) + ", " + str(2*i+1), range(n//2)))}
       )
-      _storage._value = Builtin.shufflevector_Vec${n//2}xFPIEEE${bits}_Vec${n}xInt32(
-        newValue._storage._value, oddHalf._storage._value, map._storage._value
+      _storage._value = Builtin.shufflevector_${Builtin}_Vec${n}xInt32(
+        _storage._value, ext._storage._value, map._storage._value
       )
     }
   }
@@ -177,22 +175,20 @@ extension SIMD${n} where Scalar == ${Scalar} {
   @export(implementation) @_transparent
   public var oddHalf: SIMD${n//2}<${Scalar}> {
     get {
-      let mask = SIMD${n//2}<Int32>(
-        ${", ".join(map(lambda i: str(2*i+1), range(n//2)))}
-      )
       var result = SIMD${n//2}<${Scalar}>()
-      result._storage._value = Builtin.shufflevector_${Builtin}_Vec${n//2}xInt32(
-        _storage._value, Builtin.zeroInitializer(), mask._storage._value
-      )
+      result._storage._value = Builtin.deinterleave_Vec${n//2}xFPIEEE${bits}(
+        lowHalf._storage._value, highHalf._storage._value
+      ).1
       return result
     }
     
     set {
+      let ext = Self(lowHalf: newValue, highHalf: SIMD${n//2}<Scalar>())
       let map = SIMD${n}<Int32>(
-        ${", ".join(map(lambda i: str(i) + ", " + str(n//2 + i), range(n//2)))}
+        ${", ".join(map(lambda i: str(2*i) + ", " + str(n+i), range(n//2)))}
       )
-      _storage._value = Builtin.shufflevector_Vec${n//2}xFPIEEE${bits}_Vec${n}xInt32(
-        evenHalf._storage._value, newValue._storage._value, map._storage._value
+      _storage._value = Builtin.shufflevector_${Builtin}_Vec${n}xInt32(
+        _storage._value, ext._storage._value, map._storage._value
       )
     }
   }

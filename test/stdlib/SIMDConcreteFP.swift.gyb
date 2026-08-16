@@ -15,7 +15,6 @@
 // RUN: %target-codesign %t/a.out
 // RUN: %line-directive %t/SIMDConcreteFP.swift -- %target-run %t/a.out
 // REQUIRES: executable_test
-// REQUIRES: rdar76545659
 // UNSUPPORTED: freestanding
 
 import StdlibUnittest
@@ -82,6 +81,28 @@ ${Scalar}x${n}_TestSuite.test("comparisons") {
   #endif
 %  end
 
+%  if n >= 4:
+%   if bits == 16:
+#if !((os(macOS) || targetEnvironment(macCatalyst)) && arch(x86_64))
+%   end
+${Scalar}x${n}_TestSuite.test("low/high/even/odd") {
+%   if bits == 16:
+  if #available(SwiftStdlib 5.3, *) {
+%   end
+  let a = ${Vector}(stride(from:0, to:${n}, by: 1))
+  expectEqual(a.lowHalf, SIMD${n//2}<${Scalar}>(stride(from:0, to:${n//2}, by: 1)))
+  expectEqual(a.highHalf, SIMD${n//2}<${Scalar}>(stride(from:${n//2}, to:${n}, by: 1)))
+  expectEqual(a.evenHalf, SIMD${n//2}<${Scalar}>(stride(from:0, to:${n}, by: 2)))
+  expectEqual(a.oddHalf, SIMD${n//2}<${Scalar}>(stride(from:1, to:${n}, by: 2)))
+%   if bits == 16:
+  }
+%   end
+}
+%   if bits == 16:
+  #endif
+%   end
+
+%  end
 % end
 %end
 
