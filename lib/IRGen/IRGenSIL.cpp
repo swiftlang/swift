@@ -3988,6 +3988,14 @@ void IRGenSILFunction::visitTryApplyInst(swift::TryApplyInst *i) {
   visitFullApplySite(i);
 }
 
+namespace {
+llvm::Value *loadCOMInterfacePointer(IRGenModule &IGM, IRBuilder &Builder,
+                                     Address address, const llvm::Twine &name) {
+  Address storage(address.getAddress(), IGM.Int8PtrTy, IGM.getPointerAlignment());
+  return Builder.CreateLoad(storage, name);
+}
+}
+
 void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
   auto origCalleeType = site.getOrigCalleeType();
   auto substCalleeType = site.getSubstCalleeType();
@@ -4028,9 +4036,17 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
 
     if (origCalleeType->getRepresentation() == SILFunctionTypeRepresentation::COMMethod) {
       Address storage = getLoweredAddress(selfArg);
-      Address self = Address(storage.getAddress(), IGM.Int8PtrTy,
-                             IGM.getPointerAlignment());
-      selfValue = Builder.CreateLoad(self, "com.self");
+      auto *method = cast<COMMethodInst>(site.getCallee());
+      auto Ty = selfArg->getType().getASTType()->getCanonicalType();
+      if (Ty->is<ArchetypeType>() && !Ty->is<ExistentialArchetypeType>()) {
+        auto *protocol =
+            cast<ProtocolDecl>(method->getMember().getDecl()->getDeclContext());
+        auto conformance = ProtocolConformanceRef::forAbstract(Ty, protocol);
+        selfValue = emitCOMInterfaceProjection(*this, storage.getAddress(),
+                                               Ty, protocol, conformance);
+      } else {
+        selfValue = loadCOMInterfacePointer(IGM, Builder, storage, "com.self");
+      }
     } else if (selfArg->getType().isObject()) {
       selfValue = getLoweredSingletonExplosion(selfArg);
     } else {
@@ -8585,6 +8601,8 @@ void IRGenSILFunction::visitOpenExistentialRefInst(OpenExistentialRefInst *i) {
 void IRGenSILFunction::visitOpenCOMExistentialInst(OpenCOMExistentialInst *i) {
   Explosion base = getLoweredExplosion(i->getOperand());
 
+  bindOpenedCOMExistentialArchetype(*this, i->getType().castTo<ArchetypeType>());
+
   Explosion result;
   result.add(base.claimNext());
   assert(base.empty() && "COM existential must contain exactly one pointer");
@@ -9204,16 +9222,26 @@ void IRGenSILFunction::visitCOMMethodInst(swift::COMMethodInst *i) {
   auto index = visitor.getTargetSlot();
   assert(index && "COM method is absent from its interface ABI");
 
-  Address storage = getLoweredAddress(i->getOperand());
-  Address self = Address(storage.getAddress(), IGM.Int8PtrTy,
-                         IGM.getPointerAlignment());
-  llvm::Value *interface =
-      i->getOperand()->getType().isAddress()
-          ? Builder.CreateLoad(self, "com.interface")
-          : getLoweredSingletonExplosion(i->getOperand());
+  llvm::Value *interface;
+  if (i->getOperand()->getType().isAddress()) {
+    auto Ty = i->getOperand()->getType().getASTType()->getCanonicalType();
+    Address storage = getLoweredAddress(i->getOperand());
+    if (Ty->is<ArchetypeType>() && !Ty->is<ExistentialArchetypeType>()) {
+      auto conformance = ProtocolConformanceRef::forAbstract(Ty, protocol);
+      interface = emitCOMInterfaceProjection(*this, storage.getAddress(), Ty,
+                                             protocol, conformance);
+    } else {
+      interface = loadCOMInterfacePointer(IGM, Builder, storage, "com.interface");
+    }
+  } else {
+    interface = getLoweredSingletonExplosion(i->getOperand());
+  }
+
   Address pUnk(interface, IGM.Int8PtrTy, IGM.getPointerAlignment());
+
   auto *vtable = Builder.CreateLoad(pUnk, "com.vtable");
   Address lpVtbl(vtable, IGM.Int8PtrTy, IGM.getPointerAlignment());
+
   auto slot = Builder.CreateConstArrayGEP(lpVtbl, *index, IGM.getPointerSize(),
                                           "com.method.slot");
   auto *method = Builder.CreateLoad(slot, "com.method");
