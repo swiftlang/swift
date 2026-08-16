@@ -227,6 +227,16 @@ namespace irgen {
                              CanType formalType, ProtocolDecl *interface,
                              ProtocolConformanceRef conformance);
 
+  /// Return the signed adjustment from the native object address point to the
+  /// address point for \p interface.
+  llvm::Constant *getCOMInterfaceAdjustment(IRGenModule &IGM,
+                                            CanType formalType,
+                                            ProtocolDecl *interface);
+
+  /// Return the zero adjustment used when a one-word COM existential is opened
+  /// and passed through the ordinary generic ABI.
+  llvm::Constant *getCOMExistentialAdjustment(IRGenModule &IGM);
+
   /// Load the instance size and alignment mask from a reference to
   /// class type metadata of the given type.
   std::pair<llvm::Value *, llvm::Value *>
