@@ -4146,8 +4146,9 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
       auto *method = cast<COMMethodInst>(site.getCallee());
       auto *protocol =
           cast<ProtocolDecl>(method->getMember().getDecl()->getDeclContext());
-      selfValue =
-          emitGenericCOMInterfaceProjection(*this, selfValue, type, protocol);
+      auto conformance = ProtocolConformanceRef::forAbstract(type, protocol);
+      selfValue = emitGenericCOMInterfaceProjection(*this, selfValue, type,
+                                                    conformance);
     }
   }
 
@@ -8654,14 +8655,11 @@ void IRGenSILFunction::visitInitExistentialRefInst(InitExistentialRefInst *i) {
     }
 
     if (i->getOperand()->getType().isAddress()) {
-      auto value = getLoweredAddress(i->getOperand());
-
-      llvm::Value *projected =
-          i->getFormalConcreteType()->is<ExistentialArchetypeType>()
-              ? Builder.CreateLoad(value, "com.interface")
-              : emitCOMInterfaceProjection(*this, value.getAddress(),
-                                           i->getFormalConcreteType(), interface,
-                                           concrete);
+      Address storage(getLoweredAddress(i->getOperand()).getAddress(),
+                      IGM.Int8PtrTy, IGM.getPointerAlignment());
+      auto *value = Builder.CreateLoad(storage, "com.value");
+      auto *projected = emitCOMInterfaceProjection(
+          *this, value, i->getFormalConcreteType(), interface, concrete);
 
       // Projection from an opaque generic value borrows the stored object.
       // Retain the interface pointer for the owned existential result before
@@ -9445,9 +9443,11 @@ void IRGenSILFunction::visitCOMMethodInst(swift::COMMethodInst *i) {
     interface = getLoweredSingletonExplosion(i->getOperand());
   }
   auto type = i->getOperand()->getType().getASTType();
-  if (type->is<ArchetypeType>() && !type->is<ExistentialArchetypeType>())
+  if (type->is<ArchetypeType>() && !type->is<ExistentialArchetypeType>()) {
+    auto conformance = ProtocolConformanceRef::forAbstract(type, protocol);
     interface =
-        emitGenericCOMInterfaceProjection(*this, interface, type, protocol);
+        emitGenericCOMInterfaceProjection(*this, interface, type, conformance);
+  }
 
   Address pUnk(interface, IGM.Int8PtrTy, IGM.getPointerAlignment());
   auto *vtable = Builder.CreateLoad(pUnk, "com.vtable");

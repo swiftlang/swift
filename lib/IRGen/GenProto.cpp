@@ -2816,6 +2816,11 @@ static void addWTableTypeMetadata(IRGenModule &IGM,
 }
 
 void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
+  // A COM conformance has no runtime witness table. Its SIL witness table is
+  // used only to emit the native COM vtables.
+  if (wt->getConformance()->getProtocol()->isCOMInterface())
+    return;
+
   // Don't emit a witness table if it is a declaration.
   if (wt->isDeclaration())
     return;
@@ -4031,6 +4036,12 @@ llvm::Value *irgen::emitWitnessTableRef(IRGenFunction &IGF,
   }
   assert(concreteConformance->getProtocol() == proto);
 
+  if (proto->isCOMInterface()) {
+    if (srcType->isExistentialType() || srcType->is<ExistentialArchetypeType>())
+      return getCOMExistentialAdjustment(IGF.IGM);
+    return getCOMInterfaceAdjustment(IGF.IGM, srcType, proto);
+  }
+
   auto cacheKind =
     LocalTypeDataKind::forConcreteProtocolWitnessTable(concreteConformance);
 
@@ -4682,13 +4693,17 @@ static FunctionPointer emitRelativeProtocolWitnessTableAccess(IRGenFunction &IGF
   return FunctionPointer::createSigned(fnType, fn, authInfo, signature);
 }
 
-llvm::Value *irgen::emitGenericCOMInterfaceProjection(IRGenFunction &IGF,
-                                                      llvm::Value *value,
-                                                      CanType type,
-                                                      ProtocolDecl *protocol) {
-  assert(protocol->isCOMInterface());
-  auto conformance = ProtocolConformanceRef::forAbstract(type, protocol);
+llvm::Value *
+irgen::emitGenericCOMInterfaceProjection(IRGenFunction &IGF, llvm::Value *value,
+                                         CanType type,
+                                         ProtocolConformanceRef conformance) {
+  assert(conformance && conformance.getProtocol()->isCOMInterface());
+  assert(!IGF.IGM.isResilient(conformance.getProtocol(),
+                              ResilienceExpansion::Maximal));
+
   auto *adjustment = emitWitnessTableRef(IGF, type, conformance);
+  if (adjustment->getType()->isPointerTy())
+    adjustment = IGF.Builder.CreatePtrToInt(adjustment, IGF.IGM.IntPtrTy);
   return IGF.Builder.CreateInBoundsGEP(IGF.IGM.Int8Ty, value, adjustment,
                                        "com.interface");
 }

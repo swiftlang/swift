@@ -4968,6 +4968,9 @@ namespace {
 
     void addGenericRequirement(GenericRequirement requirement,
                                ClassDecl *forClass) {
+      if (requirement.getType(IGM)->isIntegerTy())
+        return B.addInt(cast<llvm::IntegerType>(requirement.getType(IGM)), 0);
+
       switch (requirement.getKind()) {
       case GenericRequirement::Kind::Shape:
       case GenericRequirement::Kind::Value:
@@ -5370,6 +5373,14 @@ namespace {
       }
 
       assert(requirement.isAnyWitnessTable());
+      if (requirement.isCOMInterfaceAdjustment()) {
+        auto argument =
+            requirement.getTypeParameter().subst(genericSubstitutions());
+        this->B.add(getCOMInterfaceAdjustment(IGM, argument->getCanonicalType(),
+                                              requirement.getProtocol()));
+        return;
+      }
+
       auto conformance = genericSubstitutions().lookupConformance(
           requirement.getTypeParameter()->getCanonicalType(),
           requirement.getProtocol());
