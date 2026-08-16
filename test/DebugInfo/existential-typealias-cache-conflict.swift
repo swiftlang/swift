@@ -20,4 +20,4 @@ actor A<Value> {
 // CHECK-DAG: ![[ELTS]] = !{![[INNER:[0-9]+]]}
 // CHECK-DAG: ![[INNER]] = !DIDerivedType(tag: DW_TAG_member, name: "$swift.constraint", {{.*}}, baseType: ![[TYPEDEF:[0-9]+]]
 // CHECK-DAG: ![[TYPEDEF]] = !DIDerivedType(tag: DW_TAG_typedef, name: "$s12LayeredCache1AC1Tayx_GD", {{.*}}, baseType: ![[PROTO_TY:[0-9]+]])
-// CHECK-DAG: ![[PROTO_TY]] = !DICompositeType(tag: DW_TAG_structure_type, name: "$s12LayeredCache1P_px5ValueAaBPRts_XPD", {{.*}}, identifier: "$s12LayeredCache1P_px5ValueAaBPRts_XPD")
+// CHECK-DAG: ![[PROTO_TY]] = !DICompositeType(tag: DW_TAG_structure_type, name: "P", {{.*}}, identifier: "$s12LayeredCache1P_px5ValueAaBPRts_XPD")
