@@ -12,3 +12,8 @@ module Namespaces {
   header "namespaces.h"
   requires cplusplus
 }
+
+module Overloads {
+  header "overloads.h"
+  requires cplusplus
+}
