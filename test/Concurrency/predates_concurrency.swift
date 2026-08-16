@@ -232,7 +232,6 @@ protocol NotIsolated {
 // expected-complete-warning@+1{{conformance of 'MainActorPreconcurrency' to protocol 'NotIsolated' crosses into main actor-isolated code and can cause data races}}
 extension MainActorPreconcurrency: NotIsolated {
   // expected-complete-note@-1{{turn data races into runtime errors with '@preconcurrency'}}{{36-36=@preconcurrency }}
-  // expected-complete-note@-2{{isolate this conformance to the main actor with '@MainActor'}}
   func requirement() {}
   // expected-complete-note@-1 {{main actor-isolated instance method 'requirement()' cannot satisfy nonisolated requirement}}
   // expected-complete-note@-2 {{mark instance method 'requirement()' 'nonisolated'}}{{3-3=nonisolated }}
