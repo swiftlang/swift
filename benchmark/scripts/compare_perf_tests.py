@@ -873,7 +873,10 @@ class ReportFormatter(object):
 
 def parse_args(args):
     """Parse command line arguments and set default values."""
-    parser = argparse.ArgumentParser(description="Compare Performance tests.")
+    parser = argparse.ArgumentParser(
+        prog="compare_perf_tests.py",
+        description="Compare Performance tests."
+    )
     parser.add_argument(
         "--old-file", help="Baseline performance test suite (csv file)", required=True
     )
