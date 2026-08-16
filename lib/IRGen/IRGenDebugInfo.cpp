@@ -2100,9 +2100,8 @@ private:
     }
 
     case TypeKind::BuiltinFloat: {
-      auto *FloatTy = BaseTy->castTo<BuiltinFloatType>();
-      // Assuming that the bitwidth and FloatTy->getFPKind() are identical.
-      SizeInBits = FloatTy->getBitWidth();
+      SizeInBits = IGM.DataLayout.getTypeAllocSizeInBits(
+          IGM.getStorageTypeForUnlowered(BaseTy));
       Encoding = llvm::dwarf::DW_ATE_float;
       break;
     }
