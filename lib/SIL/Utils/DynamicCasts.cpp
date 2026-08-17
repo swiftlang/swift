@@ -14,6 +14,7 @@
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/Requirement.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILArgument.h"
@@ -105,13 +106,23 @@ classifyDynamicCastToProtocol(SILFunction *function, CanType source, CanType tar
   if (!TargetProtocol)
     return DynamicCastFeasibility::MaySucceed;
 
-  // If the target is a parameterized protocol type, checkConformance
-  // is insufficient to prove the feasibility of the cast as it does not
-  // check the additional requirements.
-  // FIXME: This is a weak predicate that doesn't take into account
-  // class compositions - since any C & P<T> doesn't work yet anyways.
-  if (isa<ParameterizedProtocolType>(unwrapExistential(target)))
+  // Conformance alone isn't enough for a parameterized target like
+  // `any P<Int>`: the associated-type requirements must hold too. Check them
+  // against the concrete source and only succeed if they provably do.
+  // FIXME: doesn't handle class compositions (`any C & P<T>`).
+  if (auto paramTarget =
+          dyn_cast<ParameterizedProtocolType>(unwrapExistential(target))) {
+    if (auto conformance = checkConformance(source, TargetProtocol)) {
+      if (matchesActorIsolation(conformance, function)) {
+        SmallVector<Requirement, 2> reqs;
+        paramTarget->getRequirements(source, reqs);
+        if (checkRequirementsWithoutContext(reqs) ==
+            CheckRequirementsResult::Success)
+          return DynamicCastFeasibility::WillSucceed;
+      }
+    }
     return DynamicCastFeasibility::MaySucceed;
+  }
 
   // If checkConformance() returns a valid conformance, then all conditional
   // requirements were satisfied.
