@@ -24,6 +24,7 @@
 #include "swift/Frontend/Frontend.h"
 #include "swift/Strings.h"
 #include "clang/Lex/HeaderSearchOptions.h"
+#include "llvm/CAS/CASProvidingFileSystem.h"
 #include "llvm/Config/config.h"
 #include "llvm/Support/Path.h"
 using namespace swift;
@@ -547,21 +548,8 @@ SwiftDependencyScanningService::SwiftDependencyScanningService()
   // by-name module lookup to resolve Swift overlay and cross-import overlay
   // dependencies, so opt into having Clang report them.
   opts.ReportVisibleModules = true;
-  opts.MakeVFS = ClangScanningFSFactory;
+  opts.MakeVFS = [] { return llvm::vfs::createPhysicalFileSystem(); };
 
-  ClangScanningService.emplace(std::move(opts));
-}
-
-void SwiftDependencyScanningService::setClangScanningFSFactory(
-    std::function<llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>()> factory) {
-  ClangScanningFSFactory = std::move(factory);
-  // The Clang scanning service now owns the base VFS factory (via
-  // DependencyScanningServiceOptions::MakeVFS) rather than each scanning tool,
-  // so re-create it to pick up the new factory while preserving all other
-  // options that were configured earlier (e.g. CAS compilation mode).
-  clang::dependencies::DependencyScanningServiceOptions opts =
-      ClangScanningService->getOpts();
-  opts.MakeVFS = ClangScanningFSFactory;
   ClangScanningService.emplace(std::move(opts));
 }
 
@@ -701,7 +689,20 @@ bool SwiftDependencyScanningService::setupCachingDependencyScanningService(
     opts.Compilation = clang::dependencies::IncludeTreeCompilation{
         CASOpts, Instance.getSharedCASInstance(),
         Instance.getSharedCacheInstance()};
-    opts.MakeVFS = ClangScanningFSFactory;
+    opts.MakeVFS = [&]() -> llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> {
+      auto &ctx = Instance.getASTContext();
+      auto *importer = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
+      // Dependency scanner needs to create its own file system per worker.
+      auto fs = ClangImporter::computeClangImporterFileSystem(
+          ctx, importer->getClangFileMapping(),
+          llvm::vfs::createPhysicalFileSystem(), true,
+          [&](StringRef str) { return save(str); });
+
+      auto cas = Instance.getSharedCASInstance();
+      if (cas)
+        return llvm::cas::createCASProvidingFileSystem(cas, fs);
+      return fs;
+    };
 
     ClangScanningService.emplace(std::move(opts));
   }
