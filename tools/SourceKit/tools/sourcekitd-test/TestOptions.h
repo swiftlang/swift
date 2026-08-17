@@ -74,6 +74,7 @@ enum class SourceKitRequest {
   SyntacticMacroExpansion,
   IndexToStore,
   PolyglotAST,
+  ObjCSelector,
 #define SEMANTIC_REFACTORING(KIND, NAME, ID) KIND,
 #include "swift/Refactoring/RefactoringKinds.def"
 };
