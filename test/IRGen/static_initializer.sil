@@ -22,6 +22,11 @@ public struct S2 {
   var s : S
 }
 
+struct StructWithPadding {
+  var x : Int32
+  var y : Int64
+}
+
 // CHECK: %Ts5Int32V = type <{ i32 }>
 // CHECK: %T18static_initializer2S2V = type <{ %Ts5Int32V, %Ts5Int32V, %T18static_initializer1SV }>
 // CHECK: %T18static_initializer1SV = type <{ %Ts5Int32V }>
@@ -136,6 +141,21 @@ sil_global @static_array_with_empty_element : $TestArrayStorage = {
   %initval = object $TestArrayStorage (%2 : $Int32, [tail_elems] %0 : $Empty, %0 : $Empty)
 }
 // CHECK: @static_array_with_empty_element = {{(dllexport )?}}{{(protected )?}}global %T18static_initializer16TestArrayStorageC_tailelems3c { [1 x i64] zeroinitializer, %T18static_initializer16TestArrayStorageC_tailelems3 <{ %swift.refcounted zeroinitializer, %Ts5Int32V <{ i32 2 }>, [1 x i8] undef, [1 x i8] undef }> }, align 8
+
+// The zero-initialized elements must contain the padding of the struct.
+// Otherwise the elements would be at wrong offsets.
+sil_global @static_array_of_zeroinitialized_elements : $TestArrayStorage = {
+  %0 = integer_literal $Builtin.Int32, 2
+  %1 = struct $Int32 (%0 : $Builtin.Int32)
+  %2 = builtin "zeroInitializer"() : $StructWithPadding
+  %initval = object $TestArrayStorage (%1 : $Int32, [tail_elems] %2 : $StructWithPadding, %2 : $StructWithPadding)
+}
+// CHECK: @static_array_of_zeroinitialized_elements = {{(dllexport )?}}{{(protected )?}}global %T18static_initializer16TestArrayStorageC_tailelems4c { [1 x i64] zeroinitializer, %T18static_initializer16TestArrayStorageC_tailelems4 <{ %swift.refcounted zeroinitializer, %Ts5Int32V <{ i32 2 }>, [4 x i8] undef, %T18static_initializer17StructWithPaddingV zeroinitializer, %T18static_initializer17StructWithPaddingV zeroinitializer }> }, align 8
+
+sil_global @static_zeroinitialized_struct : $StructWithPadding = {
+  %initval = builtin "zeroInitializer"() : $StructWithPadding
+}
+// CHECK: @static_zeroinitialized_struct = {{(dllexport )?}}{{(protected )?}}global %T18static_initializer17StructWithPaddingV zeroinitializer, align 8
 
 struct MyString {
   var buffer: Builtin.BridgeObject

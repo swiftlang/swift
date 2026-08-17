@@ -286,6 +286,13 @@ Explosion irgen::emitConstantValue(IRGenModule &IGM, SILValue operand,
     switch (IGM.getSILModule().getBuiltinInfo(BI->getName()).ID) {
       case BuiltinValueKind::ZeroInitializer: {
         auto &resultTI = cast<LoadableTypeInfo>(IGM.getTypeInfo(BI->getType()));
+        if (!flatten) {
+          // The storage type can contain explicit padding which is not part of
+          // the explosion schema, e.g. for imported C structs. Therefore the
+          // zero constant must be created from the storage type - otherwise the
+          // resulting constant would be too small.
+          return llvm::Constant::getNullValue(resultTI.getStorageType());
+        }
         auto schema = resultTI.getSchema();
         Explosion out;
         for (auto &elt : schema) {
@@ -504,7 +511,11 @@ llvm::Constant *irgen::emitConstantObject(IRGenModule &IGM, ObjectInst *OI,
     elements[0].add(llvm::Constant::getNullValue(ObjectHeaderTy));
   }
   insertPadding(elements, sTy);
-  return createStructFromExplosion(elements, sTy);
+  llvm::Constant *initVal = createStructFromExplosion(elements, sTy);
+  ASSERT(IGM.DataLayout.getTypeStoreSize(initVal->getType()) ==
+             IGM.DataLayout.getTypeStoreSize(sTy) &&
+         "size of statically initialized object does not match its layout");
+  return initVal;
 }
 
 void ConstantAggregateBuilderBase::addUniqueHash(StringRef data) {
