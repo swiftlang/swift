@@ -690,6 +690,9 @@ public:
     if (auto *L = dyn_cast<LoadExpr>(E))
       return getReferencedNonCopyableValue(L->getSubExpr());
 
+    if (auto *erasure = dyn_cast<ErasureExpr>(E))
+      return getReferencedNonCopyableValue(erasure->getSubExpr());
+
     if (auto *FCE = dyn_cast<FunctionConversionExpr>(E))
       return getReferencedNonCopyableValue(FCE->getSubExpr());
 
@@ -740,6 +743,12 @@ public:
             recordConsumingUse(base);
         }
       }
+    }
+
+    // Casts are consuming operations.
+    if (auto *cast = dyn_cast<ExplicitCastExpr>(E)) {
+      if (auto *V = getReferencedNonCopyableValue(cast->getSubExpr()))
+        recordConsumingUse(V);
     }
 
     // - calling `@called(once)` value
