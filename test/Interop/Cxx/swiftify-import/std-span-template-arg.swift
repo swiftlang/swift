@@ -43,6 +43,39 @@ using SpanHolder = S<std::span<const char>>;
 using IntSpan = std::span<const int>;
 using UsingSpanHolder = S<IntSpan>;
 
+template <typename T, typename U>
+struct S2 {
+    // expected-expansion@+7:11{{
+    //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
+    //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(borrow self) @_disfavoredOverload|}}
+    //   expected-remark@3{{macro content: |public borrowing func getT() -> Span<CChar> {|}}
+    //   expected-remark@4{{macro content: |    return unsafe _swiftifyOverrideLifetime(Span(_unsafeCxxSpan: unsafe getT()), copying: ())|}}
+    //   expected-remark@5{{macro content: |}|}}
+    // }}
+    T getT() const [[clang::lifetimebound]];
+    // expected-expansion@+7:11{{
+    //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
+    //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(borrow self) @_disfavoredOverload|}}
+    //   expected-remark@3{{macro content: |public borrowing func getU() -> Span<CInt> {|}}
+    //   expected-remark@4{{macro content: |    return unsafe _swiftifyOverrideLifetime(Span(_unsafeCxxSpan: unsafe getU()), copying: ())|}}
+    //   expected-remark@5{{macro content: |}|}}
+    // }}
+    U getU() const [[clang::lifetimebound]];
+
+    // expected-note@+9{{'getTPassUnrelatedU' declared here}}
+    // expected-expansion@+8:29{{
+    //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
+    //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(borrow self) @_disfavoredOverload|}}
+    //   expected-error@3{{cannot find type '__cxxConst' in scope}}
+    //   expected-remark@3{{macro content: |public borrowing func getTPassUnrelatedU(_ u: std.__1.span<__cxxConst<CInt>, _CUnsignedLong_18446744073709551615>) -> Span<CChar> {|}}
+    //   expected-remark@4{{macro content: |    return unsafe _swiftifyOverrideLifetime(Span(_unsafeCxxSpan: unsafe getTPassUnrelatedU(u)), copying: ())|}}
+    //   expected-remark@5{{macro content: |}|}}
+    // }}
+    T getTPassUnrelatedU(U u) const [[clang::lifetimebound]];
+};
+
+using SpanHolder2 = S2<std::span<const char>, std::span<const int>>;
+
 //--- test.swift
 import Test
 
@@ -51,4 +84,11 @@ public func f(_ holder: SpanHolder) {
 }
 public func g(_ holder: UsingSpanHolder) {
   let _ = holder.get();
+}
+public func h(_ holder: SpanHolder2, _ is: IntSpan) {
+  let _ = holder.getT();
+  let _ = holder.getU();
+  // expected-error@+2{{missing argument for parameter #1 in call}}
+  // expected-error@+1{{expected expression in list of expressions}}
+  let _ = holder.getTPassUnrelatedU(is);
 }
