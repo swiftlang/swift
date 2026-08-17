@@ -10,7 +10,6 @@
 // REQUIRES: optimized_stdlib
 // REQUIRES: OS=macosx || OS=linux-gnu || OS=wasip1
 // REQUIRES: swift_feature_Embedded
-// REQUIRES: swift_feature_CoroutineAccessors
 
 // CHECK: error: coroutine accessor involves heap allocation [#PerformanceHints::HeapAllocation]
 
