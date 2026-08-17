@@ -534,7 +534,7 @@ struct UnaliasedInstantiationVisitor
         clangType = ArgTy;
       } else {
         assert(0 && "unknown std::span representation");
-        return false;
+        return true;
       }
     }
     UnaliasedInstantiationVisitor checker;
