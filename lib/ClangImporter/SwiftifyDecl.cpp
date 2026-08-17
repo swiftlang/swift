@@ -907,7 +907,17 @@ static bool diagnoseMissingMacroPlugin(ASTContext &SwiftContext,
 void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
   if (SwiftContext.LangOpts.DisableSafeInteropWrappers)
     return;
-  auto ClangDecl = MappedDecl->getClangDecl();
+  const clang::Decl *ClangDecl = MappedDecl->getClangDecl();
+
+  if (ClangDecl && ClangDecl->isImplicit()) {
+    if (auto *F = dyn_cast<FuncDecl>(MappedDecl)) {
+      if (const FuncDecl *Orig = getOriginalForVirtualThunk(F)) {
+        DLOG("Remapping virtual thunk to original clang decl\n");
+        ClangDecl = Orig->getClangDecl();
+      }
+    }
+  }
+
   auto ClangFuncDecl = dyn_cast_or_null<clang::FunctionDecl>(ClangDecl);
   auto ClangObjCMethodDecl = dyn_cast_or_null<clang::ObjCMethodDecl>(ClangDecl);
   if (!ClangFuncDecl && !ClangObjCMethodDecl)
@@ -921,15 +931,6 @@ void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
   if (!SwiftifyImportDecl) {
     DLOG("_SwiftifyImport macro not found\n");
     return;
-  }
-
-  if (ClangDecl->isImplicit()) {
-    if (auto *F = dyn_cast<FuncDecl>(MappedDecl)) {
-      if (const FuncDecl *Orig = getOriginalForVirtualThunk(F)) {
-        DLOG("Remapping virtual thunk to original clang decl\n");
-        ClangDecl = dyn_cast<clang::FunctionDecl>(Orig->getClangDecl());
-      }
-    }
   }
 
   // A method that overrides a virtual method needs no wrapper of its own if it
