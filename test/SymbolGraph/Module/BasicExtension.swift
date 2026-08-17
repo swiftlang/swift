@@ -35,6 +35,7 @@ extension String {
 // ALL-LABEL: module
 
 // ALL: {{"name": ?"BasicExtension"}}
+// ALL: {{"extended": ?"Swift"}}
 
 
 // Check for Symbols and Documentation Strings:
