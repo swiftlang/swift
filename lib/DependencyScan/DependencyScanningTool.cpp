@@ -399,9 +399,8 @@ llvm::ErrorOr<ScanQueryContext> DependencyScanningTool::createScanQueryContext(
 
     // Setup the CAS instance from scanning service if applicable.
     if (Invocation->requiresCAS())
-      Instance->setSharedCASInstances(
-          ScanningService->getClangScanningService().getCAS(),
-          ScanningService->getClangScanningService().getActionCache());
+      Instance->setSharedCASInstances(ScanningService->getCAS(),
+                                      ScanningService->getActionCache());
 
     // Setup the instance
     std::string InstanceSetupError;

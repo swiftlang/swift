@@ -212,7 +212,7 @@ getClangScanningFS(SwiftDependencyScanningService &service,
 }
 
 ModuleDependencyScanningWorker::ModuleDependencyScanningWorker(
-    SwiftDependencyScanningService &globalScanningService,
+    clang::dependencies::DependencyScanningService &clangScanningService,
     const CompilerInvocation &ScanCompilerInvocation,
     const SILOptions &SILOptions, ASTContext &ScanASTContext,
     swift::DependencyTracker &DependencyTracker,
@@ -223,14 +223,13 @@ ModuleDependencyScanningWorker::ModuleDependencyScanningWorker(
     : workerCompilerInvocation(
           std::make_unique<CompilerInvocation>(ScanCompilerInvocation)),
       workerSourceMgr(ScanASTContext.SourceMgr.getFileSystem()),
-      clangScanningTool(*globalScanningService.ClangScanningService),
+      clangScanningTool(clangScanningService),
       CAS(CAS), ActionCache(ActionCache),
       diagnosticReporter(DiagnosticReporter),
       ShareClangCompilerInstance(ShareClangCompilerInstance) {
-  assert(globalScanningService.ClangScanningService->getCAS() == CAS &&
+  assert(clangScanningService.getCAS() == CAS &&
          "Need to be the same CAS instance");
-  assert(globalScanningService.ClangScanningService->getActionCache() ==
-             ActionCache &&
+  assert(clangScanningService.getActionCache() == ActionCache &&
          "Need to be the same ActionCache instance");
 
   // Instantiate a worker-specific diagnostic engine and copy over
@@ -604,8 +603,8 @@ ModuleDependencyScanner::ModuleDependencyScanner(
                      ? llvm::hardware_concurrency().compute_thread_count()
                      : 1),
       ScanningThreadPool(llvm::hardware_concurrency(NumThreads)),
-      CAS(ScanningService.ClangScanningService->getCAS()),
-      ActionCache(ScanningService.ClangScanningService->getActionCache()) {
+      CAS(ScanningService.getCAS()),
+      ActionCache(ScanningService.getActionCache()) {
   // Setup prefix mapping.
   auto &ScannerPrefixMapper =
       ScanCompilerInvocation.getSearchPathOptions().ScannerPrefixMapper;
@@ -625,22 +624,25 @@ ModuleDependencyScanner::ModuleDependencyScanner(
         llvm::cas::createCASProvidingFileSystem(
             CAS, ScanASTContext.SourceMgr.getFileSystem()));
 
-  // The Clang dependency scanning service now owns the factory that produces
-  // each worker's base file system (rather than each scanning tool owning its
-  // own). Install it before creating any worker so that the tools pick it up.
-  // The factory creates a fresh file system per worker, as required for
+  // Create the Clang dependency scanning service backing this scan. It owns
+  // the factory that produces each worker's base file system (rather than each
+  // scanning tool owning its own), and that factory closes over state specific
+  // to this scan -- this scan's `ASTContext` and CAS -- so the service cannot
+  // be shared with the other scans performed against `ScanningService`. The
+  // factory creates a fresh file system per worker, as required for
   // thread-safety.
-  ScanningService.setClangScanningFSFactory(
+  ClangScanningService.emplace(ScanningService.getClangScanningServiceOptions(
       [&ScanningService, CAS = this->CAS, &ScanASTContext]() {
         return getClangScanningFS(ScanningService, CAS, ScanASTContext);
-      });
+      }));
 
   // TODO: Make num threads configurable
   for (size_t i = 0; i < NumThreads; ++i)
     Workers.emplace_front(std::make_unique<ModuleDependencyScanningWorker>(
-        ScanningService, ScanCompilerInvocation, SILOptions, ScanASTContext,
-        DependencyTracker, CAS, ActionCache, ScanDiagnosticReporter,
-        PrefixMapper.get(), ShareClangCompilerInstance));
+        *ClangScanningService, ScanCompilerInvocation, SILOptions,
+        ScanASTContext, DependencyTracker, CAS, ActionCache,
+        ScanDiagnosticReporter, PrefixMapper.get(),
+        ShareClangCompilerInstance));
 }
 
 ModuleDependencyScanner::~ModuleDependencyScanner() = default;

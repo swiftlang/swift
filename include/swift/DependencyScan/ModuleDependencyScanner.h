@@ -113,7 +113,7 @@ private:
 class ModuleDependencyScanningWorker {
 public:
   ModuleDependencyScanningWorker(
-      SwiftDependencyScanningService &globalScanningService,
+      clang::dependencies::DependencyScanningService &clangScanningService,
       const CompilerInvocation &ScanCompilerInvocation,
       const SILOptions &SILOptions, ASTContext &ScanASTContext,
       DependencyTracker &DependencyTracker,
@@ -456,6 +456,21 @@ private:
 
   /// The available pool of workers for filesystem module search
   unsigned NumThreads;
+
+  /// The Clang dependency scanning service backing this scanner's workers.
+  ///
+  /// Unlike the enclosing \c SwiftDependencyScanningService, this cannot be
+  /// shared across scanning queries because it owns the factory producing the
+  /// base file system of each worker (see
+  /// \c DependencyScanningServiceOptions::MakeVFS), which closes over state
+  /// specific to this query and is invoked lazily throughout it.
+  ///
+  /// Must be declared before \c Workers so that it is destroyed after them:
+  /// each worker holds a \c clang::tooling::DependencyScanningTool by value,
+  /// which the service must outlive.
+  std::optional<clang::dependencies::DependencyScanningService>
+      ClangScanningService;
+
   std::list<std::unique_ptr<ModuleDependencyScanningWorker>> Workers;
   llvm::DefaultThreadPool ScanningThreadPool;
   // CAS instance.

@@ -1072,16 +1072,20 @@ class SwiftDependencyScanningService {
   /// The CAS configuration created the Scanning Service if used.
   std::optional<llvm::cas::CASConfiguration> CASConfig;
 
-  /// The persistent Clang dependency scanner service
-  std::optional<clang::dependencies::DependencyScanningService>
-      ClangScanningService;
+  /// The configuration shared by the Clang dependency scanning service of
+  /// every scanning query performed against this service.
+  ///
+  /// Note that this deliberately excludes
+  /// \c DependencyScanningServiceOptions::MakeVFS, which closes over
+  /// query-specific state and is therefore supplied per query by
+  /// \c getClangScanningServiceOptions.
+  clang::dependencies::DependencyScanningServiceOptions
+      ClangScanningServiceOptions;
 
-  /// Factory that produces the base file system used by each Clang dependency
-  /// scanning worker. Installed as \c DependencyScanningServiceOptions::MakeVFS
-  /// on \c ClangScanningService. Must be thread-safe as it is invoked
-  /// concurrently by multiple workers.
-  std::function<llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>()>
-      ClangScanningFSFactory;
+  /// The CAS instances shared by all scanning queries performed against this
+  /// service, if caching is enabled.
+  std::shared_ptr<llvm::cas::ObjectStore> CAS;
+  std::shared_ptr<llvm::cas::ActionCache> ActionCache;
 
   /// Shared state mutual-exclusivity lock
   mutable llvm::sys::SmartMutex<true> ScanningServiceGlobalLock;
@@ -1094,27 +1098,37 @@ public:
   operator=(const SwiftDependencyScanningService &) = delete;
   virtual ~SwiftDependencyScanningService() {}
 
-  /// Install the factory used to create the base file system for each Clang
-  /// dependency scanning worker and (re)create the underlying Clang scanning
-  /// service so that it picks the factory up. Since the Clang scanning service
-  /// now owns the VFS factory (see \c DependencyScanningServiceOptions::MakeVFS)
-  /// rather than each individual scanning tool, this must be called before any
-  /// worker is created.
-  void setClangScanningFSFactory(
-      std::function<llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>()> factory);
-
   /// Setup caching service.
   bool setupCachingDependencyScanningService(CompilerInstance &Instance);
 
   /// Allocate string inside ScanningService.
   StringRef save(StringRef str);
 
-  /// Get clang scanning service.
-  const clang::dependencies::DependencyScanningService &
-  getClangScanningService() const {
-    assert(ClangScanningService);
-    return *ClangScanningService;
-  }
+  /// Retrieve the options with which an individual scanning query should
+  /// construct its own \c clang::dependencies::DependencyScanningService,
+  /// installing \p MakeVFS as the factory producing the base file system of
+  /// each of the query's Clang dependency scanning workers.
+  ///
+  /// A Clang dependency scanning service cannot be shared across the queries
+  /// performed against this service because it owns the base file system
+  /// factory (see \c DependencyScanningServiceOptions::MakeVFS), which closes
+  /// over state specific to an individual query and is invoked lazily
+  /// throughout it.
+  ///
+  /// \p MakeVFS must be thread-safe, as it is invoked concurrently by the
+  /// query's workers.
+  clang::dependencies::DependencyScanningServiceOptions
+  getClangScanningServiceOptions(
+      std::function<llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>()> MakeVFS)
+      const;
+
+  /// The CAS instance shared by all scanning queries, or \c nullptr if caching
+  /// has not been set up.
+  std::shared_ptr<llvm::cas::ObjectStore> getCAS() const;
+
+  /// The action cache shared by all scanning queries, or \c nullptr if caching
+  /// has not been set up.
+  std::shared_ptr<llvm::cas::ActionCache> getActionCache() const;
 
 private:
   /// Enforce clients not being allowed to query this cache directly, it must be

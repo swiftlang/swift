@@ -537,32 +537,39 @@ void ModuleDependencyInfo::setOutputPathAndHash(StringRef outputPath,
 
 SwiftDependencyScanningService::SwiftDependencyScanningService()
     : Alloc(), Saver(Alloc) {
-  clang::dependencies::DependencyScanningServiceOptions opts;
   // ScanningOptimizations::Default excludes the current working directory
   // optimization. Clang needs to communicate with the build system to handle
   // the optimization safely. Swift can handle the working directory
   // optimizaiton already so it is safe to turn on all optimizations.
-  opts.OptimizeArgs = clang::dependencies::ScanningOptimizations::All;
+  ClangScanningServiceOptions.OptimizeArgs =
+      clang::dependencies::ScanningOptimizations::All;
   // The Swift scanner relies on the set of Clang modules visible from each
   // by-name module lookup to resolve Swift overlay and cross-import overlay
   // dependencies, so opt into having Clang report them.
-  opts.ReportVisibleModules = true;
-  opts.MakeVFS = ClangScanningFSFactory;
-
-  ClangScanningService.emplace(std::move(opts));
+  ClangScanningServiceOptions.ReportVisibleModules = true;
 }
 
-void SwiftDependencyScanningService::setClangScanningFSFactory(
-    std::function<llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>()> factory) {
-  ClangScanningFSFactory = std::move(factory);
-  // The Clang scanning service now owns the base VFS factory (via
-  // DependencyScanningServiceOptions::MakeVFS) rather than each scanning tool,
-  // so re-create it to pick up the new factory while preserving all other
-  // options that were configured earlier (e.g. CAS compilation mode).
-  clang::dependencies::DependencyScanningServiceOptions opts =
-      ClangScanningService->getOpts();
-  opts.MakeVFS = ClangScanningFSFactory;
-  ClangScanningService.emplace(std::move(opts));
+clang::dependencies::DependencyScanningServiceOptions
+SwiftDependencyScanningService::getClangScanningServiceOptions(
+    std::function<llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>()> MakeVFS)
+    const {
+  llvm::sys::SmartScopedLock<true> Lock(ScanningServiceGlobalLock);
+  clang::dependencies::DependencyScanningServiceOptions Opts =
+      ClangScanningServiceOptions;
+  Opts.MakeVFS = std::move(MakeVFS);
+  return Opts;
+}
+
+std::shared_ptr<llvm::cas::ObjectStore>
+SwiftDependencyScanningService::getCAS() const {
+  llvm::sys::SmartScopedLock<true> Lock(ScanningServiceGlobalLock);
+  return CAS;
+}
+
+std::shared_ptr<llvm::cas::ActionCache>
+SwiftDependencyScanningService::getActionCache() const {
+  llvm::sys::SmartScopedLock<true> Lock(ScanningServiceGlobalLock);
+  return ActionCache;
 }
 
 bool
@@ -672,6 +679,8 @@ bool SwiftDependencyScanningService::setupCachingDependencyScanningService(
   if (!Instance.getInvocation().requiresCAS())
     return false;
 
+  llvm::sys::SmartScopedLock<true> Lock(ScanningServiceGlobalLock);
+
   if (CASConfig) {
     // If CASOption matches, the service is initialized already.
     if (*CASConfig == Instance.getInvocation().getCASOptions().Config)
@@ -684,27 +693,19 @@ bool SwiftDependencyScanningService::setupCachingDependencyScanningService(
 
   // Setup CAS.
   CASConfig = Instance.getInvocation().getCASOptions().Config;
+  CAS = Instance.getSharedCASInstance();
+  ActionCache = Instance.getSharedCacheInstance();
 
   clang::CASOptions CASOpts;
   CASOpts.CASPath = CASConfig->CASPath;
   CASOpts.PluginPath = CASConfig->PluginPath;
   CASOpts.PluginOptions = CASConfig->PluginOptions;
 
-  {
-    clang::dependencies::DependencyScanningServiceOptions opts;
-    // The current working directory optimization (off by default) should not
-    // impact CAS. We set the optization to all to be consistent with the
-    // non-CAS case.
-    opts.OptimizeArgs = clang::dependencies::ScanningOptimizations::All;
-    // See the non-CAS case above.
-    opts.ReportVisibleModules = true;
-    opts.Compilation = clang::dependencies::IncludeTreeCompilation{
-        CASOpts, Instance.getSharedCASInstance(),
-        Instance.getSharedCacheInstance()};
-    opts.MakeVFS = ClangScanningFSFactory;
-
-    ClangScanningService.emplace(std::move(opts));
-  }
+  // Record the caching configuration to be picked up by the Clang scanning
+  // service of every subsequent scanning query. Note that the remaining
+  // options were configured once and for all in the constructor.
+  ClangScanningServiceOptions.Compilation =
+      clang::dependencies::IncludeTreeCompilation{CASOpts, CAS, ActionCache};
 
   return false;
 }
