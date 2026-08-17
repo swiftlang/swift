@@ -522,43 +522,6 @@ extension Span where Element: ~Copyable {
 
 @available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
-extension Span where Element: BitwiseCopyable {
-  /// Accesses the element at the specified index in the `Span`.
-  ///
-  /// - Parameter position: The offset of the element to access. `position`
-  ///     must be greater or equal to zero, and less than `count`.
-  ///
-  /// - Complexity: O(1)
-  @export(implementation)
-  public subscript(_ position: Index) -> Element {
-    @_transparent
-    get {
-      _checkIndex(position)
-      return unsafe self[unchecked: position]
-    }
-  }
-
-  /// Accesses the element at the specified index in the `Span`.
-  ///
-  /// This subscript does not validate `position`. Using this subscript
-  /// with an invalid `position` results in undefined behaviour.
-  ///
-  /// - Parameter position: The offset of the element to access. `position`
-  ///     must be greater or equal to zero, and less than `count`.
-  ///
-  /// - Complexity: O(1)
-  @unsafe
-  @export(implementation)
-  public subscript(unchecked position: Index) -> Element {
-    get {
-      let address = unsafe _unsafeAddressOfElement(unchecked: position)
-      return unsafe UnsafeRawPointer(address).loadUnaligned(as: Element.self)
-    }
-  }
-}
-
-@available(SwiftCompatibilitySpan 5.0, *)
-@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension Span where Element: Copyable {
 
   /// Construct a raw span over the memory represented by this span.
