@@ -136,3 +136,40 @@ bb3:
   %9999 = tuple()
   return %9999 : $()
 }
+
+// A debug_value with a debug reconstruction block cannot currently be
+// propagated, as it would crash when there is no operand to clone.
+//
+// CHECK-LABEL: sil @testConstantDebugReconstructionBlock : $@convention(thin) (@guaranteed Klass) -> () {
+// CHECK: bb0(%0 :
+// CHECK:   debug_value [moveable_value_debuginfo] %0 : $Klass, let, name "arg"
+// CHECK:   debug_value (), let, name "const", transform {
+// CHECK:   bb0:
+// CHECK:     %0 = integer_literal $Builtin.Int64, 42
+// CHECK:     return %0 : $Builtin.Int64
+// CHECK:   }
+// CHECK-NOT: name "const"
+// CHECK:   begin_apply
+// CHECK-NEXT:   debug_value [moveable_value_debuginfo] %0 : $Klass, let, name "arg"
+// CHECK-NOT: name "const"
+// CHECK:   end_apply
+// CHECK-NEXT:   debug_value [moveable_value_debuginfo] %0 : $Klass, let, name "arg"
+// CHECK-NOT: name "const"
+// CHECK: } // end sil function 'testConstantDebugReconstructionBlock'
+sil @testConstantDebugReconstructionBlock : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : $Klass):
+  debug_value [moveable_value_debuginfo] %0 : $Klass, let, name "arg"
+  debug_value [moveable_value_debuginfo] (), let, name "const", transform {
+  bb0:
+    %c = integer_literal $Builtin.Int64, 42
+    return %c : $Builtin.Int64
+  }
+  br bb1
+
+bb1:
+  %f = function_ref @yieldOnceCoroutine : $@yield_once @convention(method) (@guaranteed Klass) -> @yields @inout Int64
+  (%3, %4) = begin_apply %f(%0) : $@yield_once @convention(method) (@guaranteed Klass) -> @yields @inout Int64
+  %9999 = tuple()
+  end_apply %4 as $()
+  return %9999 : $()
+}
