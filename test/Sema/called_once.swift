@@ -178,3 +178,26 @@ struct TestCalledOnceResultWitness : P_PlainResult { // expected-error {{type 'T
 struct TestPlainResultWitness : P_CalledOnceResult {
   func f() -> () -> Void { { } } // Ok
 }
+
+// `@escaping @called(once)` implies `@_implicitSelfCapture`
+do {
+  func takeFn(fn: @escaping @called(once) () -> Int) { }
+
+  class C {
+    var property: Int = 0
+
+    func method() { }
+
+    func testMethod() {
+      takeFn { // Ok
+        method()
+        return property
+      }
+
+      let _ = { @called(once) in // Ok
+        method()
+        return property
+      }
+    }
+  }
+}
