@@ -232,3 +232,25 @@ func testGenericConsumingCaptureIsAddressOnlyMultiUse<T: Usable & ~Copyable>(_ t
   _ = g
   t.test() // expected-note {{used here}}
 }
+
+func testCasts() {
+  struct NC: ~Copyable {}
+  struct S: ~Copyable, Usable {
+    consuming func use() {}
+    func test() {}
+  }
+
+  func testIdentityCast(_ x: consuming NC) -> NC {
+    { @called(once) in x as NC }()
+  }
+
+  func testErase(_ c: consuming S) {
+    let fn = { @called(once) in c as any Usable & ~Copyable }
+    _ = fn()
+  }
+
+  func genericErase<T: Usable & ~Copyable>(_ v: consuming T) {
+    let fn = { @called(once) in v as any Usable & ~Copyable }
+    _ = fn()
+  }
+}
