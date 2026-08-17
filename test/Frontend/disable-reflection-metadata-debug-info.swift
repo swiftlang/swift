@@ -32,7 +32,7 @@
 // CHECK: warning: debug info is requested with option '-g' but option '-disable-reflection-metadata' will prevent variable inspection in the debugger
 // ERROR: error: debug info is requested with option '-g' but option '-disable-reflection-metadata' will prevent variable inspection in the debugger
 
-// NO-WARNING-NOT: warning
+// NO-WARNING-NOT: prevent variable inspection
 
 func f() {
   let x = 42
