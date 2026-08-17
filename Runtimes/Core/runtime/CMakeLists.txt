@@ -15,7 +15,6 @@ add_library(swiftRuntimeCore OBJECT
     Borrow.cpp
     BytecodeLayouts.cpp
     Casting.cpp
-    CrashReporter.cpp
     Demangle.cpp
     DynamicCast.cpp
     Enum.cpp
