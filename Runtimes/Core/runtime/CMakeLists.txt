@@ -46,7 +46,6 @@ add_library(swiftRuntimeCore OBJECT
     Numeric.cpp
     Once.cpp
     Paths.cpp
-    Portability.cpp
     ProtocolConformance.cpp
     RefCount.cpp
     ReflectionMirror.cpp
