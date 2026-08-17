@@ -451,10 +451,11 @@ public:
   /// such as `-Xcc` flags, etc.
   bool StrictImplicitModuleContext = false;
 
-  /// Downgrade all errors emitted in the module interface verification phase
-  /// to warnings.
+  /// Whether to downgrade all errors emitted in the module interface
+  /// verification phase to warnings. When this has no value, the blocklists
+  /// decide whether the module's interface verification errors are downgraded.
   /// TODO: remove this after we fix all project-side warnings in the interface.
-  bool DowngradeInterfaceVerificationError = false;
+  std::optional<bool> DowngradeInterfaceVerificationError;
 
   /// True if the "-static" option is set.
   bool Static = false;
