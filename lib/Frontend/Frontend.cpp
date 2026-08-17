@@ -950,6 +950,7 @@ bool CompilerInstance::setUpModuleLoaders() {
     InterfaceSubContextDelegateImpl ASTDelegate(
         Context->SourceMgr, &Context->Diags, Context->SearchPathOpts,
         Context->LangOpts, Context->ClangImporterOpts, Context->CASOpts,
+        Context->SILOpts,
         LoaderOpts,
         /*buildModuleCacheDirIfAbsent*/ false, ClangModuleCachePath,
         FEOpts.PrebuiltModuleCachePath, FEOpts.BackupModuleInterfaceDir,

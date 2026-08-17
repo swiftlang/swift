@@ -503,6 +503,7 @@ static bool buildModuleFromInterface(CompilerInstance &Instance) {
       Instance.getSourceMgr(), Instance.getDiags(),
       Invocation.getSearchPathOptions(), Invocation.getLangOptions(),
       Invocation.getClangImporterOptions(), Invocation.getCASOptions(),
+      Invocation.getSILOptions(),
       Invocation.getClangModuleCachePath(), PrebuiltCachePath,
       FEOpts.BackupModuleInterfaceDir, Invocation.getModuleName(), InputPath,
       Invocation.getOutputFilename(), ABIPath, FEOpts.CacheReplayPrefixMap,

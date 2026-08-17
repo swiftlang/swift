@@ -602,6 +602,7 @@ public:
       SourceManager &SourceMgr, DiagnosticEngine &Diags,
       const SearchPathOptions &SearchPathOpts, const LangOptions &LangOpts,
       const ClangImporterOptions &ClangOpts, const CASOptions &CASOpts,
+      const SILOptions &SILOpts,
       StringRef CacheDir, StringRef PrebuiltCacheDir,
       StringRef BackupInterfaceDir, StringRef ModuleName, StringRef InPath,
       StringRef OutPath, StringRef ABIOutputPath,
@@ -679,6 +680,7 @@ private:
                                      const LangOptions &LangOpts,
                                      const ClangImporterOptions &clangImporterOpts,
                                      const CASOptions &casOpts,
+                                     const SILOptions &silOpts,
                                      bool suppressNotes, bool suppressRemarks,
                                      PrintDiagnosticNamesMode diagnosticNamesMode);
   bool extractSwiftInterfaceVersionAndArgs(CompilerInvocation &subInvocation,
@@ -692,6 +694,7 @@ public:
       SourceManager &SM, DiagnosticEngine *Diags,
       const SearchPathOptions &searchPathOpts, const LangOptions &langOpts,
       const ClangImporterOptions &clangImporterOpts, const CASOptions &casOpts,
+      const SILOptions &silOpts,
       ModuleInterfaceLoaderOptions LoaderOpts, bool buildModuleCacheDirIfAbsent,
       StringRef moduleCachePath, StringRef prebuiltCachePath,
       StringRef backupModuleInterfaceDir,
