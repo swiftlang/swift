@@ -32,13 +32,6 @@ target_include_directories(swiftDemangling
 
 target_link_libraries(swiftDemangling PRIVATE swiftShims)
 
-if(SwiftCore_ENABLE_CRASH_REPORTER_CLIENT)
-  # We could likely pull the copy from the runtime sources
-  add_library(swiftDemanglingCR OBJECT
-    "${SwiftCore_SWIFTC_SOURCE_DIR}/lib/Demangling/CrashReporter.cpp")
-  target_link_libraries(swiftDemanglingCR PRIVATE swiftShims)
-endif()
-
 if(SwiftCore_ENABLE_OBJC_INTEROP)
   target_sources(swiftDemangling PRIVATE
     "${SwiftCore_SWIFTC_SOURCE_DIR}/lib/Demangling/OldDemangler.cpp"

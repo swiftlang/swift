@@ -14,6 +14,6 @@ add_swift_target_library(swiftRemoteInspection STATIC
     ${swiftRemoteInspection_C_COMPILE_FLAGS}
   LINK_FLAGS ${SWIFT_RUNTIME_LINK_FLAGS}
   INCORPORATE_OBJECT_LIBRARIES
-    swiftLLVMSupport swiftDemangling swiftDemanglingCR
+    swiftLLVMSupport swiftDemangling
   SWIFT_COMPILE_FLAGS ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
   INSTALL_IN_COMPONENT dev)
