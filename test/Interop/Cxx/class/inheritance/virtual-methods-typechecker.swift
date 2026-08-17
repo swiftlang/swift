@@ -1,13 +1,16 @@
 // RUN: %target-typecheck-verify-swift -suppress-notes -I %S/Inputs -cxx-interoperability-mode=default
+// RUN: %target-typecheck-verify-swift -suppress-notes -I %S/Inputs -cxx-interoperability-mode=default -enable-experimental-feature NoAbstractCxxClassesAsValues -verify-additional-prefix abstract-value-
+
+// REQUIRES: swift_feature_NoAbstractCxxClassesAsValues
 
 import VirtualMethods
 
 let _ = Base() // expected-error {{'init()' is unavailable: constructors of abstract C++ classes are unavailable in Swift}}
-// expected-error@-1 {{'Base' is unavailable: abstract C++ classes cannot be used as values in Swift}}
+// expected-abstract-value-error@-1 {{'Base' is unavailable: abstract C++ classes cannot be used as values in Swift}}
 let _ = DerivedInt()
 
 let _ = Base2() // expected-error {{'init()' is unavailable: constructors of abstract C++ classes are unavailable in Swift}}
-// expected-error@-1 {{'Base2' is unavailable: abstract C++ classes cannot be used as values in Swift}}
+// expected-abstract-value-error@-1 {{'Base2' is unavailable: abstract C++ classes cannot be used as values in Swift}}
 
 let _ = Derived2()
 let _ = Derived3()
@@ -24,11 +27,11 @@ let vro = VirtualRenamedOverridden()
 let _ = vro.cxxName() // expected-error {{has no member 'cxxName'}}
 let _ = vro.swiftName()
 
-func check(pvrb: PureVirtualRenamedBase) { // expected-error {{'PureVirtualRenamedBase' is unavailable: abstract C++ classes cannot be used as values in Swift}}
+func check(pvrb: PureVirtualRenamedBase) { // expected-abstract-value-error {{'PureVirtualRenamedBase' is unavailable: abstract C++ classes cannot be used as values in Swift}}
   let _ = pvrb.cxxName() // expected-error {{has no member 'cxxName'}}
   let _ = pvrb.swiftName() // expected-error {{virtual function is not available in Swift because it is pure}}
 }
-func check(pvri: PureVirtualRenamedInherited) { // expected-error {{'PureVirtualRenamedInherited' is unavailable: abstract C++ classes cannot be used as values in Swift}}
+func check(pvri: PureVirtualRenamedInherited) { // expected-abstract-value-error {{'PureVirtualRenamedInherited' is unavailable: abstract C++ classes cannot be used as values in Swift}}
   let _ = pvri.cxxName() // expected-error {{has no member 'cxxName'}}
   let _ = pvri.swiftName() // expected-error {{virtual function is not available in Swift because it is pure}}
 }

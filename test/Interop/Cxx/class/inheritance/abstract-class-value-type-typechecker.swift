@@ -1,4 +1,6 @@
-// RUN: %target-typecheck-verify-swift -suppress-notes -I %S/Inputs -cxx-interoperability-mode=default
+// RUN: %target-typecheck-verify-swift -suppress-notes -I %S/Inputs -cxx-interoperability-mode=default -enable-experimental-feature NoAbstractCxxClassesAsValues
+
+// REQUIRES: swift_feature_NoAbstractCxxClassesAsValues
 
 import AbstractClassValueType
 

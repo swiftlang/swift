@@ -1,7 +1,10 @@
 // RUN: %target-swift-ide-test -print-module -cxx-interoperability-mode=default -print-implicit-attrs -module-to-print=VirtualMethods -I %S/Inputs -source-filename=x | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -cxx-interoperability-mode=default -print-implicit-attrs -module-to-print=VirtualMethods -I %S/Inputs -source-filename=x -enable-experimental-feature NoAbstractCxxClassesAsValues | %FileCheck %s --check-prefixes=CHECK,CHECK-ABSTRACT-VALUE
 
-// CHECK:      @available(*, unavailable, message: "abstract C++ classes cannot be used as values in Swift")
-// CHECK-NEXT: struct Base {
+// REQUIRES: swift_feature_NoAbstractCxxClassesAsValues
+
+// CHECK-ABSTRACT-VALUE: @available(*, unavailable, message: "abstract C++ classes cannot be used as values in Swift")
+// CHECK:        struct Base {
 // CHECK-NEXT:   @available(*, unavailable, message: "constructors of abstract C++ classes are unavailable in Swift")
 // CHECK-NEXT:   init()
 // CHECK-NEXT:   @available(*, unavailable, message: "virtual function is not available in Swift because it is pure")
@@ -19,8 +22,8 @@
 // CHECK-NEXT:  @_addressableSelf mutating func foo()
 // CHECK-NEXT: }
 
-// CHECK:      @available(*, unavailable, message: "abstract C++ classes cannot be used as values in Swift")
-// CHECK-NEXT: struct Base2 {
+// CHECK-ABSTRACT-VALUE: @available(*, unavailable, message: "abstract C++ classes cannot be used as values in Swift")
+// CHECK:       struct Base2 {
 // CHECK-NEXT:    @available(*, unavailable, message: "constructors of abstract C++ classes are unavailable in Swift")
 // CHECK-NEXT:    init()
 // CHECK-NEXT:    @available(*, unavailable, message: "virtual function is not available in Swift because it is pure")
@@ -73,8 +76,8 @@
 // CHECK-NEXT:    @_addressableSelf func swiftName() -> CInt
 // CHECK-NEXT:  }
 //
-// CHECK:      @available(*, unavailable, message: "abstract C++ classes cannot be used as values in Swift")
-// CHECK-NEXT: struct PureVirtualRenamedBase {
+// CHECK-ABSTRACT-VALUE: @available(*, unavailable, message: "abstract C++ classes cannot be used as values in Swift")
+// CHECK:       struct PureVirtualRenamedBase {
 // CHECK-NEXT:    @available(*, unavailable, message: "constructors of abstract C++ classes are unavailable in Swift")
 // CHECK-NEXT:    init()
 // CHECK-NEXT:    @available(*, unavailable, message: "virtual function is not available in Swift because it is pure")

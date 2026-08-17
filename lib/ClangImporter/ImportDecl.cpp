@@ -2907,7 +2907,9 @@ namespace {
         if (auto structResult = dyn_cast<StructDecl>(result)) {
           // If this class is abstract, any of its methods might use a pure
           // virtual method.
-          if (cxxRecordDecl->isAbstract()) {
+          if (cxxRecordDecl->isAbstract() &&
+              Impl.SwiftContext.LangOpts.hasFeature(
+                  Feature::NoAbstractCxxClassesAsValues)) {
             Impl.markUnavailable(
                 result,
                 "abstract C++ classes cannot be used as values in Swift");
