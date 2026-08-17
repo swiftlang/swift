@@ -438,6 +438,40 @@ class NotSendable {}
         expectTrue(expectation.fulfilled)
       }
 
+      tests.test("finish(throwing:) from onTermination on cancellation throws the error passed to finish") {
+        let thrownError = SomeError()
+
+        let (controlStream, controlContinuation) = AsyncStream<Int>.makeStream()
+        var controlIterator = controlStream.makeAsyncIterator()
+
+        let task = Task { () -> Error? in
+          let stream = AsyncThrowingStream<Int, Error> { continuation in
+            continuation.onTermination = { @Sendable termination in
+              if case .cancelled = termination {
+                continuation.finish(throwing: thrownError)
+              }
+            }
+          }
+          controlContinuation.yield(1)
+          do {
+            for try await _ in stream {}
+            return nil
+          } catch {
+            return error
+          }
+        }
+
+        expectEqual(await controlIterator.next(), 1)
+        task.cancel()
+
+        let caught = await task.value
+        if let failure = caught as? SomeError {
+          expectEqual(failure, thrownError)
+        } else {
+          expectUnreachable("expected SomeError, got \(String(describing: caught))")
+        }
+      }
+
       tests.test("continuation equality") {
         let (_, continuation1) = AsyncStream<Int>.makeStream()
         let (_, continuation2) = AsyncStream<Int>.makeStream()
