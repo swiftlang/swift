@@ -21,12 +21,12 @@ public func borrowBigPod(_ target: BigPod) -> Ref<BigPod> {
 	return Ref(target)
 }
 
+// TODO: Eliminate the remaining unused copy onto the stack.
+//
 // CHECK-LABEL: define {{.*}} @"$s{{.*}}12borrowBigArc
-// CHECK:         [[TMP:%.*]] = getelementptr inbounds nuw %T{{.*}}6BigArcVG, ptr [[BUF:%.*]], i32 0, i32 0
-// CHECK:         store ptr %0, ptr [[TMP:%.*]], align
-// CHECK:         [[TMP:%.*]] = getelementptr inbounds nuw %T{{.*}}6BigArcVG, ptr [[BUF]], i32 0, i32 0
-// CHECK:         [[RESULT:%.*]] = load ptr, ptr [[TMP]]
-// CHECK:         ret ptr [[RESULT]]
+// CHECK:         [[BUF:%[0-9]+]] = alloca
+// CHECK:         memcpy
+// CHECK:         ret ptr %0
 @_lifetime(borrow target)
 public func borrowBigArc(_ target: BigArc) -> Ref<BigArc> {
 	return Ref(target)
