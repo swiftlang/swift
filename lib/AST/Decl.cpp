@@ -2772,6 +2772,12 @@ VarDecl *PatternBindingInitializer::getInitializedLazyVar() const {
       if (var->getAttrs().hasAttribute<LazyAttr>())
         return var;
       
+      // `self` may become available to property initializer
+      // expressions if re-contextualized by a macro. However,
+      // `self` access only makes sense for instance members:
+      if (!var->isInstanceMember())
+        return nullptr;
+      
       // Check if a macro moves the initalizer to a context
       // where `self` is available. These can be type-checked
       // as if they were `lazy`.
