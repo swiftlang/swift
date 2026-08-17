@@ -190,3 +190,13 @@ extension SuspendingClock.Instant: InstantProtocol {
     rhs.duration(to: lhs)
   }
 }
+
+// ==== -----------------------------------------------------------------------
+// MARK: Identifiable
+
+@available(StdlibDeploymentTarget 6.5, *)
+@_unavailableInEmbedded
+extension SuspendingClock: Identifiable {
+  /// The stable identity of the suspending system clock.
+  public var id: SystemClockID { .suspending }
+}
