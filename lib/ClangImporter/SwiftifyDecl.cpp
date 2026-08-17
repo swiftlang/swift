@@ -44,6 +44,7 @@
 #include "clang/Sema/Overload.h"
 #include "llvm-c/Types.h"
 #include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/Support/Casting.h"
 #include <optional>
 
 using namespace swift;
@@ -492,6 +493,16 @@ struct UnaliasedInstantiationVisitor
     hasUnaliasedInstantiation = true;
     DLOG("Signature contains raw template, skipping\n");
     return false;
+  }
+
+  bool VisitRecordType(const clang::RecordType *RT) {
+    if (isa_and_nonnull<clang::ClassTemplateSpecializationDecl>(
+            RT->getDecl())) {
+      hasUnaliasedInstantiation = true;
+      DLOG("Signature contains raw template, skipping\n");
+      return false;
+    }
+    return true;
   }
 
   static bool checkTemplates(clang::QualType clangType, bool hasLifetime,
