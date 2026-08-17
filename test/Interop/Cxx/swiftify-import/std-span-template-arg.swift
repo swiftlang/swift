@@ -22,10 +22,17 @@ module Test {
 
 template <typename T>
 struct S {
-    // expected-expansion@+7:10{{
+    // expected-expansion@+14:10{{
     //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
     //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(borrow self) @_disfavoredOverload|}}
     //   expected-remark@3{{macro content: |public borrowing func get() -> Span<CChar> {|}}
+    //   expected-remark@4{{macro content: |    return unsafe _swiftifyOverrideLifetime(Span(_unsafeCxxSpan: unsafe get()), copying: ())|}}
+    //   expected-remark@5{{macro content: |}|}}
+    // }}
+    // expected-expansion@+7:10{{
+    //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
+    //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(borrow self) @_disfavoredOverload|}}
+    //   expected-remark@3{{macro content: |public borrowing func get() -> Span<CInt> {|}}
     //   expected-remark@4{{macro content: |    return unsafe _swiftifyOverrideLifetime(Span(_unsafeCxxSpan: unsafe get()), copying: ())|}}
     //   expected-remark@5{{macro content: |}|}}
     // }}
@@ -33,10 +40,15 @@ struct S {
 };
 
 using SpanHolder = S<std::span<const char>>;
+using IntSpan = std::span<const int>;
+using UsingSpanHolder = S<IntSpan>;
 
 //--- test.swift
 import Test
 
 public func f(_ holder: SpanHolder) {
+  let _ = holder.get();
+}
+public func g(_ holder: UsingSpanHolder) {
   let _ = holder.get();
 }
