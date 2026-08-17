@@ -5933,6 +5933,10 @@ CallEmission::applySpecializedEmitter(SpecializedEmitter &specializedEmitter,
     SGF.addEmissionFinalizer([rawResult](SILGenFunction &SGF) {
       SGF.finalizeAddTaskLocalValue(rawResult);
     });
+  } else if (builtinName.is(getBuiltinName(BuiltinValueKind::TaskPushDeadline))) {
+    SGF.addEmissionFinalizer([rawResult](SILGenFunction &SGF) {
+      SGF.finalizeTaskPushDeadline(rawResult);
+    });
   }
 
   if (argScope.has_value())

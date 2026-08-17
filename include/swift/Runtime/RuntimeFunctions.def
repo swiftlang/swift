@@ -2434,6 +2434,26 @@ FUNCTION(TaskCancel,
          EFFECT(RuntimeEffect::Concurrency),
          MEMEFFECTS(InaccessibleMemOnly))
 
+// void swift_task_cancelWithFlags(AsyncTask *task, size_t flags);
+FUNCTION(TaskCancelWithFlags,
+         _Concurrency, swift_task_cancelWithFlags, SwiftCC,
+         ConcurrencyAvailability,
+         RETURNS(VoidTy),
+         ARGS(SwiftTaskPtrTy, SizeTy),
+         ATTRS(NoUnwind),
+         EFFECT(RuntimeEffect::Concurrency),
+         MEMEFFECTS(InaccessibleMemOnly))
+
+// size_t swift_task_getIsCancelledWithReason(AsyncTask *task);
+FUNCTION(TaskGetIsCancelledWithReason,
+         _Concurrency, swift_task_getIsCancelledWithReason, SwiftCC,
+         CancellationHandlerWithReasonAvailability,
+         RETURNS(SizeTy),
+         ARGS(SwiftTaskPtrTy),
+         ATTRS(NoUnwind),
+         EFFECT(RuntimeEffect::Concurrency),
+         MEMEFFECTS(InaccessibleMemOnly))
+
 // AsyncTaskAndContext swift_task_create(
 //     size_t taskCreateFlags,
 //     TaskOptionRecord *options,
@@ -2748,6 +2768,19 @@ FUNCTION(TaskAddCancellationHandler,
         EFFECT(RuntimeEffect::Concurrency),
         UNKNOWN_MEMEFFECTS)
 
+// CancellationNotificationStatusRecord*
+// swift_task_addCancellationHandlerWithReason(
+//     CancellationNotificationStatusRecord::FunctionTypeWithReason handler,
+//     void *context);
+FUNCTION(TaskAddCancellationHandlerWithReason,
+        _Concurrency, swift_task_addCancellationHandlerWithReason, SwiftCC,
+        CancellationHandlerWithReasonAvailability,
+        RETURNS(Int8PtrTy),
+        ARGS(Int8PtrTy, Int8PtrTy),
+        ATTRS(NoUnwind),
+        EFFECT(RuntimeEffect::Concurrency),
+        UNKNOWN_MEMEFFECTS)
+
 // void swift_task_removeCancellationHandler(
 //   CancellationNotificationStatusRecord *record);
 FUNCTION(TaskRemoveCancellationHandler,
@@ -2778,6 +2811,83 @@ FUNCTION(TaskRemovePriorityEscalationHandler,
          _Concurrency, swift_task_removePriorityEscalationHandler, SwiftCC,
          TaskPriorityEscalationHandlersAvailability,
          RETURNS(VoidTy),
+         ARGS(Int8PtrTy),
+         ATTRS(NoUnwind),
+         EFFECT(RuntimeEffect::Concurrency),
+         UNKNOWN_MEMEFFECTS)
+
+// void swift_task_pushDeadline(TaskDeadlineStatusRecord *record,
+//                              OpaqueValue *clock, OpaqueValue *instant,
+//                              const Metadata *clockType,
+//                              const Metadata *instantType);
+FUNCTION(TaskPushDeadline,
+        _Concurrency, swift_task_pushDeadline, SwiftCC,
+        TaskDeadlineAvailability,
+        RETURNS(VoidTy),
+        ARGS(Int8PtrTy, Int8PtrTy, Int8PtrTy, Int8PtrTy, Int8PtrTy),
+        ATTRS(NoUnwind),
+        EFFECT(RuntimeEffect::Concurrency),
+        UNKNOWN_MEMEFFECTS)
+
+// void swift_task_popDeadline(TaskDeadlineStatusRecord *record);
+FUNCTION(TaskPopDeadline,
+         _Concurrency, swift_task_popDeadline, SwiftCC,
+         TaskDeadlineAvailability,
+         RETURNS(VoidTy),
+         ARGS(Int8PtrTy),
+         ATTRS(NoUnwind),
+         EFFECT(RuntimeEffect::Concurrency),
+         UNKNOWN_MEMEFFECTS)
+
+// OpaqueValue *
+// swift_task_findNearestDeadlineForClock(OpaqueValue *queryClock,
+//                                        const Metadata *clockType,
+//                                        const WitnessTable *identifiableWT,
+//                                        const WitnessTable *clockWT);
+FUNCTION(TaskFindNearestDeadlineForClock,
+         _Concurrency, swift_task_findNearestDeadlineForClock, SwiftCC,
+         TaskDeadlineAvailability,
+         RETURNS(Int8PtrTy),
+         ARGS(Int8PtrTy, Int8PtrTy, Int8PtrTy, Int8PtrTy),
+         ATTRS(NoUnwind),
+         EFFECT(RuntimeEffect::Concurrency),
+         UNKNOWN_MEMEFFECTS)
+
+// TaskCancellationScopeRecord* swift_task_pushCancellationScope();
+FUNCTION(TaskPushCancellationScope,
+        _Concurrency, swift_task_pushCancellationScope, SwiftCC,
+        TaskCancellationScopeAvailability,
+        RETURNS(Int8PtrTy),
+        ARGS(),
+        ATTRS(NoUnwind),
+        EFFECT(RuntimeEffect::Concurrency),
+        UNKNOWN_MEMEFFECTS)
+
+// void swift_task_popCancellationScope(TaskCancellationScopeRecord *record);
+FUNCTION(TaskPopCancellationScope,
+         _Concurrency, swift_task_popCancellationScope, SwiftCC,
+         TaskCancellationScopeAvailability,
+         RETURNS(VoidTy),
+         ARGS(Int8PtrTy),
+         ATTRS(NoUnwind),
+         EFFECT(RuntimeEffect::Concurrency),
+         UNKNOWN_MEMEFFECTS)
+
+// void swift_task_cancelCancellationScope(TaskCancellationScopeRecord *record, size_t flags);
+FUNCTION(TaskCancelCancellationScope,
+         _Concurrency, swift_task_cancelCancellationScope, SwiftCC,
+         TaskCancellationScopeAvailability,
+         RETURNS(VoidTy),
+         ARGS(Int8PtrTy, SizeTy),
+         ATTRS(NoUnwind),
+         EFFECT(RuntimeEffect::Concurrency),
+         UNKNOWN_MEMEFFECTS)
+
+// bool swift_task_cancellationScopeIsCancelled(TaskCancellationScopeRecord *record);
+FUNCTION(TaskCancellationScopeIsCancelled,
+         _Concurrency, swift_task_cancellationScopeIsCancelled, SwiftCC,
+         TaskCancellationScopeAvailability,
+         RETURNS(Int1Ty),
          ARGS(Int8PtrTy),
          ATTRS(NoUnwind),
          EFFECT(RuntimeEffect::Concurrency),
