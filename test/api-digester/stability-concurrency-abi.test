@@ -67,6 +67,7 @@ Protocol AsyncSequence has generic signature change from <Self.AsyncIterator : _
 Protocol AsyncSequence has added inherited protocol Copyable
 Protocol AsyncSequence has added inherited protocol Escapable
 Struct CheckedContinuation has removed conformance to UnsafeSendable
+Var CancellationError._reasonRawStorage is a new API without '@available'
 Protocol AsyncIteratorProtocol is now without @rethrows
 Protocol Executor has added inherited protocol Copyable
 Protocol Executor has added inherited protocol Escapable

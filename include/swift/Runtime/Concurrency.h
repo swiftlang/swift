@@ -140,6 +140,20 @@ void swift_job_deallocate(Job *job, void *ptr);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_cancel(AsyncTask *task);
 
+/// Cancel a task with additional flags.
+///
+/// ### Flags
+/// The low 3 bits carry `CancellationError.Reason`'s raw value.
+/// The remaining bits are reserved for future evolution.
+///
+/// This can be called from any thread. Its Swift signature is
+///
+/// \code
+/// func swift_task_cancelWithFlags(_ task: Builtin.NativeObject, _ flags: UInt)
+/// \endcode
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_task_cancelWithFlags(AsyncTask *task, size_t flags);
+
 /// Cancel all the child tasks that belong to the `group`.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_cancel_group_child_tasks(TaskGroup *group);
@@ -296,6 +310,22 @@ bool swift_taskGroup_addPending(TaskGroup *group, bool unconditionally);
 /// \endcode
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_taskGroup_cancelAll(TaskGroup *group);
+
+/// Cancel the group and all of its child tasks, with additional flags.
+///
+/// ### Flags
+/// The low 3 bits carry `CancellationError.Reason`'s raw value.
+/// The remaining bits are reserved for future evolution.
+///
+/// Behavior is otherwise identical to `swift_taskGroup_cancelAll`.
+/// Its Swift signature is
+///
+/// \code
+/// func swift_taskGroup_cancelAllWithFlags(group: Builtin.RawPointer,
+///                                         flags: UInt)
+/// \endcode
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_taskGroup_cancelAllWithFlags(TaskGroup *group, size_t flags);
 
 /// Check ONLY if the group was explicitly cancelled, e.g. by `cancelAll`.
 ///
@@ -598,11 +628,114 @@ swift_task_pushTaskExecutorPreference(TaskExecutorRef executor);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_popTaskExecutorPreference(TaskExecutorPreferenceStatusRecord* record);
 
+// Task deadlines are unavailable in Embedded Swift
+#if !SWIFT_CONCURRENCY_EMBEDDED
+
+/// Push a deadline status record onto the current task.
+///
+/// The caller must guarantee that both `clock` and `instant` remain
+/// alive until the matching `swift_task_popDeadline`.
+///
+/// This function pushes the record unconditionally; perform any checks
+/// about already-exceeded deadlines before calling it.
+///
+/// Runtime availability: Swift 6.5
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_task_pushDeadline(TaskDeadlineStatusRecord *record,
+                             OpaqueValue *clock,
+                             OpaqueValue *instant,
+                             const Metadata *clockType,
+                             const Metadata *instantType);
+
+/// Remove the passed-in deadline record from the current task.
+///
+/// Runtime availability: Swift 6.5
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_task_popDeadline(TaskDeadlineStatusRecord *record);
+
+/// Find the nearest active deadline for the given clock stored on this task,
+/// or any of its parents.
+///
+/// Returns a borrowed +0 pointer into the matching record's tail storage
+/// stored `C.Instant`, or nullptr if none. If the instant needs to survive
+/// past the record pop, it must be copied by the caller.
+///
+/// Runtime availability: Swift 6.5
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+OpaqueValue *
+swift_task_findNearestDeadlineForClock(
+    OpaqueValue *queryClock,
+    const Metadata *clockType,
+    const WitnessTable *identifiableWT,
+    const WitnessTable *clockWT);
+
+#endif // !SWIFT_CONCURRENCY_EMBEDDED
+
+/// Push a cancellation scope record onto the current task.
+///
+/// Runtime availability: Swift 6.5
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+TaskCancellationScopeRecord * swift_task_pushCancellationScope();
+
+/// Remove the passed in cancellation scope record from the current task.
+///
+/// Runtime availability: Swift 6.5
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_task_popCancellationScope(TaskCancellationScopeRecord *record);
+
+/// Cancel a cancellation scope.
+///
+/// This operation modifies the scope, but does not affect
+/// the surrounding task's cancellation status.
+///
+/// May be called from any thread, any number of times.
+/// The first cancellation reason wins, and is *not* overwritten by subsequent calls.
+///
+/// ### Flags
+/// The low 3 bits carry `CancellationError.Reason`'s raw value.
+/// The remaining bits are reserved for future evolution.
+///
+/// Runtime availability: Swift 6.5
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_task_cancelCancellationScope(
+    TaskCancellationScopeRecord *record, size_t flags);
+
+/// Return whether the passed-in cancellation scope has been cancelled.
+/// This does not check the task cancellation status, just the scope.
+///
+/// Runtime availability: Swift 6.5
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+bool swift_task_cancellationScopeIsCancelled(TaskCancellationScopeRecord *record);
+
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 size_t swift_task_getJobFlags(AsyncTask* task);
 
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 bool swift_task_isCancelled(AsyncTask* task);
+
+/// Read the cancellation state and reason of the given task.
+///
+/// This API exists to answer, in a single runtime call, if the passed in task
+/// is cancelled, and if so, what was its cancellation reason (if any).
+///
+/// ### Return value layout
+///
+/// \code
+///  bit:  63                  4 3       1 0
+///       [       reserved     ][ reason ][C]
+/// \endcode
+///
+/// - `C` (bit 0):     `isCancelled` flag. 0 = not cancelled, 1 = cancelled.
+/// - `reason` (1..3): `CancellationError.Reason.rawValue` (3 bits).
+/// - `reserved`:      All other bits are zero; reserved for future evolution.
+///
+/// Runtime availability: Swift 6.5. Its Swift signature is
+///
+/// \code
+/// func swift_task_getIsCancelledWithReason(_ task: Builtin.NativeObject) -> UInt
+/// \endcode
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+size_t swift_task_getIsCancelledWithReason(AsyncTask* task);
 
 /// This is an options enum that is used to pass flags to
 /// swift_task_isCancelledWithFlags. It is meant to be a flexible toggle.
@@ -647,6 +780,14 @@ SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 CancellationNotificationStatusRecord*
 swift_task_addCancellationHandler(
     CancellationNotificationStatusRecord::FunctionType handler,
+    void *handlerContext);
+
+/// Create and add a cancellation record to the task,
+/// whose handler accepts a cancellation reason.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+CancellationNotificationStatusRecord*
+swift_task_addCancellationHandlerWithReason(
+    CancellationNotificationStatusRecord::FunctionTypeWithReason handler,
     void *handlerContext);
 
 /// Remove the passed cancellation record from the task.
