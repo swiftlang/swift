@@ -860,7 +860,8 @@ public:
       public:
         WitnessVisitor(SILSymbolVisitorImpl &V, ProtocolDecl *PD)
             : Visitor{V.Visitor}, PD{PD},
-              Resilient{PD->getParentModule()->isResilient()},
+              Resilient{PD->getParentModule()->isResilient() &&
+                        !PD->isCOMInterface()},
               WitnessMethodElimination{
                   V.Ctx.getOpts().WitnessMethodElimination} {}
 
