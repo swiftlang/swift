@@ -1,4 +1,13 @@
 
+import SwiftShims
+import _SwiftCOMShims
+
+#if os(Windows)
+public typealias HRESULT = CLong
+#else
+public typealias HRESULT = Int32
+#endif
+
 public struct GUID {
   public var data1: UInt32
   public var data2: UInt16
@@ -34,6 +43,56 @@ public protocol COMInterface {
 
 public protocol COMActivatable {
   var CLSID: CLSID { get }
+}
+
+public protocol COMAggregatable: AnyObject {
+  var controller: (any IUnknown)? { get }
+}
+
+#endif
+
+@implementation @c
+@_alwaysEmitIntoClient
+public func QueryInterface(_ pUnk: UnsafeMutableRawPointer,
+                           _ riid: UnsafeRawPointer,
+                           _ ppvObject: UnsafeMutablePointer<UnsafeMutableRawPointer?>)
+    -> HRESULT {
+  fatalError("QueryInterface")
+}
+
+@implementation @c
+@_alwaysEmitIntoClient
+public func AddRef(_ pUnk: UnsafeMutableRawPointer) -> UInt32 {
+  fatalError("AddRef")
+}
+
+@implementation @c
+@_alwaysEmitIntoClient
+public func Release(_ pUnk: UnsafeMutableRawPointer) -> UInt32 {
+  fatalError("Release")
+}
+
+#if $_MicrosoftCOM
+
+@implementation @c
+@_alwaysEmitIntoClient
+public func AggregatedQueryInterface(_ pUnk: UnsafeMutableRawPointer,
+                                     _ riid: UnsafeRawPointer,
+                                     _ ppvObject: UnsafeMutablePointer<UnsafeMutableRawPointer?>)
+    -> HRESULT {
+  fatalError("AggregatedQueryInterface")
+}
+
+@implementation @c
+@_alwaysEmitIntoClient
+public func AggregatedAddRef(_ pUnk: UnsafeMutableRawPointer) -> UInt32 {
+  fatalError("AggregatedAddRef")
+}
+
+@implementation @c
+@_alwaysEmitIntoClient
+public func AggregatedRelease(_ pUnk: UnsafeMutableRawPointer) -> UInt32 {
+  fatalError("AggregatedRelease")
 }
 
 #endif
