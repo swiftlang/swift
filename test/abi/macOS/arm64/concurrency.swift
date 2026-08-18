@@ -492,6 +492,10 @@ Added: _$ss21TaskCancellationScopeVMn
 Added: _$ss21TaskCancellationScopeVN
 Added: _$sScE11descriptionSSvg
 Added: _$sScE11descriptionSSvpMV
+Added: _$sScE17_reasonRawStorages5UInt8VvM
+Added: _$sScE17_reasonRawStorages5UInt8Vvg
+Added: _$sScE17_reasonRawStorages5UInt8VvpMV
+Added: _$sScE17_reasonRawStorages5UInt8Vvs
 Added: _$sScE6ReasonO11descriptionSSvg
 Added: _$sScE6ReasonO11descriptionSSvpMV
 Added: _$sScE6ReasonO11unspecifiedyA2BmFWC
