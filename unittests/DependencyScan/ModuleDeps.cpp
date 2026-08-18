@@ -542,16 +542,12 @@ TEST_F(ScanTest, TestStressConcurrentDiagnostics) {
   swiftscan_dependency_graph_dispose(Dependencies);
 }
 
-// Ensure that full-scan queries issued concurrently against a single
-// `DependencyScanningTool` do not interfere with one another. Each query gets
-// its own `ModuleDependencyScanner`, and anything that scanner shares with the
-// tool must therefore tolerate being used by several scans at once.
-TEST_F(ScanTest, TestConcurrentQueries) {
-  SmallString<256> tempDir;
-  ASSERT_FALSE(llvm::sys::fs::createUniqueDirectory(
-      "ScanTest.TestConcurrentQueries", tempDir));
-  SWIFT_DEFER { llvm::sys::fs::remove_directories(tempDir); };
-
+// Set up a workspace importing enough C modules that each scan spends a while
+// in the Clang dependency scanner, and build the scanner command line for it.
+static void makeConcurrentQueryCommand(StringRef tempDir, StringRef stdLibDir,
+                                       StringRef moduleName,
+                                       ArrayRef<std::string> extraArgs,
+                                       std::vector<std::string> &commandOut) {
   // Create includes
   std::string IncludeDirPath = createFilename(tempDir, "include");
   ASSERT_FALSE(llvm::sys::fs::create_directory(IncludeDirPath));
@@ -584,27 +580,43 @@ TEST_F(ScanTest, TestConcurrentQueries) {
                                     modulemapContent));
 
   // Paths to shims and stdlib
-  llvm::SmallString<128> ShimsLibDir = StdLibDir;
+  llvm::SmallString<128> ShimsLibDir = stdLibDir;
   llvm::sys::path::append(ShimsLibDir, "shims");
+  llvm::SmallString<128> PlatformStdLibDir = stdLibDir;
   auto Target = llvm::Triple(llvm::sys::getDefaultTargetTriple());
-  llvm::sys::path::append(StdLibDir, getPlatformNameForTriple(Target));
+  llvm::sys::path::append(PlatformStdLibDir, getPlatformNameForTriple(Target));
 
-  std::vector<std::string> CommandStr = {
+  // Note: '-I' and its value are kept as separate arguments. Combining them
+  // into "-I <path>" leaves a leading space in the path, which breaks search
+  // path resolution once a working directory is in play.
+  commandOut = {
       TestPathStr,
-      std::string("-I ") + CHeadersDirPath,
-      std::string("-I ") + StdLibDir.str().str(),
-      std::string("-I ") + ShimsLibDir.str().str(),
+      "-I",
+      CHeadersDirPath,
+      "-I",
+      PlatformStdLibDir.str().str(),
+      "-I",
+      ShimsLibDir.str().str(),
       "-module-name",
-      "testConcurrentQueries",
+      moduleName.str(),
   };
+  commandOut.insert(commandOut.end(), extraArgs.begin(), extraArgs.end());
 
   // On Windows we need to add an extra escape for path separator characters
   // because otherwise the command line tokenizer will treat them as escape
   // characters.
-  for (size_t i = 0; i < CommandStr.size(); ++i)
-    std::replace(CommandStr[i].begin(), CommandStr[i].end(), '\\', '/');
+  for (auto &arg : commandOut)
+    std::replace(arg.begin(), arg.end(), '\\', '/');
+}
+
+// Issue several identical full-scan queries concurrently through one tool and
+// check that they agree. Disagreement means a query resolved dependencies
+// through another query's file system.
+static void runConcurrentQueries(DependencyScanningTool &tool,
+                                 ArrayRef<std::string> commandStr,
+                                 StringRef workingDir = {}) {
   std::vector<const char *> Command;
-  for (auto &command : CommandStr)
+  for (auto &command : commandStr)
     Command.push_back(command.c_str());
 
   constexpr unsigned NumQueries = 4;
@@ -621,7 +633,7 @@ TEST_F(ScanTest, TestConcurrentQueries) {
       while (NumReady.load() < NumQueries)
         std::this_thread::yield();
 
-      auto DependenciesOrErr = ScannerTool.getDependencies(Command, {});
+      auto DependenciesOrErr = tool.getDependencies(Command, workingDir);
       if (DependenciesOrErr.getError()) {
         ++NumFailed;
         return;
@@ -637,8 +649,84 @@ TEST_F(ScanTest, TestConcurrentQueries) {
 
   ASSERT_EQ(NumFailed.load(), 0u);
 
-  // The queries are identical, so they must agree. Disagreement would mean a
-  // query resolved dependencies through another query's file system.
+  // The queries are identical, so they must agree.
   for (unsigned i = 1; i < NumQueries; ++i)
     ASSERT_EQ(ModuleCounts[i].load(), ModuleCounts[0].load());
 }
+
+// Ensure that full-scan queries issued concurrently against a single
+// `DependencyScanningTool` do not interfere with one another. Each query gets
+// its own `ModuleDependencyScanner`, and anything that scanner shares with the
+// tool must therefore tolerate being used by several scans at once.
+TEST_F(ScanTest, TestConcurrentQueries) {
+  SmallString<256> tempDir;
+  ASSERT_FALSE(llvm::sys::fs::createUniqueDirectory(
+      "ScanTest.TestConcurrentQueries", tempDir));
+  SWIFT_DEFER { llvm::sys::fs::remove_directories(tempDir); };
+
+  std::vector<std::string> CommandStr;
+  makeConcurrentQueryCommand(tempDir, StdLibDir, "testConcurrentQueries",
+                             /*extraArgs=*/{}, CommandStr);
+  ASSERT_FALSE(CommandStr.empty());
+
+  runConcurrentQueries(ScannerTool, CommandStr);
+}
+
+// As above, but with compiler caching enabled, which installs a different
+// `DependencyScanningServiceOptions::MakeVFS` callback. That callback must also
+// build a separate file system on every call: the Clang dependency scanner calls
+// `setCurrentWorkingDirectory` on whatever file system it is handed, so workers
+// sharing one corrupt each other's working directory (rdar://184810704). Run
+// under ASan/TSan to catch the heap corruption rather than just the disagreeing
+// results.
+TEST_F(ScanTest, TestConcurrentCachingQueries) {
+  SmallString<256> tempDir;
+  ASSERT_FALSE(llvm::sys::fs::createUniqueDirectory(
+      "ScanTest.TestConcurrentCachingQueries", tempDir));
+  SWIFT_DEFER { llvm::sys::fs::remove_directories(tempDir); };
+
+  // Scan with a deliberately long working directory. `RealFileSystem` stores its
+  // working directory in a `SmallString<128>`, so a shared file system only
+  // corrupts the heap once the path exceeds that inline capacity -- with a short
+  // path the racing writes stay inside the object and the bug hides.
+  std::string LongWorkingDir =
+      createFilename(createFilename(tempDir, std::string(80, 'w')),
+                     std::string(80, 'd'));
+  ASSERT_FALSE(llvm::sys::fs::create_directories(LongWorkingDir));
+  ASSERT_GT(LongWorkingDir.size(), 128u);
+
+  std::vector<std::string> ExtraArgs = {
+      "-cache-compile-job",
+      "-cas-path",
+      createFilename(tempDir, "cas"),
+      "-module-cache-path",
+      createFilename(tempDir, "clang-module-cache"),
+  };
+
+  std::vector<std::string> CommandStr;
+  makeConcurrentQueryCommand(tempDir, StdLibDir, "testConcurrentCachingQueries",
+                             ExtraArgs, CommandStr);
+  ASSERT_FALSE(CommandStr.empty());
+
+  // Confirm that caching really is enabled for this command line, so that this
+  // test cannot silently degrade into a duplicate of TestConcurrentQueries. With
+  // caching on, Clang module dependencies carry an include-tree CASID.
+  std::vector<const char *> Command;
+  for (auto &command : CommandStr)
+    Command.push_back(command.c_str());
+  auto DependenciesOrErr = ScannerTool.getDependencies(Command, LongWorkingDir);
+  ASSERT_FALSE(DependenciesOrErr.getError());
+  auto Dependencies = DependenciesOrErr.get();
+  unsigned NumClangModulesWithIncludeTree = 0;
+  for (size_t i = 0; i < Dependencies->dependencies->count; ++i) {
+    auto *Details = Dependencies->dependencies->modules[i]->details;
+    if (Details->kind == SWIFTSCAN_DEPENDENCY_INFO_CLANG &&
+        Details->clang_details.clang_include_tree.length)
+      ++NumClangModulesWithIncludeTree;
+  }
+  swiftscan_dependency_graph_dispose(Dependencies);
+  ASSERT_GT(NumClangModulesWithIncludeTree, 0u);
+
+  runConcurrentQueries(ScannerTool, CommandStr, LongWorkingDir);
+}
+
