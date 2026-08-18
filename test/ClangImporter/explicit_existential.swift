@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift %clang-importer-sdk -enable-objc-interop -import-objc-header %S/Inputs/explicit_existential.h
 
+// expected-warning@<unknown> * {{libc not found for }}
+
 // Make sure that 'typedef id<P, Q> PAndQ' imports as a typealias without
 // the ExistentialType wrapping the underlying type.
 

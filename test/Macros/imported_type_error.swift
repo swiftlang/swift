@@ -12,6 +12,8 @@
 
 // RUN: not %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module -swift-version 5 -enable-experimental-feature MacrosOnImports -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name ErrorModuleUser %s -I %t 2>&1 | %FileCheck %s
 
+// expected-warning@<unknown> * {{libc not found for }}
+
 import ImportedMacroError
 import macro_library
 

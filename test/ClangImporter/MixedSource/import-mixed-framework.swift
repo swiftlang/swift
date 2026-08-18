@@ -7,6 +7,8 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -emit-module -o %t/Mixed.framework/Modules/Mixed.swiftmodule/%target-swiftmodule-name %S/Inputs/mixed-framework/Mixed.swift -import-underlying-module -F %t -module-name Mixed -disable-objc-attr-requires-foundation-module
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -F %t -typecheck %s -verify -verify-ignore-unrelated
 
+// expected-warning@<unknown> * {{libc not found for }}
+
 import Mixed
 
 let instance = SwiftClass(x: 42)

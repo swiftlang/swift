@@ -1,6 +1,8 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -import-objc-header %S/Inputs/mirror_import_overrides_1.h -typecheck -verify %s
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -import-objc-header %S/Inputs/mirror_import_overrides_2.h -typecheck -verify %s
 
+// expected-warning@<unknown> * {{libc not found for }}
+
 // rdar://31471034
 
 func foo(widget: Widget) {

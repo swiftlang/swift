@@ -21,10 +21,14 @@
 // RUN:   -isysroot %S/../Inputs/clang-importer-sdk
 
 //--- CoreLib.swift
+// expected-warning@<unknown> * {{libc not found for }}
+
 @c(CEnum)
 public enum CEnum: CInt { case A, B }
 
 //--- MiddleLib.swift
+// expected-warning@<unknown> * {{libc not found for }}
+
 import CoreLib
 
 @c(CFunc)

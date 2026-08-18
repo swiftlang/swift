@@ -4,6 +4,8 @@
 // RUN: cp %S/Inputs/resolve-cross-language/Base.modulemap %t/module.modulemap
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -typecheck -I %t -F %clang-importer-sdk-path/frameworks -F %S/Inputs/resolve-cross-language %s -verify -verify-ignore-unrelated
 
+// expected-warning@<unknown> * {{libc not found for }}
+
 import Base
 import BaseUser
 
