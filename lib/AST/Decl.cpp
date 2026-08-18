@@ -2071,7 +2071,10 @@ SourceLoc InheritedTypes::getColonLoc() const {
     precedingTok = typeDecl->getNameLoc();
   } else {
     auto *ext = cast<const ExtensionDecl *>(Decl);
-    precedingTok = ext->getSourceRange().End;
+    auto *extendedTypeRepr = ext->getExtendedTypeRepr();
+    if (!extendedTypeRepr)
+      return SourceLoc();
+    precedingTok = extendedTypeRepr->getEndLoc();
   }
 
   auto &ctx = getASTContext();
