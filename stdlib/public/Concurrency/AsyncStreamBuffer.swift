@@ -587,11 +587,8 @@ extension _AsyncStreamStorage.StateMachine {
     case .waiting:
       fatalError("Unexpected state; called in a non-terminal state")
 
-    case .draining(var draining):
-      draining.finalized = true
-      let failure = draining.failure.take()
-      unsafe self = .init(state: .draining(draining))
-      return failure
+    case .draining:
+      fatalError("Unexpected state; called in a non-terminal state")
 
     case .terminated(var terminated):
       terminated.finalized = true
