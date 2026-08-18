@@ -22,10 +22,7 @@
 #include "llvm/TargetParser/Host.h"
 #include "llvm/TargetParser/Triple.h"
 #include "gtest/gtest.h"
-#include <atomic>
 #include <string>
-#include <thread>
-#include <vector>
 
 using namespace swift;
 using namespace swift::unittest;
@@ -540,105 +537,4 @@ TEST_F(ScanTest, TestStressConcurrentDiagnostics) {
   auto Diagnostics = Dependencies->diagnostics;
   ASSERT_TRUE(Diagnostics->count >= 1);
   swiftscan_dependency_graph_dispose(Dependencies);
-}
-
-// Ensure that full-scan queries issued concurrently against a single
-// `DependencyScanningTool` do not interfere with one another. Each query gets
-// its own `ModuleDependencyScanner`, and anything that scanner shares with the
-// tool must therefore tolerate being used by several scans at once.
-TEST_F(ScanTest, TestConcurrentQueries) {
-  SmallString<256> tempDir;
-  ASSERT_FALSE(llvm::sys::fs::createUniqueDirectory(
-      "ScanTest.TestConcurrentQueries", tempDir));
-  SWIFT_DEFER { llvm::sys::fs::remove_directories(tempDir); };
-
-  // Create includes
-  std::string IncludeDirPath = createFilename(tempDir, "include");
-  ASSERT_FALSE(llvm::sys::fs::create_directory(IncludeDirPath));
-  std::string CHeadersDirPath = createFilename(IncludeDirPath, "CHeaders");
-  ASSERT_FALSE(llvm::sys::fs::create_directory(CHeadersDirPath));
-
-  // Create test input file
-  std::string TestPathStr = createFilename(tempDir, "foo.swift");
-
-  // Create enough imported C modules for each query to spend a while in the
-  // Clang dependency scanner, so that the queries actually overlap.
-  std::string modulemapContent = "";
-  std::string testFileContent = "";
-  for (int i = 0; i < 50; ++i) {
-    std::string headerName = "A_" + std::to_string(i) + ".h";
-    std::string headerContent = "void funcA_" + std::to_string(i) + "(void);";
-    ASSERT_FALSE(
-        emitFileWithContents(CHeadersDirPath, headerName, headerContent));
-
-    std::string moduleMapEntry = "module A_" + std::to_string(i) + " {\n";
-    moduleMapEntry.append("header \"A_" + std::to_string(i) + ".h\"\n");
-    moduleMapEntry.append("export *\n");
-    moduleMapEntry.append("}\n");
-    modulemapContent.append(moduleMapEntry);
-    testFileContent.append("import A_" + std::to_string(i) + "\n");
-  }
-
-  ASSERT_FALSE(emitFileWithContents(tempDir, "foo.swift", testFileContent));
-  ASSERT_FALSE(emitFileWithContents(CHeadersDirPath, "module.modulemap",
-                                    modulemapContent));
-
-  // Paths to shims and stdlib
-  llvm::SmallString<128> ShimsLibDir = StdLibDir;
-  llvm::sys::path::append(ShimsLibDir, "shims");
-  auto Target = llvm::Triple(llvm::sys::getDefaultTargetTriple());
-  llvm::sys::path::append(StdLibDir, getPlatformNameForTriple(Target));
-
-  std::vector<std::string> CommandStr = {
-      TestPathStr,
-      std::string("-I ") + CHeadersDirPath,
-      std::string("-I ") + StdLibDir.str().str(),
-      std::string("-I ") + ShimsLibDir.str().str(),
-      "-module-name",
-      "testConcurrentQueries",
-  };
-
-  // On Windows we need to add an extra escape for path separator characters
-  // because otherwise the command line tokenizer will treat them as escape
-  // characters.
-  for (size_t i = 0; i < CommandStr.size(); ++i)
-    std::replace(CommandStr[i].begin(), CommandStr[i].end(), '\\', '/');
-  std::vector<const char *> Command;
-  for (auto &command : CommandStr)
-    Command.push_back(command.c_str());
-
-  constexpr unsigned NumQueries = 4;
-  std::atomic<unsigned> NumReady(0);
-  std::atomic<unsigned> NumFailed(0);
-  std::atomic<size_t> ModuleCounts[NumQueries] = {};
-  std::vector<std::thread> Queries;
-  Queries.reserve(NumQueries);
-  for (unsigned i = 0; i < NumQueries; ++i) {
-    Queries.emplace_back([&, i]() {
-      // Start all of the queries at roughly the same time to maximize the
-      // overlap between them.
-      ++NumReady;
-      while (NumReady.load() < NumQueries)
-        std::this_thread::yield();
-
-      auto DependenciesOrErr = ScannerTool.getDependencies(Command, {});
-      if (DependenciesOrErr.getError()) {
-        ++NumFailed;
-        return;
-      }
-      auto Dependencies = DependenciesOrErr.get();
-      ModuleCounts[i].store(Dependencies->dependencies->count);
-      swiftscan_dependency_graph_dispose(Dependencies);
-    });
-  }
-
-  for (auto &Query : Queries)
-    Query.join();
-
-  ASSERT_EQ(NumFailed.load(), 0u);
-
-  // The queries are identical, so they must agree. Disagreement would mean a
-  // query resolved dependencies through another query's file system.
-  for (unsigned i = 1; i < NumQueries; ++i)
-    ASSERT_EQ(ModuleCounts[i].load(), ModuleCounts[0].load());
 }

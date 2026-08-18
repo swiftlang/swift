@@ -195,6 +195,22 @@ static std::vector<std::string> inputSpecificClangScannerCommand(
   return result;
 }
 
+static llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>
+getClangScanningFS(SwiftDependencyScanningService &service,
+                   std::shared_ptr<llvm::cas::ObjectStore> cas,
+                   ASTContext &ctx) {
+  auto *importer = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
+  // Dependency scanner needs to create its own file system per worker.
+  auto fs = ClangImporter::computeClangImporterFileSystem(
+      ctx, importer->getClangFileMapping(),
+      llvm::vfs::createPhysicalFileSystem(), true,
+      [&](StringRef str) { return service.save(str); });
+
+  if (cas)
+    return llvm::cas::createCASProvidingFileSystem(cas, fs);
+  return fs;
+}
+
 ModuleDependencyScanningWorker::ModuleDependencyScanningWorker(
     SwiftDependencyScanningService &globalScanningService,
     const CompilerInvocation &ScanCompilerInvocation,
@@ -608,6 +624,16 @@ ModuleDependencyScanner::ModuleDependencyScanner(
     CacheFS = cast<llvm::cas::CASBackedFileSystem>(
         llvm::cas::createCASProvidingFileSystem(
             CAS, ScanASTContext.SourceMgr.getFileSystem()));
+
+  // The Clang dependency scanning service now owns the factory that produces
+  // each worker's base file system (rather than each scanning tool owning its
+  // own). Install it before creating any worker so that the tools pick it up.
+  // The factory creates a fresh file system per worker, as required for
+  // thread-safety.
+  ScanningService.setClangScanningFSFactory(
+      [&ScanningService, CAS = this->CAS, &ScanASTContext]() {
+        return getClangScanningFS(ScanningService, CAS, ScanASTContext);
+      });
 
   // TODO: Make num threads configurable
   for (size_t i = 0; i < NumThreads; ++i)
