@@ -522,8 +522,7 @@ do {
   func takesFooables(_: [any Fooable]) {}
 
   func test(v: String) {
-    takesFooables([v]) // expected-error {{cannot convert value of type '[String]' to expected argument type '[any Fooable]'}}
-    // expected-note@-1 {{arguments to generic parameter 'Element' ('String' and 'any Fooable') are expected to be equal}}
+    takesFooables([v]) // expected-error {{cannot convert value of type 'String' to expected element type 'any Fooable'}}
   }
 }
 

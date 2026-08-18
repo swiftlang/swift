@@ -425,9 +425,8 @@ do {
 do {
   struct S {}
 
-  // FIXME: The below diagnostics don't make sense
-  func test(of: [String]) {} // expected-note {{found candidate with type '[S.Type]'}}
-  func test(of: [Int]) {} // expected-note {{found candidate with type '[S.Type]'}}
+  func test(of: [String]) {} // expected-note {{candidate expects value of type '[String]' for parameter #1 (got '[S.Type]')}}
+  func test(of: [Int]) {} // expected-note {{candidate expects value of type '[Int]' for parameter #1 (got '[S.Type]')}}
 
   test(of: [S.self]) // expected-error {{no exact matches in call to local function 'test'}}
 }

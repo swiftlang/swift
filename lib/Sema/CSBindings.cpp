@@ -2761,7 +2761,11 @@ BindingSet ConstraintSystem::getBindingsFor(TypeVariableType *typeVar) {
 /// Check whether this is a dependent member type T.[P]Element where P is some
 /// protocol inheriting from Sequence, or T.[P]ArrayLiteralElement where P is
 /// some protocol inheriting from ExpressibleByArrayLiteral.
-static bool isInterestingElementType(Type type, TypeVariableType *forBase) {
+static bool isInterestingElementType(ConstraintKind forKind, Type type,
+                                     TypeVariableType *forBase) {
+  if (forKind != ConstraintKind::Bind && forKind != ConstraintKind::Equal)
+    return false;
+
   auto *memberTy = type->getAs<DependentMemberType>();
   if (!memberTy)
     return false;
@@ -2922,14 +2926,14 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
     //
     // $T0.Element bind X
     if (firstTypeVar == TypeVar &&
-        isInterestingElementType(first, TypeVar)) {
+        isInterestingElementType(constraint->getKind(), first, TypeVar)) {
       recordElementType(second, constraint);
 
     // And the other direction:
     //
     // X bind $T0.Element
     } else if (secondTypeVar == TypeVar &&
-               isInterestingElementType(second, TypeVar)) {
+               isInterestingElementType(constraint->getKind(), second, TypeVar)) {
       recordElementType(first, constraint);
     }
 

@@ -223,7 +223,7 @@ func rdar46459603() {
   // expected-error@-2 {{cannot convert value of type '[E]' to expected argument type 'Dictionary<String, E>.Values'}}
 
   _ = [arr.values] == [[e]]
-  // expected-error@-1 {{generic struct 'Set' requires that 'Dictionary<String, E>.Values' conform to 'Hashable'}}
+  // expected-error@-1 {{binary operator '==' cannot be applied to operands of type '[Dictionary<String, E>.Values]' and '[[E]]'}}
 }
 
 // https://github.com/apple/swift/issues/53233

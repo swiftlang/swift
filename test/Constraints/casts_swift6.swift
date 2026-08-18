@@ -25,11 +25,9 @@ func test_compatibility_coercions(_ arr: [Int], _ optArr: [Int]?, _ dict: [Strin
 
   // Make sure we error on the following in Swift 6 mode.
   _ = id(arr) as [String] // expected-error {{conflicting arguments to generic parameter 'T' ('[Int]' vs. '[String]')}}
-
   _ = (arr ?? []) as [String] // expected-error {{conflicting arguments to generic parameter 'T' ('[String]' vs. '[Int]')}}
-
-  _ = (arr ?? [] ?? []) as [String] // expected-error 2{{conflicting arguments to generic parameter 'T' ('[String]' vs. '[Int]')}}
-
+  _ = (arr ?? [] ?? []) as [String] // expected-error {{conflicting arguments to generic parameter 'T' ('[String]' vs. '[Int]')}}
+  // expected-error@-1{{conflicting arguments to generic parameter 'T' ('[String]' vs. '[Int]')}}
   _ = (optArr ?? []) as [String] // expected-error {{conflicting arguments to generic parameter 'T' ('[Int]' vs. '[String]'}}
 
   _ = (arr ?? []) as [String]? // expected-error {{'[Int]' is not convertible to '[String]?'}}
@@ -59,25 +57,16 @@ func test_compatibility_coercions(_ arr: [Int], _ optArr: [Int]?, _ dict: [Strin
 
   // Cases from rdar://88334481
   typealias Magic<T> = T
-  _ = [i] as [String] // expected-error {{cannot convert value of type '[Int]' to type '[String]' in coercion}}
-  // expected-note@-1 {{arguments to generic parameter 'Element' ('Int' and 'String') are expected to be equal}}
-
-  _ = [i] as Magic as [String] // expected-error {{cannot convert value of type '[Int]' to type '[String]' in coercion}}
-  // expected-note@-1 {{arguments to generic parameter 'Element' ('Int' and 'String') are expected to be equal}}
-
-  _ = ([i]) as Magic as [String] // expected-error {{cannot convert value of type '[Int]' to type '[String]' in coercion}}
-  // expected-note@-1 {{arguments to generic parameter 'Element' ('Int' and 'String') are expected to be equal}}
-
+  _ = [i] as [String] // expected-error {{cannot convert value of type 'Int' to expected element type 'String'}}
+  _ = [i] as Magic as [String] // expected-error {{cannot convert value of type 'Int' to expected element type 'String'}}
+  _ = ([i]) as Magic as [String] // expected-error {{cannot convert value of type 'Int' to expected element type 'String'}}
   _  = [i: i] as [String: Any] // expected-error {{cannot convert value of type 'Int' to expected dictionary key type 'String'}}
   _  = ([i: i]) as [String: Any] // expected-error {{cannot convert value of type 'Int' to expected dictionary key type 'String'}}
   _  = [i: stringAnyDict] as [String: Any] // expected-error {{cannot convert value of type 'Int' to expected dictionary key type 'String'}}
 
-  _ = [i].self as Magic as [String] // expected-error {{cannot convert value of type '[Int]' to type '[String]' in coercion}}
-  // expected-note@-1 {{arguments to generic parameter 'Element' ('Int' and 'String') are expected to be equal}}
-
-  _ = (try [i]) as Magic as [String] // expected-error {{cannot convert value of type '[Int]' to type '[String]' in coercion}}
-  // expected-note@-1 {{arguments to generic parameter 'Element' ('Int' and 'String') are expected to be equal}}
-  // expected-warning@-2 {{no calls to throwing functions occur within 'try' expression}}
+  _ = [i].self as Magic as [String] // expected-error {{cannot convert value of type 'Int' to expected element type 'String'}}
+  _ = (try [i]) as Magic as [String] // expected-error {{cannot convert value of type 'Int' to expected element type 'String'}}
+  // expected-warning@-1 {{no calls to throwing functions occur within 'try' expression}}
 
   // These are wrong, but make sure we don't warn about the value cast always succeeding.
   _  = [i: i] as! [String: Any]
