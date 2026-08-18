@@ -15,6 +15,12 @@ public protocol IUnrelated { }
 public final class CObject: IDerived, IUnrelated {
 }
 
+// Native interface vtables reference the C entries supplied by the COM module.
+
+// CHECK-DAG: sil {{.*}}[asmname "QueryInterface"] {{.*}} : $@convention(c)
+// CHECK-DAG: sil {{.*}}[asmname "AddRef"] {{.*}} : $@convention(c)
+// CHECK-DAG: sil {{.*}}[asmname "Release"] {{.*}} : $@convention(c)
+
 // A concrete native object is explicit projected to the selected interface
 // address point. The ordinary reference-existential instruction carries this
 // representation change without exposing a source-level pointer operation.
