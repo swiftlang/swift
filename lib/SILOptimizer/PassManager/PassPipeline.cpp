@@ -790,7 +790,6 @@ static void addClosureSpecializePassPipeline(SILPassPipelinePlan &P) {
 
   P.addClosureSpecialization();
   P.addDeadDebugVariableElimination();
-  P.addDebugReconstructionBlockSimplification();
 
   // Do the second stack promotion on low-level SIL.
   P.addStackPromotion();
