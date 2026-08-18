@@ -475,3 +475,22 @@ func test_unapplied_2(_ x: [Double], y: CGFloat) {
   let _ = x.reduce(0, -) / y
   let _ = x.reduce(0, /) / y
 }
+
+struct Blob {
+  let area: Double
+  let circumference: Double
+}
+
+func test_unapplied_3(_ blobs: [Blob]) {
+  let _: Double = blobs.map(\.area).reduce(0, +)
+  let _: Double = blobs.map(\.area).reduce(0.0, +)
+
+  let _: CGFloat = blobs.map(\.area).reduce(0, +)
+  let _: CGFloat = blobs.map(\.area).reduce(0.0, +)
+
+  let _: Double = blobs.map(\.circumference).reduce(0, +)
+  let _: Double = blobs.map(\.circumference).reduce(0.0, +)
+
+  let _: CGFloat = blobs.map(\.circumference).reduce(0, +)
+  let _: CGFloat = blobs.map(\.circumference).reduce(0.0, +)
+}
