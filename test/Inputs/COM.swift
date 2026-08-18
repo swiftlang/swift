@@ -47,6 +47,69 @@ public typealias CLSID = GUID
 @com(interface: "00000000-0000-0000-C000-000000000046")
 public protocol IUnknown: AnyObject { }
 
+#if $_MicrosoftCOM
+
+extension ObjectIdentifier {
+  @_alwaysEmitIntoClient
+  public init<Interface>(_ interface: borrowing Interface)
+      where Interface.Type: COMInterface {
+    let pUnk = unsafeBitCast(interface, to: UnsafeMutableRawPointer.self)
+    let vtable = pUnk.load(as: UnsafePointer<UnsafeRawPointer>.self)
+    let queryInterface =
+      unsafeBitCast(vtable[0], to: _SwiftCOMQueryInterfaceFunction.self)
+
+    var identity: UnsafeMutableRawPointer?
+    let hr = withUnsafePointer(to: IUnknown.IID) { iid in
+      queryInterface(pUnk, UnsafeRawPointer(iid), &identity)
+    }
+    guard hr >= 0, let identity else {
+      preconditionFailure("QueryInterface for IUnknown failed")
+    }
+
+    self = unsafeBitCast(identity, to: ObjectIdentifier.self)
+
+    let identityVTable =
+      identity.load(as: UnsafePointer<UnsafeRawPointer>.self)
+    let release =
+      unsafeBitCast(identityVTable[2], to: _SwiftCOMLifetimeFunction.self)
+    _ = release(identity)
+  }
+}
+
+@_alwaysEmitIntoClient
+public func === <Left, Right>(_ lhs: borrowing Left,
+                              _ rhs: borrowing Right) -> Bool
+    where Left.Type: COMInterface, Right.Type: COMInterface {
+  return ObjectIdentifier(lhs) == ObjectIdentifier(rhs)
+}
+
+@_alwaysEmitIntoClient
+public func === <Left, Right>(_ lhs: Left?, _ rhs: Right?) -> Bool
+    where Left.Type: COMInterface, Right.Type: COMInterface {
+  guard let lhs else {
+    return rhs == nil
+  }
+  guard let rhs else {
+    return false
+  }
+  return lhs === rhs
+}
+
+@_alwaysEmitIntoClient
+public func !== <Left, Right>(_ lhs: borrowing Left,
+                              _ rhs: borrowing Right) -> Bool
+    where Left.Type: COMInterface, Right.Type: COMInterface {
+  return !(lhs === rhs)
+}
+
+@_alwaysEmitIntoClient
+public func !== <Left, Right>(_ lhs: Left?, _ rhs: Right?) -> Bool
+    where Left.Type: COMInterface, Right.Type: COMInterface {
+  return !(lhs === rhs)
+}
+
+#endif
+
 @com(interface: "8e369447-5188-5ada-b9ec-8fcb732d226b")
 public protocol ISwiftObject {
   var object: UnsafeMutableRawPointer { get }
