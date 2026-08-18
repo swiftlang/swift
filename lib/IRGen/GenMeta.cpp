@@ -2188,6 +2188,7 @@ namespace {
       addInvertedProtocols();
       maybeAddSingletonMetadataPointer();
       maybeAddDefaultOverrideTable();
+      addInstancePrefixDescriptor();
     }
 
     void addIncompleteMetadataOrRelocationFunction() {
@@ -2232,6 +2233,9 @@ namespace {
 
         if (getDefaultOverrideTable())
           flags.class_setHasDefaultOverrideTable(true);
+
+        if (getCOMObjectPrefixSize(IGM, getType()))
+          flags.class_setHasInstancePrefix(true);
       }
 
       if (ResilientSuperClassRef) {
@@ -2240,6 +2244,16 @@ namespace {
       }
       
       return flags.getOpaqueValue();
+    }
+
+    void addInstancePrefixDescriptor() {
+      auto size = getCOMObjectPrefixSize(IGM, getType());
+      if (!size)
+        return;
+
+      B.addInt16(ClassInstancePrefixDescriptorVersion);
+      B.addInt16(size / IGM.getPointerSize());
+      B.addRelativeAddress(getOrCreateCOMObjectPrefixTemplate(IGM, getType()));
     }
 
     void maybeAddResilientSuperclass() {
@@ -7732,6 +7746,7 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::ISwiftObject:
   case KnownProtocolKind::COMInterface:
   case KnownProtocolKind::COMActivatable:
+  case KnownProtocolKind::COMAggregatable:
     return SpecialProtocol::None;
   }
 
