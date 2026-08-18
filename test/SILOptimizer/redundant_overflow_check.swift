@@ -21,6 +21,7 @@ public struct Buf {
   // `x - max(a, x)` can underflow, so the check stays.
   // CHECK-LABEL: sil {{.*}}@$s24redundant_overflow_check3BufV9clampHighyS2iF :
   // CHECK: "arithmetic overflow"
+  // CHECK: } // end sil function '$s24redundant_overflow_check3BufV9clampHighyS2iF'
   public func clampHigh(_ k: Int) -> Int {
     precondition(k >= 0)
     let dc = max(k, count)
@@ -39,4 +40,22 @@ public struct UBuf {
     let dc = min(k, count)
     return count - dc
   }
+}
+
+// `i + c` (c > 0) as an array index can't observably overflow: the bounds check traps first.
+
+// CHECK-LABEL: sil {{.*}}@$s24redundant_overflow_check9nextValueySiSaySiG_SitF :
+// CHECK-NOT: "arithmetic overflow"
+// CHECK: "Index out of range"
+// CHECK: } // end sil function '$s24redundant_overflow_check9nextValueySiSaySiG_SitF'
+public func nextValue(_ a: [Int], _ i: Int) -> Int {
+  return a[i + 1]
+}
+
+// A negative constant can underflow into a valid index, so the check stays.
+// CHECK-LABEL: sil {{.*}}@$s24redundant_overflow_check13previousValueySiSaySiG_SitF :
+// CHECK: "arithmetic overflow"
+// CHECK: } // end sil function '$s24redundant_overflow_check13previousValueySiSaySiG_SitF'
+public func previousValue(_ a: [Int], _ i: Int) -> Int {
+  return a[i - 1]
 }
