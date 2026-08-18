@@ -36,4 +36,54 @@ public protocol COMActivatable {
   var CLSID: CLSID { get }
 }
 
+public protocol COMAggregatable: AnyObject {
+  var controller: (any IUnknown)? { get }
+}
+
+#endif
+
+@c
+@_alwaysEmitIntoClient
+public func QueryInterface(_ pUnk: UnsafeMutableRawPointer,
+                           _ riid: UnsafeRawPointer,
+                           _ ppvObject: UnsafeMutablePointer<UnsafeMutableRawPointer?>)
+    -> CInt {
+  fatalError("QueryInterface")
+}
+
+@c
+@_alwaysEmitIntoClient
+public func AddRef(_ pUnk: UnsafeMutableRawPointer) -> UInt32 {
+  fatalError("AddRef")
+}
+
+@c
+@_alwaysEmitIntoClient
+public func Release(_ pUnk: UnsafeMutableRawPointer) -> UInt32 {
+  fatalError("Release")
+}
+
+#if $_MicrosoftCOM
+
+@c
+@_alwaysEmitIntoClient
+public func AggregatedQueryInterface(_ pUnk: UnsafeMutableRawPointer,
+                                     _ riid: UnsafeRawPointer,
+                                     _ ppvObject: UnsafeMutablePointer<UnsafeMutableRawPointer?>)
+    -> CInt {
+  fatalError("AggregatedQueryInterface")
+}
+
+@c
+@_alwaysEmitIntoClient
+public func AggregatedAddRef(_ pUnk: UnsafeMutableRawPointer) -> UInt32 {
+  fatalError("AggregatedAddRef")
+}
+
+@c
+@_alwaysEmitIntoClient
+public func AggregatedRelease(_ pUnk: UnsafeMutableRawPointer) -> UInt32 {
+  fatalError("AggregatedRelease")
+}
+
 #endif
