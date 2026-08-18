@@ -506,6 +506,20 @@ public:
   static std::optional<StringRef>
   findCustomName(const clang::Decl *decl, ImportNameVersion version);
 
+  /// For a C function with an error out-parameter, find that parameter and
+  /// build the ForeignErrorConvention::Info. Uses default heuristics (bool →
+  /// ZeroResult, nullable pointer → NilResult) unless overridden by a
+  /// swift_error attribute. For CFErrorRef* parameters, explicit ownership
+  /// (CF_RETURNS_RETAINED or CF_RETURNS_NOT_RETAINED) is required. Returns
+  /// nullopt for C++ methods.
+  ///
+  /// Called externally from ImportDecl when synthesizing a throwing variant
+  /// alongside the non-throwing import; the ObjC analog (private, below) runs
+  /// only inside the name-importing path.
+  std::optional<ForeignErrorConvention::Info>
+  considerErrorImportForFunction(const clang::FunctionDecl *clangDecl,
+                                 ArrayRef<const clang::ParmVarDecl *> params);
+
 private:
   bool enableObjCInterop() const { return swiftCtx.LangOpts.EnableObjCInterop; }
 

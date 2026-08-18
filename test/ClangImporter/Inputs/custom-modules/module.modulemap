@@ -307,3 +307,9 @@ module RawIdentifierSwiftNames {
   header "RawIdentifierSwiftNames.h"
   export *
 }
+
+module SwiftErrorCxxFunctions {
+  requires objc
+  header "SwiftErrorCxxFunctions.h"
+  export *
+}

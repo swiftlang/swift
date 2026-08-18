@@ -1581,11 +1581,18 @@ public:
   ///   to system APIs.
   /// \param name The name of the function.
   /// \param[out] parameterList The parameters visible inside the function body.
+  /// \param genericParams Generic type parameters for the function.
+  /// \param errorInfo If present, identifies the error out-parameter to skip
+  ///   and the convention used to adjust the return type.
+  /// \param[out] foreignErrorConvention If non-null and errorInfo is present,
+  ///   receives the resulting error convention.
   ImportedType importFunctionParamsAndReturnType(
       DeclContext *dc, const clang::FunctionDecl *clangDecl,
       ArrayRef<const clang::ParmVarDecl *> params, bool isVariadic,
       bool isFromSystemModule, DeclName name, ParameterList *&parameterList,
-      ArrayRef<GenericTypeParamDecl *> genericParams);
+      ArrayRef<GenericTypeParamDecl *> genericParams,
+      std::optional<ForeignErrorConvention::Info> errorInfo = std::nullopt,
+      std::optional<ForeignErrorConvention> *foreignErrorConvention = nullptr);
 
   /// Import the given function return type.
   ///
@@ -1616,7 +1623,9 @@ public:
       DeclContext *dc, const clang::FunctionDecl *clangDecl,
       ArrayRef<const clang::ParmVarDecl *> params, bool isVariadic,
       bool allowNSUIntegerAsInt, ArrayRef<Identifier> argNames,
-      ArrayRef<GenericTypeParamDecl *> genericParams, Type resultType);
+      ArrayRef<GenericTypeParamDecl *> genericParams, Type resultType,
+      std::optional<ForeignErrorConvention::Info> errorInfo = std::nullopt,
+      CanType *errorParamType = nullptr);
 
   struct ImportParameterTypeResult {
     /// The imported parameter Swift type.
@@ -2135,6 +2144,12 @@ bool isForwardDeclOfType(const clang::Decl *decl);
 /// Checks whether this type is bool or is a C++ enum with a bool underlying
 /// type.
 bool isBoolOrBoolEnumType(Type ty);
+
+/// Whether \p decl is a struct that is toll-free bridged to NSError, which
+/// makes a pointer to it usable as an error out-parameter. Clang applies the
+/// same struct tag and bridging attribute check when it validates the
+/// swift_error attribute, but records only the first such struct it sees.
+bool isRecordBridgedToNSError(const clang::RecordDecl *decl);
 
 /// Whether we should suppress the import of the given Clang declaration.
 bool shouldSuppressDeclImport(const clang::Decl *decl);
