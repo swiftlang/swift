@@ -541,18 +541,10 @@ static ProtocolConformanceRef getBuiltinMetaTypeTypeConformance(
   // metatype subject ('T.[metatype]').
   if (auto *archetype = instanceType->getAs<ArchetypeType>()) {
     if (auto *gamma = archetype->getGenericEnvironment()) {
-      for (const auto &requirement : gamma->getGenericSignature()
-                                        .getRequirements()) {
-        if (requirement.getKind() != RequirementKind::Conformance ||
-            !requirement.getFirstType()->is<AnyMetatypeType>())
-          continue;
-        if (!gamma->mapTypeIntoEnvironment(requirement.getFirstType())
-                  ->isEqual(type))
-          continue;
-        auto *refined = requirement.getProtocolDecl();
-        if (refined == protocol || refined->inheritsFrom(protocol))
-          return ProtocolConformanceRef::forAbstract(type, protocol);
-      }
+      auto interfaceType = MetatypeType::get(archetype->getInterfaceType());
+      if (gamma->getGenericSignature()->requiresProtocol(interfaceType,
+                                                         protocol))
+        return ProtocolConformanceRef::forAbstract(type, protocol);
     }
   }
 
