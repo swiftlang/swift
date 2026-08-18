@@ -2908,9 +2908,12 @@ namespace {
           // If this class is abstract, any of its methods might use a pure
           // virtual method.
           if (cxxRecordDecl->isAbstract()) {
-            Impl.markUnavailable(
-                result,
-                "abstract C++ classes cannot be used as values in Swift");
+            // In the future, this should be a hard error instead of a
+            // deprecation warning.
+            auto attr = AvailableAttr::createUniversallyDeprecated(
+                Impl.SwiftContext,
+                "abstract C++ classes cannot be used as values in Swift", "");
+            result->addAttribute(attr);
           }
 
           // Address-only type is a type that can't be passed in registers.
