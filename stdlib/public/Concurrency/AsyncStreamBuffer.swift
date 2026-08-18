@@ -184,8 +184,22 @@ internal final class _AsyncStreamStorage<
       // to set a failure.
       struct Terminating: ~Copyable {
         var buffer: Buffer
-        var failure: Failure?
+        private(set) var failure: Failure?
         var terminationHandler: TerminationHandler?
+
+        /// Returns true if the value was set, false otherwise.
+        @export(implementation)
+        mutating func setFailureOnce(_ failure: Failure?) -> Bool {
+          guard self.failure == nil else {
+            return false
+          }
+          self.failure = failure
+          return true
+        }
+        @export(implementation)
+        mutating func takeFailure() -> Failure? {
+          self.failure.take()
+        }
       }
 
       struct Terminated: ~Copyable {
@@ -587,8 +601,8 @@ extension _AsyncStreamStorage.StateMachine {
 
     case .terminating(var terminating):
       // A re-entrant `finish(throwing:)` from within the termination handler,
-      // while the cancellation outcome is not yet final. Adopt the failure
-      terminating.failure = failure
+      // while the cancellation outcome is not yet final.
+      terminating.setFailureOnce(failure)
       unsafe self = .init(state: .terminating(terminating))
       return unsafe .none
 
@@ -633,7 +647,7 @@ extension _AsyncStreamStorage.StateMachine {
 
     case .terminating(var terminating):
       // Already terminating: adopt the failure, matching `terminate`
-      terminating.failure = failure
+      terminating.setFailureOnce(failure)
       unsafe self = .init(state: .terminating(terminating))
       return unsafe .none
 
@@ -658,15 +672,14 @@ extension _AsyncStreamStorage.StateMachine {
       preconditionFailure("takeTerminalFailure() called in a non-terminal state")
 
     case .terminating(var terminating):
-      let failure = terminating.failure
+      let failure = terminating.takeFailure()
       unsafe self = .init(state: .terminated(.init(
         terminationHandler: terminating.terminationHandler.take()
       )))
       return failure
 
     case .terminated(var terminated):
-      let failure = terminated.failure
-      terminated.failure = nil
+      let failure = terminated.failure.take()
       unsafe self = .init(state: .terminated(terminated))
       return failure
     }

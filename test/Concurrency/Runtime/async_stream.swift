@@ -472,6 +472,44 @@ class NotSendable {}
         }
       }
 
+      tests.test("finish(throwing:) from onTermination keeps the first error when called twice") {
+        let firstError = SomeError()
+        let secondError = SomeError()
+        expectTrue(firstError != secondError)
+
+        let (controlStream, controlContinuation) = AsyncStream<Int>.makeStream()
+        var controlIterator = controlStream.makeAsyncIterator()
+
+        let task = Task { () -> Error? in
+          let stream = AsyncThrowingStream<Int, Error> { continuation in
+            continuation.onTermination = { @Sendable termination in
+              if case .cancelled = termination {
+                // Only the first finish(throwing:) should decide the outcome
+                continuation.finish(throwing: firstError)
+                continuation.finish(throwing: secondError)
+              }
+            }
+          }
+          controlContinuation.yield(1)
+          do {
+            for try await _ in stream {}
+            return nil
+          } catch {
+            return error
+          }
+        }
+
+        expectEqual(await controlIterator.next(), 1)
+        task.cancel()
+
+        let caught = await task.value
+        if let failure = caught as? SomeError {
+          expectEqual(failure, firstError)
+        } else {
+          expectUnreachable("expected SomeError, got \(String(describing: caught))")
+        }
+      }
+
       tests.test("continuation equality") {
         let (_, continuation1) = AsyncStream<Int>.makeStream()
         let (_, continuation2) = AsyncStream<Int>.makeStream()
