@@ -40,8 +40,3 @@
 
 // _Concurrency Symbols
 
-// _reasonRawStorage accessors are only emitted with assertions enabled
-Added: _$sScE17_reasonRawStorages5UInt8VvM
-Added: _$sScE17_reasonRawStorages5UInt8Vvg
-Added: _$sScE17_reasonRawStorages5UInt8VvpMV
-Added: _$sScE17_reasonRawStorages5UInt8Vvs
