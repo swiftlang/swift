@@ -470,11 +470,39 @@ static bool metatypeWithInstanceTypeIsSendable(Type instanceType) {
   return false;
 }
 
+static ProtocolConformanceRef getPackTypeConformance(
+    PackType *type, ProtocolDecl *protocol);
+
 /// Synthesize a builtin metatype type conformance to the given protocol, if
 /// appropriate.
 static ProtocolConformanceRef getBuiltinMetaTypeTypeConformance(
     Type type, const AnyMetatypeType *metatypeType, ProtocolDecl *protocol) {
   ASTContext &ctx = protocol->getASTContext();
+
+  // Substituting a parameter pack into `repeat (each T).Type: P` produces a
+  // metatype whose instance is a pack. Form the corresponding pack of
+  // metatypes so that each repeated conformance can be looked up separately.
+  if (auto *pack = metatypeType->getInstanceType()->getAs<PackType>()) {
+    auto getMetatype = [&](Type instance) -> Type {
+      if (metatypeType->hasRepresentation())
+        return MetatypeType::get(instance,
+                                 metatypeType->getRepresentation());
+      return MetatypeType::get(instance);
+    };
+
+    SmallVector<Type, 2> elements;
+    for (auto element : pack->getElementTypes()) {
+      if (auto *expansion = element->getAs<PackExpansionType>()) {
+        elements.push_back(PackExpansionType::get(
+            getMetatype(expansion->getPatternType()),
+            expansion->getCountType()));
+      } else {
+        elements.push_back(getMetatype(element));
+      }
+    }
+
+    return getPackTypeConformance(PackType::get(ctx, elements), protocol);
+  }
 
   // The metatype of an exact COM interface existential carries that interface's
   // identity and therefore conforms to COMInterface. The existential value
