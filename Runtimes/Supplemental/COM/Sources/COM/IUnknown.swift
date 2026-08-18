@@ -1,0 +1,169 @@
+//===----------------------------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2026 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+internal import SwiftShims
+public import _SwiftCOMShims
+
+#if $_MicrosoftCOM
+
+public import WinSDK
+
+/// The root interface for all COM objects.
+///
+/// Every COM interface derives from `IUnknown`, which provides the three
+/// fundamental operations of the COM binary interface: `QueryInterface`
+/// (interface discovery), `AddRef` (reference count increment), and `Release`
+/// (reference count decrement).
+///
+/// In Swift, these three operations are compiler-managed and sealed:
+///
+/// - `QueryInterface` is expressed as Swift's `as?` operator. Casting between
+///   `@com` protocol existentials generates a `QueryInterface` call with the
+///   target protocol's IID.
+/// - `AddRef` and `Release` are managed by Swift ARC through the unified
+///   reference count.  Swift developers never call them directly.
+///
+/// The protocol body is empty because the three COM methods cannot be expressed
+/// as ordinary Swift protocol requirements. They occupy vtable slots 0–2 but
+/// are sealed: `AddRef`/`Release` must go through ARC (manual calls would
+/// corrupt the refcount), and `QueryInterface` must go through `as?` (which
+/// handles existential wrapping and the `ISwiftObject` recovery path). Allowing
+/// override of any of the three would break the COM identity rule, QI symmetry,
+/// or the unified refcount contract.
+///
+/// For advanced use cases that require raw `QueryInterface` access (e.g.,
+/// dynamic IIDs not known at compile time), the underlying C functions remain
+/// available through `WinSDK`.
+///
+/// `IUnknown` conformance is implied automatically on every `@com` class.
+/// Writing `: IUnknown` explicitly is allowed but unnecessary.
+///
+/// The IID `{00000000-0000-0000-C000-000000000046}` is the well-known
+/// identifier assigned to `IUnknown` by the COM specification. `QueryInterface`
+/// for this IID returns the primary interface pointer, satisfying the COM
+/// identity rule.
+@com(interface: "00000000-0000-0000-C000-000000000046")
+public protocol IUnknown {
+}
+
+#endif // $_MicrosoftCOM
+
+// MARK: - QueryInterface
+
+@usableFromInline
+@_alwaysEmitIntoClient
+internal func QueryInterface(_ pUnk: UnsafeMutableRawPointer,
+                             _ riid: borrowing IID,
+                             _ ppvObject: UnsafeMutablePointer<UnsafeMutableRawPointer?>)
+    -> HRESULT {
+  ppvObject.pointee = nil
+
+  let stride = MemoryLayout<UnsafeRawPointer>.stride
+
+  let vtable = pUnk.load(as: UnsafePointer<UnsafeRawPointer>.self)
+  let object = pUnk.advanced(by: Int(bitPattern: vtable.advanced(by: -1).pointee))
+
+  // ISwiftObject fast path: always at object[-1]. This is the most common QI
+  // in Swift — every `as?` to a concrete @com class goes through here.
+  if riid == ISwiftObject.IID {
+    ppvObject.pointee = object.advanced(by: -stride)
+    _ = Unmanaged<AnyObject>.fromOpaque(object).retain()
+    return S_OK
+  }
+
+  let map = vtable.advanced(by: -2).pointee
+
+  let header =
+      map.assumingMemoryBound(to: _SwiftCOMInterfaceMapHeader.self).pointee
+  let entries = map.advanced(by: MemoryLayout<_SwiftCOMInterfaceMapHeader>.stride)
+
+  for index in 0 ..< Int(header.count) {
+    let address =
+        entries.advanced(by: index * MemoryLayout<_SwiftCOMInterfaceMapEntry>.stride)
+    let entry =
+        address.assumingMemoryBound(to: _SwiftCOMInterfaceMapEntry.self).pointee
+
+    let offset = entry.descriptor
+    var descriptor = address.advanced(by: Int(offset & -2))
+    if (offset & 1) == 1 {
+      descriptor = descriptor.load(as: UnsafeRawPointer.self)
+    }
+
+    let iid: IID =
+        descriptor.advanced(by: MemoryLayout<_SwiftProtocolDescriptorHeader>.stride)
+            .load(as: IID.self)
+    guard iid == riid else {
+      continue
+    }
+
+    let pointer = object.advanced(by: -(Int(entry.index) + 1) * stride)
+    ppvObject.pointee = pointer
+
+    _ = Unmanaged<AnyObject>.fromOpaque(object).retain()
+    return S_OK
+  }
+
+  // COMInterfaceResolver callback — AnyObject cast only on this fallback path.
+  let instance = Unmanaged<AnyObject>.fromOpaque(object).takeUnretainedValue()
+  if let resolver = instance as? COMInterfaceResolver,
+     let resolution = resolver.resolve(riid) {
+    ppvObject.pointee = resolution.take()
+    return S_OK
+  }
+
+  return E_NOINTERFACE
+}
+
+/// Non-delegating `QueryInterface`.
+///
+/// Used by the compiler for `@com` classes that do not conform to
+/// `COMAggregatable`. The `AnyObject` cast is deferred to the
+/// `COMInterfaceResolver` fallback path; the `IUnknown` and `ISwiftObject`
+/// fast paths are pure pointer arithmetic.
+@implementation @c
+@_alwaysEmitIntoClient
+public func QueryInterface(_ pUnk: UnsafeMutableRawPointer,
+                           _ riid: UnsafeRawPointer,
+                           _ ppvObject: UnsafeMutablePointer<UnsafeMutableRawPointer?>)
+    -> HRESULT {
+  return QueryInterface(pUnk, riid.load(as: IID.self), ppvObject)
+}
+
+// MARK: - AddRef
+
+/// Non-delegating `AddRef`.
+///
+/// Used by the compiler for `@com` classes that do not conform to
+/// `COMAggregatable`. Recovers `P` via `vtable[-1]` and calls
+/// `swift_retainReturningCount` directly. No dynamic checks.
+@implementation @c
+@_alwaysEmitIntoClient
+public func AddRef(_ pUnk: UnsafeMutableRawPointer) -> UInt32 {
+  let vtable = pUnk.load(as: UnsafePointer<UnsafeRawPointer>.self)
+  let P = pUnk.advanced(by: Int(bitPattern: vtable.advanced(by: -1).pointee))
+  return UInt32(truncatingIfNeeded: swift_retainReturningCount(P))
+}
+
+// MARK: - Release
+
+/// Non-delegating `Release`.
+///
+/// Used by the compiler for `@com` classes that do not conform to
+/// `COMAggregatable`. Recovers `P` via `vtable[-1]` and calls
+/// `swift_releaseReturningCount` directly. No dynamic checks.
+@implementation @c
+@_alwaysEmitIntoClient
+public func Release(_ pUnk: UnsafeMutableRawPointer) -> UInt32 {
+  let vtable = pUnk.load(as: UnsafePointer<UnsafeRawPointer>.self)
+  let P = pUnk.advanced(by: Int(bitPattern: vtable.advanced(by: -1).pointee))
+  return UInt32(truncatingIfNeeded: swift_releaseReturningCount(P))
+}

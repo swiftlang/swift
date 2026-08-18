@@ -1,32 +1,30 @@
-
-public struct GUID {
-  public var data1: UInt32
-  public var data2: UInt16
-  public var data3: UInt16
-  public var data4: (UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8)
-
-  public init(data1: UInt32, data2: UInt16, data3: UInt16,
-              data4: (UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8)) {
-    self.data1 = data1
-    self.data2 = data2
-    self.data3 = data3
-    self.data4 = data4
-  }
-}
-
-public typealias IID = GUID
-public typealias CLSID = GUID
-
-@com(interface: "00000000-0000-0000-C000-000000000046")
-public protocol IUnknown: AnyObject { }
+//===----------------------------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2026 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
 
 #if $_MicrosoftCOM
 
+public import _SwiftCOMShims
+
 extension ObjectIdentifier {
+  /// Creates an identifier for the COM identity of an interface.
+  ///
+  /// COM defines object identity as the interface pointer returned by
+  /// `QueryInterface` for `IUnknown`. Different interfaces on the same object
+  /// therefore produce the same identifier even when their own interface
+  /// pointers differ.
   @_alwaysEmitIntoClient
   public init<Interface>(_ interface: borrowing Interface)
       where Interface.Type: COMInterface {
-    let pUnk = unsafeBitCast(interface, to: UnsafeMutableRawPointer.self)
+    let pUnk = ManagedObject<Interface>.passUnretained(interface)
     let vtable = pUnk.load(as: UnsafePointer<UnsafeRawPointer>.self)
     let queryInterface =
       unsafeBitCast(vtable[0], to: _SwiftCOMQueryInterfaceFunction.self)
@@ -49,6 +47,7 @@ extension ObjectIdentifier {
   }
 }
 
+/// Returns whether two COM interfaces identify the same object.
 @_alwaysEmitIntoClient
 public func === <Left, Right>(_ lhs: borrowing Left,
                               _ rhs: borrowing Right) -> Bool
@@ -56,6 +55,7 @@ public func === <Left, Right>(_ lhs: borrowing Left,
   return ObjectIdentifier(lhs) == ObjectIdentifier(rhs)
 }
 
+/// Returns whether two optional COM interfaces identify the same object.
 @_alwaysEmitIntoClient
 public func === <Left, Right>(_ lhs: Left?, _ rhs: Right?) -> Bool
     where Left.Type: COMInterface, Right.Type: COMInterface {
@@ -68,6 +68,7 @@ public func === <Left, Right>(_ lhs: Left?, _ rhs: Right?) -> Bool
   return lhs === rhs
 }
 
+/// Returns whether two COM interfaces identify different objects.
 @_alwaysEmitIntoClient
 public func !== <Left, Right>(_ lhs: borrowing Left,
                               _ rhs: borrowing Right) -> Bool
@@ -75,20 +76,11 @@ public func !== <Left, Right>(_ lhs: borrowing Left,
   return !(lhs === rhs)
 }
 
+/// Returns whether two optional COM interfaces identify different objects.
 @_alwaysEmitIntoClient
 public func !== <Left, Right>(_ lhs: Left?, _ rhs: Right?) -> Bool
     where Left.Type: COMInterface, Right.Type: COMInterface {
   return !(lhs === rhs)
 }
 
-#endif
-
-@com(interface: "8e369447-5188-5ada-b9ec-8fcb732d226b")
-public protocol ISwiftObject {
-  var object: UnsafeMutableRawPointer { get }
-  var metadata: UnsafeRawPointer { get }
-}
-
-public protocol COMInterface {
-  var IID: IID { get }
-}
+#endif // $_MicrosoftCOM
