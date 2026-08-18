@@ -335,3 +335,84 @@ func testGenericConsumingCaptureIsAddressOnly<T: Usable & ~Copyable>(_ t: consum
   }
   g()
 }
+
+struct UsableResource: ~Copyable, Usable {
+  consuming func use() {}
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s30called_once_consuming_captures16testIdentityCastyAA8ResourceVADnF : $@convention(thin) (@owned Resource) -> @owned Resource {
+// CHECK: bb0([[X:%.*]] : @owned $Resource):
+// CHECK:  [[X_PROJ:%.*]] = project_box {{.*}} : ${ var Resource }, 0
+// CHECK:  [[X_TAKE_ADDR:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[X_PROJ]] : $*Resource
+// CHECK:  [[X_VALUE:%.*]] = load [take] [[X_TAKE_ADDR]] : $*Resource
+// CHECK:  [[CLOSURE:%.*]] = function_ref @$s30called_once_consuming_captures16testIdentityCastyAA8ResourceVADnFADyXEfU_
+// CHECK:  apply [[CLOSURE]]([[X_VALUE]]) : $@convention(thin) (@owned Resource) -> @owned Resource
+// CHECK: } // end sil function '$s30called_once_consuming_captures16testIdentityCastyAA8ResourceVADnF'
+
+// CHECK-LABEL: sil private [ossa] @$s30called_once_consuming_captures16testIdentityCastyAA8ResourceVADnFADyXEfU_ : $@convention(thin) (@owned Resource) -> @owned Resource {
+// CHECK: bb0([[X_CAPTURE:%.*]] : @closureCapture @owned $Resource):
+// CHECK:  [[X_STACK:%.*]] = alloc_stack $Resource, var, name "x"
+// CHECK:  [[X_ADDR:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[X_STACK]] : $*Resource
+// CHECK:  store [[X_CAPTURE]] to [init] [[X_ADDR]] : $*Resource
+// CHECK:  [[X_ADDR_2:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[X_ADDR]] : $*Resource
+// CHECK:  [[X_READ_ACCESS:%.*]] = begin_access [read] [unknown] [[X_ADDR_2]] : $*Resource
+// CHECK:  [[X_FAKE_COPY:%.*]] = load [copy] [[X_READ_ACCESS]] : $*Resource
+// CHECK:  end_access [[X_READ_ACCESS]] : $*Resource
+// CHECK:  destroy_addr [[X_ADDR_2]] : $*Resource
+// CHECK:  return [[X_FAKE_COPY]] : $Resource
+// CHECK: } // end sil function '$s30called_once_consuming_captures16testIdentityCastyAA8ResourceVADnFADyXEfU_'
+func testIdentityCast(_ x: consuming Resource) -> Resource {
+  { @called(once) in x as Resource }()
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s30called_once_consuming_captures24testEraseConsumesCaptureyyAA14UsableResourceVnF : $@convention(thin) (@owned UsableResource) -> () {
+// CHECK: bb0([[C:%.*]] : @owned $UsableResource):
+// CHECK:  [[C_PROJ:%.*]] = project_box {{.*}} : ${ var UsableResource }, 0
+// CHECK:  [[CLOSURE:%.*]] = function_ref @$s30called_once_consuming_captures24testEraseConsumesCaptureyyAA14UsableResourceVnFAA0I0_pRi_s_XPyXOfU_
+// CHECK:  [[C_TAKE_ADDR:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[C_PROJ]] : $*UsableResource
+// CHECK:  [[C_VALUE:%.*]] = load [take] [[C_TAKE_ADDR]] : $*UsableResource
+// CHECK:  partial_apply [called_once] [[CLOSURE]]([[C_VALUE]]) : $@convention(thin) (@owned UsableResource) -> @out any Usable & ~Copyable
+// CHECK: } // end sil function '$s30called_once_consuming_captures24testEraseConsumesCaptureyyAA14UsableResourceVnF'
+
+// CHECK-LABEL: sil private [ossa] @$s30called_once_consuming_captures24testEraseConsumesCaptureyyAA14UsableResourceVnFAA0I0_pRi_s_XPyXOfU_ : $@convention(thin) (@owned UsableResource) -> @out any Usable & ~Copyable {
+// CHECK: bb0([[RET:%.*]] : $*any Usable & ~Copyable, [[C_CAPTURE:%.*]] : @closureCapture @owned $UsableResource):
+// CHECK:  [[C_STACK:%.*]] = alloc_stack $UsableResource, var, name "c"
+// CHECK:  [[C_ADDR:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[C_STACK]] : $*UsableResource
+// CHECK:  store [[C_CAPTURE]] to [init] [[C_ADDR]] : $*UsableResource
+// CHECK:  [[C_ADDR_2:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[C_ADDR]] : $*UsableResource
+// CHECK:  [[C_READ_ACCESS:%.*]] = begin_access [read] [unknown] [[C_ADDR_2]] : $*UsableResource
+// CHECK:  [[C_FAKE_COPY:%.*]] = load [copy] [[C_READ_ACCESS]] : $*UsableResource
+// CHECK:  end_access [[C_READ_ACCESS]] : $*UsableResource
+// CHECK:  [[EXISTENTIAL_ADDR:%.*]] = init_existential_addr [[RET]] : $*any Usable & ~Copyable, $UsableResource
+// CHECK:  store [[C_FAKE_COPY]] to [init] [[EXISTENTIAL_ADDR]] : $*UsableResource
+// CHECK:  destroy_addr [[C_ADDR_2]] : $*UsableResource
+// CHECK: } // end sil function '$s30called_once_consuming_captures24testEraseConsumesCaptureyyAA14UsableResourceVnFAA0I0_pRi_s_XPyXOfU_'
+func testEraseConsumesCapture(_ c: consuming UsableResource) {
+  let fn = { @called(once) in c as any Usable & ~Copyable }
+  _ = fn()
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s30called_once_consuming_captures31testGenericEraseConsumesCaptureyyxnAA6UsableRzRi_zlF : $@convention(thin) <T where T : Usable, T : ~Copyable> (@in T) -> () {
+// CHECK: bb0(%0 : $*T):
+// CHECK:  [[V_PROJ:%.*]] = project_box {{.*}} : $<{{.*}}> { var {{.*}} } <T>, 0
+// CHECK:  copy_addr [take] %0 to [init] [[V_PROJ]] : $*T
+// CHECK:  [[CLOSURE:%.*]] = function_ref @$s30called_once_consuming_captures31testGenericEraseConsumesCaptureyyxnAA6UsableRzRi_zlFAaC_pRi_s_XPyXOfU_
+// CHECK:  [[V_TAKE_ADDR:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[V_PROJ]] : $*T
+// CHECK:  [[V_STACK:%.*]] = alloc_stack $T
+// CHECK:  copy_addr [take] [[V_TAKE_ADDR]] to [init] [[V_STACK]] : $*T
+// CHECK:  partial_apply [called_once] [[CLOSURE]]<T>([[V_STACK]]) : $@convention(thin) <{{.*}}> (@in {{.*}}) -> @out any Usable & ~Copyable
+// CHECK: } // end sil function '$s30called_once_consuming_captures31testGenericEraseConsumesCaptureyyxnAA6UsableRzRi_zlF'
+
+// CHECK-LABEL: sil private [ossa] @$s30called_once_consuming_captures31testGenericEraseConsumesCaptureyyxnAA6UsableRzRi_zlFAaC_pRi_s_XPyXOfU_ : $@convention(thin) <T where T : Usable, T : ~Copyable> (@in T) -> @out any Usable & ~Copyable {
+// CHECK: bb0([[RET:%.*]] : $*any Usable & ~Copyable, [[V_CAPTURE:%.*]] : @closureCapture $*T):
+// CHECK:  [[V_ADDR:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[V_CAPTURE]] : $*T
+// CHECK:  [[V_READ_ACCESS:%.*]] = begin_access [read] [unknown] [[V_ADDR]] : $*T
+// CHECK:  [[EXISTENTIAL_ADDR:%.*]] = init_existential_addr [[RET]] : $*any Usable & ~Copyable, $T
+// CHECK:  copy_addr [[V_READ_ACCESS]] to [init] [[EXISTENTIAL_ADDR]] : $*T
+// CHECK:  end_access [[V_READ_ACCESS]] : $*T
+// CHECK:  destroy_addr [[V_ADDR]] : $*T
+// CHECK: } // end sil function '$s30called_once_consuming_captures31testGenericEraseConsumesCaptureyyxnAA6UsableRzRi_zlFAaC_pRi_s_XPyXOfU_'
+func testGenericEraseConsumesCapture<T: Usable & ~Copyable>(_ v: consuming T) {
+  let fn = { @called(once) in v as any Usable & ~Copyable }
+  _ = fn()
+}

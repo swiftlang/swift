@@ -1624,10 +1624,41 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     return;
   }
   case BuiltinValueKind::TaskAddCancellationHandler:
+  case BuiltinValueKind::TaskAddCancellationHandlerWithReason:
   case BuiltinValueKind::TaskAddPriorityEscalationHandler: {
     auto func = args.claimNext();
     auto context = args.claimNext();
     out.add(emitBuiltinTaskAddHandler(IGF, Builtin.ID, func, context));
+    return;
+  }
+  case BuiltinValueKind::TaskCancellationScopePush: {
+    out.add(emitBuiltinTaskCancellationScopePush(IGF));
+    return;
+  }
+  case BuiltinValueKind::TaskCancellationScopePop: {
+    auto *record = args.claimNext();
+    emitBuiltinTaskCancellationScopePop(IGF, record);
+    return;
+  }
+  case BuiltinValueKind::TaskPushDeadline: {
+    // <C, I> (clock: borrowing C, instant: borrowing I) -> UnsafeRawPointer
+    //
+    // Under `borrowing` opaque-generic operands, SIL passes the values
+    // by address ($*C, $*I), which IRGen sees as raw `i8*` pointers.
+    // Metadata comes from the generic substitutions.
+    auto *clockPtr = args.claimNext();
+    auto *instantPtr = args.claimNext();
+    auto clockTy = substitutions.getReplacementTypes()[0]->getCanonicalType();
+    auto instantTy = substitutions.getReplacementTypes()[1]->getCanonicalType();
+    auto *clockType = IGF.emitTypeMetadataRef(clockTy);
+    auto *instantType = IGF.emitTypeMetadataRef(instantTy);
+    out.add(emitBuiltinTaskPushDeadline(IGF, clockPtr, instantPtr,
+                                        clockType, instantType));
+    return;
+  }
+  case BuiltinValueKind::TaskPopDeadline: {
+    auto *record = args.claimNext();
+    emitBuiltinTaskPopDeadline(IGF, record);
     return;
   }
   case BuiltinValueKind::RemoveTaskLocalValue:

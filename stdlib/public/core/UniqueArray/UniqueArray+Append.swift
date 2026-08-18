@@ -25,7 +25,7 @@ extension UniqueArray where Element: ~Copyable {
   @export(implementation)
   public mutating func append(_ item: consuming Element) {
     _ensureFreeCapacity(1)
-    _storage.append(item)
+    unsafe _storage._appendUnchecked(item)
   }
 }
 
@@ -84,7 +84,7 @@ extension UniqueArray where Element: ~Copyable {
     moving items: UnsafeMutableBufferPointer<Element>
   ) {
     _ensureFreeCapacity(items.count)
-    unsafe _storage.append(moving: items)
+    unsafe _storage._appendUnchecked(moving: items)
   }
 
   /// Moves the elements of a output span to the end of this array, leaving the
@@ -104,7 +104,11 @@ extension UniqueArray where Element: ~Copyable {
     moving items: inout OutputSpan<Element>
   ) {
     _ensureFreeCapacity(items.count)
-    _storage.append(moving: &items)
+    unsafe items.withUnsafeMutableBufferPointer { buffer, count in
+      let source = buffer.extracting(first: count)
+      unsafe _storage._appendUnchecked(moving: source)
+      count = 0
+    }
   }
 }
 
@@ -128,7 +132,7 @@ extension UniqueArray where Element: Copyable {
     copying newElements: UnsafeBufferPointer<Element>
   ) {
     _ensureFreeCapacity(newElements.count)
-    unsafe _storage.append(copying: newElements)
+    unsafe _storage._appendUnchecked(copying: newElements)
   }
 
   /// Copies the elements of a buffer to the end of this array.
@@ -148,7 +152,7 @@ extension UniqueArray where Element: Copyable {
   public mutating func append(
     copying newElements: UnsafeMutableBufferPointer<Element>
   ) {
-    unsafe self.append(copying: UnsafeBufferPointer(newElements))
+    unsafe append(copying: UnsafeBufferPointer(newElements))
   }
 
   /// Copies the elements of a span to the end of this array.
@@ -166,7 +170,9 @@ extension UniqueArray where Element: Copyable {
   @export(implementation)
   public mutating func append(copying newElements: Span<Element>) {
     _ensureFreeCapacity(newElements.count)
-    _storage.append(copying: newElements)
+    newElements.withUnsafeBufferPointer { source in
+      unsafe _storage._appendUnchecked(copying: source)
+    }
   }
 
   /// Copies the elements of a sequence to the end of this array.
@@ -187,7 +193,7 @@ extension UniqueArray where Element: Copyable {
   public mutating func append(copying newElements: some Sequence<Element>) {
     let done: Void? = newElements.withContiguousStorageIfAvailable { buffer in
       _ensureFreeCapacity(buffer.count)
-      unsafe _storage.append(copying: buffer)
+      unsafe _storage._appendUnchecked(copying: buffer)
       return
     }
     if done != nil { return }
@@ -195,8 +201,7 @@ extension UniqueArray where Element: Copyable {
     _ensureFreeCapacity(newElements.underestimatedCount)
     var it = _storage._append(prefixOf: newElements)
     while let item = it.next() {
-      _ensureFreeCapacity(1)
-      _storage.append(item)
+      append(item)
     }
   }
 }

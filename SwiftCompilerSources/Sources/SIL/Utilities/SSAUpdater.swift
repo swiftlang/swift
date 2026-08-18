@@ -234,9 +234,9 @@ public struct SSAUpdater<Context: MutatingContext> {
 
   /// Returns true if `value` is a phi argument which _this updater_ inserted into `block`.
   private func isInsertedPhi(_ value: Value, in block: BasicBlock) -> Bool {
-    if let arg = value as? Argument,
-       arg.parentBlock == block,
-       blocksWithInsertedPhis.contains(block)
+    if blocksWithInsertedPhis.contains(block),
+       let lastArg = block.arguments.last,
+       value == lastArg
     {
       return true
     }
@@ -389,19 +389,19 @@ let ssaUpdaterTest = Test("ssa_updater") {
     return
   }
 
-  var ssaUpdater = SSAUpdater(type: firstValue.type, ownership: firstValue.ownership, context)
+  var ssaUpdater = SSAUpdater(type: firstValue.0.type, ownership: firstValue.0.ownership, context)
   defer { ssaUpdater.deinitialize() }
 
-  var availableValuesInBlocks = Dictionary<BasicBlock, IntegerLiteralInst>()
+  var availableValuesInBlocks = Dictionary<BasicBlock, Instruction>()
 
-  for v in availableValues {
-    ssaUpdater.addAvailableValue(v, in: v.parentBlock)
-    availableValuesInBlocks[v.parentBlock] = v
+  for (v, insertionPoint) in availableValues {
+    ssaUpdater.addAvailableValue(v, in: insertionPoint.parentBlock)
+    availableValuesInBlocks[insertionPoint.parentBlock] = insertionPoint
   }
 
   for block in function.blocks {
     for inst in block.instructions {
-      for op in inst.operands where op.value is Undef && op.value.type == firstValue.type {
+      for op in inst.operands where op.value is Undef && op.value.type == firstValue.0.type {
         let v: Value
         if let available = availableValuesInBlocks[block], available.strictlyDominatesInBlock(inst) {
           v = ssaUpdater.getValue(atEndOf: block)
@@ -426,33 +426,60 @@ let instructionBasedSSAUpdaterTest = Test("instruction_based_ssa_updater") {
     return
   }
 
-  var ssaUpdater = InstructionBasedSSAUpdater(type: firstValue.type, ownership: firstValue.ownership, context)
+  var ssaUpdater = InstructionBasedSSAUpdater(type: firstValue.0.type, ownership: firstValue.0.ownership, context)
   defer { ssaUpdater.deinitialize() }
 
-  for v in availableValues {
-    for user in v.users {
-      ssaUpdater.addAvailableValue(v, after: user)
-    }
+  for (v, insertionPoint) in availableValues {
+    ssaUpdater.addAvailableValue(v, after: insertionPoint)
   }
 
   for inst in function.instructions {
-    for op in inst.operands where op.value is Undef && op.value.type == firstValue.type {
+    for op in inst.operands where op.value is Undef && op.value.type == firstValue.0.type {
       let v = ssaUpdater.getValue(before: inst)
       op.set(to: v, context)
     }
   }
 }
 
-private func getTestAvailableValues(in function: Function) -> [IntegerLiteralInst] {
-  var availableValues = [IntegerLiteralInst]()
+/// Returns the available values of a test function, together with the instruction after which
+/// each value becomes available. Available values are:
+/// - `integer_literal` instructions: available after each of their users, or after the literal
+///   itself if it has no users
+/// - block arguments which have `fix_lifetime` users: available after each such `fix_lifetime`.
+///   This allows tests to use a pre-existing block argument as an available value.
+///
+private func getTestAvailableValues(in function: Function) -> [(Value, insertionPoint: Instruction)] {
+  var availableValues = [(Value, insertionPoint: Instruction)]()
 
-  for inst in function.instructions {
-    if let il = inst as? IntegerLiteralInst {
-      availableValues.append(il)
+  for block in function.blocks {
+    for arg in block.arguments {
+      for fixLifetime in arg.uses.users(ofType: FixLifetimeInst.self) {
+        availableValues.append((arg, insertionPoint: fixLifetime))
+      }
+    }
+    for inst in block.instructions {
+      if let il = inst as? IntegerLiteralInst {
+        if il.uses.isEmpty {
+          availableValues.append((il, insertionPoint: il))
+        } else {
+          for user in il.users {
+            availableValues.append((il, insertionPoint: user))
+          }
+        }
+      }
     }
   }
 
-  availableValues.sort(by: { $0.value! < $1.value! })
+  // Order integer literals by their value (block arguments keep their relative order at the end)
+  // so that available values are added in a deterministic order.
+  availableValues.sort(by: {
+    if let il1 = $0.0 as? IntegerLiteralInst,
+       let il2 = $1.0 as? IntegerLiteralInst
+    {
+      return il1.value! < il2.value!
+    }
+    return $0.0 is IntegerLiteralInst
+  })
 
   return availableValues
 }

@@ -52,6 +52,7 @@ import CharacterLiteralsSmall
 import CharacterProperties
 import CharacterRecognizer
 import Chars
+import ChildTaskCreation
 import ClassArrayGetter
 import CodableTest
 import Combos
@@ -217,6 +218,7 @@ import SubstringTest
 import Suffix
 import SuperChars
 import TaskGroups
+import TaskIsCancelledCancellationScopes
 import TaskLocalGet
 import TaskRegistryStress
 import ToddCoxeter
@@ -225,6 +227,7 @@ import TypeFlood
 import UTF8Decode
 import UTF16Decode
 import Walsh
+import TaskDeadlines
 import WithUnsafeCurrentTask
 import WordCount
 import XorLoop
@@ -267,6 +270,7 @@ register(CharacterLiteralsSmall.benchmarks)
 register(CharacterProperties.benchmarks)
 register(CharacterRecognizer.benchmarks)
 register(Chars.benchmarks)
+register(ChildTaskCreation.benchmarks)
 register(CodableTest.benchmarks)
 register(Combos.benchmarks)
 register(ContiguousArrayTests.benchmarks)
@@ -437,6 +441,7 @@ register(SubstringTest.benchmarks)
 register(Suffix.benchmarks)
 register(SuperChars.benchmarks)
 register(TaskGroups.benchmarks)
+register(TaskIsCancelledCancellationScopes.benchmarks)
 register(TaskLocalGet.benchmarks)
 register(TaskRegistryStress.benchmarks)
 register(ToddCoxeter.benchmarks)
@@ -445,6 +450,7 @@ register(TypeFlood.benchmarks)
 register(UTF8Decode.benchmarks)
 register(UTF16Decode.benchmarks)
 register(Walsh.benchmarks)
+register(TaskDeadlines.benchmarks)
 register(WithUnsafeCurrentTask.benchmarks)
 register(WordCount.benchmarks)
 register(XorLoop.benchmarks)

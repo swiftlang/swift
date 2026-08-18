@@ -86,6 +86,10 @@ FEATURE(TypedCoroAlloc,                                 (6, 2))
 
 FEATURE(NoncopyableReflectionSafety,                    (6, 4))
 
+FEATURE(TaskCancellationScope,                          (6, 5))
+FEATURE(TaskDeadline,                                   (6, 5))
+FEATURE(CancellationHandlerWithReason,                  (6, 5))
+
 FEATURE(CustomGlobalExecutors,                          FUTURE)
 FEATURE(Differentiation,                                FUTURE)
 FEATURE(ClearSensitive,                                 FUTURE)

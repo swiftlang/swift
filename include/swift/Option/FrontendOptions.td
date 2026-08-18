@@ -982,6 +982,11 @@ def Rmodule_interface_rebuild : Flag<["-"], "Rmodule-interface-rebuild">,
 def downgrade_typecheck_interface_error : Flag<["-"], "downgrade-typecheck-interface-error">,
   HelpText<"Downgrade error to warning when typechecking emitted module interfaces">;
 
+def no_downgrade_typecheck_interface_error
+    : Flag<["-"], "no-downgrade-typecheck-interface-error">,
+      HelpText<"Report errors when typechecking emitted module interfaces, "
+               "even for a module blocklisted as having a broken interface">;
+
 def enable_volatile_modules : Flag<["-"], "enable-volatile-modules">,
   HelpText<"Load Swift modules in memory">;
 
