@@ -690,30 +690,18 @@ bool SwiftDependencyScanningService::setupCachingDependencyScanningService(
         CASOpts, Instance.getSharedCASInstance(),
         Instance.getSharedCacheInstance()};
 
-    // The base VFS is derived from the ClangImporter of the first invocation.
-    // This is usually fine since the base VFS should be the same for the same
-    // platform.
-    //
-    // Snapshot it into an owning recipe rather than capturing the ASTContext:
-    // the callback is owned by the scanning service and outlives this
-    // per-query CompilerInstance. Just as importantly, the callback must build a
-    // *separate* file system on every call -- the Clang scanner calls
-    // setCurrentWorkingDirectory on the file system it is handed, and several
-    // workers do so concurrently (rdar://184810704).
+    // Compute VFS from the clang importer from the first invocation. This is
+    // usually fine since the base VFS should be the same for the same platform.
     auto &ctx = Instance.getASTContext();
     auto *importer = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
-    auto recipe = ClangImporter::computeClangImporterVFSRecipe(
+    auto fs = ClangImporter::computeClangImporterFileSystem(
         ctx, importer->getClangFileMapping(),
+        llvm::vfs::createPhysicalFileSystem(), true,
         [&](StringRef str) { return save(str); });
     auto cas = Instance.getSharedCASInstance();
 
-    opts.MakeVFS = [recipe = std::move(recipe),
-                    cas]() -> llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> {
-      auto fs = ClangImporter::computeClangImporterFileSystem(
-          recipe, llvm::vfs::createPhysicalFileSystem());
-      if (cas)
-        return llvm::cas::createCASProvidingFileSystem(cas, std::move(fs));
-      return fs;
+    opts.MakeVFS = [=]() -> llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> {
+      return llvm::cas::createCASProvidingFileSystem(cas, fs);
     };
 
     ClangScanningService.emplace(std::move(opts));
