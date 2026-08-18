@@ -215,6 +215,11 @@ namespace irgen {
   /// pointer using the adjustment stored immediately before its vtable.
   llvm::Value *emitCOMObjectRecovery(IRGenFunction &IGF, llvm::Value *interface);
 
+  /// Return the complete, allocation-order template for the COM projection
+  /// words of \p theClass, or null for an ordinary native class.
+  llvm::Constant *
+  getOrCreateCOMObjectPrefixTemplate(IRGenModule &IGM, ClassDecl *CD);
+
   /// Load the instance size and alignment mask from a reference to
   /// class type metadata of the given type.
   std::pair<llvm::Value *, llvm::Value *>
