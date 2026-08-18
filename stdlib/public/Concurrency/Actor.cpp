@@ -2780,7 +2780,7 @@ static void swift_task_enqueueImpl(Job *job, SerialExecutorRef serialExecutorRef
   auto _taskExecutorRef = TaskExecutorRef::fromTaskExecutorPreference(job);
   SWIFT_TASK_DEBUG_LOG(
       "enqueue job %p on serial serialExecutor %p, taskExecutor = %p", job,
-      serialExecutorRef.getIdentity(), taskExecutorRef.getIdentity());
+      serialExecutorRef.getIdentity(), _taskExecutorRef.getIdentity());
 #endif
 
   assert(job && "no job provided");
