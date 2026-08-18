@@ -23,6 +23,7 @@
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/SIL/SILUndef.h"
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/Analysis/FunctionOrder.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
@@ -167,13 +168,21 @@ public:
     Builder.getFunction().setNeedCompleteLifetimes(false);
   }
 
-  SILType remapType(SILType Ty) {
-    if (Ty.hasLocalArchetype()) {
-      Ty = Ty.subst(getBuilder().getModule(),
+  /// Replaces local archetypes with the local archetypes of the new generic
+  /// environments which the cloner created for cloned instructions which
+  /// define local archetypes (e.g. `open_existential_addr`).
+  SILType substLocalArchetypes(SILType Ty) {
+    if (!Ty.hasLocalArchetype())
+      return Ty;
+
+    return Ty.subst(getBuilder().getModule(),
                     Functor, Functor, CanGenericSignature(),
                     SubstFlags::SubstitutePrimaryArchetypes |
-                    SubstFlags::SubstituteLocalArchetypes);
-    }
+                        SubstFlags::SubstituteLocalArchetypes);
+  }
+
+  SILType remapType(SILType Ty) {
+    Ty = substLocalArchetypes(Ty);
 
     switch (mode) {
       case VisitMode::DetectSerializableInst:
@@ -270,6 +279,20 @@ public:
     case VisitMode::SerializeInst:
       break;
     }
+
+    // If the operand type contains local archetypes, the cloner re-mapped
+    // those archetypes to newly created generic environments (see
+    // `substLocalArchetypes`). But because we don't really clone - the cloned
+    // instructions are deleted immediately in `postProcess` - operands are not
+    // re-mapped and their types still refer to the original local archetypes.
+    // That would create instructions whose (re-mapped) type doesn't match the
+    // type of its operands, which some SILBuilder APIs check, e.g.
+    // `createValueMetatype`.
+    // Therefore use an undef value with the re-mapped type in this case.
+    SILType substTy = substLocalArchetypes(Value->getType());
+    if (substTy != Value->getType())
+      return SILUndef::get(&getBuilder().getFunction(), substTy);
+
     return Value;
   }
 
