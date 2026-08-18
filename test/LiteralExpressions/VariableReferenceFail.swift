@@ -1,8 +1,7 @@
 // Constant globals using @section initialized with literal expressions with simple variable references
-// REQUIRES: swift_feature_LiteralExpressions
 
 // RUN: %empty-directory(%t/deps)
-// RUN: %target-swift-frontend -typecheck %s -enable-experimental-feature LiteralExpressions -verify
+// RUN: %target-swift-frontend -typecheck %s -verify
 
 // This declaration is not itself declared to be a constant value
 // but is referenced from one. Upon emitting a failure to constant fold, ensure

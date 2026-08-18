@@ -589,8 +589,7 @@ void swift::diagnoseInvalidConstExpressions(const Expr *expr,
       if (auto error = checkSupportedInConst(expr, declContext))
         diagnoseError(error->first->getLoc(), error->second, ctx.Diags);
     } else {
-      if (ctx.LangOpts.hasFeature(Feature::LiteralExpressions) &&
-          expr->getType()->isStdlibInteger())
+      if (expr->getType()->isStdlibInteger())
         foldLiteralExpression(expr, &ctx);
       else if (auto error =
                    checkSupportedWithSectionAttribute(expr, declContext))

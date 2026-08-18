@@ -1,6 +1,5 @@
 // Enum case raw value expressions
-// REQUIRES: swift_feature_LiteralExpressions
-// RUN: %target-swift-frontend -emit-module -module-name SectionLiteralExprInterface -emit-module-interface-path %t/SectionLiteralExprInterface.swiftinterface -enable-library-evolution -swift-version 5 %s -enable-experimental-feature LiteralExpressions
+// RUN: %target-swift-frontend -emit-module -module-name SectionLiteralExprInterface -emit-module-interface-path %t/SectionLiteralExprInterface.swiftinterface -enable-library-evolution -swift-version 5 %s
 // RUN: %FileCheck %s < %t/SectionLiteralExprInterface.swiftinterface
 
 // Simple arithmetic operators on integers

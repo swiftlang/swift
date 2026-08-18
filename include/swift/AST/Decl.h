@@ -9378,9 +9378,8 @@ public:
   /// exists, as it was written in the source.
   Expr *getOriginalRawValueExpr() const;
 
-  /// Retrieves a fully-typechecked and (if LiteralExpressions experimental
-  /// feature is enabled) constant-folded raw value expression associated with
-  /// this enum element, if it exists.
+  /// Retrieves a fully-typechecked and constant-folded raw value expression
+  /// associated with this enum element, if it exists.
   LiteralExpr *getRawValueExpr() const;
 
   /// Reset the raw value expression.

@@ -1,10 +1,8 @@
 // Literal expressions may not reference `let` bindings that are part of the
 // module's ABI surface: publicly visible bindings, or `@usableFromInline` ones.
-// REQUIRES: swift_feature_LiteralExpressions
 // RUN: %target-swift-frontend -typecheck %s -verify \
 // RUN:   -package-name myPkg \
-// RUN:   -disable-availability-checking \
-// RUN:   -enable-experimental-feature LiteralExpressions
+// RUN:   -disable-availability-checking
 
 public let publicPageSize = 4096
 package let packagePageSize = 4096
