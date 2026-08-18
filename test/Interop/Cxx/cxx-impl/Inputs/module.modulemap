@@ -8,6 +8,11 @@ module Matching {
   requires cplusplus
 }
 
+module Methods {
+  header "methods.h"
+  requires cplusplus
+}
+
 module Namespaces {
   header "namespaces.h"
   requires cplusplus
