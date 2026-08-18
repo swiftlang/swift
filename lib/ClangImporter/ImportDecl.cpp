@@ -11014,7 +11014,12 @@ void ClangRecordMemberLoader::load(const clang::RecordDecl *clangRecord,
     }
   }
 
-  if ((isa<clang::CXXRecordDecl>(swiftDecl->getClangDecl())) && !storage &&
+  // These all look up members by name in the Clang record, which requires a
+  // complete definition. A foreign reference type is imported even when it is
+  // only declared, and such a type has no members to find.
+  if (auto *cxxSwiftDecl =
+          dyn_cast<clang::CXXRecordDecl>(swiftDecl->getClangDecl());
+      cxxSwiftDecl && cxxSwiftDecl->isCompleteDefinition() && !storage &&
       !inheritance) {
     (void)Impl.lookupAndImportPointee(swiftDecl);
     (void)Impl.lookupAndImportSuccessor(swiftDecl);
