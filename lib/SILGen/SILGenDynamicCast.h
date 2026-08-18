@@ -18,6 +18,27 @@
 namespace swift {
 namespace Lowering {
 
+/// The SIL representation and runtime operation used for a checked cast.
+enum class CastStrategy : uint8_t {
+  Address,
+  Scalar,
+  COM,
+};
+
+CastStrategy computeCastStrategy(SILGenFunction &SGF, CanType sourceType,
+                                 CanType targetType);
+
+ManagedValue prepareCOMCastSource(SILGenFunction &SGF, SILLocation loc,
+                                  ManagedValue source);
+
+inline bool usesAddress(CastStrategy strategy) {
+  return strategy != CastStrategy::Scalar;
+}
+
+inline bool isCOMCast(CastStrategy strategy) {
+  return strategy == CastStrategy::COM;
+}
+
 RValue emitUnconditionalCheckedCast(SILGenFunction &SGF,
                                     SILLocation loc,
                                     Expr *operand,
