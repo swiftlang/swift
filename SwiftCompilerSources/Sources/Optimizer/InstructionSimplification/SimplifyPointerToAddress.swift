@@ -25,6 +25,15 @@ extension PointerToAddressInst : OnoneSimplifiable, SILCombineSimplifiable {
   }
 }
 
+extension PointerToAddressInst : DebugReconstructionBlockSimplifiable {
+  /// Only fold undef: the other simplifications walk access bases and lifetimes which don't
+  /// exist in a standalone block, and `Builtin.assumeAlignment` is salvaged as an identity so
+  /// it never reaches a reconstruction block.
+  func simplifyForDebugReconstructionBlock(_ context: SimplifyContext) {
+    foldUndefOperands(context)
+  }
+}
+
 /// Remove a redundant pair of pointer-address conversions:
 /// ```
 ///   %2 = address_to_pointer %1

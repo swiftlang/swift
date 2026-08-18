@@ -43,6 +43,24 @@ extension DebugReconstructionBlockSimplifiable where Self: Simplifiable {
   }
 }
 
+extension DebugReconstructionBlockSimplifiable where Self: SingleValueInstruction {
+  /// Folds this instruction to `undef` if any of its operands is `undef`, and returns
+  /// whether it was folded. The instruction is erased when folded.
+  ///
+  /// Only valid for instructions whose result carries no information of its own beyond
+  /// its operands. It must not be used where folding would drop something the debugger
+  /// could still have shown: `enum $E, #E.some, undef` keeps a known case, and
+  /// `builtin "and"(undef, 0)` is strictly `0`.
+  @discardableResult
+  func foldUndefOperands(_ context: SimplifyContext) -> Bool {
+    guard operands.contains(where: { $0.value is Undef }) else {
+      return false
+    }
+    replaceWithUndef(context)
+    return true
+  }
+}
+
 //===--------------------------------------------------------------------===//
 //                        Simplification passes
 //===--------------------------------------------------------------------===//
