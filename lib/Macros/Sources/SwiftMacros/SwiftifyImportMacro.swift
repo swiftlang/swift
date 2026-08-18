@@ -173,6 +173,34 @@ struct CountedBy: ParamInfo {
   }
 }
 
+struct Single: ParamInfo {
+  var pointerIndex: SwiftifyExpr
+  var nonescaping: Bool
+  var dependencies: [LifetimeDependence]
+  var original: SyntaxProtocol
+
+  var description: String {
+    return ".single(pointer: \(pointerIndex))"
+  }
+
+  func getBoundsCheckedThunkBuilder(
+    _ base: BoundsCheckedThunkBuilder, _ funcDecl: FunctionParts
+  ) -> BoundsCheckedThunkBuilder {
+    guard nonescaping else {
+      return base
+    }
+    switch pointerIndex {
+    case .param(let i):
+      return SinglePointerThunkBuilder(
+        base: base, index: i - 1, funcDecl: funcDecl, nonescaping: nonescaping)
+    case .return:
+      return base
+    case .self:
+      return base
+    }
+  }
+}
+
 struct RuntimeError: Error {
   let description: String
 
@@ -1183,6 +1211,43 @@ struct CountedOrSizedPointerThunkBuilder: ParamBoundsThunkBuilder, PointerBounds
   }
 }
 
+// FIXME: expose `__single` parameters as Ref
+struct SinglePointerThunkBuilder: ParamBoundsThunkBuilder {
+  public let base: BoundsCheckedThunkBuilder
+  public let index: Int
+  public let funcDecl: FunctionParts
+  public let nonescaping: Bool
+
+  var newType: TypeSyntax { oldType }
+
+  func buildFunctionSignature(_ argTypes: [Int: TypeSyntax?], _ returnType: TypeSyntax?) throws
+    -> FunctionSignatureSyntax
+  {
+    return try base.buildFunctionSignature(argTypes, returnType)
+  }
+  func buildFunctionCall(_ pointerArgs: [Int: ExprSyntax]) throws -> ExprSyntax {
+    return try base.buildFunctionCall(pointerArgs)
+  }
+  func buildBasicBoundsExtractions() throws -> [CodeBlockItemSyntax.Item] {
+    return try base.buildBasicBoundsExtractions()
+  }
+  func buildBasicBoundsChecks() throws -> [CodeBlockItemSyntax.Item] {
+    return try base.buildBasicBoundsChecks()
+  }
+  func buildCompoundBoundsChecks() throws -> [CodeBlockItemSyntax.Item] {
+    return try base.buildCompoundBoundsChecks()
+  }
+  func buildSpanUnwraps() throws -> [CodeBlockItemSyntax.Item] {
+    return try base.buildSpanUnwraps()
+  }
+  func buildPreReturnStatements() throws -> [CodeBlockItemSyntax.Item] {
+    return try base.buildPreReturnStatements()
+  }
+  func chainedNullableCount(name: TokenSyntax, isUnsafe: inout Bool) -> ExprSyntax {
+    return base.chainedNullableCount(name: name, isUnsafe: &isUnsafe)
+  }
+}
+
 func getArgumentByName(_ argumentList: LabeledExprListSyntax, _ name: String) throws -> ExprSyntax {
   guard
     let arg = argumentList.first(where: {
@@ -1355,6 +1420,15 @@ func parseEndedByEnum(_ enumConstructorExpr: FunctionCallExprSyntax) throws -> P
   let endPointerExprArg = try getArgumentByName(argumentList, "end")
   let _: SwiftifyExpr = try parseSwiftifyExpr(endPointerExprArg)
   throw RuntimeError("endedBy support not yet implemented")
+}
+
+func parseSingleEnum(_ enumConstructorExpr: FunctionCallExprSyntax) throws -> ParamInfo {
+  let argumentList = enumConstructorExpr.arguments
+  let pointerExprArg = try getArgumentByName(argumentList, "pointer")
+  let pointerExpr: SwiftifyExpr = try parseSwiftifyExpr(pointerExprArg)
+  return Single(
+    pointerIndex: pointerExpr, nonescaping: false, dependencies: [],
+    original: ExprSyntax(enumConstructorExpr))
 }
 
 func parseNonEscaping(_ enumConstructorExpr: FunctionCallExprSyntax) throws -> Int {
@@ -1533,6 +1607,7 @@ func parseMacroParam(
       enumConstructorExpr, rewriter, isOrNull: true,
       nullableAsEmptySpan: nullableAsEmptySpan)
   case "endedBy": return try parseEndedByEnum(enumConstructorExpr)
+  case "single": return try parseSingleEnum(enumConstructorExpr)
   case "nonescaping":
     let index = try parseNonEscaping(enumConstructorExpr)
     nonescapingPointers.insert(index)
@@ -1554,7 +1629,7 @@ func parseMacroParam(
     return nil
   default:
     throw DiagnosticError(
-      "expected 'countedBy', 'countedByOrNull', 'sizedBy', 'sizedByOrNull', 'endedBy', 'nonescaping' or 'lifetimeDependence', got '\(enumName)'",
+      "expected 'countedBy', 'countedByOrNull', 'sizedBy', 'sizedByOrNull', 'endedBy', 'single', 'nonescaping' or 'lifetimeDependence', got '\(enumName)'",
       node: enumConstructorExpr)
   }
 }

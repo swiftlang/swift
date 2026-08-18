@@ -407,6 +407,16 @@ struct SwiftifyInfoFunctionPrinter : public SwiftifyInfoPrinter {
     return true;
   }
 
+  bool printSingle(Type swiftType, ssize_t pointerIndex) {
+    if (swiftType->lookThroughSingleOptionalType()->isOpaquePointer())
+      return false;
+    printSeparator();
+    out << ".single(pointer: ";
+    printParamOrReturn(pointerIndex);
+    out << ")";
+    return true;
+  }
+
   void printNonEscaping(int idx) {
     printSeparator();
     out << ".nonescaping(pointer: ";
@@ -793,9 +803,16 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
         DLOG("Found bounds info '" << clangParamTy << "'\n");
         attachMacro = paramHasBoundsInfo = true;
       }
+      bool paramIsSingle = false;
+      if (!CAT && clangParamTy->isSinglePointerType() &&
+          !clangParamTy->getAs<clang::ValueTerminatedType>() &&
+          mappedIndex != SwiftifyInfoPrinter::SELF_PARAM_INDEX) {
+        paramIsSingle = printer.printSingle(swiftParamTy, mappedIndex);
+      }
       bool paramIsStdSpan =
           printer.registerStdSpanTypeMapping(swiftParamTy, clangParamTy);
       paramHasBoundsInfo |= paramIsStdSpan;
+      paramHasBoundsInfo |= paramIsSingle;
 
       bool paramHasLifetimeInfo = false;
       if (clangParam->template hasAttr<clang::NoEscapeAttr>()) {
@@ -836,6 +853,10 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
       }
       if (paramIsStdSpan && paramHasLifetimeInfo) {
         DLOG("Found both std::span and lifetime info\n");
+        attachMacro = true;
+      }
+      if (paramIsSingle && paramHasLifetimeInfo) {
+        DLOG("Found both __single and lifetime info\n");
         attachMacro = true;
       }
     }

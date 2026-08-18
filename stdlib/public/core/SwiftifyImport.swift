@@ -11,8 +11,9 @@ public enum _DependenceType {
 /// Different ways to annotate pointer parameters using the `@_SwiftifyImport` macro.
 /// All indices into parameter lists start at 1. Indices __must__ be integer literals, and strings
 /// __must__ be string literals, because their contents are parsed by the `@_SwiftifyImport` macro.
-/// Only 1 instance of `countedBy`, `sizedBy` or `endedBy` can refer to each pointer index, however
-/// `nonescaping` is orthogonal to the rest and can (and should) overlap with other annotations.
+/// Only 1 instance of `countedBy`, `sizedBy`, `endedBy` or `single` can refer to each pointer
+/// index, however `nonescaping` is orthogonal to the rest and can (and should) overlap with other
+/// annotations.
 ///
 /// This is not marked @available, because _SwiftifyImport is available for any target. Instances
 /// of _SwiftifyInfo should ONLY be passed as arguments directly to _SwiftifyImport, so they should
@@ -47,6 +48,9 @@ public enum _SwiftifyInfo {
     /// Parameter end: index of pointer in function parameter list, pointing one past the end of
     /// the same buffer as `start`.
     case endedBy(start: _SwiftifyExpr, end: Int)
+    /// Corresponds to the C `__single` attribute.
+    /// Parameter pointer: index of pointer in function parameter list.
+    case single(pointer: _SwiftifyExpr)
     /// Corresponds to the C `noescape` attribute. Allows generated wrapper to use `Span`-types
     /// instead of `UnsafeBuffer`-types, because it is known that the function doesn't capture the
     /// object past the lifetime of the function.
