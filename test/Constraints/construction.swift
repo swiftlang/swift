@@ -176,6 +176,39 @@ do {
 // rdar://problem/34670592 - Compiler crash on heterogeneous collection literal
 _ = Array([1, "hello"]) // Ok
 
+// A heterogeneous collection literal passed to an initializer that cannot
+// default its element type to `Any`. This used to be diagnosed in terms of
+// `Set.init(_immutableCocoaSet:)` because that (disabled) choice produced a
+// cheaper solution once it was re-enabled to attempt fixes.
+_ = Set(["hello", 1])
+// expected-error@-1 {{conflicting arguments to generic parameter 'Element'}}
+
+// Same, but without relying on the standard library. Solutions here disagree
+// about both the overload choice for `init(_:)` (the one declared in the type
+// vs. the one from the protocol extension) and the element of the literal
+// their fix is attached to, which means that neither could be used to
+// diagnose the ambiguity.
+protocol ContainerProtocol {
+  associatedtype Element: Hashable
+  init(elements: [Element])
+}
+
+extension ContainerProtocol {
+  init<S: Sequence>(_ elements: S) where S.Element == Element {
+    self.init(elements: Array(elements))
+  }
+}
+
+struct Container<Element: Hashable>: ContainerProtocol {
+  init(elements: [Element]) {}
+  init<S: Sequence>(_ elements: S) where S.Element == Element {
+    self.init(elements: Array(elements))
+  }
+}
+
+_ = Container(["hello", 1])
+// expected-error@-1 {{conflicting arguments to generic parameter 'Element'}}
+
 func init_via_non_const_metatype(_ s1: S1.Type) {
   _ = s1(i: 42) // expected-error {{initializing from a metatype value must reference 'init' explicitly}} {{9-9=.init}}
   _ = s1.init(i: 42) // ok

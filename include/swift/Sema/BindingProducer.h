@@ -46,6 +46,14 @@ public:
     // in attempt to produce a solution faster for
     // well-formed expressions.
     if (CS.shouldAttemptFixes()) {
+      // A choice that is only viable with a fix attached to it - i.e. an
+      // overload that requires re-labeling of the arguments - should stay
+      // disabled if it refers to a declaration that is not meant to be
+      // referenced directly, because suggesting it would be confusing e.g.
+      // `Set(["a", 0])` should never mention `init(_immutableCocoaSet:)`.
+      if (hasFix() && isUnderscored())
+        return true;
+
       return !(hasFix() || Choice->isDisabledInPerformanceMode());
     }
 
@@ -54,6 +62,14 @@ public:
 
   bool hasFix() const {
     return bool(Choice->getFix());
+  }
+
+  /// Whether this choice refers to a declaration that is not intended to be
+  /// referenced directly i.e. an underscored standard library declaration.
+  bool isUnderscored() const {
+    if (auto *decl = getOverloadChoiceDecl(Choice))
+      return decl->hasUnderscoredNaming();
+    return false;
   }
 
   bool isUnavailable() const {
