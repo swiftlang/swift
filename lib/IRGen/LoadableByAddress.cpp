@@ -4244,8 +4244,9 @@ void AddressAssignment::finish(DominanceInfo *dominance,
     SmallVector<SILBasicBlock *, 8> boundary;
     computeDominatedBoundaryBlocks(stackLoc->getParent(), dominance, boundary);
     for (auto *block : boundary) {
-      if (deadEnds->isDeadEnd(block))
+      if (DeadEndBlocks::triviallyEndsInUnreachable(block)) {
         continue;
+      }
       auto builder = getBuilder(block->back().getIterator());
       builder.createDeallocStack(getAutoLoc(), stackLoc);
     }
