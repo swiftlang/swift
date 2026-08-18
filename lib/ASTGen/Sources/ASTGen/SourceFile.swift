@@ -31,6 +31,9 @@ public struct ExportedSourceFile {
   /// The name of the source file being parsed.
   public let fileName: String
 
+  /// The parser mode for this source file.
+  public let mode: Parser.Mode
+
   /// The syntax tree for the complete source file.
   public let syntax: Syntax
 
@@ -111,6 +114,45 @@ extension Parser.SwiftVersion {
   }
 }
 
+/// Extract the file extension, if any, from the filename;
+/// returns an empty substring if no extension is present.
+private func fileExtension(from fileName: String) -> Substring {
+  var lastSep: String.Index = fileName.startIndex
+
+  if let lastSlash = fileName.lastIndex(of: "/") {
+    lastSep = lastSlash
+  }
+  #if os(Windows)
+  if let lastBackslash = fileName.lastIndex(of: "\\") {
+    if lastBackslash > lastSep {
+      lastSep = lastBackslash
+    }
+  }
+  #endif
+
+  if let lastDot = fileName[lastSep...].lastIndex(of: ".") {
+    let extStart = fileName.index(after: lastDot)
+    return fileName[extStart...]
+  }
+
+  return Substring()
+}
+
+/// Compute the parser mode from the file extension.
+private func parserMode(from fileExtension: Substring) -> Parser.Mode {
+  let mode: Parser.Mode
+
+  switch fileExtension {
+    case "md": mode = .markdown
+    case "rst": mode = .reStructuredText
+    case "tex": mode = .laTeX
+    default:
+      mode = .swift
+  }
+
+  return mode
+}
+
 /// Parses the given source file and produces a pointer to a new
 /// ExportedSourceFile instance.
 @_cdecl("swift_ASTGen_parseSourceFile")
@@ -125,8 +167,14 @@ public func parseSourceFile(
   let dc = declContextPtr.map { BridgedDeclContext(raw: $0) }
   let ctx = dc?.astContext
 
+  // Figure out what parser mode to use according to the filename
+  let fileName = String(bridged: filename)
+  let fileExt = fileExtension(from: fileName)
+  let mode = parserMode(from: fileExt)
+
   var parser = Parser(
     buffer,
+    mode: mode,
     swiftVersion: Parser.SwiftVersion(from: ctx),
     languageFeatures: Parser.LanguageFeatures(from: ctx)
   )
@@ -177,12 +225,12 @@ public func parseSourceFile(
 
   let exportedPtr = UnsafeMutablePointer<ExportedSourceFile>.allocate(capacity: 1)
   let moduleName = String(bridged: moduleName)
-  let fileName = String(bridged: filename)
   exportedPtr.initialize(
     to: .init(
       buffer: buffer,
       moduleName: moduleName,
       fileName: fileName,
+      mode: mode,
       syntax: parsed,
       sourceLocationConverter: SourceLocationConverter(fileName: fileName, tree: parsed)
     )
@@ -209,7 +257,13 @@ public func roundTripCheck(
 ) -> CInt {
   sourceFilePtr.withMemoryRebound(to: ExportedSourceFile.self, capacity: 1) { sourceFile in
     let sf = sourceFile.pointee
-    return sf.syntax.syntaxTextBytes.elementsEqual(sf.buffer) ? 0 : 1
+
+    switch sf.mode {
+      case .swift:
+        return sf.syntax.syntaxTextBytes.elementsEqual(sf.buffer) ? 0 : 1
+      default:
+        return 0
+    }
   }
 }
 
