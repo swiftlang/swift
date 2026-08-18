@@ -1,16 +1,17 @@
 // REQUIRES: swift_feature_SafeInteropWrappers
+// REQUIRES: swift_feature_ForeignReferenceTypeInheritance
 // REQUIRES: std_span
 // REQUIRES: executable_test
 
 // UNSUPPORTED: back_deployment_runtime || use_os_stdlib
 
 // RUN: %target-run-simple-swift-split-file(test.swift -I %t%{fs-sep}Inputs -target %target-swift-6.2-abi-triple \
-// RUN:   -cxx-interoperability-mode=default -Xcc -std=c++20 -enable-experimental-feature SafeInteropWrappers)
+// RUN:   -cxx-interoperability-mode=default -Xcc -std=c++20 -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature ForeignReferenceTypeInheritance)
 
 // Signal if unsupported functions start compiling to remind the author of creating a runtime test case.
 // RUN: %target-swift-frontend -typecheck -plugin-path %swift-plugin-dir -I %t%{fs-sep}Inputs \
 // RUN:   -target %target-swift-6.2-abi-triple -cxx-interoperability-mode=default -Xcc -std=c++20 \
-// RUN:   -enable-experimental-feature SafeInteropWrappers -D NOT_YET_SUPPORTED -verify \
+// RUN:   -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature ForeignReferenceTypeInheritance -D NOT_YET_SUPPORTED -verify \
 // RUN:   -suppress-notes %t/test.swift
 
 // This is the C++ counterpart of test/Interop/C/swiftify-import/runtime.swift.
