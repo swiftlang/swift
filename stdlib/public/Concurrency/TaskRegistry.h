@@ -44,7 +44,7 @@ struct alignas(SWIFT_CACHE_LINE_SIZE) TaskRegistryShard {
 /// Head pointers for the global live-task registry shards.
 /// Walk each shard via task->_private().registryNext.
 SWIFT_EXPORT_FROM(swift_Concurrency)
-extern TaskRegistryShard _swift_concurrency_task_registry[TaskRegistryShardCount];
+TaskRegistryShard _swift_concurrency_task_registry[TaskRegistryShardCount];
 
 /// Register a newly created task. Must be called after full initialization.
 void taskRegistryInsert(AsyncTask *task);
