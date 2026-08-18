@@ -1246,65 +1246,94 @@ ClangImporter::getClangSystemOverlayFile(const SearchPathOptions &Opts) {
   return overlayPath.str().str();
 }
 
-llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>
-ClangImporter::computeClangImporterFileSystem(
+ClangImporterVFSRecipe ClangImporter::computeClangImporterVFSRecipe(
     const ASTContext &ctx, const ClangInvocationFileMapping &fileMapping,
-    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> baseFS,
-    bool suppressDiagnostics,
     llvm::function_ref<StringRef(StringRef)> allocateString) {
-  // Configure ClangImporter file system. There are two situations:
-  // * If caching is used, thus file system is immutable, the one immutable file
-  //   system is shared between swift frontend and ClangImporter.
-  // * Otherwise, ClangImporter file system is configure from scratch from
-  //   VFS in SourceMgr using ivfsoverlay options.
-  if (ctx.CASOpts.HasImmutableFileSystem)
-    return baseFS;
+  ClangImporterVFSRecipe recipe;
+  recipe.hasImmutableFileSystem = ctx.CASOpts.HasImmutableFileSystem;
 
-  // If no file mapping, nothing to update.
-  if (fileMapping.redirectedFiles.empty() && fileMapping.overridenFiles.empty())
-    return baseFS;
-
-  // Compute and set working directory.
   const auto &importerOpts = ctx.ClangImporterOpts;
+  recipe.dumpClangDiagnostics = importerOpts.DumpClangDiagnostics;
+
+  // Record the working directory, if one was specified.
   auto workingDirPos =
       std::find(importerOpts.ExtraArgs.rbegin(), importerOpts.ExtraArgs.rend(),
                 "-working-directory");
   if (workingDirPos != importerOpts.ExtraArgs.rend() &&
       workingDirPos != importerOpts.ExtraArgs.rbegin())
-    baseFS->setCurrentWorkingDirectory(*(workingDirPos - 1));
+    recipe.workingDirectory = *(workingDirPos - 1);
 
-  if (!fileMapping.redirectedFiles.empty()) {
-    if (importerOpts.DumpClangDiagnostics) {
-      llvm::errs() << "clang importer redirected file mappings:\n";
-      for (const auto &mapping : fileMapping.redirectedFiles) {
-        llvm::errs() << "   mapping real file '" << mapping.second
-                     << "' to virtual file '" << mapping.first << "'\n";
-      }
-      llvm::errs() << "\n";
-    }
-  }
+  recipe.redirectedFiles.assign(fileMapping.redirectedFiles.begin(),
+                                fileMapping.redirectedFiles.end());
 
-  auto overridenVFS =
-      llvm::makeIntrusiveRefCnt<llvm::vfs::InMemoryFileSystem>();
-  for (auto &file : fileMapping.overridenFiles) {
-    if (importerOpts.DumpClangDiagnostics) {
-      llvm::errs() << "clang importer overriding file '"
-                   << file->getBufferIdentifier()
-                   << "' with the following contents:\n";
-      llvm::errs() << file->getBuffer() << "\n";
-    }
+  for (const auto &file : fileMapping.overridenFiles) {
     // Note MemoryBuffer is guaranteeed to be null-terminated.
     auto content = file->getMemBufferRef();
     // If allocateString callback is provided, it means the life-time of the
     // file buffer needs to be extended by saving into the string saver.
     if (allocateString)
       content = llvm::MemoryBufferRef(allocateString(content.getBuffer()), "");
-    overridenVFS->addFileNoOwn(file->getBufferIdentifier(), 0, content);
+    recipe.overridenFiles.push_back(
+        {file->getBufferIdentifier().str(), content});
   }
-  auto overlayVFS =
-      llvm::makeIntrusiveRefCnt<llvm::vfs::OverlayFileSystem>(baseFS);
+
+  return recipe;
+}
+
+llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>
+ClangImporter::computeClangImporterFileSystem(
+    const ClangImporterVFSRecipe &recipe,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> baseFS) {
+  // Configure ClangImporter file system. There are two situations:
+  // * If caching is used, thus file system is immutable, the one immutable file
+  //   system is shared between swift frontend and ClangImporter.
+  // * Otherwise, ClangImporter file system is configure from scratch from
+  //   VFS in SourceMgr using ivfsoverlay options.
+  if (recipe.hasImmutableFileSystem)
+    return baseFS;
+
+  // If no file mapping, nothing to update.
+  if (recipe.redirectedFiles.empty() && recipe.overridenFiles.empty())
+    return baseFS;
+
+  // Set the working directory.
+  if (recipe.workingDirectory)
+    baseFS->setCurrentWorkingDirectory(*recipe.workingDirectory);
+
+  if (!recipe.redirectedFiles.empty() && recipe.dumpClangDiagnostics) {
+    llvm::errs() << "clang importer redirected file mappings:\n";
+    for (const auto &mapping : recipe.redirectedFiles) {
+      llvm::errs() << "   mapping real file '" << mapping.second
+                   << "' to virtual file '" << mapping.first << "'\n";
+    }
+    llvm::errs() << "\n";
+  }
+
+  auto overridenVFS =
+      llvm::makeIntrusiveRefCnt<llvm::vfs::InMemoryFileSystem>();
+  for (const auto &file : recipe.overridenFiles) {
+    if (recipe.dumpClangDiagnostics) {
+      llvm::errs() << "clang importer overriding file '" << file.path
+                   << "' with the following contents:\n";
+      llvm::errs() << file.contents.getBuffer() << "\n";
+    }
+    overridenVFS->addFileNoOwn(file.path, 0, file.contents);
+  }
+  auto overlayVFS = llvm::makeIntrusiveRefCnt<llvm::vfs::OverlayFileSystem>(
+      std::move(baseFS));
   overlayVFS->pushOverlay(std::move(overridenVFS));
   return overlayVFS;
+}
+
+llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>
+ClangImporter::computeClangImporterFileSystem(
+    const ASTContext &ctx, const ClangInvocationFileMapping &fileMapping,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> baseFS,
+    bool suppressDiagnostics,
+    llvm::function_ref<StringRef(StringRef)> allocateString) {
+  return computeClangImporterFileSystem(
+      computeClangImporterVFSRecipe(ctx, fileMapping, allocateString),
+      std::move(baseFS));
 }
 
 std::vector<std::string>
