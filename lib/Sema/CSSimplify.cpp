@@ -11103,15 +11103,29 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
       }
     };
 
-    if (auto signature = DC->getGenericSignatureOfContext()) {
-      for (const auto &requirement : signature.getRequirements()) {
-        if (requirement.getKind() != RequirementKind::Conformance ||
-            !requirement.getFirstType()->is<AnyMetatypeType>())
-          continue;
-        if (!DC->mapTypeIntoEnvironment(requirement.getFirstType())
-               ->isEqual(baseObjTy))
-          continue;
-        addMetatypeConformanceMembers(requirement.getProtocolDecl());
+    auto signature = DC->getGenericSignatureOfContext();
+    auto *metatype = baseObjTy->castTo<AnyMetatypeType>();
+    auto instanceType = metatype->getInstanceType();
+    Type interfaceType;
+    if (auto *archetype = instanceType->getAs<ArchetypeType>()) {
+      if (auto *environment = archetype->getGenericEnvironment()) {
+        signature = environment->getGenericSignature();
+        interfaceType = MetatypeType::get(archetype->getInterfaceType());
+      }
+    }
+
+    if (signature) {
+      if (!interfaceType) {
+        if (baseObjTy->hasArchetype())
+          interfaceType = baseObjTy->mapTypeOutOfEnvironment();
+        else if (baseObjTy->hasTypeParameter())
+          interfaceType = baseObjTy;
+      }
+
+      if (interfaceType &&
+          interfaceType->getMetatypeInstanceType()->isTypeParameter()) {
+        for (auto *protocol : signature->getRequiredProtocols(interfaceType))
+          addMetatypeConformanceMembers(protocol);
       }
     }
 
