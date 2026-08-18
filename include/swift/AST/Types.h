@@ -719,6 +719,11 @@ public:
   /// the given generic signature.
   bool isBitwiseCopyable(GenericSignature sig);
 
+  /// Returns true if this contextual type satisfies a conformance to
+  /// Differentiable. If `tangentVectorEqualsSelf` is true, also check
+  /// whether the given type satisfies `TangentVector == Self`.
+  bool isDifferentiable(bool tangentVectorEqualsSelf = false);
+
   /// Are values of this type essentially just class references,
   /// possibly with some sort of additional information?
   ///
@@ -4051,6 +4056,8 @@ public:
     return containsPackExpansionType(getParams());
   }
 
+  bool isSupportedAsDifferentiableClosure() const;
+
   static bool containsPackExpansionType(ArrayRef<Param> params);
 
   static void printParams(ArrayRef<Param> Params, raw_ostream &OS,
@@ -6265,7 +6272,9 @@ public:
   /// Return the unsubstituted function type equivalent to this type; that is, the type that has the same
   /// argument and result types as `this` type after substitutions, if any.
   CanSILFunctionType getUnsubstitutedType(SILModule &M) const;
-                                    
+
+  bool isSupportedAsDifferentiableClosure() const;
+
   void Profile(llvm::FoldingSetNodeID &ID) {
     Profile(ID, getInvocationGenericSignature(),
             getExtInfo(), getCoroutineKind(), getCalleeConvention(),
