@@ -499,7 +499,7 @@ public:
   bool disableInterfaceLock = false;
   bool disableImplicitSwiftModule = false;
   bool disableBuildingInterface = false;
-  bool downgradeInterfaceVerificationError = false;
+  std::optional<bool> downgradeInterfaceVerificationError;
   bool strictImplicitModuleContext = false;
   CompilerDebuggingOptions compilerDebuggingOptions;
   std::string mainExecutablePath;
