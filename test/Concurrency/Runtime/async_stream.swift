@@ -16,7 +16,7 @@ import _Concurrency
 import StdlibUnittest
 
 struct SomeError: Error, Equatable {
-  var value = Int.random(in: 0..<100)
+  var value: Int = 0
 }
 
 class NotSendable {}
@@ -473,9 +473,8 @@ class NotSendable {}
       }
 
       tests.test("finish(throwing:) from onTermination keeps the first error when called twice") {
-        let firstError = SomeError()
-        let secondError = SomeError()
-        expectTrue(firstError != secondError)
+        let firstError = SomeError(value: 1)
+        let secondError = SomeError(value: 2)
 
         let (controlStream, controlContinuation) = AsyncStream<Int>.makeStream()
         var controlIterator = controlStream.makeAsyncIterator()
@@ -508,6 +507,26 @@ class NotSendable {}
         } else {
           expectUnreachable("expected SomeError, got \(String(describing: caught))")
         }
+      }
+
+      tests.test("onTermination handler is released after the stream terminates") {
+        let (stream, continuation) = AsyncStream<Int>.makeStream()
+
+        // Terminate the stream first
+        continuation.finish()
+
+        // Setting the handler now stores it in the terminal state, but never calls it
+        continuation.onTermination = { @Sendable _ in
+          fatalError("Unexpectedly triggered termination handler")
+        }
+
+        var iterator = stream.makeAsyncIterator()
+        let value = await iterator.next()
+        expectNil(value)
+
+        // Per the documented `onTermination` contract, the handler is released
+        // once the stream has reached its terminal state
+        expectTrue(continuation.onTermination == nil)
       }
 
       tests.test("continuation equality") {

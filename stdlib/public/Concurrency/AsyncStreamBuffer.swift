@@ -552,6 +552,9 @@ extension _AsyncStreamStorage.StateMachine {
       )
 
     case .terminated(let terminated):
+      // Reaching the terminal state drops the termination handler, per the
+      // documented `onTermination` contract: the handler is released once the
+      // stream has terminated
       unsafe self = .init(state: .terminated(.init()))
 
       switch terminated.failure {
@@ -602,7 +605,7 @@ extension _AsyncStreamStorage.StateMachine {
     case .terminating(var terminating):
       // A re-entrant `finish(throwing:)` from within the termination handler,
       // while the cancellation outcome is not yet final.
-      terminating.setFailureOnce(failure)
+      _ = terminating.setFailureOnce(failure)
       unsafe self = .init(state: .terminating(terminating))
       return unsafe .none
 
@@ -622,7 +625,7 @@ extension _AsyncStreamStorage.StateMachine {
     case .idle(var idle):
       unsafe self = .init(state: .terminating(.init(
         buffer: idle.buffer,
-        failure: failure,
+        failure: nil,
       )))
       return unsafe .call(
         terminationHandler: idle.terminationHandler.take()
@@ -631,7 +634,7 @@ extension _AsyncStreamStorage.StateMachine {
     case .waiting(var waiting):
       unsafe self = .init(state: .terminating(.init(
         buffer: [],
-        failure: failure
+        failure: nil
       )))
       return unsafe .callAndResume(.init(
         consumers: waiting.consumers,
@@ -643,9 +646,9 @@ extension _AsyncStreamStorage.StateMachine {
       unsafe self = .init(state: .draining(draining))
       return unsafe .none
 
-    case .terminating(var terminating):
-      // Already terminating: adopt the failure, matching `terminate`
-      terminating.setFailureOnce(failure)
+    case .terminating(let terminating):
+      // Already terminating: nothing to do, the cancellation path carries no
+      // failure of its own (a failure can only be set via `finish(throwing:)`)
       unsafe self = .init(state: .terminating(terminating))
       return unsafe .none
 
