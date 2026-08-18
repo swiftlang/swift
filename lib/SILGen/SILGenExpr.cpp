@@ -2503,7 +2503,16 @@ visitConditionalCheckedCastExpr(ConditionalCheckedCastExpr *E,
       }
     }
   }
-  ManagedValue operand = SGF.emitRValueAsSingleValue(E->getSubExpr());
+  auto resultObjectType =
+      E->getType()->getCanonicalType().getOptionalObjectType();
+  bool isCOMInterfaceCast =
+      resultObjectType && resultObjectType->isAnyExistentialType() &&
+      resultObjectType->getExistentialLayout().getCOMInterface();
+  ManagedValue operand =
+      SGF.emitRValueAsSingleValue(E->getSubExpr(),
+                                  isCOMInterfaceCast
+                                     ? SGFContext::AllowGuaranteedPlusZero
+                                     : SGFContext());
   return emitConditionalCheckedCast(SGF, E, operand, E->getSubExpr()->getType(),
                                     E->getType(), E->getCastKind(), C,
                                     trueCount, falseCount);
