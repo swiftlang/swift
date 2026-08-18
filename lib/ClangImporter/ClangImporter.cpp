@@ -5759,21 +5759,8 @@ ClangTypeEscapability::evaluate(Evaluator &evaluator,
       // escapable, including a SWIFT_UNSAFE_REFERENCE, whose unsafety is a
       // separate axis. Non-escapable fields and bases are rejected separately,
       // where the type is imported.
-      if (auto *definition = recordDecl->getDefinition()) {
-        if (evaluateOrDefault(evaluator,
-                              ForeignReferenceTypeInfoRequest({definition}), {})
-                .isReference())
-          continue;
-      } else if (llvm::any_of(recordDecl->redecls(), [](const auto *redecl) {
-                   return hasImportReferenceAttr(
-                       cast<clang::RecordDecl>(redecl));
-                 })) {
-        // Inherited reference-ness needs a definition, but a direct annotation
-        // is enough. Ask the attribute, not the request: the request is cached
-        // per decl, so an uninstantiated class template would cache
-        // "not a reference" for good.
+      if (importer::isForeignReferenceRecord(recordDecl, evaluator))
         continue;
-      }
       if (hasSwiftAttribute(recordDecl, {"unsafe", "unsafe(always)"}))
         return CxxEscapability::Unknown;
       llvm::ArrayRef<int> STLParams;
@@ -8774,7 +8761,8 @@ ExplicitSafety ClangDeclExplicitSafety::evaluate(
       auto *recordDecl = pointeeType->getAsRecordDecl();
       // Pointers are ok if imported as foreign reference types,
       // all other pointers are considered unsafe.
-      return !(recordDecl && hasImportReferenceAttr(recordDecl));
+      return !(recordDecl &&
+               importer::isForeignReferenceRecord(recordDecl, evaluator));
     }
     if (auto *decl = type->getAsTagDecl()) {
       // We need to check the safety of the TagDecl corresponding to this type
@@ -8793,10 +8781,19 @@ ExplicitSafety ClangDeclExplicitSafety::evaluate(
 
     // Found unsafe; whether decl == desc.decl or not, desc.decl is unsafe
     // (see invariant, above)
-    if (hasSwiftAttribute(decl, {"unsafe", "unsafe(always)"}))
+    //
+    // For a record, the annotation may sit on any of its declarations, so the
+    // verdict must not depend on which one we were handed.
+    auto hasAttrs = [&](ArrayRef<StringRef> attrs) {
+      if (auto *recordDecl = dyn_cast<clang::RecordDecl>(decl))
+        return hasSwiftAttributeOnAnyRedecl(recordDecl, attrs);
+      return hasSwiftAttribute(decl, attrs);
+    };
+
+    if (hasAttrs({"unsafe", "unsafe(always)"}))
       return ExplicitSafety::Unsafe;
 
-    if (hasSwiftAttribute(decl, {"safe"}))
+    if (hasAttrs({"safe"}))
       continue;
 
     if (desc.isClass) {

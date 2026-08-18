@@ -1597,6 +1597,13 @@ void swift::deriveAutomaticCxxConformances(
 
   ASSERT(result && clangDecl && "this should not be called with nullptrs");
 
+  // A foreign reference type is imported even when it is only declared, so
+  // this can be reached without a definition. Every conformance below is
+  // derived from members, which an incomplete type does not have, and the
+  // requests used to look them up require a definition.
+  if (!clangDecl->isCompleteDefinition())
+    return;
+
   // Skip synthesizing conformances if the associated Clang node is from
   // a module that doesn't require cplusplus, to prevent us from accidentally
   // pulling in Cxx/CxxStdlib modules when a client is importing a C library.
