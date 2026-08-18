@@ -6,7 +6,7 @@
 
 // REQUIRES: swift_feature_Embedded
 
-// CHECK-NOT: warning
+// CHECK-NOT: prevent variable inspection
 
 public struct S {}
 public func f(s: S) {}
