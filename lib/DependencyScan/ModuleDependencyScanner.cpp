@@ -223,7 +223,9 @@ ModuleDependencyScanningWorker::ModuleDependencyScanningWorker(
     : workerCompilerInvocation(
           std::make_unique<CompilerInvocation>(ScanCompilerInvocation)),
       workerSourceMgr(ScanASTContext.SourceMgr.getFileSystem()),
-      clangScanningTool(*globalScanningService.ClangScanningService),
+      clangScanningTool(
+          *globalScanningService.ClangScanningService,
+          getClangScanningFS(globalScanningService, CAS, ScanASTContext)),
       CAS(CAS), ActionCache(ActionCache),
       diagnosticReporter(DiagnosticReporter),
       ShareClangCompilerInstance(ShareClangCompilerInstance) {
@@ -624,16 +626,6 @@ ModuleDependencyScanner::ModuleDependencyScanner(
     CacheFS = cast<llvm::cas::CASBackedFileSystem>(
         llvm::cas::createCASProvidingFileSystem(
             CAS, ScanASTContext.SourceMgr.getFileSystem()));
-
-  // The Clang dependency scanning service now owns the factory that produces
-  // each worker's base file system (rather than each scanning tool owning its
-  // own). Install it before creating any worker so that the tools pick it up.
-  // The factory creates a fresh file system per worker, as required for
-  // thread-safety.
-  ScanningService.setClangScanningFSFactory(
-      [&ScanningService, CAS = this->CAS, &ScanASTContext]() {
-        return getClangScanningFS(ScanningService, CAS, ScanASTContext);
-      });
 
   // TODO: Make num threads configurable
   for (size_t i = 0; i < NumThreads; ++i)
