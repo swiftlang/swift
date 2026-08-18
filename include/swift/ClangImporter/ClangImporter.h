@@ -921,6 +921,9 @@ bool declIsCxxOnly(const Decl *decl);
 /// Is this DeclContext an `enum` that represents a C++ namespace?
 bool isClangNamespace(const DeclContext *dc);
 
+/// Is this DeclContext a nominal type imported from a C++ `struct`/`class`?
+bool isClangCxxRecord(const DeclContext *dc);
+
 /// Enumerate and import all members of the C++ namespace represented by
 /// \p namespaceEnum, invoking \p emit once for each newly imported member.
 ///

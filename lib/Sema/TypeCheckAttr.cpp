@@ -1763,6 +1763,18 @@ static SourceRange getArgListRange(ASTContext &Ctx, DeclAttribute *attr) {
   return SourceRange();
 }
 
+/// Whether \p D is a `@cxx` instance method of an imported C++ foreign
+/// reference type.
+static bool isCxxForeignReferenceInstanceMethod(const Decl *D) {
+  if (!D->getAttrs().hasAttribute<CxxDeclAttr>(/*AllowInvalid=*/true))
+    return false;
+  const auto *FD = dyn_cast<FuncDecl>(D);
+  if (!FD || FD->isStatic())
+    return false;
+  const auto *classDecl = FD->getDeclContext()->getSelfClassDecl();
+  return classDecl && classDecl->isForeignReferenceType();
+}
+
 void AttributeChecker::
 visitObjCImplementationAttr(ObjCImplementationAttr *attr) {
   // If `D` is ABI-only, let ABIDeclChecker diagnose the bad attribute.
@@ -1909,7 +1921,7 @@ visitObjCImplementationAttr(ObjCImplementationAttr *attr) {
         if (FD && !cxxAttr->isInvalid())
           evaluateOrDefault(Ctx.evaluator,
                             TypeCheckForeignFunctionRequest{FD, cxxAttr}, {});
-        if (cxxAttr->isInvalid())
+        if (cxxAttr->isInvalid() || isCxxForeignReferenceInstanceMethod(AFD))
           return;
       }
 
@@ -2520,11 +2532,18 @@ void AttributeChecker::visitCxxDeclAttr(CxxDeclAttr *attr) {
              attr->getAttrName());
 
   // @cxx may appear on a global function or on a function declared in a Swift
-  // extension of an imported C++ namespace.
+  // extension of an imported C++ namespace or C++ record.
   auto *dc = D->getDeclContext();
-  if (dc->isTypeContext() && !importer::isClangNamespace(dc))
-    diagnose(attr->getLocation(), diag::cxx_not_global_or_namespace_member,
+  if (dc->isTypeContext() && !importer::isClangNamespace(dc) &&
+      !importer::isClangCxxRecord(dc))
+    diagnose(attr->getLocation(), diag::cxx_invalid_context, attr);
+
+  // TODO: Instance methods of foreign reference types are not supported yet.
+  if (isCxxForeignReferenceInstanceMethod(D)) {
+    diagnose(attr->getLocation(), diag::cxx_foreign_reference_instance_method,
              attr);
+    attr->setInvalid();
+  }
 
   // Reject using both @cxx and @objc on the same decl.
   if (D->getAttrs().getAttribute<ObjCAttr>())

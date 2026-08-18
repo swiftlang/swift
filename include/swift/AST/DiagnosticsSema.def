@@ -2254,13 +2254,24 @@ ERROR(cxx_incompatible_with_cdecl,none,
 ERROR(cxx_attr_requires_implementation,none,
       "'@cxx' must be combined with '@implementation'",
       ())
-ERROR(cxx_not_global_or_namespace_member,none,
+ERROR(cxx_invalid_context,none,
       "%0 can only be applied to global functions or functions in extensions "
-      "of C++ namespaces", (DeclAttribute))
+      "of C++ namespaces, structs, and classes", (DeclAttribute))
+ERROR(cxx_foreign_reference_instance_method,none,
+      "%0 cannot yet be applied to instance methods of C++ foreign reference "
+      "types", (DeclAttribute))
 ERROR(cxx_func_defined,none,
       "%kind0 cannot implement C++ function '%1' because it "
       "%select{already has a definition|is declared 'inline'|is 'constexpr' (implicitly 'inline')}2",
       (ValueDecl *, StringRef, unsigned))
+ERROR(cxx_virtual_unsupported,none,
+      "%kind0 cannot implement C++ function '%1' because virtual methods are "
+      "not yet supported",
+      (ValueDecl *, StringRef))
+ERROR(cxx_mutating_mismatch,none,
+      "%kind0 should%select{|| not}1 be 'mutating' to match "
+      "%select{non-'const' ||'const' }1%kindonly2 declared by the header",
+      (ValueDecl *, unsigned, const ValueDecl *))
 ERROR(cxx_references_unsupported,none,
       "%kind0 cannot implement C++ function '%1' because reference "
       "parameters and return types are not yet supported",
