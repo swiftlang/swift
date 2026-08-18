@@ -25,10 +25,9 @@ extension StructExtractInst : OnoneSimplifiable, SILCombineSimplifiable {
 extension StructExtractInst : DebugReconstructionBlockSimplifiable {
   /// Folds `struct_extract undef` to `undef`, and fold `struct_extract(struct(x)) -> x`
   func simplifyForDebugReconstructionBlock(_ context: SimplifyContext) {
-    if self.struct is Undef {
-      replaceWithUndef(context)
-    } else {
-      simplify(context)
+    if foldUndefOperands(context) {
+      return
     }
+    simplify(context)
   }
 }

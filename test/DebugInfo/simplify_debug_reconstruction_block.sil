@@ -12,6 +12,11 @@ struct MyStruct {
 
 protocol P {}
 
+enum MyEnum {
+  case none
+  case some(Int64)
+}
+
 // CHECK-LABEL: sil {{.+}} @test_struct_extract_simplification
 // The struct+struct_extract pair is folded away, which leaves the block forwarding
 // its only argument, so the block goes away too.
@@ -193,6 +198,75 @@ bb0(%0 : $*any P):
   debug_value %0 : $*any P, let, name "indirect", type $any P, expr op_deref, transform {
   bb0(%a : $*any P):
     return %a : $*any P
+  }
+  %r = tuple ()
+  return %r : $()
+}
+
+// Undef propagates through an address projection just like through a value projection.
+// CHECK-LABEL: sil {{.+}} @test_tuple_element_addr_undef
+// CHECK: debug_value undef : $Int64, let, name "elt"
+// CHECK-NOT: transform {
+sil hidden @test_tuple_element_addr_undef : $@convention(thin) () -> () {
+bb0:
+  debug_value undef : $*(Int64, Int64), let, name "elt", type $Int64, transform {
+  bb0(%a : $*(Int64, Int64)):
+    %1 = tuple_element_addr %a : $*(Int64, Int64), 0
+    %2 = load %1 : $*Int64
+    return %2 : $Int64
+  }
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil {{.+}} @test_index_addr_undef
+// CHECK: debug_value undef : $Int64, let, name "gone_idx"
+// CHECK-NOT: transform {
+sil hidden @test_index_addr_undef : $@convention(thin) () -> () {
+bb0:
+  debug_value undef : $*Int64, let, name "gone_idx", type $Int64, transform {
+  bb0(%a : $*Int64):
+    %1 = integer_literal $Builtin.Word, 4
+    %2 = index_addr %a : $*Int64, %1 : $Builtin.Word
+    %3 = load %2 : $*Int64
+    return %3 : $Int64
+  }
+  %r = tuple ()
+  return %r : $()
+}
+
+// Salvaging clones the index literal into the block, so a zero index shows up here and
+// folds to the base. The dead literal is cleaned up with it.
+// CHECK-LABEL: sil {{.+}} @test_index_addr_zero
+// CHECK: debug_value %0 : $*Int64, let, name "idx", type $Int64, transform {
+// CHECK:   bb0(%0 : $*Int64):
+// CHECK-NEXT: %1 = load %0 : $*Int64
+// CHECK-NEXT: return %1 : $Int64
+// CHECK-NEXT: }
+sil hidden @test_index_addr_zero : $@convention(thin) (@inout Int64) -> () {
+bb0(%0 : $*Int64):
+  debug_value %0 : $*Int64, let, name "idx", type $Int64, transform {
+  bb0(%a : $*Int64):
+    %1 = integer_literal $Builtin.Word, 0
+    %2 = index_addr %a : $*Int64, %1 : $Builtin.Word
+    %3 = load %2 : $*Int64
+    return %3 : $Int64
+  }
+  %r = tuple ()
+  return %r : $()
+}
+
+// An `enum` still records which case the variable holds, so it must not be folded away
+// even though its payload became undef.
+// CHECK-LABEL: sil {{.+}} @test_enum_undef_payload_kept
+// CHECK: debug_value (), let, name "e", type $MyEnum, transform {
+// CHECK: %0 = enum $MyEnum, #MyEnum.some!enumelt, undef : $Int64
+sil hidden @test_enum_undef_payload_kept : $@convention(thin) () -> () {
+bb0:
+  debug_value undef : $Int64, let, name "e", type $MyEnum, transform {
+  bb0(%a : $Int64):
+    %1 = enum $MyEnum, #MyEnum.some!enumelt, %a : $Int64
+    return %1 : $MyEnum
   }
   %r = tuple ()
   return %r : $()

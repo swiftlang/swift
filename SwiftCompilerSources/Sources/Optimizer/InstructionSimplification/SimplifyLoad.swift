@@ -339,9 +339,7 @@ extension LoadInst : OnoneSimplifiable, SILCombineSimplifiable {
 extension LoadInst : DebugReconstructionBlockSimplifiable {
   /// Only fold `load undef` to `undef`.
   func simplifyForDebugReconstructionBlock(_ context: SimplifyContext) {
-    if address is Undef {
-      replaceWithUndef(context)
-    }
+    foldUndefOperands(context)
   }
 }
 
