@@ -48,6 +48,7 @@
 #include "swift/Demangling/Demangle.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/Basic/Unreachable.h"
+#include "swift/shims/Metadata.h"
 #include "swift/shims/HeapObject.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Casting.h"
@@ -3494,6 +3495,9 @@ public:
     return cd->getKind() == ContextDescriptorKind::Protocol;
   }
 };
+
+static_assert(sizeof(_SwiftProtocolDescriptorHeader) == ProtocolDescriptor::getOffsetToCOMInterfaceID(),
+              "_SwiftProtocolDescriptorHeader does not match TargetProtocolDescriptor");
 
 /// The descriptor for an opaque type.
 template <typename Runtime>
