@@ -2265,10 +2265,13 @@ void ModuleDecl::collectSerializedSearchPath(
 Fingerprint ModuleDecl::getFingerprint() const {
   StableHasher hasher = StableHasher::defaultHasher();
   SmallVector<Fingerprint, 16> FPs;
+  // Clients of non-strictly-resilient modules embed type sizes and offsets;
+  // type-body changes can break that ABI, so include them in the fingerprint.
+  const bool useTypeMembers = !isStrictlyResilient();
   collectBasicSourceFileInfo([&](const BasicSourceFileInfo &bsfi) {
-    // For incremental imports, the hash must be insensitive to type-body
-    // changes, so use the one without type members.
-    FPs.emplace_back(bsfi.getInterfaceHashExcludingTypeMembers());
+    FPs.emplace_back(useTypeMembers
+                         ? bsfi.getInterfaceHashIncludingTypeMembers()
+                         : bsfi.getInterfaceHashExcludingTypeMembers());
   });
   
   // Sort the fingerprints lexicographically so we have a stable hash despite
