@@ -1,0 +1,3 @@
+  version: 1
+  modules:
+    - name: _COM_Concurrency
