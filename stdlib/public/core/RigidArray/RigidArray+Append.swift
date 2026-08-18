@@ -12,6 +12,14 @@
 
 @available(SwiftStdlib 6.4, *)
 extension _RigidArray where Element: ~Copyable {
+  @available(SwiftStdlib 6.4, *)
+  @export(implementation)
+  @unsafe
+  internal mutating func _appendUnchecked(_ item: consuming Element) {
+    unsafe _storage.initializeElement(at: _count, to: item)
+    _count &+= 1
+  }
+
   /// Adds an element to the end of the array.
   ///
   /// If the array does not have sufficient capacity to hold any more elements,
@@ -24,8 +32,7 @@ extension _RigidArray where Element: ~Copyable {
   @export(implementation)
   internal mutating func append(_ item: consuming Element) {
     _precondition(!isFull, "RigidArray capacity overflow")
-    unsafe _storage.initializeElement(at: _count, to: item)
-    _count &+= 1
+    unsafe _appendUnchecked(item)
   }
 
   /// Adds an element to the end of the array, if possible.
@@ -42,7 +49,7 @@ extension _RigidArray where Element: ~Copyable {
   @export(implementation)
   internal mutating func pushLast(_ item: consuming Element) -> Element? {
     if isFull { return item }
-    append(item)
+    unsafe _appendUnchecked(item)
     return nil
   }
 }
@@ -88,6 +95,18 @@ extension _RigidArray where Element: ~Copyable {
 
 @available(SwiftStdlib 6.4, *)
 extension _RigidArray where Element: ~Copyable {
+  @available(SwiftStdlib 6.4, *)
+  @export(implementation)
+  @unsafe
+  internal mutating func _appendUnchecked(
+    moving items: UnsafeMutableBufferPointer<Element>
+  ) {
+    guard items.count > 0 else { return }
+    let c = unsafe _freeSpace._moveInitializePrefix(from: items)
+    _internalInvariant(c == items.count)
+    _count &+= items.count
+  }
+
   /// Moves the elements of a buffer to the end of this array, leaving the
   /// buffer uninitialized.
   ///
@@ -105,10 +124,7 @@ extension _RigidArray where Element: ~Copyable {
     moving items: UnsafeMutableBufferPointer<Element>
   ) {
     _precondition(items.count <= freeCapacity, "RigidArray capacity overflow")
-    guard items.count > 0 else { return }
-    let c = unsafe _freeSpace._moveInitializePrefix(from: items)
-    _internalInvariant(c == items.count)
-    _count &+= items.count
+    unsafe _appendUnchecked(moving: items)
   }
 
   /// Moves the elements of an output span to the end of this array, leaving the
@@ -126,9 +142,10 @@ extension _RigidArray where Element: ~Copyable {
   internal mutating func append(
     moving items: inout OutputSpan<Element>
   ) {
+    _precondition(items.count <= freeCapacity, "RigidArray capacity overflow")
     unsafe items.withUnsafeMutableBufferPointer { buffer, count in
       let source = buffer.extracting(first: count)
-      unsafe self.append(moving: source)
+      unsafe _appendUnchecked(moving: source)
       count = 0
     }
   }
@@ -136,6 +153,20 @@ extension _RigidArray where Element: ~Copyable {
 
 @available(SwiftStdlib 6.4, *)
 extension _RigidArray {
+  @available(SwiftStdlib 6.4, *)
+  @export(implementation)
+  @unsafe
+  internal mutating func _appendUnchecked(
+    copying newElements: UnsafeBufferPointer<Element>
+  ) {
+    guard newElements.count > 0 else { return }
+    unsafe _freeSpace.baseAddress._unsafelyUnwrappedUnchecked.initialize(
+      from: newElements.baseAddress._unsafelyUnwrappedUnchecked,
+      count: newElements.count
+    )
+    _count &+= newElements.count
+  }
+
   /// Copies the elements of a buffer to the end of this array.
   ///
   /// If the array does not have sufficient capacity to hold all items in the
@@ -154,10 +185,7 @@ extension _RigidArray {
     _precondition(
       newElements.count <= freeCapacity,
       "RigidArray capacity overflow")
-    guard newElements.count > 0 else { return }
-    unsafe _freeSpace.baseAddress.unsafelyUnwrapped.initialize(
-      from: newElements.baseAddress.unsafelyUnwrapped, count: newElements.count)
-    _count &+= newElements.count
+    unsafe _appendUnchecked(copying: newElements)
   }
 
   /// Copies the elements of a buffer to the end of this array.
@@ -175,7 +203,7 @@ extension _RigidArray {
   internal mutating func append(
     copying items: UnsafeMutableBufferPointer<Element>
   ) {
-    unsafe self.append(copying: UnsafeBufferPointer(items))
+    unsafe append(copying: UnsafeBufferPointer(items))
   }
 
   /// Copies the elements of a span to the end of this array.
@@ -191,7 +219,7 @@ extension _RigidArray {
   @export(implementation)
   internal mutating func append(copying items: Span<Element>) {
     items.withUnsafeBufferPointer { source in
-      unsafe self.append(copying: source)
+      unsafe append(copying: source)
     }
   }
 
