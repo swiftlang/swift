@@ -43,3 +43,30 @@ func f() {
   // expected-note@+1{{only concrete types such as structs, enums and classes can conform to protocols}}
   _ = property(S.self)
 }
+
+func packExpansion<each T>(_: repeat (each T).Type) -> (repeat (each T)?)
+    where repeat (each T).Type: P {
+  var index = 0
+
+  func unpack<U>(_: U.Type) -> U? where U.Type: P {
+    defer { index += 1 }
+    return nil
+  }
+
+  return (repeat unpack((each T).self))
+}
+
+func packIteration<each T>(_ types: repeat (each T).Type)
+    where repeat (each T).Type: P {
+  for type in repeat each types {
+    _ = type.identifier
+  }
+}
+
+struct Generic<Value> {
+  init(_ value: Value) {}
+}
+
+func construct<Value>(_ value: Value) {
+  _ = Generic<Value>(value)
+}
