@@ -163,6 +163,7 @@ COM_PROTOCOL(IUnknown)
 COM_PROTOCOL(ISwiftObject)
 COM_PROTOCOL(COMInterface)
 COM_PROTOCOL(COMActivatable)
+COM_PROTOCOL(COMAggregatable)
 
 PROTOCOL(AsyncSequence)
 PROTOCOL(AsyncIteratorProtocol)
