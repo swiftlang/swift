@@ -27,11 +27,13 @@
 
 // RUN: %target-swift-emit-silgen %s                          \
 // RUN:     -enable-experimental-feature CoroutineAccessors   \
+// RUN:     -enable-callee-allocated-coro-abi                 \
 // RUN:     -module-name m                                    \
 // RUN:   | %FileCheck %s --check-prefix=NO-GETTER
 
 // RUN: %target-swift-emit-silgen %s                          \
 // RUN:     -enable-experimental-feature CoroutineAccessors   \
+// RUN:     -enable-callee-allocated-coro-abi                 \
 // RUN:     -enable-library-evolution                         \
 // RUN:     -module-name m                                    \
 // RUN:   | %FileCheck %s --check-prefixes=NO-GETTER,NO-GETTER-RESILIENT
