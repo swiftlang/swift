@@ -438,6 +438,118 @@ class NotSendable {}
         expectTrue(expectation.fulfilled)
       }
 
+      // MARK: - Two-stage stream termination on cancellation
+
+      tests.test("finish(throwing:) from onTermination on cancellation throws the error passed to finish") {
+        let thrownError = SomeError()
+
+        let (controlStream, controlContinuation) = AsyncStream<Int>.makeStream()
+        var controlIterator = controlStream.makeAsyncIterator()
+
+        let task = Task { @MainActor () -> Error? in
+          let stream = AsyncThrowingStream<Int, Error> { continuation in
+            continuation.onTermination = { @Sendable termination in
+              if case .cancelled = termination {
+                continuation.finish(throwing: thrownError)
+              }
+            }
+          }
+          controlContinuation.yield(1)
+          do {
+            for try await _ in stream {}
+            return nil
+          } catch {
+            return error
+          }
+        }
+
+        expectEqual(await controlIterator.next(), 1)
+        task.cancel()
+
+        let caught = await task.value
+        if let failure = caught as? SomeError {
+          expectEqual(failure, thrownError)
+        } else {
+          expectUnreachable("expected SomeError, got \(String(describing: caught))")
+        }
+      }
+
+      tests.test("finish(throwing:) from onTermination keeps the first error when called twice") {
+        let firstError = SomeError()
+        let secondError = SomeError()
+        expectTrue(firstError != secondError)
+
+        let (controlStream, controlContinuation) = AsyncStream<Int>.makeStream()
+        var controlIterator = controlStream.makeAsyncIterator()
+
+        let task = Task { @MainActor () -> Error? in
+          let stream = AsyncThrowingStream<Int, Error> { continuation in
+            continuation.onTermination = { @Sendable termination in
+              if case .cancelled = termination {
+                // Only the first finish(throwing:) should decide the outcome
+                continuation.finish(throwing: firstError)
+                continuation.finish(throwing: secondError)
+              }
+            }
+          }
+          controlContinuation.yield(1)
+          do {
+            for try await _ in stream {}
+            return nil
+          } catch {
+            return error
+          }
+        }
+
+        expectEqual(await controlIterator.next(), 1)
+        task.cancel()
+
+        let caught = await task.value
+        if let failure = caught as? SomeError {
+          expectEqual(failure, firstError)
+        } else {
+          expectUnreachable("expected SomeError, got \(String(describing: caught))")
+        }
+      }
+
+      tests.test("finish(throwing:) from onTermination on finish throws the first error") {
+        let firstError = SomeError()
+        let secondError = SomeError()
+        expectTrue(firstError != secondError)
+
+        let (controlStream, controlContinuation) = AsyncStream<Int>.makeStream()
+        var controlIterator = controlStream.makeAsyncIterator()
+
+        let task = Task { @MainActor () -> Error? in
+          let stream = AsyncThrowingStream<Int, Error> { continuation in
+            continuation.onTermination = { @Sendable termination in
+              if case .finished = termination {
+                continuation.finish(throwing: secondError)
+              }
+            }
+            continuation.finish(throwing: firstError)
+          }
+          controlContinuation.yield(1)
+          do {
+            for try await _ in stream {}
+            return nil
+          } catch {
+            return error
+          }
+        }
+
+        expectEqual(await controlIterator.next(), 1)
+
+        let caught = await task.value
+        if let failure = caught as? SomeError {
+          expectEqual(failure, firstError)
+        } else {
+          expectUnreachable("expected SomeError, got \(String(describing: caught))")
+        }
+      }
+
+      // MARK: - Equality
+
       tests.test("continuation equality") {
         let (_, continuation1) = AsyncStream<Int>.makeStream()
         let (_, continuation2) = AsyncStream<Int>.makeStream()
@@ -569,6 +681,70 @@ class NotSendable {}
 
         // Terminate the stream by throwing
         continuation.finish(throwing: thrownError)
+
+        // Ensure the consuming Tasks both complete
+        _ = await consumer1.value
+        _ = await consumer2.value
+
+        // Ensure that all, but the first consumer return nil
+        expectEqual(nilCount, 1)
+
+        // Ensure error was only thrown once
+        expectEqual(errorCount, 1)
+      }
+
+      tests.test("finish(throwing:) from onTermination with multiple consumers") {
+        let firstError = SomeError()
+        let secondError = SomeError()
+        var errorCount = 0
+        var nilCount = 0
+
+        expectTrue(firstError != secondError)
+
+        let (stream, continuation) = AsyncThrowingStream<Int, Error>.makeStream()
+        var iterator = stream.makeAsyncIterator()
+
+        continuation.onTermination = { @Sendable termination in
+          if case .cancelled = termination {
+            continuation.finish(throwing: secondError)
+          }
+        }
+
+        let (controlStream, controlContinuation) = AsyncStream<Int>.makeStream()
+        var controlIterator = controlStream.makeAsyncIterator()
+
+        func makeConsumingTaskWithIndex(_ index: Int) -> Task<Void, Never> {
+          Task { @MainActor in
+            controlContinuation.yield(index)
+            do {
+              if let element = try await iterator.next(isolation: #isolation) {
+                controlContinuation.yield(element)
+              } else {
+                nilCount += 1
+              }
+            } catch {
+              errorCount += 1
+              if let failure = error as? SomeError {
+                expectEqual(failure, firstError)
+              } else {
+                expectUnreachable("expected SomeError, got \(String(describing: error))")
+              }
+            }
+          }
+        }
+
+        // Set up multiple consumers
+        let consumer1 = makeConsumingTaskWithIndex(1)
+        expectEqual(await controlIterator.next(isolation: #isolation), 1)
+
+        let consumer2 = makeConsumingTaskWithIndex(2)
+        expectEqual(await controlIterator.next(isolation: #isolation), 2)
+
+        // Ensure the iterators are suspended
+        await MainActor.run {}
+
+        // Terminate the stream by throwing
+        continuation.finish(throwing: firstError)
 
         // Ensure the consuming Tasks both complete
         _ = await consumer1.value
