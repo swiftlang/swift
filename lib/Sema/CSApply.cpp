@@ -1896,6 +1896,7 @@ namespace {
           (!baseIsInstance && member->isInstanceMember() &&
            !isMetatypeExtMember && !isMetatypeConformanceMember);
       const bool needsCurryThunk =
+          !(isMetatypeConformanceMember && baseTy->hasLocalArchetype()) &&
           shouldBuildCurryThunk(choice, baseIsInstance);
 
       // The formal type of the 'self' value for the member's declaration.
