@@ -23,3 +23,14 @@ struct Outer<T> where T.Type: P {
 func invoke<T>(_: T.Type) where T.Type: P {
   T.method()
 }
+
+func receive<each T>(_: repeat (each T).Type)
+    where repeat (each T).Type: P {
+}
+
+// CHECK-LABEL: sil {{.*}}forward
+// CHECK: apply {{.*}}<Pack{repeat each T}>
+func forward<each T>(_ types: repeat (each T).Type)
+    where repeat (each T).Type: P {
+  receive(repeat each types)
+}
