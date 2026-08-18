@@ -617,9 +617,7 @@ extension _AsyncStreamStorage.StateMachine {
   ///
   /// Enters the transient `terminating` state so the termination handler can
   /// still supply a failure via `finish(throwing:)`.
-  mutating func beginTerminating(
-    _ failure: consuming Failure?
-  ) -> TerminateAction {
+  mutating func beginTerminating() -> TerminateAction {
     switch unsafe consume self.state {
     case .idle(var idle):
       unsafe self = .init(state: .terminating(.init(
@@ -790,7 +788,7 @@ extension _AsyncStreamStorage {
         // Only "begin" terminating here, next we'll trigger the cancellation handler,
         // which must be allowed to `finish(throwing:)` to finalize the termination with an error.
         withLock { state in
-         return unsafe state.beginTerminating(nil)
+         return unsafe state.beginTerminating()
         }
       }
 
