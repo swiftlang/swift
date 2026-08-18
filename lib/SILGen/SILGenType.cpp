@@ -29,6 +29,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeMemberVisitor.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/SIL/FormalLinkage.h"
@@ -42,6 +43,48 @@
 
 using namespace swift;
 using namespace Lowering;
+
+namespace {
+/// Materialize COM runtime entries while their serialized implementations are
+/// still available so IRGen can place them in native vtables.
+void materializeCOMRuntimeEntries(SILGenModule &SGM, ClassDecl *CD) {
+  auto &C = SGM.getASTContext();
+  auto &SM = SGM.M;
+  auto *M = C.getLoadedModule(C.Id_COM);
+  if (!M && C.MainModule && C.MainModule->getName() == C.Id_COM)
+    M = C.MainModule;
+  ASSERT(M && "COM interop requires the COM runtime module");
+
+  SILGenFunctionBuilder B(SGM);
+  auto materialize = [&SM, &B](FuncDecl *FD) {
+    auto entry = SILDeclRef(FD).asForeign();
+    auto *SF = SM.loadFunction(entry.mangle(), SILModule::LinkingMode::LinkAll);
+    if (!SF)
+      SF = B.getOrCreateFunction(SILLocation(FD), entry, NotForDefinition);
+
+    // The native vtable reference is introduced later by IRGen and is therefore
+    // invisible to SIL dead-function elimination. Preserve a materialized
+    // implementation, but do not put an external declaration in llvm.used.
+    if (!SF->empty())
+      SF->setMarkedAsUsed(true);
+  };
+
+  bool aggregated = false;
+  if (auto *PD = C.getProtocol(KnownProtocolKind::COMAggregatable))
+    aggregated =
+        !lookupConformance(CD->getDeclaredInterfaceType(), PD).isInvalid();
+
+  for (StringRef function : {
+          aggregated ? "AggregatedQueryInterface" : "QueryInterface",
+          aggregated ? "AggregatedAddRef" : "AddRef",
+          aggregated ? "AggregatedRelease" : "Release",
+       }) {
+    auto request = COMRuntimeEntryRequest{M, C.getIdentifier(function)};
+    if (auto *FD = evaluateOrDefault(C.evaluator, request, nullptr))
+      materialize(FD);
+  }
+}
+}
 
 std::optional<SILVTable::Entry>
 SILGenModule::emitVTableMethod(ClassDecl *theClass, SILDeclRef derived,
@@ -1476,6 +1519,9 @@ public:
 
     // Build a vtable if this is a class.
     if (auto theClass = dyn_cast<ClassDecl>(theType)) {
+      if (auto *CD = theClass->getCOMDeclInfo(); CD && CD->isImplementation())
+        materializeCOMRuntimeEntries(SGM, theClass);
+
       if (!theClass->hasClangNode()) {
         SILGenVTable genVTable(SGM, theClass);
         genVTable.emitVTable();
