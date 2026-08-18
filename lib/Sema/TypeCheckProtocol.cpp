@@ -4421,6 +4421,23 @@ void ConformanceChecker::checkNonFinalClassWitness(ValueDecl *requirement,
     }
   }
 
+  // C++ constructors are not generally inherited by derived classes, unless a
+  // using-decl is used within a derived type. Therefore, a constructor of a C++
+  // foreign reference type cannot satisfy an initializer requirement.
+  if (auto ctor = dyn_cast<ConstructorDecl>(witness)) {
+    if (isa_and_nonnull<clang::CXXMethodDecl>(ctor->getClangDecl())) {
+      getASTContext().addDelayedConformanceDiag(
+          Conformance, false,
+          [ctor, requirement](NormalProtocolConformance *conformance) {
+            auto &diags = ctor->getASTContext().Diags;
+            SourceLoc diagLoc = getLocForDiagnosingWitness(conformance, ctor);
+            diags.diagnose(diagLoc, diag::witness_initializer_cxx_not_inherited,
+                           requirement, conformance->getType());
+            emitDeclaredHereIfNeeded(diags, diagLoc, ctor);
+          });
+    }
+  }
+
   // Check whether this requirement uses Self in a way that might
   // prevent conformance from succeeding.
   const auto selfRefInfo = findExistentialSelfReferences(requirement);
