@@ -98,7 +98,7 @@ struct GoodStruct {
   // actually imported, e.g., not if the function member is deleted.
   Bro<Ken> operator~() const = delete;
   Bro<Ken> deleted() const = delete;
-  Bro<Ken> frtArgByValue(FRT) const; // expected-ok-swift-note {{uses foreign reference type 'FRT' as a value}}
+  Bro<Ken> frtArgByValue(FRT) const; // expected-ok-swift-note {{takes foreign reference type 'FRT' by value}}
 };
 // CHECK:      struct GoodStruct {
 // CHECK-NEXT:   init()

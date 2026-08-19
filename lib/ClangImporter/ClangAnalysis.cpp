@@ -199,70 +199,89 @@ struct RetainReleaseInfo {
     for (auto *attr : carrier->specific_attrs<clang::SwiftAttrAttr>()) {
       StringRef attrStr = attr->getAttribute();
       if (attrStr.consume_front("retain:")) {
-        ++retainCount;
-        retain = attrStr;
+        retainAttrs.push_back(attr);
+        retainName = attrStr;
       } else if (attrStr.consume_front("release:")) {
-        ++releaseCount;
-        release = attrStr;
+        releaseAttrs.push_back(attr);
+        releaseName = attrStr;
       }
     }
   }
 
   /// The name of the last retain: operation (empty if none).
-  StringRef getRetain() const { return retain; }
+  StringRef getRetain() const { return retainName; }
 
   /// The name of the last release: operation (empty if none).
-  StringRef getRelease() const { return release; }
-
-  unsigned numRetain() const { return retainCount; }
-
-  unsigned numRelease() const { return releaseCount; }
+  StringRef getRelease() const { return releaseName; }
 
   bool isImmortal() const {
-    return retainCount == 1 && releaseCount == 1 && retain == "immortal" &&
-           release == "immortal";
+    return isValid() && retainName == "immortal" && releaseName == "immortal";
   }
 
   bool hasMixedImmortality() const {
-    bool retainImmortal = retain == "immortal";
-    bool releaseImmortal = release == "immortal";
+    bool retainImmortal = retainName == "immortal";
+    bool releaseImmortal = releaseName == "immortal";
     return retainImmortal != releaseImmortal;
   }
 
   bool isValid() const {
-    return numRetain() == 1 && numRelease() == 1 && !hasMixedImmortality();
+    return retainAttrs.size() == 1 && releaseAttrs.size() == 1 &&
+           !hasMixedImmortality();
+  }
+
+  /// Emit "retain and release functions specified on / inherited from" note.
+  void
+  noteRetainReleaseOrigin(ClangImporter::Implementation &Impl,
+                          clang::SourceLocation loc,
+                          std::optional<bool> isRelease = std::nullopt) const {
+    if (loc.isValid()) {
+      unsigned sel = 2 /* retain and release functions */;
+      if (isRelease.has_value())
+        sel = isRelease.value() ? 1 /* release function */
+                                : 0 /* retain function */;
+      Impl.diagnose(HeaderLoc(loc), diag::retain_release_function_origin, sel,
+                    /*isInherited=*/false, decl);
+    }
+    // Otherwise: no usable attribute location and not inherited -> omit.
   }
 
   /// Diagnose malformed retain:/release: attributes via \p Impl (if non-null).
   /// Returns whether the annotations are structurally well-formed.
   bool checkShape(ClangImporter::Implementation *Impl) const {
     HeaderLoc loc(decl->getLocation());
-    auto checkOp = [&](unsigned count, StringRef name, bool isRelease) {
-      if (count != 1) {
-        if (Impl)
-          Impl->diagnose(
-              loc,
-              count == 0 ? diag::reference_type_must_have_retain_release_attr
-                         : diag::too_many_reference_type_retain_release_attr,
-              isRelease, decl->getNameAsString());
+    auto checkOp = [&](bool isRelease) {
+      auto &attrs = isRelease ? releaseAttrs : retainAttrs;
+      auto &name = isRelease ? releaseName : retainName;
+      if (attrs.size() != 1) {
+        if (Impl) {
+          Impl->diagnose(loc,
+                         diag::reference_type_exactly_one_retain_release_attr,
+                         isRelease, decl);
+          for (auto *attr : attrs)
+            noteRetainReleaseOrigin(*Impl, attr->getLocation(), isRelease);
+        }
         return false;
       }
       if (name.empty()) {
-        if (Impl)
+        if (Impl) {
           Impl->diagnose(loc, diag::reference_type_empty_retain_release_name,
-                         isRelease, decl->getNameAsString());
+                         isRelease, decl);
+          noteRetainReleaseOrigin(*Impl, attrs[0]->getLocation(), isRelease);
+        }
         return false;
       }
       return true;
     };
-    bool retainOk = checkOp(retainCount, retain, /*isRelease=*/false);
-    bool releaseOk = checkOp(releaseCount, release, /*isRelease=*/true);
+    bool retainOk = checkOp(/*isRelease=*/false);
+    bool releaseOk = checkOp(/*isRelease=*/true);
     if (!retainOk || !releaseOk)
       return false;
 
     if (hasMixedImmortality()) {
-      if (Impl)
+      if (Impl) {
         Impl->diagnose(loc, diag::reference_type_mixed_immortal_marker, decl);
+        noteRetainReleaseOrigin(*Impl, retainAttrs[0]->getLocation());
+      }
       return false;
     }
     return true;
@@ -270,8 +289,8 @@ struct RetainReleaseInfo {
 
 private:
   const clang::RecordDecl *decl;
-  StringRef retain, release;
-  unsigned retainCount = 0, releaseCount = 0;
+  StringRef retainName, releaseName;
+  llvm::SmallVector<const clang::SwiftAttrAttr *, 1> retainAttrs, releaseAttrs;
 };
 
 class ForeignReferenceTypeChecker {
@@ -679,8 +698,8 @@ static bool checkRefCountOperation(const ClassDecl *classDecl, ValueDecl *op,
 
   // Instance operations take no parameters; free operations take one.
   if (fn->getParameters()->size() != (fn->isInstanceMember() ? 0 : 1)) {
-    diagnose(diag::foreign_reference_types_invalid_retain_release, !isRetain,
-             name, classDecl->getNameStr());
+    diagnose(diag::foreign_reference_retain_release_param_type, !isRetain, name,
+             classDecl->getNameStr());
     return false;
   }
 
@@ -708,11 +727,8 @@ static bool checkRefCountOperation(const ClassDecl *classDecl, ValueDecl *op,
   if (isRetain && !validReturn)
     validReturn = resultTy->lookThroughSingleOptionalType()->isEqual(paramType);
   if (!validReturn) {
-    diagnose(
-        isRetain
-            ? diag::foreign_reference_types_retain_non_void_or_self_return_type
-            : diag::foreign_reference_types_release_non_void_return_type,
-        name);
+    diagnose(diag::foreign_reference_retain_release_return_type, !isRetain,
+             name);
     return false;
   }
 
@@ -724,7 +740,7 @@ static bool checkRefCountOperation(const ClassDecl *classDecl, ValueDecl *op,
     if (cxxDecl && paramCxxDecl && cxxDecl->isDerivedFrom(paramCxxDecl)) {
       // The parameter may also be one of the FRT's bases
     } else {
-      diagnose(diag::foreign_reference_types_invalid_retain_release, !isRetain,
+      diagnose(diag::foreign_reference_retain_release_param_type, !isRetain,
                name, classDecl->getNameStr());
       return false;
     }
@@ -766,7 +782,7 @@ resolveRefCountOperation(const ClassDecl *classDecl,
       if (op) {
         Impl.diagnose(loc,
                       diag::too_many_reference_type_retain_release_operations,
-                      !isRetain, name, record->getNameAsString());
+                      !isRetain, name, record);
         return nullptr;
       }
       op = candidate;
@@ -775,15 +791,13 @@ resolveRefCountOperation(const ClassDecl *classDecl,
 
   if (!op) {
     Impl.diagnose(loc, diag::foreign_reference_types_cannot_find_retain_release,
-                  !isRetain, name, record->getNameAsString());
+                  !isRetain, name, record);
     if (!Impl.SwiftContext.LangOpts.DisableExperimentalClangImporterDiagnostics)
       Impl.diagnoseTopLevelValue(
           DeclName(Impl.SwiftContext.getIdentifier(name)));
     return nullptr;
   }
 
-  // Diagnose any signature problem on the chosen operation. It is still
-  // returned (and recorded) even if invalid, matching prior behavior.
   checkRefCountOperation(classDecl, op, isRetain, name, &Impl, loc);
   return op;
 }
