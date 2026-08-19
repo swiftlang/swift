@@ -95,7 +95,7 @@ struct SubstitutionMapWithLocalArchetypes {
   ProtocolConformanceRef operator()(InFlightSubstitution &IFS,
                                     Type origType,
                                     ProtocolDecl *proto) {
-    if (origType->is<LocalArchetypeType>())
+    if (origType->hasLocalArchetype())
       return swift::lookupConformance(origType.subst(IFS), proto);
 
     if (SubsMap) {
