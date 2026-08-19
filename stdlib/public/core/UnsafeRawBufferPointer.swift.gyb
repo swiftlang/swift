@@ -1225,7 +1225,7 @@ extension Unsafe${Mutable}RawBufferPointer {
   @export(implementation)
   @safe
   public func extracting(_ bounds: Range<Int>) -> Self {
-    _precondition(_checkBounds(bounds), "Byte offset out of range")
+    _debugPrecondition(_checkBounds(bounds), "Byte offset out of range")
     guard let start = baseAddress else {
       return unsafe Self(_uncheckedStart: nil, count: 0)
     }
@@ -1282,6 +1282,7 @@ extension Unsafe${Mutable}RawBufferPointer {
   /// - Complexity: O(1)
   @export(implementation)
   public func extracting(unchecked bounds: Range<Int>) -> Self {
+    _internalInvariant(_checkBounds(bounds), "Byte offset out of range")
     let newStart = unsafe baseAddress?.advanced(by: bounds.lowerBound)
     return unsafe Self(_uncheckedStart: newStart, count: bounds.count)
   }
