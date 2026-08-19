@@ -436,6 +436,46 @@ extension DistributedActorSystem {
     let targetName = target.identifier
     let targetNameUTF8 = Array(targetName.utf8)
 
+    // Measure the whole inbound execution: decoding, invoking the target and
+    // the result handler. The nested phases (decode, invoke) draw inside it.
+    // TODO: include more information like the number of decoded args etc?
+    var executeSpanID: UInt64 = _traceDistributedExecuteTarget(
+      targetActor: actor, targetIdentifier: target.identifier)
+    // Closes the execution interval. Calling this more than once is harmless,
+    // only the first call is recorded. The 'defer' below guarantees the
+    // interval is closed however we leave this function.
+    func endExecuteSpan(error: (any Error)? = nil, failed: Bool = false) {
+      guard executeSpanID != 0 else { return }
+      _traceDistributedExecuteTargetEnd(executeSpanID, error: error,
+                                        failed: failed)
+      executeSpanID = 0
+    }
+    defer {
+      // A 'defer' cannot see the error that is propagating, so this only
+      // reports that the execution did not run to completion
+      endExecuteSpan(failed: true)
+    }
+
+    // Measure how long decoding the incoming invocation takes. Note that the
+    // individual argument values are decoded by the distributed accessor
+    // (via 'decodeNextArgument'), so they are not part of this interval.
+    var decodeSpanID: UInt64 = _traceDistributedDecodeArgumentsBegin(
+      targetActor: actor, targetIdentifier: target.identifier)
+    // Closes the decoding interval. Calling this more than once is harmless,
+    // only the first call is recorded. The 'defer' below guarantees the
+    // interval is closed even when decoding throws.
+    func endDecodeSpan(_ argumentCount: Int, failed: Bool = false) {
+      guard decodeSpanID != 0 else { return }
+      _traceDistributedDecodeArgumentsEnd(
+        decodeSpanID, argumentCount: argumentCount, failed: failed)
+      decodeSpanID = 0
+    }
+    defer {
+      // A 'defer' cannot see the error that is propagating, so this only
+      // reports that decoding did not run to completion
+      endDecodeSpan(0, failed: true)
+    }
+
     // Gen the generic environment (if any) associated with the target.
     let genericEnv =
       targetNameUTF8.withUnsafeBufferPointer { targetNameUTF8 in
@@ -576,9 +616,32 @@ extension DistributedActorSystem {
       _openExistential(returnTypeFromTypeInfo, do: doDestroyReturnTypeBuffer)
     }
 
+    // Measure the execution of the target itself
+    var invokeSpanID: UInt64 = 0
+    // Closes the execution interval. Calling this more than once is harmless,
+    // only the first call is recorded. The 'defer' below guarantees the
+    // interval is closed however we leave this function.
+    func endInvokeSpan(error: (any Error)? = nil, failed: Bool = false) {
+      guard invokeSpanID != 0 else { return }
+      _traceDistributedInvokeTargetEnd(invokeSpanID, error: error,
+                                       failed: failed)
+      invokeSpanID = 0
+    }
+    defer {
+      // A 'defer' cannot see the error that is propagating, so this only
+      // reports that the target did not run to completion
+      endInvokeSpan(failed: true)
+    }
+
     do {
       let returnType = try invocationDecoder.decodeReturnType() ?? returnTypeFromTypeInfo
       // let errorType = try invocationDecoder.decodeErrorType() // TODO(distributed): decide how to use when typed throws are done
+
+      // Decoding of the invocation is complete
+      endDecodeSpan(argumentTypes.count)
+
+      invokeSpanID = _traceDistributedInvokeTargetBegin(
+        targetActor: actor, targetIdentifier: target.identifier)
 
       // Execute the target!
       try unsafe await _executeDistributedTarget(
@@ -596,6 +659,9 @@ extension DistributedActorSystem {
       // we must properly deinitialize it.
       executeDistributedTargetHasThrown = false
 
+      // The target ran to completion; the result handler is invoked next
+      endInvokeSpan()
+
       if returnType == Void.self {
         try await handler.onReturnVoid()
       } else {
@@ -605,7 +671,22 @@ extension DistributedActorSystem {
           metatype: returnType
         )
       }
+
+      _traceDistributedInvokeResultHandler(
+        targetActor: actor, targetIdentifier: target.identifier, error: nil)
+
+      // The whole inbound execution ran to completion
+      endExecuteSpan()
     } catch {
+      // Unlike the 'defer', here the error is in hand, so the execution
+      // interval can report which error type it failed with
+      endInvokeSpan(error: error)
+
+      _traceDistributedInvokeResultHandler(
+        targetActor: actor, targetIdentifier: target.identifier, error: error)
+
+      endExecuteSpan(error: error)
+
       try await handler.onThrow(error: error)
     }
   }

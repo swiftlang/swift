@@ -338,6 +338,14 @@ IDENTIFIER(decodeNextArgument)
 IDENTIFIER(SerializationRequirement)
 IDENTIFIER_WITH_NAME(builderSelf, "$builderSelf")
 
+IDENTIFIER_(traceDistributedRemoteCall)
+IDENTIFIER_(traceDistributedRemoteCallEnd)
+IDENTIFIER_(traceDistributedEncodeArgumentsBegin)
+IDENTIFIER_(traceDistributedEncodeArgumentsEnd)
+IDENTIFIER(targetActor)
+IDENTIFIER(targetIdentifier)
+IDENTIFIER(argumentCount)
+
 // Attribute options
 IDENTIFIER(always)
 IDENTIFIER_(_always)

@@ -103,7 +103,7 @@ set(SWIFT_RUNTIME_CONCURRENCY_C_SOURCES
   TaskGroup.cpp
   TaskLocal.cpp
   ThreadingError.cpp
-  TracingSignpost.cpp
+  TracingConcurrencySignpost.cpp
   AsyncStream.cpp
   linker-support/magic-symbols-for-install-name.c
 )
