@@ -480,8 +480,11 @@ extension _AsyncStreamStorage.StateMachine {
         )
       }
 
-    case .terminated(let terminated):
-      unsafe self = .init(state: .terminated(.init()))
+    case .terminated(var terminated):
+      unsafe self = .init(state: .terminated(.init(
+        failure: nil,
+        terminationHandler: terminated.terminationHandler.take()
+      )))
 
       switch terminated.failure {
       case .some(let failure):
