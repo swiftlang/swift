@@ -2578,6 +2578,13 @@ ERROR(called_once_cannot_be_used_with_borrowing,none,
 ERROR(called_once_function_type_mismatch,none,
       "invalid conversion from '@called(once)' function of type %0 "
       "to function type %1", (Type, Type))
+ERROR(sending_capture_requires_experimental_feature,none,
+      "'sending' capture is only valid when experimental feature "
+      "'CalledAttribute' is enabled",
+      ())
+ERROR(sending_capture_decl_requires_called_once,none,
+      "'sending' capture may only be declared in a '@called(once)' closure",
+      ())
 
 // Alignment attribute
 ERROR(alignment_not_power_of_two,none,
