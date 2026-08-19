@@ -19,6 +19,7 @@
 #define SWIFT_SEMA_DERIVEDCONFORMANCE_DERIVEDCONFORMANCE_H
 
 #include "swift/AST/Builtins.h"
+#include "swift/AST/Decl.h"
 #include "swift/Basic/LLVM.h"
 #include <utility>
 
@@ -27,6 +28,7 @@ class AbstractFunctionDecl;
 class AccessorDecl;
 class AssociatedTypeDecl;
 class ASTContext;
+enum class BuiltinDerivedConformanceMacroKind : uint8_t;
 struct ASTNode;
 class CallExpr;
 class CaseStmt;
@@ -467,13 +469,27 @@ bool memberwiseAccessorsRequireActorIsolation(NominalTypeDecl *nominal);
 
 /// Returns the value decl expanded from the macro in `code` in the context of
 /// the \p derived derived conformance for the \p requirement requirement.
-ValueDecl *deriveRequirementViaMacro(DerivedConformance &derived,
-                                     ValueDecl *requirement, StringRef code);
-  
+ValueDecl *
+deriveRequirementViaMacro(DerivedConformance &derived, ValueDecl *requirement,
+                          StringRef code,
+                          BuiltinDerivedConformanceMacroKind macroKind);
+
+/// Expands the synthesized macro declaration in `code` in the context of the
+/// \p derived derived conformance and returns the expansion.
+MacroExpansionDecl *
+expandDerivationMacro(DerivedConformance &derived, ValueDecl *requirement,
+                      StringRef code,
+                      BuiltinDerivedConformanceMacroKind macroKind,
+                      bool alwaysAttachToNominal = false);
+
 /// Get a string describing the nominal type we are deriving a conformance
 /// for by producing valid swift syntax.
 std::string getNominalTypeInfoString(DerivedConformance &derived);
 
+std::string getEnumTypeInfoString(const EnumDecl *decl);
+
+/// Returns whether \p decl comes from expanding a synthetic macro.
+bool hasBeenMacroSynthesized(Decl *decl);
 } // namespace swift
 
 #endif

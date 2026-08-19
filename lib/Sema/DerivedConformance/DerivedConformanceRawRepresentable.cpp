@@ -25,9 +25,11 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/PluginLoader.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/QuotedString.h"
 #include "llvm/ADT/APInt.h"
 
 using namespace swift;
@@ -445,6 +447,30 @@ deriveRawRepresentable_init(DerivedConformance &derived) {
   return initDecl;
 }
 
+static ValueDecl *deriveRawRepresentableViaMacros(DerivedConformance &derived,
+                                                  ValueDecl *requirement) {
+  auto &C = requirement->getASTContext();
+  bool isStrictMemorySafety = C.LangOpts.hasFeature(
+      Feature::StrictMemorySafety, /*allowMigration=*/true);
+
+  std::string macro = "#_deriveRawRepresentable(";
+  auto os = llvm::raw_string_ostream(macro);
+  os << QuotedString(getNominalTypeInfoString(derived)) << ", ";
+
+  if (requirement->getBaseName() == C.Id_RawValue) {
+    os << QuotedString("typeAlias");
+  } else if (requirement->getBaseName() == C.Id_rawValue) {
+    os << QuotedString("varDef");
+  } else if (requirement->getBaseName().isConstructor()) {
+    os << QuotedString("initializer");
+  }
+  os << ", " << (isStrictMemorySafety ? "true" : "false") << ")";
+  os.flush();
+  return deriveRequirementViaMacro(
+      derived, requirement, macro,
+      BuiltinDerivedConformanceMacroKind::DeriveRawRepresentable);
+}
+
 bool DerivedConformance::canDeriveRawRepresentable(DeclContext *DC,
                                                    NominalTypeDecl *type) {
   auto enumDecl = dyn_cast<EnumDecl>(type);
@@ -471,13 +497,11 @@ bool DerivedConformance::canDeriveRawRepresentable(DeclContext *DC,
     return false;
 
   auto &C = type->getASTContext();
-  auto rawValueDecls = enumDecl->lookupDirect(DeclName(C.Id_RawValue));
-  if (rawValueDecls.size() > 1)
-    return false;
-
-  // Check that the RawValue matches the expected raw type.
-  if (!rawValueDecls.empty()) {
-    if (auto alias = dyn_cast<TypeDecl>(rawValueDecls.front())) {
+  // Synthesizing the 'RawValue' witness introduces an alias of its own, so
+  // there may be more than one of them. They all have to match the expected raw
+  // type.
+  for (auto *decl : enumDecl->lookupDirect(DeclName(C.Id_RawValue))) {
+    if (auto alias = dyn_cast<TypeDecl>(decl)) {
       auto ty = alias->getDeclaredInterfaceType();
       if (!DC->mapTypeIntoEnvironment(ty)->isEqual(rawType)) {
         return false;
@@ -512,6 +536,26 @@ ValueDecl *DerivedConformance::deriveRawRepresentable(ValueDecl *requirement) {
   // Check preconditions for synthesized conformance.
   if (!canDeriveRawRepresentable(cast<DeclContext>(ConformanceDecl), Nominal))
     return nullptr;
+
+  auto &pluginLoader = Context.getPluginLoader();
+  auto &entry = pluginLoader.lookupPluginByModuleName(
+      Context.getIdentifier("SwiftMacros"));
+  if (!entry.libraryPath.empty() && !::getenv("DONT_DERIVE_VIA_MACROS")) {
+    if (requirement->getBaseName() == Context.Id_rawValue) {
+      auto *witness = deriveRawRepresentableViaMacros(*this, requirement);
+      maybeMarkAsInlinable(*this,
+                           cast<VarDecl>(witness)->getAccessor(AccessorKind::Get));
+      return witness;
+    }
+    if (requirement->getBaseName().isConstructor()) {
+      auto *witness = deriveRawRepresentableViaMacros(*this, requirement);
+      maybeMarkAsInlinable(*this, cast<AbstractFunctionDecl>(witness));
+      return witness;
+    }
+    Context.Diags.diagnose(requirement->getLoc(),
+                           diag::broken_raw_representable_requirement);
+    return nullptr;
+  }
 
   if (requirement->getBaseName() == Context.Id_rawValue)
     return deriveRawRepresentable_raw(*this);
