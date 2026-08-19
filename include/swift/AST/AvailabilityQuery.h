@@ -78,6 +78,15 @@ public:
                              variantRange);
   }
 
+  /// Returns the `AvailabilityQuery` to evaluate for a query of availability
+  /// in `domain`. The result is constant when the enablement of the domain is
+  /// known at compile time. The domain must support queries and must not be the
+  /// universal domain.
+  static AvailabilityQuery
+  forDomain(AvailabilityDomain domain,
+            const std::optional<AvailabilityRange> &primaryRange,
+            const std::optional<AvailabilityRange> &variantRange);
+
   /// Returns a copy of the `AvailabilityQuery` that has been modified to
   /// represent an `if #unavailable` query if `isUnavailability` is true, or an
   /// `if #available` query otherwise.

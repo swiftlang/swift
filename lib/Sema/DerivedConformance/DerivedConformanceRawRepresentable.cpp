@@ -20,6 +20,7 @@
 #include "TypeCheckAvailability.h"
 #include "TypeCheckDecl.h"
 #include "TypeChecker.h"
+#include "swift/AST/AvailabilityQuery.h"
 #include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
@@ -184,91 +185,119 @@ static VarDecl *deriveRawRepresentable_raw(DerivedConformance &derived) {
   return propDecl;
 }
 
-/// Contains information needed to synthesize a runtime version check.
-struct RuntimeVersionCheck {
-  PlatformKind Platform;
-  llvm::VersionTuple Version;
+/// Synthesizes a statement which returns nil if the given availability query
+/// fails, e.g. "guard #available(iOS 10, *) else { return nil }".
+static Stmt *createAvailabilityGuardStmt(ASTContext &C,
+                                         const AvailabilityQuery &query) {
+  auto domain = query.getDomain();
+  bool isUnavailability = query.isUnavailability();
 
-  RuntimeVersionCheck(PlatformKind Platform, llvm::VersionTuple Version)
-    : Platform(Platform), Version(Version)
-  { }
-
-  VersionRange getVersionRange() const {
-    return VersionRange::allGTE(Version);
+  // domainSpec = "\(domain) \(version)", e.g. "iOS 10". Domains that don't
+  // support versioned availability have no version, e.g. "MyDomain".
+  llvm::VersionTuple version;
+  if (auto primaryRange = query.getPrimaryRange()) {
+    if (primaryRange->hasMinimumVersion())
+      version = primaryRange->getRawMinimumVersion();
   }
+  auto domainSpec = AvailabilitySpec::createForDomain(C, domain, SourceLoc(),
+                                                      version, SourceLoc());
 
-  /// Synthesizes a statement which returns nil if the runtime version check
-  /// fails, e.g. "guard #available(iOS 10, *) else { return nil }".
-  Stmt *createEarlyReturnStmt(ASTContext &C) const {
-    // platformSpec = "\(attr.platform) \(attr.introduced)"
-    auto domain = AvailabilityDomain::forPlatform(Platform);
-    auto platformSpec = AvailabilitySpec::createForDomain(
-        C, domain, SourceLoc(), Version, SourceLoc());
+  SmallVector<AvailabilitySpec *, 2> specs;
+  specs.push_back(domainSpec);
 
-    // wildcardSpec = "*"
-    auto wildcardSpec = AvailabilitySpec::createWildcard(C, SourceLoc());
+  // Availability in some domains, like custom domains, must be specified alone,
+  // and an "#unavailable" query never takes a wildcard. For the rest, add the
+  // wildcard spec "*".
+  if (!isUnavailability && !domain.mustBeSpecifiedAlone())
+    specs.push_back(AvailabilitySpec::createWildcard(C, SourceLoc()));
 
-    // availableInfo = "#available(\(platformSpec), \(wildcardSpec))"
-    auto availableInfo = PoundAvailableInfo::create(
-        C, SourceLoc(), SourceLoc(), {platformSpec, wildcardSpec}, SourceLoc(),
-        false);
+  // availableInfo = "#available(\(specs))", or "#unavailable(\(specs))"
+  auto availableInfo = PoundAvailableInfo::create(
+      C, SourceLoc(), SourceLoc(), specs, SourceLoc(), isUnavailability);
 
-    // This won't be filled in by TypeCheckAvailability because we have
-    // invalid SourceLocs in this area of the AST.
-    availableInfo->setAvailabilityQuery(AvailabilityQuery::dynamic(
-        domain, AvailabilityRange(getVersionRange()), std::nullopt));
+  // This won't be filled in by TypeCheckAvailability because synthesized code
+  // has invalid source locations.
+  availableInfo->setAvailabilityQuery(query);
 
-    // earlyReturnBody = "{ return nil }"
-    auto earlyReturn = new (C) FailStmt(SourceLoc(), SourceLoc());
-    auto earlyReturnBody = BraceStmt::create(C, SourceLoc(),
-                                             ASTNode(earlyReturn),
-                                             SourceLoc(), /*implicit=*/true);
+  // earlyReturnBody = "{ return nil }"
+  auto earlyReturn = new (C) FailStmt(SourceLoc(), SourceLoc());
+  auto earlyReturnBody = BraceStmt::create(C, SourceLoc(), ASTNode(earlyReturn),
+                                           SourceLoc(), /*implicit=*/true);
 
-    // guardStmt = "guard \(availableInfo) else \(earlyReturnBody)"
-    StmtConditionElement conds[1] = { availableInfo };
-    auto guardStmt = new (C) GuardStmt(SourceLoc(), C.AllocateCopy(conds),
-                                       earlyReturnBody, /*implicit=*/true);
+  // guardStmt = "guard \(availableInfo) else \(earlyReturnBody)"
+  StmtConditionElement conds[1] = {availableInfo};
+  auto guardStmt = new (C) GuardStmt(SourceLoc(), C.AllocateCopy(conds),
+                                     earlyReturnBody, /*implicit=*/true);
 
-    return guardStmt;
-  }
-};
+  return guardStmt;
+}
 
-/// Checks if the case will be available at runtime given the current target
-/// platform. If it will never be available, returns false. If it will always
-/// be available, returns true. If it will sometimes be available, adds
-/// information about the runtime check needed to ensure it is available to
-/// \c versionCheck and returns true.
+/// Checks whether the case may be reached at runtime. If it can never be
+/// reached, returns false. Otherwise, returns true and appends a query to
+/// \c availabilityQueries for each domain that the case must be checked in at
+/// runtime.
 static bool
 checkAvailability(const EnumElementDecl *elt,
                   AvailabilityContext availabilityContext,
-                  std::optional<RuntimeVersionCheck> &versionCheck) {
+                  SmallVectorImpl<AvailabilityQuery> &availabilityQueries) {
   auto &C = elt->getASTContext();
-  auto restriction = availabilityContext.unsatisfiedRestrictionForDecl(elt);
 
-  // Is it always available?
-  if (!restriction)
-    return true;
-
-  // Is it never available?
-  if (restriction->isUnavailable())
+  // A case should not be emitted for an element that is unreachable at runtime
+  // since otherwise that unavailable element could be constructed illegally via
+  // instantiation from a specific raw value. Hand-written versions of
+  // init(rawValue:) would most likely handle this by wrapping the case in an
+  // appropriate `#if` condition, which we cannot do in code synthesis. Leaving
+  // the case out also keeps its raw value from appearing in the generated code,
+  // which matters for an element that is hidden behind a disabled domain.
+  //
+  // An element of an enum that is itself unreachable is exempt. Every element
+  // of such an enum inherits its unreachability, so honoring it here would
+  // leave init(rawValue:) with no cases at all.
+  if (elt->isUnreachableAtRuntime() &&
+      !elt->getParentEnum()->isUnreachableAtRuntime())
     return false;
 
-  // Some restrictions are active for type checking but can't translate to
-  // runtime restrictions.
-  if (!restriction->isActiveForRuntimeQueries(C))
-    return true;
+  for (auto const &restriction :
+       availabilityContext.allRestrictionsForDecl(elt)) {
+    // Deprecation doesn't prevent the case from being reached.
+    if (restriction.isDeprecated())
+      continue;
 
-  auto domainAndRange = restriction->getDomainAndRange(C);
+    auto domain = restriction.getDomain();
 
-  // Only platform version restrictions are supported currently.
-  // FIXME: [availability] Support non-platform domain availability checks
-  if (!domainAndRange.getDomain().isPlatform())
-    return true;
+    // Unavailability restrictions must be handled carefully. If there is no
+    // way to express an availability query that corresponds to the restriction
+    // then a case cannot be synthesized for this element.
+    if (restriction.isUnavailable() &&
+        (domain.isVersioned() || !domain.supportsQueries()))
+      return false;
 
-  // It's conditionally available; create a version restriction and return
-  // true.
-  versionCheck.emplace(domainAndRange.getDomain().getPlatformKind(),
-                       domainAndRange.getRange().getRawMinimumVersion());
+    // Some restrictions are active for type checking but can't translate to
+    // runtime restrictions.
+    if (!restriction.isActiveForRuntimeQueries(C))
+      continue;
+
+    // There is no query that can guard the case, so it can never be reached.
+    if (!domain.supportsQueries())
+      return false;
+
+    // Comparisons must be made in the canonical domain for the current
+    // compilation, which may differ from the domain that was written.
+    auto domainAndRange = restriction.getDomainAndRange(C);
+    domain = domainAndRange.getDomain();
+
+    // Only a versioned domain takes a version argument in a query.
+    std::optional<AvailabilityRange> range;
+    if (domain.isVersioned())
+      range.emplace(domainAndRange.getRange());
+
+    auto query = AvailabilityQuery::forDomain(domain, range,
+                                              /*variantRange=*/std::nullopt)
+                     .asUnavailable(restriction.isUnavailable());
+
+    availabilityQueries.push_back(query);
+  }
+
   return true;
 }
 
@@ -315,11 +344,10 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl, void *) {
   unsigned Idx = 0;
   for (auto elt : enumDecl->getAllElements()) {
     // First, check case availability. If the case will definitely be
-    // unavailable, skip it. If it might be unavailable at runtime, save
-    // information about that check in versionCheck and keep processing this
-    // element.
-    std::optional<RuntimeVersionCheck> versionCheck(std::nullopt);
-    if (!checkAvailability(elt, availabilityContext, versionCheck))
+    // unavailable, skip it. If it might be unavailable at runtime, save the
+    // queries it needs in availabilityQueries and keep processing this element.
+    SmallVector<AvailabilityQuery, 1> availabilityQueries;
+    if (!checkAvailability(elt, availabilityContext, availabilityQueries))
       continue;
 
     // litPat = elt.rawValueExpr as a pattern
@@ -335,10 +363,10 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl, void *) {
     /// Statements in the body of this case.
     SmallVector<ASTNode, 2> stmts;
 
-    // If checkAvailability() discovered we need a runtime version check,
-    // add it now.
-    if (versionCheck.has_value())
-      stmts.push_back(ASTNode(versionCheck->createEarlyReturnStmt(C)));
+    // If checkAvailability() discovered we need runtime availability queries,
+    // add them now.
+    for (auto const &query : availabilityQueries)
+      stmts.push_back(ASTNode(createAvailabilityGuardStmt(C, query)));
 
     // Create a statement which assigns the case to self.
 

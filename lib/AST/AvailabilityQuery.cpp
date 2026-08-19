@@ -65,6 +65,44 @@ AvailabilityQuery::AvailabilityQuery(
   }
 }
 
+AvailabilityQuery AvailabilityQuery::forDomain(
+    AvailabilityDomain domain,
+    const std::optional<AvailabilityRange> &primaryRange,
+    const std::optional<AvailabilityRange> &variantRange) {
+  switch (domain.getKind()) {
+  case AvailabilityDomain::Kind::Universal:
+  case AvailabilityDomain::Kind::Embedded:
+  case AvailabilityDomain::Kind::SwiftLanguageMode:
+  case AvailabilityDomain::Kind::PackageDescription:
+    // These domains don't support queries.
+    llvm::report_fatal_error("unsupported domain");
+
+  case AvailabilityDomain::Kind::StandaloneSwiftRuntime:
+    return dynamic(domain, primaryRange, std::nullopt);
+
+  case AvailabilityDomain::Kind::Platform:
+    // Platform and Swift runtime checks are always dynamic. We can't perform an
+    // analysis of whether the check would always succeed due to the deployment
+    // target here because the answer may depend on inlining across module
+    // boundaries.
+    return dynamic(domain, primaryRange, variantRange);
+
+  case AvailabilityDomain::Kind::Custom:
+    auto customDomain = domain.getCustomDomain();
+    ASSERT(customDomain);
+
+    switch (customDomain->getKind()) {
+    case CustomAvailabilityDomain::Kind::Enabled:
+    case CustomAvailabilityDomain::Kind::AlwaysEnabled:
+      return constant(domain, true);
+    case CustomAvailabilityDomain::Kind::Disabled:
+      return constant(domain, false);
+    case CustomAvailabilityDomain::Kind::Dynamic:
+      return dynamic(domain, primaryRange, variantRange);
+    }
+  }
+}
+
 static void unpackVersion(const llvm::VersionTuple &version,
                           llvm::SmallVectorImpl<unsigned> &arguments) {
   arguments.push_back(version.getMajor());

@@ -990,14 +990,7 @@ private:
     auto primaryRange = runtimeRangeForSpec(spec);
     auto variantRange = runtimeRangeForSpec(variantSpec);
 
-    switch (domain.getKind()) {
-    case AvailabilityDomain::Kind::Embedded:
-    case AvailabilityDomain::Kind::SwiftLanguageMode:
-    case AvailabilityDomain::Kind::PackageDescription:
-      // These domains don't support queries.
-      llvm::report_fatal_error("unsupported domain");
-
-    case AvailabilityDomain::Kind::Universal:
+    if (domain.isUniversal()) {
       DEBUG_ASSERT(spec.isWildcard());
 
       // If all of the specs that matched are '*', then the query trivially
@@ -1013,30 +1006,9 @@ private:
       //
       return AvailabilityQuery::dynamic(variantSpec->getDomain(), primaryRange,
                                         variantRange);
-
-    case AvailabilityDomain::Kind::StandaloneSwiftRuntime:
-      return AvailabilityQuery::dynamic(domain, primaryRange, std::nullopt);
-
-    case AvailabilityDomain::Kind::Platform:
-      // Platform and Swift runtime checks are always dynamic. The SIL optimizer
-      // is responsible eliminating these checks when it can prove that they can
-      // never fail (due to the deployment target). We can't perform that
-      // analysis here because it may depend on inlining.
-      return AvailabilityQuery::dynamic(domain, primaryRange, variantRange);
-    case AvailabilityDomain::Kind::Custom:
-      auto customDomain = domain.getCustomDomain();
-      ASSERT(customDomain);
-
-      switch (customDomain->getKind()) {
-      case CustomAvailabilityDomain::Kind::Enabled:
-      case CustomAvailabilityDomain::Kind::AlwaysEnabled:
-        return AvailabilityQuery::constant(domain, true);
-      case CustomAvailabilityDomain::Kind::Disabled:
-        return AvailabilityQuery::constant(domain, false);
-      case CustomAvailabilityDomain::Kind::Dynamic:
-        return AvailabilityQuery::dynamic(domain, primaryRange, variantRange);
-      }
     }
+
+    return AvailabilityQuery::forDomain(domain, primaryRange, variantRange);
   }
 
   /// Build the availability scopes for a StmtCondition and return a pair of
