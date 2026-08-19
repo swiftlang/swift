@@ -61,10 +61,6 @@ function(_add_host_swift_compile_options name)
       "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-implicit-string-processing-module-import>")
   endif()
 
-  # Emitting module seprately doesn't give us any benefit.
-  target_compile_options(${name} PRIVATE
-    "$<$<COMPILE_LANGUAGE:Swift>:-no-emit-module-separately-wmo>")
-
   if(SWIFT_ANALYZE_CODE_COVERAGE)
      set(_cov_flags $<$<COMPILE_LANGUAGE:Swift>:-profile-generate -profile-coverage-mapping>)
      target_compile_options(${name} PRIVATE ${_cov_flags})
@@ -338,22 +334,12 @@ function(add_pure_swift_host_library name)
     set(module_file "${module_base}/${module_triple}.swiftmodule")
     set(module_interface_file "${module_base}/${module_triple}.swiftinterface")
     set(module_private_interface_file "${module_base}/${module_triple}.private.swiftinterface")
-    set(module_sourceinfo_file "${module_base}/${module_triple}.swiftsourceinfo")
-
-    # Create the module directory.
-    add_custom_command(
-        TARGET ${name}
-        PRE_BUILD
-        COMMAND "${CMAKE_COMMAND}" -E make_directory ${module_base}
-        COMMENT "Generating module directory for ${name}")
 
     # Configure the emission of the Swift module files.
     target_compile_options("${name}" PRIVATE
         $<$<COMPILE_LANGUAGE:Swift>:
-        -module-name;$<TARGET_PROPERTY:${name},Swift_MODULE_NAME>;
         -enable-library-evolution;
         -emit-module-path;${module_file};
-        -emit-module-source-info-path;${module_sourceinfo_file};
         -emit-module-interface-path;${module_interface_file};
         -emit-private-module-interface-path;${module_private_interface_file}
         >)
@@ -456,6 +442,12 @@ function(add_pure_swift_host_tool name)
 
   # Create the library.
   add_executable(${name} ${APSHT_SOURCES})
+
+  # CMake auto-passes -module-name based on the target name.
+  # Swift module names must be valid identifiers, so sanitize hyphens to underscores.
+  string(REPLACE "-" "_" _swift_module_name ${name})
+  set_target_properties(${name} PROPERTIES Swift_MODULE_NAME ${_swift_module_name})
+
   _add_host_swift_compile_options(${name})
   _set_pure_swift_link_flags(${name} "../lib/")
   _set_pure_swift_package_options(${name} "${APSHT_PACKAGE_NAME}")
