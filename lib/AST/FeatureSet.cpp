@@ -501,6 +501,11 @@ static bool usesFeatureCoroutineAccessors(Decl *decl) {
     return llvm::any_of(var->getAllAccessors(),
                         accessorDeclUsesFeatureCoroutineAccessors);
   }
+  case DeclKind::Subscript: {
+    auto *subscript = cast<SubscriptDecl>(decl);
+    return llvm::any_of(subscript->getAllAccessors(),
+                        accessorDeclUsesFeatureCoroutineAccessors);
+  }
   case DeclKind::Accessor: {
     auto *accessor = cast<AccessorDecl>(decl);
     return accessorDeclUsesFeatureCoroutineAccessors(accessor);
