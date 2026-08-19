@@ -15,6 +15,20 @@ __attribute__((swift_attr("release:releaseNode"))) Node {
 
   static Node *_Nonnull passThrough(Node *_Nonnull n)
       __attribute__((swift_attr("returns_retained")));
+
+  // Instance methods. A foreign reference type is a class in Swift, so a
+  // non-const method is implemented by a non-mutating method too.
+  int get() const;
+  void add(int d);
+  int overloadedByType(int x) const;
+  double overloadedByType(double x) const;
+
+  // A const and a non-const overload have the same parameter types, and a
+  // class has no `mutating` to tell them apart.
+  // expected-note@+1{{found this candidate}}
+  int adjust(int x) const;
+  // expected-note@+1{{found this candidate}}
+  int adjust(int x);
 };
 
 // Parameters
@@ -58,5 +72,18 @@ __attribute__((swift_attr("release:immortal"))) Singleton {
 };
 
 Singleton *_Nonnull returnsSingleton(Singleton *_Nonnull s);
+
+// A virtual method of a foreign reference type
+
+struct Polymorphic;
+void retainPolymorphic(Polymorphic *_Nonnull);
+void releasePolymorphic(Polymorphic *_Nonnull);
+
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:retainPolymorphic")))
+__attribute__((swift_attr("release:releasePolymorphic"))) Polymorphic {
+  virtual int virtualMethod() const;
+  int nonVirtualMethod() const;
+};
 
 #endif // !TEST_INTEROP_CXX_CXX_IMPL_FOREIGN_REFERENCE_H

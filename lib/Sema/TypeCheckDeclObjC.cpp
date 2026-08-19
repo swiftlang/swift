@@ -4255,9 +4255,10 @@ private:
       }
 
       // The importer maps a const method to a non-mutating Swift method and a
-      // non-const one to a `mutating` method. The implementation must agree
-      // with the imported declaration on this as on the rest of the
-      // signature.
+      // non-const one to a `mutating` method (of a value type; the methods of
+      // a foreign reference type, a class, are never `mutating`). The
+      // implementation must agree with the imported declaration on this as on
+      // the rest of the signature.
       auto *reqFD = dyn_cast<FuncDecl>(req);
       auto *candFD = dyn_cast<FuncDecl>(cand);
       if (method->isInstance() && reqFD && candFD &&

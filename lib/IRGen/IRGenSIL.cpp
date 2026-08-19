@@ -2465,19 +2465,29 @@ static void emitEntryPointArgumentsCOrObjC(IRGenSILFunction &IGF,
 
   unsigned nextArgTyIdx = 0;
 
-  // Handle the `this` argument of a C++ method. SIL passes `self` last and
-  // indirectly; bind it to the `this` pointer.
+  // Handle the `this` argument of a C++ method. SIL passes `self` last; bind
+  // it to the `this` pointer.
   if (isCXXMethod) {
     SILArgument *selfArg = args.back();
     args = args.slice(0, args.size() - 1);
-    assert(selfArg->getType().isAddress() &&
-           "C++ method self should be passed indirectly");
 
     if (!thisValue)
       thisValue = params.claimNext();
-    const auto &selfTI = IGF.getTypeInfo(selfArg->getType());
-    IGF.setLoweredAddress(selfArg, Address(thisValue, selfTI.getStorageType(),
-                                           selfTI.getBestKnownAlignment()));
+    if (selfArg->getType().isAddress()) {
+      // The `self` of a value type is passed indirectly: `this` is its
+      // address.
+      const auto &selfTI = IGF.getTypeInfo(selfArg->getType());
+      IGF.setLoweredAddress(selfArg, Address(thisValue, selfTI.getStorageType(),
+                                             selfTI.getBestKnownAlignment()));
+    } else {
+      // The `self` of a foreign reference type is a reference to the C++
+      // object: `this` is its value.
+      assert(selfArg->getType().isForeignReferenceType() &&
+             "C++ method self should be passed indirectly");
+      Explosion self;
+      self.add(thisValue);
+      IGF.setLoweredExplosion(selfArg, self);
+    }
 
     // Skip `this` when handling the explicit arguments below.
     nextArgTyIdx = 1;
