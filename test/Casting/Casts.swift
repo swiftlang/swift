@@ -885,8 +885,6 @@ CastsTests.test("Casting Objects retained from KeyPaths to Protocols is not work
   expectNotNil(value as? SuperProtocol)
 }
 
-// https://github.com/apple/swift/issues/54462
-// FIXME: Known to still be broken, but we can document the issue here.
 #if _runtime(_ObjC)
 public protocol SomeProtocol {}
 extension NSString: SomeProtocol {}
@@ -901,7 +899,12 @@ CastsTests.test("NSDictionary -> Dictionary casting") {
 
   // Test casting of the dictionary
   let b = a as? [String:SomeProtocol]
-  expectFailure { expectNotNil(b) } // Expect non-nil, but see nil
+
+  // This is broken in older Foundation versions in macOS < 27.
+  // https://github.com/apple/swift/issues/54462
+  // TODO: enable this check once CI upgrades to macOS >= 27
+  // expectNotNil(b)
+
   let c = a as? [String:Any]
   expectNotNil(c)  // Non-nil (as expected)
   let d = c as? [String:SomeProtocol]
