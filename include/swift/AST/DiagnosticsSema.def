@@ -2239,9 +2239,6 @@ ERROR(cxx_attr_requires_implementation,none,
 ERROR(cxx_invalid_context,none,
       "%0 can only be applied to global functions or functions in extensions "
       "of C++ namespaces, structs, and classes", (DeclAttribute))
-ERROR(cxx_foreign_reference_instance_method,none,
-      "%0 cannot yet be applied to instance methods of C++ foreign reference "
-      "types", (DeclAttribute))
 ERROR(cxx_func_defined,none,
       "%kind0 cannot implement C++ function '%1' because it "
       "%select{already has a definition|is declared 'inline'|is 'constexpr' (implicitly 'inline')}2",

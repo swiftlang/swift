@@ -57,6 +57,7 @@
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/ParseDeclName.h"
 #include "swift/Sema/IDETypeChecking.h"
+#include "clang/AST/DeclCXX.h"
 #include "clang/Basic/CharInfo.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/STLExtras.h"
@@ -1764,15 +1765,28 @@ static SourceRange getArgListRange(ASTContext &Ctx, DeclAttribute *attr) {
 }
 
 /// Whether \p D is a `@cxx` instance method of an imported C++ foreign
-/// reference type.
-static bool isCxxForeignReferenceInstanceMethod(const Decl *D) {
+/// reference type whose C++ name is that of a virtual method of the type.
+static bool isCxxForeignReferenceVirtualMethod(const Decl *D) {
   if (!D->getAttrs().hasAttribute<CxxDeclAttr>(/*AllowInvalid=*/true))
     return false;
   const auto *FD = dyn_cast<FuncDecl>(D);
   if (!FD || FD->isStatic())
     return false;
   const auto *classDecl = FD->getDeclContext()->getSelfClassDecl();
-  return classDecl && classDecl->isForeignReferenceType();
+  if (!classDecl || !classDecl->isForeignReferenceType())
+    return false;
+  const auto *record =
+      dyn_cast_or_null<clang::CXXRecordDecl>(classDecl->getClangDecl());
+  if (!record)
+    return false;
+
+  auto &clangIdents = record->getASTContext().Idents;
+  clang::DeclarationName clangName(&clangIdents.get(FD->getCDeclName()));
+  for (const auto *member : record->lookup(clangName))
+    if (const auto *method = dyn_cast<clang::CXXMethodDecl>(member))
+      if (method->isVirtual())
+        return true;
+  return false;
 }
 
 void AttributeChecker::
@@ -1923,14 +1937,20 @@ visitObjCImplementationAttr(ObjCImplementationAttr *attr) {
         if (FD && !cxxAttr->isInvalid())
           evaluateOrDefault(Ctx.evaluator,
                             TypeCheckForeignFunctionRequest{FD, cxxAttr}, {});
-        if (cxxAttr->isInvalid() || isCxxForeignReferenceInstanceMethod(AFD))
+        if (cxxAttr->isInvalid())
           return;
       }
 
       if (interfaces.empty()) {
-        diagnose(attr->getLocation(),
-                 diag::attr_objc_implementation_func_not_found,
-                 AFD->getCDeclName(), AFD);
+        // TODO: Virtual methods of foreign reference types are not supported
+        // yet. They have no candidate to match, so tell them apart from a
+        // function that is genuinely not found.
+        if (isCxxForeignReferenceVirtualMethod(AFD))
+          diagnose(AFD, diag::cxx_virtual_unsupported, AFD, AFD->getCDeclName());
+        else
+          diagnose(attr->getLocation(),
+                   diag::attr_objc_implementation_func_not_found,
+                   AFD->getCDeclName(), AFD);
       } else {
         // Several imported overloads have the same signature in Swift, so the
         // function could implement any of them.
@@ -2537,13 +2557,6 @@ void AttributeChecker::visitCxxDeclAttr(CxxDeclAttr *attr) {
   if (dc->isTypeContext() && !importer::isClangNamespace(dc) &&
       !importer::isClangCxxRecord(dc))
     diagnose(attr->getLocation(), diag::cxx_invalid_context, attr);
-
-  // TODO: Instance methods of foreign reference types are not supported yet.
-  if (isCxxForeignReferenceInstanceMethod(D)) {
-    diagnose(attr->getLocation(), diag::cxx_foreign_reference_instance_method,
-             attr);
-    attr->setInvalid();
-  }
 
   // Reject using both @cxx and @objc on the same decl.
   if (D->getAttrs().getAttribute<ObjCAttr>())
