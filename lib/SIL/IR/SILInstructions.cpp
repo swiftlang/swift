@@ -3505,27 +3505,43 @@ KeyPathPattern *KeyPathInst::getPattern() const {
   return Pattern;
 }
 
+/// Shared implementation of `getStaticInstanceClassType` and its
+/// "after specialization" variant. When `assumeSpecialized` is set, the checks
+/// that folding the substitution map into the pattern would satisfy -- generic
+/// accessor and equals/hash thunks -- are skipped.
+static SILType getStaticInstanceClassTypeImpl(const KeyPathInst *KPI,
+                                              bool assumeSpecialized);
+
 SILType KeyPathInst::getStaticInstanceClassType() const {
+  return getStaticInstanceClassTypeImpl(this, /*assumeSpecialized=*/false);
+}
+
+SILType KeyPathInst::getStaticInstanceClassTypeAfterSpecialization() const {
+  return getStaticInstanceClassTypeImpl(this, /*assumeSpecialized=*/true);
+}
+
+static SILType getStaticInstanceClassTypeImpl(const KeyPathInst *KPI,
+                                              bool assumeSpecialized) {
   // The concrete `keypath_inst` type must be fully substituted: no
   // archetypes.
-  if (getKeyPathType()->hasArchetype())
+  if (KPI->getKeyPathType()->hasArchetype())
     return SILType();
-  if (getSubstitutions().getRecursiveProperties().hasArchetype())
+  if (KPI->getSubstitutions().getRecursiveProperties().hasArchetype())
     return SILType();
 
   // Captured operands (subscript indices) are fine: the instance can still be
   // described at compile time, but as a *template* whose argument area IRGen
   // fills in where the key path is formed.  See `needsRuntimeInstantiation`.
 
-  auto *pattern = getPattern();
+  auto *pattern = KPI->getPattern();
   if (!pattern)
     return SILType();
   auto components = pattern->getComponents();
 
-  auto keyPathTy = getKeyPathType();
+  auto keyPathTy = KPI->getKeyPathType();
   auto rootTy = keyPathTy->getGenericArgs()[0]->getCanonicalType();
   auto valueTy = keyPathTy->getGenericArgs()[1]->getCanonicalType();
-  auto &ctx = getModule().getASTContext();
+  auto &ctx = KPI->getModule().getASTContext();
 
   // Identity key path (0 components) — matches the runtime walker's
   // starting `capability = .value` in
@@ -3565,11 +3581,16 @@ SILType KeyPathInst::getStaticInstanceClassType() const {
       // descriptor in the defining module. These don't show up in embedded.
       if (comp.getExternalDecl())
         return SILType();
-      if (comp.getComputedPropertyForGettable()->isGeneric())
-        return SILType();
-      if (comp.getKind() == KeyPathPatternComponent::Kind::SettableProperty &&
-          comp.getComputedPropertyForSettable()->isGeneric())
-        return SILType();
+      // Specialization folds the substitution map into the pattern, which
+      // replaces these with concrete clones; skip when asking what that would
+      // yield.
+      if (!assumeSpecialized) {
+        if (comp.getComputedPropertyForGettable()->isGeneric())
+          return SILType();
+        if (comp.getKind() == KeyPathPatternComponent::Kind::SettableProperty &&
+            comp.getComputedPropertyForSettable()->isGeneric())
+          return SILType();
+      }
       // The component's `id` -- the opaque identity the runtime compares in
       // `==` and `hash(into:)` -- has to be something we can name as a
       // constant now. A function reference and a class method descriptor both
@@ -3597,7 +3618,7 @@ SILType KeyPathInst::getStaticInstanceClassType() const {
       // argument witness table, so those have to be fully specialized too.
       // They are generic whenever the pattern's signature is, even when the
       // captured values themselves are concrete.
-      if (!comp.getArguments().empty() &&
+      if (!assumeSpecialized && !comp.getArguments().empty() &&
           (comp.getIndexEquals()->isGeneric() ||
            comp.getIndexHash()->isGeneric()))
         return SILType();
@@ -3642,7 +3663,7 @@ SILType KeyPathInst::getStaticInstanceClassType() const {
   //   * crossing a class boundary (component root is a class type) while
   //     still writable promotes WritableKeyPath → ReferenceWritableKeyPath
   NominalTypeDecl *keyPathClass = ctx.getWritableKeyPathDecl();
-  auto subs = getSubstitutions();
+  auto subs = KPI->getSubstitutions();
   CanType currentRoot = rootTy;
 
   for (const auto &comp : components) {
@@ -3674,11 +3695,16 @@ SILType KeyPathInst::getStaticInstanceClassType() const {
       // descriptor in the defining module. These don't show up in embedded.
       if (comp.getExternalDecl())
         return SILType();
-      if (comp.getComputedPropertyForGettable()->isGeneric())
-        return SILType();
-      if (comp.getKind() == KeyPathPatternComponent::Kind::SettableProperty &&
-          comp.getComputedPropertyForSettable()->isGeneric())
-        return SILType();
+      // Specialization folds the substitution map into the pattern, which
+      // replaces these with concrete clones; skip when asking what that would
+      // yield.
+      if (!assumeSpecialized) {
+        if (comp.getComputedPropertyForGettable()->isGeneric())
+          return SILType();
+        if (comp.getKind() == KeyPathPatternComponent::Kind::SettableProperty &&
+            comp.getComputedPropertyForSettable()->isGeneric())
+          return SILType();
+      }
       // The component's `id` -- the opaque identity the runtime compares in
       // `==` and `hash(into:)` -- has to be something we can name as a
       // constant now. A function reference and a class method descriptor both

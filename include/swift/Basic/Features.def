@@ -616,6 +616,10 @@ EXPERIMENTAL_FEATURE(StandaloneSwiftAvailability, true)
 /// Allow enabling dynamic exclusivity in Embedded Swift.
 EXPERIMENTAL_FEATURE(EmbeddedDynamicExclusivity, true)
 
+/// Emit key path objects as static constants outside Embedded Swift, whenever
+/// the pattern can be fully described at compile time. Experimental.
+EXPERIMENTAL_FEATURE(StaticKeyPaths, true)
+
 /// Emit typed allocation calls in Embedded Swift.
 EXPERIMENTAL_FEATURE(TypedAllocation, true)
 
