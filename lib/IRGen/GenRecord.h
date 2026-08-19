@@ -326,6 +326,12 @@ public:
       fillWithZerosIfSensitive(IGF, src, T);
   }
 
+  /// Run \p body over the value(s) stored in a \c @_rawLayout type that moves
+  /// as its like type.
+  ///
+  /// \p dest is optional. Operations that have no destination, such as
+  /// destroy, pass an invalid address, in which case \p body receives an
+  /// invalid destination address as well.
   void handleRawLayout(IRGenFunction &IGF, Address dest, Address src, SILType T,
                        bool isOutlined, RawLayoutAttr *rawLayout,
                        std::function<void
@@ -340,8 +346,10 @@ public:
       // the like type's concrete storage type.
       src = Address(src.getAddress(), likeTypeInfo.getStorageType(),
                     src.getAlignment());
-      dest = Address(dest.getAddress(), likeTypeInfo.getStorageType(),
-                     dest.getAlignment());
+      if (dest.isValid()) {
+        dest = Address(dest.getAddress(), likeTypeInfo.getStorageType(),
+                       dest.getAlignment());
+      }
 
       // If we're a scalar, then we only need to run the body once.
       if (rawLayout->getScalarLikeType()) {
