@@ -2655,6 +2655,16 @@ bool swift::specializeWitnessMethodInst(WitnessMethodInst *wm) {
   if (wm->use_empty())
     return false;
 
+  // In Embedded Swift, refuse to specialize when the requirement is more
+  // generic than the protocol itself. Such calls required unspecialized
+  // generics, which are not permitted in Embedded Swift. They are diagnosed
+  // in the type checker, but only with a warning in some configurations.
+  auto requirementSig =
+      wm->getType().castTo<SILFunctionType>()->getInvocationGenericSignature();
+  auto protocolSig = wm->getConformance().getProtocol()->getGenericSignature();
+  if (requirementSig.isABIMoreGenericThan(protocolSig))
+    return false;
+
   Operand *firstUse = *wm->use_begin();
   ApplySite AI = ApplySite::isa(firstUse->getUser());
   assert(AI && AI.getCalleeOperand() == firstUse && "wrong use of witness_method instruction");
