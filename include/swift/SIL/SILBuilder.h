@@ -3410,6 +3410,10 @@ private:
 /// SIL instructions.
 class SILBuilderWithScope : public SILBuilder {
   void inheritScopeFrom(SILInstruction *I) {
+    // Instructions in a debug reconstruction block are scaffolding for a DWARF
+    // expression rather than real code, so they carry no debug scope.
+    if (I->getParent() && I->getParent()->isDebugReconstructionBlock())
+      return;
     ASSERT(I->getDebugScope() && "instruction has no debug scope");
     SILBasicBlock::iterator II(*I);
     auto End = I->getParent()->end();

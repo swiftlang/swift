@@ -1043,9 +1043,11 @@ struct BridgedInstruction {
   DebugValue_getDebugReconstructionBlock() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedBasicBlock
   DebugValue_getOrCreateDebugReconstructionBlock() const;
+  BRIDGED_INLINE void DebugValue_clearDebugReconstructionBlock() const;
   BRIDGED_INLINE void DebugValue_stripDeref(SwiftInt operandIdx) const;
   BRIDGED_INLINE void DebugValue_prependDeref(SwiftInt operandIdx) const;
   BRIDGED_INLINE void DebugValue_killOperand(SwiftInt operandIdx, BridgedType operandType) const;
+  BRIDGED_INLINE void DebugValue_eraseLastOperand() const;
 
   BRIDGED_INLINE bool AllocStack_hasVarInfo() const;
   BRIDGED_INLINE BridgedSILDebugVariable AllocStack_getVarInfo() const;

@@ -604,6 +604,7 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   P.addCommonSubexpressionElimination();
   P.addDCE();
   P.addDeadDebugVariableElimination();
+  P.addDebugReconstructionBlockSimplification();
   P.addDeadAccessScopeElimination();
 
   // Perform retain/release code motion and run the first ARC optimizer.
