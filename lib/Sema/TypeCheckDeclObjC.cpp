@@ -3769,6 +3769,13 @@ private:
   }
 
   static ObjCSelector getObjCName(ValueDecl *VD) {
+    // A virtual method of a foreign reference type is imported as a
+    // synthesized `__synthesizedVirtualCall_` dynamic-dispatch thunk; it is
+    // known by the name of the virtual method it forwards to.
+    if (auto *thunk = dyn_cast<FuncDecl>(VD))
+      if (auto *original = VD->getASTContext().getClangModuleLoader()
+                               ->getOriginalForVirtualThunk(thunk))
+        VD = original;
     if (!VD->getCDeclName().empty()) {
       auto ident = VD->getASTContext().getIdentifier(VD->getCDeclName());
       return ObjCSelector(VD->getASTContext(), 0, { ident });
@@ -4249,8 +4256,17 @@ private:
     if (!cand->getAttrs().hasAttribute<CxxDeclAttr>())
       return false;
 
+    // A virtual method of a foreign reference type matches the importer's
+    // synthesized `__synthesizedVirtualCall_` thunk. Every check below is
+    // about the underlying virtual method the implementation will provide the
+    // body of.
+    const Decl *interface = req;
+    if (auto *thunk = dyn_cast<FuncDecl>(req))
+      if (auto *original = req->getASTContext().getClangModuleLoader()
+                               ->getOriginalForVirtualThunk(thunk))
+        interface = original;
     const auto *clangFD =
-        dyn_cast_or_null<clang::FunctionDecl>(req->getClangDecl());
+        dyn_cast_or_null<clang::FunctionDecl>(interface->getClangDecl());
     if (!clangFD)
       return false;
 
@@ -4280,9 +4296,10 @@ private:
       }
 
       // The importer maps a const method to a non-mutating Swift method and a
-      // non-const one to a `mutating` method. The implementation must agree
-      // with the imported declaration on this as on the rest of the
-      // signature.
+      // non-const one to a `mutating` method (of a value type; the methods of
+      // a foreign reference type, a class, are never `mutating`). The
+      // implementation must agree with the imported declaration on this as on
+      // the rest of the signature.
       auto *reqFD = dyn_cast<FuncDecl>(req);
       auto *candFD = dyn_cast<FuncDecl>(cand);
       if (method->isInstance() && reqFD && candFD &&
@@ -4770,10 +4787,11 @@ evaluate(Evaluator &evaluator, Decl *D) const {
 }
 
 /// Diagnose a '@c' or '@cxx' function that would define the retain or release
-/// operation of a foreign reference type it also takes as a parameter.
+/// operation of a foreign reference type it also takes as a parameter or as
+/// the receiver.
 ///
 /// The C entry point retains and releases its foreign reference type
-/// parameters, so such a function would call itself.
+/// parameters and receiver, so such a function would call itself.
 static void diagnoseForeignRefCountingOperation(FuncDecl *FD,
                                                 DeclAttribute *attr) {
   auto cName = FD->getCDeclName();
@@ -4784,8 +4802,16 @@ static void diagnoseForeignRefCountingOperation(FuncDecl *FD,
   if (!loader)
     return;
 
-  for (auto *param : *FD->getParameters()) {
-    auto paramTy = param->getInterfaceType()->lookThroughAllOptionalTypes();
+  SmallVector<std::pair<Type, bool>, 4> operands;
+  if (FD->isInstanceMember())
+    operands.emplace_back(FD->getDeclContext()->getSelfInterfaceType(),
+                          /*isReceiver=*/true);
+  for (auto *param : *FD->getParameters())
+    operands.emplace_back(
+        param->getInterfaceType()->lookThroughAllOptionalTypes(),
+        /*isReceiver=*/false);
+
+  for (auto [paramTy, isReceiver] : operands) {
     auto *classDecl = paramTy->getClassOrBoundGenericClass();
 
     // Immortal foreign reference types have no retain/release to implement.
@@ -4804,7 +4830,7 @@ static void diagnoseForeignRefCountingOperation(FuncDecl *FD,
         continue;
 
       FD->diagnose(diag::cdecl_ref_counting_operation, attr, isRelease,
-                   paramTy);
+                   paramTy, isReceiver);
       return;
     }
   }
