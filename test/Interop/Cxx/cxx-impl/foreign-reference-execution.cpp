@@ -1,7 +1,8 @@
 // Executable end-to-end test: a C++ program calls functions declared in
-// foreign-reference.h that take and return foreign reference types, whose
-// bodies are provided in Swift via `@cxx @implementation`, and observes their
-// effect on the reference counts.
+// foreign-reference.h that take and return foreign reference types, and
+// methods of one, whose bodies are provided in Swift via
+// `@cxx @implementation`, and observes their effect on the object and on the
+// reference counts.
 
 // RUN: %empty-directory(%t)
 // RUN: %target-interop-build-clangxx \
@@ -70,6 +71,20 @@ int main() {
   printf("passThrough=%d live=%d\n", passedThrough->value, liveNodes);
   // CHECK: passThrough=42 live=1
   releaseNode(passedThrough);
+
+  // `self` is the receiver: a const method reads it and a non-const method
+  // mutates it, and neither retains it on net.
+  printf("get=%d live=%d\n", node.get(), liveNodes);
+  // CHECK: get=42 live=0
+
+  node.add(8);
+  printf("add=%d live=%d\n", node.value, liveNodes);
+  // CHECK: add=50 live=0
+
+  // Same-arity overloads are told apart by parameter type.
+  printf("overloadedByType=%d %.1f\n", node.overloadedByType(1),
+         node.overloadedByType(0.5));
+  // CHECK: overloadedByType=51 50.5
 
   Leaf leaf{7};
   Leaf *returnedLeaf = returnsRetainedLeaf(&leaf);

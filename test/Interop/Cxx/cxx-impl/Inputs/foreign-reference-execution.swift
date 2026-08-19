@@ -25,6 +25,22 @@ extension Node {
   //     __attribute__((swift_attr("returns_retained")));
   @cxx @implementation
   public static func passThrough(_ n: Node) -> Node { return n }
+
+  // int Node::get() const;
+  @cxx @implementation
+  public func get() -> Int32 { return value }
+
+  // void Node::add(int d);
+  @cxx @implementation
+  public func add(_ d: Int32) { value += d }
+
+  // int Node::overloadedByType(int x) const;
+  @cxx @implementation
+  public func overloadedByType(_ x: Int32) -> Int32 { return value + x }
+
+  // double Node::overloadedByType(double x) const;
+  @cxx @implementation
+  public func overloadedByType(_ x: Double) -> Double { return Double(value) + x }
 }
 
 // Leaf *_Nonnull returnsRetainedLeaf(Leaf *_Nonnull l)
