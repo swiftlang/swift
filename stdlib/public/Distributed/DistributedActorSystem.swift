@@ -426,6 +426,9 @@ extension DistributedActorSystem {
     invocationDecoder: inout InvocationDecoder,
     handler: Self.ResultHandler
   ) async throws where Act: DistributedActor {
+    try _validateMatchingInvocationDecoder(Act.self, Self.self)
+    try _validateMatchingResultHandler(Act.self, Self.self)
+
     // NOTE: Implementation could be made more efficient because we still risk
     // demangling a RemoteCallTarget identity (if it is a mangled name) multiple
     // times. We would prefer to store if it is a mangled name, demangle, and
@@ -608,6 +611,58 @@ extension DistributedActorSystem {
     } catch {
       try await handler.onThrow(error: error)
     }
+  }
+}
+
+@export(implementation)
+@available(SwiftStdlib 5.7, *)
+internal func _validateMatchingInvocationDecoder<
+  Act: DistributedActor,
+  System: DistributedActorSystem
+>(_ actorType: Act.Type, _ systemType: System.Type) throws {
+  guard Act.ActorSystem.InvocationDecoder.self
+        == System.InvocationDecoder.self else {
+    let errorCode: ExecuteDistributedTargetError.ErrorCode
+    // This is @available(SwiftStdlib 6.5, *) but can't use SwiftStdlib in an @export(implementation) function
+    if #available(anyAppleOS 9999, *) {
+      errorCode = .incompatibleInvocationDecoder
+    } else {
+      errorCode = .typeDeserializationFailure
+    }
+    throw ExecuteDistributedTargetError(
+      message: """
+               Actor '\(actorType)' uses InvocationDecoder \
+               '\(Act.ActorSystem.InvocationDecoder.self)' which does not \
+               match the receiving system's decoder \
+               '\(System.InvocationDecoder.self)'
+               """,
+      errorCode: errorCode)
+  }
+}
+
+@export(implementation)
+@available(SwiftStdlib 5.7, *)
+internal func _validateMatchingResultHandler<
+  Act: DistributedActor,
+  System: DistributedActorSystem
+>(_ actorType: Act.Type, _ systemType: System.Type) throws {
+  guard Act.ActorSystem.ResultHandler.self
+        == System.ResultHandler.self else {
+    let errorCode: ExecuteDistributedTargetError.ErrorCode
+    // This is @available(SwiftStdlib 6.5, *) but can't use SwiftStdlib in an @export(implementation) function
+    if #available(anyAppleOS 9999, *) {
+      errorCode = .incompatibleResultHandler
+    } else {
+      errorCode = .typeDeserializationFailure
+    }
+    throw ExecuteDistributedTargetError(
+      message: """
+               Actor '\(actorType)' uses ResultHandler \
+               '\(Act.ActorSystem.ResultHandler.self)' which does not match \
+               the receiving system's result handler \
+               '\(System.ResultHandler.self)'
+               """,
+      errorCode: errorCode)
   }
 }
 
@@ -925,6 +980,18 @@ public struct ExecuteDistributedTargetError: DistributedActorSystemError {
 
     // Failed to deserialize type or obtain type information for call.
     case typeDeserializationFailure
+
+    /// The actor passed to `executeDistributedTarget` belongs to an actor
+    /// system whose ``InvocationDecoder`` associated type does not match
+    /// the receiving system's ``InvocationDecoder``.
+    @available(SwiftStdlib 6.5, *)
+    case incompatibleInvocationDecoder
+
+    /// The actor passed to `executeDistributedTarget` belongs to an actor
+    /// system whose ``ResultHandler`` associated type does not match the
+    /// receiving system's ``ResultHandler``.
+    @available(SwiftStdlib 6.5, *)
+    case incompatibleResultHandler
 
     /// A general issue during the execution of the distributed call target occurred.
     case other
