@@ -82,8 +82,7 @@ class ProbeGlobal_RoundtripNonisolated: RoundtripNonisolated {
 // MARK: - RoundtripIsolated
 
 // CHECK-LABEL: @objc @_inheritsConvenienceInitializers class ProbeImplicit_RoundtripIsolated : RoundtripIsolated {
-// Note: Type-checked as isolated, but no @MainActor attribute, because attributes are not added for overriding members
-// CHECK: @objc deinit
+// CHECK: @objc @MainActor deinit
 // CHECK: }
 // CHECK-SYMB: ProbeImplicit_RoundtripIsolated.__isolated_deallocating_deinit
 // CHECK-SYMB-NEXT: // Isolation: global_actor. type: MainActor
@@ -357,7 +356,7 @@ class ProbeGlobal_DerivedIsolatedClass: DerivedIsolatedClass {
 // executor in the first place.
 
 // CHECK-LABEL: @objc @_inheritsConvenienceInitializers class ProbeImplicit_BaseIsolatedDealloc : BaseIsolatedDealloc {
-// CHECK: @objc deinit
+// CHECK: @objc @MainActor deinit
 // CHECK: }
 // CHECK-SYMB-NOT: ProbeImplicit_BaseIsolatedDealloc.__isolated_deallocating_deinit
 // CHECK-SYMB-NOT: @$s4test33ProbeImplicit_BaseIsolatedDeallocCfZ
@@ -401,8 +400,7 @@ class ProbeGlobal_BaseIsolatedDealloc: BaseIsolatedDealloc {
 // MARK: - DerivedIsolatedDealloc
 
 // CHECK-LABEL: @objc @_inheritsConvenienceInitializers class ProbeImplicit_DerivedIsolatedDealloc : DerivedIsolatedDealloc {
-// Note: Type-checked as isolated, but no @MainActor attribute, because attributes are not added for overriding members
-// CHECK: @objc deinit
+// CHECK: @objc @MainActor deinit
 // CHECK: }
 // CHECK-SYMB-NOT: ProbeImplicit_DerivedIsolatedDealloc.__isolated_deallocating_deinit
 // CHECK-SYMB-NOT: @$s4test36ProbeImplicit_DerivedIsolatedDeallocCfZ
