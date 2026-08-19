@@ -19,7 +19,7 @@ final class Tracker {
 // CHECK-LABEL: define{{.*}} swiftcc void @"$s4test33calledThroughThunkReleasesCaptureyyF"()
 // CHECK: [[TRACKER:%.*]] = call swiftcc ptr @"$s4test7TrackerCACycfC"
 // CHECK: call ptr @swift_retain(ptr returned [[TRACKER]])
-// CHECK: [[CLOSURE:%.*]] = call swiftcc { ptr, ptr } @"$s4test14makeCalledOnceyySiXOySicF"(ptr @"$s4test33calledThroughThunkReleasesCaptureyyFySicfU_TA", ptr [[TRACKER]])
+// CHECK: [[CLOSURE:%.*]] = call swiftcc { ptr, ptr } @"$s4test14makeCalledOnceyySiXOySicF"(ptr @"$s4test33calledThroughThunkReleasesCaptureyyFySicfU_TA{{.*}}", ptr [[TRACKER]])
 // CHECK: [[CLOSURE_FN:%.*]] = extractvalue { ptr, ptr } [[CLOSURE]], 0
 // CHECK: [[CLOSURE_CTX:%.*]] = extractvalue { ptr, ptr } [[CLOSURE]], 1
 // CHECK: call void @swift_release(ptr [[TRACKER]])
@@ -34,7 +34,7 @@ public func calledThroughThunkReleasesCapture() {
 // CHECK-LABEL: define{{.*}} swiftcc void @"$s4test38neverCalledThroughThunkReleasesCaptureyyF"()
 // CHECK: [[TRACKER:%.*]] = call swiftcc ptr @"$s4test7TrackerCACycfC"
 // CHECK: call ptr @swift_retain(ptr returned [[TRACKER]])
-// CHECK: [[CLOSURE:%.*]] = call swiftcc { ptr, ptr } @"$s4test14makeCalledOnceyySiXOySicF"(ptr @"$s4test38neverCalledThroughThunkReleasesCaptureyyFySicfU_TA", ptr [[TRACKER]])
+// CHECK: [[CLOSURE:%.*]] = call swiftcc { ptr, ptr } @"$s4test14makeCalledOnceyySiXOySicF"(ptr @"$s4test38neverCalledThroughThunkReleasesCaptureyyFySicfU_TA{{.*}}", ptr [[TRACKER]])
 // CHECK: [[CLOSURE_FN:%.*]] = extractvalue { ptr, ptr } [[CLOSURE]], 0
 // CHECK: [[CLOSURE_CTX:%.*]] = extractvalue { ptr, ptr } [[CLOSURE]], 1
 // CHECK: call void @swift_release(ptr [[TRACKER]])
