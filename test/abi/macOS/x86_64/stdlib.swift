@@ -1344,3 +1344,59 @@ Added: _$sSs9UTF16ViewV13_copyContents12initializings16IndexingIteratorVyABG_Sit
 // Changing the ABI of _SwiftCreateBridgedString
 Removed: _$ss35_SwiftCreateBridgedString_DoNotCall5bytes6length8encodings9UnmanagedVyyXlGSPys5UInt8VG_Sis6UInt32VtF
 Added: _$ss35_SwiftCreateBridgedString_DoNotCall5bytes6length8encodings9UnmanagedVyyXlGSgSPys5UInt8VG_Sis6UInt32VtF
+
+//
+// struct AliasedSpan
+Added: _$ss11AliasedSpanVMa
+Added: _$ss11AliasedSpanVMn
+Added: _$ss11AliasedSpanV6_countSivg
+Added: _$ss11AliasedSpanV8_pointerSVSgvg
+Added: _$ss11AliasedSpanVyxGs8IterablesMc
+
+// struct AliasedSpan.BorrowingIterator
+Added: _$ss11AliasedSpanV17BorrowingIteratorVMa
+Added: _$ss11AliasedSpanV17BorrowingIteratorVMn
+Added: _$ss11AliasedSpanV17BorrowingIteratorV5_spanAByxGvg
+Added: _$ss11AliasedSpanV17BorrowingIteratorV9_bufferedxSgvM
+Added: _$ss11AliasedSpanV17BorrowingIteratorV9_bufferedxSgvg
+Added: _$ss11AliasedSpanV17BorrowingIteratorV9_bufferedxSgvs
+Added: _$ss11AliasedSpanV17BorrowingIteratorV9_positionSivM
+Added: _$ss11AliasedSpanV17BorrowingIteratorV9_positionSivg
+Added: _$ss11AliasedSpanV17BorrowingIteratorV9_positionSivs
+Added: _$ss11AliasedSpanV17BorrowingIteratorVyADyx_GAByxGcfC
+Added: _$ss11AliasedSpanV17BorrowingIteratorVyx_Gs0cD8ProtocolsMc
+
+// struct AliasedMutableSpan
+Added: _$ss18AliasedMutableSpanVMa
+Added: _$ss18AliasedMutableSpanVMn
+Added: _$ss18AliasedMutableSpanV6_countSivg
+Added: _$ss18AliasedMutableSpanV8_pointerSvSgvg
+Added: _$ss18AliasedMutableSpanVyxGs8IterablesMc
+
+// struct AliasedRawSpan
+Added: _$ss14AliasedRawSpanVMa
+Added: _$ss14AliasedRawSpanVMn
+Added: _$ss14AliasedRawSpanVN
+Added: _$ss14AliasedRawSpanV6_countSivg
+Added: _$ss14AliasedRawSpanV8_pointerSVSgvg
+Added: _$ss14AliasedRawSpanVs8IterablesMc
+Added: _$ss14AliasedRawSpanVs8IterablesWP
+
+// struct AliasedMutableRawSpan
+Added: _$ss21AliasedMutableRawSpanVMa
+Added: _$ss21AliasedMutableRawSpanVMn
+Added: _$ss21AliasedMutableRawSpanVN
+Added: _$ss21AliasedMutableRawSpanV6_countSivg
+Added: _$ss21AliasedMutableRawSpanV8_pointerSvSgvg
+Added: _$ss21AliasedMutableRawSpanVs8IterablesMc
+Added: _$ss21AliasedMutableRawSpanVs8IterablesWP
+
+// struct AliasedRef
+Added: _$ss10AliasedRefVMa
+Added: _$ss10AliasedRefVMn
+Added: _$ss10AliasedRefV8_pointerSPyxGvg
+
+// struct AliasedMutableRef
+Added: _$ss17AliasedMutableRefVMa
+Added: _$ss17AliasedMutableRefVMn
+Added: _$ss17AliasedMutableRefV8_pointerSpyxGvg
