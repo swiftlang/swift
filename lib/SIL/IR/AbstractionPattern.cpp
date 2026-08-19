@@ -295,6 +295,32 @@ bool AbstractionPattern::requiresClass() const {
   }
 }
 
+Type AbstractionPattern::getSuperclassBound() const {
+  switch (getKind()) {
+  case Kind::Opaque:
+    return Type();
+  case Kind::Type:
+  case Kind::Discard:
+  case Kind::ClangType: {
+    auto type = getType();
+    if (auto element = dyn_cast<PackElementType>(type))
+      type = element.getPackType();
+    if (auto archetype = dyn_cast<ArchetypeType>(type))
+      return archetype->getSuperclass();
+    // An ObjC generic parameter is class constrained without being bounded by
+    // any particular class, so there is nothing to consult a signature for.
+    if (type->isTypeParameter() && getKind() != Kind::ClangType) {
+      ASSERT(GenericSig &&
+             "Dependent type in pattern without generic signature?");
+      return GenericSig->getSuperclassBound(type);
+    }
+    return Type();
+  }
+  default:
+    return Type();
+  }
+}
+
 LayoutConstraint AbstractionPattern::getLayoutConstraint() const {
   switch (getKind()) {
   case Kind::Opaque:
