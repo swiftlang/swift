@@ -94,6 +94,7 @@ extension Parser.LanguageFeatures {
     mapFeature(.DefaultIsolationPerFile, to: .defaultIsolationPerFile)
     mapFeature(.BorrowAndMutateAccessors, to: .borrowAndMutateAccessors)
     mapFeature(.LiteralExpressions, to: .literalExpressions)
+    mapFeature(.CalledAttribute, to: .calledAttribute)
   }
 }
 
