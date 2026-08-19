@@ -234,6 +234,15 @@ public:
   /// Form an expression target for a ReturnStmt.
   static SyntacticElementTarget forReturn(ReturnStmt *returnStmt,
                                           Expr *returnExpr, Type contextTy,
+                                          DeclContext *dc) {
+    ContextualTypeInfo context(contextTy, CTP_ReturnStmt);
+    return forReturn(returnStmt, returnExpr, context, dc);
+  }
+
+  /// Form an expression target for a ReturnStmt.
+  static SyntacticElementTarget forReturn(ReturnStmt *returnStmt,
+                                          Expr *returnExpr,
+                                          ContextualTypeInfo context,
                                           DeclContext *dc);
 
   /// Form a target for the preamble of a for-in loop, excluding its where
