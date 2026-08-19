@@ -102,6 +102,7 @@ set(SWIFT_RUNTIME_CONCURRENCY_C_SOURCES
   TaskStatus.cpp
   TaskGroup.cpp
   TaskLocal.cpp
+  TaskRegistry.cpp
   ThreadingError.cpp
   TracingSignpost.cpp
   AsyncStream.cpp

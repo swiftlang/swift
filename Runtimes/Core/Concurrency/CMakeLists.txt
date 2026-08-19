@@ -20,6 +20,7 @@ add_library(swift_Concurrency
   TaskAlloc.cpp
   TaskGroup.cpp
   TaskLocal.cpp
+  TaskRegistry.cpp
   TaskStatus.cpp
   ThreadingError.cpp
   "${PROJECT_SOURCE_DIR}/CompatibilityOverride/CompatibilityOverride.cpp"
