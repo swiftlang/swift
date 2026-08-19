@@ -1119,6 +1119,12 @@ struct AsyncTask::PrivateStorage {
   /// async task stack when it is needed.
   TaskDependencyStatusRecord *dependencyRecord = nullptr;
 
+#if SWIFT_CONCURRENCY_ENABLE_TASK_REGISTRY
+  /// Intrusive live-task registry links.
+  AsyncTask * registryNext{nullptr};
+  AsyncTask * registryPrev{nullptr};
+#endif
+
   // The lock used to protect more complicated operations on the task status.
   RecursiveMutex statusLock;
 

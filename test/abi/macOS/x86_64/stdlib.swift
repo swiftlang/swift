@@ -1344,3 +1344,6 @@ Added: _$sSs9UTF16ViewV13_copyContents12initializings16IndexingIteratorVyABG_Sit
 // Changing the ABI of _SwiftCreateBridgedString
 Removed: _$ss35_SwiftCreateBridgedString_DoNotCall5bytes6length8encodings9UnmanagedVyyXlGSPys5UInt8VG_Sis6UInt32VtF
 Added: _$ss35_SwiftCreateBridgedString_DoNotCall5bytes6length8encodings9UnmanagedVyyXlGSgSPys5UInt8VG_Sis6UInt32VtF
+
+// Task Registry
+Added: _concurrencyEnableTaskRegistry
