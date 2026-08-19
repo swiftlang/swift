@@ -9028,7 +9028,11 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
 
   // Dig out the fixed type to which this type refers.
   type = getFixedTypeRecursive(type, flags, /*wantRValue=*/true);
-  if (shouldAttemptFixes() && type->isPlaceholder()) {
+  bool isPlaceholder = type->isPlaceholder();
+  if (auto *metatype = type->getAs<AnyMetatypeType>())
+    isPlaceholder |= metatype->getInstanceType()->hasPlaceholder();
+
+  if (shouldAttemptFixes() && isPlaceholder) {
     // If the type associated with this conformance check is a "hole" in the
     // constraint system, let's consider this check a success without recording
     // a fix, because it's just a consequence of the other failure, e.g.
