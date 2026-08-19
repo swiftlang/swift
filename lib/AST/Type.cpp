@@ -4696,19 +4696,11 @@ ReferenceCounting TypeBase::getReferenceCounting() {
                ? ReferenceCounting::Custom
                : ReferenceCounting::None;
 
-  ReferenceCounting defaultRefCounting = ReferenceCounting::Unknown;
-
-  // In the absence of Objective-C interoperability, almost everything uses
-  // native reference counting or is the builtin BridgeObject.
-  if (!ctx.LangOpts.EnableObjCInterop) {
-    defaultRefCounting = ReferenceCounting::Native;
-
-    // It is still possible for an FRT to be involved in an archetype or
-    // protocol type, so only short-circuit for cases other than those
-    if (!isa<ArchetypeType, ProtocolType, ProtocolCompositionType>(type))
-      return isa<BuiltinBridgeObjectType>(type) ? ReferenceCounting::Bridge
-                                                : ReferenceCounting::Native;
-  }
+  // In the absence of Objective-C interoperability, a class reference uses
+  // native reference counting unless something more specific applies.
+  ReferenceCounting defaultRefCounting =
+      ctx.LangOpts.EnableObjCInterop ? ReferenceCounting::Unknown
+                                     : ReferenceCounting::Native;
 
   switch (type->getKind()) {
 #define SUGARED_TYPE(id, parent) case TypeKind::id:
@@ -4760,7 +4752,7 @@ ReferenceCounting TypeBase::getReferenceCounting() {
   }
 
   case TypeKind::ParameterizedProtocol: {
-    return cast<ParameterizedProtocolType>(this)
+    return cast<ParameterizedProtocolType>(type)
       ->getBaseType()
       ->getReferenceCounting();
   }
