@@ -239,7 +239,7 @@ public struct BorrowingIteratorAdapter<Iterator: IteratorProtocol>: BorrowingIte
   @_lifetime(&self)
   public mutating func nextSpan(maxCount: Int) -> Span<Iterator.Element> {
     _currentValue = _iterator.next()
-    return _currentValue._span()
+    return _currentValue.span
   }
 }
 
