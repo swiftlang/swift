@@ -26,6 +26,7 @@
 #include "TaskGroupPrivate.h"
 #include "TaskLocal.h"
 #include "TaskPrivate.h"
+#include "TaskRegistry.h"
 #include "Tracing.h"
 #include "swift/ABI/Metadata.h"
 #include "swift/ABI/Task.h"
@@ -350,6 +351,10 @@ AsyncTask::~AsyncTask() {
          "Status records should have been removed by this time!");
     #endif
   }
+
+#if SWIFT_CONCURRENCY_ENABLE_TASK_REGISTRY
+  taskRegistryRemove(this);
+#endif
 
   Private.destroy();
 
@@ -1233,6 +1238,10 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
       taskCreateFlags.isDiscardingTask(),
       task->Flags.task_hasInitialTaskExecutorPreference(),
       taskName);
+
+#if SWIFT_CONCURRENCY_ENABLE_TASK_REGISTRY
+  taskRegistryInsert(task);
+#endif
 
   // Attach to the group, if needed.
   if (group) {

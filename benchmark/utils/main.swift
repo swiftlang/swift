@@ -220,6 +220,7 @@ import SuperChars
 import TaskGroups
 import TaskIsCancelledCancellationScopes
 import TaskLocalGet
+import TaskRegistryStress
 import ToddCoxeter
 import TwoSum
 import TypeFlood
@@ -442,6 +443,7 @@ register(SuperChars.benchmarks)
 register(TaskGroups.benchmarks)
 register(TaskIsCancelledCancellationScopes.benchmarks)
 register(TaskLocalGet.benchmarks)
+register(TaskRegistryStress.benchmarks)
 register(ToddCoxeter.benchmarks)
 register(TwoSum.benchmarks)
 register(TypeFlood.benchmarks)

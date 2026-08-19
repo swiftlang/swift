@@ -313,6 +313,12 @@ SWIFT_RUNTIME_STDLIB_SPI bool concurrencyEnableCooperativeQueues() {
       SWIFT_DEBUG_CONCURRENCY_ENABLE_COOPERATIVE_QUEUES();
 }
 
+SWIFT_RUNTIME_STDLIB_SPI bool concurrencyEnableTaskRegistry() {
+  return runtime::environment::
+      SWIFT_DEBUG_ENABLE_TASK_REGISTRY();
+}
+
+
 SWIFT_RUNTIME_STDLIB_SPI bool concurrencyValidateUncheckedContinuations() {
   return runtime::environment::SWIFT_DEBUG_VALIDATE_UNCHECKED_CONTINUATIONS();
 }
