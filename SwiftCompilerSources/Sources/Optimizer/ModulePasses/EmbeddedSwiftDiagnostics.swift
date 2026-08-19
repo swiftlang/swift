@@ -200,10 +200,16 @@ private struct FunctionChecker {
       )
 
     case let ba as BeginApplyInst:
-      try diagnoseHeapAllocation(
-        Violation(.embedded_swift_allocating_coroutine, in: instruction)
-      )
+      // The old yield_once_1 coroutine uses a heap-allocated frame, so it
+      // cannot be used in no-allocations mode.
+      if !ba.isCalleeAllocated {
+        try diagnoseHeapAllocation(
+          Violation(.embedded_swift_allocating_coroutine, in: instruction)
+        )
+      }
 
+      // For yield_once_2, whether it allocates on the heap or the stack
+      // depends on the provided allocator, which isn't knowable here.
       try checkApply(apply: ba)
 
     case let pai as PartialApplyInst:
