@@ -790,18 +790,21 @@ void Symbol::serializeAvailabilityMixin(llvm::json::OStream &OS) const {
   // If we were asked to filter the availability platforms for the output graph,
   // perform that filtering here.
   if (Graph->Walker.Options.AvailabilityPlatforms) {
-    const auto &AvailabilityPlatforms =
+    auto AvailabilityPlatforms =
         Graph->Walker.Options.AvailabilityPlatforms.value();
-    const bool IsBlockList = Graph->Walker.Options.AvailabilityIsBlockList;
-    Availabilities.remove_if([&](const auto &Entry) {
-      // Universal availability, such as unconditional deprecation, is not
-      // tied to a platform and is never filtered out.
-      if (Entry.getKey() == "*")
-        return false;
-
-      const bool IsListed = AvailabilityPlatforms.contains(Entry.getKey());
-      return IsBlockList ? IsListed : !IsListed;
-    });
+    if (Graph->Walker.Options.AvailabilityIsBlockList) {
+      for (const auto Availability : Availabilities.keys()) {
+        if (Availability != "*" && AvailabilityPlatforms.contains(Availability)) {
+          Availabilities.erase(Availability);
+        }
+      }
+    } else {
+      for (const auto Availability : Availabilities.keys()) {
+        if (Availability != "*" && !AvailabilityPlatforms.contains(Availability)) {
+          Availabilities.erase(Availability);
+        }
+      }
+    }
   }
 
   if (Availabilities.empty()) {
