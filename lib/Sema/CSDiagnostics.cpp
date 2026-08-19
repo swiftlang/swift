@@ -2916,6 +2916,11 @@ bool ContextualFailure::diagnoseAsError() {
     }
   }
 
+  case ConstraintLocator::KeyPathDynamicMember: {
+    diagnostic = diag::expr_keypath_value_covert_to_contextual_type;
+    break;
+  }
+
   default:
     return false;
   }
