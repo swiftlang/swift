@@ -3961,7 +3961,11 @@ llvm::Value *irgen::emitWitnessTableRef(IRGenFunction &IGF,
   // more concrete than we're expecting.
   // TODO: make a best effort to devirtualize, maybe?
   } else if (conformance.isPack()) {
-    auto pack = cast<PackType>(srcType);
+    auto kind = LocalTypeDataKind::forProtocolWitnessTable(conformance);
+    if (auto *wtable = IGF.tryGetLocalTypeData(srcType, kind))
+      return wtable;
+
+    auto pack = cast<PackType>(conformance.getType()->getCanonicalType());
     return emitWitnessTablePackRef(IGF, pack, conformance.getPack());
   } else {
     concreteConformance = conformance.getConcrete();
