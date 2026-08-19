@@ -56,12 +56,30 @@ FUNCTION(AllocBox, Swift, swift_allocBox, SwiftCC, AlwaysAvailable,
          EFFECT(RuntimeEffect::Allocating),
          UNKNOWN_MEMEFFECTS)
 
+// BoxPair swift_allocBoxTyped(Metadata const *type, int64_t typeId);
+FUNCTION(AllocBoxTyped, Swift, swift_allocBoxTyped, SwiftCC, AlwaysAvailable,
+         RETURNS(RefCountedPtrTy, OpaquePtrTy),
+         ARGS(TypeMetadataPtrTy, Int64Ty),
+         ATTRS(NoUnwind),
+         EFFECT(RuntimeEffect::Allocating),
+         UNKNOWN_MEMEFFECTS)
+
 //  BoxPair swift_makeBoxUnique(OpaqueValue *buffer, Metadata *type, size_t alignMask);
 FUNCTION(MakeBoxUnique,
          Swift, swift_makeBoxUnique,
          SwiftCC, AlwaysAvailable,
          RETURNS(RefCountedPtrTy, OpaquePtrTy),
          ARGS(OpaquePtrTy, TypeMetadataPtrTy, SizeTy),
+         ATTRS(NoUnwind),
+         EFFECT(RuntimeEffect::Allocating),
+         UNKNOWN_MEMEFFECTS)
+
+//  BoxPair swift_makeBoxUniqueTyped(OpaqueValue *buffer, Metadata *type, size_t alignMask, int64_t typeId);
+FUNCTION(MakeBoxUniqueTyped,
+         Swift, swift_makeBoxUniqueTyped,
+         SwiftCC, AlwaysAvailable,
+         RETURNS(RefCountedPtrTy, OpaquePtrTy),
+         ARGS(OpaquePtrTy, TypeMetadataPtrTy, SizeTy, Int64Ty),
          ATTRS(NoUnwind),
          EFFECT(RuntimeEffect::Allocating),
          UNKNOWN_MEMEFFECTS)
@@ -298,6 +316,14 @@ FUNCTION(NativeStrongReleaseDirect, Swift, swift_releaseDirect, SwiftDirectRR_CC
 FUNCTION(ReleaseBox, Swift, swift_releaseBox, C_CC, AlwaysAvailable,
          RETURNS(VoidTy),
          ARGS(RefCountedPtrTy),
+         ATTRS(NoUnwind),
+         EFFECT(RuntimeEffect::RefCounting, RuntimeEffect::Deallocating),
+         UNKNOWN_MEMEFFECTS)
+
+// void swift_releaseBoxTyped(void *ptr, int64_t typeId);
+FUNCTION(ReleaseBoxTyped, Swift, swift_releaseBoxTyped, C_CC, AlwaysAvailable,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy, Int64Ty),
          ATTRS(NoUnwind),
          EFFECT(RuntimeEffect::RefCounting, RuntimeEffect::Deallocating),
          UNKNOWN_MEMEFFECTS)

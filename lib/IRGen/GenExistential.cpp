@@ -56,6 +56,49 @@
 using namespace swift;
 using namespace irgen;
 
+// For typed allocation, we store the type descriptor of the
+// heap-allocated box in the second word of the opaque existential's
+// 3-word inline buffer (which is unused when the first word holds the
+// heap-allocated box reference) at allocation sites and retrieve it
+// at deallocation sites.
+static bool shouldUseMallocTypeDescriptor(IRGenModule &IGM) {
+  bool available = IGM.isTypedAllocationAvailable();
+  assert((!available || IGM.getPointerSize() == Size(8)) &&
+         "Assume typed allocation is 64-bit-only");
+  return available;
+}
+
+static Address projectMallocTypeDescriptorSlot(IRGenFunction &IGF,
+                                               Address buffer) {
+  return IGF.Builder.CreateElementBitCast(
+      IGF.Builder.CreateConstByteArrayGEP(
+          IGF.Builder.CreateElementBitCast(buffer, IGF.IGM.Int8Ty),
+          IGF.IGM.getPointerSize()),
+      IGF.IGM.Int64Ty);
+}
+
+static void
+storeMallocTypeDescriptor(IRGenFunction &IGF, Address buffer,
+                          std::optional<uint64_t> descriptor) {
+  IGF.Builder.CreateStore(
+      llvm::ConstantInt::get(IGF.IGM.Int64Ty, descriptor.value_or(0)),
+      projectMallocTypeDescriptorSlot(IGF, buffer));
+}
+
+static llvm::Value *loadMallocTypeDescriptor(IRGenFunction &IGF,
+                                             Address buffer) {
+  return IGF.Builder.CreateLoad(
+      projectMallocTypeDescriptorSlot(IGF, buffer));
+}
+
+static void copyMallocTypeDescriptor(IRGenFunction &IGF,
+                                     Address destBuffer,
+                                     Address srcBuffer) {
+  IGF.Builder.CreateStore(
+      loadMallocTypeDescriptor(IGF, srcBuffer),
+      projectMallocTypeDescriptorSlot(IGF, destBuffer));
+}
+
 namespace {
   /// The layout of an existential buffer.  This is intended to be a
   /// small, easily-computed type that can be passed around by value.
@@ -981,6 +1024,14 @@ public:
       Address destBuffer = layout.projectExistentialBuffer(IGF, dest);
       emitInitializeBufferWithCopyOfBufferCall(IGF, metadata, destBuffer,
                                                srcBuffer);
+      // The buffer-copy call above via VMT either copies word 0 only
+      // when it's not inlined or full buffer when it's
+      // inlined. Unconditionally copy the type descriptor here, which
+      // is likely cheaper than doing a conditional branch and is
+      // harmless when it's inlined.
+      if (shouldUseMallocTypeDescriptor(IGF.IGM)) {
+        copyMallocTypeDescriptor(IGF, destBuffer, srcBuffer);
+      }
     } else {
       // Create an outlined function to avoid explosion
       OutliningMetadataCollector collector(T, IGF, LayoutIsNeeded,
@@ -2275,7 +2326,21 @@ static llvm::Function *getAllocateBoxedOpaqueExistentialBufferFunction(
           IGF.Builder.emitBlock(allocateBB);
           ConditionalDominanceScope allocateCondition(IGF);
           llvm::Value *box, *address;
-          IGF.emitAllocBoxCall(metadata, box, address);
+          // For typed allocation, compute the type descriptor of the
+          // heap box but just the header part because this code is
+          // reachable under Embedded Swift but the payload type isn't
+          // concrete at compile time.
+          std::optional<uint64_t> maybeDescriptor;
+          bool useMallocTypeDescriptor = shouldUseMallocTypeDescriptor(IGF.IGM);
+          if (useMallocTypeDescriptor) {
+            auto rawPointerType = SILType::getRawPointerType(IGF.IGM.Context);
+            llvm::SmallVector<SILType> fieldTypes;
+            fieldTypes.push_back(rawPointerType); // metadata pointer
+            fieldTypes.push_back(rawPointerType); // refcount word
+            maybeDescriptor =
+                computeTypedMallocTypeDescriptor(IGF.IGM, fieldTypes);
+          }
+          IGF.emitAllocBoxCall(metadata, maybeDescriptor, box, address);
           addressInBox =
               IGF.Builder.CreateBitCast(address, IGF.IGM.OpaquePtrTy);
           IGF.Builder.CreateStore(
@@ -2283,6 +2348,9 @@ static llvm::Function *getAllocateBoxedOpaqueExistentialBufferFunction(
                                existentialBuffer.getAddress(), IGM.PtrTy),
                            IGF.IGM.RefCountedPtrTy,
                            existLayout.getAlignment(IGF.IGM)));
+          if (useMallocTypeDescriptor) {
+            storeMallocTypeDescriptor(IGF, existentialBuffer, maybeDescriptor);
+          }
           IGF.Builder.CreateRet(addressInBox);
         }
       },
@@ -2313,7 +2381,19 @@ Address irgen::emitAllocateBoxedOpaqueExistentialBuffer(
     } else if (IGF.IGM.isEmbeddedWithExistentials()) {
       llvm::Value *box, *address;
       auto *metadata = existLayout.loadMetadataRef(IGF, existentialContainer);
-      IGF.emitAllocBoxCall(metadata, box, address);
+
+      // For typed allocation, compute the type descriptor of the heap box.
+      bool useMallocTypeDescriptor = shouldUseMallocTypeDescriptor(IGF.IGM);
+      std::optional<uint64_t> maybeDescriptor;
+      if (useMallocTypeDescriptor) {
+        auto rawPointerType = SILType::getRawPointerType(IGF.IGM.Context);
+        llvm::SmallVector<SILType> fieldTypes;
+        fieldTypes.push_back(rawPointerType); // metadata pointer
+        fieldTypes.push_back(rawPointerType); // refcount word
+        fieldTypes.push_back(valueType);
+        maybeDescriptor = computeTypedMallocTypeDescriptor(IGF.IGM, fieldTypes);
+      }
+      IGF.emitAllocBoxCall(metadata, maybeDescriptor, box, address);
       llvm::Value *addressInBox =
         IGF.Builder.CreateBitCast(address, IGF.IGM.OpaquePtrTy);
       IGF.Builder.CreateStore(
@@ -2321,6 +2401,9 @@ Address irgen::emitAllocateBoxedOpaqueExistentialBuffer(
                                existentialBuffer.getAddress(), IGF.IGM.PtrTy),
                            IGF.IGM.RefCountedPtrTy,
                            existLayout.getAlignment(IGF.IGM)));
+      if (useMallocTypeDescriptor) {
+        storeMallocTypeDescriptor(IGF, existentialBuffer, maybeDescriptor);
+      }
 
       return valueTI.getAddressForPointer(addressInBox);
     }
@@ -2410,9 +2493,17 @@ static llvm::Function *getDeallocateBoxedOpaqueExistentialBufferFunction(
         llvm::Value *pointerAlignMask = llvm::ConstantInt::get(
             IGF.IGM.SizeTy, IGF.IGM.getPointerAlignment().getValue() - 1);
         alignmentMask = Builder.CreateOr(alignmentMask, pointerAlignMask);
-        IGF.emitDeallocRawCall(
-            Builder.CreateBitCast(boxReference, IGF.IGM.Int8PtrTy), size,
-            alignmentMask);
+        auto *boxReferenceI8Ptr =
+            Builder.CreateBitCast(boxReference, IGF.IGM.Int8PtrTy);
+        if (shouldUseMallocTypeDescriptor(IGF.IGM)) {
+          // Get the type descriptor from the second word and use it
+          // for typed deallocation.
+          auto *descriptor = loadMallocTypeDescriptor(IGF, existentialBuffer);
+          IGF.emitDeallocRawTypedCall(boxReferenceI8Ptr, size, alignmentMask,
+                                      descriptor);
+        } else {
+          IGF.emitDeallocRawCall(boxReferenceI8Ptr, size, alignmentMask);
+        }
         // We are done. Return.
         Builder.CreateRetVoid();
       },
@@ -2532,10 +2623,19 @@ getProjectBoxedOpaqueExistentialFunction(IRGenFunction &IGF,
         auto *alignmentMask = emitAlignMaskFromFlags(IGF, flags);
 
         llvm::Value *box, *objectAddr;
-        IGF.emitMakeBoxUniqueCall(
-            Builder.CreateBitCast(existentialBuffer.getAddress(),
-                                  IGM.OpaquePtrTy),
-            metadata, alignmentMask, box, objectAddr);
+        if (shouldUseMallocTypeDescriptor(IGF.IGM)) {
+          auto *descriptor =
+              loadMallocTypeDescriptor(IGF, existentialBuffer);
+          IGF.emitMakeBoxUniqueTypedCall(
+              Builder.CreateBitCast(existentialBuffer.getAddress(),
+                                    IGM.OpaquePtrTy),
+              metadata, alignmentMask, descriptor, box, objectAddr);
+        } else {
+          IGF.emitMakeBoxUniqueCall(
+              Builder.CreateBitCast(existentialBuffer.getAddress(),
+                                    IGM.OpaquePtrTy),
+              metadata, alignmentMask, box, objectAddr);
+        }
 
         IGF.Builder.CreateRet(objectAddr);
       },
@@ -2705,13 +2805,25 @@ static llvm::Function *getAssignBoxedOpaqueExistentialBufferFunction(
                         srcBuffer.getAlignment()));
             IGF.emitNativeStrongRetain(srcReference, IGF.getDefaultAtomicity());
             if (IGF.IGM.isEmbeddedWithExistentials()) {
-              IGF.emitReleaseBox(destReference);
+              if (shouldUseMallocTypeDescriptor(IGF.IGM)) {
+                // Get the type descriptor from the old box and use it
+                // for its typed deallocation.
+                llvm::Value *descriptor =
+                    loadMallocTypeDescriptor(IGF, destBuffer);
+                IGF.emitReleaseBoxTyped(destReference, descriptor);
+              } else {
+                IGF.emitReleaseBox(destReference);
+              }
             } else
               IGF.emitNativeStrongRelease(destReference,
                                         IGF.getDefaultAtomicity());
             IGF.Builder.CreateStore(
                 srcReference, Address(destReferenceAddr, IGM.RefCountedPtrTy,
                                       existLayout.getAlignment(IGF.IGM)));
+            if (shouldUseMallocTypeDescriptor(IGF.IGM)) {
+              // Copy the type descriptor from the source to the dest.
+              copyMallocTypeDescriptor(IGF, destBuffer, srcBuffer);
+            }
             Builder.CreateBr(doneBB);
           }
         }
@@ -2782,6 +2894,11 @@ static llvm::Function *getAssignBoxedOpaqueExistentialBufferFunction(
               ConditionalDominanceScope domScope(IGF);
               initBufferWithCopyOfReference(IGF, existLayout, destBuffer,
                                             srcBuffer);
+              // dest is transitioning from inline to boxed here. give
+              // it src's descriptor for the box it now shares.
+              if (shouldUseMallocTypeDescriptor(IGF.IGM)) {
+                copyMallocTypeDescriptor(IGF, destBuffer, srcBuffer);
+              }
               Builder.CreateBr(contBB2);
             }
 
@@ -2803,6 +2920,14 @@ static llvm::Function *getAssignBoxedOpaqueExistentialBufferFunction(
             auto *destReference = Builder.CreateLoad(
                 Address(destReferenceAddr, IGM.RefCountedPtrTy,
                         srcBuffer.getAlignment()));
+            // Capture destBuffer's type descriptor now before the
+            // src-inline path below overwrites destBuffer's full
+            // width via the source type's own
+            // initializeWithCopy. This is used when releasing the old
+            // box below.
+            llvm::Value *destDescriptor = shouldUseMallocTypeDescriptor(IGF.IGM)
+                ? loadMallocTypeDescriptor(IGF, destBuffer)
+                : nullptr;
             auto *srcInlineBB = IGF.createBasicBlock("dest-outline-src-inline");
             auto *srcOutlineBB =
                 IGF.createBasicBlock("dest-outline-src-outline");
@@ -2828,6 +2953,10 @@ static llvm::Function *getAssignBoxedOpaqueExistentialBufferFunction(
               ConditionalDominanceScope domScope(IGF);
               initBufferWithCopyOfReference(IGF, existLayout, destBuffer,
                                             srcBuffer);
+              // Copy the type descriptor from the source to the dest.
+              if (shouldUseMallocTypeDescriptor(IGF.IGM)) {
+                copyMallocTypeDescriptor(IGF, destBuffer, srcBuffer);
+              }
               Builder.CreateBr(contBB2);
             }
             Builder.emitBlock(contBB2);
@@ -2835,7 +2964,11 @@ static llvm::Function *getAssignBoxedOpaqueExistentialBufferFunction(
               ConditionalDominanceScope domScope(IGF);
               // swift_release(tmpRef)
               if (IGF.IGM.isEmbeddedWithExistentials()) {
-                IGF.emitReleaseBox(destReference);
+                if (shouldUseMallocTypeDescriptor(IGF.IGM)) {
+                  IGF.emitReleaseBoxTyped(destReference, destDescriptor);
+                } else {
+                  IGF.emitReleaseBox(destReference);
+                }
               } else
                 IGF.emitNativeStrongRelease(destReference,
                                           IGF.getDefaultAtomicity());
@@ -2900,7 +3033,12 @@ static llvm::Function *getDestroyBoxedOpaqueExistentialBufferFunction(
           auto *reference = Builder.CreateLoad(Address(
               referenceAddr, IGM.RefCountedPtrTy, buffer.getAlignment()));
           if (IGF.IGM.isEmbeddedWithExistentials()) {
-            IGF.emitReleaseBox(reference);
+            if (shouldUseMallocTypeDescriptor(IGF.IGM)) {
+              llvm::Value *descriptor = loadMallocTypeDescriptor(IGF, buffer);
+              IGF.emitReleaseBoxTyped(reference, descriptor);
+            } else {
+              IGF.emitReleaseBox(reference);
+            }
           } else
             IGF.emitNativeStrongRelease(reference, IGF.getDefaultAtomicity());
 
