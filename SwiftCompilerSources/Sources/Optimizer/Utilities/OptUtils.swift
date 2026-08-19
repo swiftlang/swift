@@ -633,6 +633,11 @@ extension Instruction {
     guard let nominal = type.nominal else {
       return true
     }
+
+    guard type.mayHaveCustomDeinit(in: parentFunction) else {
+      return false
+    }
+
     if nominal.valueTypeDestructor != nil {
       guard let deinitFunc = context.lookupDeinit(ofNominal: nominal) else {
         return true
