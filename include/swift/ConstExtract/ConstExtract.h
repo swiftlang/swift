@@ -56,10 +56,26 @@ std::vector<ConstValueTypeInfo>
 gatherConstValuesForModule(const std::unordered_set<std::string> &Protocols,
                            ModuleDecl *Module);
 
-/// Serialize a collection of \c ConstValueInfos to JSON at the
-/// provided output stream.
-bool writeAsJSONToFile(const std::vector<ConstValueTypeInfo> &ConstValueInfos,
-                       llvm::raw_ostream &OS, bool Compact = false);
+/// Gather the compile-time-known values of the initialization expressions of
+/// top-level constant declarations in this file whose names appear in
+/// \c ConstantNames.
+std::vector<ConstValueTypePropertyInfo>
+gatherConstValuesForTopLevelConstantsInPrimary(
+    const std::unordered_set<std::string> &ConstantNames, const SourceFile *File);
+
+/// Gather the compile-time-known values of the initialization expressions of
+/// top-level constant declarations in this module whose names appear in
+/// \c ConstantNames.
+std::vector<ConstValueTypePropertyInfo>
+gatherConstValuesForTopLevelConstantsInModule(
+    const std::unordered_set<std::string> &ConstantNames, ModuleDecl *Module);
+
+/// Serialize a collection of \c ConstValueInfos and top-level constant
+/// \c ConstValueTypePropertyInfos to JSON at the provided output stream.
+bool writeAsJSONToFile(
+    const std::vector<ConstValueTypeInfo> &ConstValueInfos,
+    const std::vector<ConstValueTypePropertyInfo> &TopLevelConstantInfos,
+    llvm::raw_ostream &OS, bool Compact = false);
 
 /// Remap prefix-mapped paths in const values JSON output. Scans for
 /// Returns true on error.

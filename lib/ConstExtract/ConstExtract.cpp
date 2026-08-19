@@ -19,6 +19,7 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/Evaluator.h"
+#include "swift/AST/Pattern.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Assertions.h"
@@ -433,7 +434,7 @@ extractCompileTimeValue(Expr *expr, const DeclContext *declContext) {
         return std::make_shared<DictionaryValue>(
             std::vector<std::shared_ptr<TupleValue>>());
       default:
-        break;
+        return std::make_shared<DefaultArgumentValue>();
       }
     } break;
 
@@ -580,7 +581,16 @@ extractTypePropertyInfo(VarDecl *propertyDecl) {
     propertyWrapperValues = extractPropertyWrapperAttrValues(propertyDecl);
 
   if (const auto binding = propertyDecl->getParentPatternBinding()) {
-    if (const auto originalInit = binding->getInit(0)) {
+    const auto entryIndex =
+        binding->getPatternEntryIndexForVarDecl(propertyDecl);
+
+    unsigned BoundVariables = 0;
+    binding->getPattern(entryIndex)->forEachVariable(
+        [&](VarDecl *) { ++BoundVariables; });
+
+    const auto originalInit =
+        BoundVariables == 1 ? binding->getInit(entryIndex) : nullptr;
+    if (originalInit) {
       return {propertyDecl,
               extractCompileTimeValue(originalInit,
                                       propertyDecl->getInnermostDeclContext()),
@@ -735,6 +745,69 @@ gatherConstValuesForPrimary(const std::unordered_set<std::string> &Protocols,
   for (auto *CD : ConformanceDecls)
     Result.emplace_back(evaluateOrDefault(
         CD->getASTContext().evaluator, ConstantValueInfoRequest{CD, SF}, {}));
+  return Result;
+}
+
+static void collectTopLevelConstantsInDecl(
+    Decl *D, const std::unordered_set<std::string> &ConstantNames,
+    std::vector<VarDecl *> &Constants) {
+  auto considerBinding = [&](PatternBindingDecl *PBD) {
+    for (auto Index : range(PBD->getNumPatternEntries()))
+      PBD->getPattern(Index)->forEachVariable([&](VarDecl *VD) {
+        if (!VD->isLet())
+          return;
+        if (ConstantNames.count(VD->getBaseName().userFacingName().str()) != 0)
+          Constants.push_back(VD);
+      });
+  };
+
+  if (auto *PBD = dyn_cast<PatternBindingDecl>(D)) {
+    considerBinding(PBD);
+    return;
+  }
+
+  // In script mode the binding is nested within a 'TopLevelCodeDecl'.
+  if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
+    if (auto *Body = TLCD->getBody())
+      for (auto Element : Body->getElements())
+        if (auto *NestedDecl = Element.dyn_cast<Decl *>())
+          if (auto *PBD = dyn_cast<PatternBindingDecl>(NestedDecl))
+            considerBinding(PBD);
+  }
+}
+
+std::vector<ConstValueTypePropertyInfo>
+gatherConstValuesForTopLevelConstantsInModule(
+    const std::unordered_set<std::string> &ConstantNames, ModuleDecl *Module) {
+  std::vector<ConstValueTypePropertyInfo> Result;
+  if (ConstantNames.empty())
+    return Result;
+
+  std::vector<VarDecl *> Constants;
+  for (auto *File : Module->getFiles()) {
+    if (auto *SF = dyn_cast<SourceFile>(File))
+      for (auto *D : SF->getTopLevelDecls())
+        collectTopLevelConstantsInDecl(D, ConstantNames, Constants);
+  }
+
+  for (auto *VD : Constants)
+    Result.push_back(extractTypePropertyInfo(VD));
+  return Result;
+}
+
+std::vector<ConstValueTypePropertyInfo>
+gatherConstValuesForTopLevelConstantsInPrimary(
+    const std::unordered_set<std::string> &ConstantNames, const SourceFile *SF) {
+  std::vector<ConstValueTypePropertyInfo> Result;
+  if (ConstantNames.empty())
+    return Result;
+
+  std::vector<VarDecl *> Constants;
+  for (auto *D : SF->getTopLevelDecls())
+    collectTopLevelConstantsInDecl(D, ConstantNames, Constants);
+
+  for (auto *VD : Constants)
+    Result.push_back(extractTypePropertyInfo(VD));
   return Result;
 }
 
@@ -1006,6 +1079,11 @@ void writeValue(llvm::json::OStream &JSON,
 
   case CompileTimeValue::ValueKind::Runtime: {
     JSON.attribute("valueKind", "Runtime");
+    break;
+  }
+
+  case CompileTimeValue::ValueKind::DefaultArgument: {
+    JSON.attribute("valueKind", "DefaultArgument");
     break;
   }
   }
@@ -1455,37 +1533,42 @@ void writeAssociatedTypeAliases(llvm::json::OStream &JSON,
   });
 }
 
+void writeVariableInfo(llvm::json::OStream &JSON,
+                       const ConstValueTypePropertyInfo &PropertyInfo,
+                       const NominalTypeDecl *NomTypeDecl) {
+  const auto *decl = PropertyInfo.VarDecl;
+  std::shared_ptr<CompileTimeValue> value = PropertyInfo.Value;
+  JSON.attribute("label", decl->getName().str().str());
+  JSON.attribute("type",
+                 toFullyQualifiedTypeNameString(decl->getInterfaceType()));
+  JSON.attribute("mangledTypeName", "n/a - deprecated");
+  JSON.attribute("isStatic", decl->isStatic() ? "true" : "false");
+  JSON.attribute("isComputed", !decl->hasStorage() ? "true" : "false");
+  writeLocationInformation(JSON, decl->getLoc(),
+                           decl->getDeclContext()->getASTContext());
+
+  if (NomTypeDecl &&
+      value.get()->getKind() == CompileTimeValue::ValueKind::Runtime) {
+    // Extract result builder information only if the variable has not
+    // used a different kind of initializer
+    if (auto builderValue = extractBuilderValueIfExists(NomTypeDecl, decl)) {
+      value = builderValue.value();
+    }
+  }
+
+  writeValue(JSON, value);
+  writePropertyWrapperAttributes(JSON, PropertyInfo.PropertyWrappers,
+                                 decl->getASTContext());
+  writeAvailabilityAttributes(JSON, *decl);
+}
+
 void writeProperties(llvm::json::OStream &JSON,
                      const ConstValueTypeInfo &TypeInfo,
                      const NominalTypeDecl &NomTypeDecl) {
   JSON.attributeArray("properties", [&] {
     for (const auto &PropertyInfo : TypeInfo.Properties) {
-      JSON.object([&] {
-        const auto *decl = PropertyInfo.VarDecl;
-        std::shared_ptr<CompileTimeValue> value = PropertyInfo.Value;
-        JSON.attribute("label", decl->getName().str().str());
-        JSON.attribute("type", toFullyQualifiedTypeNameString(
-            decl->getInterfaceType()));
-        JSON.attribute("mangledTypeName", "n/a - deprecated");
-        JSON.attribute("isStatic", decl->isStatic() ? "true" : "false");
-        JSON.attribute("isComputed", !decl->hasStorage() ? "true" : "false");
-        writeLocationInformation(JSON, decl->getLoc(),
-                                 decl->getDeclContext()->getASTContext());
-
-        if (value.get()->getKind() == CompileTimeValue::ValueKind::Runtime) {
-          // Extract result builder information only if the variable has not
-          // used a different kind of initializer
-          if (auto builderValue =
-                  extractBuilderValueIfExists(&NomTypeDecl, decl)) {
-            value = builderValue.value();
-          }
-        }
-
-        writeValue(JSON, value);
-        writePropertyWrapperAttributes(JSON, PropertyInfo.PropertyWrappers,
-                                       decl->getASTContext());
-        writeAvailabilityAttributes(JSON, *decl);
-      });
+      JSON.object(
+          [&] { writeVariableInfo(JSON, PropertyInfo, &NomTypeDecl); });
     }
   });
 }
@@ -1540,8 +1623,10 @@ void writeNominalTypeKind(llvm::json::OStream &JSON,
           .str());
 }
 
-bool writeAsJSONToFile(const std::vector<ConstValueTypeInfo> &ConstValueInfos,
-                       llvm::raw_ostream &OS, bool Compact) {
+bool writeAsJSONToFile(
+    const std::vector<ConstValueTypeInfo> &ConstValueInfos,
+    const std::vector<ConstValueTypePropertyInfo> &TopLevelConstantInfos,
+    llvm::raw_ostream &OS, bool Compact) {
   llvm::json::OStream JSON(OS, Compact ? 0 : 2);
   JSON.array([&] {
     for (const auto &TypeInfo : ConstValueInfos) {
@@ -1565,6 +1650,13 @@ bool writeAsJSONToFile(const std::vector<ConstValueTypeInfo> &ConstValueInfos,
         writeProperties(JSON, TypeInfo, *NomTypeDecl);
         writeEnumCases(JSON, TypeInfo.EnumElements);
         writeAvailabilityAttributes(JSON, *NomTypeDecl);
+      });
+    }
+
+    for (const auto &ConstantInfo : TopLevelConstantInfos) {
+      JSON.object([&] {
+        JSON.attribute("kind", "topLevelConstant");
+        writeVariableInfo(JSON, ConstantInfo, /*NomTypeDecl=*/nullptr);
       });
     }
   });

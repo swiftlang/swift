@@ -524,6 +524,10 @@ public:
   /// A file containing a list of protocols whose conformances require const value extraction.
   std::string ConstGatherProtocolListFilePath;
 
+  /// Names of top-level constant declarations whose initialization expressions
+  /// require const value extraction.
+  std::vector<std::string> ConstGatherTopLevelConstantNames;
+
   /// Cross import module information. Map from module name to the list of cross
   /// import overlay files that associate with that module.
   using CrossImportMap = llvm::StringMap<std::vector<std::string>>;

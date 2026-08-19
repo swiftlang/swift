@@ -118,6 +118,13 @@ def const_gather_protocols_file
     Flags<[FrontendOption, NoDriverOption, ArgumentIsPath]>,
     HelpText<"Specify a list of protocols for extraction of conformances 'const values'">;
 
+def const_gather_top_level_constant
+  : Separate<["-"], "const-gather-top-level-constant">, MetaVarName<"<name>">,
+    Flags<[FrontendOption, NoDriverOption]>,
+    HelpText<"Extract the 'const value' of the initialization expression of the "
+             "top-level 'let' constant with this name. May be specified more "
+             "than once">;
+
 let Flags = [FrontendOption, NoDriverOption] in {
 
 def triple : Separate<["-"], "triple">, Alias<target>;
