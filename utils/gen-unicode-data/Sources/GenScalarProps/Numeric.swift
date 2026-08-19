@@ -129,7 +129,10 @@ func emitNumericData(
     return "0x\(String(value, radix: 16, uppercase: true))"
   }
 
-  let uniqueValues = Array(Set(values.map { $0.1 }))
+  // Sort the values so the emitted array is deterministic. The index stored
+  // per scalar is computed against this same array below, so ordering does not
+  // affect the decoded value.
+  let uniqueValues = Array(Set(values.map { $0.1 })).sorted()
 
   emitCollection(
     uniqueValues,

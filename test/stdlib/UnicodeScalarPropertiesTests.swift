@@ -232,6 +232,62 @@ UnicodeScalarPropertiesTests.test("properties.generalCategory") {
   // Unicode.Scalars for code points U+D800-DFFF.
 }
 
+UnicodeScalarPropertiesTests.test("properties.bidiClass") {
+  guard #available(SwiftStdlib 6.5, *) else { return }
+  expectEqual(.leftToRight, us("A").properties.bidiClass)
+  // U+05D0 HEBREW LETTER ALEF
+  expectEqual(.rightToLeft, us("\u{05D0}").properties.bidiClass)
+  // U+0627 ARABIC LETTER ALEF
+  expectEqual(.arabicLetter, us("\u{0627}").properties.bidiClass)
+
+  expectEqual(.europeanNumber, us("0").properties.bidiClass)
+  expectEqual(.europeanSeparator, us("+").properties.bidiClass)
+  expectEqual(.europeanTerminator, us("#").properties.bidiClass)
+  // U+0660 ARABIC-INDIC DIGIT ZERO
+  expectEqual(.arabicNumber, us("\u{0660}").properties.bidiClass)
+  expectEqual(.commonSeparator, us(",").properties.bidiClass)
+
+  // U+0300 COMBINING GRAVE ACCENT
+  expectEqual(.nonspacingMark, us("\u{0300}").properties.bidiClass)
+  // U+0000 NULL
+  expectEqual(.boundaryNeutral, us("\u{0000}").properties.bidiClass)
+  // U+2029 PARAGRAPH SEPARATOR
+  expectEqual(.paragraphSeparator, us("\u{2029}").properties.bidiClass)
+  // U+0009 CHARACTER TABULATION
+  expectEqual(.segmentSeparator, us("\u{0009}").properties.bidiClass)
+  expectEqual(.whitespace, us(" ").properties.bidiClass)
+  expectEqual(.otherNeutral, us("!").properties.bidiClass)
+
+  // U+202A LEFT-TO-RIGHT EMBEDDING
+  expectEqual(.leftToRightEmbedding, us("\u{202A}").properties.bidiClass)
+  // U+202D LEFT-TO-RIGHT OVERRIDE
+  expectEqual(.leftToRightOverride, us("\u{202D}").properties.bidiClass)
+  // U+202B RIGHT-TO-LEFT EMBEDDING
+  expectEqual(.rightToLeftEmbedding, us("\u{202B}").properties.bidiClass)
+  // U+202E RIGHT-TO-LEFT OVERRIDE
+  expectEqual(.rightToLeftOverride, us("\u{202E}").properties.bidiClass)
+  // U+202C POP DIRECTIONAL FORMATTING
+  expectEqual(.popDirectionalFormat, us("\u{202C}").properties.bidiClass)
+  // U+2066 LEFT-TO-RIGHT ISOLATE
+  expectEqual(.leftToRightIsolate, us("\u{2066}").properties.bidiClass)
+  // U+2067 RIGHT-TO-LEFT ISOLATE
+  expectEqual(.rightToLeftIsolate, us("\u{2067}").properties.bidiClass)
+  // U+2068 FIRST STRONG ISOLATE
+  expectEqual(.firstStrongIsolate, us("\u{2068}").properties.bidiClass)
+  // U+2069 POP DIRECTIONAL ISOLATE
+  expectEqual(.popDirectionalIsolate, us("\u{2069}").properties.bidiClass)
+
+  // Unassigned scalars take their value from the '@missing' defaults:
+  // U+0590 is a reserved code point in a right-to-left block.
+  expectEqual(.rightToLeft, us("\u{0590}").properties.bidiClass)
+  // U+074B is a reserved code point in an Arabic block.
+  expectEqual(.arabicLetter, us("\u{074B}").properties.bidiClass)
+  // U+20C1 is a reserved code point in the Currency Symbols block.
+  expectEqual(.europeanTerminator, us("\u{20C1}").properties.bidiClass)
+  // U+0378 is a reserved code point with no block-specific default.
+  expectEqual(.leftToRight, us("\u{0378}").properties.bidiClass)
+}
+
 UnicodeScalarPropertiesTests.test("properties.canonicalCombiningClass") {
   expectEqual(.notReordered, us("A").properties.canonicalCombiningClass)
   expectEqual(.above, us("\u{0301}").properties.canonicalCombiningClass)

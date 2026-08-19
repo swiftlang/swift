@@ -22,6 +22,7 @@ func generateScalarProps(for platform: String) {
   generateNameProp(into: &result)
   generateAgeProp(into: &result)
   generateGeneralCategory(into: &result)
+  generateBidiClass(for: platform, into: &result)
   
   result += """
   #endif // #ifndef SCALAR_PROP_DATA_H

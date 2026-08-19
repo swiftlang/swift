@@ -170,6 +170,22 @@ if #available(SwiftStdlib 6.1, *) {
 }
 
 //===----------------------------------------------------------------------===//
+// Scalar Bidi Class
+//===----------------------------------------------------------------------===//
+
+if #available(SwiftStdlib 6.5, *) {
+  UnicodeScalarPropertiesTest.test("Scalar Bidi Class") {
+    for i in 0x0 ... 0x10FFFF {
+      guard let scalar = Unicode.Scalar(i) else {
+        continue
+      }
+
+      expectEqual(scalar.properties.bidiClass, bidiClasses[scalar])
+    }
+  }
+}
+
+//===----------------------------------------------------------------------===//
 // Scalar Name Alias
 //===----------------------------------------------------------------------===//
 

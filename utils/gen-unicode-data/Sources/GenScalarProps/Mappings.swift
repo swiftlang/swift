@@ -91,7 +91,10 @@ func emitMappings(
     }
   }
 
-  let distances = Array(uniqueDistances)
+  // Sort the distances so the emitted array is deterministic. The index stored
+  // per scalar is computed against this same array below, so ordering does not
+  // affect the decoded value.
+  let distances = uniqueDistances.sorted()
 
   // 64 bit arrays * 8 bytes = .512 KB
   var bitArrays: [BitArray] = .init(repeating: .init(size: 64), count: 64)
@@ -265,7 +268,9 @@ func emitSpecialMappings(
   var index: UInt32 = 0
   var scalarIndices: [UInt32: UInt32] = [:]
 
-  for (scalar, (uppercase, lowercase, titlecase)) in data {
+  // Iterate in scalar order so the emitted byte layout and the recorded
+  // offsets are deterministic.
+  for (scalar, (uppercase, lowercase, titlecase)) in data.sorted(by: { $0.key < $1.key }) {
     scalarIndices[scalar] = index
 
     index += 1

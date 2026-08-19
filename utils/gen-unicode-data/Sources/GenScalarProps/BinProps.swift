@@ -193,7 +193,10 @@ func emitBinaryProps(
 
   """
 
-  let combinations = Array(Set(data.map { $0.1 })).map { $0.rawValue }
+  // Sort the combinations so the emitted array is deterministic. The index
+  // stored per scalar is computed against this same array below, so ordering
+  // does not affect the decoded value.
+  let combinations = Array(Set(data.map { $0.1 })).map { $0.rawValue }.sorted()
 
   // Data combinations array
 

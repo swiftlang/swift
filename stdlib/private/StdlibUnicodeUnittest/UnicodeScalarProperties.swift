@@ -534,6 +534,139 @@ public let generalCategories: [Unicode.Scalar: Unicode.GeneralCategory] = {
 }()
 
 //===----------------------------------------------------------------------===//
+// Scalar Bidi Class
+//===----------------------------------------------------------------------===//
+
+@available(SwiftStdlib 6.5, *)
+func bidiClass(forAbbreviation abbr: Substring) -> Unicode.BidiClass? {
+  switch abbr {
+  case "L": return .leftToRight
+  case "R": return .rightToLeft
+  case "AL": return .arabicLetter
+  case "EN": return .europeanNumber
+  case "ES": return .europeanSeparator
+  case "ET": return .europeanTerminator
+  case "AN": return .arabicNumber
+  case "CS": return .commonSeparator
+  case "NSM": return .nonspacingMark
+  case "BN": return .boundaryNeutral
+  case "B": return .paragraphSeparator
+  case "S": return .segmentSeparator
+  case "WS": return .whitespace
+  case "ON": return .otherNeutral
+  case "LRE": return .leftToRightEmbedding
+  case "LRO": return .leftToRightOverride
+  case "RLE": return .rightToLeftEmbedding
+  case "RLO": return .rightToLeftOverride
+  case "PDF": return .popDirectionalFormat
+  case "LRI": return .leftToRightIsolate
+  case "RLI": return .rightToLeftIsolate
+  case "FSI": return .firstStrongIsolate
+  case "PDI": return .popDirectionalIsolate
+  default: return nil
+  }
+}
+
+// The long names only appear on the '@missing' default lines.
+@available(SwiftStdlib 6.5, *)
+func bidiClass(forLongName name: Substring) -> Unicode.BidiClass? {
+  switch name {
+  case "Left_To_Right": return .leftToRight
+  case "Right_To_Left": return .rightToLeft
+  case "Arabic_Letter": return .arabicLetter
+  case "European_Terminator": return .europeanTerminator
+  default: return nil
+  }
+}
+
+// Unassigned scalars are not listed in DerivedBidiClass.txt. They instead take
+// their value from the '@missing' default lines in the header comment:
+//
+//   # @missing: 0000..10FFFF; Left_To_Right
+//   # @missing: 0590..05FF; Right_To_Left
+//
+// The overall default comes first, and later, more specific ranges override it.
+@available(SwiftStdlib 6.5, *)
+func parseBidiClassDefaults(
+  _ data: String,
+  into result: inout [Unicode.Scalar: Unicode.BidiClass]
+) {
+  for line in data.split(separator: "\n") {
+    guard line.hasPrefix("# @missing:") else {
+      continue
+    }
+
+    let info = line.dropFirst("# @missing:".count)
+    let components = info.split(separator: ";")
+
+    let longName = components[1].filter { !$0.isWhitespace }
+
+    guard let bidi = bidiClass(forLongName: Substring(longName)) else {
+      fatalError("Unhandled Bidi_Class default: \(longName)")
+    }
+
+    let scalars = parseScalars(String(components[0]))
+
+    for scalar in scalars {
+      guard let scalar = Unicode.Scalar(scalar) else {
+        continue
+      }
+
+      result[scalar] = bidi
+    }
+  }
+}
+
+@available(SwiftStdlib 6.5, *)
+func parseBidiClass(
+  _ data: String,
+  into result: inout [Unicode.Scalar: Unicode.BidiClass]
+) {
+  for line in data.split(separator: "\n") {
+    // Skip comments (including the '@missing' lines handled separately).
+    guard !line.hasPrefix("#") else {
+      continue
+    }
+
+    let info = line.split(separator: "#")
+    let components = info[0].split(separator: ";")
+
+    let filteredClass = components[1].filter { !$0.isWhitespace }
+
+    guard let bidi = bidiClass(forAbbreviation: Substring(filteredClass)) else {
+      fatalError("Unhandled Bidi_Class value: \(filteredClass)")
+    }
+
+    let scalars = parseScalars(String(components[0]))
+
+    for scalar in scalars {
+      guard let scalar = Unicode.Scalar(scalar) else {
+        continue
+      }
+
+      result[scalar] = bidi
+    }
+  }
+}
+
+@available(SwiftStdlib 6.5, *)
+public let bidiClasses: [Unicode.Scalar: Unicode.BidiClass] = {
+  var result: [Unicode.Scalar: Unicode.BidiClass] = [:]
+
+  #if canImport(Darwin)
+  let derivedBidiClass = readInputFile("Apple/DerivedBidiClass.txt")
+  #else
+  let derivedBidiClass = readInputFile("DerivedBidiClass.txt")
+  #endif
+  // Apply the '@missing' defaults first, then override with the explicitly
+  // listed scalars.
+  parseBidiClassDefaults(derivedBidiClass, into: &result)
+  parseBidiClass(derivedBidiClass, into: &result)
+
+  return result
+}()
+
+//===----------------------------------------------------------------------===//
 // Scalar Name Alias
 //===----------------------------------------------------------------------===//
 
