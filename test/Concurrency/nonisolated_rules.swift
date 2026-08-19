@@ -37,8 +37,8 @@ struct ImplicitlySendable {
   nonisolated var d = 0
 
   // never okay
-  nonisolated lazy var e = 0 // expected-error {{'nonisolated' cannot be applied to mutable stored properties}}
-  @P nonisolated var f = 0  // expected-error {{'nonisolated' cannot be applied to mutable stored properties}}
+  nonisolated lazy var e = 0 // expected-error {{'nonisolated' can not be applied to 'lazy' stored property 'e'}}
+  @P nonisolated var f = 0  // expected-error {{'nonisolated' can not be applied to stored property 'f' with a property wrapper}}
 }
 
 struct ImplicitlyNonSendable {
@@ -61,8 +61,8 @@ public struct PublicSendable: Sendable {
   nonisolated var d = 0
 
   // never okay
-  nonisolated lazy var e = 0  // expected-error {{'nonisolated' cannot be applied to mutable stored properties}}
-  @P nonisolated var f = 0  // expected-error {{'nonisolated' cannot be applied to mutable stored properties}}
+  nonisolated lazy var e = 0  // expected-error {{'nonisolated' can not be applied to 'lazy' stored property 'e'}}
+  @P nonisolated var f = 0  // expected-error {{'nonisolated' can not be applied to stored property 'f' with a property wrapper}}
 }
 
 public struct PublicNonSendable {
@@ -95,8 +95,8 @@ nonisolated struct StructRemovesGlobalActor: GloballyIsolated {
 
 @MainActor struct S {
   var value: NonSendable // globally-isolated
-  @P nonisolated var x = 0 // expected-error {{'nonisolated' cannot be applied to mutable stored properties}}
-  nonisolated lazy var y = 1 // expected-error {{'nonisolated' cannot be applied to mutable stored properties}}
+  @P nonisolated var x = 0 // expected-error {{'nonisolated' can not be applied to stored property 'x' with a property wrapper}}
+  nonisolated lazy var y = 1 // expected-error {{'nonisolated' can not be applied to 'lazy' stored property 'y'}}
   struct Nested {} // 'Nested' is not @MainActor-isolated
 }
 
@@ -305,7 +305,7 @@ struct B: Sendable {
 
 final class KlassB: Sendable {
   // expected-note@+2 {{convert 'test' to a 'let' constant or consider declaring it 'nonisolated(unsafe)' if manually managing concurrency safety}}
-  // expected-error@+1 {{'nonisolated' cannot be applied to mutable stored properties}}
+  // expected-error@+1 {{'nonisolated' can not be applied to mutable stored property 'test' of class 'KlassB'}}
   nonisolated var test: Int = 1
 }
 
