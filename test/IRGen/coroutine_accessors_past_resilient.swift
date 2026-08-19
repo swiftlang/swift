@@ -28,10 +28,10 @@ public struct OhOh {
 // CHECK: define{{.*}} swiftcc i64 @"$s34coroutine_accessors_past_resilient02OhE0V1gSivg"(ptr noalias swiftself captures(none) dereferenceable(8) %0) #{{[0-9]+}}
 
 // Setter definition
-// CHECK: define{{.*}} swiftcc void @"$s34coroutine_accessors_past_resilient02OhE0V1gSivs"(i64 %0, ptr swiftself captures(none) dereferenceable(8) %1) #{{[0-9]+}}
+// CHECK: define{{.*}} swiftcc void @"$s34coroutine_accessors_past_resilient02OhE0V1gSivs"(i64 %0, ptr noalias swiftself captures(none) dereferenceable(8) %1) #{{[0-9]+}}
 
 // _modify definition (old yield_once_1 ABI, kept for ABI stability)
-// CHECK: define{{.*}} swiftcc { ptr, ptr } @"$s34coroutine_accessors_past_resilient02OhE0V1gSivM"(ptr noalias dereferenceable(32) %0, ptr swiftself captures(none) dereferenceable(8) %1) #{{[0-9]+}}
+// CHECK: define{{.*}} swiftcc { ptr, ptr } @"$s34coroutine_accessors_past_resilient02OhE0V1gSivM"(ptr noalias dereferenceable(32) %0, ptr noalias swiftself captures(none) dereferenceable(8) %1) #{{[0-9]+}}
 
 // yielding mutate definition (new yield_once_2 ABI)
-// CHECK: define{{.*}} {{(swiftcc|swiftcorocc)}} { ptr, ptr } @"$s34coroutine_accessors_past_resilient02OhE0V1gSivx"(ptr noalias %0, ptr{{( swiftcoro)?}} %1, ptr swiftself captures(none) dereferenceable(8) %2) #{{[0-9]+}}
+// CHECK: define{{.*}} {{(swiftcc|swiftcorocc)}} { ptr, ptr } @"$s34coroutine_accessors_past_resilient02OhE0V1gSivx"(ptr noalias %0, ptr{{( swiftcoro)?}} %1, ptr noalias swiftself captures(none) dereferenceable(8) %2) #{{[0-9]+}}

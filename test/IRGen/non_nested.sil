@@ -15,7 +15,7 @@ sil @use_pack : $@convention(thin) <each τ_0_0> (@pack_guaranteed Pack{repeat e
 // CHECK: [[INIT_WITH_COPY_PTR:%.*]] = getelementptr inbounds ptr, ptr [[VALUE_WITNESS_TABLE]], i32 2
 // CHECK: [[INIT_WITH_COPY:%.*]] = load ptr, ptr [[INIT_WITH_COPY_PTR]]
 // CHECK: call ptr %InitializeWithCopy(ptr {{.*}}[[MALLOC]], ptr {{.*}}[[IN]], ptr [[META]])
-// CHECK: call swiftcc void @use_value(ptr [[MALLOC]], ptr [[META]])
+// CHECK: call swiftcc void @use_value(ptr noalias [[MALLOC]], ptr [[META]])
 // CHECK: call void @llvm.lifetime.end.p0({{.*}} -1, ptr [[MALLOC]])
 // CHECK: call void @free(ptr [[MALLOC]])
 // CHECK-NEXT: ret void
@@ -40,7 +40,7 @@ bb0(%0 : $*T):
 // CHECK: [[INIT_WITH_COPY_PTR:%.*]] = getelementptr inbounds ptr, ptr [[VALUE_WITNESS_TABLE]], i32 2
 // CHECK: [[INIT_WITH_COPY:%.*]] = load ptr, ptr [[INIT_WITH_COPY_PTR]]
 // CHECK: call ptr %InitializeWithCopy(ptr {{.*}}[[MALLOC]], ptr {{.*}}[[IN]], ptr [[META]])
-// CHECK: call swiftcc void @use_value(ptr [[MALLOC]], ptr [[META]])
+// CHECK: call swiftcc void @use_value(ptr noalias [[MALLOC]], ptr [[META]])
 // CHECK: call void @llvm.lifetime.end.p0({{.*}} -1, ptr [[MALLOC]])
 // CHECK: call void @free(ptr [[MALLOC]])
 // CHECK-NEXT: ret void
