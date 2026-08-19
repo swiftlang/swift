@@ -253,8 +253,13 @@ private struct CollectedEffects {
     case let bi as BuiltinInst where bi.id == .TSanInoutAccess:
       break
 
-    case is BeginCOWMutationInst, is IsUniqueInst:
+    case is BeginCOWMutationInst:
+      addEffects(.destroy, to: inst.operands[0].value, fromInitialPath: SmallProjectionPath(.anyValueFields))
+
+    case is IsUniqueInst:
       addEffects(.read, to: inst.operands[0].value, fromInitialPath: SmallProjectionPath(.anyValueFields))
+      // The destroy effect is required for the non-ossa ARC optimizer
+      addEffects(.destroy, to: inst.operands[0].value, fromInitialPath: SmallProjectionPath(.anyValueFields))
 
     case isReturnInstruction:
       if inst.parentFunction.convention.hasAddressResult {
