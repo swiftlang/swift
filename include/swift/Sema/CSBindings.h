@@ -695,14 +695,17 @@ public:
   /// score.
   LiteralBindingKind getLiteralForScore() const;
 
-  /// Check if this binding is favored over a disjunction e.g.
-  /// if it has only concrete types or would resolve a closure.
+  /// Check if this binding set is known to be complete without solving
+  /// any further disjunctions, so it should be attempted first.
   bool favoredOverDisjunction(Constraint *disjunction) const;
 
-  /// Check if this binding is favored over a conjunction.
+  /// Check if this binding set is known to be complete without solving
+  /// any further conjunctions, so it should be attempted first.
   bool favoredOverConjunction(Constraint *conjunction) const;
 
-  void inferTransitiveKeyPathBindings();
+  void promoteBindings();
+
+  bool inferTransitiveKeyPathBindings();
 
   /// Detect `subtype` relationship between two type variables and
   /// attempt to infer supertype bindings transitively e.g.
@@ -789,7 +792,7 @@ private:
   SubsumeBindingResult subsumeBinding(const PotentialBinding &binding,
                                       const PotentialBinding &existing);
 
-  void inferTransitiveKeyPathBindingFrom(const PotentialBinding &binding,
+  bool inferTransitiveKeyPathBindingFrom(const PotentialBinding &binding,
                                          TypeVariableType *keyPathTy);
 
   void addDefault(Constraint *constraint);

@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -solver-scope-threshold=2000
+// RUN: %target-typecheck-verify-swift -solver-scope-threshold=200
 
 func foo(_ string: String) -> Int {
   let bar = Array(string)

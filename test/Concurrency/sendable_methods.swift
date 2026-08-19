@@ -365,3 +365,21 @@ public struct TestGlobalActorAndSendable<V: Q> : Q {
     compute(test2) // Ok
   }
 }
+
+do {
+  struct Test {
+    static func fn() {}
+    static func otherFn() {}
+  }
+
+  // This shouldn't be ambiguous (@Sendable version should be preferred)
+  func fnRet(cond: Bool) -> () -> Void {
+    cond ? Test.fn : Test.otherFn
+  }
+
+  func forward<T>(_: T) -> T {
+  }
+
+  // This shouldn't be ambiguous (@Sendable version should be preferred)
+  let _: () -> Void = forward(Test.fn)
+}
