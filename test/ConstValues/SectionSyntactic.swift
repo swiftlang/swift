@@ -23,22 +23,21 @@
 
 // magic literals
 @section("mysection") let invalidNonLiteral4 = #line
+// expected-error@-1{{not supported in a literal expression}}
 
-// operators (should be rejected)
-@section("mysection") let invalidOperator1 = 1 + 1
-// expected-error@-1{{unsupported operator in a literal expression}}
+// operators (integer arithmetic folds; non-integer operators are rejected)
+@section("mysection") let validOperator1 = 1 + 1 // ok (folds to 2)
 @section("mysection") let invalidOperator2 = 3.14 * 2.0
 // expected-error@-1{{unsupported operator in a literal expression}}
-@section("mysection") let invalidOperator3: Int = -(1)
-// expected-error@-1{{unsupported operator in a literal expression}}
+@section("mysection") let validOperator3: Int = -(1) // ok (folds to -1)
 
 // non-literal expressions (should be rejected)
 @section("mysection") let invalidNonLiteral1 = Int.max
-// expected-error@-1{{not supported in a literal expression}}
+// expected-error@-1{{unable to resolve variable reference in a literal expression}}
 @section("mysection") let invalidNonLiteral2 = UInt64(42)
-// expected-error@-1{{unsupported type in a literal expression}}
-@section("mysection") let invalidNonLiteral3 = true.hashValue
 // expected-error@-1{{not supported in a literal expression}}
+@section("mysection") let invalidNonLiteral3 = true.hashValue
+// expected-error@-1{{unable to resolve variable reference in a literal expression}}
 
 func foo() -> Int { return 42 }
 func bar(x: Int) -> String { return "test" }
@@ -154,9 +153,8 @@ enum E { case a }
 
 let someVar = 42
 
-// variables (should be rejected)
-@section("mysection") let invalidVarRef = someVar
-// expected-error@-1{{unable to resolve variable reference in a literal expression}}
+// reference to a compile-time-known integer 'let' folds
+@section("mysection") let validVarRef = someVar // ok (folds to 42)
 
 struct MyCustomExpressibleByIntegerLiteral: ExpressibleByIntegerLiteral {
     init(integerLiteral value: Int) {}

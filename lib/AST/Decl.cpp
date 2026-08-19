@@ -3066,15 +3066,27 @@ VarDecl *PatternBindingDecl::getAnchoringVarDecl(unsigned i) const {
 
 bool PatternBindingDecl::hasSingleVarConstantFoldedInit() const {
   auto *singleVar = getSingleVar();
-  return singleVar && singleVar->isConstValue() &&
-         getASTContext().LangOpts.hasFeature(Feature::LiteralExpressions);
+  if (!singleVar || !singleVar->isConstValue() ||
+      !getASTContext().LangOpts.hasFeature(Feature::LiteralExpressions))
+    return false;
+  // Only stdlib integer constants participate in literal-expression folding.
+  // Other constant initializers (tuples, arrays, strings, ...) are left as
+  // written and must not be routed through the integer constant-folder.
+  Type type = singleVar->getInterfaceType();
+  return type && type->isStdlibInteger();
 }
 
 Expr *PatternBindingDecl::getExecutableInit(unsigned i) const {
   auto idxInit = getPatternList()[i].getExecutableInit();
   if (auto &ctx = getASTContext(); idxInit && hasSingleVarConstantFoldedInit())
-    return evaluateOrDefault(ctx.evaluator,
-                             ConstantFoldExpression{idxInit, &ctx}, {});
+    // Code generation: fold silently. Any diagnostics about a non-foldable
+    // '@const'/'@section' initializer are the verifier's responsibility
+    // (diagnoseInvalidConstExpressions), not code generation's -- emitting them
+    // here would duplicate/preempt those and set the error flag that makes the
+    // const-value SIL passes bail.
+    return evaluateOrDefault(
+        ctx.evaluator,
+        ConstantFoldExpression{idxInit, &ctx, /*emitDiagnostics=*/false}, {});
   return idxInit;
 }
 
@@ -12466,7 +12478,9 @@ LiteralExpr *EnumElementDecl::getRawValueExpr() const {
     if (getASTContext().LangOpts.hasFeature(Feature::LiteralExpressions))
       return dyn_cast<LiteralExpr>(evaluateOrDefault(
             getASTContext().evaluator,
-            ConstantFoldExpression{RawValueExpr, &getASTContext()}, {}));
+            ConstantFoldExpression{RawValueExpr, &getASTContext(),
+                                   /*emitDiagnostics=*/true},
+            {}));
     else
       return dyn_cast<LiteralExpr>(RawValueExpr);
   else
