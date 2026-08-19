@@ -317,8 +317,22 @@ const {
   }
 
   // Allow references to hidden dependencies from `@c/objc @implementation`
-  // decl signatures.
-  if (getDeclContext()->isInObjCImplementationContext()) {
+  // decl signatures, and from the extended type / where clause of an
+  // `@objc @implementation` extension — its members are implementations, not
+  // API, so they do not require the extended type to be imported publicly.
+  bool inObjCImplementation = getDeclContext()->isInObjCImplementationContext();
+  if (!inObjCImplementation) {
+    if (auto *ED =
+            dyn_cast_or_null<ExtensionDecl>(getDeclContext()->getAsDecl())) {
+      if (auto reason = getExportabilityReason())
+        inObjCImplementation =
+            ED->isObjCImplementation() &&
+            (*reason == ExportabilityReason::ExtensionWithPublicMembers ||
+             *reason ==
+                 ExportabilityReason::ExtensionWithConditionalConformances);
+    }
+  }
+  if (inObjCImplementation) {
     switch (originKind) {
     case DisallowedOriginKind::None:
     case DisallowedOriginKind::NonPublicImport:
