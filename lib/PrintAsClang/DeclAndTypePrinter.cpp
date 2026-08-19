@@ -133,6 +133,11 @@ static StringRef getCxxOverloadName(const ValueDecl *valueDecl) {
 }
 
 static bool isCxxOverloadCandidate(const ValueDecl *valueDecl) {
+  // Destructors are emitted as the C++ destructor of the type they belong to,
+  // so they never participate in an overload set. They are also named by a
+  // special base name that has no C++ spelling.
+  if (isa<DestructorDecl>(valueDecl))
+    return false;
   return isa<SubscriptDecl>(valueDecl) ||
          (isa<AbstractFunctionDecl>(valueDecl) &&
           !isa<AccessorDecl>(valueDecl));
