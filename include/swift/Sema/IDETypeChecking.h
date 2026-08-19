@@ -211,6 +211,37 @@ namespace swift {
       std::vector<ExpressionTypeInfo> &scratch, bool FullyQualified,
       bool CanonicalType, llvm::raw_ostream &OS);
 
+  /// An inferred actor isolation suitable for surfacing in an IDE inlay hint.
+  /// Reported as an offset+length anchor (currently the closure's `{`), with
+  /// the pretty-printed isolation and a kind string written into a shared
+  /// string buffer.
+  /// Inferred actor isolation info for
+  struct InferredIsolationInfo {
+    /// Offset of the entity to which the isolation corresponds.
+    uint32_t Offset;
+
+    /// Length of the entity to which the isolation corresponds.
+    uint32_t Length;
+
+    /// Offsets into the shared string buffer for the source-style isolation
+    /// (e.g. "@MainActor", "nonisolated", "@SomeGlobalActor").
+    uint32_t IsolationOffset;
+    uint32_t IsolationLength;
+
+    /// Offsets into the shared string buffer for the kind of entity this
+    /// isolation is attached to. Currently always "closure".
+    uint32_t KindOffset;
+    uint32_t KindLength;
+  };
+
+  /// Collect *inferred* actor isolation for every explicit \c ClosureExpr in
+  /// \c SF. Closures with their isolation written explicitly in the signature
+  /// are skipped. Pretty-printed isolation strings are written to \c OS.
+  void
+  collectInferredIsolations(SourceFile &SF, SourceRange Range,
+                            std::vector<InferredIsolationInfo> &IsolationInfos,
+                            llvm::raw_ostream &OS);
+
   /// Resolve a list of mangled names to accessible protocol decls from
   /// the decl context.
   ProtocolDecl *resolveProtocolName(DeclContext *dc, StringRef Name);

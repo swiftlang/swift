@@ -65,6 +65,7 @@ enum class SourceKitRequest {
   EnableCompileNotifications,
   CollectExpressionType,
   CollectVariableType,
+  CollectInferredIsolation,
   GlobalConfiguration,
   DependencyUpdated,
   Diagnostics,
