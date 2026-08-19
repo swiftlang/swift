@@ -840,7 +840,6 @@ public:
     }
   }
 
-  
   /// Account for bugs in LLVM.
   ///
   /// - When a variable is spilled into a stack slot, LiveDebugValues fails to
@@ -852,10 +851,15 @@ public:
   ///   on 32-bit targets as it will also fire for doubles.
   ///
   /// - CodeGen Prepare may drop dbg.values pointing to PHI instruction.
+  ///
+  /// - A dbg_value of a global's address has no location at -O0; only
+  ///   variables backed by a stack slot get one.
   bool needsShadowCopy(llvm::Value *Storage) {
     // If we have a constant data vector, we always need a shadow copy due to
     // bugs in LLVM.
     if (isa<llvm::ConstantDataVector>(Storage))
+      return true;
+    if (isa<llvm::GlobalValue>(Storage))
       return true;
     return !isa<llvm::Constant>(Storage);
   }
