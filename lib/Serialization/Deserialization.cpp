@@ -2028,6 +2028,7 @@ namespace {
       options |= TypeMatchFlags::IgnoreFunctionSendability;
       options |= TypeMatchFlags::IgnoreSendability;
       options |= TypeMatchFlags::IgnoreFunctionGlobalActorIsolation;
+      options |= TypeMatchFlags::AllowMissingClangType;
       if (type1->matches(type2, options))
         return TypeComparison::NearMatch;
     }

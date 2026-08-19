@@ -179,6 +179,40 @@ struct TestPlainResultWitness : P_CalledOnceResult {
   func f() -> () -> Void { { } } // Ok
 }
 
+func testSendingCaptures() {
+  class NS {
+    func test() {
+      _ = { @called(once) [sending self] in
+        _ = self
+      }
+    }
+  }
+
+  let ns = NS()
+  _ = { @called(once) [sending ns] in
+    ns
+  }
+  _ = { @called(once) [x = 42, sending ns = NS()] in
+    _ = x
+    _ = ns
+  }
+
+  _ = { [sending ns] in ns }
+  // expected-error@-1 {{'sending' capture may only be declared in a '@called(once)' closure}}
+
+  func calledOnce(_: @called(once) () -> Void) {}
+  func manyTimes(_: () -> Void) {}
+
+  calledOnce { [sending x = NS()] in
+    _ = x // Ok
+  }
+
+  manyTimes { [sending x = NS()] in
+    // expected-error@-1 {{'sending' capture may only be declared in a '@called(once)' closure}}
+    _ = x
+  }
+}
+
 // `@escaping @called(once)` implies `@_implicitSelfCapture`
 do {
   func takeFn(fn: @escaping @called(once) () -> Int) { }
