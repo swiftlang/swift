@@ -415,17 +415,11 @@ extension Optional where Wrapped: ~Copyable & ~Escapable {
 @available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension Optional where Wrapped: ~Copyable & Escapable {
+  @available(*, deprecated, renamed: "span")
   @export(implementation)
   @_addressableSelf
   @_lifetime(borrow self)
-  public func _span() -> Span<Wrapped> {
-    if self == nil {
-      return Span()
-    }
-    let a = Builtin.unprotectedAddressOfBorrow(self)
-    let s = unsafe Span<Wrapped>(_unsafeStart: .init(a), count: 1)
-    return unsafe _overrideLifetime(s, borrowing: self)
-  }
+  public func _span() -> Span<Wrapped> { span }
 
   public var span: Span<Wrapped> {
     @export(implementation)
