@@ -178,10 +178,10 @@ NOTE(record_over_aligned, none, "record '%0' is over aligned", (StringRef))
 NOTE(record_non_trivial_copy_destroy, none, "record '%0' is not trivial to copy or destroy", (StringRef))
 NOTE(record_is_dependent, none, "record '%0' is dependent", (StringRef))
 NOTE(record_parent_unimportable, none, "record %0's parent is not importable", (StringRef))
-NOTE(reference_passed_by_value, none, "function uses foreign reference type "
-                                      "'%0' as a value in %1 types which breaks "
-                                      "'swift_shared_reference' contract",
-     (StringRef, StringRef))
+NOTE(foreign_reference_type_by_value, none,
+    "%select{parameter takes|function returns}0 foreign reference type %1 by value "
+    "which violates reference type contract",
+     (bool, const clang::NamedDecl *))
 NOTE(record_not_automatically_importable, none, "record '%0' is not "
                                                 "automatically available: %1; "
                                                 "does this type have reference "
@@ -255,43 +255,36 @@ GROUPED_WARNING(cant_infer_frt_in_cxx_inheritance, ClangDeclarationImport, none,
         (const clang::NamedDecl *))
 
 ERROR(reference_type_mixed_immortal_marker, none,
-      "reference type %0 must mark both or neither of its 'retain:' and "
-      "'release:' Swift attributes 'immortal'",
+      "reference type %0 must mark both or neither of its retain and release "
+      "operations as immortal",
       (const clang::NamedDecl *))
-ERROR(reference_type_must_have_retain_release_attr, none,
-      "reference type '%1' must have %select{'retain:'|'release:'}0 Swift "
-      "attribute",
-      (bool, StringRef))
-ERROR(too_many_reference_type_retain_release_attr, none,
-      "reference type '%1' must have only one %select{'retain:'|'release:'}0 "
-      "Swift "
-      "attribute",
-      (bool, StringRef))
+ERROR(reference_type_exactly_one_retain_release_attr, none,
+      "reference type %1 must have exactly one '%select{retain|release}0:' "
+      "Swift attribute",
+      (bool, const clang::NamedDecl *))
 ERROR(reference_type_empty_retain_release_name, none,
-      "reference type '%1' has an empty %select{retain|release}0 operation name",
-      (bool, StringRef))
+      "reference type %1 has an empty %select{retain|release}0 operation name",
+      (bool, const clang::NamedDecl *))
+NOTE(retain_release_function_origin, none,
+     "%select{retain function|release function|retain and release functions}0 "
+     "%select{specified on|inherited from}1 %2",
+     (unsigned, bool, const clang::NamedDecl *))
+
 ERROR(foreign_reference_types_cannot_find_retain_release, none,
-      "cannot find %select{retain|release}0 function '%1' for reference type "
-      "'%2'",
-      (bool, StringRef, StringRef))
+      "cannot find %select{retain|release}0 function '%1' for reference type %2",
+      (bool, StringRef, const clang::NamedDecl *))
 ERROR(too_many_reference_type_retain_release_operations, none,
       "multiple functions '%1' found; there must be exactly one "
-      "%select{retain|release}0 function for reference type '%2'",
-      (bool, StringRef, StringRef))
-ERROR(foreign_reference_types_invalid_retain_release, none,
-      "specified %select{retain|release}0 function '%1' is invalid; "
-      "%select{retain|release}0 function must have exactly one argument of "
+      "%select{retain|release}0 function for reference type %2",
+      (bool, StringRef, const clang::NamedDecl *))
+ERROR(foreign_reference_retain_release_param_type, none,
+      "%select{retain|release}0 function '%1' must have exactly one argument of "
       "type '%2'",
       (bool, StringRef, StringRef))
-
-ERROR(foreign_reference_types_retain_non_void_or_self_return_type, none,
-      "specified retain function '%0' is invalid; "
-      "retain function must either return have 'void', the reference count as an integer, or the parameter type",
-      (StringRef))
-ERROR(foreign_reference_types_release_non_void_return_type, none,
-      "specified release function '%0' is invalid; "
-      "release function must either return 'void' or the reference count as an integer",
-      (StringRef))
+ERROR(foreign_reference_retain_release_return_type, none,
+      "%select{retain|release}0 function '%1' "
+      "must return an integer%select{, its parameter type,|}0 or 'void'",
+      (bool, StringRef))
 ERROR(foreign_reference_types_retain_release_not_a_function_decl, none,
       "specified %select{retain|release}0 function '%1' is not a function",
       (bool, StringRef))
