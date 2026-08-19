@@ -5992,6 +5992,17 @@ static FuncDecl *synthesizeBaseFunctionDeclCall(ClangImporter &impl,
       ctx.getClangModuleLoader()->importDeclDirectly(newClangMethod));
 }
 
+/// C++ parameters may be unnamed, in which case the imported ParamDecl has an
+/// empty body name. Give such parameters a body name so that SILGen produces a
+/// value for them while being lowered.
+static void giveParameterNamesForThunk(ASTContext &ctx,
+                                       ArrayRef<ParamDecl *> params) {
+  for (auto [i, param] : llvm::enumerate(params)) {
+    if (param->getParameterName().empty())
+      param->setName(ctx.getIdentifier("__argument" + std::to_string(i)));
+  }
+}
+
 // Generates the body of a derived method, that invokes the base
 // method.
 // The method's body takes the following form:
@@ -6613,6 +6624,10 @@ static ValueDecl *cloneBaseMemberDecl(ClangImporter::Implementation &Impl,
       if (cxxMethod->getRefQualifier() == clang::RefQualifierKind::RQ_RValue)
         return nullptr;
     }
+
+    // The synthesized body refers to the parameters by DeclRefExpr, so any
+    // unnamed C++ parameter needs a body name for SILGen to bind it.
+    giveParameterNamesForThunk(context, fn->getParameters()->getArray());
 
     auto out = FuncDecl::createImplicit(
         context, fn->getStaticSpelling(), fn->getName(), fn->getNameLoc(),
@@ -7739,6 +7754,10 @@ static ValueDecl *addThunkForDependentTypes(FuncDecl *oldDecl,
   auto fixedParams =
       ParameterList::create(newDecl->getASTContext(), fixedParameters);
 
+  // The synthesized body refers to the parameters by DeclRefExpr, so any
+  // unnamed C++ parameter needs a body name for SILGen to bind it.
+  giveParameterNamesForThunk(newDecl->getASTContext(), fixedParameters);
+
   Type fixedResultType;
   if (oldDecl->getResultInterfaceType()->isEqual(
           oldDecl->getASTContext().getAnyExistentialType()))
@@ -7841,6 +7860,10 @@ static ValueDecl *generateThunkForExtraMetatypes(SubstitutionMap subst,
     auto *newParamDecl = ParamDecl::clone(newDecl->getASTContext(), param);
     newParams.push_back(newParamDecl);
   }
+
+  // The synthesized body refers to the parameters by DeclRefExpr, so any
+  // unnamed C++ parameter needs a body name for SILGen to bind it.
+  giveParameterNamesForThunk(newDecl->getASTContext(), newParams);
 
   auto originalFnSubst = cast<AbstractFunctionDecl>(oldDecl)
                              ->getInterfaceType()
