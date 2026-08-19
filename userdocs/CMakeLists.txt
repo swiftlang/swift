@@ -16,7 +16,7 @@ elseif(CMAKE_Swift_COMPILER)
 else()
   set(_swift_doc_index_swiftc "swiftc")
 endif()
-
+  
 # 'generate-doc-index.swift' imports Foundation, so we need an SDK on Apple
 # platforms; otherwise swiftc fails with "no such module 'Foundation'".
 if(APPLE AND CMAKE_OSX_SYSROOT)
