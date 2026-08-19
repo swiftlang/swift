@@ -5917,6 +5917,9 @@ NOTE(note_disable_error_propagation,none,
 
 GROUPED_WARNING(no_throw_in_try,UnnecessaryEffectMarker,none,
         "no calls to throwing functions occur within 'try' expression", ())
+GROUPED_WARNING(no_throw_in_try_with_throwing_closure,UnnecessaryEffectMarker,none,
+        "no calls to throwing functions occur within 'try' expression; "
+        "'try' does not cover calls inside a closure", ())
 
 WARNING(no_throw_in_do_with_catch,none,
         "'catch' block is unreachable because no errors are thrown in 'do' block", ())
