@@ -3571,37 +3571,28 @@ namespace {
                                  const clang::FunctionDecl *accessor);
 
     bool foreignReferenceTypePassedByRef(const clang::FunctionDecl *decl) {
-      bool anyParamPassesByVal =
-          llvm::any_of(decl->parameters(), [this, decl](auto *param) {
-            if (auto recordType = dyn_cast<clang::RecordType>(
-                    param->getType().getCanonicalType())) {
-              if (recordHasReferenceSemantics(recordType->getDecl())) {
-                Impl.addImportDiagnostic(
-                    decl,
-                    Diagnostic(diag::reference_passed_by_value,
-                               Impl.SwiftContext.AllocateCopy(
-                                   recordType->getDecl()->getNameAsString()),
-                               "a parameter"),
-                    decl->getLocation());
-                return true;
-              }
-            }
-            return false;
-          });
-
-      if (anyParamPassesByVal)
-        return true;
+      for (auto *param : decl->parameters()) {
+        if (auto recordType = dyn_cast<clang::RecordType>(
+                param->getType().getCanonicalType())) {
+          if (recordHasReferenceSemantics(recordType->getDecl())) {
+            Impl.addImportDiagnostic(
+                decl,
+                Diagnostic(diag::foreign_reference_type_by_value,
+                           /*isReturn=*/false, recordType->getDecl()),
+                param->getLocation());
+            return true;
+          }
+        }
+      }
 
       if (auto recordType = dyn_cast<clang::RecordType>(
               decl->getReturnType().getCanonicalType())) {
         if (recordHasReferenceSemantics(recordType->getDecl())) {
           Impl.addImportDiagnostic(
               decl,
-              Diagnostic(diag::reference_passed_by_value,
-                         Impl.SwiftContext.AllocateCopy(
-                             recordType->getDecl()->getNameAsString()),
-                         "the return"),
-              decl->getLocation());
+              Diagnostic(diag::foreign_reference_type_by_value,
+                         /*isReturn=*/true, recordType->getDecl()),
+              decl->getReturnTypeSourceRange().getBegin());
           return true;
         }
       }
