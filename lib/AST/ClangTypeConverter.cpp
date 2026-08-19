@@ -1083,8 +1083,8 @@ ClangTypeConverter::getClangTemplateArguments(
   // error.
   SmallVector<Type, 2> failedTypes;
   for (clang::NamedDecl *param : *templateParams) {
-    // Note: all template parameters must be template type parameters. This is
-    // verified when we import the Clang decl.
+    // Note: all template parameters must be non-pack template type parameters.
+    // This is verified when we import the Clang decl.
     auto templateParam = cast<clang::TemplateTypeParmDecl>(param);
     // We must have found a defaulted parameter at the end of the list.
     if (templateParam->getIndex() >= genericArgs.size()) {
