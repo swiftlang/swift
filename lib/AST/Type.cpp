@@ -3743,7 +3743,16 @@ static bool matchesFunctionType(CanAnyFunctionType fn1, CanAnyFunctionType fn2,
     if (!ext2.isNoEscape())
       ext1 = ext1.withNoEscape(false);
   }
-  if (!ext1.isEqualTo(ext2, useClangTypes(fn1)))
+  bool compareClangTypes = useClangTypes(fn1);
+  // Under AllowMissingClangType (set for deserialization near-matches), a
+  // function type that carries a Clang type is compatible with one that lacks
+  // it — module build skew where an older module didn't record the Clang
+  // function type. Two present-but-different Clang types still mismatch.
+  if (compareClangTypes &&
+      matchMode.contains(TypeMatchFlags::AllowMissingClangType) &&
+      (ext1.getClangTypeInfo().empty() || ext2.getClangTypeInfo().empty()))
+    compareClangTypes = false;
+  if (!ext1.isEqualTo(ext2, compareClangTypes))
     return false;
 
   return paramsAndResultMatch();

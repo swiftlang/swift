@@ -1938,12 +1938,12 @@ public:
 };
 
 SWIFT_NAME("BridgedCaptureListEntry.createParsed(_:declContext:ownership:"
-           "ownershipRange:name:nameLoc:equalLoc:initializer:)")
+           "ownershipRange:sending:name:nameLoc:equalLoc:initializer:)")
 BridgedCaptureListEntry BridegedCaptureListEntry_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
     BridgedReferenceOwnership cOwnershipKind, swift::SourceRange ownershipRange,
-    swift::Identifier name, swift::SourceLoc nameLoc, swift::SourceLoc equalLoc,
-    BridgedExpr cInitializer);
+    bool isSending, swift::Identifier name, swift::SourceLoc nameLoc,
+    swift::SourceLoc equalLoc, BridgedExpr cInitializer);
 
 SWIFT_NAME("BridgedCaptureListExpr.createParsed(_:captureList:closure:)")
 BridgedCaptureListExpr BridgedCaptureListExpr_createParsed(BridgedASTContext cContext,

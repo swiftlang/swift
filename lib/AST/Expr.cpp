@@ -1367,8 +1367,8 @@ CaptureListEntry::CaptureListEntry(PatternBindingDecl *PBD) : PBD(PBD) {
 
 CaptureListEntry CaptureListEntry::createParsed(
     ASTContext &Ctx, ReferenceOwnership ownershipKind,
-    SourceRange ownershipRange, Identifier name, SourceLoc nameLoc,
-    SourceLoc equalLoc, Expr *initializer, DeclContext *DC) {
+    SourceRange ownershipRange, bool isSending, Identifier name,
+    SourceLoc nameLoc, SourceLoc equalLoc, Expr *initializer, DeclContext *DC) {
 
   bool forceVar = ownershipKind == ReferenceOwnership::Weak &&
                   !Ctx.LangOpts.hasFeature(Feature::ImmutableWeakCaptures);
@@ -1389,6 +1389,9 @@ CaptureListEntry CaptureListEntry::createParsed(
 
   if (CLE.isSimpleSelfCapture())
     VD->setIsSelfParamCapture();
+
+  if (isSending)
+    VD->setIsSendingCapture();
 
   return CLE;
 }

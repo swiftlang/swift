@@ -2955,6 +2955,50 @@ static void diagnoseImplicitWeakToStrongCapture(const Expr *E,
   const_cast<Expr *>(E)->walk(Walker);
 }
 
+/// Diagnose cases where a `sending` capture is associated with a
+/// non-`@called(once)` closure.
+static void diagnoseInvalidSendingCaptureDeclarations(const Expr *E,
+                                                      const DeclContext *DC) {
+  if (!E || isa<ErrorExpr>(E) || !E->getType())
+    return;
+
+  class CaptureWalker : public BaseDiagnosticWalker {
+    ASTContext &Ctx;
+
+  public:
+    CaptureWalker(ASTContext &ctx) : Ctx(ctx) {}
+
+    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
+      if (auto *captureList = dyn_cast<CaptureListExpr>(E)) {
+        for (const auto &capture : captureList->getCaptureList()) {
+          auto *V = capture.getVar();
+          if (!V->isSendingCapture())
+            continue;
+
+          if (!Ctx.LangOpts.hasFeature(Feature::CalledAttribute)) {
+            Ctx.Diags.diagnose(
+                V->getLoc(),
+                diag::sending_capture_requires_experimental_feature);
+            return Action::Stop();
+          }
+
+          if (!captureList->getClosureBody()->isCalledOnce()) {
+            Ctx.Diags.diagnose(V->getLoc(),
+                               diag::sending_capture_decl_requires_called_once);
+            V->setInvalid();
+            continue;
+          }
+        }
+      }
+
+      return Action::Continue(E);
+    }
+  };
+
+  CaptureWalker W(DC->getASTContext());
+  const_cast<Expr *>(E)->walk(W);
+}
+
 bool TypeChecker::getDefaultGenericArgumentsString(
     SmallVectorImpl<char> &buf,
     const swift::GenericTypeDecl *typeDecl,
@@ -6859,6 +6903,7 @@ void swift::performSyntacticExprDiagnostics(const Expr *E,
   diagnoseDictionaryLiteralDuplicateKeyEntries(E, DC);
   diagnoseMissingMemberImports(E, DC);
   diagnoseCxxFunctionCalls(E, DC);
+  diagnoseInvalidSendingCaptureDeclarations(E, DC);
 }
 
 void swift::performStmtDiagnostics(const Stmt *S, DeclContext *DC) {

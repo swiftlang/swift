@@ -413,6 +413,9 @@ public:
                                       : AccessKind::Read,
               CurDC->getParentModule(), CurDC->getResilienceExpansion()))
         Flags |= CapturedValue::IsDirect;
+
+      if (CalledOnce && var->isSendingCapture())
+        Flags |= CapturedValue::IsSending;
     }
 
     // If the closure is noescape, then we can capture the decl as noescape.
@@ -464,9 +467,12 @@ public:
       if (!NoEscape)
         Flags &= ~CapturedValue::IsNoEscape;
 
-      // Regular closures cannot consume their captures.
-      if (!CalledOnce)
+      if (!CalledOnce) {
+        // Regular closures cannot consume their captures.
         Flags &= ~CapturedValue::IsConsumed;
+        // ... or have `sending` captures.
+        Flags &= ~CapturedValue::IsSending;
+      }
 
       addCapture(capture.mergeFlags(Flags));
     }

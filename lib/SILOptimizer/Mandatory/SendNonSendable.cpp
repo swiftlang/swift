@@ -2755,6 +2755,19 @@ void UseAfterSendDiagnosticInferrer::infer() {
     }
   }
 
+  if (auto *pai = dyn_cast<PartialApplyInst>(sendingOp->getUser())) {
+    if (pai->isCalledOnce() && ApplySite(pai)
+                                   .getParamInfoForOperand(*sendingOp)
+                                   .hasOption(SILParameterInfo::Sending)) {
+      if (auto rootValueAndName = inferNameAndRootHelper(sendingOp->get())) {
+        return diagnosticEmitter.emitNamedUseofStronglySentValue(
+            baseLoc, rootValueAndName->first);
+      }
+      return diagnosticEmitter.emitTypedUseOfStronglySentValue(
+          baseLoc, baseInferredType);
+    }
+  }
+
   auto *autoClosureExpr = loc.getAsASTNode<AutoClosureExpr>();
   if (!autoClosureExpr) {
     return diagnosticEmitter.emitUnknownPatternError();
