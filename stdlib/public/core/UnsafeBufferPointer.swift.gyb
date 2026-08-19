@@ -522,7 +522,7 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   @export(implementation)
   @safe
   public func extracting(_ bounds: Range<Int>) -> Self {
-    _precondition(_checkBounds(bounds), "Index out of range")
+    _debugPrecondition(_checkBounds(bounds), "Index out of range")
     guard let start = self.baseAddress else {
       return unsafe Self(start: nil, count: 0)
     }
@@ -610,6 +610,7 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   /// - Complexity: O(1)
   @export(implementation)
   public func extracting(unchecked bounds: Range<Int>) -> Self {
+    _internalInvariant(_checkBounds(bounds), "Index out of range")
     let newStart = unsafe _position?.advanced(by: bounds.lowerBound)
     return unsafe Self(start: newStart, count: bounds.count)
   }
