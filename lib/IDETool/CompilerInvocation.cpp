@@ -162,32 +162,47 @@ bool ide::initCompilerInvocation(
     const std::string &swiftExecutablePath,
     const std::string &runtimeResourcePath, time_t sessionTimestamp,
     std::string &Error) {
+  // Frontend arguments begin with -frontend, otherwise they are treated as
+  // driver arguments.
+  bool ArgsAreFrontend =
+      !OrigArgs.empty() && StringRef(OrigArgs.front()) == "-frontend";
+  ArrayRef<const char *> PassedArgs =
+      ArgsAreFrontend ? OrigArgs.drop_front() : OrigArgs;
+
   SmallVector<const char *, 16> Args;
   // Make sure to put '-resource-dir' at the top to allow overriding them with
   // the passed in arguments.
   Args.push_back("-resource-dir");
   Args.push_back(runtimeResourcePath.c_str());
-  Args.append(OrigArgs.begin(), OrigArgs.end());
+  Args.append(PassedArgs.begin(), PassedArgs.end());
 
   SmallString<32> ErrStr;
   llvm::raw_svector_ostream ErrOS(ErrStr);
   StreamDiagConsumer DiagConsumer(ErrOS);
   Diags.addConsumer(DiagConsumer);
 
-  // Derive 'swiftc' path from 'swift-frontend' path (swiftExecutablePath).
-  SmallString<256> driverPath(swiftExecutablePath);
-  llvm::sys::path::remove_filename(driverPath);
-  llvm::sys::path::append(driverPath, "swiftc");
+  bool InvocationCreationFailed;
+  if (ArgsAreFrontend) {
+    // No need to call the driver here, arguments are parsed directly.
+    InvocationCreationFailed = Invocation.parseArgs(
+        Args, Diags, /*ConfigurationFileBuffers=*/nullptr,
+        /*workingDirectory=*/"", swiftExecutablePath);
+  } else {
+    // Derive 'swiftc' path from 'swift-frontend' path (swiftExecutablePath).
+    SmallString<256> driverPath(swiftExecutablePath);
+    llvm::sys::path::remove_filename(driverPath);
+    llvm::sys::path::append(driverPath, "swiftc");
 
-  bool InvocationCreationFailed =
-      driver::getSingleFrontendInvocationFromDriverArguments(
-          driverPath, Args, Diags,
-          [&](ArrayRef<const char *> FrontendArgs) {
-            return Invocation.parseArgs(
-                FrontendArgs, Diags, /*ConfigurationFileBuffers=*/nullptr,
-                /*workingDirectory=*/"", swiftExecutablePath);
-          },
-          /*ForceNoOutputs=*/true);
+    InvocationCreationFailed =
+        driver::getSingleFrontendInvocationFromDriverArguments(
+            driverPath, Args, Diags,
+            [&](ArrayRef<const char *> FrontendArgs) {
+              return Invocation.parseArgs(
+                  FrontendArgs, Diags, /*ConfigurationFileBuffers=*/nullptr,
+                  /*workingDirectory=*/"", swiftExecutablePath);
+            },
+            /*ForceNoOutputs=*/true);
+  }
 
   // Remove the StreamDiagConsumer as it's no longer needed.
   Diags.removeConsumer(DiagConsumer);
