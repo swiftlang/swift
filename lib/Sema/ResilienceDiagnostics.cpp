@@ -50,6 +50,18 @@ static bool addMissingImport(SourceLoc loc, const Decl *D,
   return true;
 }
 
+/// Whether a setter is referenceable from inlinable code, even if its formal
+/// access is narrower than its storage's.
+static bool isSetterUsableFromInline(const AccessorDecl *accessor) {
+  assert(accessor->isSetter() && "expected a setter accessor");
+  auto *storage = accessor->getStorage();
+  return accessor->getAttrs().hasAttribute<UsableFromInlineAttr>() ||
+         accessor->isAlwaysEmittedIntoClient() ||
+         accessor->hasAttributeWithInlinableSemantics() ||
+         storage->isAlwaysEmittedIntoClient() ||
+         storage->hasAttributeWithInlinableSemantics();
+}
+
 bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
                                                  const ValueDecl *D,
                                                  const ExportContext &where) {
@@ -88,7 +100,8 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
     if (auto *accessor = dyn_cast<AccessorDecl>(D)) {
       if (accessor->getAccessorKind() == AccessorKind::Set) {
         auto storage = accessor->getStorage();
-        if (accessor->getFormalAccess() < storage->getFormalAccess()) {
+        if (!isSetterUsableFromInline(accessor) &&
+            accessor->getFormalAccess() < storage->getFormalAccess()) {
           auto diagID = diag::resilience_decl_unavailable;
           Context.Diags
               .diagnose(loc, diagID, D, accessor->getFormalAccess(),
