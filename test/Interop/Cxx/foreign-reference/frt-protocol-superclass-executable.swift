@@ -88,4 +88,60 @@ Tests.test("custom retain/release through an FRT-bound protocol witness") {
   expectEqual(SharedBase.numRefs() + 2, SharedBase.numDerefs())
 }
 
+protocol ImmortalViaImport: ImmortalBase {
+  func tag() -> CInt
+}
+
+extension ImmortalBase: ImmortalViaImport {}
+
+protocol ImmortalViaExtension: ImmortalBase {
+  func label() -> CInt
+}
+
+extension ImmortalBase: ImmortalViaExtension {
+  func label() -> CInt { tag() }
+}
+
+func tagOfImmortal<T: ImmortalViaImport>(_ obj: T) -> CInt { obj.tag() }
+func echoImmortal<T: ImmortalViaImport>(_ obj: T) -> T { obj }
+
+func labelOfImmortal<T: ImmortalViaExtension>(_ obj: T) -> CInt { obj.label() }
+func echoLabelledImmortal<T: ImmortalViaExtension>(_ obj: T) -> T { obj }
+
+Tests.test("immortal FRT through an FRT-bound protocol witness") {
+  let a = ImmortalBase.shared()
+  expectEqual(0xC0FFEE, a.canary())
+
+  // If native reference counting were emitted here, the count would land on the
+  // canary, or corrupt memory just past the end of the object.
+  do {
+    let b = echoImmortal(a)
+    expectEqual(1, tagOfImmortal(a))
+    expectEqual(1, tagOfImmortal(b))
+    expectEqual(1, echoImmortal(a).tag())
+    expectEqual(1, echoImmortal(b).tag())
+    expectEqual(1, tagOfImmortal(echoImmortal(a)))
+    expectEqual(1, tagOfImmortal(echoImmortal(b)))
+  }
+
+  expectEqual(0xC0FFEE, a.canary())
+
+  // Same again, with the witness defined in a Swift extension.
+  do {
+    let b = echoLabelledImmortal(a)
+    expectEqual(1, labelOfImmortal(a))
+    expectEqual(1, labelOfImmortal(b))
+    expectEqual(1, echoLabelledImmortal(a).label())
+    expectEqual(1, echoLabelledImmortal(b).label())
+    expectEqual(1, labelOfImmortal(echoLabelledImmortal(a)))
+    expectEqual(1, labelOfImmortal(echoLabelledImmortal(b)))
+  }
+
+  expectEqual(0xC0FFEE, a.canary())
+
+  // There is no counter to check for an immortal FRT, so check the canary.
+  expectEqual(1, ImmortalBase.shared().tag())
+  expectEqual(0xC0FFEE, ImmortalBase.shared().canary())
+}
+
 runAllTests()

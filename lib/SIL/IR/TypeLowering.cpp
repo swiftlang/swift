@@ -671,6 +671,15 @@ namespace {
       if (origType.isTypeParameterOrOpaqueArchetype() ||
           origType.isOpaqueFunctionOrOpaqueDerivativeFunction()) {
         if (origType.requiresClass()) {
+          // An immortal foreign reference type carries no reference count, so
+          // a type parameter whose class bound is one lowers trivially.
+          if (auto bound = origType.getSuperclassBound()) {
+            if (bound->isForeignReferenceType() &&
+                bound->getReferenceCounting() == ReferenceCounting::None) {
+              return asImpl().handleTrivial(
+                  type, getTrivialSILTypeProperties(isSensitive));
+            }
+          }
           return asImpl().handleReference(
               type, getReferenceSILTypeProperties(isSensitive));
         } else {

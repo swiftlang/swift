@@ -49,4 +49,21 @@ private:
 int SharedBase::totalRefs = 0;
 int SharedBase::totalDerefs = 0;
 
+struct ImmortalBase {
+  virtual int tag() const { return 1; }
+
+  /// A canary sitting immediately after the vtable pointer, which is where a
+  /// Swift heap object keeps its reference count. An immortal FRT must never be
+  /// retained or released, so this value must never change.
+  long long canary() const { return canaryValue; }
+
+  static ImmortalBase &shared() {
+    static ImmortalBase instance;
+    return instance;
+  }
+
+private:
+  long long canaryValue = 0xC0FFEE;
+} SWIFT_IMMORTAL_REFERENCE;
+
 #endif // TEST_INTEROP_CXX_FOREIGN_REFERENCE_INPUTS_FRT_PROTOCOL_SUPERCLASS_H
