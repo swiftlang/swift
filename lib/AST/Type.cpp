@@ -3472,6 +3472,10 @@ getForeignRepresentable(Type type, ForeignLanguage language,
         switch (classDecl->getForeignClassKind()) {
         case ClassDecl::ForeignKind::Normal:
         case ClassDecl::ForeignKind::RuntimeOnly:
+          // A C++ foreign reference type is a pointer to the C++ class.
+          if (language == ForeignLanguage::Cxx &&
+              classDecl->isForeignReferenceType())
+            break;
           // Imported classes cannot be represented in C or C++.
           return failure();
         case ClassDecl::ForeignKind::CFType:
