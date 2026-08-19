@@ -2258,6 +2258,11 @@ ERROR(cxx_references_unsupported,none,
       "%kind0 cannot implement C++ function '%1' because reference "
       "parameters and return types are not yet supported",
       (ValueDecl *, StringRef))
+ERROR(cxx_unretained_result_unsupported,none,
+      "%kind0 cannot implement C++ function '%1' because it returns a foreign "
+      "reference type %select{without a 'SWIFT_RETURNS_RETAINED' annotation|"
+      "unretained ('SWIFT_RETURNS_UNRETAINED')}2, which is not yet supported",
+      (ValueDecl *, StringRef, unsigned))
 
 // @used and @section
 ERROR(section_empty_name,none,

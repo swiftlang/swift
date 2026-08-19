@@ -4256,6 +4256,28 @@ private:
       return true;
     }
 
+    // The implementation is lowered with the result convention of the C++
+    // declaration (see getSILFunctionTypeForClangDecl), but its Swift body
+    // always produces an owned (+1) value, which would leak against an
+    // unretained (+0) result, or no annotation.
+    // An immortal foreign reference type is never retained or released, so
+    // its result convention does not matter.
+    // TODO: Support returning a foreign reference type unretained.
+    if (const auto *candFD = dyn_cast<FuncDecl>(cand)) {
+      const auto *resultClass = candFD->getResultInterfaceType()
+                                    ->lookThroughAllOptionalTypes()
+                                    ->getClassOrBoundGenericClass();
+      if (resultClass && resultClass->hasRefCountingAnnotations() &&
+          importer::getOwnershipOfReturnedFRT(clangFD) !=
+              ResultConvention::Owned) {
+        unsigned reason =
+            importer::ReturnOwnershipInfo(clangFD).hasReturnsUnretained ? 1 : 0;
+        diagnose(cand, diag::cxx_unretained_result_unsupported, cand,
+                 clangFD->getName(), reason);
+        return true;
+      }
+    }
+
     // The symbol this implementation will be emitted under must not be one the
     // Swift runtime reserves (swift_retain etc.). Compute it the same way
     // SILDeclRef's lowering will: ClangImporter::getMangledName yields asm
