@@ -8486,7 +8486,7 @@ bool Parser::parseAccessorAfterIntroducer(
       !Context.LangOpts.hasFeature(Feature::CoroutineAccessors)) {
     diagnose(Tok, diag::accessor_requires_coroutine_accessors,
              getAccessorNameForDiagnostic(Kind, /*article*/ false,
-                                          /*underscored*/ false));
+                                          /*legacy*/ false));
   }
 
   if (Kind == AccessorKind::Borrow || Kind == AccessorKind::Mutate) {
@@ -8495,7 +8495,7 @@ bool Parser::parseAccessorAfterIntroducer(
         !Flags.contains(PD_InProtocol)) {
       diagnose(Tok, diag::borrow_mutate_accessor_not_supported_in_decl,
                getAccessorNameForDiagnostic(Kind, /*article*/ true,
-                                            /*underscored*/ false));
+                                            /*legacy*/ false));
     }
   }
 
@@ -8505,7 +8505,7 @@ bool Parser::parseAccessorAfterIntroducer(
     if (Tok.is(tok::l_brace))
       diagnose(Tok, diag::unexpected_getset_implementation_in_protocol,
                getAccessorNameForDiagnostic(Kind, /*article*/ false,
-                                            /*underscored*/ false));
+                                            /*legacy*/ false));
     return false;
   }
 
@@ -8969,7 +8969,7 @@ void Parser::ParsedAccessors::record(Parser &P, AbstractStorageDecl *storage,
 }
 
 static std::optional<AccessorKind>
-getCorrespondingUnderscoredAccessorKind(AccessorKind kind) {
+getCorrespondingLegacyAccessorKind(AccessorKind kind) {
   switch (kind) {
   case AccessorKind::YieldingBorrow:
     return {AccessorKind::Read};
@@ -8994,20 +8994,20 @@ getCorrespondingUnderscoredAccessorKind(AccessorKind kind) {
 static void diagnoseConflictingAccessors(Parser &P, AccessorDecl *first,
                                          AccessorDecl *&second) {
   if (!second) return;
-  bool underscored =
-      (getCorrespondingUnderscoredAccessorKind(first->getAccessorKind()) ==
+  bool legacy =
+      (getCorrespondingLegacyAccessorKind(first->getAccessorKind()) ==
        second->getAccessorKind()) ||
-      (getCorrespondingUnderscoredAccessorKind(second->getAccessorKind()) ==
+      (getCorrespondingLegacyAccessorKind(second->getAccessorKind()) ==
        first->getAccessorKind()) ||
       first->getASTContext().LangOpts.hasFeature(Feature::CoroutineAccessors);
   P.diagnose(
       second->getLoc(), diag::conflicting_accessor,
       isa<SubscriptDecl>(first->getStorage()),
-      getAccessorNameForDiagnostic(second, /*article*/ true, underscored),
-      getAccessorNameForDiagnostic(first, /*article*/ true, underscored));
+      getAccessorNameForDiagnostic(second, /*article*/ true, legacy),
+      getAccessorNameForDiagnostic(first, /*article*/ true, legacy));
   P.diagnose(
       first->getLoc(), diag::previous_accessor,
-      getAccessorNameForDiagnostic(first, /*article*/ false, underscored),
+      getAccessorNameForDiagnostic(first, /*article*/ false, legacy),
       /*already*/ false);
   second->setInvalid();
 }

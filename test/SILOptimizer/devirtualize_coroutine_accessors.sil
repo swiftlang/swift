@@ -29,7 +29,7 @@ sil [ossa] @utilize_begin_apply : $@convention(thin) () -> () {
 bb0:
   %derived = alloc_ref $Derived
   %base = upcast %derived : $Derived to $Base
-  %reader = class_method %base : $Base, #Base.x!read2 : (Base) -> () -> (), $@yield_once_2 @convention(method) (@guaranteed Base) -> @yields Int
+  %reader = class_method %base : $Base, #Base.x!yielding_borrow : (Base) -> () -> (), $@yield_once_2 @convention(method) (@guaranteed Base) -> @yields Int
   (%value, %token, %allocation) = begin_apply %reader(%base) : $@yield_once_2 @convention(method) (@guaranteed Base) -> @yields Int
   end_apply %token as $()
   dealloc_stack %allocation : $*Builtin.SILToken
@@ -38,14 +38,14 @@ bb0:
   return %retval : $()
 }
 
-sil [ossa] @Base_x_read2 : $@yield_once_2 @convention(method) (@guaranteed Base) -> @yields Int
+sil [ossa] @Base_x_yielding_borrow : $@yield_once_2 @convention(method) (@guaranteed Base) -> @yields Int
 
-sil [ossa] @Derived_x_read2 : $@yield_once_2 @convention(method) (@guaranteed Base) -> @yields Int
+sil [ossa] @Derived_x_yielding_borrow : $@yield_once_2 @convention(method) (@guaranteed Base) -> @yields Int
 
 sil_vtable Base {
-  #Base.x!read2: @Base_x_read2
+  #Base.x!yielding_borrow: @Base_x_yielding_borrow
 }
 
 sil_vtable Derived {
-  #Base.x!read2: @Derived_x_read2 [override]
+  #Base.x!yielding_borrow: @Derived_x_yielding_borrow [override]
 }
