@@ -118,6 +118,11 @@ enum : unsigned {
 };
 
 enum : unsigned {
+  NumNoSanitizeKindBits =
+      countBitsUsed(static_cast<unsigned>(NoSanitizeKind::Last_NoSanitizeKind))
+};
+
+enum : unsigned {
   NumEffectsKindBits =
       countBitsUsed(static_cast<unsigned>(EffectsKind::Last_EffectsKind))
 };
@@ -241,6 +246,10 @@ protected:
 
     SWIFT_INLINE_BITFIELD(InlineAttr, DeclAttribute, NumInlineKindBits,
       kind : NumInlineKindBits
+    );
+
+    SWIFT_INLINE_BITFIELD(NoSanitizeAttr, DeclAttribute, NumNoSanitizeKindBits,
+      kind : NumNoSanitizeKindBits
     );
 
     SWIFT_INLINE_BITFIELD(OptimizeAttr, DeclAttribute, NumOptimizationModeBits,
@@ -1551,6 +1560,35 @@ public:
   }
 
   bool isEquivalent(const InlineAttr *other, Decl *attachedTo) const {
+    return getKind() == other->getKind();
+  }
+};
+
+/// Represents an @_noSanitize(<kind>) attribute.
+class NoSanitizeAttr : public DeclAttribute {
+public:
+  NoSanitizeAttr(SourceLoc atLoc, SourceRange range, NoSanitizeKind kind,
+                 bool implicit = false)
+      : DeclAttribute(DeclAttrKind::NoSanitize, atLoc, range, implicit) {
+    Bits.NoSanitizeAttr.kind = unsigned(kind);
+  }
+
+  NoSanitizeAttr(NoSanitizeKind kind)
+    : NoSanitizeAttr(SourceLoc(), SourceRange(), kind) {}
+
+  NoSanitizeKind getKind() const {
+    return NoSanitizeKind(Bits.NoSanitizeAttr.kind);
+  }
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DeclAttrKind::NoSanitize;
+  }
+
+  NoSanitizeAttr *clone(ASTContext &ctx) const {
+    return new (ctx) NoSanitizeAttr(AtLoc, Range, getKind(), isImplicit());
+  }
+
+  bool isEquivalent(const NoSanitizeAttr *other, Decl *attachedTo) const {
     return getKind() == other->getKind();
   }
 };

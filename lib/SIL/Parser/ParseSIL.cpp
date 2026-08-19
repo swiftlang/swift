@@ -694,7 +694,7 @@ static bool parseDeclSILOptional(
     SILFunction **usedAdHocRequirementWitness, Identifier *objCReplacementFor,
     SILFunction::Purpose *specialPurpose, Inline_t *inlineStrategy,
     OptimizationMode *optimizationMode, PerformanceConstraints *perfConstraints,
-    bool *isPerformanceConstraint, bool *markedAsUsed, StringRef *asmName,
+    bool *isPerformanceConstraint, uint8_t *noSanitizeMask, bool *markedAsUsed, StringRef *asmName,
     StringRef *section,
     bool *isLet, bool *isWeakImported,
     std::optional<CodeGenerationModel> *codeGenerationModel,
@@ -814,6 +814,12 @@ static bool parseDeclSILOptional(
       *perfConstraints = PerformanceConstraints::NoObjCBridging;
     else if (perfConstraints && SP.P.Tok.getText() == "manual_ownership")
       *perfConstraints = PerformanceConstraints::ManualOwnership;
+    else if (noSanitizeMask && SP.P.Tok.getText() == "no_sanitize_address")
+      *noSanitizeMask |= 1u << unsigned(NoSanitizeKind::Address);
+    else if (noSanitizeMask && SP.P.Tok.getText() == "no_sanitize_thread")
+      *noSanitizeMask |= 1u << unsigned(NoSanitizeKind::Thread);
+    else if (noSanitizeMask && SP.P.Tok.getText() == "no_sanitize_memtag")
+      *noSanitizeMask |= 1u << unsigned(NoSanitizeKind::MemTag);
     else if (isPerformanceConstraint && SP.P.Tok.getText() == "perf_constraint")
       *isPerformanceConstraint = true;
     else if (markedAsUsed && SP.P.Tok.getText() == "used")
@@ -7643,6 +7649,7 @@ bool SILParserState::parseDeclSIL(Parser &P) {
   OptimizationMode optimizationMode = OptimizationMode::NotSet;
   PerformanceConstraints perfConstr = PerformanceConstraints::None;
   bool isPerformanceConstraint = false;
+  uint8_t noSanitizeMask = 0;
   bool markedAsUsed = false;
   StringRef asmName;
   StringRef section;
@@ -7663,7 +7670,7 @@ bool SILParserState::parseDeclSIL(Parser &P) {
           &isExactSelfClass, &DynamicallyReplacedFunction,
           &AdHocWitnessFunction, &objCReplacementFor, &specialPurpose,
           &inlineStrategy, &optimizationMode, &perfConstr,
-          &isPerformanceConstraint, &markedAsUsed, &asmName, &section, nullptr,
+          &isPerformanceConstraint, &noSanitizeMask, &markedAsUsed, &asmName, &section, nullptr,
           &isWeakImported, &codeGenerationModel, &needStackProtection, nullptr,
           &availability, &isWithoutActuallyEscapingThunk, &Semantics,
           &SpecAttrs, &ClangDecl, &MRK, &actorIsolation, FunctionState, M) ||
@@ -7721,6 +7728,7 @@ bool SILParserState::parseDeclSIL(Parser &P) {
     FunctionState.F->setOptimizationMode(optimizationMode);
     FunctionState.F->setPerfConstraints(perfConstr);
     FunctionState.F->setIsPerformanceConstraint(isPerformanceConstraint);
+    FunctionState.F->setNoSanitizeMask(noSanitizeMask);
     FunctionState.F->setEffectsKind(MRK);
     FunctionState.F->setMarkedAsUsed(markedAsUsed);
     FunctionState.F->setAsmName(asmName);
@@ -7930,7 +7938,7 @@ bool SILParserState::parseSILGlobal(Parser &P) {
           nullptr, &isSerialized, nullptr, nullptr, nullptr, nullptr, nullptr,
           nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
           nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-          &isMarkedAsUsed, &asmName, &section, &isLet, nullptr,
+          nullptr, &isMarkedAsUsed, &asmName, &section, &isLet, nullptr,
           &codeGenerationModel, nullptr, nullptr, nullptr, nullptr, nullptr,
           nullptr, nullptr, nullptr, nullptr, State, M) ||
       P.parseToken(tok::at_sign, diag::expected_sil_value_name) ||
@@ -7992,7 +8000,7 @@ bool SILParserState::parseSILProperty(Parser &P) {
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, SP, M))
+                           nullptr, nullptr, SP, M))
     return true;
 
   ValueDecl *VD;
@@ -8084,7 +8092,7 @@ bool SILParserState::parseSILVTable(Parser &P) {
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, VTableState, M))
+                           nullptr, nullptr, VTableState, M))
     return true;
 
   ClassDecl *theClass = nullptr;
@@ -8230,7 +8238,7 @@ bool SILParserState::parseSILMoveOnlyDeinit(Parser &parser) {
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, moveOnlyDeinitTableState, M))
+                           nullptr, nullptr, moveOnlyDeinitTableState, M))
     return true;
 
   // Parse the class name.
@@ -8753,7 +8761,7 @@ bool SILParserState::parseSILWitnessTable(Parser &P) {
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, nullptr, nullptr, nullptr, nullptr,
+                           nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            &isSpecialized, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, WitnessState, M))
     return true;

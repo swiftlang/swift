@@ -1632,6 +1632,7 @@ namespace  {
     UNINTERESTING_ATTR(NoLocks)
     UNINTERESTING_ATTR(NoAllocation)
     UNINTERESTING_ATTR(NoRuntime)
+    UNINTERESTING_ATTR(NoSanitize)
     UNINTERESTING_ATTR(NoExistentials)
     UNINTERESTING_ATTR(NoManualOwnership)
     UNINTERESTING_ATTR(NoObjCBridging)
