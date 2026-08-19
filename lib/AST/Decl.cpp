@@ -8122,7 +8122,7 @@ bool ProtocolDecl::hasCircularInheritedProtocols() const {
 
 /// Returns a descriptive name for the given accessor/addressor kind.
 StringRef swift::getAccessorNameForDiagnostic(AccessorKind accessorKind,
-                                              bool article, bool underscored) {
+                                              bool article, bool legacy) {
   switch (accessorKind) {
   case AccessorKind::Get:
     return article ? "a getter" : "getter";
@@ -8158,7 +8158,7 @@ StringRef swift::getAccessorNameForDiagnostic(AccessorKind accessorKind,
 
 StringRef swift::getAccessorNameForDiagnostic(AccessorDecl *accessor,
                                               bool article,
-                                              std::optional<bool> underscored) {
+                                              std::optional<bool> legacy) {
   auto kind = accessor->getAccessorKind();
   // A yield_once_2 coroutine accessor that the user spelled with the
   // underscored keyword (`_read`/`_modify`) should be named with that spelling
@@ -8171,7 +8171,7 @@ StringRef swift::getAccessorNameForDiagnostic(AccessorDecl *accessor,
   }
   return getAccessorNameForDiagnostic(
       kind, article,
-      underscored.value_or(accessor->getASTContext().LangOpts.hasFeature(
+      legacy.value_or(accessor->getASTContext().LangOpts.hasFeature(
           Feature::CoroutineAccessors)));
 }
 

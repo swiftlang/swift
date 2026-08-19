@@ -220,10 +220,29 @@ llvm::Value *IRGenFunction::emitVerifyEndOfLifetimeCall(llvm::Value *object,
 }
 
 void IRGenFunction::emitAllocBoxCall(llvm::Value *typeMetadata,
+                                      std::optional<uint64_t> mallocTypeId,
                                       llvm::Value *&box,
                                       llvm::Value *&valueAddress) {
+  if (mallocTypeId) {
+    auto *descriptorConst =
+        llvm::ConstantInt::get(IGM.Int64Ty, *mallocTypeId);
+    return emitAllocBoxTypedCall(typeMetadata, descriptorConst, box,
+                                 valueAddress);
+  }
   llvm::CallInst *call =
       Builder.CreateCall(IGM.getAllocBoxFunctionPointer(), typeMetadata);
+  call->addFnAttr(llvm::Attribute::NoUnwind);
+
+  box = Builder.CreateExtractValue(call, 0);
+  valueAddress = Builder.CreateExtractValue(call, 1);
+}
+
+void IRGenFunction::emitAllocBoxTypedCall(llvm::Value *typeMetadata,
+                                          llvm::Value *typeDescriptor,
+                                          llvm::Value *&box,
+                                          llvm::Value *&valueAddress) {
+  llvm::CallInst *call = Builder.CreateCall(
+      IGM.getAllocBoxTypedFunctionPointer(), {typeMetadata, typeDescriptor});
   call->addFnAttr(llvm::Attribute::NoUnwind);
 
   box = Builder.CreateExtractValue(call, 0);
@@ -237,6 +256,21 @@ void IRGenFunction::emitMakeBoxUniqueCall(llvm::Value *box,
                                           llvm::Value *&outValueAddress) {
   llvm::CallInst *call = Builder.CreateCall(
       IGM.getMakeBoxUniqueFunctionPointer(), {box, typeMetadata, alignMask});
+  call->addFnAttr(llvm::Attribute::NoUnwind);
+
+  outBox = Builder.CreateExtractValue(call, 0);
+  outValueAddress = Builder.CreateExtractValue(call, 1);
+}
+
+void IRGenFunction::emitMakeBoxUniqueTypedCall(llvm::Value *box,
+                                               llvm::Value *typeMetadata,
+                                               llvm::Value *alignMask,
+                                               llvm::Value *typeDescriptor,
+                                               llvm::Value *&outBox,
+                                               llvm::Value *&outValueAddress) {
+  llvm::CallInst *call = Builder.CreateCall(
+      IGM.getMakeBoxUniqueTypedFunctionPointer(),
+      {box, typeMetadata, alignMask, typeDescriptor});
   call->addFnAttr(llvm::Attribute::NoUnwind);
 
   outBox = Builder.CreateExtractValue(call, 0);

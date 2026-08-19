@@ -27,14 +27,16 @@
 
 // RUN: %target-swift-emit-silgen %s                          \
 // RUN:     -enable-experimental-feature CoroutineAccessors   \
+// RUN:     -enable-callee-allocated-coro-abi                 \
 // RUN:     -module-name m                                    \
 // RUN:   | %FileCheck %s --check-prefix=NO-GETTER
 
 // RUN: %target-swift-emit-silgen %s                          \
 // RUN:     -enable-experimental-feature CoroutineAccessors   \
+// RUN:     -enable-callee-allocated-coro-abi                 \
 // RUN:     -enable-library-evolution                         \
 // RUN:     -module-name m                                    \
-// RUN:   | %FileCheck %s --check-prefix=NO-GETTER
+// RUN:   | %FileCheck %s --check-prefixes=NO-GETTER,NO-GETTER-RESILIENT
 
 // REQUIRES: swift_feature_CoroutineAccessors
 
@@ -49,6 +51,7 @@ public struct StructYB {
 }
 // GETTER-DAG: sil{{.*}} @$s1m8StructYBV1iSivg :
 // GETTER-DAG: sil{{.*}} @$s1m8StructYBV1iSivy : $@yield_once_2
+// GETTER-DAG: sil{{.*}} @$s1m8StructYBV1iSivx : $@yield_once_2
 
 open class ClassYB {
   var _s = 0
@@ -59,6 +62,7 @@ open class ClassYB {
 }
 // GETTER-DAG: sil{{.*}} @$s1m7ClassYBC1iSivg :
 // GETTER-DAG: sil{{.*}} @$s1m7ClassYBC1iSivy : $@yield_once_2
+// GETTER-DAG: sil{{.*}} @$s1m7ClassYBC1iSivx : $@yield_once_2
 
 var _g = 0
 public var globalYB: Int {
@@ -67,6 +71,7 @@ public var globalYB: Int {
 }
 // GETTER-DAG: sil{{.*}} @$s1m8globalYBSivg :
 // GETTER-DAG: sil{{.*}} @$s1m8globalYBSivy : $@yield_once_2
+// GETTER-DAG: sil{{.*}} @$s1m8globalYBSivx : $@yield_once_2
 
 // Spelling invariance: the '_read'/'_modify' spelling produces the same getter
 // (the feature remaps it to 'yielding borrow'/'yielding mutate').
@@ -79,6 +84,7 @@ public struct StructRM {
 }
 // GETTER-DAG: sil{{.*}} @$s1m8StructRMV1iSivg :
 // GETTER-DAG: sil{{.*}} @$s1m8StructRMV1iSivy : $@yield_once_2
+// GETTER-DAG: sil{{.*}} @$s1m8StructRMV1iSivx : $@yield_once_2
 
 // The synthesized getter delegates to the coroutine, running its full body: the
 // front half up to the yield (begin_apply) and the back half (end_apply).
@@ -98,6 +104,7 @@ public struct NCHolder: ~Copyable {
   }
 }
 // NO-GETTER-NOT: @$s1m8NCHolderV1nAA5NCValVvg
+// NO-GETTER-DAG: sil{{.*}} @$s1m8NCHolderV1nAA5NCValVvy : $@yield_once_2
 
 // A protocol requirement stays a borrowing opaque read (no getter requirement),
 // so the '@_borrowed' and 'yielding borrow' spellings keep the same witness
@@ -110,3 +117,5 @@ public protocol ProtoB {
 }
 // NO-GETTER-NOT: #ProtoYB.i!getter
 // NO-GETTER-NOT: #ProtoB.i!getter
+// NO-GETTER-RESILIENT-DAG: sil{{.*}} @$s1m7ProtoYBP1iSivy : $@yield_once_2
+// NO-GETTER-RESILIENT-DAG: sil{{.*}} @$s1m6ProtoBP1iSivy : $@yield_once_2
