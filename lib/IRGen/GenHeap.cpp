@@ -1379,6 +1379,16 @@ void IRGenFunction::emitReleaseBox(llvm::Value *value) {
   emitUnaryRefCountCall(*this, IGM.getReleaseBoxFn(), value);
 }
 
+void IRGenFunction::emitReleaseBoxTyped(llvm::Value *value,
+                                        llvm::Value *typeDescriptor) {
+  if (doesNotRequireRefCounting(value))
+    return;
+  auto *call = Builder.CreateCall(IGM.getReleaseBoxTypedFunctionPointer(),
+                                  {value, typeDescriptor});
+  call->setCallingConv(IGM.DefaultCC);
+  call->addFnAttr(llvm::Attribute::NoUnwind);
+}
+
 void IRGenFunction::emitNativeSetDeallocating(llvm::Value *value) {
   if (doesNotRequireRefCounting(value)) return;
   emitUnaryRefCountCall(*this, IGM.getNativeSetDeallocatingFn(), value);
@@ -1653,7 +1663,8 @@ public:
     // Use the runtime to allocate a box of the appropriate size.
     auto metadata = IGF.emitTypeMetadataRefForLayout(boxedType);
     llvm::Value *box, *address;
-    IGF.emitAllocBoxCall(metadata, box, address);
+    IGF.emitAllocBoxCall(metadata, /*mallocTypeId*/ std::nullopt, box,
+                         address);
     address = IGF.Builder.CreateBitCast(address, IGF.IGM.PtrTy);
     return {ti.getAddressForPointer(address), box};
   }
