@@ -298,18 +298,41 @@ public protocol DistributedActorSystem<SerializationRequirement>: Sendable {
     where Act: DistributedActor,
           Act.ID == ActorID
 
-  /// Called during when a distributed actor is deinitialized, or fails to initialize completely (e.g. by throwing
+  /// Called during when a *local* distributed actor is deinitialized, or fails to initialize completely (e.g. by throwing
   /// out of an `init` that did not completely initialize all of the actors stored properties yet).
   ///
   /// This method is guaranteed to be called at-most-once for a given id (assuming IDs are unique,
   /// and not re-cycled by the system), i.e. if it is called during a failure to initialize completely,
   /// the call from the actor's deinitializer will not happen (as under these circumstances, `deinit` will be run).
   ///
-  /// If `resignID` gets called with some unknown ID, it should crash immediately as it signifies some
-  /// very unexpected use of the system.
+  /// - Parameter id: the id of an actor managed by this system that is being deinitialized.
   ///
-  /// - Parameter id: the id of an actor managed by this system that has begun its `deinit`.
+  /// - SeeAlso: ``resignRemoteID(_:)`` which is called for remote distributed actor referencesd.
   func resignID(_ id: ActorID)
+
+  /// Called when a *remote* distributed actor reference is being deinitialized.
+  ///
+  /// Paired with a prior `resolve(id:as:)` call for this `id` that resulted in a remote reference being created.
+  /// This method is only called for identifiers of a remote proxy actor.
+  ///
+  /// Because ``resolve(id:as:)`` may be called multiple times with the same id (each potentially
+  /// returning a new unique proxy instance), `resignRemoteID(_:)` may also be called multiple times
+  /// with the same id, once per distinct remote proxy that is deallocated. Actor systems that want
+  /// to reference-count remote proxies for a given id can maintain a counter using `resolve`
+  /// `resignRemoteID` as the increment/decrement points, and cleanup resources necessary for a
+  /// specific ID once the count reaches zero.
+  ///
+  /// Not called if `resolve(id:as:)` threw, returned a local actor, or otherwise did not result
+  /// in a remote reference actor being created.
+  ///
+  /// The default implementation is a no-op; systems that do not need to maintain remote reference
+  /// lifecycles can leave it unimplemented.
+  ///
+  /// - Parameter id: the id of the remote distributed actor reference that is being deinitialized.
+  ///
+  /// - SeeAlso: ``resignID(_:)`` which is called for local distributed actors
+  @available(SwiftStdlib 6.5, *)
+  func resignRemoteID(_ id: ActorID)
 
   // ==== ---------------------------------------------------------------------
   // - MARK: Remote Method Invocations
@@ -383,6 +406,12 @@ public protocol DistributedActorSystem<SerializationRequirement>: Sendable {
     resultBuffer: UnsafeRawPointer,
     metatype: Any.Type
   ) async throws
+}
+
+@available(SwiftStdlib 6.5, *)
+extension DistributedActorSystem {
+  /// Default implementation, does nothing.
+  public func resignRemoteID(_ id: ActorID) {}
 }
 
 // ==== ----------------------------------------------------------------------------------------------------------------

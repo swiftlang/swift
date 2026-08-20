@@ -33,6 +33,7 @@
 
 namespace swift {
 
+class AvailabilityQuery;
 class ParameterList;
 class ProfileCounterRef;
 
@@ -315,6 +316,15 @@ struct MaterializedLValue {
 enum class StorageReferenceOperationKind {
   Borrow,
   Consume
+};
+
+/// The kind of resignID to call.
+enum class DistributedResignIDKind {
+  // `resignID(_:)`
+  ResignID,
+  // `resignRemoteID(_:)`
+  // Available since: Swift 6.5
+  ResignRemoteID,
 };
 
 /// SILGenFunction - an ASTVisitor for producing SIL from function bodies.
@@ -2805,6 +2815,11 @@ public:
   /// Emit an `if #available` query, returning the resulting boolean test value.
   SILValue emitIfAvailableQuery(SILLocation loc, PoundAvailableInfo *info);
 
+  /// Emit an availability query for the given `AvailabilityQuery`, returning
+  /// the resulting boolean test value
+  SILValue emitAvailabilityQuery(SILLocation loc,
+                                 const AvailabilityQuery &query);
+
   //===--------------------------------------------------------------------===//
   // Back Deployment thunks
   //===--------------------------------------------------------------------===//
@@ -2878,7 +2893,7 @@ public:
   /// Specifically, this code emits SIL that performs the call
   ///
   /// \verbatim
-  ///   self.actorSystem.resignID(self.id)
+  ///   self.actorSystem.resign(Remote)ID(self.id)
   /// \endverbatim
   ///
   /// using the current builder's state as the injection point.
@@ -2886,7 +2901,8 @@ public:
   /// \param actorDecl the declaration corresponding to the actor
   /// \param actorSelf the SIL value representing the distributed actor instance
   void emitDistributedActorSystemResignIDCall(SILLocation loc,
-                              ClassDecl *actorDecl, ManagedValue actorSelf);
+                              ClassDecl *actorDecl, ManagedValue actorSelf,
+                              DistributedResignIDKind kind);
 
   /// Emits check for remote actor and a branch that implements deallocating
   /// deinit for remote proxy. Calls \p emitLocalDeinit to generate branch for
