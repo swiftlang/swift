@@ -1,4 +1,6 @@
-// RUN: %target-swift-emit-silgen -I %S/Inputs -I %swift_src_root/lib/ClangImporter/SwiftBridging -cxx-interoperability-mode=default -disable-availability-checking %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -I %S/Inputs -I %swift_src_root/lib/ClangImporter/SwiftBridging -cxx-interoperability-mode=default -enable-experimental-feature LibkernOwnershipConventions -disable-availability-checking %s | %FileCheck %s
+
+// REQUIRES: swift_feature_LibkernOwnershipConventions
 
 import LibkernOwnership
 

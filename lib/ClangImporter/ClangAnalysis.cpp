@@ -612,8 +612,9 @@ static void diagnoseMissingReturnsRetained(ClangImporter::Implementation &Impl,
           info.getDecl(), {{"returned_as_unretained_by_default", true}}))
     return;
 
-  // If this is a subclass of libkern's OSObject, rely on libkern's ownership rules.
-  if (importer::getLibkernOwnershipOfReturnedFRT(clangFunc))
+  // If this returns OSObject or one of its subclasses, rely on libkern's
+  // ownership rules.
+  if (importer::getLibkernOwnershipOfReturnedFRT(clangFunc, ctx))
     return;
 
   // If we reached here, then we have a call to an unannotated, Clang-imported
@@ -686,7 +687,8 @@ bool swift::importer::isOSIteratorSubclass(const clang::RecordDecl *record) {
 }
 
 std::optional<ResultConvention>
-swift::importer::getOwnershipOfReturnedFRT(const clang::NamedDecl *decl) {
+swift::importer::getOwnershipOfReturnedFRT(const clang::NamedDecl *decl,
+                                           ASTContext &ctx) {
 
   auto attrInfo = importer::ReturnOwnershipInfo(decl);
   if (attrInfo.hasReturnsUnretained)
@@ -696,11 +698,12 @@ swift::importer::getOwnershipOfReturnedFRT(const clang::NamedDecl *decl) {
     return ResultConvention::Owned;
 
   if (auto *recordDecl = getReturnTypeAsRecordDeclPtr(decl)) {
-    if (auto convention = getLibkernOwnershipOfReturnedFRT(decl))
-      return convention.value();
     if (auto convention = importer::matchSwiftAttr<ResultConvention>(
             recordDecl,
             {{"returned_as_unretained_by_default", ResultConvention::Unowned}}))
+      return convention.value();
+
+    if (auto convention = getLibkernOwnershipOfReturnedFRT(decl, ctx))
       return convention.value();
 
     // FIXME: this is only here to preserve legacy behavior; we really shouldn't
@@ -725,8 +728,11 @@ swift::importer::getOwnershipOfReturnedFRT(const clang::NamedDecl *decl) {
 }
 
 std::optional<ResultConvention>
-swift::importer::getLibkernOwnershipOfReturnedFRT(
-    const clang::NamedDecl *decl) {
+swift::importer::getLibkernOwnershipOfReturnedFRT(const clang::NamedDecl *decl,
+                                                  ASTContext &ctx) {
+  if (!ctx.LangOpts.hasFeature(Feature::LibkernOwnershipConventions))
+    return std::nullopt;
+
   auto *func = dyn_cast<clang::FunctionDecl>(decl);
   if (!func)
     return std::nullopt;

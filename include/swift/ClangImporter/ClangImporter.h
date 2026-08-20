@@ -963,7 +963,7 @@ matchSwiftAttr(const clang::Decl *decl,
 /// \param decl The Clang function or method declaration to inspect.
 /// \returns Matched `ResultConvention`, or `std::nullopt` if none applies.
 std::optional<ResultConvention>
-getOwnershipOfReturnedFRT(const clang::NamedDecl *decl);
+getOwnershipOfReturnedFRT(const clang::NamedDecl *decl, ASTContext &ctx);
 
 /// Determines the ownership convention of functions that return libkern's
 /// OSObject or one of its subclasses.
@@ -979,7 +979,7 @@ getOwnershipOfReturnedFRT(const clang::NamedDecl *decl);
 /// \param decl The Clang function or method declaration to inspect.
 /// \returns Matched `ResultConvention`, or `std::nullopt` if none applies.
 std::optional<ResultConvention>
-getLibkernOwnershipOfReturnedFRT(const clang::NamedDecl *decl);
+getLibkernOwnershipOfReturnedFRT(const clang::NamedDecl *decl, ASTContext &ctx);
 
 enum class RefCountedPtrError {
   NotAnnotated,
