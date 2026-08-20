@@ -1124,7 +1124,7 @@ bb0(%0 : $*MyArray<MyStruct>):
   return %t : $() 
 }
 // CHECK-LABEL: sil [noinline] @refcount_read :
-// CHECK-NEXT:  [%0: read v**]
+// CHECK-NEXT:  [%0: read v**, destroy v**]
 // CHECK-NEXT:  [global: ]
 sil [noinline] @refcount_read : $@convention(thin) (@inout Klass) -> Builtin.Int1 {
 bb0(%0 : $*Klass):

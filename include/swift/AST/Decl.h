@@ -496,12 +496,16 @@ protected:
     IsStatic : 1
   );
 
-  SWIFT_INLINE_BITFIELD(VarDecl, AbstractStorageDecl, 2+1+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(VarDecl, AbstractStorageDecl, 2+1+1+1+1+1+1+1+1,
     /// Encodes whether this is a 'let' binding.
     Introducer : 2,
 
     /// Whether this declaration captures the 'self' param under the same name.
     IsSelfParamCapture : 1,
+
+    /// Whether this declaration represents a `sending` capture i.e.
+    /// `[sending x]` where `x` is this declaration.
+    IsSendingCapture : 1,
 
     /// Whether this is a property used in expressions in the debugger.
     /// It is up to the debugger to instruct SIL how to access this variable.
@@ -7051,6 +7055,11 @@ public:
       Bits.VarDecl.IsSelfParamCapture = IsSelfParamCapture;
   }
 
+  bool isSendingCapture() const { return Bits.VarDecl.IsSendingCapture; }
+  void setIsSendingCapture(bool isSending = true) {
+    Bits.VarDecl.IsSendingCapture = isSending;
+  }
+
   /// Check whether this capture of the self param is actor-isolated.
   bool isSelfParamCaptureIsolated() const;
 
@@ -9055,7 +9064,7 @@ class AccessorDecl final : public FuncDecl {
   AbstractStorageDecl *Storage;
 
   /// Whether a yield_once_2 coroutine accessor (yielding borrow/mutate) was
-  /// written by the user with the underscored spelling (_read/_modify).  This
+  /// written by the user with the legacy spelling (_read/_modify).  This
   /// only affects diagnostics; it has no ABI or type-system effect.
   bool SpelledWithLegacyCoroutineSyntax = false;
 
@@ -9139,15 +9148,15 @@ public:
   /// When the CoroutineAccessors feature is enabled, a `_read`/`_modify`
   /// accessor is represented as a `yielding borrow`/`yielding mutate`
   /// (yield_once_2) accessor so that it uses the same ABI, remembering here that
-  /// the user wrote the underscored spelling.  This only affects diagnostics.
+  /// the user wrote the legacy spelling.  This only affects diagnostics.
   ///
-  /// Rewrites this accessor's kind from the underscored coroutine accessor
-  /// (Read/Modify) to its yielding counterpart (YieldingBorrow/YieldingMutate),
-  /// recording that it was spelled with the underscored keyword.
+  /// Rewrites this accessor's kind from the legacy coroutine accessor
+  /// (Read/Modify) to its official counterpart (YieldingBorrow/YieldingMutate),
+  /// recording that it was spelled with the legacy keyword.
   void changeLegacyCoroutineAccessorToYielding();
 
   /// Whether this yield_once_2 coroutine accessor was written by the user with
-  /// the underscored spelling (`_read`/`_modify`) rather than the
+  /// the `_read`/`_modify` spelling rather than the
   /// `yielding borrow`/`yielding mutate` spelling.
   bool isSpelledWithLegacyCoroutineSyntax() const {
     return SpelledWithLegacyCoroutineSyntax;
@@ -10651,11 +10660,10 @@ public:
 template<typename SpecificDecl>
 ABIRoleInfo(const SpecificDecl *decl) -> ABIRoleInfo<SpecificDecl>;
 
-StringRef
-getAccessorNameForDiagnostic(AccessorDecl *accessor, bool article,
-                             std::optional<bool> underscored = std::nullopt);
+StringRef getAccessorNameForDiagnostic(AccessorDecl *accessor, bool article,
+                             std::optional<bool> legacy = std::nullopt);
 StringRef getAccessorNameForDiagnostic(AccessorKind accessorKind, bool article,
-                                       bool underscored);
+                                       bool legacy);
 
 inline void simple_display(llvm::raw_ostream &out,
                            MemberwiseInitKind initKind) {

@@ -28,11 +28,17 @@
 #include "swift/Runtime/Config.h"
 
 #include <stdint.h>
+
+#if __STDC_HOSTED__
 #include <stdlib.h>
 #include <string.h>
+#endif
 
 namespace swift {
 
+// appendToCrashLogMessage need malloc which is not available in freestanding
+// mode.
+#if __STDC_HOSTED__
 
 // The number of bytes of previously reported messages to keep. The message
 // being reported is always kept in full, however long it is.
@@ -72,6 +78,8 @@ inline char *appendToCrashLogMessage(const char *oldMessage,
   memcpy(newMessage + historyLength, message, messageLength + 1);
   return newMessage;
 }
+
+#endif // __STDC_HOSTED__
 
 } // namespace swift
 

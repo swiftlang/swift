@@ -1338,6 +1338,13 @@ bool CompilerInstance::supportCaching() const {
 
 bool CompilerInstance::downgradeInterfaceVerificationErrors() const {
   auto &FrontendOpts = Invocation.getFrontendOptions();
+  // An explicit '-downgrade-typecheck-interface-error' or
+  // '-no-downgrade-typecheck-interface-error' takes precedence over the
+  // blocklists, so that the interface of a blocklisted module can still be
+  // verified.
+  if (FrontendOpts.DowngradeInterfaceVerificationError.has_value())
+    return *FrontendOpts.DowngradeInterfaceVerificationError;
+
   if (Context->blockListConfig.hasBlockListAction(FrontendOpts.ModuleName,
                                              BlockListKeyKind::ModuleName,
                         BlockListAction::DowngradeInterfaceVerificationFailure)) {
@@ -1345,7 +1352,7 @@ bool CompilerInstance::downgradeInterfaceVerificationErrors() const {
                             FrontendOpts.ModuleName);
     return true;
   }
-  return FrontendOpts.DowngradeInterfaceVerificationError;
+  return false;
 }
 
 ImplicitImportInfo CompilerInstance::getImplicitImportInfo() const {

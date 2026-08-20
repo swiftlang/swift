@@ -1,6 +1,6 @@
 # -*- mode: cmake -*-
 
-cmake_minimum_required(VERSION 3.19.6)
+cmake_minimum_required(VERSION 3.24)
 
 # Add path for custom CMake modules.
 list(APPEND CMAKE_MODULE_PATH
@@ -213,6 +213,7 @@ set(SWIFT_BENCH_MODULES
     single-source/SuperChars
     single-source/TaskGroups
     single-source/TaskLocalGet
+    single-source/TaskRegistryStress
     single-source/ToddCoxeter
     single-source/TwoSum
     single-source/TypeFlood

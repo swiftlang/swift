@@ -102,9 +102,10 @@ fileprivate class ConcurrencyDumper {
             type(of: process).GetSymbolAddress
       let ReadBytes: RemoteProcess.ReadBytesFunction =
             type(of: process).ReadBytes
-      let this = process.toOpaqueRef()
-      let addr = GetSymbolAddress(this, symbolName, UInt64(symbolName.utf8.count))
-      if addr != 0, let ptr = ReadBytes(this, addr, UInt64(MemoryLayout<UInt>.size), nil) {
+      let this = OpaqueRef(process)
+      let addr = GetSymbolAddress(this.pointer, symbolName, UInt64(symbolName.utf8.count))
+      if addr != 0,
+         let ptr = ReadBytes(this.pointer, addr, UInt64(MemoryLayout<UInt>.size), nil) {
         return swift_reflection_ptr_t(ptr.load(as: UInt.self))
       }
       return nil

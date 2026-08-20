@@ -371,6 +371,12 @@ enum class TypeMatchFlags {
   IgnoreFunctionGlobalActorIsolation = 1 << 8,
   /// Require parameter labels to match.
   RequireMatchingParameterLabels = 1 << 9,
+  /// When comparing function types, treat a missing Clang function type on
+  /// either side as compatible with a present one. Used by deserialization's
+  /// cross-reference near-match to tolerate module build skew where an older
+  /// module didn't record the Clang function type; two present-but-different
+  /// Clang types still mismatch.
+  AllowMissingClangType = 1 << 10,
 };
 using TypeMatchOptions = OptionSet<TypeMatchFlags>;
 

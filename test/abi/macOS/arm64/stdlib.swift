@@ -1352,3 +1352,6 @@ Added: _$ss35_SwiftCreateBridgedString_DoNotCall5bytes6length8encodings9Unmanage
 
 // Distributed runtime: query key-argument count for the target's generic env
 Added: _swift_distributed_getGenericEnvironmentKeyArgumentCount
+
+// Task Registry
+Added: _concurrencyEnableTaskRegistry

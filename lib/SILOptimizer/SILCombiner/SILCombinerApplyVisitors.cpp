@@ -1186,6 +1186,15 @@ struct ConcreteArgumentCopy {
     if (!paramInfo.isFormalIndirect())
       return std::nullopt;
 
+    // A move-only concrete value can't be copied into a temporary.
+    // Decline the substitution; the caller falls back to
+    // passing existentialInfo.ConcreteValue directly, which is exactly a
+    // take (the callee's parameter convention is still formally indirect
+    // and consumed at this point).
+    if (existentialInfo.ConcreteValue->getType().isAddress() &&
+        existentialInfo.ConcreteValue->getType().isMoveOnly())
+      return std::nullopt;
+
     SILBuilderWithScope builder(apply.getInstruction(), builderCtx);
     auto loc = apply.getLoc();
     auto *asi =

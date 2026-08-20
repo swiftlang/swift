@@ -72,7 +72,7 @@ public func getNew() -> StructNew {
 @_silgen_name("readNewInlinableNew")
 public func readNewInlinableNew(_ n: StructNew) -> Int {
 // CHECK-LABEL: sil {{.*}}@readNewInlinableNew : {{.*}} {
-                  // function_ref StructNew.i.read2
+                  // function_ref StructNew.i.yielding_borrow
 // CHECK:         function_ref @$s7Library9StructNewV1iSivy
 // CHECK-LABEL: } // end sil function 'readNewInlinableNew'
   return n.i
@@ -82,7 +82,7 @@ public func readNewInlinableNew(_ n: StructNew) -> Int {
 @_silgen_name("readNewNoninlinableNew")
 public func readNewNoninlinableNew(_ n: StructNew) -> Int {
 // CHECK-LABEL: sil {{.*}}@readNewNoninlinableNew : {{.*}} {
-                  // function_ref StructNew.i.read2
+                  // function_ref StructNew.i.yielding_borrow
 // CHECK:         function_ref @$s7Library9StructNewV1iSivy
 // CHECK-LABEL: } // end sil function 'readNewNoninlinableNew'
   return n.i
@@ -93,7 +93,7 @@ public func readNewNoninlinableNew(_ n: StructNew) -> Int {
 @_silgen_name("modifyNewInlinableNew")
 public func modifyNewInlinableNew(_ n: inout StructNew) {
 // CHECK-LABEL: sil {{.*}}@modifyNewInlinableNew : {{.*}} {
-                  // function_ref StructNew.i.modify2
+                  // function_ref StructNew.i.yielding_mutate
 // CHECK:         function_ref @$s7Library9StructNewV1iSivx
 // CHECK-LABEL: } // end sil function 'modifyNewInlinableNew'
   n.i.increment()
@@ -103,7 +103,7 @@ public func modifyNewInlinableNew(_ n: inout StructNew) {
 @_silgen_name("modifyNewNoninlinableNew")
 public func modifyNewNoninlinableNew(_ n: inout StructNew) {
 // CHECK-LABEL: sil {{.*}}@modifyNewNoninlinableNew : {{.*}} {
-                  // function_ref StructNew.i.modify2
+                  // function_ref StructNew.i.yielding_mutate
 // CHECK:         function_ref @$s7Library9StructNewV1iSivx
 // CHECK-LABEL: } // end sil function 'modifyNewNoninlinableNew'
   n.i.increment()
@@ -142,8 +142,8 @@ public func readOldNoninlinableOld(_ n: StructOld) -> Int {
 // CHECK-LABEL: sil {{.*}}@readOldNoninlinableOld : {{.*}} {
 // Opaque symbol never inlined.  Even though it was available before
 // CoroutineAccessors was, the implementation in this version of the module--can
-// use read2.
-                  // function_ref StructOld.i.read2
+// use yielding_borrow.
+                  // function_ref StructOld.i.yielding_borrow
 // CHECK:         function_ref @$s7Library9StructOldV1iSivy
 // CHECK-LABEL: } // end sil function 'readOldNoninlinableOld'
   return n.i
@@ -155,8 +155,8 @@ public func readOldNoninlinableOld(_ n: StructOld) -> Int {
 public func readOldInlinableNew(_ n: StructOld) -> Int {
 // CHECK-LABEL: sil {{.*}}@readOldInlinableNew : {{.*}} {
 // Could be inlined, but only into code that's running at or after
-// CoroutineAccessors is available--can use read2.
-                  // function_ref StructOld.i.read2
+// CoroutineAccessors is available--can use yielding_borrow.
+                  // function_ref StructOld.i.yielding_borrow
 // CHECK:         function_ref @$s7Library9StructOldV1iSivy
 // CHECK-LABEL: } // end sil function 'readOldInlinableNew'
   return n.i
@@ -166,8 +166,8 @@ public func readOldInlinableNew(_ n: StructOld) -> Int {
 @_silgen_name("readOldNoninlinableNew")
 public func readOldNoninlinableNew(_ n: StructOld) -> Int {
 // CHECK-LABEL: sil {{.*}}@readOldNoninlinableNew : {{.*}} {
-// Neither inlinable nor available before CoroutineAccessors--can use read2.
-                  // function_ref StructOld.i.read2
+// Neither inlinable nor available before CoroutineAccessors--can use yielding_borrow.
+                  // function_ref StructOld.i.yielding_borrow
 // CHECK:         function_ref @$s7Library9StructOldV1iSivy
 // CHECK-LABEL: } // end sil function 'readOldNoninlinableNew'
   return n.i
@@ -190,8 +190,8 @@ public func modifyOldNoninlinableOld(_ n: inout StructOld) {
 // CHECK-LABEL: sil {{.*}}@modifyOldNoninlinableOld : {{.*}} {
 // Opaque symbol never inlined.  Even though it was available before
 // CoroutineAccessors was, the implementation in this version of the module--can
-// use modify2.
-                  // function_ref StructOld.i.modify2
+// use yielding_mutate.
+                  // function_ref StructOld.i.yielding_mutate
 // CHECK:         function_ref @$s7Library9StructOldV1iSivx
 // CHECK-LABEL: } // end sil function 'modifyOldNoninlinableOld'
   n.i.increment()
@@ -203,8 +203,8 @@ public func modifyOldNoninlinableOld(_ n: inout StructOld) {
 public func modifyOldInlinableNew(_ n: inout StructOld) {
 // CHECK-LABEL: sil {{.*}}@modifyOldInlinableNew : {{.*}} {
 // Could be inlined, but only into code that's running at or after
-// CoroutineAccessors is available--can use modify2.
-                  // function_ref StructOld.i.modify2
+// CoroutineAccessors is available--can use yielding_mutate.
+                  // function_ref StructOld.i.yielding_mutate
 // CHECK:         function_ref @$s7Library9StructOldV1iSivx
 // CHECK-LABEL: } // end sil function 'modifyOldInlinableNew'
   n.i.increment()
@@ -214,8 +214,8 @@ public func modifyOldInlinableNew(_ n: inout StructOld) {
 @_silgen_name("modifyOldNoninlinableNew")
 public func modifyOldNoninlinableNew(_ n: inout StructOld) {
 // CHECK-LABEL: sil {{.*}}@modifyOldNoninlinableNew : {{.*}} {
-// Neither inlinable nor available before CoroutineAccessors--can use modify2.
-                  // function_ref StructOld.i.modify2
+// Neither inlinable nor available before CoroutineAccessors--can use yielding_mutate.
+                  // function_ref StructOld.i.yielding_mutate
 // CHECK:         function_ref @$s7Library9StructOldV1iSivx
 // CHECK-LABEL: } // end sil function 'modifyOldNoninlinableNew'
   n.i.increment()
@@ -259,8 +259,8 @@ import Library
 @_silgen_name("readNewOld")
 func readNewOld() {
 // CHECK-LABEL: sil {{.*}}@readNewOld : {{.*}} {
-// Neither inlinable nor available before CoroutineAccessors--can use read2.
-                  // function_ref StructNew.i.read2
+// Neither inlinable nor available before CoroutineAccessors--can use yielding_borrow.
+                  // function_ref StructNew.i.yielding_borrow
 // CHECK:         function_ref @$s7Library9StructNewV1iSivy
 // CHECK-LABEL: } // end sil function 'readNewOld'
   if #available(SwiftStdlib 9999, *) {
@@ -274,8 +274,8 @@ func readNewOld() {
 @_silgen_name("readNewNew")
 func readNewNew() {
 // CHECK-LABEL: sil {{.*}}@readNewNew : {{.*}} {
-// Neither inlinable nor available before CoroutineAccessors--can use read2.
-                  // function_ref StructNew.i.read2
+// Neither inlinable nor available before CoroutineAccessors--can use yielding_borrow.
+                  // function_ref StructNew.i.yielding_borrow
 // CHECK:         function_ref @$s7Library9StructNewV1iSivy
 // CHECK-LABEL: } // end sil function 'readNewNew'
   let n = getNew()
@@ -289,8 +289,8 @@ func readOldNew() {
 // CHECK-LABEL: sil {{.*}}@readOldNew : {{.*}} {
 // Although this module could be back-deployed to before CoroutineAccessors were
 // available, it can only run in environments where the feature is available--
-// can use read2.
-                  // function_ref StructOld.i.read2
+// can use yielding_borrow.
+                  // function_ref StructOld.i.yielding_borrow
 // CHECK:         function_ref @$s7Library9StructOldV1iSivy
 // CHECK-LABEL: } // end sil function 'readOldNew'
   let n = getOld()
@@ -309,7 +309,7 @@ func readOldOld() {
 // This module cannot be back-deployed (the deployment target is
 // available, and nothing ensures the function is available only after the
 // feature is available--must use read.
-                  // function_ref StructOld.i.read2
+                  // function_ref StructOld.i.yielding_borrow
 // CHECK-NEW:     function_ref @$s7Library9StructOldV1iSivy
 // CHECK-LABEL: } // end sil function 'readOldOld'
   let n = getOld()
@@ -320,8 +320,8 @@ func readOldOld() {
 @_silgen_name("modifyNewOld")
 func modifyNewOld() {
 // CHECK-LABEL: sil {{.*}}@modifyNewOld : {{.*}} {
-// Neither inlinable nor available before CoroutineAccessors--can use modify2.
-                  // function_ref StructNew.i.modify2
+// Neither inlinable nor available before CoroutineAccessors--can use yielding_mutate.
+                  // function_ref StructNew.i.yielding_mutate
 // CHECK:         function_ref @$s7Library9StructNewV1iSivx
 // CHECK-LABEL: } // end sil function 'modifyNewOld'
   if #available(SwiftStdlib 9999, *) {
@@ -335,8 +335,8 @@ func modifyNewOld() {
 @_silgen_name("modifyNewNew")
 func modifyNewNew() {
 // CHECK-LABEL: sil {{.*}}@modifyNewNew : {{.*}} {
-// Neither inlinable nor available before CoroutineAccessors--can use modify2.
-                  // function_ref StructNew.i.modify2
+// Neither inlinable nor available before CoroutineAccessors--can use yielding_mutate.
+                  // function_ref StructNew.i.yielding_mutate
 // CHECK:         function_ref @$s7Library9StructNewV1iSivx
 // CHECK-LABEL: } // end sil function 'modifyNewNew'
   var n = getNew()
@@ -350,8 +350,8 @@ func modifyOldNew() {
 // CHECK-LABEL: sil {{.*}}@modifyOldNew : {{.*}} {
 // Although this module could be back-deployed to before CoroutineAccessors were
 // available, it can only run in environments where the feature is available--
-// can use modify2.
-                  // function_ref StructOld.i.modify2
+// can use yielding_mutate.
+                  // function_ref StructOld.i.yielding_mutate
 // CHECK:         function_ref @$s7Library9StructOldV1iSivx
 // CHECK-LABEL: } // end sil function 'modifyOldNew'
   var n = getOld()
@@ -370,7 +370,7 @@ func modifyOldOld() {
 // This module cannot be back-deployed (the deployment target is
 // available, and nothing ensures the function is available only after the
 // feature is available--must use modify.
-                  // function_ref StructOld.i.modify2
+                  // function_ref StructOld.i.yielding_mutate
 // CHECK-NEW:     function_ref @$s7Library9StructOldV1iSivx
 // CHECK-LABEL: } // end sil function 'modifyOldOld'
   var n = getOld()
@@ -387,8 +387,8 @@ func readGlobalOld() -> Int {
 // Deployment target predates the feature--must use the old read.
                   // function_ref gOld.read
 // CHECK-OLD:     function_ref @$s7Library4gOldSivr
-// Deployment target postdates the feature--can use read2.
-                  // function_ref gOld.read2
+// Deployment target postdates the feature--can use yielding_borrow.
+                  // function_ref gOld.yielding_borrow
 // CHECK-NEW:     function_ref @$s7Library4gOldSivy
 // CHECK-LABEL: } // end sil function 'readGlobalOld'
   return gOld
@@ -400,7 +400,7 @@ func modifyGlobalOld() {
 // CHECK-LABEL: sil {{.*}}@modifyGlobalOld : {{.*}} {
                   // function_ref gOld.modify
 // CHECK-OLD:     function_ref @$s7Library4gOldSivM
-                  // function_ref gOld.modify2
+                  // function_ref gOld.yielding_mutate
 // CHECK-NEW:     function_ref @$s7Library4gOldSivx
 // CHECK-LABEL: } // end sil function 'modifyGlobalOld'
   gOld.increment()
@@ -412,7 +412,7 @@ func modifyGlobalOld() {
 @_silgen_name("readGlobalNew")
 func readGlobalNew() -> Int {
 // CHECK-LABEL: sil {{.*}}@readGlobalNew : {{.*}} {
-                  // function_ref gOld.read2
+                  // function_ref gOld.yielding_borrow
 // CHECK:         function_ref @$s7Library4gOldSivy
 // CHECK-LABEL: } // end sil function 'readGlobalNew'
   return gOld
@@ -422,7 +422,7 @@ func readGlobalNew() -> Int {
 @_silgen_name("modifyGlobalNew")
 func modifyGlobalNew() {
 // CHECK-LABEL: sil {{.*}}@modifyGlobalNew : {{.*}} {
-                  // function_ref gOld.modify2
+                  // function_ref gOld.yielding_mutate
 // CHECK:         function_ref @$s7Library4gOldSivx
 // CHECK-LABEL: } // end sil function 'modifyGlobalNew'
   gOld.increment()

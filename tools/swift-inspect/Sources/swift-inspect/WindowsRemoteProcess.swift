@@ -33,6 +33,14 @@ internal final class WindowsRemoteProcess: RemoteProcess {
   private var hSwiftCore: HMODULE = HMODULE(bitPattern: -1)!
   private var hSwiftConcurrency: HMODULE = HMODULE(bitPattern: -1)!
 
+  /// The reference passed to the reflection context, which the context holds
+  /// until `releaseContextRef()` clears it.
+  private var contextRef: OpaqueRef?
+
+  func releaseContextRef() {
+    contextRef = nil
+  }
+
   static var QueryDataLayout: QueryDataLayoutFunction {
     return { (context, type, _, output) in
       let _ = WindowsRemoteProcess.fromOpaque(context!)
@@ -148,10 +156,11 @@ internal final class WindowsRemoteProcess: RemoteProcess {
     self.process = process
 
     // Initialize SwiftReflectionContextRef
+    self.contextRef = OpaqueRef(self)
     guard
       let context =
         swift_reflection_createReflectionContextWithDataLayout(
-          self.toOpaqueRef(),
+          self.contextRef?.pointer,
           Self.QueryDataLayout,
           Self.Free,
           Self.ReadBytes,
@@ -188,7 +197,6 @@ internal final class WindowsRemoteProcess: RemoteProcess {
     swift_reflection_destroyReflectionContext(self.context)
     _ = SymCleanup(self.process)
     _ = CloseHandle(self.process)
-    self.release()
   }
 
   func symbolicate(_ address: swift_addr_t) -> (module: String?, symbol: String?, offset: Int?) {

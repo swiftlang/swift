@@ -1087,14 +1087,10 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   case DeclAttrKind::Override: {
     if (!Options.IsForSwiftInterface)
       break;
-    // When we are printing Swift interface, we have to skip the override keyword
-    // if the overridden decl is invisible from the interface. Otherwise, an error
-    // will occur while building the Swift module because the overriding decl
-    // doesn't override anything.
-    // We couldn't skip every `override` keywords because they change the
-    // ABI if the overridden decl is also publicly visible.
-    // For public-override-internal case, having `override` doesn't have ABI
-    // implication. Thus we can skip them.
+    // Skip printing 'override' if it would result in a broken swiftinterface.
+    // For example, 'override' should be suppressed if the base decl is internal
+    // or if the base decl is SPI and the public swiftinterface is being
+    // printed.
     if (auto *VD = dyn_cast<ValueDecl>(D)) {
       if (auto *BD = VD->getOverriddenDecl()) {
         // If the overridden decl won't be printed, printing override will fail
@@ -1103,7 +1099,8 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
           return false;
         if (!BD->hasClangNode() &&
             !BD->getFormalAccessScope(VD->getDeclContext(),
-                                      /*treatUsableFromInlineAsPublic*/ true)
+                                      /*treatUsableFromInlineAsPublic=*/true,
+                                      /*ignoreImportAccessLevel=*/true)
                  .isPublicOrPackage()) {
           return false;
         }

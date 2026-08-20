@@ -7,6 +7,9 @@
 // REQUIRES: objc_interop
 // REQUIRES: OS=macosx
 
+// Match the macosx14 target above.
+// REQUIRES: stdlib_5_9_runtime
+
 import Foundation
 
 struct S<T> {}

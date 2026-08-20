@@ -2546,7 +2546,7 @@ lowerCaptureContextParameters(TypeConverter &TC, SILDeclRef function,
         convention = ParameterConvention::Direct_Guaranteed;
       }
       SILParameterInfo param(loweredTy.getASTType(), convention, options);
-      if (function.isAsyncLetClosure)
+      if (function.isAsyncLetClosure || capture.isSending())
         param = param.addingOption(SILParameterInfo::Sending);
       inputs.push_back(param);
       break;
@@ -2566,7 +2566,7 @@ lowerCaptureContextParameters(TypeConverter &TC, SILDeclRef function,
           /*mutable*/ true);
       auto convention = ParameterConvention::Direct_Guaranteed;
       auto param = SILParameterInfo(boxTy, convention, options);
-      if (function.isAsyncLetClosure)
+      if (function.isAsyncLetClosure || capture.isSending())
         param = param.addingOption(SILParameterInfo::Sending);
       inputs.push_back(param);
       break;
@@ -2586,7 +2586,7 @@ lowerCaptureContextParameters(TypeConverter &TC, SILDeclRef function,
           /*mutable*/ false);
       auto convention = ParameterConvention::Direct_Guaranteed;
       auto param = SILParameterInfo(boxTy, convention, options);
-      if (function.isAsyncLetClosure)
+      if (function.isAsyncLetClosure || capture.isSending())
         param = param.addingOption(SILParameterInfo::Sending);
       inputs.push_back(param);
       break;
@@ -2597,7 +2597,7 @@ lowerCaptureContextParameters(TypeConverter &TC, SILDeclRef function,
       auto param = SILParameterInfo(
           ty.getASTType(), ParameterConvention::Indirect_InoutAliasable,
           options);
-      if (function.isAsyncLetClosure)
+      if (function.isAsyncLetClosure || capture.isSending())
         param = param.addingOption(SILParameterInfo::Sending);
       inputs.push_back(param);
       break;
@@ -2609,7 +2609,7 @@ lowerCaptureContextParameters(TypeConverter &TC, SILDeclRef function,
       auto param = SILParameterInfo(ty.getASTType(),
                                     ParameterConvention::Indirect_In_Guaranteed,
                                     options);
-      if (function.isAsyncLetClosure)
+      if (function.isAsyncLetClosure || capture.isSending())
         param = param.addingOption(SILParameterInfo::Sending);
       inputs.push_back(param);
       break;
@@ -2623,6 +2623,8 @@ lowerCaptureContextParameters(TypeConverter &TC, SILDeclRef function,
       SILType ty =
           loweredTL.isAddressOnly() ? loweredTy.getAddressType() : loweredTy;
       auto param = SILParameterInfo(ty.getASTType(), convention, options);
+      if (capture.isSending())
+        param = param.addingOption(SILParameterInfo::Sending);
       inputs.push_back(param);
       break;
     }

@@ -1149,7 +1149,7 @@ sil [ossa] @callUnknownIsDeinitBarrier : $@convention(thin) () -> () {
 }
 
 // CHECK-LABEL: sil @begin_cow_test
-// CHECK-NEXT:  [%0: read v**]
+// CHECK-NEXT:  [%0: destroy v**]
 // CHECK-NEXT:  [global: ]
 // CHECK-NEXT:  {{^[^[]}}
 sil @begin_cow_test : $@convention(thin) (@guaranteed X) -> () {
@@ -1160,7 +1160,7 @@ bb0(%0 : $X):
 }
 
 // CHECK-LABEL: sil @is_unique_test
-// CHECK-NEXT:  [%0: read v**]
+// CHECK-NEXT:  [%0: read v**, destroy v**]
 // CHECK-NEXT:  [global: ]
 // CHECK-NEXT:  {{^[^[]}}
 sil @is_unique_test : $@convention(thin) (@inout X) -> () {

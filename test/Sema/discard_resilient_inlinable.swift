@@ -13,9 +13,9 @@ public struct NotFrozen: ~Copyable {
 		discard self
 	}
 
-	@_alwaysEmitIntoClient
+	@export(implementation)
 	public consuming func aeic() {
-		// expected-error @+1 {{'discard' statement cannot be used in an '@_alwaysEmitIntoClient' function inside of type 'NotFrozen', which is not '@frozen'}}
+		// expected-error @+1 {{'discard' statement cannot be used in an '@export(implementation)' function inside of type 'NotFrozen', which is not '@frozen'}}
 		discard self
 	}
 
@@ -54,9 +54,9 @@ internal struct NotFrozenUFI: ~Copyable {
 		discard self
 	}
 
-	@_alwaysEmitIntoClient
+	@export(implementation)
 	public consuming func aeic() {
-		// expected-error @+1 {{'discard' statement cannot be used in an '@_alwaysEmitIntoClient' function inside of type 'NotFrozenUFI', which is not '@frozen'}}
+		// expected-error @+1 {{'discard' statement cannot be used in an '@export(implementation)' function inside of type 'NotFrozenUFI', which is not '@frozen'}}
 		discard self
 	}
 

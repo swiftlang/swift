@@ -463,6 +463,14 @@ Added: _$sSct8_rawTasks06_AsyncB0VvpMV
 /// Expose async task name offset in debug header.
 Added: __swift_concurrency_debug_asyncTaskNameOffset
 
+// Task Registry debug symbols
+Added: __swift_concurrency_debug_task_getId
+Added: __swift_concurrency_debug_task_getShardHead
+Added: __swift_concurrency_debug_task_getTaskNext
+Added: __swift_concurrency_debug_task_registryCount
+Added: __swift_concurrency_debug_task_registryWalk
+Added: __swift_concurrency_task_registry
+
 // withDeadline / TaskCancellationScope: structured-concurrency deadlines,
 // scoped cancellation (SPI), and CancellationError.Reason plumbing.
 Added: _$ss12withDeadline_9tolerance5clock9operationx7Instants5ClockPQy0__8DurationAGQy0_Sgq0_xyYaq_YKYCXEtYaq_YKs5ErrorR_s12IdentifiableR0_sAFR0_Ri_zr1_lF
@@ -492,6 +500,10 @@ Added: _$ss21TaskCancellationScopeVMn
 Added: _$ss21TaskCancellationScopeVN
 Added: _$sScE11descriptionSSvg
 Added: _$sScE11descriptionSSvpMV
+Added: _$sScE17_reasonRawStorages5UInt8VvM
+Added: _$sScE17_reasonRawStorages5UInt8Vvg
+Added: _$sScE17_reasonRawStorages5UInt8VvpMV
+Added: _$sScE17_reasonRawStorages5UInt8Vvs
 Added: _$sScE6ReasonO11descriptionSSvg
 Added: _$sScE6ReasonO11descriptionSSvpMV
 Added: _$sScE6ReasonO11unspecifiedyA2BmFWC

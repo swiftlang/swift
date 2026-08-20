@@ -909,9 +909,9 @@ static void diagnoseReadWriteMutatingnessMismatch(
   auto nameForAccessor = [&](AccessorKind kind) -> StringRef {
     if (auto *decl = storage->getParsedAccessor(kind))
       return getAccessorNameForDiagnostic(
-          decl, /*article=*/false, /*underscored=*/hasCoroutineAccessorFeature);
+          decl, /*article=*/false, /*legacy=*/hasCoroutineAccessorFeature);
     return getAccessorNameForDiagnostic(
-        kind, /*article=*/false, /*underscored=*/hasCoroutineAccessorFeature);
+        kind, /*article=*/false, /*legacy=*/hasCoroutineAccessorFeature);
   };
 
   auto readerAccessor = directAccessorKindForReadImpl(storage->getReadImpl());
@@ -941,7 +941,7 @@ static void diagnoseReadWriteMutatingnessMismatch(
   modifyAccessor->diagnose(
       diag::readwriter_mutatingness_differs_from_reader_or_writer_mutatingness,
       getAccessorNameForDiagnostic(modifyAccessor, /*article=*/false,
-                                   /*underscored=*/hasCoroutineAccessorFeature),
+                                   /*legacy=*/hasCoroutineAccessorFeature),
       isModifierMutating ? SelfAccessKind::Mutating
                          : SelfAccessKind::NonMutating,
       diagnosticForm, writerAccessorName, SelfAccessKind::NonMutating,
@@ -952,7 +952,7 @@ static void diagnoseReadWriteMutatingnessMismatch(
                      getAccessorNameForDiagnostic(
                          writerAccesor,
                          /*article=*/false,
-                         /*underscored=*/hasCoroutineAccessorFeature),
+                         /*legacy=*/hasCoroutineAccessorFeature),
                      0);
   }
   AccessorDecl *reader = nullptr;

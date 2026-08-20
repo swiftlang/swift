@@ -248,6 +248,11 @@ if(SwiftCore_ENABLE_STDLIB_LAZY_LINK)
   target_link_options(swiftStdlibStubs PUBLIC
     "SHELL:-Xlinker -lazy_framework -Xlinker CoreFoundation"
     "SHELL:-Xlinker -upward_framework -Xlinker CoreFoundation")
+  if(SwiftCore_ENABLE_CONCURRENCY)
+    target_link_options(swift_Concurrency PRIVATE
+      "SHELL:-Xlinker -lazy_framework -Xlinker CoreFoundation"
+      "SHELL:-Xlinker -upward_framework -Xlinker CoreFoundation")
+  endif()
 endif()
 
 # Inter-project install info
