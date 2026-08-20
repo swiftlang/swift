@@ -33,18 +33,14 @@ public func fooLazy() {
 // CHECK:         load ptr, ptr @OBJC_SELECTOR_REFERENCES_
 // CHECK:         ret
 
-// The two message sends below are emitted either as a load of the selector
-// followed by a call to objc_msgSend, or, where Clang enables
-// -fobjc-msgsend-selector-stubs by default (AArch64 targets linked with
-// ld64-811.2 or newer), as a call to the per-selector linker stub
-// objc_msgSend$<selector>. Accept both spellings.
-
 // CHECK-LABEL: define internal ptr @giveMeANumber()
 // CHECK:         [[CLASS:%.*]] = load ptr, ptr
-// CHECK:         call {{.*}} @{{"?}}objc_msgSend
+// CHECK-DAG:         [[SELECTOR:%.*]] = load ptr, ptr @OBJC_SELECTOR_REFERENCES_.{{.*}}
+// CHECK:         call {{.*}} @objc_msgSend
 // CHECK:         ret
 
 // CHECK-LABEL: define internal ptr @giveMeAMetaclass()
 // CHECK:         [[CLASS:%.*]] = load ptr, ptr
-// CHECK:         call {{.*}} @{{"?}}objc_msgSend
+// CHECK-DAG:         [[SELECTOR:%.*]] = load ptr, ptr @OBJC_SELECTOR_REFERENCES_
+// CHECK:         call {{.*}} @objc_msgSend
 // CHECK:         ret
