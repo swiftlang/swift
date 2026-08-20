@@ -131,12 +131,22 @@ TypeSubElementCount::TypeSubElementCount(SILValue value) : number(1) {
 
 std::optional<SubElementOffset>
 SubElementOffset::computeForAddress(SILValue projectionDerivedFromRoot,
-                                    SILValue rootAddress) {
+                                    SILValue rootAddress,
+                                    SILType *opaqueBoundaryType) {
   unsigned finalSubElementOffset = 0;
   SILModule &mod = *rootAddress->getModule();
 
   LLVM_DEBUG(llvm::dbgs() << "computing element offset for root:\n";
              rootAddress->print(llvm::dbgs()));
+
+  // Note that we looked through a node of the type tree whose leaves are opaque,
+  // reaching a type that is not a sub-tree of the root's. Anything projected out
+  // of such a node affects the node as a whole. Assigning unconditionally leaves
+  // the outermost such node, which is the one that matters.
+  auto noteOpaqueBoundary = [&](SILValue boundary) {
+    if (opaqueBoundaryType)
+      *opaqueBoundaryType = boundary->getType();
+  };
 
   while (1) {
     LLVM_DEBUG(llvm::dbgs() << "projection: ";
@@ -156,9 +166,12 @@ SubElementOffset::computeForAddress(SILValue projectionDerivedFromRoot,
       continue;
     }
 
+    // An unchecked address cast reinterprets its operand as an unrelated type,
+    // so its result covers the operand as a whole.
     if (auto *uaci =
             dyn_cast<UncheckedAddrCastInst>(projectionDerivedFromRoot)) {
       projectionDerivedFromRoot = uaci->getOperand();
+      noteOpaqueBoundary(projectionDerivedFromRoot);
       continue;
     }
 
@@ -173,15 +186,20 @@ SubElementOffset::computeForAddress(SILValue projectionDerivedFromRoot,
       continue;
     }
 
+    // The payload of an existential is not part of the existential's type tree:
+    // an existential is a single opaque leaf, while its payload can have any
+    // number of leaves. So a projection of the payload covers that one leaf.
     if (auto *oea =
             dyn_cast<OpenExistentialAddrInst>(projectionDerivedFromRoot)) {
       projectionDerivedFromRoot = oea->getOperand();
+      noteOpaqueBoundary(projectionDerivedFromRoot);
       continue;
     }
 
     if (auto *iea =
             dyn_cast<InitExistentialAddrInst>(projectionDerivedFromRoot)) {
       projectionDerivedFromRoot = iea->getOperand();
+      noteOpaqueBoundary(projectionDerivedFromRoot);
       continue;
     }
 
@@ -603,9 +621,21 @@ void TypeTreeLeafTypeRange::get(
     Operand *op, SILValue rootValue,
     SmallVectorImpl<TypeTreeLeafTypeRange> &ranges) {
   auto projectedValue = op->get();
-  auto startEltOffset = SubElementOffset::compute(projectedValue, rootValue);
+  SILType opaqueBoundaryType;
+  auto startEltOffset =
+      SubElementOffset::compute(projectedValue, rootValue, &opaqueBoundaryType);
   if (!startEltOffset)
     return;
+
+  // If the operand was projected out of an opaque node of the root's type tree,
+  // it affects that whole node. None of the sub-tree reasoning below applies:
+  // the operand's own leaves aren't in the tree, and there is in particular no
+  // separate deinit bit to carve out, since the opaque node is a single leaf.
+  if (opaqueBoundaryType) {
+    auto count = TypeSubElementCount(opaqueBoundaryType, op->getFunction());
+    ranges.push_back({*startEltOffset, *startEltOffset + count});
+    return;
+  }
 
   // A drop_deinit only consumes the deinit bit of its operand.
   if (isa<DropDeinitInst>(op->getUser())) {
