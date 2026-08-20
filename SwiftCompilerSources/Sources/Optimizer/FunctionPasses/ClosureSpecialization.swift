@@ -224,8 +224,6 @@ private func trySpecialize(apply: ApplySite, _ context: FunctionPassContext) -> 
     return false
   }
 
-  let callee = specialization.callee
-  let caller = apply.parentFunction
   let specializedParameters = specialization.getSpecializedParameters()
 
   // A function cannot have more than one "isolated" parameter.
@@ -249,8 +247,7 @@ private func trySpecialize(apply: ApplySite, _ context: FunctionPassContext) -> 
   //
   specialization.uniqueCaptureArguments(context)
 
-  var clonerContext = FunctionPassContext?(nil)
-  let specializedFunction = specialization.getOrCreateSpecializedFunction(specializedParameters, &clonerContext, context)
+  let (specializedFunction, isNewFunction) = specialization.getOrCreateSpecializedFunction(specializedParameters, context)
 
   specialization.unUniqueCaptureArguments(context)
 
@@ -258,13 +255,7 @@ private func trySpecialize(apply: ApplySite, _ context: FunctionPassContext) -> 
 
   specialization.deleteDeadClosures(context)
 
-  if context.needFixStackNesting {
-    context.fixStackNesting(in: caller)
-  }
-
-  if let clonerContext = clonerContext {
-    defer { context.bridgedPassContext.deinitializedNestedPassContext() }
-
+  if isNewFunction {
     /// Further specialization rounds can leave the cloned callee holding a specializable closure and an `apply` which
     /// takes this closure as an argument. Consider the case when this specializable closure captures an argument from
     /// the cloned callee, and this argument by itself is a specializable closure constructed in caller and passed to
@@ -327,10 +318,12 @@ private func trySpecialize(apply: ApplySite, _ context: FunctionPassContext) -> 
     ///     return apply @specialized_closure1_final(%0, %1)
     ///   specialized_closure1_final(%0 : Float, %1 : Float) -> Float:
     ///     return apply @closure0(%0, %1)
-    runClosureSpecialization(function: specializedFunction, context: clonerContext)
-  }
 
-  context.notifyNewFunction(function: specializedFunction, derivedFrom: callee)
+    context.buildSpecializedFunction(specializedFunction: specializedFunction) {
+      (specializedFunction, specializedContext) in
+      runClosureSpecialization(function: specializedFunction, context: specializedContext)
+    }
+  }
 
   return true
 }
@@ -532,13 +525,12 @@ private struct SpecializationInfo {
   private typealias Cloner = SIL.Cloner<FunctionPassContext>
 
   func getOrCreateSpecializedFunction(_ specializedParameters: [ParameterInfo],
-                                      _ clonerContext: inout FunctionPassContext?,
                                       _ context: FunctionPassContext
-  ) -> Function {
+  ) -> (Function, isNewFunction: Bool) {
     let specializedFunctionName = getSpecializedFunctionName(context)
 
     if let existingSpecializedFunction = context.lookupFunction(name: specializedFunctionName) {
-      return existingSpecializedFunction
+      return (existingSpecializedFunction, false)
     }
 
     let specializedFunction =
@@ -550,17 +542,20 @@ private struct SpecializationInfo {
         // method anymore.
         withRepresentation: .thin, makeBare: true)
 
-    let nestedBridgedContext = context.bridgedPassContext.initializeNestedPassContext(
-      specializedFunction.bridged)
-    clonerContext = FunctionPassContext(_bridged: nestedBridgedContext)
+    context.buildSpecializedFunction(
+      specializedFunction: specializedFunction,
+      buildFn: { (specializedFunction, specializedContext) in
+        var cloner = Cloner(cloneToEmptyFunction: specializedFunction, specializedContext)
+        defer { cloner.deinitialize() }
 
-    var cloner = SIL.Cloner<FunctionPassContext>(cloneToEmptyFunction: specializedFunction, clonerContext!)
-    defer { cloner.deinitialize() }
-    cloneAndSpecializeFunctionBody(using: &cloner)
+        cloneAndSpecializeFunctionBody(using: &cloner)
+        // Cloning a whole function, even if it contains an `unreachable`, doesn't require lifetime completion.
+        specializedContext.setNeedCompleteLifetimes(to: false)
+      })
 
-    clonerContext!.setNeedCompleteLifetimes(to: false)
+    context.notifyNewFunction(function: specializedFunction, derivedFrom: callee)
 
-    return specializedFunction
+    return (specializedFunction, true)
   }
 
   private func getSpecializedFunctionName(_ context: FunctionPassContext) -> String {
