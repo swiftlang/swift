@@ -23,9 +23,13 @@
 #ifdef __APPLE__
 
 #include <mach/mach.h>
+
+#if TARGET_OS_OSX
 #include <mach/mach_vm.h>
 
 #include <libproc.h>
+#endif
+
 #include <stdint.h>
 
 #ifdef __cplusplus
