@@ -657,7 +657,7 @@ extension InlineArray: ConvertibleToBytes
 extension InlineArray: ConvertibleFromBytes
   where Element: ConvertibleFromBytes {}
 
-// Conformances to Equatable and Hashable added in 6.5 (SE-NNNN).
+// Conformances to Equatable and Hashable added in 6.5 (SE-0543).
 @available(SwiftStdlib 6.5, *)
 extension InlineArray: Equatable where Element: ~Copyable & Equatable { }
 
