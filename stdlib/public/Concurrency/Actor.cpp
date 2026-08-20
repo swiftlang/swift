@@ -40,6 +40,7 @@
 #include "swift/Runtime/EnvironmentVariables.h"
 #include "swift/Runtime/Exception.h"
 #include "swift/Runtime/Heap.h"
+#include "swift/Runtime/Privilege.h"
 #include "swift/Threading/Mutex.h"
 #include "swift/Threading/Once.h"
 #include "swift/Threading/Thread.h"
@@ -478,6 +479,11 @@ __swift_bincompat_useLegacyNonCrashingExecutorChecks() {
 const char *__swift_runtime_env_useLegacyNonCrashingExecutorChecks() {
   // Potentially, override the platform detected mode, primarily used in tests.
 #if SWIFT_STDLIB_HAS_ENVIRON && !SWIFT_CONCURRENCY_EMBEDDED
+  // The override downgrades the isolation check from fatal to a warning, so it
+  // is unavailable in processes don't allow disabling safety checks.
+  if (swift::runtime::_swift_isRestrictedProcess())
+    return nullptr;
+
   return swift::runtime::environment::
       concurrencyIsCurrentExecutorLegacyModeOverride();
 #else
@@ -810,6 +816,12 @@ static unsigned unexpectedExecutorLogLevel =
 
 static void checkUnexpectedExecutorLogLevel(void *context) {
 #if SWIFT_STDLIB_HAS_ENVIRON
+  // SWIFT_UNEXPECTED_EXECUTOR_LOG_LEVEL can downgrade the executor check from a
+  // fatal error to a warning, so it is unavailable in processes don't allow
+  // disabling safety checks.
+  if (swift::runtime::_swift_isRestrictedProcess())
+    return;
+
   const char *levelStr = getenv("SWIFT_UNEXPECTED_EXECUTOR_LOG_LEVEL");
   if (!levelStr)
     return;

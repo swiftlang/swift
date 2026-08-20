@@ -1350,3 +1350,6 @@ Added: _swift_distributed_getGenericEnvironmentKeyArgumentCount
 
 // Task Registry
 Added: _concurrencyEnableTaskRegistry
+
+// Privilege gating for environment variables
+Added: __swift_isRestrictedProcess
