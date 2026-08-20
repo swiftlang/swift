@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend %s -emit-ir -disable-availability-checking | %FileCheck %s
 // RUN: %target-swift-frontend %s -O -emit-ir -disable-availability-checking | %FileCheck %s --check-prefix=CHECK-OPT
-// UNSUPPORTED: CPU=wasm32
+// UNSUPPORTED: CPU=wasm32, OS=linux-androideabi
 
 // CHECK: define{{.*}}swiftcc void @swapPointers({{.*}}noalias{{.*}},{{.*}}noalias{{.*}})
 @_silgen_name("swapPointers")
