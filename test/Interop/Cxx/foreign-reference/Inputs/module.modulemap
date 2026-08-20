@@ -149,3 +149,8 @@ module InheritedGenericArgument {
   header "inherited-generic-argument.h"
   requires cplusplus
 }
+
+module FRTProtocolSuperclass {
+  header "frt-protocol-superclass.h"
+  requires cplusplus
+}

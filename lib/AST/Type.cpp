@@ -4827,13 +4827,11 @@ ReferenceCounting TypeBase::getReferenceCounting() {
                ? ReferenceCounting::Custom
                : ReferenceCounting::None;
 
-  // In the absence of Objective-C interoperability, everything uses native
-  // reference counting or is the builtin BridgeObject.
-  if (!ctx.LangOpts.EnableObjCInterop) {
-    return type->getKind() == TypeKind::BuiltinBridgeObject
-             ? ReferenceCounting::Bridge
-             : ReferenceCounting::Native;
-  }
+  // In the absence of Objective-C interoperability, a class reference uses
+  // native reference counting unless something more specific applies.
+  ReferenceCounting defaultRefCounting =
+      ctx.LangOpts.EnableObjCInterop ? ReferenceCounting::Unknown
+                                     : ReferenceCounting::Native;
 
   switch (type->getKind()) {
 #define SUGARED_TYPE(id, parent) case TypeKind::id:
@@ -4871,25 +4869,21 @@ ReferenceCounting TypeBase::getReferenceCounting() {
   case TypeKind::PackArchetype:
   case TypeKind::ElementArchetype: {
     auto archetype = cast<ArchetypeType>(type);
-    auto layout = archetype->getLayoutConstraint();
-    (void)layout;
-    assert(layout && layout->isRefCounted());
     if (auto supertype = archetype->getSuperclass())
       return supertype->getReferenceCounting();
-    return ReferenceCounting::Unknown;
+    return defaultRefCounting;
   }
 
   case TypeKind::Protocol:
   case TypeKind::ProtocolComposition: {
     auto layout = type->getExistentialLayout();
-    assert(layout.requiresClass() && "Opaque existentials don't use refcounting");
     if (auto superclass = layout.getExplicitSuperclassOrProtocolSuperclass())
       return superclass->getReferenceCounting();
-    return ReferenceCounting::Unknown;
+    return defaultRefCounting;
   }
 
   case TypeKind::ParameterizedProtocol: {
-    return cast<ParameterizedProtocolType>(this)
+    return cast<ParameterizedProtocolType>(type)
       ->getBaseType()
       ->getReferenceCounting();
   }

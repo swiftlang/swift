@@ -30,6 +30,7 @@
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleLoader.h"
+#include "swift/AST/ReferenceCounting.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeTransform.h"
 #include "swift/Basic/Assertions.h"
@@ -2196,10 +2197,16 @@ private:
       convention = Convs.getIndirect(ownership, forSelf, origParamIndex,
                                      origType, substTLConv);
       assert(isIndirectFormalParameter(convention));
-    } else if (substTL.isTrivial() ||
-               // Foreign reference types are passed trivially.
-               (substType->getClassOrBoundGenericClass() &&
-                substType->isForeignReferenceType())) {
+    } else if (substTL.isTrivial()) {
+      convention = ParameterConvention::Direct_Unowned;
+    } else if ((substType->getClassOrBoundGenericClass() &&
+                substType->isForeignReferenceType() &&
+                !(forSelf && substType->getReferenceCounting() ==
+                                 ReferenceCounting::Custom))) {
+      // Foreign reference types are passed trivially, with one exception: when
+      // a function's self parameter is a custom-refcounted (i.e., shared) FRT,
+      // it gets the usual class convention (@guaranteed). This ensures
+      // consistency between witnesses and the requirement it satisfies.
       convention = ParameterConvention::Direct_Unowned;
     } else {
       // If we are no implicit copy, our ownership is always Owned.
