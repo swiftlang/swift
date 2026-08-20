@@ -408,7 +408,9 @@ struct SwiftifyInfoFunctionPrinter : public SwiftifyInfoPrinter {
   }
 
   bool printSingle(Type swiftType, ssize_t pointerIndex) {
-    if (swiftType->lookThroughSingleOptionalType()->isOpaquePointer())
+    Type pointerType = swiftType->lookThroughSingleOptionalType();
+    if (pointerType->isOpaquePointer() || pointerType->isUnsafeRawPointer() ||
+        pointerType->isUnsafeMutableRawPointer())
       return false;
     printSeparator();
     out << ".single(pointer: ";

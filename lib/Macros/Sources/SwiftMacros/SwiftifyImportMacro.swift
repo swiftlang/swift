@@ -192,7 +192,7 @@ struct Single: ParamInfo {
     switch pointerIndex {
     case .param(let i):
       return SinglePointerThunkBuilder(
-        base: base, index: i - 1, funcDecl: funcDecl, nonescaping: nonescaping)
+        base: base, index: i - 1, funcDecl: funcDecl)
     case .return:
       return base
     case .self:
@@ -338,17 +338,28 @@ func getUnqualifiedStdName(_ type: String) -> String? {
   return nil
 }
 
-func getSafePointerName(mut: Mutability, generateSpan: Bool, isRaw: Bool) -> TokenSyntax {
-  switch (mut, generateSpan, isRaw) {
-  case (.Immutable, true, true): return "RawSpan"
-  case (.Mutable, true, true): return "MutableRawSpan"
-  case (.Immutable, false, true): return "UnsafeRawBufferPointer"
-  case (.Mutable, false, true): return "UnsafeMutableRawBufferPointer"
+enum PointerBoundKind {
+  case countedBy
+  case sizedBy
+  case single
+}
 
-  case (.Immutable, true, false): return "Span"
-  case (.Mutable, true, false): return "MutableSpan"
-  case (.Immutable, false, false): return "UnsafeBufferPointer"
-  case (.Mutable, false, false): return "UnsafeMutableBufferPointer"
+func getSafePointerName(mut: Mutability, lifetimeDependent: Bool, kind: PointerBoundKind) -> TokenSyntax {
+  switch (mut, lifetimeDependent, kind) {
+  case (.Immutable, true, .sizedBy): return "RawSpan"
+  case (.Mutable, true, .sizedBy): return "MutableRawSpan"
+  case (.Immutable, false, .sizedBy): return "UnsafeRawBufferPointer"
+  case (.Mutable, false, .sizedBy): return "UnsafeMutableRawBufferPointer"
+
+  case (.Immutable, true, .countedBy): return "Span"
+  case (.Mutable, true, .countedBy): return "MutableSpan"
+  case (.Immutable, false, .countedBy): return "UnsafeBufferPointer"
+  case (.Mutable, false, .countedBy): return "UnsafeMutableBufferPointer"
+
+  case (.Immutable, true, .single): return "Ref"
+  case (.Mutable, true, .single): return "MutableRef"
+  case (.Immutable, false, .single): fatalError("unexpected __single without lifetime dependence")
+  case (.Mutable, false, .single): fatalError("unexpected __single without lifetime dependence")
   }
 }
 
@@ -372,16 +383,22 @@ func hasOwnershipSpecifier(_ attrType: AttributedTypeSyntax) -> Bool {
 }
 
 func transformType(
-  _ prev: TypeSyntax, _ generateSpan: Bool, _ isSizedBy: Bool, _ setMutableSpanInout: Bool
+  _ prev: TypeSyntax, _ lifetimeDependent: Bool, _ kind: PointerBoundKind, _ setMutableSpanInout: Bool
 ) throws -> TypeSyntax {
   if let optType = prev.as(OptionalTypeSyntax.self) {
     return TypeSyntax(
       optType.with(
         \.wrappedType,
-        try transformType(optType.wrappedType, generateSpan, isSizedBy, setMutableSpanInout)))
+        try transformType(optType.wrappedType, lifetimeDependent, kind, setMutableSpanInout)))
   }
   if let impOptType = prev.as(ImplicitlyUnwrappedOptionalTypeSyntax.self) {
-    return try transformType(impOptType.wrappedType, generateSpan, isSizedBy, setMutableSpanInout)
+    if kind == .single {
+      return TypeSyntax(
+        OptionalTypeSyntax(
+          wrappedType: try transformType(
+            impOptType.wrappedType, lifetimeDependent, kind, setMutableSpanInout)))
+    }
+    return try transformType(impOptType.wrappedType, lifetimeDependent, kind, setMutableSpanInout)
   }
   if let attrType = prev.as(AttributedTypeSyntax.self) {
     // We insert 'inout' by default for MutableSpan, but it shouldn't override existing ownership
@@ -389,28 +406,31 @@ func transformType(
     return TypeSyntax(
       attrType.with(
         \.baseType,
-        try transformType(attrType.baseType, generateSpan, isSizedBy, setMutableSpanInoutNext)))
+        try transformType(attrType.baseType, lifetimeDependent, kind, setMutableSpanInoutNext)))
   }
   let name = try getTypeName(prev)
   let text = name.text
   let isRaw = isRawPointerType(text: text)
-  if isRaw && !isSizedBy {
+  if isRaw && kind == .countedBy {
     throw DiagnosticError("void pointers not supported for countedBy", node: name)
   }
+  if isRaw && kind == .single {
+    throw DiagnosticError("void pointers not supported for single", node: name)
+  }
 
-  guard let kind: Mutability = getPointerMutability(text: text) else {
+  guard let mut: Mutability = getPointerMutability(text: text) else {
     throw DiagnosticError(
       "expected Unsafe[Mutable][Raw]Pointer type for type \(prev)"
         + " - first type token is '\(text)'", node: name)
   }
-  let token = getSafePointerName(mut: kind, generateSpan: generateSpan, isRaw: isSizedBy)
+  let token = getSafePointerName(mut: mut, lifetimeDependent: lifetimeDependent, kind: kind)
   let mainType =
-    if isSizedBy {
+    if kind == .sizedBy {
       TypeSyntax(IdentifierTypeSyntax(name: token))
     } else {
       try replaceTypeName(prev, token)
     }
-  if setMutableSpanInout && generateSpan && kind == .Mutable {
+  if setMutableSpanInout && lifetimeDependent && mut == .Mutable {
     return TypeSyntax("inout \(mainType)")
   }
   return mainType
@@ -851,6 +871,10 @@ extension PointerBoundsThunkBuilder {
     return (!nullableAsEmptySpan || isOrNull) && oldTypeIsNormalOptional
   }
 
+  var kind: PointerBoundKind {
+    isSizedBy ? .sizedBy : .countedBy
+  }
+
   var oldTypeIsNormalOptional: Bool { return oldType.is(OptionalTypeSyntax.self) }
   var oldTypeIsAnyOptional: Bool { return oldType.is(OptionalTypeSyntax.self) ||
     oldType.is(ImplicitlyUnwrappedOptionalTypeSyntax.self) }
@@ -858,9 +882,9 @@ extension PointerBoundsThunkBuilder {
   var newType: TypeSyntax {
     get throws {
       if !nullable, let optType = oldType.as(OptionalTypeSyntax.self) {
-        return try transformType(optType.wrappedType, generateSpan, isSizedBy, isParameter)
+        return try transformType(optType.wrappedType, generateSpan, kind, isParameter)
       }
-      return try transformType(oldType, generateSpan, isSizedBy, isParameter)
+      return try transformType(oldType, generateSpan, kind, isParameter)
     }
   }
 
@@ -1211,22 +1235,55 @@ struct CountedOrSizedPointerThunkBuilder: ParamBoundsThunkBuilder, PointerBounds
   }
 }
 
-// FIXME: expose `__single` parameters as Ref
 struct SinglePointerThunkBuilder: ParamBoundsThunkBuilder {
   public let base: BoundsCheckedThunkBuilder
   public let index: Int
   public let funcDecl: FunctionParts
-  public let nonescaping: Bool
 
-  var newType: TypeSyntax { oldType }
+  let nonescaping: Bool = true
+  let isParameter: Bool = true
+
+  var nullable: Bool {
+    return oldType.is(OptionalTypeSyntax.self)
+      || oldType.is(ImplicitlyUnwrappedOptionalTypeSyntax.self)
+  }
+
+  var newType: TypeSyntax {
+    get throws {
+      return try transformType(oldType, nonescaping, .single, isParameter)
+    }
+  }
 
   func buildFunctionSignature(_ argTypes: [Int: TypeSyntax?], _ returnType: TypeSyntax?) throws
     -> FunctionSignatureSyntax
   {
-    return try base.buildFunctionSignature(argTypes, returnType)
+    var types = argTypes
+    types[index] = try newType
+    return try base.buildFunctionSignature(types, returnType)
   }
   func buildFunctionCall(_ pointerArgs: [Int: ExprSyntax]) throws -> ExprSyntax {
-    return try base.buildFunctionCall(pointerArgs)
+    var args = pointerArgs
+    assert(args[index] == nil)
+    let questionMark = nullable ? "?" : ""
+    if isMutablePointerType(oldType) {
+      // MutableRef stores the address it was formed from, so `_unsafeAddress`
+      // hands it back directly.
+      args[index] = "\(name)\(raw: questionMark)._unsafeAddress"
+      return try base.buildFunctionCall(args)
+    }
+    // Ref has no address to hand back: for pointee types that fit in 4 words
+    // Builtin.Borrow stores the value inline, so the only address available is
+    // that of a copy. _swiftifyWithOptionalPointer materializes that copy and
+    // scopes the pointer to the call, which is sound because __single implies a
+    // lifetime dependence.
+    let ptrName = TokenSyntax("_\(name.withoutBackticks)Ptr").escapeIfNeeded
+    // The closure always receives an Optional pointer, so a _Nonnull parameter
+    // needs unwrapping.
+    args[index] = nullable ? "\(ptrName)" : "\(ptrName)!"
+    let innerCall = try base.buildFunctionCall(args)
+    return """
+      unsafe _swiftifyWithOptionalPointer(\(name)\(raw: questionMark).value, { \(ptrName) in \(innerCall) })
+      """
   }
   func buildBasicBoundsExtractions() throws -> [CodeBlockItemSyntax.Item] {
     return try base.buildBasicBoundsExtractions()

@@ -151,3 +151,18 @@ public func _swiftifyOverrideLifetime<
   // should be expressed by a builtin that is hidden within the function body.
   dependent
 }
+
+/// Let a generated wrapper turn an Optional value into an optional
+/// pointer argument without branching at the call site, so a function with
+/// several Optional pointer parameters doesn't trigger a combinatorial explosion
+/// of nested if statements.
+@export(implementation)
+@_transparent
+public func _swiftifyWithOptionalPointer<T: ~Copyable, E: ~Copyable>(
+  _ x: borrowing T?, _ f: (UnsafePointer<T>?) -> E
+) -> E {
+  switch x {
+  case .some(let value): return withUnsafePointer(to: value, f)
+  case .none: return f(nil)
+  }
+}
