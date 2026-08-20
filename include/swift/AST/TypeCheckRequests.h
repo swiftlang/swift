@@ -1299,6 +1299,24 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Find a direct C entry point supplied by the COM module.
+class COMRuntimeEntryRequest
+    : public SimpleRequest<COMRuntimeEntryRequest,
+                           FuncDecl *(ModuleDecl *, Identifier),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  FuncDecl *evaluate(Evaluator &evaluator, ModuleDecl *module,
+                     Identifier name) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
 /// Determine whether the given class is a default actor.
 class IsDefaultActorRequest :
     public SimpleRequest<IsDefaultActorRequest,
