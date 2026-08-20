@@ -672,8 +672,8 @@ extension InlineArray where Element: ~Copyable & Equatable {
   /// Returns a Boolean value indicating whether two inline arrays contain
   /// the same elements in the same order.
   ///
-  /// You can use the equal-to operator (`==`) to compare any two inline
-  /// arrays that store the same, `Equatable`-conforming element type.
+  /// You can use the equal-to operator (`==`) to compare two inline
+  /// arrays when the element type is `Equatable`.
   ///
   /// - Parameters:
   ///   - lhs: An array to compare.
