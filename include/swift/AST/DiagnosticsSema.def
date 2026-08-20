@@ -9311,7 +9311,7 @@ ERROR(inline_array_type_backwards,none,
 //===----------------------------------------------------------------------===//
 
 GROUPED_ERROR(weak_unowned_in_embedded_swift, EmbeddedRestrictions, none,
-              "attribute %0 cannot be used in Embedded Swift",
+              "attribute %0 in Embedded Swift requires a 64-bit target",
               (ReferenceOwnership))
 
 GROUPED_WARNING(generic_nonfinal_in_embedded_swift, EmbeddedRestrictions,
