@@ -6,6 +6,7 @@
 
 import os
 import re
+import shlex
 import sys
 
 
@@ -30,29 +31,31 @@ for line in sys.stdin:
         # Move the test over to the fixed suite.
         from_filename = 'validation-test/%s/%s' % (suffix, filename)
         to_filename = 'validation-test/%s_fixed/%s' % (suffix, filename)
-        git_mv_cmd = 'git mv %s %s' % (from_filename, to_filename)
+        q_from = shlex.quote(from_filename)
+        q_to = shlex.quote(to_filename)
+        git_mv_cmd = 'git mv %s %s' % (q_from, q_to)
         execute_cmd(git_mv_cmd)
 
         # Replace "not --crash %target-swift-ide-test" with "%target-swift-ide-test".
         sed_replace_not_cmd = 'sed -e "s/not --crash %s/%s/" -i "" %s' % (
-            "%target-swift-ide-test", "%target-swift-ide-test", to_filename)
+            "%target-swift-ide-test", "%target-swift-ide-test", q_to)
         execute_cmd(sed_replace_not_cmd)
 
         # Replace "not --crash" with "not".
         sed_replace_not_cmd = 'sed -e "s/not --crash/not/" -i "" %s' % (
-            to_filename)
+            q_to)
         execute_cmd(sed_replace_not_cmd)
 
         # Remove "// XFAIL: whatever" lines.
         sed_remove_xfail_cmd = 'sed -e "s|^//.*XFAIL.*$||g" -i "" %s' % (
-            to_filename)
+            q_to)
         execute_cmd(sed_remove_xfail_cmd)
 
         # Remove "// REQUIRES: asserts" lines.
         sed_remove_requires_asserts_cmd = \
-            'sed -e "s|^//.*REQUIRES: asserts.*$||g" -i "" %s' % (to_filename)
+            'sed -e "s|^//.*REQUIRES: asserts.*$||g" -i "" %s' % (q_to)
         execute_cmd(sed_remove_requires_asserts_cmd)
 
         # "git add" the result.
-        git_add_cmd = 'git add %s' % (to_filename)
+        git_add_cmd = 'git add %s' % (q_to)
         execute_cmd(git_add_cmd)
