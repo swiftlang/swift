@@ -504,7 +504,7 @@ ValueDecl *importDeclAlias(ClangImporter::Implementation &clang,
                        Bridgeability::None, { });
   swift::Type GetterTy = FunctionType::get({}, {}, Ty.getType(), ASTExtInfo{});
   swift::Type SetterTy =
-      FunctionType::get({AnyFunctionType::Param(Ty.getType())}, {},
+      FunctionType::get({AnyFunctionType::Param(Ty.getType())}, /* yields */ {},
                         Ctx.TheEmptyTupleType, ASTExtInfo{});
 
   /* Storage */

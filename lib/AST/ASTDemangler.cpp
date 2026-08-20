@@ -613,7 +613,7 @@ Type ASTBuilder::createFunctionType(
                    .withSendable(flags.isSendable())
                    .build();
 
-  return FunctionType::get(funcParams, {}, output, einfo);
+  return FunctionType::get(funcParams, /* yields */ {}, output, einfo);
 }
 
 static ParameterConvention

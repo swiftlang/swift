@@ -857,7 +857,7 @@ ManglingError Remangler::mangleCalledOnceFunctionType(Node *node,
   Buffer << "XO";
   return ManglingError::Success;
 }
-  
+
 ManglingError Remangler::mangleBoundGenericClass(Node *node, unsigned depth) {
   return mangleAnyNominalType(node, depth + 1);
 }

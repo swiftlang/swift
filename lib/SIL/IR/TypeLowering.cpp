@@ -4287,8 +4287,8 @@ static CanAnyFunctionType getPropertyWrapperBackingInitializerInterfaceType(
       ParameterTypeFlags().withOwnershipSpecifier(ParamSpecifier::LegacyOwned));
   // FIXME: Verify ExtInfo state is correct, not working by accident.
   CanAnyFunctionType::ExtInfo info;
-  return CanAnyFunctionType::get(getCanonicalSignatureOrNull(sig), {param}, {},
-                                 resultType, info);
+  return CanAnyFunctionType::get(getCanonicalSignatureOrNull(sig), {param},
+                                 /* yields */ {}, resultType, info);
 }
 
 static CanAnyFunctionType getPropertyWrappedFieldInitAccessorInterfaceType(
@@ -4323,8 +4323,8 @@ static CanAnyFunctionType getPropertyWrappedFieldInitAccessorInterfaceType(
   CanType resultType = TupleType::getEmpty(TC.Context)->getCanonicalType();
   AnyFunctionType::CanParamArrayRef paramRef(params);
   CanAnyFunctionType::ExtInfo extInfo;
-  return CanAnyFunctionType::get(getCanonicalSignatureOrNull(sig), paramRef, {},
-                                 resultType, extInfo);
+  return CanAnyFunctionType::get(getCanonicalSignatureOrNull(sig), paramRef,
+                                 /* yields */ {}, resultType, extInfo);
 }
 
 /// Get the type of a destructor function.
@@ -4358,7 +4358,8 @@ static CanAnyFunctionType getDestructorInterfaceType(DestructorDecl *dd,
   auto sig = dd->getGenericSignatureOfContext();
   FunctionType::Param args[] = {FunctionType::Param(classType)};
   return CanAnyFunctionType::get(getCanonicalSignatureOrNull(sig),
-                                 llvm::ArrayRef(args), {}, methodTy, extInfo);
+                                 llvm::ArrayRef(args), /* yields */ {},
+                                 methodTy, extInfo);
 }
 
 /// Retrieve the type of the ivar initializer or destroyer method for
@@ -4385,7 +4386,8 @@ static CanAnyFunctionType getIVarInitDestroyerInterfaceType(ClassDecl *cd,
   auto sig = cd->getGenericSignature();
   FunctionType::Param args[] = {FunctionType::Param(classType)};
   return CanAnyFunctionType::get(getCanonicalSignatureOrNull(sig),
-                                 llvm::ArrayRef(args), {}, resultType, extInfo);
+                                 llvm::ArrayRef(args), /* yields */ {},
+                                 resultType, extInfo);
 }
 
 static CanAnyFunctionType
@@ -4490,7 +4492,7 @@ static CanAnyFunctionType getEntryPointInterfaceType(ASTContext &C) {
                      .build();
 
   return CanAnyFunctionType::get(/*genericSig*/ nullptr, llvm::ArrayRef(params),
-                                 {}, Int32Ty, extInfo);
+                                 /* yields */ {}, Int32Ty, extInfo);
 }
 
 CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {

@@ -3027,8 +3027,8 @@ public:
     if (extInfo)
       extInfo = extInfo->withCoroutine(false);
 
-    return CanFunctionType::get(FunctionType::CanParamArrayRef(newParams), {},
-                                newResultTy, extInfo);
+    return CanFunctionType::get(FunctionType::CanParamArrayRef(newParams),
+                                /* yields */ {}, newResultTy, extInfo);
   }
   
   CanType visitFunctionType(CanFunctionType func,
