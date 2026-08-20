@@ -2968,6 +2968,25 @@ static NodePointer getParameterList(NodePointer funcType) {
   return parameterContainer;
 }
 
+/// Return the minimum length required for the decoded generic
+/// substitutions buffer, given the target's `GenericEnvironmentDescriptor`.
+/// 
+/// This acts as a guard before calling
+/// \c swift_func_getReturnTypeInfo, \c swift_func_getParameterTypeInfo
+/// and \c swift_distributed_getWitnessTables which assume the passed
+/// substitutions are sufficiently well formed.
+SWIFT_CC(swift)
+SWIFT_RUNTIME_STDLIB_SPI
+size_t swift_distributed_getGenericEnvironmentKeyArgumentCount(
+    GenericEnvironmentDescriptor *genericEnv) {
+  if (!genericEnv)
+    return 0;
+  return llvm::count_if(genericEnv->getGenericParameters(),
+                        [](const GenericParamDescriptor &param) {
+                          return param.hasKeyArgument();
+                        });
+}
+
 SWIFT_CC(swift)
 SWIFT_RUNTIME_STDLIB_SPI
 unsigned swift_func_getParameterCount(const char *typeNameStart,

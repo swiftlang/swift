@@ -420,6 +420,7 @@ extension DistributedActorSystem {
   ///           Throws ``ExecuteDistributedTargetMissingAccessorError`` if the `target`
   ///           does not resolve to a valid distributed function accessor, i.e. the
   ///           call identifier is incorrect, corrupted, or simply not present in this process.
+  @available(SwiftStdlib 5.7, *)
   public func executeDistributedTarget<Act>(
     on actor: Act,
     target: RemoteCallTarget,
@@ -465,10 +466,24 @@ extension DistributedActorSystem {
       }
 
       unsafe substitutionsBuffer = .allocate(capacity: subs.count)
+      let numSubstitutions = subs.count
 
       for (offset, substitution) in subs.enumerated() {
         let element = unsafe substitutionsBuffer?.advanced(by: offset)
         unsafe element?.initialize(to: substitution)
+      }
+
+      if #available(SwiftStdlib 6.5, *) {
+        let requiredKeySubsCount = unsafe _getGenericEnvironmentKeyArgumentCount(genericEnv)
+        if numSubstitutions < requiredKeySubsCount {
+          throw ExecuteDistributedTargetError(
+            message: """
+                     Generic substitutions \(subs) do not satisfy generic \
+                     requirements of \(target) (\(targetName)): expected at \
+                     least \(requiredKeySubsCount) substitutions, got \(numSubstitutions)
+                     """,
+            errorCode: .invalidGenericSubstitutions)
+        }
       }
 
       unsafe (witnessTablesBuffer, numWitnessTables) = unsafe _getWitnessTablesFor(environment: genericEnv,
