@@ -223,7 +223,7 @@ struct SWIFT_REFERENCE RefType {
 
   // expected-expansion@+20:130{{
   //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-  //   expected-apple-error@2{{instance method cannot be more available than enclosing scope}}
+  //   expected-nonxros-error@2{{instance method cannot be more available than enclosing scope}}
   //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_disfavoredOverload|}}
   //   expected-remark@3{{macro content: |public final func refLifetimeboundVirtual(_ p: Span<CInt>) -> Span<CInt> {|}}
   //   expected-remark@4{{macro content: |    let len = CInt(exactly: p.count)!|}}
@@ -405,7 +405,7 @@ extension RefType {
   final func call_refNoescape_RefType(_ p: UnsafePointer<CInt>!, _ len: CInt) {
     return unsafe refNoescape(p, len)
   }
-  // expected-apple-error@+1{{instance method cannot be more available than enclosing scope}}
+  // expected-nonxros-error@+1{{instance method cannot be more available than enclosing scope}}
   @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
     @_alwaysEmitIntoClient @_disfavoredOverload final func call_refNoescape_RefType(_ p: Span<CInt>) {
     return refNoescape(p)
@@ -455,7 +455,7 @@ extension InheritRef {
   final func call_refNoescape_RefType_super(_ p: UnsafePointer<CInt>!, _ len: CInt) {
     return unsafe super.refNoescape(p, len)
   }
-  // expected-apple-error@+1{{instance method cannot be more available than enclosing scope}}
+  // expected-nonxros-error@+1{{instance method cannot be more available than enclosing scope}}
   @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
     @_alwaysEmitIntoClient @_disfavoredOverload final func call_refNoescape_RefType_super(_ p: Span<CInt>) {
     // expected-error@+1{{calling safe interop wrapper 'refNoescape' in foreign reference type 'RefType' using 'super' is not supported}}
@@ -507,7 +507,7 @@ extension InheritRefPrivate {
   final func call_refNoescape_RefType_super(_ p: UnsafePointer<CInt>!, _ len: CInt) {
     return unsafe super.refNoescape(p, len)
   }
-  // expected-apple-error@+1{{instance method cannot be more available than enclosing scope}}
+  // expected-nonxros-error@+1{{instance method cannot be more available than enclosing scope}}
   @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
     @_alwaysEmitIntoClient @_disfavoredOverload final func call_refNoescape_RefType_super(_ p: Span<CInt>) {
     // expected-error@+1{{calling safe interop wrapper 'refNoescape' in foreign reference type 'RefType' using 'super' is not supported}}
