@@ -628,6 +628,59 @@ void ClangImporter::checkCalledClangFunction(const ValueDecl *func,
   diagnoseMissingReturnsRetained(Impl, func, callSiteLoc);
 }
 
+bool swift::importer::isOSObject(const clang::CXXRecordDecl *record) {
+  return record && record->getIdentifier() && record->getName() == "OSObject" &&
+         record->getDeclContext()->getRedeclContext()->isTranslationUnit();
+}
+
+bool swift::importer::isOSIterator(const clang::CXXRecordDecl *record) {
+  return record && record->getIdentifier() &&
+         record->getName() == "OSIterator" &&
+         record->getDeclContext()->getRedeclContext()->isTranslationUnit();
+}
+
+/// Determine whether \p record, or any of its direct or indirect bases,
+/// satisfies \p isMatch.
+static bool
+isSubclassOf(const clang::RecordDecl *record,
+             llvm::function_ref<bool(const clang::CXXRecordDecl *)> isMatch) {
+  auto *cxxRecord = dyn_cast_or_null<clang::CXXRecordDecl>(record);
+  if (!cxxRecord || !cxxRecord->hasDefinition())
+    return false;
+
+  cxxRecord = cxxRecord->getDefinition();
+
+  llvm::SmallVector<const clang::CXXRecordDecl *, 4> stack;
+  llvm::SmallDenseSet<const clang::CXXRecordDecl *, 4> seen;
+
+  stack.push_back(cxxRecord);
+  seen.insert(cxxRecord);
+  while (!stack.empty()) {
+    auto *decl = stack.pop_back_val();
+
+    if (isMatch(decl))
+      return true;
+
+    for (const auto &base : decl->bases()) {
+      auto *baseDecl = base.getType()->getAsCXXRecordDecl();
+      if (!baseDecl || !baseDecl->hasDefinition())
+        continue;
+      baseDecl = baseDecl->getDefinition();
+      if (seen.insert(baseDecl).second)
+        stack.push_back(baseDecl);
+    }
+  }
+  return false;
+}
+
+bool swift::importer::isOSObjectSubclass(const clang::RecordDecl *record) {
+  return isSubclassOf(record, isOSObject);
+}
+
+bool swift::importer::isOSIteratorSubclass(const clang::RecordDecl *record) {
+  return isSubclassOf(record, isOSIterator);
+}
+
 std::optional<ResultConvention>
 swift::importer::getOwnershipOfReturnedFRT(const clang::NamedDecl *decl) {
 
@@ -639,6 +692,8 @@ swift::importer::getOwnershipOfReturnedFRT(const clang::NamedDecl *decl) {
     return ResultConvention::Owned;
 
   if (auto *recordDecl = getReturnTypeAsRecordDeclPtr(decl)) {
+    if (auto convention = getLibkernOwnershipOfReturnedFRT(decl))
+      return convention.value();
     if (auto convention = importer::matchSwiftAttr<ResultConvention>(
             recordDecl,
             {{"returned_as_unretained_by_default", ResultConvention::Unowned}}))
@@ -663,6 +718,41 @@ swift::importer::getOwnershipOfReturnedFRT(const clang::NamedDecl *decl) {
   }
 
   return std::nullopt;
+}
+
+std::optional<ResultConvention>
+swift::importer::getLibkernOwnershipOfReturnedFRT(
+    const clang::NamedDecl *decl) {
+  auto *func = dyn_cast<clang::FunctionDecl>(decl);
+  if (!func || func->isImplicit())
+    return std::nullopt;
+
+  auto *recordDecl = getReturnTypeAsRecordDeclPtr(func);
+  if (!recordDecl)
+    return std::nullopt;
+
+  if (!importer::isOSObjectSubclass(recordDecl))
+    return std::nullopt;
+
+  if (!func->getIdentifier())
+    return std::nullopt;
+
+  // Strip leading underscores.
+  StringRef funcName = func->getName();
+  funcName = funcName.substr(funcName.find_first_not_of('_'));
+
+  if (funcName == "safeMetaCast" || funcName == "requiredMetaCast" ||
+      funcName == "metaCast")
+    return ResultConvention::Unowned;
+
+  if (funcName.ends_with("Matching"))
+    return std::nullopt;
+
+  if ((!funcName.starts_with("get") && !funcName.starts_with("Get")) ||
+      importer::isOSIteratorSubclass(recordDecl))
+    return ResultConvention::Owned;
+
+  return ResultConvention::Unowned;
 }
 
 //===----------------------------------------------------------------------===//

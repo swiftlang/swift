@@ -12,6 +12,9 @@ _ = service.probe(service, &score)
 _ = service.getProvider()
 // CHECK: sil {{.*}}[clang Service.getProvider] {{.*}} -> Optional<Service>
 
+_ = service.__getProvider()
+// CHECK: sil {{.*}}[clang Service.__getProvider] {{.*}} -> Optional<Service>
+
 _ = service.copyService()
 // CHECK: sil {{.*}}__synthesizedVirtualCall_copyService{{.*}}[clang Service.copyService] {{.*}} -> @owned Service
 _ = Service.getCopyOfService(service)
@@ -19,3 +22,15 @@ _ = Service.getCopyOfService(service)
 
 _ = copyServiceFreeFunction(service)
 // CHECK: sil {{.*}}[clang copyServiceFreeFunction] {{.*}} -> @owned Service
+
+_ = Service.noAnnotationWithID(11)
+// CHECK: sil {{.*}}[clang Service.noAnnotationWithID] {{.*}} -> @owned Service
+
+_ = NonOSService.noAnnotationWithID(11)
+// CHECK: sil {{.*}}[clang NonOSService.noAnnotationWithID] {{.*}} -> NonOSService
+
+_ = OSIterator.getIterator()
+// CHECK: sil {{.*}}[clang OSIterator.getIterator] {{.*}} -> @owned OSIterator
+
+_ = OSCollectionIterator.getCollectionIterator()
+// CHECK: sil {{.*}}[clang OSCollectionIterator.getCollectionIterator] {{.*}} -> @owned OSCollectionIterator

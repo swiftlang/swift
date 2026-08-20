@@ -842,6 +842,18 @@ bool hasImportAsOpaquePointerAttr(const clang::RecordDecl *decl);
 /// Determine whether this typedef is a CF type.
 bool isCFTypeDecl(const clang::TypedefNameDecl *Decl);
 
+/// Determine whether this is libkern's OSObject.
+bool isOSObject(const clang::CXXRecordDecl *decl);
+
+/// Determine whether this is libkern's OSIterator.
+bool isOSIterator(const clang::CXXRecordDecl *decl);
+
+/// Determine whether this is libkern's OSObject or one of its subclasses.
+bool isOSObjectSubclass(const clang::RecordDecl *decl);
+
+/// Determine whether this is libkern's OSIterator or one of its subclasses.
+bool isOSIteratorSubclass(const clang::RecordDecl *decl);
+
 /// Determine the imported CF type for the given typedef-name, or the empty
 /// string if this is not an imported CF type name.
 llvm::StringRef getCFTypeName(const clang::TypedefNameDecl *decl);
@@ -952,6 +964,22 @@ matchSwiftAttr(const clang::Decl *decl,
 /// \returns Matched `ResultConvention`, or `std::nullopt` if none applies.
 std::optional<ResultConvention>
 getOwnershipOfReturnedFRT(const clang::NamedDecl *decl);
+
+/// Determines the ownership convention of functions that return libkern's
+/// OSObject or one of its subclasses.
+///
+/// - Methods which start with "get" or "Get" and which are not returning
+///   a subclass of OSIterator are assumed to be getters.
+///   They return at "+0" and the caller is not responsible for releasing the
+///   returned object.
+///
+/// - All other methods are assumed to return at "+1", and the caller is
+///   responsible for releasing the returned object.
+///
+/// \param decl The Clang function or method declaration to inspect.
+/// \returns Matched `ResultConvention`, or `std::nullopt` if none applies.
+std::optional<ResultConvention>
+getLibkernOwnershipOfReturnedFRT(const clang::NamedDecl *decl);
 
 enum class RefCountedPtrError {
   NotAnnotated,

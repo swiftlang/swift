@@ -2,8 +2,8 @@
 
 // REQUIRES: executable_test
 
-// This test asserts that LIBKERN_RETURNS_RETAINED and LIBKERN_RETURNS_NOT_RETAINED are honored. 
-// The retain/release counts chcked below are only correct at -Onone.
+// This test asserts that LIBKERN_RETURNS_RETAINED and LIBKERN_RETURNS_NOT_RETAINED are honored.
+// The retain/release counts checked below are only correct at -Onone.
 //
 // UNSUPPORTED: swift_test_mode_optimize
 // UNSUPPORTED: swift_test_mode_optimize_size
@@ -49,6 +49,15 @@ Tests.test("Attach service") {
 
       do {
         let serviceProvider = service.getProvider()
+
+        expectTrue(checkEqual(provider, serviceProvider))
+        expectEqual(manager.getTotalRetains(), manager.getTotalReleases() + 3)
+      }
+
+      expectEqual(manager.getTotalRetains(), manager.getTotalReleases() + 2)
+
+      do {
+        let serviceProvider = service.__getProvider()
 
         expectTrue(checkEqual(provider, serviceProvider))
         expectEqual(manager.getTotalRetains(), manager.getTotalReleases() + 3)
@@ -122,6 +131,49 @@ Tests.test("Copy service") {
   }
 
   expectEqual(manager.getTotalRetains() + 2, manager.getTotalReleases())
+}
+
+Tests.test("Unannotated methods returning an OSObject subclass return +1 unless the name starts with 'get'") {
+  manager.reset()
+
+  do {
+    let service = Service.noAnnotationWithID(37)
+    expectEqual(37, service.getID())
+    expectEqual(manager.getTotalRetains(), manager.getTotalReleases())
+  }
+
+  expectEqual(manager.getTotalRetains() + 1, manager.getTotalReleases())
+}
+
+Tests.test("Missing annotation on non-OSObject subclass") {
+  manager.reset()
+
+  do {
+    let service = NonOSService.noAnnotationWithID(37)
+    expectEqual(manager.getTotalRetains(), manager.getTotalReleases() + 1)
+  }
+
+  expectEqual(manager.getTotalRetains(), manager.getTotalReleases())
+}
+
+Tests.test("OSIterator is a special case") {
+  manager.reset()
+
+  do {
+    let iterator = OSIterator.getIterator()
+    expectEqual(manager.getTotalRetains(), manager.getTotalReleases())
+  }
+
+  expectEqual(manager.getTotalRetains() + 1, manager.getTotalReleases())
+
+  manager.reset()
+
+  do {
+    let iterator = OSCollectionIterator.getCollectionIterator()
+    expectEqual(manager.getTotalRetains(), manager.getTotalReleases())
+  }
+
+  expectEqual(manager.getTotalRetains() + 1, manager.getTotalReleases())
 }
 
 runAllTests()
