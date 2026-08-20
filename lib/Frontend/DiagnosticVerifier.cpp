@@ -1601,7 +1601,7 @@ void DiagnosticVerifier::verifyDiagnostics(
     // again. We do have to do this after checking fix-its, though, because
     // the diagnostic owns its fix-its.
     CapturedDiagnostics.erase(FoundDiagnosticIter);
-    
+
     // We found the diagnostic, so remove it... unless we allow an arbitrary
     // number of diagnostics, in which case we want to reprocess this.
     if (expected.mayAppear)
@@ -2030,7 +2030,7 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
 
   // Diagnose expected diagnostics that didn't appear.
   verifyRemaining(ExpectedDiagnostics, InputFile.data());
-  
+
   // Verify that there are no diagnostics (in MemoryBuffer) left in the list.
   bool HadUnexpectedDiag = false;
   auto CapturedDiagIter = CapturedDiagnostics.begin();
@@ -2119,6 +2119,25 @@ void DiagnosticVerifier::printRemainingDiagnostics() const {
   }
 }
 
+// Build the ordering key for a sibling macro expansion (see ExpansionOrderKey).
+static DiagnosticVerifier::ExpansionContext::ExpansionOrderKey
+computeExpansionOrderKey(SourceManager &SM, const GeneratedSourceInfo &GSI,
+                         unsigned expansionBufferID) {
+  DiagnosticVerifier::ExpansionContext::ExpansionOrderKey Key;
+  Key.content = SM.getEntireTextForBuffer(expansionBufferID);
+
+  SourceLoc AttrLoc;
+  if (GSI.attachedMacroCustomAttr)
+    AttrLoc = GSI.attachedMacroCustomAttr->getLocation();
+  if (AttrLoc.isInvalid())
+    AttrLoc = GSI.originalSourceRange.getStart();
+  if (AttrLoc.isValid()) {
+    Key.anchorBufferID = SM.findBufferContainingLoc(AttrLoc);
+    Key.anchorOffset = SM.getLocOffsetInBuffer(AttrLoc, Key.anchorBufferID);
+  }
+  return Key;
+}
+
 static void
 processExpansions(SourceManager &SM, llvm::DenseMap<SourceLoc, DiagnosticVerifier::ExpansionContext> &Expansions,
                   std::vector<CapturedDiagnosticInfo> &CapturedDiagnostics) {
@@ -2132,16 +2151,9 @@ processExpansions(SourceManager &SM, llvm::DenseMap<SourceLoc, DiagnosticVerifie
     SourceLoc ExpansionStart = GSI->originalSourceRange.getStart();
     if (ExpansionStart.isInvalid())
       continue;
-    // Order sibling expansions by the source location of the attached-macro
-    // attribute that produced each, so the first attribute in source order
-    // becomes expansion index 0 (matching the order 'expected-expansion'
-    // directives are written). Buffers with no attribute fall back to
-    // buffer-ID order via a zero key.
-    uintptr_t SortKey = 0;
-    if (GSI->attachedMacroCustomAttr)
-      SortKey = reinterpret_cast<uintptr_t>(
-          GSI->attachedMacroCustomAttr->getLocation().getPointer());
-    Expansions[ExpansionStart].addBuffer(diag.SourceBufferID.value(), SortKey);
+    Expansions[ExpansionStart].addBuffer(
+        diag.SourceBufferID.value(),
+        computeExpansionOrderKey(SM, *GSI, diag.SourceBufferID.value()));
   }
 }
 
