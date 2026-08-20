@@ -2241,6 +2241,15 @@ getMacroIntroducedDeclNameKind(Identifier name) {
       .Default(std::nullopt);
 }
 
+static std::optional<MacroInitializerContextKind>
+getMacroInitializerContextKind(Identifier context) {
+  return llvm::StringSwitch<std::optional<MacroInitializerContextKind>>(
+             context.str())
+      .Case("selfAvailable", MacroInitializerContextKind::SelfAvailable)
+      .Case("selfUnavailable", MacroInitializerContextKind::SelfUnavailable)
+      .Default(std::nullopt);
+}
+
 /// Determine the macro role based on its name.
 std::optional<MacroRole> getMacroRole(StringRef roleName) {
   // Match the role string to the known set of roles.
@@ -2259,12 +2268,82 @@ static ParameterizedDeclAttributeKind getParameterizedDeclAttributeKind(bool isA
   }
 }
 
+struct Field {
+  Identifier fieldName;
+  SourceLoc fieldNameLoc;
+  SmallVector<Identifier, 2> arguments;
+  
+  /// The range of arguments of the field, excluding the fieldName
+  ///
+  ///     @attached(accessor, initialization: selfAvailable, selfUnavailable, whatever, names: ...)
+  ///                                         ˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜
+  SourceRange argumentsRange;
+  
+  void append(Identifier argument, SourceLoc argumentLoc) {
+    if (arguments.empty()) {
+      argumentsRange.Start = argumentLoc;
+    }
+    argumentsRange.End = argumentLoc;
+    arguments.push_back(argument);
+  }
+  
+  /// The count of arguments
+  int size() {
+    return arguments.size();
+  }
+  
+  /// The range of the field, including the fieldName
+  ///
+  ///     @attached(accessor, initialization: selfAvailable, selfUnavailable, whatever, names: ...)
+  ///                         ˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜˜
+  SourceRange range() {
+    SourceRange range;
+    if (!fieldName.empty()) {
+      range.Start = fieldNameLoc;
+      range.End = fieldNameEndLoc();
+    }
+    if (argumentsRange.isValid()) {
+      range.widen(argumentsRange);
+    }
+    return range;
+  }
+  
+  SourceLoc fieldNameEndLoc() {
+    unsigned nameLength = fieldName.getLength();
+    return fieldNameLoc.getAdvancedLoc(nameLength);
+  }
+  
+  StringRef getSourceText(SourceManager &sourceManager) {
+    return getSourceText(sourceManager, range());
+  }
+  
+  StringRef getSourceTextForArguments(SourceManager &sourceManager) {
+    return getSourceText(sourceManager, argumentsRange);
+  }
+  
+  StringRef getSourceText(SourceManager &sourceManager, SourceRange range) {
+    assert(range.isValid());
+    SourceLoc start = range.Start;
+    SourceLoc end = Lexer::getLocForEndOfToken(sourceManager, range.End);
+    
+    unsigned bufferID = sourceManager.findBufferContainingLoc(start);
+    assert(bufferID != 0 && "Buffer not found for range");
+    assert(sourceManager.findBufferContainingLoc(end) == bufferID
+                         && "Start and End of range are in different buffers");
+
+    CharSourceRange charRange = CharSourceRange(sourceManager, start, end);
+    return sourceManager.extractText(charRange, bufferID);
+  }
+};
+
 ParserResult<MacroRoleAttr>
 Parser::parseMacroRoleAttribute(
     MacroSyntax syntax, SourceLoc AtLoc, SourceLoc Loc)
 {
   StringRef attrName;
   bool isAttached;
+  int index = 0;
+  Field field;
   switch (syntax) {
   case MacroSyntax::Freestanding:
     attrName = "freestanding";
@@ -2286,11 +2365,13 @@ Parser::parseMacroRoleAttribute(
   SourceLoc lParenLoc = consumeAttributeLParen();
   SourceLoc rParenLoc;
   std::optional<MacroRole> role;
+  SourceLoc roleNameLoc;
   bool sawRole = false;
   bool sawConformances = false;
   bool sawNames = false;
   SmallVector<MacroIntroducedDeclName, 2> names;
   SmallVector<Expr *, 2> conformances;
+  std::optional<Field> initializationField = std::nullopt;
   auto argumentsStatus = parseList(
       tok::r_paren, lParenLoc, rParenLoc,
       /*AllowSepAfterLast=*/false, diag::expected_rparen_expr_list, [&] {
@@ -2302,13 +2383,15 @@ Parser::parseMacroRoleAttribute(
             sawRole = true;
             if (this->CodeCompletionCallbacks) {
               this->CodeCompletionCallbacks->completeDeclAttrParam(
-                  getParameterizedDeclAttributeKind(isAttached), 0,
+                  getParameterizedDeclAttributeKind(isAttached), index,
                   /*HasLabel=*/false);
             }
           } else if (!sawNames) {
+            // what about conformances? initialization?
+            // `index` used to be hard-coded as, value 1.
             if (this->CodeCompletionCallbacks) {
               this->CodeCompletionCallbacks->completeDeclAttrParam(
-                  getParameterizedDeclAttributeKind(isAttached), 1,
+                  getParameterizedDeclAttributeKind(isAttached), index,
                   /*HasLabel=*/false);
             }
           }
@@ -2319,13 +2402,39 @@ Parser::parseMacroRoleAttribute(
         SourceLoc fieldNameLoc;
         parseOptionalArgumentLabel(fieldName, fieldNameLoc);
 
-        // If there is a field name, it better be 'names'.
-        if (!(fieldName.empty() || fieldName.is("names") ||
-              fieldName.is("conformances"))) {
-          diagnose(fieldNameLoc, diag::macro_attribute_unknown_label,
-                   isAttached, fieldName);
-          status.setIsParseError();
-          return status;
+        // If there is a field name, it better be one of 'names', 'conformances', or 'initialization'.
+        if (!fieldName.empty()) {
+          if (!(fieldName.is("names")
+                || fieldName.is("conformances")
+                || fieldName.is("initialization"))) {
+            diagnose(fieldNameLoc, diag::macro_attribute_unknown_label,
+                     isAttached, fieldName);
+            status.setIsParseError();
+            return status;
+          }
+          
+          // the role has no field name and is always at index 0.
+          // The index increments for each new parameter introduced
+          // by a field name.
+          index++;
+          
+          if (field.fieldName.is("initialization")) {
+            // diagnose if we have seen "initialization:" before
+            if (initializationField != std::nullopt) {
+              diagnose(fieldNameLoc.isValid() ? fieldNameLoc : Tok.getLoc(),
+                       diag::macro_attribute_duplicate_label, isAttached,
+                       "initialization");
+            }
+            // We encountered the next name after "initialization".
+            // Before we create the new `Field` struct, we keep a
+            // copy of the parsed "initialization:" field so we can
+            // finalize it after parseList is finished.
+            initializationField = field;
+          }
+          
+          field = Field();
+          field.fieldName = fieldName;
+          field.fieldNameLoc = fieldNameLoc;
         }
 
         // If there is no field name and we haven't seen either names or the
@@ -2338,7 +2447,6 @@ Parser::parseMacroRoleAttribute(
               isAttached ? diag::macro_role_attr_expected_attached_kind
                          : diag::macro_role_attr_expected_freestanding_kind;
           Identifier roleName;
-          SourceLoc roleNameLoc;
           if (Tok.is(tok::kw_extension)) {
             roleNameLoc = consumeToken();
             role = MacroRole::Extension;
@@ -2392,6 +2500,35 @@ Parser::parseMacroRoleAttribute(
 
           return status;
         }
+        
+        // Accessor macros have an optional `initialization` parameter.
+        if (field.fieldName.is("initialization")) {
+          Identifier initializationContextIdentifier;
+          SourceLoc initializationContextLoc;
+          if (consumeIf(tok::code_complete)) {
+            status.setHasCodeCompletionAndIsError();
+            if (this->CodeCompletionCallbacks) {
+              // TODO: check this and find out what it does.
+              /// I copied this from the code that parses introduced
+              /// names further down from here. Not sure if it's
+              /// correct here and if the `index`value  is still correct here
+              /// and in the original code...
+              this->CodeCompletionCallbacks->completeDeclAttrParam(
+                  getParameterizedDeclAttributeKind(isAttached), /*index*/1, /*HasLabel=*/true);
+            }
+          } else if (Tok.is(tok::comma)) {
+            // If there is a comma without identifier, the argument is missing.
+            return status;
+          } else if (parseIdentifier(
+                       initializationContextIdentifier, initializationContextLoc,
+                       diag::macro_attribute_initializer_unknown_argument, /*diagnoseDollarPrefix=*/true
+          )) {
+            status.setIsParseError();
+            return status;
+          }
+          field.append(initializationContextIdentifier, initializationContextLoc);
+          return status;
+        }
 
         // If the field name is empty and we haved seen "names", or the field
         // name is "names" but we've already seen the argument label, complain.
@@ -2410,7 +2547,7 @@ Parser::parseMacroRoleAttribute(
           status.setHasCodeCompletionAndIsError();
           if (this->CodeCompletionCallbacks) {
             this->CodeCompletionCallbacks->completeDeclAttrParam(
-                getParameterizedDeclAttributeKind(isAttached), 1, /*HasLabel=*/true);
+                getParameterizedDeclAttributeKind(isAttached), index, /*HasLabel=*/true);
           }
         } else if (parseIdentifier(introducedNameKind, introducedNameKindLoc,
                                    diag::macro_attribute_unknown_argument_form,
@@ -2475,7 +2612,16 @@ Parser::parseMacroRoleAttribute(
             MacroIntroducedDeclName(*introducedKind, name.getFullName()));
 
         return status;
-      });
+      }); // parseList
+  
+  if (field.fieldName.is("initialization")) {
+    // TODO: Maybe better use class for `Field`
+    // This way we don't have to copy this awkwardly...
+    
+    
+    // "initialization" was the last parameter in the list.
+    initializationField = field;
+  }
 
   if (argumentsStatus.isErrorOrHasCompletion())
     return argumentsStatus;
@@ -2489,11 +2635,102 @@ Parser::parseMacroRoleAttribute(
 
     return makeParserError();
   }
+  
+  std::optional<MacroInitializerContextKind> initializerContext = std::nullopt;
+  if (role == MacroRole::Accessor) {
+    if (initializationField) {
+      int size = initializationField->size();
+      if (size == 0) {
+        SourceLoc argsLoc = initializationField->fieldNameEndLoc();
+        diagnose(argsLoc, diag::macro_attribute_initializer_missing_argument);
+        auto suggestInsertSelfAvailable = diagnose(argsLoc, diag::suggest_insert_argument, "selfAvailable");
+        suggestInsertSelfAvailable.fixItInsert(argsLoc, " selfAvailable");
+        auto suggestInsertSelfUnavailable = diagnose(argsLoc, diag::suggest_insert_argument, "selfUnavailable");
+        suggestInsertSelfUnavailable.fixItInsert(argsLoc, " selfUnavailable");
+        auto suggestRemoveParam = diagnose(argsLoc, diag::suggest_remove_param_for_default, initializationField->getSourceText(SourceMgr), "selfUnavailable");
+        suggestRemoveParam.fixItRemove(initializationField->range());
+        argumentsStatus.setIsParseError();
+        
+      } else if (size > 1) {
+        SourceRange argsRange = initializationField->argumentsRange.Start;
+        SourceLoc loc = argsRange.Start;
+        auto diag = diagnose(loc, diag::macro_attribute_initializer_multiple_arguments);
+        diag.highlight(argsRange);
+        bool foundCandidate = false;
+        for (Identifier arg : initializationField->arguments) {
+          if (arg.str() == "selfAvailable") {
+            foundCandidate = true;
+            auto suggestSelfAvailable = diagnose(loc, diag::suggest_keep_argument, "selfAvailable");
+            suggestSelfAvailable.fixItReplace(argsRange, "selfAvailable");
+          } else if (arg.str() == "selfUnavailable") {
+            foundCandidate = true;
+            auto suggestSelfUnavailable = diagnose(loc, diag::suggest_keep_argument, "selfUnavailable");
+            suggestSelfUnavailable.fixItReplace(argsRange, "selfUnavailable");
+          }
+        }
+        if (!foundCandidate) {
+          auto suggestReplaceWithSelfAvailable = diagnose(
+              loc, diag::suggest_replace_arguments,
+              initializationField->getSourceTextForArguments(SourceMgr), "selfAvailable"
+          );
+          suggestReplaceWithSelfAvailable.fixItReplace(argsRange, "selfAvailable");
+          auto suggestReplaceWithSelfUnavailable = diagnose(
+              loc, diag::suggest_replace_arguments,
+              initializationField->getSourceTextForArguments(SourceMgr), "selfUnavailable"
+          );
+          suggestReplaceWithSelfUnavailable.fixItReplace(argsRange, "selfUnavailable");
+          auto suggestRemove = diagnose(loc, diag::suggest_remove_param_for_default, initializationField->getSourceText(SourceMgr), "selfUnavailable");
+          suggestRemove.fixItRemove(initializationField->range());
+        }
+        argumentsStatus.setIsParseError();
+        
+      } else {
+        Identifier identifier = initializationField->arguments[0];
+        initializerContext = getMacroInitializerContextKind(identifier);
+        if (!initializerContext) {
+          SourceRange argRange = initializationField->argumentsRange;
+          diagnose(argRange.Start, diag::macro_attribute_initializer_unknown_argument);
+          auto suggestSelfAvailable = diagnose(argRange.Start, diag::suggest_replace_argument, identifier, "selfAvailable");
+          suggestSelfAvailable.fixItReplace(argRange, "selfAvailable");
+          auto suggestSelfUnavailable = diagnose(argRange.Start, diag::suggest_replace_argument, identifier, "selfUnavailable");
+          suggestSelfUnavailable.fixItReplace(argRange, "selfUnavailable");
+          auto suggestRemoveParam = diagnose(argRange.Start, diag::suggest_remove_param_for_default, initializationField->getSourceText(SourceMgr), "selfUnavailable");
+          suggestRemoveParam.fixItRemove(initializationField->range());
+        }
+      }
+    } // if (initializationField)
+    
+    // By default, `self` is unavailable for property initializers when
+    // re-contextualized by an accessor macro.
+    if (!initializerContext.has_value()) {
+      initializerContext = MacroInitializerContextKind::SelfUnavailable;
+    }
+  } /* if (role == MacroRole::Accessor) */ else if (initializationField) {
+    // 'initialization:' is not supported unless macro role is 'accessor'.
+    SourceLoc loc = initializationField->fieldNameLoc;
+    auto diag = diagnose(loc,
+                         diag::macro_attribute_unsupported_label,
+                         initializationField->fieldName, swift::getMacroRoleString(*role));
+    SourceRange range = initializationField->range();
+    diag.highlight(range);
+    
+    auto suggestRemove = diagnose(loc,
+                                  diag::suggest_remove_param,
+                                  initializationField->getSourceText(SourceMgr));
+    suggestRemove.fixItRemove(range);
+    
+    auto suggestAccessorRole = diagnose(roleNameLoc, diag::suggest_accessor_role);
+    suggestAccessorRole.fixItReplace(SourceRange(roleNameLoc, roleNameLoc), "accessor");
+    
+    argumentsStatus.setIsParseError();
+    return argumentsStatus;
+  }
 
   SourceRange range(Loc, rParenLoc);
   return makeParserResult(MacroRoleAttr::create(
-      Context, AtLoc, range, syntax, lParenLoc, *role, names,
-      conformances, rParenLoc, /*isImplicit*/ false));
+      Context, AtLoc, range, syntax, lParenLoc, *role,
+      initializerContext, names, conformances,
+      rParenLoc, /*isImplicit*/ false));
 }
 
 /// Guts of \c parseSingleAttrOption and \c parseSingleAttrOptionIdentifier.

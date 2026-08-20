@@ -1392,6 +1392,30 @@ swift::expandFreestandingMacro(MacroExpansionDecl *med) {
   return macroSourceFile->getBufferID();
 }
 
+PrintOptions printOptionsForMacros() {
+  PrintOptions options = PrintOptions::forDebugging();
+  options.SynthesizeSugarOnTypes = false;
+  options.FullyQualifiedTypes = true;
+  options.PrintAccess = true;
+  options.ExplodePatternBindingDecls = true;
+  options.PrintImplicitAttrs = false;
+  options.FunctionDefinitions = false;
+  options.PrintPropertyAccessors = false;
+  return options;
+}
+
+void printDecl(const Decl *decl, std::string &str) {
+  llvm::raw_string_ostream stream(str);
+  StreamPrinter streamPrinter(stream);
+  decl->print(streamPrinter, printOptionsForMacros());
+}
+
+void printExpr(const Expr *decl, std::string &str) {
+  llvm::raw_string_ostream stream(str);
+  StreamPrinter streamPrinter(stream);
+  decl->print(streamPrinter, printOptionsForMacros());
+}
+
 
 static SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
                                          CustomAttr *attr,
@@ -1609,6 +1633,16 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
     if (isPrettyPrintedDecl) {
       startLoc = attachedToLoc;
     }
+    
+    // If a macro subsumes the initializer expression, SwiftSyntax does not
+    // have the inferred type information during expansion. To work around this,
+    // print `attachedTo` as a string and pass it to macro expansion, where it
+    // can be used to augment the `VariableDeclSyntax` with a
+    // `TypeAnnotationSyntax`.
+    std::string str;
+    printDecl(attachedTo, str);
+    // TODO: Maybe we should only send typeCheckedAttachedTo if Decl is a VarDecl?
+    StringRef typeCheckedAttachedTo = StringRef(str);
 
     BridgedStringRef evaluatedSourceOut{nullptr, 0};
     assert(!externalDef.isError());
@@ -1617,6 +1651,7 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
         extendedType.c_str(), conformanceList.c_str(), getRawMacroRole(role),
         astGenAttrSourceFile, attr->AtLoc.getOpaquePointerValue(),
         astGenDeclSourceFile, startLoc.getOpaquePointerValue(),
+        typeCheckedAttachedTo,
         astGenParentDeclSourceFile, parentDeclLoc, &evaluatedSourceOut);
     if (!evaluatedSourceOut.unbridged().data())
       return nullptr;
@@ -1751,7 +1786,13 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro,
     auto *astGenClosureSourceFile = closureSourceFile->getExportedSourceFile();
     if (!astGenClosureSourceFile)
       return nullptr;
-
+    
+    // TODO: Propably better not to pass `typeCheckedAttachedTo` for closures
+    // How? Send an empty StringRef?
+    std::string str;
+    printExpr(attachedTo, str);
+    StringRef typeCheckedAttachedTo = StringRef(str);
+    
     auto startLoc = attachedTo->getStartLoc();
     BridgedStringRef evaluatedSourceOut{nullptr, 0};
     assert(!externalDef.isError());
@@ -1760,6 +1801,7 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro,
         "", "", getRawMacroRole(role),
         astGenAttrSourceFile, attr->AtLoc.getOpaquePointerValue(),
         astGenClosureSourceFile, startLoc.getOpaquePointerValue(),
+        typeCheckedAttachedTo,
         /*parentDeclSourceFile*/nullptr, /*parentDeclLoc*/nullptr,
         &evaluatedSourceOut);
     if (!evaluatedSourceOut.unbridged().data())
