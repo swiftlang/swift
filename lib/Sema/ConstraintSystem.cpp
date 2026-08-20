@@ -2058,6 +2058,38 @@ bool Solution::isValidSolution() const {
           FixedScore.Data[SK_Fix] == 0);
 }
 
+static bool diagnoseConflictingGenericArguments(ConstraintSystem &cs,
+                                                ArrayRef<Solution> solutions,
+                                                bool onlyUniqueCommonConflict);
+
+/// Determine whether all of the given solutions have fixes and every one of
+/// them is an element mismatch associated with the same collection literal.
+///
+/// This is the case when a literal is heterogeneous and each solution
+/// picks a different type for its elements e.g. `Set(["a", 0])`.
+static bool
+hasElementMismatchesInSameCollectionLiteral(ArrayRef<Solution> solutions) {
+  CollectionExpr *literal = nullptr;
+
+  for (const auto &solution : solutions) {
+    if (solution.Fixes.empty())
+      return false;
+
+    for (const auto *fix : solution.Fixes) {
+      if (fix->getKind() != FixKind::IgnoreCollectionElementContextualMismatch)
+        return false;
+
+      auto *collection = getAsExpr<CollectionExpr>(fix->getAnchor());
+      if (!collection || (literal && literal != collection))
+        return false;
+
+      literal = collection;
+    }
+  }
+
+  return literal != nullptr;
+}
+
 SolutionResult ConstraintSystem::salvage() {
   if (isDebugMode()) {
     llvm::errs() << "---Attempting to salvage and emit diagnostics---\n";
@@ -2116,6 +2148,21 @@ SolutionResult ConstraintSystem::salvage() {
 
     // FIXME: If we were able to actually fix things along the way,
     // we may have to hunt for the best solution. For now, we don't care.
+
+    // If every solution has element mismatches associated with the same
+    // collection literal, the problem is that the literal is heterogeneous
+    // e.g. `Set(["a", 0])`. Such ambiguities cannot be diagnosed through
+    // fixes or overload choices because they are different in each solution
+    // - the fixes are attached to a different element of the literal and
+    // `init(_:)` is `Set.init(_:)` in some solutions and
+    // `SetAlgebra.init(_:)` in others - but all of the solutions do disagree
+    // about the type inferred for a generic parameter they have in common,
+    // which is `Element` of `Set` in this example.
+    if (viable.size() > 1 &&
+        hasElementMismatchesInSameCollectionLiteral(viable) &&
+        diagnoseConflictingGenericArguments(*this, viable,
+                                            /*onlyUniqueCommonConflict=*/true))
+      return SolutionResult::forAmbiguous(viable);
 
     // Remove solutions that require fixes; the fixes in those systems should
     // be diagnosed rather than any ambiguity.
@@ -2290,12 +2337,17 @@ std::string swift::describeGenericType(ValueDecl *GP, bool includeName) {
 ///
 /// It's done by first retrieving all generic parameters from each solution,
 /// filtering bindings into a distinct set and diagnosing any differences.
+///
+/// \param onlyUniqueCommonConflict Consider only type variables that have been
+/// assigned a type by every solution and diagnose only if there is exactly one
+/// conflict among them. This has to be used when solutions disagree about
+/// their overload choices because type variables that represent generic
+/// parameters opened for a particular choice are not comparable across
+/// solutions, and multiple conflicts are much more likely to be a consequence
+/// of the choices rather than the problem itself.
 static bool diagnoseConflictingGenericArguments(ConstraintSystem &cs,
-                                                const SolutionDiff &diff,
-                                                ArrayRef<Solution> solutions) {
-  if (!diff.overloads.empty())
-    return false;
-
+                                                ArrayRef<Solution> solutions,
+                                                bool onlyUniqueCommonConflict) {
   bool noFixes = llvm::all_of(solutions, [](const Solution &solution) -> bool {
      const auto score = solution.getFixedScore();
      return score.Data[SK_Fix] == 0 && solution.Fixes.empty();
@@ -2356,14 +2408,17 @@ static bool diagnoseConflictingGenericArguments(ConstraintSystem &cs,
     auto GP = entry.second;
 
     swift::SmallSetVector<Type, 4> arguments;
+    bool boundByEverySolution = true;
     for (const auto &solution : solutions) {
       auto type = solution.typeBindings.lookup(typeVar);
       // Type variables gathered from a solution's type binding context may not
       // exist in another given solution because some solutions may have
       // additional type variables not present in other solutions due to taking
       // different paths in the solver.
-      if (!type)
+      if (!type) {
+        boundByEverySolution = false;
         continue;
+      }
 
       // Contextual opaque result type is uniquely identified by
       // declaration it's associated with, so we have to compare
@@ -2381,9 +2436,15 @@ static bool diagnoseConflictingGenericArguments(ConstraintSystem &cs,
       arguments.insert(type);
     }
 
+    if (onlyUniqueCommonConflict && !boundByEverySolution)
+      continue;
+
     if (arguments.size() > 1)
       conflicts[GP].append(arguments.begin(), arguments.end());
   }
+
+  if (onlyUniqueCommonConflict && conflicts.size() != 1)
+    return false;
 
   auto getGenericTypeDecl = [&](ArchetypeType *archetype) -> ValueDecl * {
     auto type = archetype->getInterfaceType();
@@ -2986,7 +3047,9 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
 
   SolutionDiff solutionDiff(solutions);
 
-  if (diagnoseConflictingGenericArguments(*this, solutionDiff, solutions))
+  if (solutionDiff.overloads.empty() &&
+      diagnoseConflictingGenericArguments(*this, solutions,
+                                          /*onlyUniqueCommonConflict=*/false))
     return true;
 
   if (auto bestScore = solverState->BestScore) {
