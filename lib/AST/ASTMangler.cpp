@@ -4311,8 +4311,8 @@ CanType ASTMangler::getDeclTypeForMangling(
         isa<SubscriptDecl>(decl)) {
       // FIXME: Verify ExtInfo state is correct, not working by accident.
       CanFunctionType::ExtInfo info;
-      return CanFunctionType::get({AnyFunctionType::Param(C.TheErrorType)}, {},
-                                  C.TheErrorType, info);
+      return CanFunctionType::get({AnyFunctionType::Param(C.TheErrorType)},
+                                  /* yields */ {}, C.TheErrorType, info);
     }
     return C.TheErrorType;
   }

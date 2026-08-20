@@ -457,7 +457,7 @@ class LifetimeDependenceChecker {
   // represent the function result.
   const unsigned resultIndex;
 
-  // The result type of the function being checked in its generic
+  // The result or yield type of the function being checked in its generic
   // environment.
   Type resultTy;
 

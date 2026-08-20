@@ -6993,21 +6993,21 @@ getTransposeOriginalFunctionType(AnyFunctionType *transposeFnType,
   // TODO: These does not handle yields properly
   if (isCurried) {
     assert(selfType && "`Self` type should be resolved");
-    originalType = makeFunctionType(originalParams, {}, originalResult,
-                                    transposeFnType->isThrowing(),
-                                    transposeFnType->getThrownError(),
-                                    /*genericSignature=*/nullptr);
     originalType = makeFunctionType(
-        AnyFunctionType::Param(selfType), {}, originalType,
+        originalParams, /* yields */ {}, originalResult,
+        transposeFnType->isThrowing(), transposeFnType->getThrownError(),
+        /*genericSignature=*/nullptr);
+    originalType = makeFunctionType(
+        AnyFunctionType::Param(selfType), /* yields */ {}, originalType,
         /*throws=*/false, Type(), transposeFnType->getOptGenericSignature());
   }
   // Otherwise, the original function type is simply:
   // `(<original parameters>) -> <original result>`.
   else {
-    originalType = makeFunctionType(originalParams, {}, originalResult,
-                                    transposeFnType->isThrowing(),
-                                    transposeFnType->getThrownError(),
-                                    transposeFnType->getOptGenericSignature());
+    originalType = makeFunctionType(
+        originalParams, /* yields */ {}, originalResult,
+        transposeFnType->isThrowing(), transposeFnType->getThrownError(),
+        transposeFnType->getOptGenericSignature());
   }
   return originalType;
 }

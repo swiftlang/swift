@@ -3800,7 +3800,7 @@ public:
                             ArgumentList *argList);
 
   /// Given two arrays of yields determine if they are equal in their
-  /// canonicalized form. Yype sugar is *not* taken into account.
+  /// canonicalized form. Type sugar is *not* taken into account.
   static bool equalYields(ArrayRef<Yield> a, ArrayRef<Yield> b);
 
   Type getResult() const { return Output; }
@@ -4104,10 +4104,6 @@ BEGIN_CAN_TYPE_WRAPPER(AnyFunctionType, Type)
   using CanParamArrayRef = AnyFunctionType::CanParamArrayRef;
   using CanYieldArrayRef = AnyFunctionType::CanYieldArrayRef;
 
-  /*  static CanAnyFunctionType get(CanGenericSignature signature,
-                                  CanParamArrayRef params, CanType result,
-                                  std::optional<ExtInfo> info = std::nullopt);
-  */
   static CanAnyFunctionType get(CanGenericSignature signature,
                                 CanParamArrayRef params,
                                 CanYieldArrayRef yields, CanType result,

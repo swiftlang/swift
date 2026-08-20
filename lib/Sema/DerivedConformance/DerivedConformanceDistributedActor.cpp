@@ -586,8 +586,8 @@ deriveBodyDistributedActor_unownedExecutor(AbstractFunctionDecl *getter, void *)
   DeclRefExpr *isLocalActorExpr = new (ctx) DeclRefExpr(
       ConcreteDeclRef(isLocalActorDecl), DeclNameLoc(), /*implicit=*/true,
       AccessSemantics::Ordinary,
-      FunctionType::get({AnyFunctionType::Param(ctx.getAnyObjectType())}, {},
-                        ctx.getBoolType()));
+      FunctionType::get({AnyFunctionType::Param(ctx.getAnyObjectType())},
+                        /* yields */ {}, ctx.getBoolType()));
   Expr *selfForIsLocalArg = DerivedConformance::createSelfDeclRef(getter);
   selfForIsLocalArg->setType(selfType);
 
