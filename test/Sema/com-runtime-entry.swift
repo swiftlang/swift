@@ -2,14 +2,17 @@
 // RUN: %empty-directory(%t/invalid)
 // RUN: %empty-directory(%t/ambiguous)
 // RUN: %empty-directory(%t/aggregated)
+// RUN: %empty-directory(%t/missing-defaults)
 // RUN: %target-swift-frontend -enable-experimental-com-interop -com-interop-model=corefoundation -module-name COM -emit-module-path %t/valid/COM.swiftmodule %S/Inputs/com-runtime-entry.swift
 // RUN: %target-swift-frontend -enable-experimental-com-interop -com-interop-model=corefoundation -module-name COM -emit-module-path %t/invalid/COM.swiftmodule -D INVALID_QUERY_INTERFACE -D MISSING_RELEASE %S/Inputs/com-runtime-entry.swift
 // RUN: %target-swift-frontend -enable-experimental-com-interop -com-interop-model=corefoundation -module-name COM -emit-module-path %t/ambiguous/COM.swiftmodule -D AMBIGUOUS_QUERY_INTERFACE %S/Inputs/com-runtime-entry.swift
 // RUN: %target-swift-frontend -enable-experimental-com-interop -com-interop-model=microsoft -module-name COM -emit-module-path %t/aggregated/COM.swiftmodule %S/Inputs/com-runtime-entry.swift
+// RUN: %target-swift-frontend -enable-experimental-com-interop -com-interop-model=corefoundation -module-name COM -emit-module-path %t/missing-defaults/COM.swiftmodule -D MISSING_ISWIFTOBJECT_DEFAULTS %S/Inputs/com-runtime-entry.swift
 // RUN: %target-swift-frontend -enable-experimental-com-interop -com-interop-model=corefoundation -I %t/valid -typecheck %s
 // RUN: not %target-swift-frontend -enable-experimental-com-interop -com-interop-model=corefoundation -I %t/invalid -typecheck %s 2>&1 | %FileCheck %s --check-prefix=INVALID
 // RUN: not %target-swift-frontend -enable-experimental-com-interop -com-interop-model=corefoundation -I %t/ambiguous -typecheck %s 2>&1 | %FileCheck %s --check-prefix=AMBIGUOUS
 // RUN: not %target-swift-frontend -enable-experimental-com-interop -com-interop-model=microsoft -I %t/aggregated -D AGGREGATED -typecheck %s 2>&1 | %FileCheck %s --check-prefix=AGGREGATED
+// RUN: not %target-swift-frontend -enable-experimental-com-interop -com-interop-model=corefoundation -I %t/missing-defaults -typecheck %s 2>&1 | %FileCheck %s --check-prefix=MISSING-DEFAULTS
 
 import COM
 
@@ -45,3 +48,4 @@ final class OtherWidget: IWidget { }
 // AGGREGATED-COUNT-1: error: function 'AggregatedQueryInterface' not found in the 'COM' module
 // AGGREGATED-COUNT-1: error: function 'AggregatedAddRef' not found in the 'COM' module
 // AGGREGATED-COUNT-1: error: function 'AggregatedRelease' not found in the 'COM' module
+// MISSING-DEFAULTS: error: type 'Widget' does not conform to protocol 'ISwiftObject'

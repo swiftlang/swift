@@ -629,7 +629,7 @@ com::deriveImplicitConformance(NominalTypeDecl *NTD, KnownProtocolKind KP) {
       context.getNormalConformance(NTD->getDeclaredInterfaceType(), protocol,
                                    NTD->getLoc(), /*inheritedTypeRepr=*/nullptr,
                                    /*conformanceDC=*/NTD,
-                                   ProtocolConformanceState::Complete,
+                                   ProtocolConformanceState::Incomplete,
                                    ProtocolConformanceOptions());
   conformance->setSourceKindAndImplyingConformance(ConformanceEntryKind::Synthesized,
                                                    nullptr);
