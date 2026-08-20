@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2020-2021 Apple Inc. and the Swift project authors
+// Copyright (c) 2020-2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -110,6 +110,9 @@ fileprivate struct Disconnected<Value: ~Copyable>: ~Copyable, @unchecked Sendabl
 ///   - `call`: Only the `TerminationHandler` is invoked.
 ///   - `none`: No action is taken.
 ///
+/// Termination Behavior:
+/// To-Do: Provide a comprehensive explanation of the ‘two-stage’ termination process.
+///
 /// Behavior:
 /// The state machine is single-consumer–based. However, instead of crashing on concurrent iteration,
 /// the consumer that “loses” the race to `next()` is enqueued in a **FIFO queue** and **eventually resumed**.
@@ -171,11 +174,13 @@ internal final class _AsyncStreamStorage<
 
       struct Draining: ~Copyable {
         var buffer: Buffer
+        var finalized: Bool
         var failure: Failure?
         var terminationHandler: TerminationHandler?
       }
 
       struct Terminated: ~Copyable {
+        var finalized: Bool
         var failure: Failure?
         var terminationHandler: TerminationHandler? // TODO: Remove this in a follow-up PR
       }
@@ -220,7 +225,6 @@ internal final class _AsyncStreamStorage<
       @unsafe
       struct CallAndResume: ~Copyable {
         var consumers: Consumers
-        let failure: Failure?
         let terminationHandler: TerminationHandler?
       }
 
@@ -444,6 +448,7 @@ extension _AsyncStreamStorage.StateMachine {
         let element = draining.buffer.popFirst()
       else {
         unsafe self = .init(state: .terminated(.init(
+          finalized: true,
           terminationHandler: draining.terminationHandler.take()
         )))
 
@@ -464,6 +469,7 @@ extension _AsyncStreamStorage.StateMachine {
 
       if draining.buffer.isEmpty {
         unsafe self = .init(state: .terminated(.init(
+          finalized: true,
           failure: draining.failure,
           terminationHandler: draining.terminationHandler.take()
         )))
@@ -481,7 +487,9 @@ extension _AsyncStreamStorage.StateMachine {
       }
 
     case .terminated(let terminated):
-      unsafe self = .init(state: .terminated(.init()))
+      unsafe self = .init(state: .terminated(.init(
+        finalized: true
+      )))
 
       switch terminated.failure {
       case .some(let failure):
@@ -499,11 +507,17 @@ extension _AsyncStreamStorage.StateMachine {
     }
   }
 
-  mutating func terminate(_ failure: consuming Failure?) -> TerminateAction {
+  mutating func terminate(
+    _ finalized: Bool,
+    _ failure: consuming Failure?
+  ) -> TerminateAction {
     switch unsafe consume self.state {
     case .idle(var idle):
       if idle.buffer.isEmpty {
-        unsafe self = .init(state: .terminated(.init(failure: failure)))
+        unsafe self = .init(state: .terminated(.init(
+          finalized: finalized,
+          failure: failure
+        )))
         return unsafe .call(
           terminationHandler: idle.terminationHandler.take()
         )
@@ -511,6 +525,7 @@ extension _AsyncStreamStorage.StateMachine {
       } else {
         unsafe self = .init(state: .draining(.init(
           buffer: idle.buffer,
+          finalized: finalized,
           failure: failure,
         )))
         return unsafe .call(
@@ -519,20 +534,67 @@ extension _AsyncStreamStorage.StateMachine {
       }
 
     case .waiting(var waiting):
-      unsafe self = .init(state: .terminated(.init()))
+      unsafe self = .init(state: .terminated(.init(
+        finalized: finalized,
+        failure: failure,
+      )))
       return unsafe .callAndResume(.init(
         consumers: waiting.consumers,
-        failure: failure,
         terminationHandler: waiting.terminationHandler.take(),
       ))
 
-    case .draining(let draining):
+    case .draining(var draining):
+      if !draining.finalized {
+        draining.failure = failure
+        draining.finalized = true
+      }
       unsafe self = .init(state: .draining(draining))
       return unsafe .none
 
-    case .terminated(let terminated):
+    case .terminated(var terminated):
+      if !terminated.finalized {
+        terminated.failure = failure
+        terminated.finalized = true
+      }
       unsafe self = .init(state: .terminated(terminated))
       return unsafe .none
+    }
+  }
+
+  mutating func finalize() {
+    switch unsafe consume self.state {
+    case .idle:
+      fatalError("Unexpected state; called in a non-terminal state")
+
+    case .waiting:
+      fatalError("Unexpected state; called in a non-terminal state")
+
+    case .draining(var draining):
+      draining.finalized = true
+      unsafe self = .init(state: .draining(draining))
+
+    case .terminated(var terminated):
+      terminated.finalized = true
+      unsafe self = .init(state: .terminated(terminated))
+    }
+  }
+
+  mutating func finalizeWithFailure() -> Failure? {
+    switch unsafe consume self.state {
+    case .idle:
+      fatalError("Unexpected state; called in a non-terminal state")
+
+    case .waiting:
+      fatalError("Unexpected state; called in a non-terminal state")
+
+    case .draining:
+      fatalError("Unexpected state; called in a non-terminal state")
+
+    case .terminated(var terminated):
+      terminated.finalized = true
+      let failure = terminated.failure.take()
+      unsafe self = .init(state: .terminated(terminated))
+      return failure
     }
   }
 }
@@ -598,25 +660,32 @@ extension _AsyncStreamStorage {
   }
 
   func terminate(_ terminationReason: Continuation.Termination) {
+    let finalized: Bool
     let failure: Failure?
 
     switch terminationReason {
     case .finished(let withFailure):
+      finalized = true
       failure = withFailure
 
     case .cancelled:
+      finalized = false
       failure = nil
     }
 
     let action = withLock { state in
-      return unsafe state.terminate(failure)
+      return unsafe state.terminate(finalized, failure)
     }
 
     switch unsafe consume action {
     case .callAndResume(var callAndResume):
       unsafe callAndResume.terminationHandler?.invoke(terminationReason)
 
-      if let failure = unsafe callAndResume.failure {
+      let failure = withLock { state in
+        return state.finalizeWithFailure()
+      }
+
+      if let failure {
         let consumer = unsafe callAndResume.consumers.removeFirst()
         unsafe consumer.resume(returning: .failure(failure))
       }
@@ -627,6 +696,10 @@ extension _AsyncStreamStorage {
 
     case .call(let terminationHandler):
       terminationHandler?.invoke(terminationReason)
+
+      withLock { state in
+        state.finalize()
+      }
 
     case .none:
       return
