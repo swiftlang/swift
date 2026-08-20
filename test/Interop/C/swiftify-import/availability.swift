@@ -12,8 +12,6 @@
 // RUN: %} %else %{\
 // RUN:   %diff %t/other-expansions.expected %t/expansions.out \
 // RUN: %}
-// XFAIL: OS=xros
-// rdar://183989115
 
 //--- test.h
 #pragma once
