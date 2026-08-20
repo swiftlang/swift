@@ -49,6 +49,7 @@
 #include "swift/Sema/Subtyping.h"
 #include "swift/Sema/TypeVariableType.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/Compiler.h"
 
@@ -3784,6 +3785,41 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
 
       if (recordFix(fix))
         return SolutionKind::Error;
+    }
+  }
+
+  // For now be very conservative in matching yields.
+  // TODO: Could be relaxed and more fixits be added
+  if (func1->isCoroutine()) {
+    if (!func2->isCoroutine())
+      return SolutionKind::Error;
+
+    auto func1Yields = func1->getYields();
+    auto func2Yields = func2->getYields();
+
+    // Do not allow extra / dropped yields. Can reconsider
+    // this later with potential placeholders.
+    if (func1Yields.size() != func2Yields.size())
+      return SolutionKind::Error;
+
+    auto yieldsLocator =
+        locator.withPathElement(ConstraintLocator::FunctionYield);
+
+    for (auto i : indices(func1Yields)) {
+      auto yield1 = func1Yields[i];
+      auto yield2 = func2Yields[i];
+
+      // Do not allow change of ownership (e.g. inout vs non-inout)
+      if (yield1.getFlags() != yield2.getFlags())
+        return SolutionKind::Error;
+
+      auto result = matchTypes(
+          yield1.getType(), yield2.getType(), subKind, subflags,
+          func1Yields.size() == 1
+              ? yieldsLocator
+              : yieldsLocator.withPathElement(LocatorPathElt::TupleElement(i)));
+      if (result == SolutionKind::Error)
+        return result;
     }
   }
 
