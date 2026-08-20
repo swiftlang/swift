@@ -4379,9 +4379,9 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
       if (auto willSet = storage->getParsedAccessor(AccessorKind::WillSet)) {
         willSet->diagnose(diag::observing_accessor_conflicts_with_accessor, 0,
                           getAccessorNameForDiagnostic(
-                              firstNonObserver->getAccessorKind(),
+                              firstNonObserver,
                               /*article=*/true,
-                              /*underscored=*/hasCoroutineAccessorFeature));
+                              /*legacy=*/hasCoroutineAccessorFeature));
         willSet->setInvalid();
         hasWillSet = false;
       }
@@ -4389,9 +4389,9 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
       if (auto didSet = storage->getParsedAccessor(AccessorKind::DidSet)) {
         didSet->diagnose(diag::observing_accessor_conflicts_with_accessor, 1,
                          getAccessorNameForDiagnostic(
-                             firstNonObserver->getAccessorKind(),
+                             firstNonObserver,
                              /*article=*/true,
-                             /*underscored=*/hasCoroutineAccessorFeature));
+                             /*legacy=*/hasCoroutineAccessorFeature));
         didSet->setInvalid();
         hasDidSet = false;
       }
