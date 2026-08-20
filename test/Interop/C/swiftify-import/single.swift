@@ -131,20 +131,12 @@ void method(struct T * _Null_unspecified __single p __noescape, int * _Null_unsp
 // }}
 int * __counted_by(2) _Null_unspecified lifetimebound(int * _Null_unspecified __single p __lifetimebound);
 
-// expected-experimental-expansion@+13:106{{
-//   expected-experimental-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-//   expected-experimental-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_disfavoredOverload public func lifetimeboundConst(_ p: Ref<CInt>?) -> Span<CInt> {|}}
-//   expected-experimental-remark@3{{macro content: |    let _resultValue: UnsafePointer<CInt>? = unsafe _swiftifyWithOptionalPointer(p?.value, { _pPtr in|}}
-//   expected-experimental-remark@4{{macro content: |            unsafe lifetimeboundConst(_pPtr)|}}
-//   expected-experimental-remark@5{{macro content: |        })|}}
-//   expected-experimental-remark@6{{macro content: |    if unsafe _resultValue == nil {|}}
-//   expected-experimental-remark@7{{macro content: |      precondition(CInt(2) == 0, "counted_by may only be null if count is 0 (unlike counted_by_or_null)")|}}
-//   expected-experimental-remark@8{{macro content: |      return Span<CInt>()|}}
-//   expected-experimental-remark@9{{macro content: |    }|}}
-//   expected-experimental-remark@10{{macro content: |    return unsafe _swiftifyOverrideLifetime(Span<CInt>(_unsafeStart: _resultValue!, count: Int(CInt(2))), copying: ())|}}
-//   expected-experimental-remark@11{{macro content: |}|}}
-// }}
 const int * __counted_by(2) _Null_unspecified lifetimeboundConst(const int * _Null_unspecified __single p __lifetimebound);
+
+struct Big {
+  int arr[4];
+};
+const int * __counted_by(4) _Null_unspecified lifetimeboundConstBig(const struct Big * _Null_unspecified __single p __lifetimebound);
 
 // expected-experimental-expansion@+24:60{{
 //   expected-experimental-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
@@ -179,7 +171,7 @@ module Test {
 
 //--- test.swift
 // GENERATED-BY: %target-swift-ide-test -print-module -module-to-print=Test -plugin-path %swift-plugin-dir -I %t -source-filename=x -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature Lifetimes > %t/Test-interface.swift && %swift-function-caller-generator Test %t/Test-interface.swift
-// GENERATED-HASH: 62994ebc9bab241291c9c7b4be587b8fbea5d9880a47e5505585ae13058e4d98
+// GENERATED-HASH: 7be4a677ab495efa3b0f7ac1ca324a02518c3cd8ca97a133119c1d70de86fc2a
 import Test
 
 func call_lifetimeless(_ p: UnsafeMutablePointer<CInt>!) -> UnsafeMutablePointer<CInt>! {
@@ -300,10 +292,6 @@ func call_lifetimeboundConst(_ p: UnsafePointer<CInt>!) -> UnsafePointer<CInt>! 
   return unsafe lifetimeboundConst(p)
 }
 
-@available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
-@_lifetime(copy p)
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_lifetimeboundConst(_ p: Ref<CInt>?) -> Span<CInt> {
-  // expected-stable-error@+2{{cannot convert value of type 'Ref<CInt>?' (aka 'Optional<Ref<Int32>>') to expected argument type 'UnsafePointer<CInt>?' (aka 'Optional<UnsafePointer<Int32>>')}}
-  // expected-stable-error@+1{{cannot convert return expression of type 'UnsafePointer<CInt>?' (aka 'Optional<UnsafePointer<Int32>>') to return type 'Span<CInt>' (aka 'Span<Int32>')}}
-  return lifetimeboundConst(p)
+func call_lifetimeboundConstBig(_ p: UnsafePointer<Big>!) -> UnsafePointer<CInt>! {
+  return unsafe lifetimeboundConstBig(p)
 }

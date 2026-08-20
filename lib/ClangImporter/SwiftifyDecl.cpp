@@ -407,16 +407,38 @@ struct SwiftifyInfoFunctionPrinter : public SwiftifyInfoPrinter {
     return true;
   }
 
-  bool printSingle(Type swiftType, ssize_t pointerIndex) {
-    Type pointerType = swiftType->lookThroughSingleOptionalType();
-    if (pointerType->isOpaquePointer() || pointerType->isUnsafeRawPointer() ||
-        pointerType->isUnsafeMutableRawPointer())
-      return false;
+  enum Validity {
+    Ignore,
+    InvalidIfLifetimebound,
+    Valid
+  };
+
+  Validity printSingle(Type swiftType, ssize_t pointerIndex) {
+    Type nonnullType = swiftType->lookThroughSingleOptionalType();
+    PointerTypeKind PTK;
+    Type pointeeTy = nonnullType->getAnyPointerElementType(PTK);
+    if (pointeeTy.isNull())
+      return Ignore;
+    if (PTK != PTK_UnsafePointer && PTK != PTK_UnsafeMutablePointer)
+      return Ignore;
+
     printSeparator();
     out << ".single(pointer: ";
     printParamOrReturn(pointerIndex);
     out << ")";
-    return true;
+
+    // An immutable pointer maps to Ref, and the generated wrapper reaches the
+    // pointee through _swiftifyWithOptionalPointer, which passes the callee a
+    // pointer to a temporary copy rather than to the original storage. That is
+    // fine while the callee only reads through the pointer, but a lifetimebound
+    // parameter may hand back a result that points into it, which would dangle
+    // as soon as the copy dies.
+    //
+    // MutableRef stores the address it was formed from, so the mutable case
+    // does not have this problem.
+    if (PTK == PTK_UnsafePointer)
+      return InvalidIfLifetimebound;
+    return Valid;
   }
 
   void printNonEscaping(int idx) {
@@ -805,16 +827,18 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
         DLOG("Found bounds info '" << clangParamTy << "'\n");
         attachMacro = paramHasBoundsInfo = true;
       }
-      bool paramIsSingle = false;
+      SwiftifyInfoFunctionPrinter::Validity singleStatus =
+          SwiftifyInfoFunctionPrinter::Ignore;
       if (!CAT && clangParamTy->isSinglePointerType() &&
           !clangParamTy->getAs<clang::ValueTerminatedType>() &&
           mappedIndex != SwiftifyInfoPrinter::SELF_PARAM_INDEX) {
-        paramIsSingle = printer.printSingle(swiftParamTy, mappedIndex);
+        singleStatus = printer.printSingle(swiftParamTy, mappedIndex);
       }
       bool paramIsStdSpan =
           printer.registerStdSpanTypeMapping(swiftParamTy, clangParamTy);
       paramHasBoundsInfo |= paramIsStdSpan;
-      paramHasBoundsInfo |= paramIsSingle;
+      paramHasBoundsInfo |=
+          singleStatus != SwiftifyInfoFunctionPrinter::Ignore;
 
       bool paramHasLifetimeInfo = false;
       if (clangParam->template hasAttr<clang::NoEscapeAttr>()) {
@@ -848,6 +872,10 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
           DLOG("lifetimebound not yet supported by stable feature-set - skipping\n");
           return false;
         }
+        if (singleStatus == SwiftifyInfoFunctionPrinter::InvalidIfLifetimebound) {
+          DLOG("can't map lifetimebound pointer to Ref of borrow with no internal pointer\n");
+          return false;
+        }
       }
       if (UnaliasedInstantiationVisitor::checkTemplates(
               clangParamTy, paramHasLifetimeInfo, paramIsStdSpan)) {
@@ -857,7 +885,8 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
         DLOG("Found both std::span and lifetime info\n");
         attachMacro = true;
       }
-      if (paramIsSingle && paramHasLifetimeInfo) {
+      if (singleStatus != SwiftifyInfoFunctionPrinter::Ignore &&
+          paramHasLifetimeInfo) {
         DLOG("Found both __single and lifetime info\n");
         attachMacro = true;
       }
