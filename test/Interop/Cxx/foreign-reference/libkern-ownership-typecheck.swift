@@ -3,9 +3,10 @@
 import LibkernOwnership
 
 let service = Service.withID(3)
-_ = service.getProvider() 
-// expected-warning@-1 {{cannot infer ownership of foreign reference value returned by 'getProvider()'}}
+_ = service.getProvider() // no warning expected
 
 _ = service.copyService() // no warning expected
+
+_ = OSIterator.getIterator() // no warning expected
 
 let _ = NastyService.toRetainOrNotToRetain()

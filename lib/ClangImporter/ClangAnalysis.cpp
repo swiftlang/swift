@@ -612,6 +612,10 @@ static void diagnoseMissingReturnsRetained(ClangImporter::Implementation &Impl,
           info.getDecl(), {{"returned_as_unretained_by_default", true}}))
     return;
 
+  // If this is a subclass of libkern's OSObject, rely on libkern's ownership rules.
+  if (importer::getLibkernOwnershipOfReturnedFRT(clangFunc))
+    return;
+
   // If we reached here, then we have a call to an unannotated, Clang-imported
   // function that returns a pointer to a shared reference type that doesn't
   // have a default return ownership convention. Emit diagnostics.
