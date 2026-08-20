@@ -2370,6 +2370,20 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts, ArgList &Args,
     Opts.EnableClangSPI = false;
   }
 
+  if (auto *A = Args.getLastArg(OPT_enable_objc_msgsend_selector_stubs,
+                                OPT_disable_objc_msgsend_selector_stubs))
+    Opts.ForceObjCMsgSendSelectorStubs =
+        A->getOption().matches(OPT_enable_objc_msgsend_selector_stubs);
+  else
+    Opts.ForceObjCMsgSendSelectorStubs = std::nullopt;
+
+  if (auto *A = Args.getLastArg(OPT_enable_objc_msgsend_class_selector_stubs,
+                                OPT_disable_objc_msgsend_class_selector_stubs))
+    Opts.ForceObjCMsgSendClassSelectorStubs =
+        A->getOption().matches(OPT_enable_objc_msgsend_class_selector_stubs);
+  else
+    Opts.ForceObjCMsgSendClassSelectorStubs = std::nullopt;
+
   Opts.DirectClangCC1ModuleBuild |= Args.hasArg(OPT_direct_clang_cc1_module_build);
 
   if (const Arg *A = Args.getLastArg(OPT_pch_output_dir)) {
