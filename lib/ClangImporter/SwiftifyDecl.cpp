@@ -44,6 +44,7 @@
 #include "clang/Sema/Overload.h"
 #include "llvm-c/Types.h"
 #include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/Support/Casting.h"
 #include <optional>
 
 using namespace swift;
@@ -494,15 +495,47 @@ struct UnaliasedInstantiationVisitor
     return false;
   }
 
+  bool VisitRecordType(const clang::RecordType *RT) {
+    if (isa_and_nonnull<clang::ClassTemplateSpecializationDecl>(
+            RT->getDecl())) {
+      hasUnaliasedInstantiation = true;
+      DLOG("Signature contains raw template, skipping\n");
+      return false;
+    }
+    return true;
+  }
+
   static bool checkTemplates(clang::QualType clangType, bool hasLifetime,
                              bool isStdSpan) {
     if (hasLifetime && isStdSpan) {
       // std::span is transformed to Swift Span, so the std::span template
       // instantiation won't show up in the macro expansion's signature. The
       // element type still needs to be checked.
-      const auto *TST = clangType->getAs<clang::TemplateSpecializationType>();
-      ASSERT(TST && "std::span is not specialized?");
-      clangType = TST->template_arguments()[0].getAsType();
+      auto getTemplateArg = [](clang::QualType Ty) {
+        const auto *STTPT = Ty->getAs<clang::SubstTemplateTypeParmType>();
+        if (!STTPT)
+          return clang::QualType();
+        const auto *RT =
+            dyn_cast<clang::RecordType>(STTPT->getReplacementType());
+        if (!RT)
+          return clang::QualType();
+        const auto *CD =
+            dyn_cast<clang::ClassTemplateSpecializationDecl>(RT->getDecl());
+        if (!CD)
+          return clang::QualType();
+        auto Args = CD->getTemplateArgs().asArray();
+        return Args[0].getAsType();
+      };
+      if (const auto *TST =
+              clangType->getAs<clang::TemplateSpecializationType>())
+        clangType = TST->template_arguments()[0].getAsType();
+      else if (clang::QualType ArgTy = getTemplateArg(clangType);
+               !ArgTy.isNull()) {
+        clangType = ArgTy;
+      } else {
+        assert(0 && "unknown std::span representation");
+        return true;
+      }
     }
     UnaliasedInstantiationVisitor checker;
     checker.TraverseType(clangType);
