@@ -1,9 +1,15 @@
 // Property-wrapper-backed storage gets a synthesized write coroutine.  Under
-// CoroutineAccessors that coroutine is `yielding mutate` (yield_once_2); the
-// legacy `_modify` (yield_once) is only emitted additively for storage that
+// CoroutineAccessors that coroutine is `yielding mutate` (mangled `vx`); the
+// legacy `_modify` (mangled `vM`) is only emitted additively for storage that
 // needs a stable ABI, so a read-modify-write must not be lowered through
 // `_modify` in general.  Naming it unconditionally used to crash SILGen, which
 // dereferenced the absent accessor while computing the base access kind.
+//
+// The checks below discriminate the two accessors by mangled suffix rather than
+// by lowered convention: whether a yielding accessor lowers to `@yield_once` or
+// `@yield_once_2` is a platform-dependent default, and in a resilient build
+// without the callee-allocated coro ABI *both* accessors lower to `@yield_once`.
+// See coroutine_accessors_yielding_synthesis.swift for that ABI matrix.
 
 // RUN: %target-swift-emit-silgen %s                          \
 // RUN:     -enable-experimental-feature CoroutineAccessors   \
@@ -25,11 +31,16 @@
 // RUN:     -module-name m                                    \
 // RUN:   | %FileCheck %s --check-prefix=NO-OLD-ABI
 
+// The RESILIENT prefix carries the platform-independent checks; the additive
+// legacy `_modify` is emitted for public resilient storage only on an ABI-stable
+// platform, so that check rides along under a second prefix.  On other platforms
+// OLD-ABI-unstable simply goes unused, which is allowed because the invocation's
+// other prefix still contributes directives.
 // RUN: %target-swift-emit-silgen %s                          \
 // RUN:     -enable-experimental-feature CoroutineAccessors   \
 // RUN:     -enable-library-evolution                         \
 // RUN:     -module-name m                                    \
-// RUN:   | %FileCheck %s --check-prefixes=RESILIENT,RESILIENT-%target-abi-stability
+// RUN:   | %FileCheck %s --check-prefixes=RESILIENT,OLD-ABI-%target-abi-stability
 
 // Internal storage has no ABI to keep stable, so it gets no legacy accessor even
 // under library evolution (separate invocation for the lone CHECK-NOT).
@@ -69,30 +80,25 @@ public func modifyResilient(_ r: inout Resilient) {
 }
 
 // The wrapper's synthesized write coroutine is `yielding mutate`.
-// FRAGILE-DAG: sil{{.*}} @$s1m7FragileV5valueSivx : $@yield_once_2
-// FRAGILE-DAG: sil{{.*}} @$s1m9ResilientV5valueSivx : $@yield_once_2
+// FRAGILE-DAG: sil{{.*}} @$s1m7FragileV5valueSivx :
+// FRAGILE-DAG: sil{{.*}} @$s1m9ResilientV5valueSivx :
 
-// A read-modify-write of the wrapped property goes through that coroutine.
+// A read-modify-write of the wrapped property goes through that coroutine.  The
+// yielded-result arity varies with the lowered convention, so only the callee is
+// pinned here.
 // CALLSITE-LABEL: sil hidden [ossa] @$s1m13modifyFragileyyAA0B0VzF :
-// CALLSITE:         [[MUTATE:%.*]] = function_ref @$s1m7FragileV5valueSivx : $@yield_once_2
-// CALLSITE:         ({{%.*}}, {{%.*}}, {{%.*}}) = begin_apply [[MUTATE]]
+// CALLSITE:         [[MUTATE:%.*]] = function_ref @$s1m7FragileV5valueSivx :
+// CALLSITE:         begin_apply [[MUTATE]]
 
-// Non-resilient: no legacy yield_once accessor for either property.
+// Non-resilient: no legacy accessor for either property.
 // NO-OLD-ABI-NOT: @$s1m7FragileV5valueSivM
 // NO-OLD-ABI-NOT: @$s1m9ResilientV5valueSivM
 
 // Resilient: the new coroutine is still the written one for both properties.
-// RESILIENT-DAG: sil{{.*}} @$s1m7FragileV5valueSivx : $@yield_once_2
-// RESILIENT-DAG: sil{{.*}} @$s1m9ResilientV5valueSivx : $@yield_once_2
+// RESILIENT-DAG: sil{{.*}} @$s1m7FragileV5valueSivx :
+// RESILIENT-DAG: sil{{.*}} @$s1m9ResilientV5valueSivx :
 
-// The legacy `_modify` is emitted additively for the public property, but only
-// on an ABI-stable platform.
-// RESILIENT-stable-DAG: sil{{.*}} @$s1m9ResilientV5valueSivM : $@yield_once @convention
+// Additive legacy `_modify`, ABI-stable platforms only.
+// OLD-ABI-stable-DAG: sil{{.*}} @$s1m9ResilientV5valueSivM :
 
-// ...whereas internal storage never gets one.
 // NO-OLD-ABI-RESILIENT-NOT: @$s1m7FragileV5valueSivM
-
-// On a non-ABI-stable platform this invocation has nothing extra to verify;
-// give the "unstable" prefix a trivial match so FileCheck doesn't reject an
-// entirely-unmatched --check-prefix.
-// RESILIENT-unstable-DAG: sil{{.*}} @$s1m9ResilientV5valueSivx : $@yield_once_2
