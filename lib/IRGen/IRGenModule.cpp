@@ -1638,6 +1638,9 @@ void IRGenModule::constructInitialFnAttributes(
   if (FuncOptMode == OptimizationMode::ForSize) {
     Attrs.addAttribute(llvm::Attribute::OptimizeForSize);
     Attrs.addAttribute(llvm::Attribute::MinSize);
+  } else if (FuncOptMode == OptimizationMode::ForSpeed) {
+    Attrs.removeAttribute(llvm::Attribute::MinSize);
+    Attrs.addAttribute(llvm::Attribute::OptimizeForSize);
   } else {
     Attrs.removeAttribute(llvm::Attribute::MinSize);
     Attrs.removeAttribute(llvm::Attribute::OptimizeForSize);
