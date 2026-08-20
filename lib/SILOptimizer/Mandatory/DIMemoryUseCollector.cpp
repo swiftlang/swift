@@ -294,7 +294,7 @@ static void tryToResignIdentity(SILLocation loc, SILBuilder &B,
   if (var != nomDecl->getDistributedActorIDProperty())
     return;
 
-  emitResignIdentityCall(B, loc, cast<ClassDecl>(nomDecl),
+  emitResignIDCall(B, loc, cast<ClassDecl>(nomDecl),
                          actorInst, idRef);
 }
 
