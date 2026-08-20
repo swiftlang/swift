@@ -521,6 +521,18 @@ bool RequirementFailure::diagnoseAsError() {
 
   maybeEmitRequirementNote(reqDC->getAsDecl(), lhs, rhs);
 
+  // If this conformance couldn't be satisfied because a witness of a
+  // deserialized conformance referenced a module that was never loaded, tell
+  // the user which import restores it.
+  if (getRequirement().getKind() == RequirementKind::Conformance) {
+    if (auto *nominal = lhs->getAnyNominal()) {
+      for (auto moduleName :
+           getASTContext().getUnloadedModulesForConformingType(nominal))
+        emitDiagnostic(diag::missing_conformance_unloaded_module, lhs, rhs,
+                       moduleName);
+    }
+  }
+
   return true;
 }
 

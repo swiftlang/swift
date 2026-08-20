@@ -488,6 +488,12 @@ struct ASTContext::Implementation {
   llvm::DenseMap<NormalProtocolConformance *, ::DelayedConformanceDiags>
     DelayedConformanceDiags;
 
+  /// Modules that were never loaded while deserializing a conformance's
+  /// witnesses, keyed by the conforming nominal type. Used to add an
+  /// "add 'import <module>'" note to the later requirement-failure diagnostic.
+  llvm::DenseMap<const NominalTypeDecl *, llvm::SmallSetVector<Identifier, 2>>
+    UnloadedModulesForConformingType;
+
   /// Stores information about lazy deserialization of various declarations.
   llvm::DenseMap<const Decl *, LazyContextData *> LazyContexts;
 
@@ -928,6 +934,7 @@ void ASTContext::Implementation::dump(llvm::raw_ostream &os) const {
   SIZE_AND_BYTES(ForeignAsyncConventions);
   SIZE_AND_BYTES(AssociativityCache);
   SIZE_AND_BYTES(DelayedConformanceDiags);
+  SIZE_AND_BYTES(UnloadedModulesForConformingType);
   SIZE_AND_BYTES(LazyContexts);
   SIZE_AND_BYTES(ElementSignatures);
   SIZE_AND_BYTES(Overrides);
@@ -3494,6 +3501,19 @@ ASTContext::takeDelayedConformanceDiags(NormalProtocolConformance const* cnfrm){
     std::swap(result, diagnostics.Diags);
   }
   return result;
+}
+
+void ASTContext::recordUnloadedModuleForConformingType(
+    const NominalTypeDecl *nominal, Identifier moduleName) {
+  getImpl().UnloadedModulesForConformingType[nominal].insert(moduleName);
+}
+
+ArrayRef<Identifier> ASTContext::getUnloadedModulesForConformingType(
+    const NominalTypeDecl *nominal) const {
+  auto known = getImpl().UnloadedModulesForConformingType.find(nominal);
+  if (known == getImpl().UnloadedModulesForConformingType.end())
+    return {};
+  return known->second.getArrayRef();
 }
 
 size_t ASTContext::getTotalMemory() const {
