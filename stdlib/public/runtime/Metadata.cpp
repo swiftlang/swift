@@ -52,6 +52,9 @@
 #include <new>
 #include <unordered_set>
 #include <vector>
+#if defined(__APPLE__) && SWIFT_STDLIB_HAS_DARWIN_LIBMALLOC
+#include <malloc/malloc.h>
+#endif
 #if SWIFT_PTRAUTH
 #include <ptrauth.h>
 #endif
@@ -8477,6 +8480,31 @@ static void checkAllocatorDebugEnvironmentVariables(void *context) {
   _swift_debug_allocationPoolBackPointerOffset = PoolRange::PageSize - sizeof(PoolTrailer);
 }
 
+// Used to allocate new pages for the allocator, or for metadata allocations
+// larger than the pool allocation size.
+static void *allocateRawMetadataMemory(size_t size, size_t alignMask) {
+#ifdef MALLOC_ZONE_MALLOC_DEFAULT_ALIGN
+  // ObjC classes (and thus Swift classes) need to be allocated with the
+  // canonical tag, because the ObjC runtime uses the high bits of the isa field
+  // for other purposes. For now, force all Swift metadata to be allocated with
+  // the canonical tag. In the future, we should be able to refine this so that
+  // only classes use the canonical tag, and maybe only NSObject subclasses.
+  //
+  // Match the value of MALLOC_ZONE_MALLOC_OPTION_CANONICAL_TAG without
+  // referencing it, so we can build against SDKs that don't have it.
+  auto canonicalTag = (malloc_zone_malloc_options_t)(1u << 1);
+  size_t alignment = alignMask + 1;
+  if (alignment < sizeof(void *))
+    alignment = sizeof(void *);
+  size = roundUpToAlignment(size, alignment);
+
+  if (__builtin_available(macOS 26.0, iOS 26.0, tvOS 26.0, watchOS 26.0,
+                          visionOS 26.0, *))
+    return malloc_zone_malloc_with_options(NULL, alignment, size, canonicalTag);
+#endif
+  return swift_slowAlloc(size, alignMask);
+}
+
 void *MetadataAllocator::Allocate(size_t size, size_t alignment) {
   assert(Tag != 0);
   assert(alignment <= alignof(void*));
@@ -8487,7 +8515,7 @@ void *MetadataAllocator::Allocate(size_t size, size_t alignment) {
 
   // If the size is larger than the maximum, just do a normal heap allocation.
   if (size > PoolRange::MaxPoolAllocationSize) {
-    void *allocation = swift_slowAlloc(size, alignment - 1);
+    void *allocation = allocateRawMetadataMemory(size, alignment - 1);
     memsetScribble(allocation, size);
     return allocation;
   }
@@ -8510,8 +8538,8 @@ void *MetadataAllocator::Allocate(size_t size, size_t alignment) {
                            curState.Remaining - sizeWithHeader};
     } else {
       allocatedNewPage = true;
-      allocation = reinterpret_cast<char *>(swift_slowAlloc(PoolRange::PageSize,
-                                                            alignof(char) - 1));
+      allocation = reinterpret_cast<char *>(
+          allocateRawMetadataMemory(PoolRange::PageSize, alignof(char) - 1));
       memsetScribble(allocation, PoolRange::PageSize);
 
       auto poolSize = PoolRange::PageSize;
