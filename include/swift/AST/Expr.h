@@ -268,7 +268,7 @@ protected:
     Kind : 2
   );
 
-  SWIFT_INLINE_BITFIELD(ClosureExpr, AbstractClosureExpr, 1+1+1+1+1+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(ClosureExpr, AbstractClosureExpr, 1+1+1+1+1+1+1+1+1+1,
     /// True if closure parameters were synthesized from anonymous closure
     /// variables.
     HasAnonymousClosureVars : 1,
@@ -311,10 +311,7 @@ protected:
     /// parameter of a `nonisolated(nonsending)` call and doesn't leave isolation of
     /// the parent context. It's easier to work with statically known isolation than
     /// make closure dynamically isolated via assuming `nonisolated(nonsending)`.
-    BehavesLikeNonisolatedNonsending: 1,
-
-    /// This closure is a part of a CollectionUpcastConversionExpr
-    IsConversionClosure : 1
+    BehavesLikeNonisolatedNonsending: 1
   );
 
   SWIFT_INLINE_BITFIELD_FULL(BindOptionalExpr, Expr, 16,
@@ -3427,17 +3424,23 @@ public:
 /// elements have some type T to the same kind of collection whose
 /// elements have type U, where U is a subtype of T.
 class CollectionUpcastConversionExpr : public ImplicitConversionExpr {
-private:
-  ClosureExpr *KeyConversion;
-  ClosureExpr *ValueConversion;
+public:
+  struct ConversionPair {
+    OpaqueValueExpr *OrigValue;
+    Expr *Conversion;
 
+    explicit operator bool() const { return OrigValue != nullptr; }
+  };
+private:
+  ConversionPair KeyConversion;
+  ConversionPair ValueConversion;
 public:
   CollectionUpcastConversionExpr(Expr *subExpr, Type type,
-                                 ClosureExpr *keyConversion,
-                                 ClosureExpr *valueConversion)
-      : ImplicitConversionExpr(ExprKind::CollectionUpcastConversion, subExpr,
-                               type),
-        KeyConversion(keyConversion), ValueConversion(valueConversion) {
+                                 ConversionPair keyConversion,
+                                 ConversionPair valueConversion)
+    : ImplicitConversionExpr(
+        ExprKind::CollectionUpcastConversion, subExpr, type),
+      KeyConversion(keyConversion), ValueConversion(valueConversion) {
     assert((!KeyConversion || ValueConversion)
            && "key conversion without value conversion");
   }
@@ -3445,27 +3448,28 @@ public:
   /// Returns the expression that should be used to perform a
   /// conversion of the collection's values; null if the conversion
   /// is formally trivial because the key type does not change.
-  ClosureExpr *getKeyConversion() const { return KeyConversion; }
-  void setKeyConversion(ClosureExpr *pair) { KeyConversion = pair; }
+  const ConversionPair &getKeyConversion() const {
+    return KeyConversion;
+  }
+  void setKeyConversion(const ConversionPair &pair) {
+    KeyConversion = pair;
+  }
 
   /// Returns the expression that should be used to perform a
   /// conversion of the collection's values; null if the conversion
   /// is formally trivial because the value type does not change.
-  ClosureExpr *getValueConversion() const { return ValueConversion; }
-  void setValueConversion(ClosureExpr *pair) { ValueConversion = pair; }
+  const ConversionPair &getValueConversion() const {
+    return ValueConversion;
+  }
+  void setValueConversion(const ConversionPair &pair) {
+    ValueConversion = pair;
+  }
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::CollectionUpcastConversion;
   }
 };
-
-struct ConversionPair {
-  OpaqueValueExpr *OrigValue;
-  Expr *Conversion;
-
-  explicit operator bool() const { return OrigValue != nullptr; }
-};
-
+  
 /// ErasureExpr - Perform type erasure by converting a value to existential
 /// type. For example:
 ///
@@ -3486,11 +3490,11 @@ struct ConversionPair {
 ///
 /// "Appropriate kind" means e.g. a concrete/existential metatype if the
 /// result is an existential metatype.
-class ErasureExpr final
-    : public ImplicitConversionExpr,
-      private llvm::TrailingObjects<ErasureExpr, ProtocolConformanceRef,
-                                    ConversionPair> {
+class ErasureExpr final : public ImplicitConversionExpr,
+    private llvm::TrailingObjects<ErasureExpr, ProtocolConformanceRef,
+                                  CollectionUpcastConversionExpr::ConversionPair> {
   friend TrailingObjects;
+  using ConversionPair = CollectionUpcastConversionExpr::ConversionPair;
 
   ErasureExpr(Expr *subExpr, Type type,
               ArrayRef<ProtocolConformanceRef> conformances,
@@ -4332,7 +4336,6 @@ public:
     Bits.ClosureExpr.RequiresDynamicIsolationChecking = false;
     Bits.ClosureExpr.IsMacroArgument = false;
     Bits.ClosureExpr.BehavesLikeNonisolatedNonsending = false;
-    Bits.ClosureExpr.IsConversionClosure = false;
   }
 
   SourceRange getSourceRange() const;
@@ -4456,14 +4459,6 @@ public:
 
   void setBehavesLikeNonisolatedNonsending(bool value = true) {
     Bits.ClosureExpr.BehavesLikeNonisolatedNonsending = value;
-  }
-
-  bool isConversionClosure() const {
-    return Bits.ClosureExpr.IsConversionClosure;
-  }
-
-  void setIsConversionClosure(bool value = true) {
-    Bits.ClosureExpr.IsConversionClosure = value;
   }
 
   /// Determine whether this closure expression has an
