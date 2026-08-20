@@ -2742,7 +2742,11 @@ ClangImporter::getWrapperForModule(const clang::Module *mod,
 
 PlatformAvailability::PlatformAvailability(const LangOptions &langOpts)
     : platformKind(targetPlatform(langOpts)) {
-  switch (platformKind) {
+  // Without a platform there are no platform-specific cutoff messages.
+  if (!platformKind)
+    return;
+
+  switch (*platformKind) {
   case PlatformKind::iOS:
   case PlatformKind::iOSApplicationExtension:
   case PlatformKind::macCatalyst:
@@ -2799,9 +2803,6 @@ PlatformAvailability::PlatformAvailability(const LangOptions &langOpts)
   case PlatformKind::Android:
     deprecatedAsUnavailableMessage = "";
     break;
-
-  case PlatformKind::none:
-    break;
   }
 }
 
@@ -2829,9 +2830,9 @@ PlatformAvailability::platformKindIfRelevant(StringRef platformName) const {
           .Case("android", PlatformKind::Android)
           .Default(std::nullopt);
 
-  if (result) {
-    if (platformKind == *result ||
-        inheritsAvailabilityFromPlatform(platformKind, *result))
+  if (result && platformKind) {
+    if (*platformKind == *result ||
+        inheritsAvailabilityFromPlatform(*platformKind, *result))
       return result;
   }
 
@@ -2845,10 +2846,10 @@ bool PlatformAvailability::treatDeprecatedAsUnavailable(
   unsigned major = version.getMajor();
   std::optional<unsigned> minor = version.getMinor();
 
-  switch (platformKind) {
-  case PlatformKind::none:
+  if (!platformKind)
     llvm_unreachable("version but no platform?");
 
+  switch (*platformKind) {
   case PlatformKind::macOS:
   case PlatformKind::macOSApplicationExtension:
     // Anything deprecated by macOS 10.14 is unavailable for async import

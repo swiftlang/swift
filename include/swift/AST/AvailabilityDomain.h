@@ -103,6 +103,9 @@ private:
   /// domain can be encapsulated inline in this class.
   class InlineDomain {
     Kind kind;
+    /// The platform of a `Kind::Platform` domain. Every other kind stores a
+    /// placeholder that `getPlatform()` never hands out, since `kind`
+    /// discriminates whether this field is meaningful.
     PlatformKind platform;
 
   public:
@@ -114,8 +117,13 @@ private:
       PlatformShift = KindShift - sizeof(PlatformKind) * CHAR_BIT,
     };
 
-    InlineDomain(Kind kind, PlatformKind platform)
-        : kind(kind), platform(platform) {};
+    InlineDomain(Kind kind, std::optional<PlatformKind> platform)
+        : kind(kind),
+          // A placeholder is needed for the kinds that have no platform. Any
+          // valid enumerator will do, since `getPlatform()` gates on `kind`.
+          platform(platform.value_or(PlatformKind{})) {
+      DEBUG_ASSERT(platform.has_value() == (kind == Kind::Platform));
+    };
     InlineDomain(IntReprType value)
         : kind(static_cast<Kind>(value >> KindShift)),
           platform(static_cast<PlatformKind>(value >> PlatformShift)) {}
@@ -128,7 +136,13 @@ private:
     }
 
     Kind getKind() const { return kind; }
-    PlatformKind getPlatform() { return platform; }
+
+    std::optional<PlatformKind> getPlatform() const {
+      if (kind != Kind::Platform)
+        return std::nullopt;
+
+      return platform;
+    }
   };
 
   using InlineDomainPtr =
@@ -138,7 +152,7 @@ private:
   Storage storage;
 
   AvailabilityDomain(Kind kind)
-      : storage(InlineDomain(kind, PlatformKind::none).asInteger()) {
+      : storage(InlineDomain(kind, std::nullopt).asInteger()) {
     DEBUG_ASSERT(kind != Kind::Platform);
   };
 
@@ -173,8 +187,6 @@ public:
   }
 
   static AvailabilityDomain forPlatform(PlatformKind platformKind) {
-    bool isPlatform = platformKind != PlatformKind::none;
-    ASSERT(isPlatform);
     return AvailabilityDomain(platformKind);
   }
 
@@ -239,12 +251,13 @@ public:
 
   bool isCustom() const { return getKind() == Kind::Custom; }
 
-  /// Returns the platform kind for this domain if applicable.
-  PlatformKind getPlatformKind() const {
+  /// Returns the platform for this domain, or `nullopt` if this is not a
+  /// platform domain.
+  std::optional<PlatformKind> getPlatformKind() const {
     if (auto inlineDomain = getInlineDomain())
       return inlineDomain->getPlatform();
 
-    return PlatformKind::none;
+    return std::nullopt;
   }
 
   /// If the domain represents a user-defined domain, returns the metadata for

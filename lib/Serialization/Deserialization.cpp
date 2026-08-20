@@ -5848,7 +5848,7 @@ decodeDomainKind(uint8_t kind) {
 
 static AvailabilityDomain
 decodeNonCustomAvailabilityDomain(AvailabilityDomainKind domainKind,
-                                  PlatformKind platformKind) {
+                                  std::optional<PlatformKind> platformKind) {
   switch (domainKind) {
   case AvailabilityDomainKind::Universal:
     return AvailabilityDomain::forUniversal();
@@ -5861,7 +5861,7 @@ decodeNonCustomAvailabilityDomain(AvailabilityDomainKind domainKind,
   case AvailabilityDomainKind::Embedded:
     return AvailabilityDomain::forEmbedded();
   case AvailabilityDomainKind::Platform:
-    return AvailabilityDomain::forPlatform(platformKind);
+    return AvailabilityDomain::forPlatform(*platformKind);
   case AvailabilityDomainKind::Custom:
     llvm_unreachable("custom domains aren't handled here");
     return AvailabilityDomain::forUniversal();
@@ -5895,12 +5895,17 @@ DeclDeserializer::readAvailable_DECL_ATTR(SmallVectorImpl<uint64_t> &scratch,
   if (!maybeDomainKind)
     return llvm::make_error<InvalidEnumValueError>(rawDomainKind, "AvailabilityDomainKind");
 
-  auto maybePlatform = platformFromUnsigned(rawPlatform);
-  if (!maybePlatform.has_value())
-    return llvm::make_error<InvalidEnumValueError>(rawPlatform, "PlatformKind");
-
   AvailabilityDomainKind domainKind = *maybeDomainKind;
-  PlatformKind platform = *maybePlatform;
+
+  // The platform field is only meaningful for a platform domain; every other
+  // domain kind writes a placeholder.
+  std::optional<PlatformKind> platform;
+  if (domainKind == AvailabilityDomainKind::Platform) {
+    platform = platformFromUnsigned(rawPlatform);
+    if (!platform.has_value())
+      return llvm::make_error<InvalidEnumValueError>(rawPlatform,
+                                                     "PlatformKind");
+  }
   StringRef message = blobData.substr(0, messageSize);
   blobData = blobData.substr(messageSize);
   StringRef rename = blobData.substr(0, renameSize);
