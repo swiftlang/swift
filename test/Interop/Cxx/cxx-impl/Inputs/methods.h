@@ -69,6 +69,7 @@ struct Rejections {
 };
 
 struct Polymorphic {
+  // expected-note@+1{{declare a non-inline virtual method before 'virtualMethod' to make that method the key function instead}}
   virtual int virtualMethod() const;
   int nonVirtualMethod() const;
 };
@@ -95,6 +96,7 @@ __attribute__((swift_attr("release:releaseWidget"))) Widget {
   int id;
 
   int tag() const;
+  // expected-note@+1{{declare a non-inline virtual method before 'describe' to make that method the key function instead}}
   virtual int describe() const;
   static int count();
 };
