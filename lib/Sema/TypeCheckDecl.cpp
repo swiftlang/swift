@@ -2733,10 +2733,11 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
       // FIXME: Verify ExtInfo state is correct, not working by accident.
       auto selfInfo = selfInfoBuilder.build();
       if (sig) {
-        funcTy =
-            GenericFunctionType::get(sig, {selfParam}, {}, funcTy, selfInfo);
+        funcTy = GenericFunctionType::get(sig, {selfParam}, /* yields */ {},
+                                          funcTy, selfInfo);
       } else {
-        funcTy = FunctionType::get({selfParam}, {}, funcTy, selfInfo);
+        funcTy =
+            FunctionType::get({selfParam}, /* yields */ {}, funcTy, selfInfo);
       }
     }
 
@@ -2762,9 +2763,10 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
     // FIXME: Verify ExtInfo state is correct, not working by accident.
     auto info = infoBuilder.build();
     if (auto sig = SD->getGenericSignature()) {
-      funcTy = GenericFunctionType::get(sig, argTy, {}, elementTy, info);
+      funcTy = GenericFunctionType::get(sig, argTy, /* yields */ {}, elementTy,
+                                        info);
     } else {
-      funcTy = FunctionType::get(argTy, {}, elementTy, info);
+      funcTy = FunctionType::get(argTy, /* yields */ {}, elementTy, info);
     }
 
     return funcTy;
@@ -2787,7 +2789,7 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
 
       // FIXME: Verify ExtInfo state is correct, not working by accident.
       FunctionType::ExtInfo info;
-      resultTy = FunctionType::get(argTy, {}, resultTy, info);
+      resultTy = FunctionType::get(argTy, /* yields */ {}, resultTy, info);
     }
 
     auto lifetimeDependenceInfo = getLifetimeDependencies(Context, EED);
@@ -2799,8 +2801,8 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
         infoBuilder =
             infoBuilder.withLifetimeDependencies(*lifetimeDependenceInfo);
       }
-      resultTy = GenericFunctionType::get(genericSig, {selfTy}, {}, resultTy,
-                                          infoBuilder.build());
+      resultTy = GenericFunctionType::get(genericSig, {selfTy}, /* yields */ {},
+                                          resultTy, infoBuilder.build());
 
     } else {
       FunctionType::ExtInfoBuilder infoBuilder;
@@ -2808,7 +2810,8 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
         infoBuilder =
             infoBuilder.withLifetimeDependencies(*lifetimeDependenceInfo);
       }
-      resultTy = FunctionType::get({selfTy}, {}, resultTy, infoBuilder.build());
+      resultTy = FunctionType::get({selfTy}, /* yields */ {}, resultTy,
+                                   infoBuilder.build());
     }
 
     return resultTy;
@@ -2825,11 +2828,11 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
 
     if (auto genericSig = macro->getGenericSignature()) {
       GenericFunctionType::ExtInfo info;
-      return GenericFunctionType::get(genericSig, paramTypes, {}, resultType,
-                                      info);
+      return GenericFunctionType::get(genericSig, paramTypes, /* yields */ {},
+                                      resultType, info);
     } else {
       FunctionType::ExtInfo info;
-      return FunctionType::get(paramTypes, {}, resultType, info);
+      return FunctionType::get(paramTypes, /* yields */ {}, resultType, info);
     }
   }
   }

@@ -610,7 +610,7 @@ struct FunctionTypeSynthesizer {
 template <class ExtInfoS, class ResultS, class ParamsS>
 FunctionTypeSynthesizer<ExtInfoS, ResultS, ParamsS, YieldListSynthesizer<>>
 _function(ExtInfoS extInfo, ResultS result, ParamsS params) {
-  return {extInfo, result, params, {}};
+  return {extInfo, result, params, /* yields */ {}};
 }
 template <class ExtInfoS, class ResultS, class ParamsS, class YieldsS>
 FunctionTypeSynthesizer<ExtInfoS, ResultS, ParamsS, YieldsS>

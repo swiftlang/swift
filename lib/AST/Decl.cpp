@@ -12702,10 +12702,11 @@ Type ConstructorDecl::getInitializerInterfaceType() {
 
   Type initFuncTy;
   if (auto sig = getGenericSignature()) {
-    initFuncTy =
-        GenericFunctionType::get(sig, {initSelfParam}, {}, funcTy, info);
+    initFuncTy = GenericFunctionType::get(sig, {initSelfParam}, /* yields */ {},
+                                          funcTy, info);
   } else {
-    initFuncTy = FunctionType::get({initSelfParam}, {}, funcTy, info);
+    initFuncTy =
+        FunctionType::get({initSelfParam}, /* yields */ {}, funcTy, info);
   }
   InitializerInterfaceType = initFuncTy;
 

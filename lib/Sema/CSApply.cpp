@@ -1214,8 +1214,8 @@ namespace {
       // to update the type of the called expression with respect to whether
       // it's 'self'-curried.
       auto *const newCalleeFnTy =
-          FunctionType::get(newCalleeParams, {}, calleeFnTy->getResult(),
-                            calleeFnTy->getExtInfo());
+          FunctionType::get(newCalleeParams, /* yields */ {},
+                            calleeFnTy->getResult(), calleeFnTy->getExtInfo());
 
       // If given, apply the base expression to the curried 'self'
       // parameter first.
@@ -2585,8 +2585,8 @@ namespace {
           flags = flags.withInOut(true);
 
         auto selfParam = AnyFunctionType::Param(selfTy, Identifier(), flags);
-        return FunctionType::get({selfParam}, {}, resultTy->getResult(),
-                                 resultTy->getExtInfo());
+        return FunctionType::get({selfParam}, /* yields */ {},
+                                 resultTy->getResult(), resultTy->getExtInfo());
       };
 
       auto *resultTySelf = getOpenedInitializerType(
@@ -5339,8 +5339,9 @@ namespace {
       //     return "{ [$kp$ = \(E)] in $0[keyPath: $kp$] }"
 
       FunctionType::ExtInfo closureInfo;
-      auto closureTy = FunctionType::get({FunctionType::Param(baseTy)}, {},
-                                         kpResultTy, closureInfo);
+      auto closureTy =
+          FunctionType::get({FunctionType::Param(baseTy)},
+                            /* yields */ {}, kpResultTy, closureInfo);
       auto closure = new (ctx)
           AutoClosureExpr(/*set body later*/nullptr, kpResultTy, dc);
 
@@ -8447,7 +8448,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
           bodyArgFnTy->withExtInfo(bodyArgFnTy->getExtInfo().withNoEscape(false)));
         bodyFnTy = cast<FunctionType>(
             FunctionType::get(bodyFnTy->getParams()[0].withType(bodyArgFnTy),
-                              {}, bodyFnTy->getResult())
+                              /* yields */ {}, bodyFnTy->getResult())
                 ->withExtInfo(bodyFnTy->getExtInfo().withNoEscape()));
         body = coerceToType(body, bodyFnTy, locator);
         assert(body && "can't make nonescaping?!");

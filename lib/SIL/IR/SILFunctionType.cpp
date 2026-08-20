@@ -5478,8 +5478,8 @@ TypeConverter::getLoweredFormalTypes(SILDeclRef constant,
   auto inner = CanFunctionType::get(llvm::ArrayRef(bridgedParams),
                                     llvm::ArrayRef(bridgedYields),
                                     bridgedResultType, innerExtInfo);
-  auto curried =
-      CanAnyFunctionType::get(genericSig, {selfParam}, {}, inner, extInfo);
+  auto curried = CanAnyFunctionType::get(genericSig, {selfParam},
+                                         /* yields */ {}, inner, extInfo);
 
   // Replace the type in the abstraction pattern with the curried type.
   bridgingFnPattern.rewriteType(genericSig, curried);

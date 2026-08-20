@@ -733,10 +733,11 @@ Type TypeBase::addCurriedSelfType(const DeclContext *dc) {
   // FIXME: Verify ExtInfo state is correct, not working by accident.
   if (sig) {
     GenericFunctionType::ExtInfo info;
-    return GenericFunctionType::get(sig, {selfParam}, {}, type, info);
+    return GenericFunctionType::get(sig, {selfParam}, /* yields */ {}, type,
+                                    info);
   }
   FunctionType::ExtInfo info;
-  return FunctionType::get({selfParam}, {}, type, info);
+  return FunctionType::get({selfParam}, /* yields */ {}, type, info);
 }
 
 void TypeBase::getTypeVariables(
@@ -5423,8 +5424,8 @@ AnyFunctionType::getAutoDiffDerivativeFunctionLinearMapType(
 
     // FIXME: Verify ExtInfo state is correct, not working by accident.
     FunctionType::ExtInfo info;
-    linearMapType =
-        FunctionType::get(differentialParams, {}, differentialResult, info);
+    linearMapType = FunctionType::get(differentialParams, /* yields */ {},
+                                      differentialResult, info);
     break;
   }
   case AutoDiffLinearMapKind::Pullback: {
@@ -5487,7 +5488,8 @@ AnyFunctionType::getAutoDiffDerivativeFunctionLinearMapType(
     }
     // FIXME: Verify ExtInfo state is correct, not working by accident.
     FunctionType::ExtInfo info;
-    linearMapType = FunctionType::get(pullbackParams, {}, pullbackResult, info);
+    linearMapType = FunctionType::get(pullbackParams, /* yields */ {},
+                                      pullbackResult, info);
     break;
   }
   }

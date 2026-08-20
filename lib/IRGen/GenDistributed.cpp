@@ -400,7 +400,7 @@ static CanSILFunctionType getAccessorType(IRGenModule &IGM) {
   }
 
   auto accessorTy = GenericFunctionType::get(
-      signature, parameters, {}, Context.TheEmptyTupleType,
+      signature, parameters, /* yields */ {}, Context.TheEmptyTupleType,
       ASTExtInfoBuilder()
           .withRepresentation(FunctionTypeRepresentation::Thin)
           .withAsync()
