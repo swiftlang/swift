@@ -899,6 +899,10 @@ def create_argument_parser():
            help='build WasmKit')
     option(['--install-wasmkit'], toggle_true('install_wasmkit'),
            help='install SourceKitLSP')
+    option('--wasi-libc-component-tools-path', store_path,
+           help='path to a directory containing the component-embedding tool '
+                'and the component link driver (e.g. a locally built WasmKit '
+                'bin directory) used to build the wasip2/p3 wasi-libc sysroot')
 
     # Emscripten options
 
