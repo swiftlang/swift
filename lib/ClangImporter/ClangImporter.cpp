@@ -7017,12 +7017,20 @@ findFunctionInterfaceAndImplementation(AbstractFunctionDecl *func) {
     return dyn_cast<AbstractFunctionDecl>(result);
   };
 
+  auto *clangLoader = func->getASTContext().getClangModuleLoader();
   for (ValueDecl *result : results) {
     AbstractFunctionDecl *resultFunc = asFunc(result);
     if (!resultFunc)
       continue;
 
-    if (resultFunc->getCDeclName() != clangName)
+    // A virtual method of a foreign reference type is imported as a
+    // synthesized `__synthesizedVirtualCall_` dynamic-dispatch thunk; it is
+    // known by the name of the virtual method it forwards to.
+    const ValueDecl *named = resultFunc;
+    if (auto *thunk = dyn_cast<FuncDecl>(resultFunc))
+      if (auto *original = clangLoader->getOriginalForVirtualThunk(thunk))
+        named = original;
+    if (named->getCDeclName() != clangName)
       continue;
 
     if (resultFunc->hasClangNode())

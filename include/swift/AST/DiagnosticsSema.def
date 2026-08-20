@@ -2261,10 +2261,26 @@ ERROR(cxx_func_defined,none,
       "%kind0 cannot implement C++ function '%1' because it "
       "%select{already has a definition|is declared 'inline'|is 'constexpr' (implicitly 'inline')}2",
       (ValueDecl *, StringRef, unsigned))
-ERROR(cxx_virtual_unsupported,none,
-      "%kind0 cannot implement C++ function '%1' because virtual methods are "
-      "not yet supported",
+ERROR(cxx_pure_virtual_unsupported,none,
+      "%kind0 cannot implement C++ function '%1' because it is a pure virtual "
+      "method; a pure virtual method's vtable slot dispatches to an overriding "
+      "method, never to a definition of '%1' itself",
       (ValueDecl *, StringRef))
+ERROR(cxx_virtual_key_function_unsupported,none,
+      "%kind0 cannot implement C++ function '%1' because it is its class's "
+      "key function, and Swift cannot yet emit the class's vtable, which C++ "
+      "emits in the translation unit that defines the key function; declare "
+      "another out-of-line virtual method earlier in the class to make that "
+      "method the key function",
+      (ValueDecl *, StringRef))
+ERROR(cxx_virtual_override_unsupported,none,
+      "%kind0 cannot implement C++ function '%1' because it overrides a "
+      "virtual method %select{in a class hierarchy that uses multiple "
+      "inheritance|in a class hierarchy that has a virtual base|and changes "
+      "its return type}2, so its vtable entries may need adjusting thunks, "
+      "which C++ emits only in the translation unit that defines the method; "
+      "this is not yet supported",
+      (ValueDecl *, StringRef, unsigned))
 ERROR(cxx_mutating_mismatch,none,
       "%kind0 should%select{|| not}1 be 'mutating' to match "
       "%select{non-'const' ||'const' }1%kindonly2 declared by the header",

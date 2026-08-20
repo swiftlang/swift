@@ -3339,6 +3339,76 @@ fixDeclarationStaticSpelling(InFlightDiagnostic &diag, ValueDecl *VD,
   llvm_unreachable("unknown StaticSpellingKind");
 }
 
+/// The Itanium C++ ABI's key function for \p RD: its first out-of-line,
+/// non-pure virtual method, whose translation unit emits the class's vtable.
+static const clang::CXXMethodDecl *
+computeItaniumKeyFunction(const clang::CXXRecordDecl *RD) {
+  RD = RD->getDefinition();
+  if (!RD || !RD->isPolymorphic() || !RD->isExternallyVisible())
+    return nullptr;
+
+  // Template instantiations have no key function (Itanium C++ ABI 5.2.6).
+  switch (RD->getTemplateSpecializationKind()) {
+  case clang::TSK_ImplicitInstantiation:
+  case clang::TSK_ExplicitInstantiationDeclaration:
+  case clang::TSK_ExplicitInstantiationDefinition:
+    return nullptr;
+  case clang::TSK_Undeclared:
+  case clang::TSK_ExplicitSpecialization:
+    break;
+  }
+
+  for (const clang::CXXMethodDecl *MD : RD->methods()) {
+    if (!MD->isVirtual() || MD->isPureVirtual() || MD->isImplicit() ||
+        !MD->isUserProvided())
+      continue;
+    if (MD->isInlineSpecified() || MD->isConstexpr() || MD->hasInlineBody())
+      continue;
+    return MD;
+  }
+  return nullptr;
+}
+
+/// Whether implementing the overriding \p method could require an adjusting
+/// thunk, which C++ emits only in the translation unit that defines the
+/// method's body. Overriding along a chain of single, non-virtual inheritance
+/// with an unchanged return type cannot. Multiple inheritance, virtual bases,
+/// and changed (covariant) return types are rejected conservatively, whether
+/// or not the adjustment would turn out to be nonzero.
+///
+/// Returns the %select index for the cxx_virtual_override_unsupported
+/// diagnostic, or none for an override that cannot need thunks.
+static std::optional<unsigned>
+cxxOverrideUnsupportedReason(const clang::CXXMethodDecl *method) {
+  if (method->size_overridden_methods() == 0)
+    return std::nullopt;
+
+  // Multiple inheritance or a virtual base anywhere in the base graph can
+  // place an overridden method's subobject at a nonzero offset.
+  const clang::CXXRecordDecl *RD = method->getParent()->getDefinition();
+  while (RD && RD->getNumBases() != 0) {
+    if (RD->getNumBases() > 1)
+      return 0;
+    const clang::CXXBaseSpecifier &base = *RD->bases_begin();
+    if (base.isVirtual())
+      return 1;
+    const auto *baseRD = base.getType()->getAsCXXRecordDecl();
+    RD = baseRD ? baseRD->getDefinition() : nullptr;
+  }
+
+  // A changed return type needs a return-adjusting thunk in the changed slots.
+  auto &clangCtx = method->getASTContext();
+  const clang::CXXMethodDecl *overridden = method;
+  while (overridden->size_overridden_methods() != 0) {
+    overridden = *overridden->begin_overridden_methods();
+    if (!clangCtx.hasSameType(overridden->getReturnType(),
+                              method->getReturnType()))
+      return 2;
+  }
+
+  return std::nullopt;
+}
+
 namespace {
 class ObjCImplementationChecker {
   Decl *decl;
@@ -3744,6 +3814,13 @@ private:
   }
 
   static ObjCSelector getObjCName(ValueDecl *VD) {
+    // A virtual method of a foreign reference type is imported as a
+    // synthesized `__synthesizedVirtualCall_` dynamic-dispatch thunk; it is
+    // known by the name of the virtual method it forwards to.
+    if (auto *thunk = dyn_cast<FuncDecl>(VD))
+      if (auto *original = VD->getASTContext().getClangModuleLoader()
+                               ->getOriginalForVirtualThunk(thunk))
+        VD = original;
     if (!VD->getCDeclName().empty()) {
       auto ident = VD->getASTContext().getIdentifier(VD->getCDeclName());
       return ObjCSelector(VD->getASTContext(), 0, { ident });
@@ -4224,8 +4301,17 @@ private:
     if (!cand->getAttrs().hasAttribute<CxxDeclAttr>())
       return false;
 
+    // A virtual method of a foreign reference type matches the importer's
+    // synthesized `__synthesizedVirtualCall_` thunk. Every check below is
+    // about the underlying virtual method the implementation will provide the
+    // body of.
+    const Decl *interface = req;
+    if (auto *thunk = dyn_cast<FuncDecl>(req))
+      if (auto *original = req->getASTContext().getClangModuleLoader()
+                               ->getOriginalForVirtualThunk(thunk))
+        interface = original;
     const auto *clangFD =
-        dyn_cast_or_null<clang::FunctionDecl>(req->getClangDecl());
+        dyn_cast_or_null<clang::FunctionDecl>(interface->getClangDecl());
     if (!clangFD)
       return false;
 
@@ -4248,10 +4334,34 @@ private:
     }
 
     if (const auto *method = dyn_cast<clang::CXXMethodDecl>(clangFD)) {
-      // TODO: Not supported yet.
       if (method->isVirtual()) {
-        diagnose(cand, diag::cxx_virtual_unsupported, cand, clangFD->getName());
-        return true;
+        if (method->isPureVirtual()) {
+          diagnose(cand, diag::cxx_pure_virtual_unsupported, cand,
+                   clangFD->getName());
+          return true;
+        }
+
+        // C++ emits the vtable in the TU that defines the class's key
+        // function.
+        // TODO: Add support for emitting vtable from Swift.
+        const auto *keyFunction =
+            computeItaniumKeyFunction(method->getParent());
+        if (keyFunction &&
+            keyFunction->getCanonicalDecl() == method->getCanonicalDecl()) {
+          diagnose(cand, diag::cxx_virtual_key_function_unsupported, cand,
+                   clangFD->getName());
+          return true;
+        }
+
+        // An overriding method's vtable entries can need this/return-
+        // adjusting thunks, which C++ emits only alongside the method's
+        // body. Ban the overrides where an entry could need one.
+        // TODO: Add support for emitting the thunks.
+        if (auto reason = cxxOverrideUnsupportedReason(method)) {
+          diagnose(cand, diag::cxx_virtual_override_unsupported, cand,
+                   clangFD->getName(), *reason);
+          return true;
+        }
       }
 
       // The importer maps a const method to a non-mutating Swift method and a

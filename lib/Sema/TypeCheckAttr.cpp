@@ -1764,31 +1764,6 @@ static SourceRange getArgListRange(ASTContext &Ctx, DeclAttribute *attr) {
   return SourceRange();
 }
 
-/// Whether \p D is a `@cxx` instance method of an imported C++ foreign
-/// reference type whose C++ name is that of a virtual method of the type.
-static bool isCxxForeignReferenceVirtualMethod(const Decl *D) {
-  if (!D->getAttrs().hasAttribute<CxxDeclAttr>(/*AllowInvalid=*/true))
-    return false;
-  const auto *FD = dyn_cast<FuncDecl>(D);
-  if (!FD || FD->isStatic())
-    return false;
-  const auto *classDecl = FD->getDeclContext()->getSelfClassDecl();
-  if (!classDecl || !classDecl->isForeignReferenceType())
-    return false;
-  const auto *record =
-      dyn_cast_or_null<clang::CXXRecordDecl>(classDecl->getClangDecl());
-  if (!record)
-    return false;
-
-  auto &clangIdents = record->getASTContext().Idents;
-  clang::DeclarationName clangName(&clangIdents.get(FD->getCDeclName()));
-  for (const auto *member : record->lookup(clangName))
-    if (const auto *method = dyn_cast<clang::CXXMethodDecl>(member))
-      if (method->isVirtual())
-        return true;
-  return false;
-}
-
 void AttributeChecker::
 visitObjCImplementationAttr(ObjCImplementationAttr *attr) {
   // If `D` is ABI-only, let ABIDeclChecker diagnose the bad attribute.
@@ -1940,18 +1915,11 @@ visitObjCImplementationAttr(ObjCImplementationAttr *attr) {
       }
 
       if (interfaces.empty()) {
-        // TODO: Virtual methods of foreign reference types are not supported
-        // yet. They have no candidate to match, so tell them apart from a
-        // function that is genuinely not found.
-        if (isCxxForeignReferenceVirtualMethod(AFD)) {
-          diagnose(AFD, diag::cxx_virtual_unsupported, AFD, AFD->getCDeclName());
-        } else {
-          StringRef name = AFD->getCDeclName();
-          if (name.empty())
-            name = AFD->getNameStr();
-          diagnose(attr->getLocation(),
-                   diag::attr_objc_implementation_func_not_found, name, AFD);
-        }
+        StringRef name = AFD->getCDeclName();
+        if (name.empty())
+          name = AFD->getNameStr();
+        diagnose(attr->getLocation(),
+                 diag::attr_objc_implementation_func_not_found, name, AFD);
       } else {
         // Several imported overloads have the same signature in Swift, so the
         // function could implement any of them.

@@ -4482,9 +4482,16 @@ static const clang::CXXMethodDecl *
 getImplementedCXXMethod(const ValueDecl *decl) {
   if (!decl->getAttrs().hasAttribute<CxxDeclAttr>())
     return nullptr;
-  const auto *interface = decl->getImplementedObjCDecl();
+  const Decl *interface = decl->getImplementedObjCDecl();
   if (!interface)
     return nullptr;
+  // A virtual method of a foreign reference type matches the importer's
+  // `__synthesizedVirtualCall_` dispatch thunk; lower the implementation
+  // against the underlying virtual method it provides the body of.
+  if (const auto *thunk = dyn_cast<FuncDecl>(interface))
+    if (const auto *original = decl->getASTContext().getClangModuleLoader()
+                                   ->getOriginalForVirtualThunk(thunk))
+      interface = original;
   return dyn_cast_or_null<clang::CXXMethodDecl>(interface->getClangDecl());
 }
 

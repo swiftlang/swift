@@ -27,3 +27,8 @@ module Overloads {
   header "overloads.h"
   requires cplusplus
 }
+
+module Virtual {
+  header "virtual.h"
+  requires cplusplus
+}

@@ -18,6 +18,7 @@
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/DistributedDecl.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/Basic/Assertions.h"
@@ -384,9 +385,22 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
   if (constant.hasDecl()) {
     auto decl = constant.getDecl();
 
-    if (constant.isForeign && decl->hasClangNode() &&
-        !decl->getObjCImplementationDecl())
-      F->setClangNodeOwner(decl);
+    if (constant.isForeign && decl->hasClangNode()) {
+      // Clang must not emit a body for a declaration whose Swift
+      // `@implementation` defines its symbol -- except the importer's dispatch
+      // thunk for a foreign reference type's virtual method, whose
+      // implementation defines the underlying method's symbol, not the
+      // thunk's.
+      bool clangProvidesBody = !decl->getObjCImplementationDecl();
+      if (!clangProvidesBody)
+        if (auto *thunk = dyn_cast<FuncDecl>(decl)) {
+          auto *loader = decl->getASTContext().getClangModuleLoader();
+          clangProvidesBody =
+              loader->getOriginalForVirtualThunk(thunk) != nullptr;
+        }
+      if (clangProvidesBody)
+        F->setClangNodeOwner(decl);
+    }
 
     if (auto availability = constant.getAvailabilityForLinkage())
       F->setAvailabilityForLinkage(*availability);
