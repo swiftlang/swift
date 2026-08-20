@@ -3683,7 +3683,7 @@ namespace {
       case OverloadChoiceKind::ExtractFunctionIsolation: {
         auto isolationType = solution.getResolvedType(expr);
         auto *extractExpr = new (ctx)
-          ExtractFunctionIsolationExpr(base,
+          ExtractFunctionIsolationExpr(cs.coerceToRValue(base),
                                        expr->getEndLoc(),
                                        isolationType);
         return cs.cacheType(extractExpr);
