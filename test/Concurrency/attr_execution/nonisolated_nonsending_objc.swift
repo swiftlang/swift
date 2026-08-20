@@ -44,4 +44,24 @@ class Test: NSObject {
   // CHECK: } // end sil function '$s27nonisolated_nonsending_objc4TestC12testImplicityyySSYbcYaFyyYacfU_To'
   @objc func testImplicit(_: @Sendable @escaping (String) -> Void) async {
   }
+
+  // The implicit isolation parameter shifts the native parameter list, so
+  // parameter conventions have to be looked up at the shifted index too.
+  // `Any` is address-only, so consulting the isolation parameter's (direct)
+  // convention instead would attempt to load the bridged argument.
+
+  // CHECK: // Test.testIndirect(_:)
+  // CHECK-NEXT: // Isolation: nonisolated(nonsending)
+  // CHECK-LABEL: sil hidden [ossa] @$s27nonisolated_nonsending_objc4TestC12testIndirectyyypYaF : $@convention(method) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed Any, @guaranteed Test) -> ()
+
+  // @objc closure #1 in Test.testIndirect(_:)
+  // CHECK-LABEL: sil shared [thunk] [ossa] @$s27nonisolated_nonsending_objc4TestC12testIndirectyyypYaFyyYacfU_To : $@convention(thin) @Sendable @async (AnyObject, @convention(block) () -> (), Test) -> () {
+  // CHECK: [[ACTOR:%.*]] = enum $Optional<any Actor>, #Optional.none!enumelt
+  // CHECK: [[BUILTIN_ACTOR:%.*]] = unchecked_value_cast [[ACTOR]] to $Builtin.ImplicitActor
+  // CHECK: [[ARG:%.*]] = alloc_stack $Any
+  // CHECK: [[TEST_INDIRECT_REF:%.*]] = function_ref @$s27nonisolated_nonsending_objc4TestC12testIndirectyyypYaF : $@convention(method) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed Any, @guaranteed Test) -> ()
+  // CHECK-NEXT: apply [[TEST_INDIRECT_REF]]([[BUILTIN_ACTOR]], [[ARG]], {{.*}}) : $@convention(method) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed Any, @guaranteed Test) -> ()
+  // CHECK: } // end sil function '$s27nonisolated_nonsending_objc4TestC12testIndirectyyypYaFyyYacfU_To'
+  @objc nonisolated(nonsending) func testIndirect(_: Any) async {
+  }
 }
