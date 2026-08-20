@@ -1345,5 +1345,8 @@ Added: _$sSs9UTF16ViewV13_copyContents12initializings16IndexingIteratorVyABG_Sit
 Removed: _$ss35_SwiftCreateBridgedString_DoNotCall5bytes6length8encodings9UnmanagedVyyXlGSPys5UInt8VG_Sis6UInt32VtF
 Added: _$ss35_SwiftCreateBridgedString_DoNotCall5bytes6length8encodings9UnmanagedVyyXlGSgSPys5UInt8VG_Sis6UInt32VtF
 
+// Distributed runtime: query key-argument count for the target's generic env
+Added: _swift_distributed_getGenericEnvironmentKeyArgumentCount
+
 // Task Registry
 Added: _concurrencyEnableTaskRegistry
