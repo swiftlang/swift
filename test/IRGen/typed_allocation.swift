@@ -1,5 +1,6 @@
 // RUN: %target-swift-emit-ir %s -parse-stdlib -enable-experimental-feature Embedded -enable-experimental-feature TypedAllocation -target arm64-apple-macos99.99 -wmo | %FileCheck %s
 // RUN: %target-swift-emit-ir %s -parse-stdlib -enable-experimental-feature Embedded -enable-experimental-feature TypedAllocation -target arm64-apple-macos99.99 -wmo | %FileCheck %s --check-prefix=UNSAFEMUTABLEPOINTERALLOC
+// RUN: %target-swift-emit-ir %s -parse-stdlib -enable-experimental-feature Embedded -enable-experimental-feature TypedAllocation -target arm64-apple-macos99.99 -wmo | %FileCheck %s --check-prefix=ERRORBOX
 
 // REQUIRES: OS=macosx
 // REQUIRES: SWIFT_STDLIB_ARCH=arm64
@@ -310,3 +311,30 @@ public func reassignDifferentType() -> any Existential {
 // CHECK:   store i64 [[NEW_DESCRIPTOR2]], ptr [[NEW_DESCRIPTOR_SLOT2]]
 // CHECK: dest-outline-cont:
 // CHECK:   call void @swift_releaseBoxTyped(ptr [[OLD_DEST_REF2]], i64 [[OLD_DESCRIPTOR2]])
+
+
+// --- Boxed Error existential cases (typed allocErrorBoxTyped / deallocErrorBoxTyped) ---
+
+public struct SimpleError: Error {}
+
+// emitBoxedExistentialContainerAllocation (swift_allocError).
+@inline(never)
+public func makeError() -> any Error {
+  return SimpleError()
+}
+
+// ARC release path (_errorBoxDestroyImpl).
+@inline(never)
+public func dropError() {
+  _ = makeError()
+}
+
+// ERRORBOX-DAG: define {{.*}} @swift_allocError(ptr %0, ptr %1, ptr %2, i1 %3)
+// ERRORBOX-DAG:   call noalias ptr @swift_allocObjectTyped(ptr @_swift_embedded_error_metadata_storage, i64 {{.*}}, i64 {{.*}}, i64 [[ERRORBOX_HEADER_TYPEID:[0-9]+]])
+
+// ERRORBOX-DAG: define {{.*}} @_swift_embedded_error_destroy_impl(ptr %0)
+// ERRORBOX-DAG:   call void @swift_deallocObjectTyped(ptr %0, i64 {{.*}}, i64 {{.*}}, i64 [[ERRORBOX_HEADER_TYPEID]])
+
+// emitBoxedExistentialContainerDeallocation (swift_deallocError).
+// ERRORBOX-DAG: define {{.*}} @swift_deallocError(ptr %0, ptr %1)
+// ERRORBOX-DAG:   call void @swift_deallocObjectTyped(ptr %0, i64 {{.*}}, i64 {{.*}}, i64 [[ERRORBOX_HEADER_TYPEID]])

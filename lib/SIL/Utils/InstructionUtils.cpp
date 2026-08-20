@@ -1102,9 +1102,11 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
       return RuntimeEffect::Casting;
     case BuiltinValueKind::AllocRaw:
     case BuiltinValueKind::AllocRawTyped:
+    case BuiltinValueKind::AllocErrorBoxTyped:
       return RuntimeEffect::Allocating;
     case BuiltinValueKind::DeallocRaw:
     case BuiltinValueKind::DeallocRawTyped:
+    case BuiltinValueKind::DeallocErrorBoxTyped:
       return RuntimeEffect::Deallocating;
     case BuiltinValueKind::Fence:
     case BuiltinValueKind::CmpXChg:
