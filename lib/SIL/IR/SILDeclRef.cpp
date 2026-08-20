@@ -1374,7 +1374,7 @@ static void mangleClangDeclViaImporter(raw_ostream &buffer,
   importer->getMangledName(buffer, clangDecl);
 }
 
-static std::string mangleClangDecl(Decl *decl, bool isForeign) {
+static std::string mangleClangDecl(const Decl *decl, bool isForeign) {
   auto clangDecl = decl->getClangDecl();
 
   if (auto namedClangDecl = dyn_cast<clang::DeclaratorDecl>(clangDecl)) {
@@ -1571,8 +1571,18 @@ std::optional<std::string> SILDeclRef::getAsmName() const {
     // If there is a Clang declaration, use its mangled name.
     if (isNativeToForeignThunk() || isForeign) {
       auto decl = getDecl();
-      auto hasClangDecl = decl->getClangDecl()
-          ? decl : decl->getImplementedObjCDecl();
+      const swift::Decl *hasClangDecl = decl;
+      if (!decl->getClangDecl()) {
+        hasClangDecl = decl->getImplementedObjCDecl();
+        // Implementing a foreign reference type's virtual method matches the
+        // importer's dispatch thunk; the body must define the underlying
+        // method's symbol, which the class's vtable names.
+        if (const auto *thunk = dyn_cast<FuncDecl>(hasClangDecl))
+          if (const auto *original = decl->getASTContext()
+                                         .getClangModuleLoader()
+                                         ->getOriginalForVirtualThunk(thunk))
+            hasClangDecl = original;
+      }
       auto clangMangling = mangleClangDecl(hasClangDecl, isForeign);
       if (!clangMangling.empty())
         return clangMangling;
