@@ -243,7 +243,7 @@ public:
   SwiftDependencyTracker(std::shared_ptr<llvm::cas::ObjectStore> CAS,
                          llvm::PrefixMapper *Mapper,
                          const CompilerInvocation &CI,
-                         ArrayRef<std::string> ClangBlocklists = {});
+                         ArrayRef<std::string> ExtraFiles = {});
   
   void startTracking(bool includeCommonDeps = true);
 

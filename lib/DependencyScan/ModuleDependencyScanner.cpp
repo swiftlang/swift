@@ -457,7 +457,7 @@ ModuleDependencyScanner::getModuleImportIdentifier(StringRef moduleName) {
 
 SwiftDependencyTracker::SwiftDependencyTracker(
     std::shared_ptr<llvm::cas::ObjectStore> CAS, llvm::PrefixMapper *Mapper,
-    const CompilerInvocation &CI, ArrayRef<std::string> ClangBlocklists)
+    const CompilerInvocation &CI, ArrayRef<std::string> ExtraFiles)
     : CAS(CAS), Mapper(Mapper) {
   auto &SearchPathOpts = CI.getSearchPathOptions();
 
@@ -495,9 +495,10 @@ SwiftDependencyTracker::SwiftDependencyTracker(
   for (auto &File: CI.getFrontendOptions().BlocklistConfigFilePaths)
     addCommonFile(File);
 
-  // Add files referenced by the Clang cc1 command line that will be needed at
-  // replay time (e.g. sanitizer ignorelists auto-injected by the Clang driver).
-  for (auto &File : ClangBlocklists)
+  // Add extra files that are needed at replay time but are not otherwise
+  // named in the Swift invocation (e.g. sanitizer ignorelists auto-injected
+  // by the Clang driver).
+  for (auto &File : ExtraFiles)
     addCommonFile(File);
 
   // Add access notes.
