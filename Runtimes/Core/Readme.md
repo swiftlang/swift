@@ -81,7 +81,7 @@ cmake -B build -S . -G Ninja \
     -DCMAKE_OSX_DEPLOYMENT_TARGET=15.3 \
     -DCMAKE_OSX_SYSROOT=macosx \
     -DCMAKE_Swift_COMPILER=<swiftc> \
-    --toolchain cmake/caches/Vendors/Apple/Darwin.toolchain.cmake \
+    --toolchain ../cmake/toolchains/Darwin.toolchain.cmake  \
     -C cmake/caches/Vendors/Apple/x86_64-MacOSX.cmake
 cmake --build build
 ```
