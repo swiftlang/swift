@@ -33,7 +33,7 @@ final class Widget: IWidget {
   }
 }
 
-// CHECK-LABEL: define {{.*}}i32 {{.*}}6WidgetC{{.*}}TW.com.entry
+// CHECK-LABEL: define {{.*}}i32 {{.*}}6WidgetC{{.*}}TWV
 // CHECK-SAME:  (ptr [[PTHIS:%.*]], ptr [[RESULT:%.*]])
 // CHECK-NOT:     alloca ptr
 // CHECK:         [[VTABLE:%.*]] = load ptr, ptr [[PTHIS]]
@@ -44,7 +44,7 @@ final class Widget: IWidget {
 // CHECK:         [[CALL_RESULT:%.*]] = call swiftcc i32 {{.*}}WidgetC5value
 // CHECK:         ret i32 [[CALL_RESULT]]
 
-// CHECK-OPT-LABEL: define {{.*}}i32 {{.*}}6WidgetC{{.*}}TW.com.entry
+// CHECK-OPT-LABEL: define {{.*}}i32 {{.*}}6WidgetC{{.*}}TWV
 // CHECK-OPT:         [[OPT_RESULT:%.*]] = tail call swiftcc i32
 // CHECK-OPT-NEXT:    ret i32 [[OPT_RESULT]]
 
@@ -56,7 +56,7 @@ public class DefaultWidget: IWidget {
 // native entry neither receives a separate metadata argument nor materializes
 // address storage for the object before calling the extension witness.
 
-// CHECK-LABEL: define {{.*}}i32 {{.*}}13DefaultWidgetC{{.*}}TW.com.entry
+// CHECK-LABEL: define {{.*}}i32 {{.*}}13DefaultWidgetC{{.*}}TWV
 // CHECK-SAME:  (ptr [[DEFAULT_PTHIS:%.*]], ptr [[DEFAULT_RESULT:%.*]])
 // CHECK-NOT:     alloca ptr
 // CHECK:         [[DEFAULT_VTABLE:%.*]] = load ptr, ptr [[DEFAULT_PTHIS]]
@@ -79,7 +79,7 @@ final class ReferenceWidget: IReferenceWidget {
   }
 }
 
-// CHECK-LABEL: define {{.*}}i32 {{.*}}15ReferenceWidgetC{{.*}}TW.com.entry
+// CHECK-LABEL: define {{.*}}i32 {{.*}}15ReferenceWidgetC{{.*}}TWV
 // CHECK-SAME:  (ptr [[REFERENCE_PTHIS:%.*]], ptr [[REFERENCE_RESULT:%.*]])
 // CHECK-NOT:     alloca ptr
 // CHECK:         [[REFERENCE_VTABLE:%.*]] = load ptr, ptr [[REFERENCE_PTHIS]]
@@ -90,6 +90,6 @@ final class ReferenceWidget: IReferenceWidget {
 // CHECK:         [[CALL_RESULT:%.*]] = call swiftcc i32 {{.*}}ReferenceWidgetC9referencey
 // CHECK:         ret i32 [[CALL_RESULT]]
 
-// CHECK-OPT-LABEL: define {{.*}}i32 {{.*}}15ReferenceWidgetC{{.*}}TW.com.entry
+// CHECK-OPT-LABEL: define {{.*}}i32 {{.*}}15ReferenceWidgetC{{.*}}TWV
 // CHECK-OPT:         [[OPT_REFERENCE_RESULT:%.*]] = tail call swiftcc i32
 // CHECK-OPT-NEXT:    ret i32 [[OPT_REFERENCE_RESULT]]

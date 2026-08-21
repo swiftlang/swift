@@ -183,20 +183,26 @@ Constant *getOrCreateCOMMethodEntry(IRGenModule &IGM, ClassDecl *CD,
   auto conformance = lookupConformance(CD->getDeclaredInterfaceType(), PD);
   ASSERT(!conformance.isInvalid() && conformance.isConcrete());
 
-  auto concrete = conformance.getConcrete();
-  if (auto *inherited = dyn_cast<InheritedProtocolConformance>(concrete))
-    concrete = inherited->getInheritedConformance();
+  auto result = IGM.getSILModule().lookUpFunctionInWitnessTable(
+      conformance, requirement, /*lookupInSpecializedWitnessTable=*/true,
+      SILModule::LinkingMode::LinkNormal);
+  auto *table = result.second;
+  ASSERT(table && "native COM conformance must provide a witness table");
 
-  IRGenMangler decorator(IGM.Context);
-  std::string name =
-      (decorator.mangleWitnessThunk(concrete,
-                                    requirement.getDecl()) + Twine(".com.entry"))
-          .str();
+  for (auto &entry : table->getEntries()) {
+    if (entry.getKind() != SILWitnessTable::Method)
+      continue;
 
-  auto *entry = IGM.getSILModule().lookUpFunction(name);
-  ASSERT(entry && !entry->empty() &&
-         "native COM conformance must provide a method entry");
-  return IGM.getAddrOfSILFunction(entry, NotForDefinition);
+    auto &method = entry.getMethodWitness();
+    if (method.Requirement != requirement)
+      continue;
+
+    ASSERT(method.InterfaceEntry &&
+           "native COM conformance must provide an interface entry");
+    return IGM.getAddrOfSILFunction(method.InterfaceEntry, NotForDefinition);
+  }
+
+  llvm_unreachable("method witness disappeared from its witness table");
 }
 
 Constant *getOrEmitCOMVTable(IRGenModule &IGM, ClassDecl *CD, Constant *map,

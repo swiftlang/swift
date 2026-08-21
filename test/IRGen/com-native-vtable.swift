@@ -24,12 +24,12 @@ public final class COMObject: IDerived, IIndependent {
 // interface map, its adjustment to the native object, and the three common COM
 // operations. ISwiftObject then adds its default property witnesses.
 
-// CHECK-DAG: @"$s{{.*}}9COMObjectCMn.com.vtable.$s3COM12ISwiftObjectMp"   = private constant {{.*}} { ptr @"$s{{.*}}9COMObjectCMn.com.interface_map", i64  8, ptr @QueryInterface, ptr @AddRef, ptr @Release, ptr @"$s{{.*}}9COMObjectC{{.*}}ISwiftObject{{.*}}6object{{.*}}TW.com.entry", ptr @"$s{{.*}}9COMObjectC{{.*}}ISwiftObject{{.*}}8metadata{{.*}}TW.com.entry"
+// CHECK-DAG: @"$s{{.*}}9COMObjectCMn.com.vtable.$s3COM12ISwiftObjectMp"   = private constant {{.*}} { ptr @"$s{{.*}}9COMObjectCMn.com.interface_map", i64  8, ptr @QueryInterface, ptr @AddRef, ptr @Release, ptr @"$s{{.*}}9COMObjectC{{.*}}ISwiftObject{{.*}}6object{{.*}}TWV", ptr @"$s{{.*}}9COMObjectC{{.*}}ISwiftObject{{.*}}8metadata{{.*}}TWV"
 // CHECK-DAG: @"$s{{.*}}9COMObjectCMn.com.vtable.$s{{.*}}8IDerivedMp"      = private constant {{.*}} { ptr @"$s{{.*}}9COMObjectCMn.com.interface_map", i64 16, ptr @QueryInterface, ptr @AddRef, ptr @Release
 // CHECK-DAG: @"$s{{.*}}9COMObjectCMn.com.vtable.$s{{.*}}12IIndependentMp" = private constant {{.*}} { ptr @"$s{{.*}}9COMObjectCMn.com.interface_map", i64 24, ptr @QueryInterface, ptr @AddRef, ptr @Release
 
-// CHECK-DAG: define internal ptr @"$s{{.*}}9COMObjectC{{.*}}ISwiftObject{{.*}}6object{{.*}}TW.com.entry"(ptr
-// CHECK-DAG: define internal ptr @"$s{{.*}}9COMObjectC{{.*}}ISwiftObject{{.*}}8metadata{{.*}}TW.com.entry"(ptr
+// CHECK-DAG: define internal ptr @"$s{{.*}}9COMObjectC{{.*}}ISwiftObject{{.*}}6object{{.*}}TWV"(ptr
+// CHECK-DAG: define internal ptr @"$s{{.*}}9COMObjectC{{.*}}ISwiftObject{{.*}}8metadata{{.*}}TWV"(ptr
 
 // The prefix template stores the vtable address points in memory order:
 // IIndependent, IDerived (which also represents IBase), then ISwiftObject

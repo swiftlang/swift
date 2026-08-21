@@ -718,11 +718,12 @@ public:
       assert(witnessRef.isEnumElement() && "Witness decl, but different kind?");
     }
 
+    SILFunction *interfaceEntry = nullptr;
     SILFunction *witnessFn = SGM.emitProtocolWitness(
         ProtocolConformanceRef(Conformance), witnessLinkage, witnessSerializedKind,
-        requirementRef, witnessRef, isFree, witness);
-    Entries.push_back(
-                    SILWitnessTable::MethodWitness{requirementRef, witnessFn});
+        requirementRef, witnessRef, isFree, witness, &interfaceEntry);
+    Entries.push_back(SILWitnessTable::MethodWitness{
+        requirementRef, witnessFn, interfaceEntry});
   }
 
   void addAssociatedType(AssociatedTypeDecl *assocType) {
@@ -827,7 +828,8 @@ CanSILFunctionType getCOMMethodEntryType(CanSILFunctionType WitnessTy) {
 SILFunction *SILGenModule::emitProtocolWitness(
     ProtocolConformanceRef origConformance, SILLinkage linkage,
     SerializedKind_t serializedKind, SILDeclRef requirement,
-    SILDeclRef witnessRef, IsFreeFunctionWitness_t isFree, Witness witness) {
+    SILDeclRef witnessRef, IsFreeFunctionWitness_t isFree, Witness witness,
+    SILFunction **interfaceEntry) {
   auto requirementInfo =
       Types.getConstantInfo(TypeExpansionContext::minimal(), requirement);
 
@@ -1024,7 +1026,8 @@ SILFunction *SILGenModule::emitProtocolWitness(
     auto *info = CD ? CD->getCOMDeclInfo() : nullptr;
     if (info && info->isImplementation()) {
       auto Ty = getCOMMethodEntryType(witnessSILFnType);
-      auto label = nameBuffer + ".com.entry";
+      auto label = NewMangler.mangleCOMMethodWitnessThunk(
+          manglingConformance, requirement.getDecl());
       // TODO: Emit ABI-compatible COM entries as alternate machine-code entry
       // points so the adjustment can fall through into the native body.
       auto *entry =
@@ -1038,8 +1041,9 @@ SILFunction *SILGenModule::emitProtocolWitness(
                                  IsNotRuntimeAccessible, ProfileCounter(),
                                  IsThunk, SubclassScope::NotApplicable,
                                  InlineStrategy);
-      entry->setMarkedAsUsed(true);
       emitThunkBody(entry, "generating COM method entry thunk");
+      if (interfaceEntry)
+        *interfaceEntry = entry;
     }
   }
 
