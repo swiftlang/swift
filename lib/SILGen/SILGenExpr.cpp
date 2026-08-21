@@ -1713,7 +1713,7 @@ public:
 
   Expr *visitOpaqueValueExpr(OpaqueValueExpr *E) {
     if (E == OrigValue) {
-      return new (Context) DeclRefExpr(Param, DeclNameLoc(), true, AccessSemantics::Ordinary, OrigValue->getType());
+      return new (Context) DeclRefExpr(Param, DeclNameLoc(E->getStartLoc()), true, AccessSemantics::Ordinary, OrigValue->getType());
     }
     // Other opaque values are possible, e.g. intrudced by the OpenExistentialExpr
     return nullptr;
