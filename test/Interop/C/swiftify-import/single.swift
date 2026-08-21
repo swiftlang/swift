@@ -67,9 +67,9 @@ void nullableFlipped(int * _Nullable __single p __noescape);
 // expected-expansion@+8:67{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(macOS 13.0, *) @_disfavoredOverload public func nullUnspecifiedConst(_ p: Ref<CInt>?) {|}}
-//   expected-remark@3{{macro content: |    return unsafe _swiftifyWithOptionalPointer(p?.value, { _pPtr in|}}
-//   expected-remark@4{{macro content: |            unsafe nullUnspecifiedConst(_pPtr)|}}
-//   expected-remark@5{{macro content: |        })|}}
+//   expected-remark@3{{macro content: |    return unsafe _swiftifyWithOptionalPointer(p?.value) { _pPtr in|}}
+//   expected-remark@4{{macro content: |        unsafe nullUnspecifiedConst(_pPtr)|}}
+//   expected-remark@5{{macro content: |    }|}}
 //   expected-remark@6{{macro content: |}|}}
 // }}
 void nullUnspecifiedConst(const int * _Null_unspecified __single p __noescape);
@@ -77,9 +77,9 @@ void nullUnspecifiedConst(const int * _Null_unspecified __single p __noescape);
 // expected-expansion@+8:50{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(macOS 13.0, *) @_disfavoredOverload public func nonnullConst(_ p: Ref<CInt>) {|}}
-//   expected-remark@3{{macro content: |    return unsafe withUnsafePointer(to: p.value, { _pPtr in|}}
-//   expected-remark@4{{macro content: |            unsafe nonnullConst(_pPtr)|}}
-//   expected-remark@5{{macro content: |        })|}}
+//   expected-remark@3{{macro content: |    return unsafe withUnsafePointer(to: p.value) { _pPtr in|}}
+//   expected-remark@4{{macro content: |        unsafe nonnullConst(_pPtr)|}}
+//   expected-remark@5{{macro content: |    }|}}
 //   expected-remark@6{{macro content: |}|}}
 // }}
 void nonnullConst(const int * __single _Nonnull p __noescape);
@@ -87,9 +87,9 @@ void nonnullConst(const int * __single _Nonnull p __noescape);
 // expected-expansion@+8:52{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(macOS 13.0, *) @_disfavoredOverload public func nullableConst(_ p: Ref<CInt>?) {|}}
-//   expected-remark@3{{macro content: |    return unsafe _swiftifyWithOptionalPointer(p?.value, { _pPtr in|}}
-//   expected-remark@4{{macro content: |            unsafe nullableConst(_pPtr)|}}
-//   expected-remark@5{{macro content: |        })|}}
+//   expected-remark@3{{macro content: |    return unsafe _swiftifyWithOptionalPointer(p?.value) { _pPtr in|}}
+//   expected-remark@4{{macro content: |        unsafe nullableConst(_pPtr)|}}
+//   expected-remark@5{{macro content: |    }|}}
 //   expected-remark@6{{macro content: |}|}}
 // }}
 void nullableConst(const int * __single _Nullable p __noescape);
