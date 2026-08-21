@@ -8202,6 +8202,13 @@ ClangImporter::getForeignReferenceTypeOperations(
   return Impl.getForeignReferenceTypeOperations(decl);
 }
 
+LibkernSubclass
+ClangImporter::getLibkernSubclass(const clang::RecordDecl *decl) {
+  if (auto *cxxRecord = dyn_cast<clang::CXXRecordDecl>(decl))
+    return Impl.getLibkernSubclass(cxxRecord);
+  return LibkernSubclass::None;
+}
+
 void ClangImporter::diagnoseTopLevelValue(const DeclName &name) {
   Impl.diagnoseTopLevelValue(name);
 }

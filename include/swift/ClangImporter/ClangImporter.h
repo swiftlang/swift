@@ -119,6 +119,18 @@ enum OptionalTypeKind : unsigned {
 };
 enum { NumOptionalTypeKinds = 2 };
 
+/// Where a C++ record sits in libkern's OSObject hierarchy. This is used to
+/// decide whether to apply libkern's ownership convention.
+///
+/// Only meaningful when the 'LibkernOwnershipConventions' feature is enabled.
+enum class LibkernSubclass {
+  None,
+  OSObject,
+  /// OSIterator derives from OSObject, so a type that derives from OSIterator
+  /// also derives from OSObject.
+  OSIterator,
+};
+
 /// This interface is implemented by LLDB to serve as a fallback when Clang
 /// modules can't be imported from source in the debugger.
 ///
@@ -746,6 +758,9 @@ public:
   std::pair<const clang::FunctionDecl *, const clang::FunctionDecl *>
   getForeignReferenceTypeOperations(const clang::RecordDecl *decl) override;
 
+  /// Classify \p decl against libkern's OSObject hierarchy.
+  LibkernSubclass getLibkernSubclass(const clang::RecordDecl *decl);
+
   void checkCalledClangFunction(const ValueDecl *funcDecl,
                                 SourceLoc callSiteLoc) override;
 
@@ -841,18 +856,6 @@ bool hasImportAsOpaquePointerAttr(const clang::RecordDecl *decl);
 
 /// Determine whether this typedef is a CF type.
 bool isCFTypeDecl(const clang::TypedefNameDecl *Decl);
-
-/// Determine whether this is libkern's OSObject.
-bool isOSObject(const clang::CXXRecordDecl *decl);
-
-/// Determine whether this is libkern's OSIterator.
-bool isOSIterator(const clang::CXXRecordDecl *decl);
-
-/// Determine whether this is libkern's OSObject or one of its subclasses.
-bool isOSObjectSubclass(const clang::RecordDecl *decl);
-
-/// Determine whether this is libkern's OSIterator or one of its subclasses.
-bool isOSIteratorSubclass(const clang::RecordDecl *decl);
 
 /// Determine the imported CF type for the given typedef-name, or the empty
 /// string if this is not an imported CF type name.

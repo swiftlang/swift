@@ -18,6 +18,7 @@
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
+#include <algorithm>
 
 using namespace swift;
 
@@ -633,57 +634,46 @@ void ClangImporter::checkCalledClangFunction(const ValueDecl *func,
   diagnoseMissingReturnsRetained(Impl, func, callSiteLoc);
 }
 
-bool swift::importer::isOSObject(const clang::CXXRecordDecl *record) {
+static bool isOSObject(const clang::CXXRecordDecl *record) {
   return record && record->getIdentifier() && record->getName() == "OSObject" &&
          record->getDeclContext()->getRedeclContext()->isTranslationUnit();
 }
 
-bool swift::importer::isOSIterator(const clang::CXXRecordDecl *record) {
+static bool isOSIterator(const clang::CXXRecordDecl *record) {
   return record && record->getIdentifier() &&
          record->getName() == "OSIterator" &&
          record->getDeclContext()->getRedeclContext()->isTranslationUnit();
 }
 
-/// Determine whether \p record, or any of its direct or indirect bases,
-/// satisfies \p isMatch.
-static bool
-isSubclassOf(const clang::RecordDecl *record,
-             llvm::function_ref<bool(const clang::CXXRecordDecl *)> isMatch) {
-  auto *cxxRecord = dyn_cast_or_null<clang::CXXRecordDecl>(record);
-  if (!cxxRecord || !cxxRecord->hasDefinition())
-    return false;
+LibkernSubclass ClangImporter::Implementation::getLibkernSubclass(
+    const clang::CXXRecordDecl *record) {
+  if (!record || !record->hasDefinition())
+    return LibkernSubclass::None;
 
-  cxxRecord = cxxRecord->getDefinition();
+  record = record->getDefinition();
+  auto it = libkernSubclasses.find(record);
+  if (it != libkernSubclasses.end())
+    return it->second;
 
-  llvm::SmallVector<const clang::CXXRecordDecl *, 4> stack;
-  llvm::SmallDenseSet<const clang::CXXRecordDecl *, 4> seen;
-
-  stack.push_back(cxxRecord);
-  seen.insert(cxxRecord);
-  while (!stack.empty()) {
-    auto *decl = stack.pop_back_val();
-
-    if (isMatch(decl))
-      return true;
-
-    for (const auto &base : decl->bases()) {
-      auto *baseDecl = base.getType()->getAsCXXRecordDecl();
-      if (!baseDecl || !baseDecl->hasDefinition())
-        continue;
-      baseDecl = baseDecl->getDefinition();
-      if (seen.insert(baseDecl).second)
-        stack.push_back(baseDecl);
-    }
+  // OSIterator is the strongest answer there is, so no base can change it.
+  if (isOSIterator(record)) {
+    libkernSubclasses[record] = LibkernSubclass::OSIterator;
+    return LibkernSubclass::OSIterator;
   }
-  return false;
-}
 
-bool swift::importer::isOSObjectSubclass(const clang::RecordDecl *record) {
-  return isSubclassOf(record, isOSObject);
-}
+  auto result =
+      isOSObject(record) ? LibkernSubclass::OSObject : LibkernSubclass::None;
 
-bool swift::importer::isOSIteratorSubclass(const clang::RecordDecl *record) {
-  return isSubclassOf(record, isOSIterator);
+  for (const auto &base : record->bases()) {
+    auto baseSubclass =
+        getLibkernSubclass(base.getType()->getAsCXXRecordDecl());
+    result = std::max(result, baseSubclass);
+    if (result == LibkernSubclass::OSIterator)
+      break;
+  }
+
+  libkernSubclasses[record] = result;
+  return result;
 }
 
 std::optional<ResultConvention>
@@ -741,7 +731,9 @@ swift::importer::getLibkernOwnershipOfReturnedFRT(const clang::NamedDecl *decl,
   if (!recordDecl)
     return std::nullopt;
 
-  if (!importer::isOSObjectSubclass(recordDecl))
+  auto *importer = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
+  auto libkernSubclass = importer->getLibkernSubclass(recordDecl);
+  if (libkernSubclass == LibkernSubclass::None)
     return std::nullopt;
 
   if (!func->getIdentifier())
@@ -775,7 +767,7 @@ swift::importer::getLibkernOwnershipOfReturnedFRT(const clang::NamedDecl *decl,
     return std::nullopt;
 
   if ((!funcName.starts_with("get") && !funcName.starts_with("Get")) ||
-      importer::isOSIteratorSubclass(recordDecl))
+      libkernSubclass == LibkernSubclass::OSIterator)
     return ResultConvention::Owned;
 
   return ResultConvention::Unowned;
