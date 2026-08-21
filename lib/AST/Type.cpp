@@ -4827,12 +4827,18 @@ ReferenceCounting TypeBase::getReferenceCounting() {
                ? ReferenceCounting::Custom
                : ReferenceCounting::None;
 
-  // In the absence of Objective-C interoperability, everything uses native
-  // reference counting or is the builtin BridgeObject.
+  ReferenceCounting defaultRefCounting = ReferenceCounting::Unknown;
+
+  // In the absence of Objective-C interoperability, almost everything uses
+  // native reference counting or is the builtin BridgeObject.
   if (!ctx.LangOpts.EnableObjCInterop) {
-    return type->getKind() == TypeKind::BuiltinBridgeObject
-             ? ReferenceCounting::Bridge
-             : ReferenceCounting::Native;
+    defaultRefCounting = ReferenceCounting::Native;
+
+    // It is still possible for an FRT to be involved in an archetype or
+    // protocol type, so only short-circuit for cases other than those
+    if (!isa<ArchetypeType, ProtocolType, ProtocolCompositionType>(type))
+      return isa<BuiltinBridgeObjectType>(type) ? ReferenceCounting::Bridge
+                                                : ReferenceCounting::Native;
   }
 
   switch (type->getKind()) {
@@ -4871,21 +4877,17 @@ ReferenceCounting TypeBase::getReferenceCounting() {
   case TypeKind::PackArchetype:
   case TypeKind::ElementArchetype: {
     auto archetype = cast<ArchetypeType>(type);
-    auto layout = archetype->getLayoutConstraint();
-    (void)layout;
-    assert(layout && layout->isRefCounted());
     if (auto supertype = archetype->getSuperclass())
       return supertype->getReferenceCounting();
-    return ReferenceCounting::Unknown;
+    return defaultRefCounting;
   }
 
   case TypeKind::Protocol:
   case TypeKind::ProtocolComposition: {
     auto layout = type->getExistentialLayout();
-    assert(layout.requiresClass() && "Opaque existentials don't use refcounting");
     if (auto superclass = layout.getExplicitSuperclassOrProtocolSuperclass())
       return superclass->getReferenceCounting();
-    return ReferenceCounting::Unknown;
+    return defaultRefCounting;
   }
 
   case TypeKind::ParameterizedProtocol: {
