@@ -584,6 +584,58 @@ static bool isInMainBody(ValueDecl *member, NominalTypeDecl *ty) {
               ty->getImplementationContext()->getAsGenericContext();
 }
 
+/// True if an explicit initializer declared in an unconstrained extension of
+/// \p decl within the same source file would conflict with the initializer
+/// that would be implicitly synthesized. Such an initializer takes the
+/// synthesized initializer's place instead.
+static bool hasExtensionInitMatching(
+    NominalTypeDecl *decl, ImplicitConstructorKind ICK,
+    std::optional<MemberwiseInitKind> memberwiseKind) {
+  auto *sourceFile = decl->getParentSourceFile();
+
+  SmallVector<ConstructorDecl *, 2> candidates;
+  for (auto *member : decl->lookupDirect(DeclBaseName::createConstructor())) {
+    if (member->isImplicit())
+      continue;
+
+    // Initializers in the main body suppress synthesis entirely; here we
+    // only look for ones in extensions in the same source file. For a
+    // deserialized type there is no source file, but a matching initializer
+    // in a same-module extension can only have come from the same file, or
+    // the module would not have compiled.
+    auto *ext = dyn_cast<ExtensionDecl>(member->getDeclContext());
+    if (!ext || ext->getParentModule() != decl->getParentModule())
+      continue;
+    if (sourceFile && ext->getParentSourceFile() != sourceFile)
+      continue;
+
+    // An initializer in a constrained extension has a different generic
+    // signature, so it can coexist with the synthesized initializer.
+    if (ext->isConstrainedExtension())
+      continue;
+
+    if (!ABIRoleInfo(member).providesAPI())
+      continue;
+
+    candidates.push_back(cast<ConstructorDecl>(member));
+  }
+  if (candidates.empty())
+    return false;
+
+  // Compare the candidates against the initializer that would be synthesized
+  // using the same rules as redeclaration checking.
+  auto &ctx = decl->getASTContext();
+  auto *synthesized = createImplicitConstructor(decl, ICK, memberwiseKind, ctx);
+  for (auto *ctor : candidates) {
+    if (conflicting(ctx, ctor->getOverloadSignature(),
+                    ctor->getOverloadSignatureType(),
+                    synthesized->getOverloadSignature(),
+                    synthesized->getOverloadSignatureType()))
+      return true;
+  }
+  return false;
+}
+
 static void
 configureInheritedDesignatedInitAttributes(ClassDecl *classDecl,
                                            ConstructorDecl *ctor,
@@ -1523,6 +1575,13 @@ bool HasMemberwiseInitRequest::evaluate(Evaluator &evaluator, StructDecl *decl,
       return false;
   }
 
+  // If an explicit initializer declared in a same-file extension would
+  // conflict with the memberwise initializer, it takes the memberwise
+  // initializer's place.
+  if (hasExtensionInitMatching(decl, ImplicitConstructorKind::Memberwise,
+                               initKind))
+    return false;
+
   std::multimap<VarDecl *, VarDecl *> initializedViaAccessor;
   decl->collectPropertiesInitializableByInitAccessors(initializedViaAccessor);
 
@@ -1778,6 +1837,14 @@ HasDefaultInitRequest::evaluate(Evaluator &evaluator,
   // If the user has already defined a designated initializer, then don't
   // synthesize a default init.
   if (hasUserDefinedDesignatedInit(evaluator, decl))
+    return false;
+
+  // If an explicit initializer declared in a same-file extension of a struct
+  // would conflict with the default initializer, it takes the default
+  // initializer's place.
+  if (isa<StructDecl>(decl) &&
+      hasExtensionInitMatching(decl, ImplicitConstructorKind::Default,
+                               /*memberwiseKind=*/std::nullopt))
     return false;
 
   // Regardless of whether all of the properties are initialized or
