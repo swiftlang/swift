@@ -35,6 +35,18 @@ public protocol ISwiftObject {
   var metadata: UnsafeRawPointer { get }
 }
 
+extension ISwiftObject {
+  @_alwaysEmitIntoClient
+  public var object: UnsafeMutableRawPointer {
+    unsafeBitCast(self, to: UnsafeMutableRawPointer.self)
+  }
+
+  @_alwaysEmitIntoClient
+  public var metadata: UnsafeRawPointer {
+    unsafeBitCast(type(of: self), to: UnsafeRawPointer.self)
+  }
+}
+
 public protocol COMInterface {
   var IID: IID { get }
 }
