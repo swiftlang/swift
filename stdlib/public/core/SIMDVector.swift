@@ -738,6 +738,8 @@ public struct SIMDMask<Storage>: SIMD
   }
 }
 
+extension SIMDMask: BitwiseCopyable where Storage: BitwiseCopyable {}
+
 extension SIMDMask: Sendable where Storage: Sendable {}
 
 extension SIMDMask {
