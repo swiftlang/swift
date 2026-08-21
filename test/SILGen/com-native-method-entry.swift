@@ -61,6 +61,18 @@ public class DefaultWidget: IWidget {
 // CHECK: method #IWidget.value: {{.*}} : {{.*}}TW{{.*}}, com {{.*}}TWV
 
 @com
+public final class PublicWidget: IWidget {
+}
+
+// A serialized conformance retains the native entry alongside its ordinary
+// witness. Both thunks therefore have shared linkage and serialized bodies.
+
+// CHECK-LABEL: sil shared [transparent] [serialized] [thunk] {{.*}}PublicWidgetC{{.*}}TWV
+// CHECK-SAME: $@convention(com_method) (Optional<UnsafeMutablePointer<Int32>>, @guaranteed PublicWidget) -> UInt32
+// CHECK-LABEL: sil_witness_table [serialized] PublicWidget: IWidget
+// CHECK: method #IWidget.value: {{.*}} : {{.*}}TW{{.*}}, com {{.*}}TWV
+
+@com
 open class OpenWidget: IWidget {
   public init() {
   }
