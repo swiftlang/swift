@@ -365,7 +365,10 @@ enum class SolutionCompareResult {
   /// The first solution is better than the second.
   Better,
   /// The second solution is better than the first.
-  Worse
+  Worse,
+  /// The two solutions are potentially mergeable into one with type refinement
+  /// If not an error, this is semantically resolved as Incomparable
+  Mergeable
 };
 
 /// Key to the constraint solver's mapping from AST nodes to their corresponding
@@ -568,14 +571,37 @@ public:
     SmallVector<OverloadChoice, 2> choices;
   };
 
+  /// A difference between selected fixes
+  struct FixDiff {
+    /// The fix
+    FixKind fix;
+
+    /// The solutions deriving that fix
+    SmallVector<size_t> solutions;
+  };
+
+  struct TypeDiff {
+    Type resolved;
+    SmallVector<size_t> solutions;
+  };
+
   /// The differences between the overload choices between the
   /// solutions.
   SmallVector<OverloadDiff, 4> overloads;
+
+  /// The differences between the fixes of the solutions
+  SmallVector<FixDiff, 4> fixes;
+
+  /// The differences between type bindings between the solutions
+  llvm::DenseMap<TypeVariableType *, SmallVector<TypeDiff, 4>> types;
 
   /// Compute the differences between the given set of solutions.
   ///
   /// \param solutions The set of solutions.
   explicit SolutionDiff(ArrayRef<Solution> solutions);
+
+  llvm::DenseMap<TypeVariableType *, std::pair<Type, Type>>
+  typesDiffPerSolution(size_t idx1, size_t idx2) const;
 };
 
 /// An intrusive, doubly-linked list of constraints.
@@ -1317,6 +1343,9 @@ private:
 
   void incrementScopeCounter();
   void incrementLeafScopes();
+
+  /// All type variables seen with conflicting types while solving
+  MergeableTypes mergeableTypes;
 
 public:
   /// Introduces a new solver scope, which any changes to the
@@ -2103,6 +2132,16 @@ public:
 
   /// Undo the above change.
   void removeKeyPath(const KeyPathExpr *keypath);
+
+  /// Record the binding type variable and the current type that should be added
+  /// to the mergeset, indicating a conflicted type binding. Add a change to the
+  /// trail
+  void recordMergeable(TypeVariableType *root, Type conflict);
+
+  /// Undo the addition of a type to the mergeset for a type variable, record in
+  /// trail If this is the last type binding for a type variable, remove the
+  /// type variable.
+  void removeMergeable(TypeVariableType *root, CanType unmerged);
 
   /// Walk a closure AST to determine its effects.
   ///
@@ -3153,8 +3192,8 @@ public:
   /// Attempt to repair typing failures and record fixes if needed.
   /// \return true if at least some of the failures has been repaired
   /// successfully, which allows type matcher to continue.
-  bool repairFailures(Type lhs, Type rhs, ConstraintKind matchKind,
-                      TypeMatchOptions flags,
+  bool repairFailures(Type lhs, Type rhs, 
+                      ConstraintKind matchKind, TypeMatchOptions flags,
                       SmallVectorImpl<RestrictionOrFix> &conversionsOrFixes,
                       ConstraintLocatorBuilder locator);
 
@@ -3188,7 +3227,7 @@ public:
   SolutionKind matchFunctionTypes(FunctionType *func1, FunctionType *func2,
                                   ConstraintKind kind, TypeMatchOptions flags,
                                   ConstraintLocatorBuilder locator);
-  
+
   /// Subroutine of \c matchTypes()
   bool matchFunctionIsolations(FunctionType *func1, FunctionType *func2,
                                ConstraintKind kind, TypeMatchOptions flags,
@@ -4133,6 +4172,89 @@ public:
 
   void print(raw_ostream &out) const;
   void print(raw_ostream &out, Expr *) const;
+};
+
+/// When types have been in conflict creating ambiguities, there may be more
+/// similarities to identify across other types in the solution which will
+/// permit better diagnostics or other identification of type identity. For
+/// example if there has been a conflict in S<Int> -> Int, S<Double> -> Double,
+/// S<Float> -> Float, where this is represented with three different type
+/// variables, merging will identify that there is a conflict Int, Double, Float
+/// and that there is an attempt to use S<T> -> T
+class ConflictMerger {
+private:
+  ASTContext *context;
+  SmallVector<std::pair<CanType, CanType>> typeMap;
+  typedef llvm::DenseMap<TypeVariableType *, ConflictedType> StorageEnv;
+  typedef MergeableTypes Env;
+
+  typedef llvm::DenseMap<TypeVariableType *, std::pair<Type, Type>> ConflictEnv;
+  typedef std::function<Type(std::pair<Type, Type>)> Accessor;
+
+  Accessor first = [](std::pair<Type, Type> p) { return p.first; };
+  Accessor second = [](std::pair<Type, Type> p) { return p.second; };
+
+  unsigned int nextFreeType = 0;
+
+  TypeVariableType *freshVar(TypeVariableType *currentTV);
+  std::optional<CanType> inTypeMap(CanType key);
+
+  typedef std::function<std::optional<CanType>(TypeVariableType *, CanType)>
+      LookupF;
+  LookupF inTypeMapWrapper() {
+    return
+        [&](TypeVariableType *_, CanType key) { return this->inTypeMap(key); };
+  }
+
+  typedef std::function<void(TypeVariableType *, Type)> AddToEnvF;
+  void addToNominal(CanType key, CanType rep) {
+    typeMap.emplace_back(std::pair(key, rep));
+  }
+
+  void mergeTypes(ConflictEnv baseMap, const Solution *s1, const Solution *s2);
+
+  class TypeUnifier {
+  private:
+    CanType focusType;
+    TypeVariableType *currentTV;
+    ASTContext *context;
+    ConflictMerger *cm;
+    bool storeNew;
+
+  public:
+    TypeUnifier(CanType focusType, TypeVariableType *cTV, ASTContext *ctx,
+                ConflictMerger *cm, LookupF lookUpEnv, bool storeNew)
+        : focusType(focusType), currentTV(cTV), context(ctx), cm(cm),
+          storeNew(storeNew), lookUpEnv(lookUpEnv) {}
+
+    LookupF lookUpEnv;
+
+    std::optional<CanType> unifyNominal(CanType t);
+    std::optional<CanType> unifyAll(CanType t);
+    static void buildMergedMap(ASTContext *context, ConflictMerger *cm,
+                                    ConflictEnv baseMap,
+                                    bool storeNew, LookupF lookup,
+                                    AddToEnvF addToMergeEnv, Accessor typeAccess);
+    static LookupF inStorageEnv(StorageEnv &env);
+    static LookupF inMergeable(MergeableTypes &env);
+    static AddToEnvF addToStorageEnv(StorageEnv &env);
+    static AddToEnvF addToMergeable(MergeableTypes &env);
+    static std::pair<bool, bool> matchingTypes(ConflictEnv baseMap,
+                                               Env unified1, StorageEnv comparison1,
+                                               Env unified2, StorageEnv comparison2);
+    static std::pair<bool, bool> matchingTypes(ConflictEnv baseMap,
+                                               Env unified1, Env comparison1,
+                                               Env unified2, StorageEnv comparison2);
+    static std::pair<bool, bool> matchingTypes(ConflictEnv baseMap,
+                                               Env unified1, StorageEnv comparison1,
+                                               Env unified2, Env comparison2);
+    static void loadIntoMergeable(Env env, StorageEnv storage);
+  };
+
+public:
+  ConflictMerger(ASTContext *context) : context(context) {}
+  bool canMergeTypes(const Solution *s1, const Solution *s2,
+                     ConflictEnv baseMap, bool saveUnifiedTypes);
 };
 
 /// A function object suitable for use as an \c OpenRequirementFn that "opens"

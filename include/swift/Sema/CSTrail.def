@@ -172,6 +172,7 @@ CHANGE(RetiredConstraint)
 CHANGE(AddedBinding)
 CHANGE(RetractedBinding)
 CHANGE(PrunedDisjunction)
+CHANGE(AddedMergeableType)
 
 LAST_CHANGE(PrunedDisjunction)
 

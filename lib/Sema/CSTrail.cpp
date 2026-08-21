@@ -170,6 +170,16 @@ SolverTrail::Change::UpdatedTypeVariable(
 }
 
 SolverTrail::Change
+SolverTrail::Change::AddedMergeableType(TypeVariableType *typeVar,
+                                        CanType seenType) {
+  Change result;
+  result.Kind = ChangeKind::AddedMergeableType;
+  result.Merged.TypeVar = typeVar;
+  result.Merged.merged = seenType;
+  return result;
+}
+
+SolverTrail::Change
 SolverTrail::Change::AddedConversionRestriction(Type srcType, Type dstType) {
   Change result;
   result.Kind = ChangeKind::AddedConversionRestriction;
@@ -491,6 +501,10 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
     cg.removeNode(TypeVar);
     break;
 
+  case ChangeKind::AddedMergeableType:
+    cs.mergeableTypes.map.erase(Merged.TypeVar);
+    break;
+
   case ChangeKind::AddedConstraint:
     cg.removeConstraint(TheConstraint.TypeVar, TheConstraint.Constraint);
     break;
@@ -780,6 +794,14 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
   case ChangeKind::AddedTypeVariable:
     out << "(AddedTypeVariable ";
     TypeVar->print(out, PO);
+    out << ")\n";
+    break;
+
+  case ChangeKind::AddedMergeableType:
+    out << "(AddedMergeableType ";
+    Merged.TypeVar->print(out, PO);
+    out << " , ";
+    Merged.merged->print(out, PO);
     out << ")\n";
     break;
 
