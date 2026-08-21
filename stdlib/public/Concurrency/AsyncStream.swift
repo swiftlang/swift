@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2020-2021 Apple Inc. and the Swift project authors
+// Copyright (c) 2020-2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -31,11 +31,18 @@ import Swift
 /// calling it from concurrent contexts external to the iteration of the
 /// `AsyncStream`.
 ///
+/// ### Backpressure
+///
 /// An arbitrary source of elements can produce elements faster than they are
 /// consumed by a caller iterating over them. Because of this, `AsyncStream`
 /// defines a buffering behavior, allowing the stream to buffer a specific
 /// number of oldest or newest elements. By default, the buffer limit is
 /// `Int.max`, which means the value is unbounded.
+///
+/// ### Concurrent Iteration
+///
+/// When you iterate the stream concurrently, each element you yield
+/// to the stream is delivered to only a single iterator once.
 ///
 /// ### Adapting Existing Code to Use Streams
 ///
@@ -377,9 +384,7 @@ extension AsyncStream: AsyncSequence {
   /// The asynchronous iterator for iterating an asynchronous stream.
   ///
   /// This type doesn't conform to `Sendable`. Don't use it from multiple
-  /// concurrent contexts. It is a programmer error to invoke `next()` from a
-  /// concurrent context that contends with another such call, which
-  /// results in a call to `fatalError()`.
+  /// concurrent contexts.
   public struct Iterator: AsyncIteratorProtocol {
     let context: _Context
 
@@ -387,10 +392,6 @@ extension AsyncStream: AsyncSequence {
     ///
     /// When `next()` returns `nil`, this signifies the end of the
     /// `AsyncStream`.
-    ///
-    /// It is a programmer error to invoke `next()` from a
-    /// concurrent context that contends with another such call, which
-    /// results in a call to `fatalError()`.
     ///
     /// If you cancel the task this iterator is running in while `next()` is
     /// awaiting a value, the `AsyncStream` terminates. In this case, `next()`
@@ -401,16 +402,12 @@ extension AsyncStream: AsyncSequence {
 
     /// The next value from the asynchronous stream.
     ///
-    /// When `next()` returns `nil`, this signifies the end of the
+    /// When `next(isolation:)` returns `nil`, this signifies the end of the
     /// `AsyncStream`.
     ///
-    /// It is a programmer error to invoke `next()` from a concurrent
-    /// context that contends with another such call, which results in a call to
-    /// `fatalError()`.
-    ///
-    /// If you cancel the task this iterator is running in while `next()`
+    /// If you cancel the task this iterator is running in while `next(isolation:)`
     /// is awaiting a value, the `AsyncStream` terminates. In this case,
-    /// `next()` might return `nil` immediately, or return `nil` on
+    /// `next(isolation:)` might return `nil` immediately, or return `nil` on
     /// subsequent calls.
     @available(SwiftStdlib 6.0, *)
     public mutating func next(isolation actor: isolated (any Actor)?) async -> Element? {
