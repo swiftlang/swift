@@ -1991,6 +1991,11 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       Diags.diagnose(SourceLoc(), diag::objc_with_embedded);
       HadError = true;
     }
+
+    if (Opts.hasFeature(Feature::TypedAllocation) && !Target.isArch64Bit()) {
+      Diags.diagnose(SourceLoc(), diag::typed_allocation_requires_64_bit);
+      HadError = true;
+    }
   }
 
   if (auto A = Args.getLastArg(OPT_checked_async_objc_bridging)) {
