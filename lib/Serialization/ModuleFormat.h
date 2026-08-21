@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
 const uint16_t SWIFTMODULE_VERSION_MINOR =
-    1031; // added 'diagnose' SIL instruction
+    1032; // native COM method witnesses
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
