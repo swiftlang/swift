@@ -48,7 +48,7 @@ public class DefaultWidget: IWidget {
 // class-bound archetype. Its native entry receives the recovered object
 // directly; the COM ABI does not carry a separate Self metadata argument.
 
-// CHECK-LABEL: sil private [transparent] [thunk] {{.*}}DefaultWidgetC{{.*}}TWV
+// CHECK-LABEL: sil shared [transparent] [serialized] [thunk] {{.*}}DefaultWidgetC{{.*}}TWV
 // CHECK-SAME: $@convention(com_method) <[[DEFAULT_SELF:[^ ]+]] where [[DEFAULT_SELF]] : DefaultWidget>
 // CHECK-SAME: (Optional<UnsafeMutablePointer<Int32>>, @guaranteed [[DEFAULT_SELF]]) -> UInt32
 
@@ -100,8 +100,8 @@ open class OpenWidget: IWidget {
 // DEFAULT-SAME: $@convention(com_method)
 // DEFAULT-DAG: sil private [transparent] [thunk] {{.*}}WidgetC{{.*}}ISwiftObject{{.*}}8metadata{{.*}}TWV
 // DEFAULT-SAME: $@convention(com_method)
-// DEFAULT-DAG: sil private [transparent] [thunk] {{.*}}DefaultWidgetC{{.*}}ISwiftObject{{.*}}6object{{.*}}TWV : $@convention(com_method) <[[DEFAULT_OBJECT_SELF:[^ ]+]] where [[DEFAULT_OBJECT_SELF]] : DefaultWidget> (@guaranteed [[DEFAULT_OBJECT_SELF]]) -> UnsafeMutableRawPointer
-// DEFAULT-DAG: sil private [transparent] [thunk] {{.*}}DefaultWidgetC{{.*}}ISwiftObject{{.*}}8metadata{{.*}}TWV : $@convention(com_method) <[[DEFAULT_METADATA_SELF:[^ ]+]] where [[DEFAULT_METADATA_SELF]] : DefaultWidget> (@guaranteed [[DEFAULT_METADATA_SELF]]) -> UnsafeRawPointer
+// DEFAULT-DAG: sil shared [transparent] [serialized] [thunk] {{.*}}DefaultWidgetC{{.*}}ISwiftObject{{.*}}6object{{.*}}TWV : $@convention(com_method) <[[DEFAULT_OBJECT_SELF:[^ ]+]] where [[DEFAULT_OBJECT_SELF]] : DefaultWidget> (@guaranteed [[DEFAULT_OBJECT_SELF]]) -> UnsafeMutableRawPointer
+// DEFAULT-DAG: sil shared [transparent] [serialized] [thunk] {{.*}}DefaultWidgetC{{.*}}ISwiftObject{{.*}}8metadata{{.*}}TWV : $@convention(com_method) <[[DEFAULT_METADATA_SELF:[^ ]+]] where [[DEFAULT_METADATA_SELF]] : DefaultWidget> (@guaranteed [[DEFAULT_METADATA_SELF]]) -> UnsafeRawPointer
 // DEFAULT-DAG: sil [transparent] [thunk] {{.*}}OpenWidgetC{{.*}}ISwiftObject{{.*}}6object{{.*}}TWV : $@convention(com_method) <[[OPEN_OBJECT_SELF:[^ ]+]] where [[OPEN_OBJECT_SELF]] : OpenWidget> (@guaranteed [[OPEN_OBJECT_SELF]]) -> UnsafeMutableRawPointer
 // DEFAULT-DAG: sil [transparent] [thunk] {{.*}}OpenWidgetC{{.*}}ISwiftObject{{.*}}8metadata{{.*}}TWV : $@convention(com_method) <[[OPEN_METADATA_SELF:[^ ]+]] where [[OPEN_METADATA_SELF]] : OpenWidget> (@guaranteed [[OPEN_METADATA_SELF]]) -> UnsafeRawPointer
 // DEFAULT-LABEL: sil_witness_table {{.*}} Widget: ISwiftObject
