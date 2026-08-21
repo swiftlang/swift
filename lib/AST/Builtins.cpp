@@ -1194,6 +1194,18 @@ static ValueDecl *getDeallocRawTypedOperation(ASTContext &ctx, Identifier id) {
                             _void);
 }
 
+static ValueDecl *getAllocErrorBoxTypedOperation(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin,
+                            _parameters(_rawPointer, _word, _word),
+                            _rawPointer);
+}
+
+static ValueDecl *getDeallocErrorBoxTypedOperation(ASTContext &ctx, Identifier id) {
+  return getBuiltinFunction(ctx, id, _thin,
+                            _parameters(_rawPointer, _word, _word),
+                            _void);
+}
+
 static ValueDecl *getStackAllocOperation(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(ctx, id, _thin,
                             _parameters(_word, _word, _word),
@@ -3332,6 +3344,12 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::DeallocRawTyped:
     return getDeallocRawTypedOperation(Context, Id);
+
+  case BuiltinValueKind::AllocErrorBoxTyped:
+    return getAllocErrorBoxTypedOperation(Context, Id);
+
+  case BuiltinValueKind::DeallocErrorBoxTyped:
+    return getDeallocErrorBoxTypedOperation(Context, Id);
 
   case BuiltinValueKind::StackAlloc:
   case BuiltinValueKind::UnprotectedStackAlloc:

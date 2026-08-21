@@ -918,6 +918,21 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(AllocRawTyped, "allocRawTyped", "", Special)
 /// is used by the runtime to compute a type descriptor for the allocation.
 BUILTIN_MISC_OPERATION_WITH_SILGEN(DeallocRawTyped, "deallocRawTyped", "", Special)
 
+/// AllocErrorBoxTyped : (Builtin.RawPointer, Int, Int) -> Builtin.RawPointer
+///
+/// Allocates a boxed `Error` existential (heap object header + type
+/// pointer + error conformance pointer). Parameters: the class metadata
+/// used for the heap object header, object size, object alignment mask.
+/// Used only by the embedded runtime's `swift_allocError`.
+BUILTIN_MISC_OPERATION(AllocErrorBoxTyped, "allocErrorBoxTyped", "", Special)
+
+/// DeallocErrorBoxTyped : (Builtin.RawPointer, Int, Int) -> ()
+///
+/// The dealloc counterpart to AllocErrorBoxTyped. Parameters: object
+/// address, object size, object alignment mask. Used only by the embedded
+/// runtime's error box destroyer.
+BUILTIN_MISC_OPERATION(DeallocErrorBoxTyped, "deallocErrorBoxTyped", "", Special)
+
 /// Strideof has type T.Type -> Int
 BUILTIN_MISC_OPERATION_WITH_SILGEN(Strideof, "strideof", "n", Special)
 

@@ -523,7 +523,8 @@ public func _errorBoxDestroyImpl(
     UnsafeMutableRawPointer(mutating: contents.type),
     UnsafeMutableRawPointer(mutating: contents.value))
   let layout = unsafe _errorBoxLayout(metadata: contents.type)
-  unsafe swift_slowDealloc(p, layout.totalSize, layout.totalAlignMask)
+  Builtin.deallocErrorBoxTyped(
+    object, layout.totalSize._builtinWordValue, layout.totalAlignMask._builtinWordValue)
 }
 
 /// Metadata storage for error boxes. Layout matches ClassMetadata: [superclass, destroy, ivarDestroyer].
@@ -564,10 +565,10 @@ public func swift_allocError(
 
   _ensureErrorMetadataInitialized()
   let metaPtr = unsafe Builtin.addressof(&_errorMetadataStorage)
-  let objectPtr = swift_allocObject(
-    metadata: metaPtr,
-    requiredSize: layout.totalSize,
-    requiredAlignmentMask: layout.totalAlignMask)
+  let objectPtr = Builtin.allocErrorBoxTyped(
+    metaPtr,
+    layout.totalSize._builtinWordValue,
+    layout.totalAlignMask._builtinWordValue)
   let p = UnsafeMutableRawPointer(objectPtr)
 
   // Store type and errorConformance after the HeapObject header
@@ -601,8 +602,8 @@ public func swift_deallocError(
   _ metadata: Builtin.RawPointer
 ) {
   let layout = unsafe _errorBoxLayout(metadata: UnsafeRawPointer(metadata))
-  unsafe swift_slowDealloc(
-    UnsafeMutableRawPointer(box), layout.totalSize, layout.totalAlignMask)
+  Builtin.deallocErrorBoxTyped(
+    box, layout.totalSize._builtinWordValue, layout.totalAlignMask._builtinWordValue)
 }
 
 /// Extract the value address, type metadata, and error conformance from an error box.

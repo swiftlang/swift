@@ -55,6 +55,13 @@ class SwiftPM(product.Product):
 
         toolchain_path = self.native_toolchain_path(host_target)
         clang_tools_path = self.native_clang_tools_path(host_target)
+        merged_toolchain_path = self.merged_install_toolchain_path(host_target)
+        if merged_toolchain_path is not None:
+            # An explicit native toolchain takes precedence.
+            if self.args.native_swift_tools_path is None:
+                toolchain_path = merged_toolchain_path
+            if self.args.native_clang_tools_path is None:
+                clang_tools_path = merged_toolchain_path
         swiftc = os.path.join(toolchain_path, "bin", "swiftc")
         clang = os.path.join(clang_tools_path, "bin", "clang")
 

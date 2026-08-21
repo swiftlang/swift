@@ -680,6 +680,40 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     return;
   }
 
+  case BuiltinValueKind::AllocErrorBoxTyped: {
+    auto metadata = args.claimNext();
+    auto size = args.claimNext();
+    auto alignMask = args.claimNext();
+    // Fixed header layout: heap object header (metadata + refcount) followed
+    // by the error box's type pointer and error conformance pointer.
+    auto rawPointerType = SILType::getRawPointerType(IGF.IGM.Context);
+    SmallVector<SILType, 4> fieldTypes{rawPointerType, rawPointerType,
+                                       rawPointerType, rawPointerType};
+    auto *typedMetadata =
+        IGF.Builder.CreateBitCast(metadata, IGF.IGM.TypeMetadataPtrTy);
+    auto *alloc = IGF.emitAllocObjectCall(
+        typedMetadata, size, alignMask,
+        computeTypedMallocTypeDescriptor(IGF.IGM, fieldTypes),
+        "builtin-allocErrorBoxTyped");
+    out.add(IGF.Builder.CreateBitCast(alloc, IGF.IGM.Int8PtrTy));
+    return;
+  }
+
+  case BuiltinValueKind::DeallocErrorBoxTyped: {
+    auto pointer = args.claimNext();
+    auto size = args.claimNext();
+    auto alignMask = args.claimNext();
+    auto rawPointerType = SILType::getRawPointerType(IGF.IGM.Context);
+    SmallVector<SILType, 4> fieldTypes{rawPointerType, rawPointerType,
+                                       rawPointerType, rawPointerType};
+    auto *object =
+        IGF.Builder.CreateBitCast(pointer, IGF.IGM.RefCountedPtrTy);
+    emitDeallocateHeapObject(
+        IGF, object, size, alignMask,
+        computeTypedMallocTypeDescriptor(IGF.IGM, fieldTypes));
+    return;
+  }
+
   case BuiltinValueKind::Fence: {
     SmallVector<Type, 4> Types;
     StringRef BuiltinName =
