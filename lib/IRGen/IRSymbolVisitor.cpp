@@ -230,6 +230,11 @@ public:
     Visitor.addProtocolWitnessThunk(C, requirementDecl);
   }
 
+  void addCOMMethodWitnessThunk(RootProtocolConformance *C,
+                                ValueDecl *requirementDecl) override {
+    Visitor.addCOMMethodWitnessThunk(C, requirementDecl);
+  }
+
   void addSwiftMetaclassStub(ClassDecl *CD) override {
     addLinkEntity(LinkEntity::forSwiftMetaclassStub(CD));
   }
