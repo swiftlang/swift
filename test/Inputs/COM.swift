@@ -37,8 +37,15 @@ public protocol ISwiftObject {
 
 #if !MISSING_ISWIFTOBJECT_DEFAULTS
 extension ISwiftObject {
-  public var object: UnsafeMutableRawPointer { fatalError() }
-  public var metadata: UnsafeRawPointer { fatalError() }
+  @_alwaysEmitIntoClient
+  public var object: UnsafeMutableRawPointer {
+    unsafeBitCast(self, to: UnsafeMutableRawPointer.self)
+  }
+
+  @_alwaysEmitIntoClient
+  public var metadata: UnsafeRawPointer {
+    unsafeBitCast(type(of: self), to: UnsafeRawPointer.self)
+  }
 }
 #endif
 
