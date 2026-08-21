@@ -147,13 +147,14 @@ public:
   }
 
   void initializeWithCopy(IRGenFunction &IGF, Address dest, Address src,
-                          SILType T, bool isOutlined) const override {
+                          SILType T,
+                          bool suppressOutlinedValueOperationCalls) const override {
     auto eltTy = getElementSILType(IGF.IGM, T);
     eachElementAddrLoop(IGF, T,
                         [&](ArrayRef<Address> destAndSrc) {
-                          Element.initializeWithCopy(IGF, destAndSrc[0],
-                                                     destAndSrc[1],
-                                                     eltTy, isOutlined);
+                          Element.initializeWithCopy(
+                              IGF, destAndSrc[0], destAndSrc[1], eltTy,
+                              suppressOutlinedValueOperationCalls);
                         }, {dest, src});
   }
   

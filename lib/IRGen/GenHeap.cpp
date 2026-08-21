@@ -81,7 +81,7 @@ namespace {
         ValueTypeAndIsOptional(valueType, isOptional) {} \
     void initializeWithCopy(IRGenFunction &IGF, Address destAddr, \
                             Address srcAddr, SILType T, \
-                            bool isOutlined) const override { \
+                            bool suppressOutlinedValueOperationCalls) const override { \
       IGF.emit##Nativeness##Name##CopyInit(destAddr, srcAddr); \
     } \
     void initializeWithTake(IRGenFunction &IGF, Address destAddr, \
