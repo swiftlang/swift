@@ -1,11 +1,18 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -enable-experimental-com-interop -module-name COM -emit-module-path %t/COM.swiftmodule %S/../Inputs/COM.swift
-// RUN: %target-swift-frontend -enable-experimental-com-interop -I %t -emit-sil %s | %FileCheck %s
-// RUN: %target-swift-frontend -enable-experimental-com-interop -I %t -emit-sil %s | %FileCheck %s --check-prefix=DEFAULT
+// RUN: %target-swift-frontend -enable-experimental-com-interop -I %t -emit-sil -sil-verify-all %s | %FileCheck %s
+// RUN: %target-swift-frontend -enable-experimental-com-interop -I %t -emit-sil -sil-verify-all %s | %FileCheck %s --check-prefix=DEFAULT
 
 @com(interface: "20000000-0000-0000-0000-000000000001")
-protocol IWidget {
+public protocol IWidget {
   func value(_ result: UnsafeMutablePointer<Int32>?) -> UInt32
+}
+
+extension IWidget {
+  public func value(_ result: UnsafeMutablePointer<Int32>?) -> UInt32 {
+    result?.pointee = 17
+    return 0
+  }
 }
 
 @com
@@ -33,6 +40,18 @@ final class Widget: IWidget {
 // CHECK:          apply {{.*}}({{.*}}, [[SELF]])
 // CHECK:          return
 
+@com
+public class DefaultWidget: IWidget {
+}
+
+// A non-final implementation inherits a protocol-extension witness through a
+// class-bound archetype. Its native entry receives the recovered object
+// directly; the COM ABI does not carry a separate Self metadata argument.
+
+// CHECK-LABEL: sil private [transparent] [thunk] [used] {{.*}}DefaultWidgetC{{.*}}TW.com.entry
+// CHECK-SAME: $@convention(com_method) <[[DEFAULT_SELF:[^ ]+]] where [[DEFAULT_SELF]] : DefaultWidget>
+// CHECK-SAME: (Optional<UnsafeMutablePointer<Int32>>, @guaranteed [[DEFAULT_SELF]]) -> UInt32
+
 // The synthesized ISwiftObject conformance uses the default property
 // implementations supplied by the COM module.
 
@@ -40,6 +59,8 @@ final class Widget: IWidget {
 // DEFAULT-SAME: $@convention(com_method)
 // DEFAULT-DAG: sil private [transparent] [thunk] [used] {{.*}}WidgetC{{.*}}ISwiftObject{{.*}}8metadata{{.*}}TW.com.entry
 // DEFAULT-SAME: $@convention(com_method)
+// DEFAULT-DAG: sil private [transparent] [thunk] [used] {{.*}}DefaultWidgetC{{.*}}ISwiftObject{{.*}}6object{{.*}}TW.com.entry : $@convention(com_method) <[[DEFAULT_OBJECT_SELF:[^ ]+]] where [[DEFAULT_OBJECT_SELF]] : DefaultWidget> (@guaranteed [[DEFAULT_OBJECT_SELF]]) -> UnsafeMutableRawPointer
+// DEFAULT-DAG: sil private [transparent] [thunk] [used] {{.*}}DefaultWidgetC{{.*}}ISwiftObject{{.*}}8metadata{{.*}}TW.com.entry : $@convention(com_method) <[[DEFAULT_METADATA_SELF:[^ ]+]] where [[DEFAULT_METADATA_SELF]] : DefaultWidget> (@guaranteed [[DEFAULT_METADATA_SELF]]) -> UnsafeRawPointer
 // DEFAULT-LABEL: sil_witness_table {{.*}} Widget: ISwiftObject
 // DEFAULT-DAG: method #ISwiftObject.object!getter:
 // DEFAULT-DAG: method #ISwiftObject.metadata!getter:
