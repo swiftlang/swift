@@ -356,6 +356,23 @@ extension RawSpan {
   public init<Element: ConvertibleToBytes>(elements span: Span<Element>) {
     unsafe self = Self.init(unsafeElements: span)
   }
+
+  /// Create a span over the bytes of the single value passed as a parameter.
+  ///
+  /// - Parameters:
+  ///   - value: a value to be borrowed by the span
+  @export(implementation)
+  @_lifetime(borrow value)
+  public init<Element: ConvertibleToBytes>(
+    _ value: borrowing @_addressable Element
+  ) {
+    let buffer = unsafe UnsafeRawBufferPointer(
+      start: .init(Builtin.unprotectedAddressOfBorrow(value)),
+      count: MemoryLayout<Element>.size
+    )
+    let span = unsafe RawSpan(_unsafeBytes: buffer)
+    self = unsafe _overrideLifetime(span, borrowing: value)
+  }
 }
 
 @available(SwiftCompatibilitySpan 5.0, *)
