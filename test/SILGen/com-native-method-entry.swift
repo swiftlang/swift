@@ -52,14 +52,6 @@ public class DefaultWidget: IWidget {
 // CHECK-SAME: $@convention(com_method) <[[DEFAULT_SELF:[^ ]+]] where [[DEFAULT_SELF]] : DefaultWidget>
 // CHECK-SAME: (Optional<UnsafeMutablePointer<Int32>>, @guaranteed [[DEFAULT_SELF]]) -> UInt32
 
-// The witness tables record the native entries separately from the ordinary
-// Swift witnesses. IRGen follows these references when it builds COM vtables.
-
-// CHECK-LABEL: sil_witness_table hidden Widget: IWidget
-// CHECK: method #IWidget.value: {{.*}} : {{.*}}TW{{.*}}, com {{.*}}TWV
-// CHECK-LABEL: sil_witness_table hidden DefaultWidget: IWidget
-// CHECK: method #IWidget.value: {{.*}} : {{.*}}TW{{.*}}, com {{.*}}TWV
-
 @com
 public final class PublicWidget: IWidget {
 }
@@ -69,8 +61,6 @@ public final class PublicWidget: IWidget {
 
 // CHECK-LABEL: sil shared [transparent] [serialized] [thunk] {{.*}}PublicWidgetC{{.*}}TWV
 // CHECK-SAME: $@convention(com_method) (Optional<UnsafeMutablePointer<Int32>>, @guaranteed PublicWidget) -> UInt32
-// CHECK-LABEL: sil_witness_table [serialized] PublicWidget: IWidget
-// CHECK: method #IWidget.value: {{.*}} : {{.*}}TW{{.*}}, com {{.*}}TWV
 
 @com
 open class OpenWidget: IWidget {
@@ -90,6 +80,16 @@ open class OpenWidget: IWidget {
 // CHECK-LABEL: sil [transparent] [thunk] {{.*}}OpenWidgetC{{.*}}TWV
 // CHECK-SAME: $@convention(com_method) <[[OPEN_SELF:[^ ]+]] where [[OPEN_SELF]] : OpenWidget>
 // CHECK-SAME: (Optional<UnsafeMutablePointer<Int32>>, @guaranteed [[OPEN_SELF]]) -> UInt32
+
+// The witness tables record the native entries separately from the ordinary
+// Swift witnesses. IRGen follows these references when it builds COM vtables.
+
+// CHECK-LABEL: sil_witness_table hidden Widget: IWidget
+// CHECK: method #IWidget.value: {{.*}} : {{.*}}TW{{.*}}, com {{.*}}TWV
+// CHECK-LABEL: sil_witness_table DefaultWidget: IWidget
+// CHECK: method #IWidget.value: {{.*}} : {{.*}}TW{{.*}}, com {{.*}}TWV
+// CHECK-LABEL: sil_witness_table [serialized] PublicWidget: IWidget
+// CHECK: method #IWidget.value: {{.*}} : {{.*}}TW{{.*}}, com {{.*}}TWV
 // CHECK-LABEL: sil_witness_table OpenWidget: IWidget
 // CHECK: method #IWidget.value: {{.*}} : {{.*}}TW{{.*}}, com {{.*}}TWV
 
