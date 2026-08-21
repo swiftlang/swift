@@ -794,3 +794,42 @@ bb0(%x : $Builtin.Int64, %y: $Builtin.Int64):
   %ret = tuple ()
   return %ret : $()
 } // end sil function 'cond_fail_of_cmp'
+
+// The overflow check of `x + c` (c > 0) is redundant when the sum is later bounds-checked `< 0`.
+// CHECK-LABEL: @add_index_guarded_by_lower_bound
+// CHECK-NOT: "arithmetic overflow"
+// CHECK: "Index out of range"
+// CHECK: } // end sil function 'add_index_guarded_by_lower_bound'
+sil hidden @add_index_guarded_by_lower_bound : $@convention(thin) (Builtin.Int64) -> () {
+bb0(%0 : $Builtin.Int64):
+  %1 = integer_literal $Builtin.Int1, -1
+  %2 = integer_literal $Builtin.Int64, 1
+  %3 = builtin "sadd_with_overflow_Int64"(%0 : $Builtin.Int64, %2 : $Builtin.Int64, %1 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %4 = tuple_extract %3 : $(Builtin.Int64, Builtin.Int1), 0
+  %5 = tuple_extract %3 : $(Builtin.Int64, Builtin.Int1), 1
+  cond_fail %5 : $Builtin.Int1, "arithmetic overflow"
+  %7 = integer_literal $Builtin.Int64, 0
+  %8 = builtin "cmp_slt_Int64"(%4 : $Builtin.Int64, %7 : $Builtin.Int64) : $Builtin.Int1
+  cond_fail %8 : $Builtin.Int1, "Index out of range"
+  %10 = tuple ()
+  return %10 : $()
+}
+
+// Not optimized: with a negative addend an overflow can wrap positive and escape the `< 0` check.
+// CHECK-LABEL: @sub_index_not_optimized
+// CHECK: "arithmetic overflow"
+// CHECK: } // end sil function 'sub_index_not_optimized'
+sil hidden @sub_index_not_optimized : $@convention(thin) (Builtin.Int64) -> () {
+bb0(%0 : $Builtin.Int64):
+  %1 = integer_literal $Builtin.Int1, -1
+  %2 = integer_literal $Builtin.Int64, -1
+  %3 = builtin "sadd_with_overflow_Int64"(%0 : $Builtin.Int64, %2 : $Builtin.Int64, %1 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %4 = tuple_extract %3 : $(Builtin.Int64, Builtin.Int1), 0
+  %5 = tuple_extract %3 : $(Builtin.Int64, Builtin.Int1), 1
+  cond_fail %5 : $Builtin.Int1, "arithmetic overflow"
+  %7 = integer_literal $Builtin.Int64, 0
+  %8 = builtin "cmp_slt_Int64"(%4 : $Builtin.Int64, %7 : $Builtin.Int64) : $Builtin.Int1
+  cond_fail %8 : $Builtin.Int1, "Index out of range"
+  %10 = tuple ()
+  return %10 : $()
+}
