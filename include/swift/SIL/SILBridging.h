@@ -1233,7 +1233,7 @@ struct BridgedConstExprFunctionState {
 };
 
 struct BridgedWitnessTableEntry {
-  uint64_t storage[5];
+  uint64_t storage[6];
 
   enum class Kind {
     invalid,
@@ -1259,6 +1259,7 @@ struct BridgedWitnessTableEntry {
   BRIDGED_INLINE Kind getKind() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclRef getMethodRequirement() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedFunction getMethodWitness() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedFunction getMethodInterface() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj getAssociatedTypeRequirement() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType getAssociatedTypeWitness() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType getAssociatedConformanceRequirement() const;
@@ -1270,7 +1271,8 @@ struct BridgedWitnessTableEntry {
   static BridgedWitnessTableEntry createInvalid();
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
   static BridgedWitnessTableEntry createMethod(BridgedDeclRef requirement,
-                                               OptionalBridgedFunction witness);
+                                               OptionalBridgedFunction witness,
+                                               OptionalBridgedFunction interface);
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
   static BridgedWitnessTableEntry createAssociatedType(BridgedDeclObj requirement,
                                                        BridgedCanType witness);

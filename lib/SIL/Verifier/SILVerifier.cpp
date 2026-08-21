@@ -7929,6 +7929,19 @@ void SILWitnessTable::verify(const SILModule &mod) const {
       continue;
 
     auto *witnessFunction = entry.getMethodWitness().Witness;
+    auto *interface = entry.getMethodWitness().InterfaceEntry;
+
+    if (interface) {
+      assert(getProtocol()->isCOMInterface() &&
+             "only COM conformances may have native interface entries");
+      assert(interface->getLoweredFunctionType()->getRepresentation() ==
+                 SILFunctionTypeRepresentation::COMMethod &&
+             "native COM interface entries must have com_method representation");
+      if (hasOpenInterfaceEntries())
+        assert(interface->hasValidLinkageForFragileRef(IsSerialized) &&
+               "open COM conformances must expose native interface entries");
+    }
+
     if (!witnessFunction)
       continue;
 

@@ -8738,8 +8738,29 @@ static bool parseSILWitnessTableEntry(
       return true;
     }
   }
+  SILFunction *COMFunc = nullptr;
+  if (P.consumeIf(tok::comma)) {
+    if (!P.Tok.is(tok::identifier) || P.Tok.getText() != "com") {
+      P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, "com");
+      return true;
+    }
+    P.consumeToken();
+
+    Identifier COMFuncName;
+    SourceLoc COMFuncLoc;
+    if (P.parseToken(tok::at_sign, diag::expected_sil_function_name) ||
+        witnessState.parseSILIdentifier(COMFuncName, COMFuncLoc,
+                                        diag::expected_sil_value_name))
+      return true;
+
+    COMFunc = M.lookUpFunction(COMFuncName.str());
+    if (!COMFunc) {
+      P.diagnose(COMFuncLoc, diag::sil_witness_func_not_found, COMFuncName);
+      return true;
+    }
+  }
   witnessEntries.push_back(SILWitnessTable::MethodWitness{
-    Ref, Func
+    Ref, Func, COMFunc
   });
 
   return false;
@@ -8752,7 +8773,7 @@ static bool parseSILWitnessTableEntry(
 /// decl-sil-witness-body:
 ///   '{' sil-witness-entry* '}'
 /// sil-witness-entry:
-///   method SILDeclRef ':' @SILFunctionName
+///   method SILDeclRef ':' @SILFunctionName (',' 'com' @SILFunctionName)?
 ///   associated_type AssociatedTypeDeclName: Type
 ///   associated_conformance (AssocName: ProtocolName):
 ///                              protocol-conformance|dependent
