@@ -323,7 +323,8 @@ static void recordTypeWitness(NormalProtocolConformance *conformance,
   if (typeDecl == nullptr && !conformance->isReparented()) {
     Identifier name;
     bool needsImplementsAttr;
-    if (isAsyncIteratorOrSequenceFailure(assocType)) {
+    if (isAsyncIteratorOrSequenceFailure(assocType) ||
+        proto->getAttrs().hasAttribute<ReparentableAttr>()) {
       // Use __<protocol>_<assocType> as the name, to keep it out of the
       // way of other names.
       llvm::SmallString<32> nameBuffer;
