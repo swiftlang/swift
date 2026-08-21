@@ -845,10 +845,17 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValueHelper(
         // variable of a concrete class type is wrapped in `any Protocol` before
         // being stored into an indirect return slot, init_existential_ref sits
         // between the concrete copy_value and the enum wrapping. Without
-        // looking through it the inferrer gives up and the diagnostic falls back
-        // to the generic "unknown pattern" catch-all.
+        // looking through it the inferrer gives up and the diagnostic falls
+        // back to the generic "unknown pattern" catch-all.
         isa<InitExistentialRefInst>(searchValue) ||
-        isa<InitExistentialAddrInst>(searchValue)) {
+        isa<InitExistentialAddrInst>(searchValue) ||
+        // A `move_value [var_decl]` with no attached debug_value means the
+        // debug info for this var decl was never emitted (e.g. a capture-list
+        // entry synthesized directly from a member-access initializer, as in
+        // `[sending ns]` capturing `self.ns`). Fall through to the value's
+        // initializer instead of giving up, so e.g. a getter call underneath
+        // can still be named via the call-result path below.
+        isa<MoveValueInst>(searchValue)) {
       searchValue = cast<SingleValueInstruction>(searchValue)->getOperand(0);
       continue;
     }

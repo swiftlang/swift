@@ -3539,7 +3539,7 @@ bool SentNeverSendableDiagnosticEmitter::initForIsolatedPartialApply(
   auto *diagnosticOp = diagnosticPair->first;
 
   ApplyIsolationCrossing crossing(
-      op->getFunction()->getActorIsolation(),
+      actualCallerIsolation.value_or(op->getFunction()->getActorIsolation()),
       diagnosticOp->getFunction()->getActorIsolation());
 
   // We do not need to worry about failing to infer a name here since we are
@@ -3718,6 +3718,26 @@ bool SentNeverSendableDiagnosticEmitter::emit() {
     if (ace->getActorIsolation().isActorIsolated()) {
       if (initForIsolatedPartialApply(op, ace)) {
         return true;
+      }
+    }
+
+    // A `sending` capture of an non-isolated `@called(once)` closure is
+    // translated by `translateSILCalledOncePartialApply` as a send of
+    // that specific operand -- so reaching this operand here means the
+    // capture itself crossed isolation, independent of whether the closure
+    // as a whole is isolated. Let's use the captured value's tracked
+    // isolation (when it is actor-isolated) as the caller isolation.
+    if (auto *pai = dyn_cast<PartialApplyInst>(op->getUser());
+        pai && pai->isCalledOnce()) {
+      ApplySite apply(pai);
+      if (apply.getParamInfoForOperand(*op).hasOption(
+              SILParameterInfo::Sending)) {
+        std::optional<ActorIsolation> callerIsolation;
+        if (diagnosticEmitter.getIsolationRegionInfo()->hasActorIsolation())
+          callerIsolation =
+              diagnosticEmitter.getIsolationRegionInfo()->getActorIsolation();
+        if (initForIsolatedPartialApply(op, ace, callerIsolation))
+          return true;
       }
     }
   }
