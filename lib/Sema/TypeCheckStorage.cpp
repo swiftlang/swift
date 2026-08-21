@@ -4023,8 +4023,8 @@ static void finishPropertyWrapperImplInfo(VarDecl *var,
   if (var->hasObservers() || var->getDeclContext()->isLocalContext()) {
     info = StorageImplInfo::getMutableComputed();
   } else {
-    info = StorageImplInfo(ReadImplKind::Get, WriteImplKind::Set,
-                           ReadWriteImplKind::Modify);
+    info = StorageImplInfo::getMutableOpaque(OpaqueReadOwnership::Owned,
+                                             var->getASTContext());
   }
 }
 
