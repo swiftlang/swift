@@ -792,7 +792,11 @@ CanSILFunctionType getCOMMethodEntryType(CanSILFunctionType WitnessTy) {
   ASSERT(!parameters.empty());
 
   auto self = parameters.back();
-  if (!self.getInterfaceType()->getClassOrBoundGenericClass())
+  auto selfType = self.getInterfaceType();
+  auto genericSignature = FTy->getInvocationGenericSignature();
+  if (!selfType->mayHaveSuperclass() &&
+      !(selfType->isTypeParameter() && genericSignature &&
+        genericSignature->requiresClass(selfType)))
     return FTy;
 
   switch (self.getConvention()) {
