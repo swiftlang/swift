@@ -1937,7 +1937,10 @@ ClosureExpr *RValueEmitter::synthesizeConversionClosure(
             Identifier(), SourceLoc(), ident, closure);
 
   param->setSpecifier(ParamSpecifier::Default);
-  param->setInterfaceType(pair.OrigValue->getType());
+  auto paramTy = pair.OrigValue->getType();
+  param->setInterfaceType(paramTy->hasArchetype()
+                              ? paramTy->mapTypeOutOfEnvironment()
+                              : paramTy);
   param->setImplicit();
 
   ParameterList *params = ParameterList::create(Context, SourceLoc(), ArrayRef(param), SourceLoc());
