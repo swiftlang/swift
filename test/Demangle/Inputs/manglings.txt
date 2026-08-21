@@ -191,6 +191,7 @@ _TFCSo1AE ---> __C.A.__ivar_destroyer
 _TFCSo1Ae ---> __C.A.__ivar_initializer
 _TTWC13call_protocol1CS_1PS_FS1_3foofT_Si ---> protocol witness for call_protocol.P.foo() -> Swift.Int in conformance call_protocol.C : call_protocol.P in call_protocol
 _T013call_protocol1CCAA1PA2aDP3fooSiyFTW ---> {T:} protocol witness for call_protocol.P.foo() -> Swift.Int in conformance call_protocol.C : call_protocol.P in call_protocol
+$s4main6WidgetCAA7IWidgetA2aDP5valueys6UInt32VSpys5Int32VGSgFTWV ---> {T:,C} COM method witness for main.IWidget.value(Swift.UnsafeMutablePointer<Swift.Int32>?) -> Swift.UInt32 in conformance main.Widget : main.IWidget in main
 _TFC12dynamic_self1X1ffT_DS0_ ---> dynamic_self.X.f() -> Self
 _TTSg5Si___TFSqcfT_GSqx_ ---> generic specialization <Swift.Int> of Swift.Optional.init() -> A?
 _TTSgq5Si___TFSqcfT_GSqx_ ---> generic specialization <serialized, Swift.Int> of Swift.Optional.init() -> A?
