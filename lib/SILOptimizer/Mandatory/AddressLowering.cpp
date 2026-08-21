@@ -4068,7 +4068,8 @@ void UseRewriter::visitStoreInst(StoreInst *storeInst) {
   if (qualifier == StoreOwnershipQualifier::Init)
     isInit = IsInitialization;
   else {
-    assert(qualifier == StoreOwnershipQualifier::Assign);
+    assert(qualifier == StoreOwnershipQualifier::Assign ||
+           qualifier == StoreOwnershipQualifier::Trivial);
     isInit = IsNotInitialization;
   }
   rewriteStore(storeInst->getSrc(), storeInst->getDest(), isInit);
@@ -4485,7 +4486,9 @@ protected:
     if (loadInst->getOwnershipQualifier() == LoadOwnershipQualifier::Take)
       isTake = IsTake;
     else {
-      assert(loadInst->getOwnershipQualifier() == LoadOwnershipQualifier::Copy);
+      assert(
+          loadInst->getOwnershipQualifier() == LoadOwnershipQualifier::Copy ||
+          loadInst->getOwnershipQualifier() == LoadOwnershipQualifier::Trivial);
       isTake = IsNotTake;
     }
     // Dummy loads are already mapped to their storage address.
