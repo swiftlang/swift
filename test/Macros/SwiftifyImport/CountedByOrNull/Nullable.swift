@@ -75,8 +75,8 @@ public func myFunc3(_ ptr: inout MutableSpan<CInt>?, _ ptr2: inout MutableSpan<C
 @__swiftmacro_4test7myFunc415_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @inline(always) @_lifetime(copy ptr) @_lifetime(ptr: copy ptr) @_disfavoredOverload
-public func myFunc4(_ ptr: inout MutableSpan<CInt>?) -> MutableSpan<CInt>? {
+@_alwaysEmitIntoClient @inline(always) @_lifetime(copy ptr) @_disfavoredOverload
+public func myFunc4(_ ptr: consuming MutableSpan<CInt>?) -> MutableSpan<CInt>? {
     let len = CInt(exactly: ptr?.count ?? 0)!
     let _ptrPtr = ptr?.withUnsafeMutableBufferPointer {
         unsafe $0

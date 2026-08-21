@@ -275,8 +275,8 @@ module Instance {
 // CHECK-NEXT:@__swiftmacro_So8spanSelf{{.*}}_SwiftifyImportfMp_.swift
 // CHECK-NEXT:------------------------------
 // CHECK-NEXT:/// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT:@available(swift, obsoleted: 3, renamed: "IntSpan.spanSelf(self:)") @_alwaysEmitIntoClient @inline(always) @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_lifetime(p: copy p) @_disfavoredOverload
-// CHECK-NEXT:public func spanSelf(_ p: inout MutableSpan<CInt>) -> MutableSpan<CInt> {
+// CHECK-NEXT:@available(swift, obsoleted: 3, renamed: "IntSpan.spanSelf(self:)") @_alwaysEmitIntoClient @inline(always) @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_disfavoredOverload
+// CHECK-NEXT:public func spanSelf(_ p: consuming MutableSpan<CInt>) -> MutableSpan<CInt> {
 // CHECK-NEXT:    return unsafe _swiftifyOverrideLifetime(MutableSpan(_unsafeCxxSpan: p.withUnsafeMutableBufferPointer { _pPtr in
 // CHECK-NEXT:      return unsafe spanSelf(IntSpan(_pPtr))
 // CHECK-NEXT:            }), copying: ())
@@ -293,8 +293,8 @@ module Instance {
 // CHECK-NEXT:@__swiftmacro_{{.*}}spanConstSelf{{.*}}_SwiftifyImportfMp_.swift
 // CHECK-NEXT:------------------------------
 // CHECK-NEXT:/// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT:@available(swift, obsoleted: 3, renamed: "IntSpan.spanConstSelf(self:)") @_alwaysEmitIntoClient @inline(always) @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_lifetime(p: copy p) @_disfavoredOverload
-// CHECK-NEXT:public func spanConstSelf(_ p: inout MutableSpan<CInt>) -> MutableSpan<CInt> {
+// CHECK-NEXT:@available(swift, obsoleted: 3, renamed: "IntSpan.spanConstSelf(self:)") @_alwaysEmitIntoClient @inline(always) @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_disfavoredOverload
+// CHECK-NEXT:public func spanConstSelf(_ p: consuming MutableSpan<CInt>) -> MutableSpan<CInt> {
 // CHECK-NEXT:    return unsafe _swiftifyOverrideLifetime(MutableSpan(_unsafeCxxSpan: p.withUnsafeMutableBufferPointer { _pPtr in
 // CHECK-NEXT:      return unsafe spanConstSelf(IntSpan(_pPtr))
 // CHECK-NEXT:            }), copying: ())

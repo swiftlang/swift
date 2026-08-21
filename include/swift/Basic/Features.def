@@ -529,6 +529,15 @@ EXPERIMENTAL_FEATURE(SafeInteropWrappers, true)
 // behavior is already standard in the stabilized version.
 EXPERIMENTAL_FEATURE(SafeInteropWrappersNullAsEmptySpan, true)
 
+// Opts back into passing a `__lifetimebound` Mutable[Raw]Span wrapper parameter
+// as `inout` rather than `consuming`. By default the wrapper is now `consuming`,
+// since `inout` cannot express that the returned span keeps borrowing the
+// parameter after the call returns. Enabling this feature restores the original
+// `inout` convention, matching the SafeInteropWrappers source contract that some
+// projects adopted before `consuming` became the default. Immutable spans are
+// unaffected, since they carry no ownership specifier.
+EXPERIMENTAL_FEATURE(SafeInteropWrappersLegacyNonconsumingLifetimebound, true)
+
 /// Ignore resilience errors due to C++ types.
 EXPERIMENTAL_FEATURE(AssumeResilientCxxTypes, true)
 

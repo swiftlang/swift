@@ -2013,6 +2013,13 @@ public:
   /// Used to avoid emitting the same warning once per imported function.
   bool DiagnosedMissingNullableAsEmptySpanParam = false;
 
+  /// Tracks whether we have already warned the user that the loaded
+  /// _SwiftifyImport macro plugin lacks the `legacyNonconsumingLifetimebound`
+  /// parameter, and therefore cannot honor the default `consuming` convention
+  /// for __lifetimebound Mutable[Raw]Span parameters.
+  /// Used to avoid emitting the same warning once per imported function.
+  bool DiagnosedMissingLegacyNonconsumingLifetimeboundParam = false;
+
   /// Find the lookup table that corresponds to the given Clang module.
   ///
   /// \param clangModule The module, or null to indicate that we're talking
