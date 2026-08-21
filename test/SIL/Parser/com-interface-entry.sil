@@ -1,0 +1,32 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -enable-experimental-com-interop -module-name COM -emit-module-path %t/COM.swiftmodule %S/../../Inputs/COM.swift
+// RUN: %target-swift-frontend -enable-experimental-com-interop -I %t -module-name main -parse-sil -emit-sil %s | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import COM
+
+@com(interface: "20000000-0000-0000-0000-000000000001")
+protocol IInterface {
+  func method()
+}
+
+@com
+final class Implementation : IInterface {
+  func method()
+  deinit
+}
+
+sil hidden_external @witness : $@convention(witness_method: IInterface) <τ_0_0 where τ_0_0 : IInterface> (@in_guaranteed τ_0_0) -> ()
+sil hidden_external @interface : $@convention(com_method) (@guaranteed Implementation) -> ()
+
+// CHECK-LABEL: sil_witness_table hidden Implementation: IInterface module main {
+// CHECK: method #IInterface.method:
+// CHECK-SAME: : @witness
+// CHECK-SAME: , com @interface
+// CHECK: }
+sil_witness_table hidden Implementation: IInterface module main {
+  method #IInterface.method: <Self where Self : IInterface> (Self) -> () -> () : @witness, com @interface
+}
