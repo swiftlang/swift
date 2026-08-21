@@ -754,6 +754,31 @@ extension Sequence {
     // FIXME(performance): optimize to 1 pass?  But Array(self) can be
     // optimized to a memcpy() sometimes.  Those cases are usually collections,
     // though.
+    //
+    // Swapping through a `MutableSpan` makes the buffer uniquely referenced and
+    // mutable once instead of once per swap. `ContiguousArray` is used instead
+    // of `Array` because its `mutableSpan` is back deployed, which keeps the
+    // availability check below at the oldest ABI stable runtime rather than at
+    // the runtime that introduced `Span`, and because it has no bridged
+    // representation to check for. Rewrapping the result as an `Array` is O(1).
+    //
+    // The version list below is SwiftCompatibilitySpan 5.0, spelled out because
+    // availability macros cannot be used in an '@inlinable' function.
+    if #available(
+      macOS 10.14.4, iOS 12.2, watchOS 5.2, tvOS 12.2, visionOS 1.0, *
+    ) {
+      var result = ContiguousArray(self)
+      let count = result.count
+      // Forming the span has a constant cost that is pure overhead when there
+      // is nothing to swap.
+      if count > 1 {
+        var span = result.mutableSpan
+        for i in 0..<count/2 {
+          unsafe span.swapAt(unchecked: i, unchecked: count - ((i + 1) as Int))
+        }
+      }
+      return Array(result)
+    }
     var result = Array(self)
     let count = result.count
     for i in 0..<count/2 {
