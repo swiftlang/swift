@@ -1,6 +1,12 @@
 // REQUIRES: swift_feature_SafeInteropWrappers
 // REQUIRES: swift_feature_Lifetimes
 
+// Ref/MutableRef are annotated with StdlibDeploymentTarget, which CMake clamps
+// to the platform being built, so the availability in the expansions below is
+// specific to a non-strict macOS build.
+// REQUIRES: OS=macosx
+// REQUIRES: !swift_stdlib_strict_availability
+
 // RUN: %empty-directory(%t)
 // RUN: split-file --leading-lines %s %t
 
