@@ -2597,6 +2597,8 @@ static void visitBuiltinAddress(BuiltinInst *builtin,
     case BuiltinValueKind::DeallocRaw:
     case BuiltinValueKind::AllocRawTyped:
     case BuiltinValueKind::DeallocRawTyped:
+    case BuiltinValueKind::AllocErrorBoxTyped:
+    case BuiltinValueKind::DeallocErrorBoxTyped:
     case BuiltinValueKind::StackAlloc:
     case BuiltinValueKind::UnprotectedStackAlloc:
     case BuiltinValueKind::AllocVector:
