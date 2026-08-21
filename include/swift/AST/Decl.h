@@ -1446,6 +1446,17 @@ public:
   /// \seeAlso ExtensionDecl::isObjCInterface()
   Decl *getObjCImplementationDecl() const;
 
+  /// Whether this Clang-imported declaration is known to have its definition
+  /// provided by a Swift `@implementation`.
+  ///
+  /// Unlike \c getObjCImplementationDecl(), this only consults the already
+  /// computed interface-to-implementation cache; it never triggers the
+  /// \c ObjCInterfaceAndImplementationRequest (and thus never performs a
+  /// reverse name lookup). It is therefore only meaningful once the relevant
+  /// `@implementation` has been type-checked, which is guaranteed for the
+  /// SIL/IRGen clients that use it.
+  bool hasObjCImplementation() const;
+
   bool getCachedLacksObjCInterfaceOrImplementation() const {
     return Bits.Decl.LacksObjCInterfaceOrImplementation;
   }
