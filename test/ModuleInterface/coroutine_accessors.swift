@@ -55,8 +55,8 @@ public protocol P1 {
 }
 
 // The requirement is written identically with or without the feature, so the
-// availability guard's two branches print identically.  The subscript
-// prints without a guard.
+// availability guard's two branches print identically -- for both the
+// property and the subscript.
 
 // CHECK:      public protocol P1 {
 // CHECK:        #if compiler(>=5.3) && $CoroutineAccessors
@@ -64,7 +64,11 @@ public protocol P1 {
 // CHECK-NEXT:   #else
 // CHECK-NEXT:   @_borrowed var value: Swift::Int { get set }
 // CHECK-NEXT:   #endif
-// CHECK:        @_borrowed subscript(i: Swift::Int) -> Swift::Int { get set }
+// CHECK-NEXT:   #if compiler(>=5.3) && $CoroutineAccessors
+// CHECK-NEXT:   @_borrowed subscript(i: Swift::Int) -> Swift::Int { get set }
+// CHECK-NEXT:   #else
+// CHECK-NEXT:   @_borrowed subscript(i: Swift::Int) -> Swift::Int { get set }
+// CHECK-NEXT:   #endif
 // CHECK:      }
 
 
@@ -99,14 +103,21 @@ public struct S {
 // CHECK-unstable-NEXT: }
 // CHECK-NEXT:   #endif
 
-// TODO: Fix this bug
-// Unlike the property, the subscript currently gets no guard:
-// it always prints the new spelling unconditionally, identically on stable
-// and unstable platforms.
+// The subscript now mirrors the property: same guard, same stable/unstable
+// split for the legacy branch.
 
+// CHECK-NEXT:   #if compiler(>=5.3) && $CoroutineAccessors
 // CHECK-NEXT:   public subscript(i: Swift::Int) -> Swift::Int {
 // CHECK-NEXT:     yielding borrow
 // CHECK-NEXT:     yielding mutate
 // CHECK-NEXT:   }
+// CHECK-NEXT:   #else
+// CHECK-stable-NEXT: public subscript(i: Swift::Int) -> Swift::Int {
+// CHECK-stable-NEXT:   _read
+// CHECK-stable-NEXT:   _modify
+// CHECK-stable-NEXT: }
+// CHECK-unstable-NEXT: public subscript(i: Swift::Int) -> Swift::Int {
+// CHECK-unstable-NEXT: }
+// CHECK-NEXT:   #endif
 // CHECK:      }
 
