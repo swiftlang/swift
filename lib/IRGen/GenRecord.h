@@ -208,6 +208,13 @@ public:
 
   void assignWithCopy(IRGenFunction &IGF, Address dest, Address src, SILType T,
                       bool isOutlined) const override {
+    // if POD, forward to generic LoadableTypeInfo implementation, which will memcpy
+    if (this->isTriviallyDestroyable(ResilienceExpansion::Maximal) &&
+        isa<LoadableTypeInfo>(this)) {
+      return cast<LoadableTypeInfo>(this)->LoadableTypeInfo::initializeWithCopy(
+          IGF, dest, src, T, isOutlined);
+    }
+
     // If the fields are not ABI-accessible, use the value witness table.
     if (!AreFieldsABIAccessible) {
       return emitAssignWithCopyCall(IGF, T, dest, src);
@@ -231,6 +238,13 @@ public:
 
   void assignWithTake(IRGenFunction &IGF, Address dest, Address src, SILType T,
                       bool isOutlined) const override {
+    // If POD, forward to initializeWithTake to memcpy
+    if (this->isTriviallyDestroyable(ResilienceExpansion::Maximal) &&
+        isa<LoadableTypeInfo>(this)) {
+      return initializeWithTake(IGF, dest, src, T, isOutlined,
+                                /*zeroizeIfSensitive=*/true);
+    }
+
     // If the fields are not ABI-accessible, use the value witness table.
     if (!AreFieldsABIAccessible) {
       return emitAssignWithTakeCall(IGF, T, dest, src);
