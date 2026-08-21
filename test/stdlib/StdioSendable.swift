@@ -12,7 +12,6 @@
 
 // RUN: %target-swift-frontend -swift-version 6 -emit-sil -o /dev/null -verify %s
 // REQUIRES: concurrency
-// REQUIRES: OS=linux-gnu || OS=linux-musl || OS=linux-android || OS=linux-androideabi || OS=wasip1 || OS=openbsd || OS=freebsd
 
 // Regression test: stdin/stdout/stderr must be usable from concurrent contexts
 // on Linux, Android, WASI, OpenBSD, and FreeBSD. They are computed vars marked
@@ -20,7 +19,9 @@
 // FreeBSD. Either way they must not trip "global shared mutable state" errors in
 // Swift 6 mode.
 
-#if canImport(Glibc)
+#if canImport(Darwin)
+import Darwin
+#elseif canImport(Glibc)
 import Glibc
 #elseif canImport(Musl)
 import Musl
@@ -28,6 +29,8 @@ import Musl
 import Android
 #elseif canImport(WASILibc)
 import WASILibc
+#elseif os(Windows)
+import CRT
 #else
 #error("Unsupported platform")
 #endif
@@ -54,15 +57,9 @@ nonisolated func useFromNonisolatedContext() {
 
 // Make sure we can pass stdout/stderr to `FILE *` parameters of stdio functions
 // imported from the same overlay.
-//
-// On Android and WASI `FILE *` imports as OpaquePointer, so those platforms
-// require a bridging typealias at each call site (see swift-inspect for the
-// pattern). This check therefore runs only where FILE is a nominal type.
-#if !os(Android) && !os(WASI)
 func passToStdioFunctions() {
     setvbuf(stdout, nil, _IOLBF, 0)
     setvbuf(stderr, nil, _IOLBF, 0)
     fflush(stdout)
     fputs("hi", stderr)
 }
-#endif
