@@ -61,17 +61,19 @@ func testNestedRejectedThroughNonCalledOnceIntermediate(ns1: sending NS) {
   let _: @called(once) () -> Void = {
     manyTimes {
       calledOnce { [sending ns1] in
-        // expected-error@-1 {{task or actor-isolated value cannot be sent}}
         sendAgain(ns1)
+        // expected-error@-1 {{sending 'ns1' risks causing data races}}
+        // expected-note@-2 {{'ns1' is captured by a nonisolated closure. nonisolated uses in closure may race against code in the current isolation context}}
       }
     }
   }
-  
+
   let _: @called(once) () -> Void = { [sending ns1] in
     manyTimes {
       calledOnce { [sending ns1] in
-        // expected-error@-1 {{task or actor-isolated value cannot be sent}}
         sendAgain(ns1)
+        // expected-error@-1 {{sending 'ns1' risks causing data races}}
+        // expected-note@-2 {{'ns1' is captured by a nonisolated closure. nonisolated uses in closure may race against code in the current isolation context}}
       }
     }
   }
@@ -88,8 +90,9 @@ func testNestedAcceptedWithExplicitChain(ns1: sending NS) {
 func testOuterCalledOnceAloneIsNotEnough(ns1: sending NS) {
   let _: @called(once) () -> Void = {
     calledOnce { [sending ns1] in
-      // expected-error@-1 {{task or actor-isolated value cannot be sent}}
       sendAgain(ns1)
+      // expected-error@-1 {{sending 'ns1' risks causing data races}}
+      // expected-note@-2 {{'ns1' is captured by a nonisolated closure. nonisolated uses in closure may race against code in the current isolation context}}
     }
   }
 }
@@ -122,12 +125,10 @@ actor CalledOnceActor {
 
 // SentNeverSendable: sending an actor-isolated capture (`ns` here resolves
 // to `self.ns`, captured while already inside the actor-isolated method).
-//
-// TODO: Falls through to the generic path for unknown values.
 extension CalledOnceActor {
   func testSentNeverSendableActorIsolatedCapture() {
-    _ = CalledOnceTask { [sending ns] in // expected-error {{task or actor-isolated value cannot be sent}}
-      sendAgain(ns)
+    _ = CalledOnceTask { [sending ns] in
+      sendAgain(ns) // expected-error {{sending 'self.ns' risks causing data races}} expected-note {{'self'-isolated 'self.ns' is captured by a nonisolated closure. nonisolated uses in closure may race against later actor-isolated uses}}
     }
   }
 }
@@ -167,12 +168,10 @@ func testInOutSendingParametersInSameRegionUnaffected(_ x: inout sending NS, _ y
 // `@called(once)` closure counts as consuming the parameter, and the
 // function must reinitialize it with a disconnected value before returning,
 // exactly as it would for an ordinary direct send.
-//
-// TODO: note should say "capture" instead of "argument".
 func testInOutSendingCaptureNotReinitialized(_ x: inout sending NS) {
   _ = CalledOnceTask { [sending x] in
-    // expected-error@-1 {{sending value of non-Sendable type 'NS' risks causing data races}}
-    // expected-note@-2 {{Passing value of non-Sendable type 'NS' as a 'sending' argument risks causing races in between local and caller code}}
+    // expected-error@-1 {{sending 'x' risks causing data races}}
+    // expected-note@-2 {{'x' used after being passed as a 'sending' parameter; Later uses could race}}
     sendAgain(x)
   }
 } // expected-note {{'inout sending' parameter must be reinitialized before function exit with a non-actor-isolated value}}
