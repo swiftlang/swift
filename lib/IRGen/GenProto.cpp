@@ -4010,7 +4010,17 @@ llvm::Value *irgen::emitWitnessTableRef(IRGenFunction &IGF,
   if (proto->isCOMInterface()) {
     if (srcType->isExistentialType() || srcType->is<ExistentialArchetypeType>())
       return getCOMExistentialAdjustment(IGF.IGM);
-    return getCOMInterfaceAdjustment(IGF.IGM, srcType, proto);
+
+    // A protocol-extension witness on a class can express Self as an
+    // archetype, and its mapped conformance can retain that archetypal type.
+    // The root conformance identifies the class whose native COM layout
+    // supplies the interface adjustment.
+    CanType layoutType = srcType;
+    if (srcType->is<ArchetypeType>()) {
+      auto *root = concreteConformance->getRootConformance();
+      layoutType = root->getType()->getCanonicalType();
+    }
+    return getCOMInterfaceAdjustment(IGF.IGM, layoutType, proto);
   }
 
   auto cacheKind =
