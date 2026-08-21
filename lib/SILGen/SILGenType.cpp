@@ -780,6 +780,46 @@ SILGenModule::getWitnessTable(RootProtocolConformance *conformance) {
   return table;
 }
 
+namespace {
+CanSILFunctionType getCOMMethodEntryType(CanSILFunctionType WitnessTy) {
+  auto FTy =
+      Lowering::adjustFunctionType(WitnessTy,
+                                   SILFunctionTypeRepresentation::COMMethod,
+                                   ProtocolConformanceRef());
+
+  SmallVector<SILParameterInfo, 8> parameters;
+  llvm::append_range(parameters, FTy->getParameters());
+  ASSERT(!parameters.empty());
+
+  auto self = parameters.back();
+  if (!self.getInterfaceType()->getClassOrBoundGenericClass())
+    return FTy;
+
+  switch (self.getConvention()) {
+  case ParameterConvention::Indirect_In_Guaranteed:
+    parameters.back() =
+        self.getWithConvention(ParameterConvention::Direct_Guaranteed);
+    break;
+  case ParameterConvention::Indirect_In:
+    parameters.back() =
+        self.getWithConvention(ParameterConvention::Direct_Owned);
+    break;
+  default:
+    return FTy;
+  }
+
+  return SILFunctionType::get(FTy->getInvocationGenericSignature(),
+                              FTy->getExtInfo(), FTy->getCoroutineKind(),
+                              FTy->getCalleeConvention(), parameters,
+                              FTy->getYields(), FTy->getResults(),
+                              FTy->getOptionalErrorResult(),
+                              FTy->getPatternSubstitutions(),
+                              FTy->getInvocationSubstitutions(),
+                              FTy->getASTContext(),
+                              FTy->getWitnessMethodConformanceOrInvalid());
+}
+}
+
 SILFunction *SILGenModule::emitProtocolWitness(
     ProtocolConformanceRef origConformance, SILLinkage linkage,
     SerializedKind_t serializedKind, SILDeclRef requirement,
@@ -939,14 +979,6 @@ SILFunction *SILGenModule::emitProtocolWitness(
       ProfileCounter(), thunkKind, SubclassScope::NotApplicable,
       InlineStrategy);
 
-  f->setDebugScope(new (M)
-                   SILDebugScope(RegularLocation(witnessRef.getDecl()), f));
-
-  PrettyStackTraceSILFunction trace("generating protocol witness thunk", f);
-
-  // Create the witness.
-  SILGenFunction SGF(*this, *f, SwiftModule);
-
   // Substitutions mapping the generic parameters of the witness to
   // archetypes of the witness thunk generic environment.
   auto witnessSubs = witness.getSubstitutions();
@@ -962,14 +994,50 @@ SILFunction *SILGenModule::emitProtocolWitness(
       isPreconcurrency = C->isPreconcurrency();
   }
 
-  SGF.emitProtocolWitness(AbstractionPattern(reqtOrigTy), reqtSubstTy,
-                          requirement, reqtSubMap, witnessRef,
-                          witnessSubs, isFree,
-                          /*isSelfConformance*/ false,
-                          isPreconcurrency,
-                          witness.getEnterIsolation());
+  auto emitThunkBody = [&](SILFunction *function, const char *description) {
+    PrettyStackTraceSILFunction trace(description, function);
 
-  emitLazyConformancesForFunction(f);
+    auto location = RegularLocation(witnessRef.getDecl());
+    function->setDebugScope(new (M) SILDebugScope(location, function));
+
+    SILGenFunction SGF(*this, *function, SwiftModule);
+    SGF.emitProtocolWitness(AbstractionPattern(reqtOrigTy), reqtSubstTy,
+                            requirement, reqtSubMap, witnessRef, witnessSubs,
+                            isFree, /*isSelfConformance*/ false,
+                            isPreconcurrency, witness.getEnterIsolation());
+    emitLazyConformancesForFunction(function);
+  };
+
+  emitThunkBody(f, "generating protocol witness thunk");
+
+  // IRGen references this entry from the native interface vtable after SIL
+  // optimization has finished. Give the entry the requirement adaptation of the
+  // ordinary witness thunk, but the physical COM method convention.
+  auto *protocol = origConformance.getProtocol();
+  if (origConformance.isConcrete() && protocol->isCOMInterface()) {
+    auto *CD =
+        origConformance.getConcrete()->getType()->getClassOrBoundGenericClass();
+    auto *info = CD ? CD->getCOMDeclInfo() : nullptr;
+    if (info && info->isImplementation()) {
+      auto Ty = getCOMMethodEntryType(witnessSILFnType);
+      auto label = nameBuffer + ".com.entry";
+      // TODO: Emit ABI-compatible COM entries as alternate machine-code entry
+      // points so the adjustment can fall through into the native body.
+      auto *entry =
+          builder.createFunction(SILLinkage::Private, label, Ty,
+                                 getSILFunctionTypeActorIsolation(reqtSubstTy,
+                                                                  requirement,
+                                                                  witnessRef),
+                                 genericEnv, SILLocation(witnessRef.getDecl()),
+                                 IsNotBare, IsTransparent, IsNotSerialized,
+                                 IsNotDynamic, IsNotDistributed,
+                                 IsNotRuntimeAccessible, ProfileCounter(),
+                                 IsThunk, SubclassScope::NotApplicable,
+                                 InlineStrategy);
+      entry->setMarkedAsUsed(true);
+      emitThunkBody(entry, "generating COM method entry thunk");
+    }
+  }
 
   return f;
 }
