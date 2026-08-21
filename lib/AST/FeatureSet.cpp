@@ -488,6 +488,7 @@ UNINTERESTING_FEATURE(ImportNonPublicCxxMembers)
 UNINTERESTING_FEATURE(ImportCxxMembersLazily)
 UNINTERESTING_FEATURE(ImportUnsafeCxxMethodsAsAlwaysUnsafe)
 UNINTERESTING_FEATURE(ForeignReferenceTypeInheritance)
+UNINTERESTING_FEATURE(CxxExistentialInterop)
 UNINTERESTING_FEATURE(CoroutineAccessorsUnwindOnCallerError)
 UNINTERESTING_FEATURE(AllowRuntimeSymbolDeclarations)
 
