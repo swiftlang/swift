@@ -10,15 +10,15 @@
 // This test is meant to act as an alarm bell to unintended changes in whitespace
 
 //--- test.swift
-@_SwiftifyImport(.countedBy(pointer: .return, count: "len"), .lifetimeDependence(dependsOn: .param(1), pointer: .return, type: .copy), .countedBy(pointer: .param(1), count: "len"), .nonescaping(pointer: .param(1)), .countedBy(pointer: .param(3), count: "len2"), .nonescaping(pointer: .param(3)), nullableAsEmptySpan: true)
+@_SwiftifyImport(.countedBy(pointer: .return, count: "len"), .lifetimeDependence(dependsOn: .param(1), pointer: .return, type: .copy), .countedBy(pointer: .param(1), count: "len"), .nonescaping(pointer: .param(1)), .countedBy(pointer: .param(3), count: "len2"), .nonescaping(pointer: .param(3)), nullableAsEmptySpan: true, consumingLifetimebound: true)
 public func myFunc(_ ptr: UnsafeMutablePointer<CInt>?, _ len: CInt, _ ptr2: UnsafeMutablePointer<CInt>?, _ len2: CInt) -> UnsafeMutablePointer<CInt>? { nil }
 
 //--- expansions.expected
 @__swiftmacro_4test6myFunc15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_lifetime(copy ptr) @_lifetime(ptr: copy ptr) @_lifetime(ptr2: copy ptr2) @_disfavoredOverload
-public func myFunc(_ ptr: inout MutableSpan<CInt>, _ ptr2: inout MutableSpan<CInt>) -> MutableSpan<CInt> {
+@_alwaysEmitIntoClient @_lifetime(copy ptr) @_lifetime(ptr2: copy ptr2) @_disfavoredOverload
+public func myFunc(_ ptr: consuming MutableSpan<CInt>, _ ptr2: inout MutableSpan<CInt>) -> MutableSpan<CInt> {
     let len = CInt(exactly: ptr.count)!
     let len2 = CInt(exactly: ptr2.count)!
     let _ptrPtr = ptr.withUnsafeMutableBufferPointer {

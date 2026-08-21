@@ -8624,6 +8624,12 @@ WARNING(swiftify_nullable_as_empty_span_param_missing, none,
         "retain the legacy Optional-propagating behavior for _Nullable "
         "__counted_by and __sized_by pointers", ())
 
+WARNING(swiftify_consuming_lifetimebound_param_missing, none,
+        "the loaded _SwiftifyImport macro plugin does not support the "
+        "'consumingLifetimebound' parameter; generated safe wrappers will "
+        "retain the legacy 'inout' convention for __lifetimebound "
+        "Mutable[Raw]Span parameters", ())
+
 //------------------------------------------------------------------------------
 // MARK: Noncopyable Types Diagnostics
 //------------------------------------------------------------------------------

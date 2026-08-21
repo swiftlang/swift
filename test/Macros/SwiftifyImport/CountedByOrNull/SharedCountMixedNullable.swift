@@ -79,7 +79,7 @@ public func mutSpansAllOrNull(_ p1: UnsafeMutablePointer<CInt>?, _ p2: UnsafeMut
 // parameters of mixed nullability. The non-Optional `.countedBy` sharer is
 // the extractor; the Optional sharer's check is nil-aware. Return is a
 // non-Optional MutableSpan (since `.countedBy` hides nullability).
-@_SwiftifyImport(.countedBy(pointer: .param(1), count: "len"), .nonescaping(pointer: .param(1)), .countedByOrNull(pointer: .param(2), count: "len"), .nonescaping(pointer: .param(2)), .countedBy(pointer: .return, count: "len"), .lifetimeDependence(dependsOn: .param(1), pointer: .return, type: .copy), nullableAsEmptySpan: true)
+@_SwiftifyImport(.countedBy(pointer: .param(1), count: "len"), .nonescaping(pointer: .param(1)), .countedByOrNull(pointer: .param(2), count: "len"), .nonescaping(pointer: .param(2)), .countedBy(pointer: .return, count: "len"), .lifetimeDependence(dependsOn: .param(1), pointer: .return, type: .copy), nullableAsEmptySpan: true, consumingLifetimebound: true)
 public func mutSpansMixedReturn(_ p1: UnsafeMutablePointer<CInt>?, _ p2: UnsafeMutablePointer<CInt>?, _ len: CInt) -> UnsafeMutablePointer<CInt>? {
 // expected-error@+1{{missing return in global function expected to return 'UnsafeMutablePointer<CInt>?' (aka 'Optional<UnsafeMutablePointer<Int32>>')}}
 }
@@ -87,7 +87,7 @@ public func mutSpansMixedReturn(_ p1: UnsafeMutablePointer<CInt>?, _ p2: UnsafeM
 // Case 12: MutableSpan? return value — `.countedByOrNull` on the return
 // keeps the wrapper's return type Optional, exercising the early-return-nil
 // path alongside the shared-count infrastructure.
-@_SwiftifyImport(.countedBy(pointer: .param(1), count: "len"), .nonescaping(pointer: .param(1)), .countedByOrNull(pointer: .param(2), count: "len"), .nonescaping(pointer: .param(2)), .countedByOrNull(pointer: .return, count: "len"), .lifetimeDependence(dependsOn: .param(1), pointer: .return, type: .copy), nullableAsEmptySpan: true)
+@_SwiftifyImport(.countedBy(pointer: .param(1), count: "len"), .nonescaping(pointer: .param(1)), .countedByOrNull(pointer: .param(2), count: "len"), .nonescaping(pointer: .param(2)), .countedByOrNull(pointer: .return, count: "len"), .lifetimeDependence(dependsOn: .param(1), pointer: .return, type: .copy), nullableAsEmptySpan: true, consumingLifetimebound: true)
 public func mutSpansMixedOrNullReturn(_ p1: UnsafeMutablePointer<CInt>?, _ p2: UnsafeMutablePointer<CInt>?, _ len: CInt) -> UnsafeMutablePointer<CInt>? {
 // expected-error@+1{{missing return in global function expected to return 'UnsafeMutablePointer<CInt>?' (aka 'Optional<UnsafeMutablePointer<Int32>>')}}
 }
@@ -310,8 +310,8 @@ public func mutSpansAllOrNull(_ p1: inout MutableSpan<CInt>?, _ p2: inout Mutabl
 // the extractor; the Optional sharer's check is nil-aware. Return is a
 // non-Optional MutableSpan (since `.countedBy` hides nullability).
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_lifetime(copy p1) @_lifetime(p1: copy p1) @_lifetime(p2: copy p2) @_disfavoredOverload
-public func mutSpansMixedReturn(_ p1: inout MutableSpan<CInt>, _ p2: inout MutableSpan<CInt>?) -> MutableSpan<CInt> {
+@_alwaysEmitIntoClient @_lifetime(copy p1) @_lifetime(p2: copy p2) @_disfavoredOverload
+public func mutSpansMixedReturn(_ p1: consuming MutableSpan<CInt>, _ p2: inout MutableSpan<CInt>?) -> MutableSpan<CInt> {
     let len = CInt(exactly: p1.count)!
     if let _p2Count = p2?.count, _p2Count != len {
       fatalError("bounds check failure in mutSpansMixedReturn: expected \(len) but got \(_p2Count)")
@@ -342,8 +342,8 @@ public func mutSpansMixedReturn(_ p1: inout MutableSpan<CInt>, _ p2: inout Mutab
 // keeps the wrapper's return type Optional, exercising the early-return-nil
 // path alongside the shared-count infrastructure.
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_lifetime(copy p1) @_lifetime(p1: copy p1) @_lifetime(p2: copy p2) @_disfavoredOverload
-public func mutSpansMixedOrNullReturn(_ p1: inout MutableSpan<CInt>, _ p2: inout MutableSpan<CInt>?) -> MutableSpan<CInt>? {
+@_alwaysEmitIntoClient @_lifetime(copy p1) @_lifetime(p2: copy p2) @_disfavoredOverload
+public func mutSpansMixedOrNullReturn(_ p1: consuming MutableSpan<CInt>, _ p2: inout MutableSpan<CInt>?) -> MutableSpan<CInt>? {
     let len = CInt(exactly: p1.count)!
     if let _p2Count = p2?.count, _p2Count != len {
       fatalError("bounds check failure in mutSpansMixedOrNullReturn: expected \(len) but got \(_p2Count)")
