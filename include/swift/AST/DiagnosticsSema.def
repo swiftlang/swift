@@ -3155,6 +3155,9 @@ ERROR(type_does_not_conform_anyobject_in_decl_ref,none,
 ERROR(type_does_not_conform_decl_owner,none,
       "%kind0 requires that %1 conform to %2",
       (const ValueDecl *, Type, Type))
+NOTE(missing_conformance_unloaded_module,none,
+     "the conformance of %0 to %1 could not be loaded because module %2 was not "
+     "imported; add import of module %2", (Type, Type, Identifier))
 ERROR(type_does_not_conform_anyobject_decl_owner,none,
       "%kind0 requires that %1 be a class type",
       (const ValueDecl *, Type, Type))

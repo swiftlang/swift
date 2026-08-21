@@ -983,6 +983,7 @@ ProtocolConformanceDeserializer::readNormalProtocolConformanceXRef(
 
   // FIXME: If the module hasn't been loaded, we probably don't want to fall
   // back to the current module like this.
+  bool moduleNotLoaded = !module;
   if (!module)
     module = MF.getAssociatedModule();
 
@@ -1007,6 +1008,14 @@ ProtocolConformanceDeserializer::readNormalProtocolConformanceXRef(
     if (!conformances.empty())
       return conformances.front();
   }
+
+  // If the referenced module was never loaded (e.g. it is hidden behind a
+  // non-public import in a dependency), mirror resolveCrossReference and
+  // return a recoverable error instead of a hard ConformanceXRefError. The
+  // witness-substitution reader recovers by installing an opaque witness.
+  if (moduleNotLoaded)
+    return llvm::make_error<XRefNonLoadedModuleError>(
+        MF.getIdentifier(moduleID));
 
   auto error = llvm::make_error<ConformanceXRefError>(
                  nominal->getName(), proto->getName(), module);
@@ -9400,7 +9409,16 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
       if (witnessSubstitutions.errorIsA<XRefNonLoadedModuleError>() ||
           witnessSubstitutions.errorIsA<UnsafeDeserializationError>() ||
           allowCompilerErrors()) {
-        diagnoseAndConsumeError(witnessSubstitutions.takeError());
+        auto errorInfo = takeErrorInfo(witnessSubstitutions.takeError());
+        // Remember which module wasn't loaded so Sema can point the user at
+        // the import to add when the resulting requirement failure surfaces.
+        if (errorInfo->isA<XRefNonLoadedModuleError>()) {
+          auto *modErr = static_cast<XRefNonLoadedModuleError *>(errorInfo.get());
+          if (auto *nominal = conformance->getType()->getAnyNominal())
+            getContext().recordUnloadedModuleForConformingType(
+                nominal, modErr->getName().getBaseIdentifier());
+        }
+        diagnoseAndConsumeError(std::move(errorInfo));
         isOpaque = true;
       }
       else
