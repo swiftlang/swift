@@ -1452,6 +1452,18 @@ public:
   std::vector<MissingWitness>
   takeDelayedMissingWitnesses(NormalProtocolConformance *conformance);
 
+  /// Record that a witness of a conformance of \p nominal could not be fully
+  /// deserialized because \p moduleName was never loaded. Used to add an
+  /// actionable note ("add 'import <module>'") to the later requirement-failure
+  /// diagnostic at the use site.
+  void recordUnloadedModuleForConformingType(const NominalTypeDecl *nominal,
+                                              Identifier moduleName);
+
+  /// Retrieve the modules that were not loaded while deserializing conformances
+  /// of \p nominal, or an empty list if there were none.
+  ArrayRef<Identifier>
+  getUnloadedModulesForConformingType(const NominalTypeDecl *nominal) const;
+
   /// Produce a specialized conformance, which takes a generic
   /// conformance and substitutions written in terms of the generic
   /// conformance's signature.
