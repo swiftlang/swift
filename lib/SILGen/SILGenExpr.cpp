@@ -38,6 +38,7 @@
 #include "swift/AST/ExtInfo.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/TypeWalker.h"
 #include "swift/AST/InFlightSubstitution.h"
 #include "swift/AST/KnownProtocols.h"
 #include "swift/AST/ParameterList.h"
@@ -1793,6 +1794,78 @@ public:
 };
 } // namespace
 
+static void computeConversionClosureCaptures(ClosureExpr *closure) {
+  ASTContext &ctx = closure->getASTContext();
+
+  bool hasGenericParamCaptures = false;
+  llvm::SetVector<GenericEnvironment *> capturedEnvironments;
+  SmallVector<CapturedType, 4> capturedTypes;
+  llvm::SmallDenseMap<CanType, unsigned, 4> capturedTypeEntryNumber;
+
+  auto recordUseOfGenericType = [&](Type type) {
+    hasGenericParamCaptures = true;
+
+    auto [insertionPos, inserted] = capturedTypeEntryNumber.insert(
+        {type->getCanonicalType(), capturedTypes.size()});
+    if (inserted) {
+      capturedTypes.push_back(CapturedType(type, SourceLoc()));
+    }
+  };
+
+  class TypeCaptureWalker : public TypeWalker {
+    llvm::SetVector<GenericEnvironment *> &CapturedEnvironments;
+    std::function<void(Type)> RecordUseOfGenericType;
+
+  public:
+    TypeCaptureWalker(
+        llvm::SetVector<GenericEnvironment *> &capturedEnvironments,
+        std::function<void(Type)> recordUseOfGenericType)
+        : CapturedEnvironments(capturedEnvironments),
+          RecordUseOfGenericType(std::move(recordUseOfGenericType)) {}
+
+    Action walkToTypePre(Type t) override {
+      if (auto *element = t->getAs<ElementArchetypeType>()) {
+        auto *env = element->getGenericEnvironment();
+        CapturedEnvironments.insert(env);
+      } else if (auto *openedExistential =
+                     t->getAs<ExistentialArchetypeType>()) {
+        auto *env = openedExistential->getGenericEnvironment();
+        CapturedEnvironments.insert(env);
+        RecordUseOfGenericType(t);
+      } else if (t->is<PrimaryArchetypeType>() ||
+                 t->is<PackArchetypeType>() ||
+                 t->is<GenericTypeParamType>()) {
+        RecordUseOfGenericType(t);
+      }
+      return Action::Continue;
+    }
+  };
+
+  auto checkType = [&](Type type) {
+    if (!type)
+      return;
+
+    type = type->getCanonicalType();
+
+    if (type->hasArchetype() || type->hasTypeParameter()) {
+      TypeCaptureWalker walker(capturedEnvironments, recordUseOfGenericType);
+      type.walk(walker);
+    }
+  };
+
+  auto fnType = closure->getType()->castTo<FunctionType>();
+  for (const auto &param : fnType->getParams())
+    checkType(param.getPlainType());
+  checkType(fnType->getResult());
+
+  closure->setCaptureInfo(CaptureInfo(ctx, /*captures=*/{},
+                                      /*dynamicSelf=*/nullptr,
+                                      /*opaqueValue=*/nullptr,
+                                      hasGenericParamCaptures,
+                                      capturedEnvironments.getArrayRef(),
+                                      capturedTypes));
+}
+
 ClosureExpr *RValueEmitter::synthesizeConversionClosure(
     CollectionUpcastConversionExpr::ConversionPair pair) {
   ASTContext &Context = SGF.getASTContext();
@@ -1841,11 +1914,11 @@ ClosureExpr *RValueEmitter::synthesizeConversionClosure(
   auto *fnTy = FunctionType::get(ArrayRef(closureParam), pair.Conversion->getType(), extInfo);
   closure->setType(fnTy);
 
-  closure->setCaptureInfo(CaptureInfo::empty());
-
   auto discriminator = Context.getNextDiscriminator(declContext);
   closure->setDiscriminator(discriminator++);
   Context.setMaxAssignedDiscriminator(declContext, discriminator);
+
+  computeConversionClosureCaptures(closure);
 
   return closure;
 }
