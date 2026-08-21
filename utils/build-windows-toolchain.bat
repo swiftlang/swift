@@ -24,6 +24,7 @@ echo set SKIP_UPDATE_CHECKOUT=%SKIP_UPDATE_CHECKOUT%>> %TEMP%\call-build.cmd
 echo set REPO_SCHEME=%REPO_SCHEME%>> %TEMP%\call-build.cmd
 echo set WINDOWS_SDKS=%WINDOWS_SDKS%>> %TEMP%\call-build.cmd
 echo set HOST_ARCH_NAME=%HOST_ARCH_NAME%>> %TEMP%\call-build.cmd
+echo set SMOKE_TEST=%SMOKE_TEST%>> %TEMP%\call-build.cmd
 echo "%~f0">> %TEMP%\call-build.cmd
 start /i /b /wait cmd.exe /env=default /c "%TEMP%\call-build.cmd"
 set ec=%errorlevel%
@@ -91,6 +92,16 @@ if not "%DEBUG_INFO%"=="" set "DebugInfoArg=-DebugInfo"
 
 call :CloneRepositories || (exit /b 1)
 
+if not "%SMOKE_TEST%"=="" if "%INCLUDE_PACKAGING%"=="" (
+  echo SMOKE_TEST needs INCLUDE_PACKAGING
+  exit /b 1
+)
+
+if not "%SMOKE_TEST%"=="" if not exist "%SourceRoot%\swift-docker" (
+  echo SMOKE_TEST needs a swift-docker checkout at %SourceRoot%\swift-docker
+  exit /b 1
+)
+
 :: We only have write access to BuildRoot, so use that as the image root.
 powershell.exe -ExecutionPolicy RemoteSigned -File %~dp0build.ps1 ^
   %HostArchNameArg% ^
@@ -103,6 +114,12 @@ powershell.exe -ExecutionPolicy RemoteSigned -File %~dp0build.ps1 ^
   -IncludeSBoM ^
   %DebugInfoArg% ^
   -Summary || (exit /b 1)
+
+if not "%SMOKE_TEST%"=="" (
+  powershell.exe -ExecutionPolicy RemoteSigned -File %~dp0windows-smoke-tests\RunSmokeTest.ps1 ^
+    -Installer "%PackageRoot%\installer.exe" ^
+    -SourceCache "%SourceRoot%" || (exit /b 1)
+)
 
 :: Publish PDBs into a Microsoft-compatible symbol store and zip it so that
 :: CI can upload the archive to the Swift debug-symbols server.
