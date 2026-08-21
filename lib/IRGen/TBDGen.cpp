@@ -533,6 +533,13 @@ void TBDGenVisitor::addProtocolWitnessThunk(RootProtocolConformance *C,
   }
 }
 
+void TBDGenVisitor::addCOMMethodWitnessThunk(
+    RootProtocolConformance *C, ValueDecl *requirementDecl) {
+  Mangle::ASTMangler Mangler(requirementDecl->getASTContext());
+  auto name = Mangler.mangleCOMMethodWitnessThunk(C, requirementDecl);
+  addSymbol(name, SymbolSource::forUnknown(), SymbolFlags::Text);
+}
+
 void TBDGenVisitor::addFirstFileSymbols() {
   // Embedded Swift does not use force-load symbols.
   if (SwiftModule->getASTContext().LangOpts.hasFeature(Feature::Embedded))
