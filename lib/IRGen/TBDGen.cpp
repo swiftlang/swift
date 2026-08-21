@@ -522,6 +522,13 @@ void TBDGenVisitor::addProtocolWitnessThunk(RootProtocolConformance *C,
   }
 }
 
+void TBDGenVisitor::addCOMMethodWitnessThunk(
+    RootProtocolConformance *C, ValueDecl *requirementDecl) {
+  Mangle::ASTMangler Mangler(requirementDecl->getASTContext());
+  auto name = Mangler.mangleCOMMethodWitnessThunk(C, requirementDecl);
+  addSymbol(name, SymbolSource::forUnknown(), SymbolFlags::Text);
+}
+
 void TBDGenVisitor::addFirstFileSymbols() {
   if (!Opts.ModuleLinkName.empty()) {
     // FIXME: We ought to have a symbol source for this.
