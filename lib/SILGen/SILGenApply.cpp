@@ -6919,7 +6919,7 @@ ManagedValue SILGenFunction::emitInjectEnum(SILLocation loc,
   // Easy case -- no payload
   if (!element->hasAssociatedValues()) {
     assert(payloads.empty());
-    if (enumTy.isLoadable(F) || !silConv.useLoweredAddresses()) {
+    if (enumTy.isLoadableOrOpaque(F)) {
       return emitManagedRValueWithCleanup(
           B.createEnum(loc, SILValue(), element, enumTy.getObjectType()));
     }
@@ -6971,7 +6971,7 @@ ManagedValue SILGenFunction::emitInjectEnum(SILLocation loc,
   }
 
   // Loadable with payload
-  if (enumTy.isLoadable(F) || !silConv.useLoweredAddresses()) {
+  if (enumTy.isLoadableOrOpaque(F)) {
     ManagedValue payloadMV;
     if (boxMV) {
       payloadMV = boxMV;
@@ -7764,7 +7764,7 @@ static void collectFakeIndexParameters(SILGenFunction &SGF,
   // Use conventions that will produce a +1 value.
   auto &tl = SGF.getTypeLowering(substType);
   ParameterConvention convention;
-  if (tl.isAddressOnly()) {
+  if (tl.getRecursiveProperties().isAddressOnly()) {
     convention = ParameterConvention::Indirect_In;
   } else if (tl.isTrivial()) {
     convention = ParameterConvention::Direct_Unowned;

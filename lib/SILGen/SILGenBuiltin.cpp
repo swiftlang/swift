@@ -2304,7 +2304,7 @@ static ManagedValue emitBorrowObject(
   ArgumentSource &&arg) {
 
   // Loadable referent (therefore loadable borrow).
-  assert(loweredBorrowTy.isLoadable(SGF.F)
+  assert(loweredBorrowTy.isLoadableOrOpaque(SGF.F)
          && "borrow must be loadable if referent is");
 
   auto referent = std::move(arg).getAsSingleValue(

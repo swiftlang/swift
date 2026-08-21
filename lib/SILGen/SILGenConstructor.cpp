@@ -907,7 +907,7 @@ void SILGenFunction::emitEnumConstructor(EnumElementDecl *element) {
 
   // Emit the indirect return slot.
   InitializationPtr dest;
-  if (enumTI.isAddressOnly() && silConv.useLoweredAddresses()) {
+  if (!enumTI.isLoadableOrOpaque(F)) {
     auto &AC = getASTContext();
     auto VD = new (AC) ParamDecl(SourceLoc(), SourceLoc(),
                                  AC.getIdentifier("$return_value"),
@@ -965,7 +965,7 @@ void SILGenFunction::emitEnumConstructor(EnumElementDecl *element) {
     scope.pop();
     B.createReturn(ReturnLoc, emitEmptyTuple(CleanupLocation(Loc)));
   } else {
-    assert(enumTI.isLoadable() || !silConv.useLoweredAddresses());
+    assert(enumTI.isLoadableOrOpaque(F));
     SILValue result = mv.ensurePlusOne(*this, ReturnLoc).forward(*this);
     scope.pop();
     B.createReturn(ReturnLoc, result);
