@@ -45,24 +45,6 @@ namespace swift {
 
 class SILInstruction;
 
-/// Deletes all of the debug instructions that use \p value.
-inline void deleteAllDebugUses(SILValue value) {
-  for (auto ui = value->use_begin(), ue = value->use_end(); ui != ue;) {
-    auto *inst = ui->getUser();
-    ++ui;
-    if (inst->isDebugInstruction()) {
-      inst->eraseFromParent();
-    }
-  }
-}
-
-/// Deletes all of the debug uses of any result of \p inst.
-inline void deleteAllDebugUses(SILInstruction *inst) {
-  for (SILValue v : inst->getResults()) {
-    deleteAllDebugUses(v);
-  }
-}
-
 /// Drops all of the debug uses of \p value.
 /// Unlike deleteAllDebugUses, this preserves the debug_value instruction
 /// but replaces its operand with undef and strips non-fragment DIExpr parts.

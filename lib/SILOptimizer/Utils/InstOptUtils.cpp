@@ -2410,6 +2410,46 @@ void swift::salvageLoadDebugInfo(LoadOperation load) {
   }
 }
 
+static void deleteAllDebugUsesWithoutSalvaging(SILValue value,
+                                               InstModCallbacks &callbacks) {
+  for (auto ui = value->use_begin(), ue = value->use_end(); ui != ue;) {
+    auto *inst = ui->getUser();
+    ++ui;
+    if (inst->isDebugInstruction()) {
+      callbacks.deleteInst(inst);
+    }
+  }
+}
+
+static void deleteAllDebugUsesWithoutSalvaging(SILValue value) {
+  for (auto ui = value->use_begin(), ue = value->use_end(); ui != ue;) {
+    auto *inst = ui->getUser();
+    ++ui;
+    if (inst->isDebugInstruction()) {
+      inst->eraseFromParent();
+    }
+  }
+}
+
+void swift::deleteAllDebugUses(SILInstruction *inst,
+                               InstModCallbacks &callbacks,
+                               bool salvage) {
+  if (salvage)
+    salvageDebugInfo(inst);
+  for (SILValue v : inst->getResults()) {
+    deleteAllDebugUsesWithoutSalvaging(v, callbacks);
+  }
+}
+
+void swift::deleteAllDebugUses(SILInstruction *inst, bool salvage) {
+  if (salvage)
+    salvageDebugInfo(inst);
+  for (SILValue v : inst->getResults()) {
+    deleteAllDebugUsesWithoutSalvaging(v);
+  }
+}
+
+
 IntegerLiteralInst *swift::optimizeBuiltinCanBeObjCClass(BuiltinInst *bi,
                                                          SILBuilder &builder) {
   assert(bi->getBuiltinInfo().ID == BuiltinValueKind::CanBeObjCClass);

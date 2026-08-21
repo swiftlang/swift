@@ -599,10 +599,15 @@ bb0(%0 : @owned $NativeObjectPair):
 }
 
 // Just make sure that we do not crash on this. We should be able to eliminate
-// everything here.
+// everything here. The debug_value gets salvaged.
 //
 // CHECK-LABEL: sil [ossa] @copy_value_with_debug_user : $@convention(thin) (@guaranteed NativeObjectPair) -> () {
-// CHECK: bb0
+// CHECK: bb0([[ARG:%.*]] : @guaranteed $NativeObjectPair):
+// CHECK-NEXT:  debug_value [[ARG]] : $NativeObjectPair, let, name "myField", transform {
+// CHECK:       bb0(%0 : $NativeObjectPair):
+// CHECK-NEXT:    %1 = struct_extract %0 : $NativeObjectPair, #NativeObjectPair.obj1
+// CHECK-NEXT:    return %1 : $Builtin.NativeObject
+// CHECK-NEXT:  }
 // CHECK-NEXT:  tuple
 // CHECK-NEXT:  return
 // CHECK-NEXT: } // end sil function 'copy_value_with_debug_user'

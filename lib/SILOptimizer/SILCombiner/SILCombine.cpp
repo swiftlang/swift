@@ -238,8 +238,8 @@ bool SILCombiner::trySinkOwnedForwardingInst(SingleValueInstruction *svi) {
 
     LLVM_DEBUG(llvm::dbgs() << "Sink forwarding: " << *svi << '\n');
 
-    // Otherwise, delete all of the debug uses so we don't have to sink them as
-    // well and then return true so we process svi in its new position.
+    // Otherwise, salvage all of the debug uses so we don't have to sink them
+    // as well and then return true so we process svi in its new position.
     deleteAllDebugUses(svi, getInstModCallbacks());
     svi->moveBefore(consumingUser);
     MadeChange = true;
@@ -255,6 +255,9 @@ bool SILCombiner::trySinkOwnedForwardingInst(SingleValueInstruction *svi) {
   if (llvm::any_of(getNonDebugUses(svi),
                    [](Operand *use) { return !use->isLifetimeEnding(); }))
     return false;
+
+  // Salvage svi before sinking it.
+  salvageDebugInfo(svi);
 
   while (!svi->use_empty()) {
     auto *sviUse = *svi->use_begin();

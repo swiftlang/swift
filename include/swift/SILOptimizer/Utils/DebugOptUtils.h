@@ -24,24 +24,19 @@
 
 namespace swift {
 
-/// Deletes all of the debug instructions that use \p value.
-inline void deleteAllDebugUses(SILValue value, InstModCallbacks &callbacks) {
-  for (auto ui = value->use_begin(), ue = value->use_end(); ui != ue;) {
-    auto *inst = ui->getUser();
-    ++ui;
-    if (inst->isDebugInstruction()) {
-      callbacks.deleteInst(inst);
-    }
-  }
-}
 
-/// Deletes all of the debug uses of any result of \p inst.
-inline void deleteAllDebugUses(SILInstruction *inst,
-                               InstModCallbacks &callbacks) {
-  for (SILValue v : inst->getResults()) {
-    deleteAllDebugUses(v, callbacks);
-  }
-}
+/// Salvages the debug uses of any result of \p inst, then deletes whatever
+/// could not be salvaged.
+///
+/// Pass \p salvage as false when the instruction already has been salvaged.
+void deleteAllDebugUses(SILInstruction *inst, InstModCallbacks &callbacks,
+                        bool salvage = true);
+
+/// Salvages the debug uses of any result of \p inst, then deletes whatever
+/// could not be salvaged. Does not use callbacks.
+///
+/// Pass \p salvage as false when the instruction already has been salvaged.
+void deleteAllDebugUses(SILInstruction *inst, bool salvage = true);
 
 /// Transfer debug info associated with (the result of) \p I to a
 /// new `debug_value` instruction before \p I is deleted.
