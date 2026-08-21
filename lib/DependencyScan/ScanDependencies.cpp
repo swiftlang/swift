@@ -1544,12 +1544,7 @@ bool swift::dependencies::scanDependencies(CompilerInstance &CI) {
                         dependencies))
     return true;
 
-  // This process succeeds regardless of whether any errors occurred.
-  // FIXME: We shouldn't need this, but it's masking bugs in our scanning
-  // logic where we don't create a fresh context when scanning Swift interfaces
-  // that includes their own command-line flags.
-  ctx.Diags.resetHadAnyError();
-  return false;
+  return ctx.hadError();
 }
 
 bool swift::dependencies::prescanDependencies(CompilerInstance &instance) {

@@ -11,7 +11,7 @@
 // B
 
 // RUN: echo "import A" > %t/B.swift
-// RUN: %target-swift-frontend -module-name B -scan-dependencies -module-cache-path %t/clang-module-cache %t/B.swift -o %t/B-deps.json -swift-version 6 -cache-compile-job -cas-path %t/cas %t/B.swift  -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib -O -I %t
+// RUN: %target-swift-frontend -module-name B -scan-dependencies -module-cache-path %t/clang-module-cache %t/B.swift -o %t/B-deps.json -swift-version 6 -cache-compile-job -cas-path %t/cas -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib -O -I %t
 
 // RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/B-deps.json B> %t/B.cmd
 // RUN: %{python} %S/Inputs/GenerateExplicitModuleMap.py %t/B-deps.json > %t/B-map.json
@@ -26,7 +26,7 @@
 
 // Main
 
-// RUN: %target-swift-frontend -module-name Main -scan-dependencies -module-cache-path %t/clang-module-cache %s -o %t/deps.json -swift-version 6 -cache-compile-job -cas-path %t/cas %s  -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib -O -I %t
+// RUN: %target-swift-frontend -module-name Main -scan-dependencies -module-cache-path %t/clang-module-cache %s -o %t/deps.json -swift-version 6 -cache-compile-job -cas-path %t/cas -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib -O -I %t
 // UN: %validate-json %t/deps.json | %FileCheck %s -DTEMP=%t
 
 // RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json Main> %t/Main.cmd
