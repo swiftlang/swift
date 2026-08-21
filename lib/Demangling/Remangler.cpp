@@ -3030,6 +3030,12 @@ ManglingError Remangler::mangleProtocolWitness(Node *node, unsigned depth) {
   return ManglingError::Success;
 }
 
+ManglingError Remangler::mangleCOMMethodWitness(Node *node, unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNodes(node, depth + 1));
+  Buffer << "TWV";
+  return ManglingError::Success;
+}
+
 ManglingError
 Remangler::mangleProtocolSelfConformanceWitnessTable(Node *node,
                                                      unsigned depth) {

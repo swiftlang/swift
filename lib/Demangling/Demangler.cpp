@@ -3082,7 +3082,9 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
     case 'W': {
       NodePointer Entity = popNode(isEntity);
       NodePointer Conf = popProtocolConformance();
-      return createWithChildren(Node::Kind::ProtocolWitness, Conf, Entity);
+      return createWithChildren(nextIf('V') ? Node::Kind::COMMethodWitness
+                                            : Node::Kind::ProtocolWitness,
+                                Conf, Entity);
     }
     case 'S':
       return createWithChild(Node::Kind::ProtocolSelfConformanceWitness,
