@@ -1047,8 +1047,7 @@ static bool shouldEagerlyImportClangRecordMember(const clang::NamedDecl *decl,
     switch (fn->getDeclName().getNameKind()) {
     case clang::DeclarationName::CXXOperatorName:
     case clang::DeclarationName::CXXConversionFunctionName:
-    case clang::DeclarationName::CXXConstructorName:
-      // Eagerly import operators, conversions, and constructors for now.
+      // Eagerly import operators and conversions for now.
       // Some of these are handled in special ways that require them to
       // be eagerly available, e.g., in VisitCXXRecordDecl() and
       // conformToCxxConvertibleToBoolIfNeeded().
@@ -3096,7 +3095,6 @@ namespace {
 
       // Import each of the members.
       SmallVector<VarDecl *, 4> members;
-      SmallVector<ConstructorDecl *, 4> ctors;
 
       // The name of every member.
       llvm::DenseSet<StringRef> allMemberNames;
@@ -3193,15 +3191,9 @@ namespace {
           continue;
         }
 
-        if (auto CD = dyn_cast<ConstructorDecl>(member)) {
-          ctors.push_back(CD);
-          if (auto *legacyCD =
-                  importer::getDeclForCounterpartCArrayProjection(CD))
-            ctors.push_back(legacyCD);
-          continue;
-        }
-
-        if (isa<FuncDecl>(member))
+        // Constructors (and their C array counterparts, which are recorded as
+        // alternate decls) are looked up lazily; see lookupClangConstructors().
+        if (isa<FuncDecl, ConstructorDecl>(member))
           continue;
 
         if (isa<VarDecl>(member) && isa<clang::CXXMethodDecl>(nd)) {
@@ -3302,7 +3294,10 @@ namespace {
 
             if (isNonEscapable)
               markReturnsUnsafeNonescapable(valueCtor);
-            ctors.push_back(valueCtor);
+
+            // Synthesized initializers only apply to imported structs, not FRTs
+            if (isa<StructDecl>(result))
+              result->addMember(valueCtor);
 
             return valueCtor;
           });
@@ -3371,7 +3366,9 @@ namespace {
               "");
           defaultCtor->addAttribute(attr);
         }
-        ctors.push_back(defaultCtor);
+        // Only structs get Swift-synthesized initializers; see above.
+        if (isa<StructDecl>(result))
+          result->addMember(defaultCtor);
       }
 
       bool forceMemberwiseInitializer = false;
@@ -3435,20 +3432,17 @@ namespace {
           if (isNonEscapable)
             markReturnsUnsafeNonescapable(valueCtor);
 
-          ctors.push_back(valueCtor);
+          // Only structs get Swift-synthesized initializers; see above.
+          if (isa<StructDecl>(result))
+            result->addMember(valueCtor);
+
           return valueCtor;
         });
 
         Impl.applyAvailabilityFloor(valueCtor);
       }
 
-      if (isa<StructDecl>(result)) {
-        for (auto ctor : ctors) {
-          // Add ctors directly as they cannot always be looked up from the
-          // clang decl (some are synthesized by Swift).
-          result->addMember(ctor);
-        }
-      } else {
+      if (!isa<StructDecl>(result)) {
         assert(
             isa<ClassDecl>(result) &&
             "Expected result to be a ClassDecl as it cannot be a StructDecl");
@@ -12078,13 +12072,26 @@ void ClangRecordMemberLoader::load(const clang::RecordDecl *clangRecord,
     if (isa<AccessorDecl>(member))
       continue;
 
-    // FIXME: subscripts and constructors are imported and added eagerly
-    //        (though they shouldn't be and won't be in the near future).
-    // Skip adding these here to avoid double-adding the same member.
-    if (isa<SubscriptDecl, ConstructorDecl>(member)) {
+    // FIXME: subscripts are imported and added eagerly (though they shouldn't
+    //        be and won't be in the near future). Skip adding those here to
+    //        avoid double-adding the same member.
+    if (isa<SubscriptDecl>(member)) {
       const auto &LangOpts = Impl.SwiftContext.LangOpts;
       if (auto *nd = dyn_cast_or_null<clang::NamedDecl>(member->getClangDecl());
           nd && shouldEagerlyImportClangRecordMember(nd, LangOpts))
+        continue;
+    }
+
+    // An FRT's C++ constructors are not directly imported as initializers.
+    // (Instead we synthesize static factories that call these constructors and
+    // import those factories as initializers.)
+    if (isa<ConstructorDecl>(member) && isa<ClassDecl>(swiftDecl)) {
+      // getAsFunction() looks through the FunctionTemplateDecl of a constructor
+      // template, which is what the imported decl carries as its Clang node.
+      const clang::FunctionDecl *fn = nullptr;
+      if (auto *clangDecl = member->getClangDecl())
+        fn = clangDecl->getAsFunction();
+      if (isa_and_nonnull<clang::CXXConstructorDecl>(fn))
         continue;
     }
 
