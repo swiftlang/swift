@@ -1,12 +1,6 @@
 // RUN: %target-typecheck-verify-swift \
 // RUN:   -cxx-interoperability-mode=default \
 // RUN:   -I %S/Inputs
-// RUN: %target-typecheck-verify-swift \
-// RUN:   -cxx-interoperability-mode=default \
-// RUN:   -enable-experimental-feature ImportCxxMembersLazily \
-// RUN:   -I %S/Inputs
-//
-// REQUIRES: swift_feature_ImportCxxMembersLazily
 
 import FunctionTemplateParameterPack
 
