@@ -336,6 +336,80 @@ void importer::forEachCXXNamespaceMember(
   }
 }
 
+/// Look up the initializers of \a recordDecl, i.e., the members that are
+/// imported under the base name 'init', including constructors of value types
+/// and static factory functions of foreign reference types.
+///
+/// Note that this lookup does not need to look at \a recordDecl's bases because
+/// constructors are not implicitly inherited. Inherited static factories
+/// functions are not supported.
+static TinyPtrVector<ValueDecl *>
+lookupClangConstructors(ClangImporter::Implementation &Impl,
+                        NominalTypeDecl *recordDecl, bool skipIfNonPublic) {
+  TinyPtrVector<ValueDecl *> result;
+  CollectLookupResults collector(DeclBaseName::createConstructor(), result,
+                                 Impl);
+
+  auto *cxxRecordDecl =
+      dyn_cast<clang::CXXRecordDecl>(recordDecl->getClangDecl());
+  if (!cxxRecordDecl)
+    // C records don't have constructors; Swift initializers are synthesized and
+    // added eagerly
+    return result;
+
+  cxxRecordDecl = cxxRecordDecl->getDefinition();
+  if (!cxxRecordDecl)
+    return result;
+
+  bool isForeignReference = isa<ClassDecl>(recordDecl);
+
+  for (const auto *member : cxxRecordDecl->decls()) {
+    if (member->getDeclContext() != cxxRecordDecl)
+      // e.g., friend decls
+      continue;
+
+    const auto *asWritten = member;
+    if (const auto *ftd = dyn_cast<clang::FunctionTemplateDecl>(member))
+      // Look through member function template at the underlying function decl
+      asWritten = ftd->getTemplatedDecl();
+
+    // Only a member function can be imported as an initializer: either a C++
+    // constructor or a static member function renamed to 'init(...)'
+    const auto *method = dyn_cast<clang::CXXMethodDecl>(asWritten);
+    if (!method)
+      continue;
+
+    if (auto *ctor = dyn_cast<clang::CXXConstructorDecl>(method)) {
+      if (isForeignReference)
+        // FRTs are never constructed by value so we don't import its C++
+        // constructors directly
+        continue;
+      if (ctor->isCopyOrMoveConstructor())
+        // Copy and move constructors are reflected in the value witness table
+        // rather than imported as initializers
+        continue;
+    } else if (!method->isStatic()) {
+      continue;
+    }
+
+    // Check that this member really is imported as an initializer
+    auto importedName = Impl.importFullName(method, Impl.CurrentVersion);
+    if (!importedName.getDeclName().getBaseName().isConstructor())
+      continue;
+
+    auto nonPublic = method->getAccess() == clang::AS_private ||
+                     method->getAccess() == clang::AS_protected;
+    if (skipIfNonPublic && nonPublic)
+      continue;
+
+    if (auto *imported = cast_or_null<ValueDecl>(Impl.importDecl(
+            cast<clang::NamedDecl>(member), Impl.CurrentVersion)))
+      collector.add(imported);
+  }
+
+  return result;
+}
+
 TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
     Evaluator &evaluator, ClangRecordMemberLookupDescriptor desc) const {
   NominalTypeDecl *recordDecl = desc.recordDecl;
@@ -356,6 +430,11 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
   auto skipIfNonPublic =
       !ctx.LangOpts.hasFeature(Feature::ImportNonPublicCxxMembers) &&
       cxxRecordDecl && importer::getPrivateFileIDAttrs(cxxRecordDecl).empty();
+
+  if (name.getBaseName().isConstructor()) {
+    ASSERT(!inheritance && "constructor lookup should not be inherited");
+    return lookupClangConstructors(Importer.Impl, recordDecl, skipIfNonPublic);
+  }
 
   auto directResults =
       directRecordMemberLookup(Importer, clangRecordDecl, name, ctx.Stats);
