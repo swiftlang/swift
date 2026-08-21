@@ -61,8 +61,8 @@ func unsafePointerConversionAvailability(
   _ = UnsafeMutablePointer<Int>(umpi)
   _ = UnsafeMutablePointer<Int>(oumpi)
 
-  _ = UnsafeMutablePointer<Void>(rp)  // expected-error {{cannot convert value of type 'UnsafeRawPointer' to expected argument type 'UnsafeMutablePointer<Void>'}} expected-warning {{UnsafeMutablePointer<Void> has been replaced by UnsafeMutableRawPointer}}
-  _ = UnsafeMutablePointer<Void>(mrp) // expected-error {{cannot convert value of type 'UnsafeMutableRawPointer' to expected argument type 'UnsafeMutablePointer<Void>'}} expected-warning {{UnsafeMutablePointer<Void> has been replaced by UnsafeMutableRawPointer}}
+  _ = UnsafeMutablePointer<Void>(rp)  // expected-error {{cannot convert argument of type 'UnsafeRawPointer' to expected argument type 'UnsafeMutablePointer<Void>'}} expected-warning {{UnsafeMutablePointer<Void> has been replaced by UnsafeMutableRawPointer}}
+  _ = UnsafeMutablePointer<Void>(mrp) // expected-error {{cannot convert value of type 'UnsafeMutableRawPointer' to expected argument type 'UnsafeMutablePointer<Void>' because initializer 'init(_:)' was not imported from C header}} expected-warning {{UnsafeMutablePointer<Void> has been replaced by UnsafeMutableRawPointer}}
   _ = UnsafeMutablePointer<Void>(umpv) // expected-warning {{UnsafeMutablePointer<Void> has been replaced by UnsafeMutableRawPointer}}
   _ = UnsafeMutablePointer<Void>(umpi) // expected-warning {{UnsafeMutablePointer<Void> has been replaced by UnsafeMutableRawPointer}}
   _ = UnsafeMutablePointer<Void>(umps) // expected-warning {{UnsafeMutablePointer<Void> has been replaced by UnsafeMutableRawPointer}}
@@ -76,8 +76,8 @@ func unsafePointerConversionAvailability(
   _ = UnsafePointer<Void>(umps) // expected-warning {{UnsafePointer<Void> has been replaced by UnsafeRawPointer}}
   _ = UnsafePointer<Void>(ups) // expected-warning {{UnsafePointer<Void> has been replaced by UnsafeRawPointer}}
 
-  _ = UnsafeMutablePointer<Int>(rp) // expected-error {{cannot convert value of type 'UnsafeRawPointer' to expected argument type 'UnsafeMutablePointer<Int>'}}
-  _ = UnsafeMutablePointer<Int>(mrp) // expected-error {{cannot convert value of type 'UnsafeMutableRawPointer' to expected argument type 'UnsafeMutablePointer<Int>'}}
+  _ = UnsafeMutablePointer<Int>(rp) // expected-error {{cannot convert argument of type 'UnsafeRawPointer' to expected argument type 'UnsafeMutablePointer<Int>'}}
+  _ = UnsafeMutablePointer<Int>(mrp) // expected-error {{cannot convert argument of type 'UnsafeMutableRawPointer' to expected argument type 'UnsafeMutablePointer<Int>'}}
   // This is ambiguous because we have failable and non-failable initializers that accept the same argument type.
   _ = UnsafeMutablePointer<Int>(orp) // expected-error {{no exact matches in call to initializer}}
   // Two candidates here: OpaquePointer? and UnsafeMutablePointer<Int>?
