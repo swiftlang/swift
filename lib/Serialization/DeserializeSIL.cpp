@@ -4991,16 +4991,20 @@ void SILDeserializer::readWitnessTableEntries(
       });
     } else if (kind == SIL_WITNESS_METHOD_ENTRY) {
       ArrayRef<uint64_t> ListOfValues;
-      DeclID NameID;
-      WitnessMethodEntryLayout::readRecord(scratch, NameID, ListOfValues);
+      DeclID NameID, COMNameID;
+      WitnessMethodEntryLayout::readRecord(scratch, NameID, COMNameID,
+                                           ListOfValues);
       SILFunction *Func = nullptr;
       if (NameID != 0) {
         Func = getFuncForReference(MF->getIdentifierText(NameID));
       }
-      if (Func || NameID == 0) {
+      SILFunction *COMFunc = nullptr;
+      if (COMNameID != 0)
+        COMFunc = getFuncForReference(MF->getIdentifierText(COMNameID));
+      if ((Func || NameID == 0) && (COMFunc || COMNameID == 0)) {
         unsigned NextValueIndex = 0;
         witnessEntries.push_back(SILWitnessTable::MethodWitness{
-          getSILDeclRef(MF, ListOfValues, NextValueIndex), Func
+          getSILDeclRef(MF, ListOfValues, NextValueIndex), Func, COMFunc
         });
       }
     } else {

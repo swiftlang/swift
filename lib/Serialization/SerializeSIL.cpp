@@ -3771,10 +3771,19 @@ void SILSerializer::writeSILWitnessTableEntry(
     addReferencedSILFunction(witness, true);
     witnessID = S.addUniquedStringRef(witness->getName());
   }
+  IdentifierID interfaceID = 0;
+  SILFunction *interface = methodWitness.InterfaceEntry;
+  if (interface &&
+      interface->hasValidLinkageForFragileRef(IsSerialized)) {
+    addReferencedSILFunction(interface, true);
+    interfaceID = S.addUniquedStringRef(interface->getName());
+  }
   WitnessMethodEntryLayout::emitRecord(Out, ScratchRecord,
       SILAbbrCodes[WitnessMethodEntryLayout::Code],
       // SILFunction name
       witnessID,
+      // Native COM entry name
+      interfaceID,
       ListOfValues);
 }
 
@@ -4020,7 +4029,8 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
 
   // Write out fragile WitnessTables.
   for (const SILWitnessTable &wt : SILMod->getWitnessTables()) {
-    if ((Options.SerializeAllSIL || wt.isAnySerialized()) &&
+    if ((Options.SerializeAllSIL || wt.isAnySerialized() ||
+         wt.hasOpenInterfaceEntries()) &&
         SILMod->shouldSerializeEntitiesAssociatedWithDeclContext(
                                          wt.getConformance()->getDeclContext()))
       writeSILWitnessTable(wt);
