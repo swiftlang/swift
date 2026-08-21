@@ -1785,6 +1785,50 @@ public:
     if (!subExpr) return E;
     return new (Context) BridgeFromObjCExpr(subExpr, E->getType());
   }
+  
+  Expr *visitOptionalEvaluationExpr(OptionalEvaluationExpr *E) {
+    Expr* subExpr = visit(E->getSubExpr());
+    if (!subExpr) return E;
+    return new (Context) OptionalEvaluationExpr(subExpr, E->getType());
+  }
+  
+  Expr *visitTupleExpr(TupleExpr *E) {
+    SmallVector<Expr *, 4> elements;
+    bool changed = false;
+    for (unsigned i = 0, n = E->getNumElements(); i != n; ++i) {
+      Expr *elem = visit(E->getElement(i));
+      if (elem) {
+        changed = true;
+      } else {
+        elem = E->getElement(i);
+      }
+      elements.push_back(elem);
+    }
+    if (!changed) return E;
+    return TupleExpr::create(Context, E->getLParenLoc(), elements,
+                             E->getElementNames(),
+                             E->getElementNameLocs(),
+                             E->getRParenLoc(), E->isImplicit(),
+                             E->getType());
+  }
+
+  Expr *visitBindOptionalExpr(BindOptionalExpr *E) {
+    Expr *subExpr = visit(E->getSubExpr());
+    if (!subExpr) return E;
+    return new (Context) BindOptionalExpr(subExpr, E->getQuestionLoc(),
+                                          E->getDepth(), E->getType());
+  }
+
+  Expr *visitDestructureTupleExpr(DestructureTupleExpr *E) {
+    Expr *srcExpr = visit(E->getSubExpr());
+    Expr *dstExpr = visit(E->getResultExpr());
+    if (!srcExpr && !dstExpr) return E;
+    return DestructureTupleExpr::create(Context,
+      E->getDestructuredElements(),
+      srcExpr ? srcExpr : E->getSubExpr(),
+      dstExpr ? dstExpr : E->getResultExpr(),
+      E->getType());
+  }
 
   Expr *visitExpr(Expr *E) {
     E->dump(llvm::errs());
